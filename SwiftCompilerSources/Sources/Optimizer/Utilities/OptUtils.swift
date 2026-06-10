@@ -71,18 +71,18 @@ extension Value {
       }
       switch v {
       case let fw as ForwardingInstruction:
-        worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+        worklist.pushIfNotVisited(contentsOf: fw.definedOperands.values)
+      case let ot as OwnershipTransitionInstruction where !(ot is CopyingInstruction):
+        worklist.pushIfNotVisited(ot.operand.value)
       case let bf as BorrowedFromInst:
         worklist.pushIfNotVisited(bf.borrowedValue)
-      case let bb as BeginBorrowInst:
-        worklist.pushIfNotVisited(bb.borrowedValue)
       case let arg as Argument:
         if let phi = Phi(arg) {
           worklist.pushIfNotVisited(contentsOf: phi.incomingValues)
         } else if let termResult = TerminatorResult(arg),
                let fw = termResult.terminator as? ForwardingInstruction
         {
-          worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+          worklist.pushIfNotVisited(contentsOf: fw.definedOperands.values)
         }
       default:
         continue
@@ -241,6 +241,48 @@ extension FullApplySite {
   }
 }
 
+extension ApplySite {
+  func replace(withCallTo callee: Function, arguments newArguments: [Value], _ context: some MutatingContext) {
+    let builder = Builder(before: self, context)
+    let calleeRef = builder.createFunctionRef(callee)
+
+    switch self {
+    case let applyInst as ApplyInst:
+      let newApply = builder.createApply(function: calleeRef,
+                                         applyInst.substitutionMap,
+                                         arguments: newArguments,
+                                         isNonThrowing: applyInst.isNonThrowing)
+      applyInst.replace(with: newApply, context)
+
+    case let partialAp as PartialApplyInst:
+      let newApply = builder.createPartialApply(function: calleeRef,
+                                                substitutionMap: partialAp.substitutionMap,
+                                                capturedArguments: newArguments,
+                                                calleeConvention: partialAp.calleeConvention,
+                                                hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
+                                                isOnStack: partialAp.isOnStack,
+                                                isNested:  partialAp.isNested)
+      partialAp.replace(with: newApply, context)
+
+    case let tryApply as TryApplyInst:
+      builder.createTryApply(function: calleeRef,
+                             tryApply.substitutionMap,
+                             arguments: newArguments,
+                             normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock)
+      context.erase(instruction: tryApply)
+
+    case let beginApply as BeginApplyInst:
+      let newApply = builder.createBeginApply(function: calleeRef,
+                                              beginApply.substitutionMap,
+                                              arguments: newArguments)
+      beginApply.replace(with: newApply, context)
+
+    default:
+      fatalError("unknown apply")
+    }
+  }
+}
+
 extension Builder {
   static func insert(after inst: Instruction, _ context: some MutatingContext, insertFunc: (Builder) -> ()) {
     Builder.insert(after: inst, location: inst.location, context, insertFunc: insertFunc)
@@ -259,6 +301,18 @@ extension Builder {
     } else {
       let builder = Builder(after: inst, location: location, context)
       insertFunc(builder)
+    }
+  }
+
+  static func insertCleanupAtFunctionExits(
+    of function: Function,
+    _ context: some MutatingContext,
+    insert: (Builder) -> ()
+  ) {
+    for exitBlock in function.blocks where exitBlock.terminator.isFunctionExiting {
+      let terminator = exitBlock.terminator
+      let builder = Builder(before: terminator, location: terminator.location.asCleanup, context)
+      insert(builder)
     }
   }
 
@@ -388,6 +442,14 @@ extension Instruction {
       // An extend_lifetime can only be removed if the operand is also removed.
       // If its operand is trivial, it will be removed by MandatorySimplification.
       return false
+    case let dsi as DestructureStructInst:
+      // A dead `destructure_struct` with an owned argument can appear for a non-copyable or
+      // non-escapable struct which has only trivial elements. The instruction is not trivially
+      // dead because it ends the lifetime of its operand.
+      if dsi.struct.ownership == .owned {
+        return false
+      }
+      return true
     default:
       break
     }
@@ -420,7 +482,7 @@ extension Instruction {
       case .USubOver:
         // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
         // This pattern appears in UTF8 String literal construction.
-        if let tei = bi.uses.getSingleUser(ofType: TupleExtractInst.self),
+        if let tei = bi.uses.singleUser(ofType: TupleExtractInst.self),
            tei.isResultOfOffsetSubtract {
           return true
         }
@@ -434,7 +496,7 @@ extension Instruction {
       // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
       // This pattern appears in UTF8 String literal construction.
       if tei.isResultOfOffsetSubtract,
-         let bi = tei.uses.getSingleUser(ofType: BuiltinInst.self),
+         let bi = tei.uses.singleUser(ofType: BuiltinInst.self),
          bi.id == .StringObjectOr {
         return true
       }
@@ -534,6 +596,54 @@ extension Instruction {
     // Eventually we want to replace the SILCombine implementation with this one.
     return nil
   }
+
+  /// Returns true if a destroy of `type` must not be moved across this instruction.
+  func isBarrierForDestroy(of type: Type, _ context: some Context) -> Bool {
+    let instEffects = memoryEffects
+    if instEffects == .noEffects || type.isTrivial(in: parentFunction) {
+      return false
+    }
+    guard type.isMoveOnly else {
+      // Non-trivial copyable types only have to consider deinit-barriers for classes.
+      return isDeinitBarrier(context.calleeAnalysis)
+    }
+
+    // Check side-effects of non-copyable deinits.
+
+    guard let nominal = type.nominal else {
+      return true
+    }
+    if nominal.valueTypeDestructor != nil {
+      guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
+        return true
+      }
+      let destructorEffects = deinitFunc.getSideEffects().memory
+      if instEffects.write || destructorEffects.write {
+        return true
+      }
+    }
+
+    switch nominal {
+    case is StructDecl:
+      guard let fields = type.getNominalFields(in: parentFunction) else {
+        return true
+      }
+      return fields.contains { isBarrierForDestroy(of: $0, context) }
+    case is EnumDecl:
+      guard let enumCases = type.getEnumCases(in: parentFunction) else {
+        return true
+      }
+      return enumCases.contains {
+        if let payload = $0.payload {
+          return isBarrierForDestroy(of: payload, context)
+        }
+        return false
+      }
+    default:
+      return true
+    }
+  }
+
 }
 
 // Match the pattern:
@@ -559,11 +669,28 @@ extension StoreInst {
     let builder = Builder(after: self, context)
     let type = source.type
     if type.isStruct {
-      if (type.nominal as! StructDecl).hasUnreferenceableStorage {
+      let structDecl = type.nominal as! StructDecl
+      if structDecl.hasUnreferenceableStorage {
         return
       }
       if parentFunction.hasOwnership && source.ownership != .none {
-        let destructure = builder.createDestructureStruct(struct: source)
+        let v: Value
+        if structDecl.valueTypeDestructor != nil {
+          if storeOwnership == .assign {
+            // We must not drop the original (implicit) destroy of the `store [assign]`.
+            // Therefore replace the `store [assign]` with a `destroy_addr` - `store [init]` pair
+            // and then split the `store [init]`.
+            builder.createDestroyAddr(address: destination)
+            let initStore = builder.createStore(source: source, destination: destination, ownership: .initialize)
+            context.erase(instruction: self)
+            initStore.trySplit(context)
+            return
+          }
+          v = builder.createDropDeinit(of: source)
+        } else {
+          v = source
+        }
+        let destructure = builder.createDestructureStruct(struct: v)
         for (fieldIdx, fieldValue) in destructure.results.enumerated() {
           let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: fieldIdx)
           builder.createStore(source: fieldValue, destination: destFieldAddr, ownership: splitOwnership(for: fieldValue))
@@ -820,7 +947,7 @@ private struct EscapesToValueVisitor : EscapeVisitor {
     if operand.value == target.value && path.projectionPath.mayOverlap(with: target.path) {
       return .abort
     }
-    if operand.instruction is ReturnInst {
+    if operand.instruction.isReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
@@ -941,6 +1068,23 @@ func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalTy
   }
 }
 
+func isCastSupportedInEmbeddedSwift(from sourceType: Type,
+                                    to destType: Type ) -> Bool {
+  if !sourceType.isExistential {
+    return false
+  }
+  if destType.hasArchetype {
+    return false
+  }
+
+  if !destType.isStruct && !destType.isClass && !destType.isEnum &&
+      !destType.isTuple && !destType.isLoweredFunction {
+    return false
+  }
+
+  return true
+}
+
 extension CheckedCastAddrBranchInst {
   var dynamicCastResult: Bool? {
     switch classifyDynamicCastBridged(bridged) {
@@ -949,6 +1093,18 @@ extension CheckedCastAddrBranchInst {
       case .willFail:    return false
       default: fatalError("unknown result from classifyDynamicCastBridged")
     }
+  }
+
+  var supportedInEmbeddedSwift: Bool {
+    return isCastSupportedInEmbeddedSwift(from: source.type,
+                                          to: destination.type)
+  }
+}
+
+extension UnconditionalCheckedCastAddrInst {
+  var supportedInEmbeddedSwift: Bool {
+    return isCastSupportedInEmbeddedSwift(from: source.type,
+                                          to: destination.type)
   }
 }
 
@@ -1040,9 +1196,6 @@ extension Type {
   /// False if expanding a type is invalid. For example, expanding a
   /// struct-with-deinit drops the deinit.
   func shouldExpand(_ context: some Context) -> Bool {
-    if !context.options.useAggressiveReg2MemForCodeSize {
-      return true
-    }
     return context.bridgedPassContext.shouldExpand(self.bridged)
   }
 }
@@ -1109,6 +1262,10 @@ func cloneFunction(from originalFunction: Function, toEmpty targetFunction: Func
   var cloner = Cloner(cloneToEmptyFunction: targetFunction, context)
   defer { cloner.deinitialize() }
   cloner.cloneFunctionBody(from: originalFunction)
+
+  // Cloning a whole function may clone some `unreachable` instructions but doesn't
+  // introduce any incomplete lifetimes in the cloned function.
+  context.setNeedCompleteLifetimes(to: false)
 }
 
 func cloneAndSpecializeFunction(from originalFunction: Function,
@@ -1120,4 +1277,19 @@ func cloneAndSpecializeFunction(from originalFunction: Function,
                                       substitutions: substitutions, context)
   defer { cloner.deinitialize() }
   cloner.cloneFunctionBody()
+
+  // Cloning a whole function may clone some `unreachable` instructions but doesn't
+  // introduce any incomplete lifetimes in the cloned function.
+  context.setNeedCompleteLifetimes(to: false)
+}
+
+let destroyBarrierTest = FunctionTest("destroy_barrier") { function, arguments, context in
+  let type = arguments.takeValue().type
+  for inst in function.instructions {
+    if inst.isBarrierForDestroy(of: type, context) {
+      print("barrier: \(inst)")
+    } else {
+      print("transparent: \(inst)")
+    }
+  }
 }

@@ -25,6 +25,8 @@
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Parse/Lexer.h"
@@ -225,6 +227,8 @@ private:
         case AvailabilityScope::Reason::GuardStmtFallthrough:
         case AvailabilityScope::Reason::GuardStmtElseBranch:
         case AvailabilityScope::Reason::WhileStmtBody:
+        case AvailabilityScope::Reason::SwitchStmt:
+        case AvailabilityScope::Reason::SwitchStmtCaseBody:
           // Nothing to check here.
           break;
         }
@@ -479,7 +483,7 @@ private:
     if (decl->isSPI())
       return true;
 
-    return !isExported(decl);
+    return isExported(decl) != ExportedLevel::Exported;
   }
 
   /// Returns the source range which should be refined by declaration. This
@@ -670,6 +674,11 @@ private:
       return Action::SkipNode(stmt);
     }
 
+    if (auto *switchStmt = dyn_cast<SwitchStmt>(stmt)) {
+      if (buildSwitchStmtRefinementContext(switchStmt))
+        return Action::SkipNode(stmt);
+    }
+
     return Action::Continue(stmt);
   }
 
@@ -772,6 +781,136 @@ private:
     }
   }
 
+  /// Returns the enum element matched by \p pattern, or null if the pattern
+  /// does not bind to a single enum element. The pattern is expected to have
+  /// already been resolved to an `EnumElementPattern` with a resolved decl
+  /// (which is the state after switch type-checking has run).
+  static const EnumElementDecl *getMatchedEnumElement(const Pattern *pattern) {
+    auto *p = pattern->getSemanticsProvidingPattern();
+    if (auto *eep = dyn_cast<EnumElementPattern>(p))
+      return eep->getElementDecl();
+    return nullptr;
+  }
+
+  /// Builds the children of a switch statement's placeholder availability
+  /// scope. Called during lazy expansion via
+  /// `ExpandChildAvailabilityScopesRequest`. By this point the case label
+  /// items have been type-checked, so we can extract the matched enum
+  /// elements and decide which case bodies need refinement scopes.
+  void expandSwitchStmtRefinementContext(SwitchStmt *switchStmt) {
+    // Note: the subject expression has already been walked in the outer
+    // scope when the placeholder was created, so it isn't walked again here.
+
+    // In a single pass over the cases, compute the set of cases that can be
+    // entered via fallthrough from another case.
+    llvm::DenseSet<CaseStmt *> casesWithFallthroughPredecessor;
+    for (auto *caseStmt : switchStmt->getCases()) {
+      if (!caseStmt->hasFallthroughDest())
+        continue;
+      if (auto *dest = caseStmt->getFallthroughDest().getPtrOrNull())
+        casesWithFallthroughPredecessor.insert(dest);
+    }
+
+    auto enclosingAvailability = getCurrentScope()->getAvailabilityContext();
+    for (auto *caseStmt : switchStmt->getCases()) {
+      // If a fallthrough statement could enter this case body from another
+      // case, matching this case's patterns isn't a precondition for
+      // executing the body. Avoid introducing a refined availability scope
+      // and walk the body directly in the placeholder scope.
+      if (casesWithFallthroughPredecessor.count(caseStmt)) {
+        walkCaseStmtChildren(caseStmt);
+        continue;
+      }
+
+      // Otherwise, compute the case body's effective availability as what's
+      // *common* to the matched enum elements: matching any one of the case
+      // label items is sufficient to enter the body, so we only refine when
+      // every item produces the same availability context.
+      std::optional<AvailabilityContext> bodyAvailability;
+      for (auto &item : caseStmt->getCaseLabelItems()) {
+        auto *element = getMatchedEnumElement(item.getPattern());
+        if (!element) {
+          bodyAvailability = std::nullopt;
+          break;
+        }
+        auto itemAvailability = enclosingAvailability;
+        itemAvailability.constrainWithDecl(element);
+
+        if (!bodyAvailability) {
+          bodyAvailability = itemAvailability;
+        } else if (*bodyAvailability != itemAvailability) {
+          bodyAvailability = std::nullopt;
+          break;
+        }
+      }
+
+      // Only introduce a new scope when the matched-element availability
+      // actually refines what's already in scope.
+      if (bodyAvailability && *bodyAvailability != enclosingAvailability) {
+        auto *caseBodyScope = AvailabilityScope::createForSwitchStmtCaseBody(
+            Context, caseStmt, getCurrentDeclContext(), getCurrentScope(),
+            *bodyAvailability);
+        // Walk the case label items in the outer scope: the patterns and
+        // `where` guards execute before entering the case body.
+        for (auto &item : caseStmt->getMutableCaseLabelItems()) {
+          if (auto *p = item.getPattern())
+            p->walk(*this);
+          if (auto *g = item.getGuardExpr())
+            g->walk(*this);
+        }
+        AvailabilityScopeBuilder(caseBodyScope, Context)
+            .build(caseStmt->getBody());
+        continue;
+      }
+
+      walkCaseStmtChildren(caseStmt);
+    }
+  }
+
+  /// Walks the patterns, where guards, and body of \p caseStmt in the current
+  /// scope.
+  void walkCaseStmtChildren(CaseStmt *caseStmt) {
+    for (auto &item : caseStmt->getMutableCaseLabelItems()) {
+      if (auto *p = item.getPattern())
+        p->walk(*this);
+      if (auto *g = item.getGuardExpr())
+        g->walk(*this);
+    }
+    if (auto *body = caseStmt->getBody())
+      body->walk(*this);
+  }
+
+  /// During the initial scope build, defers all switch-statement scope
+  /// construction by creating a placeholder availability scope that is
+  /// expanded lazily. This is necessary because the case label items haven't
+  /// been type-checked yet when the function body's availability scope is
+  /// built, so we can't yet tell which case bodies need refinement.
+  ///
+  /// Returns true if a placeholder has been created and the caller should
+  /// skip walking the switch's children.
+  bool buildSwitchStmtRefinementContext(SwitchStmt *switchStmt) {
+    // If parse recovery left us without a valid brace range, skip this
+    // statement and let the walker handle its (incomplete) children.
+    if (switchStmt->getLBraceLoc().isInvalid() ||
+        switchStmt->getRBraceLoc().isInvalid())
+      return false;
+
+    // Walk the subject expression in the *outer* scope. The placeholder's
+    // source range only covers the case bodies (between the braces), so the
+    // subject is excluded — that excludes any nested availability scopes
+    // induced by the subject from being added as out-of-range children of
+    // the placeholder.
+    if (auto *subject = switchStmt->getSubjectExpr())
+      subject->walk(*this);
+
+    auto *currentScope = getCurrentScope();
+    auto *placeholderScope = AvailabilityScope::createForSwitchStmt(
+        Context, switchStmt, getCurrentDeclContext(), currentScope,
+        currentScope->getAvailabilityContext());
+    placeholderScope->setNeedsExpansion(true);
+    return true;
+  }
+
   /// Builds the availability scopes for the GuardStmt and pushes
   /// the fallthrough scope onto the scope stack so that subsequent
   /// AST elements in the same scope are analyzed in the context of the
@@ -847,7 +986,7 @@ private:
 
     switch (domain.getKind()) {
     case AvailabilityDomain::Kind::Embedded:
-    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::SwiftLanguageMode:
     case AvailabilityDomain::Kind::PackageDescription:
       // These domains don't support queries.
       llvm::report_fatal_error("unsupported domain");
@@ -869,11 +1008,14 @@ private:
       return AvailabilityQuery::dynamic(variantSpec->getDomain(), primaryRange,
                                         variantRange);
 
+    case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+      return AvailabilityQuery::dynamic(domain, primaryRange, std::nullopt);
+
     case AvailabilityDomain::Kind::Platform:
-      // Platform checks are always dynamic. The SIL optimizer is responsible
-      // eliminating these checks when it can prove that they can never fail
-      // (due to the deployment target). We can't perform that analysis here
-      // because it may depend on inlining.
+      // Platform and Swift runtime checks are always dynamic. The SIL optimizer
+      // is responsible eliminating these checks when it can prove that they can
+      // never fail (due to the deployment target). We can't perform that
+      // analysis here because it may depend on inlining.
       return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
     case AvailabilityDomain::Kind::Custom:
       auto customDomain = domain.getCustomDomain();
@@ -998,6 +1140,7 @@ private:
 
     // Tracks if we're refining for availability or unavailability.
     std::optional<bool> isUnavailability = std::nullopt;
+    bool hasAnyNonAvailabilityCondition = false;
 
     for (StmtConditionElement element : cond) {
       auto *currentScope = getCurrentScope();
@@ -1005,10 +1148,7 @@ private:
 
       // If the element is not a condition, walk it in the current scope.
       if (element.getKind() != StmtConditionElement::CK_Availability) {
-        // Assume any condition element that is not a #available() can
-        // potentially be false, so conservatively make the false flow's
-        // refinement undefined since there is nothing we can prove about it.
-        falseFlowBuilder.setUndefined();
+        hasAnyNonAvailabilityCondition = true;
         element.walk(*this);
         continue;
       }
@@ -1093,15 +1233,28 @@ private:
           if (isUnavailability.value())
             continue;
 
-          DiagnosticEngine &diags = Context.Diags;
-          if (currentScope->getReason() != AvailabilityScope::Reason::Root) {
-            diags.diagnose(query->getLoc(),
-                           diag::availability_query_useless_enclosing_scope,
-                           domain.getNameForAttributePrinting());
-            diags.diagnose(
-                currentScope->getIntroductionLoc(),
-                diag::availability_query_useless_enclosing_scope_here);
+          if (currentScope->getReason() == AvailabilityScope::Reason::Root)
+            continue;
+
+          // Skip diagnosing useless availability in fragile functions with
+          // opaque result types since removing an availability check could
+          // change the ABI of the function and result in a miscompilation.
+          auto *dc = getCurrentDeclContext();
+          if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+            if (auto decl = dc->getInnermostDeclarationDeclContext()) {
+              if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+                if (afd->getOpaqueResultTypeDecl())
+                  continue;
+              }
+            }
           }
+
+          DiagnosticEngine &diags = Context.Diags;
+          diags.diagnose(query->getLoc(),
+                         diag::availability_query_useless_enclosing_scope,
+                         domain.getNameForAttributePrinting());
+          diags.diagnose(currentScope->getIntroductionLoc(),
+                         diag::availability_query_useless_enclosing_scope_here);
         }
 
         continue;
@@ -1121,44 +1274,53 @@ private:
       ++nestedCount;
     }
 
+    // Determine the availability context for the branch where the availability
+    // conditions hold. If there are any scopes on the stack, it will be the
+    // availability context for the scope at the top. Otherwise, no distinct
+    // context is introduced by the availability conditions.
+    std::optional<AvailabilityContext> trueRefinement = std::nullopt;
+    if (nestedCount > 0)
+      trueRefinement = getCurrentScope()->getAvailabilityContext();
+
+    // Pop the stack.
+    while (nestedCount-- > 0)
+      ContextStack.pop_back();
+
+    DEBUG_ASSERT(getCurrentScope() == startingScope);
+
+    // Determine availability for the branch where the availability conditions
+    // do not hold.
     auto startingContext = startingScope->getAvailabilityContext();
     auto falseFlowContext = falseFlowBuilder.constrainContext(startingContext);
 
-    // The version range for the false branch should never have any versions
-    // that weren't possible when the condition started evaluating.
+    // The availability context for the false flow should either be the same
+    // as the starting context or it should refine it. If not, there's a logic
+    // error.
     DEBUG_ASSERT(falseFlowContext.isContainedIn(startingContext));
 
     // If the starting availability context is not completely contained in the
     // false flow context then it must be the case that false flow context
-    // is strictly smaller than the starting context (because the false flow
-    // context *is* contained in the starting context), so we should introduce a
-    // new availability scope for the false flow.
+    // is strictly contained in the starting context. Introduce a new
+    // availability scope for the false flow in that case.
     std::optional<AvailabilityContext> falseRefinement = std::nullopt;
-    if (!startingScope->getAvailabilityContext().isContainedIn(
-            falseFlowContext)) {
+    if (!startingContext.isContainedIn(falseFlowContext))
       falseRefinement = falseFlowContext;
-    }
 
-    auto makeResult =
-        [isUnavailability](std::optional<AvailabilityContext> trueRefinement,
-                           std::optional<AvailabilityContext> falseRefinement) {
-          if (isUnavailability.has_value() && *isUnavailability) {
-            // If this is an unavailability check, invert the result.
-            return std::make_pair(falseRefinement, trueRefinement);
-          }
-          return std::make_pair(trueRefinement, falseRefinement);
-        };
+    // For #unavailable, the then/else semantics are inverted: the then branch
+    // executes when the availability condition is NOT met, and the else
+    // executes it IS met. So swap the refinements.
+    auto thenRefinement = trueRefinement;
+    auto elseRefinement = falseRefinement;
+    if (isUnavailability && *isUnavailability)
+      std::swap(thenRefinement, elseRefinement);
 
-    if (nestedCount == 0)
-      return makeResult(std::nullopt, falseRefinement);
+    // If there were any non-availability conditions in the if statement then
+    // the else branch cannot be refined at all because it can be reached
+    // regardless of any availability condition.
+    if (hasAnyNonAvailabilityCondition)
+      elseRefinement = std::nullopt;
 
-    AvailabilityScope *nestedScope = getCurrentScope();
-    while (nestedCount-- > 0)
-      ContextStack.pop_back();
-
-    assert(getCurrentScope() == startingScope);
-
-    return makeResult(nestedScope->getAvailabilityContext(), falseRefinement);
+    return {thenRefinement, elseRefinement};
   }
 
   /// Return the best active spec for the target platform or nullptr if no
@@ -1270,6 +1432,7 @@ AvailabilityScope *AvailabilityScope::getOrBuildForSourceFile(SourceFile &SF) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::Interface:
+  case SourceFileKind::SyntheticMacro:
     break;
   }
   ASTContext &ctx = SF.getASTContext();
@@ -1309,6 +1472,13 @@ evaluator::SideEffect ExpandChildAvailabilityScopesRequest::evaluate(
     AvailabilityScopeBuilder builder(parentScope, ctx);
     builder.prepareDeclForLazyExpansion(decl);
     builder.build(decl);
+  } else if (parentScope->getReason() ==
+             AvailabilityScope::Reason::SwitchStmt) {
+    auto *switchStmt = parentScope->getIntroductionNode().getAsSwitchStmt();
+    auto *dc = parentScope->getIntroductionNode().getDeclContext();
+    ASTContext &ctx = dc->getASTContext();
+    AvailabilityScopeBuilder builder(parentScope, ctx);
+    builder.expandSwitchStmtRefinementContext(switchStmt);
   }
   return evaluator::SideEffect();
 }

@@ -208,7 +208,7 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
             if (auto *fri = dyn_cast<FunctionRefInst>(bi->getArguments()[1])) {
               if (visitCallee(bi, fri->getReferencedFunction(), perfConstr, parentLoc))
                 return true;
-            } else {
+            } else if (perfConstr != PerformanceConstraints::ManualOwnership) {
               LocWithParent loc(inst.getLoc().getSourceLoc(), parentLoc);
               diagnose(loc, diag::performance_unknown_callees);
               return true;
@@ -250,6 +250,12 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
                                             SILInstruction *callInst,
                                             PerformanceConstraints perfConstr,
                                             LocWithParent *parentLoc) {
+  // Closures within a function are pre-annotated with [manual_ownership]
+  // within SILGen, if they're visible to users for annotation at all.
+  // So no recursive closure checking is needed here.
+  if (perfConstr == PerformanceConstraints::ManualOwnership)
+    return false;
+
   // Walk through the definition of the closure until we find the "underlying"
   // function_ref instruction.
   while (!isa<FunctionRefInst>(closure)) {
@@ -480,6 +486,49 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
 
         // Catch-all diagnostic for when we at least have the name.
         diagnose(loc, diag::manualownership_copy_happened, *name);
+        return false;
+      }
+    }
+    if (impact & RuntimeEffect::ExclusivityChecking) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::BeginUnpairedAccessInst:
+      case SILInstructionKind::EndUnpairedAccessInst:
+        // These instructions are quite unusual; they seem to only ever created
+        // explicitly by calling functions from the Builtin module, see:
+        //   - emitBuiltinPerformInstantaneousReadAccess
+        //   - emitBuiltinEndUnpairedAccess
+        break;
+      case SILInstructionKind::EndAccessInst:
+        break; // We'll already diagnose the begin access.
+      case SILInstructionKind::BeginAccessInst: {
+        auto bai = cast<BeginAccessInst>(inst);
+        auto info = VariableNameInferrer::inferNameAndRoot(bai->getSource());
+
+        if (!info) {
+          LLVM_DEBUG(llvm::dbgs() << "exclusivity (no name?): " << *inst);
+          diagnose(loc, diag::manualownership_exclusivity);
+          return false;
+        }
+        Identifier name = info->first;
+        SILValue root = info->second;
+        StringRef advice = "";
+
+        // Try to classify the root to give advice.
+        if (isa<GlobalAddrInst>(root)) {
+          advice = ", because it involves a global variable";
+        } else if (root->getType().isAnyClassReferenceType()) {
+          advice = ", because it's a member of a reference type";
+        }
+
+        LLVM_DEBUG(llvm::dbgs() << "exclusivity: " << *inst);
+        LLVM_DEBUG(llvm::dbgs() << "with root: " << root);
+
+        diagnose(loc, diag::manualownership_exclusivity_named, name, advice);
+        break;
+      }
+      default:
+        LLVM_DEBUG(llvm::dbgs() << "UNKNOWN EXCLUSIVITY INST: " << *inst);
+        diagnose(loc, diag::manualownership_exclusivity);
         return false;
       }
     }
@@ -715,19 +764,25 @@ private:
     // indexing purposes.
     if (!module->getOptions().EnableWMORequiredDiagnostics) return;
 
+    // Bypass this verification when a prior diagnostic error is present.
+    // In that case, required mandatory transofmation passes may not have
+    // run which would mean the diagnostics we emit here would be
+    // false-positive.
+    if (module->getASTContext().hadError()) return;
+
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
-    // Check that @_section, @_silgen_name is only on constant globals
+    // Check that @section, @_silgen_name is only on constant globals
     for (SILGlobalVariable &g : module->getSILGlobals()) {
       if (!g.getStaticInitializerValue() && g.mustBeInitializedStatically()) {
         PrettyStackTraceSILGlobal stackTrace(
             "global inst", &g);
 
         auto *decl = g.getDecl();
-        if (g.getSectionAttr()) {
+        if (!g.section().empty()) {
           module->getASTContext().Diags.diagnose(
             g.getDecl()->getLoc(), diag::bad_attr_on_non_const_global,
-            "@_section");
+            "@section");
         } else if (decl && g.isDefinition() &&
                    decl->getAttrs().hasAttribute<SILGenNameAttr>()) {
           module->getASTContext().Diags.diagnose(

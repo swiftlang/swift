@@ -55,7 +55,7 @@ enum class TypeResolutionFlags : uint16_t {
   Direct = 1 << 5,
 
   /// Whether we should not produce diagnostics if the type is invalid.
-  SilenceErrors = 1 << 6,
+  SilenceDiagnostics = 1 << 6,
 
   /// Whether to allow module declaration types.
   AllowModule = 1 << 7,
@@ -87,6 +87,9 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether the immediate context has an @escaping attribute.
   DirectEscaping = 1 << 14,
+
+  /// Whether the name being resolved has a module selector or not.
+  HasModuleSelector = 1 << 15,
 };
 
 /// Type resolution contexts that require special handling.
@@ -675,6 +678,12 @@ public:
     return unboundTyOpener;
   }
 
+  static Type defaultUnboundTypeOpener(UnboundGenericType *ty) {
+    // FIXME: Don't let unbound generic types escape type resolution.
+    // For now, just return the unbound generic type.
+    return ty;
+  }
+
   HandlePlaceholderTypeReprFn getPlaceholderHandler() const {
     return placeholderHandler;
   }
@@ -702,12 +711,6 @@ public:
   /// \returns A well-formed type that is never null, or an \c ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR,
                    SILTypeResolutionContext *silContext = nullptr) const;
-
-  /// Resolve a reference to a member type of the given (dependent) base and
-  /// name.
-  Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
-                                  SourceRange baseRange,
-                                  QualifiedIdentTypeRepr *repr) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.
@@ -746,7 +749,8 @@ public:
   /// \see applyGenericArguments
   Type applyUnboundGenericArguments(GenericTypeDecl *decl, Type parentTy,
                                     SourceLoc loc,
-                                    ArrayRef<Type> genericArgs) const;
+                                    ArrayRef<Type> genericArgs,
+                                    bool *diagnosedRequirementFailure=nullptr) const;
 };
 
 void diagnoseInvalidGenericArguments(SourceLoc loc, ValueDecl *decl,

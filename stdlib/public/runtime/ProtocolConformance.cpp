@@ -1640,7 +1640,8 @@ static bool swift_isInConformanceExecutionContextImpl(
     // Check whether we are running on this global actor.
     if (!_swift_task_isCurrentGlobalActorHook(
            context->globalActorIsolationType,
-           context->globalActorIsolationWitnessTable))
+           context->globalActorIsolationWitnessTable,
+           context->globalActorIsolationType))
       return false;
   }
 
@@ -1794,10 +1795,6 @@ bool swift::_swift_class_isSubclass(const Metadata *subclass,
                                     const Metadata *superclass) {
   return isSubclass(subclass, superclass);
 }
-
-static std::optional<TypeLookupError>
-checkInvertibleRequirements(const Metadata *type,
-                              InvertibleProtocolSet ignored);
 
 static std::optional<TypeLookupError>
 checkGenericRequirement(
@@ -2229,6 +2226,14 @@ checkInvertibleRequirementsStructural(const Metadata *type,
   case MetadataKind::ExtendedExistential: {
     auto existential = cast<ExtendedExistentialTypeMetadata>(type);
     auto &shape = *existential->Shape;
+
+    // If this is an extended existential metatype, then just allow it. Metatypes
+    // are always copyable and escapable so there can't possibly be a
+    // suppression issue.
+    if (shape.Flags.isMetatypeConstrained()) {
+      return std::nullopt;
+    }
+
     llvm::ArrayRef<GenericRequirementDescriptor> reqs(
         shape.getReqSigRequirements(), shape.getNumReqSigRequirements());
     // Look for any suppressed protocol requirements. If the existential
@@ -2264,6 +2269,16 @@ checkInvertibleRequirementsStructural(const Metadata *type,
     // Builtin.FixedArray has no conformances of its own.
     return std::nullopt;
 
+  case MetadataKind::Borrow:
+    // All Builtin.Borrow are '~Escapable'.
+    if (!ignored.containsEscapable()) {
+      return TYPE_LOOKUP_ERROR_FMT(
+        "borrow type missing escapable invertible protocol %x",
+        ignored.rawBits());
+    }
+
+    return std::nullopt;
+
   case MetadataKind::LastEnumerated:
     break;
   }
@@ -2275,8 +2290,8 @@ checkInvertibleRequirementsStructural(const Metadata *type,
 /// Check that the given `type` meets all invertible protocol requirements
 /// that haven't been explicitly suppressed by `ignored`.
 std::optional<TypeLookupError>
-checkInvertibleRequirements(const Metadata *type, 
-                              InvertibleProtocolSet ignored) {
+swift::checkInvertibleRequirements(const Metadata *type,
+                                   InvertibleProtocolSet ignored) {
   auto contextDescriptor = type->getTypeContextDescriptor();
   if (!contextDescriptor)
     return checkInvertibleRequirementsStructural(type, ignored);

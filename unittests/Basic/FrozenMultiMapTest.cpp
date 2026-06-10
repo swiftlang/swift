@@ -322,3 +322,533 @@ TEST(FrozenMultiMapCustomTest, SimpleErase2) {
     EXPECT_EQ(std::distance(range.begin(), range.end()), 0);
   }
 }
+
+TEST(SmallFrozenMultiMapCustomStaySmall, SimpleFind) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<Canary, Canary, 16> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  EXPECT_EQ(map.size(), 5u);
+  {
+    auto r = map.find(key1);
+    EXPECT_TRUE(r.has_value());
+    EXPECT_EQ(r->size(), 3u);
+    EXPECT_EQ((*r)[0].getID(), 2u);
+    EXPECT_EQ((*r)[1].getID(), 3u);
+    EXPECT_EQ((*r)[2].getID(), 4u);
+  }
+
+  {
+    auto r = map.find(key2);
+    EXPECT_TRUE(r.has_value());
+    EXPECT_EQ(r->size(), 2u);
+    EXPECT_EQ((*r)[0].getID(), 5u);
+    EXPECT_EQ((*r)[1].getID(), 6u);
+  }
+}
+
+TEST(SmallFrozenMultiMapCustomStaySmall, TestResetWorks) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<Canary, Canary, 16> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+  map.reset();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  // Just do a quick soundness test.
+  auto range = map.getRange();
+  auto begin = range.begin();
+  auto end = range.end();
+  ++begin;
+  ++begin;
+  EXPECT_EQ(std::distance(begin, end), 0);
+}
+
+TEST(SmallFrozenMultiMapCustomStaySmall, SimpleIter) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<Canary, Canary, 16> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  EXPECT_EQ(map.size(), 5u);
+
+  auto range = map.getRange();
+  EXPECT_EQ(std::distance(range.begin(), range.end()), 2);
+
+  {
+    auto begin = range.begin();
+    auto end = range.end();
+    ++begin;
+    ++begin;
+    EXPECT_EQ(std::distance(begin, end), 0);
+  }
+
+  auto iter = range.begin();
+  {
+    auto p = *iter;
+    EXPECT_EQ(p.first.getID(), key1.getID());
+    EXPECT_EQ(p.second.size(), 3u);
+    EXPECT_EQ(p.second[0].getID(), 2u);
+    EXPECT_EQ(p.second[1].getID(), 3u);
+    EXPECT_EQ(p.second[2].getID(), 4u);
+  }
+
+  ++iter;
+  {
+    auto p = *iter;
+    EXPECT_EQ(p.first.getID(), key2.getID());
+    EXPECT_EQ(p.second.size(), 2u);
+    EXPECT_EQ(p.second[0].getID(), 5u);
+    EXPECT_EQ(p.second[1].getID(), 6u);
+  }
+}
+
+TEST(SmallFrozenMultiMapCustomStaySmall, RandomAgainstStdMultiMap) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<unsigned, unsigned, 16> map;
+  std::multimap<unsigned, unsigned> stdMultiMap;
+
+  auto seed =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  std::mt19937 mt_rand(seed);
+
+  std::vector<unsigned> keyIdList;
+  for (unsigned i = 0; i < 1024; ++i) {
+    unsigned keyID = mt_rand() % 20;
+    keyIdList.push_back(keyID);
+    for (unsigned valueID = (mt_rand()) % 15; valueID < 15; ++valueID) {
+      map.insert(keyID, valueID);
+      stdMultiMap.emplace(keyID, valueID);
+    }
+  }
+
+  map.setFrozen();
+
+  // Then for each key.
+  for (unsigned i : keyIdList) {
+    // Make sure that we have the same elements in the same order for each key.
+    auto range = *map.find(i);
+    auto stdRange = stdMultiMap.equal_range(i);
+    EXPECT_EQ(std::distance(range.begin(), range.end()),
+              std::distance(stdRange.first, stdRange.second));
+    auto modernStdRange = llvm::make_range(stdRange.first, stdRange.second);
+    for (auto p : llvm::zip(range, modernStdRange)) {
+      unsigned lhs = std::get<0>(p);
+      unsigned rhs = std::get<1>(p).second;
+      EXPECT_EQ(lhs, rhs);
+    }
+  }
+
+  // Then check that when we iterate over both ranges, we get the same order.
+  {
+    auto range = map.getRange();
+    auto rangeIter = range.begin();
+    auto stdRangeIter = stdMultiMap.begin();
+
+    while (rangeIter != range.end()) {
+      auto rangeElt = *rangeIter;
+
+      for (unsigned i : indices(rangeElt.second)) {
+        EXPECT_EQ(rangeElt.first, stdRangeIter->first);
+        EXPECT_EQ(rangeElt.second[i], stdRangeIter->second);
+        ++stdRangeIter;
+      }
+
+      ++rangeIter;
+    }
+  }
+}
+
+TEST(SmallFrozenMultiMapCustomStaySmall, SimpleErase1) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<Canary, Canary, 16> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  EXPECT_EQ(map.size(), 5u);
+
+  EXPECT_TRUE(map.erase(key2));
+  EXPECT_FALSE(map.erase(key2));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 1);
+
+    {
+      auto begin = range.begin();
+      auto end = range.end();
+      ++begin;
+      EXPECT_EQ(std::distance(begin, end), 0);
+    }
+
+    auto iter = range.begin();
+    {
+      auto p = *iter;
+      EXPECT_EQ(p.first.getID(), key1.getID());
+      EXPECT_EQ(p.second.size(), 3u);
+      EXPECT_EQ(p.second[0].getID(), 2u);
+      EXPECT_EQ(p.second[1].getID(), 3u);
+      EXPECT_EQ(p.second[2].getID(), 4u);
+    }
+  }
+
+  EXPECT_TRUE(map.erase(key1));
+  EXPECT_FALSE(map.erase(key1));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 0);
+  }
+}
+
+TEST(SmallFrozenMultiMapCustomStaySmall, SimpleErase2) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<Canary, Canary, 16> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  EXPECT_EQ(map.size(), 5u);
+
+  EXPECT_TRUE(map.erase(key1));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 1);
+
+    {
+      auto begin = range.begin();
+      auto end = range.end();
+      ++begin;
+      EXPECT_EQ(std::distance(begin, end), 0);
+    }
+
+    auto iter = range.begin();
+    {
+      auto p = *iter;
+      EXPECT_EQ(p.first.getID(), key2.getID());
+      EXPECT_EQ(p.second.size(), 2u);
+      EXPECT_EQ(p.second[0].getID(), 5u);
+      EXPECT_EQ(p.second[1].getID(), 6u);
+    }
+  }
+
+  EXPECT_TRUE(map.erase(key2));
+  EXPECT_FALSE(map.erase(key2));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 0);
+  }
+}
+
+TEST(SmallFrozenMultiMapCustomSmallToLarge, SimpleFind) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<Canary, Canary, 2> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  EXPECT_EQ(map.size(), 5u);
+  {
+    auto r = map.find(key1);
+    EXPECT_TRUE(r.has_value());
+    EXPECT_EQ(r->size(), 3u);
+    EXPECT_EQ((*r)[0].getID(), 2u);
+    EXPECT_EQ((*r)[1].getID(), 3u);
+    EXPECT_EQ((*r)[2].getID(), 4u);
+  }
+
+  {
+    auto r = map.find(key2);
+    EXPECT_TRUE(r.has_value());
+    EXPECT_EQ(r->size(), 2u);
+    EXPECT_EQ((*r)[0].getID(), 5u);
+    EXPECT_EQ((*r)[1].getID(), 6u);
+  }
+}
+
+TEST(SmallFrozenMultiMapCustomSmallToLarge, TestResetWorks) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<Canary, Canary, 2> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+  map.reset();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  // Just do a quick soundness test.
+  auto range = map.getRange();
+  auto begin = range.begin();
+  auto end = range.end();
+  ++begin;
+  ++begin;
+  EXPECT_EQ(std::distance(begin, end), 0);
+}
+
+TEST(SmallFrozenMultiMapCustomSmallToLarge, SimpleIter) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<Canary, Canary, 2> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  EXPECT_EQ(map.size(), 5u);
+
+  auto range = map.getRange();
+  EXPECT_EQ(std::distance(range.begin(), range.end()), 2);
+
+  {
+    auto begin = range.begin();
+    auto end = range.end();
+    ++begin;
+    ++begin;
+    EXPECT_EQ(std::distance(begin, end), 0);
+  }
+
+  auto iter = range.begin();
+  {
+    auto p = *iter;
+    EXPECT_EQ(p.first.getID(), key1.getID());
+    EXPECT_EQ(p.second.size(), 3u);
+    EXPECT_EQ(p.second[0].getID(), 2u);
+    EXPECT_EQ(p.second[1].getID(), 3u);
+    EXPECT_EQ(p.second[2].getID(), 4u);
+  }
+
+  ++iter;
+  {
+    auto p = *iter;
+    EXPECT_EQ(p.first.getID(), key2.getID());
+    EXPECT_EQ(p.second.size(), 2u);
+    EXPECT_EQ(p.second[0].getID(), 5u);
+    EXPECT_EQ(p.second[1].getID(), 6u);
+  }
+}
+
+TEST(SmallFrozenMultiMapCustomSmallToLarge, RandomAgainstStdMultiMap) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<unsigned, unsigned, 2> map;
+  std::multimap<unsigned, unsigned> stdMultiMap;
+
+  auto seed =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  std::mt19937 mt_rand(seed);
+
+  std::vector<unsigned> keyIdList;
+  for (unsigned i = 0; i < 1024; ++i) {
+    unsigned keyID = mt_rand() % 20;
+    keyIdList.push_back(keyID);
+    for (unsigned valueID = (mt_rand()) % 15; valueID < 15; ++valueID) {
+      map.insert(keyID, valueID);
+      stdMultiMap.emplace(keyID, valueID);
+    }
+  }
+
+  map.setFrozen();
+
+  // Then for each key.
+  for (unsigned i : keyIdList) {
+    // Make sure that we have the same elements in the same order for each key.
+    auto range = *map.find(i);
+    auto stdRange = stdMultiMap.equal_range(i);
+    EXPECT_EQ(std::distance(range.begin(), range.end()),
+              std::distance(stdRange.first, stdRange.second));
+    auto modernStdRange = llvm::make_range(stdRange.first, stdRange.second);
+    for (auto p : llvm::zip(range, modernStdRange)) {
+      unsigned lhs = std::get<0>(p);
+      unsigned rhs = std::get<1>(p).second;
+      EXPECT_EQ(lhs, rhs);
+    }
+  }
+
+  // Then check that when we iterate over both ranges, we get the same order.
+  {
+    auto range = map.getRange();
+    auto rangeIter = range.begin();
+    auto stdRangeIter = stdMultiMap.begin();
+
+    while (rangeIter != range.end()) {
+      auto rangeElt = *rangeIter;
+
+      for (unsigned i : indices(rangeElt.second)) {
+        EXPECT_EQ(rangeElt.first, stdRangeIter->first);
+        EXPECT_EQ(rangeElt.second[i], stdRangeIter->second);
+        ++stdRangeIter;
+      }
+
+      ++rangeIter;
+    }
+  }
+}
+
+TEST(SmallFrozenMultiMapCustomSmallToLarge, SimpleErase1) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<Canary, Canary, 2> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  EXPECT_EQ(map.size(), 5u);
+
+  EXPECT_TRUE(map.erase(key2));
+  EXPECT_FALSE(map.erase(key2));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 1);
+
+    {
+      auto begin = range.begin();
+      auto end = range.end();
+      ++begin;
+      EXPECT_EQ(std::distance(begin, end), 0);
+    }
+
+    auto iter = range.begin();
+    {
+      auto p = *iter;
+      EXPECT_EQ(p.first.getID(), key1.getID());
+      EXPECT_EQ(p.second.size(), 3u);
+      EXPECT_EQ(p.second[0].getID(), 2u);
+      EXPECT_EQ(p.second[1].getID(), 3u);
+      EXPECT_EQ(p.second[2].getID(), 4u);
+    }
+  }
+
+  EXPECT_TRUE(map.erase(key1));
+  EXPECT_FALSE(map.erase(key1));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 0);
+  }
+}
+
+TEST(SmallFrozenMultiMapCustomSmallToLarge, SimpleErase2) {
+  Canary::resetIDs();
+  SmallFrozenMultiMap<Canary, Canary, 2> map;
+
+  auto key1 = Canary();
+  auto key2 = Canary();
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key1, Canary());
+  map.insert(key2, Canary());
+  map.insert(key2, Canary());
+
+  map.setFrozen();
+
+  EXPECT_EQ(map.size(), 5u);
+
+  EXPECT_TRUE(map.erase(key1));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 1);
+
+    {
+      auto begin = range.begin();
+      auto end = range.end();
+      ++begin;
+      EXPECT_EQ(std::distance(begin, end), 0);
+    }
+
+    auto iter = range.begin();
+    {
+      auto p = *iter;
+      EXPECT_EQ(p.first.getID(), key2.getID());
+      EXPECT_EQ(p.second.size(), 2u);
+      EXPECT_EQ(p.second[0].getID(), 5u);
+      EXPECT_EQ(p.second[1].getID(), 6u);
+    }
+  }
+
+  EXPECT_TRUE(map.erase(key2));
+  EXPECT_FALSE(map.erase(key2));
+
+  {
+    auto range = map.getRange();
+    EXPECT_EQ(std::distance(range.begin(), range.end()), 0);
+  }
+}

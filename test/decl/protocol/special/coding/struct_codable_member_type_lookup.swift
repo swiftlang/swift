@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -package-name myPkg
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -package-name myPkg
 
 // A top-level CodingKeys type to fall back to in lookups below.
 public enum CodingKeys : String, CodingKey {

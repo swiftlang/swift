@@ -67,7 +67,7 @@
 
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -Xcc -working-directory -Xcc %/t -c %/s | %FileCheck %s -check-prefix=CLANG
 // CLANG: -Xcc -working-directory -Xcc SOURCE_DIR
-// CLANG-SAME: -Xcc -working-directory -Xcc BUILD_DIR
+// CLANG-SAME: -Xcc -working-directory -Xcc TMP_DIR
 
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c main.swift | %FileCheck %s -check-prefix=OUTPUT_IMPLICIT_OBJ
 // OUTPUT_IMPLICIT_OBJ: -o {{"?}}SOURCE_DIR/test/Driver/Inputs{{\\\\|/}}main.o

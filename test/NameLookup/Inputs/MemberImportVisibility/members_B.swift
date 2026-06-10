@@ -11,6 +11,11 @@ extension X {
   public var propXinB: Bool { return true }
   package var propXinB_package: Bool { return true }
 
+  public func shadowedByMemberOnXinB() { }
+  public static func shadowedByStaticMemberOnXinB() { }
+
+  public static var max: Int { return Int.min }
+
   public static func >>>(a: Self, b: Self) -> Self { b }
 
   public struct NestedInB {}
@@ -49,8 +54,48 @@ package enum EnumInB_package {
 open class DerivedClassInB: BaseClassInA {
   open func methodInB() {}
   open override func overriddenMethod() {}
+  open override func overriddenInBMethod() {}
 }
 
-extension ProtocolInA {
+extension ProtocolInA2 {
   public func defaultedRequirementInB() { }
+}
+
+extension ProtocolInA3 {
+  public func defaultedRequirementInBAndC() { }
+}
+
+extension StructInA1 {
+  public struct WitnessedInB { }
+}
+
+extension StructInA2 {
+  public var hashValue: Int { 0 }
+}
+
+public protocol ProtocolInB1 {
+  func defaultedRequirementInB() // has an inherited default
+}
+
+extension ProtocolInB1 {
+  public func defaultedRequirementInB() { }
+}
+
+public protocol ProtocolInB2 {
+  func defaultedRequirementInC() // has a retroactive default (in C)
+}
+
+public protocol ProtocolInB3 {
+  func defaultedRequirementInB() // has a retroactive default (in a constrained extension)
+}
+
+extension ProtocolInB3 where Self: EmptyProtocolInA {
+  public func defaultedRequirementInB() { }
+}
+
+
+public struct EquatableInB: Equatable {
+  public static func ==(_: EquatableInB, _: EquatableInB) -> Bool {
+    false
+  }
 }

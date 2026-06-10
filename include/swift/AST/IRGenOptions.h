@@ -29,9 +29,9 @@
 #include "llvm/IR/CallingConv.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
-#include "llvm/Transforms/Instrumentation.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Instrumentation.h"
 #include <optional>
 #include <string>
 #include <tuple>
@@ -251,6 +251,20 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Like PartialApplyCapture but for use with CoroFunctionPointer values.
   PointerAuthSchema CoroPartialApplyCapture;
+
+  /// Stored in a coro allocator struct, the function used to allocate memory.
+  PointerAuthSchema CoroAllocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to deallocate memory.
+  PointerAuthSchema CoroDeallocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to allocate a callee
+  /// coroutine's fixed-size frame.
+  PointerAuthSchema CoroFrameAllocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to deallocate a
+  /// callee coroutine's fixed-size frame.
+  PointerAuthSchema CoroFrameDeallocationFunction;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -263,6 +277,15 @@ enum class JITDebugArtifact : unsigned {
 class IRGenOptions {
 public:
   std::string ModuleName;
+
+  /// The path/cache key to the main binary swiftmodule for the debug info.
+  std::string DebugModulePath;
+
+  /// Use self key as swift module cacke key
+  bool DebugModuleSelfKey = false;
+
+  /// The cache key for PCH.
+  std::string BridgingPCHCacheKey;
 
   /// The compilation directory for the debug info.
   std::string DebugCompilationDir;
@@ -542,15 +565,31 @@ public:
   // Whether to emit mergeable or non-mergeable traps.
   unsigned MergeableTraps : 1;
 
+  /// Enable the use of swift_retain/releaseDirect functions.
+  unsigned EnableSwiftDirectRetainRelease : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
+  /// Path to the profdata file to be used for IR/CS-IR PGO, or the empty string.
+  std::string UseIRProfile = "";
+
   /// Path to the data file to be used for sampling-based PGO,
   /// or the empty string.
   std::string UseSampleProfile = "";
+
+  /// Name of the profile file to use as output for -ir-profile-generate,
+  /// and -cs-profile-generate, or the default string.
+  std::string InstrProfileOutput = "default_%m.profraw";
+
+  /// Whether to enable context-sensitive IR PGO generation.
+  bool EnableCSIRProfileGen = false;
+
+  /// Whether to enable IR level instrumentation.
+  bool EnableIRProfileGen = false;
 
   /// Controls whether DWARF discriminators are added to the IR.
   unsigned DebugInfoForProfiling : 1;
@@ -608,6 +647,9 @@ public:
   /// Set to true if we support AArch64TBI.
   bool HasAArch64TBI = false;
 
+  /// Generate verbose assembly output with comments.
+  bool VerboseAsm = true;
+
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
         Verify(true), VerifyEach(false), OptMode(OptimizationMode::NotSet),
@@ -653,11 +695,13 @@ public:
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         UseCoroCCX8664(false), UseCoroCCArm64(false), MergeableTraps(false),
+        EnableSwiftDirectRetainRelease(SWIFT_ENABLE_DIRECT_RETAIN_RELEASE),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
-        CASObjMode(llvm::CASBackendMode::Native), HasAArch64TBI(false) {
+        CASObjMode(llvm::CASBackendMode::Native), HasAArch64TBI(false),
+        VerboseAsm(true) {
     DisableRoundTripDebugTypes = !CONDITIONAL_ASSERT_enabled();
   }
 

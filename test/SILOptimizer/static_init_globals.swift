@@ -28,5 +28,14 @@ public struct MyStruct {
   // OPT:         %initval = struct $GenS
   // OPT-NEXT:  }
   public static let genericStruct = GenS(a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8)
+
+  // CHECK-LABEL: sil_global [let] @$s4test8MyStructV1aypSg_AEtvpZ : $(Optional<Any>, Optional<Any>) = {
+  public static let a: (Any?, Any?) = (nil, nil)
+
+  // CHECK-LABEL: sil_global [let] @$s4test8MyStructV1bs5Error_pSg_AFtvpZ : $(Optional<any Error>, Optional<any Error>) = {
+  public static let b: ((any Error)?, (any Error)?) = (nil, nil)
+
+  // CHECK-LABEL: sil_global [let] @$s4test8MyStructV1cypSg_s8Sendable_pSgtvpZ : $(Optional<Any>, Optional<any Sendable>) = {
+  public static let c: (Any?, (any Sendable)?) = (nil, nil)
 }
 

@@ -65,13 +65,13 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization"
   ${SwiftCore_ENABLE_PRESPECIALIZATION})
 
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Werror StrictMemorySafety>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypesWithDefaults>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>"
@@ -83,6 +83,8 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+find_package(SwiftSwiftDirectRuntime)
 
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
 # LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
@@ -111,6 +113,13 @@ cmake_policy(GET CMP0157 Policy157Enabled)
 if(Policy157Enabled STREQUAL NEW)
   set_target_properties(swiftDistributed PROPERTIES
     LINKER_LANGUAGE CXX)
+  # `CMAKE_STATIC_LIBRARY_PREFIX_Swift` will not impact the prefix for this
+  # library because we have changed the linker language to C++. This is required
+  # for Windows to properly reference this library.
+  if(NOT BUILD_SHARED_LIBS)
+    set_target_properties(swiftDistributed PROPERTIES
+      PREFIX lib)
+  endif()
 endif()
 
 target_compile_definitions(swiftDistributed PRIVATE
@@ -139,7 +148,8 @@ target_link_libraries(swiftDistributed PRIVATE
   swift_Concurrency
   swift_Builtin_float
   $<$<PLATFORM_ID:Android>:swiftAndroid>
-  $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
+  $<$<PLATFORM_ID:Windows>:swiftWinSDK>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 install(TARGETS swiftDistributed
   EXPORT SwiftDistributedTargets

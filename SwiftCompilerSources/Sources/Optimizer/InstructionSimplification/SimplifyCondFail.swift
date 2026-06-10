@@ -12,18 +12,25 @@
 
 import SIL
 
-extension CondFailInst : OnoneSimplifiable {
+extension CondFailInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
-    /// Eliminates
-    /// ```
-    ///   %0 = integer_literal 0
-    ///   cond_fail %0, "message"
-    /// ```
-    if let literal = condition as? IntegerLiteralInst,
-       let value = literal.value,
-       value == 0
-    {
+    if let literal = condition as? IntegerLiteralInst, let value = literal.value {
+      if value == 0 {
+        // Eliminates
+        // ```
+        //   %0 = integer_literal 0
+        //   cond_fail %0, "message"
+        // ```
+        context.erase(instruction: self)
+      }
+      // Even if `shouldRemoveCondFail` is true, we don't want to remove unconditioal fails,
+      // i.e. `cond_fail` with a non-zero condition, because this would prevent removing dead
+      // code after such a `cond_fail` in a later optimization.
+      return
+    }
+
+    if context.options.shouldRemoveCondFail(withMessage: message, inFunction: parentFunction.name) {
       context.erase(instruction: self)
     }
   }

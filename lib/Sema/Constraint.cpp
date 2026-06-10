@@ -20,6 +20,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -83,6 +84,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::UnresolvedMemberChainBase:
@@ -102,7 +104,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::ValueWitness:
     llvm_unreachable("Wrong constructor for member constraint");
 
   case ConstraintKind::Defaultable:
@@ -166,11 +167,11 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::ValueMember:
-  case ConstraintKind::ValueWitness:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
   case ConstraintKind::BindOverload:
@@ -221,31 +222,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
   *getTrailingObjects<DeclContext *>() = useDC;
 }
 
-Constraint::Constraint(ConstraintKind kind, Type first, Type second,
-                       ValueDecl *requirement, DeclContext *useDC,
-                       FunctionRefInfo functionRefInfo,
-                       ConstraintLocator *locator,
-                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
-    : Kind(kind), NumTypeVariables(typeVars.size()),
-      HasFix(false), HasDeclContext(true), HasRestriction(false),
-      IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
-      RememberChoice(false), IsFavored(false), IsIsolated(false),
-      Locator(locator) {
-  Member.First = first;
-  Member.Second = second;
-  Member.Member.Ref = requirement;
-  TheFunctionRefInfo = functionRefInfo.getOpaqueValue();
-
-  assert(kind == ConstraintKind::ValueWitness);
-  assert(getFunctionRefInfo() == functionRefInfo);
-  assert(requirement && "Value witness constraint has no requirement");
-  assert(useDC && "Member constraint has no use DC");
-
-  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
-  *getTrailingObjects<DeclContext *>() = useDC;
-}
-
-Constraint::Constraint(Type type, OverloadChoice choice,
+Constraint::Constraint(Type type, OverloadChoice choice, Type effectiveOverloadType,
                        DeclContext *useDC,
                        ConstraintFix *fix, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
@@ -253,7 +230,8 @@ Constraint::Constraint(Type type, OverloadChoice choice,
       HasFix(fix != nullptr), HasDeclContext(true), HasRestriction(false),
       IsActive(false), IsDisabled(bool(fix)), IsDisabledForPerformance(false),
       RememberChoice(false), IsFavored(false), IsIsolated(false),
-      Overload{type, /*preparedOverload=*/nullptr}, Locator(locator) {
+      Overload{type, effectiveOverloadType, /*preparedOverload=*/nullptr},
+      Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
   if (fix)
     *getTrailingObjects<ConstraintFix *>() = fix;
@@ -462,51 +440,15 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
+  case ConstraintKind::ForEachElement:
+    Out << " for each element ";
+    break;
   case ConstraintKind::OptionalObject:
       Out << " optional with object type "; break;
   case ConstraintKind::BindOverload: {
     Out << " bound to ";
     auto overload = getOverloadChoice();
-    auto printDecl = [&] {
-      auto decl = overload.getDecl();
-      decl->dumpRef(Out);
-      Out << " : " << decl->getInterfaceType();
-    };
-
-    switch (overload.getKind()) {
-    case OverloadChoiceKind::Decl:
-      Out << "decl ";
-      printDecl();
-      break;
-    case OverloadChoiceKind::DeclViaDynamic:
-      Out << "decl-via-dynamic ";
-      printDecl();
-      break;
-    case OverloadChoiceKind::DeclViaBridge:
-      Out << "decl-via-bridge ";
-      printDecl();
-      break;
-    case OverloadChoiceKind::DeclViaUnwrappedOptional:
-      Out << "decl-via-unwrapped-optional ";
-      printDecl();
-      break;
-    case OverloadChoiceKind::DynamicMemberLookup:
-    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
-      Out << "dynamic member lookup '" << overload.getName() << "'";
-      break;
-    case OverloadChoiceKind::TupleIndex:
-      Out << "tuple index " << overload.getTupleIndex();
-      break;
-    case OverloadChoiceKind::MaterializePack:
-      Out << "materialize pack";
-      break;
-    case OverloadChoiceKind::ExtractFunctionIsolation:
-      Out << "extract function islation";
-      break;
-    case OverloadChoiceKind::KeyPathApplication:
-      Out << "key path application";
-      break;
-    }
+    overload.dump(Type(), sm, Out);
 
     skipSecond = true;
     break;
@@ -518,14 +460,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::UnresolvedValueMember:
     Out << "[(implicit) ." << getMember() << ": value] == ";
     break;
-
-  case ConstraintKind::ValueWitness: {
-    auto requirement = getRequirement();
-    auto selfNominal = requirement->getDeclContext()->getSelfNominalTypeDecl();
-    Out << "[." << selfNominal->getName() << "::" << requirement->getName()
-        << ": witness] == ";
-    break;
-  }
 
   case ConstraintKind::Defaultable:
     Out << " can default to ";
@@ -703,10 +637,10 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Subtype:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
-  case ConstraintKind::ValueWitness:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::Defaultable:
   case ConstraintKind::SubclassOf:
@@ -744,17 +678,6 @@ gatherReferencedTypeVars(Constraint *constraint,
                     constraint->getTypeVariables().end());
     break;
   }
-}
-
-unsigned Constraint::countResolvedArgumentTypes(ConstraintSystem &cs) const {
-  auto *argumentFuncType = cs.getAppliedDisjunctionArgumentFunction(this);
-  if (!argumentFuncType)
-    return 0;
-
-  return llvm::count_if(argumentFuncType->getParams(), [&](const AnyFunctionType::Param arg) {
-    auto argType = cs.getFixedTypeRecursive(arg.getPlainType(), /*wantRValue=*/true);
-    return !argType->isTypeVariableOrMember();
-  });
 }
 
 bool Constraint::isExplicitConversion() const {
@@ -868,30 +791,6 @@ Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind,
                               functionRefInfo, locator, typeVars);
 }
 
-Constraint *Constraint::createValueWitness(
-    ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
-    ValueDecl *requirement, DeclContext *useDC,
-    FunctionRefInfo functionRefInfo, ConstraintLocator *locator) {
-  assert(kind == ConstraintKind::ValueWitness);
-
-  // Collect type variables.
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
-  if (first->hasTypeVariable())
-    first->getTypeVariables(typeVars);
-  if (second->hasTypeVariable())
-    second->getTypeVariables(typeVars);
-
-  // Create the constraint.
-  auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, DeclContext *,
-                     ContextualTypeInfo, OverloadChoice>(
-      typeVars.size(), /*hasFix=*/0, /*hasDeclContext=*/1,
-      /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/0);
-  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(kind, first, second, requirement, useDC,
-                              functionRefInfo, locator, typeVars);
-}
-
 Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 
                                            OverloadChoice choice,
                                            DeclContext *useDC,
@@ -905,6 +804,9 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
     baseType->getTypeVariables(typeVars);
   }
 
+  // Compute effective overload type, for disjunction selection and pruning.
+  auto effectiveOverloadType = cs.getEffectiveOverloadType(locator, choice, useDC);
+
   // Create the constraint.
   auto size =
     totalSizeToAlloc<TypeVariableType *, ConstraintFix *, DeclContext *,
@@ -912,7 +814,7 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
       typeVars.size(), fix ? 1 : 0, /*hasDeclContext=*/1,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/1);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(type, choice, useDC,
+  return new (mem) Constraint(type, choice, effectiveOverloadType, useDC,
                               fix, locator, typeVars);
 }
 
@@ -1140,5 +1042,20 @@ Constraint::getTrailingClosureMatching() const {
 
 void *Constraint::operator new(size_t bytes, ConstraintSystem& cs,
                                size_t alignment) {
-  return ::operator new (bytes, cs, alignment);
+  return cs.getAllocator().Allocate(bytes, alignment);
+}
+
+// FIXME: Perhaps we should store the Constraint -> PreparedOverload mapping
+// in a SolverStep or something? Mutating Constraint feels wrong.
+
+void Constraint::setPreparedOverload(PreparedOverload *preparedOverload) {
+  ASSERT(Kind == ConstraintKind::BindOverload);
+
+  // We can only set a prepared overload at most once in normal
+  // type checking, and then once in salvage.
+  ASSERT(!Overload.Prepared ||
+         (!Overload.Prepared->wasForDiagnostics() &&
+          preparedOverload->wasForDiagnostics()));
+
+  Overload.Prepared = preparedOverload;
 }

@@ -7,6 +7,7 @@ import Swift
 
 
 let OptionalTests = TestSuite("Optional")
+defer { runAllTests() }
 
 protocol TestProtocol1 {}
 
@@ -341,17 +342,18 @@ OptionalTests.test("Casting Optional") {
   expectTrue(anyToAnyIsOptional(Optional<(String, String)>.none, Bool.self))
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-OptionalTests.test("Casting Optional Traps") {
+OptionalTests.test("Casting Optional Traps")
+.require(.crashTesting)
+.code {
   let nx: C? = nil
   expectCrash { _blackHole(anyToAny(nx, Int.self)) }
 }
-OptionalTests.test("Casting Optional Any Traps") {
+OptionalTests.test("Casting Optional Any Traps")
+.require(.crashTesting)
+.code {
   let nx: X? = X()
   expectCrash { _blackHole(anyToAny(nx as Any, Optional<Int>.self)) }
 }
-#endif
 
 class TestNoString {}
 class TestString : CustomStringConvertible, CustomDebugStringConvertible {
@@ -413,9 +415,8 @@ OptionalTests.test("unsafelyUnwrapped") {
   expectEqual(3, nonEmpty.unsafelyUnwrapped)
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
 OptionalTests.test("unsafelyUnwrapped nil")
+  .require(.crashTesting)
   .xfail(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "assertions are disabled in Release and Unchecked mode"))
@@ -424,6 +425,30 @@ OptionalTests.test("unsafelyUnwrapped nil")
   expectCrashLater()
   _blackHole(empty.unsafelyUnwrapped)
 }
-#endif
 
-runAllTests()
+OptionalTests.test("_span() from Optional.none")
+.require(.stdlib_6_2).code {
+  var o = Optional<[Int]>.none
+  let span = o._span()
+  // o = [1, 2, 3] // Does not compile, exclusivity violation
+  expectEqual(span.count, 0)
+
+  // make it fail at test time if exclusivity was violated
+  expectNil(o, "fail due to exclusivity violation")
+}
+
+OptionalTests.test("_span() from Optional.some")
+.require(.stdlib_6_2).code {
+  let a: [Int] = [1, 2, 3]
+  var o: Optional = a
+  let span = o._span()
+  // o = nil // Does not compile, exclusivity violation
+  expectEqual(span.count, 1)
+  expectEqual(span[0], o, "accessed mysterious memory location")
+
+  expectNotNil(o, "fail due to exclusivity violation")
+
+  let b = [4, 5, 6]
+  // o = b // Does not compile, exclusivity violation
+  expectNotEqual(span[0], b, "accessed mysterious memory location")
+}

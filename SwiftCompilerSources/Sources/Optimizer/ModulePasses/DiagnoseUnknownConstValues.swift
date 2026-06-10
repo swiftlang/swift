@@ -37,6 +37,14 @@ let diagnoseUnknownConstValues = ModulePass(name: "diagnose-unknown-const-values
 }
 
 private func verifyGlobals(_ context: ModulePassContext) {
+  // In case of a preceding error, `initialize-static-globals` would
+  // not have run, and we would always be emitting these diagnostics regardless
+  // of whether or not the GV actually would have failed to get statically
+  // initialized.
+  guard !context.hadError else {
+    return
+  }
+
   for gv in context.globalVariables where gv.isConst {
     if gv.staticInitValue == nil {
       context.diagnosticEngine.diagnose(.require_const_initializer_for_const,

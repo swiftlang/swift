@@ -798,7 +798,7 @@ bb0(%0 : @owned $B):
 // CHECK:   switch_enum_addr [[TMP_NC]], case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK: bb2:
-// CHECK:   [[DATA:%[0-9]+]] = unchecked_take_enum_data_addr [[TMP_NC]], #Optional.some!enumelt
+// CHECK:   [[DATA:%[0-9]+]] = unchecked_inplace_enum_data_addr [[TMP_NC]], #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[DATA]] to [init] [[VIEW]]
 // CHECK:   begin_access [modify] [unknown] [[ATHING]]
 // CHECK:   apply %{{.*}} : $@convention(thin) (@inout AThing) -> ()
@@ -844,7 +844,7 @@ bb1:
   unreachable
 
 bb2:
-  %44 = unchecked_take_enum_data_addr %14, #Optional.some!enumelt
+  %44 = unchecked_inplace_enum_data_addr %14, #Optional.some!enumelt
   copy_addr [take] %44 to [init] %12
   dealloc_stack %13
 

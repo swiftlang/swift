@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(   -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none) | %FileCheck %s
+// RUN: %target-run-simple-swift(   -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded

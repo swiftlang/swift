@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all -sil-combine %s | %FileCheck %s
 
+// REQUIRES: objc_codegen
+
 import Swift
 
 class AClass {

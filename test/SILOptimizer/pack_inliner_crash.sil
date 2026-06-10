@@ -1,0 +1,42 @@
+// RUN: %target-sil-opt -inline %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @callee : $@convention(thin) (@pack_guaranteed Pack{}) -> () {
+bb0(%pack : $*Pack{}):
+  %len = integer_literal $Builtin.Word, 0
+  %zero = integer_literal $Builtin.Word, 0
+  br bb1(%zero : $Builtin.Word)
+
+bb1(%idx : $Builtin.Word):
+  %cmp = builtin "cmp_eq_Word"(%idx : $Builtin.Word, %len : $Builtin.Word) : $Builtin.Int1
+  cond_br %cmp, bb3, bb2
+
+bb2:
+  %dyn = dynamic_pack_index %idx of $Pack{}
+  %ppi = pack_pack_index 0, %dyn of $Pack{}
+  %one = integer_literal $Builtin.Word, 1
+  %next = builtin "add_Word"(%idx : $Builtin.Word, %one : $Builtin.Word) : $Builtin.Word
+  br bb1(%next : $Builtin.Word)
+
+bb3:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// Ensure no crash after inlining
+// CHECK-LABEL: sil @caller : $@convention(thin) () -> () {
+// CHECK-NOT: apply
+// CHECK-LABEL: } // end sil function 'caller'
+sil @caller : $@convention(thin) () -> () {
+bb0:
+  %pack = alloc_pack $Pack{}
+  %f = function_ref @callee : $@convention(thin) (@pack_guaranteed Pack{}) -> ()
+  %r = apply %f(%pack) : $@convention(thin) (@pack_guaranteed Pack{}) -> ()
+  dealloc_pack %pack : $*Pack{}
+  %ret = tuple ()
+  return %ret : $()
+}

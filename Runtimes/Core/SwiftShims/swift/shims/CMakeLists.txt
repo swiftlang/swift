@@ -22,7 +22,6 @@ install(FILES
   System.h
   Target.h
   ThreadLocalStorage.h
-  UnicodeData.h
   Visibility.h
   _SwiftConcurrency.h
   _SwiftDistributed.h
@@ -44,3 +43,5 @@ target_compile_options(swiftShims INTERFACE
 install(TARGETS swiftShims
   EXPORT SwiftCoreTargets
   COMPONENT SwiftCore_development)
+
+include("${SwiftCore_VENDOR_MODULE_DIR}/swiftShims.cmake" OPTIONAL)

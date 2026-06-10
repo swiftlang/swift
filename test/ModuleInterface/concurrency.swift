@@ -65,32 +65,32 @@ func callFn() async {
 // CHECK: public func fn() async
 // CHECK: public func reasyncFn(_: () async -> ()) reasync
 // CHECK: public func takesSendable(_ block: {{@escaping @Sendable|@Sendable @escaping}} () async throws ->
-// CHECK: public func takesMainActor(_ block: {{@escaping @_Concurrency.MainActor|@MainActor @escaping}} () ->
+// CHECK: public func takesMainActor(_ block: {{@escaping @_Concurrency::MainActor|@MainActor @escaping}} () ->
 
-// CHECK:      @_Concurrency.MainActor @preconcurrency public protocol UnsafeMainProtocol {
-// CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency func requirement()
+// CHECK:      @_Concurrency{{::|\.}}MainActor @preconcurrency public protocol UnsafeMainProtocol {
+// CHECK-NEXT:   @_Concurrency{{::|\.}}MainActor @preconcurrency func requirement()
 // CHECK-NEXT: }
 
-// CHECK:      @_Concurrency.MainActor @preconcurrency public struct InferredUnsafeMainActor :
-// CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency public func requirement()
-// CHECK-NEXT:   @preconcurrency @_Concurrency.MainActor public func explicitPreconcurrency()
+// CHECK:      @_Concurrency{{::|\.}}MainActor @preconcurrency public struct InferredUnsafeMainActor :
+// CHECK-NEXT:   @_Concurrency{{::|\.}}MainActor @preconcurrency public func requirement()
+// CHECK-NEXT:   @preconcurrency @_Concurrency{{::|\.}}MainActor public func explicitPreconcurrency()
 // CHECK-NEXT: }
 
-// CHECK:      @preconcurrency @_Concurrency.MainActor public protocol PreconcurrencyMainProtocol {
-// CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency func requirement()
+// CHECK:      @preconcurrency @_Concurrency{{::|\.}}MainActor public protocol PreconcurrencyMainProtocol {
+// CHECK-NEXT:   @_Concurrency{{::|\.}}MainActor @preconcurrency func requirement()
 // CHECK-NEXT: }
 
-// CHECK:      @_Concurrency.MainActor @preconcurrency public struct InferredPreconcurrencyMainActor :
-// CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency public func requirement()
-// CHECK-NEXT:   @preconcurrency @_Concurrency.MainActor public func explicitPreconcurrency()
+// CHECK:      @_Concurrency{{::|\.}}MainActor @preconcurrency public struct InferredPreconcurrencyMainActor :
+// CHECK-NEXT:   @_Concurrency{{::|\.}}MainActor @preconcurrency public func requirement()
+// CHECK-NEXT:   @preconcurrency @_Concurrency{{::|\.}}MainActor public func explicitPreconcurrency()
 // CHECK-NEXT: }
 
-// CHECK-TYPECHECKED: public struct UncheckedSendable : @unchecked Swift.Sendable
+// CHECK-TYPECHECKED: public struct UncheckedSendable : @unchecked Swift::Sendable
 // CHECK-ASWRITTEN: public struct UncheckedSendable : @unchecked Sendable
 
-// CHECK-TYPECHECKED: extension Swift.UnsafePointer : @unchecked @retroactive Swift.Sendable
+// CHECK-TYPECHECKED: extension Swift::UnsafePointer : @unchecked @retroactive Swift::Sendable
 // CHECK-ASWRITTEN: extension UnsafePointer : @retroactive @unchecked Sendable
 
-// RUN: %target-swift-emit-module-interface(%t/LibraryPreserveTypesAsWritten.swiftinterface) %s -enable-experimental-concurrency -DLIBRARY -module-name LibraryPreserveTypesAsWritten -module-interface-preserve-types-as-written
+// RUN: %target-swift-emit-module-interface(%t/LibraryPreserveTypesAsWritten.swiftinterface) %s -enable-experimental-concurrency -DLIBRARY -module-name LibraryPreserveTypesAsWritten -disable-module-selectors-in-module-interface -module-interface-preserve-types-as-written
 // RUN: %target-swift-typecheck-module-from-interface(%t/LibraryPreserveTypesAsWritten.swiftinterface) -enable-experimental-concurrency
 // RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK-ASWRITTEN %s < %t/LibraryPreserveTypesAsWritten.swiftinterface

@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=swift-5.9
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=swift-6
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=swift-5.9
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=swift-6
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
 
 import DefaultArguments
 
@@ -53,9 +53,8 @@ let _ = HasStaticMethodWithDefaultArg.isNonZeroPrivateCounter(1)
 let _ = HasStaticMethodWithDefaultArg.isArgZeroRef() // expected-error {{missing argument for parameter #1 in call}}
 
 let _ = HasCtorWithDefaultArg(1, 2, 3)
-// TODO: support default arguments of constructors (https://github.com/apple/swift/issues/70124)
-//let _ = HasCtorWithDefaultArg(1, 2)
-//let _ = HasCtorWithDefaultArg(1)
+let _ = HasCtorWithDefaultArg(1, 2)
+let _ = HasCtorWithDefaultArg(1)
 
 let _ = TemplatedHasMethodWithDefaultArgFloat().isZero()
 let _ = TemplatedHasMethodWithDefaultArgFloat().isNonZero()
@@ -71,3 +70,6 @@ let _ = ambiguous(1, 2)
 let _ = nonTrailing()
 let _ = nonTrailing(1)
 let _ = nonTrailing(1, 2)
+
+let _ = takesUnnamedParam()
+let _ = takesUnnamedParam(789)

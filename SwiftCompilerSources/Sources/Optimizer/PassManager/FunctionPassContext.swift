@@ -52,6 +52,12 @@ struct FunctionPassContext : MutatingContext {
     return LoopTree(bridged: bridgedLT, context: self)
   }
 
+  /// Updates all analysis.
+  /// This is useful if a pass needs an updated analysis after invalidating the SIL of a function.
+  func updateAnalysis() {
+    bridgedPassContext.updateAnalysis()
+  }
+
   func notifyNewFunction(function: Function, derivedFrom: Function) {
     bridgedPassContext.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
   }
@@ -111,10 +117,34 @@ struct FunctionPassContext : MutatingContext {
     return String(taking: bridgedPassContext.mangleOutlinedVariable(function.bridged))
   }
 
-  func mangle(withClosureArguments closureArgs: [(argumentIndex: Int, argumentValue: Value)],
+  enum ClosureArgumentMangling {
+    case closure(SingleValueInstruction)
+
+    /// The argument specializes for the same closure as a previous argument, e.g.
+    /// ```
+    ///   %1 = partial_apply %closure
+    ///   apply %f(%1, %1)    // first argument: `.closure(%1)`
+    ///                       // second argument: `.previousArgumentIndex(0)`
+    case previousArgumentIndex(Int)
+  }
+
+  func mangle(withClosureArguments closureArgs: [(argumentIndex: Int, argumentValue: ClosureArgumentMangling)],
               from applySiteCallee: Function
   ) -> String {
-    closureArgs.withBridgedArrayRef{ bridgedClosureArgs in
+    let bridgedArgManglings = closureArgs.map {
+      switch $0.argumentValue {
+      case .closure(let closure):
+        return BridgedPassContext.ClosureArgMangling(argIdx: $0.argumentIndex,
+                                                     inst: Optional<Instruction>(closure).bridged,
+                                                     otherArgIdx: -1)
+      case .previousArgumentIndex(let idx):
+        return BridgedPassContext.ClosureArgMangling(argIdx: $0.argumentIndex,
+                                                     inst: OptionalBridgedInstruction(),
+                                                     otherArgIdx: idx)
+      }
+    }
+
+    return bridgedArgManglings.withBridgedArrayRef{ bridgedClosureArgs in
       String(taking: bridgedPassContext.mangleWithClosureArgs(bridgedClosureArgs, applySiteCallee.bridged))
     }
   }
@@ -134,19 +164,48 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func createSpecializedFunctionDeclaration(from original: Function, withName specializedFunctionName: String,
-                                            withParams specializedParameters: [ParameterInfo],
-                                            makeThin: Bool = false,
-                                            makeBare: Bool = false,
-                                            preserveGenericSignature: Bool = true) -> Function
-  {
+  func mangle(withExplodedPackArguments argIndices: [Int], from original: Function) -> String {
+    return argIndices.withBridgedArrayRef { bridgedArgIndices in
+      String(taking: bridgedPassContext.mangleWithExplodedPackArgs(bridgedArgIndices, original.bridged))
+    }
+  }
+
+  func mangle(withChangedRepresentation original: Function) -> String {
+    String(taking: bridgedPassContext.mangleWithChangedRepresentation(original.bridged))
+  }
+
+  func createSpecializedFunctionDeclaration(
+    from original: Function, withName specializedFunctionName: String,
+    withParams specializedParameters: [ParameterInfo],
+    withResults specializedResults: [ResultInfo]? = nil,
+    withRepresentation: FunctionTypeRepresentation? = nil,
+    makeBare: Bool = false,
+    preserveGenericSignature: Bool = true
+  ) -> Function {
     return specializedFunctionName._withBridgedStringRef { nameRef in
       let bridgedParamInfos = specializedParameters.map { $0._bridged }
+      let repr = withRepresentation ?? original.loweredFunctionType.functionTypeRepresentation
 
       return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
-        bridgedPassContext.createSpecializedFunctionDeclaration(nameRef, paramBuf.baseAddress, paramBuf.count,
-                                                                original.bridged, makeThin, makeBare,
-                                                                preserveGenericSignature).function
+
+        if let bridgedResultInfos = specializedResults?.map({ $0._bridged }) {
+
+          return bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
+            return bridgedPassContext.createSpecializedFunctionDeclaration(
+              nameRef, paramBuf.baseAddress, paramBuf.count,
+              resultBuf.baseAddress, resultBuf.count,
+              original.bridged, repr.bridged, makeBare,
+              preserveGenericSignature
+            ).function
+          }
+        } else {
+          return bridgedPassContext.createSpecializedFunctionDeclaration(
+            nameRef, paramBuf.baseAddress, paramBuf.count,
+            nil, 0,
+            original.bridged, repr.bridged, makeBare,
+            preserveGenericSignature
+          ).function
+        }
       }
     }
   }
@@ -166,6 +225,31 @@ struct FunctionPassContext : MutatingContext {
       notifyInstructionsChanged()
     }
   }
+
+  /// True if the pass has notified that stack nesting needs to be fixed.
+  /// In this case the pass needs to call `fixStackNesting`.
+  var needFixStackNesting: Bool { bridgedPassContext.getNeedFixStackNesting() }
+
+  /// True if the pass has deleted any basic blocks.
+  /// In case a deleted block was an exit blocks of a loop the remaining loop might have become an infinite
+  /// loop. Infinite loops must be eliminated by calling `breakInfiniteLoops`.
+  var needBreakInfiniteLoops: Bool { bridgedPassContext.getNeedBreakInfiniteLoops() }
+
+  /// If `value` is true, notifies that a pass has deleted a basic block which might end up in an infinite loop.
+  /// A pass can set the notification to `false` again if a basic block has been deleted but the pass knows
+  /// that this cannot cause any infinite loops.
+  func setNeedBreakInfiniteLoops(to value: Bool) { bridgedPassContext.setNeedBreakInfiniteLoops(value) }
+
+  /// True if the pass has inserted an `unreachable` instruction.
+  /// In such a case, lifetimes which have reached over this point are cut off and must be completed
+  /// by calling `completeLifetimes`.
+  var needCompleteLifetimes: Bool { bridgedPassContext.getNeedCompleteLifetimes() }
+
+  /// If `value` is true, notifies that a pass has inserted an `unreachable` instruction which might
+  /// have cut off any lifetimes.
+  /// A pass can set the notification to `false` again if an `unreachable` was inserted but the pass
+  /// knows that this didn't cut off any lifetimes.
+  func setNeedCompleteLifetimes(to value: Bool) { bridgedPassContext.setNeedCompleteLifetimes(value) }
 
   func fixStackNesting(in function: Function) {
     bridgedPassContext.fixStackNesting(function.bridged)

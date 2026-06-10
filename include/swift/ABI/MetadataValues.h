@@ -264,6 +264,8 @@ public:
   }
   
   /// True if values of this type can be copied.
+  /// NOTE: This is NOT accurate for types that are conditionally Copyable.
+  /// You may need to use `checkInvertibleRequirements`.
   bool isCopyable() const { return !(Data & IsNonCopyable); }
   constexpr TargetValueWitnessFlags withCopyable(bool isCopyable) const {
     return TargetValueWitnessFlags((Data & ~IsNonCopyable) |
@@ -1351,7 +1353,7 @@ public:
     return (Data & IsolationMask) == IsolatedAny;
   }
 
-  bool isNonIsolatedCaller() const {
+  bool isNonisolatedNonsending() const {
     return (Data & IsolationMask) == NonIsolatedNonsending;
   }
 
@@ -1793,6 +1795,12 @@ namespace SpecialPointerAuthDiscriminators {
   /// IsCurrentGlobalActor function used between the Swift runtime and
   /// concurrency runtime.
   const uint16_t IsCurrentGlobalActorFunction = 0xd1b8; // = 53688
+
+  /// Function pointers stored in the coro allocator struct.
+  const uint16_t CoroAllocationFunction = 0x5f95;   // = 24469
+  const uint16_t CoroDeallocationFunction = 0x9faf; // = 40879
+  const uint16_t CoroFrameAllocationFunction = 0xd251;   // = 53841
+  const uint16_t CoroFrameDeallocationFunction = 0x5ba8; // = 23464
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -2888,8 +2896,8 @@ enum class TaskStatusRecordKind : uint8_t {
   /// enqueued on.
   TaskExecutorPreference = 5,
 
-  /// A human-readable task name.
-  TaskName = 6,
+  /// Deprecated: A human-readable task name, replaced by `NameFragment`.
+  // DEPRECATED: TaskName = 6,
 
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
@@ -2904,9 +2912,9 @@ enum class TaskOptionRecordKind : uint8_t {
   InitialSerialExecutor = 0,
   /// Request a child task to be part of a specific task group.
   TaskGroup = 1,
-  /// DEPRECATED. AsyncLetWithBuffer is used instead.
+  /// UNUSED. AsyncLetWithBuffer is used instead.
   /// Request a child task for an 'async let'.
-  AsyncLet = 2,
+  // AsyncLet = 2,
   /// Request a child task for an 'async let'.
   AsyncLetWithBuffer = 3,
   /// Information about the result type of the task, used in embedded Swift.

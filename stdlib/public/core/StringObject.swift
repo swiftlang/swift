@@ -1115,14 +1115,13 @@ extension _StringObject {
   @_alwaysEmitIntoClient
   @inlinable
   @inline(__always)
-  @_unavailableInEmbedded
-  internal var owner: AnyObject? {
+  internal var owner: _ConvertedObject? {
     guard self.isMortal else { return nil }
     #if !$Embedded
     let unmanaged = unsafe Unmanaged<AnyObject>.fromOpaque(largeAddress)
     return unsafe unmanaged.takeUnretainedValue()
     #else
-    fatalError("unreachable in embedded Swift")
+    return unsafe unsafeBitCast(largeAddress, to: _ConvertedObject.self)
     #endif
   }
 }

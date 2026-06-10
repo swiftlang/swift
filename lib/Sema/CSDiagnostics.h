@@ -690,6 +690,12 @@ public:
 
   bool diagnoseAsNote() override;
 
+  /// If the type of a key path literal is read-only due to setter
+  /// availability constraints but the context requires a writable
+  /// key path, let's produce a tailed availability diagnostic that
+  /// points to the offending setter.
+  bool diagnoseKeyPathLiteralMutabilityMismatch() const;
+
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
 
@@ -948,7 +954,11 @@ public:
 #ifndef NDEBUG
     auto fnType1 = fromType->castTo<FunctionType>();
     auto fnType2 = toType->castTo<FunctionType>();
-    assert(fnType1->isThrowing() != fnType2->isThrowing());
+    // FIXME: `AnyFunctionType::isThrowing` is going to produce `true` for
+    // function that's with `throws(Never)`, we need to address that in
+    // `TypeSimplifier`.
+    assert(fnType1->getEffectiveThrownErrorType() &&
+           !fnType2->getEffectiveThrownErrorType());
 #endif
   }
 
@@ -1513,6 +1523,7 @@ private:
   /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
   bool diagnoseClosure(const ClosureExpr *closure);
+  bool diagnoseClosure(const ClosureExpr *closure, FunctionType *expectedType);
 
   /// Diagnose a single missing argument to a buildBlock call.
   bool diagnoseMissingResultBuilderElement() const;
@@ -1653,6 +1664,27 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference member from the wrong module with a module
+/// selector, e.g.
+///
+/// ```swift
+/// import Foo
+/// import Bar
+///
+/// SomeType.Bar::methodDefinedInFoo()
+/// ```
+class MemberFromWrongModuleFailure final : public FailureDiagnostic {
+  ValueDecl *Member;
+  DeclNameRef Name;
+
+public:
+  MemberFromWrongModuleFailure(const Solution &solution, DeclNameRef name,
+                               ValueDecl *member, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Member(member), Name(name) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose an attempt to reference member marked as `mutating`
 /// on immutable base e.g. `let` variable:
 ///
@@ -1776,6 +1808,20 @@ public:
         BaseType(resolveType(baseType)->getRValueType()) {}
 
   Type getBaseType() const { return BaseType; }
+
+  bool diagnoseAsError() override;
+};
+
+class InvalidProtocolMetatypeStaticMemberRefInKeyPath final
+    : public InvalidMemberRefInKeyPath {
+  Type BaseType;
+
+public:
+  InvalidProtocolMetatypeStaticMemberRefInKeyPath(
+      const Solution &solution, Type baseType, ValueDecl *member,
+      ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator),
+        BaseType(resolveType(baseType)->getRValueType()) {}
 
   bool diagnoseAsError() override;
 };
@@ -2428,6 +2474,15 @@ private:
   bool diagnoseMissingConformance() const;
 };
 
+class NonMetatypeDynamicTypeFailure final : public ContextualFailure {
+public:
+  NonMetatypeDynamicTypeFailure(const Solution &solution, Type instanceTy,
+                                Type metatypeTy, ConstraintLocator *locator)
+      : ContextualFailure(solution, instanceTy, metatypeTy, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 class MissingContextualBaseInMemberRefFailure final : public FailureDiagnostic {
   DeclNameRef MemberName;
 
@@ -2979,7 +3034,8 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Emit a warning for mismatched tuple labels.
+/// Emit a warning for mismatched tuple labels, which is upgraded to an error
+/// for a future language mode.
 class TupleLabelMismatchWarning final : public ContextualFailure {
 public:
   TupleLabelMismatchWarning(const Solution &solution, Type fromType,

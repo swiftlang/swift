@@ -143,17 +143,19 @@ struct AvailableValueStore {
                   liveness.getNumSubElements()),
         numBits(liveness.getNumSubElements()) {}
 
-  std::pair<AvailableValues *, bool> get(SILBasicBlock *block) {
+  std::pair<AvailableValues, bool> get(SILBasicBlock *block) {
     auto iter = blockToValues.try_emplace(block, AvailableValues());
 
     if (!iter.second) {
-      return {&iter.first->second, false};
+      return {iter.first->second, false};
     }
+
+    ASSERT(dataStore.size() >= (nextOffset + numBits) && "underallocated!");
 
     iter.first->second.values =
         MutableArrayRef<SILValue>(&dataStore[nextOffset], numBits);
     nextOffset += numBits;
-    return {&iter.first->second, true};
+    return {iter.first->second, true};
   }
 };
 
@@ -239,7 +241,7 @@ struct borrowtodestructure::Implementation {
 
   void cleanup();
 
-  AvailableValues &computeAvailableValues(SILBasicBlock *block);
+  AvailableValues computeAvailableValues(SILBasicBlock *block);
 
   /// Returns mark_unresolved_non_copyable_value if we are processing borrows or
   /// the enum argument if we are processing switch_enum.
@@ -302,6 +304,17 @@ bool Implementation::gatherUses(SILValue value) {
       // copyable values as normal uses.
       if (auto *cvi = dyn_cast<CopyValueInst>(nextUse->getUser())) {
         if (cvi->getOperand()->getType().isMoveOnly()) {
+          // Borrow accessor's callsite consists of copy_value +
+          // mark_unresolved_non_copyable_value instructions.
+          // It's diagnostics are driven by the
+          // mark_unresolved_non_copyable_value instruction.
+          // Ignore the copy_value uses to avoid an incoherent error.
+          if (cvi->getOperand()->isBorrowAccessorResult()) {
+            assert(isa<MarkUnresolvedNonCopyableValueInst>(
+                cvi->getSingleConsumingUse()->getUser()));
+            continue;
+          }
+
           LLVM_DEBUG(llvm::dbgs() << "        Found copy value of move only "
                                      "field... looking through!\n");
           for (auto *use : cvi->getUses())
@@ -691,23 +704,24 @@ static void dumpSmallestTypeAvailable(
 /// ensures that we match at the source level the assumption by users that they
 /// can use entire valid parts as late as possible. If we were to do it earlier
 /// we would emit errors too early.
-AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
+AvailableValues Implementation::computeAvailableValues(SILBasicBlock *block) {
   LLVM_DEBUG(llvm::dbgs() << "    Computing Available Values For bb"
                           << block->getDebugID() << '\n');
 
   // First grab our block. If we already have state for the block, just return
   // its available values. We already computed the available values and
   // potentially updated it with new destructured values for our block.
+  ASSERT(blockToAvailableValues.has_value());
   auto pair = blockToAvailableValues->get(block);
   if (!pair.second) {
     LLVM_DEBUG(llvm::dbgs()
                << "        Already have values! Returning them!\n");
-    LLVM_DEBUG(pair.first->print(llvm::dbgs(), "            "));
-    return *pair.first;
+    LLVM_DEBUG(pair.first.print(llvm::dbgs(), "            "));
+    return pair.first;
   }
 
   LLVM_DEBUG(llvm::dbgs() << "        No values computed! Initializing!\n");
-  auto &newValues = *pair.first;
+  AvailableValues newValues = pair.first;
 
   // Otherwise, we need to initialize our available values with predecessor
   // information.
@@ -814,7 +828,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
                  << "        Recursively loading its available values to "
                     "compute initial smallest type available for block bb"
                  << block->getDebugID() << '\n');
-      auto &predAvailableValues = computeAvailableValues(bb);
+      auto predAvailableValues = computeAvailableValues(bb);
       LLVM_DEBUG(
           llvm::dbgs()
           << "        Computing initial smallest type available for block bb"
@@ -841,7 +855,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
                               << bb->getDebugID() << '\n');
       LLVM_DEBUG(llvm::dbgs()
                  << "        Recursively loading its available values!\n");
-      auto &predAvailableValues = computeAvailableValues(bb);
+      auto predAvailableValues = computeAvailableValues(bb);
       for (unsigned i : range(predAvailableValues.size())) {
         if (!smallestTypeAvailable[i].has_value())
           continue;
@@ -881,7 +895,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
   for (auto *predBlock : predsSkippingBackEdges) {
     SWIFT_DEFER { typeSpanToValue.clear(); };
 
-    auto &predAvailableValues = computeAvailableValues(predBlock);
+    auto predAvailableValues = computeAvailableValues(predBlock);
 
     // First go through our available values and initialize our interval map. We
     // should never fail to insert. We want to insert /all/ available values so
@@ -930,7 +944,8 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
       // earlier value required. Instead, we do a final loop afterwards using
       // the interval map to update each available value.
       auto loc = getSafeLoc(predBlock->getTerminator());
-      SILBuilderWithScope builder(predBlock->getTerminator());
+      SILBuilderWithScope builder(predBlock->getTerminator(),
+                                  &interface.createdDestructures);
 
       while (smallestOffsetSize->first.size < iterOffsetSize.size) {
         // Before we destructure ourselves, erase our entire value from the
@@ -952,11 +967,21 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
             loc, predAvailableValues[i], [&](unsigned index, SILValue value) {
               // Now, wire up our new value to its span in the interval map.
               TypeSubElementCount childSize(value);
-              typeSpanToValue.insert(childOffsetIterator, childSize, value);
+              typeSpanToValue.insert(childOffsetIterator,
+                                     childOffsetIterator + childSize, value);
 
               // Update childOffsetIterator so it points at our next child.
               childOffsetIterator += childSize;
             });
+
+        {
+          // Update iterOffsetSize based on the current state of
+          // typeSpanToValue.
+          auto iter = typeSpanToValue.find(i);
+          assert(iter != typeSpanToValue.end());
+          auto iterValue = iter.value();
+          iterOffsetSize = TypeOffsetSizePair(iterValue, getRootValue());
+        }
       }
     }
 
@@ -997,7 +1022,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
     // phis.
     SILValue sameValue;
     for (auto *predBlock : predsSkippingBackEdges) {
-      auto &predAvailableValues = computeAvailableValues(predBlock);
+      auto predAvailableValues = computeAvailableValues(predBlock);
       if (!sameValue) {
         sameValue = predAvailableValues[i];
       } else if (sameValue != predAvailableValues[i]) {
@@ -1018,7 +1043,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
     }
 
     for (auto *predBlock : predsSkippingBackEdges) {
-      auto &predAvailableValues = computeAvailableValues(predBlock);
+      auto predAvailableValues = computeAvailableValues(predBlock);
       addNewEdgeValueToBranch(predBlock->getTerminator(), block,
                               predAvailableValues[i], deleter);
     }
@@ -1181,7 +1206,7 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
     // block.
     LLVM_DEBUG(llvm::dbgs()
                << "    Found needed bits! Propagating available values!\n");
-    auto &availableValues = computeAvailableValues(block);
+    auto availableValues = computeAvailableValues(block);
     LLVM_DEBUG(llvm::dbgs() << "    Computed available values for block bb"
                             << block->getDebugID() << '\n';
                availableValues.print(llvm::dbgs(), "        "));

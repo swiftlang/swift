@@ -58,7 +58,7 @@ func intToAll<T>(_ x: Int) -> T {
   return x as! T
 }
 
-// CHECK: define hidden swiftcc i64 @"$s13generic_casts8anyToIntySiypF"(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden swiftcc i64 @"$s13generic_casts8anyToIntySiypF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 func anyToInt(_ x: Any) -> Int {
   return x as! Int
 }
@@ -104,7 +104,7 @@ func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
 protocol P {}
 protocol Q {}
 
-// CHECK: define hidden swiftcc void @"$s13generic_casts19compositionToMemberyAA1P_pAaC_AA1QpF{{.*}}"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK: define hidden swiftcc void @"$s13generic_casts19compositionToMemberyAA1P_pAaC_AA1QpF{{.*}}"(ptr noalias sret({{.*}}) captures(none) %0, ptr noalias captures(none) dereferenceable({{.*}}) %1) {{.*}} {
 func compositionToMember(_ a: P & Q) -> P {
   return a
 }

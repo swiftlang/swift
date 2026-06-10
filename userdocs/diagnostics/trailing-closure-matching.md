@@ -1,11 +1,13 @@
-# Argument Matching for Trailing Closures
+# Argument matching for trailing closures (TrailingClosureMatching)
+
+## Overview
 
 Where trailing closures are used to pass one or more arguments to a function, the argument label for the first trailing closure is always omitted:
 
 ```swift
 func animate(
-  withDuration duration: Double, 
-  animations: () -> Void, 
+  withDuration duration: Double,
+  animations: () -> Void,
   completion: (() -> Void)? = nil
 ) { /* ... */ }
 
@@ -40,8 +42,8 @@ When scanning forwards to match an unlabeled trailing closure argument, the comp
 
 ```swift
 func animate(
-  withDuration duration: Double = 1.0, 
-  animations: () -> Void, 
+  withDuration duration: Double = 1.0,
+  animations: () -> Void,
   completion: (() -> Void)? = nil
 ) { /* ... */ }
 
@@ -60,7 +62,7 @@ animate {
 
 For source compatibility in Swift 5, the compiler will attempt to apply *both* the new forward scanning rule and the old backward scanning rule when it encounters a function call with a single trailing closure. If the forward and backward scans produce *different valid* matches of arguments to parameters, the compiler will prefer the result of the backward scanning rule and produce a warning. To silence this warning, rewrite the function call to label the argument explicitly without using trailing closure syntax.
 
-## Structural Resemblance to a Function Type
+## Structural resemblance to a function type
 
 A parameter structurally resembles a function type if both of the following are true:
 
@@ -73,7 +75,7 @@ The adjusted type of the parameter is the parameter's type as it appears in the 
 2. If the parameter is variadic, look at the base element type.
 3. Remove all outer "optional" types.
 
-## Heuristic for Skipping Parameters
+## Heuristic for skipping parameters
 
 To maintain source compatibility, the forward scanning rule applies an additional heuristic when matching trailing closure arguments. If:
 
@@ -107,4 +109,7 @@ showAlert(message: "Hello, World!") {
 }
 ```
 
-To learn more about argument matching for trailing closures, see [Swift Evolution Proposal SE-0286](https://github.com/apple/swift-evolution/blob/master/proposals/0286-forward-scan-trailing-closures.md).
+## See Also
+
+- [SE-0279: Multiple trailing closures](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0279-multiple-trailing-closures.md)
+- [SE-0286: Forward-scan matching for trailing closures](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0286-forward-scan-trailing-closures.md)

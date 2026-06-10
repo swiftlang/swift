@@ -10,13 +10,13 @@
 // RUN: %FileCheck -check-prefix CHECK-RECOVERY %s < %t.txt
 // RUN: %FileCheck -check-prefix CHECK-RECOVERY-NEGATIVE %s < %t.txt
 
-// RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -DVERIFY %s -verify
+// RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -DVERIFY %s -verify -verify-ignore-unrelated
 // RUN: %target-swift-frontend -emit-silgen -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s | %FileCheck -check-prefix CHECK-SIL %s
 
 // RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -DTEST %s | %FileCheck --check-prefixes=CHECK-IR,CHECK-IR-%target-runtime %s
 // RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s | %FileCheck --check-prefixes=CHECK-IR,CHECK-IR-%target-runtime %s
 
-// RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD %S/Inputs/typedefs-helper.swift -verify
+// RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD %S/Inputs/typedefs-helper.swift -verify -verify-ignore-unrelated
 
 #if TEST
 
@@ -58,7 +58,6 @@ let _ = wrapped // expected-error {{cannot find 'wrapped' in scope}}
 let _ = unwrapped // okay
 
 _ = usesWrapped(nil) // expected-error {{cannot find 'usesWrapped' in scope}}
-                     // expected-error@-1 {{'nil' requires a contextual type}}
 _ = usesUnwrapped(nil) // expected-error {{'nil' is not compatible with expected argument type 'Int32'}}
 
 let _: WrappedAlias = nil // expected-error {{cannot find type 'WrappedAlias' in scope}}

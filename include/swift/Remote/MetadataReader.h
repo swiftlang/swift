@@ -457,18 +457,20 @@ public:
         swift::Demangle::NodePointer {
       // Resolve the reference to a remote address.
       auto offsetInMangledName =
-            (const char *)base - mangledName.getLocalBuffer();
-      auto remoteAddress =
-          mangledName.getRemoteAddress() + offsetInMangledName + offset;
+          (const char *)base - mangledName.getLocalBuffer();
+      auto offsetAddress = mangledName.getRemoteAddress() + offsetInMangledName;
 
       RemoteAbsolutePointer resolved;
       if (directness == Directness::Indirect) {
+        auto remoteAddress = Reader->resolveIndirectAddressAtOffset(
+            offsetAddress, offset, /*directnessEncodedInOffset=*/false);
         if (auto indirectAddress = readPointer(remoteAddress)) {
           resolved = stripSignedPointer(*indirectAddress);
         } else {
           return nullptr;
         }
       } else {
+        auto remoteAddress = offsetAddress + offset;
         resolved = Reader->getSymbol(remoteAddress);
       }
 
@@ -1241,6 +1243,23 @@ public:
       TypeCache[TypeCacheKey] = BuiltForeign;
       return BuiltForeign;
     }
+    case MetadataKind::FixedArray: {
+      auto fixedArray = cast<TargetFixedArrayTypeMetadata<Runtime>>(Meta);
+      auto elementAddress = RemoteAddress(
+          fixedArray->Element, MetadataAddress.getAddressSpace());
+      auto Element =
+          readTypeFromMetadata(elementAddress, false, recursion_limit);
+      if (!Element) return BuiltType();
+
+      auto count = static_cast<intptr_t>(fixedArray->Count);
+      BuiltType Size = (count < 0) ? Builder.createNegativeIntegerType(count)
+                                   : Builder.createIntegerType(count);
+      if (!Size) return BuiltType();
+
+      auto BuiltFixedArray = Builder.createBuiltinFixedArrayType(Size, Element);
+      TypeCache[TypeCacheKey] = BuiltFixedArray;
+      return BuiltFixedArray;
+    }
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
@@ -1491,33 +1510,33 @@ public:
       break;
     case ContextDescriptorKind::Extension:
       success =
-          readFullContextDescriptor<TargetExtensionContextDescriptor<Runtime>>(
-              remoteAddress, ptr);
+          readFullTrailingObjects<TargetExtensionContextDescriptor<Runtime>>(
+              remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::Anonymous:
       success =
-          readFullContextDescriptor<TargetAnonymousContextDescriptor<Runtime>>(
-              remoteAddress, ptr);
+          readFullTrailingObjects<TargetAnonymousContextDescriptor<Runtime>>(
+              remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::Class:
-      success = readFullContextDescriptor<TargetClassDescriptor<Runtime>>(
-          remoteAddress, ptr);
+      success = readFullTrailingObjects<TargetClassDescriptor<Runtime>>(
+          remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::Enum:
-      success = readFullContextDescriptor<TargetEnumDescriptor<Runtime>>(
-          remoteAddress, ptr);
+      success = readFullTrailingObjects<TargetEnumDescriptor<Runtime>>(
+          remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::Struct:
-      success = readFullContextDescriptor<TargetStructDescriptor<Runtime>>(
-          remoteAddress, ptr);
+      success = readFullTrailingObjects<TargetStructDescriptor<Runtime>>(
+          remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::Protocol:
-      success = readFullContextDescriptor<TargetProtocolDescriptor<Runtime>>(
-          remoteAddress, ptr);
+      success = readFullTrailingObjects<TargetProtocolDescriptor<Runtime>>(
+          remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::OpaqueType:
-      success = readFullContextDescriptor<TargetOpaqueTypeDescriptor<Runtime>>(
-          remoteAddress, ptr);
+      success = readFullTrailingObjects<TargetOpaqueTypeDescriptor<Runtime>>(
+          remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     default:
       // We don't know about this kind of context.
@@ -1533,14 +1552,21 @@ public:
     return ContextDescriptorRef(remoteAddress, descriptor);
   }
 
-  template <typename DescriptorTy>
-  bool readFullContextDescriptor(RemoteAddress address,
-                                 MemoryReader::ReadBytesResult &ptr) {
+  /// Read all memory occupied by a value with TrailingObjects. This will
+  /// incrementally read pieces of the object to figure out the full size of it.
+  ///   - address: The address of the value.
+  ///   - ptr: The bytes that have been read so far. On return, the full object.
+  ///   - existingByteCount: The number of bytes in ptr.
+  /// Returns the full size, or 0 if an error occurred.
+  template <typename BaseTy>
+  size_t readFullTrailingObjects(RemoteAddress address,
+                                 MemoryReader::ReadBytesResult &ptr,
+                                 size_t existingByteCount) {
     // Read the full base descriptor if it's bigger than what we have so far.
-    if (sizeof(DescriptorTy) > sizeof(TargetContextDescriptor<Runtime>)) {
-      ptr = Reader->template readObj<DescriptorTy>(address);
+    if (sizeof(BaseTy) > existingByteCount) {
+      ptr = Reader->template readObj<BaseTy>(address);
       if (!ptr)
-        return false;
+        return -1;
     }
 
     // We don't know how much memory we need to read to get all the trailing
@@ -1554,20 +1580,24 @@ public:
     // size. Once we've walked through all the trailing objects, we've read
     // everything.
 
-    size_t sizeSoFar = sizeof(DescriptorTy);
+    size_t sizeSoFar = sizeof(BaseTy);
 
-    for (size_t i = 0; i < DescriptorTy::trailingTypeCount(); i++) {
-      const DescriptorTy *descriptorSoFar =
-          reinterpret_cast<const DescriptorTy *>(ptr.get());
+    for (size_t i = 0; i < BaseTy::trailingTypeCount(); i++) {
+      const BaseTy *descriptorSoFar =
+          reinterpret_cast<const BaseTy *>(ptr.get());
       size_t thisSize = descriptorSoFar->sizeWithTrailingTypeCount(i);
       if (thisSize > sizeSoFar) {
+        // Make sure we haven't ended up with a ridiculous size.
+        if (thisSize > MaxMetadataSize)
+          return -1;
+
         ptr = Reader->readBytes(address, thisSize);
         if (!ptr)
-          return false;
+          return -1;
         sizeSoFar = thisSize;
       }
     }
-    return true;
+    return sizeSoFar;
   }
 
   /// Demangle the entity represented by a symbolic reference to a given symbol name.
@@ -2084,17 +2114,19 @@ protected:
     
     using SignedPointer = typename std::make_signed<StoredPointer>::type;
 
-    RemoteAddress resultAddress = getAddress(fieldRef) + (SignedPointer)offset;
-
     // Low bit set in the offset indicates that the offset leads to the absolute
     // address in memory.
     if (indirect) {
+      RemoteAddress resultAddress = Reader->resolveIndirectAddressAtOffset(
+          getAddress(fieldRef), (SignedPointer)offset,
+          /*directnessEncodedInOffset=*/true);
       if (auto ptr = readPointer(resultAddress)) {
         return stripSignedPointer(*ptr);
       }
       return std::nullopt;
     }
 
+    RemoteAddress resultAddress = getAddress(fieldRef) + (SignedPointer)offset;
     return RemoteAbsolutePointer(resultAddress);
   }
 
@@ -2131,61 +2163,42 @@ protected:
                          reinterpret_cast<const TargetMetadata<Runtime> *>(
                              cached->second.get()));
 
+    return readMetadataAndSize(address).first;
+  }
+
+  std::pair<MetadataRef, size_t> readMetadataAndSize(RemoteAddress address) {
     StoredPointer KindValue = 0;
     if (!Reader->readInteger(address, &KindValue))
-      return nullptr;
+      return {nullptr, 0};
 
     switch (getEnumeratedMetadataKind(KindValue)) {
       case MetadataKind::Class:
-
-        return _readMetadata<TargetClassMetadataType>(address);
-
+        return _readMetadataFixedSize<TargetClassMetadataType>(address);
       case MetadataKind::Enum:
-        return _readMetadata<TargetEnumMetadata>(address);
+        return _readMetadataFixedSize<TargetEnumMetadata>(address);
       case MetadataKind::ErrorObject:
-        return _readMetadata<TargetEnumMetadata>(address);
-      case MetadataKind::Existential: {
-        RemoteAddress flagsAddress = address + sizeof(StoredPointer);
-
-        ExistentialTypeFlags::int_type flagsData;
-        if (!Reader->readInteger(flagsAddress, &flagsData))
-          return nullptr;
-
-        ExistentialTypeFlags flags(flagsData);
-
-        RemoteAddress numProtocolsAddress = flagsAddress + sizeof(flagsData);
-        uint32_t numProtocols;
-        if (!Reader->readInteger(numProtocolsAddress, &numProtocols))
-          return nullptr;
-
-        // Make sure the number of protocols is reasonable
-        if (numProtocols >= 256)
-          return nullptr;
-
-        auto totalSize = sizeof(TargetExistentialTypeMetadata<Runtime>)
-          + numProtocols *
-          sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
-
-        if (flags.hasSuperclassConstraint())
-          totalSize += sizeof(StoredPointer);
-
-        return _readMetadata(address, totalSize);
-      }
+        return _readMetadataFixedSize<TargetMetadata>(address);
+      case MetadataKind::Existential:
+        return _readMetadataVariableSize<TargetExistentialTypeMetadata>(
+            address);
       case MetadataKind::ExistentialMetatype:
-        return _readMetadata<TargetExistentialMetatypeMetadata>(address);
+        return _readMetadataFixedSize<TargetExistentialMetatypeMetadata>(
+            address);
       case MetadataKind::ExtendedExistential: {
         // We need to read the shape in order to figure out how large
-        // the generalization arguments are.
+        // the generalization arguments are. This prevents us from using
+        // _readMetadataVariableSize, which requires the Shape field to be
+        // dereferenceable here.
         RemoteAddress shapeAddress = address + sizeof(StoredPointer);
         RemoteAddress signedShapePtr;
         if (!Reader->template readRemoteAddress<StoredPointer>(shapeAddress,
                                                                signedShapePtr))
-          return nullptr;
+          return {nullptr, 0};
         auto shapePtr = stripSignedPointer(signedShapePtr);
 
         auto shape = readShape(shapePtr);
         if (!shape)
-          return nullptr;
+          return {nullptr, 0};
 
         auto totalSize =
             sizeof(TargetExtendedExistentialTypeMetadata<Runtime>)
@@ -2194,69 +2207,47 @@ protected:
         return _readMetadata(address, totalSize);
       }
       case MetadataKind::ForeignClass:
-        return _readMetadata<TargetForeignClassMetadata>(address);
+        return _readMetadataFixedSize<TargetForeignClassMetadata>(address);
       case MetadataKind::ForeignReferenceType:
-        return _readMetadata<TargetForeignReferenceTypeMetadata>(address);
-      case MetadataKind::Function: {
-        StoredSize flagsValue;
-        auto flagsAddr =
-            address + TargetFunctionTypeMetadata<Runtime>::OffsetToFlags;
-        if (!Reader->readInteger(flagsAddr, &flagsValue))
-          return nullptr;
-
-        auto flags =
-            TargetFunctionTypeFlags<StoredSize>::fromIntValue(flagsValue);
-
-        auto totalSize =
-            sizeof(TargetFunctionTypeMetadata<Runtime>) +
-            flags.getNumParameters() * sizeof(FunctionTypeMetadata::Parameter);
-
-        if (flags.hasParameterFlags())
-          totalSize += flags.getNumParameters() * sizeof(uint32_t);
-
-        if (flags.isDifferentiable())
-          totalSize = roundUpToAlignment(totalSize, sizeof(StoredPointer)) +
-              sizeof(TargetFunctionMetadataDifferentiabilityKind<
-                  typename Runtime::StoredSize>);
-
-        return _readMetadata(address,
-                             roundUpToAlignment(totalSize, sizeof(StoredPointer)));
-      }
+        return _readMetadataFixedSize<TargetForeignReferenceTypeMetadata>(
+            address);
+      case MetadataKind::Function:
+        return _readMetadataVariableSize<TargetFunctionTypeMetadata>(address);
       case MetadataKind::HeapGenericLocalVariable:
-        return _readMetadata<TargetGenericBoxHeapMetadata>(address);
+        return _readMetadataFixedSize<TargetGenericBoxHeapMetadata>(address);
       case MetadataKind::HeapLocalVariable:
-        return _readMetadata<TargetHeapLocalVariableMetadata>(address);
+        return _readMetadataFixedSize<TargetHeapLocalVariableMetadata>(address);
       case MetadataKind::Metatype:
-        return _readMetadata<TargetMetatypeMetadata>(address);
+        return _readMetadataFixedSize<TargetMetatypeMetadata>(address);
       case MetadataKind::ObjCClassWrapper:
-        return _readMetadata<TargetObjCClassWrapperMetadata>(address);
+        return _readMetadataFixedSize<TargetObjCClassWrapperMetadata>(address);
       case MetadataKind::Optional:
-        return _readMetadata<TargetEnumMetadata>(address);
+        return _readMetadataFixedSize<TargetEnumMetadata>(address);
       case MetadataKind::Struct:
-        return _readMetadata<TargetStructMetadata>(address);
+        return _readMetadataFixedSize<TargetStructMetadata>(address);
       case MetadataKind::Tuple: {
         auto numElementsAddress = address +
           TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements();
         StoredSize numElements;
         if (!Reader->readInteger(numElementsAddress, &numElements))
-          return nullptr;
+          return {nullptr, 0};
         auto totalSize = sizeof(TargetTupleTypeMetadata<Runtime>) +
                          numElements * sizeof(TupleTypeMetadata::Element);
 
         // Make sure the number of elements is reasonable
         if (numElements >= 256)
-          return nullptr;
+          return {nullptr, 0};
 
         return _readMetadata(address, totalSize);
       }
       case MetadataKind::Opaque:
       default:
-        return _readMetadata<TargetOpaqueMetadata>(address);
+        return _readMetadataFixedSize<TargetOpaqueMetadata>(address);
     }
 
     // We can fall out here if the value wasn't actually a valid
     // MetadataKind.
-    return nullptr;
+    return {nullptr, 0};
   }
 
   RemoteAddress
@@ -2329,20 +2320,39 @@ protected:
 
 private:
   template <template <class R> class M>
-  MetadataRef _readMetadata(RemoteAddress address) {
+  std::pair<MetadataRef, size_t> _readMetadataFixedSize(RemoteAddress address) {
+    static_assert(!ABI::typeHasTrailingObjects<M<Runtime>>(),
+                  "Type must not have trailing objects. Use "
+                  "_readMetadataVariableSize for types that have them.");
+
     return _readMetadata(address, sizeof(M<Runtime>));
   }
 
-  MetadataRef _readMetadata(RemoteAddress address, size_t sizeAfter) {
-    if (sizeAfter > MaxMetadataSize)
-      return nullptr;
-    auto readResult = Reader->readBytes(address, sizeAfter);
-    if (!readResult)
-      return nullptr;
+  template <template <class R> class M>
+  std::pair<MetadataRef, size_t> _readMetadataVariableSize(RemoteAddress address) {
+    static_assert(ABI::typeHasTrailingObjects<M<Runtime>>(),
+                  "Type must have trailing objects. Use _readMetadataFixedSize "
+                  "for types that don't.");
 
+    MemoryReader::ReadBytesResult bytes;
+    auto readResult = readFullTrailingObjects<M<Runtime>>(address, bytes, 0);
+    if (readResult == 0)
+      return {nullptr, 0};
+    return {_cacheMetadata(address, bytes), readResult};
+  }
+
+  std::pair<MetadataRef, size_t> _readMetadata(RemoteAddress address, size_t sizeAfter) {
+    if (sizeAfter > MaxMetadataSize)
+      return {nullptr, 0};
+    auto readResult = Reader->readBytes(address, sizeAfter);
+    return {_cacheMetadata(address, readResult), sizeAfter};
+  }
+
+  MetadataRef _cacheMetadata(RemoteAddress address,
+                             MemoryReader::ReadBytesResult &bytes) {
     auto metadata =
-        reinterpret_cast<const TargetMetadata<Runtime> *>(readResult.get());
-    MetadataCache.insert(std::make_pair(address, std::move(readResult)));
+        reinterpret_cast<const TargetMetadata<Runtime> *>(bytes.get());
+    MetadataCache.insert(std::make_pair(address, std::move(bytes)));
     return MetadataRef(address, metadata);
   }
 
@@ -2656,6 +2666,26 @@ private:
   }
 
   Demangle::NodePointer
+  buildContextDescriptorManglingForSymbol(llvm::StringRef symbol,
+                                          Demangler &dem) {
+    if (auto demangledSymbol = buildContextManglingForSymbol(symbol, dem)) {
+      // Look through Type nodes since we're building up a mangling here.
+      if (demangledSymbol->getKind() == Demangle::Node::Kind::Type) {
+        demangledSymbol = demangledSymbol->getChild(0);
+      }
+      return demangledSymbol;
+    }
+
+    return nullptr;
+  }
+
+  Demangle::NodePointer
+  buildContextDescriptorManglingForSymbol(const std::string &symbol,
+                                          Demangler &dem) {
+    return buildContextDescriptorManglingForSymbol(dem.copyString(symbol), dem);
+  }
+
+  Demangle::NodePointer
   buildContextDescriptorMangling(const ParentContextDescriptorRef &descriptor,
                                  Demangler &dem, int recursion_limit) {
     if (recursion_limit <= 0) {
@@ -2668,15 +2698,7 @@ private:
     
     // Try to demangle the symbol name to figure out what context it would
     // point to.
-    auto demangledSymbol = buildContextManglingForSymbol(descriptor.getSymbol(),
-                                                         dem);
-    if (!demangledSymbol)
-      return nullptr;
-    // Look through Type notes since we're building up a mangling here.
-    if (demangledSymbol->getKind() == Demangle::Node::Kind::Type){
-      demangledSymbol = demangledSymbol->getChild(0);
-    }
-    return demangledSymbol;
+    return buildContextDescriptorManglingForSymbol(descriptor.getSymbol(), dem);
   }
 
   Demangle::NodePointer
@@ -2684,6 +2706,18 @@ private:
                                  Demangler &dem, int recursion_limit) {
     if (recursion_limit <= 0) {
       return nullptr;
+    }
+
+    // Check if the Reader can provide a symbol for this descriptor, and if it 
+    // can, use that instead.
+    if (auto remoteAbsolutePointer =
+            Reader->resolvePointerAsSymbol(descriptor.getRemoteAddress())) {
+      auto symbol = remoteAbsolutePointer->getSymbol();
+      if (!symbol.empty()) {
+        if (auto demangledSymbol = buildContextDescriptorManglingForSymbol(symbol, dem)) {
+          return demangledSymbol;
+        }
+      }
     }
 
     // Read the parent descriptor.
@@ -2919,7 +2953,7 @@ private:
       RemoteAddress address(descriptor.getRemoteAddress());
       address = Reader->resolveRemoteAddress(address).value_or(address);
       snprintf(addressBuf, sizeof(addressBuf), "$%" PRIx64,
-               (uint64_t)descriptor.getRemoteAddress().getRawAddress());
+               (uint64_t)address.getRawAddress());
       auto anonNode = dem.createNode(Node::Kind::AnonymousContext);
       CharVector addressStr;
       addressStr.append(addressBuf, dem);
@@ -3138,13 +3172,27 @@ private:
     
     auto numGenericArgs =
       generics->getGenericContextHeader().getNumArguments();
-    
+
     auto offsetToGenericArgs = readGenericArgsOffset(metadata, descriptor);
     if (!offsetToGenericArgs)
       return {};
 
-    auto genericArgsAddr = getAddress(metadata)
+    auto genericArgsBaseAddr = getAddress(metadata)
       + sizeof(StoredPointer) * *offsetToGenericArgs;
+
+    // The generic argument layout begins with one StoredSize "shape class"
+    // entry per same-shape equivalence class. These hold pack lengths for
+    // pack-typed key arguments. Skip past them to reach the metadata pointers.
+    auto packShapeHeader = generics->getGenericPackShapeHeader();
+    auto packShapeDescriptors = generics->getGenericPackShapeDescriptors();
+    if (numGenericArgs < packShapeHeader.NumShapeClasses)
+      return {};
+    numGenericArgs -= packShapeHeader.NumShapeClasses;
+
+    auto genericArgsAddr = genericArgsBaseAddr
+      + sizeof(StoredPointer) * packShapeHeader.NumShapeClasses;
+
+    unsigned packIndex = 0;
 
     std::vector<BuiltType> builtSubsts;
     for (auto param : generics->getGenericParams()) {
@@ -3175,10 +3223,65 @@ private:
           return {};
         }
         break;
-        
+
       case GenericParamKind::TypePack:
-        // assert(false && "Packs not supported here yet");
-        return {};
+        if (param.hasKeyArgument()) {
+          if (numGenericArgs == 0)
+            return {};
+          --numGenericArgs;
+
+          // Find the matching pack shape descriptor. By invariant the
+          // metadata pack descriptors come before any witness table pack
+          // descriptors, in the same order as the pack-typed parameters
+          // with key arguments, so the next descriptor is ours.
+          if (packIndex >= packShapeDescriptors.size())
+            return {};
+          const auto &packDescriptor = packShapeDescriptors[packIndex++];
+          if (packDescriptor.Kind != GenericPackKind::Metadata)
+            return {};
+
+          // The pack length is stored in the shape class slot at the
+          // start of the generic argument layout.
+          auto packLengthAddr = genericArgsBaseAddr
+            + sizeof(StoredPointer) * packDescriptor.ShapeClass;
+          StoredSize packLength;
+          if (!Reader->readInteger(packLengthAddr, &packLength))
+            return {};
+
+          // Read the pack pointer. Its low bit indicates heap vs. stack
+          // lifetime; the actual element array is at the address with the
+          // low bit cleared.
+          StoredPointer rawPackPtr;
+          if (!Reader->readInteger(genericArgsAddr, &rawPackPtr))
+            return {};
+          genericArgsAddr += sizeof(StoredPointer);
+
+          auto packElementsAddr = RemoteAddress(
+              rawPackPtr & ~StoredPointer(1),
+              genericArgsAddr.getAddressSpace());
+
+          std::vector<BuiltType> elements;
+          elements.reserve(packLength);
+          for (StoredSize i = 0; i < packLength; ++i) {
+            RemoteAddress elementMetadata;
+            if (!Reader->template readRemoteAddress<StoredPointer>(
+                    packElementsAddr, elementMetadata)) {
+              return {};
+            }
+            packElementsAddr += sizeof(StoredPointer);
+
+            auto builtElement = readTypeFromMetadata(
+                elementMetadata, false, recursion_limit);
+            if (!builtElement)
+              return {};
+            elements.push_back(builtElement);
+          }
+
+          builtSubsts.push_back(Builder.createPackType(elements));
+        } else {
+          return {};
+        }
+        break;
 
       default:
         // We don't know about this kind of parameter.

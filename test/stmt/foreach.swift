@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -disable-typo-correction
 
 // Bad containers and ranges
 struct BadContainer1 {
@@ -352,6 +352,29 @@ do {
   }
 }
 
+protocol PSeq: Sequence where Self.Element: P {}
+
+protocol HasPSeq {
+  associatedtype X: PSeq
+  func pseq() -> X
+}
+
+// Make sure we can type-check the existential erasure in this case.
+func testExistentialElementErasure(_ x: any HasPSeq) {
+  for _ in x.pseq() {}
+}
+
+struct IntIter: IteratorProtocol {
+  func next() -> Int? { nil }
+}
+protocol IntSeq: Sequence where Iterator == IntIter {}
+
+func testExistentialWithConcreteIter(_ xs: any IntSeq) {
+  for x in xs {
+    let _: Int = x
+  }
+}
+
 // Make sure the bodies still type-check okay if the preamble is invalid.
 func testInvalidPreamble() {
   func takesAutoclosure(_ x: @autoclosure () -> Int) -> Int { 0 }
@@ -362,5 +385,40 @@ func testInvalidPreamble() {
   for x in undefined { // expected-error {{cannot find 'undefined' in scope}}
     let b: Int = x  // No type error, `x` is invalid.
     _ = "" as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
+  }
+}
+
+func testFlatMap() {
+  struct S {
+    var ys: [Int]
+  }
+  func foo(_ xs: [S]) {
+    // Make sure we pick the flattening overload instead of the compactMap
+    // compatibility overload.
+    for x in xs.flatMap({ $0.ys }) {
+      let _: Int = x
+    }
+  }
+}
+
+func testInvalidContainerNotInScope(){
+  for x in (a,b) {} // expected-error {{for-in loop requires '(_, _)' to conform to 'Sequence'}}
+  // expected-error@-1 {{cannot find 'a' in scope}} 
+  // expected-error@-2 {{cannot find 'b' in scope}}
+}
+
+// A Sequence conformance that is unconditionally unavailable. Previously this
+// crashed in DesugarForEachStmtRequest because the diagnostic path called
+// AvailabilityRange::getVersionString() on an unversioned constraint.
+struct UnavailableSeq {
+  func makeIterator() -> AnyIterator<Int> { AnyIterator { nil } }
+}
+
+@available(*, unavailable)
+extension UnavailableSeq: Sequence {}
+
+func testUnavailableSequenceConformance(seq: UnavailableSeq) {
+  for x in seq { // expected-error {{for-in loop requires 'UnavailableSeq' to conform to 'Sequence', but the conformance is unavailable}}
+    _ = x
   }
 }

@@ -30,6 +30,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/ThrownErrorDestination.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/AccessControls.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -154,12 +155,12 @@ protected:
     Implicit : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(CollectionExpr, Expr, 64-NumExprBits,
+  SWIFT_INLINE_BITFIELD_FULL(CollectionExpr, Expr, 64-NumberOfExprBits,
     /// True if the type of this collection expr was inferred by the collection
     /// fallback type, like [Any].
     IsTypeDefaulted : 1,
     /// Number of comma source locations.
-    NumCommas : 32 - 1 - NumExprBits,
+    NumCommas : 32 - 1 - NumberOfExprBits,
     /// Number of entries in the collection. If this is a DictionaryExpr,
     /// each entry is a Tuple with the key and value pair.
     NumSubExprs : 32
@@ -193,16 +194,16 @@ protected:
     LiteralCapacity : 32
   );
 
-  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+3+1+1,
+  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+4+1+1,
     Semantics : 2, // an AccessSemantics
-    FunctionRefInfo : 3,
+    FunctionRefInfo : 4,
     IsImplicitlyAsync : 1,
     IsImplicitlyThrows : 1
   );
 
-  SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+3,
+  SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+4,
     DeclRefKind : 2,
-    FunctionRefInfo : 3
+    FunctionRefInfo : 4
   );
 
   SWIFT_INLINE_BITFIELD(MemberRefExpr, LookupExpr, 2,
@@ -225,8 +226,8 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 3,
-    FunctionRefInfo : 3
+  SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 4,
+    FunctionRefInfo : 4
   );
 
   SWIFT_INLINE_BITFIELD_FULL(SubscriptExpr, LookupExpr, 2,
@@ -235,12 +236,12 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicSubscriptExpr, DynamicLookupExpr);
 
-  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 3,
-    FunctionRefInfo : 3
+  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 4,
+    FunctionRefInfo : 4
   );
 
-  SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 3,
-    FunctionRefInfo : 3
+  SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 4,
+    FunctionRefInfo : 4
   );
 
   SWIFT_INLINE_BITFIELD(BooleanLiteralExpr, LiteralExpr, 1,
@@ -256,8 +257,8 @@ protected:
     LitKind : 3
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractClosureExpr, Expr, (16-NumExprBits)+16,
-    : 16 - NumExprBits, // Align and leave room for subclasses
+  SWIFT_INLINE_BITFIELD(AbstractClosureExpr, Expr, (16-NumberOfExprBits)+16,
+    : 16 - NumberOfExprBits, // Align and leave room for subclasses
     Discriminator : 16
   );
 
@@ -267,7 +268,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -302,7 +303,15 @@ protected:
     /// Whether this closure was type-checked as an argument to a macro. This
     /// is only populated after type-checking, and only exists for diagnostic
     /// logic. Do not add more uses of this.
-    IsMacroArgument : 1
+    IsMacroArgument : 1,
+
+    /// True if this closure, even though it has a different static isolation,
+    /// should behave like `nonisolated(nonsending)` when lowered. This is important
+    /// for cases where a closure is passed to a non-sending `nonisolated(nonsending)`
+    /// parameter of a `nonisolated(nonsending)` call and doesn't leave isolation of
+    /// the parent context. It's easier to work with statically known isolation than
+    /// make closure dynamically isolated via assuming `nonisolated(nonsending)`.
+    BehavesLikeNonisolatedNonsending: 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -505,6 +514,10 @@ public:
   /// children, and if there is a closure within the expression, this does not
   /// walk into the body of it (unless it is single-expression).
   void forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback);
+
+  /// Apply the specified function to all variables referenced in any
+  /// child UnresolvedPatternExprs.
+  void forEachUnresolvedVariable(llvm::function_ref<void(VarDecl *)> f) const;
 
   /// Determine whether this expression refers to a type by name.
   ///
@@ -3293,8 +3306,7 @@ private:
       DstExpr(dstExpr) {
     Bits.DestructureTupleExpr.NumElements = destructuredElements.size();
     std::uninitialized_copy(destructuredElements.begin(),
-                            destructuredElements.end(),
-                            getTrailingObjects<OpaqueValueExpr *>());
+                            destructuredElements.end(), getTrailingObjects());
   }
 
 public:
@@ -3306,8 +3318,8 @@ public:
          Expr *srcExpr, Expr *dstExpr, Type ty);
 
   ArrayRef<OpaqueValueExpr *> getDestructuredElements() const {
-    return {getTrailingObjects<OpaqueValueExpr *>(),
-            static_cast<size_t>(Bits.DestructureTupleExpr.NumElements)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.DestructureTupleExpr.NumElements));
   }
 
   Expr *getResultExpr() const {
@@ -3712,7 +3724,7 @@ class UnresolvedSpecializeExpr final : public Expr,
       SubExpr(SubExpr), LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc) {
     Bits.UnresolvedSpecializeExpr.NumUnresolvedParams = UnresolvedParams.size();
     std::uninitialized_copy(UnresolvedParams.begin(), UnresolvedParams.end(),
-                            getTrailingObjects<TypeRepr *>());
+                            getTrailingObjects());
   }
 
 public:
@@ -3726,8 +3738,8 @@ public:
   /// Retrieve the list of type parameters. These parameters have not yet
   /// been bound to archetypes of the entity to be specialized.
   ArrayRef<TypeRepr *> getUnresolvedParams() const {
-    return {getTrailingObjects<TypeRepr *>(),
-            static_cast<size_t>(Bits.UnresolvedSpecializeExpr.NumUnresolvedParams)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.UnresolvedSpecializeExpr.NumUnresolvedParams));
   }
   
   SourceLoc getLoc() const { return LAngleLoc; }
@@ -3984,7 +3996,7 @@ class SequenceExpr final : public Expr,
     Bits.SequenceExpr.NumElements = elements.size();
     assert(Bits.SequenceExpr.NumElements > 0 && "zero-length sequence!");
     std::uninitialized_copy(elements.begin(), elements.end(),
-                            getTrailingObjects<Expr*>());
+                            getTrailingObjects());
   }
 
 public:
@@ -4000,11 +4012,13 @@ public:
   unsigned getNumElements() const { return Bits.SequenceExpr.NumElements; }
 
   MutableArrayRef<Expr*> getElements() {
-    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.SequenceExpr.NumElements)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.SequenceExpr.NumElements));
   }
 
   ArrayRef<Expr*> getElements() const {
-    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.SequenceExpr.NumElements)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.SequenceExpr.NumElements));
   }
 
   Expr *getElement(unsigned i) const {
@@ -4132,6 +4146,8 @@ public:
   ///
   /// Closures with untyped throws will produce "any Error", functions that
   /// cannot throw or are specified to throw "Never" will return std::nullopt.
+  SWIFT_UNAVAILABLE_IN_SILGEN_MSG(
+      "use 'TypeConverter::getClosureTypeInfo' instead")
   std::optional<Type> getEffectiveThrownType() const;
 
   /// \brief Return whether this closure is async when fully applied.
@@ -4309,6 +4325,7 @@ public:
     Bits.ClosureExpr.NoGlobalActorAttribute = false;
     Bits.ClosureExpr.RequiresDynamicIsolationChecking = false;
     Bits.ClosureExpr.IsMacroArgument = false;
+    Bits.ClosureExpr.BehavesLikeNonisolatedNonsending = false;
   }
 
   SourceRange getSourceRange() const;
@@ -4419,6 +4436,21 @@ public:
     Bits.ClosureExpr.IsMacroArgument = value;
   }
 
+  /// Determines whether this closure, even though it has a different static
+  /// isolation, should behave like `nonisolated(nonsending)` when lowered. This
+  /// is important for cases where a closure is passed to a non-sending
+  /// `nonisolated(nonsending)` parameter of a `nonisolated(nonsending)` call
+  /// and doesn't leave isolation of the parent context. It's easier to work with
+  /// statically known isolation than make closure dynamically isolated via
+  /// assuming `nonisolated(nonsending)`.
+  bool behavesLikeNonisolatedNonsending() const {
+    return Bits.ClosureExpr.BehavesLikeNonisolatedNonsending;
+  }
+
+  void setBehavesLikeNonisolatedNonsending(bool value = true) {
+    Bits.ClosureExpr.BehavesLikeNonisolatedNonsending = value;
+  }
+
   /// Determine whether this closure expression has an
   /// explicitly-specified result type.
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
@@ -4469,10 +4501,6 @@ public:
     assert(hasExplicitResultType() && "No explicit result type");
     return ExplicitResultTypeAndBodyState.getPointer()->getTypeRepr();
   }
-
-  /// Returns the resolved macro for the given custom attribute
-  /// attached to this closure expression.
-  MacroDecl *getResolvedMacro(CustomAttr *customAttr);
 
   /// Determine whether the closure has a single expression for its
   /// body.
@@ -4641,7 +4669,7 @@ class CaptureListExpr final : public Expr,
     assert(closureBody);
     Bits.CaptureListExpr.NumCaptures = captureList.size();
     std::uninitialized_copy(captureList.begin(), captureList.end(),
-                            getTrailingObjects<CaptureListEntry>());
+                            getTrailingObjects());
   }
 
 public:
@@ -4650,8 +4678,8 @@ public:
                                  AbstractClosureExpr *closureBody);
 
   ArrayRef<CaptureListEntry> getCaptureList() {
-    return {getTrailingObjects<CaptureListEntry>(),
-            static_cast<size_t>(Bits.CaptureListExpr.NumCaptures)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.CaptureListExpr.NumCaptures));
   }
   AbstractClosureExpr *getClosureBody() { return closureBody; }
   const AbstractClosureExpr *getClosureBody() const { return closureBody; }
@@ -5763,14 +5791,13 @@ class EditorPlaceholderExpr : public Expr {
   SourceLoc Loc;
   TypeRepr *PlaceholderTy;
   TypeRepr *ExpansionTyR;
-  Expr *SemanticExpr;
 
 public:
   EditorPlaceholderExpr(Identifier Placeholder, SourceLoc Loc,
                         TypeRepr *PlaceholderTy, TypeRepr *ExpansionTyR)
       : Expr(ExprKind::EditorPlaceholder, /*Implicit=*/false),
         Placeholder(Placeholder), Loc(Loc), PlaceholderTy(PlaceholderTy),
-        ExpansionTyR(ExpansionTyR), SemanticExpr(nullptr) {}
+        ExpansionTyR(ExpansionTyR) {}
 
   Identifier getPlaceholder() const { return Placeholder; }
   SourceRange getSourceRange() const { return Loc; }
@@ -5782,9 +5809,6 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::EditorPlaceholder;
   }
-
-  Expr *getSemanticExpr() const { return SemanticExpr; }
-  void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
 };
 
 /// A LazyInitializerExpr is used to embed an existing typechecked
@@ -5929,6 +5953,8 @@ class KeyPathExpr : public Expr {
   /// Determines whether a key path starts with '.' which denotes necessity for
   /// a contextual root type.
   bool HasLeadingDot = false;
+
+  friend class ObjCKeyPathStringRequest;
 
 public:
   /// A single stored component, which will be one of:
@@ -6395,6 +6421,7 @@ public:
   /// Retrieve the string literal expression, which will be \c NULL prior to
   /// type checking and a string literal after type checking for an
   /// @objc key path.
+  /// FIXME: Ideally this would lazily evaluate ObjCKeyPathStringRequest.
   Expr *getObjCStringLiteralExpr() const {
     return ObjCStringLiteralExpr;
   }
@@ -6497,16 +6524,20 @@ public:
   }
 };
 
+struct ForCollectionInit {
+  VarDecl *ForAccumulatorDecl;
+  PatternBindingDecl *ForAccumulatorBinding;
+};
+
 /// An expression that may wrap a statement which produces a single value.
 class SingleValueStmtExpr : public Expr {
 public:
-  enum class Kind {
-    If, Switch, Do, DoCatch
-  };
+  enum class Kind { If, Switch, Do, DoCatch, For };
 
 private:
   Stmt *S;
   DeclContext *DC;
+  std::optional<ForCollectionInit> ForExpressionPreamble;
 
   SingleValueStmtExpr(Stmt *S, DeclContext *DC)
       : Expr(ExprKind::SingleValueStmt, /*isImplicit*/ true), S(S), DC(DC) {}
@@ -6571,6 +6602,14 @@ public:
 
   SourceRange getSourceRange() const;
 
+  std::optional<ForCollectionInit> getForExpressionPreamble() const {
+    return this->ForExpressionPreamble;
+  }
+
+  void setForExpressionPreamble(ForCollectionInit newPreamble) {
+    this->ForExpressionPreamble = newPreamble;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::SingleValueStmt;
   }
@@ -6591,7 +6630,7 @@ class TypeJoinExpr final : public Expr,
   }
 
   MutableArrayRef<Expr *> getMutableElements() {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
+    return getTrailingObjects(getNumElements());
   }
 
   TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
@@ -6634,7 +6673,7 @@ public:
   }
 
   ArrayRef<Expr *> getElements() const {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
+    return getTrailingObjects(getNumElements());
   }
 
   Expr *getElement(unsigned i) const {

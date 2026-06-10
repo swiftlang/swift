@@ -108,10 +108,6 @@ public:
   /// purposes.
   bool EnableOSSAOptimizations = true;
 
-  /// Controls whether to turn on speculative devirtualization.
-  /// It is turned off by default.
-  bool EnableSpeculativeDevirtualization = false;
-
   /// Controls whether to emit actor data-race checks.
   bool EnableActorDataRaceChecks = false;
 
@@ -194,12 +190,6 @@ public:
 
   /// If set to true, compile with the SIL Opaque Values enabled.
   bool EnableSILOpaqueValues = false;
-
-  /// Introduce linear OSSA lifetimes after SILGen
-  bool OSSACompleteLifetimes = true;
-
-  /// Verify linear OSSA lifetimes throughout OSSA pipeline.
-  bool OSSAVerifyComplete = false;
 
   /// Enable pack metadata stack "promotion".
   ///
@@ -303,10 +293,6 @@ public:
   /// Are we building in embedded Swift + -no-allocations?
   bool NoAllocations = false;
 
-  /// Should we use the experimental Swift based closure-specialization
-  /// optimization pass instead of the existing C++ one.
-  bool EnableExperimentalSwiftBasedClosureSpecialization = false;
-
   /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;
@@ -341,8 +327,12 @@ public:
   bool MergeableTraps = false;
 
   /// Whether the @yield_once_2 convention is used by accessors added with the
-  /// CoroutineAccessors feature (i.e. read2/modify2).
+  /// CoroutineAccessors feature (i.e. yielding borrow/mutate).
   bool CoroutineAccessorsUseYieldOnce2 = false;
+
+  /// Abort if SIL region isolation detects an unknown pattern.
+  /// For compiler developers only.
+  bool AbortOnUnknownRegionIsolationPatternError = false;
 
   SILOptions() {}
 

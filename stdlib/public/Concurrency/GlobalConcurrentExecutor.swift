@@ -32,9 +32,10 @@ import Swift
 /// Customizing the global concurrent executor is currently not supported.
 @available(SwiftStdlib 6.0, *)
 @_unavailableInEmbedded
+@diagnose(UselessAvailabilityCheck, as: ignored)
 public var globalConcurrentExecutor: any TaskExecutor {
   get {
-    if #available(StdlibDeploymentTarget 6.2, *) {
+    if #available(StdlibDeploymentTarget 6.3, *) {
       return Task.defaultExecutor
     } else {
       fatalError("we shouldn't get here; if we have, availability is broken")

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -swift-version 4
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -swift-version 4
 
 enum Conditional<T> {
   case a(x: T, y: T?)

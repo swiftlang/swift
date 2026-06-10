@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-typecheck-verify-swift -target %target-stable-abi-triple -module-name main -I %S/Inputs %s
 // RUN: %target-swift-frontend -emit-module -target %target-stable-abi-triple -module-name main -o %t -I %S/Inputs %s
-// RUN: llvm-bcanalyzer %t/main.swiftmodule > %t/main.swiftmodule.txt
+// RUN: %llvm-bcanalyzer %t/main.swiftmodule > %t/main.swiftmodule.txt
 // RUN: %target-swift-ide-test -print-module -target %target-stable-abi-triple -module-to-print=main -I %t -source-filename=%s >%t/main.txt
 // RUN: %FileCheck %s --input-file=%t/main.txt
 

@@ -23,6 +23,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
@@ -39,6 +40,7 @@
 #include "clang/AST/GlobalDecl.h"
 #include "clang/AST/Mangle.h"
 #include "clang/AST/RecordLayout.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Sema/Sema.h"
@@ -276,6 +278,22 @@ namespace {
       if (fields.size() != 1)
         return false;
       return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
+    }
+
+    void strongCustomRetain(IRGenFunction &IGF, Explosion &e,
+                            bool needsNullCheck) const override {
+      ReferenceCounting dummy;
+      ASSERT(isSingleRetainablePointer(ResilienceExpansion::Maximal, &dummy));
+      auto fields = asImpl().getFields();
+      fields[0].getTypeInfo().strongCustomRetain(IGF, e, needsNullCheck);
+    }
+
+    void strongCustomRelease(IRGenFunction &IGF, Explosion &e,
+                             bool needsNullCheck) const override {
+      ReferenceCounting dummy;
+      ASSERT(isSingleRetainablePointer(ResilienceExpansion::Maximal, &dummy));
+      auto fields = asImpl().getFields();
+      fields[0].getTypeInfo().strongCustomRelease(IGF, e, needsNullCheck);
     }
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
@@ -553,14 +571,9 @@ namespace {
       const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      for (auto ctor : cxxRecordDecl->ctors()) {
-        if (ctor->isCopyConstructor() &&
-            // FIXME: Support default arguments (rdar://142414553)
-            ctor->getNumParams() == 1 &&
-            ctor->getAccess() == clang::AS_public && !ctor->isDeleted() &&
-            !ctor->isIneligibleOrNotSelected())
-          return ctor;
-      }
+      if (auto *cctor = importer::findCopyConstructor(cxxRecordDecl);
+          cctor && cctor->getAccess() == clang::AS_public)
+        return cctor;
       return nullptr;
     }
 
@@ -570,7 +583,7 @@ namespace {
         return nullptr;
       for (auto ctor : cxxRecordDecl->ctors()) {
         if (ctor->isMoveConstructor() &&
-            // FIXME: Support default arguments (rdar://142414553)
+            // FIXME: Support default arguments (https://github.com/swiftlang/swift/issues/86260)
             ctor->getNumParams() == 1 &&
             ctor->getAccess() == clang::AS_public && !ctor->isDeleted() &&
             !ctor->isIneligibleOrNotSelected())
@@ -619,7 +632,7 @@ namespace {
           /*invocation subs*/ SubstitutionMap(), IGF.IGM.Context);
     }
 
-    void emitCopyWithCopyConstructor(
+    void emitCopyWithCopyOrMoveConstructor(
         IRGenFunction &IGF, SILType T,
         const clang::CXXConstructorDecl *copyConstructor, llvm::Value *src,
         llvm::Value *dest) const {
@@ -629,9 +642,30 @@ namespace {
 
       auto &ctx = IGF.IGM.Context;
       auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-      
+
       auto &diagEngine = importer->getClangSema().getDiagnostics();
       clang::DiagnosticErrorTrap trap(diagEngine);
+
+      if (copyConstructor->isDefaulted() &&
+          copyConstructor->getAccess() == clang::AS_public &&
+          !copyConstructor->isDeleted() &&
+          !copyConstructor->isIneligibleOrNotSelected() &&
+          // Note: we use "doesThisDeclarationHaveABody" here because
+          // that's what "DefineImplicitCopyConstructor" checks.
+          !copyConstructor->doesThisDeclarationHaveABody()) {
+        assert(!copyConstructor->getParent()->isAnonymousStructOrUnion() &&
+               "Cannot do codegen of special member functions of anonymous "
+               "structs/unions");
+        if (copyConstructor->isCopyConstructor())
+          importer->getClangSema().DefineImplicitCopyConstructor(
+              clang::SourceLocation(),
+              const_cast<clang::CXXConstructorDecl *>(copyConstructor));
+        else
+          importer->getClangSema().DefineImplicitMoveConstructor(
+              clang::SourceLocation(),
+              const_cast<clang::CXXConstructorDecl *>(copyConstructor));
+      }
+
       auto clangFnAddr =
           IGF.IGM.getAddrOfClangGlobalDecl(globalDecl, NotForDefinition);
 
@@ -657,7 +691,7 @@ namespace {
             });
 
         bool hasRequiresClause =
-            copyConstructor->getTrailingRequiresClause() != nullptr;
+            !copyConstructor->getTrailingRequiresClause().isNull();
 
         if (hasRequiresClause || hasCopyableIfAttr) {
           ctx.Diags.diagnose(copyConstructorLoc, diag::maybe_missing_annotation,
@@ -809,9 +843,9 @@ namespace {
                             Address srcAddr, SILType T,
                             bool isOutlined) const override {
       if (auto copyConstructor = findCopyConstructor()) {
-        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
-                                    srcAddr.getAddress(),
-                                    destAddr.getAddress());
+        emitCopyWithCopyOrMoveConstructor(IGF, T, copyConstructor,
+                                          srcAddr.getAddress(),
+                                          destAddr.getAddress());
         return;
       }
       StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
@@ -824,9 +858,9 @@ namespace {
                         SILType T, bool isOutlined) const override {
       if (auto copyConstructor = findCopyConstructor()) {
         destroy(IGF, destAddr, T, isOutlined);
-        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
-                                    srcAddr.getAddress(),
-                                    destAddr.getAddress());
+        emitCopyWithCopyOrMoveConstructor(IGF, T, copyConstructor,
+                                          srcAddr.getAddress(),
+                                          destAddr.getAddress());
         return;
       }
       StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
@@ -838,17 +872,15 @@ namespace {
                             SILType T, bool isOutlined,
                             bool zeroizeIfSensitive) const override {
       if (auto moveConstructor = findMoveConstructor()) {
-        emitCopyWithCopyConstructor(IGF, T, moveConstructor,
-                                    src.getAddress(),
-                                    dest.getAddress());
+        emitCopyWithCopyOrMoveConstructor(IGF, T, moveConstructor,
+                                          src.getAddress(), dest.getAddress());
         destroy(IGF, src, T, isOutlined);
         return;
       }
 
       if (auto copyConstructor = findCopyConstructor()) {
-        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
-                                    src.getAddress(),
-                                    dest.getAddress());
+        emitCopyWithCopyOrMoveConstructor(IGF, T, copyConstructor,
+                                          src.getAddress(), dest.getAddress());
         destroy(IGF, src, T, isOutlined);
         return;
       }
@@ -862,18 +894,16 @@ namespace {
                         bool isOutlined) const override {
       if (auto moveConstructor = findMoveConstructor()) {
         destroy(IGF, dest, T, isOutlined);
-        emitCopyWithCopyConstructor(IGF, T, moveConstructor,
-                                    src.getAddress(),
-                                    dest.getAddress());
+        emitCopyWithCopyOrMoveConstructor(IGF, T, moveConstructor,
+                                          src.getAddress(), dest.getAddress());
         destroy(IGF, src, T, isOutlined);
         return;
       }
 
       if (auto copyConstructor = findCopyConstructor()) {
         destroy(IGF, dest, T, isOutlined);
-        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
-                                    src.getAddress(),
-                                    dest.getAddress());
+        emitCopyWithCopyOrMoveConstructor(IGF, T, copyConstructor,
+                                          src.getAddress(), dest.getAddress());
         destroy(IGF, src, T, isOutlined);
         return;
       }
@@ -1468,7 +1498,7 @@ private:
         // Collect all of the following bitfields.
         unsigned bitStart =
           layout.getFieldOffset(clangField->getFieldIndex());
-        unsigned bitEnd = bitStart + clangField->getBitWidthValue(ClangContext);
+        unsigned bitEnd = bitStart + clangField->getBitWidthValue();
 
         while (cfi != cfe && (*cfi)->isBitField()) {
           clangField = *cfi++;
@@ -1484,7 +1514,7 @@ private:
             bitStart = nextStart;
           }
 
-          bitEnd = nextStart + clangField->getBitWidthValue(ClangContext);
+          bitEnd = nextStart + clangField->getBitWidthValue();
         }
 
         addOpaqueBitField(bitStart, bitEnd);
@@ -1716,10 +1746,15 @@ const TypeInfo *irgen::getPhysicalStructFieldTypeInfo(IRGenModule &IGM,
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {
-  if (!IRGen.hasLazyMetadata(st) &&
-      !st->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+  bool isEmbedded = st->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+  // In embedded mode, generic types are handled via specialization, not
+  // eagerly emitted here.
+  bool shouldEmit = !IRGen.hasLazyMetadata(st) &&
+                    !(isEmbedded && st->isGenericContext());
+  if (shouldEmit) {
     emitStructMetadata(*this, st);
-    emitFieldDescriptor(st);
+    if (!isEmbedded)
+      emitFieldDescriptor(st);
   }
 
   emitNestedTypeDecls(st->getMembers());

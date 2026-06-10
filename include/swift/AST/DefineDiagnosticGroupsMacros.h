@@ -28,10 +28,11 @@
 // Declares a diagnostic group.
 // Parameters:
 //   Name - group name as it appears in DiagGroupID enum and DiagGroupInfo.name
+//   Options - attributes applying to members of this diagnostic group
 //   DocsFile - file with a human readable description for the group located in
 //   userdocs/diagnostic_groups
 #ifndef GROUP
-#define GROUP(Name, DocsFile)
+#define GROUP(Name, Options, DocsFile)
 #endif
 
 // GROUP_LINK macro:

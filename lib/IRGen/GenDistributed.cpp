@@ -327,7 +327,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
     signature = buildGenericSignature(Context, GenericSignature(),
                                       std::move(genericParams),
                                       std::move(genericRequirements),
-                                      /*allowInverses=*/true);
+                                      ExpandDefaults);
   }
 
   auto accessorTy = GenericFunctionType::get(
@@ -368,6 +368,12 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
   IRGenFunction IGF(*this, f);
   auto accessor = DistributedAccessor(IGF, target, getAccessorType(*this));
   accessor.emit();
+
+  // Mark the accessor function and its async function pointer as used
+  // so they are not stripped by the linker.
+  addUsedGlobal(f);
+  auto *afp = cast<llvm::GlobalValue>(getAddrOfAsyncFunctionPointer(accessorRef));
+  addUsedGlobal(afp);
 
   auto targetDecl = cast<AbstractFunctionDecl>(accessorRef.getDecl());
 
@@ -698,7 +704,7 @@ void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
   error.add(errorValue);
 
   emitAsyncReturn(IGF, AsyncLayout, getResultType(), AccessorType, voidResult,
-                  error);
+                  error, getErrorType());
 }
 
 void DistributedAccessor::emit() {

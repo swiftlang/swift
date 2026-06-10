@@ -255,7 +255,7 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // rdar://91502776
 // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}21checkCostcoMembershipSbyYaF : $@convention(thin) @async () -> Bool {
 // CHECK:    bb0:
-// CHECK:        hop_to_executor {{%.*}} : $Optional<Builtin.Executor>
+// CHECK:        hop_to_executor {{%.*}} : $Optional<any Actor>
 // CHECK:        [[FINAL_BUF:%.*]] = alloc_stack $Bool
 // CHECK:        [[RESULT_BUF:%.*]] = alloc_stack $NSObject
 // CHECK:        [[METH:%.*]] = objc_method {{%.*}} : $@objc_metatype Person.Type, #Person.asCustomer!foreign
@@ -264,7 +264,7 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // CHECK:        dealloc_stack {{%.*}} : $*@block_storage
 // CHECK:        await_async_continuation {{%.*}} : $Builtin.RawUnsafeContinuation, resume bb1
 // CHECK:    bb1:
-// CHECK:        hop_to_executor {{%.*}} : $Optional<Builtin.Executor>
+// CHECK:        hop_to_executor {{%.*}} : $Optional<any Actor>
 // CHECK:        [[RESULT:%.*]] = load [take] [[RESULT_BUF]] : $*NSObject
 // CHECK:        objc_method {{%.*}} : $CostcoManager, #CostcoManager.isCustomerEnrolled!foreign
 // CHECK:        get_async_continuation_addr Bool, [[FINAL_BUF]] : $*Bool
@@ -275,7 +275,7 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // CHECK:        dealloc_stack [[BLOCK_STORAGE]] : $*@block_storage
 // CHECK:        await_async_continuation {{%.*}} : $Builtin.RawUnsafeContinuation, resume bb2
 // CHECK:    bb2:
-// CHECK:        hop_to_executor {{%.*}} : $Optional<Builtin.Executor>
+// CHECK:        hop_to_executor {{%.*}} : $Optional<any Actor>
 // CHECK:        [[ANSWER:%.*]] = load [trivial] [[FINAL_BUF]] : $*Bool
 // CHECK:        fix_lifetime [[EXTEND2]] : $CostcoManager
 // CHECK:        destroy_value [[EXTEND2]] : $CostcoManager
@@ -315,17 +315,20 @@ extension OptionalMemberLookups {
 
 
 // CHECK-LABEL: sil {{.*}} @$s10objc_async12checkHotdogsySSSgx_So8NSObjectCtYaKSo16HotdogCompetitorRzlF : $@convention(thin) @async <τ_0_0 where τ_0_0 : HotdogCompetitor> (@guaranteed τ_0_0, @guaranteed NSObject) -> (@owned Optional<String>, @error any Error) {
+// CHECK: [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+// CHECK: hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
+// CHECK: [[PILE_OF_HOT_DOGS_REF:%.*]] = objc_method %0 : $τ_0_0, #HotdogCompetitor.pileOfHotdogsToEat!foreign
 // CHECK: hop_to_executor {{.*}} : $MainActor
-// CHECK: [[AUTO_REL_STR:%.*]] = apply {{.*}}<τ_0_0>({{.*}}) : $@convention(objc_method)
+// CHECK: [[AUTO_REL_STR:%.*]] = apply [[PILE_OF_HOT_DOGS_REF]]<τ_0_0>({{.*}}) : $@convention(objc_method)
 // CHECK: [[UNMANAGED_OPTIONAL:%.*]] = load [trivial] {{.*}} : $*@sil_unmanaged Optional<NSError>
 // CHECK: [[MANAGED_OPTIONAL:%.*]] = unmanaged_to_ref [[UNMANAGED_OPTIONAL]] : $@sil_unmanaged Optional<NSError> to $Optional<NSError>
 // CHECK: [[RETAINED_OPTIONAL:%.*]] = copy_value [[MANAGED_OPTIONAL]] : $Optional<NSError>
 // CHECK: [[MARKED:%.*]] = mark_dependence [[RETAINED_OPTIONAL]] : $Optional<NSError> on {{.*}} : $*Optional<NSError>
 // CHECK: assign [[MARKED]] to {{.*}} : $*Optional<NSError>
-// CHECK: destroy_value {{.*}} : $MainActor
 // CHECK: dealloc_stack {{.*}} : $*AutoreleasingUnsafeMutablePointer<Optional<NSError>>
 // CHECK: dealloc_stack {{.*}} : $*@sil_unmanaged Optional<NSError>
-// CHECK: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
+// CHECK: destroy_value {{.*}} : $MainActor
+// CHECK: hop_to_executor {{.*}} : $Optional<any Actor>
 // CHECK: switch_enum
 func checkHotdogs(_ v: some HotdogCompetitor, _ timeLimit: NSObject) async throws -> String? {
     return try await v.pileOfHotdogsToEat(withLimit: timeLimit)

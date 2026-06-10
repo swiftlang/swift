@@ -31,6 +31,12 @@ namespace swift {
   class SourceManager;
   enum class DiagID : uint32_t;
 
+/// Information about a diagostic's diagnostic group
+struct DiagnosticCategoryInfo {
+  StringRef Name;
+  std::string DocumentationURL;
+};
+
 /// Information about a diagnostic passed to DiagnosticConsumers.
 struct DiagnosticInfo {
   DiagID ID = DiagID(0);
@@ -38,7 +44,6 @@ struct DiagnosticInfo {
   DiagnosticKind Kind;
   StringRef FormatString;
   ArrayRef<DiagnosticArgument> FormatArgs;
-  StringRef Category;
 
   /// Only used when directing diagnostics to different outputs.
   /// In batch mode a diagnostic may be
@@ -51,8 +56,10 @@ struct DiagnosticInfo {
   /// DiagnosticInfo of notes which are children of this diagnostic, if any
   ArrayRef<DiagnosticInfo *> ChildDiagnosticInfo;
 
-  /// Path for category documentation.
-  std::string CategoryDocumentationURL;
+  /// Full diagnostic group chain, ordered leaf-first.
+  /// Index 0 = this diagnostic's category, index 1+ = parent groups toward root.
+  /// Empty if the diagnostic has no category.
+  std::vector<DiagnosticCategoryInfo> CategoryChain;
 
   /// Represents a fix-it, a replacement of one range of text with another.
   class FixIt {
@@ -67,6 +74,17 @@ struct DiagnosticInfo {
 
     StringRef getText() const { return Text; }
   };
+
+  StringRef getCategoryName() const {
+    return CategoryChain.empty() ? StringRef() : CategoryChain[0].Name;
+  }
+  StringRef getCategoryDocumentationURL() const {
+    return CategoryChain.empty() ? StringRef() : CategoryChain[0].DocumentationURL;
+  }
+  void setCategoryDocumentationURL(std::string url) {
+    if (!CategoryChain.empty())
+      CategoryChain[0].DocumentationURL = std::move(url);
+  }
 
   /// Extra source ranges that are attached to the diagnostic.
   ArrayRef<CharSourceRange> Ranges;
@@ -87,10 +105,13 @@ struct DiagnosticInfo {
                  ArrayRef<CharSourceRange> Ranges, ArrayRef<FixIt> FixIts,
                  bool IsChildNote)
       : ID(ID), Loc(Loc), Kind(Kind), FormatString(FormatString),
-        FormatArgs(FormatArgs), Category(Category),
+        FormatArgs(FormatArgs),
         BufferIndirectlyCausingDiagnostic(BufferIndirectlyCausingDiagnostic),
         ChildDiagnosticInfo(ChildDiagnosticInfo), Ranges(Ranges),
-        FixIts(FixIts), IsChildNote(IsChildNote) {}
+        FixIts(FixIts), IsChildNote(IsChildNote) {
+    if (!Category.empty())
+      CategoryChain.push_back({Category, ""});
+  }
 };
   
 /// Abstract interface for classes that present diagnostics to the user.

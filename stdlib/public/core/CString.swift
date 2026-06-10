@@ -71,7 +71,7 @@ extension String {
     "Use String(decoding: array, as: UTF8.self) instead, after truncating the null termination."
   )
   public init(cString nullTerminatedUTF8: [CChar]) {
-    self = unsafe nullTerminatedUTF8.withUnsafeBufferPointer {
+    self = nullTerminatedUTF8.withUnsafeBufferPointer {
       unsafe $0.withMemoryRebound(to: UInt8.self, String.init(_checkingCString:))
     }
   }
@@ -135,7 +135,7 @@ extension String {
     "Use String(decoding: array, as: UTF8.self) instead, after truncating the null termination."
   )
   public init(cString nullTerminatedUTF8: [UInt8]) {
-    self = unsafe nullTerminatedUTF8.withUnsafeBufferPointer {
+    self = nullTerminatedUTF8.withUnsafeBufferPointer {
       unsafe String(_checkingCString: $0)
     }
   }
@@ -259,7 +259,7 @@ extension String {
         "input of String.init(validatingCString:) must be null-terminated"
       )
     }
-    let string = unsafe nullTerminatedUTF8.prefix(length).withUnsafeBufferPointer {
+    let string = nullTerminatedUTF8.prefix(length).withUnsafeBufferPointer {
       unsafe $0.withMemoryRebound(to: UInt8.self, String._tryFromUTF8(_:))
     }
     guard let string else { return nil }
@@ -410,7 +410,7 @@ extension String {
     }
 
     if _fastPath(encoding == Unicode.UTF8.self) {
-      return unsafe cString.prefix(length).withUnsafeBufferPointer {
+      return cString.prefix(length).withUnsafeBufferPointer {
         buffer -> (result: String, repairsMade: Bool)? in
         return unsafe buffer.withMemoryRebound(to: UInt8.self) { codeUnits in
           if isRepairing {
@@ -424,7 +424,7 @@ extension String {
       }
     }
 
-    return unsafe cString.prefix(length).withUnsafeBufferPointer {
+    return cString.prefix(length).withUnsafeBufferPointer {
       buf -> (result: String, repairsMade: Bool)? in
       unsafe String._fromCodeUnits(buf, encoding: encoding, repair: isRepairing)
     }
@@ -438,7 +438,7 @@ extension String {
     as encoding: Encoding.Type,
     repairingInvalidCodeUnits isRepairing: Bool = true
   ) -> (result: String, repairsMade: Bool)? {
-    return unsafe cString.withCString(encodedAs: encoding) {
+    return cString.withCString(encodedAs: encoding) {
       unsafe String.decodeCString(
         $0, as: encoding, repairingInvalidCodeUnits: isRepairing
       )
@@ -518,7 +518,7 @@ extension String {
     decodingCString nullTerminatedCodeUnits: String,
     as encoding: Encoding.Type
   ) {
-    self = unsafe nullTerminatedCodeUnits.withCString(encodedAs: encoding) {
+    self = nullTerminatedCodeUnits.withCString(encodedAs: encoding) {
       unsafe String(decodingCString: $0, as: encoding.self)
     }
   }

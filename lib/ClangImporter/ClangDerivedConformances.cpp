@@ -11,18 +11,137 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangDerivedConformances.h"
+#include "ClangSynthesizedDecls.h"
 #include "ImporterImpl.h"
+#include "SwiftLookupTable.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Identifier.h"
+#include "swift/AST/KnownProtocols.h"
+#include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/CXXInheritance.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
+#include "clang/AST/DeclTemplate.h"
+#include "clang/AST/Type.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/Lookup.h"
 #include "clang/Sema/Overload.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 using namespace swift::importer;
+
+/// Known C++ stdlib types, for which we can assume conformance to the standard
+/// (e.g., std::map has template parameters for key and value types, and has
+/// members like key_type, size_type, and operator[]).
+enum class CxxStdType {
+  uncategorized,
+  optional,
+  set,
+  unordered_set,
+  multiset,
+  pair,
+  map,
+  unordered_map,
+  multimap,
+  vector,
+  span,
+};
+
+static CxxStdType identifyCxxStdTypeByName(StringRef name) {
+#define CaseStd(name) Case(#name, CxxStdType::name)
+  return llvm::StringSwitch<CxxStdType>(name)
+      .CaseStd(optional)
+      .CaseStd(set)
+      .CaseStd(unordered_set)
+      .CaseStd(multiset)
+      .CaseStd(pair)
+      .CaseStd(map)
+      .CaseStd(unordered_map)
+      .CaseStd(multimap)
+      .CaseStd(vector)
+      .CaseStd(span)
+      .Default(CxxStdType::uncategorized);
+#undef CxxStdCase
+}
+
+static const clang::TypeDecl *
+lookupCxxTypeMember(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
+                    StringRef name, bool mustBeComplete = false) {
+  auto R = clang::LookupResult(Sema, &Sema.PP.getIdentifierTable().get(name),
+                               clang::SourceLocation(),
+                               clang::Sema::LookupMemberName);
+  R.suppressDiagnostics();
+  Sema.LookupQualifiedName(R, const_cast<clang::CXXRecordDecl *>(Rec));
+
+  if (!R.isSingleResult())
+    return nullptr; // Result was absent or ambiguous
+
+  auto it = R.begin();
+  if (it->getAccess() != clang::AS_public)
+    return nullptr; // Not accessible from outside of the class
+
+  auto *td = dyn_cast<clang::TypeDecl>(it.getDecl());
+  if (!td)
+    return nullptr; // Was not a clang::TypeDecl
+
+  if (mustBeComplete &&
+      !Sema.isCompleteType({}, td->getASTContext().getTypeDeclType(td)))
+    return nullptr;
+
+  return td;
+}
+
+static std::pair<clang::CXXMethodDecl *, clang::CXXMethodDecl *>
+lookupCxxZeroArityMethod(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
+                         StringRef name) {
+  auto R = clang::LookupResult(Sema, &Sema.PP.getIdentifierTable().get(name),
+                               clang::SourceLocation(),
+                               clang::Sema::LookupMemberName);
+  R.suppressDiagnostics();
+  Sema.LookupQualifiedName(R, const_cast<clang::CXXRecordDecl *>(Rec));
+
+  if (!R.isSingleResult() && !R.isOverloadedResult())
+    return {nullptr, nullptr};
+
+  clang::CXXMethodDecl *constMethod = nullptr, *mutMethod = nullptr;
+  for (auto it = R.begin(); it != R.end(); ++it) {
+    if (it.getAccess() != clang::AS_public)
+      continue; // not public
+
+    auto *cmd = dyn_cast<clang::CXXMethodDecl>(it.getDecl());
+    if (!cmd)
+      continue; // not a method
+
+    if (cmd->getMinRequiredArguments() != 0)
+      continue; // not 0-arity
+
+    if (cmd->isVolatile() ||
+        cmd->getRefQualifier() == clang::RefQualifierKind::RQ_RValue)
+      continue; // volatile and r-value ref overload (not supported)
+
+    if (cmd->isConst()) {
+      if (constMethod)
+        return {nullptr, nullptr};
+      constMethod = cmd;
+    } else {
+      if (mutMethod)
+        return {nullptr, nullptr};
+      mutMethod = cmd;
+    }
+  }
+  return {constMethod, mutMethod};
+}
 
 /// Alternative to `NominalTypeDecl::lookupDirect`.
 /// This function does not attempt to load extensions of the nominal decl.
@@ -72,89 +191,96 @@ static Decl *lookupDirectSingleWithoutExtensions(NominalTypeDecl *decl,
   return dyn_cast<Decl>(results.front());
 }
 
-static FuncDecl *getInsertFunc(NominalTypeDecl *decl,
-                               TypeAliasDecl *valueType) {
-  ASTContext &ctx = decl->getASTContext();
-
-  auto insertId = ctx.getIdentifier("__insertUnsafe");
-  auto inserts = lookupDirectWithoutExtensions(decl, insertId);
-  FuncDecl *insert = nullptr;
-  for (auto candidate : inserts) {
-    if (auto candidateMethod = dyn_cast<FuncDecl>(candidate)) {
-      auto params = candidateMethod->getParameters();
-      if (params->size() != 1)
-        continue;
-      auto param = params->front();
-      if (param->getTypeInContext()->getCanonicalType() !=
-          valueType->getUnderlyingType()->getCanonicalType())
-        continue;
-      insert = candidateMethod;
-      break;
-    }
-  }
-  return insert;
-}
-
-static bool isStdDecl(const clang::CXXRecordDecl *clangDecl,
-                      llvm::ArrayRef<StringRef> names) {
-  if (!clangDecl->isInStdNamespace())
-    return false;
-  if (!clangDecl->getIdentifier())
-    return false;
-  StringRef name = clangDecl->getName();
-  return llvm::is_contained(names, name);
-}
-
-static clang::TypeDecl *
-lookupNestedClangTypeDecl(const clang::CXXRecordDecl *clangDecl,
-                          StringRef name) {
-  clang::IdentifierInfo *nestedDeclName =
-      &clangDecl->getASTContext().Idents.get(name);
-  auto nestedDecls = clangDecl->lookup(nestedDeclName);
-  // If this is a templated typedef, Clang might have instantiated several
-  // equivalent typedef decls. If they aren't equivalent, Clang has already
-  // complained about this. Let's assume that they are equivalent. (see
-  // filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
-  if (nestedDecls.empty())
-    return nullptr;
-  auto nestedDecl = nestedDecls.front();
-  return dyn_cast_or_null<clang::TypeDecl>(nestedDecl);
-}
-
-static clang::TypeDecl *
-getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
-  return lookupNestedClangTypeDecl(clangDecl, "iterator_category");
-}
-
-static clang::TypeDecl *
-getIteratorConceptDecl(const clang::CXXRecordDecl *clangDecl) {
-  return lookupNestedClangTypeDecl(clangDecl, "iterator_concept");
-}
-
-static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
-                                 function_ref<bool(ValueDecl *)> isValid) {
+// isValidSwiftMember is used to validate the operators declared as member functions
+// and operate on Swift declarations while isValidClangGlobal is used to validate
+// operators defined in global or namespace scope and is operating on Clang declarations.
+static ValueDecl *lookupOperator(
+    NominalTypeDecl *decl, Identifier id,
+    function_ref<bool(ValueDecl *)> isValidSwiftMember,
+    function_ref<bool(const clang::FunctionDecl *)> isValidClangGlobal) {
   // First look for operator declared as a member.
   auto memberResults = lookupDirectWithoutExtensions(decl, id);
   for (const auto &member : memberResults) {
-    if (isValid(member))
+    if (isValidSwiftMember(member))
       return member;
   }
 
-  // If no member operator was found, look for out-of-class definitions in the
-  // same module.
-  auto module = decl->getModuleContext();
-  SmallVector<ValueDecl *> nonMemberResults;
-  module->lookupValue(id, NLKind::UnqualifiedLookup, nonMemberResults);
-  for (const auto &nonMember : nonMemberResults) {
-    if (isValid(nonMember))
-      return nonMember;
+  // Look up global operators. We want to do the filtering before import to avoid
+  // overly eager imports.
+  auto &ctx = decl->getASTContext();
+  auto loader = ctx.getClangModuleLoader();
+  auto clangDecl = decl->getClangDecl();
+  auto *clangModule =
+      importer::getClangOwningModule(clangDecl, clangDecl->getASTContext());
+  auto lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
+  // Look up operators in the namespace context first.
+  for (auto entry : lookupTable->lookupMemberOperators(DeclBaseName(id))) {
+    if (isValidClangGlobal(dyn_cast<clang::FunctionDecl>(entry))) {
+      return cast_or_null<ValueDecl>(loader->importDeclDirectly(entry));
+    }
+  }
+  // Look up operators in the global namespace
+  for (auto entry : lookupTable->lookup(
+           DeclBaseName(id),
+           EffectiveClangContext(
+               clangDecl->getASTContext().getTranslationUnitDecl()))) {
+    auto decl = dyn_cast_or_null<clang::FunctionDecl>(
+        entry.dyn_cast<clang::NamedDecl *>());
+    if (!decl)
+      continue;
+    if (isValidClangGlobal(decl)) {
+      return cast_or_null<ValueDecl>(loader->importDeclDirectly(decl));
+    }
   }
 
   return nullptr;
 }
 
+/// Get the underlying type of a parameter, returning a null QualType if the
+/// parameter is not read-only. A reference parameter must be const-qualified
+/// and non-volatile to be accepted.
+static clang::QualType getReadOnlyParamType(const clang::ParmVarDecl *param) {
+  auto ty = param->getType();
+  if (ty->isReferenceType()) {
+    ty = ty->getPointeeType();
+    if (!ty.isConstQualified() || ty.isVolatileQualified())
+      return clang::QualType();
+  }
+  return ty;
+}
+
+// Is this an operator where both arguments take T, or const T&?
+static bool isValidBinOp(NominalTypeDecl *decl, const clang::FunctionDecl *fd) {
+  if (!fd)
+    return false;
+  auto ty = cast<clang::TypeDecl>(decl->getClangDecl())->getTypeForDecl();
+  if (auto method = dyn_cast<clang::CXXMethodDecl>(fd)) {
+    if (method->param_size() != 1)
+      return false;
+    if (!method->isConst())
+      return false;
+
+    auto parTy = getReadOnlyParamType(fd->getParamDecl(0));
+    if (parTy.isNull())
+      return false;
+    auto thisTy = method->getParent()->getTypeForDecl();
+    return parTy.getCanonicalType() == thisTy->getCanonicalTypeUnqualified() &&
+           parTy.getCanonicalType() == ty->getCanonicalTypeUnqualified();
+  }
+  if (fd->param_size() != 2)
+    return false;
+  auto lhsTy = getReadOnlyParamType(fd->getParamDecl(0));
+  auto rhsTy = getReadOnlyParamType(fd->getParamDecl(1));
+  if (lhsTy.isNull() || rhsTy.isNull())
+    return false;
+  return lhsTy->getCanonicalTypeUnqualified() ==
+             rhsTy->getCanonicalTypeUnqualified() &&
+         lhsTy->getCanonicalTypeUnqualified() ==
+             ty->getCanonicalTypeUnqualified();
+}
+
 static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
-  auto isValid = [&](ValueDecl *equalEqualOp) -> bool {
+  auto isValidMember = [&](ValueDecl *equalEqualOp) -> bool {
     auto equalEqual = dyn_cast<FuncDecl>(equalEqualOp);
     if (!equalEqual)
       return false;
@@ -171,19 +297,18 @@ static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
       return false;
     auto lhsNominal = lhsTy->getAnyNominal();
     auto rhsNominal = rhsTy->getAnyNominal();
-    if (lhsNominal != rhsNominal || lhsNominal != decl)
-      return false;
-    return true;
+    return lhsNominal == rhsNominal && lhsNominal == decl;
   };
-
-  return lookupOperator(decl, decl->getASTContext().Id_EqualsOperator, isValid);
+  return lookupOperator(
+      decl, decl->getASTContext().Id_EqualsOperator, isValidMember,
+      [decl](const clang::FunctionDecl *fd) { return isValidBinOp(decl, fd); });
 }
 
 static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
   auto binaryIntegerProto =
       decl->getASTContext().getProtocol(KnownProtocolKind::BinaryInteger);
 
-  auto isValid = [&](ValueDecl *minusOp) -> bool {
+  auto isValidMember = [&](ValueDecl *minusOp) -> bool {
     auto minus = dyn_cast<FuncDecl>(minusOp);
     if (!minus)
       return false;
@@ -203,18 +328,52 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
     if (lhsNominal != rhsNominal || lhsNominal != decl)
       return false;
     auto returnTy = minus->getResultInterfaceType();
-    if (!checkConformance(returnTy, binaryIntegerProto))
+    return static_cast<bool>(checkConformance(returnTy, binaryIntegerProto));
+  };
+  auto isValidGlobal = [&](const clang::FunctionDecl *minusOp) -> bool {
+    if (!isValidBinOp(decl, minusOp))
       return false;
-    return true;
+    return minusOp->getReturnType()->isIntegerType();
   };
 
   ValueDecl *result =
-      lookupOperator(decl, decl->getASTContext().getIdentifier("-"), isValid);
+      lookupOperator(decl, decl->getASTContext().getIdentifier("-"),
+                     isValidMember, isValidGlobal);
   return dyn_cast_or_null<FuncDecl>(result);
 }
 
-static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
-  auto isValid = [&](ValueDecl *plusEqualOp) -> bool {
+static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
+  auto isValidGlobal = [&](const clang::FunctionDecl *fd) -> bool {
+    if (!fd)
+      return false;
+    auto ty = cast<clang::TypeDecl>(decl->getClangDecl())->getTypeForDecl();
+    if (auto method = dyn_cast<clang::CXXMethodDecl>(fd)) {
+      if (method->param_size() != 1)
+        return false;
+      if (!method->isConst())
+        return false;
+
+      auto parTy = getReadOnlyParamType(fd->getParamDecl(0));
+      if (parTy.isNull())
+        return false;
+      if (!parTy->isIntegerType())
+        return false;
+      auto thisTy = method->getParent()->getTypeForDecl();
+      return thisTy->getCanonicalTypeUnqualified() ==
+             ty->getCanonicalTypeUnqualified();
+    }
+    if (fd->param_size() != 2)
+      return false;
+    auto lhsTy = getReadOnlyParamType(fd->getParamDecl(0));
+    auto rhsTy = getReadOnlyParamType(fd->getParamDecl(1));
+    if (lhsTy.isNull() || rhsTy.isNull())
+      return false;
+    if (rhsTy->isIntegerType())
+      return false;
+    return lhsTy->getCanonicalTypeUnqualified() ==
+           ty->getCanonicalTypeUnqualified();
+  };
+  auto isValidMember = [&](ValueDecl *plusEqualOp) -> bool {
     auto plusEqual = dyn_cast<FuncDecl>(plusEqualOp);
     if (!plusEqual)
       return false;
@@ -229,20 +388,34 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
     auto rhsTy = rhs->getTypeInContext();
     if (!lhsTy || !rhsTy)
       return false;
-    if (rhsTy->getCanonicalType() != distanceTy->getCanonicalType())
-      return false;
     auto lhsNominal = lhsTy->getAnyNominal();
     if (lhsNominal != decl)
       return false;
     auto returnTy = plusEqual->getResultInterfaceType();
-    if (!returnTy->isVoid())
-      return false;
-    return true;
+    return returnTy->isVoid();
   };
 
   ValueDecl *result =
-      lookupOperator(decl, decl->getASTContext().getIdentifier("+="), isValid);
+      lookupOperator(decl, decl->getASTContext().getIdentifier("+="),
+                     isValidMember, isValidGlobal);
   return dyn_cast_or_null<FuncDecl>(result);
+}
+
+/// Register a synthesized declaration in the lookup tables and mark it as
+/// always visible. Declarations are added to two lookup tables (the one for
+/// the record's context and the one for its owning module) to handle the case
+/// where a C++ namespace spans across multiple Clang modules.
+static void registerSynthesizedDecl(ClangImporter::Implementation &impl,
+                                    const clang::CXXRecordDecl *classDecl,
+                                    clang::FunctionDecl *decl) {
+  impl.synthesizedAndAlwaysVisibleDecls.insert(decl);
+  auto *lookupTable1 = impl.findLookupTable(classDecl);
+  addEntryToLookupTable(*lookupTable1, decl, impl.getNameImporter());
+  auto *owningModule =
+      importer::getClangOwningModule(classDecl, classDecl->getASTContext());
+  auto *lookupTable2 = impl.findLookupTable(owningModule);
+  if (lookupTable1 != lookupTable2)
+    addEntryToLookupTable(*lookupTable2, decl, impl.getNameImporter());
 }
 
 static clang::FunctionDecl *
@@ -273,8 +446,7 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
                                           best)) {
   case clang::OR_Success: {
     if (auto clangCallee = best->Function) {
-      auto lookupTable = impl.findLookupTable(classDecl);
-      addEntryToLookupTable(*lookupTable, clangCallee, impl.getNameImporter());
+      registerSynthesizedDecl(impl, classDecl, clangCallee);
       return clangCallee;
     }
     break;
@@ -321,36 +493,22 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
       returnTy, {lhsTy, rhsTy}, clang::FunctionProtoType::ExtProtoInfo());
 
   // Create a `bool operator==(T, T)` function.
-  auto equalEqualDecl = clang::FunctionDecl::Create(
-      clangCtx, declContext, clang::SourceLocation(), clang::SourceLocation(),
-      declName, equalEqualTy, clangCtx.getTrivialTypeSourceInfo(returnTy),
-      clang::StorageClass::SC_Static);
-  equalEqualDecl->setImplicit();
-  equalEqualDecl->setImplicitlyInline();
+  auto equalEqualDecl =
+      createClangFunctionDecl(clangCtx, declContext, declName, equalEqualTy);
   // If this is a static member function of a class, it needs to be public.
   equalEqualDecl->setAccess(clang::AccessSpecifier::AS_public);
 
   // Create the parameters of the function. They are not referenced from source
   // code, so they don't need to have a name.
-  auto lhsParamId = nullptr;
-  auto lhsTyInfo = clangCtx.getTrivialTypeSourceInfo(lhsTy);
-  auto lhsParamDecl = clang::ParmVarDecl::Create(
-      clangCtx, equalEqualDecl, clang::SourceLocation(),
-      clang::SourceLocation(), lhsParamId, lhsTy, lhsTyInfo,
-      clang::StorageClass::SC_None, /*DefArg*/ nullptr);
-  auto lhsParamRefExpr = new (clangCtx) clang::DeclRefExpr(
-      clangCtx, lhsParamDecl, false, lhsTy, clang::ExprValueKind::VK_LValue,
-      clang::SourceLocation());
+  auto lhsParamDecl =
+      createClangParmVarDecl(clangCtx, equalEqualDecl, nullptr, lhsTy);
+  auto lhsParamRefExpr =
+      createClangDeclRefExpr(clangCtx, lhsParamDecl, lhsTy, clang::VK_LValue);
 
-  auto rhsParamId = nullptr;
-  auto rhsTyInfo = clangCtx.getTrivialTypeSourceInfo(rhsTy);
-  auto rhsParamDecl = clang::ParmVarDecl::Create(
-      clangCtx, equalEqualDecl, clang::SourceLocation(),
-      clang::SourceLocation(), rhsParamId, rhsTy, rhsTyInfo,
-      clang::StorageClass::SC_None, nullptr);
-  auto rhsParamRefExpr = new (clangCtx) clang::DeclRefExpr(
-      clangCtx, rhsParamDecl, false, rhsTy, clang::ExprValueKind::VK_LValue,
-      clang::SourceLocation());
+  auto rhsParamDecl =
+      createClangParmVarDecl(clangCtx, equalEqualDecl, nullptr, rhsTy);
+  auto rhsParamRefExpr =
+      createClangDeclRefExpr(clangCtx, rhsParamDecl, rhsTy, clang::VK_LValue);
 
   equalEqualDecl->setParams({lhsParamDecl, rhsParamDecl});
 
@@ -372,18 +530,172 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
     return false;
   auto underlyingCall = underlyingCallResult.get();
 
-  auto equalEqualBody = clang::ReturnStmt::Create(
-      clangCtx, clang::SourceLocation(), underlyingCall, nullptr);
-  equalEqualDecl->setBody(equalEqualBody);
+  equalEqualDecl->setBody(createClangReturnStmt(clangCtx, underlyingCall));
 
-  impl.synthesizedAndAlwaysVisibleDecls.insert(equalEqualDecl);
-  auto lookupTable = impl.findLookupTable(classDecl);
-  addEntryToLookupTable(*lookupTable, equalEqualDecl, impl.getNameImporter());
+  registerSynthesizedDecl(impl, classDecl, equalEqualDecl);
   return true;
 }
 
-bool swift::isIterator(const clang::CXXRecordDecl *clangDecl) {
-  return getIteratorCategoryDecl(clangDecl);
+void swift::simple_display(llvm::raw_ostream &out,
+                           const CxxRecordDeclDescriptor &desc) {
+  out << "Inferring C++ iterator info for '";
+  if (desc.decl->getIdentifier())
+    out << desc.decl->getName();
+  else if (desc.decl->isAnonymousStructOrUnion())
+    out << "(anonymous record)";
+  else
+    out << "(unnamed record)";
+  out << "'\n";
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const CxxRecordDeclDescriptor &desc) {
+  return SourceLoc();
+}
+
+static std::optional<CxxIteratorCategory>
+categorizeIteratorFromTypeTag(const clang::TypeDecl *tyDecl) {
+
+  const clang::CXXRecordDecl *underlyingDecl = nullptr;
+  if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(tyDecl))
+    // Typical case: `using iterator_tag = some_tag;`
+    underlyingDecl = typedefDecl->getUnderlyingType()
+                         .getCanonicalType()
+                         ->getAsCXXRecordDecl();
+  else
+    // Less common: `struct iterator_tag : some_tag {};`
+    underlyingDecl = dyn_cast<clang::CXXRecordDecl>(tyDecl);
+
+  if (underlyingDecl)
+    underlyingDecl = underlyingDecl->getDefinition();
+  if (!underlyingDecl)
+    return {};
+
+  std::optional<CxxIteratorCategory> category = std::nullopt;
+
+  // In the easiest case, the underlyingDecl is the iterator category tag from
+  // the std namespace, but it might also be some record that inherits from one
+  // of the std iterator tags. Look through all of its (public) bases and find
+  // the strongest iterator category.
+
+  llvm::SmallVector<const clang::CXXRecordDecl *, 2> queue;
+  queue.push_back(underlyingDecl);
+
+  while (!queue.empty()) {
+    auto *decl = queue.back();
+    queue.pop_back();
+
+    auto matchedTag = false;
+    if (decl->isInStdNamespace() && decl->getIdentifier()) {
+      auto declCategory =
+          llvm::StringSwitch<std::optional<CxxIteratorCategory>>(
+              decl->getName())
+              .Case("input_iterator_tag", CxxIteratorCategory::Input)
+              .Case("random_access_iterator_tag",
+                    CxxIteratorCategory::RandomAccess)
+              .Case("contiguous_iterator_tag", CxxIteratorCategory::Contiguous)
+              .Default(std::nullopt);
+
+      if (declCategory.has_value()) {
+        matchedTag = true;
+
+        if (!category.has_value() || category.value() < declCategory.value())
+          // This is one of the std category tags, and is stronger than what
+          // we've previously seen
+          category = declCategory;
+      }
+    }
+
+    if (!matchedTag) {
+      // We only need to explore bases if this isn't a std iterator category tag
+      for (auto base : decl->bases()) {
+        if (base.getAccessSpecifier() != clang::AS_public)
+          // Simply skip over any non-public base
+          continue;
+
+        auto *ty = base.getType()->getAs<clang::RecordType>();
+        if (!ty)
+          // Bail if we encounter some kind of base that isn't a record type
+          return {};
+
+        auto *baseDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+            ty->getDecl()->getDefinition());
+        if (!baseDecl || (baseDecl->isDependentContext() &&
+                          !baseDecl->isCurrentInstantiation(decl)))
+          // Bail if we encounter a base that isn't a defined C++ record
+          return {};
+
+        // Look at this base later
+        queue.push_back(baseDecl);
+      }
+    }
+  }
+  return category;
+}
+
+std::optional<CxxIteratorCategory>
+CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
+                                 CxxRecordDeclDescriptor desc) const {
+  auto *decl = desc.decl;
+  auto &sema = desc.sema;
+  auto &ctx = decl->getASTContext();
+
+  // Look for a non-primary specialization of std::iterator_traits<decl>.
+  //
+  // If one exists, use its iterator tag, but don't try to instantiate
+  // a specialization if there isn't already one.
+  if (auto *stdNS = sema.getStdNamespace()) {
+    auto iteratorTraitsId =
+        ctx.DeclarationNames.getIdentifier(&ctx.Idents.get("iterator_traits"));
+    if (auto *iterator_traits = stdNS->lookup(iteratorTraitsId)
+                                    .find_first<clang::ClassTemplateDecl>()) {
+      void *insertPos = nullptr; // unused
+      if (auto *traitSpecialization = iterator_traits->findSpecialization(
+              {clang::TemplateArgument(ctx.getTypeDeclType(decl))}, insertPos);
+          traitSpecialization && traitSpecialization->hasDefinition()) {
+        if (traitSpecialization->isExplicitSpecialization()) {
+          // Determine info from definition of iterator_traits specialization,
+          // but only if it is a non-primary specialization.
+          //
+          // N.B. decl is ITER_TRAITS from [iterator.concepts.general]
+          decl = traitSpecialization->getDefinition();
+        }
+      }
+    }
+  }
+
+  if (sema.getLangOpts().CPlusPlus20) {
+    // Only look for iterator_concept if we are using C++20 or above.
+    auto *conceptDecl = lookupCxxTypeMember(sema, decl, "iterator_concept");
+    if (conceptDecl)
+      return categorizeIteratorFromTypeTag(conceptDecl);
+
+    // iterator_concept should take precedence, but if it is absent, fallback
+    // to iterator_category.
+  }
+
+  if (auto *categoryDecl = lookupCxxTypeMember(sema, decl, "iterator_category")) {
+    auto info = categorizeIteratorFromTypeTag(categoryDecl);
+    if (info == CxxIteratorCategory::Contiguous)
+      info = CxxIteratorCategory::RandomAccess;
+    return info;
+  }
+
+  return {};
+}
+
+bool swift::hasIteratorCategory(const clang::CXXRecordDecl *clangDecl) {
+  clang::IdentifierInfo *name =
+      &clangDecl->getASTContext().Idents.get("iterator_category");
+  auto members = clangDecl->lookup(name);
+  if (members.empty())
+    return false;
+  // NOTE: If this is a templated typedef, Clang might have instantiated
+  // several equivalent typedef decls, so members.isSingleResult() may
+  // return false here. But if they aren't equivalent, Clang should have
+  // already complained about this. Let's assume that they are equivalent.
+  // (see filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
+  return isa<clang::TypeDecl>(members.front());
 }
 
 ValueDecl *
@@ -403,123 +715,54 @@ swift::importer::getImportedMemberOperator(const DeclBaseName &name,
   }
   if (name.getIdentifier() == selfType->getASTContext().getIdentifier("+=") &&
       parameterType) {
-    return getPlusEqualOperator(selfType, *parameterType);
+    return getPlusEqualOperator(selfType);
   }
   return nullptr;
 }
 
-void swift::conformToCxxIteratorIfNeeded(
-    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
-  PrettyStackTraceDecl trace("conforming to UnsafeCxxInputIterator", decl);
+static void
+conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
+                             NominalTypeDecl *decl,
+                             const clang::CXXRecordDecl *clangDecl) {
+  static_assert(
+      CxxIteratorCategory::Input < CxxIteratorCategory::RandomAccess &&
+      CxxIteratorCategory::RandomAccess < CxxIteratorCategory::Contiguous);
 
-  assert(decl);
-  assert(clangDecl);
+  PrettyStackTraceDecl trace("trying to conform to UnsafeCxxInputIterator", decl);
   ASTContext &ctx = decl->getASTContext();
   clang::ASTContext &clangCtx = clangDecl->getASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
 
-  if (!ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator))
+  if (!ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator) ||
+      !ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableInputIterator))
+    return; // Don't even bother if we don't have protocols for input iterators
+
+  // FIXME: hasIteratorCategory() is more conservative than it should be because
+  // it doesn't consider an inherited iterator_category, nor iterator_concept.
+  // For now, checking this maintains existing behavior and ensures consistency
+  // across ClangImporter, where clang::Sema isn't always readily available.
+
+  auto iterInfo = evaluateOrDefault(
+      ctx.evaluator, CxxIteratorInfoRequest({clangDecl, clangSema}), {});
+
+  if (!iterInfo.has_value())
     return;
 
-  // We consider a type to be an input iterator if it defines an
-  // `iterator_category` that inherits from `std::input_iterator_tag`, e.g.
-  // `using iterator_category = std::input_iterator_tag`.
-  auto iteratorCategory = getIteratorCategoryDecl(clangDecl);
-  if (!iteratorCategory)
+  auto category = iterInfo.value();
+  ASSERT(category >= CxxIteratorCategory::Input);
+
+  // Input iterators require:
+  //   - operator*()  / .pointee
+  //   - operator++() / .successor()
+  //   - operator==() / func ==(lhs:rhs)
+
+  auto [pointee, operatorStar, _] =
+      impl.lookupAndImportPointeeAndOperatorStar(decl);
+  if (!pointee || pointee->isGetterMutating() ||
+      pointee->getTypeInContext()->hasError())
     return;
 
-  auto unwrapUnderlyingTypeDecl =
-      [](clang::TypeDecl *typeDecl) -> clang::CXXRecordDecl * {
-    clang::CXXRecordDecl *underlyingDecl = nullptr;
-    if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(typeDecl)) {
-      auto type = typedefDecl->getUnderlyingType();
-      underlyingDecl = type->getAsCXXRecordDecl();
-    } else {
-      underlyingDecl = dyn_cast<clang::CXXRecordDecl>(typeDecl);
-    }
-    if (underlyingDecl) {
-      underlyingDecl = underlyingDecl->getDefinition();
-    }
-    return underlyingDecl;
-  };
-
-  // If `iterator_category` is a typedef or a using-decl, retrieve the
-  // underlying struct decl.
-  auto underlyingCategoryDecl = unwrapUnderlyingTypeDecl(iteratorCategory);
-  if (!underlyingCategoryDecl)
-    return;
-
-  auto isIteratorTagDecl = [&](const clang::CXXRecordDecl *base,
-                               StringRef tag) {
-    return base->isInStdNamespace() && base->getIdentifier() &&
-           base->getName() == tag;
-  };
-  auto isInputIteratorDecl = [&](const clang::CXXRecordDecl *base) {
-    return isIteratorTagDecl(base, "input_iterator_tag");
-  };
-  auto isRandomAccessIteratorDecl = [&](const clang::CXXRecordDecl *base) {
-    return isIteratorTagDecl(base, "random_access_iterator_tag");
-  };
-  auto isContiguousIteratorDecl = [&](const clang::CXXRecordDecl *base) {
-    return isIteratorTagDecl(base, "contiguous_iterator_tag"); // C++20
-  };
-
-  // Traverse all transitive bases of `underlyingDecl` to check if
-  // it inherits from `std::input_iterator_tag`.
-  bool isInputIterator = isInputIteratorDecl(underlyingCategoryDecl);
-  bool isRandomAccessIterator =
-      isRandomAccessIteratorDecl(underlyingCategoryDecl);
-  underlyingCategoryDecl->forallBases([&](const clang::CXXRecordDecl *base) {
-    if (isInputIteratorDecl(base)) {
-      isInputIterator = true;
-    }
-    if (isRandomAccessIteratorDecl(base)) {
-      isRandomAccessIterator = true;
-      isInputIterator = true;
-      return false;
-    }
-    return true;
-  });
-
-  if (!isInputIterator)
-    return;
-
-  bool isContiguousIterator = false;
-  // In C++20, `std::contiguous_iterator_tag` is specified as a type called
-  // `iterator_concept`. It is not possible to detect a contiguous iterator
-  // based on its `iterator_category`. The type might not have an
-  // `iterator_concept` defined.
-  if (auto iteratorConcept = getIteratorConceptDecl(clangDecl)) {
-    if (auto underlyingConceptDecl =
-            unwrapUnderlyingTypeDecl(iteratorConcept)) {
-      isContiguousIterator = isContiguousIteratorDecl(underlyingConceptDecl);
-      if (!isContiguousIterator)
-        underlyingConceptDecl->forallBases(
-            [&](const clang::CXXRecordDecl *base) {
-              if (isContiguousIteratorDecl(base)) {
-                isContiguousIterator = true;
-                return false;
-              }
-              return true;
-            });
-    }
-  }
-
-  // Check if present: `var pointee: Pointee { get }`
-  auto pointeeId = ctx.getIdentifier("pointee");
-  auto pointee = lookupDirectSingleWithoutExtensions<VarDecl>(decl, pointeeId);
-  if (!pointee || pointee->isGetterMutating() || pointee->getTypeInContext()->hasError())
-    return;
-
-  // Check if `var pointee: Pointee` is settable. This is required for the
-  // conformance to UnsafeCxxMutableInputIterator but is not necessary for
-  // UnsafeCxxInputIterator.
-  bool pointeeSettable = pointee->isSettable(nullptr);
-
-  // Check if present: `func successor() -> Self`
-  auto successorId = ctx.getIdentifier("successor");
-  auto successor =
-      lookupDirectSingleWithoutExtensions<FuncDecl>(decl, successorId);
+  auto *successor = impl.lookupAndImportSuccessor(decl);
   if (!successor || successor->isMutating())
     return;
   auto successorTy = successor->getResultInterfaceType();
@@ -551,20 +794,43 @@ void swift::conformToCxxIteratorIfNeeded(
   if (!equalEqual)
     return;
 
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Pointee"),
-                               pointee->getTypeInContext());
-  if (pointeeSettable)
+  Type pointeeTy = pointee->getTypeInContext();
+
+  // Look for __operatorStar(), which must be non-mutating and return a
+  // reference. This makes sure we use the const operator* overload.
+  Type dereferenceResultTy = pointeeTy;
+  if (operatorStar && !operatorStar->isMutating()) {
+    auto operatorStarReturnTy = operatorStar->getResultInterfaceType();
+    assert(operatorStarReturnTy &&
+           "__operatorStar doesn't have a return type?");
+
+    if (operatorStarReturnTy &&
+        operatorStarReturnTy->getAnyPointerElementType() &&
+        (operatorStarReturnTy->getAnyPointerElementType()->getCanonicalType() ==
+         pointeeTy->getCanonicalType()))
+      dereferenceResultTy = operatorStar->getResultInterfaceType();
+  }
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Pointee"), pointeeTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("DereferenceResult"),
+                               dereferenceResultTy);
+
+  bool mutableIterator = pointee->isSettable(nullptr);
+
+  if (mutableIterator)
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::UnsafeCxxMutableInputIterator});
   else
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::UnsafeCxxInputIterator});
 
-  if (!isRandomAccessIterator ||
-      !ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator))
+  if (category < CxxIteratorCategory::RandomAccess ||
+      !ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator) ||
+      !ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator))
     return;
 
-  // Try to conform to UnsafeCxxRandomAccessIterator if possible.
+  // Random access iterators additionally require:
+  //   - operator-()  / func -(lhs:rhs)
+  //   - operator+=() / func +=(lhs:rhs)
 
   // Check if present: `func -`
   auto minus = getMinusOperator(decl);
@@ -585,124 +851,77 @@ void swift::conformToCxxIteratorIfNeeded(
   }
   if (!minus)
     return;
-  auto distanceTy = minus->getResultInterfaceType();
   // distanceTy conforms to BinaryInteger, this is ensured by getMinusOperator.
+  auto distanceTy = minus->getResultInterfaceType();
 
-  auto plusEqual = getPlusEqualOperator(decl, distanceTy);
-  if (!plusEqual) {
-    clang::FunctionDecl *instantiated = instantiateTemplatedOperator(
-        impl, clangDecl, clang::BinaryOperatorKind::BO_AddAssign);
-    if (instantiated && !impl.isUnavailableInSwift(instantiated)) {
-      plusEqual = getPlusEqualOperator(decl, distanceTy);
-      if (!plusEqual) {
-        clang::QualType returnTy = instantiated->getReturnType();
-        auto clangMinus = cast<clang::FunctionDecl>(minus->getClangDecl());
-        auto lhsTy = clangCtx.getRecordType(clangDecl);
-        auto rhsTy = clangMinus->getReturnType();
-        synthesizeCXXOperator(impl, clangDecl,
-                              clang::BinaryOperatorKind::BO_AddAssign, lhsTy,
-                              rhsTy, returnTy);
-        plusEqual = getPlusEqualOperator(decl, distanceTy);
-      }
-    }
-  }
-  if (!plusEqual)
+  auto plusEqual = getPlusEqualOperator(decl);
+  if (!plusEqual ||
+      plusEqual->getParameters()
+              ->get(1)
+              ->getInterfaceType()
+              ->getCanonicalType() != distanceTy->getCanonicalType())
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Distance"), distanceTy);
-  if (pointeeSettable)
+  if (mutableIterator)
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator});
   else
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::UnsafeCxxRandomAccessIterator});
 
-  if (isContiguousIterator) {
-    if (pointeeSettable)
-      impl.addSynthesizedProtocolAttrs(
-          decl, {KnownProtocolKind::UnsafeCxxMutableContiguousIterator});
-    else
-      impl.addSynthesizedProtocolAttrs(
-          decl, {KnownProtocolKind::UnsafeCxxContiguousIterator});
-  }
-}
-
-void swift::conformToCxxConvertibleToBoolIfNeeded(
-    ClangImporter::Implementation &impl, swift::NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
-  PrettyStackTraceDecl trace("conforming to CxxConvertibleToBool", decl);
-
-  assert(decl);
-  assert(clangDecl);
-  ASTContext &ctx = decl->getASTContext();
-
-  auto conversionId = ctx.getIdentifier("__convertToBool");
-  auto conversions = lookupDirectWithoutExtensions(decl, conversionId);
-
-  // Find a non-mutating overload of `__convertToBool`.
-  FuncDecl *conversion = nullptr;
-  for (auto c : conversions) {
-    auto candidate = dyn_cast<FuncDecl>(c);
-    if (!candidate || candidate->isMutating())
-      continue;
-    if (conversion)
-      // Overload ambiguity?
-      return;
-    conversion = candidate;
-  }
-  if (!conversion)
-    return;
-  auto conversionTy = conversion->getResultInterfaceType();
-  if (!conversionTy->isBool())
+  if (category < CxxIteratorCategory::Contiguous ||
+      !ctx.getProtocol(KnownProtocolKind::UnsafeCxxContiguousIterator) ||
+      !ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableContiguousIterator))
     return;
 
-  impl.addSynthesizedProtocolAttrs(decl,
-                                   {KnownProtocolKind::CxxConvertibleToBool});
+  // Contiguous iterators do not have any additional requirements
+
+  if (mutableIterator)
+    impl.addSynthesizedProtocolAttrs(
+        decl, {KnownProtocolKind::UnsafeCxxMutableContiguousIterator});
+  else
+    impl.addSynthesizedProtocolAttrs(
+        decl, {KnownProtocolKind::UnsafeCxxContiguousIterator});
 }
 
-void swift::conformToCxxOptionalIfNeeded(
-    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
+static void
+conformToCxxConvertibleToBoolIfNeeded(ClangImporter::Implementation &impl,
+                                      swift::NominalTypeDecl *decl) {
+  PrettyStackTraceDecl trace("trying to conform to CxxConvertibleToBool", decl);
+  if (impl.lookupAndImportOperatorBool(decl))
+    impl.addSynthesizedProtocolAttrs(decl,
+                                     {KnownProtocolKind::CxxConvertibleToBool});
+}
+
+static void conformToCxxOptional(ClangImporter::Implementation &impl,
+                                 NominalTypeDecl *decl,
+                                 const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxOptional", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
   clang::ASTContext &clangCtx = impl.getClangASTContext();
   clang::Sema &clangSema = impl.getClangSema();
 
-  if (!isStdDecl(clangDecl, {"optional"}))
+  auto *value_type = lookupCxxTypeMember(clangSema, clangDecl, "value_type",
+                                         /*mustBeComplete=*/true);
+  if (!value_type)
     return;
 
-  ProtocolDecl *cxxOptionalProto =
-      ctx.getProtocol(KnownProtocolKind::CxxOptional);
-  // If the Cxx module is missing, or does not include one of the necessary
-  // protocol, bail.
-  if (!cxxOptionalProto)
+  auto *Wrapped = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(value_type, impl.CurrentVersion));
+  if (!Wrapped)
     return;
 
-  auto pointeeId = ctx.getIdentifier("pointee");
-  auto pointees = lookupDirectWithoutExtensions(decl, pointeeId);
-  if (pointees.size() != 1)
-    return;
-  auto pointee = dyn_cast<VarDecl>(pointees.front());
+  auto pointee = impl.lookupAndImportPointee(decl);
   if (!pointee)
     return;
-  auto pointeeTy = pointee->getInterfaceType();
-
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"), pointeeTy);
-  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
 
   // `std::optional` has a C++ constructor that takes the wrapped value as a
   // parameter. Unfortunately this constructor has templated parameter type, so
   // it isn't directly usable from Swift. Let's explicitly instantiate a
   // constructor with the wrapped value type, and then import it into Swift.
 
-  auto valueTypeDecl = lookupNestedClangTypeDecl(clangDecl, "value_type");
-  if (!valueTypeDecl)
-    // `std::optional` without a value_type?!
-    return;
-  auto valueType = clangCtx.getTypeDeclType(valueTypeDecl);
+  auto valueType = clangCtx.getTypeDeclType(value_type);
 
   auto constRefValueType =
       clangCtx.getLValueReferenceType(valueType.withConst());
@@ -715,7 +934,7 @@ void swift::conformToCxxOptionalIfNeeded(
   auto fakeValueRefExpr = new (clangCtx) clang::DeclRefExpr(
       clangCtx, fakeValueVarDecl, false,
       constRefValueType.getNonReferenceType(), clang::ExprValueKind::VK_LValue,
-      clang::SourceLocation());
+      clangDecl->getLocation());
 
   auto clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
       clang::QualType(clangDecl->getTypeForDecl(), 0));
@@ -750,49 +969,132 @@ void swift::conformToCxxOptionalIfNeeded(
   if (!importedConstructor)
     return;
   decl->addMember(importedConstructor);
+
+  // Mark `var pointee` as deprecated to direct users towards `var value`, which
+  // is provided by the Cxx overlay. It supports mutation and is UB-safe. Only
+  // do so if `value` is actually available, i.e. if the conformance to
+  // CxxOptional was synthesized.
+  auto pointeeDeprecatedAttr = AvailableAttr::createUniversallyDeprecated(
+      ctx, "use 'value' instead for instances of 'std.optional'", "value");
+  pointee->addAttribute(pointeeDeprecatedAttr);
+
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"),
+                               Wrapped->getUnderlyingType());
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
 }
 
-void swift::conformToCxxSequenceIfNeeded(
+static void conformToCxxBorrowingSequenceIfNeeded(
     ClangImporter::Implementation &impl, NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
-  PrettyStackTraceDecl trace("conforming to CxxSequence", decl);
+    const clang::CXXRecordDecl *clangDecl,
+    const ProtocolConformance *rawIteratorConformance) {
+  PrettyStackTraceDecl trace("trying to conform to CxxBorrowingSequence", decl);
+  ASTContext &ctx = decl->getASTContext();
 
-  assert(decl);
-  assert(clangDecl);
+  if (!ctx.LangOpts.hasFeature(Feature::BorrowingSequence))
+    return;
+
+  ProtocolDecl *cxxIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
+  ProtocolDecl *cxxBorrowingSequenceProto =
+      ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence);
+  if (!cxxIteratorProto || !cxxBorrowingSequenceProto)
+    return;
+
+  // Take the default definition of `BorrowingIterator` from
+  // CxxBorrowingSequence protocol. This type is currently
+  // `CxxBorrowingIterator<Self>`.
+  auto borrowingIteratorDecl = cxxBorrowingSequenceProto->getAssociatedType(
+      ctx.getIdentifier("BorrowingIterator"));
+  if (!borrowingIteratorDecl)
+    return;
+  auto borrowingIteratorNominal =
+      borrowingIteratorDecl->getDefaultDefinitionType()->getAnyNominal();
+
+  // Substitute generic `Self` parameter.
+  auto declSelfTy = decl->getDeclaredInterfaceType();
+  auto borrowingIteratorTy =
+      BoundGenericType::get(borrowingIteratorNominal, Type(), {declSelfTy});
+
+  auto dereferenceResultDecl = cxxIteratorProto->getAssociatedType(
+      ctx.getIdentifier("DereferenceResult"));
+  if (!dereferenceResultDecl)
+    return;
+
+  auto dereferenceResultTy =
+      rawIteratorConformance->getTypeWitness(dereferenceResultDecl);
+
+  if (dereferenceResultTy && dereferenceResultTy->getAnyPointerElementType()) {
+    // Only conform to CxxBorrowingSequence if `__operatorStar` returns
+    // `UnsafePointer<Pointee>`. Otherwise, we can't create a span for pointee.
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("BorrowingIterator"),
+                                 borrowingIteratorTy);
+    impl.addSynthesizedProtocolAttrs(decl,
+                                     {KnownProtocolKind::CxxBorrowingSequence});
+  }
+}
+
+static void
+conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
+                             NominalTypeDecl *decl,
+                             const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("trying to conform to CxxSequence", decl);
+  clang::Sema &clangSema = impl.getClangSema();
   ASTContext &ctx = decl->getASTContext();
 
   ProtocolDecl *cxxIteratorProto =
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
   ProtocolDecl *cxxSequenceProto =
       ctx.getProtocol(KnownProtocolKind::CxxSequence);
-  ProtocolDecl *cxxConvertibleProto =
-      ctx.getProtocol(KnownProtocolKind::CxxConvertibleToCollection);
   // If the Cxx module is missing, or does not include one of the necessary
   // protocols, bail.
   if (!cxxIteratorProto || !cxxSequenceProto)
     return;
 
-  // Check if present: `func __beginUnsafe() -> RawIterator`
-  auto beginId = ctx.getIdentifier("__beginUnsafe");
-  auto begin = lookupDirectSingleWithoutExtensions<FuncDecl>(decl, beginId);
-  if (!begin)
+  // Look up begin() and end() methods. We only require the const overloads,
+  // but will make use of the non-const overloads later, if available, for
+  // a possible mutable collection conformance.
+  auto [beginConst, beginMut] =
+      lookupCxxZeroArityMethod(clangSema, clangDecl, "begin");
+  auto [endConst, endMut] =
+      lookupCxxZeroArityMethod(clangSema, clangDecl, "end");
+  if (!beginConst || !endConst)
     return;
+
+  auto iterTy = beginConst->getReturnType().getCanonicalType();
+  if (iterTy != endConst->getReturnType().getCanonicalType())
+    // begin() and end() need to have the same return type
+    return;
+
+  if (!iterTy->isPointerOrReferenceType()) {
+    // Check if begin() returns an iterator.
+    auto *iterDecl = iterTy->getAsCXXRecordDecl();
+    if (!iterDecl || !iterDecl->hasDefinition())
+      return;
+    auto iterInfo = evaluateOrDefault(
+        ctx.evaluator, CxxIteratorInfoRequest({iterDecl, clangSema}), {});
+    if (!iterInfo.has_value())
+      return;
+  }
+
+  // import begin() and end()
+  auto *begin = dyn_cast_or_null<FuncDecl>(
+      impl.importDecl(beginConst, impl.CurrentVersion));
+  auto *end = dyn_cast_or_null<FuncDecl>(
+      impl.importDecl(endConst, impl.CurrentVersion));
+  if (!begin || !end)
+    return;
+
+  ASSERT(begin->getBaseName() == "__beginUnsafe" &&
+         "begin() should always be __Unsafe");
+  ASSERT(end->getBaseName() == "__endUnsafe" &&
+         "end() should always be __Unsafe");
+  ASSERT(!begin->isMutating() && !end->isMutating() &&
+         "begin() and end() should not be mutating");
+
   auto rawIteratorTy = begin->getResultInterfaceType();
-
-  // Check if present: `func __endUnsafe() -> RawIterator`
-  auto endId = ctx.getIdentifier("__endUnsafe");
-  auto end = lookupDirectSingleWithoutExtensions<FuncDecl>(decl, endId);
-  if (!end)
-    return;
-
-  // Check if `begin()` and `end()` are non-mutating.
-  if (begin->isMutating() || end->isMutating())
-    return;
-
-  // Check if `__beginUnsafe` and `__endUnsafe` have the same return type.
-  auto endTy = end->getResultInterfaceType();
-  if (!endTy || endTy->getCanonicalType() != rawIteratorTy->getCanonicalType())
-    return;
+  ASSERT(rawIteratorTy->getCanonicalType() ==
+             end->getResultInterfaceType()->getCanonicalType() &&
+         "begin() and end() should have the same return type");
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
   auto rawIteratorConformanceRef =
@@ -807,13 +1109,26 @@ void swift::conformToCxxSequenceIfNeeded(
   auto pointeeTy = rawIteratorConformance->getTypeWitness(pointeeDecl);
   assert(pointeeTy && "valid conformance must have a Pointee witness");
 
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
+                               rawIteratorTy);
+
+  conformToCxxBorrowingSequenceIfNeeded(impl, decl, clangDecl,
+                                        rawIteratorConformance);
+
+  // `CxxSequence` and `CxxRandomAccessCollection` protocols require `Element`
+  // to be Copyable and Escapable
+  if (!pointeeTy->isCopyable() || !pointeeTy->isEscapable())
+    return;
+
+  // CxxSequence conformance.
   // Take the default definition of `Iterator` from CxxSequence protocol. This
   // type is currently `CxxIterator<Self>`.
   auto iteratorDecl = cxxSequenceProto->getAssociatedType(ctx.Id_Iterator);
   auto iteratorTy = iteratorDecl->getDefaultDefinitionType();
   // Substitute generic `Self` parameter.
-  auto cxxSequenceSelfTy = cxxSequenceProto->getSelfInterfaceType();
   auto declSelfTy = decl->getDeclaredInterfaceType();
+  auto cxxSequenceSelfTy = cxxSequenceProto->getSelfInterfaceType();
   iteratorTy = iteratorTy.subst(
       [&](SubstitutableType *dependentType) {
         if (dependentType->isEqual(cxxSequenceSelfTy))
@@ -821,11 +1136,8 @@ void swift::conformToCxxSequenceIfNeeded(
         return Type(dependentType);
       },
       LookUpConformanceInModule());
-
-  impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.Id_Iterator, iteratorTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
-                               rawIteratorTy);
+
   // Not conforming the type to CxxSequence protocol here:
   // The current implementation of CxxSequence triggers extra copies of the C++
   // collection when creating a CxxIterator instance. It needs a more efficient
@@ -866,7 +1178,6 @@ void swift::conformToCxxSequenceIfNeeded(
         },
         LookUpConformanceInModule());
 
-    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Element"), pointeeTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Index"), indexTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Indices"), indicesTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("SubSequence"),
@@ -919,393 +1230,335 @@ void swift::conformToCxxSequenceIfNeeded(
   // copy of the sequence's elements) by conforming the type to
   // CxxCollectionConvertible. This enables an overload of Array.init declared
   // in the Cxx module.
+  ProtocolDecl *cxxConvertibleProto =
+      ctx.getProtocol(KnownProtocolKind::CxxConvertibleToCollection);
   if (!conformedToRAC && cxxConvertibleProto) {
-    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Element"), pointeeTy);
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::CxxConvertibleToCollection});
   }
 }
 
-static bool isStdSetType(const clang::CXXRecordDecl *clangDecl) {
-  return isStdDecl(clangDecl, {"set", "unordered_set", "multiset"});
-}
-
-static bool isStdMapType(const clang::CXXRecordDecl *clangDecl) {
-  return isStdDecl(clangDecl, {"map", "unordered_map", "multimap"});
-}
-
 bool swift::isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl) {
-  auto parentDecl =
+  auto *parentDecl =
       dyn_cast<clang::CXXRecordDecl>(methodDecl->getDeclContext());
-  if (!parentDecl)
+  if (!parentDecl || !parentDecl->isInStdNamespace() ||
+      !parentDecl->getIdentifier())
     return false;
-  if (!isStdSetType(parentDecl) && !isStdMapType(parentDecl))
-    return false;
-  if (methodDecl->getDeclName().isIdentifier() &&
-      methodDecl->getName() == "insert")
-    return true;
+
+  if (methodDecl->getIdentifier() && methodDecl->getName() == "insert") {
+    // Types for which the insert method is considered unsafe,
+    // due to potential iterator invalidation.
+    return llvm::StringSwitch<bool>(parentDecl->getName())
+        .Cases({"set", "unordered_set", "multiset"}, true)
+        .Cases({"map", "unordered_map", "multimap"}, true)
+        .Default(false);
+  }
   return false;
 }
 
-void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
-                                    NominalTypeDecl *decl,
-                                    const clang::CXXRecordDecl *clangDecl) {
+/// Look up the `insert(const value_type&)` overload on a C++ container.
+///
+/// C++ containers like std::set and std::map have multiple `insert` overloads.
+/// This finds the overload that takes a single `const value_type&` parameter,
+/// which maps most closely to Swift's semantics. The return type of this
+/// overload is used as the InsertionResult associated type, since there is no
+/// equivalent typedef in C++ we can use directly.
+static const clang::CXXMethodDecl *
+findInsertMethod(clang::Sema &clangSema, clang::ASTContext &clangCtx,
+                 const clang::CXXRecordDecl *clangDecl,
+                 const clang::TypeDecl *valueType) {
+  auto R = clang::LookupResult(
+      clangSema, &clangSema.PP.getIdentifierTable().get("insert"),
+      clang::SourceLocation(), clang::Sema::LookupMemberName);
+  R.suppressDiagnostics();
+  clangSema.LookupQualifiedName(
+      R, const_cast<clang::CXXRecordDecl *>(clangDecl));
+  switch (R.getResultKind()) {
+  case clang::LookupResultKind::Found:
+  case clang::LookupResultKind::FoundOverloaded:
+    break;
+  default:
+    return nullptr;
+  }
+
+  for (auto *nd : R) {
+    if (auto *insertOverload = dyn_cast<clang::CXXMethodDecl>(nd)) {
+      if (insertOverload->param_size() != 1)
+        continue;
+      auto *paramTy = (*insertOverload->param_begin())
+                          ->getType()
+                          ->getAs<clang::ReferenceType>();
+      if (!paramTy)
+        continue;
+      if (paramTy->getPointeeType()->getCanonicalTypeUnqualified() !=
+          clangCtx.getTypeDeclType(valueType)->getCanonicalTypeUnqualified())
+        continue;
+      if (!paramTy->getPointeeType().isConstQualified())
+        continue;
+      return insertOverload;
+    }
+  }
+  return nullptr;
+}
+
+static void conformToCxxSet(ClangImporter::Implementation &impl,
+                            NominalTypeDecl *decl,
+                            const clang::CXXRecordDecl *clangDecl,
+                            bool isUniqueSet) {
   PrettyStackTraceDecl trace("conforming to CxxSet", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
+  auto &clangCtx = impl.getClangASTContext();
+  auto &clangSema = impl.getClangSema();
 
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdSetType(clangDecl))
+  // Look up the type members we need from Clang
+  //
+  // N.B. we don't actually need const_iterator for multiset, but it should be
+  // there. If it's not there for any reason, we should probably bail out.
+
+  auto *size_type = lookupCxxTypeMember(clangSema, clangDecl, "size_type",
+                                        /*mustBeComplete=*/true);
+  auto *value_type = lookupCxxTypeMember(clangSema, clangDecl, "value_type",
+                                         /*mustBeComplete=*/true);
+  auto *iterator = lookupCxxTypeMember(clangSema, clangDecl, "iterator",
+                                       /*mustBeComplete=*/true);
+  auto *const_iterator =
+      lookupCxxTypeMember(clangSema, clangDecl, "const_iterator",
+                          /*mustBeComplete=*/true);
+  if (!size_type || !value_type || !iterator || !const_iterator)
     return;
 
-  auto valueType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("value_type"));
-  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("size_type"));
-  if (!valueType || !sizeType)
-    return;
-
-  auto insert = getInsertFunc(decl, valueType);
+  auto *insert = findInsertMethod(clangSema, clangCtx, clangDecl, value_type);
   if (!insert)
     return;
 
+  // We've looked up everything we need from Clang for the conformance.
+  // Now, use ClangImporter to convert import those types to Swift.
+  //
+  // NOTE: we're actually importing the typedefs and function members here,
+  // but not *adding* them as members to the Swift StructDecl---that is done
+  // elsewhere (and could be lazy too, though not at this time of writing).
+  // We are just using these imported Swift members for their type fields,
+  // because importDecl() needs fewer arguments than importTypeIgnoreIUO().
+
+  auto *Size = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(size_type, impl.CurrentVersion));
+  auto *Value = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(value_type, impl.CurrentVersion));
+  auto *RawMutableIterator = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(iterator, impl.CurrentVersion));
+  auto *RawIterator = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(const_iterator, impl.CurrentVersion));
+  auto *Insert =
+      dyn_cast_or_null<FuncDecl>(impl.importDecl(insert, impl.CurrentVersion));
+  if (!Size || !Value || !RawMutableIterator || !RawIterator || !Insert)
+    return;
+
+  // We have our Swift types, synthesize type aliases and conformances
+
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
-                               valueType->getUnderlyingType());
+                               Value->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
-                               valueType->getUnderlyingType());
+                               Value->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
-                               sizeType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
-                               insert->getResultInterfaceType());
-  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSet});
-
-  // If this isn't a std::multiset, try to also synthesize the conformance to
-  // CxxUniqueSet.
-  if (!isStdDecl(clangDecl, {"set", "unordered_set"}))
-    return;
-
-  ProtocolDecl *cxxInputIteratorProto =
-      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
-  if (!cxxInputIteratorProto)
-    return;
-
-  auto rawIteratorType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("const_iterator"));
-  auto rawMutableIteratorType =
-      lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-          decl, ctx.getIdentifier("iterator"));
-  if (!rawIteratorType || !rawMutableIteratorType)
-    return;
-
-  auto rawIteratorTy = rawIteratorType->getUnderlyingType();
-  auto rawMutableIteratorTy = rawMutableIteratorType->getUnderlyingType();
-
-  if (!checkConformance(rawIteratorTy, cxxInputIteratorProto) ||
-      !checkConformance(rawMutableIteratorTy, cxxInputIteratorProto))
-    return;
-
+                               Size->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
-                               rawIteratorTy);
+                               RawIterator->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
-                               rawMutableIteratorTy);
-  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxUniqueSet});
+                               RawMutableIterator->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
+                               Insert->getResultInterfaceType());
+
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSet});
+  if (isUniqueSet)
+    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxUniqueSet});
 }
 
-void swift::conformToCxxPairIfNeeded(ClangImporter::Implementation &impl,
-                                     NominalTypeDecl *decl,
-                                     const clang::CXXRecordDecl *clangDecl) {
+static void conformToCxxPair(ClangImporter::Implementation &impl,
+                             NominalTypeDecl *decl,
+                             const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxPair", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
 
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdDecl(clangDecl, {"pair"}))
+  auto *first_type = lookupCxxTypeMember(clangSema, clangDecl, "first_type",
+                                         /*mustBeComplete=*/true);
+  auto *second_type = lookupCxxTypeMember(clangSema, clangDecl, "second_type",
+                                          /*mustBeComplete=*/true);
+  if (!first_type || !second_type)
     return;
 
-  auto firstType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("first_type"));
-  auto secondType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("second_type"));
-  if (!firstType || !secondType)
+  auto *First = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(first_type, impl.CurrentVersion));
+  auto *Second = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(second_type, impl.CurrentVersion));
+  if (!First || !Second)
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("First"),
-                               firstType->getUnderlyingType());
+                               First->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Second"),
-                               secondType->getUnderlyingType());
+                               Second->getUnderlyingType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxPair});
 }
 
-void swift::conformToCxxDictionaryIfNeeded(
-    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
+static void conformToCxxDictionary(ClangImporter::Implementation &impl,
+                                   NominalTypeDecl *decl,
+                                   const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxDictionary", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
+  clang::ASTContext &clangCtx = impl.getClangASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
 
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdMapType(clangDecl))
+  auto *key_type = lookupCxxTypeMember(clangSema, clangDecl, "key_type", true);
+  auto *mapped_type =
+      lookupCxxTypeMember(clangSema, clangDecl, "mapped_type", true);
+  auto *value_type =
+      lookupCxxTypeMember(clangSema, clangDecl, "value_type", true);
+  auto *size_type =
+      lookupCxxTypeMember(clangSema, clangDecl, "size_type", true);
+  auto *iterator = lookupCxxTypeMember(clangSema, clangDecl, "iterator", true);
+  auto *const_iterator =
+      lookupCxxTypeMember(clangSema, clangDecl, "const_iterator", true);
+  if (!key_type || !mapped_type || !value_type || !size_type || !iterator ||
+      !const_iterator)
     return;
 
-  auto keyType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("key_type"));
-  auto valueType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("mapped_type"));
-  auto iterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("const_iterator"));
-  auto mutableIterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("iterator"));
-  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("size_type"));
-  auto keyValuePairType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("value_type"));
-  if (!keyType || !valueType || !iterType || !mutableIterType || !sizeType ||
-      !keyValuePairType)
-    return;
-
-  auto insert = getInsertFunc(decl, keyValuePairType);
+  auto *insert = findInsertMethod(clangSema, clangCtx, clangDecl, value_type);
   if (!insert)
     return;
 
-  ProtocolDecl *cxxInputIteratorProto =
-      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
-  ProtocolDecl *cxxMutableInputIteratorProto =
-      ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableInputIterator);
-  if (!cxxInputIteratorProto || !cxxMutableInputIteratorProto)
+  auto *Size = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(size_type, impl.CurrentVersion));
+  auto *Key = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(key_type, impl.CurrentVersion));
+  auto *Value = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(mapped_type, impl.CurrentVersion));
+  auto *Element = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(value_type, impl.CurrentVersion));
+  auto *RawIterator = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(const_iterator, impl.CurrentVersion));
+  auto *RawMutableIterator = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(iterator, impl.CurrentVersion));
+  if (!Size || !Key || !Value || !Element || !RawIterator ||
+      !RawMutableIterator)
     return;
 
-  auto rawIteratorTy = iterType->getUnderlyingType();
-  auto rawMutableIteratorTy = mutableIterType->getUnderlyingType();
-
-  // Check if RawIterator conforms to UnsafeCxxInputIterator.
-  if (!checkConformance(rawIteratorTy, cxxInputIteratorProto))
+  auto *Insert =
+      dyn_cast_or_null<FuncDecl>(impl.importDecl(insert, impl.CurrentVersion));
+  if (!Insert)
     return;
 
-  // Check if RawMutableIterator conforms to UnsafeCxxMutableInputIterator.
-  if (!checkConformance(rawMutableIteratorTy, cxxMutableInputIteratorProto))
-    return;
+  impl.addSynthesizedTypealias(decl, ctx.Id_Key, Key->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.Id_Value, Value->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
+                               Element->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
+                               RawIterator->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
+                               RawMutableIterator->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               Size->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
+                               Insert->getResultInterfaceType());
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxDictionary});
 
-  // Make the original subscript that returns a non-optional value unavailable.
+  // Prevent subscript (returning non-optional) from being synthesized.
   // CxxDictionary adds another subscript that returns an optional value,
   // similarly to Swift.Dictionary.
-  for (auto member : decl->getCurrentMembersWithoutLoading()) {
-    if (auto subscript = dyn_cast<SubscriptDecl>(member)) {
-      impl.markUnavailable(subscript,
-                           "use subscript with optional return value");
-    }
-  }
-
-  impl.addSynthesizedTypealias(decl, ctx.Id_Key, keyType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.Id_Value,
-                               valueType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
-                               keyValuePairType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
-                               rawIteratorTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
-                               rawMutableIteratorTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
-                               sizeType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
-                               insert->getResultInterfaceType());
-  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxDictionary});
+  (void)impl.lookupAndImportSubscripts(decl, /*noSynthesize=*/true);
 }
 
-void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
-                                       NominalTypeDecl *decl,
-                                       const clang::CXXRecordDecl *clangDecl) {
+static void conformToCxxVector(ClangImporter::Implementation &impl,
+                               NominalTypeDecl *decl,
+                               const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxVector", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
 
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdDecl(clangDecl, {"vector"}))
-    return;
+  auto *value_type = lookupCxxTypeMember(clangSema, clangDecl, "value_type",
+                                         /*mustBeComplete=*/true);
+  auto *size_type = lookupCxxTypeMember(clangSema, clangDecl, "size_type",
+                                        /*mustBeComplete=*/true);
+  auto *const_iterator =
+      lookupCxxTypeMember(clangSema, clangDecl, "const_iterator",
+                          /*mustBeComplete=*/true);
 
-  auto valueType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("value_type"));
-  auto iterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("const_iterator"));
-  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("size_type"));
-  if (!valueType || !iterType || !sizeType)
-    return;
-
-  ProtocolDecl *cxxRandomAccessIteratorProto =
-      ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
-  if (!cxxRandomAccessIteratorProto)
-    return;
-
-  auto rawIteratorTy = iterType->getUnderlyingType();
-
-  // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
-  if (!checkConformance(rawIteratorTy, cxxRandomAccessIteratorProto))
+  auto *Element = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(value_type, impl.CurrentVersion));
+  auto *Size = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(size_type, impl.CurrentVersion));
+  auto *RawIterator = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(const_iterator, impl.CurrentVersion));
+  if (!Element || !Size || !RawIterator)
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
-                               valueType->getUnderlyingType());
+                               Element->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
-                               valueType->getUnderlyingType());
+                               Element->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
-                               sizeType->getUnderlyingType());
+                               Size->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
-                               rawIteratorTy);
+                               RawIterator->getUnderlyingType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxVector});
 }
 
-void swift::conformToCxxFunctionIfNeeded(
-    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
-  PrettyStackTraceDecl trace("conforming to CxxFunction", decl);
-
-  assert(decl);
-  assert(clangDecl);
-  ASTContext &ctx = decl->getASTContext();
-  clang::ASTContext &clangCtx = impl.getClangASTContext();
-  clang::Sema &clangSema = impl.getClangSema();
-
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdDecl(clangDecl, {"function"}))
-    return;
-
-  // There is no typealias for the argument types on the C++ side, so to
-  // retrieve the argument types we look at the overload of `operator()` that
-  // got imported into Swift.
-
-  auto callAsFunctionDecl = lookupDirectSingleWithoutExtensions<FuncDecl>(
-      decl, ctx.getIdentifier("callAsFunction"));
-  if (!callAsFunctionDecl)
-    return;
-
-  auto operatorCallDecl = dyn_cast_or_null<clang::CXXMethodDecl>(
-      callAsFunctionDecl->getClangDecl());
-  if (!operatorCallDecl)
-    return;
-
-  std::vector<clang::QualType> operatorCallParamTypes;
-  llvm::transform(
-      operatorCallDecl->parameters(),
-      std::back_inserter(operatorCallParamTypes),
-      [](const clang::ParmVarDecl *paramDecl) { return paramDecl->getType(); });
-
-  auto funcPointerType = clangCtx.getPointerType(clangCtx.getFunctionType(
-      operatorCallDecl->getReturnType(), operatorCallParamTypes,
-      clang::FunctionProtoType::ExtProtoInfo())).withConst();
-
-  // Create a fake variable with a function type that matches the type of
-  // `operator()`.
-  auto fakeFuncPointerVarDecl = clang::VarDecl::Create(
-      clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
-      clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
-      funcPointerType, clangCtx.getTrivialTypeSourceInfo(funcPointerType),
-      clang::StorageClass::SC_None);
-  auto fakeFuncPointerRefExpr = new (clangCtx) clang::DeclRefExpr(
-      clangCtx, fakeFuncPointerVarDecl, false, funcPointerType,
-      clang::ExprValueKind::VK_LValue, clang::SourceLocation());
-
-  auto clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
-      clang::QualType(clangDecl->getTypeForDecl(), 0));
-  SmallVector<clang::Expr *, 1> constructExprArgs = {fakeFuncPointerRefExpr};
-
-  // Instantiate the templated constructor that would accept this fake variable.
-  auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
-      clangDeclTyInfo, clangDecl->getLocation(), constructExprArgs,
-      clangDecl->getLocation(), /*ListInitialization*/ false);
-  if (!constructExprResult.isUsable())
-    return;
-
-  auto castExpr = dyn_cast_or_null<clang::CastExpr>(constructExprResult.get());
-  if (!castExpr)
-    return;
-
-  auto bindTempExpr =
-      dyn_cast_or_null<clang::CXXBindTemporaryExpr>(castExpr->getSubExpr());
-  if (!bindTempExpr)
-    return;
-
-  auto constructExpr =
-      dyn_cast_or_null<clang::CXXConstructExpr>(bindTempExpr->getSubExpr());
-  if (!constructExpr)
-    return;
-
-  auto constructorDecl = constructExpr->getConstructor();
-
-  auto importedConstructor =
-      impl.importDecl(constructorDecl, impl.CurrentVersion);
-  if (!importedConstructor)
-    return;
-  decl->addMember(importedConstructor);
-
-  // TODO: actually conform to some form of CxxFunction protocol
-
-}
-
-void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
-                                     NominalTypeDecl *decl,
-                                     const clang::CXXRecordDecl *clangDecl) {
+static void conformToCxxSpan(ClangImporter::Implementation &impl,
+                             NominalTypeDecl *decl,
+                             const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxSpan", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
   clang::ASTContext &clangCtx = impl.getClangASTContext();
   clang::Sema &clangSema = impl.getClangSema();
 
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdDecl(clangDecl, {"span"}))
+  auto *element_type = lookupCxxTypeMember(clangSema, clangDecl, "element_type",
+                                           /*mustBeComplete=*/true);
+  auto *size_type = lookupCxxTypeMember(clangSema, clangDecl, "size_type",
+                                        /*mustBeComplete=*/true);
+  auto *pointer = lookupCxxTypeMember(clangSema, clangDecl, "pointer",
+                                      /*mustBeComplete=*/true);
+  if (!element_type || !size_type || !pointer)
     return;
 
-  auto elementType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("element_type"));
-  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("size_type"));
+  auto pointerType = clangCtx.getTypeDeclType(pointer);
+  auto sizeType = clangCtx.getTypeDeclType(size_type);
 
-  if (!elementType || !sizeType)
+  auto *Element = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(element_type, impl.CurrentVersion));
+  auto *Size = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(size_type, impl.CurrentVersion));
+  if (!Element || !Size)
     return;
 
-  auto pointerTypeDecl = lookupNestedClangTypeDecl(clangDecl, "pointer");
-  auto countTypeDecl = lookupNestedClangTypeDecl(clangDecl, "size_type");
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
+                               Element->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               Size->getUnderlyingType());
 
-  if (!pointerTypeDecl || !countTypeDecl)
-    return;
+  if (pointerType->getPointeeType().isConstQualified())
+    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSpan});
+  else
+    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxMutableSpan});
 
   // create fake variable for pointer (constructor arg 1)
-  clang::QualType pointerType = clangCtx.getTypeDeclType(pointerTypeDecl);
   auto fakePointerVarDecl = clang::VarDecl::Create(
       clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
       clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
       pointerType, clangCtx.getTrivialTypeSourceInfo(pointerType),
       clang::StorageClass::SC_None);
 
-  auto fakePointer = new (clangCtx) clang::DeclRefExpr(
-      clangCtx, fakePointerVarDecl, false, pointerType,
-      clang::ExprValueKind::VK_LValue, clang::SourceLocation());
+  auto fakePointer = createClangDeclRefExpr(clangCtx, fakePointerVarDecl,
+                                            pointerType, clang::VK_LValue);
 
   // create fake variable for count (constructor arg 2)
-  auto countType = clangCtx.getTypeDeclType(countTypeDecl);
   auto fakeCountVarDecl = clang::VarDecl::Create(
       clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
       clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
-      countType, clangCtx.getTrivialTypeSourceInfo(countType),
+      sizeType, clangCtx.getTrivialTypeSourceInfo(sizeType),
       clang::StorageClass::SC_None);
 
-  auto fakeCount = new (clangCtx) clang::DeclRefExpr(
-      clangCtx, fakeCountVarDecl, false, countType,
-      clang::ExprValueKind::VK_LValue, clang::SourceLocation());
+  auto fakeCount = createClangDeclRefExpr(clangCtx, fakeCountVarDecl, sizeType,
+                                         clang::VK_LValue);
 
   // Use clangSema.BuildCxxTypeConstructExpr to create a CXXTypeConstructExpr,
   // passing constPointer and count
@@ -1334,18 +1587,66 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
 
   auto attr = AvailableAttr::createUniversallyDeprecated(
       importedConstructor->getASTContext(), "use 'init(_:)' instead.", "");
-  importedConstructor->getAttrs().add(attr);
+  importedConstructor->addAttribute(attr);
 
   decl->addMember(importedConstructor);
+}
 
-  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
-                               elementType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
-                               sizeType->getUnderlyingType());
+void swift::deriveAutomaticCxxConformances(
+    ClangImporter::Implementation &Impl, NominalTypeDecl *result,
+    const clang::CXXRecordDecl *clangDecl) {
 
-  if (pointerType->getPointeeType().isConstQualified()) {
-    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSpan});
-  } else {
-    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxMutableSpan});
+  ASSERT(result && clangDecl && "this should not be called with nullptrs");
+
+  // Skip synthesizing conformances if the associated Clang node is from
+  // a module that doesn't require cplusplus, to prevent us from accidentally
+  // pulling in Cxx/CxxStdlib modules when a client is importing a C library.
+  //
+  // We will still attempt to synthesize to account for scenarios where the
+  // module specification is missing altogether.
+  if (auto *clangModule = importer::getClangOwningModule(
+          result->getClangNode(), Impl.getClangASTContext());
+      clangModule && !requiresCPlusPlus(clangModule))
+    return;
+
+  // Automatic conformances: these may be applied to any type that fits the
+  // requirements.
+  conformToCxxIteratorIfNeeded(Impl, result, clangDecl);
+  conformToCxxSequenceIfNeeded(Impl, result, clangDecl);
+  conformToCxxConvertibleToBoolIfNeeded(Impl, result);
+
+  // CxxStdlib conformances: these should only apply to known C++ stdlib types,
+  // which we determine by name and membership in the std namespace.
+  if (!clangDecl->getIdentifier() || !clangDecl->isInStdNamespace())
+    return;
+
+  auto ty = identifyCxxStdTypeByName(clangDecl->getName());
+  switch (ty) {
+  case CxxStdType::uncategorized:
+    return;
+  case CxxStdType::optional:
+    conformToCxxOptional(Impl, result, clangDecl);
+    return;
+  case CxxStdType::set:
+  case CxxStdType::unordered_set:
+    conformToCxxSet(Impl, result, clangDecl, /*isUniqueSet=*/true);
+    return;
+  case CxxStdType::multiset:
+    conformToCxxSet(Impl, result, clangDecl, /*isUniqueSet=*/false);
+    return;
+  case CxxStdType::pair:
+    conformToCxxPair(Impl, result, clangDecl);
+    return;
+  case CxxStdType::map:
+  case CxxStdType::unordered_map:
+  case CxxStdType::multimap:
+    conformToCxxDictionary(Impl, result, clangDecl);
+    return;
+  case CxxStdType::vector:
+    conformToCxxVector(Impl, result, clangDecl);
+    return;
+  case CxxStdType::span:
+    conformToCxxSpan(Impl, result, clangDecl);
+    return;
   }
 }

@@ -3,12 +3,14 @@
 // Verify the result type of a subset parameters thunk matches the declaration:
 //
 // CHECK: // autodiff subset parameters thunk for forward-mode derivative from f(x:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil shared [transparent] [thunk] @$s17param_thunk_tuple{{.*}} : $@convention(thin) (X)
 // CHECK-SAME: -> (Float, Double, @owned @callee_guaranteed (X.TangentVector) -> Float)
 // CHECK: return
 // CHECK-SAME: %{{.*}} : $(Float, Double, @callee_guaranteed (X.TangentVector) -> Float)
 //
 // CHECK: // autodiff subset parameters thunk for reverse-mode derivative from f(x:)
+// CHECK-NEXT: // Isolation: unspecified
 // CHECK-NEXT: sil shared [transparent] [thunk] @$s17param_thunk_tuple{{.*}} : $@convention(thin) (X)
 // CHECK-SAME: -> (Float, Double, @owned @callee_guaranteed (Float) -> X.TangentVector)
 // CHECK: return

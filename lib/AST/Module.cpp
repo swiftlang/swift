@@ -40,12 +40,14 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SourceFileExtras.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -104,9 +106,6 @@ BuiltinUnit::LookupCache &BuiltinUnit::getCache() const {
 void BuiltinUnit::LookupCache::lookupValue(
        Identifier Name, NLKind LookupKind, const BuiltinUnit &M,
        SmallVectorImpl<ValueDecl*> &Result) {
-  // Only qualified lookup ever finds anything in the builtin module.
-  if (LookupKind != NLKind::QualifiedLookup) return;
-
   ValueDecl *&Entry = Cache[Name];
   ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (!Entry) {
@@ -784,7 +783,9 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
   Bits.ModuleDecl.StrictMemorySafety = 0;
-  Bits.ModuleDecl.DeferredCodeGen = 0;
+  Bits.ModuleDecl.CodeGenModel =
+      static_cast<unsigned>(CodeGenerationModel::Interface);
+  Bits.ModuleDecl.AggressiveCMOEnabled = 0;
 
   // Populate the module's files.
   SmallVector<FileUnit *, 2> files;
@@ -1014,7 +1015,18 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   } else if (privateDiscriminator.empty()) {
     auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
                                  [](const ValueDecl *VD) -> bool {
-      return VD->getFormalAccess() <= AccessLevel::FilePrivate;
+      // FIXME: The ClangImporter sometimes generates private declarations but
+      // doesn't give their file unit a private discriminator so they mangle
+      // incorrectly.
+      //
+      // The hasClangNode() carveout makes the ASTDemangler work properly in
+      // this case.
+      //
+      // We should fix things up so that such declarations also mangle with a
+      // a private discriminator, in which case this entry point will be called
+      // with the right parameters so that this isn't needed.
+      return (VD->getFormalAccess() <= AccessLevel::FilePrivate &&
+              !VD->hasClangNode());
     });
     results.erase(newEnd, results.end());
 
@@ -1073,6 +1085,11 @@ void ModuleDecl::lookupAvailabilityDomains(
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
                               OptionSet<ModuleLookupFlags> Flags,
                               SmallVectorImpl<ValueDecl*> &result) const {
+  // Only qualified lookup ever finds anything in the builtin module.
+  if (lookupKind != NLKind::QualifiedLookup
+        && !Flags.contains(ModuleLookupFlags::HasModuleSelector))
+    return;
+
   getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
 }
 
@@ -1166,13 +1183,15 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return std::nullopt;
   }
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
   if (Kind != SourceFileKind::MacroExpansion &&
-      Kind != SourceFileKind::DefaultArgument)
+      Kind != SourceFileKind::DefaultArgument &&
+      Kind != SourceFileKind::SyntheticMacro)
     return nullptr;
 
   auto sourceLoc = getGeneratedSourceFileInfo()->originalSourceRange.getStart();
@@ -1181,7 +1200,8 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
 
 ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
   if (Kind != SourceFileKind::MacroExpansion &&
-      Kind != SourceFileKind::DefaultArgument)
+      Kind != SourceFileKind::DefaultArgument &&
+      Kind != SourceFileKind::SyntheticMacro)
     return nullptr;
 
   return ASTNode::getFromOpaqueValue(getGeneratedSourceFileInfo()->astNode);
@@ -2289,6 +2309,43 @@ bool ModuleDecl::isExternallyConsumed() const {
 }
 
 //===----------------------------------------------------------------------===//
+// Hidden-Type Layouts
+//===----------------------------------------------------------------------===//
+
+void ModuleDecl::recordHiddenTypeLayout(StringRef mangledName,
+                                        const AbstractTypeLayout &layout) {
+  auto result = HiddenTypeLayouts.try_emplace(mangledName, layout);
+  if (!result.second) {
+    ASSERT(result.first->second.size == layout.size &&
+           result.first->second.alignment == layout.alignment &&
+           result.first->second.stride == layout.stride &&
+           result.first->second.bitwiseCopyable == layout.bitwiseCopyable &&
+           result.first->second.isOpaque == layout.isOpaque &&
+           "conflicting hidden-type layouts for the same mangled name");
+  }
+}
+
+std::optional<AbstractTypeLayout>
+ModuleDecl::lookupHiddenTypeLayout(StringRef mangledName) const {
+  auto it = HiddenTypeLayouts.find(mangledName);
+  if (it == HiddenTypeLayouts.end())
+    return std::nullopt;
+  return it->second;
+}
+
+SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4>
+ModuleDecl::getSortedHiddenTypeLayouts() const {
+  SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4> result;
+  result.reserve(HiddenTypeLayouts.size());
+  for (auto &entry : HiddenTypeLayouts)
+    result.emplace_back(entry.getKey(), entry.getValue());
+  llvm::sort(result, [](const auto &a, const auto &b) {
+    return a.first < b.first;
+  });
+  return result;
+}
+
+//===----------------------------------------------------------------------===//
 // Cross-Import Overlays
 //===----------------------------------------------------------------------===//
 
@@ -2398,28 +2455,41 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
   if (auto *clangModule = getUnderlyingModuleIfOverlay())
     worklist.push_back(clangModule);
 
+  auto addOverlay = [&](Identifier overlay) {
+    // We don't present non-underscored overlays as part of the underlying
+    // module, so ignore them.
+    if (!overlay.hasUnderscoredNaming())
+      return;
+
+    ModuleDecl *overlayMod =
+        getASTContext().getModuleByIdentifier(overlay);
+    if (!overlayMod && overlayMod != this)
+      return;
+
+    if (seen.insert(overlayMod).second) {
+      overlayModules.push_back(overlayMod);
+      worklist.push_back(overlayMod);
+      if (auto *clangModule = overlayMod->getUnderlyingModuleIfOverlay())
+        worklist.push_back(clangModule);
+    }
+  };
+
   while (!worklist.empty()) {
     ModuleDecl *current = worklist.back();
     worklist.pop_back();
+
+    if (current->isStdlibModule()) {
+      for (auto overlay : getASTContext().StdlibOverlayNames) {
+        addOverlay(overlay);
+      }
+    }
+
     for (auto &pair: current->declaredCrossImports) {
       Identifier &bystander = std::get<0>(pair);
       for (auto *file: std::get<1>(pair)) {
         auto overlays = file->getOverlayModuleNames(current, unused, bystander);
         for (Identifier overlay: overlays) {
-          // We don't present non-underscored overlays as part of the underlying
-          // module, so ignore them.
-          if (!overlay.hasUnderscoredNaming())
-            continue;
-          ModuleDecl *overlayMod =
-              getASTContext().getModuleByName(overlay.str());
-          if (!overlayMod)
-            continue;
-          if (seen.insert(overlayMod).second) {
-            overlayModules.push_back(overlayMod);
-            worklist.push_back(overlayMod);
-            if (auto *clangModule = overlayMod->getUnderlyingModuleIfOverlay())
-              worklist.push_back(clangModule);
-          }
+          addOverlay(overlay);
         }
       }
     }
@@ -2455,6 +2525,12 @@ ModuleDecl::getDeclaringModuleAndBystander() {
 
   if (!hasUnderscoredNaming())
     return *(declaringModuleAndBystander = {nullptr, Identifier()});
+
+  // If this is one of the stdlib overlays, indicate as much.
+  auto &ctx = getASTContext();
+  if (llvm::is_contained(ctx.StdlibOverlayNames, getRealName()))
+    return *(declaringModuleAndBystander = { ctx.getStdlibModule(),
+                                             Identifier() });
 
   // Search the transitive set of imported @_exported modules to see if any have
   // this module as their overlay.
@@ -2535,11 +2611,18 @@ bool ModuleDecl::getRequiredBystandersIfCrossImportOverlay(
   auto *clangModule = declaring->getUnderlyingModuleIfOverlay();
   auto current = std::make_pair(this, Identifier());
   while ((current = current.first->getDeclaringModuleAndBystander()).first) {
-    bystanderNames.push_back(current.second);
+    if (!current.second.empty())
+      bystanderNames.push_back(current.second);
     if (current.first == declaring || current.first == clangModule)
       return true;
   }
   return false;
+}
+
+Identifier ModuleDecl::getNameForModuleSelector() {
+  if (auto declaring = getDeclaringModuleIfCrossImportOverlay())
+    return declaring->getName();
+  return this->getName();
 }
 
 bool ModuleDecl::isClangHeaderImportModule() const {
@@ -3033,7 +3116,8 @@ void ModuleDecl::setPackageName(Identifier name) {
   Package = PackageUnit::create(name, *this, getASTContext());
 }
 
-bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
+bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module,
+    bool assumeImported) const {
   if (module == this) return false;
 
   auto &imports = getASTContext().getImportCache();
@@ -3054,7 +3138,17 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
       return false;
   }
 
-  return true;
+  if (assumeImported)
+    return true;
+
+  results.clear();
+  getImportedModules(results,
+      {ModuleDecl::ImportFilterKind::ImplementationOnly});
+  for (auto &desc : results)
+    if (imports.isImportedBy(module, desc.importedModule))
+      return true;
+
+  return false;
 }
 
 void SourceFile::lookupImportedSPIGroups(
@@ -3235,6 +3329,13 @@ LibraryLevel
 ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
                                     const ModuleDecl *module) const {
   auto &ctx = module->getASTContext();
+
+  // Check if the library level was explicitly provided via the explicit
+  // module map (e.g. from the dependency scanner).
+  if (auto level = ctx.getExplicitModuleLibraryLevel(
+          module->getName().str(), module->isNonSwiftModule()))
+    return *level;
+
   namespace path = llvm::sys::path;
   SmallString<128> scratch;
 
@@ -3260,6 +3361,10 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
 
   if (module->isNonSwiftModule()) {
     if (auto *underlying = module->findUnderlyingClangModule()) {
+      if (llvm::is_contained(ctx.LangOpts.IPIClangModuleNames,
+                             module->getName().str()))
+        return LibraryLevel::IPI;
+
       // Imported clangmodules are SPI if they are defined by a private
       // modulemap or from the PrivateFrameworks folder in the SDK.
       bool moduleIsSPI = underlying->ModuleMapIsPrivate ||
@@ -3273,8 +3378,13 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
     return ctx.LangOpts.LibraryLevel;
 
   } else {
-    // Other Swift modules are SPI if they are from the PrivateFrameworks
-    // folder in the SDK.
+    // IPI is never returned by the path heuristic, so the stored value
+    // is the only way to detect it.
+    auto stored = module->getStoredLibraryLevel();
+    if (stored == LibraryLevel::IPI)
+      return stored;
+
+    // For API/SPI, use the path heuristic as before.
     auto modulePath = module->getModuleFilename();
     return fromPrivateFrameworks(modulePath) ?
       LibraryLevel::SPI : LibraryLevel::API;

@@ -104,7 +104,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
 
   auto &II = BInst->getIntrinsicInfo();
   if (II.ID != llvm::Intrinsic::not_intrinsic) {
-    auto attrs = II.getOrCreateAttributes(F->getASTContext());
+    auto &attrs = II.getOrCreateFnAttributes(F->getASTContext());
     if (attrs.getMemoryEffects().doesNotAccessMemory()) {
       for (auto &Op : BInst->getAllOperands()) {
         if (!Op.get()->getType().isTrivial(*F)) {
@@ -203,6 +203,8 @@ bool swift::canUseObject(SILInstruction *Inst) {
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::RefElementAddrInst:
   case SILInstructionKind::RefTailAddrInst:
   case SILInstructionKind::UncheckedEnumDataInst:

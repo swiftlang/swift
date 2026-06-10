@@ -12,16 +12,13 @@
 
 #define DEBUG_TYPE "libsil"
 
-#include "swift/SIL/TypeLowering.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
@@ -33,19 +30,18 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILTypeProperties.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/Test.h"
-#include "clang/AST/Type.h"
 #include "clang/AST/Decl.h"
-#include "llvm/Support/Compiler.h"
+#include "clang/AST/Type.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -258,6 +254,8 @@ namespace {
     }
 
     RetTy handleReference(CanType type) {
+      // TODO: Consider final classes with no user deinit to be
+      // HasOnlyDefaultDeinit.
       return handleReference(type, SILTypeProperties::forReference());
     }
 
@@ -331,6 +329,8 @@ namespace {
 
     RetTy visit(CanType substType, AbstractionPattern origType,
                 IsTypeExpansionSensitive_t isSensitive) {
+      // A variadic tuple substituted with exactly one element in the expansion
+      // becomes the scalar type.
       if (auto origEltType = origType.getVanishingTupleElementPatternType()) {
         return visit(substType, *origEltType, isSensitive);
       }
@@ -354,11 +354,13 @@ namespace {
     IMPL(BuiltinPackIndex, Trivial)
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
+    IMPL(BuiltinImplicitActor, Reference)
     IMPL(BuiltinVector, Trivial)
     IMPL(SILToken, Trivial)
     IMPL(AnyMetatype, Trivial)
     IMPL(Module, Trivial)
     IMPL(Integer, Trivial)
+    IMPL(Hidden, Trivial)
 
 #undef IMPL
 
@@ -390,7 +392,7 @@ namespace {
       // Fixed array regions are implied to be addressable-for-dependencies,
       // since the developer probably wants to be able to form Spans etc.
       // over them.
-      props.setAddressableForDependencies();
+      props.setDefinitelyAddressableForDependencies();
       
       // If the size isn't a known literal, then the layout is also dependent,
       // so make it address-only. If the size is massive, also treat it as
@@ -401,6 +403,7 @@ namespace {
           && (!fixedSize.has_value()
               || *fixedSize > BuiltinFixedArrayType::MaximumLoadableSize)) {
         props.setAddressOnly();
+        props.setVeryLargeType();
       }
       return props;
     }
@@ -410,6 +413,37 @@ namespace {
                                      IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().handleAggregateByProperties(type,
                   getBuiltinFixedArrayProperties(type, origType, isSensitive));
+    }
+
+    RetTy visitBuiltinBorrowType(CanBuiltinBorrowType type,
+                                 AbstractionPattern origType,
+                                 IsTypeExpansionSensitive_t isSensitive) {
+      auto referentType = type->getReferentType();
+      AbstractionPattern origReferent = AbstractionPattern::getOpaque();
+      if (auto bfaOrigTy = origType.getAs<BuiltinBorrowType>()) {
+        origReferent = AbstractionPattern(
+          origType.getGenericSignatureOrNull(),
+          bfaOrigTy->getReferentType());
+      }
+
+      // For any particular referent's known type layout, the layout of `Borrow`
+      // is fixed size (either a bitwise image of the borrowed value, or a
+      // pointer to the value in memory), BitwiseCopyable, and non-Escapable.
+      // However, if the layout of the referent is unknown or abstracted, then
+      // we don't necessarily know which layout `Borrow` uses, so treat `Borrow`
+      // as address-only. Known raw layout types and known addressable for
+      // dependencies types are always known to be passed indirectly though, so
+      // for those we can treat it as the trivial pointer representation.
+      auto referentProps = classifyType(origReferent, referentType, TC,
+                                        Expansion);
+
+      if (referentProps.isFixedABI() ||
+          referentProps.definitelyIsOrContainsRawLayout() ||
+          referentProps.definitelyIsAddressableForDependencies()) {
+        return SILTypeProperties::forTrivial();
+      } else {
+        return SILTypeProperties::forTrivialOpaque();
+      }
     }
 
     RetTy visitPackType(CanPackType type,
@@ -753,6 +787,7 @@ namespace {
     RetTy
     visitArchetypeType(CanArchetypeType type, AbstractionPattern origType,
                        IsTypeExpansionSensitive_t isSensitive) {
+      // TODO: Add a HasOnlyDefaultDeinit "layout protocol".
       auto LayoutInfo = type->getLayoutConstraint();
       if (LayoutInfo) {
         if (LayoutInfo->isFixedSizeTrivial()) {
@@ -2390,6 +2425,19 @@ namespace {
           UnsafeValueBufferTypeLowering(silType, Expansion, isSensitive);
     }
 
+    TypeLowering *
+    visitBuiltinImplicitActorType(CanBuiltinImplicitActorType type,
+                                  AbstractionPattern origType,
+                                  IsTypeExpansionSensitive_t isSensitive) {
+      auto silType = SILType::getPrimitiveObjectType(type);
+      auto properties = SILTypeProperties();
+      properties.setTypeExpansionSensitive(isSensitive);
+      properties.setNonTrivial();
+      properties.setLexical(IsLexical);
+      return new (TC)
+          MiscNontrivialTypeLowering(silType, properties, Expansion);
+    }
+
     TypeLowering *visitPackType(CanPackType packType,
                                 AbstractionPattern origType,
                                 IsTypeExpansionSensitive_t isSensitive) {
@@ -2458,6 +2506,38 @@ namespace {
                  getBuiltinFixedArrayProperties(faType, origType, isSensitive));
     }
 
+    TypeLowering *visitBuiltinBorrowType(CanBuiltinBorrowType borrowType,
+                                       AbstractionPattern origType,
+                                       IsTypeExpansionSensitive_t isSensitive) {
+      auto referentType = borrowType->getReferentType();
+      AbstractionPattern origReferent = AbstractionPattern::getOpaque();
+      if (auto bfaOrigTy = origType.getAs<BuiltinBorrowType>()) {
+        origReferent = AbstractionPattern(
+          origType.getGenericSignatureOrNull(),
+          bfaOrigTy->getReferentType());
+      }
+
+      // For any particular referent's known type layout, the layout of `Borrow`
+      // is fixed size (either a bitwise image of the borrowed value, or a
+      // pointer to the value in memory), BitwiseCopyable, and non-Escapable.
+      // However, if the layout of the referent is unknown or abstracted, then
+      // we don't necessarily know which layout `Borrow` uses, so treat `Borrow`
+      // as address-only. Known raw layout types and known addressable for
+      // dependencies types are always known to be passed indirectly though, so
+      // for those we can treat it as the trivial pointer representation.
+      auto referentProps = classifyType(origReferent, referentType, TC,
+                                        Expansion);
+
+      if (referentProps.isFixedABI() ||
+          referentProps.definitelyIsOrContainsRawLayout() ||
+          referentProps.definitelyIsAddressableForDependencies()) {
+        return handleTrivial(borrowType);
+      } else {
+        return handleAddressOnly(borrowType,
+                                 SILTypeProperties::forTrivialOpaque());
+      }
+    }
+
     bool handleResilience(CanType type, NominalTypeDecl *D,
                           SILTypeProperties &properties) {
       if (D->isResilient()) {
@@ -2511,6 +2591,8 @@ namespace {
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
+      auto subMap = structType->getContextSubstitutionMap();
+
       // Bail out if the struct layout relies on itself.
       TypeConverter::LowerAggregateTypeRAII loweringStruct(TC, structType);
       if (loweringStruct.IsInfinite) {
@@ -2521,8 +2603,17 @@ namespace {
         return handleAddressOnly(structType, properties);
       }
 
+      // Force address-only when the struct has hidden stored properties from
+      // an internal bridging header.
+      if (D->getAttrs().hasAttribute<HasHiddenStoredPropertiesAttr>()) {
+        properties.setAddressOnly();
+        properties.setNonTrivial();
+        properties.setLexical(IsLexical);
+        return handleAddressOnly(structType, properties);
+      }
+
       if (D->isCxxNonTrivial()) {
-        properties.setAddressableForDependencies();
+        properties.setDefinitelyAddressableForDependencies();
         properties.setAddressOnly();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
@@ -2538,7 +2629,7 @@ namespace {
           // Treat imported C structs and unions as addressable-for-dependencies
           // so that Swift lifetime dependencies are more readily interoperable
           // with pointers in C used for similar purposes.
-          properties.setAddressableForDependencies();
+          properties.setDefinitelyAddressableForDependencies();
         }
       }
 
@@ -2555,12 +2646,29 @@ namespace {
       }
 
       // If the type has raw storage, it is move-only and address-only.
-      if (D->getAttrs().hasAttribute<RawLayoutAttr>()) {
-        properties.setHasRawLayout();
+      if (auto rawLayout = D->getAttrs().getAttribute<RawLayoutAttr>()) {
+        properties.setDefinitelyHasRawLayout();
         properties.setAddressOnly();
-        properties.setAddressableForDependencies();
+        properties.setDefinitelyAddressableForDependencies();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+
+        // If the raw layout does _not_ specify a manual layout, then it defines
+        // either a scalar like type or an array like type. If the like type is
+        // non-fixed abi, then this type is also non-fixed abi.
+        if (!rawLayout->getSizeAndAlignment()) {
+          auto likeType = rawLayout->getResolvedLikeType(D)->getCanonicalType();
+          auto origLikeType = AbstractionPattern(
+              D->getGenericSignature().getCanonicalSignature(), likeType);
+          likeType = likeType.subst(subMap)->getCanonicalType();
+          auto likeTypeProps = classifyType(origLikeType, likeType, TC,
+                                            Expansion);
+
+          if (!likeTypeProps.isFixedABI()) {
+            properties.setNonFixedABI();
+          }
+        }
+
         return handleMoveOnlyAddressOnly(structType, properties);
       }
 
@@ -2572,10 +2680,8 @@ namespace {
       }
       
       if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
-        properties.setAddressableForDependencies();
+        properties.setDefinitelyAddressableForDependencies();
       }
-
-      auto subMap = structType->getContextSubstitutionMap();
 
       // Classify the type according to its stored properties.
       for (auto field : D->getStoredProperties()) {
@@ -2611,6 +2717,9 @@ namespace {
       if (origType.isNoncopyable(structType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+        if (D->getValueTypeDestructor()) {
+          properties.setCustomDeinit(MayHaveCustomDeinit);
+        }
         if (properties.isAddressOnly())
           return handleMoveOnlyAddressOnly(structType, properties);
         return new (TC) MoveOnlyLoadableStructTypeLowering(
@@ -2620,6 +2729,13 @@ namespace {
       // for lifetime diagnostics.
       if (!origType.isEscapable(structType)) {
         properties.setNonTrivial();
+      }
+      // Merge the CustomDeinit properties of the type parameters.
+      if (hasConditionalDefaultDeinit(structType, D)) {
+        auto genericProps = classifyTypeParameters(structType, TC, Expansion);
+        if (genericProps.mayHaveCustomDeinit() == HasOnlyDefaultDeinit) {
+          properties.setCustomDeinit(HasOnlyDefaultDeinit);
+        }
       }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
                                                                     properties);
@@ -2645,7 +2761,7 @@ namespace {
         return handleAddressOnly(enumType, properties);
 
       if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
-        properties.setAddressableForDependencies();
+        properties.setDefinitelyAddressableForDependencies();
       }
 
       // [is_or_contains_pack_unsubstituted] Visit the elements of the
@@ -2714,6 +2830,9 @@ namespace {
       if (origType.isNoncopyable(enumType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+        if (D->getValueTypeDestructor()) {
+          properties.setCustomDeinit(MayHaveCustomDeinit);
+        }
         if (properties.isAddressOnly())
           return handleMoveOnlyAddressOnly(enumType, properties);
         return new (TC)
@@ -2754,6 +2873,43 @@ namespace {
         return handleTrivial(type, props);
       }
       return new (TC) LoadableLoweringClass(type, props, Expansion);
+    }
+
+  private:
+    bool hasConditionalDefaultDeinit(CanType type, StructDecl *structDecl) {
+      if (type->isArray() || type->is_ArrayBuffer()
+          || type->is_ContiguousArrayBuffer() || type->isDictionary()) {
+        return true;
+      }
+      if (ProtocolDecl *DestructorSafeContainer =
+          TC.Context.getProtocol(KnownProtocolKind::DestructorSafeContainer)) {
+        return bool(lookupConformance(type, DestructorSafeContainer));
+      }
+      return false;
+    }
+
+    // Merge the type properties of all the generic parameters. Useful for
+    // summarizing the properties of indirectly stored types, such as Array
+    // elements. Only non-layout flags, such as CustomDeinitFlag are relevant in
+    // the result.
+    //
+    // This may return an incomplete 'isInfinite' lowering on self-recursion. In
+    // this case, the non-layout flags have their default values.
+    SILTypeProperties classifyTypeParameters(CanType type, TypeConverter &tc,
+                                             TypeExpansionContext expansion) {
+      TypeConverter::NonLayoutTypeRAII nonLayoutLowering(tc);
+      SILTypeProperties props;
+      if (auto bgt = dyn_cast<BoundGenericType>(type)) {
+        for (auto paramType : bgt->getGenericArgs()) {
+          // Use an opaque abstraction pattern for the element type because
+          // abstraction does not apply to the generic parameter itself.
+          AbstractionPattern origElementType = AbstractionPattern::getOpaque();
+          auto &lowering = tc.getTypeLowering(origElementType, paramType,
+                                              expansion);
+          props.addSubobject(lowering.getRecursiveProperties());
+        }
+      }
+      return props;
     }
   };
 } // end anonymous namespace
@@ -2809,7 +2965,22 @@ void TypeConverter::removeNullEntry(const TypeKey &k) {
 void TypeConverter::insert(const TypeKey &k, const TypeLowering *tl) {
   if (!k.isCacheable()) return;
 
-  LoweredTypes[k.getCachingKey()] = tl;
+  if (isCacheableLowering(tl)) {
+    LoweredTypes[k.getCachingKey()] = tl;
+    if (k == k.getKeyForMinimalExpansion())
+      return;
+  }
+#ifndef NDEBUG
+  removeNullEntry(k.getKeyForMinimalExpansion());
+#endif
+}
+
+// Infinite lowerings are incomplete. They are only cached when they
+// correspond to a self-recursive layout, which can never have a complete
+// lowering. Avoid caching an infinite non-layout lowering so that the
+// complete layout can be lowered later.
+bool TypeConverter::isCacheableLowering(const TypeLowering *tl) {
+  return !tl || !isLoweringNonLayoutType || !tl->isInfinite();
 }
 
 /// Lower each of the elements of the substituted type according to
@@ -2967,9 +3138,6 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     insert(key.getKeyForMinimalExpansion(), lowering);
   } else {
     insert(key, lowering);
-#ifndef NDEBUG
-    removeNullEntry(key.getKeyForMinimalExpansion());
-#endif
   }
 
 #ifndef NDEBUG
@@ -3154,7 +3322,7 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
                                    AbstractionPattern origType,
                                    CanType substType,
                                    TypeExpansionContext forExpansion) {
-  if (TypeLoweringDisableVerification) {
+  if (TypeLoweringDisableVerification || !isCacheableLowering(&lowering)) {
     return;
   }
   verifyLexicalLowering(lowering, origType, substType, forExpansion);
@@ -3298,6 +3466,11 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (isa<SILPackType>(ty) || isa<PackExpansionType>(ty))
             return true;
 
+          // A HiddenType placeholder is a leaf with no inner structure to
+          // walk
+          if (isa<HiddenType>(ty))
+            return true;
+
           auto *nominal = ty.getAnyNominal();
           // Only pack-related non-nominal aggregates may be responsible for
           // non-conformance; walk into the rest.
@@ -3344,6 +3517,12 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
           // The error type doesn't conform but is trivial (case (8)).
           if (isa<ErrorType>(ty))
+            return false;
+
+          // A HiddenType placeholder stands in for a C-imported type whose
+          // identity has been elided from the client's view. It can be
+          // trivial without explicit conformance to BitwiseCopyable.
+          if (isa<HiddenType>(ty))
             return false;
 
           // These show up in the context of non-conforming variadic generics
@@ -3801,9 +3980,6 @@ const TypeLowering &TypeConverter::getTypeLoweringForLoweredType(
     insert(key.getKeyForMinimalExpansion(), lowering);
   else {
     insert(key, lowering);
-#ifndef NDEBUG
-    removeNullEntry(key.getKeyForMinimalExpansion());
-#endif
   }
 
   return *lowering;
@@ -3909,7 +4085,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   Type resultTy;
 
   if (auto type = pd->getTypeOfDefaultExpr()) {
-    resultTy = type->mapTypeOutOfContext();
+    resultTy = type->mapTypeOutOfEnvironment();
   } else {
     resultTy = pd->getInterfaceType();
   }
@@ -3940,7 +4116,7 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                                      VarDecl *VD) {
   auto *DC = VD->getDeclContext();
   CanType resultTy =
-    VD->getParentPattern()->getType()->mapTypeOutOfContext()
+    VD->getParentPattern()->getType()->mapTypeOutOfEnvironment()
           ->getCanonicalType();
 
   // If this is the backing storage for a property with an attached
@@ -4014,6 +4190,7 @@ static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
     CanType selfType = wrappedProperty->getDeclContext()
                            ->getSelfInterfaceType()
                            ->getCanonicalType();
+    selfType = sig.getReducedType(selfType);
     // Create the self param
     params.emplace_back(
         selfType, Identifier(),
@@ -4593,8 +4770,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case ReadImplKind::Read:
             collectAccessorCaptures(AccessorKind::Read);
             break;
-          case ReadImplKind::Read2:
-            collectAccessorCaptures(AccessorKind::Read2);
+          case ReadImplKind::YieldingBorrow:
+            collectAccessorCaptures(AccessorKind::YieldingBorrow);
             break;
           case ReadImplKind::Inherited:
             llvm_unreachable("inherited local variable?");
@@ -4619,8 +4796,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case WriteImplKind::Modify:
             collectAccessorCaptures(AccessorKind::Modify);
             break;
-          case WriteImplKind::Modify2:
-            collectAccessorCaptures(AccessorKind::Modify2);
+          case WriteImplKind::YieldingMutate:
+            collectAccessorCaptures(AccessorKind::YieldingMutate);
             break;
           case WriteImplKind::InheritedWithObservers:
             llvm_unreachable("inherited local variable");
@@ -4641,8 +4818,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case ReadWriteImplKind::Modify:
             collectAccessorCaptures(AccessorKind::Modify);
             break;
-          case ReadWriteImplKind::Modify2:
-            collectAccessorCaptures(AccessorKind::Modify2);
+          case ReadWriteImplKind::YieldingMutate:
+            collectAccessorCaptures(AccessorKind::YieldingMutate);
             break;
           case ReadWriteImplKind::StoredWithDidSet:
             // We've already processed the didSet operation.
@@ -5095,6 +5272,12 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
       (fnTy1->isAsync() || fnTy2->isAsync()))
     return ABIDifference::NeedsThunk;
 
+  // A synchronous function requires a thunk to be treated as an asynchronous
+  // function. An async function cannot be called synchronously just by adding a
+  // thunk and hopefully doesn't get here.
+  if (!fnTy1->isAsync() && fnTy2->isAsync())
+    return ABIDifference::NeedsThunk;
+
   for (unsigned i = 0, e = fnTy1->getParameters().size(); i < e; ++i) {
     auto param1 = fnTy1->getParameters()[i], param2 = fnTy2->getParameters()[i];
     
@@ -5466,6 +5649,19 @@ unsigned TypeConverter::countNumberOfFields(SILType Ty,
   return std::max(fieldsCount, 1U);
 }
 
+uint16_t FunctionType::getPointerAuthDiscriminator(
+    ModuleDecl &m, const clang::FunctionType *clangType) {
+  TypeConverter converter(m);
+  AbstractionPattern pattern =
+      clangType ? AbstractionPattern(getCanonicalType(), clangType)
+                : AbstractionPattern(getCanonicalType());
+  auto &typeLowering =
+      converter.getTypeLowering(pattern, Type(static_cast<TypeBase *>(this)),
+                                TypeExpansionContext::minimal());
+  auto functionType = typeLowering.getLoweredType().getAs<SILFunctionType>();
+  return functionType->getPointerAuthDiscriminator(nullptr);
+}
+
 void TypeLowering::print(llvm::raw_ostream &os) const {
   auto BOOL = [&](bool b) -> StringRef {
     if (b)
@@ -5485,6 +5681,12 @@ void TypeLowering::print(llvm::raw_ostream &os) const {
      << ".\n"
      << "isLexical: " << BOOL(Properties.isLexical()) << ".\n"
      << "isOrContainsPack: " << BOOL(Properties.isOrContainsPack()) << ".\n"
+     << "isAddressableForDependencies: "
+     << BOOL(Properties.isAddressableForDependencies()) << ".\n"
+     << "hasOnlyDefaultDeinit: "
+     << BOOL(Properties.mayHaveCustomDeinit() == HasOnlyDefaultDeinit) << ".\n"
+     << "definitelyIsAddressableForDependencies: " << BOOL(Properties.definitelyIsAddressableForDependencies()) << ".\n"
+     << "definitelyIsOrContainsRawLayout: " << BOOL(Properties.definitelyIsOrContainsRawLayout()) << ".\n"
      << "\n";
 }
 

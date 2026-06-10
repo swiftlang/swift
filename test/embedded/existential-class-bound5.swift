@@ -22,13 +22,13 @@ func test(existential: any ClassBound) {
 }
 
 func test(existential: any NotClassBound) {
-    existential.foo() // expected-error {{cannot use a value of protocol type 'any NotClassBound' in embedded Swift}}
+    existential.foo()
 }
 
 @main
 struct Main {
     static func main() {
         test(existential: MyClass() as (any ClassBound)) // ok
-        test(existential: MyClass() as (any NotClassBound)) // expected-error {{cannot use a value of protocol type 'any NotClassBound' in embedded Swift}}
+        test(existential: MyClass() as (any NotClassBound)) // ok
     }
 }

@@ -16,6 +16,7 @@
 
 #include "swift/Frontend/CompileJobCacheResult.h"
 #include "swift/Basic/FileTypes.h"
+#include "llvm/Support/EndianStream.h"
 
 using namespace swift;
 using namespace swift::cas;
@@ -85,6 +86,16 @@ CompileJobCacheResult::getOutput(file_types::ID Kind) const {
   return {};
 }
 
+Expected<unsigned> CompileJobCacheResult::getInputIndex() const {
+  if (getData().size() < sizeof(uint32_t)) {
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "invalid CompileJobCacheResult data");
+  }
+  StringRef IndexData = getData().take_back(sizeof(uint32_t));
+  return llvm::support::endian::read<uint32_t>(IndexData.data(),
+                                               llvm::endianness::little);
+}
+
 Error CompileJobCacheResult::print(llvm::raw_ostream &OS) {
   return forEachOutput([&](Output O) -> Error {
     OS << file_types::getTypeName(O.Kind) << "    " << getCAS().getID(O.Object)
@@ -93,14 +104,24 @@ Error CompileJobCacheResult::print(llvm::raw_ostream &OS) {
   });
 }
 
-size_t CompileJobCacheResult::getNumOutputs() const { return getData().size(); }
+size_t CompileJobCacheResult::getNumOutputs() const {
+  // " - 1" because the last reference is the node kind.
+  return getNumReferences() - 1;
+}
 ObjectRef CompileJobCacheResult::getOutputObject(size_t I) const {
   return getReference(I);
 }
 
 file_types::ID
 CompileJobCacheResult::getOutputKind(size_t I) const {
-  return static_cast<file_types::ID>(getData()[I]);
+  return getOutputKinds()[I];
+}
+
+ArrayRef<file_types::ID> CompileJobCacheResult::getOutputKinds() const {
+  assert(getData().size() >= sizeof(uint32_t));
+  StringRef KindsData = getData().drop_back(sizeof(uint32_t));
+  return ArrayRef(reinterpret_cast<const file_types::ID *>(KindsData.data()),
+                  KindsData.size());
 }
 
 CompileJobCacheResult::CompileJobCacheResult(const ObjectProxy &Obj)
@@ -143,14 +164,23 @@ Error CompileJobCacheResult::Builder::addOutput(StringRef Path,
                                      Path + "'");
 }
 
-Expected<ObjectRef> CompileJobCacheResult::Builder::build(ObjectStore &CAS) {
+Expected<ObjectRef> CompileJobCacheResult::Builder::build(ObjectStore &CAS,
+                                                          unsigned InputIndex) {
   CompileJobResultSchema Schema(CAS);
   // The resulting Refs contents are:
   // Object 0...N, SchemaKind
   SmallVector<ObjectRef> Refs;
   std::swap(Impl.Objects, Refs);
   Refs.push_back(Schema.getKindRef());
-  return CAS.store(Refs, {(char *)Impl.Kinds.begin(), Impl.Kinds.size()});
+
+  SmallString<10> Buffer(
+      StringRef((char *)Impl.Kinds.begin(), Impl.Kinds.size()));
+  {
+    llvm::raw_svector_ostream OS(Buffer);
+    llvm::support::endian::write<uint32_t>(OS, InputIndex,
+                                           llvm::endianness::little);
+  }
+  return CAS.store(Refs, Buffer);
 }
 
 static constexpr llvm::StringLiteral CompileJobResultSchemaName =

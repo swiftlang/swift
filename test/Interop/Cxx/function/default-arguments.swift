@@ -66,6 +66,14 @@ DefaultArgTestSuite.test("func with non-trailing argument") {
   expectEqual(11, t1)
 }
 
+DefaultArgTestSuite.test("func with unnamed argument") {
+  let t0 = takesUnnamedParam()
+  expectEqual(456, t0)
+
+  let t1 = takesUnnamedParam(321)
+  expectEqual(456, t1)
+}
+
 DefaultArgTestSuite.test("method with integer parameter") {
   let s = HasMethodWithDefaultArg()
   let z0 = s.isZero()
@@ -75,17 +83,15 @@ DefaultArgTestSuite.test("method with integer parameter") {
   expectTrue(z1)
 }
 
-// TODO: support default args of constructors
-// (https://github.com/apple/swift/issues/70124)
 DefaultArgTestSuite.test("constructor with integer parameter") {
   let a = HasCtorWithDefaultArg(1, 2, 3)
   expectEqual(a.value, 6)
 
-//  let b = HasCtorWithDefaultArg(1, 2)
-//  expectEqual(b.value, 126)
+  let b = HasCtorWithDefaultArg(1, 2)
+  expectEqual(b.value, 126)
 
-//  let c = HasCtorWithDefaultArg(1)
-//  expectEqual(c.value, 580)
+  let c = HasCtorWithDefaultArg(1)
+  expectEqual(c.value, 580)
 }
 
 DefaultArgTestSuite.test("method in a templated class") {

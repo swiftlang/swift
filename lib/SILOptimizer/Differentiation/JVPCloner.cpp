@@ -333,15 +333,15 @@ private:
   /// Remap any archetypes into the differential function's context.
   Type remapTypeInDifferential(Type ty) {
     if (ty->hasArchetype())
-      return getDifferential().mapTypeIntoContext(ty->mapTypeOutOfContext());
-    return getDifferential().mapTypeIntoContext(ty);
+      return getDifferential().mapTypeIntoEnvironment(ty->mapTypeOutOfEnvironment());
+    return getDifferential().mapTypeIntoEnvironment(ty);
   }
 
   /// Remap any archetypes into the differential function's context.
   SILType remapSILTypeInDifferential(SILType ty) {
     if (ty.hasArchetype())
-      return getDifferential().mapTypeIntoContext(ty.mapTypeOutOfContext());
-    return getDifferential().mapTypeIntoContext(ty);
+      return getDifferential().mapTypeIntoEnvironment(ty.mapTypeOutOfEnvironment());
+    return getDifferential().mapTypeIntoEnvironment(ty);
   }
 
   /// Find the tangent space of a given canonical type.
@@ -702,7 +702,7 @@ public:
         loc, differentialRef, jvpSubstMap, {diffStructVal},
         ParameterConvention::Direct_Guaranteed);
 
-    auto differentialType = jvp->mapTypeIntoContext(
+    auto differentialType = jvp->mapTypeIntoEnvironment(
         jvp->getConventions().getSILType(
             jvp->getLoweredFunctionType()->getResults().back(),
             jvp->getTypeExpansionContext()));
@@ -1705,7 +1705,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
   auto *differential = fb.createFunction(
       linkage, context.getASTContext().getIdentifier(diffName).str(), diffType,
-      diffGenericEnv, original->getLocation(), original->isBare(),
+      original->getActorIsolation(), diffGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, jvp->getSerializedKind(),
       original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());

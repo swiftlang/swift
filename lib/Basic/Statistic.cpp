@@ -39,9 +39,6 @@
 #ifdef HAVE_PROC_PID_RUSAGE
 #include <libproc.h>
 #endif
-#ifdef HAVE_MALLOC_MALLOC_H
-#include <malloc/malloc.h>
-#endif
 #if defined(_WIN32)
 #define NOMINMAX
 #include "Windows.h"
@@ -535,26 +532,33 @@ FrontendStatsTracer::~FrontendStatsTracer()
 // Copy any interesting process-wide resource accounting stats to
 // associated fields in the provided AlwaysOnFrontendCounters.
 void updateProcessWideFrontendCounters(
-    UnifiedStatsReporter::AlwaysOnFrontendCounters &C) {
-  if (auto instrExecuted = getInstructionsExecuted()) {
-    C.NumInstructionsExecuted = instrExecuted;
-  }
+    UnifiedStatsReporter::AlwaysOnFrontendCounters &C,
+    llvm::TimeRecord &StartTime,
+    llvm::TimeRecord &Now) {
+  C.WallClockMicroseconds = uint64_t(1000000.0 * (Now.getWallTime() - StartTime.getWallTime()));
 
-#if defined(HAVE_MALLOC_ZONE_STATISTICS) && defined(HAVE_MALLOC_MALLOC_H)
-  // On Darwin we have a lifetime max that's maintained by malloc we can
-  // just directly query, even if we only make one query on shutdown.
-  malloc_statistics_t Stats;
-  // Query all zones.
-  malloc_zone_statistics(/*zone=*/NULL, &Stats);
-  C.MaxMallocUsage = (int64_t)Stats.max_size_in_use;
-#else
-  // If we don't have a malloc-tracked max-usage counter, we have to rely
-  // on taking the max over current-usage samples while running and hoping
-  // we get called often enough. This will happen when profiling/tracing,
-  // but not while doing single-query-on-shutdown collection.
-  C.MaxMallocUsage = std::max(C.MaxMallocUsage,
-                              (int64_t)llvm::sys::Process::GetMallocUsage());
+#if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
+  struct rusage_info_v4 ru;
+  if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru) == 0) {
+    C.NumInstructionsExecuted = ru.ri_instructions;
+    C.MaxMallocUsage = ru.ri_lifetime_max_phys_footprint;
+    return;
+  }
+#elif defined(_WIN32)
+  ULONG64 CycleTime;
+  if (QueryProcessCycleTime(GetCurrentProcess(), &CycleTime))
+    C.NumCyclesExecuted = CycleTime;
+
+  PROCESS_MEMORY_COUNTERS_EX PMC;
+  PMC.cb = sizeof(PMC);
+  if (GetProcessMemoryInfo(GetCurrentProcess(),
+                           reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&PMC),
+                           sizeof(PMC)))
+    C.MaxMallocUsage = PMC.PeakWorkingSetSize;
+  return;
 #endif
+
+  // FIXME: Do something useful when the above APIs are not available.
 }
 
 static inline void
@@ -600,7 +604,7 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
   auto Now = llvm::TimeRecord::getCurrentTime();
   auto &Curr = getFrontendCounters();
   auto &Last = *LastTracedFrontendCounters;
-  updateProcessWideFrontendCounters(Curr);
+  updateProcessWideFrontendCounters(Curr, StartedTime, Now);
   if (EventProfilers) {
     auto TimeDelta = Now;
     TimeDelta -= EventProfilers->LastUpdated;
@@ -678,8 +682,10 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
     }
   }
 
+  auto Now = llvm::TimeRecord::getCurrentTime();
+
   if (FrontendCounters)
-    updateProcessWideFrontendCounters(getFrontendCounters());
+    updateProcessWideFrontendCounters(getFrontendCounters(), StartedTime, Now);
 
   // NB: Timer needs to be Optional<> because it needs to be destructed early;
   // LLVM will complain about double-stopping a timer if you tear down a
@@ -690,7 +696,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 
   // We currently do this by manual TimeRecord keeping because LLVM has decided
   // not to allow access to the Timers inside NamedRegionTimers.
-  auto ElapsedTime = llvm::TimeRecord::getCurrentTime();
+  auto ElapsedTime = Now;
   ElapsedTime -= StartedTime;
 
   if (DriverCounters) {

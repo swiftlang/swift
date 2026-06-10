@@ -238,13 +238,6 @@ struct SILOptOptions {
                         llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
 
   llvm::cl::opt<bool>
-  EnableOSSACompleteLifetimes = llvm::cl::opt<bool>("enable-ossa-complete-lifetimes",
-                        llvm::cl::desc("Require linear OSSA lifetimes after SILGenCleanup."));
-  llvm::cl::opt<bool>
-  EnableOSSAVerifyComplete = llvm::cl::opt<bool>("enable-ossa-verify-complete",
-                        llvm::cl::desc("Verify linear OSSA lifetimes after SILGenCleanup."));
-
-  llvm::cl::opt<bool>
   EnableObjCInterop = llvm::cl::opt<bool>("enable-objc-interop",
                     llvm::cl::desc("Enable Objective-C interoperability."));
 
@@ -295,10 +288,6 @@ struct SILOptOptions {
   llvm::cl::opt<bool>
   VerifyExclusivity = llvm::cl::opt<bool>("enable-verify-exclusivity",
                     llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
-
-  llvm::cl::opt<bool>
-  EnableSpeculativeDevirtualization = llvm::cl::opt<bool>("enable-spec-devirt",
-                    llvm::cl::desc("Enable Speculative Devirtualization pass."));
 
   llvm::cl::opt<bool>
   EnableAsyncDemotion = llvm::cl::opt<bool>("enable-async-demotion",
@@ -597,6 +586,11 @@ struct SILOptOptions {
       "enable-address-dependencies",
       llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
 
+  llvm::cl::opt<bool> DisaleAggressiveReg2Mem = llvm::cl::opt<bool>(
+      "disable-aggressive-reg2mem",
+      llvm::cl::desc("Disable aggressive reg2mem optimizations."),
+      llvm::cl::init(false));
+
   llvm::cl::opt<bool> EnableCalleeAllocatedCoroAbi = llvm::cl::opt<bool>(
       "enable-callee-allocated-coro-abi",
       llvm::cl::desc("Override per-platform settings and use yield_once_2."),
@@ -769,11 +763,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       exit(-1);
     }
 
-    if (auto firstVersion = feature->getLanguageVersion()) {
-      if (Invocation.getLangOptions().isSwiftVersionAtLeast(*firstVersion)) {
+    if (auto languageMode = feature->getLanguageMode()) {
+      if (Invocation.getLangOptions().isLanguageModeAtLeast(
+              languageMode.value())) {
         llvm::errs() << "error: upcoming feature " << QuotedString(featureName)
-                     << " is already enabled as of Swift version "
-                     << *firstVersion << '\n';
+                     << " already enabled as of the Swift "
+                     << languageMode->versionString() << " language mode\n";
         exit(-1);
       }
     }
@@ -891,15 +886,13 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EmitVerboseSIL |= options.EmitVerboseSIL;
   SILOpts.EmitSortedSIL |= options.EmitSortedSIL;
 
-  SILOpts.EnableSpeculativeDevirtualization = options.EnableSpeculativeDevirtualization;
   SILOpts.EnableAsyncDemotion = options.EnableAsyncDemotion;
   SILOpts.EnableThrowsPrediction = options.EnableThrowsPrediction;
   SILOpts.EnableNoReturnCold = options.EnableNoReturnCold;
   SILOpts.IgnoreAlwaysInline = options.IgnoreAlwaysInline;
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
-  SILOpts.OSSACompleteLifetimes = options.EnableOSSACompleteLifetimes;
-  SILOpts.OSSAVerifyComplete = options.EnableOSSAVerifyComplete;
   SILOpts.StopOptimizationAfterSerialization |= options.EmitSIB;
+
   if (options.CopyPropagationState) {
     SILOpts.CopyPropagation = *options.CopyPropagationState;
   }
@@ -926,6 +919,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       options.EnablePackMetadataStackPromotion;
 
   SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
+  if (options.DisaleAggressiveReg2Mem)
+    SILOpts.UseAggressiveReg2MemForCodeSize = false;
   if (options.EnableCalleeAllocatedCoroAbi)
     SILOpts.CoroutineAccessorsUseYieldOnce2 = true;
   if (options.DisableCalleeAllocatedCoroAbi)

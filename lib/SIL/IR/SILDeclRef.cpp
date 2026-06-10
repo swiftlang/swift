@@ -19,6 +19,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILLinkage.h"
@@ -89,6 +90,11 @@ bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
     if (proto->isObjC())
       return true;
 
+  // If there is only a C entrypoint from a Swift function, we will need
+  // foreign-to-native thunks to deal with them.
+  if (vd->hasOnlyCEntryPoint())
+    return true;
+
   if (auto fd = dyn_cast<FuncDecl>(vd))
     return fd->hasClangNode();
 
@@ -111,6 +117,9 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   if (vd->hasClangNode())
     return true;
 
+  if (vd->hasOnlyCEntryPoint())
+    return true;
+
   if (auto *accessor = dyn_cast<AccessorDecl>(vd)) {
     // Property accessors should be generated alongside the property.
     if (accessor->isGetterOrSetter()) {
@@ -128,7 +137,9 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
                        bool isRuntimeAccessible,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-    : loc(vd), kind(kind), isForeign(isForeign), distributedThunk(isDistributedThunk),
+    : loc(vd), kind(kind),
+      isForeign(isForeign),
+      distributedThunk(isDistributedThunk),
       isKnownToBeLocal(isKnownToBeLocal),
       isRuntimeAccessible(isRuntimeAccessible),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
@@ -467,7 +478,8 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     // Native-to-foreign thunks for methods are always just private, since
     // they're anchored by Objective-C metadata.
     auto &attrs = fn->getAttrs();
-    if (constant.isNativeToForeignThunk() && !attrs.hasAttribute<CDeclAttr>()) {
+    if (constant.isNativeToForeignThunk() &&
+        !(attrs.hasAttribute<CDeclAttr>() && !fn->hasOnlyCEntryPoint())) {
       auto isTopLevel = fn->getDeclContext()->isModuleScopeContext();
       return isTopLevel ? Limit::OnDemand : Limit::Private;
     }
@@ -494,14 +506,14 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::Deallocator:
   case Kind::IsolatedDeallocator:
   case Kind::Destroyer: {
-    // @_alwaysEmitIntoClient declarations are like the default arguments of
+    // Always-emit-into-client declarations are like the default arguments of
     // public functions; they are roots for dead code elimination and have
     // serialized bodies, but no public symbol in the generated binary.
-    if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    if (d->isAlwaysEmittedIntoClient())
       return Limit::AlwaysEmitIntoClient;
     if (auto accessor = dyn_cast<AccessorDecl>(d)) {
       auto *storage = accessor->getStorage();
-      if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      if (storage->isAlwaysEmittedIntoClient())
         return Limit::AlwaysEmitIntoClient;
     }
     break;
@@ -829,6 +841,18 @@ bool SILDeclRef::isBorrowAccessor() const {
   return false;
 }
 
+static bool canSerializeSynthesizedBorrowingAccessors(SILDeclRef declRef) {
+  if (!declRef.isBorrowAccessor() && !declRef.isMutateAccessor()) {
+    return true;
+  }
+  auto *decl = cast<AccessorDecl>(declRef.getDecl());
+  assert(decl->hasForcedStaticDispatch());
+  if (!decl->getStorage()->isResilient()) {
+    return true;
+  }
+  return false;
+}
+
 /// True if the function should be treated as transparent.
 bool SILDeclRef::isTransparent() const {
   if (isEnumElement())
@@ -983,12 +1007,18 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
   if (isEnumElement())
     return IsSerialized;
 
-  // 'read' and 'modify' accessors synthesized on-demand are serialized if
-  // visible outside the module.
-  if (auto fn = dyn_cast<FuncDecl>(d))
-    if (!isClangImported() &&
-        fn->hasForcedStaticDispatch())
+  // Accessors synthesized on-demand are serialized if visible outside the
+  // module.
+  // FIXME: `FuncDecl::hasForcedStaticDispatch` is set on accessors that are
+  // synthesized because of a requirement and are not an opaque accessor for
+  // their storage. These accessors can only be accessed via protocol witnesses
+  // and should be serialized only when the protocol witness is serialized
+  // (protocol is public and we are in a non-resilient module).
+  if (auto fn = dyn_cast<FuncDecl>(d)) {
+    if (!isClangImported() && fn->hasForcedStaticDispatch() &&
+        canSerializeSynthesizedBorrowingAccessors(*this))
       return IsSerialized;
+  }
 
   if (isForeignToNativeThunk())
     return IsSerialized;
@@ -1014,7 +1044,8 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
     // @objc thunks for top-level functions are serializable since they're
     // referenced from @convention(c) conversions inside inlinable
     // functions.
-    return IsSerialized;
+    if (isThunk())
+      return IsSerialized;
   }
 
   // Declarations imported from Clang modules are serialized if
@@ -1153,31 +1184,51 @@ bool SILDeclRef::hasNonUniqueDefinition() const {
   return false;
 }
 
+bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
+  // @c / @_cdecl / @objc.
+  if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+      (decl->getAttrs().hasAttribute<ObjCAttr>() &&
+       decl->getDeclContext()->isModuleScopeContext())) {
+    return true;
+  }
+
+  // @_expose that isn't negated.
+  for (auto *expose : decl->getAttrs().getAttributes<ExposeAttr>()) {
+    switch (expose->getExposureKind()) {
+      case ExposureKind::Cxx:
+      case ExposureKind::Wasm:
+        return true;
+
+      case ExposureKind::NotCxx:
+        continue;
+    }
+  }
+
+  return false;
+}
+
 bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   // This function only forces the issue in embedded.
   if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  // If the declaration is marked as @_neverEmitIntoClient, it has a unique
-  // definition.
-  if (decl->isNeverEmittedIntoClient())
-    return false;
-
-  /// @_alwaysEmitIntoClient means that we have a non-unique definition.
-  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-    return true;
-
   auto module = decl->getModuleContext();
   auto &ctx = module->getASTContext();
 
-  /// With deferred code generation, declarations are emitted as late as
-  /// possible, so they must have non-unique definitions.
-  if (module->deferredCodeGen())
+  switch (decl->getEffectiveCodeGenerationModel()) {
+  case CodeGenerationModel::Implementation:
+    /// When deferring all code generation, declarations are emitted as late
+    /// as possible, so they must have non-unique definitions.
     return true;
 
-  // If the declaration is not from the main module, treat its definition as
-  // non-unique.
-  return module != ctx.MainModule && ctx.MainModule;
+  case CodeGenerationModel::Inlinable:
+    // If the declaration is not from the main module, treat its definition as
+    // non-unique.
+    return module != ctx.MainModule && ctx.MainModule;
+
+  case CodeGenerationModel::Interface:
+    return false;
+  }
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
@@ -1218,6 +1269,10 @@ bool SILDeclRef::isNativeToForeignThunk() const {
       return false;
     // No thunk is required if the decl directly references an external decl.
     if (getDecl()->getAttrs().hasAttribute<ExternAttr>())
+      return false;
+
+    // No thunk is required if the decl directly exposes a C entry point.
+    if (getDecl()->hasOnlyCEntryPoint())
       return false;
 
     // Only certain kinds of SILDeclRef can expose native-to-foreign thunks.
@@ -1326,18 +1381,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         silConfig);
   }
 
-  // As a special case, Clang functions and globals don't get mangled at all
-  // - except \c objc_direct decls.
-  if (hasDecl() && !isDefaultArgGenerator()) {
-    if (getDecl()->getClangDecl()) {
-      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
-        auto clangMangling = mangleClangDecl(getDecl(), isForeign);
-        if (!clangMangling.empty())
-          return clangMangling;
-      }
-    }
-  }
-
   // Mangle prespecializations.
   if (getSpecializedSignature()) {
     SILDeclRef nonSpecializedDeclRef = *this;
@@ -1381,24 +1424,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!NameA->Name.empty() && !isThunk()) {
         return NameA->Name.str();
-      }
-
-    if (auto *ExternA = ExternAttr::find(getDecl()->getAttrs(), ExternKind::C)) {
-      assert(isa<FuncDecl>(getDecl()) && "non-FuncDecl with @_extern should be rejected by typechecker");
-      return ExternA->getCName(cast<FuncDecl>(getDecl())).str();
-    }
-
-    // Use a given cdecl name for native-to-foreign thunks.
-    if (getDecl()->getAttrs().hasAttribute<CDeclAttr>())
-      if (isNativeToForeignThunk()) {
-        // If this is an @implementation @_cdecl, mangle it like the clang
-        // function it implements.
-        if (auto objcInterface = getDecl()->getImplementedObjCDecl()) {
-          auto clangMangling = mangleClangDecl(objcInterface, isForeign);
-          if (!clangMangling.empty())
-            return clangMangling;
-        }
-        return getDecl()->getCDeclName().str();
       }
 
     if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
@@ -1487,6 +1512,39 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   llvm_unreachable("bad entity kind!");
 }
+
+std::optional<std::string> SILDeclRef::getAsmName() const {
+  if (isAutoDiffDerivativeFunction())
+    return std::nullopt;
+
+  if (hasDecl() && !isDefaultArgGenerator() &&
+      (getDecl()->getClangDecl() || getDecl()->getImplementedObjCDecl())) {
+    // If there is a Clang declaration, use its mangled name.
+    if (isNativeToForeignThunk() || isForeign) {
+      auto decl = getDecl();
+      auto hasClangDecl = decl->getClangDecl()
+          ? decl : decl->getImplementedObjCDecl();
+      auto clangMangling = mangleClangDecl(hasClangDecl, isForeign);
+      if (!clangMangling.empty())
+        return clangMangling;
+    }
+  }
+
+  if (isForeign && hasDecl()) {
+    // @_extern(c)
+    auto decl = getDecl();
+    if (auto *EA = ExternAttr::find(decl->getAttrs(), ExternKind::C))
+      if (auto VD = dyn_cast<ValueDecl>(decl))
+        return std::string(EA->getCName(VD));
+
+    // @c/@_cdecl
+    if (decl->getAttrs().hasAttribute<CDeclAttr>())
+      return std::string(decl->getCDeclName());
+  }
+
+  return std::nullopt;
+}
+
 
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
 // FIXME(https://github.com/apple/swift/issues/54833): Also consider derived declaration `@derivative` attributes.
@@ -1985,5 +2043,37 @@ ActorIsolation SILDeclRef::getActorIsolation() const {
     return param->getInitializerIsolation();
   }
 
-  return getActorIsolationOfContext(getInnermostDeclContext());
+  // If we have a stored property initializer for a VarDecl with an explicit
+  // isolation, match that explicit isolation.
+  if (isStoredPropertyInitializer()) {
+    return cast<VarDecl>(getDecl())->getInitializerIsolation();
+  }
+
+  auto isolation = getActorIsolationOfContext(getInnermostDeclContext());
+  if (!isolation.isUnspecified())
+    return isolation;
+
+  // Local computed variable accessors get their isolation from the context.
+  //
+  // TODO: This is a narrow fix for region-based isolation, a proper fix here
+  // would be to set isolation correctly on the variable itself during
+  // type-checking, but that requires significant changes to support closures
+  // because their local declarations are currently type-checked during CSApply.
+  if (auto *accessor = getAccessorDecl()) {
+    auto *dc = accessor->getDeclContext();
+    if (dc->isLocalContext()) {
+      auto contextIsolation =
+          getActorIsolationOfContext(accessor->getDeclContext());
+
+      if (contextIsolation.isNonisolatedOrConcurrent() ||
+          contextIsolation.isNonisolatedNonsending())
+        return accessor->isAsync()
+                   ? ActorIsolation::forNonisolatedConcurrent()
+                   : ActorIsolation::forNonisolated(/*unsafe=*/false);
+
+      return contextIsolation;
+    }
+  }
+
+  return isolation;
 }

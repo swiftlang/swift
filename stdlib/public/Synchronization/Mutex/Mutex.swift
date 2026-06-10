@@ -114,20 +114,19 @@ extension Mutex where Value: ~Copyable {
   ///     }
   ///     return try body(&value)
   ///
-  /// - Warning: Recursive calls to `withLockIfAvailable` within the
-  ///   closure parameter has behavior that is platform dependent.
-  ///   Some platforms may choose to panic the process, deadlock,
-  ///   or leave this behavior unspecified. This will never
-  ///   reacquire the lock however.
-  ///
   /// - Parameter body: A closure with a parameter of `Value`
   ///   that has exclusive access to the value being stored within
   ///   this mutex. This closure is considered the critical section
   ///   as it will only be executed if the calling thread acquires
   ///   the lock.
   ///
-  /// - Returns: The return value, if any, of the `body` closure parameter
-  ///   or nil if the lock couldn't be acquired.
+  /// - Returns: The return value, if any, of the `body` closure parameter or
+  ///   `nil` if the lock couldn’t be acquired.
+  ///
+  /// - Note: This function cannot spuriously fail to acquire the lock. The
+  ///   behavior of similar functions in other languages (such as C's
+  ///   `mtx_trylock()`) is platform-dependent and may differ from Swift's
+  ///   behavior.
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent

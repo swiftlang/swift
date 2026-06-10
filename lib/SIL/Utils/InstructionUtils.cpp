@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "sil-inst-utils"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -44,6 +45,21 @@ SILValue swift::lookThroughOwnershipInsts(SILValue v) {
     case ValueKind::CopyValueInst:
     case ValueKind::BeginBorrowInst:
       v = cast<SingleValueInstruction>(v)->getOperand(0);
+    }
+  }
+}
+
+SILValue swift::lookThroughMoveOnlyCheckerPattern(SILValue value) {
+  while (true) {
+    switch (value->getKind()) {
+    default:
+      return value;
+    case ValueKind::MoveValueInst:
+    case ValueKind::CopyValueInst:
+    case ValueKind::BeginBorrowInst:
+    case ValueKind::MarkUnresolvedNonCopyableValueInst:
+    case ValueKind::CopyableToMoveOnlyWrapperValueInst:
+      value = cast<SingleValueInstruction>(value)->getOperand(0);
     }
   }
 }
@@ -571,11 +587,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::InitEnumDataAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::SelectEnumInst:
   case SILInstructionKind::SelectEnumAddrInst:
   case SILInstructionKind::ProjectBlockStorageInst:
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ReturnBorrowInst:
   case SILInstructionKind::ThrowInst:
   case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::YieldInst:
@@ -624,6 +643,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::TypeValueInst:
   case SILInstructionKind::IgnoredUseInst:
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
+  case SILInstructionKind::UncheckedOwnershipInst:
+  case SILInstructionKind::MakeBorrowInst:
+  case SILInstructionKind::DereferenceBorrowInst:
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::InitBorrowAddrInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst:
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::LoadInst: {
@@ -824,7 +851,9 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
     if (!ca->isTakeOfSrc())
       return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
-    return RuntimeEffect::MetaData;
+    if (ca->getSrc()->getType().hasArchetype())
+      return RuntimeEffect::MetaData;
+    return RuntimeEffect::NoEffect;
   }
   case SILInstructionKind::TupleAddrConstructorInst: {
     auto *ca = cast<TupleAddrConstructorInst>(inst);
@@ -1103,7 +1132,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
     case BuiltinValueKind::BuildDefaultActorExecutorRef:
     case BuiltinValueKind::BuildMainActorExecutorRef:
-    case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
       return RuntimeEffect::MetaData;
     default:
@@ -1466,10 +1494,42 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
     if (nominalTy->getValueTypeDestructor())
       return false;
   }
+
+  // At this point we know it's valid to expand the type, next decide if we
+  // "should" expand it.
+
   if (EnableExpandAll) {
+    return true;
+  }
+
+  if (!module.getOptions().UseAggressiveReg2MemForCodeSize) {
     return true;
   }
 
   unsigned numFields = module.Types.countNumberOfFields(ty, expansion);
   return (numFields <= 6);
+}
+
+void InstructionIndices::indexBlock(SILBasicBlock &block) {
+  unsigned idx = 1;
+  for (SILInstruction &inst : block) {
+    indices.set(inst.asSILNode(), idx);
+    if (indices.fits(idx + 1)) {
+      idx += 1;
+    } else {
+      indicesOverflowed = true;
+    }
+  }
+}
+
+InstructionIndices::InstructionIndices(SILFunction *f)
+    : indices(f, numIndexBits) {
+  for (SILBasicBlock &block : *f) {
+    indexBlock(block);
+  }
+}
+
+InstructionIndices::InstructionIndices(SILBasicBlock *block)
+    : indices(block->getFunction(), numIndexBits) {
+  indexBlock(*block);
 }

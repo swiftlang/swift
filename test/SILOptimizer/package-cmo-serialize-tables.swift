@@ -22,6 +22,8 @@
 // rdar://140330692 (🟠 OSS Swift CI: oss-swift_tools-RA_stdlib-DA_test-device-non_executable failed...
 // UNSUPPORTED: OS=watchos, OS=linux-androideabi
 
+// UNSUPPORTED: CPU=x86_64
+
 //--- main.swift
 
 import Lib

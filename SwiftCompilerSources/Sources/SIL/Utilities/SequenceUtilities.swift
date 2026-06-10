@@ -12,8 +12,8 @@
 
 import Basic
 
-/// Types conforming to `HasName` will be displayed by their name (instead of the
-/// full object) in collection descriptions.
+/// Types conforming to `HasShortDescription` will be displayed by their name (instead
+/// of the full object) in collection descriptions.
 ///
 /// This is useful to make collections, e.g. of BasicBlocks or Functions, readable.
 public protocol HasShortDescription {
@@ -86,6 +86,15 @@ public extension Sequence {
   }
 
   var first: Element? { first(where: { _ in true }) }
+
+  func countExceeds(_ n: Int) -> Bool {
+    for (idx, _) in self.enumerated() {
+      if idx > n {
+        return true
+      }
+    }
+    return false
+  }
 }
 
 // Also make the lazy sequences a CollectionLikeSequence if the underlying sequence is one.

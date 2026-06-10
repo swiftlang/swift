@@ -22,15 +22,16 @@ bb0(%0 : $Builtin.Int64):
 // CHECK:         %1 = value_to_bridge_object %0
 // CHECK:         %2 = value_to_bridge_object %0
 // CHECK:         %3 = tuple (%1 : $Builtin.BridgeObject, %2 : $Builtin.BridgeObject)
-// CHECK:         return %3
+// CHECK:         %4 = copy_value %3
+// CHECK:         return %4
 // CHECK:       } // end sil function 'keep_both_vtbo_instructions'
-sil [ossa] @keep_both_vtbo_instructions : $@convention(thin) (Builtin.Int64) -> (Builtin.BridgeObject, Builtin.BridgeObject) {
+sil [ossa] @keep_both_vtbo_instructions : $@convention(thin) (Builtin.Int64) -> @owned (Builtin.BridgeObject, Builtin.BridgeObject) {
 bb0(%0 : $Builtin.Int64):
   %1 = value_to_bridge_object %0 : $Builtin.Int64
   %2 = unchecked_trivial_bit_cast %1 : $Builtin.BridgeObject to $UInt64
   %3 = struct_extract %2 : $UInt64, #UInt64._value
   %4 = value_to_bridge_object %3 : $Builtin.Int64
   %5 = tuple (%1 : $Builtin.BridgeObject, %4 : $Builtin.BridgeObject)
-  return %5 : $(Builtin.BridgeObject, Builtin.BridgeObject)
+  %6 = copy_value %5
+  return %6
 }
-

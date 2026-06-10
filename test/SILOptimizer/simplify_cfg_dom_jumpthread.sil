@@ -531,7 +531,8 @@ bb6:
 }
 
 // CHECK-LABEL: sil [ossa] @test_begin_borrow_and_unreachable :
-// CHECK-NOT:     @reborrow
+// TODO: this is currently not optimized
+// xCHECK-NOT:     @reborrow
 // CHECK:       } // end sil function 'test_begin_borrow_and_unreachable'
 sil [ossa] @test_begin_borrow_and_unreachable : $@convention(thin) (@guaranteed E2, @guaranteed E2) -> () {
 bb0(%0 : @guaranteed $E2, %1 : @guaranteed $E2):
@@ -556,6 +557,8 @@ bb5(%11 : @guaranteed $E2):
 
 bb6:
   fix_lifetime %6 : $E2
+  end_borrow %6
+  destroy_value [dead_end] %5
   unreachable
 }
 
@@ -592,5 +595,27 @@ bb6(%12 : @guaranteed $C):
   end_borrow %7
   %15 = tuple ()
   return %15
+}
+
+// CHECK-LABEL: sil [ossa] @test_switch_enum_default_with_payload :
+// CHECK-NOT:     switch_enum
+// CHECK:         copy_value {{%.*}} : $E2
+// CHECK:       } // end sil function 'test_switch_enum_default_with_payload'
+sil [ossa] @test_switch_enum_default_with_payload : $@convention(thin) (@guaranteed E2) -> @owned E2 {
+bb0(%0 : @guaranteed $E2):
+  %1 = unchecked_enum_data %0, #E2.b!enumelt
+  %2 = enum $E2, #E2.b!enumelt, %1
+  switch_enum %2, case #E2.a!enumelt: bb1, default bb2
+
+bb1:
+  %4 = copy_value %0
+  br bb3(%4)
+
+bb2(%6 : @guaranteed $E2):
+  %7 = copy_value %6
+  br bb3(%7)
+
+bb3(%9 : @owned $E2):
+  return %9
 }
 

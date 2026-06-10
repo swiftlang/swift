@@ -47,8 +47,7 @@ static TaskAllocator &allocator(AsyncTask *task) {
   static GlobalAllocator global;
   return global.allocator;
 #else
-  puts("global allocator fallback not available\n");
-  abort();
+  swift_Concurrency_fatalError(0, "global allocator fallback not available");
 #endif
 }
 
@@ -84,3 +83,8 @@ void swift::swift_job_deallocate(Job *job, void *ptr) {
 
   allocator(static_cast<AsyncTask *>(job)).dealloc(ptr);
 }
+
+#if !SWIFT_CONCURRENCY_EMBEDDED
+std::atomic<TaskAllocatorConfiguration::EnableState>
+    TaskAllocatorConfiguration::enableState = {EnableState::Uninitialized};
+#endif

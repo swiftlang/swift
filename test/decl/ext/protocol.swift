@@ -945,11 +945,11 @@ enum Foo : Int, ReallyRaw {
 // Semantic restrictions
 // ----------------------------------------------------------------------------
 
-// Extension cannot have an inheritance clause.
+// Extension cannot declare inheritance relationship.
 protocol BadProto1 { }
 protocol BadProto2 { }
 
-extension BadProto1 : BadProto2 { } // expected-error{{extension of protocol 'BadProto1' cannot have an inheritance clause}}
+extension BadProto1 : BadProto2 { } // expected-error{{extension of protocol 'BadProto1' cannot declare inheritance relationship}}
 
 extension BadProto2 {
   struct S { } // expected-error{{type 'S' cannot be nested in protocol extension of 'BadProto2'}}

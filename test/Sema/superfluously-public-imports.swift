@@ -129,7 +129,7 @@ public struct Extended {
 //--- Client_Swift5.swift
 /// No diagnostics should be raised on the implicit access level.
 import UnusedImport
-public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-7=internal}}
+public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{group-name=UnusedImportAccess}} {{1-7=internal}}
 
 //--- Client.swift
 public import DepUsedFromInlinableCode
@@ -143,7 +143,7 @@ public import ExtensionA
 public import ExtensionB
 public import PropertyWrapper
 public import ExtendedDefinitionPublic
-public import ExtendedDefinitionNonPublic // expected-warning {{public import of 'ExtendedDefinitionNonPublic' was not used in public declarations or inlinable code}} {{1-8=}}
+public import ExtendedDefinitionNonPublic // expected-warning {{public import of 'ExtendedDefinitionNonPublic' was not used in public declarations or inlinable code}} {{group-name=UnusedImportAccess}} {{1-8=}}
 
 /// Repeat some imports to make sure we report all of them.
 public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-8=}}
@@ -228,8 +228,8 @@ extension NonPublicExtendedType {
 }
 
 public struct Struct { // expected-remark {{implicitly used struct 'Int' is imported via 'Swift'}}
-  public var propWithInferredIntType = 42
-  public var propWithExplicitType: String = "Text" // expected-remark {{struct 'String' is imported via 'Swift'}}
+  public var propWithInferredIntType = 42 // expected-remark {{struct 'Int' is imported via 'Swift'}}
+  public var propWithExplicitType: String = "Text" // expected-remark 3 {{struct 'String' is imported via 'Swift'}}
 }
 
 public func publicFunction() {
@@ -246,7 +246,7 @@ package func packageFunc(a: PackageType = packageFunc()) {} // expected-remark {
 public func spiFunc(a: ToUseFromSPI) {} // expected-remark {{struct 'ToUseFromSPI' is imported via 'SPIOnlyUsedInSPI'}}
 
 public protocol Countable {
-  var count: Int { get } // expected-remark {{struct 'Int' is imported via 'Swift'}}
+  var count: Int { get } // expected-remark 3 {{struct 'Int' is imported via 'Swift'}}
 }
 
 extension Extended: Countable { // expected-remark {{struct 'Extended' is imported via 'RetroactiveConformance'}}
@@ -329,7 +329,7 @@ typedef struct _TypedefTypeUnderlying {
 
 //--- ClientOfClangModules.swift
 public import ClangSimple
-public import ClangSimpleUnused // expected-warning {{public import of 'ClangSimpleUnused' was not used in public declarations or inlinable code}}
+public import ClangSimpleUnused // expected-warning {{public import of 'ClangSimpleUnused' was not used in public declarations or inlinable code}} {{group-name=UnusedImportAccess}}
 public import ClangSubmodule.ClangSubmoduleSubmodule
 public import ClangSubmoduleUnused.ClangSubmoduleUnsuedSubmodule // expected-warning {{public import of 'ClangSubmoduleUnused' was not used in public declarations or inlinable code}}
 

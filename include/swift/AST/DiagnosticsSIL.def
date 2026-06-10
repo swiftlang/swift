@@ -142,6 +142,10 @@ ERROR(deserialize_function_type_mismatch,Fatal,
       "type mismatch of function '%0', declared as %1 but used in a swift module as %2",
       (StringRef, Type, Type))
 
+ERROR(deserialize_function_linkage_mismatch,Fatal,
+      "linkage mismatch of function '%0', declared as %1 but expected as %2",
+      (StringRef, StringRef, StringRef))
+
 ERROR(without_actually_escaping_on_isolated_any,none,
       "withoutActuallyEscaping is currently unimplemented for '@isolated(any)' "
       "function values", ())
@@ -222,7 +226,7 @@ ERROR(ivar_not_initialized_at_implicit_superinit,none,
       (StringRef, bool))
 ERROR(ivar_not_initialized_by_init_accessor,none,
       "property %0 not initialized by init accessor",
-      (DeclName))
+      (StringRef))
 
 ERROR(noncopyable_dynamic_lifetime_unsupported,none,
       "conditional initialization or destruction of noncopyable types is not "
@@ -241,7 +245,7 @@ ERROR(use_of_self_before_fully_init,none,
 NOTE(stored_property_not_initialized,none,
      "'%0' not initialized", (StringRef))
 NOTE(isolated_property_initializer,none,
-     "%1 default value of '%0' cannot be used in a %2 initalizer",
+     "%1 default value of '%0' cannot be used in a %2 initializer",
      (StringRef, ActorIsolation, ActorIsolation))
 
 ERROR(selfinit_multiple_times,none,
@@ -390,18 +394,8 @@ GROUPED_ERROR(embedded_cannot_specialize_witness_method,EmbeddedRestrictions,non
       "a protocol type cannot contain a generic method %0 in embedded Swift", (DeclName))
 GROUPED_ERROR(cannot_specialize_class,EmbeddedRestrictions,none,
       "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
-GROUPED_ERROR(embedded_swift_existential_type,EmbeddedRestrictions,none,
-      "cannot use a value of protocol type %0 in embedded Swift", (Type))
-GROUPED_ERROR(embedded_swift_existential_protocol,EmbeddedRestrictions,none,
-      "cannot use a value of protocol type 'any %0' in embedded Swift", (StringRef))
-GROUPED_ERROR(embedded_swift_existential,EmbeddedRestrictions,none,
-      "cannot use a value of protocol type in embedded Swift", ())
-GROUPED_ERROR(embedded_swift_value_deinit,EmbeddedRestrictions,none,
-      "cannot de-virtualize deinit of type %0", (Type))
 GROUPED_ERROR(embedded_swift_metatype_type,EmbeddedRestrictions,none,
       "cannot use metatype of type %0 in embedded Swift", (Type))
-GROUPED_ERROR(embedded_swift_metatype,EmbeddedRestrictions,none,
-      "cannot use metatype in embedded Swift", ())
 GROUPED_ERROR(embedded_swift_keypath,EmbeddedRestrictions,none,
       "cannot use key path in embedded Swift", ())
 GROUPED_ERROR(embedded_swift_dynamic_cast,EmbeddedRestrictions,none,
@@ -433,14 +427,21 @@ ERROR(wrong_linkage_for_serialized_function,none,
       "function has wrong linkage to be called from %0", (StringRef))
 NOTE(performance_called_from,none,
       "called from here", ())
-ERROR(manualownership_copy,none,
-      "explicit 'copy' required here; please report this vague diagnostic as a bug", ())
-ERROR(manualownership_copy_happened,none,
+
+// ManualOwnership diagnostics
+GROUPED_WARNING(manualownership_copy,SemanticCopies,none,
+      "implicit 'copy' happens here; please report this vague diagnostic as a bug", ())
+GROUPED_WARNING(manualownership_copy_happened,SemanticCopies,none,
       "accessing %0 may produce a copy; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
-ERROR(manualownership_copy_demanded,none,
+GROUPED_WARNING(manualownership_copy_demanded,SemanticCopies,none,
       "independent copy of %0 is required here; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
-ERROR(manualownership_copy_captured,none,
+GROUPED_WARNING(manualownership_copy_captured,SemanticCopies,none,
       "closure capture of '%0' requires independent copy of it; write [%0 = copy %0] in the closure's capture list to acknowledge", (StringRef))
+
+GROUPED_WARNING(manualownership_exclusivity,DynamicExclusivity,none,
+      "exclusive access here will be checked at runtime; please report this vague diagnostic as a bug", ())
+GROUPED_WARNING(manualownership_exclusivity_named,DynamicExclusivity,none,
+      "accessing %0 here may incur runtime exclusivity check%1", (Identifier, StringRef))
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,
@@ -735,11 +736,15 @@ WARNING(warning_int_to_fp_inexact, none,
 // Flow-isolation diagnostics
 ERROR(isolated_after_nonisolated, none,
       "cannot access %kind1 here in "
-      "%select{nonisolated initializer|deinitializer}0",
-      (bool, const ValueDecl *))
+      "%select{%2 initializer|deinitializer}0",
+      (bool, const ValueDecl *, StringRef))
+ERROR(isolated_after_nonisolated_identifier, none,
+      "cannot access %1 here in "
+      "%select{%2 initializer|deinitializer}0",
+      (bool, Identifier, StringRef))
 NOTE(nonisolated_blame, none, "after %1%2 %3, "
-     "only nonisolated properties of 'self' can be accessed from "
-     "%select{this init|a deinit}0", (bool, StringRef, StringRef, DeclName))
+     "only %4 properties of 'self' can be accessed from "
+     "%select{this init|a deinit}0", (bool, StringRef, StringRef, DeclName, StringRef))
 ERROR(isolated_property_mutation_in_nonisolated_context,none,
       "actor-isolated %kind0 can not be %select{referenced|mutated}1 "
       "from a nonisolated context",
@@ -995,7 +1000,7 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 //===
 // Misc
 
-ERROR(regionbasedisolation_unknown_pattern, none,
+GROUPED_ERROR(regionbasedisolation_unknown_pattern, RegionIsolationUnknownPattern, none,
       "pattern that the region-based isolation checker does not understand how to check. Please file a bug",
       ())
 NOTE(regionbasedisolation_maybe_race, none,
@@ -1043,8 +1048,10 @@ NOTE(regionbasedisolation_named_value_used_after_explicit_sending, none,
       "%0 used after being passed as a 'sending' parameter; Later uses could race",
       (Identifier))
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
-      "%select{%1 |}0%2 is captured by a %3 closure. %3 uses in closure may race against later %4 uses",
-      (bool, StringRef, Identifier, StringRef, StringRef))
+      "%select{%1 |}0%2 is captured by a %3 closure. %3 uses in closure may race against %select{later %4 uses|code in the current isolation context}5",
+      (bool, StringRef, Identifier, StringRef, StringRef, bool))
+NOTE(regionbasedisolation_named_isolated_closure_yields_race_mutable, none,
+     "%0 closure captures reference to mutable %1 which remains modifiable by %select{%3 code|code in the current isolation context}2", (StringRef, Identifier, bool, StringRef))
 
 NOTE(regionbasedisolation_typed_use_after_sending, none,
       "Passing value of non-Sendable type %0 as a 'sending' argument risks causing races in between local and caller code",
@@ -1057,45 +1064,54 @@ NOTE(regionbasedisolation_typed_use_after_sending_callee, none,
 // Sending Never Sendable Emitter
 
 NOTE(regionbasedisolation_named_send_never_sendable, none,
-      "sending %select{%2 |}0%1 to %3 callee risks causing data races between %3 and %4 uses",
-      (bool, Identifier, StringRef, StringRef, StringRef))
+      "sending %select{%2 |}0%1 to %3 callee risks causing data races between %3 %select{|code }5and %select{%4 uses|code in the current isolation context}5",
+      (bool, Identifier, StringRef, StringRef, StringRef, bool))
 NOTE(regionbasedisolation_named_send_never_sendable_callee, none,
-      "sending %select{%2 |}0%1 to %3 %kind4 risks causing data races between %3 and %5 uses",
-      (bool, Identifier, StringRef, StringRef, const ValueDecl *, StringRef))
+      "sending %select{%2 |}0%1 to %3 %kind4 risks causing data races between %3 %select{|code }6and %select{%5 uses|code in the current isolation context}6",
+      (bool, Identifier, StringRef, StringRef, const ValueDecl *, StringRef, bool))
 
 NOTE(regionbasedisolation_named_send_into_sending_param, none,
      "%select{%1 |}0%2 is passed as a 'sending' parameter; Uses in callee may race with "
-     "later %1 uses",
-     (bool, StringRef, Identifier))
+     "%select{later %1 uses|code in the current isolation context}3",
+     (bool, StringRef, Identifier, bool))
 NOTE(regionbasedisolation_named_nosend_send_into_result, none,
-     "%select{%1 |}0%2 cannot be a 'sending' result. %3 uses may race with caller uses",
-     (bool, StringRef, Identifier, StringRef))
+     "%select{%1 |}0%2 cannot be a 'sending' result. %select{%3 uses|Code in the current task}4 may race with caller uses",
+     (bool, StringRef, Identifier, StringRef, bool))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
      "Passing %0 value of non-Sendable type %1 as a 'sending' parameter risks "
      "causing races inbetween %0 uses and uses reachable from the callee",
      (StringRef, Type))
 
-ERROR(regionbasedisolation_typed_tns_passed_sending_closure, none,
+GROUPED_ERROR(regionbasedisolation_typed_tns_passed_sending_closure, SendingClosureRisksDataRace, none,
      "passing closure as a 'sending' parameter risks causing data races between %0 and concurrent execution of the closure",
      (StringRef))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value, none,
      "closure captures %0 %1",
      (StringRef, DeclName))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_task_isolated, none,
-     "closure captures %0 which is accessible to code in the current task",
+     "closure captures %0 which is accessible to code in the current isolation context",
      (DeclName))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_boxed_value_task_isolated, none,
-     "closure captures reference to mutable %kind0 which is accessible to code in the current task",
+     "closure captures reference to mutable %kind0 which remains modifiable by code in the current isolation context",
      (const ValueDecl *))
+GROUPED_ERROR(regionbasedisolation_sent_closure_captures_mutable_var, SendingRisksDataRace, none,
+     "closure passed as an argument to a 'sending' parameter captures reference to mutable %kind0 which is accessed later by code in the current isolation context",
+     (const ValueDecl *))
+GROUPED_ERROR(regionbasedisolation_sent_closure_captures_value, SendingRisksDataRace, none,
+     "closure passed as an argument to a 'sending' parameter captures %0 which is accessed later by code in the current isolation context",
+     (DeclName))
+GROUPED_ERROR(regionbasedisolation_sent_autoclosure_captures_mutable_var, SendingRisksDataRace, none,
+     "mutable %kind0 cannot be captured by 'sending' @autoclosure parameter because %0 is accessed later in the current task",
+     (const ValueDecl *))
+GROUPED_ERROR(regionbasedisolation_sent_autoclosure_captures_value, SendingRisksDataRace, none,
+     "%0 cannot be captured by 'sending' @autoclosure parameter because %0 is accessed later in the current task",
+     (DeclName))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_region, none,
      "closure captures %1 which is accessible to %0 code",
      (StringRef, DeclName))
 
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_multiple_value, none,
      "closure captures non-Sendable %0",
-     (DeclName))
-NOTE(regionbasedisolation_closure_captures, none,
-     "closure captures %0",
      (DeclName))
 NOTE(regionbasedisolation_closure_captures_actor, none,
      "closure captures %0 allowing access to %1 state within the closure",
@@ -1106,14 +1122,14 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending_callee, none,
      (StringRef, Type, const ValueDecl *))
 
 NOTE(regionbasedisolation_named_send_nt_asynclet_capture, none,
-      "sending %1 %0 into async let risks causing data races between nonisolated and %1 uses",
-      (Identifier, StringRef))
+      "sending %select{%1 |}2%0 into async let risks causing data races between nonisolated %select{|code }2and %select{%1 uses|code in the current isolation context}2",
+      (Identifier, StringRef, bool))
 NOTE(regionbasedisolation_typed_sendneversendable_via_arg, none,
-      "sending %0 value of non-Sendable type %1 to %2 callee risks causing races in between %0 and %2 uses",
-      (StringRef, Type, StringRef))
+      "sending %select{%0 |}3value of non-Sendable type %1 to %2 callee risks causing races in between %select{%0 |code in the current isolation context }3and %2 uses",
+      (StringRef, Type, StringRef, bool))
 NOTE(regionbasedisolation_typed_sendneversendable_via_arg_callee, none,
-      "sending %0 value of non-Sendable type %1 to %2 %kind3 risks causing races in between %0 and %2 uses",
-      (StringRef, Type, StringRef, const ValueDecl *))
+      "sending %select{%0 |}4value of non-Sendable type %1 to %2 %kind3 risks causing races in between %select{%0 |code in the current isolation context }4and %2 uses",
+      (StringRef, Type, StringRef, const ValueDecl *, bool))
 
 NOTE(regionbasedisolation_isolated_conformance_introduced, none,
      "isolated conformance to %kind0 can be introduced here",
@@ -1121,7 +1137,7 @@ NOTE(regionbasedisolation_isolated_conformance_introduced, none,
 
 // Error that is only used when the send non sendable emitter cannot discover any
 // information to give a better diagnostic.
-ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,
+GROUPED_ERROR(regionbasedisolation_task_or_actor_isolated_sent, RegionIsolation, none,
       "task or actor-isolated value cannot be sent", ())
 
 //===
@@ -1130,19 +1146,19 @@ ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,
 NOTE(regionbasedisolation_inout_sending_must_be_reinitialized, none,
      "'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value",
      ())
-ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
-      "'inout sending' parameter %0 cannot be %1 at end of function",
-      (Identifier, StringRef))
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, RegionIsolation, none,
+      "'inout sending' parameter %0 %select{cannot be %1 at end of function|is accessible to code in the current isolation context at end of function}2",
+      (Identifier, StringRef, bool))
 NOTE(regionbasedisolation_inout_sending_cannot_be_actor_isolated_note, none,
-      "%1 %0 risks causing races in between %1 uses and caller uses since caller assumes value is not actor isolated",
-      (Identifier, StringRef))
-ERROR(regionbasedisolation_inout_sending_cannot_be_returned_param, none,
+      "%select{%1 |}2%0 risks causing races in between %select{%1 uses|code in the current isolation context}2 and caller uses since caller assumes value is not actor isolated",
+      (Identifier, StringRef, bool))
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_returned_param, RegionIsolation, none,
       "'inout sending' parameter %0 cannot be returned",
       (Identifier))
-ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value, none,
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value, RegionIsolation, none,
       "%0 cannot be returned",
       (Identifier))
-ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value_result, none,
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value_result, RegionIsolation, none,
       "result of %kind0 cannot be returned",
       (const ValueDecl *))
 NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_param, none,
@@ -1166,27 +1182,27 @@ NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_actor_return_val
 //===
 // Out Sending
 
-ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_type, none,
-      "returning a %1 %0 value as a 'sending' result risks causing data races",
-      (Type, StringRef))
+GROUPED_ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_type, RegionIsolation, none,
+      "returning a %select{%1 |}2%0 value as a 'sending' result risks causing data races%select{; the value is accessible to code in the current isolation context|}2",
+      (Type, StringRef, bool))
 NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_type, none,
-      "returning a %1 %0 value risks causing races since the caller assumes the value can be safely sent to other isolation domains",
-      (Type, StringRef))
-ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_named, none,
-      "returning %1 %0 as a 'sending' result risks causing data races",
-      (Identifier, StringRef))
+      "returning a %select{%1 |}2%0 value risks causing races since the caller assumes the value can be safely sent to other isolation domains%select{, but the value is accessible to code in the current isolation context|}2",
+      (Type, StringRef, bool))
+GROUPED_ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_named, RegionIsolation, none,
+      "returning %select{%1 |}2%0 as a 'sending' result risks causing data races%select{; %0 is accessible to code in the current isolation context|}2",
+      (Identifier, StringRef, bool))
 NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
-      "returning %1 %0 risks causing data races since the caller assumes that %0 can be safely sent to other isolation domains",
-      (Identifier, StringRef))
+      "returning %select{%1 |}2%0 risks causing data races since the caller assumes that %0 can be safely sent to other isolation domains%select{, but %0 is accessible to code in the current isolation context|}2",
+      (Identifier, StringRef, bool))
 
 //===
 // non-Sendable Results
 
 // Example: returning main-actor isolated result to a custom-actor isolated context risks causing data races
-ERROR(rbi_isolation_crossing_result, none,
+GROUPED_ERROR(rbi_isolation_crossing_result, RegionIsolation, none,
       "non-Sendable %0-typed result can not be returned from %1 %kind2 to %3 context",
       (Type, StringRef, const ValueDecl *, StringRef))
-ERROR(rbi_isolation_crossing_result_no_decl, none,
+GROUPED_ERROR(rbi_isolation_crossing_result_no_decl, RegionIsolation, none,
       "non-Sendable %0-typed result can not be returned from %1 function to %2 context",
       (Type, StringRef, StringRef))
 NOTE(rbi_non_sendable_nominal,none,
@@ -1201,9 +1217,76 @@ NOTE(rbi_add_generic_parameter_sendable_conformance,none,
      "consider making generic parameter %0 conform to the 'Sendable' protocol",
      (Type))
 
+GROUPED_ERROR(regionbasedisolation_inout_sending_in_same_region, RegionIsolation, none,
+      "'inout sending' parameters %0 and %1 can be potentially accessed from each other at function return risking data races in caller",
+      (Identifier, Identifier))
+NOTE(regionbasedisolation_inout_sending_in_same_region_note, none,
+     "caller function assumes on return that %0 and %1 cannot be used to access each other implying sending them to different isolation domains does not risk a data race", (Identifier, Identifier))
+
+//===
+// Merge Region Failure Error
+//
+
+// Generic merge -- instruction does not match a more specific shape below.
+GROUPED_ERROR(rbi_merge_failure_unknown, RegionIsolationCrossIsolationDataRace, none,
+      "executing operation could allow for references between values exposed to "
+      "%select{%0 code|code in the current isolation context}2 and "
+      "%select{%1 code|code in the current isolation context}3 "
+      "risking data races",
+      (StringRef, StringRef, bool, bool))
+
+// Store / assignment that brings two domains into the same region.
+GROUPED_ERROR(rbi_merge_failure_assign, RegionIsolationCrossIsolationDataRace, none,
+      "assignment could allow for references between values exposed to "
+      "%select{%0 code|code in the current isolation context}2 and "
+      "%select{%1 code|code in the current isolation context}3 "
+      "risking data races",
+      (StringRef, StringRef, bool, bool))
+
+// Nonisolated callee receiving arguments from two different domains.
+GROUPED_ERROR(rbi_merge_failure_nonisolatedfn, RegionIsolationCrossIsolationDataRace, none,
+      "passing arguments to %kind2 could allow for references between values exposed to "
+      "%select{%0 code|code in the current isolation context}3 and "
+      "%select{%1 code|code in the current isolation context}4 "
+      "risking data races",
+      (StringRef, StringRef, const ValueDecl *, bool, bool))
+
+// Isolated callee receiving a value from a different domain.
+// Two variants: a named primary that includes the source value's name when we
+// can recover it, and an unnamed primary (no leading article) when we cannot.
+GROUPED_ERROR(rbi_merge_failure_isolatedfn, RegionIsolationCrossIsolationDataRace, none,
+      "passing value to %2 %kind1 could allow for references between values exposed to "
+      "%select{%0 code|code in the current isolation context}3 and "
+      "%select{%2 code|code in the current isolation context}4 "
+      "risking data races",
+      (StringRef, const ValueDecl *, StringRef, bool, bool))
+GROUPED_ERROR(rbi_merge_failure_isolatedfn_named, RegionIsolationCrossIsolationDataRace, none,
+      "passing %0 to %3 %kind2 could allow for references between values exposed to "
+      "%select{%1 code|code in the current isolation context}4 and "
+      "%select{%3 code|code in the current isolation context}5 "
+      "risking data races",
+      (Identifier, StringRef, const ValueDecl *, StringRef, bool, bool))
+
+// Cast across isolation domains.
+GROUPED_ERROR(rbi_merge_failure_cast, RegionIsolationCrossIsolationDataRace, none,
+      "casting value to type %1 could allow for references between values exposed to "
+      "%select{%0 code|code in the current isolation context}3 and "
+      "%select{%2 code|code in the current isolation context}4 "
+      "risking data races",
+      (StringRef, Type, StringRef, bool, bool))
+
+// Per-value notes -- two variants. We use the named form when we can recover a
+// name for the value, otherwise the bare form. We deliberately do not emit a
+// "value of type T" form, because SIL values often do not carry a reliable AST
+// type.
+NOTE(rbi_merge_failure_value_note_named, none,
+     "%0 is exposed to %select{%1 code|code in the current isolation context}2",
+     (Identifier, StringRef, bool))
+NOTE(rbi_merge_failure_value_note_bare, none,
+     "value is exposed to %select{%0 code|code in the current isolation context}1",
+     (StringRef, bool))
+
 // Concurrency related diagnostics
-ERROR(cannot_find_executor_factory_type, none,
-      "the DefaultExecutorFactory type could not be found", ())
 ERROR(executor_factory_must_conform, none,
       "the DefaultExecutorFactory does not conform to 'ExecutorFactory'", ())
 
@@ -1213,7 +1296,7 @@ ERROR(executor_factory_must_conform, none,
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,
-      "deinit of non-copyable type not visible in the current module", ())
+      "deinit of non-copyable type %0 not visible in the current module", (Type))
 
 ERROR(lifetime_variable_outside_scope, none,
       "lifetime-dependent variable '%0' escapes its scope", (Identifier))
@@ -1240,20 +1323,24 @@ NOTE(lifetime_outside_scope_use, none,
 NOTE(lifetime_outside_scope_escape, none,
      "this use causes the lifetime-dependent value to escape", ())
 
+NOTE(implicit_function_note, none, "error in compiler-generated '%0'", (StringRef))
+
 ERROR(noncopyable_shared_case_block_unimplemented, none,
       "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())
 
 
 /// Borrow and mutate accessors
 ERROR(invalid_borrow_accessor_return, none,
-      "invalid return value from borrow accessor", ())
+      "invalid return value from a %0 accessor", (StringRef))
 NOTE(borrow_accessor_not_a_projection_note, none,
-     "borrow accessors can return either literals, stored properties or computed "
-     "properties that have borrow accessors",
-     ())
+     "%0 accessors can return stored properties, computed properties with "
+     "%0 accessors or global 'let' declarations",
+     (StringRef))
 ERROR(invalid_multiple_return_borrow_accessor, none,
       "multiple return statements in borrow accessors are not yet supported",
       ())
-
+ERROR(unsupported_borrow_abstraction, none,
+      "cannot witness borrow requirement for result type %0",
+      (Type))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

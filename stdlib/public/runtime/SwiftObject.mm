@@ -567,12 +567,6 @@ _swift_objcClassUsesNativeSwiftReferenceCounting(const Metadata *theClass) {
 #endif
 }
 
-// The non-pointer bits, excluding the tag bits.
-static auto const unTaggedNonNativeBridgeObjectBits
-  = heap_object_abi::SwiftSpareBitsMask
-  & ~heap_object_abi::ObjCReservedBitsMask
-  & ~heap_object_abi::BridgeObjectTagBitsMask;
-
 #if SWIFT_OBJC_INTEROP
 
 #if defined(__x86_64__)
@@ -646,7 +640,7 @@ void *swift::swift_nonatomic_unknownObjectRetain(void *object) {
 void swift::swift_nonatomic_unknownObjectRelease(void *object) {
   if (isObjCTaggedPointerOrNull(object)) return;
   if (objectUsesNativeSwiftReferenceCounting(object))
-    return swift_release(static_cast<HeapObject *>(object));
+    return swift_nonatomic_release(static_cast<HeapObject *>(object));
   return objc_release(static_cast<id>(object));
 }
 
@@ -674,7 +668,7 @@ static bool isBridgeObjectTaggedPointer(void *object) {
 ///
 /// Precondition: object does not encode a tagged pointer
 static void* toPlainObject_unTagged_bridgeObject(void *object) {
-  return (void*)(uintptr_t(object) & ~unTaggedNonNativeBridgeObjectBits);
+  return (void*)(uintptr_t(object) & ~heap_object_abi::UntaggedNonNativeBridgeObjectBits);
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -695,13 +689,9 @@ void *swift::swift_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
   if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return object;
-#endif
 
-  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
-
-#if SWIFT_OBJC_INTEROP
   if (!isNonNative_unTagged_bridgeObject(object)) {
-    return swift_retain(static_cast<HeapObject *>(objectRef));
+    return swift_retain(static_cast<HeapObject *>(object));
   }
 
   // Put the call to objc_retain in a separate function, tail-called here. This
@@ -712,10 +702,9 @@ void *swift::swift_bridgeObjectRetain(void *object) {
   // bit set.
   SWIFT_MUSTTAIL return objcRetainAndReturn(object);
 #else
-  // No tail call here. When !SWIFT_OBJC_INTEROP, the value of objectRef may be
-  // different from that of object, e.g. on Linux ARM64.
-  swift_retain(static_cast<HeapObject *>(objectRef));
-  return object;
+  // swift_retain will mask off any extra bits in object, and return the
+  // original value, so we can tail call it here.
+  return swift_retain(static_cast<HeapObject *>(object));
 #endif
 }
 

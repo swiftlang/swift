@@ -17,7 +17,8 @@
 
 // REQUIRES: objc_interop
 
-// CHECK-LABEL: #if __has_feature(objc_modules)
+// CHECK: #if __has_feature(objc_modules)
+// CHECK: #if __has_feature(objc_modules)
 // CHECK-NEXT: #if __has_warning
 // CHECK-NEXT: #pragma clang diagnostic
 // CHECK-NEXT: #endif

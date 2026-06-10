@@ -44,6 +44,9 @@
 using namespace swift;
 using namespace ownership;
 
+STATISTIC(NumInstScansDuringLivenessQueries,
+          "# of instructions scanned while computing `getLivenessAtInst()`");
+
 llvm::cl::opt<bool> TriggerUnreachableOnFailure(
     "sil-di-assert-on-failure", llvm::cl::init(false),
     llvm::cl::desc("After emitting a DI error, assert instead of continuing. "
@@ -474,9 +477,6 @@ namespace {
 
     AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
                                       unsigned NumElts);
-    AvailabilitySet getLivenessAtNonTupleInst(SILInstruction *Inst,
-                                              SILBasicBlock *InstBB,
-                                              AvailabilitySet &CurrentSet);
     int getAnyUninitializedMemberAtInst(SILInstruction *Inst, unsigned FirstElt,
                                         unsigned NumElts);
 
@@ -625,7 +625,7 @@ bool LifetimeChecker::isBlockIsReachableFromEntry(const SILBasicBlock *BB) {
   // Lazily compute reachability, so we only have to do it in the case of an
   // error.
   if (BlocksReachableFromEntry.empty()) {
-    SmallVector<const SILBasicBlock*, 128> Worklist;
+    SmallVector<const SILBasicBlock*, 8> Worklist;
     Worklist.push_back(&BB->getParent()->front());
     BlocksReachableFromEntry.insert(Worklist.back());
     
@@ -1066,7 +1066,8 @@ void LifetimeChecker::injectActorHops() {
 
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedConcurrent:
+  case ActorIsolation::NonisolatedNonsending:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::GlobalActor:
     return;
@@ -1197,13 +1198,14 @@ void LifetimeChecker::doIt() {
 
   // All of the indirect results marked as "out" have to be fully initialized
   // before their lifetime ends.
-  if (TheMemory.isOut()) {
+  if (TheMemory.isOut() &&
+      !TheMemory.getType().isEmptyTuple(TheMemory.getFunction())) {
     auto diagnoseMissingInit = [&]() {
       std::string propertyName;
-      auto *property = TheMemory.getPathStringToElement(0, propertyName);
+      TheMemory.getPathStringToElement(0, propertyName);
       diagnose(Module, F.getLocation(),
                diag::ivar_not_initialized_by_init_accessor,
-               property->getName());
+               StringRef("'" + propertyName + "'"));
       EmittedErrorLocs.push_back(TheMemory.getLoc());
     };
 
@@ -1534,10 +1536,51 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     return;
   }
 
+  // Check for instructions that are assignments to the memory location being
+  // analyzed. This is used to suppress diagnostics that would otherwise be
+  // produced when fully-assigning to a struct `self` in init where a `let`
+  // property has already been assigned, and for certain compatibility
+  // diagnostics when initializing structs across module boundaries.
+  auto isFullValueAssignment = [this](const SILInstruction *inst) -> bool {
+    SILValue addr;
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst))
+      addr = copyAddr->getDest();
+    else if (auto *moveAddr = dyn_cast<MarkUnresolvedMoveAddrInst>(inst))
+      addr = moveAddr->getDest();
+    else if (auto *assign = dyn_cast<AssignInst>(inst))
+      addr = assign->getDest();
+    else
+      return false;
+
+    if (auto *access = dyn_cast<BeginAccessInst>(addr))
+      addr = access->getSource();
+    if (auto *projection = dyn_cast<ProjectBoxInst>(addr))
+      addr = projection->getOperand();
+
+    return addr == TheMemory.getUninitializedValue();
+  };
+
+  auto isFullValueStructInitAssignment = [&](const DIMemoryUse &Use) -> bool {
+    if (TheMemory.isStructInitSelf() && isFullValueAssignment(Use.Inst)) {
+      ASSERT(
+          Use.FirstElement == 0 &&
+          Use.NumElements == TheMemory.getNumElements() &&
+          "expected full-value store to struct self to produce a use of every "
+          "element");
+      return true;
+    }
+
+    return false;
+  };
+
   // If this is a store to a 'let' property in an initializer, then we only
   // allow the assignment if the property was completely uninitialized.
-  // Overwrites are not permitted.
-  if (Use.Kind == DIUseKind::PartialStore || !isFullyUninitialized) {
+  // Overwrites of an initialized `let` property are not permitted. However,
+  // if we're performing a full-element store to `self` in a `struct`
+  // initializer, then the assignment is permitted, since this replaces the
+  // entire aggregate, and doesn't re-assign existing elements.
+  if ((Use.Kind == DIUseKind::PartialStore || !isFullyUninitialized) &&
+      !isFullValueStructInitAssignment(Use)) {
     for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
          i != e; ++i) {
       if (Liveness.get(i) == DIKind::No || !TheMemory.isElementLetProperty(i))
@@ -1568,25 +1611,6 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   // than DelegatingSelf for Swift 4 compatibility. We look for a problem case by
   // seeing if there are any assignments to individual fields that might be
   // initializations; that is, that they're not dominated by `self = other`.
-
-  auto isFullValueAssignment = [this](const SILInstruction *inst) -> bool {
-    SILValue addr;
-    if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst))
-      addr = copyAddr->getDest();
-    else if (auto *moveAddr = dyn_cast<MarkUnresolvedMoveAddrInst>(inst))
-      addr = moveAddr->getDest();
-    else if (auto *assign = dyn_cast<AssignInst>(inst))
-      addr = assign->getDest();
-    else
-      return false;
-
-    if (auto *access = dyn_cast<BeginAccessInst>(addr))
-      addr = access->getSource();
-    if (auto *projection = dyn_cast<ProjectBoxInst>(addr))
-      addr = projection->getOperand();
-
-    return addr == TheMemory.getUninitializedValue();
-  };
 
   if (!isFullyInitialized && WantsCrossModuleStructInitializerDiagnostic &&
       !isFullValueAssignment(Use.Inst)) {
@@ -1796,13 +1820,13 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         case AccessorKind::Get:
         case AccessorKind::DistributedGet:
         case AccessorKind::Read:
-        case AccessorKind::Read2:
+        case AccessorKind::YieldingBorrow:
         case AccessorKind::Address:
         case AccessorKind::Borrow:
           return false;
         case AccessorKind::Set:
         case AccessorKind::Modify:
-        case AccessorKind::Modify2:
+        case AccessorKind::YieldingMutate:
         case AccessorKind::MutableAddress:
         case AccessorKind::DidSet:
         case AccessorKind::WillSet:
@@ -2010,7 +2034,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   // uninitialized at MarkFunctionEscapeInst, extract and report the reason
   // why the variable escapes in the error message.
   //
-  // (b) An UncheckedTakeEnumDataAddrInst takes the address of the data of
+  // (b) An Unchecked*EnumDataAddrInst takes the address of the data of
   // an optional and is introduced as an intermediate step in optional chaining.
   Diag<StringRef, bool> DiagMessage;
   if (isa<MarkFunctionEscapeInst>(Inst)) {
@@ -2021,7 +2045,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
     } else {
       DiagMessage = diag::variable_function_use_uninit;
     }
-  } else if (isa<UncheckedTakeEnumDataAddrInst>(Inst)) {
+  } else if (isa<UncheckedEnumDataAddrInstBase>(Inst)) {
     DiagMessage = diag::variable_used_before_initialized;
   } else {
     DiagMessage = diag::variable_closure_use_uninit;
@@ -2355,7 +2379,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
       }
     }
   }
-  
+
   // If this is a copy_addr into the 'self' argument, and the memory object is a
   // rootself struct/enum or a non-delegating initializer, then we're looking at
   // the implicit "return self" in an address-only initializer.  Emit a specific
@@ -2369,6 +2393,24 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
                                                             Use)) {
         return;
       }
+    }
+  }
+
+  // Check if the superclass initializer is called
+  // in an failable initializer of a class that inherits from another class.
+  if (auto *EI = dyn_cast<EnumInst>(Inst)) {
+    if (isFailableInitReturnUseOfEnum(EI) && TheMemory.isNonRootClassSelf()) {
+      if (!shouldEmitError(Inst)) return;
+      if (!SuperInitDone) {
+        diagnose(Module, Inst->getLoc(),
+                 diag::superselfinit_not_called_before_return,
+                 (unsigned)TheMemory.isDelegatingInit());
+      } else {
+        diagnose(Module, Inst->getLoc(),
+                 diag::return_from_init_without_initing_stored_properties);
+        noteUninitializedMembers(Use);
+      }
+      return;
     }
   }
 
@@ -3592,43 +3634,6 @@ void LifetimeChecker::getOutSelfInitialized(SILBasicBlock *BB,
     Result = mergeKinds(Result, getBlockInfo(Pred).OutSelfInitialized);
 }
 
-AvailabilitySet
-LifetimeChecker::getLivenessAtNonTupleInst(swift::SILInstruction *Inst,
-                                           swift::SILBasicBlock *InstBB,
-                                           AvailabilitySet &Result) {
-  // If there is a store in the current block, scan the block to see if the
-  // store is before or after the load.  If it is before, it produces the value
-  // we are looking for.
-  if (getBlockInfo(InstBB).HasNonLoadUse) {
-    for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
-      --BBI;
-      SILInstruction *TheInst = &*BBI;
-
-      if (TheInst == TheMemory.getUninitializedValue()) {
-        Result.set(0, DIKind::No);
-        return Result;
-      }
-
-      if (NonLoadUses.count(TheInst)) {
-        // We've found a definition, or something else that will require that
-        // the memory is initialized at this point.
-        Result.set(0, DIKind::Yes);
-        return Result;
-      }
-    }
-  }
-
-  getOutAvailability(InstBB, Result);
-
-  // If the result element wasn't computed, we must be analyzing code within
-  // an unreachable cycle that is not dominated by "TheMemory".  Just force
-  // the unset element to yes so that clients don't have to handle this.
-  if (!Result.getConditional(0))
-    Result.set(0, DIKind::Yes);
-
-  return Result;
-}
-
 /// getLivenessAtInst - Compute the liveness state for any number of tuple
 /// elements at the specified instruction.  The elements are returned as an
 /// AvailabilitySet.  Elements outside of the range specified may not be
@@ -3648,12 +3653,6 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
 
   SILBasicBlock *InstBB = Inst->getParent();
 
-  // The vastly most common case is memory allocations that are not tuples,
-  // so special case this with a more efficient algorithm.
-  if (TheMemory.getNumElements() == 1) {
-    return getLivenessAtNonTupleInst(Inst, InstBB, Result);
-  }
-
   // Check locally to see if any elements are satisfied within the block, and
   // keep track of which ones are still needed in the NeededElements set.
   SmallBitVector NeededElements(TheMemory.getNumElements());
@@ -3664,6 +3663,7 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
   // the elements we are looking for.
   if (getBlockInfo(InstBB).HasNonLoadUse) {
     for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
+      ++NumInstScansDuringLivenessQueries;
       --BBI;
       SILInstruction *TheInst = &*BBI;
 

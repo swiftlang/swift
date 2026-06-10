@@ -1,0 +1,4 @@
+// RUN: cp %S/Inputs/split-file-last.txt %t.txt
+
+// RUN: %update-generated-tests %t.txt
+// RUN: %diff %t.txt %S/Inputs/split-file-last.expected

@@ -269,6 +269,13 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     strategy.emitValueInjection(IGM, builder, ei->getElement(), data, out);
     return replaceUnalignedIntegerValues(IGM, std::move(out));
   } else if (auto *ILI = dyn_cast<IntegerLiteralInst>(operand)) {
+    if (ILI->getType().is<BuiltinIntegerLiteralType>()) {
+      auto pair = emitConstantIntegerLiteral(IGM, ILI);
+      Explosion e;
+      e.add(pair.Data);
+      e.add(pair.Flags);
+      return e;
+    }
     return emitConstantInt(IGM, ILI);
   } else if (auto *FLI = dyn_cast<FloatLiteralInst>(operand)) {
     return emitConstantFP(IGM, FLI);

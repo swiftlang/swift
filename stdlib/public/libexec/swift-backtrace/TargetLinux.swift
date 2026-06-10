@@ -284,13 +284,20 @@ class Target {
     }
   }
 
-  func withDebugger(_ body: () -> ()) throws {
+  enum DebuggerResult {
+    case abort
+    case handOffToDebugger
+  }
+
+  func withDebugger(_ body: () -> DebuggerResult) throws {
     print("""
             From another shell, please run
 
             lldb --attach-pid \(pid) -o c
             """)
-    body()
+    if body() == .handOffToDebugger {
+      exit(0)
+    }
   }
 }
 

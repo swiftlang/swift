@@ -67,7 +67,9 @@ public struct Cloner<Context: MutatingContext> {
     if let entryBlock = targetFunction.blocks.first {
       return entryBlock
     }
-    return targetFunction.appendNewBlock(context)
+    let entryBlock = targetFunction.appendNewBlock(context)
+    bridged.setInsertionBlockIfNotSet(entryBlock.bridged)
+    return entryBlock
   }
 
   public func cloneFunctionBody(from originalFunction: Function, entryBlockArguments: [Value]) {
@@ -131,7 +133,7 @@ public struct Cloner<Context: MutatingContext> {
       fatalError("expected instruction to clone or already cloned value")
     }
 
-    for op in inst.operands {
+    for op in inst.definedOperands {
       if cloneRecursively(value: op.value, customGetCloned: customGetCloned) == nil {
         return nil
       }

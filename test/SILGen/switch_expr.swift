@@ -333,7 +333,7 @@ func testNested(_ e: E) throws -> Int {
 // CHECK:       br [[EXITBB:bb[0-9]+]]
 //
 // CHECK:       [[DEFBB]]({{.*}}):
-// CHECK:       [[NESTEDRESULT:%[0-9]+]] = alloc_stack $Int
+// CHECK-NOT:   {{.*}} = alloc_stack $Int
 // CHECK:       switch_enum %0 : $E, case #E.b!enumelt: [[BBB:bb[0-9]+]], default [[NESTEDDEFBB:bb[0-9]+]]
 
 // CHECK:       [[BBB]]:
@@ -342,9 +342,7 @@ func testNested(_ e: E) throws -> Int {
 // CHECK:       [[NESTEDDEFBB]]({{.*}}):
 // CHECK:       [[TWO_BUILTIN:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 2
 // CHECK:       [[TWO:%[0-9]+]] = apply {{%[0-9]+}}([[TWO_BUILTIN]], {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-// CHECK:       store [[TWO]] to [trivial] [[NESTEDRESULT]] : $*Int
-// CHECK:       [[TMP:%[0-9]+]] = load [trivial] [[NESTEDRESULT]] : $*Int
-// CHECK:       store [[TMP]] to [trivial] [[RESULT]] : $*Int
+// CHECK:       store [[TWO]] to [trivial] [[RESULT]] : $*Int
 // CHECK:       br [[EXITBB:bb[0-9]+]]
 //
 // CHECK:       [[EXITBB]]:
@@ -919,4 +917,69 @@ struct LazyProp {
   case false:
     0
   }
+}
+
+// MARK: In-place Init
+
+// Implicit return of address-only generic type writes directly to @out
+
+// CHECK-LABEL: sil hidden [ossa] @$s11switch_expr29testImplicitReturnNoTemporaryyxx_xtlF : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T
+// CHECK:       bb0([[RESULT:%0]] : $*T, [[X:%1]] : $*T, [[Y:%2]] : $*T):
+// CHECK-NOT:   alloc_stack $T
+// CHECK:       switch_value {{.*}}, case {{.*}}: [[TRUEBB:bb[0-9]+]], case {{.*}}: [[FALSEBB:bb[0-9]+]]
+// CHECK:       [[TRUEBB]]:
+// CHECK:       copy_addr [[X]] to [init] [[RESULT]] : $*T
+// CHECK:       [[FALSEBB]]:
+// CHECK:       copy_addr [[Y]] to [init] [[RESULT]] : $*T
+func testImplicitReturnNoTemporary<T>(_ x: T, _ y: T) -> T {
+  switch Bool.random() {
+  case true: x
+  case false: y
+  }
+}
+
+// Nested switch with address-only type — both levels write directly to %0
+
+// CHECK-LABEL: sil hidden [ossa] @$s11switch_expr21testNestedAddressOnlyyxx_xxtlF : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, @in_guaranteed T) -> @out T
+// CHECK:       bb0([[RESULT:%0]] : $*T, [[X:%1]] : $*T, [[Y:%2]] : $*T, [[Z:%3]] : $*T):
+// CHECK-NOT:   alloc_stack $T
+// CHECK:       switch_value {{.*}}, case {{.*}}: [[TRUEBB:bb[0-9]+]], case {{.*}}: [[FALSEBB:bb[0-9]+]]
+// CHECK:       [[TRUEBB]]:
+// CHECK:       copy_addr [[X]] to [init] [[RESULT]] : $*T
+// CHECK:       [[FALSEBB]]:
+// CHECK-NOT:   alloc_stack $T
+// CHECK:       switch_value {{.*}}, case {{.*}}: [[INNERTRUE:bb[0-9]+]], case {{.*}}: [[INNERFALSE:bb[0-9]+]]
+// CHECK:       [[INNERTRUE]]:
+// CHECK:       copy_addr [[Y]] to [init] [[RESULT]] : $*T
+// CHECK:       [[INNERFALSE]]:
+// CHECK:       copy_addr [[Z]] to [init] [[RESULT]] : $*T
+func testNestedAddressOnly<T>(_ x: T, _ y: T, _ z: T) -> T {
+  switch Bool.random() {
+  case true: x
+  case false:
+    switch Bool.random() {
+    case true: y
+    case false: z
+    }
+  }
+}
+
+// let binding with address-only type — switch writes into the binding,
+// not a separate temporary
+
+// CHECK-LABEL: sil hidden [ossa] @$s11switch_expr25testLetBindingAddressOnlyyxx_xtlF : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T
+// CHECK:       bb0([[RETURN:%0]] : $*T, [[X:%1]] : $*T, [[Y:%2]] : $*T):
+// CHECK:       [[BINDING:%[0-9]+]] = alloc_stack [lexical] [var_decl] $T, let, name "result"
+// CHECK-NOT:   alloc_stack $T
+// CHECK:       switch_value {{.*}}, case {{.*}}: [[TRUEBB:bb[0-9]+]], case {{.*}}: [[FALSEBB:bb[0-9]+]]
+// CHECK:       [[TRUEBB]]:
+// CHECK:       copy_addr [[X]] to [init] [[BINDING]] : $*T
+// CHECK:       [[FALSEBB]]:
+// CHECK:       copy_addr [[Y]] to [init] [[BINDING]] : $*T
+func testLetBindingAddressOnly<T>(_ x: T, _ y: T) -> T {
+  let result = switch Bool.random() {
+  case true: x
+  case false: y
+  }
+  return result
 }

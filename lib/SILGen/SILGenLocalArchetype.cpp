@@ -60,7 +60,7 @@ public:
     for (auto &bb : F)
       bbs.push_back(&bb);
 
-    // Make F.mapTypeIntoContext() use the new environment.
+    // Make F.mapTypeIntoEnvironment() use the new environment.
     F.setGenericEnvironment(env);
 
     // Start by cloning the entry block.

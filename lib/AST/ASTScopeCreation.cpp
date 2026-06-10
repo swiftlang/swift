@@ -286,8 +286,7 @@ void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
   auto sr = AFD->getOriginalBodySourceRange();
   if (sr.isInvalid())
     return;
-  ASTScopeImpl *bodyScope =
-      findInnermostEnclosingScope(AFD->getParentModule(), sr.Start, nullptr);
+  ASTScopeImpl *bodyScope = findInnermostEnclosingScope(sr.Start, nullptr);
   if (!bodyScope->getWasExpanded())
     bodyScope->expandAndBeCurrent(*scopeCreator);
 }
@@ -414,6 +413,7 @@ public:
   VISIT_AND_IGNORE(ContinueStmt)
   VISIT_AND_IGNORE(FallthroughStmt)
   VISIT_AND_IGNORE(FailStmt)
+  VISIT_AND_IGNORE(OpaqueStmt)
 
 #undef VISIT_AND_IGNORE
 
@@ -959,11 +959,8 @@ AnnotatedInsertionPoint
 ConditionalClausePatternUseScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   auto *initializer = sec.getInitializer();
-  if (!isa<ErrorExpr>(initializer)) {
-    scopeCreator
-      .constructExpandAndInsert<ConditionalClauseInitializerScope>(
-        this, initializer);
-    }
+  scopeCreator.constructExpandAndInsert<ConditionalClauseInitializerScope>(
+      this, initializer);
 
   return {this,
           "Succeeding code must be in scope of conditional clause pattern bindings"};
@@ -1183,7 +1180,7 @@ void SwitchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  scopeCreator.addToScopeTree(stmt->getParsedSequence(), this);
+  scopeCreator.addToScopeTree(stmt->getSequence(), this);
 
   // Add a child describing the scope of the pattern.
   // In error cases such as:

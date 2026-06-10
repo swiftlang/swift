@@ -20,10 +20,6 @@ module NestedTypes {
   header "nested-types.h"
 }
 
-module Subscripts {
-  header "subscripts.h"
-}
-
 module TypeAliases {
   header "type-aliases.h"
 }
@@ -51,5 +47,15 @@ module InheritedLookup {
 
 module CircularInheritance {
   header "circular-inheritance.h"
+  requires cplusplus
+}
+
+module ProtectedSpecialMember {
+  header "protected-special-member.h"
+  requires cplusplus
+}
+
+module InheritedStringField {
+  header "inherited-string-field.h"
   requires cplusplus
 }

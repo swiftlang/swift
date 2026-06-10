@@ -176,19 +176,92 @@ static void validateWarningControlArgs(DiagnosticEngine &diags,
   }
 }
 
+/// Validates only *generate* profiling flags and their mutual conflicts.
+static void validateProfilingGenerateArgs(DiagnosticEngine &diags,
+                                          const ArgList &args) {
+  const Arg *ProfileGenerate = args.getLastArg(options::OPT_profile_generate);
+  const Arg *IRProfileGenerate =
+      args.getLastArg(options::OPT_ir_profile_generate);
+  const Arg *CSProfileGenerate =
+      args.getLastArg(options::OPT_cs_profile_generate);
+  const Arg *CSProfileGenerateEQ =
+      args.getLastArg(options::OPT_cs_profile_generate_EQ);
+  const Arg *IRProfileGenerateEQ =
+      args.getLastArg(options::OPT_ir_profile_generate_EQ);
+
+  // If both CS Profile forms were specified, report a clear conflict.
+  if (CSProfileGenerate && CSProfileGenerateEQ) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-cs-profile-generate", "-cs-profile-generate=");
+    CSProfileGenerateEQ = nullptr;
+  }
+  // If both IR Profile forms were specified, report a clear conflict.
+  if (IRProfileGenerate && IRProfileGenerateEQ) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate", "-ir-profile-generate=");
+    IRProfileGenerateEQ = nullptr;
+  }
+
+  llvm::SmallVector<std::pair<const Arg *, const char *>, 3> gens;
+  if (ProfileGenerate)
+    gens.push_back({ProfileGenerate, "-profile-generate"});
+  if (IRProfileGenerate)
+    gens.push_back({IRProfileGenerate, "-ir-profile-generate"});
+  if (IRProfileGenerateEQ)
+    gens.push_back({IRProfileGenerateEQ, "-ir-profile-generate="});
+  if (CSProfileGenerate)
+    gens.push_back({CSProfileGenerate, "-cs-profile-generate"});
+  else if (CSProfileGenerateEQ)
+    gens.push_back({CSProfileGenerateEQ, "-cs-profile-generate="});
+
+  // Emit pairwise conflicts if more than one generate-mode was selected
+  for (size_t i = 0; i + 1 < gens.size(); ++i) {
+    for (size_t j = i + 1; j < gens.size(); ++j) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                     gens[i].second, gens[j].second);
+    }
+  }
+}
+
 static void validateProfilingArgs(DiagnosticEngine &diags,
                                   const ArgList &args) {
+  validateProfilingGenerateArgs(diags, args);
   const Arg *ProfileGenerate = args.getLastArg(options::OPT_profile_generate);
   const Arg *ProfileUse = args.getLastArg(options::OPT_profile_use);
+  const Arg *IRProfileGenerate =
+      args.getLastArg(options::OPT_ir_profile_generate);
+  const Arg *IRProfileGenerateEQ =
+      args.getLastArg(options::OPT_ir_profile_generate_EQ);
+  const Arg *IRProfileUse = args.getLastArg(options::OPT_ir_profile_use);
   if (ProfileGenerate && ProfileUse) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-profile-generate", "-profile-use");
   }
-
+  if (ProfileGenerate && IRProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-profile-generate", "-ir-profile-use");
+  }
+  if (IRProfileGenerate && ProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate", "-profile-use");
+  }
+  if (IRProfileGenerate && IRProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate", "-ir-profile-use");
+  }
+  if (IRProfileGenerateEQ && ProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate=", "-profile-use");
+  }
+  if (IRProfileGenerateEQ && IRProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate=", "-ir-profile-use");
+  }
   // Check if the profdata is missing
-  if (ProfileUse && !llvm::sys::fs::exists(ProfileUse->getValue())) {
-    diags.diagnose(SourceLoc(), diag::error_profile_missing,
-                   ProfileUse->getValue());
+  for (const Arg *use : {ProfileUse, IRProfileUse}) {
+    if (use && !llvm::sys::fs::exists(use->getValue())) {
+      diags.diagnose(SourceLoc(), diag::error_profile_missing, use->getValue());
+    }
   }
 }
 
@@ -351,6 +424,7 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
 
   switch (target.getOS()) {
   case llvm::Triple::XROS:
+  case llvm::Triple::Firmware:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
@@ -377,6 +451,11 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   case llvm::Triple::Haiku:
     return std::make_unique<toolchains::GenericUnix>(*this, target);
   case llvm::Triple::WASI:
+    Diags.diagnose(SourceLoc(), diag::wasi_deprecated_use_wasip1);
+    LLVM_FALLTHROUGH;
+  case llvm::Triple::WASIp1:
+  case llvm::Triple::WASIp2:
+  case llvm::Triple::WASIp3:
     return std::make_unique<toolchains::WebAssembly>(*this, target);
   case llvm::Triple::UnknownOS:
     return std::make_unique<toolchains::GenericUnix>(*this, target);
@@ -1414,13 +1493,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.RuntimeVariant =
           llvm::StringSwitch<std::optional<OutputInfo::MSVCRuntime>>(
               A->getValue())
-              .Cases("MD", "MultiThreadedDLL", "shared-ucrt",
+              .Cases({"MD", "MultiThreadedDLL", "shared-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDLL)
-              .Cases("MDd", "MultiThreadedDebugDLL", "shared-debug-ucrt",
+              .Cases({"MDd", "MultiThreadedDebugDLL", "shared-debug-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDebugDLL)
-              .Cases("MT", "MultiThreaded", "static-ucrt",
+              .Cases({"MT", "MultiThreaded", "static-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreaded)
-              .Cases("MTd", "MultiThreadedDebug", "static-debug-ucrt",
+              .Cases({"MTd", "MultiThreadedDebug", "static-debug-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDebug)
               .Default(std::nullopt);
       if (!OI.RuntimeVariant)
@@ -1626,6 +1705,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftOverlayFile:
       case file_types::TY_JSONDependencies:
       case file_types::TY_JSONArguments:
+      case file_types::TY_JSONPolyglotAST:
       case file_types::TY_SwiftABIDescriptor:
       case file_types::TY_SwiftAPIDescriptor:
       case file_types::TY_ConstValues:

@@ -248,6 +248,17 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 // so changing this value is not sufficient.
 #define SWIFT_DEFAULT_LLVM_CC llvm::CallingConv::C
 
+// Define the calling convention for refcounting functions for targets where it
+// differs from the standard calling convention. Currently this is only used for
+// swift_retain, swift_release, and some internal helper functions that they
+// call.
+#if defined(__aarch64__) && !SWIFT_RUNTIME_EMBEDDED
+#define SWIFT_REFCOUNT_CC SWIFT_CC_PreserveMost
+#define SWIFT_REFCOUNT_CC_PRESERVEMOST 1
+#else
+#define SWIFT_REFCOUNT_CC
+#endif
+
 /// Should we use absolute function pointers instead of relative ones?
 /// WebAssembly target uses it by default.
 #ifndef SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
@@ -564,7 +575,14 @@ swift_auth_code(T value, unsigned extra) {
 #    define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
 #  endif
 #elif defined(_WIN32)
-#  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
+   // Backtracing is disabled for 32-bit x86 on Windows because the Swift
+   // compiler doesn't respect `stdcall`.  Other architectures don't use a
+   // special calling convention for Win32 APIs, so are OK.
+#  if defined(__i386__)
+#    define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
+#  else
+#    define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 1
+#  endif
 #  define SWIFT_BACKTRACE_SECTION ".sw5bckt"
 #elif defined(__linux__) && (defined(__aarch64__) || defined(__x86_64__))
 #  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 1

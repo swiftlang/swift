@@ -1,4 +1,4 @@
-// REQUIRES: shell
+// UNSUPPORTED: OS=windows-msvc
 // Check that 'swift' and 'swift repl' invoke the REPL.
 
 // RUN: rm -rf %t.dir

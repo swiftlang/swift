@@ -50,11 +50,6 @@ parseNumericLiteral(ClangImporter::Implementation &impl,
   return nullptr;
 }
 
-// FIXME: Duplicated from ImportDecl.cpp.
-static bool isInSystemModule(DeclContext *D) {
-  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
-}
-
 static std::optional<StringRef>
 getTokenSpelling(ClangImporter::Implementation &impl, const clang::Token &tok) {
   bool tokenInvalid = false;
@@ -125,6 +120,11 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         return nullptr;
     }
 
+    auto &ctx = DC->getASTContext();
+    auto *constantTyNominal = constantType->getAnyNominal();
+    if (!constantTyNominal)
+      return nullptr;
+
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
       // Determine the value.
       llvm::APSInt value{integer->getValue(), clangTy->isUnsignedIntegerType()};
@@ -140,6 +140,17 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         }
       }
 
+      // Make sure the destination type actually conforms to the builtin literal
+      // protocol or is Bool before attempting to import, otherwise we'll crash
+      // since `createConstant` expects it to.
+      // FIXME: We ought to be careful checking conformance here since it can
+      // result in cycles. Additionally we ought to consider checking for the
+      // non-builtin literal protocol to allow any ExpressibleByIntegerLiteral
+      // type to be supported.
+      if (!isBoolOrBoolEnumType(constantType) &&
+          !ctx.getIntBuiltinInitDecl(constantTyNominal)) {
+        return nullptr;
+      }
       return createMacroConstant(Impl, MI, name, DC, constantType,
                                  clang::APValue(value),
                                  ConstantConvertKind::None,
@@ -157,6 +168,16 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       if (signTok && signTok->is(clang::tok::minus)) {
         value.changeSign();
       }
+
+      // Make sure the destination type actually conforms to the builtin literal
+      // protocol before attempting to import, otherwise we'll crash since
+      // `createConstant` expects it to.
+      // FIXME: We ought to be careful checking conformance here since it can
+      // result in cycles. Additionally we ought to consider checking for the
+      // non-builtin literal protocol to allow any ExpressibleByFloatLiteral
+      // type to be supported.
+      if (!ctx.getFloatBuiltinInitDecl(constantTyNominal))
+        return nullptr;
 
       return createMacroConstant(Impl, MI, name, DC, constantType,
                                  clang::APValue(value),
@@ -417,13 +438,16 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                         Ctx.TheEmptyTupleType, ASTExtInfo{});
 
   /* Storage */
-  swift::VarDecl *V =
-      new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                        SourceLoc(), alias, DC);
+  auto *V = new (Ctx) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
+                              /*nameLoc=*/SourceLoc(), alias, DC);
+
   V->setAccess(swift::AccessLevel::Public);
   V->setInterfaceType(Ty.getType());
-  V->getAttrs().add(new (Ctx) TransparentAttr(/*Implicit*/true));
-  V->getAttrs().add(new (Ctx) InlineAttr(InlineKind::AlwaysUnderscored));
+
+  V->addAttribute(new (Ctx) TransparentAttr(/*Implicit*/ true));
+  V->addAttribute(new (Ctx) InlineAttr(InlineKind::AlwaysUnderscored));
+  V->addAttribute(new (Ctx) PreconcurrencyAttr(/*IsImplicit=*/true));
+  V->setSynthesized();
 
   /* Accessor */
   swift::AccessorDecl *G = nullptr;
@@ -445,8 +469,8 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
   }
 
   swift::AccessorDecl *S = nullptr;
-  if (isa<clang::VarDecl>(D) &&
-      !cast<clang::VarDecl>(D)->getType().isConstQualified()) {
+  if (const auto *Var = dyn_cast<clang::VarDecl>(D);
+      Var && !Var->getType().isConstQualified()) {
     S = AccessorDecl::createImplicit(Ctx, AccessorKind::Set, V, false, false,
                                      TypeLoc(), Ctx.TheEmptyTupleType, DC);
     S->setAccess(swift::AccessLevel::Public);
@@ -469,14 +493,11 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                AbstractFunctionDecl::BodyKind::TypeChecked);
   }
 
-  /* Bind */
-  V->setImplInfo(S ? StorageImplInfo::getMutableComputed()
-                   : StorageImplInfo::getImmutableComputed());
-  V->setAccessors(SourceLoc(), S ? ArrayRef{G,S} : ArrayRef{G}, SourceLoc());
+  ClangImporter::Implementation::makeComputed(V, G, S);
 
   return V;
 }
-}
+} // namespace
 
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               llvm::SmallSet<StringRef, 4> &visitedMacros,
@@ -621,7 +642,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       clang::LookupResult R(S, {{tok.getIdentifierInfo()}, {}},
                             clang::Sema::LookupAnyName);
       if (S.LookupName(R, S.TUScope))
-        if (R.getResultKind() == clang::LookupResult::LookupResultKind::Found)
+        if (R.getResultKind() == clang::LookupResultKind::Found)
           if (const auto *VD = dyn_cast<clang::ValueDecl>(R.getFoundDecl()))
             return importDeclAlias(impl, DC, VD, name);
     }
@@ -928,7 +949,8 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   // result.
 
   DeclContext *DC;
-  if (const clang::Module *module = getClangOwningModule(macroNode)) {
+  if (const clang::Module *module =
+          importer::getClangOwningModule(macroNode, getClangASTContext())) {
     // Get the parent module because currently we don't model Clang submodules
     // in Swift.
     DC = getWrapperForModule(module->getTopLevelModule());

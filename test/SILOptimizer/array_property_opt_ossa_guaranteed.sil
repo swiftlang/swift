@@ -92,6 +92,8 @@ bb1:
 
 bb2:
   fix_lifetime %11
+  end_borrow %11
+  destroy_value [dead_end] %10
   unreachable
 
 bb3:

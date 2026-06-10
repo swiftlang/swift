@@ -21,16 +21,16 @@ public class Base<In, Out> {
 // CHECK-NEXT: public init<A>(_ a1: A, _ a2: A)
   public init<A>(_ a1: A, _ a2: A) {}
 
-// CHECK-NEXT: public init<C>(_: C) where C : main.Base<In, Out>
+// CHECK-NEXT: public init<C>(_: C) where C : main::Base<In, Out>
   public init<C>(_: C) where C : Base<In, Out> {}
 // CHECK: }
 }
 
-// CHECK: public class Derived<T> : {{(main.)?}}Base<T, T> {
+// CHECK: public class Derived<T> : {{(main::)?}}Base<T, T> {
 public class Derived<T> : Base<T, T> {
 // CHECK-NEXT: override public init(x: @escaping (T) -> T)
 // CHECK-NEXT: override public init<A>(_ a1: A, _ a2: A)
-// CHECK-NEXT: override public init<C>(_ __argument1: C) where C : main.Base<T, T>
+// CHECK-NEXT: override public init<C>(_ __argument1: C) where C : main::Base<T, T>
 // CHECK-NEXT: {{(@objc )?}}deinit
 // CHECK-NEXT: }
 }

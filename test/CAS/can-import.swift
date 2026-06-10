@@ -30,12 +30,31 @@
 // CMD-NEXT: "0"
 // CMD-NEXT: "1000.0.0"
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   %t/main.swift @%t/MyApp.cmd
+
+/// Check that a single canImport check eval to false is behaving correctly.
+// RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache -O \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
+// RUN:   %t/single.swift -o %t/deps2.json -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/include -F %t/frameworks
+
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps2.json -o %t/Test.cmd
+// RUN: %FileCheck %s --check-prefix=SINGLE --input-file=%t/Test.cmd
+// SINGLE:      "-module-can-import-version"
+// SINGLE-NEXT: "Simple"
+// SINGLE-NEXT: "0"
+// SINGLE-NEXT: "1000.0.0"
+
+// RUN: %target-swift-frontend-plain \
+// RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
+// RUN:   -swift-version 5 \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
+// RUN:   -module-name Test \
+// RUN:   %t/single.swift @%t/Test.cmd
 
 //--- main.swift
 #if canImport(A.Sub)
@@ -84,6 +103,13 @@ func useA() {
   simple()
 }
 
+//--- single.swift
+import Simple
+
+#if canImport(Simple, _underlyingVersion: 3000)
+#error("wrong version")
+#endif
+
 //--- include/module.modulemap
 module A {
   module Sub {
@@ -116,6 +142,7 @@ public func d() { }
 //--- include/Simple.swiftinterface
 // swift-interface-format-version: 1.0
 // swift-module-flags: -module-name Simple -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib
+@_exported import Simple
 public func simple() { }
 
 //--- frameworks/Simple.framework/Modules/module.modulemap

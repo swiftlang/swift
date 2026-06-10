@@ -10,7 +10,6 @@ target_sources(swiftSILOptimizer PRIVATE
   PhiStorageOptimizer.cpp
   ConstantPropagation.cpp
   DiagnoseUnnecessaryPreconcurrencyImports.cpp
-  DebugInfoCanonicalizer.cpp
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
@@ -50,6 +49,7 @@ target_sources(swiftSILOptimizer PRIVATE
   YieldOnceCheck.cpp
   OSLogOptimization.cpp
   MoveOnlyWrappedTypeEliminator.cpp
+  MarkNeverWrittenMutableClosureBoxesAsImmutable.cpp
   RegionAnalysisInvalidationTransform.cpp
   DiagnosticDeadFunctionElimination.cpp
   OwnershipModelEliminator.cpp)

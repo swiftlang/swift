@@ -28,4 +28,46 @@ using ImplBox2 = Box<Impl>;
 
 } // namespace Space
 
+namespace NS1 {
+template <typename T>
+struct Box {};
+using BoxInt = Box<int>;
+} // namespace NS1
+
+namespace NS2 {
+template <typename T>
+struct Box {};
+using BoxInt = Box<int>;
+} // namespace NS2
+
+namespace A {
+namespace B {
+namespace C1 {
+
+template <typename T>
+struct Box {};
+using BoxInt = Box<int>;
+using BoxOfBoxInt = Box<Box<int>>;
+using BoxOfBoxC1 = Box<Box<int>>;
+
+} // namespace C1
+
+namespace C2 {
+
+template <typename T>
+struct Box {};
+using BoxInt = Box<int>;
+
+} // namespace C2
+
+template <typename T>
+struct Box {};
+using BoxInt = Box<int>;
+using BoxOfBoxInt = Box<Box<int>>;
+using BoxOfBoxC1 = Box<C1::Box<int>>;
+using BoxOfBoxC2 = Box<C2::Box<int>>;
+
+} // namespace B
+} // namespace A
+
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_IN_NAMESPACE_H

@@ -2,10 +2,16 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_ReferenceBindings
+// UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
 
 defer { runAllTests() }
+
+@inline(never)
+func useit(s: inout String) {
+  _blackHole(s)
+}
 
 var tests = TestSuite("reference bindings")
 
@@ -27,6 +33,7 @@ tests.test("multiple global access exclusivity error")
     @inline(never)
     func test(_ x: inout String) {
       inout x = global
+      useit(s: &x)
     }
     test(&global)
   }

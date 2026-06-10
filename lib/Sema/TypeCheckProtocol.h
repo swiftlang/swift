@@ -170,15 +170,28 @@ public:
   void resolveSingleWitness(ValueDecl *requirement);
 };
 
+/// The types that should be used when matching a witness and a requirement.
+struct MatchWitnessTypes {
+  /// The interface type of the requirement.
+  Type requirement;
+  /// The interface type of the witness.
+  Type witness;
+  /// The type the requirement throws.
+  Type requirementThrows;
+  /// The type the witness throws.
+  Type witnessThrows;
+};
+
 /// Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
 RequirementMatch matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-    llvm::function_ref<
-        std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type>(void)>
-        setup,
+    llvm::function_ref<MatchWitnessTypes(void)> setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
+    llvm::function_ref<std::optional<RequirementMatch>(
+        const LifetimeDependentInterface &, const LifetimeDependentInterface &)>
+        matchLifetimes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
         finalize);
 

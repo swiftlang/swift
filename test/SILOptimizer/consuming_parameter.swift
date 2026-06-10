@@ -4,11 +4,11 @@
 
 // CHECK-LABEL: sil [ossa] @async_dead_arg_call : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @noImplicitCopy @_eagerMove @owned
-// CHECK:         destroy_value [[INSTANCE]]
-// CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt 
+// CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<any Actor>, #Optional.none!enumelt 
 // CHECK:         [[CALLEE:%[^,]+]] = function_ref @async_callee
 // CHECK:         apply [[CALLEE]]()
 // CHECK:         hop_to_executor [[EXECUTOR]]
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'async_dead_arg_call'
 @_silgen_name("async_dead_arg_call")
 public func async_dead_arg_call(o: consuming AnyObject) async {
@@ -18,7 +18,7 @@ public func async_dead_arg_call(o: consuming AnyObject) async {
  
 // CHECK-LABEL: sil [ossa] @async_dead_arg_call_lexical : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @noImplicitCopy @_lexical @owned
-// CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt 
+// CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<any Actor>, #Optional.none!enumelt 
 // CHECK:         [[CALLEE:%[^,]+]] = function_ref @async_callee
 // CHECK:         apply [[CALLEE]]()
 // CHECK:         hop_to_executor [[EXECUTOR]]
@@ -46,11 +46,11 @@ extension C {
 public class C {
   // CHECK-LABEL: sil [ossa] @async_dead_arg_call_method : {{.*}} {
   // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @noImplicitCopy @_eagerMove @owned
-  // CHECK:         destroy_value [[INSTANCE]]
-  // CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt 
+  // CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<any Actor>, #Optional.none!enumelt 
   // CHECK:         [[CALLEE:%[^,]+]] = function_ref @async_callee : $@convention(thin) @async () -> () 
   // CHECK:         apply [[CALLEE]]() : $@convention(thin) @async () -> () 
   // CHECK:         hop_to_executor [[EXECUTOR]]
+  // CHECK:         destroy_value [[INSTANCE]]
   // CHECK-LABEL: } // end sil function 'async_dead_arg_call_method'
   @_silgen_name("async_dead_arg_call_method")
   consuming

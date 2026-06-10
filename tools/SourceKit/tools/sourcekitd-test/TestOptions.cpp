@@ -35,13 +35,13 @@ enum Opt {
 #undef OPTION
 };
 
-// Create prefix string literals used in Options.td.
-#define PREFIX(NAME, VALUE)                                                    \
-  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
-  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
-      NAME##_init, std::size(NAME##_init) - 1);
+#define OPTTABLE_STR_TABLE_CODE
 #include "Options.inc"
-#undef PREFIX
+#undef OPTTABLE_STR_TABLE_CODE
+
+#define OPTTABLE_PREFIXES_TABLE_CODE
+#include "Options.inc"
+#undef OPTTABLE_PREFIXES_TABLE_CODE
 
 // Create table mapping all options defined in Options.td.
 static const llvm::opt::OptTable::Info InfoTable[] = {
@@ -53,7 +53,8 @@ static const llvm::opt::OptTable::Info InfoTable[] = {
 // Create OptTable class for parsing actual command line arguments
 class TestOptTable : public llvm::opt::GenericOptTable {
 public:
-  TestOptTable() : GenericOptTable(InfoTable) {}
+  TestOptTable()
+      : GenericOptTable(OptionStrTable, OptionPrefixesTable, InfoTable) {}
 };
 
 } // end anonymous namespace
@@ -154,6 +155,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("compile.close", SourceKitRequest::CompileClose)
         .Case("syntactic-expandmacro", SourceKitRequest::SyntacticMacroExpansion)
         .Case("index-to-store", SourceKitRequest::IndexToStore)
+        .Case("polyglot-ast", SourceKitRequest::PolyglotAST)
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) .Case("refactoring." #ID, SourceKitRequest::KIND)
 #include "swift/Refactoring/RefactoringKinds.def"
         .Default(SourceKitRequest::None);

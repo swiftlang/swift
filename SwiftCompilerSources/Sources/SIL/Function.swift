@@ -26,6 +26,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return Location(bridged: bridged.getLocation())
   }
 
+  public var declRef: DeclRef { DeclRef(bridged: bridged.getDeclRef()) }
+
+  public var sourceFile: SourceFile? { declRef.sourceFile }
+
   final public var description: String {
     return String(taking: bridged.getDebugDescription())
   }
@@ -51,6 +55,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
 
   public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
+
+  public var isAddressor: Bool { bridged.isAddressor() }
 
   public var specializationLevel: Int { bridged.specializationLevel() }
 
@@ -84,8 +90,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     SubstitutionMap(bridged: bridged.getForwardingSubstitutionMap())
   }
 
-  public func mapTypeIntoContext(_ type: AST.`Type`) -> AST.`Type` {
-    return AST.`Type`(bridged: bridged.mapTypeIntoContext(type.bridged))
+  public func mapTypeIntoEnvironment(_ type: AST.`Type`) -> AST.`Type` {
+    return AST.`Type`(bridged: bridged.mapTypeIntoEnvironment(type.bridged))
+  }
+
+  public func mapTypeIntoEnvironment(_ type: Type) -> Type {
+    return Type(bridged: bridged.mapTypeIntoEnvironment(type.bridged))
   }
 
   /// Returns true if the function is a definition and not only an external declaration.
@@ -119,9 +129,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
   }
   
-  public var returnInstruction: ReturnInst? {
+  public var returnInstruction: ReturnInstruction? {
     for block in blocks.reversed() {
-      if let retInst = block.terminator as? ReturnInst { return retInst }
+      if let retInst = block.terminator as? ReturnInstruction { return retInst }
     }
     return nil
   }
@@ -145,6 +155,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// Such a function allocates a global and stores the global's init value.
   /// It's called from a `[global_init]` function via a `builtin "once"`.
   public var isGlobalInitOnceFunction: Bool { bridged.isGlobalInitOnceFunction() }
+
+  public var isLazyPropertyGetter: Bool { bridged.isLazyPropertyGetter() }
 
   public var isDestructor: Bool { bridged.isDestructor() }
 
@@ -171,6 +183,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       bridged.hasSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
     }
   }
+
   public var isSerialized: Bool {
     switch serializedKind {
     case .notSerialized, .serializedForPackage:
@@ -265,6 +278,18 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       return nil
     }
     return StringRef(bridged: bridged.getAccessorName()).string
+  }
+
+  public var isInitializer: Bool {
+    return bridged.isInitializer()
+  }
+
+  public var isDeinitializer: Bool {
+    return bridged.isDeinitializer()
+  }
+
+  public var isImplicit: Bool {
+    return bridged.isImplicit()
   }
 
   /// True, if the function runs with a swift 5.1 runtime.

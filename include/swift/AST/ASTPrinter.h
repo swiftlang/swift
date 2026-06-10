@@ -238,6 +238,9 @@ public:
   ASTPrinter &operator<<(QuotedString s);
 
   ASTPrinter &operator<<(unsigned long long N);
+
+  static void getUUIDStringForPrinting(UUID uuid, llvm::SmallVectorImpl<char> &out);
+
   ASTPrinter &operator<<(UUID UU);
 
   ASTPrinter &operator<<(Identifier name);
@@ -365,19 +368,23 @@ public:
     return printedClangDecl.insert(d).second;
   }
 
+  /// Print a lifetime dependence annotation.
+  ///
+  /// When \p params is provided, Swift-style formatting is used (labels,
+  /// target, '&' for inout). When \p params is \c std::nullopt, SIL-style
+  /// formatting is used (indices only, no target).
   void printLifetimeDependence(
-      std::optional<LifetimeDependenceInfo> lifetimeDependence) {
-    if (!lifetimeDependence.has_value()) {
-      return;
-    }
-    *this << lifetimeDependence->getString();
-  }
+      LifetimeDependenceInfo const &info,
+      std::optional<ArrayRef<AnyFunctionType::Param>> params,
+      const PrintOptions &options);
 
   void printLifetimeDependenceAt(
-      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies, unsigned index) {
+      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies, unsigned index,
+      std::optional<ArrayRef<AnyFunctionType::Param>> params,
+      const PrintOptions &options) {
     if (auto lifetimeDependence =
             getLifetimeDependenceFor(lifetimeDependencies, index)) {
-      printLifetimeDependence(*lifetimeDependence);
+      printLifetimeDependence(*lifetimeDependence, params, options);
     }
   }
 
@@ -450,6 +457,18 @@ void printWithCompatibilityFeatureChecks(ASTPrinter &printer,
 /// context, by wrapping it in backticks.
 bool escapeIdentifierInContext(Identifier name, PrintNameContext context,
                                bool isSpecializedCxxType = false);
+
+/// Escape a raw identifier (keyword or containing spaces/special characters)
+/// using backticks if needed, and write it to the output stream.
+void printIdentifierEscapingIfNeeded(
+    StringRef identifier, llvm::raw_ostream &os,
+    PrintNameContext context = PrintNameContext::Normal);
+
+/// Escape a raw identifier (keyword or containing spaces/special characters)
+/// using backticks if needed, and return it as a string.
+std::string
+identifierEscapingIfNeeded(StringRef identifier,
+                           PrintNameContext context = PrintNameContext::Normal);
 
 } // namespace swift
 

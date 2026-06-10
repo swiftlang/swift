@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -disable-objc-interop
 
 // Test that we get a custom diagnostic for an ephemeral conversion to non-ephemeral param for an Unsafe[Mutable][Raw][Buffer]Pointer init.
 func unsafePointerInitEphemeralConversions() {

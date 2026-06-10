@@ -404,7 +404,7 @@ private extension Value {
       case is LoadInst:
         return true
       case is StructInst, is TupleInst:
-        worklist.pushIfNotVisited(contentsOf: (v as! Instruction).operands.lazy.map { $0.value })
+        worklist.pushIfNotVisited(contentsOf: (v as! Instruction).operands.values)
       case let ei as EnumInst:
         if let payload = ei.payload {
           worklist.pushIfNotVisited(payload)
@@ -478,7 +478,7 @@ private struct InitValueBuilder: AddressDefUseWalker {
       case .PrepareInitialization:
         return .continueWalk
       case .AddressOfRawLayout:
-        if let addr2Ptr = bi.uses.getSingleUser(ofType: PointerToAddressInst.self) {
+        if let addr2Ptr = bi.uses.singleUser(ofType: PointerToAddressInst.self) {
           return walkDownUses(ofAddress: addr2Ptr, path: path)
         }
         return .abortWalk

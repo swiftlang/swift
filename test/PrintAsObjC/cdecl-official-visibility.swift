@@ -4,21 +4,17 @@
 /// Generate cdecl.h for an app
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   %t/Lib.swift -emit-module -verify -o %t -emit-module-doc \
-// RUN:   -emit-clang-header-path %t/cdecl.h -package-name pkg \
-// RUN:   -enable-experimental-feature CDecl
+// RUN:   -emit-clang-header-path %t/cdecl.h -package-name pkg
 // RUN: %FileCheck %s --input-file %t/cdecl.h --check-prefixes PUBLIC-AND-INTERNAL,INTERNAL-ONLY
 // RUN: %check-in-clang-c %t/cdecl.h
 
 /// Generate cdecl.h for a library
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library \
 // RUN:   %t/Lib.swift -emit-module -verify -o %t -emit-module-doc \
-// RUN:   -emit-clang-header-path %t/cdecl.h -package-name pkg \
-// RUN:   -enable-experimental-feature CDecl
+// RUN:   -emit-clang-header-path %t/cdecl.h -package-name pkg
 // RUN: %FileCheck %s --input-file %t/cdecl.h --check-prefixes PUBLIC-AND-INTERNAL
 // RUN: %FileCheck %s --input-file %t/cdecl.h --implicit-check-not INTERNAL-ONLY
 // RUN: %check-in-clang-c %t/cdecl.h
-
-// REQUIRES: swift_feature_CDecl
 
 //--- Lib.swift
 

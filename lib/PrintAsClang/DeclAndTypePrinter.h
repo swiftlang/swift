@@ -15,11 +15,14 @@
 
 #include "OutputLanguageMode.h"
 
+#include "PrintClangFunction.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 // for OptionalTypeKind
+#include "swift/AST/TypeRepr.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSet.h"
 
 namespace clang {
@@ -36,15 +39,26 @@ class SwiftToClangInteropContext;
 /// Tracks which C++ declarations have been emitted in a lexical
 /// C++ scope.
 struct CxxDeclEmissionScope {
+  /// Records information about an emitted C++ function overload.
+  struct EmittedFunctionOverload {
+    const AbstractFunctionDecl *funcDecl;
+    /// The C++ parameter types as they appear in the C++ inline thunk
+    /// signature, used to detect genuinely ambiguous overloads.
+    llvm::SmallVector<std::string, 4> cxxParamTypes;
+  };
+
   /// Additional Swift declarations that are unrepresentable in C++.
-  std::vector<const ValueDecl *> additionalUnrepresentableDeclarations;
+  /// The string holds a reason why the declaration is unrepresentable;
+  /// empty string means the reason should be acqured from
+  /// 'getDeclRepresentation'.
+  llvm::MapVector<const ValueDecl *, std::string>
+      additionalUnrepresentableDeclarations;
   /// Records the C++ declaration names already emitted in this lexical scope.
   llvm::StringSet<> emittedDeclarationNames;
   /// Records the names of the function overloads already emitted in this
   /// lexical scope.
-  llvm::StringMap<llvm::SmallVector<const AbstractFunctionDecl *, 2>>
+  llvm::StringMap<llvm::SmallVector<EmittedFunctionOverload, 2>>
       emittedFunctionOverloads;
-  llvm::StringMap<const AccessorDecl *> emittedAccessorMethodNames;
 };
 
 /// Responsible for printing a Swift Decl or Type in Objective-C, to be
@@ -56,6 +70,7 @@ public:
 private:
   class Implementation;
   friend class Implementation;
+  friend class DeclAndTypeClangFunctionPrinter;
 
   ModuleDecl &M;
   raw_ostream &os;
@@ -69,6 +84,7 @@ private:
   bool requiresExposedAttribute;
   llvm::StringSet<> &exposedModules;
   OutputLanguageMode outputLang;
+  llvm::DenseMap<Type, std::optional<ClangRepresentation>> typeRepresentations;
 
   /// The name 'CFTypeRef'.
   ///

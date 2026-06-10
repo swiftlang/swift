@@ -163,6 +163,12 @@ def main():
     parser.add_argument("--update-tests", action="store_true",
                         help="Invoke lit with --update-tests to auto-repair failing tests "
                              "(when possible)")
+    parser.add_argument("--lit-args",
+                        type=argparse.types.ShellSplitType(),
+                        action=argparse.actions.AppendAction,
+                        default=[],
+                        help="direct passthrough options for lit, for options not directly "
+                             "supported by run-test")
 
     args = parser.parse_args()
 
@@ -285,6 +291,8 @@ def main():
 
     if args.update_tests:
         test_args.append('--update-tests')
+
+    test_args += args.lit_args
 
     test_cmd = [sys.executable, args.lit] + test_args + paths
 

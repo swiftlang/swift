@@ -89,6 +89,58 @@ extension CodingKey {
   public var debugDescription: String {
     return description
   }
+
+  /// A simplified description: the int value, if present, in square brackets.
+  /// Otherwise, the string value by itself. Used when concatenating coding keys
+  /// to form a path when printing debug information.
+  /// - parameter isFirst: Whether this is the first key in a coding path, in
+  ///   which case we will omit the prepended '.' delimiter from string keys.
+  fileprivate func _errorPresentationDescription(isFirstInCodingPath isFirst: Bool = true) -> String {
+    if let intValue {
+      return "[\(intValue)]"
+    } else {
+      let delimiter = isFirst ? "" : "."
+      return "\(delimiter)\(stringValue._escapedForCodingKeyErrorPresentationDescription)"
+    }
+  }
+}
+
+extension [any CodingKey] {
+  /// Concatenates the elements of an array of coding keys and joins them with
+  /// "/" separators to make them read like a path.
+  fileprivate func _errorPresentationDescription() -> String {
+    return (
+      self.prefix(1).map { $0._errorPresentationDescription(isFirstInCodingPath: true) }
+      + self.dropFirst(1).map { $0._errorPresentationDescription(isFirstInCodingPath: false) }
+    ).joined(separator: "")
+  }
+}
+
+extension String {
+  /// When printing coding paths, delimit string keys with a '.' (period). If
+  /// the key contains a period, escape it with backticks so that it can be
+  /// distinguished from the delimiter. Also escape backslashes and backticks
+  /// (but *not* periods) to avoid confusion with delimiters.
+  internal var _escapedForCodingKeyErrorPresentationDescription: String {
+    let charactersThatNeedBackticks: Set<Character> = [".", "`", "\\"]
+    let charactersThatNeedEscaping: Set<Character> = ["`", "\\"]
+    assert(
+      charactersThatNeedEscaping.isSubset(of: charactersThatNeedBackticks),
+      "Only some characters in backticks will require further escaping to disambiguate them from the backticks"
+    )
+
+    var escaped = self
+    var needsBackticks = false
+    for (character, index) in zip(self, indices).reversed() {
+      if charactersThatNeedBackticks.contains(character) {
+        needsBackticks = true
+        if charactersThatNeedEscaping.contains(character) {
+          escaped.insert("\\", at: index)
+        }
+      }
+    }
+    return needsBackticks ? "`\(escaped)`" : self
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -3721,6 +3773,94 @@ public enum DecodingError: Error {
     #else
       return nil
     #endif
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension EncodingError: CustomDebugStringConvertible {
+  /// A textual representation of this encoding error, intended for debugging.
+  ///
+  /// - Important: The contents of the returned string are not guaranteed to
+  ///    remain stable: they may arbitrarily change in any Swift release.
+  @available(SwiftStdlib 6.3, *)
+  public var debugDescription: String {
+    let (message, context) = switch self {
+      case .invalidValue(let value, let context):
+        (
+          "EncodingError.invalidValue: \(String(reflecting: value)) (\(type(of: value)))",
+          context
+        )
+    }
+
+    var output = message
+
+    let contextDebugDescription = context.debugDescription
+
+    if !context.codingPath.isEmpty {
+      output.append(". Path: \(context.codingPath._errorPresentationDescription())")
+    }
+
+    if !contextDebugDescription.isEmpty {
+      output.append(". Debug description: \(context.debugDescription)")
+    }
+
+    if let underlyingError = context.underlyingError {
+      output.append(". Underlying error: \(underlyingError)")
+    }
+
+    return output
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension DecodingError: CustomDebugStringConvertible {
+  /// A textual representation of this decoding error, intended for debugging.
+  ///
+  /// - Important: The contents of the returned string are not guaranteed to
+  ///    remain stable: they may arbitrarily change in any Swift release.
+  @available(SwiftStdlib 6.3, *)
+  public var debugDescription: String {
+    let (message, context) = switch self {
+      case .typeMismatch(let expectedType, let context):
+        ("DecodingError.typeMismatch: Expected value of type \(expectedType)", context)
+      case .valueNotFound(let expectedType, let context):
+        // Note: the value can be not-found for multiple reasons. Since we do
+        // not know the reason here, it is up to debug description that is 
+        // provided to the decoding context to provide more information.
+        // 
+        // The reasons that a value was not found may include:
+        // - Keyed decoding container: the value at the given key was null.
+        // - Unkeyed decoding container: we reached the end of the container
+        //   without finding the expected value.
+        //
+        // The doc comment for valueNotFound explicitly mentions that it
+        // is used when a null value is found where a non-optional value is
+        // expected. But in practice, for example in Foundation's JSONDecoder,
+        // it is also used in the unkeyed decoding container scenario mentioned
+        // above.
+        ("DecodingError.valueNotFound: Expected value of type \(expectedType)", context)
+      case .keyNotFound(let expectedKey, let context):
+        ("DecodingError.keyNotFound: Key '\(expectedKey._errorPresentationDescription())' not found in keyed decoding container", context)
+      case .dataCorrupted(let context):
+        ("DecodingError.dataCorrupted: Data was corrupted", context)
+    }
+
+    var output = message
+
+    if !context.codingPath.isEmpty {
+      output.append(". Path: \(context.codingPath._errorPresentationDescription())")
+    }
+
+    let contextDebugDescription = context.debugDescription
+    if !contextDebugDescription.isEmpty {
+      output.append(". Debug description: \(contextDebugDescription)")
+    }
+
+    if let underlyingError = context.underlyingError {
+      output.append(". Underlying error: \(underlyingError)")
+    }
+
+    return output
   }
 }
 

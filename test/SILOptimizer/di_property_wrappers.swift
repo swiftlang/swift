@@ -3,6 +3,10 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// RUN: %target-build-swift %s -Xfrontend -enable-sil-opaque-values -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s
+
 // REQUIRES: executable_test
 
 @propertyWrapper
@@ -147,6 +151,17 @@ final class GenericClass<T : IntInitializable> {
   }
 }
 
+struct TestDelegatingInitializer {
+  @Wrapper var x: Int? = nil
+
+  init() {}
+
+  // Just check that this compiles successfully
+  init(x: Int?) {
+    self.init()
+    self.x = x
+  }
+}
 
 func testIntStruct() {
   // CHECK: ## IntStruct

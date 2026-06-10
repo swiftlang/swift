@@ -1,7 +1,6 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature CDecl) > %t.out
+// RUN: %target-run-simple-swift > %t.out
 // RUN: %FileCheck --input-file %t.out %s
 
-// REQUIRES: swift_feature_CDecl
 // REQUIRES: executable_test
 
 @c

@@ -46,13 +46,21 @@ SWIFT_INLINE_THUNK String(const char *cString) noexcept {
     memcpy(_getOpaquePointer(), &res, sizeof(res));
     return;
   }
+#ifdef __EmbeddedSwift__
+  auto res = _impl::$eSS7cStringSSSPys4Int8VG_tcfC(cString);
+#else
   auto res = _impl::$sSS7cStringSSSPys4Int8VG_tcfC(cString);
+#endif
   memcpy(_getOpaquePointer(), &res, sizeof(res));
 }
 
 /// Constructs a Swift string from a C++ string.
 SWIFT_INLINE_THUNK String(const std::string &str) noexcept {
+#ifdef __EmbeddedSwift__
+  auto res = _impl::$eSS7cStringSSSPys4Int8VG_tcfC(str.c_str());
+#else
   auto res = _impl::$sSS7cStringSSSPys4Int8VG_tcfC(str.c_str());
+#endif
   memcpy(_getOpaquePointer(), &res, sizeof(res));
 }
 
@@ -171,8 +179,13 @@ struct SymbolicP {
 } __attribute__((packed));
 
 SWIFT_INLINE_THUNK const void *_Nullable getErrorMetadata() {
+// We do not care about these symbols being duplicated across multiple shared
+// libraries for now.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunique-object-duplication"
   static SymbolicP errorSymbol;
   static int *_Nonnull got_ss5ErrorMp = &$ss5ErrorMp;
+#pragma clang diagnostic pop
   errorSymbol._1 = 2;
   errorSymbol._2 =
       static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&got_ss5ErrorMp) -

@@ -62,6 +62,8 @@ struct NE<T : ~Escapable> : ~Escapable {
   init(_ t: borrowing T) {}
 }
 
+extension NE: Escapable where T: Escapable {}
+
 @_lifetime(copy t)
 func getNE<T : ~Escapable>(_ t: borrowing T) -> NE<T> {
   return NE(t)

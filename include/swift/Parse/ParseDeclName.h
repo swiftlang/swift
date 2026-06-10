@@ -13,20 +13,36 @@
 #ifndef SWIFT_PARSE_PARSEDECLNAME_H
 #define SWIFT_PARSE_PARSEDECLNAME_H
 
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Parse/Lexer.h"
 
+#include <string>
+
 namespace swift {
 
 /// Describes a parsed declaration name.
+///
+/// This type maintains the property that if any of the components is a raw
+/// identifier, it will be stored *without* surrounding backticks (for example,
+/// a basename of `has a space` will be stored as "has a space"), since this
+/// matches how they are stored when forming `Identifier` values.
 struct ParsedDeclName {
   /// The name of the context of which the corresponding entity should
-  /// become a member.
-  StringRef ContextName;
+  /// become a member, represented as a list of components.
+  SmallVector<StringRef, 2> ContextNames;
 
   /// The base name of the declaration.
   StringRef BaseName;
+
+  /// The kind of the base name.
+  DeclBaseName::Kind BaseNameKind = DeclBaseName::Kind::Normal;
+
+  /// Get the spelling of the base name, escaping it if it is a normal
+  /// identifier and needs escaping in the given context.
+  std::string
+  baseNameSpelling(PrintNameContext context = PrintNameContext::Normal) const;
 
   /// The argument labels for a function declaration.
   SmallVector<StringRef, 4> ArgumentLabels;
@@ -46,12 +62,16 @@ struct ParsedDeclName {
   /// instance member, the index of the "Self" parameter.
   std::optional<unsigned> SelfIndex;
 
+  /// Reconstruct the full dot-delimited context name as a string, placing
+  /// backticks around any components that require escaping.
+  std::string fullContextName() const;
+
   /// Determine whether this is a valid name.
   explicit operator bool() const { return !BaseName.empty(); }
 
   /// Whether this declaration name turns the declaration into a
   /// member of some named context.
-  bool isMember() const { return !ContextName.empty(); }
+  bool isMember() const { return !ContextNames.empty(); }
 
   /// Whether the result is translated into an instance member.
   bool isInstanceMember() const {
@@ -70,11 +90,11 @@ struct ParsedDeclName {
   bool isOperator() const { return Lexer::isOperator(BaseName); }
 
   /// Form a declaration name from this parsed declaration name.
-  DeclName formDeclName(ASTContext &ctx, bool isSubscript = false,
+  DeclName formDeclName(ASTContext &ctx,
                         bool isCxxClassTemplateSpec = false) const;
 
   /// Form a declaration name from this parsed declaration name.
-  DeclNameRef formDeclNameRef(ASTContext &ctx, bool isSubscript = false,
+  DeclNameRef formDeclNameRef(ASTContext &ctx,
                               bool isCxxClassTemplateSpec = false) const;
 };
 
@@ -85,14 +105,14 @@ ParsedDeclName parseDeclName(StringRef name) LLVM_READONLY;
 /// Form a Swift declaration name from its constituent parts.
 DeclName formDeclName(ASTContext &ctx, StringRef baseName,
                       ArrayRef<StringRef> argumentLabels, bool isFunctionName,
-                      bool isInitializer, bool isSubscript = false,
+                      DeclBaseName::Kind baseNameKind,
                       bool isCxxClassTemplateSpec = false);
 
 /// Form a Swift declaration name reference from its constituent parts.
 DeclNameRef formDeclNameRef(ASTContext &ctx, StringRef baseName,
                             ArrayRef<StringRef> argumentLabels,
-                            bool isFunctionName, bool isInitializer,
-                            bool isSubscript = false,
+                            bool isFunctionName,
+                            DeclBaseName::Kind baseNameKind,
                             bool isCxxClassTemplateSpec = false);
 
 } // namespace swift

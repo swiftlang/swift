@@ -52,6 +52,7 @@ import SubE
 
 /// --------Main module
 // CHECK-LABEL: "modulePath": "deps.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: sourceFiles
 // CHECK-NEXT: module_deps_include_tree.swift
 // CHECK-NEXT: ],
@@ -124,6 +125,7 @@ import SubE
 
 /// --------Swift module F
 // CHECK:      "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: "sourceFiles": [
 // CHECK-NEXT: ],
 // CHECK-NEXT: "directDependencies": [
@@ -152,7 +154,6 @@ import SubE
 // CHECK: "directDependencies"
 // CHECK-NEXT: {
 // CHECK-DAG:   "clang": "G"
-// CHECK-DAG:   "swift": "Swift"
 // CHECK-DAG:   "swift": "SwiftOnoneSupport"
 // CHECK: ],
 // CHECK-NEXT: "linkLibraries": [
@@ -165,7 +166,7 @@ import SubE
 // CHECK: "-cas-path"
 // CHECK: "-module-name"
 // CHECK: "G"
-// CHECK: "-swift-version"
+// CHECK: {{"-language-mode"|"-swift-version"}}
 // CHECK: "5"
 // CHECK: ],
 // CHECK: "contextHash": "{{.*}}",
@@ -173,10 +174,6 @@ import SubE
 /// --------Swift module E
 // CHECK: "swift": "E"
 // CHECK-LABEL: modulePath": "{{.*}}{{/|\\}}E-{{.*}}.swiftmodule"
-// CHECK: "directDependencies"
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "Swift"
-
 // CHECK: "moduleInterfacePath"
 // CHECK-SAME: E.swiftinterface
 

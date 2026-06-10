@@ -1,27 +1,29 @@
 // RUN: %empty-directory(%t)
 
-// RUN: COMPILER_ARGS=( \
-// RUN:   -define-availability '_iOS53Aligned:macOS 50.0, iOS 53.0' \
-// RUN:   -define-availability '_iOS54Aligned:macOS 51.0, iOS 54.0' \
-// RUN:   -define-availability '_iOS54:iOS 54.0' \
-// RUN:   -define-availability '_macOS51_0:macOS 51.0' \
-// RUN:   -define-availability '_myProject 1.0:macOS 51.0' \
-// RUN:   -define-availability '_myProject 2.5:macOS 52.5' \
-// RUN: )
+// DEFINE: %{availability} = \
+// DEFINE:   -define-availability '_iOS53Aligned:macOS 50.0, iOS 53.0' \
+// DEFINE:   -define-availability '_iOS54Aligned:macOS 51.0, iOS 54.0' \
+// DEFINE:   -define-availability '_iOS54:iOS 54.0' \
+// DEFINE:   -define-availability '_macOS51_0:macOS 51.0' \
+// DEFINE:   -define-availability '_myProject 1.0:macOS 51.0' \
+// DEFINE:   -define-availability '_myProject 2.5:macOS 52.5' \
+// DEFINE:   -define-availability "_emptyMacro:*"
 
-// RUN: %target-swift-frontend-dump-parse "${COMPILER_ARGS[@]}" \
+// RUN: %target-swift-frontend-dump-parse \
+// RUN:   %{availability} \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   | %sanitize-address > %t/astgen.ast
 
-// RUN: %target-swift-frontend-dump-parse "${COMPILER_ARGS[@]}" \
+// RUN: %target-swift-frontend-dump-parse \
+// RUN:   %{availability} \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-typecheck-verify-swift "${COMPILER_ARGS[@]}" \
+// RUN: %target-typecheck-verify-swift \
+// RUN:   %{availability} \
 // RUN:   -enable-experimental-feature ParserASTGen
 
-// REQUIRES: shell
 // REQUIRES: swift_feature_ParserASTGen
 
 @available(swift 4)
@@ -41,6 +43,9 @@ func testMacroNameOnly() {}
 
 @available(_myProject 2.5, *)
 func testMacroWithVersion() {}
+
+@available(_emptyMacro, *)
+func testEmptyMacro() {}
 
 @_specialize(exported: true, availability: _iOS54Aligned, *; where T == Int)
 func testSpecialize<T>(arg: T) -> T {}
@@ -66,4 +71,19 @@ func testPoundIf() {
 public class ClassWithMembers {
   @_spi_available(macOS 10.15, *)
   public func spiFunc() {}
+}
+
+@available(*, unavailable, renamed: "`class`")
+func keyword_renamed() {} // expected-note {{'keyword_renamed()' has been explicitly marked unavailable here}}
+
+@available(*, unavailable, renamed: "`foo bar`")
+func spaces_renamed() {} // expected-note {{'spaces_renamed()' has been explicitly marked unavailable here}}
+
+@available(*, unavailable, renamed: "foo(`3bar baz`:)")
+func keywords_in_arguments(x: Int) {} // expected-note {{'keywords_in_arguments(x:)' has been explicitly marked unavailable here}}
+
+func testEscapedRenamed() {
+  keyword_renamed() // expected-error {{'keyword_renamed()' has been renamed to '`class`'}}
+  spaces_renamed() // expected-error {{'spaces_renamed()' has been renamed to '`foo bar`'}}
+  keywords_in_arguments(x: 0) // expected-error {{'keywords_in_arguments(x:)' has been renamed to 'foo(`3bar baz`:)'}}
 }

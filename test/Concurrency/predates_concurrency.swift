@@ -220,6 +220,11 @@ nonisolated func blah() {
   // expected-warning@-1 {{call to main actor-isolated static method 'predatesConcurrency()' in a synchronous nonisolated context}}
 }
 
+@concurrent func bleh() async {
+  InferMainActorPreconcurrency.predatesConcurrency()
+  // expected-warning@-1 {{main actor-isolated static method 'predatesConcurrency()' cannot be called from outside of the actor; this is an error in the Swift 6 language mode}}
+}
+
 protocol NotIsolated {
   func requirement()
 }
@@ -227,11 +232,11 @@ protocol NotIsolated {
 // expected-complete-warning@+1{{conformance of 'MainActorPreconcurrency' to protocol 'NotIsolated' crosses into main actor-isolated code and can cause data races}}
 extension MainActorPreconcurrency: NotIsolated {
   // expected-complete-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{36-36=@preconcurrency }}
-  // expected-complete-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
-  // expected-complete-note@-3{{isolate this conformance to the main actor with '@MainActor'}}
+  // expected-complete-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
   func requirement() {}
   // expected-complete-note@-1 {{main actor-isolated instance method 'requirement()' cannot satisfy nonisolated requirement}}
-  // expected-complete-note@-2 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-note@-2 {{mark instance method 'requirement()' 'nonisolated'}}{{3-3=nonisolated }}
+  // expected-complete-note@-3 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
 
 
   class Nested {

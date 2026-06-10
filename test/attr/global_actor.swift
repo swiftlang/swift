@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking -package-name myPkg
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s  -disable-availability-checking -package-name myPkg
 // REQUIRES: concurrency
 
 actor SomeActor { }
@@ -62,7 +62,7 @@ struct OtherGlobalActor {
 }
 
 @GA1 func f() {
-  @GA1 let x = 17 // expected-error{{local variable 'x' cannot have a global actor}}
+  @GA1 let x = 17 // expected-error@:3{{local variable 'x' cannot have a global actor}} {{3-8=}}
   _ = x
 }
 
@@ -83,15 +83,17 @@ class SomeClass {
   @GA1 deinit { }
 }
 
-@GA1 typealias Integer = Int // expected-error{{type alias cannot have a global actor}}
+@GA1 typealias Integer = Int // expected-error@:1{{type alias cannot have a global actor}} {{1-6=}}
 
-@GA1 actor ActorInTooManyPlaces { } // expected-error{{actor 'ActorInTooManyPlaces' cannot have a global actor}}
+@GA1 actor ActorInTooManyPlaces { } // expected-error@:1{{actor 'ActorInTooManyPlaces' cannot have a global actor}} {{1-6=}}
 
 @GA1 @OtherGlobalActor func twoGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('OtherGlobalActor' and 'GA1')}}
+// expected-note@-1{{'GA1' attribute previously declared here}}
 
 struct Container {
   // FIXME: Diagnostic could be improved to show the generic arguments.
 @GenericGlobalActor<Int> @GenericGlobalActor<String> func twoGenericGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('GenericGlobalActor' and 'GenericGlobalActor')}}
+// expected-note@-1{{'GenericGlobalActor' attribute previously declared here}}
 }
 
 // -----------------------------------------------------------------------
@@ -156,7 +158,7 @@ do {
     var test1: Int {
       get { 42 }
       @GA1
-      set { } // expected-warning {{setter cannot have a global actor}} {{-1:7-11=}}
+      set { } // expected-warning {{setter cannot have a global actor}} {{-1:1-+0:1=}}
       // expected-note@-1 {{move global actor attribute to property 'test1'}} {{-3:5-5=@GA1}}
 
       @GA1 _modify { fatalError() } // expected-warning {{_modify accessor cannot have a global actor}} {{7-12=}}
@@ -182,7 +184,7 @@ do {
     var test1: Int {
       get { 42 }
       @GA1
-      set { } // expected-warning {{setter cannot have a global actor}} {{-1:7-11=}}
+      set { } // expected-warning {{setter cannot have a global actor}} {{-1:1-+0:1=}}
       // expected-note@-1 {{move global actor attribute to property 'test1'}} {{-3:5-5=@GA1}}
       @GA1 _modify { fatalError() } // expected-warning {{_modify accessor cannot have a global actor}} {{7-12=}}
       // expected-note@-1 {{move global actor attribute to property 'test1'}} {{-5:5-5=@GA1}}

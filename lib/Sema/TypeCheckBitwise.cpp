@@ -247,7 +247,7 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
     return true;
   }
 
-  if (dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())
+  if (dc->mapTypeIntoEnvironment(nominal->getDeclaredInterfaceType())
           ->isNoncopyable()) {
     // Already separately diagnosed when explicit.
     return true;
@@ -349,6 +349,7 @@ bool DeriveImplicitBitwiseCopyableConformance::allowedForFile() {
     case SourceFileKind::DefaultArgument:
     case SourceFileKind::Main:
     case SourceFileKind::SIL:
+    case SourceFileKind::SyntheticMacro:
       return true;
     }
     llvm_unreachable("covered switch");

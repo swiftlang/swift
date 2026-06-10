@@ -27,10 +27,16 @@ public:
   /// for the eventual deserialization of a function body.
   SILFunction *createDeclaration(StringRef name, SILType type,
                                  SILLocation loc) {
+    auto isolation = ActorIsolation::forUnspecified();
+    // FIXME: We should be serializing isolation associated with a `SILFunction`
+    // but for now we can get it from `SILFunctionType` which is precise enough.
+    if (type.isNonIsolatedCallerFunction())
+      isolation = ActorIsolation::forNonisolatedNonsending();
+
     return builder.createFunction(
-        SILLinkage::Private, name, type.getAs<SILFunctionType>(), nullptr,
-        loc, IsNotBare, IsNotTransparent,
-        IsNotSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
+        SILLinkage::Private, name, type.getAs<SILFunctionType>(), isolation,
+        nullptr, loc, IsNotBare, IsNotTransparent, IsNotSerialized,
+        IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
         ProfileCounter(), IsNotThunk, SubclassScope::NotApplicable);
   }
 

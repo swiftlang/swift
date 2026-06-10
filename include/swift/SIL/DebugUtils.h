@@ -63,6 +63,27 @@ inline void deleteAllDebugUses(SILInstruction *inst) {
   }
 }
 
+/// Drops all of the debug uses of \p value.
+/// Unlike deleteAllDebugUses, this preserves the debug_value instruction
+/// but replaces its operand with undef and strips non-fragment DIExpr parts.
+/// Use this when salvage has NOT already created a replacement debug_value.
+inline void killAllDebugUses(SILValue value) {
+  SmallVector<DebugValueInst *, 4> debugUsers;
+  for (auto *use : value->getUses()) {
+    if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
+      debugUsers.push_back(dvi);
+  }
+  for (auto *dvi : debugUsers)
+    dvi->killOperand();
+}
+
+/// Drops all of the debug uses of any result of \p inst.
+inline void killAllDebugUses(SILInstruction *inst) {
+  for (SILValue v : inst->getResults()) {
+    killAllDebugUses(v);
+  }
+}
+
 /// This iterator filters out any debug (or non-debug) instructions from a range
 /// of uses, provided by the underlying ValueBaseUseIterator.
 /// If \p nonDebugInsts is true, then the iterator provides a view to all non-
@@ -202,45 +223,6 @@ inline Operand *getAnyDebugUse(SILValue value) {
   if (ii == ie)
     return nullptr;
   return *ii;
-}
-
-/// Erases the instruction \p I from it's parent block and deletes it, including
-/// all debug instructions which use \p I.
-/// Precondition: The instruction may only have debug instructions as uses.
-/// If the iterator \p InstIter references any deleted instruction, it is
-/// incremented.
-///
-/// \p callBack will be invoked before each instruction is deleted. \p callBack
-/// is not responsible for deleting the instruction because this utility
-/// unconditionally deletes the \p I and its debug users.
-///
-/// Returns an iterator to the next non-deleted instruction after \p I.
-inline SILBasicBlock::iterator eraseFromParentWithDebugInsts(
-    SILInstruction *I, llvm::function_ref<void(SILInstruction *)> callBack =
-                           [](SILInstruction *) {}) {
-
-  auto nextII = std::next(I->getIterator());
-
-  auto results = I->getResults();
-
-  bool foundAny;
-  do {
-    foundAny = false;
-    for (auto result : results) {
-      while (!result->use_empty()) {
-        foundAny = true;
-        auto *User = result->use_begin()->getUser();
-        assert(User->isDebugInstruction());
-        if (nextII == User->getIterator())
-          nextII++;
-        callBack(User);
-        User->eraseFromParent();
-      }
-    }
-  } while (foundAny);
-
-  I->eraseFromParent();
-  return nextII;
 }
 
 /// Return true if the def-use graph rooted at \p V contains any non-debug,
@@ -459,6 +441,23 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     llvm_unreachable("covered switch");
   }
 
+  /// Like getVarInfo, but always includes the variable type.
+  /// For DebugValueInst, delegates to its getCompleteVarInfo().
+  /// For AllocStack/AllocBox, fills in the type from the element/address type.
+  std::optional<SILDebugVariable> getCompleteVarInfo() const {
+    switch (getKind()) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      return cast<DebugValueInst>(**this)->getCompleteVarInfo();
+    case Kind::AllocStack:
+      return cast<AllocStackInst>(**this)->getVarInfo(/*complete*/ true);
+    case Kind::AllocBox:
+      return cast<AllocBoxInst>(**this)->getVarInfo(/*complete*/ true);
+    }
+    llvm_unreachable("covered switch");
+  }
+
   void setDebugVarScope(const SILDebugScope *NewDS) {
     switch (getKind()) {
     case Kind::Invalid:
@@ -501,6 +500,20 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
       return cast<AllocStackInst>(**this)->usesMoveableValueDebugInfo();
     case Kind::AllocBox:
       return cast<AllocBoxInst>(**this)->usesMoveableValueDebugInfo();
+    }
+  }
+  
+  /// Returns true if this DebugVarCarryingInst is a `debug_value`
+  /// with a reconstruction block.
+  bool hasDebugReconstructionBlock() const {
+    switch (getKind()) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      return cast<DebugValueInst>(**this)->getDebugReconstructionBlock();
+    case Kind::AllocStack:
+    case Kind::AllocBox:
+      return false;
     }
   }
 

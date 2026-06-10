@@ -2,7 +2,7 @@
 
 // https://github.com/swiftlang/swift/issues/49476
 
-// This is invalid, because offset and index have mismatched types
+// Invalid expression, because offset and index have mismatched types
 
 func slow() {
   let offset: Double = 5.0

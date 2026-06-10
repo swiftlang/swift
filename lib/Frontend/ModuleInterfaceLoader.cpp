@@ -1304,6 +1304,10 @@ ModuleInterfaceLoaderOptions::ModuleInterfaceLoaderOptions(
   }
 }
 
+ModuleInterfaceLoaderOptions &ModuleInterfaceLoader::getOptions() {
+  return InterfaceChecker.Opts;
+}
+
 bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
   return InterfaceChecker.isCached(DepPath);
 }
@@ -1609,27 +1613,6 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
     StringRef outputPath, bool ShouldSerializeDeps,
     ArrayRef<std::string> CompiledCandidates,
     DependencyTracker *tracker) {
-
-  if (!Instance.getInvocation().getIRGenOptions().AlwaysCompile) {
-    // First, check if the expected output already exists and possibly
-    // up-to-date w.r.t. all of the dependencies it was built with. If so, early
-    // exit.
-    UpToDateModuleCheker checker(
-        Instance.getASTContext());
-    ModuleRebuildInfo rebuildInfo;
-    SmallVector<FileDependency, 3> allDeps;
-    std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-    if (checker.swiftModuleIsUpToDate(outputPath, rebuildInfo, allDeps,
-                                      moduleBuffer)) {
-      if (Instance.getASTContext()
-              .LangOpts.EnableSkipExplicitInterfaceModuleBuildRemarks) {
-        Instance.getDiags().diagnose(
-            SourceLoc(), diag::explicit_interface_build_skipped, outputPath);
-      }
-      return false;
-    }
-  }
-
   // Read out the compiler version.
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver ArgSaver(alloc);
@@ -1663,7 +1646,8 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     FrontendOptions::ActionType requestedAction,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
-    bool suppressRemarks) {
+    bool suppressNotes, bool suppressRemarks,
+    PrintDiagnosticNamesMode printDiagnosticNames) {
   GenericArgs.push_back("-frontend");
   // Start with a genericSubInvocation that copies various state from our
   // invoking ASTContext.
@@ -1731,12 +1715,6 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.setSDKPath(SearchPathOpts.getSDKPath().str());
   }
 
-  if (SearchPathOpts.PlatformAvailabilityInheritanceMapPath) {
-    GenericArgs.push_back("-platform-availability-inheritance-map-path");
-    GenericArgs.push_back(ArgSaver.save(*SearchPathOpts.PlatformAvailabilityInheritanceMapPath));
-    genericSubInvocation.setPlatformAvailabilityInheritanceMapPath(*SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
-  }
-
   // Inherit the plugin search opts but do not inherit the arguments.
   genericSubInvocation.getSearchPathOptions().PluginSearchOpts =
       SearchPathOpts.PluginSearchOpts;
@@ -1753,9 +1731,29 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   GenericArgs.push_back("-suppress-warnings");
 
   // Inherit the parent invocation's setting on whether to suppress remarks
+  if (suppressNotes) {
+    genericSubInvocation.getDiagnosticOptions().SuppressNotes = true;
+    GenericArgs.push_back("-suppress-notes");
+  }
+
+  // Inherit the parent invocation's setting on whether to suppress remarks
   if (suppressRemarks) {
     genericSubInvocation.getDiagnosticOptions().SuppressRemarks = true;
     GenericArgs.push_back("-suppress-remarks");
+  }
+
+  // Inherit the parent invocation's setting for printing diagnostic IDs.
+  genericSubInvocation.getDiagnosticOptions().PrintDiagnosticNames =
+      printDiagnosticNames;
+  switch (printDiagnosticNames) {
+  case PrintDiagnosticNamesMode::None:
+    break;
+  case PrintDiagnosticNamesMode::Identifier:
+    GenericArgs.push_back("-debug-diagnostic-names");
+    break;
+  case PrintDiagnosticNamesMode::Group:
+    // FIXME: Currently no flag for Group mode
+    break;
   }
 
   // Inherit this setting down so that it can affect error diagnostics (mostly
@@ -1805,7 +1803,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
 
   if (casOpts.EnableCaching) {
     genericSubInvocation.getCASOptions().EnableCaching = casOpts.EnableCaching;
-    genericSubInvocation.getCASOptions().CASOpts = casOpts.CASOpts;
+    genericSubInvocation.getCASOptions().Config = casOpts.Config;
     genericSubInvocation.getCASOptions().HasImmutableFileSystem =
         casOpts.HasImmutableFileSystem;
     casOpts.enumerateCASConfigurationFlags(
@@ -1858,12 +1856,17 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     StringRef moduleCachePath, StringRef prebuiltCachePath,
     StringRef backupModuleInterfaceDir,
     ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
-    bool serializeDependencyHashes, bool trackSystemDependencies)
-    : SM(SM), Diags(Diags), ArgSaver(Allocator) {
+    bool serializeDependencyHashes, bool trackSystemDependencies,
+    std::shared_ptr<llvm::cas::ObjectStore> CAS,
+    std::shared_ptr<llvm::cas::ActionCache> ActionCache)
+    : SM(SM), Diags(Diags), ArgSaver(Allocator),
+      CAS(std::move(CAS)), ActionCache(std::move(ActionCache)) {
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(LoaderOpts.requestedAction, searchPathOpts,
                                      langOpts, clangImporterOpts, casOpts,
-                                     Diags->getSuppressRemarks());
+                                     Diags->getSuppressNotes(),
+                                     Diags->getSuppressRemarks(),
+                                     Diags->getPrintDiagnosticNamesMode());
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();
   SubFEOpts.RequestedAction = LoaderOpts.requestedAction;
@@ -2024,23 +2027,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   if (langOpts.EnableCXXInterop) {
     // Modelled after a reverse of validateCxxInteropCompatibilityMode
     genericSubInvocation.getLangOptions().EnableCXXInterop = true;
-    genericSubInvocation.getLangOptions().cxxInteropCompatVersion =
-        langOpts.cxxInteropCompatVersion;
-    std::string compatVersion;
-    if (langOpts.cxxInteropCompatVersion.empty())
-      compatVersion = "default";
-    else if (langOpts.cxxInteropCompatVersion[0] == 5)
-      compatVersion = "swift-5.9";
-    else if (langOpts.cxxInteropCompatVersion[0] == 6)
-      compatVersion = "swift-6";
-    else if (langOpts.cxxInteropCompatVersion[0] ==
-             version::getUpcomingCxxInteropCompatVersion())
-      compatVersion = "upcoming-swift";
-    else // TODO: This may need to be updated once more versions are added
-      compatVersion = "default";
-
-    GenericArgs.push_back(
-        ArgSaver.save("-cxx-interoperability-mode=" + compatVersion));
+    GenericArgs.push_back(ArgSaver.save("-cxx-interoperability-mode=default"));
 
     if (!langOpts.isUsingPlatformDefaultCXXStdlib() &&
         langOpts.CXXStdlib == CXXStdlibKind::Libcxx) {
@@ -2057,6 +2044,17 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     genericSubInvocation.getLangOptions().enableFeature(Feature::Embedded);
     GenericArgs.push_back("-enable-experimental-feature");
     GenericArgs.push_back("Embedded");
+  }
+
+  if (langOpts.DebuggerSupport) {
+    if (clangImporterOpts.DirectClangCC1ModuleBuild) {
+      subClangImporterOpts.ExtraArgs.push_back("-dwarf-ext-refs");
+      subClangImporterOpts.ExtraArgs.push_back("-fmodule-format=obj");
+        subClangImporterOpts.ExtraArgs.push_back("-debug-info-kind=standalone");
+    } else {
+      subClangImporterOpts.ExtraArgs.push_back("-gmodules");
+      subClangImporterOpts.ExtraArgs.push_back("-g");
+    }
   }
 }
 
@@ -2156,9 +2154,11 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.getFrontendOptions().InputsAndOutputs
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
-  CompilerInstance subInstance;
+  // Diagnostic consumers must outlive subInstance, since subInstance's
+  // DiagnosticEngine holds raw pointers to them.
   ForwardingDiagnosticConsumer FDC(*Diags);
   NullDiagnosticConsumer noopConsumer;
+  CompilerInstance subInstance;
   if (!silenceErrors) {
     subInstance.addDiagnosticConsumer(&FDC);
   } else {
@@ -2189,6 +2189,8 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInstance.getSourceMgr().setFileSystem(SM.getFileSystem());
 
   std::string InstanceSetupError;
+  if (CAS)
+    subInstance.setSharedCASInstances(CAS, ActionCache);
   if (subInstance.setup(subInvocation, InstanceSetupError)) {
     return std::make_error_code(std::errc::not_supported);
   }
@@ -2211,13 +2213,30 @@ static void addModuleAliasesFromExplicitSwiftModuleMap(
 struct ExplicitSwiftModuleLoader::Implementation {
   ASTContext &Ctx;
   llvm::BumpPtrAllocator Allocator;
-  llvm::StringMap<ExplicitSwiftModuleInputInfo> ExplicitModuleMap;
-  Implementation(ASTContext &Ctx) : Ctx(Ctx) {}
+  std::unique_ptr<ExplicitSwiftModuleMap> ExplicitModuleMap;
+  std::unique_ptr<ExplicitClangModuleMap> ExplicitClangModuleMap;
+  llvm::StringMap<std::string> ModuleAliases;
+  Implementation(
+      ASTContext &Ctx,
+      std::unique_ptr<swift::ExplicitSwiftModuleMap> ExplicitSwiftModuleMapPtr,
+      std::unique_ptr<swift::ExplicitClangModuleMap> ExplicitClangModuleMapPtr)
+      : Ctx(Ctx), ExplicitModuleMap(std::move(ExplicitSwiftModuleMapPtr)),
+        ExplicitClangModuleMap(std::move(ExplicitClangModuleMapPtr)) {
+    if (!ExplicitModuleMap)
+      ExplicitModuleMap = std::make_unique<swift::ExplicitSwiftModuleMap>();
+    if (!ExplicitClangModuleMap)
+      ExplicitClangModuleMap =
+          std::make_unique<swift::ExplicitClangModuleMap>();
+    for (auto &entry : *ExplicitModuleMap)
+      if (auto alias = entry.getValue().moduleAlias)
+        ModuleAliases.insert({entry.getKey(), *alias});
+    for (auto &entry : *ExplicitClangModuleMap)
+      if (auto alias = entry.getValue().moduleAlias)
+        ModuleAliases.insert({entry.getKey(), *alias});
+  }
 
   void parseSwiftExplicitModuleMap(StringRef fileName) {
     ExplicitModuleMapParser parser(Allocator);
-    llvm::StringMap<ExplicitClangModuleInputInfo> ExplicitClangModuleMap;
-    llvm::StringMap<std::string> ModuleAliases;
     // Load the input file.
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
         llvm::MemoryBuffer::getFile(fileName);
@@ -2228,19 +2247,21 @@ struct ExplicitSwiftModuleLoader::Implementation {
     }
 
     auto error = parser.parseSwiftExplicitModuleMap(
-        (*fileBufOrErr)->getMemBufferRef(), ExplicitModuleMap,
-        ExplicitClangModuleMap, ModuleAliases);
+        (*fileBufOrErr)->getMemBufferRef(), *ExplicitModuleMap,
+        *ExplicitClangModuleMap, ModuleAliases);
     llvm::handleAllErrors(std::move(error), [this, &fileName](
                                                 const llvm::StringError &E) {
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
                          fileName, E.getMessage());
     });
+  }
 
+  void setupModuleLoader() {
     // A single module map can define multiple modules; keep track of the ones
     // we've seen so that we don't generate duplicate flags.
     std::set<std::string> moduleMapsSeen;
     std::vector<std::string> &extraClangArgs = Ctx.ClangImporterOpts.ExtraArgs;
-    for (auto &entry : ExplicitClangModuleMap) {
+    for (auto &entry : *ExplicitClangModuleMap) {
       const auto &moduleMapPath = entry.getValue().moduleMapPath;
       if (!moduleMapPath.empty() &&
           entry.getValue().isBridgingHeaderDependency &&
@@ -2263,22 +2284,30 @@ struct ExplicitSwiftModuleLoader::Implementation {
   void addCommandLineExplicitInputs(
     const llvm::StringMap<std::string> &commandLineExplicitInputs) {
     for (const auto &moduleInput : commandLineExplicitInputs) {
-      ExplicitSwiftModuleInputInfo entry(moduleInput.getValue(), {}, {}, {});
-      ExplicitModuleMap.try_emplace(moduleInput.first(), std::move(entry));
+      ExplicitSwiftModuleInputInfo entry(moduleInput.getValue(), {}, {}, {},
+                                         {});
+      ExplicitModuleMap->try_emplace(moduleInput.first(), std::move(entry));
     }
   }
 };
 
 ExplicitSwiftModuleLoader::ExplicitSwiftModuleLoader(
-      ASTContext &ctx,
-      DependencyTracker *tracker,
-      ModuleLoadingMode loadMode,
-      bool IgnoreSwiftSourceInfoFile):
-        SerializedModuleLoaderBase(ctx, tracker, loadMode,
-                                   IgnoreSwiftSourceInfoFile),
-        Impl(*new Implementation(ctx)) {}
+    ASTContext &ctx, DependencyTracker *tracker, ModuleLoadingMode loadMode,
+    bool IgnoreSwiftSourceInfoFile,
+    std::unique_ptr<ExplicitSwiftModuleMap> ExplicitModuleMap,
+    std::unique_ptr<ExplicitClangModuleMap> ExplicitClangModuleMap)
+    : SerializedModuleLoaderBase(ctx, tracker, loadMode,
+                                 IgnoreSwiftSourceInfoFile),
+      Impl(*new Implementation(ctx, std::move(ExplicitModuleMap),
+                               std::move(ExplicitClangModuleMap))) {}
 
 ExplicitSwiftModuleLoader::~ExplicitSwiftModuleLoader() { delete &Impl; }
+ExplicitSwiftModuleMap *ExplicitSwiftModuleLoader::getExplicitSwiftModuleMap() {
+  return Impl.ExplicitModuleMap.get();
+}
+ExplicitClangModuleMap *ExplicitSwiftModuleLoader::getExplicitClangModuleMap() {
+  return Impl.ExplicitClangModuleMap.get();
+}
 
 bool ExplicitSwiftModuleLoader::findModule(
     ImportPath::Element ModuleID, SmallVectorImpl<char> *ModuleInterfacePath,
@@ -2286,8 +2315,8 @@ bool ExplicitSwiftModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool IsCanImportLookup, bool isTestableDependencyLookup,
-    bool &IsFramework, bool &IsSystemModule) {
+    std::string *cacheKey, bool IsCanImportLookup,
+    bool isTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -2295,10 +2324,10 @@ bool ExplicitSwiftModuleLoader::findModule(
   // input file has 'import Foo', a module called Bar (real name) should be searched.
   StringRef moduleName = Ctx.getRealModuleName(ModuleID.Item).str();
 
-  auto it = Impl.ExplicitModuleMap.find(moduleName);
+  auto it = Impl.ExplicitModuleMap->find(moduleName);
   // If no explicit module path is given matches the name, return with an
   // error code.
-  if (it == Impl.ExplicitModuleMap.end()) {
+  if (it == Impl.ExplicitModuleMap->end()) {
     return false;
   }
   auto &moduleInfo = it->getValue();
@@ -2367,7 +2396,6 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
     bool IsCanImportLookup, bool IsFramework,
     bool IsTestableDependencyLookup) {
-  llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
   return std::make_error_code(std::errc::not_supported);
 }
 
@@ -2384,9 +2412,9 @@ bool ExplicitSwiftModuleLoader::canImportModule(
   // maps Foo appearing in source files, e.g. 'import Foo', to the real module
   // name Bar (on-disk name), which should be searched for loading.
   StringRef moduleName = Ctx.getRealModuleName(mID.Item).str();
-  auto it = Impl.ExplicitModuleMap.find(moduleName);
+  auto it = Impl.ExplicitModuleMap->find(moduleName);
   // If no provided explicit module matches the name, then it cannot be imported.
-  if (it == Impl.ExplicitModuleMap.end()) {
+  if (it == Impl.ExplicitModuleMap->end()) {
     return false;
   }
 
@@ -2426,26 +2454,29 @@ bool ExplicitSwiftModuleLoader::canImportModule(
 
 void ExplicitSwiftModuleLoader::collectVisibleTopLevelModuleNames(
       SmallVectorImpl<Identifier> &names) const {
-  for (auto &entry: Impl.ExplicitModuleMap) {
+  for (auto &entry : *Impl.ExplicitModuleMap) {
     names.push_back(Ctx.getIdentifier(entry.getKey()));
   }
 }
 
-std::unique_ptr<ExplicitSwiftModuleLoader>
-ExplicitSwiftModuleLoader::create(ASTContext &ctx,
-    DependencyTracker *tracker, ModuleLoadingMode loadMode,
-    StringRef ExplicitSwiftModuleMap,
+std::unique_ptr<ExplicitSwiftModuleLoader> ExplicitSwiftModuleLoader::create(
+    ASTContext &ctx, DependencyTracker *tracker, ModuleLoadingMode loadMode,
+    StringRef ExplicitSwiftModuleMapPath,
     const llvm::StringMap<std::string> &ExplicitSwiftModuleInputs,
-    bool IgnoreSwiftSourceInfoFile) {
-  auto result = std::unique_ptr<ExplicitSwiftModuleLoader>(
-    new ExplicitSwiftModuleLoader(ctx, tracker, loadMode,
-                                  IgnoreSwiftSourceInfoFile));
+    bool IgnoreSwiftSourceInfoFile,
+    std::unique_ptr<swift::ExplicitSwiftModuleMap> ExplicitModuleMap,
+    std::unique_ptr<swift::ExplicitClangModuleMap> ExplicitClangModuleMap) {
+  auto result =
+      std::unique_ptr<ExplicitSwiftModuleLoader>(new ExplicitSwiftModuleLoader(
+          ctx, tracker, loadMode, IgnoreSwiftSourceInfoFile,
+          std::move(ExplicitModuleMap), std::move(ExplicitClangModuleMap)));
   auto &Impl = result->Impl;
   // If the explicit module map is given, try parse it.
-  if (!ExplicitSwiftModuleMap.empty()) {
+  if (!ExplicitSwiftModuleMapPath.empty()) {
     // Parse a JSON file to collect explicitly built modules.
-    Impl.parseSwiftExplicitModuleMap(ExplicitSwiftModuleMap);
+    Impl.parseSwiftExplicitModuleMap(ExplicitSwiftModuleMapPath);
   }
+  Impl.setupModuleLoader();
   // If some modules are provided with explicit
   // '-swift-module-file' options, add those as well.
   if (!ExplicitSwiftModuleInputs.empty()) {
@@ -2461,11 +2492,32 @@ struct ExplicitCASModuleLoader::Implementation {
   llvm::cas::ObjectStore &CAS;
   llvm::cas::ActionCache &Cache;
 
-  llvm::StringMap<ExplicitSwiftModuleInputInfo> ExplicitModuleMap;
+  std::unique_ptr<ExplicitSwiftModuleMap> ExplicitModuleMap;
+  std::unique_ptr<ExplicitClangModuleMap> ExplicitClangModuleMap;
+  llvm::StringMap<std::string> ModuleAliases;
 
-  Implementation(ASTContext &Ctx, llvm::cas::ObjectStore &CAS,
-                 llvm::cas::ActionCache &Cache)
-      : Ctx(Ctx), CAS(CAS), Cache(Cache) {}
+  Implementation(
+      ASTContext &Ctx, llvm::cas::ObjectStore &CAS,
+      llvm::cas::ActionCache &Cache,
+      std::unique_ptr<swift::ExplicitSwiftModuleMap> ExplicitSwiftModuleMapPtr,
+      std::unique_ptr<swift::ExplicitClangModuleMap> ExplicitClangModuleMapPtr)
+      : Ctx(Ctx), CAS(CAS), Cache(Cache),
+        ExplicitModuleMap(std::move(ExplicitSwiftModuleMapPtr)),
+        ExplicitClangModuleMap(std::move(ExplicitClangModuleMapPtr)) {
+    {
+      if (!ExplicitModuleMap)
+        ExplicitModuleMap = std::make_unique<swift::ExplicitSwiftModuleMap>();
+      if (!ExplicitClangModuleMap)
+        ExplicitClangModuleMap =
+            std::make_unique<swift::ExplicitClangModuleMap>();
+      for (auto &entry : *ExplicitModuleMap)
+        if (auto alias = entry.getValue().moduleAlias)
+          ModuleAliases.insert({entry.getKey(), *alias});
+      for (auto &entry : *ExplicitClangModuleMap)
+        if (auto alias = entry.getValue().moduleAlias)
+          ModuleAliases.insert({entry.getKey(), *alias});
+    }
+  }
 
   std::unique_ptr<llvm::MemoryBuffer> loadBuffer(StringRef ID) {
     auto key = CAS.parseID(ID);
@@ -2493,9 +2545,13 @@ struct ExplicitCASModuleLoader::Implementation {
   // Same as the regular explicit module map but must be loaded from
   // CAS, instead of a file that is not tracked by the dependency.
   void parseSwiftExplicitModuleMap(StringRef ID) {
+    // ModuleLoader can be setup with no explicit module map and explicitly
+    // setup each individual dependencies via `addExplicitModulePath` function.
+    // If the input CASID is empty, just return.
+    if (ID.empty())
+      return;
+
     ExplicitModuleMapParser parser(Allocator);
-    llvm::StringMap<ExplicitClangModuleInputInfo> ExplicitClangModuleMap;
-    llvm::StringMap<std::string> ModuleAliases;
     auto buf = loadBuffer(ID);
     if (!buf) {
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_missing,
@@ -2506,14 +2562,16 @@ struct ExplicitCASModuleLoader::Implementation {
         llvm::MemoryBuffer::getFile(ID);
 
     auto error = parser.parseSwiftExplicitModuleMap(
-        buf->getMemBufferRef(), ExplicitModuleMap, ExplicitClangModuleMap,
+        buf->getMemBufferRef(), *ExplicitModuleMap, *ExplicitClangModuleMap,
         ModuleAliases);
     llvm::handleAllErrors(std::move(error), [this,
                                              &ID](const llvm::StringError &E) {
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
                          ID, E.getMessage());
     });
+  }
 
+  void setupModuleLoader() {
     std::set<std::string> moduleMapsSeen;
     std::vector<std::string> &extraClangArgs = Ctx.ClangImporterOpts.ExtraArgs;
     // Append -Xclang if we are not in direct cc1 mode.
@@ -2521,7 +2579,7 @@ struct ExplicitCASModuleLoader::Implementation {
       if (!Ctx.ClangImporterOpts.DirectClangCC1ModuleBuild)
         extraClangArgs.push_back("-Xclang");
     };
-    for (auto &entry : ExplicitClangModuleMap) {
+    for (auto &entry : *ExplicitClangModuleMap) {
       const auto &moduleMapPath = entry.getValue().moduleMapPath;
       if (!moduleMapPath.empty() && !Ctx.CASOpts.EnableCaching &&
           moduleMapsSeen.find(moduleMapPath) == moduleMapsSeen.end()) {
@@ -2552,8 +2610,9 @@ struct ExplicitCASModuleLoader::Implementation {
   void addCommandLineExplicitInputs(
       const llvm::StringMap<std::string> &commandLineExplicitInputs) {
     for (const auto &moduleInput : commandLineExplicitInputs) {
-      ExplicitSwiftModuleInputInfo entry(moduleInput.getValue(), {}, {}, {});
-      ExplicitModuleMap.try_emplace(moduleInput.getKey(), std::move(entry));
+      ExplicitSwiftModuleInputInfo entry(moduleInput.getValue(), {}, {}, {},
+                                         {});
+      ExplicitModuleMap->try_emplace(moduleInput.getKey(), std::move(entry));
     }
   }
 
@@ -2611,7 +2670,7 @@ struct ExplicitCASModuleLoader::Implementation {
 
   llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>
   loadModuleFromPath(StringRef Path, DiagnosticEngine &Diags) {
-    for (auto &Deps : ExplicitModuleMap) {
+    for (auto &Deps : *ExplicitModuleMap) {
       if (Deps.second.modulePath == Path) {
         if (!Deps.second.moduleCacheKey)
           return nullptr;
@@ -2624,17 +2683,24 @@ struct ExplicitCASModuleLoader::Implementation {
   }
 };
 
-ExplicitCASModuleLoader::ExplicitCASModuleLoader(ASTContext &ctx,
-                                                 llvm::cas::ObjectStore &CAS,
-                                                 llvm::cas::ActionCache &cache,
-                                                 DependencyTracker *tracker,
-                                                 ModuleLoadingMode loadMode,
-                                                 bool IgnoreSwiftSourceInfoFile)
+ExplicitCASModuleLoader::ExplicitCASModuleLoader(
+    ASTContext &ctx, llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &cache,
+    DependencyTracker *tracker, ModuleLoadingMode loadMode,
+    bool IgnoreSwiftSourceInfoFile,
+    std::unique_ptr<ExplicitSwiftModuleMap> ExplicitModuleMap,
+    std::unique_ptr<ExplicitClangModuleMap> ExplicitClangModuleMap)
     : SerializedModuleLoaderBase(ctx, tracker, loadMode,
                                  IgnoreSwiftSourceInfoFile),
-      Impl(*new Implementation(ctx, CAS, cache)) {}
+      Impl(*new Implementation(ctx, CAS, cache, std::move(ExplicitModuleMap),
+                               std::move(ExplicitClangModuleMap))) {}
 
 ExplicitCASModuleLoader::~ExplicitCASModuleLoader() { delete &Impl; }
+ExplicitSwiftModuleMap *ExplicitCASModuleLoader::getExplicitSwiftModuleMap() {
+  return Impl.ExplicitModuleMap.get();
+}
+ExplicitClangModuleMap *ExplicitCASModuleLoader::getExplicitClangModuleMap() {
+  return Impl.ExplicitClangModuleMap.get();
+}
 
 bool ExplicitCASModuleLoader::findModule(
     ImportPath::Element ModuleID, SmallVectorImpl<char> *ModuleInterfacePath,
@@ -2642,8 +2708,8 @@ bool ExplicitCASModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool IsCanImportLookup, bool IsTestableDependencyLookup,
-    bool &IsFramework, bool &IsSystemModule) {
+    std::string *CacheKey, bool IsCanImportLookup,
+    bool IsTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -2652,10 +2718,10 @@ bool ExplicitCASModuleLoader::findModule(
   // searched.
   StringRef moduleName = Ctx.getRealModuleName(ModuleID.Item).str();
 
-  auto it = Impl.ExplicitModuleMap.find(moduleName);
+  auto it = Impl.ExplicitModuleMap->find(moduleName);
   // If no explicit module path is given matches the name, return with an
   // error code.
-  if (it == Impl.ExplicitModuleMap.end()) {
+  if (it == Impl.ExplicitModuleMap->end()) {
     return false;
   }
   auto &moduleInfo = it->getValue();
@@ -2663,6 +2729,8 @@ bool ExplicitCASModuleLoader::findModule(
   // Set IsFramework bit according to the moduleInfo
   IsFramework = moduleInfo.isFramework;
   IsSystemModule = moduleInfo.isSystem;
+  if (CacheKey && moduleInfo.moduleCacheKey)
+    *CacheKey = *moduleInfo.moduleCacheKey;
 
   // Fallback check for module cache key passed on command-line as module path.
   std::string moduleCASID = moduleInfo.moduleCacheKey
@@ -2676,47 +2744,15 @@ bool ExplicitCASModuleLoader::findModule(
       Impl.CAS, Impl.Cache, Ctx.Diags, moduleCASID,
       file_types::ID::TY_SwiftModuleFile, moduleInfo.modulePath);
   if (!moduleBuf) {
-    // We cannot read the module content, diagnose.
-    Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
-                       moduleInfo.modulePath);
+    // Cannot load the module. For any real issues like malformed CASID or
+    // module, the error has been diagnosed in
+    // `loadCachedCompileResultFromCacheKey`. The only way to reach here without
+    // error diagnostics is that the module is not found via loader, just return
+    // false in the case so the next loader can try findModule without hitting
+    // an error.
     return false;
   }
 
-  const bool isForwardingModule =
-      !serialization::isSerializedAST(moduleBuf->getBuffer());
-  // If the module is a forwarding module, read the actual content from the path
-  // encoded in the forwarding module as the actual module content.
-  if (isForwardingModule) {
-    auto forwardingModule = ForwardingModule::load(*moduleBuf.get());
-    if (forwardingModule) {
-      // Look through ExplicitModuleMap for paths.
-      // TODO: need to have dependency scanner reports forwarded module as
-      // dependency for this compilation and ingested into CAS.
-      auto moduleOrErr = Impl.loadModuleFromPath(
-          forwardingModule->underlyingModulePath, Ctx.Diags);
-      if (!moduleOrErr) {
-        llvm::consumeError(moduleOrErr.takeError());
-        Ctx.Diags.diagnose(SourceLoc(),
-                           diag::error_opening_explicit_module_file,
-                           moduleInfo.modulePath);
-        return false;
-      }
-      moduleBuf = std::move(*moduleOrErr);
-      if (!moduleBuf) {
-        // We cannot read the module content, diagnose.
-        Ctx.Diags.diagnose(SourceLoc(),
-                           diag::error_opening_explicit_module_file,
-                           moduleInfo.modulePath);
-        return false;
-      }
-    } else {
-      // We cannot read the module content, diagnose.
-      Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
-                         moduleInfo.modulePath);
-      return false;
-    }
-  }
-  assert(moduleBuf);
   // Move the opened module buffer to the caller.
   *ModuleBuffer = std::move(moduleBuf);
 
@@ -2733,7 +2769,6 @@ std::error_code ExplicitCASModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
     bool IsCanImportLookup, bool IsFramework,
     bool IsTestableDependencyLookup) {
-  llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
   return std::make_error_code(std::errc::not_supported);
 }
 
@@ -2750,10 +2785,10 @@ bool ExplicitCASModuleLoader::canImportModule(
   // Foo=Bar' maps Foo appearing in source files, e.g. 'import Foo', to the real
   // module name Bar (on-disk name), which should be searched for loading.
   StringRef moduleName = Ctx.getRealModuleName(mID.Item).str();
-  auto it = Impl.ExplicitModuleMap.find(moduleName);
+  auto it = Impl.ExplicitModuleMap->find(moduleName);
   // If no provided explicit module matches the name, then it cannot be
   // imported.
-  if (it == Impl.ExplicitModuleMap.end()) {
+  if (it == Impl.ExplicitModuleMap->end()) {
     return false;
   }
 
@@ -2781,7 +2816,7 @@ bool ExplicitCASModuleLoader::canImportModule(
 
 void ExplicitCASModuleLoader::collectVisibleTopLevelModuleNames(
     SmallVectorImpl<Identifier> &names) const {
-  for (auto &entry : Impl.ExplicitModuleMap) {
+  for (auto &entry : *Impl.ExplicitModuleMap) {
     names.push_back(Ctx.getIdentifier(entry.getKey()));
   }
 }
@@ -2789,18 +2824,22 @@ void ExplicitCASModuleLoader::collectVisibleTopLevelModuleNames(
 std::unique_ptr<ExplicitCASModuleLoader> ExplicitCASModuleLoader::create(
     ASTContext &ctx, llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &cache,
     DependencyTracker *tracker, ModuleLoadingMode loadMode,
-    StringRef ExplicitSwiftModuleMap,
+    StringRef ExplicitSwiftModuleMapPath,
     const llvm::StringMap<std::string> &ExplicitSwiftModuleInputs,
-    bool IgnoreSwiftSourceInfoFile) {
+    bool IgnoreSwiftSourceInfoFile,
+    std::unique_ptr<ExplicitSwiftModuleMap> ExplicitModuleMap,
+    std::unique_ptr<ExplicitClangModuleMap> ExplicitClangModuleMap) {
   auto result =
       std::unique_ptr<ExplicitCASModuleLoader>(new ExplicitCASModuleLoader(
-          ctx, CAS, cache, tracker, loadMode, IgnoreSwiftSourceInfoFile));
+          ctx, CAS, cache, tracker, loadMode, IgnoreSwiftSourceInfoFile,
+          std::move(ExplicitModuleMap), std::move(ExplicitClangModuleMap)));
   auto &Impl = result->Impl;
   // If the explicit module map is given, try parse it.
-  if (!ExplicitSwiftModuleMap.empty()) {
+  if (!ExplicitSwiftModuleMapPath.empty()) {
     // Parse a JSON file to collect explicitly built modules.
-    Impl.parseSwiftExplicitModuleMap(ExplicitSwiftModuleMap);
+    Impl.parseSwiftExplicitModuleMap(ExplicitSwiftModuleMapPath);
   }
+  Impl.setupModuleLoader();
   // If some modules are provided with explicit
   // '-swift-module-file' options, add those as well.
   if (!ExplicitSwiftModuleInputs.empty()) {

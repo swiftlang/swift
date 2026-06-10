@@ -170,6 +170,12 @@ public:
     FOREACH_IMPL_RETURN(getCalleeFunction());
   }
 
+  /// Gets the referenced function by looking through partial apply,
+  /// convert_function, and thin to thick function until we find a function_ref.
+  SILDeclRef getCalleeDeclRef() const {
+    FOREACH_IMPL_RETURN(getCalleeDeclRef());
+  }
+
   bool isCalleeDynamicallyReplaceable() const {
     FOREACH_IMPL_RETURN(isCalleeDynamicallyReplaceable());
   }
@@ -574,6 +580,18 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  bool hasAddressResult() const {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->hasAddressResult();
+    case ApplySiteKind::BeginApplyInst:
+    case ApplySiteKind::TryApplyInst:
+    case ApplySiteKind::PartialApplyInst:
+      return false;
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;
@@ -645,12 +663,25 @@ public:
     return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
   }
 
+  /// Returns true if \p op is the callee operand of this apply site
+  /// and not an argument operand.
+  ///
+  /// If this instruction is not a full apply site, this always returns false.
+  bool isCalleeOperand(const Operand &op) const;
+
+  /// Returns true if this is an 'out' parameter.
   bool isSending(const Operand &oper) const {
-    if (isIndirectErrorResultOperand(oper))
+    if (isIndirectErrorResultOperand(oper) || oper.isTypeDependent() ||
+        isCalleeOperand(oper))
       return false;
     if (isIndirectResultOperand(oper))
       return getSubstCalleeType()->hasSendingResult();
     return getArgumentParameterInfo(oper).hasOption(SILParameterInfo::Sending);
+  }
+
+  /// Returns true if this operand is an 'inout sending' parameter.
+  bool isInOutSending(const Operand &oper) const {
+    return isSending(oper) && getArgumentConvention(oper).isInoutConvention();
   }
 
   /// Return true if 'operand' is addressable after type substitution in the
@@ -790,6 +821,25 @@ public:
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
+  // For a direct error result, as a result of an @error convention, if any.
+  SILValue getDirectErrorResult() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+    case FullApplySiteKind::BeginApplyInst:
+      return SILValue();
+    case FullApplySiteKind::TryApplyInst: {
+      if (getNumIndirectSILErrorResults())
+        return SILValue(); // Not a direct @error convention.
+
+      auto *errBlock = cast<TryApplyInst>(getInstruction())->getErrorBB();
+      assert(errBlock->getNumArguments() == 1 &&
+             "Expected this try_apply to have a single direct error result");
+      return errBlock->getArgument(0);
+    }
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
   unsigned getNumIndirectSILResults() const {
     return getSubstCalleeConv().getNumIndirectSILResults();
   }
@@ -906,19 +956,8 @@ public:
            getNumIndirectSILErrorResults();
   }
 
-  std::optional<ActorIsolation> getActorIsolation() const {
-    if (auto isolation = getIsolationCrossing();
-        isolation && isolation->getCalleeIsolation())
-      return isolation->getCalleeIsolation();
-    auto *calleeFunction = getCalleeFunction();
-    if (!calleeFunction)
-      return {};
-    return calleeFunction->getActorIsolation();
-  }
-
-  bool isCallerIsolationInheriting() const {
-    auto isolation = getActorIsolation();
-    return isolation && isolation->isCallerIsolationInheriting();
+  bool isNonisolatedNonsending() const {
+    return getSubstCalleeType()->hasNonisolatedNonsendingIsolation();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
@@ -1035,6 +1074,13 @@ inline bool ApplySite::isIndirectErrorResultOperand(const Operand &op) const {
   if (!fas)
     return false;
   return fas.isIndirectErrorResultOperand(op);
+}
+
+inline bool ApplySite::isCalleeOperand(const Operand &op) const {
+  auto fas = asFullApplySite();
+  if (!fas)
+    return false;
+  return fas.isCalleeOperand(op);
 }
 
 } // namespace swift

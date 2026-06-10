@@ -59,8 +59,8 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
-  if (CallerIsolatedLoc.isValid()) {
-    ty = new (p.Context) CallerIsolatedTypeRepr(ty, CallerIsolatedLoc);
+  if (NonisolatedNonsendingLoc.isValid()) {
+    ty = new (p.Context) NonisolatedNonsendingTypeRepr(ty, NonisolatedNonsendingLoc);
   }
 
   if (lifetimeEntry) {
@@ -180,9 +180,28 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     tildeLoc = consumeToken();
   }
 
+  auto diagnoseAndRecover = [&]() -> ParserResult<TypeRepr> {
+    {
+      auto diag = diagnose(Tok, MessageID);
+      // If the next token is closing or separating, the type was likely
+      // forgotten
+      if (Tok.isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::arrow,
+                    tok::equal, tok::comma, tok::semi))
+        diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
+    }
+    if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
+      ty = makeParserErrorResult(ErrorTypeRepr::create(Context, Tok.getLoc()));
+      consumeToken();
+      return ty;
+    }
+    checkForInputIncomplete();
+    return nullptr;
+  };
+
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::identifier:
+  case tok::colon_colon:
     // In SIL files (not just when parsing SIL types), accept the
     // Pack{} syntax for spelling variadic type packs.
     if (isInSILMode() && Tok.isContextualKeyword("Pack") &&
@@ -225,7 +244,10 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     }
     break;
   case tok::kw_Any:
-    ty = parseAnyType();
+    if (peekToken().is(tok::colon_colon))
+      ty = parseTypeIdentifier(/*base=*/nullptr);
+    else
+      ty = parseAnyType();
     break;
   case tok::l_paren:
     ty = parseTypeTupleBody();
@@ -245,29 +267,26 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     break;
   }
   case tok::kw__:
-    ty = makeParserResult(new (Context) PlaceholderTypeRepr(consumeToken()));
+    if (peekToken().is(tok::colon_colon))
+      ty = parseTypeIdentifier(/*base=*/nullptr);
+    else
+      ty = makeParserResult(new (Context) PlaceholderTypeRepr(consumeToken()));
     break;
   case tok::kw_protocol:
     if (startsWithLess(peekToken())) {
       ty = parseOldStyleProtocolComposition();
       break;
     }
-    LLVM_FALLTHROUGH;
+    return diagnoseAndRecover();
+  case tok::kw_self:
+  case tok::kw_super:
+    if (peekToken().is(tok::colon_colon)) {
+      ty = parseTypeIdentifier(/*base=*/nullptr);
+      break;
+    }
+    return diagnoseAndRecover();
   default:
-    {
-      auto diag = diagnose(Tok, MessageID);
-      // If the next token is closing or separating, the type was likely forgotten
-      if (Tok.isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::arrow,
-                    tok::equal, tok::comma, tok::semi))
-        diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
-    }
-    if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
-      ty = makeParserErrorResult(ErrorTypeRepr::create(Context, Tok.getLoc()));
-      consumeToken();
-      return ty;
-    }
-    checkForInputIncomplete();
-    return nullptr;
+    return diagnoseAndRecover();
   }
 
   // '.X', '.Type', '.Protocol', '?', '!', '[]'.
@@ -958,15 +977,80 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
   }
 
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {
+    if (opaqueLoc.isInvalid() && anyLoc.isInvalid()) {
+      return type;
+    }
+
+    // Unwrap any layers of optionality, keeping track of what we peeled off.
+    SmallVector<TypeRepr *, 2> optionals;
+    TypeRepr *base = type;
+    InverseTypeRepr *inverseToReapply = nullptr;
+
+    if (auto *inv = dyn_cast<InverseTypeRepr>(base)) {
+      inverseToReapply = inv;
+      base = inv->getConstraint();
+    }
+
+    while (true) {
+      if (auto *opt = dyn_cast<OptionalTypeRepr>(base)) {
+        optionals.push_back(base);
+        base = opt->getBase();
+      } else if (auto *iuo =
+                     dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(base)) {
+        optionals.push_back(base);
+        base = iuo->getBase();
+      } else {
+        break;
+      }
+    }
+
+    if (inverseToReapply) {
+      base = new (Context) InverseTypeRepr(inverseToReapply->getTildeLoc(), base);
+    }
+
+    // If this was a composition with `some` or `any`, the optional sugar is
+    // parsed as bound to the elements, not to the whole composition. Check the
+    // last element so that if we have something like `some P & Q?`, we can
+    // diagnose it specifically with a fix-it.
+    if (auto *comp = dyn_cast<CompositionTypeRepr>(base)) {
+      if (!comp->getTypes().empty()) {
+        auto *last = comp->getTypes().back();
+        auto *lastForDiag = last;
+        if (auto *inv = dyn_cast<InverseTypeRepr>(lastForDiag)) {
+          lastForDiag = inv->getConstraint();
+        }
+        if (isa<OptionalTypeRepr>(lastForDiag) ||
+            isa<ImplicitlyUnwrappedOptionalTypeRepr>(lastForDiag)) {
+          diagnose(last->getEndLoc(),
+                   diag::confusing_some_any_optional_composition)
+              .fixItInsert(comp->getStartLoc(), "(")
+              .fixItInsert(last->getEndLoc(), ")");
+        }
+      }
+    }
+
+    // Apply the opaque or existential typing.
+    TypeRepr *result = base;
     if (opaqueLoc.isValid() &&
         (anyLoc.isInvalid() || SourceMgr.isBeforeInBuffer(opaqueLoc, anyLoc))) {
-      type = new (Context) OpaqueReturnTypeRepr(opaqueLoc, type);
+      result = new (Context) OpaqueReturnTypeRepr(opaqueLoc, result);
     } else if (anyLoc.isValid()) {
-      type = new (Context) ExistentialTypeRepr(anyLoc, type);
+      result = new (Context) ExistentialTypeRepr(anyLoc, result);
     }
-    return type;
+
+    // Re-wrap the optionals.
+    for (auto *optRepr : llvm::reverse(optionals)) {
+      if (auto *opt = dyn_cast<OptionalTypeRepr>(optRepr)) {
+        result = new (Context) OptionalTypeRepr(result, opt->getQuestionLoc());
+      } else if (auto *iuo =
+                     dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(optRepr)) {
+        result = new (Context) ImplicitlyUnwrappedOptionalTypeRepr(
+            result, iuo->getExclamationLoc());
+      }
+    }
+    return result;
   };
-  
+
   // Parse the first type
   ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID, reason);
   if (FirstType.isNull())
@@ -1323,6 +1407,9 @@ ParserResult<TypeRepr> Parser::parseTypeInlineArray(SourceLoc lSquare) {
   // 'isStartOfInlineArrayTypeBody' means we should at least have a type and
   // 'of' to start with.
   auto count = parseTypeOrValue();
+  if (count.isNull())
+    return makeParserError();
+
   auto *countTy = count.get();
   status |= count;
 
@@ -1519,22 +1606,64 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue() {
 
 ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
                                                 ParseTypeReason reason) {
+  if (canParseGenericValueLiteral())
+    return parseGenericValueLiteral();
+
+  // Look ahead to consider if this is a generic value expression
+  // or possibly a tuple type with a postfix grammar
+  bool shouldParseValueExpr = false;
+  if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
+      Tok.is(tok::l_paren)) {
+    BacktrackingScope backtrack(*this);
+    skipSingle();
+    if (Tok.is(tok::comma) || startsWithGreater(Tok) ||
+        (Tok.isContextualKeyword("of") && !Tok.isAtStartOfLine()))
+      shouldParseValueExpr = true;
+  }
+
+  if (shouldParseValueExpr) {
+    // Ensure that constituent references get parsed as declaration references,
+    // not type references.
+    llvm::SaveAndRestore<PatternBindingState> X(
+        InBindingPattern, PatternBindingState::NotInBinding);
+    auto expr = parseExprPrimary(MessageID, false);
+    if (expr.isNull()) {
+      diagnose(Tok, MessageID);
+      return makeParserError();
+    }
+    return makeParserResult(
+        new (Context) GenericArgumentExprTypeRepr(expr.get(), &Context));
+  } else {
+    return parseType(MessageID, reason);
+  }
+}
+
+bool Parser::canParseGenericValueLiteral() {
+  return (Tok.isMinus() && peekToken().is(tok::integer_literal)) ||
+         Tok.is(tok::integer_literal);
+}
+
+ParserResult<TypeRepr> Parser::parseGenericValueLiteral() {
   // Eat any '-' preceding integer literals.
   SourceLoc minusLoc;
   if (Tok.isMinus() && peekToken().is(tok::integer_literal)) {
     minusLoc = consumeToken();
   }
 
-  // Attempt to parse values first. Right now the only value that can be parsed
+  // Attempt to parse the integer value
   // as a type are integers.
-  if (Tok.is(tok::integer_literal)) {
-    auto text = copyAndStripUnderscores(Tok.getText());
-    auto loc = consumeToken(tok::integer_literal);
-    return makeParserResult(new (Context) IntegerTypeRepr(text, loc, minusLoc));
+  if (!Tok.is(tok::integer_literal)) {
+    diagnose(Tok, diag::expected_integer_generic_value);
+    return makeParserError();
   }
 
-  // Otherwise, attempt to parse a regular type.
-  return parseType(MessageID, reason);
+  auto digitsText = copyAndStripUnderscores(Tok.getText());
+  auto loc = consumeToken(tok::integer_literal);
+  auto intLitExpr = new (Context) IntegerLiteralExpr(digitsText, loc, false);
+  if (minusLoc)
+    intLitExpr->setNegative(minusLoc);
+  return makeParserResult(
+      new (Context) GenericArgumentExprTypeRepr(intLitExpr, &Context));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1604,8 +1733,12 @@ bool Parser::canParseGenericArguments() {
   }
 
   do {
-    if (!canParseType())
+    if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
+        Tok.is(tok::l_paren))
+      skipSingle();
+    else if (!canParseType())
       return false;
+
     // Parse the comma, if the list continues.
     // This could be the trailing comma.
   } while (consumeIf(tok::comma) && !startsWithGreater(Tok));
@@ -1826,7 +1959,10 @@ bool Parser::canParseStartOfInlineArrayType() {
   // expression or type. We specifically look for any type, not just integers
   // for better recovery in e.g cases where the user writes '[Int of 2]'. We
   // only do type-scalar since variadics would be ambiguous e.g 'Int...of'.
-  if (!canParseTypeScalar())
+  if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
+      Tok.is(tok::l_paren))
+    skipSingle(); // Assume a parentheses-delimited value expression
+  else if (!canParseTypeScalar())
     return false;
 
   // For now we don't allow multi-line since that would require
@@ -1872,6 +2008,9 @@ bool Parser::canParseCollectionType() {
 }
 
 bool Parser::canParseTypeIdentifier() {
+  // Parse a module selector, if present.
+  parseModuleSelector();
+  
   // Parse an identifier.
   //
   // FIXME: We should expect e.g. 'X.var'. Almost any keyword is a valid member component.

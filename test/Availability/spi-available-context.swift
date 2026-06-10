@@ -18,6 +18,6 @@ public class Bar {
 
 @available(macOS 10.10, iOS 8.0, *)
 public class Baz {
-  public var macos: MacOSSPIProto? // expected-error {{cannot use protocol 'MacOSSPIProto' here; it is SPI}}
+  public var macos: MacOSSPIProto? // expected-error {{cannot use protocol 'MacOSSPIProto' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   public var ios: iOSSPIProto?
 }

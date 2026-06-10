@@ -258,8 +258,8 @@ func resyncParserB11() {}
 // rdar://21346928
 func optStr() -> String? { return nil }
 let x = (optStr() ?? "autoclosure").#^TOP_LEVEL_AUTOCLOSURE_1?check=AUTOCLOSURE_STRING^#
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal/IsSystem: unicodeScalars[#String.UnicodeScalarView#]
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal/IsSystem: utf16[#String.UTF16View#]
+// AUTOCLOSURE_STRING-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: unicodeScalars[#String.UnicodeScalarView#]
+// AUTOCLOSURE_STRING-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: utf16[#String.UTF16View#]
 
 func resyncParserB12() {}
 

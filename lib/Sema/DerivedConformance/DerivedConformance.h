@@ -324,10 +324,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);  
 
-  /// Identifiable may need to have the `ID` type witness synthesized explicitly
-  static bool canDeriveIdentifiable(NominalTypeDecl *nominal,
-                                    DeclContext *dc);
-
   /// Whether we can derive the given DistributedActor requirement in the given context.
   static bool canDeriveDistributedActor(NominalTypeDecl *nominal,
                                         DeclContext *dc);
@@ -468,6 +464,15 @@ public:
 /// stored properties of the given nominal type, require actor isolation
 /// because they involve mutable state.
 bool memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal);
+
+/// Returns the value decl expanded from the macro in `code` in the context of
+/// the \p derived derived conformance for the \p requirement requirement.
+ValueDecl *deriveRequirementViaMacro(DerivedConformance &derived,
+                                     ValueDecl *requirement, StringRef code);
+  
+/// Get a string describing the nominal type we are deriving a conformance
+/// for by producing valid swift syntax.
+std::string getNominalTypeInfoString(DerivedConformance &derived);
 
 } // namespace swift
 

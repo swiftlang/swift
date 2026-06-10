@@ -21,7 +21,7 @@ _ = [String: Int](uniqueKeysWithValues: zip(["one", "two", "three"], 1...3))
 // CHECK: [[@LINE-1]]:5 | constructor/Swift | init(uniqueKeysWithValues:) | s:SD20uniqueKeysWithValuesSDyxq_Gqd__n_tcSTRd__x_q_t7ElementRtd__lufc | {{.*}}Ref
 
 extension Array where Element == Int {
-// CHECK: [[@LINE+1]]:3 | constructor/Swift | init(_:) | s:Sa14swift_ide_testSiRszlEySaySiGSicfc | {{.*}}Def
+// CHECK: [[@LINE+1]]:3 | constructor(internal)/Swift | init(_:) | s:Sa14swift_ide_testSiRszlEySaySiGSicfc | {{.*}}Def
   init(_ input: Int) {
     self = [input]
   }
@@ -31,7 +31,7 @@ _ = [Int](0)
 // CHECK: [[@LINE-1]]:5 | constructor/Swift | init(_:) | s:Sa14swift_ide_testSiRszlEySaySiGSicfc | {{.*}}Ref
 
 extension Dictionary {
-// CHECK: [[@LINE+1]]:3 | constructor/Swift | init(_:_:) | s:SD14swift_ide_testEySDyxq_Gx_q_tcfc | {{.*}}Def
+// CHECK: [[@LINE+1]]:3 | constructor(internal)/Swift | init(_:_:) | s:SD14swift_ide_testEySDyxq_Gx_q_tcfc | {{.*}}Def
   init(_ k: Key, _ v: Value) {
     self = [k: v]
   }

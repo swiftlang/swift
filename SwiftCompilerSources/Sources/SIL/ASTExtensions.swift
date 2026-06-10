@@ -23,6 +23,13 @@ extension TypeProperties {
   public func loweredType(in function: Function, maximallyAbstracted: Bool = false) -> Type {
     function.bridged.getLoweredType(rawType.bridged, maximallyAbstracted).type.objectType
   }
+
+  // Lowers the AST type to a SIL type - in a specific function.
+  // In contrast to `loweredType`, this takes `AbstractionPattern` constructed from `function`'s
+  // `SubstGenericSignature` into account when getting the lowered type.
+  public func loweredTypeWithAbstractionPattern(in function: Function) -> Type {
+    function.bridged.getLoweredTypeWithAbstractionPattern(rawType.canonical.bridged).type
+  }
 }
 
 extension CanonicalType {

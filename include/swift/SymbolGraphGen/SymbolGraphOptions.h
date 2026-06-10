@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/PlatformKind.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/TargetParser/Triple.h"
@@ -77,6 +78,16 @@ struct SymbolGraphOptions {
 
   /// Whether `AvailabilityPlatforms` is an allow list or a block list.
   bool AvailabilityIsBlockList = false;
+
+  /// If non-null, only emit availability metadata for the active platform.
+  std::optional<PlatformKind> ActivePlatform = std::nullopt;
+
+  /// Whether to use shortened, by using a hash of the module names, file names
+  /// when writing symbol graph files to `OutputDir`.
+  /// An additional JSON file is written at `OutputDir` that contains a mapping
+  /// of the shortened file names to the module name(s) in the symbol graph
+  /// files.
+  bool ShortenOutputNames = false;
 };
 
 } // end namespace symbolgraphgen

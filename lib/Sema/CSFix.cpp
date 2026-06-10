@@ -32,6 +32,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/OverloadChoice.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
@@ -295,7 +296,7 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
     // Passing a static member reference as an argument needs to be downgraded
     // to a warning until future major mode to maintain source compatibility for
     // code with non-Sendable metatypes.
-    if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(7)) {
+    if (!cs.getASTContext().isLanguageModeAtLeast(LanguageMode::future)) {
       auto *argLoc = cs.getConstraintLocator(locator);
       if (auto *argument = getAsExpr(simplifyLocatorToAnchor(argLoc))) {
         if (auto overload = cs.findSelectedOverloadFor(
@@ -330,7 +331,7 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
   }
 
   // Otherwise, warn until Swift 6.
-  if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+  if (!cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v6))
     return FixBehavior::DowngradeToWarning;
 
   return FixBehavior::Error;
@@ -363,6 +364,17 @@ bool MarkGlobalActorFunction::attempt(ConstraintSystem &cs,
       *fixBehavior);
 
   return cs.recordFix(fix);
+}
+
+AddSendableAttribute::AddSendableAttribute(ConstraintSystem &cs,
+                                           FunctionType *fromType,
+                                           FunctionType *toType,
+                                           ConstraintLocator *locator,
+                                           FixBehavior fixBehavior)
+    : ContextualMismatch(cs, FixKind::AddSendableAttribute, fromType, toType,
+                         locator, fixBehavior) {
+  DEBUG_ASSERT(cs.simplifyType(fromType)->isSendableType() !=
+               cs.simplifyType(toType)->isSendableType());
 }
 
 bool AddSendableAttribute::diagnose(const Solution &solution,
@@ -939,7 +951,11 @@ DefineMemberBasedOnUse::diagnoseForAmbiguity(CommonFixesArray commonFixes) const
     const auto *solution = solutionAndFix.first;
     const auto *fix = solutionAndFix.second->getAs<DefineMemberBasedOnUse>();
 
-    auto baseType = solution->simplifyType(fix->BaseType);
+    // Ignore differences in optionality since we can look through an optional
+    // to resolve an implicit member `.foo`.
+    auto baseType = solution->simplifyType(fix->BaseType)
+                        ->getMetatypeInstanceType()
+                        ->lookThroughAllOptionalTypes();
     if (!concreteBaseType)
       concreteBaseType = baseType;
 
@@ -1210,6 +1226,21 @@ AllowInaccessibleMember::create(ConstraintSystem &cs, Type baseType,
       AllowInaccessibleMember(cs, baseType, member, name, locator);
 }
 
+bool AllowMemberFromWrongModule::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  MemberFromWrongModuleFailure failure(solution, getMemberName(), getMember(),
+                                       getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowMemberFromWrongModule *
+AllowMemberFromWrongModule::create(ConstraintSystem &cs, Type baseType,
+                                   ValueDecl *member, DeclNameRef name,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMemberFromWrongModule(cs, baseType, member, name, locator);
+}
+
 bool AllowAnyObjectKeyPathRoot::diagnose(const Solution &solution,
                                          bool asNote) const {
   AnyObjectKeyPathRootFailure failure(solution, getLocator());
@@ -1255,6 +1286,12 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
   case RefKind::StaticMember: {
     InvalidStaticMemberRefInKeyPath failure(solution, BaseType, Member,
                                             getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::ProtocolMetatypeStaticMember: {
+    InvalidProtocolMetatypeStaticMemberRefInKeyPath failure(
+        solution, BaseType, Member, getLocator());
     return failure.diagnose(asNote);
   }
 
@@ -1336,9 +1373,17 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
       }
     }
 
-    if (!baseType->getRValueType()->is<AnyMetatypeType>())
+    auto baseRValueType = baseType->getRValueType();
+    if (auto *metatype = baseRValueType->getAs<AnyMetatypeType>()) {
+      if (metatype->getInstanceType()->isExistentialType()) {
+        return AllowInvalidRefInKeyPath::create(
+            cs, baseType, RefKind::ProtocolMetatypeStaticMember, member,
+            locator);
+      }
+    } else {
       return AllowInvalidRefInKeyPath::create(
           cs, baseType, RefKind::StaticMember, member, locator);
+    }
   }
 
   // Referencing enum cases in key path is not currently allowed.
@@ -1825,6 +1870,21 @@ IgnoreAssignmentDestinationType::create(ConstraintSystem &cs, Type sourceTy,
       IgnoreAssignmentDestinationType(cs, sourceTy, destTy, locator);
 }
 
+IgnoreNonMetatypeDynamicType *
+IgnoreNonMetatypeDynamicType::create(ConstraintSystem &cs, Type instanceTy,
+                                     Type metatypeTy,
+                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreNonMetatypeDynamicType(cs, instanceTy, metatypeTy, locator);
+}
+
+bool IgnoreNonMetatypeDynamicType::diagnose(const Solution &solution,
+                                            bool asNote) const {
+  NonMetatypeDynamicTypeFailure failure(solution, getFromType(), getToType(),
+                                        getLocator());
+  return failure.diagnose(asNote);
+}
+
 bool AllowInOutConversion::diagnose(const Solution &solution,
                                     bool asNote) const {
   InOutConversionFailure failure(solution, getFromType(), getToType(),
@@ -1967,7 +2027,7 @@ bool AllowSendingMismatch::diagnose(const Solution &solution,
 AllowSendingMismatch *AllowSendingMismatch::create(ConstraintSystem &cs,
                                                    Type srcType, Type dstType,
                                                    ConstraintLocator *locator) {
-  auto fixBehavior = cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6)
+  auto fixBehavior = cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v6)
                          ? FixBehavior::Error
                          : FixBehavior::DowngradeToWarning;
   return new (cs.getAllocator())
@@ -2749,7 +2809,7 @@ bool AllowFunctionSpecialization::diagnose(const Solution &solution,
 AllowFunctionSpecialization *
 AllowFunctionSpecialization::create(ConstraintSystem &cs, ValueDecl *decl,
                                     ConstraintLocator *locator) {
-  auto fixBehavior = cs.getASTContext().isSwiftVersionAtLeast(6)
+  auto fixBehavior = cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v6)
                          ? FixBehavior::Error
                          : FixBehavior::DowngradeToWarning;
   return new (cs.getAllocator())

@@ -13,6 +13,7 @@ public func bar() {
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "modulePath": "deps.swiftmodule",
+// CHECK-NEXT:      "libraryLevel":
 // CHECK-NEXT:      "sourceFiles": [
 // CHECK-NEXT:        "{{.*}}ScanDependencies/unicode_filename.swift",
 // CHECK-NEXT:        "{{.*}}ScanDependencies/Inputs/unicode_filёnamё.swift"

@@ -22,7 +22,6 @@ add_swift_host_library(swiftIDE STATIC
   SignatureHelpFormatter.cpp
   CursorInfo.cpp
   ExprCompletion.cpp
-  ExprContextAnalysis.cpp
   Formatting.cpp
   FuzzyStringMatcher.cpp
   IDEBridging.cpp

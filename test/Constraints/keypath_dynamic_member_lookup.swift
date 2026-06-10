@@ -601,3 +601,73 @@ struct TestIssue56837 {
         _ = value[type: Int8.max]
     }
 }
+
+@dynamicMemberLookup
+class TestDynamicSelf {
+  struct S {
+    subscript() -> Int { 0 }
+  }
+  func foo() -> Self {
+    // Make sure we can do dynamic member lookup on a dynamic self.
+    _ = self[]
+    return self
+  }
+  subscript<T>(dynamicMember dynamicMember: KeyPath<S, T>) -> T {
+    fatalError()
+  }
+}
+
+@dynamicMemberLookup
+protocol P1 {}
+
+extension P1 {
+  subscript<T>(dynamicMember dynamicMemberLookup: KeyPath<TestOverloaded.S2, T>) -> T {
+    fatalError()
+  }
+}
+
+struct TestOverloaded {
+  struct S1: P1 {
+    subscript(x: String) -> Int {
+      fatalError()
+    }
+    func f(_ x: String) -> Int {
+      return self[x]
+    }
+  }
+  struct S2: P1 {}
+}
+
+@dynamicMemberLookup
+struct SingleLens<T> {
+  var value: T
+  init(_ value: T) {
+    self.value = value
+  }
+  subscript<U>(dynamicMember keyPath: KeyPath<T, U>) -> U {
+    value[keyPath: keyPath]
+  }
+}
+
+func testRecursiveSingleSubscript(_ x: SingleLens<SingleLens<SingleLens<SingleLens<[Int]>>>>) {
+  _ = x[0]
+}
+
+// Make sure that coerceCallArguments doesn't crash when arity of the subscript doesn't match
+// that of the member found by the lookup.
+func testMultipleArguments() {
+  @dynamicMemberLookup
+  struct Entity<T> {
+    subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R {
+      fatalError()
+    }
+  }
+
+  struct FuncEntity {
+    let implementation: (String, Int) -> Void
+  }
+
+  func test(e: Entity<FuncEntity>) {
+    e.implementation("ultimate question", 42)
+  }
+}

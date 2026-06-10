@@ -43,6 +43,14 @@ protected:
     : super(IGM), Target(target) {}
 
 public:
+
+  void embeddedLayout() {
+    // The embedded layout consists of:
+    // +    // -1 : vwt
+    // +    //  0 : metadata flags
+    super::layout();
+  }
+
   void layout() {
     static_assert(MetadataAdjustmentIndex::ValueType == 2,
                   "Adjustment index must be synchronized with this layout");

@@ -200,6 +200,27 @@ struct ChildFragment {
   typename Runtime::StoredPointer NextChild;
 };
 
+template <typename Runtime>
+struct GroupChildFragment {
+  typename Runtime::StoredPointer Group;
+};
+
+/// Mirror of `AsyncTask::NameFragment` in include/swift/ABI/Task.h.
+/// Tail-allocated immediately after `AsyncTask` iff
+/// `JobFlags::task_hasInitialTaskName()` is set.
+template <typename Runtime>
+struct NameFragment {
+  typename Runtime::StoredPointer Name;
+  typename Runtime::StoredSize NameLength;
+};
+
+template <typename Runtime>
+struct FutureFragment {
+  // The low 2 bits are the status, the rest is a pointer to the first
+  // waiting AsyncTask.
+  typename Runtime::StoredPointer WaitQueue;
+};
+
 } // end namespace reflection
 } // end namespace swift
 

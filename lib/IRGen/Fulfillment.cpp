@@ -122,6 +122,10 @@ static bool isLeafTypeMetadata(CanType type) {
   // Integer types are leaves.
   case TypeKind::Integer:
     return true;
+
+  // Hidden types are leaves.
+  case TypeKind::Hidden:
+    return true;
   }
   llvm_unreachable("bad type kind");
 }
@@ -380,7 +384,24 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
   for (unsigned reqtIndex : indices(requirements.getRequirements())) {
     auto requirement = requirements.getRequirements()[reqtIndex];
-    auto arg = requirement.getTypeParameter().subst(subs)->getCanonicalType();
+
+    // FIXME: The correct fix is to pass down the substitution map's
+    // output generic signature and reduce the result of subst() with
+    // this signature before forming the lookup key.
+    //
+    // Once that's fixed, change the below back to this:
+    // auto arg = requirement.getTypeParameter().subst(subs)->getCanonicalType();
+
+    auto arg = requirement.getTypeParameter().subst(
+      QuerySubstitutionMap{subs},
+      [&](InFlightSubstitution &IFS, Type origType, ProtocolDecl *proto)
+            -> ProtocolConformanceRef {
+        auto substType = origType.subst(IFS);
+        if (substType->isTypeParameter())
+          return ProtocolConformanceRef::forAbstract(substType, proto);
+
+        return subs.lookupConformance(origType->getCanonicalType(), proto);
+      })->getCanonicalType();
 
     // Skip uninteresting type arguments.
     if (!keys.hasInterestingType(arg))

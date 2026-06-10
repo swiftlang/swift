@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -target %target-swift-5.1-abi-triple
-// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -target %target-swift-5.1-abi-triple -enable-upcoming-feature NonisolatedNonsendingByDefault
+// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -verify-additional-prefix ni- -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -verify-additional-prefix ni-ns- -target %target-swift-5.1-abi-triple -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -61,13 +61,12 @@ extension MyActor {
         _ = self
         _ = sc
 
-        Task { // expected-error {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-          // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-          _ = sc
+        Task { // expected-error {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+          _ = sc // expected-note {{closure captures 'self'-isolated 'sc'}}
         }
 
-        Task { // expected-note {{access can happen concurrently}}
-          _ = sc
+        Task { // expected-error {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+          _ = sc // expected-note {{closure captures 'self'-isolated 'sc'}}
         }
       }
     }
@@ -82,5 +81,5 @@ func sendingTransferNonSendableError(_ x: NonSendableKlass) {
 
 func sendingTransferNonSendableError(_ x: NonSendableKlass) async {
   await transferToMain(x) // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated value of non-Sendable type 'NonSendableKlass' to main actor-isolated global function 'transferToMain' risks causing races in between task-isolated and main actor-isolated uses}}
+  // expected-note @-1 {{sending value of non-Sendable type 'NonSendableKlass' to main actor-isolated global function 'transferToMain' risks causing races in between code in the current isolation context and main actor-isolated uses}}
 }

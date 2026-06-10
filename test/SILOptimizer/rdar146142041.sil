@@ -37,6 +37,8 @@ bb3:
   cond_br undef, bb4, bb5
 
 bb4:
+  end_borrow %5
+  destroy_value [dead_end] %4
   unreachable
 
 bb5:
@@ -86,6 +88,8 @@ bb3:
   cond_br undef, bb4, bb5
 
 bb4:
+  end_borrow %5
+  destroy_value [dead_end] %4
   unreachable
 
 bb5:
@@ -132,6 +136,8 @@ bb3:
   cond_br undef, bb4, bb5
 
 bb4:
+  end_borrow %5
+  destroy_value [dead_end] %4
   unreachable
 
 bb5:

@@ -87,7 +87,7 @@ operator()(InFlightSubstitution &IFS, Type dependentType,
            ProtocolDecl *conformedProtocol) const {
   if (dependentType->is<PrimaryArchetypeType>() ||
       dependentType->is<PackArchetypeType>())
-    dependentType = dependentType->mapTypeOutOfContext();
+    dependentType = dependentType->mapTypeOutOfEnvironment();
 
   auto result = Subs.lookupConformance(
       dependentType->getCanonicalType(),
@@ -407,7 +407,7 @@ TypeSubstituter::transformOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *opaqu
 
   // If we return an opaque archetype unchanged, recurse into its substitutions
   // as a special case.
-  if (known->getCanonicalType() == opaque->getCanonicalType())
+  if (known.getPointer() == opaque)
     return std::nullopt; // Recursively process the substitutions of the
                          // opaque type archetype.
   return known;
@@ -516,7 +516,8 @@ Type Type::subst(InFlightSubstitution &IFS) const {
 
 static Type getConcreteTypeForSuperclassTraversing(Type t) {
   if (t->isExistentialType()) {
-    return t->getExistentialLayout().getSuperclass();
+    // FIXME: This is broken, see the comment on that getter method.
+    return t->getExistentialLayout().getExplicitSuperclassOrProtocolSuperclass();
   } if (auto archetype = t->getAs<ArchetypeType>()) {
     return archetype->getSuperclass();
   } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {
@@ -760,7 +761,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     if (baseTy && baseTy->is<ErrorType>())
       substTy = ErrorType::get(baseTy->getASTContext());
     else if (genericEnv)
-      substTy = genericEnv->mapTypeIntoContext(gp);
+      substTy = genericEnv->mapTypeIntoEnvironment(gp);
 
     if (gp->isParameterPack() && !substTy->hasError())
       substTy = PackType::getSingletonPackExpansion(substTy);
@@ -819,7 +820,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
                 param);
           }
           if (genericEnv) {
-            substGenericParam = genericEnv->mapTypeIntoContext(
+            substGenericParam = genericEnv->mapTypeIntoEnvironment(
                 substGenericParam);
           }
 
@@ -1089,11 +1090,19 @@ swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
 
 ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
     ProtocolConformanceRef ref, TypeExpansionContext context) {
+  if (ref.isInvalid())
+    return ref;
+
+  if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
+      !ref.getType()->hasOpaqueArchetype())
+    return ref;
+
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
   InFlightSubstitution IFS(replacer, replacer,
-                           SubstFlags::SubstituteOpaqueArchetypes);
+                           SubstFlags::SubstituteOpaqueArchetypes |
+                           SubstFlags::PreservePackExpansionLevel);
 
   auto substRef = ref.subst(IFS);
 
@@ -1115,7 +1124,7 @@ ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
 ProtocolConformanceRef ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(InFlightSubstitution &IFS, Type maybeOpaqueType,
            ProtocolDecl *protocol) const {
-  auto archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
+  auto *archetype = maybeOpaqueType->getAs<OpaqueTypeArchetypeType>();
   if (!archetype)
     return ProtocolConformanceRef::forAbstract(maybeOpaqueType, protocol);
 
@@ -1186,7 +1195,7 @@ Type ReplaceExistentialArchetypesWithConcreteTypes::operator()(
 
 ProtocolConformanceRef ReplaceExistentialArchetypesWithConcreteTypes::operator()(
     InFlightSubstitution &IFS, Type origType, ProtocolDecl *proto) const {
-  auto existentialArchetype = dyn_cast<ExistentialArchetypeType>(origType);
+  auto *existentialArchetype = origType->getAs<ExistentialArchetypeType>();
   if (!existentialArchetype ||
       existentialArchetype->getGenericEnvironment() != env)
     return ProtocolConformanceRef::forAbstract(origType.subst(IFS), proto);

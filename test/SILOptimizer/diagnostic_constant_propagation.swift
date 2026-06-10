@@ -328,6 +328,14 @@ func testAssumeNonNegative() {
   _ = _assumeNonNegative(input) // expected-error {{assumed non-negative value '-3' is negative}}
 }
 
+func testUnsignedSwitchOverflow(val: UInt) {
+  switch val { // expected-error {{negative integer '-24' overflows when stored into unsigned type 'UInt'}}
+    case 12: break
+    case -24: break
+    default: break
+  }
+}
+
 protocol Num { func Double() -> Self }
 
 extension Int8 : Num {

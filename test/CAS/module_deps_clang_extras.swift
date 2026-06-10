@@ -17,11 +17,11 @@
 // RUN: %validate-json %t/deps.json &>/dev/null
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json Test casFSRootID > %t/fs.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s -DDIR=%basename_t -check-prefix FS_ROOT
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s -check-prefix FS_ROOT
 
-// FS_ROOT: [[DIR]].tmp/hidden/Dummy.h
-// FS_ROOT: [[DIR]].tmp/hidden/a.h
-// FS_ROOT: [[DIR]].tmp/hidden/b.h
+// FS_ROOT: TMP_DIR/hidden/Dummy.h
+// FS_ROOT: TMP_DIR/hidden/a.h
+// FS_ROOT: TMP_DIR/hidden/b.h
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd

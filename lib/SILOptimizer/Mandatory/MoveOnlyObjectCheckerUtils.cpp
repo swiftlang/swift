@@ -507,6 +507,23 @@ bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
       orig = markDep->getValue();
       continue;
     }
+    // Look through `destructure_tuple` so that a bindBorrow `copy_value`
+    // of a destructured tuple element (e.g., the `let l, let r` binding
+    // under a `borrowing` switch over a `~Copyable` enum case with a tuple
+    // payload) finds its underlying @guaranteed source. Destructure
+    // results are `MultipleValueInstruction` results, not the defining
+    // instruction itself, so look through `getDefiningInstruction()`.
+    //
+    // `destructure_struct` is intentionally NOT handled here: SILGen's
+    // bindBorrow path doesn't reach it from any source-level construct
+    // today (noncopyable struct payloads bind as a whole; positional
+    // struct destructuring isn't accepted in switch patterns). Add it
+    // alongside a regression test if a new SILGen path ever does emit it.
+    if (auto *destructure = dyn_cast_or_null<DestructureTupleInst>(
+            orig->getDefiningInstruction())) {
+      orig = destructure->getOperand();
+      continue;
+    }
     break;
   }
 
@@ -561,7 +578,13 @@ bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
   //   %copy = copy_value %yield
   //   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign]
   //   %copy
-  if (isa_and_nonnull<BeginApplyInst>(orig->getDefiningInstruction())) {
+  //   Borrow accessors:
+  //   %borrowed_return = apply
+  //   %copy = copy_value %borrowed_return
+  //   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign]
+  //   %copy
+  if (isa_and_nonnull<BeginApplyInst>(orig->getDefiningInstruction()) ||
+      isa_and_nonnull<ApplyInst>(orig->getDefiningInstruction())) {
     if (orig->getOwnershipKind() == OwnershipKind::Guaranteed) {
       for (auto *use : markedInst->getConsumingUses()) {
         destroys.push_back(cast<DestroyValueInst>(use->getUser()));
@@ -574,6 +597,7 @@ bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
       return true;
     }
   }
+
   return false;
 }
 

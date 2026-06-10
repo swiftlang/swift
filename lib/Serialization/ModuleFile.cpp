@@ -152,7 +152,6 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
                                            SourceLoc diagLoc,
                                            bool forTestable) {
   ASTContext &ctx = getContext();
-  auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   ModuleDecl *M = file->getParentModule();
 
   bool missingDependency = false;
@@ -163,6 +162,11 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     assert(!dependency.isLoaded() && "already loaded?");
 
     if (dependency.isHeader()) {
+      auto clangImporter =
+          static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+      if (!clangImporter)
+        return Status::FailedToLoadBridgingHeader;
+
       // The path may be empty if the file being loaded is a partial AST,
       // and the current compiler invocation is a merge-modules step.
       if (!dependency.Core.RawPath.empty()) {
@@ -210,7 +214,6 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     auto importPath = builder.copyTo(ctx);
     auto modulePath = importPath.getModulePath(dependency.isScoped());
     auto accessPath = importPath.getAccessPath(dependency.isScoped());
-
     auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
       // If we're missing the module we're an overlay for, treat that specially.
@@ -263,6 +266,11 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   Status status = Status::Valid;
 
   ModuleDecl *M = file->getParentModule();
+
+  // Propagate any deserialized hidden-type layouts onto the AST.
+  for (auto &entry : Core->HiddenTypeLayouts)
+    M->recordHiddenTypeLayout(entry.getKey(), entry.getValue());
+
   // The real (on-disk) name of the module should be checked here as that's the
   // actually loaded module. In case module aliasing is used when building the main
   // module, e.g. -module-name MyModule -module-alias Foo=Bar, the loaded module
@@ -292,7 +300,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
 
   StringRef SDKPath = ctx.SearchPathOpts.getSDKPath();
   // In Swift 6 mode, we do not inherit search paths from loaded non-SDK modules.
-  if (!ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v6) &&
       (SDKPath.empty() ||
        !Core->ModuleInputBuffer->getBufferIdentifier().starts_with(SDKPath))) {
     for (const auto &searchPath : Core->SearchPaths) {
@@ -428,6 +436,7 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
       "", "", std::move(newBuf), nullptr, nullptr,
       /*isFramework=*/isFramework,
       Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
+      Ctx.LangOpts.hasFeature(Feature::Embedded),
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
   Name = loadedModuleFile->Name.str();
   return std::move(moduleBuf.get());
@@ -597,6 +606,10 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           TopLevelModule->lookupQualified(
               TopLevelModule, DeclNameRef(ScopeID),
               SourceLoc(), NL_QualifiedDefault, Decls);
+          // Skip macro until `import macro` is implemented.
+          llvm::erase_if(Decls, [](ValueDecl *VD) {
+            return isa<MacroDecl>(VD);
+          });
           std::optional<ImportKind> FoundKind =
               ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.has_value() &&
@@ -609,11 +622,10 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
                                     SourceLoc(), importPath.get());
       ID->setModule(M);
       if (Dep.isExported())
-        ID->getAttrs().add(
-            new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+        ID->addAttribute(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
       if (Dep.isImplementationOnly())
-        ID->getAttrs().add(
-            new (Ctx) ImplementationOnlyAttr(/*IsImplicit=*/false));
+        ID->addAttribute(new (Ctx)
+                             ImplementationOnlyAttr(/*IsImplicit=*/false));
 
       ImportDecls.push_back(ID);
     }
@@ -754,7 +766,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
     return;
   auto &ctx = originalAFD->getASTContext();
   Mangle::ASTMangler Mangler(ctx);
-  auto mangledName = Mangler.mangleDeclAsUSR(originalAFD, "");
+  auto mangledName = Mangler.mangleDeclWithPrefix(originalAFD, "");
   auto configs = Core->DerivativeFunctionConfigurations->find(mangledName);
   if (configs == Core->DerivativeFunctionConfigurations->end())
     return;
@@ -1248,9 +1260,11 @@ ModuleFile::getExternalRawLocsForDecl(const Decl *D) const {
       4 +        // Source filename offset
       4 +        // Doc ranges offset
       4 * 3 * 7; // Loc/StartLoc/EndLoc each have 7 4-byte fields
-  uint32_t RecordOffset = RecordSize * UsrId;
-  assert(RecordOffset < Core->BasicDeclLocsData.size());
-  assert(Core->BasicDeclLocsData.size() % RecordSize == 0);
+  // Bounds check. Compute the offset with 64-bit arithmetic to avoid overflows.
+  uint64_t RecordOffset = uint64_t(RecordSize) * UsrId;
+  if (RecordOffset + RecordSize > Core->BasicDeclLocsData.size() ||
+      Core->BasicDeclLocsData.size() % RecordSize != 0)
+    return std::nullopt;
   auto *Record = Core->BasicDeclLocsData.data() + RecordOffset;
 
   ExternalSourceLocs::RawLocs Result;
@@ -1258,10 +1272,21 @@ ModuleFile::getExternalRawLocsForDecl(const Decl *D) const {
 
   const auto DocRangesOffset = readNext<uint32_t>(Record);
   if (DocRangesOffset) {
-    assert(!Core->DocRangesData.empty());
+    if (Core->DocRangesData.empty() ||
+        DocRangesOffset + sizeof(uint32_t) > Core->DocRangesData.size())
+      return std::nullopt;
     const auto *Data = Core->DocRangesData.data() + DocRangesOffset;
     const auto NumLocs = readNext<uint32_t>(Data);
-    assert(NumLocs);
+    if (!NumLocs)
+      return std::nullopt;
+    // Each iteration consumes one RawLoc (7 x uint32_t) plus a trailing
+    // uint32_t length, i.e. 32 bytes. Cap NumLocs against the remaining
+    // bytes in DocRangesData so the loop can't read past the buffer.
+    constexpr uint64_t BytesPerLoc = 8 * sizeof(uint32_t);
+    const uint64_t BytesAvailable =
+        Core->DocRangesData.data() + Core->DocRangesData.size() - Data;
+    if (uint64_t(NumLocs) * BytesPerLoc > BytesAvailable)
+      return std::nullopt;
 
     for (uint32_t I = 0; I < NumLocs; ++I) {
       auto &Range =

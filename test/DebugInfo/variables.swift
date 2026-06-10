@@ -5,6 +5,7 @@
 // ASM-macho: .section __DWARF,__debug_info
 // ASM-elf: .section .debug_info,"",{{[@%]}}progbits
 // ASM-coff: .section .debug_info,"dr"
+// ASM-wasm: .section .debug_info,"",@
 
 // Test variables-interpreter.swift runs this code with `swift -g -i`.
 // Test variables-repl.swift runs this code with `swift -g < variables.swift`.

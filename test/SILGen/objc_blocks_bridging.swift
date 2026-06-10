@@ -195,7 +195,7 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
 
   // CHECK: [[SOME_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt, [[BLOCK]]
   // CHECK: dealloc_stack [[BLOCK_ALLOC]]
-  // CHECK: [[FN:%.*]] = function_ref @noescapeBlock : $@convention(c) (Optional<@convention(block) @noescape () -> ()>) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$sSo13noescapeBlockyyyyXESgFTo : $@convention(c) (Optional<@convention(block) @noescape () -> ()>) -> ()
   // CHECK: apply [[FN]]([[SOME_BLOCK]])
   noescapeBlock { }
   // CHECK: destroy_value [[SOME_BLOCK]]
@@ -217,13 +217,13 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
 
   // CHECK: [[SOME_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt, [[BLOCK]]
   // CHECK: dealloc_stack [[BLOCK_ALLOC]]
-  // CHECK: [[FN:%.*]] = function_ref @noescapeBlock : $@convention(c) (Optional<@convention(block) @noescape () -> ()>) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$sSo13noescapeBlockyyyyXESgFTo : $@convention(c) (Optional<@convention(block) @noescape () -> ()>) -> ()
   // CHECK: apply [[FN]]([[SOME_BLOCK]])
   noescapeBlock(fn)
   // CHECK: destroy_value [[SOME_BLOCK]]
 
   // CHECK: [[NIL_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.none!enumelt
-  // CHECK: [[FN:%.*]] = function_ref @noescapeBlock : $@convention(c) (Optional<@convention(block) @noescape () -> ()>) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$sSo13noescapeBlockyyyyXESgFTo : $@convention(c) (Optional<@convention(block) @noescape () -> ()>) -> ()
   // CHECK: apply [[FN]]([[NIL_BLOCK]])
   noescapeBlock(nil)
 
@@ -242,7 +242,7 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
   // CHECK: [[BLOCK:%.*]] = copy_block_without_escaping [[BLOCK_STACK]]
 
-  // CHECK: [[FN:%.*]] = function_ref @noescapeNonnullBlock : $@convention(c) (@convention(block) @noescape () -> ()) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$sSo20noescapeNonnullBlockyyyyXEFTo : $@convention(c) (@convention(block) @noescape () -> ()) -> ()
   // CHECK: apply [[FN]]([[BLOCK]])
   noescapeNonnullBlock { }
   // CHECK: destroy_value [[BLOCK]]
@@ -262,7 +262,7 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
   // CHECK: [[BLOCK:%.*]] = copy_block_without_escaping [[BLOCK_STACK]]
 
-  // CHECK: [[FN:%.*]] = function_ref @noescapeNonnullBlock : $@convention(c) (@convention(block) @noescape () -> ()) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$sSo20noescapeNonnullBlockyyyyXEFTo : $@convention(c) (@convention(block) @noescape () -> ()) -> ()
   // CHECK: apply [[FN]]([[BLOCK]])
   noescapeNonnullBlock(fn)
 

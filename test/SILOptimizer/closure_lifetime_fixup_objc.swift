@@ -88,11 +88,10 @@ public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villain
 // CHECK:   [[BLOCK_PROJ:%.*]] = project_block_storage [[BLOCK_SLOT]]
 // CHECK:   store [[MDI]] to [[BLOCK_PROJ]] :
 // CHECK:   [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_SLOT]]
-// CHECK:   release_value [[LOOP_IND_VAR]]
 // CHECK:   [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[MDI]]
 // CHECK:   [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
 // CHECK:   destroy_addr [[BLOCK_PROJ]]
-// CHECK:   [[DISPATCH_SYNC_FUNC:%.*]] = function_ref @dispatch_sync :
+// CHECK:   [[DISPATCH_SYNC_FUNC:%.*]] = function_ref @$sSo17OS_dispatch_queueC4sync7executeyyyXE_tFTo :
 // CHECK:   apply [[DISPATCH_SYNC_FUNC]]({{%.*}}, [[BLOCK_COPY]])
 // CHECK:   strong_release [[BLOCK_COPY]]
 // CHECK:   destroy_not_escaped_closure [objc] [[SOME]]
@@ -100,7 +99,6 @@ public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villain
 // CHECK:   br [[LOOP_HEADER_BB]]([[NONE_FOR_BACKEDGE]] :
 //
 // CHECK: [[NONE_BB]]:
-// CHECK:   release_value [[LOOP_IND_VAR]]
 // CHECK:   return
 // CHECK: } // end sil function '$s27closure_lifetime_fixup_objc9dontCrashyyF'
 public func dontCrash() {
@@ -134,7 +132,6 @@ class C: NSObject {
 // Make sure even if we have a loop, we do not release the value after calling super.deinit
 // CHECK-LABEL: sil hidden @$s27closure_lifetime_fixup_objc9CWithLoopCfD : $@convention(method) (@owned CWithLoop) -> () {
 // CHECK:        [[METH:%.*]] = objc_super_method
-// CHECK-NEXT:   release_value
 // CHECK-NEXT:   release_value
 // CHECK-NEXT:   upcast {{%.*}} : $CWithLoop to $NSObject
 // CHECK-NEXT:   apply [[METH]]({{%.*}}) : $@convention(objc_method) (NSObject) -> ()

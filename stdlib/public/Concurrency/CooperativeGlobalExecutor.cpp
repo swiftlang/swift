@@ -30,19 +30,12 @@
 
 #include "swift/shims/Visibility.h"
 
-#include <chrono>
-#ifndef SWIFT_THREADING_NONE
-# include <thread>
-#endif
 #include <new>
 
-#include <errno.h>
 #include "swift/Basic/PriorityQueue.h"
+#include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Heap.h"
 
-#if __has_include(<time.h>)
-# include <time.h>
-#endif
 #ifndef NSEC_PER_SEC
 # define NSEC_PER_SEC 1000000000ull
 #endif
@@ -71,7 +64,18 @@ struct JobQueueTraits {
 };
 using JobPriorityQueue = PriorityQueue<SwiftJob*, JobQueueTraits>;
 
-using JobDeadline = std::chrono::time_point<std::chrono::steady_clock>;
+/// A deadline expressed as nanoseconds on the suspending clock — the same
+/// monotonic timebase `swift_get_time(swift_clock_id_suspending, ...)`
+/// reports.
+using JobDeadline = long long;
+
+/// Read the current time on the suspending clock and return it as a
+/// nanosecond count.
+static JobDeadline currentSuspendingNanos() {
+  long long seconds, nanoseconds;
+  swift_get_time(&seconds, &nanoseconds, swift_clock_id_suspending);
+  return seconds * static_cast<JobDeadline>(NSEC_PER_SEC) + nanoseconds;
+}
 
 template <bool = (sizeof(JobDeadline) <= sizeof(void*) &&
                   alignof(JobDeadline) <= alignof(void*))>
@@ -165,9 +169,7 @@ void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
                                            SwiftJob *newJob) {
   assert(newJob && "no job provided");
 
-  auto deadline = std::chrono::steady_clock::now()
-                + std::chrono::duration_cast<JobDeadline::duration>(
-                    std::chrono::nanoseconds(delay));
+  auto deadline = currentSuspendingNanos() + static_cast<JobDeadline>(delay);
   JobDeadlineStorage<>::set(newJob, deadline);
 
   insertDelayedJob(newJob, deadline);
@@ -181,13 +183,16 @@ void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                               int clock, SwiftJob *newJob) {
   assert(newJob && "no job provided");
 
-  SwiftTime now = swift_time_now(clock);
+  // Compute how far away the caller-supplied deadline is in the caller's
+  // clock, then re-anchor it to our internal suspending-clock timebase.
+  long long nowSec, nowNsec;
+  swift_get_time(&nowSec, &nowNsec, static_cast<swift_clock_id>(clock));
 
-  uint64_t delta = (sec - now.seconds) * NSEC_PER_SEC + nsec - now.nanoseconds;
+  long long delta =
+      (sec - nowSec) * static_cast<JobDeadline>(NSEC_PER_SEC) +
+      (nsec - nowNsec);
 
-  auto deadline = std::chrono::steady_clock::now()
-                + std::chrono::duration_cast<JobDeadline::duration>(
-                    std::chrono::nanoseconds(delta));
+  auto deadline = currentSuspendingNanos() + delta;
   JobDeadlineStorage<>::set(newJob, deadline);
 
   insertDelayedJob(newJob, deadline);
@@ -200,7 +205,7 @@ static void recognizeReadyDelayedJobs() {
   auto nextDelayedJob = DelayedJobQueue;
   if (!nextDelayedJob) return;
 
-  auto now = std::chrono::steady_clock::now();
+  auto now = currentSuspendingNanos();
 
   // Pull jobs off of the delayed-jobs queue whose deadline has been
   // reached, and add them to the ready queue.
@@ -217,22 +222,13 @@ static void recognizeReadyDelayedJobs() {
 }
 
 static void sleepThisThreadUntil(JobDeadline deadline) {
-#ifdef SWIFT_THREADING_NONE
-  auto duration = deadline - std::chrono::steady_clock::now();
-  // If the deadline is in the past, don't sleep with invalid negative value
-  if (duration <= std::chrono::nanoseconds::zero()) {
+  auto now = currentSuspendingNanos();
+  auto remaining = deadline - now;
+  // If the deadline is already in the past there's nothing to wait for.
+  if (remaining <= 0)
     return;
-  }
-  auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
-  auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(duration - sec);
-
-  struct timespec ts;
-  ts.tv_sec = sec.count();
-  ts.tv_nsec = ns.count();
-  while (nanosleep(&ts, &ts) == -1 && errno == EINTR);
-#else
-  std::this_thread::sleep_until(deadline);
-#endif
+  swift_sleep(remaining / static_cast<JobDeadline>(NSEC_PER_SEC),
+              remaining % static_cast<JobDeadline>(NSEC_PER_SEC));
 }
 
 /// Claim the next job from the cooperative global queue.

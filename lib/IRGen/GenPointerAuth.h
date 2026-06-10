@@ -68,6 +68,10 @@ public:
     OpaqueTypeDescriptorAsArgument,
     ContextDescriptorAsArgument,
     TypeLayoutString,
+    CoroAllocationFunction,
+    CoroDeallocationFunction,
+    CoroFrameAllocationFunction,
+    CoroFrameDeallocationFunction,
   };
 
 private:

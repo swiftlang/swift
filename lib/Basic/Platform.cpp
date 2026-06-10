@@ -150,7 +150,10 @@ bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
 }
 
 bool swift::tripleBTCFIByDefaultInOpenBSD(const llvm::Triple &triple) {
-  return triple.isOSOpenBSD() && triple.getArch() == llvm::Triple::aarch64;
+  return triple.isOSOpenBSD() && (
+     triple.getArch() == llvm::Triple::aarch64 ||
+     triple.getArch() == llvm::Triple::x86_64);
+
 }
 
 DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
@@ -181,6 +184,8 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
       return DarwinPlatformKind::VisionOSSimulator;
     return DarwinPlatformKind::VisionOS;
   }
+  if (triple.isAppleFirmware())
+    return DarwinPlatformKind::Firmware;
 
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -205,6 +210,8 @@ static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
     return "xros";
   case DarwinPlatformKind::VisionOSSimulator:
     return "xrsimulator";
+  case DarwinPlatformKind::Firmware:
+    return "firmware";
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -219,7 +226,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::DragonFly:
   case llvm::Triple::DriverKit:
   case llvm::Triple::ELFIAMCU:
-  case llvm::Triple::Emscripten:
   case llvm::Triple::Fuchsia:
   case llvm::Triple::HermitCore:
   case llvm::Triple::Hurd:
@@ -236,6 +242,10 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::Solaris:
   case llvm::Triple::Vulkan:
   case llvm::Triple::ZOS:
+  case llvm::Triple::CheriotRTOS:
+  case llvm::Triple::ChipStar:
+  case llvm::Triple::OpenCL:
+  case llvm::Triple::QURT:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
@@ -243,6 +253,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
   case llvm::Triple::XROS:
+  case llvm::Triple::Firmware:
     return getPlatformNameForDarwin(getDarwinPlatformKind(triple));
   case llvm::Triple::Linux:
     if (triple.isAndroid())
@@ -278,10 +289,20 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "haiku";
   case llvm::Triple::WASI:
     return "wasi";
+  case llvm::Triple::WASIp1:
+    // FIXME: Should be "wasip1", but that breaks the SwiftWASILibC build
+    return "wasi";
+  case llvm::Triple::WASIp2:
+    return "wasip2";
+  case llvm::Triple::WASIp3:
+    return "wasip3";
+  case llvm::Triple::Emscripten:
+    return "emscripten";
   case llvm::Triple::UnknownOS:
     return "none";
   case llvm::Triple::UEFI:
   case llvm::Triple::LiteOS:
+  case llvm::Triple::Managarm:
     llvm_unreachable("unsupported OS");
   }
   llvm_unreachable("unsupported OS");
@@ -300,6 +321,8 @@ llvm::VersionTuple swift::getVersionForTriple(const llvm::Triple &triple) {
     return triple.getOSVersion();
   } else if (triple.isOSWindows()) {
     return triple.getOSVersion();
+  } else if (triple.isAndroid()) {
+    return triple.getEnvironmentVersion();
   }
   return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
 }
@@ -361,18 +384,18 @@ getArchForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleArchName = triple.getArchName();
 
   return llvm::StringSwitch<StringRef>(tripleArchName)
-              .Cases("arm64", "aarch64", "arm64")
-              .Cases("arm64_32", "aarch64_32", "arm64_32")
-              .Cases("x86_64", "amd64", "x86_64")
-              .Cases("i386", "i486", "i586", "i686", "i786", "i886", "i986",
-                     "i386")
-              .Cases("unknown", "", "unknown")
-  // These values are also supported, but are handled by the default case below:
-  //          .Case ("armv7s", "armv7s")
-  //          .Case ("armv7k", "armv7k")
-  //          .Case ("armv7", "armv7")
-  //          .Case ("arm64e", "arm64e")
-              .Default(tripleArchName);
+      .Cases({"arm64", "aarch64"}, "arm64")
+      .Cases({"arm64_32", "aarch64_32"}, "arm64_32")
+      .Cases({"x86_64", "amd64"}, "x86_64")
+      .Cases({"i386", "i486", "i586", "i686", "i786", "i886", "i986"}, "i386")
+      .Cases({"unknown", ""}, "unknown")
+      // These values are also supported, but are handled by the default case
+      // below:
+      //          .Case ("armv7s", "armv7s")
+      //          .Case ("armv7k", "armv7k")
+      //          .Case ("armv7", "armv7")
+      //          .Case ("arm64e", "arm64e")
+      .Default(tripleArchName);
 }
 
 static StringRef
@@ -399,20 +422,21 @@ getOSForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleOSNameNoVersion = tripleOSName.take_until(llvm::isDigit);
 
   return llvm::StringSwitch<StringRef>(tripleOSNameNoVersion)
-              .Cases("macos", "macosx", "darwin", "macos")
-              .Cases("unknown", "", "unknown")
-  // These values are also supported, but are handled by the default case below:
-  //          .Case ("ios", "ios")
-  //          .Case ("tvos", "tvos")
-  //          .Case ("watchos", "watchos")
-              .Default(tripleOSNameNoVersion);
+      .Cases({"macos", "macosx", "darwin"}, "macos")
+      .Cases({"unknown", ""}, "unknown")
+      // These values are also supported, but are handled by the default case
+      // below:
+      //          .Case ("ios", "ios")
+      //          .Case ("tvos", "tvos")
+      //          .Case ("watchos", "watchos")
+      .Default(tripleOSNameNoVersion);
 }
 
 static std::optional<StringRef>
 getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleEnvironment = triple.getEnvironmentName();
   return llvm::StringSwitch<std::optional<StringRef>>(tripleEnvironment)
-      .Cases("unknown", "", std::nullopt)
+      .Cases({"unknown", ""}, std::nullopt)
       // These values are also supported, but are handled by the default case
       // below:
       //          .Case ("simulator", StringRef("simulator"))
@@ -451,13 +475,8 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
                         triple.getOSName(), environment);
   }
 
-  if (triple.isOSFreeBSD()) {
+  if (triple.isOSFreeBSD() || triple.isOSOpenBSD()) {
     return swift::getUnversionedTriple(triple);
-  }
-
-  if (triple.isOSOpenBSD()) {
-    StringRef arch = swift::getMajorArchitectureName(triple);
-    return llvm::Triple(arch, triple.getVendorName(), triple.getOSName());
   }
 
   // Other platforms get no normalization.
@@ -466,15 +485,20 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
 llvm::Triple swift::getUnversionedTriple(const llvm::Triple &triple) {
   StringRef unversionedOSName = triple.getOSName().take_until(llvm::isDigit);
+  StringRef arch = triple.getArchName();
+  if (triple.isOSOpenBSD()) {
+    arch = swift::getMajorArchitectureName(triple);
+  }
+
   if (triple.getEnvironment()) {
     StringRef environment =
         llvm::Triple::getEnvironmentTypeName(triple.getEnvironment());
 
-    return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+    return llvm::Triple(arch, triple.getVendorName(),
                         unversionedOSName, environment);
   }
 
-  return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+  return llvm::Triple(arch, triple.getVendorName(),
                       unversionedOSName);
 }
 
@@ -750,6 +774,11 @@ findSwiftRuntimeVersionHelper(llvm::VersionTuple targetPlatformVersion,
                               ArrayRef<PlatformSwiftRelease> allReleases) {
   #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+  // If the target release is at least the notional future-release version,
+  // return that we aren't deployment-limited.
+  if (targetPlatformVersion >= llvm::VersionTuple(99, 99))
+    return std::nullopt;
+
   // Scan forward in our filtered platform release array for the given
   // platform.
   for (auto &release : allReleases) {
@@ -762,12 +791,6 @@ findSwiftRuntimeVersionHelper(llvm::VersionTuple targetPlatformVersion,
       return std::max(release.swiftVersion, minimumSwiftVersion);
     }
   }
-
-  // If we didn't find anything, but the target release is at least the
-  // notional future-release version, return that we aren't
-  // deployment-limited.
-  if (targetPlatformVersion >= llvm::VersionTuple(99, 99))
-    return std::nullopt;
 
   // Otherwise, return the minimum Swift version.
   return minimumSwiftVersion;

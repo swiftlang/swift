@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -F %S/Inputs/frameworks -module-cache-path %t/mcp1  -target %target-stable-abi-triple
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -F %S/Inputs/frameworks -module-cache-path %t/mcp1  -target %target-stable-abi-triple
 
 // REQUIRES: objc_interop
 

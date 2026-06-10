@@ -24,6 +24,7 @@ fileprivate let pageMask = pageSize - 1
 fileprivate let maxCachedSize = pageSize * 8
 
 @_spi(MemoryReaders)
+@available(BacktracingDT 6.2, *)
 public class CachingMemoryReader<Reader: MemoryReader>: MemoryReader {
   private var reader: Reader
   private var cache: [Address:UnsafeRawBufferPointer]
@@ -96,10 +97,12 @@ extension CachingMemoryReader where Reader == UncachedMemserverMemoryReader {
 }
 #endif
 
-#if os(Linux) || os(macOS)
+#if os(Linux) || os(macOS) || os(Windows)
 @_spi(MemoryReaders)
+@available(BacktracingDT 6.2, *)
 public typealias RemoteMemoryReader = CachingMemoryReader<UncachedRemoteMemoryReader>
 
+@available(BacktracingDT 6.2, *)
 extension CachingMemoryReader where Reader == UncachedRemoteMemoryReader {
   #if os(macOS)
   convenience public init(task: Any) {
@@ -109,12 +112,18 @@ extension CachingMemoryReader where Reader == UncachedRemoteMemoryReader {
   convenience public init(pid: Any) {
     self.init(for: UncachedRemoteMemoryReader(pid: pid))
   }
+  #elseif os(Windows)
+  convenience public init(hProcess: UInt) {
+    self.init(for: UncachedRemoteMemoryReader(hProcess: hProcess))
+  }
   #endif
 }
 
 @_spi(MemoryReaders)
+@available(BacktracingDT 6.2, *)
 public typealias LocalMemoryReader = CachingMemoryReader<UncachedLocalMemoryReader>
 
+@available(BacktracingDT 6.2, *)
 extension CachingMemoryReader where Reader == UncachedLocalMemoryReader {
   convenience public init() {
     self.init(for: UncachedLocalMemoryReader())

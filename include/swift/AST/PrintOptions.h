@@ -127,9 +127,11 @@ struct ShouldPrintChecker {
 
 /// Type-printing options which should only be applied to the outermost
 /// type.
-enum class NonRecursivePrintOption: uint32_t {
+enum class NonRecursivePrintOption : uint32_t {
   /// Print `Optional<T>` as `T!`.
   ImplicitlyUnwrappedOptional = 1 << 0,
+  /// Avoid printing `nonisolated(nonsending)` modifier.
+  SkipNonisolatedNonsending = 1 << 1,
 };
 using NonRecursivePrintOptions = OptionSet<NonRecursivePrintOption>;
 
@@ -277,11 +279,26 @@ public:
   /// Whether to protocol-qualify DependentMemberTypes.
   bool ProtocolQualifiedDependentMemberTypes = false;
 
-  /// If true, printed module names will use the "exported" name, which may be
-  /// different from the regular name.
+  enum class ExportedModuleNameUsage : uint8_t {
+    /// If there is an exported module name, always use it instead of the
+    /// regular name.
+    Always,
+
+    /// If there is an exported module name and the named module is the main
+    /// module or has been loaded by the main module, use it instead of the
+    /// regular name.
+    IfLoaded,
+
+    /// Always use the regular name.
+    Never,
+  };
+
+  /// Conditions under which printed module names will use the "exported" name,
+  /// which may be different from the regular name.
   ///
   /// \see FileUnit::getExportedModuleName
-  bool UseExportedModuleNames = false;
+  ExportedModuleNameUsage UseExportedModuleNames =
+    ExportedModuleNameUsage::Never;
 
   /// If true, printed module names will use the "public" (for documentation)
   /// name, which may be different from the regular name.
@@ -323,6 +340,10 @@ public:
 
   /// Whether to print implicit parts of the AST.
   bool SkipImplicit = false;
+
+  /// Whether to print implicit but synthesized (user-facing) declarations, even
+  /// if SkipImplicit.
+  bool AlwaysPrintSynthesized = false;
 
   /// Whether to print unavailable parts of the AST.
   bool SkipUnavailable = false;
@@ -405,6 +426,12 @@ public:
 
   /// Suppress @inline(always) attribute and emit @inline(__always) instead.
   bool SuppressInlineAlways = false;
+
+  /// Suppress printing of ~Sendable in inheritance and requirement lists.
+  bool SuppressTildeSendable = false;
+
+  /// Suppress printing of @c in favor of @_cdecl.
+  bool SuppressCAttribute = false;
 
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
@@ -577,6 +604,9 @@ public:
   /// with types sharing a name with a module.
   bool AliasModuleNames = false;
 
+  /// Use module selectors when printing names.
+  bool UseModuleSelectors = false;
+
   /// Name of the modules that have been aliased in AliasModuleNames mode.
   /// Ideally we would use something other than a string to identify a module,
   /// but since one alias can apply to more than one module, strings happen
@@ -624,6 +654,11 @@ public:
   /// Whether to print feature checks for compatibility with older Swift
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
+
+  /// Whether to print homogeneous unlabeled tuples in compact form
+  /// (e.g. `(Int /* ... repeated 5 times ... */)` instead of 
+  /// `(Int, Int, Int, Int, Int)`).
+  bool PrintHomogeneousTuplesCompactly = false;
 
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
@@ -694,6 +729,7 @@ public:
   static PrintOptions forDiagnosticArguments() {
     PrintOptions result;
     result.PrintExplicitPackTypes = false;
+    result.PrintHomogeneousTuplesCompactly = true;
     return result;
   }
 
@@ -723,6 +759,7 @@ public:
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
     result.PrintDocumentationComments = false;
+    result.PrintHomogeneousTuplesCompactly = true;
     result.PrintCurrentMembersOnly = true;
     if (printFullConvention)
       result.PrintFunctionRepresentationAttrs =
@@ -766,10 +803,12 @@ public:
   ///
   /// \see swift::emitSwiftInterface
   static PrintOptions printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
+                                              bool useModuleSelectors,
                                               bool preferTypeRepr,
                                               bool printFullConvention,
                                               InterfaceMode interfaceMode,
-                                              bool useExportedModuleNames,
+                                              ExportedModuleNameUsage
+                                                useExportedModuleNames,
                                               bool aliasModuleNames,
                                               llvm::SmallSet<StringRef, 4>
                                                 *aliasModuleNamesTargets
@@ -786,8 +825,6 @@ public:
   void initForSynthesizedExtension(TypeOrExtensionDecl D);
   void initForSynthesizedExtensionInScope(TypeOrExtensionDecl D,
                                           OverrideScope &scope) const;
-
-  void clearSynthesizedExtension();
 
   bool shouldPrint(const Decl* D) const {
     return CurrentPrintabilityChecker->shouldPrint(D, *this);

@@ -18,6 +18,7 @@ PreservedAnalyses AsyncEntryReturnMetadataPass::run(Module &M,
 
   SmallVector<llvm::Function *, 16> asyncEntries;
   SmallVector<llvm::Function *, 16> asyncReturns;
+  SmallVector<llvm::Function *, 16> asyncContinuations;
   for (auto &F : M) {
     if (F.isDeclaration())
       continue;
@@ -26,6 +27,8 @@ PreservedAnalyses AsyncEntryReturnMetadataPass::run(Module &M,
       asyncEntries.push_back(&F);
     if (F.hasFnAttribute("async_ret"))
       asyncReturns.push_back(&F);
+    if (F.hasFnAttribute("async_continuation"))
+      asyncContinuations.push_back(&F);
   }
 
   auto &ctxt = M.getContext();
@@ -83,6 +86,8 @@ PreservedAnalyses AsyncEntryReturnMetadataPass::run(Module &M,
   addSection("__TEXT,__swift_as_ret, coalesced, no_dead_strip",
              "__swift_async_ret_functlets",
              asyncReturns);
+  addSection("__TEXT,__swift_as_cont, coalesced, no_dead_strip",
+             "__swift_async_cont_functlets", asyncContinuations);
 
   if (!changed)
     return PreservedAnalyses::all();

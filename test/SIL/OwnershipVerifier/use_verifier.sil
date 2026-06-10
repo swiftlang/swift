@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -update-borrowed-from -enable-objc-interop -enable-sil-verify-all=0 -module-name Swift -o /dev/null %s 2>&1
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all=0 -module-name Swift -o /dev/null %s 2>&1
 // REQUIRES: asserts
 
 // This file is meant to contain tests that previously the verifier treated
@@ -828,30 +828,6 @@ bb5(%5 : @owned $ThreeDifferingPayloadEnum):
   return %5 : $ThreeDifferingPayloadEnum
 }
 
-sil [ossa] @enum_cases_with_trivial_unowned_cases_arg_into_phi : $@convention(thin) (Builtin.NativeObject) -> ThreeDifferingPayloadEnum {
-bb0(%0 : @unowned $Builtin.NativeObject):
-  cond_br undef, bb1, bb2
-
-bb1:
-  cond_br undef, bb3, bb4
-
-bb2:
-  %1 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
-  br bb5(%1 : $ThreeDifferingPayloadEnum)
-
-bb3:
-  %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %0 : $Builtin.NativeObject
-  br bb5(%2 : $ThreeDifferingPayloadEnum)
-
-bb4:
-  %3 = integer_literal $Builtin.Int32, 0
-  %4 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt, %3 : $Builtin.Int32
-  br bb5(%4 : $ThreeDifferingPayloadEnum)
-
-bb5(%5 : @unowned $ThreeDifferingPayloadEnum):
-  return %5 : $ThreeDifferingPayloadEnum
-}
-
 sil [ossa] @enum_cases_with_trivial_guaranteed_cases_arg_into_phi : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned ThreeDifferingPayloadEnum {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   cond_br undef, bb1, bb2
@@ -860,21 +836,22 @@ bb1:
   cond_br undef, bb3, bb4
 
 bb2:
-  %1 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
-  br bb5(%1 : $ThreeDifferingPayloadEnum)
+  %3 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
+  br bb5(%3)
 
 bb3:
-  %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %0 : $Builtin.NativeObject
-  br bb5(%2 : $ThreeDifferingPayloadEnum)
+  %5 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %0
+  br bb5(%5)
 
 bb4:
-  %3 = integer_literal $Builtin.Int32, 0
-  %4 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt, %3 : $Builtin.Int32
-  br bb5(%4 : $ThreeDifferingPayloadEnum)
+  %7 = integer_literal $Builtin.Int32, 0
+  %8 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt, %7
+  br bb5(%8)
 
-bb5(%5 : @guaranteed $ThreeDifferingPayloadEnum):
-  %6 = copy_value %5 : $ThreeDifferingPayloadEnum
-  return %6 : $ThreeDifferingPayloadEnum
+bb5(%10 : @guaranteed $ThreeDifferingPayloadEnum):
+  %11 = borrowed %10 from (%0)
+  %12 = copy_value %11
+  return %12
 }
 
 sil [ossa] @enum_cases_with_trivial_guaranteed_cases_value_into_phi : $@convention(thin) (@owned Builtin.NativeObject) -> @owned ThreeDifferingPayloadEnum {
@@ -882,30 +859,31 @@ bb0(%0 : @owned $Builtin.NativeObject):
   cond_br undef, bb1, bb2
 
 bb1:
-  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %2 = begin_borrow %0
   cond_br undef, bb3, bb4
 
 bb2:
-  %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
-  br bb6(%2 : $ThreeDifferingPayloadEnum)
+  %4 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
+  br bb6(%4)
 
 bb3:
-  %3 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %1 : $Builtin.NativeObject
-  br bb5(%3 : $ThreeDifferingPayloadEnum)
+  %6 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %2
+  br bb5(%6)
 
 bb4:
-  %4 = integer_literal $Builtin.Int32, 0
-  %5 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt, %4 : $Builtin.Int32
-  br bb5(%5 : $ThreeDifferingPayloadEnum)
+  %8 = integer_literal $Builtin.Int32, 0
+  %9 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt, %8
+  br bb5(%9)
 
-bb5(%6 : @guaranteed $ThreeDifferingPayloadEnum):
-  %7 = copy_value %6 : $ThreeDifferingPayloadEnum
-  end_borrow %1 : $Builtin.NativeObject
-  br bb6(%7 : $ThreeDifferingPayloadEnum)
+bb5(%11 : @guaranteed $ThreeDifferingPayloadEnum):
+  %12 = borrowed %11 from (%2)
+  %13 = copy_value %12
+  end_borrow %2
+  br bb6(%13)
 
-bb6(%8 : @owned $ThreeDifferingPayloadEnum):
-  destroy_value %0 : $Builtin.NativeObject
-  return %8 : $ThreeDifferingPayloadEnum
+bb6(%16 : @owned $ThreeDifferingPayloadEnum):
+  destroy_value %0
+  return %16
 }
 
 
@@ -1129,28 +1107,6 @@ bb0:
   return %9999 : $()
 }
 
-// Make sure that we do not false positive due to borrow users of %12 in an
-// unreachable block.
-sil [ossa] @test_unreachable_users : $@convention(method) (@guaranteed UnsafeUnownedFieldKlass) -> () {
-bb0(%0 : @guaranteed $UnsafeUnownedFieldKlass):
-  %3 = ref_element_addr %0 : $UnsafeUnownedFieldKlass, #UnsafeUnownedFieldKlass.x
-  %4 = load_borrow %3 : $*@sil_unowned Builtin.NativeObject
-  %5 = strong_copy_unowned_value %4 : $@sil_unowned Builtin.NativeObject
-  end_borrow %4 : $@sil_unowned Builtin.NativeObject
-  %12 = begin_borrow %5 : $Builtin.NativeObject
-  %func = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  apply %func(%12) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  end_borrow %12 : $Builtin.NativeObject
-  destroy_value %5 : $Builtin.NativeObject
-  %36 = tuple ()
-  return %36 : $()
-
-bb1:
-  %func2 = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  apply %func2(%12) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  unreachable
-}
-
 sil [ossa] @strong_copy_unmanaged_value_test : $@convention(thin) (@sil_unmanaged Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $@sil_unmanaged Builtin.NativeObject):
   %1 = strong_copy_unmanaged_value %0 : $@sil_unmanaged Builtin.NativeObject
@@ -1174,17 +1130,18 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
   cond_br undef, bb1, bb2
 
 bb1:
-  %3 = load_borrow %0 : $*Builtin.NativeObject
-  br bb3(%3 : $Builtin.NativeObject)
+  %3 = load_borrow %0
+  br bb3(%3)
 
 bb2:
-  %5 = begin_borrow %1 : $Builtin.NativeObject
-  br bb3(%5 : $Builtin.NativeObject)
+  %5 = begin_borrow %1
+  br bb3(%5)
 
-bb3(%7 : @guaranteed $Builtin.NativeObject):
-  end_borrow %7 : $Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
+bb3(%7 : @reborrow $Builtin.NativeObject):
+  %8 = borrowed %7 from (%1)
+  end_borrow %8
+  %10 = tuple ()
+  return %10
 }
 
 sil [ossa] @simple_non_postdominating_diamond_with_forwarding_uses : $@convention(thin) (@in_guaranteed Builtin.NativeObject, @guaranteed NonTrivialStructWithTrivialField) -> () {
@@ -1192,18 +1149,19 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $NonTrivialStructWithTrivialFi
   cond_br undef, bb1, bb2
 
 bb1:
-  %3 = load_borrow %0 : $*Builtin.NativeObject
-  br bb3(%3 : $Builtin.NativeObject)
+  %3 = load_borrow %0
+  br bb3(%3)
 
 bb2:
-  %5 = struct_extract %1 : $NonTrivialStructWithTrivialField, #NonTrivialStructWithTrivialField.owner
-  %6 = begin_borrow %5 : $Builtin.NativeObject
-  br bb3(%6 : $Builtin.NativeObject)
+  %5 = struct_extract %1, #NonTrivialStructWithTrivialField.owner
+  %6 = begin_borrow %5
+  br bb3(%6)
 
-bb3(%7 : @guaranteed $Builtin.NativeObject):
-  end_borrow %7 : $Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
+bb3(%8 : @reborrow $Builtin.NativeObject):
+  %9 = borrowed %8 from (%1)
+  end_borrow %9
+  %11 = tuple ()
+  return %11
 }
 
 // Make sure that we can express a borrow loop carry.
@@ -1212,22 +1170,23 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   br bb1
 
 bb1:
-  %2 = begin_borrow %1 : $Builtin.NativeObject
-  br bb2(%2 : $Builtin.NativeObject)
+  %3 = begin_borrow %1
+  br bb2(%3)
 
-bb2(%3 : @guaranteed $Builtin.NativeObject):
+bb2(%5 : @reborrow $Builtin.NativeObject):
+  %6 = borrowed %5 from (%1)
   cond_br undef, bb3, bb4
 
 bb3:
-  %4 = load_borrow %0 : $*Builtin.NativeObject
-  end_borrow %3 : $Builtin.NativeObject
-  br bb2(%4 : $Builtin.NativeObject)
+  %8 = load_borrow %0
+  end_borrow %6
+  br bb2(%8)
 
 bb4:
-  end_borrow %3 : $Builtin.NativeObject
-  %9999 = tuple()
-  destroy_value %1 : $Builtin.NativeObject
-  return %9999 : $()
+  end_borrow %6
+  %12 = tuple ()
+  destroy_value %1
+  return %12
 }
 
 // Make sure that we accept a borrow loop carry over a two backedge loop.
@@ -1236,33 +1195,34 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   br bb1
 
 bb1:
-  %2 = begin_borrow %1 : $Builtin.NativeObject
-  br bb2(%2 : $Builtin.NativeObject)
+  %3 = begin_borrow %1
+  br bb2(%3)
 
-bb2(%3 : @guaranteed $Builtin.NativeObject):
-  br bb2a
-
-bb2a:
-  cond_br undef, bb3, bb4
+bb2(%5 : @reborrow $Builtin.NativeObject):
+  %6 = borrowed %5 from (%1)
+  br bb3
 
 bb3:
-  cond_br undef, bb3a, bb3b
-
-bb3a:
-  %4 = load_borrow %0 : $*Builtin.NativeObject
-  end_borrow %3 : $Builtin.NativeObject
-  br bb2(%4 : $Builtin.NativeObject)
-
-bb3b:
-  %5 = load_borrow %0 : $*Builtin.NativeObject
-  end_borrow %3 : $Builtin.NativeObject
-  br bb2(%5 : $Builtin.NativeObject)
+  cond_br undef, bb4, bb7
 
 bb4:
-  end_borrow %3 : $Builtin.NativeObject
-  %9999 = tuple()
-  destroy_value %1 : $Builtin.NativeObject
-  return %9999 : $()
+  cond_br undef, bb5, bb6
+
+bb5:
+  %10 = load_borrow %0
+  end_borrow %6
+  br bb2(%10)
+
+bb6:
+  %13 = load_borrow %0
+  end_borrow %6
+  br bb2(%13)
+
+bb7:
+  end_borrow %6
+  %17 = tuple ()
+  destroy_value %1
+  return %17
 }
 
 sil [ossa] @init_existential_ref_forwarding : $@convention(thin) (@guaranteed ClassProtConformingRef, @owned ClassProtConformingRef) -> @owned (ClassProt, ClassProt) {
@@ -1345,21 +1305,22 @@ bb3(%fUnknown : $@callee_owned () -> ()):
 
 sil [ossa] @thin_to_thick_function_noneownership_test_3 : $@convention(thin) () -> () {
 bb0:
-  %f1 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
-  %f2 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
+  %0 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
+  %1 = function_ref @thin_to_thick_function_callee : $@convention(thin) () -> ()
   cond_br undef, bb1, bb2
 
 bb1:
-  %f1thick = thin_to_thick_function %f1 : $@convention(thin) () -> () to $@callee_owned () -> ()
-  br bb3(%f1thick : $@callee_owned () -> ())
+  %3 = thin_to_thick_function %0 to $@callee_owned () -> ()
+  br bb3(%3)
 
 bb2:
-  %f2thick = thin_to_thick_function %f2 : $@convention(thin) () -> () to $@callee_owned () -> ()
-  br bb3(%f2thick : $@callee_owned () -> ())
+  %5 = thin_to_thick_function %1 to $@callee_owned () -> ()
+  br bb3(%5)
 
-bb3(%fUnknown : @guaranteed $@callee_owned () -> ()):
-  %9999 = tuple()
-  return %9999 : $()
+bb3(%7 : @guaranteed $@callee_owned () -> ()):
+  %8 = borrowed %7 from ()
+  %9 = tuple ()
+  return %9
 }
 
 sil [ossa] @thin_to_thick_function_noneownership_test_4 : $@convention(thin) () -> () {
@@ -1381,20 +1342,6 @@ bb3(%fUnknown : @owned $@callee_owned () -> ()):
   destroy_value %fUnknown : $@callee_owned () -> ()
   %9999 = tuple()
   return %9999 : $()
-}
-
-sil [ossa] @unowned_to_ref_is_unowned_instant_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.NativeObject {
-bb0(%0 : @guaranteed $Builtin.NativeObject):
-  %1 = ref_to_unowned %0 : $Builtin.NativeObject to $@sil_unowned Builtin.NativeObject
-  %2 = unowned_to_ref %1 : $@sil_unowned Builtin.NativeObject to $Builtin.NativeObject
-  return %2 : $Builtin.NativeObject
-}
-
-sil [ossa] @unmanaged_to_ref_is_unowned_instant_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.NativeObject {
-bb0(%0 : @guaranteed $Builtin.NativeObject):
-  %1 = ref_to_unmanaged %0 : $Builtin.NativeObject to $@sil_unmanaged Builtin.NativeObject
-  %2 = unmanaged_to_ref %1 : $@sil_unmanaged Builtin.NativeObject to $Builtin.NativeObject
-  return %2 : $Builtin.NativeObject
 }
 
 sil [ossa] @nontrivial_enum_unchecked_enum_data_trivial_payload_owned : $@convention(thin) (@owned ThreeDifferingPayloadEnum) -> Builtin.Int32 {

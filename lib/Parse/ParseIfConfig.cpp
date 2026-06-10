@@ -116,15 +116,24 @@ static llvm::VersionTuple getCanImportVersion(ArgumentList *args,
     return result;
   }
 
-  // VersionTuple supports a maximum of 4 components.
-  ssize_t excessComponents = verText.count('.') - 3;
+  // VersionTuple supports a maximum of 5 components.
+  ssize_t excessComponents = verText.count('.') - 4;
   if (excessComponents > 0) {
+    auto originalSize = verText.size();
     do {
       verText = verText.rsplit('.').first;
     } while (--excessComponents > 0);
     if (D) {
+      // Highlight the trailing dotted components that are about to be dropped,
+      // starting at the period that precedes the first ignored component.
+      SourceLoc verStart = isa<StringLiteralExpr>(subE)
+                               ? subE->getStartLoc().getAdvancedLoc(1)
+                               : subE->getStartLoc();
+      SourceLoc trailingStart = verStart.getAdvancedLoc(verText.size());
+      SourceLoc trailingEnd = verStart.getAdvancedLoc(originalSize);
       D->diagnose(subE->getLoc(), diag::canimport_version_too_many_components,
-                  verText);
+                  verText)
+          .highlightChars(trailingStart, trailingEnd);
     }
   }
 
@@ -385,7 +394,7 @@ public:
       return E;
     }
 
-    // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' | '_hasAtomicBitWidth' ) '(' identifier ')''
+    // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' | '_hasAtomicBitWidth' | 'objectFormat' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.has_value()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
@@ -429,6 +438,8 @@ public:
         DiagName = "pointer authentication scheme"; break;
       case PlatformConditionKind::HasAtomicBitWidth:
         DiagName = "has atomic bit width"; break;
+      case PlatformConditionKind::ObjectFileFormat:
+        DiagName = "object file format"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }

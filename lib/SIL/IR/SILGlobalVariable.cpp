@@ -44,7 +44,23 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
 }
 
 ModuleDecl *SILGlobalVariable::getParentModule() const {
-  return ParentModule ? ParentModule : getModule().getSwiftModule();
+  if (auto parentModule = DeclCtxOrParentModule.dyn_cast<ModuleDecl *>())
+    return parentModule;
+
+  if (auto declContext = DeclCtxOrParentModule.dyn_cast<DeclContext *>())
+    return declContext->getParentModule();
+
+  return getModule().getSwiftModule();
+}
+
+DeclContext *SILGlobalVariable::getDeclContext() const {
+  if (auto var = getDecl())
+    return var->getDeclContext();
+
+  if (auto declContext = DeclCtxOrParentModule.dyn_cast<DeclContext *>())
+    return declContext;
+
+  return nullptr;
 }
 
 static bool isGlobalLet(SILModule &mod, VarDecl *decl, SILType type) {
@@ -72,11 +88,27 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
                                      VarDecl *Decl)
     : SwiftObjectHeader(registeredMetatype), Module(Module), Name(Name),
       LoweredType(LoweredType), Location(Loc.value_or(SILLocation::invalid())),
-      Linkage(unsigned(Linkage)), HasLocation(Loc.has_value()), VDecl(Decl) {
+      Linkage(unsigned(Linkage)), HasLocation(Loc.has_value()), CodeGenModel(0),
+      VDecl(Decl) {
   setSerializedKind(serializedKind);
   IsDeclaration = isAvailableExternally(Linkage);
   setLet(isGlobalLet(Module, Decl, LoweredType));
   setMarkedAsUsed(Decl && Decl->getAttrs().hasAttribute<UsedAttr>());
+  if (Decl) {
+    auto cgModel = Decl->getExplicitCodeGenerationModel();
+    if (!cgModel && Module.getOptions().EmbeddedSwift)
+      cgModel = Decl->getEffectiveCodeGenerationModel();
+    if (cgModel) {
+      switch (*cgModel) {
+      case CodeGenerationModel::Interface:
+      case CodeGenerationModel::Implementation:
+        setCodeGenerationModel(*cgModel);
+        break;
+      case CodeGenerationModel::Inlinable:
+        break;
+      }
+    }
+  }
   Module.silGlobals.push_back(this);
 }
 
@@ -84,11 +116,40 @@ SILGlobalVariable::~SILGlobalVariable() {
   clear();
 }
 
+void SILGlobalVariable::setAsmName(StringRef value) {
+  ASSERT((AsmName.empty() || value == AsmName) && "Cannot change asmname");
+  AsmName = value;
+
+  if (!value.empty()) {
+    // Update the variable-by-asm-name-table.
+    getModule().GlobalVariableByAsmNameMap.insert({AsmName, this});
+  }
+}
+
+std::optional<CodeGenerationModel>
+SILGlobalVariable::codeGenerationModel() const {
+  if (CodeGenModel == 0)
+    return std::nullopt;
+
+  return static_cast<CodeGenerationModel>(CodeGenModel - 1);
+}
+
+void SILGlobalVariable::setCodeGenerationModel(
+    std::optional<CodeGenerationModel> value) {
+  if (value)
+    CodeGenModel = static_cast<unsigned>(*value) + 1;
+  else
+    CodeGenModel = 0;
+}
+
 bool SILGlobalVariable::isPossiblyUsedExternally() const {
   if (shouldBePreservedForDebugger())
     return true;
 
   if (markedAsUsed())
+    return true;
+
+  if (!section().empty())
     return true;
 
   SILLinkage linkage = getLinkage();
@@ -100,6 +161,20 @@ bool SILGlobalVariable::hasNonUniqueDefinition() const {
   auto &ctx = getModule().getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::Embedded))
     return false;
+
+  // If a code generation model was recorded on this SIL global (either set at
+  // SIL construction time or recovered from serialization), use it directly so
+  // the answer matches across module boundaries.
+  if (auto cgModel = codeGenerationModel()) {
+    switch (*cgModel) {
+    case CodeGenerationModel::Implementation:
+      return true;
+    case CodeGenerationModel::Interface:
+      return false;
+    case CodeGenerationModel::Inlinable:
+      break;
+    }
+  }
 
   // If this is for a declaration, ask it.
   if (auto decl = getDecl()) {
@@ -148,7 +223,7 @@ SILInstruction *SILGlobalVariable::getStaticInitializerValue() {
 }
 
 bool SILGlobalVariable::mustBeInitializedStatically() const {
-  if (getSectionAttr())
+  if (!section().empty())
     return true;
 
   auto *decl = getDecl();  

@@ -34,6 +34,9 @@ with open(input_json, "r") as file:
             if "moduleCacheKey" in detail["details"][kind]:
                 module["moduleCacheKey"] = detail["details"][kind]["moduleCacheKey"]
 
+        if "libraryLevel" in detail:
+            module["libraryLevel"] = detail["libraryLevel"]
+
         modules.append(module)
 
 

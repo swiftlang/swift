@@ -36,8 +36,8 @@ actor ActorWithSynchronousNonIsolatedInit {
     // TODO: This should say actor isolated.
     let _ = { @MainActor in
       print(newK) // expected-error {{sending 'newK' risks causing data races}}
-      // expected-ni-note @-1 {{task-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
-      // expected-ni-ns-note @-2 {{task-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-ni-note @-1 {{'self'-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-ni-ns-note @-2 {{'self'-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 
@@ -47,7 +47,6 @@ actor ActorWithSynchronousNonIsolatedInit {
     helper(newK)
 
     let _ = { @MainActor in
-      // TODO: Second part should say later 'self'-isolated uses
       print(newK) // expected-error {{sending 'newK' risks causing data races}}
       // expected-note @-1 {{'self'-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
@@ -75,10 +74,10 @@ func initActorWithSyncNonIsolatedInit() {
 func initActorWithSyncNonIsolatedInit2(_ k: NonSendableKlass) {
   // TODO: This should say actor isolated.
   _ = ActorWithSynchronousNonIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated code and code in the current isolation context}}
   let _ = { @MainActor in
     print(k) // expected-error {{sending 'k' risks causing data races}}
-    // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-note @-1 {{'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against code in the current isolation context}}
   }
 }
 
@@ -104,10 +103,10 @@ func initActorWithAsyncIsolatedInit() async {
 func initActorWithAsyncIsolatedInit2(_ k: NonSendableKlass) async {
   // TODO: This should say actor isolated.
   _ = await ActorWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'k' to actor-isolated initializer 'init(_:)' risks causing data races between actor-isolated code and code in the current isolation context}}
   let _ = { @MainActor in
     print(k) // expected-error {{sending 'k' risks causing data races}}
-    // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-note @-1 {{'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against code in the current isolation context}}
   }
 }
 
@@ -124,7 +123,7 @@ class ClassWithSynchronousNonIsolatedInit {
 
     let _ = { @MainActor in
       print(newK) // expected-error {{sending 'newK' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against code in the current isolation context}}
     }
   }
 
@@ -143,7 +142,7 @@ func initClassWithSyncNonIsolatedInit2(_ k: NonSendableKlass) {
   _ = ClassWithSynchronousNonIsolatedInit(k)
   let _ = { @MainActor in
     print(k) // expected-error {{sending 'k' risks causing data races}}
-    // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-note @-1 {{'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against code in the current isolation context}}
   }
 }
 
@@ -171,9 +170,77 @@ func initClassWithAsyncIsolatedInit() async {
 
 func initClassWithAsyncIsolatedInit2(_ k: NonSendableKlass) async {
   _ = await ClassWithAsyncIsolatedInit(k) // expected-error {{sending 'k' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'k' to global actor 'CustomActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'CustomActor'-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'k' to global actor 'CustomActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'CustomActor'-isolated code and code in the current isolation context}}
   let _ = { @MainActor in
     print(k) // expected-error {{sending 'k' risks causing data races}}
-    // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-note @-1 {{'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against code in the current isolation context}}
   }
+}
+
+// Iterating over an existential sequence parameter must not produce false
+// positive RBI errors in any of these isolation contexts.
+
+actor ActorWithExistentialSequenceInit {
+  init(sequence: any Sequence<Int>) {
+    for element in sequence {
+      _ = element
+    }
+  }
+}
+
+@MainActor
+class MainActorClassWithExistentialSequenceInit {
+  init(sequence: any Sequence<Int>) {
+    for element in sequence {
+      _ = element
+    }
+  }
+}
+
+@CustomActor
+class CustomActorClassWithExistentialSequenceInit {
+  init(sequence: any Sequence<Int>) async {
+    for element in sequence {
+      _ = element
+    }
+  }
+}
+
+func nonisolatedFuncWithExistentialSequence(sequence: any Sequence<Int>) {
+  for element in sequence {
+    _ = element
+  }
+}
+
+// Class-constrained variant: the iterator associated type is AnyObject-constrained,
+// so erasing it into an existential uses init_existential_ref (not init_existential_addr).
+// This exercises the visitInitExistentialRefInst fix path.
+
+protocol FakeClassIterator: AnyObject {
+  func nextElement()
+}
+
+protocol FakeClassSequence {
+  associatedtype Iterator: FakeClassIterator
+  func makeIterator() -> Iterator
+}
+
+actor ActorWithClassExistentialSequenceInit {
+  init(sequence: any FakeClassSequence) {
+    let iter: any FakeClassIterator = sequence.makeIterator()
+    iter.nextElement()
+  }
+}
+
+@MainActor
+class MainActorClassWithClassExistentialSequenceInit {
+  init(sequence: any FakeClassSequence) {
+    let iter: any FakeClassIterator = sequence.makeIterator()
+    iter.nextElement()
+  }
+}
+
+func nonisolatedFuncWithClassExistentialSequence(sequence: any FakeClassSequence) {
+  let iter: any FakeClassIterator = sequence.makeIterator()
+  iter.nextElement()
 }

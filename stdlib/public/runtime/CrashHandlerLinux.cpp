@@ -29,6 +29,7 @@
 
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -48,6 +49,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #define DEBUG_MEMSERVER 0
 
@@ -63,9 +65,6 @@
 #include <cstring>
 
 #include "BacktracePrivate.h"
-
-// Run the memserver in a thread (0) or separate process (1)
-#define MEMSERVER_USE_PROCESS 0
 
 #ifndef lengthof
 #define lengthof(x)     (sizeof(x) / sizeof(x[0]))
@@ -85,6 +84,7 @@ uint32_t currently_paused();
 void wait_paused(uint32_t expected, const struct timespec *timeout);
 int  memserver_start();
 int  memserver_entry(void *);
+void closeFds(int memserver_master_fd);
 
 ssize_t safe_read(int fd, void *buf, size_t len) {
   uint8_t *ptr = (uint8_t *)buf;
@@ -94,7 +94,7 @@ ssize_t safe_read(int fd, void *buf, size_t len) {
   while (ptr < end) {
     ssize_t ret;
     do {
-      ret = read(fd, buf, len);
+      ret = read(fd, ptr, len);
     } while (ret <= 0 && errno == EINTR);
     if (ret <= 0)
       return ret;
@@ -114,7 +114,7 @@ ssize_t safe_write(int fd, const void *buf, size_t len) {
   while (ptr < end) {
     ssize_t ret;
     do {
-      ret = write(fd, buf, len);
+      ret = write(fd, ptr, len);
     } while (ret <= 0 && errno == EINTR);
     if (ret <= 0)
       return ret;
@@ -127,6 +127,7 @@ ssize_t safe_write(int fd, const void *buf, size_t len) {
 }
 
 CrashInfo crashInfo;
+int maxFdToClose = 1024;
 
 const int signalsToHandle[] = {
   SIGQUIT,
@@ -193,6 +194,11 @@ _swift_installCrashHandler()
     }
   }
 
+  // Read the per-process open-file limit once, for use in closeFds()
+  struct rlimit rl;
+  if (getrlimit(RLIMIT_NOFILE, &rl) == 0)
+    maxFdToClose = (int)rl.rlim_cur;
+
   return 0;
 }
 
@@ -202,7 +208,7 @@ _swift_installCrashHandler()
 
 namespace {
 
-// Older glibc and musl don't have these two syscalls
+// Older glibc and musl don't have these syscalls
 pid_t
 gettid()
 {
@@ -212,6 +218,24 @@ gettid()
 int
 tgkill(int tgid, int tid, int sig) {
   return syscall(SYS_tgkill, tgid, tid, sig);
+}
+
+#ifndef SYS_close_range
+#define SYS_close_range 436
+#endif
+
+#define CLOSE_RANGE_UNSHARE 0x2
+#define CLOSE_RANGE_CLOEXEC 0x4
+
+static int _close_range(unsigned int first, unsigned int last, int flags) {
+  if (syscall(SYS_close_range, first, last, flags) == 0)
+    return 0;
+  if (errno != ENOSYS)
+    return -1;
+  for (unsigned int i = first; i <= last; i++) {
+    close(i);
+  }
+  return 0;
 }
 
 void
@@ -240,15 +264,7 @@ handle_fatal_signal(int signum,
   for (unsigned n = 0; n < lengthof(signalsToHandle); ++n)
     reset_signal(signalsToHandle[n]);
 
-  // Fill in crash info
-  crashInfo.crashing_thread = self.tid;
-  crashInfo.signal = signum;
-  crashInfo.fault_address = (uint64_t)pinfo->si_addr;
-
-  // Start the memory server
-  int fd = memserver_start();
-
-  // Display a progress message
+  // Find the program counter
   void *pc = 0;
   ucontext_t *ctx = (ucontext_t *)uctx;
 
@@ -266,7 +282,30 @@ handle_fatal_signal(int signum,
 #endif
 #endif
 
+  // Fill in crash info
+  crashInfo.crashing_thread = self.tid;
+  crashInfo.signal = signum;
+  switch (signum) {
+  case SIGILL:
+  case SIGFPE:
+  case SIGSEGV:
+  case SIGBUS:
+  case SIGTRAP:
+    crashInfo.fault_address = (uint64_t)pinfo->si_addr;
+    break;
+  default:
+    crashInfo.fault_address = (uint64_t)pc;
+  }
+
+  // Start the memory server
+  int fd = memserver_start();
+
+  // Display a progress message
   _swift_displayCrashMessage(signum, pc);
+
+  if (_swift_backtraceSettings.closeFds) {
+    closeFds(fd);
+  }
 
   // Actually start the backtracer
   if (!_swift_spawnBacktracer(&crashInfo, fd)) {
@@ -278,12 +317,10 @@ handle_fatal_signal(int signum,
       write(STDERR_FILENO, message, strlen(message));
   }
 
-#if !MEMSERVER_USE_PROCESS
-  /* If the memserver is in-process, it may have set signal handlers,
+  /* The memserver may have set signal handlers,
      so reset SIGSEGV and SIGBUS again */
   reset_signal(SIGSEGV);
   reset_signal(SIGBUS);
-#endif
 
   // Restart the other threads
   resume_other_threads();
@@ -354,6 +391,12 @@ getdents(int fd, void *buf, size_t bufsiz)
   return syscall(SYS_getdents64, fd, buf, bufsiz);
 }
 
+// Write a string to stderr
+void
+warn(const char *str) {
+  write(STDERR_FILENO, str, strlen(str));
+}
+
 /* Find the signal to use to suspend the given thread.
 
    Sadly, libdispatch blocks SIGUSR1, so we can't just use that everywhere;
@@ -383,8 +426,10 @@ signal_for_suspend(int pid, int tid)
   strcat(status_file, "/status");   // 7 + 1 for NUL
 
   int fd = open(status_file, O_RDONLY);
-  if (fd < 0)
+  if (fd < 0) {
+    warn("swift-runtime: cannot open status file\n");
     return -1;
+  }
 
   enum match_state {
     Matching,
@@ -459,17 +504,9 @@ signal_for_suspend(int pid, int tid)
       return SIGUSR2;
     else if (!(mask & (1 << (SIGPROF - 1))))
       return SIGPROF;
-    else
-      return -1;
   }
 
   return -1;
-}
-
-// Write a string to stderr
-void
-warn(const char *str) {
-  write(STDERR_FILENO, str, strlen(str));
 }
 
 /* Stop all other threads in this process; we do this by establishing a
@@ -495,7 +532,7 @@ suspend_other_threads(struct thread *self)
 
   // Swap out the signal handlers first
   sigfillset(&sa.sa_mask);
-  sa.sa_flags = 0;
+  sa.sa_flags = SA_SIGINFO;
   sa.sa_handler = NULL;
   sa.sa_sigaction = pause_thread;
 
@@ -514,11 +551,13 @@ suspend_other_threads(struct thread *self)
 
   unsigned max_loops = 15;
   uint32_t pending = 0;
+  uint32_t waitingToSignal = 0;
 
   do {
     uint32_t paused = currently_paused();
 
     pending = 0;
+    waitingToSignal = 0;
 
     lseek(fd, 0, SEEK_SET);
 
@@ -540,29 +579,50 @@ suspend_other_threads(struct thread *self)
 
       int tid = atoi(dp->d_name);
 
+      // check if this thread is on our list of threads already known
       if ((int64_t)tid != self->tid && !seen_thread(tid)) {
+        // if not, try to find a suitable signal to suspend it
         int sig_to_use = signal_for_suspend(our_pid, tid);
 
         if (sig_to_use > 0) {
           tgkill(our_pid, tid, sig_to_use);
           ++pending;
         } else {
+          // try another time to see if we can signal via the outer loop...
+          ++waitingToSignal;
           warn("swift-runtime: failed to suspend thread ");
           warn(dp->d_name);
-          warn(" while processing a crash; backtraces will be missing "
-               "information\n");
+          warn(" retrying...\n");
         }
       }
     }
 
     // If we find no new threads, we're done
-    if (!pending)
+    if (!pending && !waitingToSignal)
       break;
+
+    if (!pending) {
+      // we are not waiting for any thread to pause, but we haven't exited
+      // so waitingToSignal > 0 and pending == 0
+      // when we are unable to get a suitable signal for at least one thread,
+      // a common cause is glibc masking signals temporarily, for things like
+      // pthread creation/termination, try a short pause, then we'll try again
+      // on the next iteration
+      struct timespec shortDelay;
+      shortDelay.tv_sec = 0;
+      shortDelay.tv_nsec = 10000000;
+      nanosleep(&shortDelay, NULL);
+    }
 
     // Wait for the threads to suspend
     struct timespec timeout = { 2, 0 };
     wait_paused(paused + pending, &timeout);
   } while (max_loops--);
+
+  if (waitingToSignal) {
+    warn("swift-runtime: failed to suspend thread while processing a crash; "
+      "backtraces will be missing information\n");
+  }
 
   // Close the directory
   close(fd);
@@ -658,6 +718,27 @@ int memserver_fd;
 sigjmp_buf memserver_fault_buf;
 pid_t memserver_pid;
 
+#define MIN_FD_TO_CLOSE 3
+
+void
+closeFds(int memserver_master_fd) {
+  // We don't attempt to close either of the file descriptors for the
+  // pipe used to communicate with the memserver thread.
+
+  // Otherwise we close all file descriptors after stderr except the end of
+  // the pipe used by swift-backtrace.
+
+  int keepOpen1 = memserver_master_fd < memserver_fd
+    ? memserver_master_fd : memserver_fd;
+  int keepOpen2 = memserver_master_fd < memserver_fd
+    ? memserver_fd : memserver_master_fd;
+
+  _close_range(MIN_FD_TO_CLOSE, keepOpen1-1, 0);
+  if (keepOpen2 > keepOpen1+1)
+    _close_range(keepOpen1+1, keepOpen2-1, 0);
+  _close_range(keepOpen2+1, maxFdToClose, 0);
+}
+
 int
 memserver_start()
 {
@@ -672,33 +753,19 @@ memserver_start()
 
   memserver_fd = fds[0];
   ret = clone(memserver_entry, memserver_stack + sizeof(memserver_stack),
-#if MEMSERVER_USE_PROCESS
-              0,
-#else
               #ifndef __musl__
               // Can't use CLONE_THREAD on musl because the clone() function
               // there returns EINVAL if we do.
               CLONE_THREAD | CLONE_SIGHAND |
               #endif
               CLONE_VM | CLONE_FILES | CLONE_FS | CLONE_IO,
-#endif
               NULL);
   if (ret < 0) {
     memserver_error("memserver_start: clone failed");
     return ret;
   }
 
-#if MEMSERVER_USE_PROCESS
-  memserver_pid = ret;
-
-  /* Tell the Yama LSM module, if it's running, that it's OK for
-     the memserver to read process memory */
-  prctl(PR_SET_PTRACER, ret);
-
-  close(fds[0]);
-#else
   memserver_pid = getpid();
-#endif
 
   return fds[1];
 }
@@ -730,10 +797,6 @@ int
 memserver_entry(void *dummy __attribute__((unused))) {
   int fd = memserver_fd;
   int result = 1;
-
-#if MEMSERVER_USE_PROCESS || defined(__musl__)
-  prctl(PR_SET_NAME, "[backtrace]");
-#endif
 
   struct sigaction sa;
   sigfillset(&sa.sa_mask);

@@ -1,0 +1,42 @@
+// RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -O -g -emit-ir %s | %FileCheck %s
+sil_stage canonical
+
+import Swift
+import Builtin
+
+struct MyStruct {
+  var x: Builtin.Int64
+  var y: Builtin.Int64
+}
+
+// CHECK-LABEL: define {{.*}} @load_from_addr
+sil @load_from_addr : $@convention(thin) (@in_guaranteed Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64):
+  // CHECK: #dbg_value(ptr %0, ![[LOAD_VAR:[0-9]+]], !DIExpression(DW_OP_deref)
+  debug_value %0 : $*Builtin.Int64, var, name "loaded", transform {
+  bb0(%1 : $*Builtin.Int64):
+    %2 = load %1 : $*Builtin.Int64
+    return %2 : $Builtin.Int64
+  }
+  %v = load %0 : $*Builtin.Int64
+  return %v : $Builtin.Int64
+}
+
+// CHECK-LABEL: define {{.*}} @load_field
+sil @load_field : $@convention(thin) (@in_guaranteed MyStruct) -> Builtin.Int64 {
+bb0(%0 : $*MyStruct):
+  // The struct_element_addr becomes a constant offset, and the load becomes DW_OP_deref.
+  // CHECK: #dbg_value(ptr %0, ![[LOAD_FIELD_VAR:[0-9]+]], !DIExpression(DW_OP_plus_uconst, 8, DW_OP_deref, DW_OP_stack_value)
+  debug_value %0 : $*MyStruct, var, name "field_y", type $Builtin.Int64, transform {
+  bb0(%1 : $*MyStruct):
+    %2 = struct_element_addr %1 : $*MyStruct, #MyStruct.y
+    %3 = load %2 : $*Builtin.Int64
+    return %3 : $Builtin.Int64
+  }
+  %addr = struct_element_addr %0 : $*MyStruct, #MyStruct.x
+  %v = load %addr : $*Builtin.Int64
+  return %v : $Builtin.Int64
+}
+
+// CHECK: ![[LOAD_VAR]] = !DILocalVariable(name: "loaded"
+// CHECK: ![[LOAD_FIELD_VAR]] = !DILocalVariable(name: "field_y"

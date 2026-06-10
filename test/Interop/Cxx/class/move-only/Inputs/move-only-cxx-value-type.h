@@ -68,4 +68,30 @@ struct FieldInAnonStruct {
 
 using FieldInAnonStructNC = FieldInAnonStruct<NonCopyable>;
 
+struct EmptyBase {};
+
+struct __attribute__((swift_attr("~Copyable"))) TrivialNonCopyable {
+  int x;
+};
+struct __attribute__((swift_attr("~Copyable"))) DerivesEmptyBase
+    : public EmptyBase {
+  NonCopyable first;
+  TrivialNonCopyable second;
+  Copyable third;
+
+  DerivesEmptyBase(int f, int s, int t) : first{f}, second{s}, third{t} {}
+};
+
+struct DerivesEmptyBaseNoAttr : public EmptyBase {
+  NonCopyable first;
+  TrivialNonCopyable second;
+  Copyable third;
+
+  DerivesEmptyBaseNoAttr(int f, int s, int t) : first{f}, second{s}, third{t} {}
+  DerivesEmptyBaseNoAttr(const DerivesEmptyBaseNoAttr &other) = delete;
+  DerivesEmptyBaseNoAttr(DerivesEmptyBaseNoAttr &&other)
+      : first(std::move(other.first)), second(other.second),
+        third(other.third) {}
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_MOVE_ONLY_VT_H

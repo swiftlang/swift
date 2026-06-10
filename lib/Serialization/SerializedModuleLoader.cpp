@@ -333,6 +333,8 @@ std::optional<std::string> SerializedModuleLoaderBase::invalidModuleReason(seria
     return "target platform newer than current platform";
   case Status::SDKMismatch:
     return "SDK does not match";
+  case Status::EmbeddedMismatch:
+      return "mixes Embedded Swift and non-embedded Swift";
   case Status::Valid:
     return std::nullopt;
   }
@@ -342,7 +344,8 @@ std::optional<std::string> SerializedModuleLoaderBase::invalidModuleReason(seria
 llvm::ErrorOr<std::vector<ScannerImportStatementInfo>>
 SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
     Twine modulePath, bool isFramework,
-    StringRef SDKName, const llvm::Triple &target, StringRef packageName,
+    StringRef SDKName, const llvm::Triple &target, bool isEmbedded,
+    StringRef packageName,
     llvm::vfs::FileSystem *fileSystem, PathObfuscator &recoverer) {
   auto moduleBuf = fileSystem->getBufferForFile(modulePath);
   if (!moduleBuf)
@@ -353,7 +356,7 @@ SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      SDKName, target, recoverer, loadedModuleFile);
+      SDKName, target, isEmbedded, recoverer, loadedModuleFile);
 
   if (loadedModuleFile->getModulePackageName() != packageName)
     return importedModuleNames;
@@ -732,8 +735,8 @@ bool SerializedModuleLoaderBase::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-    bool isCanImportLookup, bool isTestableDependencyLookup,
-    bool &isFramework, bool &isSystemModule) {
+    std::string *cacheKey, bool isCanImportLookup,
+    bool isTestableDependencyLookup, bool &isFramework, bool &isSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -952,6 +955,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
       std::move(moduleSourceInfoInputBuffer), isFramework,
       Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
+      Ctx.LangOpts.hasFeature(Feature::Embedded),
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
 
@@ -983,12 +987,16 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (!loadedModuleFile->getPublicModuleName().empty())
       M.setPublicModuleName(Ctx.getIdentifier(loadedModuleFile->getPublicModuleName()));
+    if (!loadedModuleFile->getOSLogStringSectionName().empty())
+      Ctx.LangOpts.OSLogStringSectionName = loadedModuleFile->getOSLogStringSectionName();
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
     if (loadedModuleFile->strictMemorySafety())
       M.setStrictMemorySafety();
-    if (loadedModuleFile->deferredCodeGen())
-      M.setDeferredCodeGen();
+    M.setCodeGenerationModel(loadedModuleFile->codeGenerationModel());
+    if (loadedModuleFile->isAggressiveCMOEnabled())
+      M.setAggressiveCMOEnabled();
+    M.setStoredLibraryLevel(loadedModuleFile->getLibraryLevel());
     if (loadedModuleFile->hasCxxInteroperability()) {
       M.setHasCxxInteroperability();
       M.setCXXStdlibKind(loadedModuleFile->getCXXStdlibKind());
@@ -1067,18 +1075,6 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   if (M.hasHermeticSealAtLink() && !Ctx.LangOpts.HermeticSealAtLink) {
     Ctx.Diags.diagnose(diagLoc.value_or(SourceLoc()),
                        diag::need_hermetic_seal_to_import_module, M.getName());
-  }
-
-  if (M.isEmbeddedSwiftModule() &&
-      !Ctx.LangOpts.hasFeature(Feature::Embedded)) {
-    Ctx.Diags.diagnose(diagLoc.value_or(SourceLoc()),
-                       diag::cannot_import_embedded_module, M.getName());
-  }
-
-  if (!M.isEmbeddedSwiftModule() &&
-      Ctx.LangOpts.hasFeature(Feature::Embedded)) {
-    Ctx.Diags.diagnose(diagLoc.value_or(SourceLoc()),
-                       diag::cannot_import_non_embedded_module, M.getName());
   }
 
   // Non-resilient modules built with C++ interoperability enabled
@@ -1225,11 +1221,20 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     break;
   }
 
-  case serialization::Status::SDKMismatch:
+  case serialization::Status::SDKMismatch: {
     auto currentSDK = Ctx.LangOpts.SDKName;
     auto moduleSDK = loadInfo.sdkName;
     Ctx.Diags.diagnose(diagLoc, diag::serialization_sdk_mismatch,
                        ModuleName, moduleSDK, currentSDK, moduleBufferID);
+    break;
+  }
+
+  case serialization::Status::EmbeddedMismatch:
+    Ctx.Diags.diagnose(diagLoc,
+                       Ctx.LangOpts.hasFeature(Feature::Embedded)
+                         ? diag::cannot_import_non_embedded_module
+                         : diag::cannot_import_embedded_module,
+                       ModuleName);
     break;
   }
 }
@@ -1250,6 +1255,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   case serialization::Status::TargetIncompatible:
   case serialization::Status::TargetTooNew:
   case serialization::Status::SDKMismatch:
+  case serialization::Status::EmbeddedMismatch:
     llvm_unreachable("status not handled by "
         "diagnoseSerializedASTLoadFailureTransitive");
 
@@ -1484,6 +1490,7 @@ std::unique_ptr<llvm::MemoryBuffer> swift::extractEmbeddedBridgingHeaderContent(
       "", "", std::move(file), nullptr, nullptr, false,
       Context.LangOpts.SDKName,
       Context.LangOpts.Target,
+      Context.LangOpts.hasFeature(Feature::Embedded),
       Context.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFile);
 
@@ -1508,12 +1515,13 @@ bool SerializedModuleLoaderBase::canImportModule(
   bool isSystemModule = false;
 
   auto mID = path[0];
-  auto found = findModule(
-      mID, /*moduleInterfacePath=*/nullptr, &moduleInterfaceSourcePath,
-      &moduleInputBuffer,
-      /*moduleDocBuffer=*/nullptr, /*moduleSourceInfoBuffer=*/nullptr,
-      /*isCanImportLookup=*/true, isTestableDependencyLookup,
-      isFramework, isSystemModule);
+  auto found =
+      findModule(mID, /*moduleInterfacePath=*/nullptr,
+                 &moduleInterfaceSourcePath, &moduleInputBuffer,
+                 /*moduleDocBuffer=*/nullptr,
+                 /*moduleSourceInfoBuffer=*/nullptr, /*cacheKey=*/nullptr,
+                 /*isCanImportLookup=*/true, isTestableDependencyLookup,
+                 isFramework, isSystemModule);
   // If we cannot find the module, don't continue.
   if (!found)
     return false;
@@ -1536,9 +1544,11 @@ bool SerializedModuleLoaderBase::canImportModule(
   }
 
   if (moduleInputBuffer) {
+    serialization::ExtendedValidationInfo extInfo;
     auto metaData = serialization::validateSerializedAST(
         moduleInputBuffer->getBuffer(),
-        Ctx.LangOpts.SDKName);
+        Ctx.LangOpts.SDKName, &extInfo, nullptr, nullptr, nullptr, nullptr,
+        std::nullopt, Ctx.LangOpts.hasFeature(Feature::Embedded));
 
     // If we only found binary module, make sure that is valid.
     if (metaData.status != serialization::Status::Valid &&
@@ -1597,6 +1607,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   bool isFramework = false;
   bool isSystemModule = false;
 
+  std::string cacheKey;
   llvm::SmallString<256> moduleInterfacePath;
   llvm::SmallString<256> moduleInterfaceSourcePath;
   std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
@@ -1606,10 +1617,9 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   // Look on disk.
   if (!findModule(moduleID, &moduleInterfacePath, &moduleInterfaceSourcePath,
                   &moduleInputBuffer, &moduleDocInputBuffer,
-                  &moduleSourceInfoInputBuffer,
+                  &moduleSourceInfoInputBuffer, &cacheKey,
                   /*isCanImportLookup=*/false,
-                  /*isTestableDependencyLookup=*/false,
-                  isFramework,
+                  /*isTestableDependencyLookup=*/false, isFramework,
                   isSystemModule)) {
     return nullptr;
   }
@@ -1635,6 +1645,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
     }
     M->setHasResolvedImports();
   });
+  M->setCacheKey(cacheKey);
 
   if (dependencyTracker && file) {
     auto DepPath = file->getFilename();
@@ -1706,8 +1717,28 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   return M;
 }
 
+bool MemoryBufferSerializedModuleLoader::registerMemoryBuffer(
+    StringRef importPath, std::unique_ptr<llvm::MemoryBuffer> input,
+    llvm::VersionTuple version) {
+  return MemoryBuffers
+      .insert({importPath, MemoryBufferInfo(std::move(input), version)})
+      .second;
+}
+
+bool MemoryBufferSerializedModuleLoader::unregisterMemoryBuffer(
+    StringRef importPath) {
+  return MemoryBuffers.erase(importPath);
+}
+
 void SerializedModuleLoaderBase::loadExtensions(NominalTypeDecl *nominal,
                                                 unsigned previousGeneration) {
+  // Nominals in parsed SourceFiles can't have extensions provided by imported
+  // serialized modules. This is necessary to avoid triggering semantic requests
+  // from extension binding since looking up extensions may need to compute the
+  // mangled name.
+  if (nominal->getParentSourceFile())
+    return;
+
   for (auto &modulePair : LoadedModuleFiles) {
     if (modulePair.second <= previousGeneration)
       continue;

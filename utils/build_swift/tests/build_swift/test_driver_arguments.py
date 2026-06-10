@@ -519,6 +519,36 @@ class TestDriverArgumentParser(
         self.parse_default_args('--swift-stdlib-strict-availability')
         self.parse_default_args('--no-swift-stdlib-strict-availability')
 
+    def test_swift_pedantic_diagnostics(self):
+        def expectation(args, expected_value):
+            namespace = self.parse_default_args(args)
+            self.assertEqual(expected_value, namespace.swift_pedantic_diagnostics)
+
+        expectation(
+            ['--no-swift-pedantic-diagnostics', '--swift-pedantic-diagnostics'],
+            True)
+        expectation(
+            ['--swift-pedantic-diagnostics', '--no-swift-pedantic-diagnostics'],
+            False)
+        expectation(
+            ['--swift-assertions'],
+            True)
+        expectation(
+            ['--swift-assertions', '--swift-pedantic-diagnostics'],
+            True)
+        expectation(
+            ['--swift-assertions', '--no-swift-pedantic-diagnostics'],
+            False)
+        expectation(
+            ['--no-swift-assertions'],
+            False)
+        expectation(
+            ['--no-swift-assertions', '--swift-pedantic-diagnostics'],
+            True)
+        expectation(
+            [ '--no-swift-assertions', '--no-swift-pedantic-diagnostics'],
+            False)
+
     # -------------------------------------------------------------------------
     # Implied defaults tests
 

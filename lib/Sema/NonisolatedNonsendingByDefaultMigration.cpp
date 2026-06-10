@@ -66,12 +66,12 @@ static bool isSwiftTestingTestFunction(ValueDecl *decl) {
   if (!isa<FuncDecl>(decl))
     return false;
 
-  return llvm::any_of(decl->getAttrs(), [&decl](DeclAttribute *attr) {
+  return llvm::any_of(decl->getAttrs(), [](DeclAttribute *attr) {
     auto customAttr = dyn_cast<CustomAttr>(attr);
     if (!customAttr)
       return false;
 
-    auto *macro = decl->getResolvedMacro(customAttr);
+    auto *macro = customAttr->getResolvedMacro();
     return macro && macro->getBaseIdentifier().is("Test") &&
            macro->getParentModule()->getName().is("Testing");
   });
@@ -143,7 +143,7 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
       isNonisolated = isolation.get<FunctionTypeIsolation>().isNonIsolated();
     } else {
       auto isolation = this->isolation.get<ActorIsolation>();
-      isNonisolated = isolation.isNonisolated() || isolation.isUnspecified();
+      isNonisolated = isolation.isNonisolatedOrConcurrent() || isolation.isUnspecified();
     }
 
     if (!isNonisolated) {

@@ -12,8 +12,11 @@ public class MySubClass: MyClass {
   override func foo() { }
 }
 
-// CHECK: @"$e4main7MyClassCN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$e4main7MyClassCfD", ptr null, ptr @"$e4main7MyClassC3fooyyF", ptr @"$e4main7MyClassC3baryyF", ptr @swift_deletedMethodError }>
-// CHECK: @"$e4main10MySubClassCN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr @"$e4main7MyClassCN", ptr @"$e4main10MySubClassCfD", ptr null, ptr @"$e4main10MySubClassC3fooyyF", ptr @"$e4main7MyClassC3baryyF", ptr @"$e4main10MySubClassCACycfC" }>
+// CHECK: @"$e4main10MySubClassCMf" = {{.*}} <{ ptr @"$eBoWV", ptr getelementptr inbounds ({{.*}}, ptr @"$e4main7MyClassCMf", i32 0, i32 1), ptr @"$e4main10MySubClassCfD", ptr null, ptr @"$e4main10MySubClassC3fooyyF", ptr @"$e4main7MyClassC3baryyF", ptr @"$e4main10MySubClassCACycfC" }>
+// CHECK: @"$e4main7MyClassCMf" = {{.*}} <{ ptr @"$eBoWV", ptr null, ptr @"$e4main7MyClassCfD", ptr null, ptr @"$e4main7MyClassC3fooyyF", ptr @"$e4main7MyClassC3baryyF", ptr @swift_deletedMethodError }>
+
+// CHECK: @"$e4main10MySubClassCN" = {{.*}}alias{{.*}} ptr @"$e4main10MySubClassCMf", i32 0, i32 1)
+// CHECK: @"$e4main7MyClassCN" = {{.*}}alias{{.*}} ptr @"$e4main7MyClassCMf", i32 0, i32 1)
 
 // CHECK: define {{.*}}void @"$e4main4test1xyAA7MyClassC_tF"(ptr %0)
 public func test(x: MyClass) {

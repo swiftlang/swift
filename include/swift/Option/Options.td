@@ -196,7 +196,7 @@ def validate_clang_modules_once :
   HelpText<"Don't verify input files for Clang modules if the module has been successfully validated or loaded during this build session">;
 
 def clang_build_session_file : Separate<["-"], "clang-build-session-file">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Use the last modification time of <file> as the underlying Clang build session timestamp">;
 
 def disallow_forwarding_driver :
@@ -285,18 +285,25 @@ def sdk : Separate<["-"], "sdk">,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
-def swift_version : Separate<["-"], "swift-version">,
-  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
-         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
-  HelpText<"Interpret input according to a specific Swift language version number">,
-  MetaVarName<"<vers>">;
-
 def language_mode : Separate<["-"], "language-mode">,
   Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Interpret input according to a specific Swift language mode">,
-  MetaVarName<"<mode>">,
-  Alias<swift_version>;
+  MetaVarName<"<mode>">;
+
+def swift_version : Separate<["-"], "swift-version">,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Interpret input according to a specific Swift language version number">,
+  MetaVarName<"<vers>">,
+  Alias<language_mode>;
+
+def min_swift_runtime_version
+    : Separate<["-"], "min-swift-runtime-version">,
+      Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+      HelpText<"The minimum Swift runtime version "
+               "that will be available at runtime">,
+      MetaVarName<"<vers>">;
 
 def package_description_version: Separate<["-"], "package-description-version">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
@@ -369,6 +376,16 @@ def internal_import_pch : Separate<["-"], "internal-import-pch">,
 def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Directory to persist automatically created precompiled bridging headers">;
+
+def sil_output_dir: Separate<["-"], "sil-output-dir">,
+  Flags<[ArgumentIsPath, SupplementaryOutput]>,
+  HelpText<"Output SIL files to directory <dir> as additional output during compilation">,
+  MetaVarName<"<dir>">;
+
+def ir_output_dir: Separate<["-"], "ir-output-dir">,
+  Flags<[ArgumentIsPath, SupplementaryOutput]>,
+  HelpText<"Output LLVM IR files to directory <dir> as additional output during compilation">,
+  MetaVarName<"<dir>">;
 
 def auto_bridging_header_chaining: Flag<["-"], "auto-bridging-header-chaining">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -539,7 +556,7 @@ def localization_path : Separate<["-"], "localization-path">,
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath,
          SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
-         SwiftSynthesizeInterfaceOption]>,
+         SwiftSynthesizeInterfaceOption, CacheInvariant]>,
   HelpText<"Specifies the module cache path">;
 
 def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
@@ -624,6 +641,12 @@ def library_level_EQ : Joined<["-"], "library-level=">,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   Alias<library_level>;
 
+def ipi_clang_module : Separate<["-"], "ipi-clang-module">,
+  MetaVarName<"<name>">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Mark a Clang module by name as project-internal (IPI). "
+           "Public imports of the named module will be diagnosed.">;
+
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption,
          SwiftSymbolGraphExtractOption, SwiftSynthesizeInterfaceOption]>,
@@ -635,6 +658,15 @@ def project_name : Separate<["-"], "project-name">,
 
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
+
+def debug_module_path : Separate<["-"], "debug-module-path">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Path or cache key to this module's binary swiftmodule artifact (required by debug info)">;
+def debug_module_path_EQ : Joined<["-"], "debug-module-path=">, Flags<[FrontendOption, ArgumentIsPath]>,
+  Alias<debug_module_path>;
+def debug_module_self_key : Flag<["-"], "debug-module-self-key">,
+  Flags<[FrontendOption]>,
+  HelpText<"Embeded the key of current job in debug info generation (required by debug info)">;
 
 def module_alias : Separate<["-"], "module-alias">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -729,6 +761,16 @@ def emit_variant_package_module_interface_path :
   MetaVarName<"<path>">,
   HelpText<"Output package module interface file for the target variant to <path>">;
 
+def enable_module_selectors_in_module_interface :
+  Flag<["-"], "enable-module-selectors-in-module-interface">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When emitting module interface files, use module selectors to avoid name collisions">;
+
+def disable_module_selectors_in_module_interface :
+  Flag<["-"], "disable-module-selectors-in-module-interface">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When emitting module interface files, do not use module selectors to avoid name collisions">;
+
 def verify_emitted_module_interface :
   Flag<["-"], "verify-emitted-module-interface">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -807,6 +849,11 @@ def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
          SupplementaryOutput, CacheInvariant]>,
   HelpText<"Emit an Objective-C and C++ header file to <path>">,
   Alias<emit_objc_header_path>;
+
+def emit_clang_header_min_access : Separate<["-"], "emit-clang-header-min-access">,
+  Flags<[FrontendOption, NoInteractiveOption, CacheInvariant]>,
+  MetaVarName<"<access-level>">,
+  HelpText<"The minimum access level of declarations to include in the emitted header">;
 
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
@@ -900,6 +947,12 @@ def experimental_serialize_debug_info:
   Flag<["-"], "experimental-serialize-debug-info">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enables serialization/deserialization of debug scopes">;
+
+def disable_safe_interop_wrappers :
+  Flag<["-"], "disable-safe-interop-wrappers">,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
+         SwiftSynthesizeInterfaceOption, HelpHidden]>,
+  HelpText<"Disable safe interop wrapper generation and bounds attribute parsing">;
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -928,6 +981,10 @@ def Wwarning : Separate<["-"], "Wwarning">,
   Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"<diagnostic_group>">,
   HelpText<"Treat this warning group as warning">;
+
+def suppress_notes : Flag<["-"], "suppress-notes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Suppress all notes">;
 
 def suppress_remarks : Flag<["-"], "suppress-remarks">,
   Flags<[FrontendOption]>,
@@ -1009,21 +1066,21 @@ def default_isolation_EQ :  Joined<["-"], "default-isolation=">,
 
 def enable_experimental_feature :
   Separate<["-"], "enable-experimental-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enable an experimental feature">;
 
 def disable_experimental_feature :
   Separate<["-"], "disable-experimental-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Disable an experimental feature">;
 
 def enable_upcoming_feature : Separate<["-"], "enable-upcoming-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enable a feature that will be introduced in an upcoming language "
            "version">;
 
 def disable_upcoming_feature : Separate<["-"], "disable-upcoming-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Disable a feature that will be introduced in an upcoming language "
            "version">;
 
@@ -1465,6 +1522,10 @@ def print_ast_decl : Flag<["-"], "print-ast-decl">,
   HelpText<"Parse and type-check input file(s) and pretty print declarations from AST(s)">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_polyglot_ast : Flag<["-"], "emit-polyglot-ast">,
+  HelpText<"Parse the Objective-C input file and emit polyglot AST as JSON">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_pcm : Flag<["-"], "dump-pcm">,
   HelpText<"Dump debugging information about a precompiled Clang module">,
   ModeOpt,
@@ -1514,12 +1575,15 @@ def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[HelpHidden]>,
 
 def Xcc : Separate<["-"], "Xcc">,
   Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
-         SwiftSynthesizeInterfaceOption]>,
+         SwiftSynthesizeInterfaceOption, SwiftAPIDigesterOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
 
 def Xclang_linker : Separate<["-"], "Xclang-linker">, Flags<[HelpHidden]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to Clang when it is used for linking.">;
+
+def Xlinker_driver : Separate<["-"], "Xlinker-driver">, Flags<[HelpHidden]>,
+  MetaVarName<"<arg>">, HelpText<"Pass <arg> to the linker driver (clang, emcc, etc.) regardless of which one is in use.">;
 
 def Xllvm : Separate<["-"], "Xllvm">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -1557,6 +1621,16 @@ def target_variant : Separate<["-"], "target-variant">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
            " variant target triple in addition to the main -target triple">;
+
+def target_arch_variant
+    : Separate<["-"], "target-arch-variant">,
+      Flags<[FrontendOption, NoInteractiveOption, NewDriverOnlyOption,
+             ModuleInterfaceOption, ModuleWrapOption,
+             SwiftSynthesizeInterfaceOption]>,
+      MetaVarName<"<arch-variant>">,
+      HelpText<"Generate code for an additional arch/slice variant of the "
+               "target architecture"
+               "into fat mach-o binaries">;
 
 def clang_target : Separate<["-"], "clang-target">,
   Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
@@ -1619,6 +1693,29 @@ def profile_sample_use : Joined<["-"], "profile-sample-use=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, NewDriverOnlyOption]>,
   MetaVarName<"<profile data>">,
   HelpText<"Supply sampling-based profiling data from llvm-profdata to enable profile-guided optimization">;
+
+def cs_profile_generate : Flag<["-"], "cs-profile-generate">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Generate instrumented code to collect context sensitive execution counts into default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def cs_profile_generate_EQ : Joined<["-"], "cs-profile-generate=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  MetaVarName<"<directory>">,
+  HelpText<"Generate instrumented code to collect context sensitive execution counts into <directory>/default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_generate: Flag<["-"], "ir-profile-generate">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Generate instrumented code to collect execution counts into default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_generate_EQ : Joined<["-"], "ir-profile-generate=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  MetaVarName<"<directory>">,
+  HelpText<"Generate instrumented code to collect execution counts into <directory>/default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_use : CommaJoined<["-"], "ir-profile-use=">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  MetaVarName<"<profdata>">,
+  HelpText<"Supply an IR-level PGO profdata file to enable profile-guided optimization">;
 
 def embed_bitcode : Flag<["-"], "embed-bitcode">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -1851,6 +1948,12 @@ def block_availability_platforms: Separate<["-"], "block-availability-platforms"
   HelpText<"Remove the given platforms from symbol graph availability metadata, e.g. 'macOS,Swift'">,
   MetaVarName<"<platforms>">;
 
+def active_platform_availability_only
+    : Flag<["-"], "active-platform-availability-only">,
+      Flags<[SwiftSymbolGraphExtractOption]>,
+      HelpText<"Only emit availability metadata for platforms that are active "
+               "according to the target">;
+
 // swift-synthesize-interface-only options
 def include_submodules : Flag<["-"], "include-submodules">,
   Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
@@ -1859,6 +1962,14 @@ def include_submodules : Flag<["-"], "include-submodules">,
 def print_fully_qualified_types : Flag<["-"], "print-fully-qualified-types">,
   Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Always print fully qualified type names">;
+
+def synthesize_interface_show :
+  Joined<["-"], "synthesize-interface-show=">,
+  Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
+  MetaVarName<"<options>">,
+  HelpText<"Comma-separated options controlling what gets printed. "
+           "Options: 'unavailable', 'implicit-attrs', 'qualified-types'. "
+           "Shorthands: 'all' (every option enabled), 'minimal' (default).">;
 
 // swift-symbolgraph-extract-only options
 def output_dir : Separate<["-"], "output-dir">,
@@ -1876,7 +1987,8 @@ def skip_synthesized_members: Flag<[ "-" ], "skip-synthesized-members">,
   HelpText<"Skip members inherited through classes or default implementations">;
 
 def minimum_access_level : Separate<["-"], "minimum-access-level">,
-  Flags<[NoDriverOption, SwiftSymbolGraphExtractOption]>,
+  Flags<[NoDriverOption, SwiftSymbolGraphExtractOption,
+         SwiftSynthesizeInterfaceOption]>,
   HelpText<"Include symbols with this access level or more">,
   MetaVarName<"<level>">;
 
@@ -1895,6 +2007,11 @@ def skip_protocol_implementations : Flag<["-"], "skip-protocol-implementations">
   Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
          NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Skip emitting symbols that are implementations of protocol requirements or inherited from protocol extensions">;
+
+def symbol_graph_shorten_output_names : Flag<["-"], "symbol-graph-shorten-output-names">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Shorten the symbol graph output file names by hashing the module name; outputs an additional JSON file with the map of hash to original name">;
 
 // swift-api-digester-only options
 def dump_sdk: Flag<["-", "--"], "dump-sdk">,
@@ -1942,10 +2059,21 @@ def ignore_spi_groups : Separate<["-", "--"], "ignore-spi-group">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"SPI group name to not diagnose about">;
 
+def ignore_spi_groups_new_api
+    : Separate<["-", "--"], "ignore-spi-group-new-api">,
+      Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+      HelpText<"Suppress “new API without '@available’ diagnostic for given "
+               "SPI group name">;
+
 def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement-allow-list">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
   HelpText<"File containing a new-line separated list of protocol names">,
   MetaVarName<"<path>">;
+
+def const_gather_protocols_list
+  : Separate<["-"], "const-gather-protocols-list">, MetaVarName<"<path>">,
+    Flags<[NewDriverOnlyOption, ArgumentIsPath, FrontendOption]>,
+    HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
 
 def input_paths: Separate<["-", "--"], "input-paths">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
@@ -2029,10 +2157,6 @@ def BI : JoinedOrSeparate<["-"], "BI">,
 def BI_EQ : Joined<["-"], "BI=">, Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   Alias<BI>;
 
-def iframework : JoinedOrSeparate<["-"], "iframework">,
-  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
-  HelpText<"add a directory to the clang importer system framework search path">;
-
 def baseline_path : JoinedOrSeparate<["-"], "baseline-path">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
   HelpText<"The path to the Json file that we should use as the baseline">;
@@ -2082,8 +2206,13 @@ def driver_print_graphviz:
 
 def driver_explicit_module_build:
   Flag<["-"], "explicit-module-build">,
-  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  Flags<[NewDriverOnlyOption]>,
   HelpText<"Prebuild module dependencies to make them explicit">;
+
+def driver_no_explicit_module_build:
+  Flag<["-"], "no-explicit-module-build">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Opt out of the default explicit-module-build behavior for swiftc">;
 
 def incremental_dependency_scan:
   Flag<["-"], "incremental-dependency-scan">,
@@ -2236,6 +2365,10 @@ def cache_compile_job:  Flag<["-"], "cache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Enable compiler caching">;
 
+def no_cache_compile_job:  Flag<["-"], "no-cache-compile-job">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
+  HelpText<"Disable compiler caching">;
+
 def cache_remarks:  Flag<["-"], "Rcache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Show remarks for compiler caching">;
@@ -2243,6 +2376,10 @@ def cache_remarks:  Flag<["-"], "Rcache-compile-job">,
 def cache_disable_replay:  Flag<["-"], "cache-disable-replay">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Skip loading the compilation result from cache">;
+
+def write_output_hash_xattr:  Flag<["-"], "write-output-hash-xattr">,
+  Flags<[FrontendOption, CacheInvariant]>,
+  HelpText<"When caching, write the output file's hash (as determined by the CAS hashing schema) as a file extended attribute.">;
 
 def cas_path: Separate<["-"], "cas-path">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
@@ -2257,11 +2394,11 @@ def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
   HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
 
 def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cache-path">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Specifies the Clang dependency scanner module cache path">;
 
 def sdk_module_cache_path : Separate<["-"], "sdk-module-cache-path">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Specifies the module cache path for explicitly-built SDK modules">;
 
 def scanner_prefix_map_paths : MultiArg<["-"], "scanner-prefix-map-paths", 2>,
@@ -2269,7 +2406,7 @@ def scanner_prefix_map_paths : MultiArg<["-"], "scanner-prefix-map-paths", 2>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix> <replacement>">;
 
 def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
-  Flags<[NewDriverOnlyOption]>,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix=replacement>">;
 
 def scanner_prefix_map_sdk : Separate<["-"], "scanner-prefix-map-sdk">,
@@ -2283,6 +2420,11 @@ def scanner_prefix_map_toolchain : Separate<["-"], "scanner-prefix-map-toolchain
 def cache_replay_prefix_map: MultiArg<["-"], "cache-replay-prefix-map", 2>,
   Flags<[FrontendOption, NoDriverOption, CacheInvariant]>,
   HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix> <replacement>">;
+
+def register_module_dependency : Separate<["-"], "register-module-dependency">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Register module for dependency scan without importing in the frontend">;
+
 
 // END ONLY SUPPORTED IN NEW DRIVER
 

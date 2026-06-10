@@ -20,7 +20,9 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
@@ -238,6 +240,17 @@ llvm::Value *FixedTypeInfo::getIsTriviallyDestroyable(IRGenFunction &IGF, SILTyp
 llvm::Value *FixedTypeInfo::getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
       getBitwiseTakable(ResilienceExpansion::Maximal) >= IsBitwiseTakableOnly);
+}
+llvm::Value *FixedTypeInfo::getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const {
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+      getBitwiseTakable(ResilienceExpansion::Maximal) == IsBitwiseTakableAndBorrowable);
+}
+llvm::Value *FixedTypeInfo::getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const {
+
+  bool isAFD = T.isAddressableForDeps(IGF.IGM.getSILModule(),
+                                      TypeExpansionContext::minimal());
+  
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty, isAFD);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return IGM.getSize(getFixedStride());
@@ -886,7 +899,9 @@ void irgen::storeFixedTypeEnumTagSinglePayload(
   payloadIndex->addIncoming(payloadIndex0, payloadLT4BB);
 
   if (fixedSize > Size(0)) {
-    if (fixedSize.getValueInBits() <= llvm::IntegerType::MAX_INT_BITS / 4) {
+    // TODO: Setting the threshold at PointerSize causes stack clobbering in
+    // Windows validation tests. Investigate this before lowering the value further.
+    if (fixedSize <= IGM.getPointerSize() * 2) {
       // Write the value to the payload as a zero extended integer.
       auto *intType = Builder.getIntNTy(fixedSize.getValueInBits());
       Builder.CreateStore(Builder.CreateZExtOrTrunc(payloadIndex, intType),
@@ -1360,6 +1375,12 @@ namespace {
     llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
+    llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
     llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                           SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -1373,8 +1394,9 @@ namespace {
     llvm::Constant *getStaticStride(IRGenModule &IGM) const override {
       return nullptr;
     }
-    StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                               const llvm::Twine &name) const override {
+    StackAddress
+    allocateStack(IRGenFunction &IGF, SILType T, const llvm::Twine &name,
+                  StackAllocationIsNested_t isNested) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
     void deallocateStack(IRGenFunction &IGF, StackAddress addr,
@@ -1407,6 +1429,55 @@ namespace {
                                    SILType T,
                                    bool isOutlined) const override {
       llvm_unreachable("should not call on an immovable opaque type");
+    }
+  };
+
+  /// A TypeInfo for a HiddenType placeholder. The placeholder stands in for a
+  /// real C-imported type whose identity has been elided from the importing
+  /// Layout is recovered from the defining module's HiddenTypeLayouts table.
+  ///
+  /// Address-only: clients lack the clang::RecordDecl required to derive a
+  /// correct register-passing schema for the hidden field, so values are
+  /// always passed indirectly. 
+  class TrivialHiddenTypeInfo final
+      : public IndirectTypeInfo<TrivialHiddenTypeInfo, FixedTypeInfo> {
+  public:
+    TrivialHiddenTypeInfo(llvm::Type *storage, Size size, Alignment align)
+      : IndirectTypeInfo(storage, size,
+                         SpareBitVector::getConstant(size.getValueInBits(),
+                                                     false),
+                         align,
+                         IsTriviallyDestroyable, IsBitwiseTakableAndBorrowable,
+                         IsCopyable,
+                         IsFixedSize, IsABIAccessible) {}
+
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const override {
+      IGF.emitMemCpy(dest, src, getFixedSize());
+    }
+    void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                            SILType T, bool isOutlined) const override {
+      IGF.emitMemCpy(dest, src, getFixedSize());
+    }
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
+      // Trivial destructor under the plain-C assumption.
+    }
+
+    TypeLayoutEntry *
+    buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                         bool useStructLayouts) const override {
+      if (!useStructLayouts)
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(
+          *this, T, ScalarKind::TriviallyDestroyable);
+    }
+
+    unsigned getFixedExtraInhabitantCount(IRGenModule &) const override {
+      return 0;
+    }
+    bool mayHaveExtraInhabitants(IRGenModule &) const override {
+      return false;
     }
   };
 } // end anonymous namespace
@@ -1993,7 +2064,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Map the archetype out of its own generic environment and into the
   // canonical generic environment.
   auto interfaceType = t->getInterfaceType();
-  auto exemplar = canGenericEnv->mapTypeIntoContext(interfaceType)
+  auto exemplar = canGenericEnv->mapTypeIntoEnvironment(interfaceType)
                     ->castTo<ArchetypeType>();
   assert(isExemplarArchetype(exemplar));
   return exemplar;
@@ -2051,7 +2122,7 @@ const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
   auto contextTy = canonicalTy;
   if (contextTy->hasTypeParameter()) {
     // The type we got should be lowered, so lower it like a SILType.
-    contextTy = getGenericEnvironment()->mapTypeIntoContext(
+    contextTy = getGenericEnvironment()->mapTypeIntoEnvironment(
                   IGM.getSILModule(),
                   SILType::getPrimitiveAddressType(contextTy)).getASTType();
   }
@@ -2255,6 +2326,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinNativeObject:
     return &getNativeObjectTypeInfo();
+  case TypeKind::BuiltinImplicitActor:
+    return &getImplicitActorTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinUnsafeValueBuffer:
@@ -2319,6 +2392,10 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertBuiltinFixedArrayType(cast<BuiltinFixedArrayType>(ty));
   }
 
+  case TypeKind::BuiltinBorrow: {
+    return convertBuiltinBorrowType(cast<BuiltinBorrowType>(ty));
+  }
+
   case TypeKind::PrimaryArchetype:
   case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
@@ -2375,6 +2452,19 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::Integer:
     llvm_unreachable("should not be asking for the type info an IntegerType");
+  case TypeKind::Hidden: {
+    auto hidden = cast<HiddenType>(ty);
+    auto *defining = hidden->getDefiningModule();
+    assert(defining &&
+           "HiddenType must carry a defining module after deserialization");
+    auto layout = defining->lookupHiddenTypeLayout(hidden->getMangledName());
+    assert(layout &&
+           "no HIDDEN_TYPE_LAYOUTS_BLOCK entry for this mangled name");
+
+    auto *storage = llvm::ArrayType::get(IGM.Int8Ty, layout->size);
+    return new TrivialHiddenTypeInfo(storage, Size(layout->size),
+                              Alignment(layout->alignment));
+  }
   }
   }
   llvm_unreachable("bad type kind");

@@ -110,18 +110,39 @@ struct BridgedDeadEndBlocksAnalysis {
   BRIDGED_INLINE bool isDeadEnd(BridgedBasicBlock block) const;
 };
 
+struct BridgedDomTree;
+
+class BridgedDomChildrenIterator {
+  void *_Nullable node;
+
+public:
+  BRIDGED_INLINE BridgedDomChildrenIterator(BridgedDomTree tree,
+                                            BridgedBasicBlock bb);
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock next();
+};
+
 struct BridgedDomTree {
   swift::DominanceInfo * _Nonnull di;
 
   BRIDGED_INLINE bool dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
-  BRIDGED_INLINE SwiftInt getNumberOfChildren(BridgedBasicBlock bb) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getChildAt(BridgedBasicBlock bb, SwiftInt index) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getImmediateDominator(BridgedBasicBlock block) const;
 };
 
 struct BridgedPostDomTree {
   swift::PostDominanceInfo * _Nonnull pdi;
 
   BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
+};
+
+struct BridgedOptimizerUtilities {
+  typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
+  typedef void (* _Nonnull UpdateLifetimeFunctionFn)(BridgedContext, BridgedFunction, bool);
+  typedef void (* _Nonnull UpdateLifetimeValuesFn)(BridgedContext, BridgedArrayRef, BridgedArrayRef);
+
+  static void registerLifetimeCompletion(UpdateLifetimeFunctionFn completeAllLifetimesFn,
+                                         UpdateLifetimeValuesFn completeLifetimeFn);
+  static void registerControlFlowUtils(UpdateFunctionFn breakInfiniteLoopsFn);
 };
 
 struct BridgedLoopTree {
@@ -141,6 +162,8 @@ struct BridgedPassContext {
 
   BRIDGED_INLINE bool hadError() const;
   BRIDGED_INLINE void notifyDependencyOnBodyOf(BridgedFunction otherFunction) const;
+
+  BRIDGED_INLINE void updateAnalysis() const;
 
   // Analysis
 
@@ -164,6 +187,8 @@ struct BridgedPassContext {
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedDiagnosticEngine getDiagnosticEngine() const;
+  BRIDGED_INLINE bool isWholeModule() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getModuleDecl() const;
 
   // SIL modifications
 
@@ -187,13 +212,22 @@ struct BridgedPassContext {
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
+
+  struct ClosureArgMangling {
+    SwiftInt argIdx;
+    OptionalBridgedInstruction inst;
+    SwiftInt otherArgIdx;
+  };
+
   BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
-  BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgIndices,
-                                                               BridgedFunction applySiteCallee) const;
+  BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgManglings, BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithConstCaptureArgs(BridgedArrayRef bridgedConstArgs,
                                                 BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithBoxToStackPromotedArgs(BridgedArrayRef bridgedPromotedArgIndices,
                                                       BridgedFunction bridgedOriginalFunction) const;
+  BridgedOwnedString mangleWithExplodedPackArgs(BridgedArrayRef bridgedPackArgs,
+                                                BridgedFunction applySiteCallee) const;
+  BridgedOwnedString mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const;
 
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
@@ -207,12 +241,18 @@ struct BridgedPassContext {
   SwiftInt getStaticAlignment(BridgedType type) const;
   SwiftInt getStaticStride(BridgedType type) const;
   bool canMakeStaticObjectReadOnly(BridgedType type) const;
+  bool hasClassFixedMetadataLayout(BridgedDeclObj classDecl) const;
 
-  // Stack nesting
+  // Stack nesting and other notifications
 
   BRIDGED_INLINE void notifyInvalidatedStackNesting() const;
   BRIDGED_INLINE bool getNeedFixStackNesting() const;
   void fixStackNesting(BridgedFunction function) const;
+
+  BRIDGED_INLINE bool getNeedBreakInfiniteLoops() const;
+  BRIDGED_INLINE void setNeedBreakInfiniteLoops(bool value) const;
+  BRIDGED_INLINE bool getNeedCompleteLifetimes() const;
+  BRIDGED_INLINE void setNeedCompleteLifetimes(bool value) const;
 
   // Access SIL module data structures
 
@@ -250,6 +290,7 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool enableStackProtection() const;
   BRIDGED_INLINE bool enableMergeableTraps() const;
   BRIDGED_INLINE bool hasFeature(BridgedFeature feature) const;
+  BRIDGED_INLINE bool shouldRemoveCondFail(BridgedStringRef message, BridgedStringRef function) const;
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;
@@ -263,8 +304,10 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                                         const BridgedParameterInfo * _Nullable specializedBridgedParams,
                                                         SwiftInt paramCount,
+                                                        const BridgedResultInfo *_Nullable specializedBridgedResults,
+                                                        SwiftInt resultCount,
                                                         BridgedFunction bridgedOriginal,
-                                                        bool makeThin,
+                                                        BridgedASTType::FunctionTypeRepresentation representation,
                                                         bool makeBare,
                                                         bool preserveGenericSignature) const;
 

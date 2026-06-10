@@ -29,6 +29,7 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -1156,13 +1157,6 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   }
 
   if (f.isPossiblyUsedExternally()) {
-    // Under the embedded linkage model, if it has a non-unique definition,
-    // treat it lazily.
-    if (f.hasNonUniqueDefinition() && !f.isSwiftRuntimeFunction()
-        && !f.markedAsUsed()) {
-      return true;
-    }
-
     return false;
   }
 
@@ -1175,11 +1169,10 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
 // Eagerly emit global variables that are externally visible.
 static bool isLazilyEmittedGlobalVariable(SILGlobalVariable &v, SILModule &m) {
   if (v.isPossiblyUsedExternally()) {
-    // Under the embedded linkage model, if it has a non-unique definition,
-    // treat it lazily.
-    if (v.hasNonUniqueDefinition() && !v.markedAsUsed()) {
+    // Globals that come from a different module will be lazily emitted unless
+    // explicitly marked @used.
+    if (v.getParentModule() != m.getSwiftModule() && !v.markedAsUsed())
       return true;
-    }
 
     return false;
   }
@@ -1361,7 +1354,7 @@ deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRec
 void IRGenerator::emitLazyDefinitions() {
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     // In embedded Swift, the compiler cannot emit any metadata, etc.
-    assert(LazyTypeMetadata.empty());
+    // Other than to support existentials.
     assert(LazySpecializedTypeMetadataRecords.empty());
     assert(LazyTypeContextDescriptors.empty());
     assert(LazyOpaqueTypeDescriptors.empty());
@@ -1388,7 +1381,8 @@ void IRGenerator::emitLazyDefinitions() {
          !LazyCanonicalSpecializedMetadataAccessors.empty() ||
          !LazyMetadataAccessors.empty() ||
          !LazyClassMetadata.empty() ||
-         !LazySpecializedClassMetadata.empty()
+         !LazySpecializedClassMetadata.empty() ||
+         !LazySpecializedValueMetadata.empty()
          ) {
     // Emit any lazy type metadata we require.
     while (!LazyTypeMetadata.empty()) {
@@ -1514,6 +1508,12 @@ void IRGenerator::emitLazyDefinitions() {
       CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
       emitLazySpecializedClassMetadata(*IGM.get(), classType);
     }
+
+    while(!LazySpecializedValueMetadata.empty()) {
+      CanType valueType = LazySpecializedValueMetadata.pop_back_val();
+      CurrentIGMPtr IGM = getGenModule(valueType->getNominalOrBoundGenericNominal());
+      emitLazySpecializedValueMetadata(*IGM.get(), valueType);
+    }
   }
 
   FinishedEmittingLazyDefinitions = true;
@@ -1561,8 +1561,8 @@ void IRGenerator::addLazyGlobalVariable(SILGlobalVariable *v) {
   assert(!FinishedEmittingLazyDefinitions);
   LazyGlobalVariables.push_back(v);
 
-  if (auto decl = v->getDecl()) {
-    if (decl->getDeclContext()->getParentSourceFile())
+  if (auto dc = v->getDeclContext()) {
+    if (dc->getParentSourceFile())
       return;
   }
 
@@ -1579,6 +1579,19 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   auto found = HasLazyMetadata.find(type);
   if (found != HasLazyMetadata.end())
     return found->second;
+  auto &langOpts = SIL.getASTContext().LangOpts;
+  if (langOpts.hasFeature(Feature::Embedded) &&
+      (isa<StructDecl>(type) || isa<EnumDecl>(type))) {
+    auto *nominal = cast<NominalTypeDecl>(type);
+    // @export(interface) types have a unique definition in their defining
+    // module; importing modules reference them as external symbols rather than
+    // lazily emitting their own copy.
+    bool isExportInterface =
+      nominal->getEffectiveCodeGenerationModel() == CodeGenerationModel::Interface;
+    bool isLazy = !nominal->isGenericContext() && !isExportInterface;
+    HasLazyMetadata[type] = isLazy;
+    return isLazy;
+  }
 
   auto canBeLazy = [&]() -> bool {
     auto *dc = type->getDeclContext();
@@ -1628,8 +1641,14 @@ void IRGenerator::noteUseOfClassMetadata(CanType classType) {
 }
 
 void IRGenerator::noteUseOfSpecializedClassMetadata(CanType classType) {
-  if (LazilyEmittedSpecializedClassMetadata.insert(classType.getPointer()).second) {
+  if (LazilyEmittedSpecializedMetadata.insert(classType.getPointer()).second) {
     LazySpecializedClassMetadata.push_back(classType);
+  }
+}
+
+void IRGenerator::noteUseOfSpecializedValueMetadata(CanType valueType) {
+  if (LazilyEmittedSpecializedMetadata.insert(valueType.getPointer()).second) {
+    LazySpecializedValueMetadata.push_back(valueType);
   }
 }
 
@@ -2191,11 +2210,18 @@ void IRGenModule::emitVTableStubs() {
     
     if (!stub) {
       // Create a single stub function which calls swift_deletedMethodError().
+      // Use linkonce_odr hidden to merge these symbols, except on
+      // COFF where the linker cannot merge them.
+      bool canLinkOnce = !Module.getTargetTriple().isOSBinFormatCOFF();
+      auto linkage = canLinkOnce ? llvm::GlobalValue::LinkOnceODRLinkage
+                                 : llvm::GlobalValue::InternalLinkage;
       stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
-                                    llvm::GlobalValue::InternalLinkage,
-                                    "_swift_dead_method_stub");
+                                    linkage, "_swift_dead_method_stub",
+                                    &Module);
+      ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
+                                 : IRLinkage::Internal)
+          .to(stub, /* nonAliasedDefinition */ false);
       stub->setAttributes(constructInitialAttributes());
-      Module.getFunctionList().push_back(stub);
       stub->setCallingConv(DefaultCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
       auto *errorFunc = getDeletedMethodErrorFn();
@@ -2294,11 +2320,11 @@ void IRGenerator::emitEntryPointInfo() {
   IGM.addUsedGlobal(var);
 }
 
-static IRLinkage
-getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
-             SILLinkage linkage, ForDefinition_t isDefinition,
-             bool isWeakImported, bool isKnownLocal,
-             bool hasNonUniqueDefinition) {
+static IRLinkage getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
+                              SILLinkage linkage, ForDefinition_t isDefinition,
+                              bool isWeakImported, bool isKnownLocal,
+                              bool hasNonUniqueDefinition,
+                              bool privateMeansPrivate) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   IRLinkage{llvm::GlobalValue::LINKAGE##Linkage,                               \
             llvm::GlobalValue::VISIBILITY##Visibility,                         \
@@ -2329,8 +2355,13 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
   case SILLinkage::Package: {
     auto linkage = llvm::GlobalValue::ExternalLinkage;
 
-    if (hasNonUniqueDefinition)
-      linkage = llvm::GlobalValue::WeakODRLinkage;
+    if (hasNonUniqueDefinition) {
+      // Keep Swift runtime functions around so IRGen can reference them.
+      if (SILFunction::isSwiftRuntimeFunction(name, nullptr))
+        linkage = llvm::GlobalValue::WeakODRLinkage;
+      else
+        linkage = llvm::GlobalValue::LinkOnceODRLinkage;
+    }
 
     return {linkage, PublicDefinitionVisibility,
             info.Internalize ? llvm::GlobalValue::DefaultStorageClass
@@ -2348,19 +2379,22 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
 
   case SILLinkage::Hidden:
     if (hasNonUniqueDefinition)
-      return RESULT(WeakODR, Hidden, Default);
+      return RESULT(LinkOnceODR, Hidden, Default);
 
     return RESULT(External, Hidden, Default);
 
   case SILLinkage::Private: {
     if (info.forcePublicDecls() && !isDefinition)
       return getIRLinkage(name, info, SILLinkage::PublicExternal, isDefinition,
-                          isWeakImported, isKnownLocal, hasNonUniqueDefinition);
+                          isWeakImported, isKnownLocal, hasNonUniqueDefinition,
+                          privateMeansPrivate);
 
-    auto linkage = info.needLinkerToMergeDuplicateSymbols()
-                       ? llvm::GlobalValue::LinkOnceODRLinkage
-                       : llvm::GlobalValue::InternalLinkage;
-    auto visibility = info.shouldAllPrivateDeclsBeVisibleFromOtherFiles()
+    auto linkage =
+        info.needLinkerToMergeDuplicateSymbols() && !privateMeansPrivate
+            ? llvm::GlobalValue::LinkOnceODRLinkage
+            : llvm::GlobalValue::InternalLinkage;
+    auto visibility = info.shouldAllPrivateDeclsBeVisibleFromOtherFiles() &&
+                              !privateMeansPrivate
                           ? llvm::GlobalValue::HiddenVisibility
                           : llvm::GlobalValue::DefaultVisibility;
     return {linkage, visibility, llvm::GlobalValue::DefaultStorageClass};
@@ -2411,8 +2445,8 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   auto IRL =
       getIRLinkage(global->hasName() ? global->getName() : StringRef(),
                    linkInfo, entity.getLinkage(ForDefinition), ForDefinition,
-                   weakImported, isKnownLocal,
-                   entity.hasNonUniqueDefinition());
+                   weakImported, isKnownLocal, entity.hasNonUniqueDefinition(),
+                   entity.privateMeansPrivate());
   ApplyIRLinkage(IRL).to(global);
 
   LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
@@ -2463,10 +2497,10 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   }
 
   bool weakImported = entity.isWeakImported(swiftModule);
-  result.IRL = getIRLinkage(result.Name, linkInfo,
-                            entity.getLinkage(isDefinition), isDefinition,
-                            weakImported, isKnownLocal,
-                            entity.hasNonUniqueDefinition());
+  result.IRL = getIRLinkage(
+      result.Name, linkInfo, entity.getLinkage(isDefinition), isDefinition,
+      weakImported, isKnownLocal, entity.hasNonUniqueDefinition(),
+      entity.privateMeansPrivate());
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2478,7 +2512,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
   result.Name += name;
   result.IRL = getIRLinkage(name, linkInfo, linkage, isDefinition,
                             isWeakImported, linkInfo.Internalize,
-                            /*hasNonUniqueDefinition=*/false);
+                            /*hasNonUniqueDefinition=*/false,
+                            /*privateMeansPrivate=*/false);
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2848,13 +2883,13 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     if (!forDefinition)
       gvar->setComdat(nullptr);
 
-    // Mark as llvm.used if @_used, set section if @_section
+    // Mark as llvm.used if @used, set section if @section
     if (var->markedAsUsed())
       addUsedGlobal(gvar);
     else if (var->shouldBePreservedForDebugger() && forDefinition) 
       addUsedGlobal(gvar);
-    if (auto *sectionAttr = var->getSectionAttr())
-      gvar->setSection(sectionAttr->Name);
+    if (!var->section().empty())
+      gvar->setSection(var->section());
   }
   if (forDefinition && !gvar->hasInitializer()) {
     if (initVal) {
@@ -3588,8 +3623,8 @@ llvm::CallBase *swift::irgen::emitCXXConstructorCall(
 bool swift::irgen::hasValidSignatureForEmbedded(SILFunction *f) {
   auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
   for (auto genParam : s.getGenericParams()) {
-    auto mappedParam = f->getGenericEnvironment()->mapTypeIntoContext(genParam);
-    if (auto archeTy = dyn_cast<ArchetypeType>(mappedParam)) {
+    auto mappedParam = f->getGenericEnvironment()->mapTypeIntoEnvironment(genParam);
+    if (auto *archeTy = mappedParam->getAs<ArchetypeType>()) {
       if (archeTy->requiresClass())
         continue;
     }
@@ -3722,7 +3757,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   fn = createFunction(*this, link, signature, insertBefore,
                       f->getOptimizationMode(), shouldEmitStackProtector(f));
 
-  // Mark as llvm.used if @_used, set section if @_section
+  // Mark as llvm.used if @used, set section if @section
   if (f->markedAsUsed())
     addUsedGlobal(fn);
 
@@ -4011,38 +4046,41 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   auto var = createVariable(*this, link, definitionType,
                             entity.getAlignment(*this), DbgTy);
 
-  // @escaping () -> ()
-  // NOTE: we explicitly desugar the `Void` type for the return as the test
-  // suite makes assumptions that it can emit the value witness table without a
-  // standard library for the target. `Context.getVoidType()` will attempt to
-  // lookup the `Decl` before returning the canonical type. To workaround this
-  // dependency, we simply desugar the `Void` return type to `()`.
-  static CanType kAnyFunctionType =
-      FunctionType::get({}, Context.TheEmptyTupleType,
-                        ASTExtInfo{})->getCanonicalType();
+  auto isZeroParamFunctionType = [this](Type t) -> bool {
+    if (auto *funcTy = t->getAs<FunctionType>()) {
+      return (funcTy->getParams().size() == 0 &&
+              funcTy->getResult()->isEqual(Context.TheEmptyTupleType));
+    }
+
+    return false;
+  };
 
   // Adjust the linkage for the well-known VWTs that are strongly defined
   // in the runtime.
   //
-  // We special case the "AnyFunctionType" here as this type is referened
+  // We special case the "AnyFunctionType" here as this type is referenced
   // inside the standard library with the definition being in the runtime
   // preventing the normal detection from identifying that this is module
   // local.
   //
   // If we are statically linking the standard library, we need to internalise
   // the symbols.
-  if (getSwiftModule()->isStdlibModule() ||
-      (Context.getStdlibModule() &&
-       Context.getStdlibModule()->isStaticLibrary()))
-    if (entity.isTypeKind() &&
-        (IsWellKnownBuiltinOrStructralType(entity.getType()) ||
-         entity.getType() == kAnyFunctionType))
-      if (auto *GV = dyn_cast<llvm::GlobalValue>(var))
-        if (GV->hasDLLImportStorageClass())
-          ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
-                          llvm::GlobalValue::DefaultVisibility,
-                          llvm::GlobalValue::DefaultStorageClass})
-              .to(GV);
+  if (auto *GV = dyn_cast<llvm::GlobalValue>(var)) {
+    if (GV->hasDLLImportStorageClass()) {
+      if (getSwiftModule()->isStdlibModule() ||
+          (Context.getStdlibModule() &&
+           Context.getStdlibModule()->isStaticLibrary())) {
+        if (entity.isTypeKind() &&
+            (isWellKnownBuiltinOrStructuralType(entity.getType()) ||
+             isZeroParamFunctionType(entity.getType()))) {
+              ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
+                              llvm::GlobalValue::DefaultVisibility,
+                              llvm::GlobalValue::DefaultStorageClass})
+                  .to(GV);
+        }
+      }
+    }
+  }
 
   // Install the concrete definition if we have one.
   if (definition && definition.hasInit()) {
@@ -4066,6 +4104,26 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
     auto existing = cast<llvm::GlobalValue>(existingGlobal);
     auto castVar = llvm::ConstantExpr::getBitCast(var, existing->getType());
     existing->replaceAllUsesWith(castVar);
+
+    // Sometimes, two extension descriptors with different LinkEntity's
+    // may refer to the same llvm::Constant* within the GlobalVars map;
+    // their mangled names would be the same. It's suspected to have to
+    // do with `getAddrOfSharedContextDescriptor`'s shenanigans, but not proven.
+    // This is currently only ben observed for extension descriptors created for
+    // protocol-to-protocol conformances. In that case, we check for additional
+    // references in the GlobalVars map to prevent a dangling pointer.
+    if (entity.hasExtension()) {
+      for (auto otherExt : IRGen.AllConformanceOfProtocolExtensionDescriptors) {
+        auto otherEntity = LinkEntity::forExtensionDescriptor(otherExt);
+        auto &entry = GlobalVars[otherEntity];
+        if (entry == existing) {
+          assert(otherExt->getExtendedNominal() ==
+                 entity.getExtension()->getExtendedNominal());
+          entry = var;
+        }
+      }
+    }
+
     existing->eraseFromParent();
   }
 
@@ -4854,7 +4912,8 @@ void IRGenModule::emitAccessibleFunctions() {
     llvm_unreachable("Don't know how to emit accessible functions for "
                      "the selected object format.");
   case llvm::Triple::MachO:
-    fnsSectionName = "__TEXT, __swift5_acfuncs, regular";
+    // no_dead_strip - accessible functions must never be stripped
+    fnsSectionName = "__TEXT, __swift5_acfuncs, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
@@ -5254,7 +5313,8 @@ llvm::GlobalValue *IRGenModule::defineAlias(LinkEntity entity,
 llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     CanType concreteType, bool isPattern, bool isConstant,
     ConstantInitFuture init, llvm::StringRef section,
-    SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries) {
+    SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries,
+    unsigned numConformanceEntries) {
   assert(init);
 
   auto concreteTypeDecl = concreteType->getAnyGeneric();
@@ -5270,7 +5330,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
     return cast<llvm::GlobalValue>(addr);
   }
-
+  bool hasEmbeddedExistentials = Context.LangOpts.hasFeature(Feature::Embedded);
   auto entity =
       (isPrespecialized &&
        !irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
@@ -5286,6 +5346,9 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     entity = LinkEntity::forTypeMetadata(concreteType,
                                          TypeMetadataAddress::AddressPoint);
+    if (hasEmbeddedExistentials)
+      entity = LinkEntity::forTypeMetadata(concreteType,
+                                           TypeMetadataAddress::FullMetadata);
   }
 
   auto DbgTy = DebugTypeInfo::getGlobalMetadata(MetatypeType::get(concreteType),
@@ -5307,9 +5370,12 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
   markGlobalAsUsedBasedOnLinkage(*this, link, var);
-  
+
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-    return var;
+    ASSERT(numConformanceEntries == 0 &&
+           "conformance lookup currently not supported in Embedded Swift");
+    if (!hasEmbeddedExistentials)
+      return var;
   }
 
   /// For concrete metadata, we want to use the initializer on the
@@ -5319,12 +5385,14 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   if (auto nominal = concreteType->getAnyNominal()) {
     // Keep type metadata around for all types (except @_objcImplementation,
     // since we're using ObjC metadata for that).
-    if (!isObjCImpl)
+    if (!isObjCImpl && !hasEmbeddedExistentials)
       addRuntimeResolvableType(nominal);
 
     // Don't define the alias for foreign type metadata, prespecialized
     // generic metadata, or @_objcImplementation classes, since they're not ABI.
-    if (requiresForeignTypeMetadata(nominal) || isPrespecialized || isObjCImpl)
+    if ((requiresForeignTypeMetadata(nominal) && !hasEmbeddedExistentials) ||
+        (isPrespecialized && !hasEmbeddedExistentials) ||
+        isObjCImpl)
       return var;
 
     // Native Swift class metadata has a destructor before the address point.
@@ -5337,14 +5405,34 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     }
   }
 
+  if (hasEmbeddedExistentials) {
+    adjustmentIndex = MetadataAdjustmentIndex::EmbeddedWithExistentials;
+  }
+
   llvm::Constant *indices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
-      llvm::ConstantInt::get(Int32Ty, adjustmentIndex)};
+      // As conformance entries are stored at negative offsets we have to compensate
+      // with `numConformanceEntries` to get to the base address.
+      llvm::ConstantInt::get(Int32Ty, adjustmentIndex + numConformanceEntries)};
   auto addr = llvm::ConstantExpr::getInBoundsGetElementPtr(var->getValueType(),
                                                            var, indices);
   addr = llvm::ConstantExpr::getBitCast(addr, TypeMetadataPtrTy);
 
   // For concrete metadata, declare the alias to its address point.
+
+  if (hasEmbeddedExistentials) {
+    auto isFromOtherModule = [] (NominalTypeDecl *d) -> bool {
+      auto module = d->getModuleContext();
+      auto &ctx = module->getASTContext();
+      return module != ctx.MainModule && ctx.MainModule;
+    };
+    auto nom = concreteType->getAnyNominal();
+    if (!nom || isFromOtherModule(nom)) {
+      // We don't actually use the defined type medata in the non-home module
+      // but rather reference the full metadata at an offset.
+      return nullptr;
+    }
+  }
   auto directEntity = LinkEntity::forTypeMetadata(
       concreteType, TypeMetadataAddress::AddressPoint);
   return defineAlias(directEntity, addr, TypeMetadataStructTy);
@@ -5378,7 +5466,11 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-  if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
+  auto hasEmbeddedExistentials = Context.LangOpts.hasFeature(Feature::Embedded);
+  if (hasEmbeddedExistentials) {
+    adjustmentIndex = 0;
+    defaultVarTy = EmbeddedExistentialsMetadataStructTy;
+  } else if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
     defaultVarTy = FullExistentialTypeMetadataStructTy;
     adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
   } else if (fullMetadata) {
@@ -5421,6 +5513,21 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
         }
       }
     }
+
+    if (hasEmbeddedExistentials) {
+      if ((isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) &&
+          nominal->isGenericContext()) {
+        IRGen.noteUseOfSpecializedValueMetadata(concreteType);
+      }
+    }
+  }
+
+  if (hasEmbeddedExistentials &&
+      (isa<TupleType>(concreteType) ||
+       isa<FunctionType>(concreteType) ||
+       concreteType->isAnyExistentialType() ||
+       isa<MetatypeType>(concreteType))) {
+    IRGen.noteUseOfSpecializedValueMetadata(concreteType);
   }
 
   if (shouldPrespecializeGenericMetadata()) {
@@ -5461,6 +5568,30 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
                                  /*overrideDeclType=*/nullptr);
     typeOfValue = entity->getDefaultDeclarationType(*this);
+  } else if (hasEmbeddedExistentials) {
+    // We want to avoid generating any local uses of metadata address point
+    // definitions. Instead any local use should be to the offset full metadata
+    // symbol, that is "(gep <full metadata symbol> <offset>)".
+    auto fullMetadataEntity = LinkEntity::forTypeMetadata(
+      concreteType, TypeMetadataAddress::FullMetadata);
+    auto fullMetadata = getAddrOfLLVMVariable(fullMetadataEntity,
+                                              ConstantInit(), DbgTy, refKind,
+                                              /*overrideDeclType=*/nullptr);
+
+    if (auto *GV = dyn_cast<llvm::GlobalVariable>(fullMetadata.getValue()))
+      if (GV->isDeclaration())
+        GV->setComdat(nullptr);
+
+    llvm::Constant *indices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty,
+                             MetadataAdjustmentIndex::EmbeddedWithExistentials)
+    };
+    addr = ConstantReference(
+      llvm::ConstantExpr::getInBoundsGetElementPtr(defaultVarTy,
+                                                   fullMetadata.getValue(),
+                                                   indices),
+      fullMetadata.isIndirect());
   } else {
     addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
                                  /*overrideDeclType=*/defaultVarTy);
@@ -5997,9 +6128,8 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
 Address IRGenFunction::createAlloca(llvm::Type *type,
                                     Alignment alignment,
                                     const llvm::Twine &name) {
-  llvm::AllocaInst *alloca =
-      new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), name,
-                           AllocaIP);
+  llvm::AllocaInst *alloca = new llvm::AllocaInst(
+      type, IGM.DataLayout.getAllocaAddrSpace(), name, AllocaIP->getIterator());
   alloca->setAlignment(llvm::MaybeAlign(alignment.getValue()).valueOrOne());
   return Address(alloca, type, alignment);
 }
@@ -6009,9 +6139,10 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
                                     llvm::Value *ArraySize,
                                     Alignment alignment,
                                     const llvm::Twine &name) {
-  llvm::AllocaInst *alloca = new llvm::AllocaInst(
-      type, IGM.DataLayout.getAllocaAddrSpace(), ArraySize,
-      llvm::MaybeAlign(alignment.getValue()).valueOrOne(), name, AllocaIP);
+  llvm::AllocaInst *alloca =
+      new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), ArraySize,
+                           llvm::MaybeAlign(alignment.getValue()).valueOrOne(),
+                           name, AllocaIP->getIterator());
   return Address(alloca, type, alignment);
 }
 
@@ -6026,7 +6157,8 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
 llvm::Constant *
 IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
                                    bool willBeRelativelyAddressed) {
-  if (TargetInfo.OutputObjectFormat != llvm::Triple::MachO)
+  if (TargetInfo.OutputObjectFormat != llvm::Triple::MachO ||
+      willBeRelativelyAddressed)
     type = CStringSectionType::Default;
   StringRef sectionName;
   switch (type) {
@@ -6043,7 +6175,7 @@ IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
     sectionName = ObjCMethodTypeSectionName;
     break;
   case CStringSectionType::OSLogString:
-    sectionName = OSLogStringSectionName;
+    sectionName = Context.LangOpts.OSLogStringSectionName;
     break;
   case CStringSectionType::NumTypes:
     llvm_unreachable("invalid type");

@@ -23,10 +23,10 @@
 namespace swift {
   namespace detail {
     struct DeferTask {};
-    template<typename F>
-    auto operator+(DeferTask, F &&fn) ->
-        decltype(llvm::make_scope_exit(std::forward<F>(fn))) {
-      return llvm::make_scope_exit(std::forward<F>(fn));
+    template <typename F>
+    auto operator+(DeferTask, F &&fn)
+        -> decltype(llvm::scope_exit(std::forward<F>(fn))) {
+      return llvm::scope_exit(std::forward<F>(fn));
     }
   }
 } // end namespace swift

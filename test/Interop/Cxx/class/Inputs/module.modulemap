@@ -48,7 +48,15 @@ module MemoryLayout {
   requires cplusplus
 }
 
-module MemberVariables {
+// This header is shared between 3 test cases. It's built with -verify in
+// test/Interop/Cxx/class/member-variables-typechecker.swift, which is defeated
+// if the test just picks up a cached module. We could set the module cache path
+// explicitly, but that would rebuild CxxStdlib which is really slow.
+module MemberVariablesNoDiagnostics {
+  header "member-variables.h"
+  requires cplusplus
+}
+module MemberVariablesDiagnostics {
   header "member-variables.h"
   requires cplusplus
 }
@@ -60,6 +68,11 @@ module MutableMembers {
 
 module MutabilityAnnotations {
   header "mutability-annotations.h"
+  requires cplusplus
+}
+
+module NestedEnums {
+  header "nested-enums.h"
   requires cplusplus
 }
 
@@ -163,4 +176,21 @@ module Mirror {
   header "mirror.h"
   requires cplusplus
   export *
+}
+
+module SuppressibleProtocols {
+  header "suppressible-protocols.h"
+  requires cplusplus
+  export *
+}
+
+module FriendFunction {
+  header "friend-function.h"
+  requires cplusplus
+  export *
+}
+
+module NoncopyableNonmovableGlobal {
+  header "noncopyable-nonmovable-global.h"
+  requires cplusplus
 }

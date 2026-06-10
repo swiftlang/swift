@@ -45,11 +45,21 @@ extension Context {
   func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
     bridgedPassContext.canMakeStaticObjectReadOnly(objectType.bridged)
   }
+
+  /// True if the current compilation is in whole-module mode, i.e. the SIL of all source files
+  /// of the module is available.
+  var isWholeModule: Bool {
+    bridgedPassContext.isWholeModule()
+  }
+
+  /// The ModuleDecl of the currently compiled module.
+  var moduleDecl: ModuleDecl {
+    bridgedPassContext.getModuleDecl().getAs(ModuleDecl.self)
+  }
 }
 
 extension MutatingContext {
   func notifyInvalidatedStackNesting() { bridgedPassContext.notifyInvalidatedStackNesting() }
-  var needFixStackNesting: Bool { bridgedPassContext.getNeedFixStackNesting() }
 
   func tryOptimizeApplyOfPartialApply(closure: PartialApplyInst) -> Bool {
     if bridgedPassContext.tryOptimizeApplyOfPartialApply(closure.bridged) {
@@ -90,29 +100,37 @@ extension MutatingContext {
   }
   
   func tryOptimizeKeypath(apply: FullApplySite) -> Bool {
-    return bridgedPassContext.tryOptimizeKeypath(apply.bridged)
+    if bridgedPassContext.tryOptimizeKeypath(apply.bridged) {
+      notifyBranchesChanged()
+      notifyInstructionsChanged()
+      return true
+    }
+    return false
   }
 
   func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) {
     // This is only a best-effort attempt to notify the new cloned instructions as changed.
     // TODO: get a list of cloned instructions from the `inlineFunction`
-    let instAfterInling: Instruction?
+    let instBeforeInlining = apply.previous
+    let instAfterInlining: Instruction?
     switch apply {
     case is ApplyInst:
-      instAfterInling = apply.next
+      instAfterInlining = apply.next
     case let beginApply as BeginApplyInst:
       let next = beginApply.next!
-      instAfterInling = (next is EndApplyInst ? nil : next)
+      instAfterInlining = (next is EndApplyInst ? nil : next)
     case is TryApplyInst:
-      instAfterInling = apply.parentBlock.next?.instructions.first
+      instAfterInlining = apply.parentBlock.next?.instructions.first
     default:
-      instAfterInling = nil
+      instAfterInlining = nil
     }
 
     bridgedPassContext.inlineFunction(apply.bridged, mandatoryInline)
 
-    if let instAfterInling = instAfterInling {
-      notifyNewInstructions(from: apply, to: instAfterInling)
+    if let instBeforeInlining = instBeforeInlining?.next,
+       let instAfterInlining = instAfterInlining,
+       !instAfterInlining.isDeleted {
+      notifyNewInstructions(from: instBeforeInlining, to: instAfterInlining)
     }
   }
 

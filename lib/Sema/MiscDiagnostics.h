@@ -41,7 +41,8 @@ namespace swift {
 
   /// Emit diagnostics for syntactic restrictions on a given expression.
   void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
-                                       bool isExprStmt, bool isConstInitExpr);
+                                       bool isExprStmt, bool isConstInitExpr,
+                                       bool inForEachPreamble);
 
   /// Emit diagnostics for a given statement.
   void performStmtDiagnostics(const Stmt *S, DeclContext *DC);
@@ -135,10 +136,8 @@ namespace swift {
   void checkFunctionAsyncUsage(AbstractFunctionDecl *decl);
   void checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl);
 
-  /// Detect and diagnose a missing `try` in `for-in` loop sequence
-  /// expression in async context (denoted with `await` keyword).
-  bool diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
-                                             ForEachStmt *forEach);
+  /// Determine if any of the performance hint diagnostics are enabled.
+  bool performanceHintDiagnosticsEnabled(ASTContext &ctx, SourceFile *sf);
 
   class BaseDiagnosticWalker : public ASTWalker {
   protected:
@@ -188,6 +187,9 @@ namespace swift {
                      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) {
                        return E->getType();
                      });
+
+  /// Diagnose a declaration of typed throws at the given location.
+  void diagnoseUntypedThrows(const DeclContext *dc, SourceLoc throwsLoc);
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

@@ -66,11 +66,11 @@ namespace constraints {
 enum class DeclTypeCheckingSemantics {
   /// A normal declaration.
   Normal,
-  
+
   /// The type(of:) declaration, which performs a "dynamic type" operation,
   /// with different behavior for existential and non-existential arguments.
   TypeOf,
-  
+
   /// The withoutActuallyEscaping(_:do:) declaration, which makes a nonescaping
   /// closure temporarily escapable.
   WithoutActuallyEscaping,
@@ -95,9 +95,14 @@ class LookupTypeResult {
   SmallVector<LookupTypeResultEntry, 4> Results;
 
 public:
+  using const_iterator = SmallVectorImpl<LookupTypeResultEntry>::const_iterator;
+  const_iterator begin() const { return Results.begin(); }
+  const_iterator end() const { return Results.end(); }
+
   using iterator = SmallVectorImpl<LookupTypeResultEntry>::iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
+
   unsigned size() const { return Results.size(); }
 
   LookupTypeResultEntry operator[](unsigned index) const {
@@ -289,7 +294,7 @@ public:
         RequirementFailureInfo{Req, SubstReq, { }, IsolatedConformances,
                                IsolatedConformanceProto});
   }
-  
+
   const RequirementFailureInfo &getRequirementFailureInfo() const {
     assert(Kind == CheckRequirementsResult::RequirementFailure);
 
@@ -297,6 +302,44 @@ public:
   }
 
   CheckRequirementsResult getKind() const { return Kind; }
+};
+
+/// Helper type for diagnosing a lookup that failed merely because it was
+/// restricted by a module selector.
+///
+/// To use this, perform the lookup again without its module selector and
+/// construct a \c ModuleSelectorCorrection from the lookup result. If
+/// there are any results, the \c diagnose() method will emit an error and a
+/// set of fix-it notes.
+class ModuleSelectorCorrection {
+  enum class CandidateKind {
+    /// A declaration that is found without depending on context.
+    /// Usually either a top-level type or a member with an explicit base type.
+    ContextFree,
+    /// A member declaration accessed via implicit \c self .
+    MemberViaSelf,
+    /// A member declaration not accessed via implicit \c self (usually a static
+    /// member of an enclosing type).
+    MemberViaContext,
+    /// A local declaration.
+    Local
+  };
+
+  using CandidateModule = std::pair<Identifier, CandidateKind>;
+  SmallSetVector<CandidateModule, 4> candidateModules;
+
+public:
+  ModuleSelectorCorrection(const LookupResult &candidates);
+  ModuleSelectorCorrection(const LookupTypeResult &candidates);
+  ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates);
+  ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates);
+
+  /// Emit an error and warnings if there were any candidates.
+  ///
+  /// \returns \c true if an error was diagnosed.
+  bool diagnose(ASTContext &ctx,
+                DeclNameLoc nameLoc,
+                DeclNameRef originalName) const;
 };
 
 /// Describes the kind of checked cast operation being performed.
@@ -317,6 +360,18 @@ enum class CheckedCastContextKind {
   /// Coerce to checked cast. Used when we verify if it is possible to
   /// suggest to convert a coercion to a checked cast.
   Coercion,
+};
+
+/// Determines which BraceStmts should be type-checked.
+enum class BraceStmtChecking {
+  /// Type-check all BraceStmts. This should always be the case for regular
+  /// type-checking.
+  All,
+
+  /// Only type-check the body of a do-catch statement, not including catch
+  /// clauses. This is necessary for completion where we still need the caught
+  /// error type to be computed.
+  OnlyDoCatchBody,
 };
 
 namespace TypeChecker {
@@ -482,7 +537,7 @@ bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
 ConcreteDeclRef getReferencedDeclForHasSymbolCondition(Expr *E);
 
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
-                      bool LeaveBodyUnchecked = false);
+                      BraceStmtChecking braceChecking = BraceStmtChecking::All);
 
 /// Try to apply the result builder transform of the given builder type
 /// to the body of the function.
@@ -493,8 +548,6 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 /// value if an error occurred while type checking the transformed body.
 std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                            Type builderType);
-
-bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
 void collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced);
 
@@ -673,12 +726,6 @@ bool typeCheckForCodeCompletion(
     constraints::SyntacticElementTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
-/// Check the key-path expression.
-///
-/// Returns the type of the last component of the key-path.
-std::optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
-                                         bool requireResultType = false);
-
 /// Type check whether the given type declaration includes members of
 /// unsupported recursive value types.
 ///
@@ -799,7 +846,8 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
 /// together.
 ///
 /// \returns true if a failure occurred.
-bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt);
+bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                              bool skipWhereClause);
 
 /// Compute the set of captures for the given closure.
 void computeCaptures(AbstractClosureExpr *ACE);
@@ -838,6 +886,12 @@ Expr *addImplicitLoadExpr(
     std::function<void(Expr *, Type)> setType =
         [](Expr *E, Type type) { E->setType(type); });
 
+Expr *addImplicitBorrowExpr(
+    ASTContext &Context, Expr *expr,
+    std::function<Type(Expr *)> getType = [](Expr *E) { return E->getType(); },
+    std::function<void(Expr *, Type)> setType =
+        [](Expr *E, Type type) { E->setType(type); });
+
 /// Determine whether the given type either conforms to, or itself an
 /// existential subtype of, the given protocol.
 ///
@@ -864,6 +918,11 @@ void checkConformancesInContext(IterableDeclContext *idc);
 
 /// Check that the type of the given property conforms to NSCopying.
 ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
+
+/// Simplify generic argument expressions which are type sugar productions that
+/// got parsed as expressions due to the parser not knowing which identifiers
+/// are type names.
+TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
 
 /// \name Name lookup
 ///
@@ -1041,6 +1100,11 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 std::optional<Diagnostic>
 diagnosticIfDeclCannotBeUnavailable(const Decl *D, SemanticAvailableAttr attr);
 
+/// Emit a warning on the first use of a compatibility memberwise initializer
+/// overload in a SourceFile.
+void diagnoseCompatMemberwiseInitIfNeeded(const ConstructorDecl *init,
+                                          SourceLoc loc);
+
 /// Checks whether the required range of versions of the compilation's target
 /// platform are available at the given `SourceRange`. If not, `Diagnose` is
 /// invoked.
@@ -1088,14 +1152,9 @@ void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkCallerSideDefaultArgumentEffects(DeclContext *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 
 /// Whether the given expression can throw, and if so, the thrown type.
 std::optional<Type> canThrow(ASTContext &ctx, Expr *expr);
-
-/// Whether the given for..each statement can throw, and if so, the thrown
-/// error type.
-std::optional<Type> canThrow(ASTContext &ctx, ForEachStmt *forEach);
 
 /// Determine the error type that is thrown out of the body of the given
 /// do-catch statement.
@@ -1254,40 +1313,6 @@ diag::RequirementKind getProtocolRequirementKind(ValueDecl *Requirement);
 /// `dynamicallyCall(withKeywordArguments:)`.
 bool isValidDynamicCallableMethod(FuncDecl *decl,
                                   bool hasKeywordArguments);
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)`.
-bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                         bool ignoreLabel = false);
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)` which
-/// takes a single non-variadic parameter that conforms to
-/// `ExpressibleByStringLiteral` protocol.
-bool isValidStringDynamicMemberLookup(SubscriptDecl *decl,
-                                      bool ignoreLabel = false);
-
-/// Returns the KeyPath parameter type for a valid implementation of
-/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
-/// @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)` which
-/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-///
-/// Returns null if the given subscript is not a valid dynamic member lookup
-/// implementation.
-BoundGenericType *
-getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
-                                     bool ignoreLabel = false);
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
-/// @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)` which
-/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
-                                       bool ignoreLabel = false);
 
 /// Compute the wrapped value type for the given property that has attached
 /// property wrappers, when the backing storage is known to have the given type.
@@ -1493,6 +1518,11 @@ void recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 
+/// Returns true if a diagnostic ought to be emitted for any explicit reference
+/// to decl made from within the given DeclContext.
+bool shouldDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                          const DeclContext *dc);
+
 /// Emit or delay a diagnostic that suggests adding a missing import that is
 /// necessary to bring \p decl into scope in the containing source file. If
 /// delayed, the diagnostic will instead be emitted after type checking the
@@ -1505,6 +1535,12 @@ bool maybeDiagnoseMissingImportForMember(
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
+
+// Guide ForEachStmt type-checking by indicating whether the BorrowingSequence
+// protocol should be used, thus enabling Borrowing iteration for a given
+// sequence type.
+bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync,
+                                SourceLoc loc, DeclContext *dc);
 
 } // end namespace swift
 

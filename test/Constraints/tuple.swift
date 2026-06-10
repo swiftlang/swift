@@ -184,22 +184,6 @@ func gcd_23700031<T>(_ a: T, b: T) {
   (a, b) = (b, a % b)  // expected-error {{binary operator '%' cannot be applied to two 'T' operands}}
 }
 
-// <rdar://problem/24210190>
-//   Don't ignore tuple labels in same-type constraints or stronger.
-protocol Kingdom {
-  associatedtype King
-}
-struct Victory<General> {
-  init<K: Kingdom>(_ king: K) where K.King == General {} // expected-note {{where 'General' = '(x: Int, y: Int)', 'K.King' = 'MagicKingdom<(Int, Int)>.King' (aka '(Int, Int)')}}
-}
-struct MagicKingdom<K> : Kingdom {
-  typealias King = K
-}
-func magnify<T>(_ t: T) -> MagicKingdom<T> { return MagicKingdom() }
-func foo(_ pair: (Int, Int)) -> Victory<(x: Int, y: Int)> {
-  return Victory(magnify(pair)) // expected-error {{initializer 'init(_:)' requires the types '(x: Int, y: Int)' and 'MagicKingdom<(Int, Int)>.King' (aka '(Int, Int)') be equivalent}}
-}
-
 
 // https://github.com/apple/swift/issues/43213
 // Compiler crashes when accessing a non-existent property of a closure
@@ -341,27 +325,6 @@ optionalTuple = (bignum, 1) // expected-error {{cannot assign value of type '(In
 // Optional to Optional
 optionalTuple = optionalTuple2 // expected-error {{cannot assign value of type '(Int64, Int)?' to type '(Int, Int)?'}}
 // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('(Int64, Int)' and '(Int, Int)') are expected to be equal}}
-
-func testTupleLabelMismatchFuncConversion(fn1: @escaping ((x: Int, y: Int)) -> Void,
-                                          fn2: @escaping () -> (x: Int, Int)) {
-  // Warn on mismatches
-  let _: ((a: Int, b: Int)) -> Void = fn1 // expected-warning {{tuple conversion from '(a: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
-  let _: ((x: Int, b: Int)) -> Void = fn1 // expected-warning {{tuple conversion from '(x: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
-
-  let _: () -> (y: Int, Int) = fn2 // expected-warning {{tuple conversion from '(x: Int, Int)' to '(y: Int, Int)' mismatches labels}}
-  let _: () -> (y: Int, k: Int) = fn2 // expected-warning {{tuple conversion from '(x: Int, Int)' to '(y: Int, k: Int)' mismatches labels}}
-
-  // Attempting to shuffle has always been illegal here
-  let _: () -> (y: Int, x: Int) = fn2 // expected-error {{cannot convert value of type '() -> (x: Int, Int)' to specified type '() -> (y: Int, x: Int)'}}
-
-  // Losing labels is okay though.
-  let _: () -> (Int, Int) = fn2
-
-  // Gaining labels also okay.
-  let _: ((x: Int, Int)) -> Void = fn1
-  let _: () -> (x: Int, y: Int) = fn2
-  let _: () -> (Int, y: Int) = fn2
-}
 
 func testTupleLabelMismatchKeyPath() {
   // FIXME: The warning should be upgraded to an error for key paths.

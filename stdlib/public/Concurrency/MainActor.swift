@@ -36,8 +36,13 @@ import Swift
   }
 }
 #else
-/// A singleton actor whose executor is equivalent to the main
-/// dispatch queue.
+/// A global actor whose executor is equivalent to the main thread.
+///
+/// - Note: For additional information about the main actor,
+/// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
+///
+/// [concurrency]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/#The-Main-Actor
+/// [tspl]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/
 @available(SwiftStdlib 5.1, *)
 @globalActor public final actor MainActor: GlobalActor {
   public static let shared = MainActor()
@@ -95,7 +100,7 @@ extension MainActor {
   /// executor of the MainActor.
   ///
   /// If that is the case, the operation is invoked with an `isolated` version
-  /// of the actor, / allowing synchronous access to actor local state without
+  /// of the actor, allowing synchronous access to actor local state without
   /// hopping through asynchronous boundaries.
   ///
   /// If the current context is not running on the actor's serial executor, or
@@ -107,9 +112,9 @@ extension MainActor {
   /// will hop task execution to the target actor if necessary.
   ///
   /// - Note: This check is performed against the MainActor's serial executor,
-  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   meaning that if another actor uses the same serial executor--by using
   ///   ``MainActor/sharedUnownedExecutor`` as its own
-  ///   ``Actor/unownedExecutor``--this check will succeed , as from a concurrency
+  ///   ``Actor/unownedExecutor``--this check will succeed, as from a concurrency
   ///   safety perspective, the serial executor guarantees mutual exclusion of
   ///   those two actors.
   ///
@@ -163,7 +168,7 @@ extension MainActor {
   }
 }
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+#if os(anyAppleOS)
 @_extern(c, "pthread_main_np")
 @usableFromInline
 internal func pthread_main_np() -> CInt

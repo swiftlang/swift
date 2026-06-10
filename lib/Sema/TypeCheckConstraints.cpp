@@ -34,6 +34,7 @@
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -50,174 +51,6 @@
 
 using namespace swift;
 using namespace constraints;
-
-//===----------------------------------------------------------------------===//
-// Type variable implementation.
-//===----------------------------------------------------------------------===//
-#pragma mark Type variable implementation
-
-void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
-  getTypeVariable()->print(OS, PrintOptions::forDebugging());
-
-  SmallVector<TypeVariableOptions, 4> bindingOptions;
-  if (canBindToLValue())
-    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToLValue);
-  if (canBindToInOut())
-    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToInOut);
-  if (canBindToNoEscape())
-    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToNoEscape);
-  if (canBindToHole())
-    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToHole);
-  if (canBindToPack())
-    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToPack);
-  if (isPackExpansion())
-    bindingOptions.push_back(TypeVariableOptions::TVO_PackExpansion);
-  if (!bindingOptions.empty()) {
-    OS << " [can bind to: ";
-    interleave(bindingOptions, OS,
-               [&](TypeVariableOptions option) {
-                  (OS << getTypeVariableOptions(option));},
-               ", ");
-               OS << "]";
-  }
-}
-
-GenericTypeParamType *
-TypeVariableType::Implementation::getGenericParameter() const {
-  return locator ? locator->getGenericParameter() : nullptr;
-}
-
-std::optional<ExprKind>
-TypeVariableType::Implementation::getAtomicLiteralKind() const {
-  if (!locator || !locator->directlyAt<LiteralExpr>())
-    return std::nullopt;
-
-  auto kind = getAsExpr(locator->getAnchor())->getKind();
-  switch (kind) {
-  case ExprKind::IntegerLiteral:
-  case ExprKind::FloatLiteral:
-  case ExprKind::StringLiteral:
-  case ExprKind::BooleanLiteral:
-  case ExprKind::NilLiteral:
-    return kind;
-  default:
-    return std::nullopt;
-  }
-}
-
-bool TypeVariableType::Implementation::isClosureType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  return isExpr<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
-}
-
-bool TypeVariableType::Implementation::isTapType() const {
-  return locator && locator->directlyAt<TapExpr>();
-}
-
-bool TypeVariableType::Implementation::isClosureParameterType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  return isExpr<ClosureExpr>(locator->getAnchor()) &&
-         locator->isLastElement<LocatorPathElt::TupleElement>();
-}
-
-bool TypeVariableType::Implementation::isClosureResultType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  return isExpr<ClosureExpr>(locator->getAnchor()) &&
-         locator->isLastElement<LocatorPathElt::ClosureResult>();
-}
-
-bool TypeVariableType::Implementation::isKeyPathType() const {
-  return locator && locator->isKeyPathType();
-}
-
-bool TypeVariableType::Implementation::isKeyPathRoot() const {
-  return locator && locator->isKeyPathRoot();
-}
-
-bool TypeVariableType::Implementation::isKeyPathValue() const {
-  return locator && locator->isKeyPathValue();
-}
-
-bool TypeVariableType::Implementation::isKeyPathSubscriptIndex() const {
-  return locator &&
-         locator->isLastElement<LocatorPathElt::KeyPathSubscriptIndex>();
-}
-
-bool TypeVariableType::Implementation::isSubscriptResultType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  if (!locator->isLastElement<LocatorPathElt::FunctionResult>())
-    return false;
-
-  if (isExpr<SubscriptExpr>(locator->getAnchor()))
-    return true;
-
-  auto *KP = getAsExpr<KeyPathExpr>(locator->getAnchor());
-  if (!KP)
-    return false;
-
-  auto componentLoc = locator->findFirst<LocatorPathElt::KeyPathComponent>();
-  if (!componentLoc)
-    return false;
-
-  auto &component = KP->getComponents()[componentLoc->getIndex()];
-  return component.getKind() == KeyPathExpr::Component::Kind::Subscript ||
-         component.getKind() ==
-             KeyPathExpr::Component::Kind::UnresolvedSubscript;
-}
-
-bool TypeVariableType::Implementation::isParameterPack() const {
-  return locator
-      && locator->isForGenericParameter()
-      && locator->getGenericParameter()->isParameterPack();
-}
-
-bool TypeVariableType::Implementation::isCodeCompletionToken() const {
-  return locator && locator->directlyAt<CodeCompletionExpr>();
-}
-
-bool TypeVariableType::Implementation::isOpaqueType() const {
-  if (!locator)
-    return false;
-
-  auto GP = locator->getLastElementAs<LocatorPathElt::GenericParameter>();
-  if (!GP)
-    return false;
-
-  if (auto *GPT = GP->getType()->getAs<GenericTypeParamType>())
-    return (GPT->getOpaqueDecl() != nullptr);
-
-  return false;
-}
-
-bool TypeVariableType::Implementation::isCollectionLiteralType() const {
-  return locator && (locator->directlyAt<ArrayExpr>() ||
-                     locator->directlyAt<DictionaryExpr>());
-}
-
-bool TypeVariableType::Implementation::isNumberLiteralType() const {
-  return locator && locator->directlyAt<NumberLiteralExpr>();
-}
-
-bool TypeVariableType::Implementation::isFunctionResult() const {
-  return locator && locator->isLastElement<LocatorPathElt::FunctionResult>();
-}
-
-bool TypeVariableType::Implementation::isTernary() const {
-  return locator && locator->directlyAt<TernaryExpr>();
-}
-
-void *operator new(size_t bytes, ConstraintSystem& cs,
-                   size_t alignment) {
-  return cs.getAllocator().Allocate(bytes, alignment);
-}
 
 bool constraints::computeTupleShuffle(TupleType *fromTuple,
                                       TupleType *toTuple,
@@ -358,7 +191,8 @@ public:
       }
 
       performSyntacticExprDiagnostics(E, Target.getDeclContext(), isExprStmt,
-                                      isConstInitExpr);
+                                      isConstInitExpr,
+                                      Target.isForEachPreamble());
     }
     ExprDepth += 1;
     return Action::Continue(E);
@@ -464,13 +298,6 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
     csOptions |= ConstraintSystemFlags::DisableMacroExpansions;
 
-  if (Context.TypeCheckerOpts.EnableConstraintSolverPerformanceHacks ||
-      evaluateOrDefault(Context.evaluator,
-                        ModuleHasTypeCheckerPerformanceHacksEnabledRequest{
-                            dc->getParentModule()},
-                        false))
-    csOptions |= ConstraintSystemFlags::EnablePerformanceHacks;
-
   ConstraintSystem cs(dc, csOptions, diagnosticTransaction);
 
   if (auto *expr = target.getAsExpr()) {
@@ -478,10 +305,6 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
     // diagnostics and is a hint for various performance optimizations.
     cs.setContextualInfo(expr, target.getExprContextualTypeInfo());
 
-    // Try to shrink the system by reducing disjunction domains. This
-    // goes through every sub-expression and generate its own sub-system, to
-    // try to reduce the domains of those subexpressions.
-    cs.shrink(expr);
     target.setExpr(expr);
   }
 
@@ -535,7 +358,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter,
       paramType, /*isDiscarded=*/false);
 
-  auto paramInterfaceTy = paramType->mapTypeOutOfContext();
+  auto paramInterfaceTy = paramType->mapTypeOutOfEnvironment();
 
   // Attempt to pre-check expression first, if that fails - skip type-checking.
   // This would make sure that diagnostics about invalid AST are never dropped.
@@ -694,11 +517,11 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
       // In Swift 6.2 and below we incorrectly missed checking this rule for
       // methods, downgrade to a warning until the next language mode.
-      auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      if (!anchor->hasCurriedSelf() || ctx.isSwiftVersionAtLeast(futureVersion))
+      if (!anchor->hasCurriedSelf() ||
+          ctx.isLanguageModeAtLeast(LanguageMode::future))
         return Type();
 
-      diag.warnUntilFutureSwiftVersion();
+      diag.warnUntilLanguageMode(LanguageMode::future);
     }
   }
 
@@ -715,8 +538,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   {
     auto recordRequirement = [&](unsigned index, Requirement requirement,
                                  ConstraintLocator *locator) {
-      cs.openGenericRequirement(DC->getParent(), signature, index, requirement,
-                                /*skipSelfProtocolConstraint=*/false, locator,
+      cs.openGenericRequirement(DC->getParent(), signature, index, requirement, locator,
                                 [&](Type type) -> Type {
                                   return cs.openType(type, genericParameters, locator,
                                                      /*preparedOverload=*/nullptr);
@@ -841,6 +663,28 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                 initializer, DC, patternType, pattern,
                 /*bindPatternVarsOneWay=*/false);
 
+  // Bindings cannot be type-checked independently from their context in a
+  // closure. If we want to be able to lazily type-check these we'll need to
+  // type-check the entire surrounding expression. The only exception to this
+  // is macro expansions since they cannot refer to closure parameters.
+  //
+  // FIXME: We'll likely still have crashers for macro expansions in cases
+  // where e.g the return type of the closure is being queried in the constraint
+  // system.
+  if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
+    if (!pattern->isImplicit() &&
+        !swift::isMacroExpansionInContext(pattern->getStartLoc(),
+                                          DC->getParentSourceFile())) {
+      // Completion may trigger lazy type-checking, just decline to type-check.
+      auto &ctx = CE->getASTContext();
+      if (ctx.SourceMgr.hasIDEInspectionTargetBuffer()) {
+        target.markInvalid();
+        return true;
+      }
+      ABORT("Cannot type-check PatternBindingDecl without closure context");
+    }
+  }
+
   // Type-check the initializer.
   auto resultTarget = typeCheckExpression(target, options);
 
@@ -893,7 +737,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   return hadError;
 }
 
-bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt) {
+bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                                           bool skipWhere) {
   auto &Context = dc->getASTContext();
   FrontendStatsTracer statsTracer(Context.Stats, "typecheck-for-each", stmt);
   PrettyStackTraceStmt stackTrace(Context, "type-checking-for-each", stmt);
@@ -902,36 +747,28 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt) {
   if (!typeCheckTarget(target))
     return true;
 
-  if (auto *where = stmt->getWhere()) {
-    auto boolType = dc->getASTContext().getBoolType();
-    if (!boolType)
-      return true;
+  if (!skipWhere) {
+    if (auto *where = stmt->getWhere()) {
+      auto boolType = dc->getASTContext().getBoolType();
+      if (!boolType)
+        return true;
 
-    SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
-                                       /*isDiscarded=*/false);
-    auto result = typeCheckTarget(whereClause);
-    if (!result)
-      return true;
+      SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
+                                         /*isDiscarded=*/false);
+      auto result = typeCheckTarget(whereClause);
+      if (!result)
+        return true;
 
-    stmt->setWhere(result->getAsExpr());
+      stmt->setWhere(result->getAsExpr());
+    }
   }
-
-  // Check to see if the sequence expr is throwing (in async context),
-  // if so require the stmt to have a `try`.
-  if (diagnoseUnhandledThrowsInAsyncContext(dc, stmt))
-    return true;
 
   return false;
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
-  // If this expression is already typechecked and has type Bool, then just
-  // re-typecheck it.
-  if (expr->getType() && expr->getType()->isBool()) {
-    auto resultTy =
-        TypeChecker::typeCheckExpression(expr, dc);
-    return !resultTy;
-  }
+  ASSERT(!expr->getType() || isa<OpaqueValueExpr>(expr)
+         && "the bool condition is already type checked");
 
   auto *boolDecl = dc->getASTContext().getBoolDecl();
   if (!boolDecl)
@@ -952,7 +789,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                   "typecheck-expr-pattern", EP);
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
-  EP->getMatchVar()->setInterfaceType(rhsType->mapTypeOutOfContext());
+  EP->getMatchVar()->setInterfaceType(rhsType->mapTypeOutOfEnvironment());
 
   // Check the expression as a condition.
   auto target = SyntacticElementTarget::forExprPattern(EP);
@@ -978,7 +815,7 @@ static Type openTypeParameter(ConstraintSystem &cs,
   }
 
   auto *paramTy = interfaceTy->castTo<GenericTypeParamType>();
-  auto archetypeTy = env->mapTypeIntoContext(paramTy)->castTo<ArchetypeType>();
+  auto archetypeTy = env->mapTypeIntoEnvironment(paramTy)->castTo<ArchetypeType>();
 
   auto found = types.find(archetypeTy);
   if (found != types.end())
@@ -1129,6 +966,16 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
 }
 
 Expr *
+TypeChecker::addImplicitBorrowExpr(ASTContext &Ctx, Expr *E,
+                                 std::function<Type(Expr *)> getType,
+                                 std::function<void(Expr *, Type)> setType) {
+  auto objectType = getType(E)->getRValueType();
+  auto *BE = BorrowExpr::createImplicit(Ctx, E->getLoc(), E, objectType);
+  setType(BE, objectType);
+  return BE;
+}
+
+Expr *
 TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
                                  std::function<Type(Expr *)> getType,
                                  std::function<void(Expr *, Type)> setType) {
@@ -1189,10 +1036,7 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
                             llvm::function_ref<Type(Expr *)> getType,
                             llvm::function_ref<void(Expr *, Type)> setType) {
   Type exprTy = getType(expr);
-
-  // If expr has no type, just assume it's the right expr.
-  if (!exprTy)
-    return expr;
+  ASSERT(exprTy);
 
   // If the type is already materializable, then we're already done.
   if (!exprTy->hasLValueType())
@@ -1267,23 +1111,62 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
 //===----------------------------------------------------------------------===//
 #pragma mark Debugging
 
+void PotentialThrowSite::print(SourceManager *sm,
+                               llvm::raw_ostream &out) const {
+  switch (kind) {
+  case PotentialThrowSite::Application:
+    out << "- application @ ";
+    break;
+  case PotentialThrowSite::ExplicitThrow:
+    out << " - explicit throw @ ";
+    break;
+  case PotentialThrowSite::NonExhaustiveDoCatch:
+    out << " - non-exhaustive do..catch @ ";
+    break;
+  case PotentialThrowSite::PropertyAccess:
+    out << " - property access @ ";
+    break;
+  }
+
+  locator->dump(sm, out);
+}
+
 void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
                           raw_ostream &out) const {
   PrintOptions PO = PrintOptions::forDebugging();
-  out << " with ";
 
-  switch (getKind()) {
-  case OverloadChoiceKind::Decl:
-  case OverloadChoiceKind::DeclViaDynamic:
-  case OverloadChoiceKind::DeclViaBridge:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional:
-    getDecl()->dumpRef(out);
+  auto printDecl = [&]() {
+    auto *decl = getDecl();
+
+    decl->dumpRef(out);
     out << " as ";
     if (getBaseType())
       out << getBaseType()->getString(PO) << ".";
 
-    out << getDecl()->getBaseName() << ": "
-        << adjustedOpenedType->getString(PO);
+    auto type = (adjustedOpenedType
+                 ? adjustedOpenedType
+                 : decl->getInterfaceType());
+    out << type->getString(PO);
+  };
+
+  switch (getKind()) {
+  case OverloadChoiceKind::Decl:
+    printDecl();
+    break;
+
+  case OverloadChoiceKind::DeclViaDynamic:
+    printDecl();
+    out << " dynamic";
+    break;
+
+  case OverloadChoiceKind::DeclViaBridge:
+    printDecl();
+    out << " bridged";
+    break;
+
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    printDecl();
+    out << " unwrapped";
     break;
 
   case OverloadChoiceKind::KeyPathApplication:
@@ -1293,7 +1176,7 @@ void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
     out << "dynamic member lookup root " << getBaseType()->getString(PO)
-        << " name='" << getName();
+        << " name='" << getName() << "'";
     break;
 
   case OverloadChoiceKind::TupleIndex:
@@ -1352,6 +1235,7 @@ void Solution::dump(raw_ostream &out, unsigned indent) const {
         ovl.first->dump(sm, out);
       }
 
+      out << " with ";
       auto choice = ovl.second.choice;
       choice.dump(ovl.second.adjustedOpenedType, sm, out);
     }
@@ -1445,6 +1329,17 @@ void Solution::dump(raw_ostream &out, unsigned indent) const {
       out << ", ";
     });
     out << "\n";
+  }
+
+  if (!potentialThrowSites.empty()) {
+    out.indent(indent) << "Potential throw sites:\n";
+    interleave(
+        potentialThrowSites,
+        [&](const auto &throwSite) {
+          throwSite.second.print(sm, out.indent(indent + 2));
+        },
+        [&] { out << "\n"; });
+    out << '\n';
   }
 
   if (!Fixes.empty()) {
@@ -1704,27 +1599,13 @@ void ConstraintSystem::print(raw_ostream &out) const {
 
   if (!potentialThrowSites.empty()) {
     out.indent(indent) << "Potential throw sites:\n";
-    interleave(potentialThrowSites, [&](const auto &throwSite) {
-      out.indent(indent + 2);
-      switch (throwSite.second.kind) {
-      case PotentialThrowSite::Application:
-        out << "- application @ ";
-        break;
-      case PotentialThrowSite::ExplicitThrow:
-        out << " - explicit throw @ ";
-        break;
-      case PotentialThrowSite::NonExhaustiveDoCatch:
-        out << " - non-exhaustive do..catch @ ";
-        break;
-      case PotentialThrowSite::PropertyAccess:
-        out << " - property access @ ";
-        break;
-      }
-
-      throwSite.second.locator->dump(&getASTContext().SourceMgr, out);
-    }, [&] {
-      out << "\n";
-    });
+    interleave(
+        potentialThrowSites,
+        [&](const auto &throwSite) {
+          throwSite.second.print(&getASTContext().SourceMgr,
+                                 out.indent(indent + 2));
+        },
+        [&] { out << "\n"; });
     out << "\n";
 
   }
@@ -2208,8 +2089,12 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
         return CheckedCastKind::ValueCast;
 
       // Compare superclass bounds.
-      if (fromSuperclass->isBindableToSuperclassOf(toSuperclass))
+      if (fromSuperclass->isBindableToSuperclassOf(toSuperclass)) {
+        if (toType->isForeignReferenceType() ||
+            fromType->isForeignReferenceType())
+          return failed();
         return CheckedCastKind::ValueCast;
+      }
 
       // An upcast is also OK.
       if (toSuperclass->isBindableToSuperclassOf(fromSuperclass))
@@ -2423,12 +2308,4 @@ void ConstraintSystem::forEachExpr(
   };
 
   expr->walk(ChildWalker(*this, callback));
-}
-
-bool ModuleHasTypeCheckerPerformanceHacksEnabledRequest::evaluate(
-    Evaluator &evaluator, const ModuleDecl *module) const {
-  auto name = module->getRealName().str();
-  return module->getASTContext().blockListConfig.hasBlockListAction(
-      name, BlockListKeyKind::ModuleName,
-      BlockListAction::ShouldUseTypeCheckerPerfHacks);
 }

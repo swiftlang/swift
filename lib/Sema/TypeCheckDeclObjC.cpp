@@ -222,17 +222,11 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for enums.
   if (T->is<EnumType>()) {
-    if (DC->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
-      // New dialog mentioning @c.
-      diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
-                     language)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-    } else {
-      diags.diagnose(TypeRange.Start, diag::not_objc_swift_enum)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-    }
+    // New dialog mentioning @c.
+    diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
+                   language)
+        .highlight(TypeRange)
+        .limitBehavior(behavior);
     return;
   }
 
@@ -545,7 +539,8 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
     llvm_unreachable("decl cannot have dynamic isolation");
 
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedConcurrent:
+  case ActorIsolation::NonisolatedNonsending:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     return false;
@@ -563,6 +558,8 @@ static AvailabilityRange getObjCClassStubAvailability(ASTContext &ctx) {
   if (target.isWatchOS())
     return AvailabilityRange(llvm::VersionTuple(6, 0, 0));
   if (target.isXROS())
+    return AvailabilityRange(llvm::VersionTuple(1, 0, 0));
+  if (target.isAppleFirmware())
     return AvailabilityRange(llvm::VersionTuple(1, 0, 0));
   return AvailabilityRange::alwaysAvailable();
 }
@@ -644,9 +641,10 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
           return false;
         if (!classDecl->isTypeErasedGenericClass()) {
           softenIfAccessNote(value, reason.getAttr(),
-            value->diagnose(diag::objc_in_generic_extension,
-                            classDecl->isGeneric())
-                .limitBehavior(behavior));
+                             value
+                                 ->diagnose(diag::objc_in_generic_extension,
+                                            classDecl->hasGenericParamList())
+                                 .limitBehavior(behavior));
           reason.describe(value);
           return true;
         }
@@ -784,9 +782,9 @@ bool swift::isRepresentableInLanguage(
       Reason.describe(accessor);
       return false;
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
       diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
                             diag::objc_coroutine_accessor)
           .limitBehavior(behavior);
@@ -825,7 +823,7 @@ bool swift::isRepresentableInLanguage(
   }
 
   if (auto FD = dyn_cast<FuncDecl>(AFD)) {
-    Type ResultType = FD->mapTypeIntoContext(FD->getResultInterfaceType());
+    Type ResultType = FD->mapTypeIntoEnvironment(FD->getResultInterfaceType());
     if (!FD->hasAsync() &&
         !ResultType->hasError() &&
         !ResultType->isVoid() &&
@@ -846,7 +844,7 @@ bool swift::isRepresentableInLanguage(
   }
 
   // Check that @objc functions can't have typed throw.
-  if (AFD->hasThrows()) {
+  if (!AFD->getDeclContext()->isInSwiftinterface() && AFD->hasThrows()) {
     Type thrownType = AFD->getThrownInterfaceType();
     // TODO: only `throws(Error)` is allowed.
     // Throwing `any MyError` that confronts `Error` is not implemented yet.
@@ -924,7 +922,7 @@ bool swift::isRepresentableInLanguage(
 
     // Translate the result type of the function into parameters for the
     // completion handler parameter, exploding one level of tuple if needed.
-    Type resultType = FD->mapTypeIntoContext(FD->getResultInterfaceType());
+    Type resultType = FD->mapTypeIntoEnvironment(FD->getResultInterfaceType());
     if (auto tupleType = resultType->getAs<TupleType>()) {
       for (const auto &tupleElt : tupleType->getElements()) {
         if (addCompletionHandlerParam(tupleElt.getType()))
@@ -1174,7 +1172,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return isRepresentableInObjC(abiRole.getCounterpart(), Reason);
 
-  Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
+  Type T = VD->getDeclContext()->mapTypeIntoEnvironment(VD->getInterfaceType());
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
     // In-memory layout of @weak and @unowned does not correspond to anything
     // in Objective-C, but this does not really matter here, since Objective-C
@@ -1405,8 +1403,8 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       if (attr->hasName() && !CD->isGenericContext()) {
         // @objc with a name on a non-generic subclass of a generic class is
         // just controlling the runtime name. Don't diagnose this case.
-        const_cast<ClassDecl *>(CD)->getAttrs().add(
-          new (ctx) ObjCRuntimeNameAttr(*attr));
+        const_cast<ClassDecl *>(CD)->addAttribute(
+            new (ctx) ObjCRuntimeNameAttr(*attr));
         return std::nullopt;
       }
 
@@ -1421,8 +1419,8 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     if (ancestry.contains(AncestryFlags::ResilientOther) &&
         !checkObjCClassStubAvailability(ctx, CD)) {
       if (attr->hasName()) {
-        const_cast<ClassDecl *>(CD)->getAttrs().add(
-          new (ctx) ObjCRuntimeNameAttr(*attr));
+        const_cast<ClassDecl *>(CD)->addAttribute(
+            new (ctx) ObjCRuntimeNameAttr(*attr));
         return std::nullopt;
       }
 
@@ -1536,9 +1534,9 @@ shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit,
       switch (accessor->getAccessorKind()) {
       case AccessorKind::DidSet:
       case AccessorKind::Modify:
-      case AccessorKind::Modify2:
+      case AccessorKind::YieldingMutate:
       case AccessorKind::Read:
-      case AccessorKind::Read2:
+      case AccessorKind::YieldingBorrow:
       case AccessorKind::WillSet:
       case AccessorKind::Init:
       case AccessorKind::DistributedGet:
@@ -1964,7 +1962,7 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 
     // Create an @objc attribute with the implicit name.
     attr = ObjCAttr::create(ctx, selector, /*implicitName=*/true);
-    decl->getAttrs().add(attr);
+    decl->addAttribute(attr);
   };
 
   // If this declaration overrides an @objc declaration, use its name.
@@ -2547,6 +2545,9 @@ namespace {
         auto opposite = (*this)(rightDecl, leftDecl);
         if (normal != opposite)
           return normal;
+
+        leftContext = leftContext->getParent();
+        rightContext = rightContext->getParent();
       }
 
       // Final tiebreaker: Kind
@@ -2882,11 +2883,11 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
       // conflict checking and have to be diagnosed as warnings in Swift 5:
 
       // * Selectors for imported methods with async variants.
-      bool breakingInSwift5 = originalIsImportedAsync;
-      
+      bool breakingPreSwift6 = originalIsImportedAsync;
+
       // * Protocol requirements
       if (!isa<ClassDecl>(conflict.typeDecl))
-        breakingInSwift5 = true;
+        breakingPreSwift6 = true;
 
       bool redeclSame = (diagInfo == origDiagInfo);
       auto diag = Ctx.Diags.diagnose(conflictingDecl,
@@ -2895,7 +2896,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      diagInfo.first, diagInfo.second,
                                      origDiagInfo.first, origDiagInfo.second,
                                      conflict.selector);
-      diag.warnUntilSwiftVersionIf(breakingInSwift5, 6);
+      diag.warnUntilLanguageModeIf(breakingPreSwift6, LanguageMode::v6);
 
       // Temporarily soften selector conflicts in objcImpl extensions; we're
       // seeing some that are caused by ObjCImplementationChecker improvements.
@@ -3054,10 +3055,11 @@ bool swift::diagnoseObjCCategoryConflicts(SourceFile &sf) {
           if (implCat != catToCheck)
             bestCat = implCat;
 
-        Ctx.Diags.diagnose(catToCheck, diag::objc_redecl_category_name,
-                           catToCheck->hasClangNode(),
-                           bestCat->hasClangNode(), catName)
-          .warnUntilSwiftVersion(6);
+        Ctx.Diags
+            .diagnose(catToCheck, diag::objc_redecl_category_name,
+                      catToCheck->hasClangNode(), bestCat->hasClangNode(),
+                      catName)
+            .warnUntilLanguageMode(LanguageMode::v6);
 
         Ctx.Diags.diagnose(bestCat, diag::invalid_redecl_prev_name, catName);
       }
@@ -3564,6 +3566,7 @@ private:
     WrongWritability,
     WrongRequiredAttr,
     WrongForeignErrorConvention,
+    WrongParameterOwnership,
     WrongSendability,
 
     Match,
@@ -3896,10 +3899,20 @@ private:
       if (reqCtor->isRequired() != cast<ConstructorDecl>(cand)->isRequired())
         return MatchOutcome::WrongRequiredAttr;
 
-    if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req))
+    if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req)) {
+      auto candAFD = cast<AbstractFunctionDecl>(cand);
       if (reqAFD->getForeignErrorConvention() !=
-              cast<AbstractFunctionDecl>(cand)->getForeignErrorConvention())
+          candAFD->getForeignErrorConvention())
         return MatchOutcome::WrongForeignErrorConvention;
+      for (auto [reqParam, candParam] :
+           llvm::zip(*reqAFD->getParameters(), *candAFD->getParameters())) {
+        // In case the ObjC owership is unowned and the swift is owned, the ObjC
+        // thunk will make the necessary adjustment.
+        if (reqParam->getValueOwnership() != candParam->getValueOwnership() &&
+            reqParam->getValueOwnership() != ValueOwnership::Default)
+          return MatchOutcome::WrongParameterOwnership;
+      }
+    }
 
     // If we got here, everything matched. But at what quality?
     if (explicitObjCName)
@@ -4016,6 +4029,10 @@ private:
     case MatchOutcome::WrongType:
       diagnose(cand, diag::objc_implementation_type_mismatch,
                cand, getMemberType(cand), getMemberType(req));
+      return;
+
+    case MatchOutcome::WrongParameterOwnership:
+      diagnose(cand, diag::objc_implementation_ownership_mismatch, cand);
       return;
 
     case MatchOutcome::WrongWritability:
@@ -4191,15 +4208,6 @@ public:
     // Only encourage adoption if the corresponding language feature is enabled.
     if (isa<ExtensionDecl>(decl) &&
         !decl->getASTContext().LangOpts.hasFeature(Feature::ObjCImplementation))
-      return;
-
-    if (isa<AbstractFunctionDecl>(decl) &&
-        !decl->getASTContext().LangOpts.hasFeature(Feature::CImplementation))
-      return;
-
-    // Only encourage @_objcImplementation *extension* adopters to adopt
-    // @implementation; @_objcImplementation @_cdecl hasn't been stabilized yet.
-    if (!isa<ExtensionDecl>(decl))
       return;
 
     auto diag = diagnose(getAttr()->getLocation(),

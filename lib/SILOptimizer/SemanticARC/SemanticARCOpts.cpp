@@ -36,9 +36,6 @@ static llvm::cl::list<ARCTransformKind> TransformsToPerform(
         clEnumValN(ARCTransformKind::LoadCopyToLoadBorrowPeephole,
                    "sil-semantic-arc-peepholes-loadcopy-to-loadborrow",
                    "Perform the load [copy] to load_borrow peephole"),
-        clEnumValN(ARCTransformKind::RedundantBorrowScopeElimPeephole,
-                   "sil-semantic-arc-peepholes-redundant-borrowscope-elim",
-                   "Perform the redundant borrow scope elimination peephole"),
         clEnumValN(ARCTransformKind::RedundantCopyValueElimPeephole,
                    "sil-semantic-arc-peepholes-redundant-copyvalue-elim",
                    "Perform the redundant copy_value peephole"),
@@ -87,7 +84,6 @@ struct SemanticARCOpts : SILFunctionTransform {
       switch (transform) {
       case ARCTransformKind::LifetimeJoiningPeephole:
       case ARCTransformKind::RedundantCopyValueElimPeephole:
-      case ARCTransformKind::RedundantBorrowScopeElimPeephole:
       case ARCTransformKind::LoadCopyToLoadBorrowPeephole:
       case ARCTransformKind::AllPeepholes:
       case ARCTransformKind::OwnershipConversionElimPeephole:

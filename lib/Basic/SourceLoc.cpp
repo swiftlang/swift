@@ -219,6 +219,10 @@ void SourceManager::recordSourceFile(unsigned bufferID, SourceFile *sourceFile){
   bufferIDToSourceFiles[bufferID].push_back(sourceFile);
 }
 
+void SourceManager::deleteSourceFile(unsigned bufferID){
+  bufferIDToSourceFiles.erase(bufferID);
+}
+
 llvm::TinyPtrVector<SourceFile *>
 SourceManager::getSourceFilesForBufferID(unsigned bufferID) const {
   auto found = bufferIDToSourceFiles.find(bufferID);
@@ -402,6 +406,7 @@ void SourceManager::setGeneratedSourceInfo(
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     break;
 
   case GeneratedSourceInfo::ReplacedFunctionBody:

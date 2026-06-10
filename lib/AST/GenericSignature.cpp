@@ -792,6 +792,14 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
   return GenericSignatureImpl::Profile(ID, genericParams, requirements);
 }
 
+void swift::simple_display(raw_ostream &out,
+                           DefaultRequirementOptions options) {
+  out << "DefaultRequirementOptions(expandingDefaults="
+      << options.contains(ExpandDefaults)
+      << ", inferOutOfScopeImpliedInverses="
+      << options.contains(InferOutOfScopeImpliedInverses) << ")";
+}
+
 void swift::simple_display(raw_ostream &out, GenericSignature sig) {
   if (sig)
     sig->print(out);
@@ -1179,11 +1187,9 @@ void swift::validateGenericSignature(ASTContext &context,
   {
     PrettyStackTraceGenericSignature debugStack("verifying", sig);
 
-    auto newSigWithError = buildGenericSignatureWithError(context,
-                                                      GenericSignature(),
-                                                      genericParams,
-                                                      requirements,
-                                                      /*allowInverses*/ false);
+    auto newSigWithError = buildGenericSignatureWithError(
+        context, GenericSignature(), genericParams, requirements,
+        DefaultRequirementOptions());
     // If there were any errors, the signature was invalid.
     auto errorFlags = newSigWithError.getInt();
     if (errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements) ||
@@ -1218,7 +1224,7 @@ void swift::validateGenericSignature(ASTContext &context,
           nullptr,
           genericParams,
           newRequirements,
-          /*allowInverses=*/false},
+          DefaultRequirementOptions()},
         GenericSignatureWithError());
 
     // If there were any errors, we formed an invalid signature, so
@@ -1308,14 +1314,14 @@ swift::buildGenericSignatureWithError(ASTContext &ctx,
                              GenericSignature baseSignature,
                              SmallVector<GenericTypeParamType *, 2> addedParameters,
                              SmallVector<Requirement, 2> addedRequirements,
-                             bool allowInverses) {
+                             DefaultRequirementOptions options) {
   return evaluateOrDefault(
       ctx.evaluator,
       AbstractGenericSignatureRequest{
         baseSignature.getPointer(),
         addedParameters,
         addedRequirements,
-        allowInverses},
+        options},
       GenericSignatureWithError());
 }
 
@@ -1324,10 +1330,10 @@ swift::buildGenericSignature(ASTContext &ctx,
                              GenericSignature baseSignature,
                              SmallVector<GenericTypeParamType *, 2> addedParameters,
                              SmallVector<Requirement, 2> addedRequirements,
-                             bool allowInverses) {
+                             DefaultRequirementOptions options) {
   return buildGenericSignatureWithError(ctx, baseSignature,
                                         addedParameters, addedRequirements,
-                                        allowInverses).getPointer();
+                                        options).getPointer();
 }
 
 GenericSignature GenericSignature::withoutMarkerProtocols() const {
@@ -1356,36 +1362,119 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     SmallVector<InverseRequirement, 2> &inverses) const {
   auto &ctx = getASTContext();
 
-  // Record the absence of conformances to invertible protocols.
-  for (auto gp : getGenericParams()) {
+  llvm::SmallSet<CanType, 12> seenDMTs;
+  auto addInverses = [&](Type tyParam) {
+    // We keep track of member types for which we tried to add an inverse,
+    // as they're the same set of types for which we should filter-out
+    // any positive requirements as well, as they may not need an inverse.
+    if (tyParam->getAs<DependentMemberType>() &&
+        !seenDMTs.insert(tyParam->getCanonicalType()).second)
+      return;
+
     // Any generic parameter with a superclass bound or concrete type does not
     // have an inverse.
-    if (getSuperclassBound(gp) || getConcreteType(gp))
-      continue;
+    if (getSuperclassBound(tyParam) || getConcreteType(tyParam))
+      return;
 
     // Variable generics never have inverses (or the positive thereof).
-    if (gp->isValue())
-      continue;
+    if (auto gp = tyParam->getAs<GenericTypeParamType>()) {
+      if (gp->isValue())
+        return;
+    }
 
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
 
       // If we can derive a conformance to this protocol, then don't add an
       // inverse.
-      if (requiresProtocol(gp, proto))
+      if (requiresProtocol(tyParam, proto))
         continue;
 
       // Nothing implies a conformance to this protocol, so record the inverse.
-      inverses.push_back({gp, proto, SourceLoc()});
+      inverses.push_back({tyParam, proto, SourceLoc()});
+    }
+  };
+
+  // Record the absence of conformances to invertible protocols
+  // for generic parameters.
+  for (auto gp : getGenericParams()) {
+    addInverses(gp);
+  }
+
+  const unsigned MinDepth = getGenericParams().front()->getDepth();
+
+  /// Add inverses for all primary associated types (PATs) that are suppressed.
+  /// For example, given this protocol:
+  ///
+  ///     public protocol P<A> {
+  ///       associatedtype A: ~Copyable
+  ///     }
+  ///     public func i<T: P>(..) where T.A: ~Copyable {}
+  ///     public func c<T: P>(..) where T.A: Copyable {}
+  ///
+  /// Function `i` WILL mention the inverse `T.A: ~Copyable` in its symbol
+  /// and interfaces, but `c` will NOT mention `T.A: Copyable`, as that's a
+  /// given for primary associated types.
+  ///
+  /// For non-primary associated types, it's the opposite.
+  /// Function `i` WILL NOT mention the inverse `T.A: ~Copyable` in its symbol
+  /// or interfaces, but `c` WILL mention `T.A: Copyable`, as that's NOT assumed
+  /// for a non-primary associated type.
+  ///
+  /// In theory this scheme is generalizable to any subset of associated types
+  /// for which a default is to be assumed for either Copyable and/or Escapable.
+  /// The idea is to mention what is NOT the default for the associatedtype.
+  for (auto req : getRequirements()) {
+
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    auto subject = req.getFirstType();
+    auto *proto = req.getProtocolDecl();
+
+    // Only consider conformance requirements whose subject is rooted in
+    // a generic parameter that is within this signature's depth.
+    if (subject->getRootGenericParam()->getDepth() < MinDepth)
+      continue;
+
+    // Try to add inverses all primary associated types, if they're suppressed
+    // within this signature.
+    for (auto pat : proto->getPrimaryAssociatedTypes()) {
+      auto member = DependentMemberType::get(subject, pat);
+
+      // Can end up in a situation where member is τ_1_0.Element under this sig:
+      //   <τ_1_0 where τ_0_0 : P7, τ_1_0 : Sequence, τ_0_0.A == τ_1_0.Element>
+      // and thus we end up with a type parameter τ_0_0.[P7:A] outside the sig.
+      if (!isValidTypeParameter(member))
+        continue;
+
+      addInverses(member);
     }
   }
 
-  // Filter out explicit conformances to invertible protocols.
+  // Filter out most explicit conformances to invertible protocols.
   for (auto req : getRequirements()) {
-    if (req.isInvertibleProtocolRequirement()) {
+    // If it's not a conformance to an invertible protocol, always include it.
+    if (req.getKind() != RequirementKind::Conformance ||
+        !req.getProtocolDecl()->getInvertibleProtocolKind()) {
+      reqs.push_back(req);
       continue;
     }
 
+    auto subject = req.getFirstType();
+
+    // Drop conformances to invertibles for generic type parameters, as we do
+    // infer a default for them.
+    if (subject->is<GenericTypeParamType>())
+      continue;
+
+    // If the subject matches a primary associated type we identified earlier,
+    // then we will infer a default for them, so drop this requirement.
+    if (seenDMTs.contains(subject->getCanonicalType()))
+      continue;
+
+    // Otherwise, for a non-primary associated type, no default is inferred,
+    // thus this conformance requirement was explicitly stated. Keep it.
     reqs.push_back(req);
   }
 }
@@ -1400,33 +1489,13 @@ RequirementSignature RequirementSignature::getPlaceholderRequirementSignature(
     const ProtocolDecl *proto, GenericSignatureErrors errors) {
   auto &ctx = proto->getASTContext();
 
-  SmallVector<ProtocolDecl *, 2> inheritedProtos;
-  for (auto *inheritedProto : proto->getInheritedProtocols()) {
-    inheritedProtos.push_back(inheritedProto);
-  }
-
+  // Pretend the protocol inherits from Copyable and Escapable.
+  SmallVector<Requirement, 2> requirements;
   for (auto ip : InvertibleProtocolSet::allKnown()) {
     auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
-    inheritedProtos.push_back(otherProto);
-  }
-
-  ProtocolType::canonicalizeProtocols(inheritedProtos);
-
-  SmallVector<Requirement, 2> requirements;
-
-  for (auto *inheritedProto : inheritedProtos) {
     requirements.emplace_back(RequirementKind::Conformance,
                               proto->getSelfInterfaceType(),
-                              inheritedProto->getDeclaredInterfaceType());
-  }
-
-  for (auto *assocTypeDecl : proto->getAssociatedTypeMembers()) {
-    for (auto ip : InvertibleProtocolSet::allKnown()) {
-      auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
-      requirements.emplace_back(RequirementKind::Conformance,
-                                assocTypeDecl->getDeclaredInterfaceType(),
-                                otherProto->getDeclaredInterfaceType());
-    }
+                              otherProto->getDeclaredInterfaceType());
   }
 
   // Maintain invariants.

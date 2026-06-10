@@ -50,7 +50,6 @@ public func Foo() {
 
 //--- MyExe.swift
 #if canImport(MyLib, _version: 42) // expected-warning {{cannot find user version number for module 'MyLib'; version number ignored}}
-  // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for module 'MyLib'; version number ignored}}
   #warning("versioned canImport() of unversioned module is working")
   // expected-warning@-1{{versioned canImport() of unversioned module is working}}
 #else

@@ -23,6 +23,7 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/PluginPaths.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "clang/Basic/Version.h"
@@ -159,6 +160,16 @@ bool containsValue(
 }
 
 }
+
+namespace swift::driver::toolchains {
+bool needsInstrProfileRuntime(const llvm::opt::ArgList &Args) {
+  return Args.hasArg(options::OPT_profile_generate) ||
+         Args.hasArg(options::OPT_cs_profile_generate) ||
+         Args.hasArg(options::OPT_cs_profile_generate_EQ) ||
+         Args.hasArg(options::OPT_ir_profile_generate) ||
+         Args.hasArg(options::OPT_ir_profile_generate_EQ);
+}
+} // namespace swift::driver::toolchains
 
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
@@ -306,6 +317,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
   inputArgs.AddLastArg(arguments, options::OPT_module_abi_name);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_module_selectors_in_module_interface,
+                       options::OPT_disable_module_selectors_in_module_interface);
   inputArgs.AddLastArg(arguments, options::OPT_package_name);
   inputArgs.AddLastArg(arguments, options::OPT_export_as);
   inputArgs.AddLastArg(arguments, options::OPT_nostdimport);
@@ -323,6 +336,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_PackageCMO);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
+  inputArgs.AddLastArg(arguments, options::OPT_ir_profile_generate);
+  inputArgs.AddLastArg(arguments, options::OPT_ir_profile_generate_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_ir_profile_use);
+  inputArgs.AddLastArg(arguments, options::OPT_cs_profile_generate);
+  inputArgs.AddLastArg(arguments, options::OPT_cs_profile_generate_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
   inputArgs.AddAllArgs(arguments, options::OPT_warning_treating_Group);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
@@ -332,7 +350,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_stable_abi_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
-  inputArgs.AddLastArg(arguments, options::OPT_swift_version);
+  inputArgs.AddLastArg(arguments, options::OPT_language_mode);
   inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
   inputArgs.AddLastArg(arguments, options::OPT_tools_directory);
@@ -679,6 +697,21 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-debug-info-store-invocation");
   }
 
+  if (context.Args.hasArg(options::OPT_g))
+    for (auto Output : context.Output.getAdditionalOutputsForType(
+             file_types::ID::TY_SwiftModuleFile)) {
+      // This communicates the output of an action that depends on this action's
+      // output, which is why we're recomputing the name here.
+      llvm::SmallString<128> Path(Output);
+      assert(!Path.empty());
+      llvm::sys::path::remove_filename(Path);
+      llvm::sys::path::append(Path, context.OI.ModuleName);
+      llvm::sys::path::replace_extension(
+          Path, file_types::getExtension(file_types::ID::TY_SwiftModuleFile));
+      Arguments.push_back("-debug-module-path");
+      Arguments.push_back(context.Args.MakeArgString(Path));
+    }
+
   if (context.Args.hasArg(
                       options::OPT_disable_autolinking_runtime_compatibility)) {
     Arguments.push_back("-disable-autolinking-runtime-compatibility");
@@ -716,6 +749,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   context.Args.AddLastArg(Arguments, options::OPT_emit_extension_block_symbols,
                           options::OPT_omit_extension_block_symbols);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
+  context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_shorten_output_names);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_skip_synthesized_members);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_skip_inherited_docs);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_pretty_print);
@@ -768,6 +802,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-scan-dependencies";
   case file_types::TY_JSONArguments:
     return "-emit-supported-arguments";
+  case file_types::TY_JSONPolyglotAST:
+    return "-emit-polyglot-ast";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -953,6 +989,12 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SwiftModuleSummaryFile,
                    "-emit-module-summary-path");
+
+  // Add extra output paths for SIL and LLVM IR
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SIL,
+                   "-sil-output-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_LLVM_IR,
+                   "-ir-output-path");
 }
 
 ToolChain::InvocationInfo
@@ -1054,6 +1096,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_IndexData:
     case file_types::TY_JSONDependencies:
     case file_types::TY_JSONArguments:
+    case file_types::TY_JSONPolyglotAST:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:
@@ -1237,12 +1280,19 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
                    "-emit-tbd-path");
 
+  // Add extra output paths for SIL and LLVM IR
+  addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_SIL,
+                   "-sil-output-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_LLVM_IR, "-ir-output-path");
+
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
   context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
   context.Args.AddLastArg(Arguments, options::OPT_emit_extension_block_symbols,
                           options::OPT_omit_extension_block_symbols);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
+  context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_shorten_output_names);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_bridging_header,
                           options::OPT_internal_import_bridging_header);
@@ -1513,8 +1563,9 @@ void ToolChain::addLinkRuntimeLib(const ArgList &Args, ArgStringList &Arguments,
   Arguments.push_back(Args.MakeArgString(P));
 }
 
-static void appendInProcPluginServerPath(StringRef PluginPathRoot,
-                                         llvm::SmallVectorImpl<char> &InProcPluginServerPath) {
+void swift::driver::appendInProcPluginServerPath(
+    StringRef PluginPathRoot,
+    llvm::SmallVectorImpl<char> &InProcPluginServerPath) {
   InProcPluginServerPath.append(PluginPathRoot.begin(), PluginPathRoot.end());
 #if defined(_WIN32)
   llvm::sys::path::append(InProcPluginServerPath, "bin", "SwiftInProcPluginServer.dll");
@@ -1527,8 +1578,8 @@ static void appendInProcPluginServerPath(StringRef PluginPathRoot,
 #endif
 }
 
-static void appendPluginsPath(StringRef PluginPathRoot,
-                              llvm::SmallVectorImpl<char> &PluginsPath) {
+void swift::driver::appendPluginsPath(
+    StringRef PluginPathRoot, llvm::SmallVectorImpl<char> &PluginsPath) {
   PluginsPath.append(PluginPathRoot.begin(), PluginPathRoot.end());
 #if defined(_WIN32)
   llvm::sys::path::append(PluginsPath, "bin");
@@ -1540,11 +1591,11 @@ static void appendPluginsPath(StringRef PluginPathRoot,
 }
 
 #if defined(__APPLE__) || defined(__unix__)
-static void appendLocalPluginsPath(StringRef PluginPathRoot,
-                                   llvm::SmallVectorImpl<char> &LocalPluginsPath) {
+void swift::driver::appendLocalPluginsPath(
+    StringRef PluginPathRoot, llvm::SmallVectorImpl<char> &LocalPluginsPath) {
   SmallString<261> localPluginPathRoot = PluginPathRoot;
   llvm::sys::path::append(localPluginPathRoot, "local");
-  appendPluginsPath(localPluginPathRoot, LocalPluginsPath);
+  swift::driver::appendPluginsPath(localPluginPathRoot, LocalPluginsPath);
 }
 #endif
 
@@ -1634,6 +1685,7 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
                                        const llvm::opt::ArgList &args,
                                        StringRef SDKPath, bool shared) const {
   SmallString<128> scratchPath;
+  scratchPath.clear();
   getResourceDirPath(scratchPath, args, shared);
   runtimeLibPaths.push_back(std::string(scratchPath.str()));
 

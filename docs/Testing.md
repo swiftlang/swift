@@ -284,6 +284,15 @@ code for the target that is not the build machine:
 
   Add ``REQUIRES: executable_test`` to the test.
 
+* ``%target-run-simple-swift-split-file(`` *source-file* [*compiler arguments*] ``)``:
+  like ``%target-run-simple-swift()``, but for tests whose
+  source lives in ``%s`` as ``split-file``.
+
+  Runs ``split-file %s %t`` before building. The *source-file* is the bare filename 
+  produced by ``split-file`` (no ``%t/`` prefix).
+ 
+  Add ``REQUIRES: executable_test`` to the test.
+
 * ``%target-run-simple-swiftgyb``: build a one-file Swift `.gyb` program and
   run it on the target machine.
 

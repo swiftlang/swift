@@ -32,8 +32,9 @@ public typealias AnyActor = AnyObject & Sendable
 
 /// Common protocol to which all actors conform.
 ///
-/// The `Actor` protocol generalizes over all `actor` types. Actor types
-/// implicitly conform to this protocol.
+/// The `Actor` protocol generalizes over all `actor` types.
+/// Define a new actor with the `actor` keyword.
+/// Only types declared with the `actor` keyword conform to the `Actor` protocol.
 ///
 /// ### Actors and SerialExecutors
 /// By default, actors execute tasks on a shared global concurrency thread pool.
@@ -46,6 +47,12 @@ public typealias AnyActor = AnyObject & Sendable
 ///
 /// - SeeAlso: ``SerialExecutor``
 /// - SeeAlso: ``TaskExecutor``
+///
+/// For information about the language-level concurrency model that `Actor` is part of,
+/// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
+///
+/// [concurrency]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency#Actors
+/// [tspl]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/
 @available(SwiftStdlib 5.1, *)
 public protocol Actor: AnyObject, Sendable {
 

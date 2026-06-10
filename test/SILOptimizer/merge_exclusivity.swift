@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -Xllvm -sil-disable-pass=redundant-load-elimination -Xllvm -sil-print-types -emit-sil  -primary-file %s | %FileCheck %s --check-prefix=TESTSIL
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -Xllvm -sil-print-types -emit-sil  -primary-file %s | %FileCheck %s --check-prefix=TESTSIL
 // REQUIRES: optimized_stdlib,asserts
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: PTRSIZE=64
@@ -20,23 +20,14 @@ func sum(_ x: UInt64, _ y: UInt64) -> UInt64 {
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: bb4{{.*}}:
-// TESTSIL: [[B2a:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B2a]]
-// TESTSIL: end_access [[B2a]]
 // TESTSIL: [[B2b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: store {{.*}} to [[B2b]]
 // TESTSIL: end_access [[B2b]]
 // TESTSIL: bb5:
-// TESTSIL: [[B3a:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B3a]]
-// TESTSIL: end_access [[B3a]]
 // TESTSIL: [[B3b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: store {{.*}} to [[B3b]]
 // TESTSIL: end_access [[B3b]]
-// TESTSIL: bb6:
-// TESTSIL: [[B4a:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B4a]]
-// TESTSIL: end_access [[B4a]]
+// TESTSIL: bb8:
 // TESTSIL: [[B4b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: store {{.*}} to [[B4b]]
 // TESTSIL: end_access [[B4b]]
@@ -68,17 +59,11 @@ public func MergeTest1(_ N: Int) {
 // TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
-// TESTSIL: bb6
-// TESTSIL: [[B2a:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B2a]]
-// TESTSIL: end_access [[B2a]]
+// TESTSIL: bb5
 // TESTSIL: [[B2b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: store {{.*}} to [[B2b]]
 // TESTSIL: end_access [[B2b]]
-// TESTSIL: bb7
-// TESTSIL: [[B3a:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B3a]]
-// TESTSIL: end_access [[B3a]]
+// TESTSIL: bb8
 // TESTSIL: [[B3b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: store {{.*}} to [[B3b]]
 // TESTSIL: end_access [[B3b]]

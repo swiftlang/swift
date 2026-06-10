@@ -23,7 +23,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
-#include "swift/RemoteInspection/Records.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
@@ -48,7 +47,8 @@
 
 using namespace swift;
 using namespace Demangle;
-using namespace reflection;
+
+using FieldDescriptor = reflection::TargetFieldDescriptor<InProcess>;
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
@@ -1055,9 +1055,9 @@ _findContextDescriptor(Demangle::NodePointer node,
 
 /// Function to check whether we're currently running on the given global
 /// actor.
-bool (* __ptrauth_swift_is_global_actor_function SWIFT_CC(swift)
+SWIFT_CC(swift) bool (* __ptrauth_swift_is_global_actor_function
         swift::_swift_task_isCurrentGlobalActorHook)(
-    const Metadata *, const WitnessTable *);
+    const Metadata *, const WitnessTable *, SWIFT_CONTEXT const Metadata *);
 
 void swift::_swift_registerConcurrencyRuntime(
     const ConcurrencyStandardTypeDescriptors *descriptors,
@@ -2369,7 +2369,7 @@ public:
 
     if (base.isMetadata()) {
       return BuiltType(projectDependentMemberType(base.getMetadata()));
-    } else {
+    } else if (base.isMetadataPack()) {
       MetadataPackPointer basePack = base.getMetadataPack();
 
       llvm::SmallVector<const Metadata *, 4> packElts;
@@ -2380,6 +2380,8 @@ public:
 
       return BuiltType(swift_allocateMetadataPack(packElts.data(), packElts.size()));
     }
+
+    return TypeLookupError("Cannot create dependent member type with NULL base.");
   }
 
 #define REF_STORAGE(Name, ...)                                                 \
@@ -2479,6 +2481,12 @@ public:
     return BuiltType(swift_getFixedArrayTypeMetadata(MetadataState::Abstract,
                                                      size.getValue(),
                                                      element.getMetadata()));
+  }
+
+  TypeLookupErrorOr<BuiltType> createBuiltinBorrowType(BuiltType referent) {
+    llvm_unreachable("not implemented");
+    // return BuiltType(swift_getBorrowTypeMetadata(MetadataState::Abstract,
+    //                                                  referent.getValue());
   }
 };
 

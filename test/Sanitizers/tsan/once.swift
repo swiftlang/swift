@@ -8,6 +8,9 @@
 // rdar://101876380
 // UNSUPPORTED: OS=ios
 
+// rdar://165448053
+// UNSUPPORTED: OS=freebsd
+
 // FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
 // don't support TSan.
 // UNSUPPORTED: remote_run

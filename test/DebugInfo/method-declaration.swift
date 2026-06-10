@@ -3,6 +3,8 @@
 
 // RUN: %target-swift-frontend -primary-file %t/a.swift -import-objc-header %t/objc.h -enable-objc-interop -emit-ir -gdwarf-types -o - | %FileCheck %s
 
+// REQUIRES: objc_interop
+
 // Verify that we added a declaration for a method.
 
 // CHECK: define{{.*}}foo_static_method{{.*}} !dbg ![[FOO_STATIC_METHOD_DEF_DBG:[0-9]+]]

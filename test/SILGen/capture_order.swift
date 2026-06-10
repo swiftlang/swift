@@ -109,16 +109,6 @@ func transitiveForwardCapture3() {
   }
 }
 
-func captureInClosure() {
-  let x = { (i: Int) in // expected-error {{closure captures 'currentTotal' before it is declared}}
-    currentTotal += i // expected-note {{captured here}}
-  }
-
-  var currentTotal = 0 // expected-note {{captured value declared here}}
-
-  _ = x
-}
-
 /// Regression tests
 
 // https://github.com/apple/swift/issues/47389
@@ -183,12 +173,157 @@ func f_57097() {
   // expected-warning@-1 {{variable 'r' was never mutated; consider changing to 'let' constant}}
 }
 
-class class77933460 {}
+// MARK: - Forward Declared Lets
 
-func func77933460() {
-  var obj: class77933460 = { obj }()
-  // expected-error@-1 {{closure captures 'obj' before it is declared}}
-  // expected-note@-2 {{captured here}}
-  // expected-note@-3 {{captured value declared here}}
-  // expected-warning@-4 {{variable 'obj' was never mutated; consider changing to 'let' constant}}
+// https://github.com/swiftlang/swift/issues/84909
+// Make sure we can't capture an uninitialized 'let' temporary allocation either.
+
+protocol P {}
+
+enum E {
+  static func static_gen_fwd<T>(_ g: () -> T) -> T { g() }
 }
+
+func global_fwd(_ a: () -> Any) -> Any { a() }
+func global_gen_fwd<T>(_ g: () -> T) -> T { g() }
+func global_fwd_p(_ p: () -> any P) -> any P { p() }
+
+func forward_declared_let_captures_local_fn() {
+  do {
+    func bad_local_f() -> Any { bad }
+    // expected-error@-1 {{closure captures 'bad' before it is declared}}
+    // expected-note@-2 {{captured here}}
+    let bad = bad_local_f()
+    // expected-note@-1 {{captured value declared here}}
+  }
+
+  do {
+    func fwd(_ i: () -> Any) -> Any { i() }
+    func badFn() -> Any {
+      // expected-error@-1 {{closure captures 'bad' before it is declared}}
+      fwd { bad }
+      // expected-note@-1 {{captured here}}
+    }
+    let bad = badFn()
+    // expected-note@-1 {{captured value declared here}}
+  }
+
+  do {
+    func badFn() -> Any {
+      // expected-error@-1 {{closure captures 'bad' before it is declared}}
+      global_gen_fwd { bad }
+      // expected-note@-1 {{captured here}}
+    }
+    let bad = badFn()
+    // expected-note@-1 {{captured value declared here}}
+  }
+
+  do {
+    func badFn() -> Any {
+      // expected-error@-1 {{closure captures 'bad' before it is declared}}
+      E.static_gen_fwd { bad }
+      // expected-note@-1 {{captured here}}
+    }
+    let bad = badFn()
+    // expected-note@-1 {{captured value declared here}}
+  }
+
+  do {
+    func badFn() -> Any {
+      // expected-error@-1 {{closure captures 'badNested' before it is declared}}
+      global_fwd { { [badNested] in badNested }() }
+      // expected-note@-1 {{captured here}}
+    }
+    let badNested = badFn()
+    // expected-note@-1 {{captured value declared here}}
+  }
+
+  do {
+    func badFn() -> Any? {
+      // expected-error@-1 {{closure captures 'badOpt' before it is declared}}
+      { () -> Any? in badOpt }()
+      // expected-note@-1 {{captured here}}
+    }
+    let badOpt = badFn()
+    // expected-note@-1 {{captured value declared here}}
+  }
+
+  do {
+    func badFn() -> (Any, Any) {
+      // expected-error@-1 {{closure captures 'badTup' before it is declared}}
+      { (badTup.0, badTup.1) }()
+      // expected-note@-1 {{captured here}}
+    }
+    let badTup = badFn()
+    // expected-note@-1 {{captured value declared here}}
+  }
+
+  do {
+    func badFn() -> (Int, Any) {
+      // expected-error@-1 {{closure captures 'badTup' before it is declared}}
+      { (badTup.0, badTup.1) }()
+      // expected-note@-1 {{captured here}}
+    }
+    let badTup = badFn()
+    // expected-note@-1 {{captured value declared here}}
+  }
+
+  do {
+    func badFn() -> (Any, Any) {
+      // expected-error@-1 {{closure captures 'badTup3' before it is declared}}
+      // expected-error@-2 {{closure captures 'badTup4' before it is declared}}
+      { (badTup4, badTup3) }()
+      // expected-note@-1 2{{captured here}}
+    }
+    let (badTup3, badTup4) = badFn()
+    // expected-note@-1 2{{captured value declared here}}
+  }
+
+  do {
+    struct S { var p: Any }
+    func badFn() -> S {
+      // expected-error@-1 {{closure captures 'badStruct' before it is declared}}
+      { S(p: badStruct.p) }()
+      // expected-note@-1 {{captured here}}
+    }
+    let badStruct = badFn()
+    // expected-note@-1 {{captured value declared here}}
+  }
+
+  do {
+    enum EE {
+      case boring
+      case weird(Any)
+      case strange(Any)
+    }
+
+    func badFn() -> EE {
+      // expected-error@-1 {{closure captures 'badEnum' before it is declared}}
+      { .weird(EE.strange(badEnum)) }()
+      // expected-note@-1 {{captured here}}
+    }
+    let badEnum = badFn()
+    // expected-note@-1 {{captured value declared here}}
+  }
+
+  do {
+    func badFn() -> any P {
+      // expected-error@-1 {{closure captures 'badproto' before it is declared}}
+      global_fwd_p { badproto }
+      // expected-note@-1 {{captured here}}
+    }
+    let badproto = badFn()
+    // expected-note@-1 {{captured value declared here}}
+  }
+}
+
+// FIXME: Currently they crash SILGen (TypeConverter-setCaptureTypeExpansionContext-e72208.swift)
+//func forward_declared_local_lazy_captures() {
+//  // runtime stack overflow
+//  var _infiniteRecurse: Any { infiniteRecurse }
+//  lazy var infiniteRecurse = _infiniteRecurse
+//
+//  // function that returns itself
+//  func _hmm() -> Any { hmm }
+//  lazy var hmm = _hmm
+//}

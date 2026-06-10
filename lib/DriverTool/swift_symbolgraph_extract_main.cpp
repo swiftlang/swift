@@ -151,7 +151,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
   Invocation.setDefaultPrebuiltCacheIfNecessary();
 
-  if (auto *A = ParsedArgs.getLastArg(OPT_swift_version)) {
+  if (auto *A = ParsedArgs.getLastArg(OPT_language_mode)) {
     using version::Version;
     auto SwiftVersion = A->getValue();
     bool isValid = false;
@@ -185,10 +185,18 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Options.SkipInheritedDocs = ParsedArgs.hasArg(OPT_skip_inherited_docs);
   Options.SkipProtocolImplementations = ParsedArgs.hasArg(OPT_skip_protocol_implementations);
   Options.IncludeSPISymbols = ParsedArgs.hasArg(OPT_include_spi_symbols);
+  Options.ShortenOutputNames = ParsedArgs.hasArg(OPT_symbol_graph_shorten_output_names);
   Options.EmitExtensionBlockSymbols =
       ParsedArgs.hasFlag(OPT_emit_extension_block_symbols,
                          OPT_omit_extension_block_symbols, /*default=*/false);
   Options.AllowedReexportedModules = AllowedRexports;
+  if (ParsedArgs.hasArg(OPT_active_platform_availability_only)) {
+    // The output should only include platform availability that applies to the
+    // platform inferred from the -target. Include app extension availability,
+    // too.
+    Options.ActivePlatform =
+        platformForTriple(Target, /*enableAppExtensionRestrictions=*/true);
+  }
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {
     Options.MinimumAccessLevel =

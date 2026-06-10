@@ -14,7 +14,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContextStorage.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -278,10 +277,13 @@ bool AvailabilityContext::isUnavailable() const {
   return false;
 }
 
-bool AvailabilityContext::containsUnavailableDomain(
+bool AvailabilityContext::isUnavailableForDomain(
     AvailabilityDomain domain) const {
   for (auto domainInfo : storage->getDomainInfos()) {
     if (domainInfo.isUnavailable()) {
+      if (domainInfo.getDomain().isUniversal())
+        return true;
+
       if (domainInfo.getDomain().contains(domain))
         return true;
     }

@@ -57,10 +57,10 @@ protocol NonIsolatedRequirement {
 // expected-warning@+1{{conformance of 'OnMain' to protocol 'NonIsolatedRequirement' crosses into main actor-isolated code}}
 extension OnMain: NonIsolatedRequirement {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
-  // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
-  // expected-note@-3{{isolate this conformance to the main actor with '@MainActor'}}
+  // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
   // expected-note@+1 {{main actor-isolated instance method 'requirement()' cannot satisfy nonisolated requirement}}
   func requirement() {}
+  // expected-note@-1{{mark instance method 'requirement()' 'nonisolated'}}{{3-3=nonisolated }}
 }
 
 // expected-note@+1 {{calls to global function 'downgrade()' from outside of its actor context are implicitly asynchronous}}

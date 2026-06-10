@@ -1,0 +1,55 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplification -simplify-instruction=builtin -sil-print-debuginfo | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+// This verifies that debug information attached to the arguments of builtin
+// instructions is preserved when those instructions are constant-folded.
+//
+// CHECK-LABEL: sil @preserve_bitwise_operands : $@convention(thin) () -> Builtin.Int32 {
+// CHECK:       bb0:
+// CHECK-NEXT:    debug_value undef : $Builtin.Int32, let, name "x", transform {
+// CHECK:           %0 = integer_literal $Builtin.Int32, 1
+// CHECK:           return %0 : $Builtin.Int32
+// CHECK:         }
+// CHECK:         debug_value undef : $Builtin.Int32, let, name "y", transform {
+// CHECK:           %0 = integer_literal $Builtin.Int32, 2
+// CHECK:           return %0 : $Builtin.Int32
+// CHECK:         }
+// CHECK:         [[THREE:%[0-9]+]] = integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:    return [[THREE]] : $Builtin.Int32
+// CHECK-LABEL: } // end sil function 'preserve_bitwise_operands'
+sil @preserve_bitwise_operands : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 1
+  debug_value %0, let, name "x"
+  %1 = integer_literal $Builtin.Int32, 2
+  debug_value %1, let, name "y"
+  %2 = builtin "or_Int32"(%0, %1) : $Builtin.Int32
+  return %2
+}
+
+// CHECK-LABEL: sil @preserve_add_operands : $@convention(thin) () -> Builtin.Int32 {
+// CHECK:       bb0:
+// CHECK-NEXT:    debug_value undef : $Builtin.Int32, let, name "x", transform {
+// CHECK:           %0 = integer_literal $Builtin.Int32, -1
+// CHECK:           return %0 : $Builtin.Int32
+// CHECK:         }
+// CHECK:         debug_value undef : $Builtin.Int32, let, name "y", transform {
+// CHECK:           %0 = integer_literal $Builtin.Int32, 2
+// CHECK:           return %0 : $Builtin.Int32
+// CHECK:         }
+// CHECK:         [[ONE:%[0-9]+]] = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    return [[ONE]] : $Builtin.Int32
+// CHECK-LABEL: } // end sil function 'preserve_add_operands'
+sil @preserve_add_operands : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, -1
+  debug_value %0, let, name "x"
+  %1 = integer_literal $Builtin.Int32, 2
+  debug_value %1, let, name "y"
+  %2 = builtin "add_Int32"(%0, %1) : $Builtin.Int32
+  return %2
+}

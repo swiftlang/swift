@@ -8,13 +8,15 @@
 
 swift_compiler_sources(Optimizer
   AddressUtils.swift
+  ControlFlowUtils.swift
   Devirtualization.swift
   EscapeUtils.swift
   FunctionSignatureTransforms.swift
-  FunctionTest.swift
   GenericSpecialization.swift
+  LifetimeCompletion.swift
   LifetimeDependenceUtils.swift
   LocalVariableUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
+  Test.swift
 )

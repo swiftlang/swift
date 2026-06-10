@@ -54,6 +54,8 @@ struct DIElementUseInfo;
 class DIMemoryObjectInfo {
   /// The uninitialized memory that we are analyzing.
   MarkUninitializedInst *MemoryInst;
+  // The uninitialized value representing that memory
+  SingleValueInstruction *uninitializedValue;
 
   /// This is the base type of the memory allocation.
   SILType MemorySILType;

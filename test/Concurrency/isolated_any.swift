@@ -71,7 +71,7 @@ func testConvertIsolatedAnyToNonIsolated(fn: @Sendable @isolated(any) () -> ()) 
 
 func requireSendableNonIsolated_sync(_ fn: @Sendable () -> ()) {}
 func testConvertIsolatedAnyToNonIsolated_sync(fn: @Sendable @isolated(any) () -> ()) {
-  // expected-warning @+1 {{converting @isolated(any) function of type '@isolated(any) @Sendable () -> ()' to synchronous function type '@Sendable () -> ()' is not allowed; this will be an error in a future Swift language mode}}
+  // expected-warning @+1 {{converting @isolated(any) function of type '@isolated(any) @Sendable () -> ()' to synchronous function type '@Sendable () -> ()' is not allowed; this will be an error in a future Swift language mode}}{{group-name=ConversionFromIsolatedAnyToSynchronous}}
   requireSendableNonIsolated_sync(fn)
 }
 
@@ -105,7 +105,7 @@ func extractFunctionIsolationExpr(
 
   // Only `@isolated(any)` functions have `.isolation`
   let myActor = A()
-  let _: (any Actor)? = myActor.actorFunction.isolation // expected-error {{value of type '@Sendable () -> ()' has no member 'isolation'}}
+  let _: (any Actor)? = myActor.actorFunction.isolation // expected-error {{value of type '() -> ()' has no member 'isolation'}}
   let _: (any Actor)? = myActor.asyncActorFunction.isolation // expected-error {{value of type '@Sendable () async -> ()' has no member 'isolation'}}
   let _: (any Actor)? = myActor.asyncThrowsActorFunction.isolation // expected-error {{value of type '@Sendable () async throws -> ()' has no member 'isolation'}}
   let _: (any Actor)? = myActor.actorFunctionWithArgs.isolation // expected-error {{value of type '@Sendable (Int) async -> String' has no member 'isolation'}}

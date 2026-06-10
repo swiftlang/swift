@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 struct MyType<TyA, TyB> { // expected-note {{generic struct 'MyType' declared here}}
   // expected-note @-1 {{arguments to generic parameter 'TyB' ('S' and 'Int') are expected to be equal}}
@@ -178,6 +178,8 @@ class GenericClass<T> {
   }
 
   func testCaptureInvalid1<S>(s: S, t: T) -> TA<Int> {
+    // FIXME: https://github.com/swiftlang/swift/issues/89690
+    // Should print "type 'TA<S>'"
     return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, S>' to return type 'GenericClass<T>.TA<Int>' (aka 'MyType<T, Int>')}}
   }
 
@@ -481,3 +483,20 @@ struct TestNestedRequirementInference<T> {
     foo((x, s)) // expected-error {{instance method 'foo' requires the types 'T' and 'S.A' (aka 'Float') be equivalent}}
   }
 }
+
+//
+// Nested self-referential generic typealiases
+// (similar to a pattern used for `Task.Handle` backwards compatibility)
+//
+
+extension X where T == Never, U == Never {
+  typealias SelfRef1 = X
+  typealias SelfRef2 = generic.X
+  typealias SelfRef3 = generic::X
+}
+
+func testSelfRefs(
+  _: X.SelfRef1<Int, Int>, // expected-error {{cannot specialize non-generic type 'X<Never, Never>'}}
+  _: X.SelfRef2<Int, Int>, // no-error
+  _: X.SelfRef3<Int, Int> // no-error
+) {}

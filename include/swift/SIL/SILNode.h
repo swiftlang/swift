@@ -33,6 +33,7 @@ class NonSingleValueInstruction;
 class SILModule;
 class ValueBase;
 class SILNode;
+class SILPrintContext;
 class SILValue;
 
 /// An enumeration which contains values for all the nodes in SILNodes.def.
@@ -221,26 +222,36 @@ protected:
     SHARED_FIELD(DebugValueInst, uint8_t
                  poisonRefs : 1,
                  usesMoveableValueDebugInfo : 1,
-                 trace : 1);
+                 trace : 1,
+                 prependDeref : 1);
 
     SHARED_FIELD(AllocStackInst, uint8_t
                  dynamicLifetime : 1,
                  lexical : 1,
                  fromVarDecl : 1,
                  usesMoveableValueDebugInfo : 1,
-                 hasInvalidatedVarInfo : 1);
+                 hasInvalidatedVarInfo : 1,
+                 isNested : 1);
 
     SHARED_FIELD(AllocBoxInst, uint8_t
                  dynamicLifetime : 1,
                  reflection : 1,
                  usesMoveableValueDebugInfo : 1,
-                 pointerEscape : 1);
+                 pointerEscape : 1,
+                 inferredImmutable : 1);
 
     SHARED_FIELD(AllocRefInstBase, uint8_t
       objC : 1,
       onStack : 1,
+      isNested : 1,
       isBare : 1,   // Only used in AllocRefInst
       numTailTypes: NumAllocRefTailTypesBits);
+
+    SHARED_FIELD(AllocPackMetadataInst, uint8_t
+      isNested : 1);
+
+    SHARED_FIELD(PartialApplyInst, uint8_t
+                 isNested : 1);
 
     SHARED_FIELD(BeginBorrowInst, uint8_t
                  lexical : 1,
@@ -306,7 +317,7 @@ protected:
     SHARED_FIELD(UncheckedEnumDataInst, uint32_t caseIndex);
     SHARED_FIELD(InjectEnumAddrInst, uint32_t caseIndex);
     SHARED_FIELD(InitEnumDataAddrInst, uint32_t caseIndex);
-    SHARED_FIELD(UncheckedTakeEnumDataAddrInst, uint32_t caseIndex);
+    SHARED_FIELD(UncheckedEnumDataAddrInstBase, uint32_t caseIndex);
     SHARED_FIELD(TupleExtractInst, uint32_t fieldNo);
     SHARED_FIELD(TupleElementAddrInst, uint32_t fieldNo);
     SHARED_FIELD(MultipleValueInstructionResult, uint32_t index);
@@ -316,7 +327,7 @@ protected:
     SHARED_FIELD(PointerToAddressInst, uint32_t alignment);
     SHARED_FIELD(SILFunctionArgument, uint32_t noImplicitCopy : 1,
                  lifetimeAnnotation : 2, closureCapture : 1,
-                 parameterPack : 1);
+                 parameterPack : 1, inferredImmutable : 1);
     SHARED_FIELD(MergeRegionIsolationInst, uint32_t numOperands);
 
     // Do not use `_sharedUInt32_private` outside of SILNode.
@@ -430,12 +441,14 @@ public:
   /// will be valid SIL assembly; otherwise, it will be an arbitrary
   /// format suitable for debugging.
   void print(raw_ostream &OS) const;
+  void print(SILPrintContext &ctx) const;
   void dump() const;
 
   /// Pretty-print the node in context, preceded by its operands (if the
   /// value represents the result of an instruction) and followed by its
   /// users.
   void printInContext(raw_ostream &OS) const;
+  void printInContext(SILPrintContext &ctx) const;
   void dumpInContext() const;
 
   // Cast to SingleValueInstruction.  This is an implementation detail

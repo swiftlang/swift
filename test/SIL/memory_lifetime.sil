@@ -35,6 +35,15 @@ enum KlassOrBool {
   case bool(Bool)
 }
 
+struct IntPair {
+  var a: Int
+  var b: Int
+}
+
+struct MyError : Error {
+  var x: AnyObject
+}
+
 
 sil [ossa] @test_struct : $@convention(thin) (@in Outer) -> @owned T {
 bb0(%0 : $*Outer):
@@ -130,22 +139,6 @@ bb2:
 bb3:
   destroy_addr %1 : $*T
   dealloc_stack %1 : $*T
-  %r = tuple ()
-  return %r : $()
-}
-
-sil [ossa] @test_unreachable_block : $@convention(thin) (@owned T) -> () {
-bb0(%0 : @owned $T):
-  %2 = alloc_stack $T
-  store %0 to [init] %2 : $*T
-  br bb2
-
-bb1:
-  br bb2
-
-bb2:
-  destroy_addr %2 : $*T
-  dealloc_stack %2 : $*T
   %r = tuple ()
   return %r : $()
 }
@@ -375,6 +368,7 @@ bb3:
 
 // An inconsistent state is allowed at unreachable blocks.
 bb4(%23 : @owned $Error):
+  destroy_value [dead_end] %23
   unreachable
 
 bb5(%43 : @owned $Error):
@@ -407,7 +401,7 @@ bb0(%0 : $*Optional<T>):
   switch_enum_addr %0 : $*Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
-  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
   destroy_addr %2 : $*T
   br bb3
 
@@ -426,7 +420,7 @@ bb0(%0 : $*Optional<T>):
 
 bb1(%3 : @guaranteed $T):
   end_borrow %1 : $Optional<T>
-  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
   destroy_addr %2 : $*T
   br bb3
 
@@ -458,6 +452,16 @@ bb3:
   return %r : $()
 }
 
+sil [ossa] @test_init_enum2 : $@convention(thin) (@inout Optional<T>, @in T) -> () {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  %11 = init_enum_data_addr %0, #Optional.some!enumelt
+  destroy_addr %0
+  copy_addr [take] %1 to [init] %11
+  inject_enum_addr %0, #Optional.some!enumelt
+  %121 = tuple ()
+  return %121
+}
+
 sil [ossa] @test_store_to_enum : $@convention(thin) (@owned T) -> () {
 bb0(%0 : @owned $T):
   %1 = alloc_stack $Optional<T>
@@ -480,6 +484,43 @@ bb0(%0 : $Int):
   dealloc_stack %8 : $*(Int, Optional<T>)
   %13 = tuple ()
   return %13 : $()
+}
+
+sil [ossa] @test_trivial_enum_case1 : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %1 = alloc_stack $Optional<T>
+  inject_enum_addr %1, #Optional.none!enumelt
+  %3 = init_enum_data_addr %1, #Optional.some!enumelt
+  store %0 to [init] %3
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @test_trivial_enum_case2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<T>
+  inject_enum_addr %0, #Optional.none!enumelt
+  %2 = alloc_stack $Optional<T>
+  copy_addr %0 to [init] %2
+  dealloc_stack %2
+  dealloc_stack %0
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @test_trivial_enum_case3 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<T>
+  inject_enum_addr %0, #Optional.none!enumelt
+  %2 = alloc_stack $(Int, Optional<T>)
+  %3 = tuple_element_addr %2, 1
+  copy_addr %0 to [init] %3
+  dealloc_stack %2
+  dealloc_stack %0
+  %r = tuple ()
+  return %r
 }
 
 sil [ossa] @test_select_enum_addr : $@convention(thin) (@in_guaranteed Optional<T>) -> Builtin.Int1 {
@@ -510,24 +551,23 @@ bb0(%0 :  $*T):
   return %res : $()
 }
 
-sil [ossa] @test_non_escaping_closure_with_mark_dependence : $@convention(thin) () -> () {
-bb0:
-  %0 = alloc_stack $T
-  %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
-  %pa = partial_apply [callee_guaranteed] [on_stack] %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
-  %pa1 = mark_dependence %pa on %0
-  destroy_value %pa1 : $@noescape @callee_guaranteed () -> () 
-  dealloc_stack %0
-  %res = tuple ()
-  return %res : $()
-}
-
 sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed T) -> () {
 bb0(%0 :  @guaranteed $T):
   %s = alloc_stack $T
   %sb = store_borrow %0 to %s : $*T
   end_borrow %sb : $*T
   dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test_store_borrow_nested : $@convention(thin) (@guaranteed Inner) -> () {
+bb0(%0 :  @guaranteed $Inner):
+  %s = alloc_stack $Inner
+  %sb = store_borrow %0 to %s
+  %elem = struct_element_addr %sb, #Inner.a
+  end_borrow %sb
+  dealloc_stack %s
   %res = tuple ()
   return %res : $()
 }
@@ -728,22 +768,6 @@ entry:
   return %retval : $()
 }
 
-sil @read_inner_b : $@convention(thin) (@in_guaranteed Inner) -> () {
-[%0: read s1]
-}
-
-sil [ossa] @test_partial_read_in_argument : $@convention(thin) (@in Inner) -> () {
-bb0(%0: $*Inner):
-  %1 = struct_element_addr %0 : $*Inner, #Inner.a
-  destroy_addr %1 : $*T
-  %3 = function_ref @read_inner_b : $@convention(thin) (@in_guaranteed Inner) -> ()
-  %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Inner) -> ()
-  %5 = struct_element_addr %0 : $*Inner, #Inner.b
-  destroy_addr %5 : $*T
-  %r = tuple ()
-  return %r : $()
-}
-
 sil [ossa] @test : $@convention(thin) (@guaranteed KlassOrBool) -> () {
 bb0(%0 : @guaranteed $KlassOrBool):
   %1 = alloc_stack $KlassOrBool                   
@@ -825,7 +849,7 @@ bb0(%0 : @owned $T, %1 : @owned $Inner):
   %4 = alloc_stack $Inner
   store %1 to [init] %4
   %6 = mark_dependence %4 on %2
-  %7 = begin_access [read] [dynamic] %6
+  %7 = begin_access [modify] [dynamic] %6
   %8 = load [take] %7
   end_access %7
   dealloc_stack %4
@@ -841,7 +865,7 @@ bb0(%0 : @owned $T, %1 : @owned $Inner):
   %4 = alloc_stack $Inner
   store %1 to [init] %4
   mark_dependence_addr %4 on %2
-  %7 = begin_access [read] [dynamic] %4
+  %7 = begin_access [modify] [dynamic] %4
   %8 = load [take] %7
   end_access %7
   dealloc_stack %4
@@ -871,4 +895,136 @@ sil [ossa] @storage_leaked_into_dead_ends : $@convention(thin) () -> () {
   store %t to [init] %t_addr
   dealloc_stack %t_addr
   unreachable
+}
+
+sil [ossa] @read_a : $@convention(thin) (@inout IntPair) -> () {
+[%0: read s0.v**]
+}
+
+sil [ossa] @callee_reads_unknown_subfield : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $IntPair
+  %2 = struct_element_addr %1, #IntPair.a
+  store %0 to [trivial] %2
+  %4 = function_ref @read_a : $@convention(thin) (@inout IntPair) -> ()
+  %5 = apply %4(%1) : $@convention(thin) (@inout IntPair) -> ()
+  dealloc_stack %1
+  %7 = tuple ()
+  return %7
+}
+
+sil [ossa] @callee_reads_known_subfield : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $IntPair
+  %2 = struct_element_addr %1, #IntPair.a
+  %3 = struct_element_addr %1, #IntPair.b
+  store %0 to [trivial] %2
+  %4 = function_ref @read_a : $@convention(thin) (@inout IntPair) -> ()
+  %5 = apply %4(%1) : $@convention(thin) (@inout IntPair) -> ()
+  dealloc_stack %1
+  %7 = tuple ()
+  return %7
+}
+
+sil @dont_read_from_inout : $@convention(thin) (@inout Bool) -> ()
+
+sil [ossa] @no_read_from_inout : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $Bool
+  %8 = function_ref @dont_read_from_inout : $@convention(thin) (@inout Bool) -> ()
+  %9 = apply %8(%1) : $@convention(thin) (@inout Bool) -> ()
+  dealloc_stack %1 : $*Bool
+  %10 = tuple ()
+  return %10 : $()
+}
+
+struct BoolAndObj {
+  var b: Bool
+  var obj: AnyObject
+}
+
+sil [ossa] @test_store_assign : $@convention(thin) (@owned BoolAndObj, @owned AnyObject) -> () {
+bb0(%0 : @owned $BoolAndObj, %1 : @owned $AnyObject):
+  %2 = alloc_stack $BoolAndObj
+  %3 = struct_element_addr %2, #BoolAndObj.b
+  %4 = struct_element_addr %2, #BoolAndObj.obj
+  store %1 to [init] %4
+  store %0 to [assign] %2
+  %7 = load [take] %2
+  destroy_value %7
+  dealloc_stack %2
+  return undef : $()
+}
+
+sil [ossa] @test_switch_value_default_block : $@convention(thin) (@in_guaranteed Optional<T>, @in_guaranteed T) -> () {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  %stk = alloc_stack $Optional<T>
+  %2 = init_enum_data_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  copy_addr %1 to [init] %2 : $*T
+  inject_enum_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  %val = integer_literal $Builtin.Int1, 0
+  %true_val = integer_literal $Builtin.Int1, -1
+  switch_value %val : $Builtin.Int1, case %true_val: bb1, default bb2
+
+bb1:
+  destroy_addr %stk : $*Optional<T>
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb2:
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+class Klass {}
+
+enum TripleCaseEnum {
+  case none
+  case some1(Klass)
+  case some2(Int)
+}
+
+sil [ossa] @test_switch_value_case_block : $@convention(thin) (@in_guaranteed TripleCaseEnum, @in_guaranteed Int) -> () {
+bb0(%0 : $*TripleCaseEnum, %1 : $*Int):
+  %stk = alloc_stack $TripleCaseEnum
+  %2 = init_enum_data_addr %stk : $*TripleCaseEnum, #TripleCaseEnum.some2!enumelt
+  copy_addr %1 to [init] %2 : $*Int
+  inject_enum_addr %stk : $*TripleCaseEnum, #TripleCaseEnum.some2!enumelt
+  %val = integer_literal $Builtin.Int32, 2
+  %none_val = integer_literal $Builtin.Int32, 0
+  %some1_val = integer_literal $Builtin.Int32, 1
+  %some2_val = integer_literal $Builtin.Int32, 2
+  switch_value %val, case %none_val: bb1, case %some1_val: bb2, case %some2_val: bb3
+
+bb1:
+  dealloc_stack %stk : $*TripleCaseEnum
+  br bb4
+
+bb2:
+  destroy_addr %stk : $*TripleCaseEnum
+  dealloc_stack %stk : $*TripleCaseEnum
+  br bb4
+
+bb3:
+  dealloc_stack %stk : $*TripleCaseEnum
+  br bb4
+
+bb4:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @not_throwing : $@convention(thin) (Int) -> (Int, @error_indirect MyError)
+
+sil [ossa] @apply_nothrow_with_indirect_error : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %2 = function_ref @not_throwing : $@convention(thin) (Int) -> (Int, @error_indirect MyError)
+  %3 = alloc_stack $MyError
+  %4 = apply [nothrow] %2(%3, %0) : $@convention(thin) (Int) -> (Int, @error_indirect MyError)
+  dealloc_stack %3
+  return %4
 }

@@ -38,38 +38,44 @@ class MergeTestCase(unittest.TestCase):
             },
         }
 
-        self.assertEqual(merge_config(default_config, {
-            "note": "this is machine generated or something",
-            "ssh-clone-pattern": "git@2",
-            "repos": {
-                "llvm-project": {"remote": {"id": "blah/llvm-project"}},
-                "swift-syntax": {"remote": {"id": "swiftlang/swift-syntax"}},
-            },
-            "default-branch-scheme": "bonus",
-            "branch-schemes": {
-                "bonus": {
-                    "aliases": ["bonus", "also-bonus"],
+        self.assertEqual(
+            merge_config(
+                default_config,
+                {
+                    "note": "this is machine generated or something",
+                    "ssh-clone-pattern": "git@2",
+                    "repos": {
+                        "llvm-project": {"remote": {"id": "blah/llvm-project"}},
+                        "swift-syntax": {"remote": {"id": "swiftlang/swift-syntax"}},
+                    },
+                    "default-branch-scheme": "bonus",
+                    "branch-schemes": {
+                        "bonus": {
+                            "aliases": ["bonus", "also-bonus"],
+                        },
+                    },
                 },
-            },
-        }), {
-            "ssh-clone-pattern": "git@2",
-            "https-clone-pattern": "https://1",
-            "repos": {
-                "swift": {"remote": {"id": "swiftlang/swift"}},
-                "llvm-project": {"remote": {"id": "blah/llvm-project"}},
-                "swift-syntax": {"remote": {"id": "swiftlang/swift-syntax"}},
-            },
-            "default-branch-scheme": "bonus",
-            "branch-schemes": {
-                "main": {
-                    "aliases": ["swift/main", "main", "stable/20240723"],
+            ),
+            {
+                "ssh-clone-pattern": "git@2",
+                "https-clone-pattern": "https://1",
+                "repos": {
+                    "swift": {"remote": {"id": "swiftlang/swift"}},
+                    "llvm-project": {"remote": {"id": "blah/llvm-project"}},
+                    "swift-syntax": {"remote": {"id": "swiftlang/swift-syntax"}},
                 },
-                "bonus": {
-                    "aliases": ["bonus", "also-bonus"],
+                "default-branch-scheme": "bonus",
+                "branch-schemes": {
+                    "main": {
+                        "aliases": ["swift/main", "main", "stable/20240723"],
+                    },
+                    "bonus": {
+                        "aliases": ["bonus", "also-bonus"],
+                    },
                 },
+                "note": "this is machine generated or something",
             },
-            "note": "this is machine generated or something",
-        })
+        )
 
         with self.assertRaises(ValueError):
             merge_config(default_config, default_config)

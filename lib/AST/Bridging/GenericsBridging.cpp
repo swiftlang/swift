@@ -59,6 +59,15 @@ BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
   return decl;
 }
 
+BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createImplicit(
+    BridgedDeclContext cDeclContext, swift::Identifier name, SwiftInt depth,
+    SwiftInt index, swift::GenericTypeParamKind paramKind) {
+  auto *param = GenericTypeParamDecl::createImplicit(
+      cDeclContext.unbridged(), name, depth, index, paramKind);
+  param->setDeclContext(cDeclContext.unbridged());
+  return param;
+}
+
 BridgedTrailingWhereClause
 BridgedTrailingWhereClause_createParsed(BridgedASTContext cContext,
                                         SourceLoc whereKeywordLoc,

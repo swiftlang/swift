@@ -18,6 +18,7 @@ import SILBridging
 /// propagate its bits in any way that isn't tracked by its
 /// results. Passes assume that a forwarding value is nonescaping as
 /// long as its results are nonescaping.
+@_semantics("fast_cast")
 public protocol ForwardingInstruction : Instruction {
   var singleForwardedOperand: Operand? { get }
 
@@ -253,6 +254,7 @@ extension TuplePackExtractInst : ForwardingInstruction {
 /// OpenExistentialValueInst). This most likely has to do with
 /// type-dependent operands, although any ConversionInstruction should
 /// support type-dependent operands.
+@_semantics("fast_cast")
 public protocol ConversionInstruction : SingleValueInstruction, UnaryInstruction, ForwardingInstruction {}
 
 extension ConversionInstruction {
@@ -467,6 +469,12 @@ extension BorrowedFromInst: ForwardingInstruction {
   public var canForwardOwnedValues: Bool { false }
 }
 
+extension ImplicitActorToOpaqueIsolationCastInst: ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { false }
+}
+
 // -----------------------------------------------------------------------------
 // ownership transition instructions
 
@@ -475,6 +483,7 @@ extension BorrowedFromInst: ForwardingInstruction {
 /// copy_value, move_value, begin_borrow.
 ///
 /// OwnershipTransitionInstructions always preserve the identity of the source. See swift::isIdentityPreservingRefCast.
+@_semantics("fast_cast")
 public protocol OwnershipTransitionInstruction: UnaryInstruction {
   var ownershipResult: Value { get }
 }

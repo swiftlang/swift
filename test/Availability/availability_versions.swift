@@ -647,7 +647,7 @@ enum CompassPoint {
 func functionTakingEnumIntroducedOn52(_ e: EnumIntroducedOn52) { }
 
 func useEnums() {
-      // expected-note@-1 3{{add '@available' attribute to enclosing global function}}
+      // expected-note@-1 2{{add '@available' attribute to enclosing global function}}
   let _: CompassPoint = .North // expected-error {{'CompassPoint' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
@@ -686,13 +686,89 @@ func useEnums() {
         markUsed("WithAvailableByEnumElementPayload2")
       case .WithAvailableByEnumElementPayload(let p):
         markUsed("WithAvailableByEnumElementPayload")
-
-        // For the moment, we do not incorporate enum element availability into 
-        // scope construction. Perhaps we should?
-        functionTakingEnumIntroducedOn52(p)  // expected-error {{'functionTakingEnumIntroducedOn52' is only available in macOS 52 or newer}}
-          
-          // expected-note@-2 {{add 'if #available' version check}}
+        functionTakingEnumIntroducedOn52(p)
     }
+  }
+}
+
+@available(OSX, introduced: 51)
+func switchStatements(point: CompassPoint) {
+  // Matching `case .West` (which is `@available(OSX 52, *)`) refines the body
+  // so that OSX 52 APIs can be called without an `if #available` guard.
+  switch point {
+  case .North, .South, .East:
+    _ = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  case .West:
+    _ = globalFuncAvailableOn52()
+  default:
+    break
+  }
+
+  // A `where` guard does not disable refinement.
+  switch point {
+  case .West where true:
+    _ = globalFuncAvailableOn52()
+  default:
+    break
+  }
+
+  // Multiple case label items that share the same availability still allow
+  // refinement to that common availability.
+  switch point {
+  case .WithAvailableByEnumElementPayload1(_), .WithAvailableByEnumElementPayload2(_):
+    _ = globalFuncAvailableOn52()
+  default:
+    break
+  }
+
+  // When case label items have different availability, the body can be reached
+  // through whichever item happens to match so the body cannot be refined.
+  switch point {
+  case .North, .West:
+    _ = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  default:
+    break
+
+    // Fallthrough from another case always disables refinement.
+    switch point {
+    case .North:
+      fallthrough
+    case .West:
+      _ = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+      // expected-note@-1 {{add 'if #available' version check}}
+    default:
+      break
+    }
+
+    // Refinement still applies for cases that aren't reachable via fallthrough.
+    switch point {
+    case .North:
+      fallthrough
+    case .West:
+      _ = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+      // expected-note@-1 {{add 'if #available' version check}}
+    case .WithAvailableByEnumElementPayload1(_):
+      _ = globalFuncAvailableOn52()
+    default:
+      break
+    }
+  }
+}
+
+@available(OSX, introduced: 51)
+func switchExprs(point: CompassPoint) -> Int {
+  return switch point {
+  case .North, .South, .East:
+    globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  case .West:
+    // FIXME: https://github.com/swiftlang/swift/issues/89721
+    globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  default:
+    0
   }
 }
 
@@ -1351,6 +1427,29 @@ func functionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note 2{{en
   }
 }
 
+@available(OSX, introduced: 51)
+@inlinable
+public func fragileFunctionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note {{enclosing scope here}}
+  if #available(OSX 51, *) { } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
+}
+
+public protocol Mystery { }
+public struct Secret: Mystery {
+  public init() { }
+}
+public struct SuperSecret: Mystery {
+  public init() { }
+}
+
+@available(OSX, introduced: 51)
+@inlinable
+public func fragileFunctionWithSpecifiedAvailabilityUselessCheckAndOpaqueResult() -> some Mystery {
+  if #available(OSX 51, *) {
+    return Secret()
+  }
+  return SuperSecret()
+}
+
 // #available(...) outside if statement guards
 
 func injectToOptional<T>(_ v: T) -> T? {
@@ -1925,6 +2024,26 @@ class StoredPropertiesWithAvailabilityInClosures {
   }()
 }
 
+// https://github.com/swiftlang/swift/issues/80338
+func testAvailabilityInIfExprInClosure() { // expected-note {{add '@available' attribute to enclosing global function}}
+  _ = {
+    if #available(macOS 51, *) {
+      globalFuncAvailableOn51()
+    } else {
+      nil
+    }
+  }() ?? 0
+
+  _ = {
+    if #available(macOS 51, *) {
+      nil
+    } else {
+      globalFuncAvailableOn51() // expected-error {{'globalFuncAvailableOn51()' is only available in macOS 51 or newer}}
+      // expected-note@-1 {{add 'if #available' version check}}
+    }
+  }() ?? 0
+}
+
 struct PropertyObservers {
   var hasPotentiallyUnavailableObservers: Int {
     @available(macOS 51, *) // expected-error {{willSet observer cannot be marked potentially unavailable with '@available'}}
@@ -1950,4 +2069,26 @@ struct PropertyObservers {
     didSet { }
   }
 
+}
+
+@available(macOS, introduced: 10, obsoleted: 14)
+func obsoletedBeforeDeploymentTarget() {}
+// expected-note@-1 {{'obsoletedBeforeDeploymentTarget()' was obsoleted in macOS 14}}
+
+func reachableUseStillDiagnosed() {
+  obsoletedBeforeDeploymentTarget()
+  // expected-error@-1 {{'obsoletedBeforeDeploymentTarget()' is unavailable in macOS}}
+}
+
+func useInUnreachableUnavailableBranch() {
+  if #unavailable(macOS 14) {
+    obsoletedBeforeDeploymentTarget()
+  }
+}
+
+func useInUnreachableAvailableElseBranch() {
+  if #available(macOS 14, *) {
+  } else {
+    obsoletedBeforeDeploymentTarget()
+  }
 }

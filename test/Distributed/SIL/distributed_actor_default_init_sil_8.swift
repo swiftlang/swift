@@ -49,7 +49,6 @@ distributed actor MyDistActor {
 // CHECK:    [[TP_FIELD2:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
 // CHECK:    [[RELOADED_SYS1:%[0-9]+]] = load [[TP_FIELD2]] : $*FakeRoundtripActorSystem
 // CHECK:    [[SELF_METATYPE:%[0-9]+]] = metatype $@thick MyDistActor.Type
-// CHECK:    strong_retain [[RELOADED_SYS1]] : $FakeRoundtripActorSystem
 // CHECK:    [[ASSIGN_ID_FN:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0a9RoundtripC6SystemC8assignIDyAA0C7AddressVxm0B00bC0RzlF
 // CHECK:    [[ID:%[0-9]+]] = apply [[ASSIGN_ID_FN]]<MyDistActor>([[SELF_METATYPE]], {{.*}})
 // CHECK:    strong_release {{.*}} : $FakeRoundtripActorSystem
@@ -72,7 +71,6 @@ distributed actor MyDistActor {
 // CHECK:    return [[SELF]] : $MyDistActor
 
 // CHECK:  [[SYSTEM_ERROR_BB]]([[ERROR_ARG:%[0-9]+]] : $any Error):
-// CHECK:    strong_retain [[ERROR_ARG]] : $any Error
 // CHECK:    function_ref @$s27FakeDistributedActorSystems0a9RoundtripC6SystemCACycfC
 // CHECK:    store {{.*}} to {{.*}} : $*FakeRoundtripActorSystem
 // CHECK:    store {{.*}} to {{.*}} : $*ActorAddress

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -verify | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
@@ -88,7 +88,7 @@ func checkConformer(_ s: S, _ p: any P, _ ma: MyActor) async {
   s.m(thing: ma)
   await p.m(thing: ma)
   // expected-warning @-1 {{sending 'p' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'p' to actor-isolated instance method 'm(thing:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'p' to actor-isolated instance method 'm(thing:)' risks causing data races between actor-isolated code and code in the current isolation context}}
 }
 
 // Redeclaration checking
@@ -212,13 +212,13 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
 
   await optionalIsolated(ns, to: myActor)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns' to actor-isolated global function 'optionalIsolated(_:to:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns' to actor-isolated global function 'optionalIsolated(_:to:)' risks causing data races between actor-isolated code and code in the current isolation context}}
 }
 
 @MainActor func callFromMainActor(ns: NotSendable) async {
   await optionalIsolated(ns, to: nil)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending main actor-isolated 'ns' to nonisolated global function 'optionalIsolated(_:to:)' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-note @-2 {{sending main actor-isolated 'ns' to @concurrent global function 'optionalIsolated(_:to:)' risks causing data races between @concurrent and main actor-isolated uses}}
 
   optionalIsolatedSync(ns, to: nil)
 
@@ -333,6 +333,19 @@ class ClassWithIsolatedAsyncInitializer {
     init(isolation: isolated (any Actor)? = #isolation) async {}
 }
 
+// Subscripts
+struct SubscriptTest {
+  subscript(x: isolated (any Actor)? = #isolation) -> Int { return 0 }
+}
+
+func f1(x: (any Actor)?) async {
+  _ = await SubscriptTest()[x]
+}
+
+func f2() async {
+  _ = await SubscriptTest()[]
+}
+
 // https://github.com/swiftlang/swift/issues/80992
 struct WritableActorKeyPath<Root: Actor, Value>: Sendable {
     var getter: @Sendable (isolated Root) -> Value
@@ -342,4 +355,27 @@ struct WritableActorKeyPath<Root: Actor, Value>: Sendable {
         get { getter(root) }
         nonmutating set { setter(root, newValue) }
     }
+}
+
+func testLocalFunctionAndAutoclosure() {
+  func check(_: @autoclosure () -> Void) {}
+  func checkWithClosure(_: () -> Void) {}
+
+  func test(isolation: isolated (any Actor)? = #isolation) async {
+    let result: Int = 0
+
+    func local() {
+      _ = result
+    }
+
+    // CHECK: // implicit closure #1 in test #1 (isolation:) in testLocalFunctionAndAutoclosure()
+    // CHECK: // Isolation: actor_instance. name: 'isolation'
+    // CHECK: sil private [transparent] @$s19isolated_parameters31testLocalFunctionAndAutoclosureyyF0C0L_9isolationyScA_pSgYi_tYaFyyXEfu_ : $@convention(thin) (Int, @sil_isolated @guaranteed Optional<any Actor>) -> ()
+    check(local()) // Ok
+
+    // CHECK: // closure #1 in test #1 (isolation:) in testLocalFunctionAndAutoclosure()
+    // CHECK: // Isolation: actor_instance. name: 'isolation'
+    // CHECK: sil private @$s19isolated_parameters31testLocalFunctionAndAutoclosureyyF0C0L_9isolationyScA_pSgYi_tYaFyyXEfU_ : $@convention(thin) (Int, @sil_isolated @guaranteed Optional<any Actor>) -> ()
+    checkWithClosure { local() } // Ok
+  }
 }

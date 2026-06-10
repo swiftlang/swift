@@ -130,15 +130,14 @@ internal struct DumpGenericMetadata: ParsableCommand {
 
       // Update summary
       generics.forEach { metadata in
-        if let allocation = metadata.allocation {
-          let name = metadata.name
-          if metadataSummary.keys.contains(name) {
-            metadataSummary[name]!.totalSize += allocation.size
-            metadataSummary[name]!.processes.insert(process.processName)
-          } else {
-            metadataSummary[name] = MetadataSummary(totalSize: allocation.size,
-                                                    processes: Set([process.processName]))
-            }
+        let size = metadata.allocation?.size ?? swift_reflection_metadataSize(process.context, metadata.ptr)
+        let name = metadata.name
+        if metadataSummary.keys.contains(name) {
+          metadataSummary[name]!.totalSize += size
+          metadataSummary[name]!.processes.insert(process.processName)
+        } else {
+          metadataSummary[name] = MetadataSummary(totalSize: size,
+                                                  processes: Set([process.processName]))
         }
       }
 
@@ -194,8 +193,11 @@ internal struct DumpGenericMetadata: ParsableCommand {
   private func metadataFromScanning(process: any RemoteProcess) throws -> [Metadata] {
     var metadata: [Metadata] = []
 
-    func scanMemory(address: swift_reflection_ptr_t, size: UInt64) {
-      for candidate in stride(from: address, to: address + swift_reflection_ptr_t(size), by: MemoryLayout<UInt>.size) {
+    func scanMemory(address: swift_addr_t, size: UInt64) {
+      let convertedAddress = swift_reflection_ptr_t(address)
+      for candidate in stride(from: convertedAddress,
+                              to: convertedAddress + swift_reflection_ptr_t(size),
+                              by: MemoryLayout<UInt>.size) {
         guard let name = process.context.name(type: candidate, mangled: mangled) else {
           continue
         }

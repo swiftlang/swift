@@ -19,7 +19,7 @@ SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest,
               GenericSignatureWithError (const GenericSignatureImpl *,
                                          SmallVector<GenericTypeParamType *, 2>,
                                          SmallVector<Requirement, 2>,
-                                         bool),
+                                         DefaultRequirementOptions),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ApplyAccessNoteRequest,
               evaluator::SideEffect(ValueDecl *), SeparatelyCached, NoLocationInfo)
@@ -99,7 +99,7 @@ SWIFT_REQUEST(TypeChecker, SpecializeAttrTargetDeclRequest,
               ValueDecl *(const ValueDecl *, AbstractSpecializeAttr *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,
-              evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
+              evaluator::SideEffect (EnumDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawTypeRequest,
               Type(EnumDecl *), Cached, NoLocationInfo)
@@ -160,9 +160,6 @@ SWIFT_REQUEST(TypeChecker, GetDistributedActorSystemPropertyRequest,
 SWIFT_REQUEST(TypeChecker, GetDistributedRemoteCallTargetInitFunctionRequest,
               ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, GetDistributedMethodWitnessedProtocolRequirements,
-              ArrayRef<ValueDecl *> (AbstractFunctionDecl *),
-              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedRemoteCallArgumentInitFunctionRequest,
               ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
@@ -204,7 +201,7 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                          WhereClauseOwner,
                                          SmallVector<Requirement, 2>,
                                          SmallVector<TypeBase *, 2>,
-                                         SourceLoc, ExtensionDecl *, bool),
+                                         SourceLoc, ExtensionDecl *, DefaultRequirementOptions),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DistributedModuleIsAvailableRequest,
               bool(const ValueDecl *), Cached, NoLocationInfo)
@@ -304,13 +301,16 @@ SWIFT_REQUEST(TypeChecker, RequirementRequest,
               Requirement(WhereClauseOwner, unsigned, TypeResolutionStage),
               Cached, HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, StructuralRequirementsRequest,
-              ArrayRef<StructuralRequirement>(ProtocolDecl *), Cached,
+              (std::pair<ArrayRef<StructuralRequirement>, ArrayRef<InverseRequirement>>(ProtocolDecl *)), Cached,
               HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, TypeAliasRequirementsRequest,
               ArrayRef<Requirement>(ProtocolDecl *), Cached,
               HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, ProtocolDependenciesRequest,
               ArrayRef<ProtocolDecl *>(ProtocolDecl *), Cached,
+              HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, ProtocolInversesRequest,
+              ArrayRef<InverseRequirement>(ProtocolDecl *), Cached,
               HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, RequirementSignatureRequest,
               RequirementSignature(ProtocolDecl *), SeparatelyCached,
@@ -336,11 +336,16 @@ SWIFT_REQUEST(TypeChecker, StoredPropertiesAndMissingMembersRequest,
               ArrayRef<Decl *>(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, StoredPropertiesRequest,
               ArrayRef<VarDecl *>(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, InitializablePropertiesRequest,
+              ArrayRef<VarDecl *>(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InitAccessorPropertiesRequest,
               ArrayRef<VarDecl *>(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MemberwiseInitPropertiesRequest,
-              ArrayRef<VarDecl *>(NominalTypeDecl *),
+              ArrayRef<VarDecl *>(NominalTypeDecl *, MemberwiseInitKind),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, MemberwiseInitMaxAccessLevel,
+              AccessLevel(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, StructuralTypeRequest, Type(TypeAliasDecl *), Cached,
               NoLocationInfo)
@@ -392,7 +397,7 @@ SWIFT_REQUEST(TypeChecker, AreAllStoredPropertiesDefaultInitableRequest,
 SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
-              bool(StructDecl *), Cached, NoLocationInfo)
+              bool(StructDecl *, MemberwiseInitKind), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, BraceHasExplicitReturnStmtRequest,
               bool(const BraceStmt *),
               Cached, NoLocationInfo)
@@ -400,7 +405,7 @@ SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               evaluator::SideEffect(NominalTypeDecl *, ImplicitMemberAction),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveMacroRequest,
-              ConcreteDeclRef(UnresolvedMacroReference, const Decl *),
+              ConcreteDeclRef(UnresolvedMacroReference),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveMacroConformances,
               ArrayRef<Type>(const MacroRoleAttr *, const Decl *),
@@ -425,6 +430,9 @@ SWIFT_REQUEST(TypeChecker, ConformanceIsolationRequest,
 SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,
               Type (const TypeResolution *, TypeRepr *, GenericParamList *),
               Uncached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolvePreInverseGenericsRequest,
+              Type(Decl *, PreInverseGenericsAttr *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveRawLayoutTypeRequest,
               Type(StructDecl *, RawLayoutAttr *, bool),
               SeparatelyCached, NoLocationInfo)
@@ -432,7 +440,8 @@ SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
               llvm::ArrayRef<Identifier>(Decl *),
               SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeMemberwiseInitRequest,
-              ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
+              ConstructorDecl *(NominalTypeDecl *, MemberwiseInitKind),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveEffectiveMemberwiseInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
@@ -584,8 +593,8 @@ SWIFT_REQUEST(TypeChecker, SerializeAttrGenericSignatureRequest,
 SWIFT_REQUEST(TypeChecker, IsFunctionBodySkippedRequest,
               bool(const AbstractFunctionDecl *),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsCCompatibleFuncDeclRequest,
-              bool(const FuncDecl *),
+SWIFT_REQUEST(TypeChecker, IsCCompatibleDeclRequest,
+              bool(const ValueDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SemanticDeclAttrsRequest,
               DeclAttributes(const Decl *),
@@ -599,6 +608,9 @@ SWIFT_REQUEST(TypeChecker, LocalTypeDeclsRequest,
 SWIFT_REQUEST(TypeChecker, ObjCRequirementMapRequest,
               ObjCRequirementMap(const ProtocolDecl *proto),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ObjCKeyPathStringRequest,
+              Expr *(KeyPathExpr *, DeclContext *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ImportDeclRequest,
               std::optional<AttributedImport<ImportedModule>>(
                   const SourceFile *sf, const ModuleDecl *mod),
@@ -653,10 +665,6 @@ SWIFT_REQUEST(TypeChecker, BindExtensionsRequest,
               evaluator::SideEffect(ModuleDecl *),
               Cached, NoLocationInfo)
 
-SWIFT_REQUEST(TypeChecker, ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
-              bool(const ModuleDecl *),
-              Cached, NoLocationInfo)
-
 SWIFT_REQUEST(TypeChecker, AvailabilityDomainForDeclRequest,
               std::optional<AvailabilityDomain>(ValueDecl *),
               Cached | SplitCached, NoLocationInfo)
@@ -664,3 +672,19 @@ SWIFT_REQUEST(TypeChecker, AvailabilityDomainForDeclRequest,
 SWIFT_REQUEST(TypeChecker, IsCustomAvailabilityDomainPermanentlyEnabled,
               bool(const CustomAvailabilityDomain *),
               SeparatelyCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, EmitPerformanceHints,
+              evaluator::SideEffect(SourceFile *),
+              Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, DynamicMemberLookupSubscriptRequest,
+              DynamicMemberLookupSubscriptEligibility(const SubscriptDecl *),
+              Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, DesugarForEachStmtRequest,
+              BraceStmt *(ForEachStmt *),
+              SeparatelyCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, ConstantFoldExpression,
+              Expr *(const Expr *, ASTContext *),
+              Cached, NoLocationInfo)

@@ -219,6 +219,37 @@ static std::optional<bool> toOptionalBool(llvm::cl::boolOrDefault defaultable) {
   llvm_unreachable("Bad case for llvm::cl::boolOrDefault!");
 }
 
+namespace {
+class LLVMOptionFilter {
+  /// Options with -Xllvm removed. We let through -Xllvm options so that LLVM's
+  /// processing can find it.
+  SmallVector<const char *, 32> filteredOptions;
+
+  /// Options with the -Xllvm prefix. We have that here so we can process them
+  /// separately.
+  SmallVector<const char *, 32> llvmOptions;
+
+public:
+  LLVMOptionFilter(ArrayRef<const char *> argv) {
+    for (unsigned i = 0; i < argv.size(); ++i) {
+      // Not a -Xllvm option... just let it through.
+      if (StringRef(argv[i]) != "-Xllvm") {
+        filteredOptions.push_back(argv[i]);
+        continue;
+      }
+
+      assert(i + 1 < argv.size() && "-Xllvm without a corresponding option");
+      ++i;
+      filteredOptions.push_back(argv[i]);
+      llvmOptions.push_back(argv[i]);
+    }
+  }
+
+  ArrayRef<const char *> getFilteredOptions() const { return filteredOptions; }
+  ArrayRef<const char *> getLLVMOptions() const { return llvmOptions; }
+};
+} // namespace
+
 int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
   INITIALIZE_LLVM();
 
@@ -226,15 +257,20 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   SILLLVMGenOptions options;
-
-  llvm::cl::ParseCommandLineOptions(argv.size(), argv.data(), "Swift LLVM IR Generator\n");
-
-  if (options.PrintStats)
-    llvm::EnableStatistics();
+  LLVMOptionFilter filteredOptions(argv);
 
   CompilerInvocation Invocation;
 
   Invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(argv[0], MainAddr));
+  copy(filteredOptions.getLLVMOptions(),
+       std::back_inserter(Invocation.getFrontendOptions().LLVMArgs));
+
+  llvm::cl::ParseCommandLineOptions(filteredOptions.getFilteredOptions().size(),
+                                    filteredOptions.getFilteredOptions().data(),
+                                    "Swift LLVM IR Generator\n");
+
+  if (options.PrintStats)
+    llvm::EnableStatistics();
 
   // Give the context the list of search paths to use for modules.
   std::vector<SearchPathOptions::SearchPath> ImportPaths;
@@ -318,11 +354,12 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
       exit(-1);
     }
 
-    if (auto firstVersion = feature->getLanguageVersion()) {
-      if (Invocation.getLangOptions().isSwiftVersionAtLeast(*firstVersion)) {
+    if (auto languageMode = feature->getLanguageMode()) {
+      if (Invocation.getLangOptions().isLanguageModeAtLeast(
+              languageMode.value())) {
         llvm::errs() << "error: upcoming feature " << QuotedString(featureName)
-                     << " is already enabled as of Swift version "
-                     << *firstVersion << '\n';
+                     << " already enabled as of the Swift "
+                     << languageMode->versionString() << " language mode\n";
         exit(-1);
       }
     }
@@ -400,7 +437,7 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
                            options.OutputFilename, toString(outFile.takeError()));
     return 1;
   }
-  auto closeFile = llvm::make_scope_exit([&]() {
+  llvm::scope_exit closeFile([&]() {
     if (auto E = outFile->keep()) {
       CI.getDiags().diagnose(SourceLoc(), diag::error_closing_output,
                              options.OutputFilename, toString(std::move(E)));
@@ -420,12 +457,13 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
     if (options.PerformWMO) {
       return IRGenDescriptor::forWholeModule(
           mod, Opts, TBDOpts, SILOpts, SILTypes,
-          /*SILMod*/ nullptr, moduleName, PSPs);
+          /*SILMod*/ nullptr, moduleName, PSPs, /*CAS=*/nullptr);
     }
 
-    return IRGenDescriptor::forFile(
-        mod->getFiles()[0], Opts, TBDOpts, SILOpts, SILTypes,
-        /*SILMod*/ nullptr, moduleName, PSPs, /*discriminator*/ "");
+    return IRGenDescriptor::forFile(mod->getFiles()[0], Opts, TBDOpts, SILOpts,
+                                    SILTypes,
+                                    /*SILMod*/ nullptr, moduleName, PSPs,
+                                    /*CAS=*/nullptr, /*discriminator*/ "");
   };
 
   auto &eval = CI.getASTContext().evaluator;
@@ -433,6 +471,15 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
   desc.out = &outFile->getOS();
 
   if (options.OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization) {
+    // We need to perform Sema here since IRGenRequest itself does not perform
+    // Sema (unlike OptimizedIRRequest).
+    CI.performSema();
+
+    // If Sema produced an error, exit early.
+    bool HadError = CI.getASTContext().hadError();
+    if (HadError)
+      exit(-1);
+
     auto generatedMod = evaluateOrFatal(eval, IRGenRequest{desc});
     if (!generatedMod)
       return 1;

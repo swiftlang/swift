@@ -57,7 +57,7 @@ import SwiftShims
 ///
 /// The description implementation has the following requirements:
 ///
-/// * The body of the description implementation must a single string
+/// * The body of the description implementation must be a single string
 ///   expression. String concatenation is not supported, use string interpolation
 ///   instead.
 /// * String interpolation can reference stored properties only, functions calls
@@ -214,18 +214,22 @@ public enum _DebuggerSupport {
   
     print(String(repeating: " ", count: indent), terminator: "", to: &target)
 
-    // do not expand classes with no custom Mirror
-    // yes, a type can lie and say it's a class when it's not since we only
-    // check the displayStyle - but then the type would have a custom Mirror
-    // anyway, so there's that...
+    // 1. Do not expand classes, unless they conform to CustomReflectable.
+    // 2. Do not expand value types that conform to CustomStringConvertible
+    //    or CustomDebugStringConvertible, unless the type also conform to
+    //    CustomReflectable.
     let isNonClass = mirror.displayStyle != .`class`
+    let isStringConvertible: Bool
     let isCustomReflectable: Bool
     if let value = value {
       isCustomReflectable = value is CustomReflectable
+      isStringConvertible =
+        value is CustomStringConvertible || value is CustomDebugStringConvertible
     } else {
       isCustomReflectable = true
+      isStringConvertible = false
     }
-    let willExpand = isNonClass || isCustomReflectable
+    let willExpand = (isNonClass && !isStringConvertible) || isCustomReflectable
 
     let count = mirror.children.count
     let bullet = isRoot && (count == 0 || !willExpand) ? ""
@@ -309,6 +313,18 @@ public enum _DebuggerSupport {
     }
   }
 
+  /// Returns a string representation of `value` for display by the `po` LLDB
+  /// command.
+  ///
+  /// When the value conforms to `CustomDebugStringConvertible`, its
+  /// `debugDescription` is returned. Otherwise, if it conforms to
+  /// `CustomStringConvertible`, its `description` is returned. When it conforms
+  /// to neither, a mirror-based tree of the value's contents is produced,
+  /// similar to `dump(_:)`.
+  ///
+  /// Types that conform to `CustomReflectable` in addition to one of the string
+  /// convertible protocols will display both the custom description and their
+  /// mirrored contents.
   public static func stringForPrintObject(_ value: Any) -> String {
     var maxItemCounter = Int.max
     var refs = Set<ObjectIdentifier>()
@@ -327,6 +343,38 @@ public enum _DebuggerSupport {
       target: &target)
 
     return target
+  }
+
+  // Print an object or value without the caller having a concrete type.
+  //
+  // For simplicity of data handling in LLDB avoids using an enum return type,
+  // using (Bool, String) instead of Optional<String>.
+  @available(SwiftStdlib 6.3, *)
+  public static func stringForPrintObject(_ pointer: UnsafeRawPointer?, mangledTypeName: String) -> (Bool, String) {
+    guard let pointer = unsafe pointer else {
+      return (false, "invalid pointer")
+    }
+
+    guard let type =
+      unsafe _getTypeByMangledNameInContext(
+        mangledTypeName,
+        UInt(mangledTypeName.count),
+        genericContext: nil,
+        genericArguments: nil)
+      else {
+        return (false, "type not found for mangled name: \(mangledTypeName)")
+      }
+
+    func loadPointer<T>(type: T.Type) -> Any {
+      if type is AnyObject.Type {
+        unsafe unsafeBitCast(pointer, to: T.self)
+      } else {
+        unsafe pointer.load(as: T.self)
+      }
+    }
+
+    let anyValue = _openExistential(type, do: loadPointer)
+    return (true, stringForPrintObject(anyValue))
   }
 }
 

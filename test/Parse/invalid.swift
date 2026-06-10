@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 // REQUIRES: swift_swift_parser
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx

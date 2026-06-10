@@ -14,8 +14,9 @@
 #define SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 
 #include "swift/Basic/PrintDiagnosticNamesMode.h"
-#include "swift/Basic/WarningAsErrorRule.h"
+#include "swift/Basic/WarningGroupBehaviorRule.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallSet.h"
 #include <vector>
 
 namespace swift {
@@ -41,6 +42,20 @@ public:
   /// \c VerifyMode is not \c NoVerify.
   bool VerifyIgnoreUnknown = false;
 
+  /// Indicates whether to allow diagnostics for locations outside files parsed
+  /// for 'expected' diagnostics if \c VerifyMode is not \c NoVerify. Does not
+  /// allow diagnostics at <unknown>, that is controlled by VerifyIgnoreUnknown.
+  bool VerifyIgnoreUnrelated = false;
+
+  /// Indicates whether to ignore \c diag::in_macro_expansion. This is useful
+  /// for when they occur in unnamed buffers (such as clang attribute buffers),
+  /// but VerifyIgnoreUnrelated is too blunt of a tool. Note that notes of this
+  /// kind are not printed by \c PrintingDiagnosticConsumer.
+  bool VerifyIgnoreMacroLocationNote = false;
+
+  /// If true, enforce that child notes are listed in {{children:}} blocks.
+  bool VerifyChildNotes = false;
+
   /// Indicates whether diagnostic passes should be skipped.
   bool SkipDiagnosticPasses = false;
 
@@ -51,6 +66,25 @@ public:
   /// Keep emitting subsequent diagnostics after a fatal error.
   bool ShowDiagnosticsAfterFatalError = false;
 
+  /// Trap when any error diagnostic is emitted. For compiler developers only.
+  ///
+  /// These flags are intentionally separate from the normal diagnostic
+  /// suppression and escalation machinery. That separation is deliberate:
+  /// they are useful precisely when *other* diagnostics are being emitted (e.g.
+  /// when debugging a miscompile by setting an lldb breakpoint on the trap), so
+  /// they must not be suppressed by -suppress-warnings or similar options.
+  bool AssertOnError = false;
+
+  /// Trap when any warning diagnostic is emitted. For compiler developers only.
+  /// See AssertOnError for why this is separate from the normal machinery.
+  bool AssertOnWarning = false;
+
+  /// Trap when any diagnostic belonging to one of these groups is emitted.
+  /// Allows targeting a single diagnostic group rather than all errors or all
+  /// warnings. For compiler developers only.
+  /// See AssertOnError for why this is separate from the normal machinery.
+  llvm::SmallSet<DiagGroupID, 1> AssertOnGroupIDs;
+
   /// When emitting fixits as code edits, apply all fixits from diagnostics
   /// without any filtering.
   bool FixitCodeForAllDiagnostics = false;
@@ -58,11 +92,18 @@ public:
   /// Suppress all warnings
   bool SuppressWarnings = false;
   
+  /// Suppress all notes
+  bool SuppressNotes = false;
+
   /// Suppress all remarks
   bool SuppressRemarks = false;
 
   /// Rules for escalating warnings to errors
-  std::vector<WarningAsErrorRule> WarningsAsErrorsRules;
+  llvm::SmallVector<WarningGroupBehaviorRule, 4> WarningGroupControlRules;
+
+  /// Unknown warning group names specified via -Werror or -Wwarning.
+  /// These will be diagnosed when the DiagnosticEngine is configured.
+  llvm::SmallVector<std::string, 1> UnknownWarningGroups;
 
   /// When printing diagnostics, include either the diagnostic name
   /// (diag::whatever) at the end or the associated diagnostic group.

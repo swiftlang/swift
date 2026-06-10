@@ -1,0 +1,3 @@
+// {"extraArgs":["-experimental-allow-module-with-compiler-errors","-cxx-interoperability-mode=default","-emit-clang-header-min-access","internal","-emit-clang-header-path","/dev/null"],"kind":"typecheck","original":"436ff53a","signature":"swift::SILSpecializeAttr::buildTypeErasedSignature(swift::GenericSignature, llvm::ArrayRef<swift::Type>)","signatureAssert":"Assertion failed: (Ptr && \"Cannot dereference a null GenericSignature!\"), function operator->","signatureNext":"SILSpecializeAttr::create"}
+// RUN: not --crash %target-swift-frontend -typecheck -experimental-allow-module-with-compiler-errors -cxx-interoperability-mode=default -emit-clang-header-min-access internal -emit-clang-header-path /dev/null %s
+@_specialize(where <#type#> == <#type#>) func a()

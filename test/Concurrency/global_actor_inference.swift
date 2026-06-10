@@ -3,7 +3,9 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
-// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete- -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-experimental-feature FlowIsolationGlobalActor
+
+// REQUIRES: swift_feature_FlowIsolationGlobalActor
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
@@ -128,6 +130,7 @@ class Object: Interface {
   // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
 
   var baz: Int = 42 // expected-note{{main actor-isolated property 'baz' cannot satisfy nonisolated requirement}}
+  // expected-note@-1{{change property 'baz' to a 'nonisolated let' constant}}{{3-6=nonisolated let}}
 }
 
 
@@ -334,14 +337,12 @@ struct WrapperOnActor<Wrapped: Sendable> {
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
   
-  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
-  public var wrappedValue: Wrapped
+  public var wrappedValue: Wrapped // expected-minimal-targeted-note {{mutation of this property is only permitted within the actor}}
 
   public var accessCount: Int
 
   nonisolated public init(wrappedValue: Wrapped) {
-    // expected-warning@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.wrappedValue = wrappedValue
+    self.wrappedValue = wrappedValue // expected-minimal-targeted-warning {{main actor-isolated property 'wrappedValue' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 }
 
@@ -400,8 +401,7 @@ struct HasWrapperOnActor {
     synced = 17
   }
 
-  @WrapperActor var actorSynced: Int = 0 // expected-warning{{'nonisolated' is not supported on properties with property wrappers}}
-
+  @WrapperActor var actorSynced: Int = 0 // expected-warning {{'nonisolated' cannot be applied to mutable stored properties}}
   func testActorSynced() {
     _ = actorSynced
     _ = $actorSynced
@@ -499,9 +499,8 @@ struct SimplePropertyWrapper {
 
 @MainActor
 class WrappedContainsNonisolatedAttr {
-  @SimplePropertyWrapper nonisolated var value 
-  // expected-error@-1 {{'nonisolated' is not supported on properties with property wrappers}}
-  // expected-note@-2 {{property declared here}}
+  @SimplePropertyWrapper nonisolated var value
+  // expected-note@-1 {{property declared here}}
 
   nonisolated func test() {
     _ = value
@@ -655,7 +654,7 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
   }
 
   acceptAsyncSendableClosureInheriting {
-    await onlyOnMainActor() // expected-warning{{no 'async' operations occur within 'await' expression}}
+    await onlyOnMainActor() // expected-warning{{no 'async' operations occur within 'await' expression}}{{5-11=}}
   }
 }
 
@@ -663,7 +662,7 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
 // defer bodies inherit global actor-ness
 @MainActor
 var statefulThingy: Bool = false // expected-minimal-targeted-note {{var declared here}}
-// expected-complete-error @-1 {{top-level code variables cannot have a global actor}}
+// expected-complete-error @-2:1 {{top-level code variables cannot have a global actor}} {{1-+1:1=}}
 
 @MainActor
 func useFooInADefer() -> String { // expected-minimal-targeted-note {{calls to global function 'useFooInADefer()' from outside of its actor context are implicitly asynchronous}}

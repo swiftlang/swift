@@ -247,3 +247,14 @@ func testCompoundRefs() {
   let _: (Int) -> Int = hasArgLabel(x:) // expected-error {{cannot convert value of type '(Int) -> Int?' to specified type '(Int) -> Int}}
   let _: (Int) -> Int? = hasArgLabel(x:)
 }
+
+// https://github.com/swiftlang/swift/issues/88530
+// An IUO binding inside a closure, typed as an unbound generic member, used
+// to crash the compiler because `OverloadChoice::getIUOReferenceKind` forced
+// the VarDecl's interface type, re-entering `typeCheckPatternBinding` from
+// outside the closure's own type-check context.
+struct GenericBox<T> { struct Inner {} }
+let closureWithUnboundGenericIUO = {
+  let x: GenericBox.Inner! = GenericBox<Int>.Inner()
+  _ = x
+}

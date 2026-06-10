@@ -118,7 +118,7 @@ extension ASTGenVisitor {
       let attrKind: swift.DeclAttrKind?
       do {
         let bridgedOptional = BridgedOptionalDeclAttrKind(from: attrName.bridged)
-        attrKind = if bridgedOptional.hasValue {
+        attrKind = if identTy.moduleSelector == nil && bridgedOptional.hasValue {
           bridgedOptional.value
         } else {
           nil
@@ -150,6 +150,8 @@ extension ASTGenVisitor {
         return handle(self.generateEffectsAttr(attribute: node)?.asDeclAttribute)
       case .Exclusivity:
         return handle(self.generateExclusivityAttr(attribute: node)?.asDeclAttribute)
+      case .Export:
+        return handle(self.generateExportAttr(attribute: node)?.asDeclAttribute)
       case .Expose:
         return handle(self.generateExposeAttr(attribute: node)?.asDeclAttribute)
       case .Extern:
@@ -174,6 +176,8 @@ extension ASTGenVisitor {
         return handle(self.generateOptimizeAttr(attribute: node)?.asDeclAttribute)
       case .OriginallyDefinedIn:
         return self.generateOriginallyDefinedInAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
+      case .PreInverseGenerics:
+        return handle(self.generatePreInverseGenericsAttr(attribute: node)?.asDeclAttribute)
       case .PrivateImport:
         return handle(self.generatePrivateImportAttr(attribute: node)?.asDeclAttribute)
       case .ProjectedValueProperty:
@@ -196,6 +200,8 @@ extension ASTGenVisitor {
         return handle(self.generateStorageRestrictionAttr(attribute: node)?.asDeclAttribute)
       case .SwiftNativeObjCRuntimeBase:
         return handle(self.generateSwiftNativeObjCRuntimeBaseAttr(attribute: node)?.asDeclAttribute)
+      case .Diagnose:
+        return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
       case .Transpose:
         return handle(self.generateTransposeAttr(attribute: node)?.asDeclAttribute)
       case .TypeEraser:
@@ -224,6 +230,9 @@ extension ASTGenVisitor {
       case nil where attrName == "_versioned":
         // TODO: Diagnose.
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .UsableFromInline))
+      case nil where attrName == "warn":
+        // TODO: Diagnose. 'warn' is renamed to 'diagnose'
+        return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
 
       // Simple attributes.
       case .AddressableSelf,
@@ -249,6 +258,7 @@ extension ASTGenVisitor {
         .Frozen,
         .GKInspectable,
         .GlobalActor,
+        .HasHiddenStoredProperties,
         .HasInitialValue,
         .HasMissingDesignatedInitializers,
         .HasStorage,
@@ -265,7 +275,6 @@ extension ASTGenVisitor {
         .LexicalLifetimes,
         .LLDBDebuggerFunction,
         .MainType,
-        .ManualOwnership,
         .Marker,
         .MoveOnly,
         .NeverEmitIntoClient,
@@ -276,6 +285,7 @@ extension ASTGenVisitor {
         .NoRuntime,
         .NoImplicitCopy,
         .NoLocks,
+        .NoManualOwnership,
         .NoMetadata,
         .NoObjCBridging,
         .NonEphemeral,
@@ -287,9 +297,10 @@ extension ASTGenVisitor {
         .NSManaged,
         .ObjCMembers,
         .ObjCNonLazyRealization,
+        .Owned,
         .Preconcurrency,
-        .PreInverseGenerics,
         .PropertyWrapper,
+        .Reparentable,
         .RequiresStoredPropertyInits,
         .ResultBuilder,
         .Safe,
@@ -309,7 +320,8 @@ extension ASTGenVisitor {
         .UsableFromInline,
         .Used,
         .WarnUnqualifiedAccess,
-        .WeakLinked:
+        .WeakLinked,
+        .UnsafeSelfDependentResult:
 
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: attrKind!))
 
@@ -366,6 +378,11 @@ extension ASTGenVisitor {
         break
 
       case .none:
+        // '@_accessorBlock' is a parser only disambiguation marker, ignore.
+        if attrName == "_accessorBlock" {
+          return
+        }
+
         // Fall back to CustomAttr.
         break
       }
@@ -470,7 +487,8 @@ extension ASTGenVisitor {
     let features = args.compactMap(in: self) { arg -> Identifier? in
       guard arg.label == nil,
             let declNameExpr = arg.expression.as(DeclReferenceExprSyntax.self),
-            declNameExpr.argumentNames == nil
+            declNameExpr.argumentNames == nil,
+            declNameExpr.moduleSelector == nil
       else {
         // TODO: Diagnose.
         return nil
@@ -672,7 +690,10 @@ extension ASTGenVisitor {
 
     let accessorKind: swift.AccessorKind?
     if let accessorToken = args.accessorSpecifier {
-      accessorKind = self.generate(accessorSpecifier: accessorToken)
+      accessorKind = self.generate(
+        accessorSpecifier: accessorToken,
+        modifiers: []
+      )
     } else {
       accessorKind = nil
     }
@@ -769,6 +790,7 @@ extension ASTGenVisitor {
       attrNameLoc: self.generateSourceLoc(node.attributeName),
       lParenLoc: self.generateSourceLoc(node.leftParen),
       replacedFunction: replacedFunction.name,
+      replacedFunctionLoc: replacedFunction.loc,
       rParenLoc: self.generateSourceLoc(node.rightParen)
     )
   }
@@ -1016,7 +1038,7 @@ extension ASTGenVisitor {
 
   /// E.g.
   ///   ```
-  ///   @_section("__TEXT,__mysection")
+  ///   @section("__TEXT,__mysection")
   ///   ```
   func generateSectionAttr(attribute node: AttributeSyntax) -> BridgedSectionAttr? {
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
@@ -1046,6 +1068,10 @@ extension ASTGenVisitor {
       return nil
     }
 
+    if arg.declName.moduleSelector != nil {
+      // TODO: Diagnose; module selector is meaningless at this position.
+    }
+
     let type = self.generate(type: arg.type)
     let member = self.generateDeclNameRef(declReferenceExpr: arg.declName)
 
@@ -1056,6 +1082,33 @@ extension ASTGenVisitor {
       protocolType: type,
       memberName: member.name,
       memberNameLoc: member.loc
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @export(interface)
+  ///   @export(implementation)
+  ///   ```
+  func generateExportAttr(attribute node: AttributeSyntax) -> BridgedExportAttr? {
+    let kind: swift.ExportKind? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "interface": return .interface
+        case "implementation": return .implementation
+        default: return nil
+        }
+      }
+    )
+    guard let kind else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      kind: kind
     )
   }
 
@@ -1125,7 +1178,8 @@ extension ASTGenVisitor {
     let loc = self.generateSourceLoc(descriptorExpr)
     if
       let declRefExpr = descriptorExpr.as(DeclReferenceExprSyntax.self),
-      declRefExpr.argumentNames == nil
+      declRefExpr.argumentNames == nil,
+      declRefExpr.moduleSelector == nil
     {
       return generateLifetimeDescriptor(
         nameToken: declRefExpr.baseName,
@@ -1216,7 +1270,10 @@ extension ASTGenVisitor {
     if node.argumentNames != nil {
       // TODO: Diagnose
     }
-    guard node.argumentNames == nil else {
+    if node.moduleSelector != nil {
+      // TODO: Diagnose
+    }
+    guard node.argumentNames == nil && node.moduleSelector == nil else {
       return nil
     }
     switch node.baseName.rawText {
@@ -1276,7 +1333,11 @@ extension ASTGenVisitor {
       if let arg = arg.as(DeclReferenceExprSyntax.self) {
         name = self.generateDeclNameRef(declReferenceExpr: arg).name
       } else if arg.is(DiscardAssignmentExprSyntax.self) {
-        name = BridgedDeclNameRef.createParsed(.init(self.ctx.getIdentifier("_")))
+        name = BridgedDeclNameRef.createParsed(
+          self.ctx,
+          moduleSelector: nil,
+          baseName: .init(self.ctx.getIdentifier("_"))
+        )
       } else {
         // TODO: Diagnose
         fatalError("expected name")
@@ -1673,30 +1734,21 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateValueOrType(expr node: ExprSyntax) -> BridgedTypeRepr? {
-    var node = node
-
-    // Try value first.
-    let minusLoc: SourceLoc
-    if let prefixExpr = node.as(PrefixOperatorExprSyntax.self),
-      prefixExpr.operator.rawText == "-",
-      prefixExpr.expression.is(IntegerLiteralExprSyntax.self) {
-      minusLoc = self.generateSourceLoc(prefixExpr.operator)
-      node = prefixExpr.expression
-    } else {
-      minusLoc = nil
+  func generatePreInverseGenericsAttr(attribute node: AttributeSyntax) -> BridgedPreInverseGenericsAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      switch args.first?.label?.rawText {
+        case "except":
+          fatalError("ASTGen does not yet support the except: argument")
+        default:
+          // TODO: Diagnose.
+          fatalError("invalid argument for @_preInverseGenerics attribute")
+      }
+      return .createParsed(
+          self.ctx,
+          atLoc: self.generateSourceLoc(node.atSign),
+          range: self.generateAttrSourceRange(node)
+      )
     }
-    if let integerExpr = node.as(IntegerLiteralExprSyntax.self) {
-      let value = self.copyAndStripUnderscores(text: integerExpr.literal.rawText)
-      return BridgedIntegerTypeRepr.createParsed(
-        self.ctx,
-        string: value,
-        loc: self.generateSourceLoc(node), minusLoc: minusLoc
-      ).asTypeRepr
-    }
-
-    assert(!minusLoc.isValid)
-    return self.generateTypeRepr(expr: node)
   }
 
   func generateRawLayoutAttr(attribute node: AttributeSyntax) -> BridgedRawLayoutAttr? {
@@ -1762,7 +1814,7 @@ extension ASTGenVisitor {
 
         // 'count:' can be integer literal or a generic parameter.
         let count = self.generateConsumingAttrOption(args: &args, label: "count") {
-          self.generateValueOrType(expr: $0)
+          self.generateValueOrType(expr: $0).asTypeRepr
         }
         guard let count else {
           return nil
@@ -1912,7 +1964,7 @@ extension ASTGenVisitor {
     let exported: Bool? = nil
     let kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
-    let targetFunction: BridgedDeclNameRef? = nil
+    let targetFunction: (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc)? = nil
     let spiGroups: [Identifier] = []
     let availableAttrs: [BridgedAvailableAttr] = []
 
@@ -1925,7 +1977,8 @@ extension ASTGenVisitor {
       whereClause: whereClause.asNullable,
       exported: exported ?? false,
       kind: kind ?? .full,
-      taretFunction: targetFunction ?? BridgedDeclNameRef(),
+      targetFunction: targetFunction?.name ?? BridgedDeclNameRef(),
+      targetFunctionLoc: targetFunction?.loc ?? BridgedDeclNameLoc(),
       spiGroups: spiGroups.lazy.bridgedArray(in: self),
       availableAttrs: availableAttrs.lazy.bridgedArray(in: self)
     )
@@ -1945,7 +1998,7 @@ extension ASTGenVisitor {
     var exported: Bool?
     var kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
-    var targetFunction: BridgedDeclNameRef? = nil
+    var targetFunction: (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc)?
     var spiGroups: [Identifier] = []
     var availableAttrs: [BridgedAvailableAttr] = []
 
@@ -1957,7 +2010,7 @@ extension ASTGenVisitor {
         if targetFunction != nil {
           // TODO: Diangose.
         }
-        targetFunction = self.generateDeclNameRef(declReferenceExpr: arg.declName).name
+        targetFunction = self.generateDeclNameRef(declReferenceExpr: arg.declName)
       case .specializeAvailabilityArgument(let arg):
         availableAttrs = self.generateAvailableAttr(
           atLoc: self.generateSourceLoc(arg.availabilityLabel),
@@ -2021,7 +2074,8 @@ extension ASTGenVisitor {
       whereClause: whereClause.asNullable,
       exported: exported ?? false,
       kind: kind ?? .full,
-      taretFunction: targetFunction ?? BridgedDeclNameRef(),
+      targetFunction: targetFunction?.name ?? BridgedDeclNameRef(),
+      targetFunctionLoc: targetFunction?.loc ?? BridgedDeclNameLoc(),
       spiGroups: spiGroups.lazy.bridgedArray(in: self),
       availableAttrs: availableAttrs.lazy.bridgedArray(in: self)
     )
@@ -2095,7 +2149,8 @@ extension ASTGenVisitor {
         func generatePropertyName(expr node: ExprSyntax) -> Identifier? {
           guard
             let node = node.as(DeclReferenceExprSyntax.self),
-            node.argumentNames == nil
+            node.argumentNames == nil,
+            node.moduleSelector == nil
           else {
             // TODO: Diagnose.
             return nil
@@ -2146,6 +2201,56 @@ extension ASTGenVisitor {
       name: name
     )
   }
+  
+  /// E.g.:
+  ///   ```
+  ///   @diagnose(DiagGroupID, as: Behavior, reason: String?)
+  ///   ```
+  func generateDiagnoseAttr(attribute node: AttributeSyntax) -> BridgedDiagnoseAttr? {
+    guard let diagGroupIdentifier: swift.Identifier = self.generateWithLabeledExprListArguments(attribute: node, { args in
+      self.generateConsumingAttrOption(args: &args, label: nil) { expr in
+        guard let declRefExpr = expr.as(DeclReferenceExprSyntax.self) else {
+          return nil
+        }
+        return self.generateIdentifier(declRefExpr.baseName)
+      }
+    }) else {
+      return nil
+    }
+    
+    guard let behavior: swift.WarningGroupBehavior = self.generateWithLabeledExprListArguments(attribute: node, { args in
+      self.generateConsumingAttrOption(args: &args, label: "as") { expr in
+        guard let declRefExpr = expr.as(DeclReferenceExprSyntax.self) else {
+          return nil
+        }
+        switch declRefExpr.baseName.text {
+        case "error": return swift.WarningGroupBehavior.error
+        case "warning": return swift.WarningGroupBehavior.warning
+        case "ignored": return swift.WarningGroupBehavior.ignored
+        default: return nil
+        }
+      }
+    }) else {
+      return nil
+    }
+    
+    let reason: BridgedStringRef
+    if let userSpecifiedReason = self.generateWithLabeledExprListArguments(attribute: node, { args in
+      self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "reason")}) {
+      reason = userSpecifiedReason
+    } else {
+      reason = allocateBridgedString("")
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      diagGroupName: diagGroupIdentifier,
+      behavior: behavior,
+      reason: reason
+    )
+  }
 
   /// E.g.:
   ///   ```
@@ -2186,11 +2291,12 @@ extension ASTGenVisitor {
     // FIXME: Should be normal LabeledExprListSyntax arguments.
     // FIXME: Error handling
     let type: BridgedTypeRepr? = self.generateSingleAttrOption(attribute: node, { token in
-      let nameLoc = self.generateIdentifierAndSourceLoc(token)
+      // FIXME: Module selector?
+      let nameRef = self.generateDeclNameRef(moduleSelector: nil, baseName: token)
       return BridgedUnqualifiedIdentTypeRepr.createParsed(
         self.ctx,
-        loc: nameLoc.sourceLoc,
-        name: nameLoc.identifier
+        name: nameRef.name,
+        loc: nameRef.loc
       ).asTypeRepr
     })
     guard let type else {
@@ -2284,9 +2390,9 @@ extension ASTGenVisitor {
     }
 
     return .createParsed(
-      self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       type: type,
+      declContext: declContext,
       initContext: initContext.asNullable,
       argumentList: argList.asNullable
     )
@@ -2360,7 +2466,7 @@ extension ASTGenVisitor {
     _ valueGeneratorFunction: (TokenSyntax) -> R?
   ) -> R? {
     return generateConsumingAttrOption(args: &args, label: nil) {
-      if let declRefExpr = $0.as(DeclReferenceExprSyntax.self), declRefExpr.argumentNames == nil {
+      if let declRefExpr = $0.as(DeclReferenceExprSyntax.self), declRefExpr.argumentNames == nil, declRefExpr.moduleSelector == nil {
         return valueGeneratorFunction(declRefExpr.baseName)
       } else if let discardExpr = $0.as(DiscardAssignmentExprSyntax.self) {
         return valueGeneratorFunction(discardExpr.wildcard)

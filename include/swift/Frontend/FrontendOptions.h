@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Version.h"
@@ -48,6 +49,13 @@ struct CompilerDebuggingOptions {
   /// Indicates whether or not the Clang importer should dump lookup tables
   /// upon termination.
   bool DumpClangLookupTables = false;
+
+  bool DumpAbstractLayout = false;
+
+  /// Dump every hidden-type layout known to this compilation: those recorded
+  /// during the local module's compilation plus those deserialized from any
+  /// imported Swift modules.
+  bool DumpHiddenTypeLayouts = false;
 };
 
 /// Options for controlling the behavior of the frontend.
@@ -217,6 +225,8 @@ public:
 
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
+
+    EmitPolyglotAST, ///< Emit polyglot AST as JSON
 
     ScanDependencies, ///< Scan dependencies of Swift source files
     PrintVersion,     ///< Print version information.
@@ -398,6 +408,9 @@ public:
   /// The path at which to either serialize or deserialize the dependency scanner cache.
   std::string SerializedDependencyScannerCachePath;
 
+  /// Emit dependency scanning related remarks.
+  bool EmitDependencyScannerRemarks = false;
+
   /// Emit remarks indicating use of the serialized module dependency scanning cache.
   bool EmitDependencyScannerCacheRemarks = false;
 
@@ -410,6 +423,10 @@ public:
   /// Whether the dependency scanner invocation should resolve imports
   /// to filesystem modules in parallel.
   bool ParallelDependencyScan = true;
+
+  /// Whether the dependency scanning worker should share a single Clang
+  /// compiler instance across named module dependency queries.
+  bool ShareClangCompilerInstance = true;
 
   /// When performing an incremental build, ensure that cross-module incremental
   /// build metadata is available in any swift modules emitted by this frontend
@@ -501,6 +518,10 @@ public:
   /// header.
   std::optional<ClangHeaderExposeBehavior> ClangHeaderExposedDecls;
 
+  // Include declarations that are at least as visible as the acces specified
+  // by -emit-clang-header-min-access
+  std::optional<AccessLevel> ClangHeaderMinAccess;
+
   struct ClangHeaderExposedImportedModule {
     std::string moduleName;
     std::string headerName;
@@ -536,12 +557,12 @@ public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Dependency Scanning hash.
   llvm::hash_code getModuleScanningHashComponents() const {
-    return hash_combine(ModuleName,
-                        ModuleABIName,
-                        ModuleLinkName,
-                        ImplicitObjCHeaderPath,
-                        PrebuiltModuleCachePath,
-                        UserModuleVersion);
+    return hash_combine(
+        ModuleName, ModuleABIName, ModuleLinkName, ImplicitObjCHeaderPath,
+        PrebuiltModuleCachePath,
+        llvm::hash_combine_range(ImplicitImportModuleNames.begin(),
+                                 ImplicitImportModuleNames.end()),
+        UserModuleVersion);
   }
 
   StringRef determineFallbackModuleName() const;

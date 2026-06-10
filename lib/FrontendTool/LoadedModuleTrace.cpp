@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Dependencies.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginRegistry.h"
 #include "swift/AST/SourceFile.h"
@@ -25,6 +25,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/FrontendTool/Dependencies.h"
 #include "swift/IDE/SourceEntityWalker.h"
 
 #include "clang/AST/DeclObjC.h"
@@ -48,7 +49,7 @@ using namespace swift;
 
 namespace {
 struct SwiftModuleTraceInfo {
-  Identifier Name;
+  std::string Name;
   std::string Path;
   bool IsImportedDirectly;
   bool SupportsLibraryEvolution;
@@ -56,14 +57,14 @@ struct SwiftModuleTraceInfo {
 };
 
 struct SwiftMacroTraceInfo {
-  Identifier Name;
+  std::string Name;
   std::string Path;
 };
 
 struct LoadedModuleTraceFormat {
   static const unsigned CurrentVersion = 2;
   unsigned Version;
-  Identifier Name;
+  std::string Name;
   std::string Arch;
   std::string LanguageMode;
   std::vector<StringRef> EnabledLanguageFeatures;
@@ -77,8 +78,7 @@ namespace swift {
 namespace json {
 template <> struct ObjectTraits<SwiftModuleTraceInfo> {
   static void mapping(Output &out, SwiftModuleTraceInfo &contents) {
-    StringRef name = contents.Name.str();
-    out.mapRequired("name", name);
+    out.mapRequired("name", contents.Name);
     out.mapRequired("path", contents.Path);
     out.mapRequired("isImportedDirectly", contents.IsImportedDirectly);
     out.mapRequired("supportsLibraryEvolution",
@@ -91,8 +91,7 @@ template <> struct ObjectTraits<SwiftModuleTraceInfo> {
 template <>
 struct ObjectTraits<SwiftMacroTraceInfo> {
   static void mapping(Output &out, SwiftMacroTraceInfo &contents) {
-    StringRef name = contents.Name.str();
-    out.mapRequired("name", name);
+    out.mapRequired("name", contents.Name);
     out.mapRequired("path", contents.Path);
   }
 };
@@ -104,8 +103,7 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
   static void mapping(Output &out, LoadedModuleTraceFormat &contents) {
     out.mapRequired("version", contents.Version);
 
-    StringRef name = contents.Name.str();
-    out.mapRequired("name", name);
+    out.mapRequired("name", contents.Name);
 
     out.mapRequired("arch", contents.Arch);
 
@@ -642,7 +640,7 @@ static void computeSwiftModuleTraceInfo(
 
       traceInfo.push_back(
           {/*Name=*/
-           depMod->getName(),
+           depMod->getName().str().str(),
            /*Path=*/
            realDepPath.str(),
            // TODO: There is an edge case which is not handled here.
@@ -655,8 +653,7 @@ static void computeSwiftModuleTraceInfo(
            /*IsImportedDirectly=*/
            isImportedDirectly,
            /*SupportsLibraryEvolution=*/
-           depMod->isResilient(),
-           depMod->strictMemorySafety()});
+           depMod->isResilient(), depMod->strictMemorySafety()});
       buffer.clear();
 
       continue;
@@ -718,7 +715,7 @@ static void
 computeSwiftMacroTraceInfo(ASTContext &ctx, const DependencyTracker &depTracker,
                            std::vector<SwiftMacroTraceInfo> &traceInfo) {
   for (const auto &macroDep : depTracker.getMacroPluginDependencies()) {
-    traceInfo.push_back({macroDep.moduleName, macroDep.path});
+    traceInfo.push_back({macroDep.moduleName.str().str(), macroDep.path});
   }
 
   // Again, almost a re-implementation of reversePathSortedFilenames :(.
@@ -730,7 +727,7 @@ computeSwiftMacroTraceInfo(ASTContext &ctx, const DependencyTracker &depTracker,
       });
 }
 
-static void computeEnabledFeatures(ASTContext &ctx,
+static void computeEnabledFeatures(const ASTContext &ctx,
                                    std::vector<StringRef> &enabledFeatures) {
   struct FeatureAndName {
     Feature feature;
@@ -739,12 +736,12 @@ static void computeEnabledFeatures(ASTContext &ctx,
 
   static const FeatureAndName features[] = {
 #define FEATURE_ENTRY(FeatureName) {Feature::FeatureName, #FeatureName},
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Version)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                     \
   FEATURE_ENTRY(FeatureName)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version)                       \
+#define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)                  \
   FEATURE_ENTRY(FeatureName)
-#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Version)              \
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)          \
   FEATURE_ENTRY(FeatureName)
 #include "swift/Basic/Features.def"
   };
@@ -760,6 +757,60 @@ static void computeEnabledFeatures(ASTContext &ctx,
             [](const StringRef &lhs, const StringRef &rhs) -> bool {
               return lhs.compare(rhs) < 0;
             });
+}
+
+static bool
+writeLoadedModuleOutput(const ASTContext &ctxt, StringRef mainModuleName,
+                        bool isStrictMemorySafety,
+                        const std::vector<SwiftModuleTraceInfo> &swiftModules,
+                        const std::vector<SwiftMacroTraceInfo> &swiftMacros,
+                        StringRef loadedModuleTracePath) {
+  std::vector<StringRef> enabledFeatures;
+  computeEnabledFeatures(ctxt, enabledFeatures);
+
+  LoadedModuleTraceFormat trace = {
+      /*version=*/LoadedModuleTraceFormat::CurrentVersion,
+      mainModuleName.str(),
+      /*arch=*/ctxt.LangOpts.Target.getArchName().str(),
+      ctxt.LangOpts.EffectiveLanguageVersion.asAPINotesVersionString(),
+      enabledFeatures,
+      isStrictMemorySafety,
+      swiftModules,
+      swiftMacros};
+
+  // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
+  // so first write to memory and then dump the buffer to the trace file.
+  std::string stringBuffer;
+  {
+    llvm::raw_string_ostream memoryBuffer(stringBuffer);
+    json::Output jsonOutput(memoryBuffer, /*UserInfo=*/{},
+                            /*PrettyPrint=*/false);
+    json::jsonize(jsonOutput, trace, /*Required=*/true);
+  }
+  stringBuffer += "\n";
+
+  // Write output via atomic append.
+  llvm::vfs::OutputConfig config;
+  config.setAppend().setAtomicWrite();
+  auto outputFile =
+      ctxt.getOutputBackend().createFile(loadedModuleTracePath, config);
+
+  if (!outputFile) {
+    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                        loadedModuleTracePath,
+                        toString(outputFile.takeError()));
+    return true;
+  }
+
+  *outputFile << stringBuffer;
+
+  if (auto err = outputFile->keep()) {
+    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                        loadedModuleTracePath, toString(std::move(err)));
+    return true;
+  }
+
+  return false;
 }
 
 // [NOTE: Bailing-vs-crashing-in-trace-emission] There are certain edge cases
@@ -778,6 +829,10 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                                           DependencyTracker *depTracker,
                                           const FrontendOptions &opts,
                                           const InputFile &input) {
+  // Scan dependencies emit the trace from module dependency cache.
+  if (opts.RequestedAction == FrontendOptions::ActionType::ScanDependencies)
+    return false;
+
   ASTContext &ctxt = mainModule->getASTContext();
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
@@ -824,51 +879,87 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   std::vector<SwiftMacroTraceInfo> swiftMacros;
   computeSwiftMacroTraceInfo(ctxt, *depTracker, swiftMacros);
 
-  std::vector<StringRef> enabledFeatures;
-  computeEnabledFeatures(ctxt, enabledFeatures);
+  return writeLoadedModuleOutput(ctxt, mainModule->getName().str(),
+                                 mainModule->strictMemorySafety(), swiftModules,
+                                 swiftMacros, loadedModuleTracePath);
+}
 
-  LoadedModuleTraceFormat trace = {
-      /*version=*/LoadedModuleTraceFormat::CurrentVersion,
-      /*name=*/mainModule->getName(),
-      /*arch=*/ctxt.LangOpts.Target.getArchName().str(),
-      ctxt.LangOpts.EffectiveLanguageVersion.asAPINotesVersionString(),
-      enabledFeatures,
-      mainModule ? mainModule->strictMemorySafety() : false,
-      swiftModules,
-      swiftMacros};
+bool swift::emitLoadedModuleTraceIfNeeded(const ModuleDependencyID &mainModule,
+                                          const ModuleDependenciesCache &cache,
+                                          const ASTContext &ctxt,
+                                          const FrontendOptions &opts) {
+  // Compute the output path.
+  auto loadedModuleTracePath = opts.InputsAndOutputs.firstInputProducingOutput()
+                                   .getLoadedModuleTracePath();
+  if (loadedModuleTracePath.empty())
+    return false;
 
-  // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
-  // so first write to memory and then dump the buffer to the trace file.
-  std::string stringBuffer;
-  {
-    llvm::raw_string_ostream memoryBuffer(stringBuffer);
-    json::Output jsonOutput(memoryBuffer, /*UserInfo=*/{},
-                            /*PrettyPrint=*/false);
-    json::jsonize(jsonOutput, trace, /*Required=*/true);
-  }
-  stringBuffer += "\n";
-
-  // Write output via atomic append.
-  llvm::vfs::OutputConfig config;
-  config.setAppend().setAtomicWrite();
-  auto outputFile =
-      ctxt.getOutputBackend().createFile(loadedModuleTracePath, config);
-
-  if (!outputFile) {
-    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                        loadedModuleTracePath,
-                        toString(outputFile.takeError()));
-    return true;
+  // compute the full set of swift module dependencies.
+  auto *info = cache.findKnownDependency(mainModule).getAsSwiftSourceModule();
+  assert(info && "main module is not source module");
+  std::set<ModuleDependencyID> directDeps;
+  for (auto &dep : cache.getAllSwiftDependencies(mainModule)) {
+    if (llvm::find(info->dependencyOnlyImports, dep.ModuleName) ==
+        info->dependencyOnlyImports.end())
+      directDeps.insert(dep);
   }
 
-  *outputFile << stringBuffer;
+  std::set<ModuleDependencyID> allLoadedModules;
+  SmallVector<ModuleDependencyID> workList(directDeps.begin(),
+                                           directDeps.end());
+  while (!workList.empty()) {
+    ModuleDependencyID mod = workList.back();
+    workList.pop_back();
 
-  if (auto err = outputFile->keep()) {
-    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                        loadedModuleTracePath, toString(std::move(err)));
-    return true;
+    if (!allLoadedModules.insert(mod).second)
+      continue; // already visited.
+
+    if (mod.Kind == ModuleDependencyKind::Clang)
+      continue; // ignore clang dependencies.
+
+    auto deps = cache.getAllSwiftDependencies(mod);
+    workList.append(deps.begin(), deps.end());
   }
-  return false;
+
+  auto isDirectImport = [&](const ModuleDependencyID &mod) {
+    return llvm::find(directDeps, mod) != directDeps.end();
+  };
+
+  auto realPath = [&](const std::string &path) {
+    SmallString<128> realPath;
+    if (ctxt.SourceMgr.getFileSystem()->getRealPath(path, realPath))
+      return path;
+    return realPath.str().str();
+  };
+
+  std::vector<SwiftModuleTraceInfo> swiftModules;
+  for (auto &mod : allLoadedModules) {
+    // Record swift module dependencies and ignore other dependencies.
+    auto &info = cache.findKnownDependency(mod);
+    if (auto *binary = info.getAsSwiftBinaryModule())
+      swiftModules.push_back({mod.ModuleName,
+                              realPath(binary->getDefiningModulePath()),
+                              isDirectImport(mod), binary->isResilient,
+                              binary->isStrictMemorySafety});
+    else if (auto *textual = info.getAsSwiftInterfaceModule())
+      swiftModules.push_back(
+          {mod.ModuleName, realPath(textual->swiftInterfaceFile),
+           isDirectImport(mod),
+           /*isResilient=*/true, textual->isStrictMemorySafety});
+  }
+
+  std::vector<SwiftMacroTraceInfo> swiftMacros;
+  for (auto &macro : info->macroDependencies) {
+    swiftMacros.push_back(
+        {macro.first, macro.second.LibraryPath.empty()
+                          ? realPath(macro.second.ExecutablePath)
+                          : realPath(macro.second.LibraryPath)});
+  }
+
+  return writeLoadedModuleOutput(
+      ctxt, mainModule.ModuleName,
+      ctxt.LangOpts.hasFeature(Feature::StrictMemorySafety), swiftModules,
+      swiftMacros, loadedModuleTracePath);
 }
 
 class ObjcMethodReferenceCollector: public SourceEntityWalker {

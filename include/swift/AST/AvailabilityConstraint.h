@@ -175,6 +175,12 @@ public:
   /// on the reason for the constraint.
   AvailabilityDomainAndRange getDomainAndRange(const ASTContext &ctx) const;
 
+  /// Returns the domain and range to use in availability fix-its. This may be
+  /// different than the value returned by `getDomainAndRange()` depending on
+  /// which domain the underlying availability attribute was written with.
+  AvailabilityDomainAndRange
+  getFixItDomainAndRange(const ASTContext &ctx) const;
+
   /// Some availability constraints are active for type-checking but cannot
   /// be translated directly into an `if #available(...)` runtime query.
   bool isActiveForRuntimeQueries(const ASTContext &ctx) const;

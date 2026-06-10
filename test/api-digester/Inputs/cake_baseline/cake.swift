@@ -234,3 +234,5 @@ open class AddingNewDesignatedInit {
 }
 
 public func addingAnInverse<T>(_ t: borrowing T) {}
+
+public func addingAnInversePreInverse<T>(_ t: borrowing T) {}

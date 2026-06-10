@@ -52,10 +52,10 @@ extension Int {
 public struct StructNew {
   var _i: Int
   public var i: Int {
-    read {
+    yielding borrow {
       yield _i
     }
-    modify {
+    yielding mutate {
       yield &_i
     }
   }
@@ -111,10 +111,10 @@ public func modifyNewNoninlinableNew(_ n: inout StructNew) {
 public struct StructOld {
   var _i: Int
   public var i: Int {
-    read {
+    yielding borrow {
       yield _i
     }
-    modify {
+    yielding mutate {
       yield &_i
     }
   }
@@ -229,10 +229,10 @@ open class BaseClassOld {
   }
   var _i: Int
   open var i: Int {
-    read {
+    yielding borrow {
       yield _i
     }
-    modify {
+    yielding mutate {
       yield &_i
     }
   }
@@ -371,10 +371,10 @@ public class DerivedOldFromBaseClassOld : BaseClassOld {
   }
   var _j: Int
   override public var i: Int {
-    read {
+    yielding borrow {
       yield _j
     }
-    modify {
+    yielding mutate {
       yield &_j
     }
   }
@@ -383,8 +383,8 @@ public class DerivedOldFromBaseClassOld : BaseClassOld {
 // CHECK-LABEL: sil_vtable [serialized] DerivedOldFromBaseClassOld {
 // CHECK-NEXT:    #BaseClassOld.init!allocator
 // CHECK-NEXT:    #BaseClassOld.i!read
-// CHECK-NEXT:    #BaseClassOld.i!read2
+// CHECK-NEXT:    #BaseClassOld.i!yielding_borrow
 // CHECK-NEXT:    #BaseClassOld.i!setter
 // CHECK-NEXT:    #BaseClassOld.i!modify
-// CHECK-NEXT:    #BaseClassOld.i!modify2
+// CHECK-NEXT:    #BaseClassOld.i!yielding_mutate
 // CHECK:       }

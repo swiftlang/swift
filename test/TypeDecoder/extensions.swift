@@ -58,3 +58,19 @@ extension Generic where T: AnyObject {
 // DEMANGLE-DECL: $s10extensions7GenericVAARlzClE18NestedViaAnyObjectV
 // CHECK-DECL: extensions.(file).Generic extension.NestedViaAnyObject
 
+// Invertible Constraints
+
+struct GenericNonCopyable<T: ~Copyable> {}
+protocol ProtoNonCopyable: ~Copyable {}
+
+extension GenericNonCopyable where T: ProtoNonCopyable/*, T: Copyable*/ {
+  struct Nested {}
+}
+
+struct NonCopyableType: ProtoNonCopyable {}
+
+// DEMANGLE-DECL: $s10extensions18GenericNonCopyableVA2A05ProtocD0RzlE6NestedV
+// CHECK-DECL: extensions.(file).GenericNonCopyable extension.Nested
+
+// DEMANGLE-TYPE: $s10extensions18GenericNonCopyableVA2A05ProtocD0RzlE6NestedVyAA0cD4TypeV_GD
+// CHECK-TYPE: GenericNonCopyable<NonCopyableType>.Nested

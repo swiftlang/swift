@@ -301,6 +301,8 @@ public:
       return &forwardingInst->getOperandRef(TuplePackExtractInst::TupleOperand);
     case SILInstructionKind::BorrowedFromInst:
       return &forwardingInst->getOperandRef(0);
+    case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
+      return &forwardingInst->getOperandRef(0);
     default:
       int numRealOperands = forwardingInst->getNumRealOperands();
       if (numRealOperands == 0) {
@@ -328,6 +330,25 @@ public:
     return forwardingInst->getAllOperands();
   }
 
+  /// Return true if this forwarding operation destructures an owned operand,
+  /// extracting sub-components from an aggregate or enum value.
+  bool isOwnedValueDestructure() const {
+    if (auto *op = getSingleForwardingOperand()) {
+      if (op->get()->getOwnershipKind() != OwnershipKind::Owned) {
+        return false;
+      }
+    }
+    switch (forwardingInst->getKind()) {
+    case SILInstructionKind::DestructureStructInst:
+    case SILInstructionKind::DestructureTupleInst:
+    case SILInstructionKind::UncheckedEnumDataInst:
+    case SILInstructionKind::UncheckedValueCastInst:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   bool canForwardOwnedCompatibleValuesOnly() {
     switch (forwardingInst->getKind()) {
     case SILInstructionKind::MarkUninitializedInst:
@@ -344,6 +365,7 @@ public:
     case SILInstructionKind::StructExtractInst:
     case SILInstructionKind::DifferentiableFunctionExtractInst:
     case SILInstructionKind::LinearFunctionExtractInst:
+    case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
       return true;
     default:
       return false;
@@ -352,6 +374,8 @@ public:
 
   /// Return true if the forwarded value has the same representation. If true,
   /// then the result can be mapped to the same storage without a move or copy.
+  ///
+  /// See ForwardingInstruction.swift preservesRepresentation().
   bool hasSameRepresentation() const;
 
   /// Return true if the forwarded value is address-only either before or after
@@ -391,10 +415,19 @@ struct FixedStorageSemanticsCall {
     }
   }
 
+  bool hasSelf() const { return apply->hasSelfArgument(); }
+
+  SILValue getSelf() const { return apply->getSelfArgument(); }
+
+  SILValue getIndex() const { return apply->getArgument(0); }
+
+  Operand &getIndexOperand() const { return apply->getArgumentRef(0); }
+
   FixedStorageSemanticsCallKind getKind() const { return kind; }
   explicit operator bool() const { return apply != nullptr; }
-  const ApplyInst *operator->() const { return apply; }
-  ApplyInst *operator->() { return apply; }
+  const ApplyInst* operator->() const { return apply; }
+  ApplyInst* operator->() { return apply; }
+  ApplyInst* operator*() const { return apply; }
 };
 
 bool isFixedStorageSemanticsCallKind(SILFunction *function);

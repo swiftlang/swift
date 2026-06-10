@@ -236,7 +236,7 @@ extension ArraySlice {
   @inlinable
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
-    return unsafe _buffer.subscriptBaseAddress + index
+    return unsafe _buffer.getSubscriptBaseAddress() + index
   }
 }
 
@@ -555,7 +555,7 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
     _modify {
       _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_native(index)
-      let address = unsafe _buffer.subscriptBaseAddress + index
+      let address = unsafe _buffer.getSubscriptBaseAddress() + index
       defer { _endMutation() }
       yield unsafe &address.pointee
     }
@@ -1100,27 +1100,29 @@ extension ArraySlice: RangeReplaceableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return unsafe try withUnsafeMutableBufferPointer {
+    return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(&bufferPointer)
     }
   }
 
   @inlinable
+  @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return unsafe try withUnsafeMutableBufferPointer {
+    return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(&bufferPointer)
     }
   }
 
   @inlinable
+  @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return unsafe try withUnsafeBufferPointer {
+    return try withUnsafeBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(bufferPointer)
     }
@@ -1178,6 +1180,7 @@ extension ArraySlice {
   // for ABI reasons.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
+  @safe
   internal func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
@@ -1214,6 +1217,7 @@ extension ArraySlice {
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @safe
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -1224,10 +1228,15 @@ extension ArraySlice {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension ArraySlice {
+  /// A span over the elements of this array slice.
+  ///
+  /// - Returns: A `Span` over the elements of this array.
+  ///
+  /// - Complexity: O(1)
   @available(SwiftCompatibilitySpan 5.0, *)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
       let span = unsafe Span(_unsafeStart: pointer, count: count)
@@ -1246,7 +1255,7 @@ extension ArraySlice {
   mutating func __abi_withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    return try unsafe withUnsafeMutableBufferPointer(body)
+    return try withUnsafeMutableBufferPointer(body)
   }
 
   /// Calls the given closure with a pointer to the array's mutable contiguous
@@ -1291,6 +1300,7 @@ extension ArraySlice {
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
   // once we allocate noescape closures on the stack.
+  @safe
   public mutating func withUnsafeMutableBufferPointer<R, E>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -1320,9 +1330,15 @@ extension ArraySlice {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension ArraySlice {
+  /// A mutable span over the elements of this array slice.
+  ///
+  /// - Returns: A `MutableSpan` over the elements of this array.
+  ///
+  /// - Complexity: O(1) when the array's storage is uniquely referenced,
+  ///   O(*n*) otherwise.
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     mutating get {
       // _makeMutableAndUnique*() inserts begin_cow_mutation.
       // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.
@@ -1533,10 +1549,11 @@ extension ArraySlice {
   ///   execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
+  @safe
   public mutating func withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try unsafe self.withUnsafeMutableBufferPointer {
+    return try self.withUnsafeMutableBufferPointer {
       return try unsafe body(UnsafeMutableRawBufferPointer($0))
     }
   }
@@ -1569,10 +1586,11 @@ extension ArraySlice {
   ///   argument is valid only for the duration of the closure's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
+  @safe
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try unsafe self.withUnsafeBufferPointer {
+    return try self.withUnsafeBufferPointer {
       try unsafe body(UnsafeRawBufferPointer($0))
     }
   }
@@ -1607,3 +1625,44 @@ extension ArraySlice {
   }
 }
 #endif
+
+extension ArraySlice {
+  /// Returns a boolean value indicating whether this array is identical to
+  /// `other`.
+  ///
+  /// Two array values are identical if there is no way to distinguish between
+  /// them.
+  /// 
+  /// For any values `a`, `b`, and `c`:
+  ///
+  /// - `a.isTriviallyIdentical(to: a)` is always `true`. (Reflexivity)
+  /// - `a.isTriviallyIdentical(to: b)` implies `b.isTriviallyIdentical(to: a)`.
+  /// (Symmetry)
+  /// - If `a.isTriviallyIdentical(to: b)` and `b.isTriviallyIdentical(to: c)`
+  /// are both `true`, then `a.isTriviallyIdentical(to: c)` is also `true`.
+  /// (Transitivity)
+  /// - If `a` and `b` are `Equatable`, then `a.isTriviallyIdentical(b)` implies
+  /// `a == b`
+  ///   - `a == b` does not imply `a.isTriviallyIdentical(b)`
+  ///
+  /// Values produced by copying the same value, with no intervening mutations,
+  /// will compare identical:
+  ///
+  /// ```swift
+  /// let d = c
+  /// print(c.isTriviallyIdentical(to: d))
+  /// // Prints true
+  /// ```
+  ///
+  /// Comparing arrays this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying
+  /// array storage object. Therefore, identical arrays are guaranteed to
+  /// compare equal with `==`, but not all equal arrays are considered
+  /// identical.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._buffer.isTriviallyIdentical(to: other._buffer)
+  }
+}

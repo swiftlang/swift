@@ -25,10 +25,14 @@ using namespace swift;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
-extern "C" SWIFT_CC(swift)
+#if !SWIFT_CONCURRENCY_EMBEDDED || !SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+// When using the Embedded Swift Platform Abstraction Layer, _swift_exit is
+// provided by the platform, so we don't define it here.
+extern "C"
 void _swift_exit(int result) {
   exit(result);
 }
+#endif
 
 extern "C" SWIFT_CC(swift)
 void swift_createDefaultExecutorsOnce() {

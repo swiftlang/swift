@@ -91,6 +91,7 @@ import Swift
 %   ],
 %   [ # PARAMS
 %     'priority: TaskPriority? = nil',
+%     # detach does not support typed throws, it's a legacy api for compat only
 %     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
 %   ]),
 %   # ==== Legacy API: runDetached
@@ -105,6 +106,7 @@ import Swift
 %   ],
 %   [ # PARAMS
 %     'priority: TaskPriority? = nil',
+%     # runDetached does not support typed throws, it's a legacy api for compat only
 %     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
 %   ]),
 %   # ==== Legacy API: asyncDetached
@@ -119,6 +121,7 @@ import Swift
 %   ],
 %   [ # PARAMS
 %     'priority: TaskPriority? = nil',
+%     # asyncDetached does not support typed throws, it's a legacy api for compat only
 %     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
 %   ]),
 %   # ==== Legacy API: async
@@ -133,6 +136,7 @@ import Swift
 %   ],
 %   [ # PARAMS
 %     'priority: TaskPriority? = nil',
+%     # async does not support typed throws, it's a legacy api for compat only
 %     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
 %   ]),
 % ]:
@@ -286,7 +290,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
 % end # IS_DEPRECATED
   ${"\n  ".join(adjust_availability(ALL_AVAILABILITY))}
   @discardableResult
-  public ${METHOD_VARIANT}( // Task ${METHOD_VARIANT}
+  public ${METHOD_VARIANT}(
     ${",\n    ".join(adjust_params_for_kind(PARAMS))}
   ) ${ARROW_RETURN_TYPE}{
 
@@ -313,7 +317,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
       % if HAS_TASK_EXECUTOR:
       #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
       task =
-        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             % if HAS_ISOLATED_ANY:
@@ -323,14 +327,14 @@ extension Task where Failure == ${FAILURE_TYPE} {
             initialTaskExecutorConsuming: taskExecutor,
             % end
             taskName: nameBytes.baseAddress!._rawValue,
-            operation: operation).0
+            operation: operation).0 // Task ${METHOD_VARIANT}
         }
       #else // no $BuiltinCreateAsyncTaskOwnedTaskExecutor
       // legacy branch for the non-consuming task executor
       let executorBuiltin: Builtin.Executor =
         taskExecutor.asUnownedTaskExecutor().executor
       task =
-        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             % if HAS_ISOLATED_ANY:
@@ -338,19 +342,19 @@ extension Task where Failure == ${FAILURE_TYPE} {
             % end
             initialTaskExecutor: executorBuiltin,
             taskName: nameBytes.baseAddress!._rawValue,
-            operation: operation).0
+            operation: operation).0 // Task ${METHOD_VARIANT}
         }
       #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
       % else: # if no TASK_EXECUTOR
       task =
-        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             % if HAS_ISOLATED_ANY:
             initialSerialExecutor: builtinSerialExecutor,
             % end
             taskName: nameBytes.baseAddress!._rawValue,
-            operation: operation).0
+            operation: operation).0 // Task ${METHOD_VARIANT}
         }
       % end # if no HAS_TASK_EXECUTOR
     } // let name
@@ -368,7 +372,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
         initialSerialExecutor: builtinSerialExecutor,
         % end
         initialTaskExecutorConsuming: taskExecutor,
-        operation: operation).0
+        operation: operation).0 // Task ${METHOD_VARIANT}
       #else
       // legacy branch for the non-consuming task executor
       let executorBuiltin: Builtin.Executor =
@@ -380,7 +384,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
         initialSerialExecutor: builtinSerialExecutor,
         % end
         initialTaskExecutor: executorBuiltin,
-        operation: operation).0
+        operation: operation).0 // Task ${METHOD_VARIANT}
       #endif
     }
 % end # HAS_TASK_EXECUTOR
@@ -392,7 +396,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
       % if HAS_ISOLATED_ANY:
       initialSerialExecutor: builtinSerialExecutor,
       % end
-      operation: operation).0
+      operation: operation).0 // Task ${METHOD_VARIANT}
     }
 
 % if IS_INIT:

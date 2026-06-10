@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && (os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS))
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && os(anyAppleOS)
 
 import Swift
 
-@available(StdlibDeploymentTarget 6.2, *)
+@_spi(ExperimentalCustomExecutors)
+@available(StdlibDeploymentTarget 6.3, *)
 public struct PlatformExecutorFactory: ExecutorFactory {
   public static var mainExecutor: any MainExecutor {
     if CoreFoundation.isPresent {
@@ -33,4 +34,4 @@ public struct PlatformExecutorFactory: ExecutorFactory {
   }
 }
 
-#endif // os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+#endif // os(anyAppleOS)

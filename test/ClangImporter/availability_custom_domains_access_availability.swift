@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify \
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated \
 // RUN:   -import-objc-header %S/Inputs/availability_domains_bridging_header.h \
 // RUN:   -I %S/../Inputs/custom-modules/availability-domains \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -experimental-spi-only-imports -parse-as-library -swift-version 4 \
 // RUN:   %s
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify \
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated \
 // RUN:   -import-objc-header %S/Inputs/availability_domains_bridging_header.h \
 // RUN:   -I %S/../Inputs/custom-modules/availability-domains \
 // RUN:   -enable-experimental-feature CustomAvailability \
@@ -354,7 +354,7 @@ func testPermanentlyUnavailable() { }
 @available(*, deprecated)
 extension PublicGenericStruct {
   @available(Aral)
-  // expected-warning@-1 {{'@available' has no effect because 'Aral' is always available}}{{3-19=}}
+  // expected-warning@-1 {{'@available' has no effect because 'Aral' is always available}}{{1-+1:1=}}
   func testPermanentlyAvailableInDeprecatedExtension() { }
 
   @available(Aral, deprecated)
@@ -382,10 +382,11 @@ extension PublicGenericStruct {
 }
 
 func testUnnecessaryIfAvailableStmt() {
+  // expected-warning@+3 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
+  // expected-warning@+1 {{'if' condition is always true}}{{3-+2:4=_ = 0}}
   if #available(Aral) {
-    // expected-warning@-1 {{availability domain 'Aral' is deprecated}}
-    // expected-warning@-2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
-    // expected-warning@-3 {{'if' condition is always true}}{{none}}
+    _ = 0
   }
 }
 
@@ -418,10 +419,10 @@ func testUnnecessaryIfUnavailableCompoundStmt() {
 }
 
 func testUnnecessaryGuardAvailableStmt() {
+  // expected-warning@+3 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
+  // expected-warning@+1 {{'guard' condition is always true}}{{1-+3:1=}}
   guard #available(Aral) else {
-    // expected-warning@-1 {{availability domain 'Aral' is deprecated}}
-    // expected-warning@-2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
-    // expected-warning@-3 {{'guard' condition is always true}}{{none}}
     return
   }
 }
@@ -440,5 +441,16 @@ func testUnnecessaryWhileAvailableStmt() {
     // expected-warning@-2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
     // expected-warning@-3 {{'while' condition is always true}}{{none}}
     break
+  }
+}
+
+func testUnnecessaryIfAvailableStmtWithElse() {
+  // expected-warning@+3 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
+  // expected-warning@+1 {{'if' condition is always true}}{{3-+4:4=_ = 0}}
+  if #available(Aral) {
+    _ = 0
+  } else {
+    _ = 1
   }
 }

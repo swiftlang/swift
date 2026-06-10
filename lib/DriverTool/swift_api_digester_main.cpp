@@ -38,7 +38,6 @@
 #include "swift/Option/Options.h"
 #include "swift/Parse/ParseVersion.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -675,7 +674,17 @@ public:
         !D->getIntroducingVersion().hasOSAvailability() &&
         !D->hasDeclAttribute(DeclAttrKind::AlwaysEmitIntoClient) &&
         !D->hasDeclAttribute(DeclAttrKind::Marker)) {
-      D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
+      // Check if this SPI group should ignore new API warnings
+      bool shouldIgnoreNewAPI = false;
+      for(auto spi: D->getSPIGroups()) {
+        if (Ctx.getOpts().SPIGroupNamesToIgnoreNewAPI.contains(spi)) {
+          shouldIgnoreNewAPI = true;
+          break;
+        }
+      }
+      if (!shouldIgnoreNewAPI) {
+        D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
+      }
     }
   }
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
@@ -775,11 +784,14 @@ public:
       }
       // Diagnose a protocol conformance has been removed.
       if (auto *Conf = dyn_cast<SDKNodeConformance>(Left)) {
-        auto *TD = Conf->getNominalTypeDecl();
-        TD->emitDiag(SourceLoc(),
-                     diag::conformance_removed,
-                     Conf->getName(),
-                     TD->isProtocol());
+        // Removing conformance to a marker protocol does not affect ABI
+        if (!(Ctx.checkingABI() && Conf->isMarkerProtocol())) {
+          auto *TD = Conf->getNominalTypeDecl();
+          TD->emitDiag(SourceLoc(),
+                       diag::conformance_removed,
+                       Conf->getName(),
+                       TD->isProtocol());
+        }
       }
       if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Left)) {
         diagnoseRemovedDecl(Acc);
@@ -2189,6 +2201,8 @@ static StringRef getBaselineFilename(llvm::Triple Triple) {
     return "windows.json";
   else if (Triple.isXROS())
     return "xros.json";
+  else if (Triple.isAppleFirmware())
+    return "firmware.json";
   else {
     llvm::errs() << "Unsupported triple target\n";
     exit(1);
@@ -2274,6 +2288,7 @@ private:
   std::string ResourceDir;
   std::string ModuleCachePath;
   bool DisableFailOnError;
+  std::vector<std::string> ClangImporterArgs;
 
 public:
   SwiftAPIDigesterInvocation(const std::string &ExecPath)
@@ -2363,9 +2378,8 @@ public:
     SDK = ParsedArgs.getLastArgValue(OPT_sdk).str();
     BaselineSDK = ParsedArgs.getLastArgValue(OPT_bsdk).str();
     Triple = ParsedArgs.getLastArgValue(OPT_target).str();
-    SwiftVersion = ParsedArgs.getLastArgValue(OPT_swift_version).str();
+    SwiftVersion = ParsedArgs.getLastArgValue(OPT_language_mode).str();
     SystemFrameworkPaths = ParsedArgs.getAllArgValues(OPT_Fsystem);
-    llvm::append_range(SystemFrameworkPaths, ParsedArgs.getAllArgValues(OPT_iframework));
     BaselineFrameworkPaths = ParsedArgs.getAllArgValues(OPT_BF);
     FrameworkPaths = ParsedArgs.getAllArgValues(OPT_F);
     SystemModuleImportPaths = ParsedArgs.getAllArgValues(OPT_Isystem);
@@ -2377,6 +2391,7 @@ public:
         ParsedArgs.getAllArgValues(OPT_use_interface_for_module);
     ResourceDir = ParsedArgs.getLastArgValue(OPT_resource_dir).str();
     ModuleCachePath = ParsedArgs.getLastArgValue(OPT_module_cache_path).str();
+    ClangImporterArgs = ParsedArgs.getAllArgValues(OPT_Xcc);
     DebugMapping = ParsedArgs.hasArg(OPT_debug_mapping);
     DisableFailOnError = ParsedArgs.hasArg(OPT_disable_fail_on_error);
 
@@ -2404,6 +2419,8 @@ public:
       CheckerOpts.ToolArgs.push_back(Arg);
     for(auto spi: ParsedArgs.getAllArgValues(OPT_ignore_spi_groups))
       CheckerOpts.SPIGroupNamesToIgnore.insert(spi);
+    for(auto spi: ParsedArgs.getAllArgValues(OPT_ignore_spi_groups_new_api))
+      CheckerOpts.SPIGroupNamesToIgnoreNewAPI.insert(spi);
     if (!SDK.empty()) {
       auto Ver = getSDKBuildVersion(SDK);
       if (!Ver.empty()) {
@@ -2457,6 +2474,11 @@ public:
     InitInvoke.getLangOptions().EnableObjCInterop =
         InitInvoke.getLangOptions().Target.isOSDarwin();
     InitInvoke.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+
+    // Pass -Xcc arguments to the Clang importer
+    for (const auto &arg : ClangImporterArgs) {
+      InitInvoke.getClangImporterOptions().ExtraArgs.push_back(arg);
+    }
 
     if (!SwiftVersion.empty()) {
       using version::Version;

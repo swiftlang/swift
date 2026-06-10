@@ -1,5 +1,10 @@
 #pragma once
 
+#define IMMORTAL_FRT                                                           \
+  __attribute__((swift_attr("import_reference")))                              \
+  __attribute__((swift_attr("retain:immortal")))                               \
+  __attribute__((swift_attr("release:immortal")))
+
 namespace NoAnnotations {
 
 struct RefCountedType {
@@ -8,9 +13,9 @@ struct RefCountedType {
 __attribute__((swift_attr("retain:retainRefCounted")))
 __attribute__((swift_attr("release:releaseRefCounted")));
 
-RefCountedType& getRefCountedByRef(); // expected-note {{'getRefCountedByRef()' is defined here}}
-RefCountedType& createRefCountedByRef(); // expected-note {{'createRefCountedByRef()' is defined here}}
-RefCountedType& copyRefCountedByRef(); // expected-note {{'copyRefCountedByRef()' is defined here}}   
+RefCountedType& getRefCountedByRef(); // expected-note {{annotate 'getRefCountedByRef()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
+RefCountedType& createRefCountedByRef(); // expected-note {{annotate 'createRefCountedByRef()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
+RefCountedType& copyRefCountedByRef(); // expected-note {{annotate 'copyRefCountedByRef()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
 
 } // namespace NoAnnotations
 
@@ -69,3 +74,19 @@ RefCountedType& getByRef();
 
 void retainBothRefCounted(BothAnnotations::RefCountedType* obj);
 void releaseBothRefCounted(BothAnnotations::RefCountedType* obj);
+
+struct ImmortalIntBox {
+  int value;
+
+  ImmortalIntBox(const ImmortalIntBox &) = delete;
+
+  ImmortalIntBox &builderPattern() { return *this; }
+} IMMORTAL_FRT;
+
+static ImmortalIntBox globalImmortalIntBox = {123};
+ImmortalIntBox &createImmortalIntBox() { return globalImmortalIntBox; }
+
+struct DerivedImmortalIntBox : ImmortalIntBox {};
+
+static DerivedImmortalIntBox globalDerivedImmortalIntBox = {456};
+DerivedImmortalIntBox &createDerivedImmortalIntBox() { return globalDerivedImmortalIntBox; }

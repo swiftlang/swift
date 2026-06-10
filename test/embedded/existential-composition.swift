@@ -22,6 +22,6 @@ func test(existential: any ClassBound & OtherProtocol) {
 @main
 struct Main {
   static func main() {
-    test(existential: MyClass()) // expected-error {{cannot use a value of protocol type 'any OtherProtocol' in embedded Swift}}
+    test(existential: MyClass())
   }
 }

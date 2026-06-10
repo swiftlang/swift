@@ -27,9 +27,21 @@ public enum _SwiftifyInfo {
     /// Corresponds to the C `__sized_by(size)` attribute.
     /// Parameter pointer: index of pointer in function parameter list. Must be of type
     /// `Unsafe[Mutable]RawPointer[?]`, i.e. not an `UnsafePointer<T>`.
-    /// Parameter count: string containing valid Swift syntax containing the size of the buffer,
+    /// Parameter size: string containing valid Swift syntax containing the size of the buffer,
     /// in bytes.
     case sizedBy(pointer: _SwiftifyExpr, size: String)
+    /// Corresponds to the C `__counted_by_or_null(count)` attribute.
+    /// Parameter pointer: index of pointer in function parameter list. Must be of type
+    /// `Unsafe[Mutable]Pointer<T>[?]`, i.e. not an `UnsafeRawPointer`.
+    /// Parameter count: string containing valid Swift syntax containing the number of elements in
+    /// the buffer.
+    case countedByOrNull(pointer: _SwiftifyExpr, count: String)
+    /// Corresponds to the C `__sized_by_or_null(size)` attribute.
+    /// Parameter pointer: index of pointer in function parameter list. Must be of type
+    /// `Unsafe[Mutable]RawPointer[?]`, i.e. not an `UnsafePointer<T>`.
+    /// Parameter size: string containing valid Swift syntax containing the size of the buffer,
+    /// in bytes.
+    case sizedByOrNull(pointer: _SwiftifyExpr, size: String)
     /// Corresponds to the C `__ended_by(end)` attribute.
     /// Parameter start: index of pointer in function parameter list.
     /// Parameter end: index of pointer in function parameter list, pointing one past the end of
@@ -66,6 +78,30 @@ public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
 #endif
 
+/// Allows annotating pointer parameters in a protocol method using the `@_SwiftifyImportProtocol` macro.
+///
+/// This is not marked @available, because _SwiftifyImportProtocolMethod is available for any target.
+/// Instances of _SwiftifyProtocolMethodInfo should ONLY be passed as arguments directly to
+/// _SwiftifyImportProtocolMethod, so they should not affect linkage since there are never any instances
+/// at runtime.
+public enum _SwiftifyProtocolMethodInfo {
+  case method(signature: String, paramInfo: [_SwiftifyInfo])
+}
+
+/// Like _SwiftifyImport, but since protocols cannot contain function implementations they need to
+/// be placed in a separate extension instead. Unlike _SwiftifyImport, which applies to a single
+/// function, this macro supports feeding info about multiple methods and generating safe overloads
+/// for all of them at once.
+#if hasFeature(Macros)
+  @attached(extension, names: arbitrary)
+  public macro _SwiftifyImportProtocol(
+    _ methodInfo: _SwiftifyProtocolMethodInfo...,
+    spanAvailability: String? = nil,
+    typeMappings: [String: String] = [:]
+  ) =
+    #externalMacro(module: "SwiftMacros", type: "SwiftifyImportProtocolMacro")
+#endif
+
 /// Unsafely discard any lifetime dependency on the `dependent` argument. Return
 /// a value identical to `dependent` with a lifetime dependency on the caller's
 /// borrow scope of the `source` argument.
@@ -75,7 +111,7 @@ public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(borrow source)
+@_lifetime(borrow source)
 public func _swiftifyOverrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -95,7 +131,7 @@ public func _swiftifyOverrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(copy source)
+@_lifetime(copy source)
 public func _swiftifyOverrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(

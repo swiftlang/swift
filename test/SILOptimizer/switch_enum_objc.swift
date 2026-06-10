@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O -primary-file %s -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/switch_enum_objc.h | %FileCheck %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -Osize -primary-file %s -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/switch_enum_objc.h | %FileCheck %s
 
+// REQUIRES: objc_codegen
+
 @inline(never)
 func action0() {}
 

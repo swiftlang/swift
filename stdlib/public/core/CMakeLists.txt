@@ -27,43 +27,48 @@ split_embedded_sources(
   OUT_LIST_EMBEDDED SWIFTLIB_EMBEDDED_SOURCES
   OUT_LIST_NORMAL SWIFTLIB_SOURCES
 
-  ### "ESSENTIAL" SOURCES
   ### -- PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
-  # Some files can't be sorted alphabetically, see notes in the list below.
+  EMBEDDED ASCII.swift
   EMBEDDED Algorithm.swift
+  EMBEDDED AnyHashable.swift
+  EMBEDDED Array.swift
   EMBEDDED ArrayBody.swift
   EMBEDDED ArrayBuffer.swift
   EMBEDDED ArrayBufferProtocol.swift
   EMBEDDED ArrayCast.swift
-  EMBEDDED Array.swift
   EMBEDDED ArrayShared.swift
   EMBEDDED ArraySlice.swift
   EMBEDDED ArrayType.swift
-  EMBEDDED ASCII.swift
   EMBEDDED Assert.swift
   EMBEDDED AssertCommon.swift
+  EMBEDDED Availability.swift
   EMBEDDED BidirectionalCollection.swift
   EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
+  EMBEDDED BorrowingSequence.swift
     NORMAL BridgeObjectiveC.swift
   EMBEDDED BridgeStorage.swift
     NORMAL BridgingBuffer.swift
   EMBEDDED Builtin.swift
   EMBEDDED BuiltinMath.swift
+  EMBEDDED ByteOrder.swift
+  EMBEDDED CString.swift
+  EMBEDDED CTypes.swift
   EMBEDDED Character.swift
+  EMBEDDED CharacterProperties.swift
+  EMBEDDED ClosedRange.swift
     NORMAL CocoaArray.swift
     NORMAL Codable.swift
   EMBEDDED Collection.swift
   EMBEDDED CollectionAlgorithms.swift
+  EMBEDDED CollectionDifference.swift
+  EMBEDDED CollectionOfOne.swift
+    NORMAL CommandLine.swift
   EMBEDDED Comparable.swift
   EMBEDDED CompilerProtocols.swift
-  EMBEDDED Sendable.swift
   EMBEDDED ContiguousArray.swift
-  EMBEDDED ContiguouslyStored.swift
-  EMBEDDED ClosedRange.swift
   EMBEDDED ContiguousArrayBuffer.swift
-  EMBEDDED CString.swift
-  EMBEDDED CTypes.swift
+  EMBEDDED ContiguouslyStored.swift
     NORMAL DebuggerSupport.swift
   EMBEDDED Dictionary.swift
   EMBEDDED DictionaryBridging.swift
@@ -71,30 +76,34 @@ split_embedded_sources(
   EMBEDDED DictionaryCasting.swift
   EMBEDDED DictionaryStorage.swift
   EMBEDDED DictionaryVariant.swift
+  EMBEDDED Diffing.swift
   EMBEDDED DiscontiguousSlice.swift
   EMBEDDED DropWhile.swift
     NORMAL Dump.swift
+  EMBEDDED Duration.swift
+  EMBEDDED DurationProtocol.swift
   EMBEDDED EmptyCollection.swift
   EMBEDDED EnumeratedSequence.swift
   EMBEDDED Equatable.swift
   EMBEDDED ErrorType.swift
+  EMBEDDED Exclusivity.swift
   EMBEDDED ExistentialCollection.swift
   EMBEDDED Filter.swift
   EMBEDDED FlatMap.swift
   EMBEDDED Flatten.swift
   EMBEDDED FloatingPoint.swift
+  EMBEDDED FloatingPointRandom.swift
+  EMBEDDED FullyInhabited.swift
+  EMBEDDED HashTable.swift
   EMBEDDED Hashable.swift
-  # WORKAROUND: This file name is not sorted alphabetically in the list because
-  # if we do so, the compiler crashes.
-  EMBEDDED AnyHashable.swift
-  # END WORKAROUND
   EMBEDDED Hasher.swift
     NORMAL Hashing.swift
-  EMBEDDED HashTable.swift
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
   EMBEDDED InlineArray.swift
   EMBEDDED InputStream.swift
+  EMBEDDED Instant.swift
+  EMBEDDED Int128.swift
   EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
   EMBEDDED Join.swift
@@ -108,39 +117,42 @@ split_embedded_sources(
   EMBEDDED ManagedBuffer.swift
   EMBEDDED Map.swift
   EMBEDDED MemoryLayout.swift
-  EMBEDDED UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
+  EMBEDDED Mirror.swift
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
-  EMBEDDED NativeDictionary.swift
-  EMBEDDED NativeSet.swift
-    NORMAL NewtypeWrapper.swift
+  EMBEDDED MutableRef.swift
   EMBEDDED NFC.swift
   EMBEDDED NFD.swift
+  EMBEDDED NativeDictionary.swift
+  EMBEDDED NativeSet.swift
+  EMBEDDED NewtypeWrapper.swift
   EMBEDDED ObjectIdentifier.swift
-  EMBEDDED Optional.swift
   EMBEDDED OptionSet.swift
+  EMBEDDED Optional.swift
   EMBEDDED OutputStream.swift
+    NORMAL PlaygroundDisplay.swift
   EMBEDDED Pointer.swift
   EMBEDDED Policy.swift
   EMBEDDED PrefixWhile.swift
     NORMAL Prespecialize.swift
     NORMAL Print.swift
   EMBEDDED PtrAuth.swift
+    NORMAL REPL.swift
   EMBEDDED Random.swift
   EMBEDDED RandomAccessCollection.swift
   EMBEDDED Range.swift
   EMBEDDED RangeReplaceableCollection.swift
   EMBEDDED RangeSet.swift
   EMBEDDED RangeSetRanges.swift
+  EMBEDDED Ref.swift
     NORMAL ReflectionMirror.swift
   EMBEDDED Repeat.swift
-    NORMAL REPL.swift
   EMBEDDED Result.swift
   EMBEDDED Reverse.swift
   EMBEDDED Runtime.swift
     NORMAL RuntimeFunctionCounters.swift
-  EMBEDDED SipHash.swift
+  EMBEDDED Sendable.swift
   EMBEDDED Sequence.swift
   EMBEDDED SequenceAlgorithms.swift
   EMBEDDED Set.swift
@@ -153,7 +165,9 @@ split_embedded_sources(
   EMBEDDED SetVariant.swift
   EMBEDDED ShadowProtocols.swift
     NORMAL Shims.swift
+  EMBEDDED SipHash.swift
   EMBEDDED Slice.swift
+  EMBEDDED SliceBuffer.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
   EMBEDDED Span/MutableRawSpan.swift
@@ -162,10 +176,10 @@ split_embedded_sources(
   EMBEDDED Span/OutputSpan.swift
   EMBEDDED Span/RawSpan.swift
   EMBEDDED Span/Span.swift
-  EMBEDDED StaticString.swift
+  EMBEDDED StaticBigInt.swift
   EMBEDDED StaticPrint.swift
+  EMBEDDED StaticString.swift
   EMBEDDED Stride.swift
-  EMBEDDED StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   EMBEDDED String.swift
   EMBEDDED StringBreadcrumbs.swift
   EMBEDDED StringBridge.swift
@@ -173,47 +187,38 @@ split_embedded_sources(
   EMBEDDED StringComparable.swift
   EMBEDDED StringComparison.swift
   EMBEDDED StringCreate.swift
+  EMBEDDED StringGraphemeBreaking.swift
   EMBEDDED StringGuts.swift
-  EMBEDDED StringGutsSlice.swift
   EMBEDDED StringGutsRangeReplaceable.swift
-  EMBEDDED StringObject.swift
-  EMBEDDED StringProtocol.swift
+  EMBEDDED StringGutsSlice.swift
+  EMBEDDED StringHashable.swift
   EMBEDDED StringIndex.swift
   EMBEDDED StringIndexConversions.swift
   EMBEDDED StringIndexValidation.swift
   EMBEDDED StringInterpolation.swift
   EMBEDDED StringLegacy.swift
   EMBEDDED StringNormalization.swift
+  EMBEDDED StringObject.swift
+  EMBEDDED StringProtocol.swift
   EMBEDDED StringRangeReplaceableCollection.swift
   EMBEDDED StringStorage.swift
   EMBEDDED StringStorageBridge.swift
   EMBEDDED StringSwitch.swift
   EMBEDDED StringTesting.swift
-  EMBEDDED StringUnicodeScalarView.swift
   EMBEDDED StringUTF16View.swift
-  EMBEDDED StringUTF8View.swift
   EMBEDDED StringUTF8Validation.swift
+  EMBEDDED StringUTF8View.swift
+  EMBEDDED StringUnicodeScalarView.swift
   EMBEDDED StringWordBreaking.swift
   EMBEDDED Substring.swift
   EMBEDDED SwiftNativeNSArray.swift
+  EMBEDDED SwiftifyImport.swift
   EMBEDDED TemporaryAllocation.swift
     NORMAL ThreadLocalStorage.swift
+  EMBEDDED UInt128.swift
   EMBEDDED UIntBuffer.swift
-  EMBEDDED UnavailableStringAPIs.swift
-  EMBEDDED UnicodeData.swift
-  EMBEDDED UnicodeEncoding.swift
-  EMBEDDED UnicodeBreakProperty.swift
-  EMBEDDED UnicodeHelpers.swift
-  EMBEDDED UnicodeParser.swift
-  EMBEDDED UnicodeScalarProperties.swift
-  EMBEDDED CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
-  EMBEDDED UnicodeSPI.swift
-  EMBEDDED Unmanaged.swift
-  EMBEDDED UnmanagedOpaqueString.swift
-  EMBEDDED UnmanagedString.swift
-  EMBEDDED UnsafePointer.swift
-  EMBEDDED UnsafeRawPointer.swift
-  EMBEDDED UTFEncoding.swift
+  EMBEDDED UTF16.swift
+  EMBEDDED UTF32.swift
   EMBEDDED UTF8.swift
   EMBEDDED UTF8EncodingError.swift
   EMBEDDED UTF8Span.swift
@@ -222,36 +227,31 @@ split_embedded_sources(
   EMBEDDED UTF8SpanFundamentals.swift
   EMBEDDED UTF8SpanInternalHelpers.swift
   EMBEDDED UTF8SpanIterators.swift
-  EMBEDDED UTF16.swift
-  EMBEDDED UTF32.swift
-  EMBEDDED Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
-  EMBEDDED StringGraphemeBreaking.swift # ORDER DEPENDENCY: Must follow UTF16.swift
-  EMBEDDED ValidUTF8Buffer.swift
-  EMBEDDED WriteBackMutableSlice.swift
-  EMBEDDED MigrationSupport.swift
-
-    ### "NON-ESSENTIAL" SOURCES, LAYERED ON TOP OF THE "ESSENTIAL" ONES
-    ### -- PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
-  EMBEDDED Availability.swift
-  EMBEDDED CollectionDifference.swift
-  EMBEDDED CollectionOfOne.swift
-  EMBEDDED Diffing.swift
-  EMBEDDED Duration.swift
-  EMBEDDED DurationProtocol.swift
-  EMBEDDED FloatingPointRandom.swift
-  EMBEDDED Instant.swift
-  EMBEDDED Int128.swift
-  EMBEDDED Mirror.swift
-    NORMAL PlaygroundDisplay.swift
-  EMBEDDED SwiftifyImport.swift
-    NORMAL CommandLine.swift
-  EMBEDDED SliceBuffer.swift
-  EMBEDDED StaticBigInt.swift
-  EMBEDDED UInt128.swift
+  EMBEDDED UTFEncoding.swift
+  EMBEDDED UnavailableStringAPIs.swift
   EMBEDDED UnfoldSequence.swift
+  EMBEDDED Unicode.swift
+  EMBEDDED UnicodeBreakProperty.swift
+  EMBEDDED UnicodeData.swift
+  EMBEDDED UnicodeEncoding.swift
+  EMBEDDED UnicodeHelpers.swift
+  EMBEDDED UnicodeParser.swift
+  EMBEDDED UnicodeSPI.swift
+  EMBEDDED UnicodeScalar.swift
+  EMBEDDED UnicodeScalarProperties.swift
+  EMBEDDED UniqueBox.swift
+  EMBEDDED Unmanaged.swift
+  EMBEDDED UnmanagedOpaqueString.swift
+  EMBEDDED UnmanagedString.swift
   EMBEDDED UnsafeBufferPointerSlice.swift
+  EMBEDDED UnsafePointer.swift
+  EMBEDDED UnsafeRawPointer.swift
+  EMBEDDED ValidUTF8Buffer.swift
     NORMAL VarArgs.swift
+  EMBEDDED WriteBackMutableSlice.swift
   EMBEDDED Zip.swift
+  EMBEDDED _InlineArray.swift
+  EMBEDDED MigrationSupport.swift # TODO: Out of order due to a solver issue
     NORMAL "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
   )
 
@@ -260,7 +260,9 @@ split_embedded_sources(
   OUT_LIST_NORMAL SWIFTLIB_GYB_SOURCES
 
     NORMAL AtomicInt.swift.gyb
+  EMBEDDED FloatingPointFromString.swift
   EMBEDDED FloatingPointParsing.swift.gyb
+  EMBEDDED FloatingPointToString.swift
   EMBEDDED FloatingPointTypes.swift.gyb
   EMBEDDED IntegerTypes.swift.gyb
   EMBEDDED LegacyInt128.swift.gyb
@@ -293,6 +295,7 @@ if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF" AND NOT SWIFT_FREESTANDING_FLAVOR AND N
 endif()
 
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
+  EmbeddedCasting.swift
   EmbeddedRuntime.swift
   EmbeddedStubs.swift
   EmbeddedPrint.swift
@@ -345,6 +348,11 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ValueGene
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableParameters")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SuppressedAssociatedTypesWithDefaults")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Reparenting")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Lifetimes")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAndMutateAccessors")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowInout")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
@@ -445,6 +453,11 @@ if(TARGET libSwiftScan)
   list(APPEND tooling_stdlib_deps libSwiftScan)
 endif()
 
+set(stdlib_link_libraries)
+if(SWIFT_BUILD_SWIFT_DIRECT_RUNTIME)
+  list(APPEND stdlib_link_libraries swiftSwiftDirectRuntime)
+endif()
+
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
                   ${swiftCore_common_options}
@@ -510,10 +523,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
 
   # Under Embedded Swift, all stdlib APIs should be available always. Replace
-  # all availability macros with very very old OS versions.
+  # all availability macros with an empty expansion (`*`).
   set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
   foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
-    string(REGEX REPLACE ":.*" ":macOS 10.9, iOS 7.0, watchOS 2.0, tvOS 9.0, visionOS 1.0" replaced "${def}")
+    string(REGEX REPLACE ":.*" ":*" replaced "${def}")
     list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
   endforeach()
   set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
@@ -527,6 +540,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
+    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+      set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+    endif()
+    set(swift_embedded_stdlib_extra_compile_flags)
+    if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
+      list(APPEND swift_embedded_stdlib_extra_compile_flags "-D" "SWIFT_USE_EMBEDDED_SWIFT_PLATFORM")
+    endif()
     add_swift_target_library_single(
       embedded-stdlib-${mod}
       swiftCore
@@ -535,7 +555,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       ${SWIFTLIB_EMBEDDED_SOURCES}
       GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS
-        ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded
+        ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded ${swift_embedded_stdlib_extra_compile_flags}
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"

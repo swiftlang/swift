@@ -15,6 +15,25 @@ public struct ThreeWords: Error {
     public let z = 0
 }
 
+public struct ManyBytes {
+    let x0: UInt8 = 0
+    let x1: UInt8 = 1
+    let x2: UInt8 = 2
+    let x3: UInt8 = 3
+    let x4: UInt8 = 4
+    let x5: UInt8 = 5
+    let x6: UInt8 = 6
+    let x7: UInt8 = 7
+    let x8: UInt8 = 8
+    let x9: UInt8 = 9
+    let x10: UInt8 = 10
+    let x11: UInt8 = 11
+    let x12: UInt8 = 12
+    let x13: UInt8 = 13
+    let x14: UInt8 = 14
+    let x15: UInt8 = 15
+}
+
 public struct Impl: P {
     public init() {}
 
@@ -57,6 +76,13 @@ public struct Impl: P {
             throw Empty()
         }
         return (1, 2, 3, 4, 5)
+    }
+
+    public func fManyBytes(_ b: Bool) throws(Empty) -> ManyBytes {
+        guard b else {
+            throw Empty()
+        }
+        return ManyBytes()
     }
 
     public func g0(_ b: Bool) throws(OneWord) {
@@ -242,6 +268,13 @@ public struct ImplAsync: PAsync {
         return (1, 2, 3, 4, 5)
     }
 
+    public func fManyBytes(_ b: Bool) async throws(Empty) -> ManyBytes {
+        guard b else {
+            throw Empty()
+        }
+        return ManyBytes()
+    }
+
     public func g0(_ b: Bool) async throws(OneWord) {
         guard b else {
             throw OneWord()
@@ -387,6 +420,7 @@ public protocol P {
     func f3(_ b: Bool) throws(Empty) -> (Int, Int, Int)
     func f4(_ b: Bool) throws(Empty) -> (Int, Int, Int, Int)
     func f5(_ b: Bool) throws(Empty) -> (Int, Int, Int, Int, Int)
+    func fManyBytes(_ b: Bool) throws(Empty) -> ManyBytes
 
     func g0(_ b: Bool) throws(OneWord)
     func g1(_ b: Bool) throws(OneWord) -> Int
@@ -421,6 +455,7 @@ public protocol PAsync {
     func f3(_ b: Bool) async throws(Empty) -> (Int, Int, Int)
     func f4(_ b: Bool) async throws(Empty) -> (Int, Int, Int, Int)
     func f5(_ b: Bool) async throws(Empty) -> (Int, Int, Int, Int, Int)
+    func fManyBytes(_ b: Bool) async throws(Empty) -> ManyBytes
 
     func g0(_ b: Bool) async throws(OneWord)
     func g1(_ b: Bool) async throws(OneWord) -> Int

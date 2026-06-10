@@ -39,34 +39,38 @@ enum NLOptions : unsigned {
   /// Remove overridden declarations from the set of results.
   NL_RemoveOverridden = 1 << 2,
 
+  /// Remove associated type declarations from the set of results. This is used
+  /// by conformance checking for resolving type witnesses.
+  NL_RemoveAssociatedTypes = 1 << 3,
+
   /// Don't check access when doing lookup into a type.
   ///
   /// When performing lookup into a module, this option only applies to
   /// declarations in the same module the lookup is coming from.
-  NL_IgnoreAccessControl = 1 << 3,
+  NL_IgnoreAccessControl = 1 << 4,
 
   /// This lookup should only return type declarations.
-  NL_OnlyTypes = 1 << 4,
+  NL_OnlyTypes = 1 << 5,
 
   /// Include synonyms declared with @_implements()
-  NL_IncludeAttributeImplements = 1 << 5,
+  NL_IncludeAttributeImplements = 1 << 6,
 
   // Include @usableFromInline and @inlinable
-  NL_IncludeUsableFromInline = 1 << 6,
+  NL_IncludeUsableFromInline = 1 << 7,
 
   /// Exclude names introduced by macro expansions in the top-level module.
-  NL_ExcludeMacroExpansions = 1 << 7,
+  NL_ExcludeMacroExpansions = 1 << 8,
 
   /// This lookup should only return macro declarations.
-  NL_OnlyMacros = 1 << 8,
+  NL_OnlyMacros = 1 << 9,
 
   /// Include members that would otherwise be filtered out because they come
   /// from a module that has not been imported.
-  NL_IgnoreMissingImports = 1 << 9,
+  NL_IgnoreMissingImports = 1 << 10,
 
   /// If @abi attributes are present, return the decls representing the ABI,
   /// not the API.
-  NL_ABIProviding = 1 << 10,
+  NL_ABIProviding = 1 << 11,
 
   /// The default set of options used for qualified name lookup.
   ///
@@ -104,6 +108,9 @@ enum class ModuleLookupFlags : unsigned {
   /// If @abi attributes are present, return the decls representing the ABI,
   /// not the API.
   ABIProviding = 1 << 1,
+  /// The lookup is qualified by a module selector which has specified this
+  /// module explicitly.
+  HasModuleSelector = 1 << 2,
 };
 
 } // end namespace swift

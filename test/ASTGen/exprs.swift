@@ -83,7 +83,7 @@ func asyncFunc(_ arg: String) async throws -> Int {
   return 1
 }
 func testUnaryExprs() async throws {
-  let str = String()
+  var str = String()
   let foo = try await asyncFunc(_borrow str)
   let bar = copy foo
   let baz = consume foo
@@ -139,6 +139,14 @@ class TestClosure {
     acceptClosures { [val = self, str, self = val] in }
   }
 }
+
+func testDollarIdentifiers() {
+  // https://github.com/swiftlang/swift/issues/54030
+
+  #if false
+  if $0 {}
+  #endif
+  }
 
 func testInOut() {
   func acceptInOut(arg: inout Int) { arg += 1 }

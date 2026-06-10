@@ -398,6 +398,15 @@ int swift_reflection_metadataIsActor(SwiftReflectionContextRef ContextRef,
   });
 }
 
+size_t
+swift_reflection_metadataSize(SwiftReflectionContextRef ContextRef,
+                              swift_reflection_ptr_t Metadata) {
+  return ContextRef->withContext([&](auto *Context) -> size_t {
+    return Context->metadataSize(
+        RemoteAddress(Metadata, RemoteAddress::DefaultAddressSpace));
+  });
+}
+
 swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object) {
@@ -561,6 +570,10 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   case TypeInfoKind::Array: {
     return SWIFT_ARRAY;
   }
+
+  case TypeInfoKind::Borrow: {
+    swift_unreachable("not implemented");
+  }
   }
 
   swift_unreachable("Unhandled TypeInfoKind in switch");
@@ -582,6 +595,8 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
     NumFields = RecordTI->getNumCases();
   } else if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
     NumFields = RecordTI->getNumFields();
+  } else if (auto *ArrayTI = dyn_cast<ArrayTypeInfo>(TI)) {
+    NumFields = ArrayTI->getElementCount();
   }
 
   return {
@@ -597,13 +612,23 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
   if (!TI)
     return {};
 
+  if (auto *ArrayTI = dyn_cast<ArrayTypeInfo>(TI)) {
+    auto *ElementTI = ArrayTI->getElementTypeInfo();
+    return {
+      "element",
+      Index * ElementTI->getStride(),
+      getTypeInfoKind(*ElementTI),
+      reinterpret_cast<swift_typeref_t>(ArrayTI->getElementTypeRef()),
+    };
+  }
+
   const FieldInfo *FieldInfo = nullptr;
   if (auto *EnumTI = dyn_cast<EnumTypeInfo>(TI)) {
     FieldInfo = &(EnumTI->getCases()[Index]);
   } else if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
     FieldInfo = &(RecordTI->getFields()[Index]);
   } else {
-    assert(false && "convertChild(TI): TI must be record or enum typeinfo");
+    assert(false && "convertChild(TI): TI must be record, enum, or array typeinfo");
     return {
       "unknown TypeInfo kind",
       0,

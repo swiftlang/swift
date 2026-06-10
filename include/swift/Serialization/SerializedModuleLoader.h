@@ -27,9 +27,11 @@ namespace swift {
 class ModuleFile;
 class PathObfuscator;
 class ModuleFileSharedCore;
+struct ExplicitSwiftModuleMap;
+struct ExplicitClangModuleMap;
 enum class ModuleLoadingBehavior;
 namespace file_types {
-  enum ID : uint8_t;
+enum ID : uint8_t;
 }
 
 /// How a dependency should be loaded.
@@ -103,8 +105,8 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-      bool isCanImportLookup, bool isTestableDependencyLookup,
-      bool &isFramework, bool &isSystemModule);
+      std::string *CacheKey, bool isCanImportLookup,
+      bool isTestableDependencyLookup, bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
@@ -195,6 +197,7 @@ protected:
                                         bool isFramework,
                                         StringRef SDKName,
                                         const llvm::Triple &target,
+                                        bool isEmbedded,
                                         StringRef packageName,
                                         llvm::vfs::FileSystem *fileSystem,
                                         PathObfuscator &recoverer);
@@ -268,6 +271,13 @@ public:
   /// A textual reason why the compiler rejected a binary module load
   /// attempt with a given status, to be used for diagnostic output.
   static std::optional<std::string> invalidModuleReason(serialization::Status status);
+
+  virtual ExplicitSwiftModuleMap *getExplicitSwiftModuleMap() {
+    return nullptr;
+  }
+  virtual ExplicitClangModuleMap *getExplicitClangModuleMap() {
+    return nullptr;
+  }
 };
 
 /// Imports serialized Swift modules into an ASTContext.
@@ -371,11 +381,14 @@ public:
   /// FIXME: make this an actual import *path* once submodules are designed.
   bool registerMemoryBuffer(StringRef importPath,
                             std::unique_ptr<llvm::MemoryBuffer> input,
-                            llvm::VersionTuple version) {
-    return MemoryBuffers
-        .insert({importPath, MemoryBufferInfo(std::move(input), version)})
-        .second;
-  }
+                            llvm::VersionTuple version);
+
+  /// During the transtion to explicitly tracked module dependencies LLDB may
+  /// instruct this loader to forget one of the (now redundant) MemoryBuffers
+  /// because it found an explicit module file on disk.
+  ///
+  /// \return true if the importPath existed.
+  bool unregisterMemoryBuffer(StringRef importPath);
 
   void collectVisibleTopLevelModuleNames(
       SmallVectorImpl<Identifier> &names) const override {}

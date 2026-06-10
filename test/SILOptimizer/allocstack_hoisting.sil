@@ -291,10 +291,10 @@ bb3:
 sil @merging : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
   %1 = alloc_stack $T
-  debug_value %1 : $*T, name "x"
+  debug_value %1 : $*T, name "x", expr op_deref
   dealloc_stack %1 : $*T
   %2 = alloc_stack $T
-  debug_value %2 : $*T, name "y"
+  debug_value %2 : $*T, name "y", expr op_deref
   dealloc_stack %2 : $*T
   %r = tuple ()
   return %r : $()
@@ -311,9 +311,9 @@ bb0(%0 : $*T):
 sil @dont_merge : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
   %1 = alloc_stack $T
-  debug_value %1 : $*T, name "x"
+  debug_value %1 : $*T, name "x", expr op_deref
   %3 = alloc_stack $T
-  debug_value %3 : $*T, name "y"
+  debug_value %3 : $*T, name "y", expr op_deref
   dealloc_stack %3 : $*T
   dealloc_stack %1 : $*T
   %r = tuple ()

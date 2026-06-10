@@ -44,6 +44,13 @@ struct NCWrapper : ~Copyable, ~Escapable {
   deinit
 }
 
+struct BorrowWrapper<T: ~Copyable & ~Escapable>: ~Escapable {
+  private let ref: Builtin.Borrow<T>
+
+  @_lifetime(borrow target)
+  init(_ target: borrowing T)
+}
+
 sil @getNEPointer : $@convention(thin) (@guaranteed NE) -> Builtin.RawPointer
 sil @useA : $@convention(thin) (A) -> ()
 sil @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
@@ -70,6 +77,9 @@ sil @addressInt : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(bor
 sil @addressOfInt : $@convention(thin) (@in_guaranteed Int) -> @lifetime(borrow address 0) @owned Span<Int>
 sil @noAddressInt : $@convention(thin) (@in_guaranteed Int) -> @lifetime(borrow 0) @owned Span<Int>
 sil @useSpan : $@convention(thin) (@guaranteed Span<Int>) -> ()
+sil @useRawSpan : $@convention(thin) (@guaranteed RawSpan) -> @error any Error
+
+sil @getInlineSpan : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address 0) @owned RawSpan
 
 // Test returning a owned dependence on a trivial value
 sil [ossa] @return_trivial_dependence : $@convention(thin) (@guaranteed C) -> @lifetime(borrow 0) @owned NE {
@@ -351,4 +361,119 @@ bb0(%0: $Int):
   destroy_value %11 // expected-note{{this use of the lifetime-dependent value is out of scope}}
   %18 = tuple ()
   return %18
+}
+
+// Test dependence on the temporary stack address of a trivial value. computeAddressableRange must extend the lifetime
+// of %tempAddr into the unreachable.
+sil hidden [ossa] @testTempAddressUnreachable : $@convention(thin) (@in_guaranteed InlineInt) -> () {
+bb0(%0 : $*InlineInt):
+  %loadArg = load [trivial] %0
+  %tempAddr = alloc_stack $InlineInt
+  store %loadArg to [trivial] %tempAddr
+
+  %f1 = function_ref @getInlineSpan : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address 0) @owned RawSpan
+  %call = apply %f1(%tempAddr) : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address 0) @owned RawSpan
+  %md = mark_dependence [unresolved] %call on %tempAddr
+
+  %f2 = function_ref @useRawSpan : $@convention(thin) (@guaranteed RawSpan) -> @error any Error
+  try_apply %f2(%md) : $@convention(thin) (@guaranteed RawSpan) -> @error any Error, normal bb1, error bb2
+
+bb1(%void : $()):
+  destroy_value %md
+  dealloc_stack %tempAddr
+  %99 = tuple ()
+  return %99
+
+bb2(%error : @owned $any Error):
+  destroy_value [dead_end] %error
+  destroy_value [dead_end] %md
+  unreachable
+}
+
+// Test dependence on the temporary stack address of a trivial value. computeAddressableRange must extend the lifetime
+// of %tempAddr into the unreachable.
+//
+// Note that the computed instruction range is marked Invalid because it does not have a single dominating
+// block. Nonetheless, the range still include all blocks in which the stack allocation is live, which is all we care
+// about.
+sil hidden [ossa] @testTempAddressNondominatedUnreachable : $@convention(thin) (@in_guaranteed InlineInt) -> () {
+bb0(%0 : $*InlineInt):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb5
+
+bb2:
+  %loadArg = load [trivial] %0
+  %tempAddr = alloc_stack $InlineInt
+  store %loadArg to [trivial] %tempAddr
+
+  %f1 = function_ref @getInlineSpan : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address 0) @owned RawSpan
+  %call = apply %f1(%tempAddr) : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address 0) @owned RawSpan
+  %md = mark_dependence [unresolved] %call on %tempAddr
+
+  %f2 = function_ref @useRawSpan : $@convention(thin) (@guaranteed RawSpan) -> @error any Error
+  try_apply %f2(%md) : $@convention(thin) (@guaranteed RawSpan) -> @error any Error, normal bb3, error bb4
+
+bb3(%void : $()):
+  destroy_value %md
+  dealloc_stack %tempAddr
+  %99 = tuple ()
+  return %99
+
+bb4(%error : @owned $any Error):
+  destroy_value [dead_end] %error
+  destroy_value [dead_end] %md
+  br bb5
+
+bb5:
+  unreachable
+}
+
+// rdar://176564359 ([nonescapable] support Builtin.makeBorrow in lifetime diagnostics)
+//
+// Test that lifetime def-use walkers can follow the initialization of a local using init_borrow_addr.
+sil hidden [ossa] @testInitBorrowAddr : $@convention(method) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T, @thin BorrowWrapper<T>.Type) -> @lifetime(borrow address_for_deps 0) @out BorrowWrapper<T> {
+bb0(%0 : $*BorrowWrapper<T>, %1 : $*T, %2 : $@thin BorrowWrapper<T>.Type):
+  %3 = alloc_stack [lexical] [var_decl] $BorrowWrapper<T>, var, name "self", type $BorrowWrapper<T>
+  debug_value %1, let, name "target", argno 1, expr op_deref
+  %5 = alloc_stack $Builtin.Borrow<T>
+  init_borrow_addr %5 with %1
+  %7 = begin_access [modify] [static] %3
+  %8 = struct_element_addr %7, #BorrowWrapper.ref
+  copy_addr %5 to [init] %8
+  end_access %7
+  dealloc_stack %5
+  copy_addr %3 to [init] %0
+  destroy_addr %3
+  dealloc_stack %3
+  %15 = tuple ()
+  return %15
+}
+
+// rdar://177381648: error: lifetime-dependent variable escapes its scope
+//
+// Test that lifetime diagnostics are disabled for @noescape function arguments.
+// The diagnostics would fail here because the mark_dependence is on the conditionally unwrapped value.
+sil @noescape_to_escape_thunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+
+sil shared [serialized] [thunk] [ossa] @testNoEscapeBlockEscape : $@convention(thin) (@owned Optional<@noescape @callee_guaranteed () -> ()>) -> () {
+bb0(%0 : @owned $Optional<@noescape @callee_guaranteed () -> ()>):
+  switch_enum %0, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : @owned $@noescape @callee_guaranteed () -> ()):
+  %4 = copy_value %3
+  %5 = function_ref @noescape_to_escape_thunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %7 = mark_dependence [unresolved] %6 on %3
+  destroy_value %7
+  destroy_value %3
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %tup = tuple ()
+  return %tup
 }

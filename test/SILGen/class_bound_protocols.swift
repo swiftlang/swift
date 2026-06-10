@@ -183,9 +183,9 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   // CHECK-NEXT: store [[X_PAYLOAD]] to [init] [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
   // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened("{{.*}}", any InheritsMutatingMethod) Self, #HasMutatingMethod.mutatingCounter!getter : <Self where Self : HasMutatingMethod> (Self) -> () -> Value, [[X_PAYLOAD]] : $@opened("{{.*}}", any InheritsMutatingMethod) Self : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
   // CHECK-NEXT: [[RESULT_VALUE:%.*]] = apply [[METHOD]]<@opened("{{.*}}", any InheritsMutatingMethod) Self>([[TEMPORARY]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
+  // CHECK-NEXT: ignored_use [[RESULT_VALUE]]
   // CHECK-NEXT: destroy_addr
   // CHECK-NEXT: end_access [[X_ADDR]] : $*any InheritsMutatingMethod
-  // CHECK-NEXT: ignored_use [[RESULT_VALUE]]
   // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
   _ = x.mutatingCounter
 

@@ -937,6 +937,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     case ResultConvention::Pack:
     case ResultConvention::GuaranteedAddress:
     case ResultConvention::Guaranteed:
+    case ResultConvention::Inout:
       lifetimeExtendsSelf = false;
       break;
     }
@@ -1083,7 +1084,10 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     auto resultType = callee.getOrigFunctionType()->getDirectFormalResultsType(
         IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
     subIGF.emitScalarReturn(resultType, resultType, result,
-                            true /*isSwiftCCReturn*/, false);
+                            /*isSwiftCCReturn=*/true,
+                            /*isOutlined=*/false,
+                            /*mayPeepholeLoad=*/false,
+                            /*errorType=*/SILType());
   }
   
   return fwd;
@@ -1264,8 +1268,10 @@ void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
                                            VarDecl *property, std::string &s) {
   // FIXME: Property encoding differs in slight ways that aren't publicly
   // exposed from Clang.
-  IGM.getClangASTContext()
-    .getObjCEncodingForPropertyType(getObjCPropertyType(IGM, property), s);
+  auto clangType = getObjCPropertyType(IGM, property);
+  if (clangType.isNull())
+    return;
+  IGM.getClangASTContext().getObjCEncodingForPropertyType(clangType, s);
 }
 
 static void
@@ -1424,6 +1430,7 @@ irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM, VarDecl *property) {
   auto clangType = getObjCPropertyType(IGM, property);
   if (clangType.isNull()) {
     descriptor.typeEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    descriptor.impl = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     descriptor.silFunction = nullptr;
     return descriptor;
   }
@@ -1504,6 +1511,7 @@ irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   clangType = getObjCPropertyType(IGM, property);
   if (clangType.isNull()) {
     descriptor.typeEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    descriptor.impl = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     descriptor.silFunction = nullptr;
     return descriptor;
   }
@@ -1731,10 +1739,9 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
 
 void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
     ValueDecl *fn, llvm::Value *value, bool needsNullCheck) {
-  if (auto originalDecl = fn->getASTContext()
-                              .getClangModuleLoader()
-                              ->getOriginalForClonedMember(fn))
-    fn = originalDecl;
+  auto loader = fn->getASTContext().getClangModuleLoader();
+  if (loader->getOriginalForClonedMember(fn))
+    fn = loader->getCalledBaseCxxMethod(fn);
 
   assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
 

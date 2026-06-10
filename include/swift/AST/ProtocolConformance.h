@@ -445,6 +445,13 @@ public:
   /// conforming type and the protocol.
   bool isRetroactive() const;
 
+  /// Given Q = getProtocol(), does this conformance represent a
+  /// default conformance of Q for any type that conforms to protocol P, where
+  /// P is the extended nominal type of getDeclContext(). In other words,
+  /// P was reparented by the reparentable protocol Q, such that all of Q's
+  /// requirements can be witnessed within an extension of P.
+  bool isReparented() const;
+
   /// Print a parseable and human-readable description of the identifying
   /// information of the protocol conformance.
   void printName(raw_ostream &os,
@@ -713,6 +720,11 @@ public:
     return getOptions().contains(ProtocolConformanceFlags::Unchecked);
   }
 
+  /// Whether this is a @reparented conformance.
+  bool isReparented() const {
+    return getOptions().contains(ProtocolConformanceFlags::Reparented);
+  }
+
   /// Mark the conformance as unchecked (equivalent to the @unchecked
   /// conformance attribute).
   void setUnchecked() {
@@ -797,6 +809,29 @@ public:
   /// Whether this conformance was synthesized automatically in multiple
   /// modules, but in a manner that ensures that all copies are equivalent.
   bool isSynthesizedNonUnique() const;
+
+  /// Compute the code generation model that is required for this conformance.
+  ///
+  /// This function applies the limitations of the compilation model to
+  /// determine if there's a code generation model that *must* be used for the
+  /// given conformances. For example, generic conformances must be
+  /// `@export(implementation)` in Embedded Swift, because it does not support
+  /// unspecialized generics.
+  std::optional<CodeGenerationModel>
+  getRequiredCodeGenerationModel() const;
+
+  /// Retrieve the code generation model explicitly requested for this
+  /// conformance, inherited from the @export attribute on the declaring
+  /// nominal type or extension. Returns nullopt if the declaring context
+  /// does not specify an explicit code generation model.
+  std::optional<CodeGenerationModel>
+  getExplicitCodeGenerationModel() const;
+
+  /// Compute the code generation model for the conformance, combining the
+  /// explicitly-specified information from attributes with defaults
+  /// based on Embedded Swift or feature flags.
+  CodeGenerationModel
+  getEffectiveCodeGenerationModel() const;
 
   /// Whether this conformance represents the conformance of one protocol's
   /// conforming types to another protocol.
@@ -1065,7 +1100,7 @@ public:
 
   /// Get any requirements that must be satisfied for this conformance to apply.
   ArrayRef<Requirement> getConditionalRequirements() const {
-    return *getConditionalRequirementsIfAvailable();
+    return getConditionalRequirementsIfAvailable().value();
   }
 
   /// Get the protocol being conformed to.

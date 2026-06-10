@@ -335,6 +335,13 @@ void TypeRefBuilder::ReflectionTypeDescriptorFinder::
   ProcessedReflectionInfoIndexes.insert(Index);
 }
 
+void TypeRefBuilder::ReflectionTypeDescriptorFinder::
+    ensureAllFieldDescriptorsCached() {
+  for (size_t i = 0; i < ReflectionInfos.size(); ++i) {
+    populateFieldTypeInfoCacheWithReflectionAtIndex(i);
+  }
+}
+
 std::optional<RemoteRef<FieldDescriptor>>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::findFieldDescriptorAtIndex(
     size_t Index, const std::string &MangledName) {
@@ -489,6 +496,7 @@ public:
 
   std::vector<std::unique_ptr<FieldRecordBase>> getFieldRecords() override {
     std::vector<std::unique_ptr<FieldRecordBase>> FieldRecords;
+    FieldRecords.reserve(FD->NumFields);
     for (auto &FieldRef : *FD.getLocalBuffer()) {
       FieldRecords.emplace_back(
           std::make_unique<FieldRecordImpl>(FD.getField(FieldRef), Builder));
@@ -522,8 +530,11 @@ bool TypeRefBuilder::getFieldTypeRefs(
   if (!Subs)
     return false;
 
+  auto FieldRecords = FD.getFieldRecords();
+  Fields.reserve(FieldRecords.size());
+
   int FieldValue = -1;
-  for (auto &Field : FD.getFieldRecords()) {
+  for (auto &Field : FieldRecords) {
     auto FieldName = Field->getFieldName();
     FieldValue += 1;
 
@@ -616,8 +627,11 @@ public:
   BuiltinTypeDescriptorImpl(RemoteRef<BuiltinTypeDescriptor> BTD,
                             TypeRefBuilder &Builder)
       : BuiltinTypeDescriptorBase(BTD->Size, BTD->getAlignment(),
-                                       BTD->Stride, BTD->NumExtraInhabitants,
-                                       BTD->isBitwiseTakable()),
+                                  BTD->Stride, BTD->NumExtraInhabitants,
+                                  BTD->isBitwiseTakable()
+                                    ? BitwiseBorrowability::TakableAndBorrowable
+                                    : BitwiseBorrowability::None,
+                                  /*AFD*/ false),
         BTD(BTD), Builder(Builder) {}
 
   ~BuiltinTypeDescriptorImpl() override {}

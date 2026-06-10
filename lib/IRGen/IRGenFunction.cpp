@@ -162,13 +162,26 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
 }
 
 /// Emit a heap allocation.
-llvm::Value *IRGenFunction::emitAllocObjectCall(llvm::Value *metadata,
-                                                llvm::Value *size,
-                                                llvm::Value *alignMask,
-                                                const llvm::Twine &name) {
+llvm::Value *IRGenFunction::emitAllocObjectCall(
+    llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
+    std::optional<uint64_t> mallocTypeId, const llvm::Twine &name) {
+  if (mallocTypeId) {
+    auto descriptorConst = llvm::ConstantInt::get(IGM.Int64Ty, *mallocTypeId);
+    return emitAllocObjectTypedCall(metadata, size, alignMask, descriptorConst,
+                                    name);
+  }
   // For now, all we have is swift_allocObject.
   return emitAllocatingCall(*this, IGM.getAllocObjectFunctionPointer(),
                             {metadata, size, alignMask}, name);
+}
+
+/// Emit a typed heap allocation.
+llvm::Value *IRGenFunction::emitAllocObjectTypedCall(
+    llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
+    llvm::Value *typeDescriptor, const llvm::Twine &name) {
+  // For now, all we have is swift_allocObjectTyped.
+  return emitAllocatingCall(*this, IGM.getAllocObjectTypedFunctionPointer(),
+                            {metadata, size, alignMask, typeDescriptor}, name);
 }
 
 llvm::Value *IRGenFunction::emitInitStackObjectCall(llvm::Value *metadata,
@@ -299,7 +312,7 @@ static unsigned getBaseMachOPlatformID(const llvm::Triple &TT) {
   case llvm::Triple::XROS:
     return llvm::MachO::PLATFORM_XROS;
   default:
-    return /*Unknown platform*/ 0;
+    return llvm::MachO::PLATFORM_UNKNOWN;
   }
 }
 
@@ -307,11 +320,18 @@ llvm::Value *
 IRGenFunction::emitTargetOSVersionAtLeastCall(llvm::Value *major,
                                               llvm::Value *minor,
                                               llvm::Value *patch) {
-  auto fn = IGM.getPlatformVersionAtLeastFunctionPointer();
+  // compiler-rt in the NDK does not include __isPlatformVersionAtLeast
+  // but only __isOSVersionAtLeast
+  if (IGM.Triple.isAndroid()) {
+    auto fn = IGM.getOSVersionAtLeastFunctionPointer();
+    return Builder.CreateCall(fn, {major, minor, patch});
+  } else {
+    auto fn = IGM.getPlatformVersionAtLeastFunctionPointer();
 
-  llvm::Value *platformID =
-    llvm::ConstantInt::get(IGM.Int32Ty, getBaseMachOPlatformID(IGM.Triple));
-  return Builder.CreateCall(fn, {platformID, major, minor, patch});
+    llvm::Value *platformID =
+      llvm::ConstantInt::get(IGM.Int32Ty, getBaseMachOPlatformID(IGM.Triple));
+    return Builder.CreateCall(fn, {platformID, major, minor, patch});
+  }
 }
 
 llvm::Value *
@@ -507,30 +527,18 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
     }
   }
 
-  if (IGM.IRGen.Opts.shouldOptimize() && !IGM.IRGen.Opts.MergeableTraps) {
-    // Emit unique side-effecting inline asm calls in order to eliminate
-    // the possibility that an LLVM optimization or code generation pass
-    // will merge these blocks back together again. We emit an empty asm
-    // string with the side-effect flag set, and with a unique integer
-    // argument for each cond_fail we see in the function.
-    llvm::IntegerType *asmArgTy = IGM.Int32Ty;
-    llvm::Type *argTys = {asmArgTy};
-    llvm::FunctionType *asmFnTy =
-        llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
-    llvm::InlineAsm *inlineAsm =
-        llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
-    CreateAsmCall(inlineAsm,
-                  llvm::ConstantInt::get(asmArgTy, NumTrapBarriers++));
-  }
-
   // Emit the trap instruction.
-  llvm::Function *trapIntrinsic =
-      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::trap);
+  llvm::Function *trapIntrinsic = llvm::Intrinsic::getOrInsertDeclaration(
+      &IGM.Module, llvm::Intrinsic::trap);
   if (EnableTrapDebugInfo && IGM.DebugInfo && !failureMsg.empty()) {
     IGM.DebugInfo->addFailureMessageToCurrentLoc(*this, failureMsg);
   }
   auto Call = IRBuilderBase::CreateCall(trapIntrinsic, {});
   setCallingConvUsingCallee(Call);
+
+  if (IGM.IRGen.Opts.shouldOptimize() && !IGM.IRGen.Opts.MergeableTraps) {
+    Call->addFnAttr(llvm::Attribute::NoMerge);
+  }
 
   if (!IGM.IRGen.Opts.TrapFuncName.empty()) {
     auto A = llvm::Attribute::get(getContext(), "trap-func-name",
@@ -655,7 +663,7 @@ static Address emitAddrOfContinuationErrorResultPointer(IRGenFunction &IGF,
 }
 
 void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
-                                             StackAddress resultAddr,
+                                             Address resultAddr,
                                              Explosion &out,
                                              bool canThrow) {
   // A continuation is just a reference to the current async task,
@@ -701,13 +709,14 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   //   lifetime.end within the await after we take from the slot.
   auto normalResultAddr =
     emitAddrOfContinuationNormalResultPointer(*this, continuationContext);
-  if (!resultAddr.getAddress().isValid()) {
+  if (!resultAddr.isValid()) {
     auto &resumeTI = getTypeInfo(resumeTy);
     resultAddr =
-      resumeTI.allocateStack(*this, resumeTy, "async.continuation.result");
+      resumeTI.allocateStack(*this, resumeTy, "async.continuation.result")
+        .getAddress();
   }
   Builder.CreateStore(Builder.CreateBitOrPointerCast(
-                            resultAddr.getAddress().getAddress(),
+                            resultAddr.getAddress(),
                             IGM.OpaquePtrTy),
                       normalResultAddr);
 

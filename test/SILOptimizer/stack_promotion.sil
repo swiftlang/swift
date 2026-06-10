@@ -20,6 +20,12 @@ class YY {
 	init(newx: XX)
 }
 
+class C {}
+
+struct S {
+  let c: C
+}
+
 class DummyArrayStorage<Element> {
   @_hasStorage var count : Int
   @_hasStorage var capacity : Int
@@ -1058,19 +1064,32 @@ bb0(%0 : $Int, %another: $Array<Int>):
   return %24 : $()
 }
 
-
+//   The input to StackNesting seems sketchy here; it isn't really
+//   obeying joint post-dominance, and is just skating by under the
+//   laxer rules for blocks that don't exit.
 // CHECK-LABEL: sil @promote_with_unreachable_block_nest_bug
-// CHECK: bb3:
-// CHECK: dealloc_stack_ref %{{.*}}
-// CHECK: bb4:
-// CHECK: br bb5
-// CHECK: bb5:
-// CHECK: dealloc_stack_ref %{{.*}}
-// CHECK: bb6:
-// CHECK: dealloc_stack_ref %{{.*}}
-// CHECK: bb11:
-// CHECK: alloc_ref [stack] $XX
-// CHECK: return
+// CHECK:      bb3:
+// CHECK-NEXT:   strong_release [[APPLY_RESULT:%[0-9]+]]
+// CHECK-NEXT:   dealloc_stack_ref [[ALLOC:%[0-9]+]]
+// CHECK-NEXT:   br bb6
+// CHECK:      bb4:
+// CHECK-NEXT:   integer_literal
+// CHECK-NEXT:   struct
+// CHECK-NEXT:   br bb13
+// CHECK:      bb5:
+// CHECK-NEXT:   strong_release [[APPLY_RESULT]]
+// CHECK-NEXT:   dealloc_stack_ref [[ALLOC]]
+// CHECK-NEXT:   br bb6
+// CHECK:      bb10:
+// CHECK-NEXT:   [[ALLOC]] = alloc_ref [stack] $XX
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   function_ref
+// CHECK-NEXT:   [[APPLY_RESULT]] = apply
+// CHECK-NEXT:   ref_element_addr
+// CHECK-NEXT:   load
+// CHECK-NEXT:   cond_br undef, bb2, bb4
+// CHECK:      bb13(
+// CHECK-NEXT:   unreachable
 sil @promote_with_unreachable_block_nest_bug : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $Builtin.Int32                 // user: %30
@@ -1231,5 +1250,28 @@ bb3:
   dealloc_stack %1 : $*XX
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @escaping_array_element
+// CHECK:         alloc_ref $C
+// CHECK-LABEL: } // end sil function 'escaping_array_element'
+sil [ossa] @escaping_array_element : $@convention(thin) (Builtin.Word) -> @owned C {
+bb0(%0 : $Builtin.Word):
+  %1 = integer_literal $Builtin.Word, 2
+  %2 = alloc_ref [stack] [tail_elems $S * %1] $DummyArrayStorage<S>
+  %3 = begin_borrow %2
+  %4 = ref_tail_addr %3, $S
+  %5 = integer_literal $Builtin.Word, 1
+  %6 = index_addr %4, %5
+  %7 = alloc_ref $C
+  %10 = struct $S (%7)
+  store %10 to [init] %6
+  %30 = index_addr [stack_protection] %4, %0
+  %31 = load [copy] %30
+  %32 = destructure_struct %31
+  end_borrow %3
+  dealloc_ref %2
+  dealloc_stack_ref %2
+  return %32
 }
 

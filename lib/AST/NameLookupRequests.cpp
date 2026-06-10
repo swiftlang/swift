@@ -58,7 +58,7 @@ void SuperclassDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void SuperclassDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 std::optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {
@@ -427,10 +427,10 @@ void ModuleQualifiedLookupRequest::writeDependencySink(
 }
 
 //----------------------------------------------------------------------------//
-// LookupConformanceInModuleRequest computation.
+// LookupConformanceRequest computation.
 //----------------------------------------------------------------------------//
 
-void LookupConformanceInModuleRequest::writeDependencySink(
+void LookupConformanceRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
     ProtocolConformanceRef lookupResult) const {
   if (lookupResult.isInvalid() || !lookupResult.isConcrete())
@@ -486,23 +486,6 @@ void SPIGroupsRequest::cacheResult(llvm::ArrayRef<Identifier> result) const {
 // The following clang importer requests have some definitions here to prevent
 // linker errors when building lib syntax parser (which doesn't link with the
 // clang importer).
-
-//----------------------------------------------------------------------------//
-// ClangDirectLookupRequest computation.
-//----------------------------------------------------------------------------//
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           const ClangDirectLookupDescriptor &desc) {
-  out << "Looking up ";
-  simple_display(out, desc.name);
-  out << " in ";
-  simple_display(out, desc.decl);
-}
-
-SourceLoc
-swift::extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc) {
-  return extractNearestSourceLoc(desc.decl);
-}
 
 //----------------------------------------------------------------------------//
 // CXXNamespaceMemberLookup computation.
@@ -631,12 +614,12 @@ UnqualifiedLookupRequest::UnqualifiedLookupRequest(
 ) : SimpleRequest(contextualizeOptions(descriptor)) { }
 
 LookupInModuleRequest::LookupInModuleRequest(
-      const DeclContext *moduleOrFile, DeclName name, NLKind lookupKind,
-      namelookup::ResolutionKind resolutionKind,
+      const DeclContext *moduleOrFile, DeclName name, bool hasModuleSelector,
+      NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
       const DeclContext *moduleScopeContext,
       SourceLoc loc, NLOptions options
- ) : SimpleRequest(moduleOrFile, name, lookupKind, resolutionKind,
-                   moduleScopeContext,
+ ) : SimpleRequest(moduleOrFile, name, hasModuleSelector, lookupKind,
+                   resolutionKind, moduleScopeContext,
                    contextualizeOptions(moduleOrFile, loc, options)) { }
 
 ModuleQualifiedLookupRequest::ModuleQualifiedLookupRequest(

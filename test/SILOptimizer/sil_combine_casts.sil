@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
+// REQUIRES: objc_codegen
+
 sil_stage canonical
 
 import Builtin
@@ -77,8 +79,7 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK-LABEL: sil [ossa] @ref_to_raw_pointer_unchecked_ref_cast_composition_ossa_owned : $@convention(thin) (@owned Klass) -> Builtin.RawPointer
 // CHECK: bb0([[ARG:%.*]] : @owned
 // CHECK-NEXT: [[RESULT:%.*]] = ref_to_raw_pointer [[ARG]]
-// CHECK-NEXT: [[CAST:%.*]] = unchecked_ref_cast [[ARG]]
-// CHECK-NEXT: destroy_value [[CAST]]
+// CHECK-NEXT: destroy_value [[ARG]]
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function 'ref_to_raw_pointer_unchecked_ref_cast_composition_ossa_owned'
 sil [ossa] @ref_to_raw_pointer_unchecked_ref_cast_composition_ossa_owned : $@convention(thin) (@owned Klass) -> Builtin.RawPointer {

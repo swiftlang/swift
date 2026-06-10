@@ -34,6 +34,8 @@
 namespace swift {
 
 class ASTContext;
+class ActorIsolation;
+enum class CodeGenerationModel: uint8_t;
 class SILInstruction;
 class SILModule;
 class SILFunctionBuilder;
@@ -42,6 +44,7 @@ class BasicBlockBitfield;
 class NodeBitfield;
 class OperandBitfield;
 class CalleeCache;
+class DominanceInfo;
 class SILTypeProperties;
 class SILUndef;
 
@@ -59,6 +62,7 @@ enum IsThunk_t {
   IsReabstractionThunk,
   IsSignatureOptimizedThunk,
   IsBackDeployedThunk,
+  IsDistributedThunk,
 };
 enum IsDynamicallyReplaceable_t {
   IsNotDynamic,
@@ -320,7 +324,12 @@ private:
   /// The function's remaining set of specialize attributes.
   std::vector<SILSpecializeAttr*> SpecializeAttrSet;
 
-  /// Name of a section if @_section attribute was used, otherwise empty.
+  /// The name that this function should have when it is lowered to LLVM IR.
+  ///
+  /// If empty, use the SIL function's name directly.
+  StringRef AsmName;
+
+  /// Name of a section if @section attribute was used, otherwise empty.
   StringRef Section;
 
   /// Name of a Wasm export if @_expose(wasm) attribute was used, otherwise
@@ -355,7 +364,7 @@ private:
   unsigned BlockListChangeIdx = 0;
 
   /// The isolation of this function.
-  std::optional<ActorIsolation> actorIsolation;
+  ActorIsolation actorIsolation;
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -391,12 +400,17 @@ private:
   /// would indicate.
   unsigned HasCReferences : 1;
 
-  /// Whether attribute @_used was present
+  /// Whether attribute @used was present
   unsigned MarkedAsUsed : 1;
 
   /// Whether cross-module references to this function should always use weak
   /// linking.
   unsigned IsAlwaysWeakImported : 1;
+
+  /// The code generation model used for this particular function. This is
+  /// zero in the case where it's using the default model, or 1 + the
+  /// CodeGenerationModel otherwise.
+  unsigned CodeGenModel : 2;
 
   /// Whether the implementation can be dynamically replaced.
   unsigned IsDynamicReplaceable : 1;
@@ -473,6 +487,9 @@ private:
   /// within a module by the MandatoryOptimizations pass.
   unsigned IsPerformanceConstraint : 1;
 
+  unsigned NeedBreakInfiniteLoops : 1;
+  unsigned NeedCompleteLifetimes : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -490,6 +507,7 @@ private:
     case IsThunk:
     case IsReabstractionThunk:
     case IsBackDeployedThunk:
+    case IsDistributedThunk:
       thunkCanHaveSubclassScope = false;
       break;
     }
@@ -502,12 +520,12 @@ private:
   }
 
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
-              CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-              IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-              SerializedKind_t serializedKind, ProfileCounter entryCount,
-              IsThunk_t isThunk, SubclassScope classSubclassScope,
-              Inline_t inlineStrategy, EffectsKind E,
-              const SILDebugScope *debugScope,
+              CanSILFunctionType loweredType, ActorIsolation isolation,
+              GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
+              IsTransparent_t isTrans, SerializedKind_t serializedKind,
+              ProfileCounter entryCount, IsThunk_t isThunk,
+              SubclassScope classSubclassScope, Inline_t inlineStrategy,
+              EffectsKind E, const SILDebugScope *debugScope,
               IsDynamicallyReplaceable_t isDynamic,
               IsExactSelfClass_t isExactSelfClass,
               IsDistributed_t isDistributed,
@@ -515,11 +533,11 @@ private:
 
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
-         CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-         std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
-         IsTransparent_t isTrans, SerializedKind_t serializedKind,
-         ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
-         IsDistributed_t isDistributed,
+         CanSILFunctionType loweredType, ActorIsolation isolation,
+         GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
+         IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+         SerializedKind_t serializedKind, ProfileCounter entryCount,
+         IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
          IsRuntimeAccessible_t isRuntimeAccessible,
          IsExactSelfClass_t isExactSelfClass, IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
@@ -529,11 +547,12 @@ private:
          const SILDebugScope *DebugScope = nullptr);
 
   void init(SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
-            GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
-            IsTransparent_t isTrans, SerializedKind_t serializedKind,
-            ProfileCounter entryCount, IsThunk_t isThunk,
-            SubclassScope classSubclassScope, Inline_t inlineStrategy,
-            EffectsKind E, const SILDebugScope *DebugScope,
+            ActorIsolation isolation, GenericEnvironment *genericEnv,
+            IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+            SerializedKind_t serializedKind, ProfileCounter entryCount,
+            IsThunk_t isThunk, SubclassScope classSubclassScope,
+            Inline_t inlineStrategy, EffectsKind E,
+            const SILDebugScope *DebugScope,
             IsDynamicallyReplaceable_t isDynamic,
             IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
             IsRuntimeAccessible_t isRuntimeAccessible);
@@ -783,6 +802,8 @@ public:
     return LoweredType->isCalleeAllocatedCoroutine();
   }
 
+  bool isCoroutine() const { return LoweredType->isCoroutine(); }
+
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
     return getLoweredFunctionType()->getRepresentation();
@@ -930,6 +951,10 @@ public:
   /// function, such as swift_retain.
   bool isSwiftRuntimeFunction() const;
 
+  /// Helper method that determines whether a function with the given name and
+  /// parent module is a Swift runtime function such as swift_retain.
+  static bool isSwiftRuntimeFunction(StringRef name, const ModuleDecl *module);
+
   /// Helper method which returns true if the linkage of the SILFunction
   /// indicates that the object's definition might be required outside the
   /// current SILModule.
@@ -965,6 +990,11 @@ public:
   void setIsAlwaysWeakImported(bool value) { IsAlwaysWeakImported = value; }
 
   bool isWeakImported(ModuleDecl *module) const;
+
+  /// Determine the explicit code generation model
+  std::optional<CodeGenerationModel> codeGenerationModel() const;
+
+  void setCodeGenerationModel(std::optional<CodeGenerationModel> value);
 
   /// Returns whether this function implementation can be dynamically replaced.
   IsDynamicallyReplaceable_t isDynamicallyReplaceable() const {
@@ -1095,6 +1125,31 @@ public:
 
   void setIsPerformanceConstraint(bool flag = true) {
     IsPerformanceConstraint = flag;
+  }
+
+  /// True if the current pass has deleted any basic blocks.
+  /// In case a deleted block was an exit blocks of a loop the remaining loop might
+  /// have become an infinite loop.
+  bool needBreakInfiniteLoops() const { return NeedBreakInfiniteLoops; }
+
+  /// If `flag` is true, notifies that a pass has deleted a basic block which
+  /// might end up in an infinite loop. A pass can set the notification to `false`
+  /// again if a basic block has been deleted but the pass knows that this cannot
+  /// cause any infinite loops.
+  void setNeedBreakInfiniteLoops(bool flag = true) {
+    NeedBreakInfiniteLoops = flag;
+  }
+
+  /// True if the pass has inserted an `unreachable` instruction.
+  /// In such a case, lifetimes which have reached over this point are cut off.
+  bool needCompleteLifetimes() const { return NeedCompleteLifetimes; }
+
+  /// If `flag` is true, notifies that a pass has inserted an `unreachable`
+  /// instruction which might have cut off any lifetimes. A pass can set the
+  /// notification to `false` again if an `unreachable` was inserted but the
+  /// pass knows that this didn't cut off any lifetimes.
+  void setNeedCompleteLifetimes(bool flag = true) {
+    NeedCompleteLifetimes = flag;
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
@@ -1348,12 +1403,12 @@ public:
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
-  Type mapTypeIntoContext(Type type) const;
+  Type mapTypeIntoEnvironment(Type type) const;
 
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
-  SILType mapTypeIntoContext(SILType type) const;
+  SILType mapTypeIntoEnvironment(SILType type) const;
 
   /// Converts the given function definition to a declaration.
   void convertToDeclaration() {
@@ -1405,21 +1460,21 @@ public:
     return false;
   }
 
-  /// Returns true if this function belongs to a declaration that
-  /// has `@_alwaysEmitIntoClient` attribute.
-  bool markedAsAlwaysEmitIntoClient() const {
-    if (!hasLocation())
-      return false;
+  /// Whether this declaration is always emitted into the client.
+  bool isAlwaysEmitIntoClient() const;
 
-    auto *V = getLocation().getAsASTNode<ValueDecl>();
-    return V && V->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
-  }
+  /// Whether this declaration is never emitted into the client.
+  bool isNeverEmitIntoClient() const;
 
-  /// Return whether this function has attribute @_used on it
+  /// Return whether this function has attribute @used on it
   bool markedAsUsed() const { return MarkedAsUsed; }
   void setMarkedAsUsed(bool value) { MarkedAsUsed = value; }
 
-  /// Return custom section name if @_section was used, otherwise empty
+  /// Return custom assembler name, otherwise empty.
+  StringRef asmName() const { return AsmName; }
+  void setAsmName(StringRef value);
+
+  /// Return custom section name if @section was used, otherwise empty
   StringRef section() const { return Section; }
   void setSection(StringRef value) { Section = value; }
 
@@ -1475,16 +1530,12 @@ public:
     return false;
   }
 
-  void setActorIsolation(ActorIsolation newActorIsolation) {
-    actorIsolation = newActorIsolation;
-  }
-
-  std::optional<ActorIsolation> getActorIsolation() const {
+  ActorIsolation getActorIsolation() const {
     return actorIsolation;
   }
 
   bool isNonisolatedNonsending() const {
-    return actorIsolation && actorIsolation->isCallerIsolationInheriting();
+    return actorIsolation.isNonisolatedNonsending();
   }
 
   /// Return the source file that this SILFunction belongs to if it exists.
@@ -1518,9 +1569,17 @@ public:
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
+  /// Creates a standalone debug reconstruction block that is NOT inserted into
+  /// the function's BlockList. This should only be called by the cloner and
+  /// the SIL parser, optimization passes should go through the debug value
+  /// instruction's getOrCreateDebugReconstructionBlock.
+  SILBasicBlock *createEmptyDebugReconstructionBlock();
+
   /// Removes and destroys \p BB;
   void eraseBlock(SILBasicBlock *BB) {
     assert(BB->getParent() == this);
+    if (hasOwnership())
+      setNeedBreakInfiniteLoops();
     BlockList.erase(BB);
   }
 
@@ -1551,7 +1610,7 @@ public:
     return std::find_if(begin(), end(),
       [](const SILBasicBlock &BB) -> bool {
         const TermInst *TI = BB.getTerminator();
-        return isa<ReturnInst>(TI);
+        return isa<ReturnInst>(TI) || isa<ReturnBorrowInst>(TI);
     });
   }
 
@@ -1561,7 +1620,7 @@ public:
     return std::find_if(begin(), end(),
       [](const SILBasicBlock &BB) -> bool {
         const TermInst *TI = BB.getTerminator();
-        return isa<ReturnInst>(TI);
+        return isa<ReturnInst>(TI) || isa<ReturnBorrowInst>(TI);
     });
   }
 
@@ -1687,14 +1746,15 @@ public:
   /// verify - Run the SIL verifier to make sure that the SILFunction follows
   /// invariants.
   void verify(CalleeCache *calleeCache = nullptr,
-              bool SingleFunction = true,
-              bool isCompleteOSSA = true,
+              DominanceInfo *dominanceInfo = nullptr,
+              bool SingleFunction = true, bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
 
   /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
   /// blocks.
   void verifyIncompleteOSSA() const {
-    verify(/*calleeCache*/nullptr, /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
+    verify(/*calleeCache*/ nullptr, /*dominanceInfo=*/nullptr,
+           /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
   }
 
   /// Verifies the lifetime of memory locations in the function.

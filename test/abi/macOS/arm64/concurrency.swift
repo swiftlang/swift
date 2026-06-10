@@ -316,6 +316,11 @@ Added: _$sScf13checkIsolatedyyFTj
 // method descriptor for Swift.SerialExecutor.checkIsolated() -> ()
 Added: _$sScf13checkIsolatedyyFTq
 
+// Added Hashable conformance to UnownedTaskExecutor
+Added: _$ss19UnownedTaskExecutorV9hashValueSivg
+Added: _$ss19UnownedTaskExecutorV9hashValueSivpMV
+Added: _$ss19UnownedTaskExecutorVSHsMc
+
 // #isolated adoption in multiple APIs
 // withTaskCancellationHandler gains #isolated
 Added: _$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXE_yyYbXEScA_pSgYitYaKlF
@@ -400,9 +405,60 @@ Added: _$sScfsE25isIsolatingCurrentContextSbSgyF
 Added: _$sScf25isIsolatingCurrentContextSbSgyFTj
 Added: _$sScf25isIsolatingCurrentContextSbSgyFTq
 
+// Cancellation shields
+Added: _swift_task_cancellationShieldPush
+Added: _swift_task_cancellationShieldPop
+Added: _swift_task_hasActiveCancellationShield
+Added: _$sSct27hasActiveCancellationShieldSbvpMV
+Added: _$sScTss5NeverORszABRs_rlE27hasActiveCancellationShieldSbvpZMV
+Added: _swift_task_isCancelledWithFlags
+
+// UnsafeCurrentTask's _task became usable from inline
+Added: _$sSct5_taskBovg
+Added: _$sSct5_taskBovpMV
+
+// Swift.UnsafeCurrentTask.init(_AsyncTask) -> Swift.UnsafeCurrentTask
+Added: _$sSctyScts10_AsyncTaskVcfC
+// Swift.withUnsafeCurrentTaskNonsending<A>(body: nonisolated(nonsending) (Swift.UnsafeCurrentTask?) async throws -> A) async throws -> A
+Added: _$ss31withUnsafeCurrentTaskNonsending4bodyxxSctSgYaKYCXE_tYaKlF
+Added: _$ss31withUnsafeCurrentTaskNonsending4bodyxxSctSgYaKYCXE_tYaKlFTu
+
 // CoroutineAccessors
 Added: _swift_task_dealloc_through
 
 // Clock systemEpochs
 Added: _$ss15ContinuousClockV11systemEpochAB7InstantVvpMV
 Added: _$ss15SuspendingClockV11systemEpochAB7InstantVvpMV
+
+// Getting task names off a task handle (task.name)
+Added: _swift_task_getTaskName
+Added: _$sScT4nameSSSgvg
+Added: _$sScT4nameSSSgvpMV
+Added: _$sSct4nameSSSgvg
+Added: _$sSct4nameSSSgvpMV
+
+// Continuation (noncopyable, ~Copyable Success)
+Added: _$ss12ContinuationVMa
+Added: _$ss12ContinuationVMn
+Added: _$ss12ContinuationVsRi_zrlE7contextBcvg
+Added: _$ss12ContinuationVsRi_zrlEfD
+Added: _$ss12ContinuationVsRi_zrlEyAByxq_GBccfC
+
+// _AsyncTask: opaque pointer wrapper for AsyncTask*. Single decl for each
+// runtime fn parameter (replaces the previous Builtin.NativeObject /
+// UnsafeRawPointer? Raw-overload pairs which collided at the SIL level).
+Added: _$ss10_AsyncTaskV9_rawValueBpvg
+Added: _$ss10_AsyncTaskV9_rawValueBpvpMV
+Added: _$ss10_AsyncTaskVMa
+Added: _$ss10_AsyncTaskVMn
+Added: _$ss10_AsyncTaskVN
+Added: _$ss10_AsyncTaskVyABBocfC
+Added: _$ss10_AsyncTaskVyABBpcfC
+
+// UnsafeCurrentTask now stores the task as a non-owning `_AsyncTask`
+// (raw pointer wrapper) under the new `_rawTask` field.
+Added: _$sSct8_rawTasks06_AsyncB0Vvg
+Added: _$sSct8_rawTasks06_AsyncB0VvpMV
+
+/// Expose async task name offset in debug header.
+Added: __swift_concurrency_debug_asyncTaskNameOffset

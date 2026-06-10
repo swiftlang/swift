@@ -89,17 +89,17 @@ struct UnsafeAsSequence: @unsafe Sequence, @unsafe IteratorProtocol {
 func testUnsafeAsSequenceForEach() {
   let uas = UnsafeAsSequence()
 
-  // expected-note@+2{{reference to unsafe instance method 'next()'}}
-  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
+  // expected-note@+1{{reference to unsafe instance method 'next()'}}
   for _ in uas { } // expected-note{{conformance}}
   // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
   // expected-note@+1{{reference to unsafe instance method 'next()'}}
-  for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
+  for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }} expected-note{{conformance}}
+  // expected-warning@-1 {{no unsafe operations occur within 'unsafe' expression}}
 
-  for unsafe _ in unsafe uas { } // okay
+  for unsafe _ in unsafe uas { } // expected-warning{{no unsafe operations occur within 'unsafe' expression}}
 
-  for unsafe _ in [1, 2, 3] { } // expected-warning{{no unsafe operations occur within 'unsafe' for-in loop}}
+  for unsafe _ in [1, 2, 3] { } // expected-warning{{no unsafe operations occur within 'unsafe' for-in loop}}{{group-name=UnnecessaryUnsafe}}
 }
 
 func testForInUnsafeAmbiguity(_ integers: [Int]) {

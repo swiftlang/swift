@@ -14,7 +14,7 @@
 
 #include "ArgsToFrontendInputsConverter.h"
 #include "ArgsToFrontendOutputsConverter.h"
-#include "clang/Driver/Driver.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
@@ -24,18 +24,19 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
+#include "clang/Driver/Driver.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/TargetParser/Triple.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/Compression.h"
-#include "llvm/Support/PrefixMapper.h"
-#include "llvm/Support/Process.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/PrefixMapper.h"
+#include "llvm/Support/Process.h"
+#include "llvm/TargetParser/Triple.h"
 
 using namespace swift;
 using namespace llvm::opt;
@@ -97,6 +98,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
   Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
   Opts.IndexIncludeLocals |= Args.hasArg(OPT_index_include_locals);
+  Opts.IndexStoreCompress |= Args.hasArg(OPT_index_store_compress);
   Opts.SerializeDebugInfoSIL |=
       Args.hasArg(OPT_experimental_serialize_debug_info);
 
@@ -156,10 +158,15 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.SerializeDependencyScannerCache |= Args.hasArg(OPT_serialize_dependency_scan_cache);
   Opts.ReuseDependencyScannerCache |= Args.hasArg(OPT_reuse_dependency_scan_cache);
   Opts.ValidatePriorDependencyScannerCache |= Args.hasArg(OPT_validate_prior_dependency_scan_cache);
-  Opts.EmitDependencyScannerCacheRemarks |= Args.hasArg(OPT_dependency_scan_cache_remarks);
+  Opts.EmitDependencyScannerRemarks |= Args.hasArg(OPT_dependency_scan_remarks);
+  Opts.EmitDependencyScannerCacheRemarks |=
+      Args.hasArg(OPT_dependency_scan_cache_remarks) ||
+      Opts.EmitDependencyScannerRemarks;
   Opts.ParallelDependencyScan = Args.hasFlag(OPT_parallel_scan,
                                              OPT_no_parallel_scan,
                                              true);
+  Opts.ShareClangCompilerInstance =
+      !Args.hasArg(OPT_no_clang_compiler_instance_sharing);
   Opts.GenReproducer |= Args.hasArg(OPT_gen_reproducer);
   Opts.GenReproducerDir = Args.getLastArgValue(OPT_gen_reproducer_dir);
 
@@ -198,6 +205,12 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.CompilerDebuggingOpts.DumpClangLookupTables |=
       Args.hasArg(OPT_dump_clang_lookup_tables);
+
+  Opts.CompilerDebuggingOpts.DumpAbstractLayout |=
+      Args.hasArg(OPT_dump_abstract_layout);
+
+  Opts.CompilerDebuggingOpts.DumpHiddenTypeLayouts |=
+      Args.hasArg(OPT_dump_hidden_type_layouts);
 
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
@@ -398,6 +411,17 @@ bool ArgsToFrontendOptionsConverter::convert(
                   FrontendOptions::ClangHeaderExposeBehavior::
                       HasExposeAttrOrImplicitDeps)
             .Default(std::nullopt);
+  }
+  if (const Arg *A = Args.getLastArg(OPT_emit_clang_header_min_access)) {
+    Opts.ClangHeaderMinAccess =
+        llvm::StringSwitch<std::optional<AccessLevel>>(A->getValue())
+            .Case("public", AccessLevel::Public)
+            .Case("package", AccessLevel::Package)
+            .Case("internal", AccessLevel::Internal)
+            .Default(std::nullopt);
+    if (!Opts.ClangHeaderMinAccess)
+      Diags.diagnose(SourceLoc(), diag::error_invalid_clang_header_access_level,
+                     A->getValue());
   }
   for (const auto &arg :
        Args.getAllArgValues(options::OPT_clang_header_expose_module)) {
@@ -693,6 +717,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::TypecheckModuleFromInterface;
   if (Opt.matches(OPT_emit_supported_arguments))
     return FrontendOptions::ActionType::PrintArguments;
+  if (Opt.matches(OPT_emit_polyglot_ast))
+    return FrontendOptions::ActionType::EmitPolyglotAST;
   llvm_unreachable("Unhandled mode option");
 }
 

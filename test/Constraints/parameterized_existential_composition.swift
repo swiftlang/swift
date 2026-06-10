@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.7-abi-triple
 
 func f1(_ s: any Sequence<Int> & Hashable) -> any Sequence<Int> {
   return s

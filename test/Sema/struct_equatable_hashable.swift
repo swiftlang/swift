@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/struct_equatable_hashable_other.swift -verify-ignore-unknown -swift-version 4
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -primary-file %s %S/Inputs/struct_equatable_hashable_other.swift -verify-ignore-unknown -swift-version 4
 
 var hasher = Hasher()
 

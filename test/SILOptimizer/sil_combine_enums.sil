@@ -42,7 +42,7 @@ bb0:
   switch_enum_addr %7 : $*Optional<SomeClass>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2 // id: %10
 
 bb1:                                              // Preds: bb0
-  %11 = unchecked_take_enum_data_addr %7 : $*Optional<SomeClass>, #Optional.some!enumelt // user: %12
+  %11 = unchecked_inplace_enum_data_addr %7 : $*Optional<SomeClass>, #Optional.some!enumelt // user: %12
   %12 = load %11 : $*SomeClass                    // users: %15, %16
   dealloc_stack %7 : $*Optional<SomeClass> // id: %13
   release_value %5 : $Optional<SomeClass>         // id: %14
@@ -80,7 +80,7 @@ bb0:
   cond_br %b, bb1, bb2
 
 bb1:
-  %11 = unchecked_take_enum_data_addr %7 : $*Optional<SomeClass>, #Optional.some!enumelt
+  %11 = unchecked_inplace_enum_data_addr %7 : $*Optional<SomeClass>, #Optional.some!enumelt
   %12 = load %11 : $*SomeClass                    // users: %15, %16
   dealloc_stack %7 : $*Optional<SomeClass>
   release_value %5 : $Optional<SomeClass>
@@ -605,10 +605,10 @@ bb3:
   return %11 : $()
 }
 
-// CHECK-LABEL: sil @dont_expand_alloc_stack_of_enum_multiple_cases
-// CHECK:   alloc_stack $MP
-// CHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases'
-sil @dont_expand_alloc_stack_of_enum_multiple_cases : $@convention(method) (S) -> () {
+// CHECK-LABEL: sil @expand_alloc_stack_of_enum_multiple_cases2
+// CHECK:   alloc_stack $S
+// CHECK: } // end sil function 'expand_alloc_stack_of_enum_multiple_cases2'
+sil @expand_alloc_stack_of_enum_multiple_cases2 : $@convention(method) (S) -> () {
 bb0(%0 : $S):
   %1 = alloc_stack $MP
   cond_br undef, bb1, bb2
@@ -690,7 +690,7 @@ bb2:
   br bb3
 
 bb3:
-  %9 = unchecked_take_enum_data_addr %1 : $*Optional<any P>, #Optional.some!enumelt
+  %9 = unchecked_inplace_enum_data_addr %1 : $*Optional<any P>, #Optional.some!enumelt
   dealloc_stack %1 : $*Optional<any P>
   %11 = alloc_stack [lexical] [var_decl] $any P, var, name "comp"
   copy_addr [take] %9 to [init] %11 : $*any P

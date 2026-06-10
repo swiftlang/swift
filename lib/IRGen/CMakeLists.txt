@@ -9,6 +9,7 @@ add_swift_host_library(swiftIRGen STATIC
   Fulfillment.cpp
   GenArchetype.cpp
   GenArray.cpp
+  GenBorrow.cpp
   GenBuiltin.cpp
   GenCall.cpp
   GenCast.cpp
@@ -71,6 +72,7 @@ add_swift_host_library(swiftIRGen STATIC
   TypeLayoutVerifier.cpp
 
   LLVM_LINK_COMPONENTS
+    Plugins
     target
     targetparser
     transformutils

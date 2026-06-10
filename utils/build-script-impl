@@ -49,6 +49,7 @@ KNOWN_SETTINGS=(
     verbose-build                                 ""                "print the commands executed during the build"
     check-args-only                               ""                "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
     only-execute                                  "all"             "Only execute the named action (see implementation)"
+    continue-on-test-failure                      ""                "continue building and testing remaining targets even if a test target fails"
     check-incremental-compilation                 "0"               "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
     enable-array-cow-checks                       "0"               "set tp 1 compile the stdlib with Array COW checks enabled (only relevant for assert builds)"
 
@@ -107,7 +108,7 @@ KNOWN_SETTINGS=(
     darwin-deployment-version-watchos             "6.0"             "minimum deployment target version for watchOS"
     darwin-deployment-version-xros                "1.0"             "minimum deployment target version for xrOS"
     darwin-install-extract-symbols                ""                "whether to extract symbols with dsymutil during installations"
-    darwin-install-extract-symbols-use-just-built-dsymutil "1"       "whether we should extract symbols using the just built dsymutil"
+    darwin-install-extract-symbols-use-just-built-dsymutil ""       "whether we should extract symbols using the just built dsymutil"
     darwin-symroot-path-filters                   ""                "space-separated list of path patterns to consider for symbol generation"
     darwin-overlay-target                         ""                "single overlay target to build, dependencies are computed later"
     darwin-sdk-deployment-targets                 "xctest-ios-8.0"  "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
@@ -339,7 +340,9 @@ function call() {
     if [[ ! ${DRY_RUN} ]]; then
         { set -x; } 2>/dev/null
         "$@"
+        local exit_code=$?
         { set +x; } 2>/dev/null
+        return $exit_code
     fi
 }
 
@@ -1992,13 +1995,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ "${SWIFT_STDLIB_CONCURRENCY_TRACING}" ]] ; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_STDLIB_CONCURRENCY_TRACING:BOOL=$(true_false "${SWIFT_STDLIB_CONCURRENCY_TRACING}")
-                    )
-                fi
-
                 if [[ "${SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -2124,6 +2120,33 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/Sources/FoundationNetworking"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/Sources/FoundationXML"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/lib"
+                fi
+
+                if [[ ! "${SKIP_BUILD_LIBXML2}" ]]; then
+                  # Note: This is wrong when cross-compiling. LLDB is part of
+                  # the toolchain while the built libxml2 is built for the
+                  # runtime environment for use in FoundationXML.
+                  # Build-Script does not separate the toolchain and runtime
+                  # build, so this is already broken.
+                  BASE_INSTALL_DIR="$(get_host_install_destdir ${host})"
+                  LIBXML2_HEADERS="${BASE_INSTALL_DIR}/usr/include/libxml2"
+                  LIBXML2_LIBRARY="${BASE_INSTALL_DIR}/usr/lib/libxml2.a"
+
+                  if [[ -z "${DRY_RUN}" && ! -d "${LIBXML2_HEADERS}" ]]; then
+                      echo "Error: '${LIBXML2_HEADERS}' does not exist" 1>&2
+                      exit 1
+                  fi
+
+                  if [[ -z "${DRY_RUN}" && ! -e "${LIBXML2_LIBRARY}" ]]; then
+                      echo "Error: '${LIBXML2_LIBRARY}' does not exist" 1>&2
+                      exit 1
+                  fi
+
+                  cmake_options+=(
+                    -DLIBXML2_INCLUDE_DIR:PATH="${LIBXML2_HEADERS}"
+                    -DLIBXML2_LIBRARY:PATH="${LIBXML2_LIBRARY}"
+                    -DLIBXML2_DEFINITIONS="-DLIBXML_STATIC"
+                  )
                 fi
 
                 # Watchpoint testing is currently disabled: see rdar://38566150.
@@ -2313,6 +2336,8 @@ for host in "${ALL_HOSTS[@]}"; do
 
                     -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
                     -DFoundation_DIR=$(build_directory ${host} foundation)/cmake/modules
+                    -DSwiftTesting_DIR=$(build_directory ${host} swifttesting)/cmake/modules
+                    -DSwiftTestingMacros_DIR=$(build_directory ${host} swifttestingmacros)/cmake/modules
                     -DLLVM_DIR=$(build_directory ${host} llvm)/lib/cmake/llvm
 
                     -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE:PATH=${LIBDISPATCH_SOURCE_DIR}
@@ -2526,11 +2551,13 @@ for host in "${ALL_HOSTS[@]}"; do
 
                     -DSwift_DIR="${SWIFT_BUILD_PATH}/lib/cmake/swift"
 
-                    -DENABLE_TESTING=YES
                     -DBUILD_SHARED_LIBS=$([[ ${product} == libdispatch_static ]] && echo "NO" || echo "YES")
                   )
                   if [[ $(is_cross_tools_host ${host}) ]] ; then
-                      cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
+                      cmake_options+=(
+                          "${SWIFT_TARGET_CMAKE_OPTIONS[@]}"
+                          -DBUILD_TESTING=NO
+                      )
                   fi
                 ;;
                 esac
@@ -2583,6 +2610,8 @@ tests_busted ()
 {
     echo "*** Failed while running tests for $1 $2"
 }
+
+all_failed_targets=()
 
 for host in "${ALL_HOSTS[@]}"; do
     # Skip this pass when the only action to execute can't match.
@@ -2669,7 +2698,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 FILTER_SWIFT_OPTION="--filter=[sS]wift"
-                FILTER_SWIFT_API_OPTION="--filter=lang/swift"
                 LLVM_LIT_FILTER_ARG=""
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
@@ -2678,20 +2706,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
-                echo "--- Running LLDB tests (Swift Config: ClangImporter) ---"
+                echo "--- Running LLDB tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=true"
-                echo "--- Rerun LLDB Swift API tests (Swift Config: DWARFImporter) ---"
-                with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
-                         "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=false"
+                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                     echo "Running LLDB swift compatibility tests against" \
@@ -2806,14 +2827,21 @@ for host in "${ALL_HOSTS[@]}"; do
         for target in "${results_targets[@]}"; do
             if [[ "${target}" != "" ]]; then
                 echo "--- ${target} ---"
-                trap "tests_busted ${product} '(${target})'" ERR
 
                 test_target="$target"
                 if [[ ${test_target} == check-swift* ]] && [[ "${TEST_PATHS}" ]]; then
                     test_target="${test_target}-custom"
                 fi
 
-                call "${build_cmd[@]}" ${test_target}
+                if [[ "${CONTINUE_ON_TEST_FAILURE}" ]]; then
+                    call "${build_cmd[@]}" ${test_target} || {
+                        tests_busted ${product} "(${target})"
+                        all_failed_targets+=("${target}")
+                    }
+                else
+                    trap "tests_busted ${product} '(${target})'" ERR
+                    call "${build_cmd[@]}" ${test_target}
+                fi
 
                 echo "-- ${target} finished --"
             fi
@@ -2824,6 +2852,16 @@ for host in "${ALL_HOSTS[@]}"; do
     done
 done
 # END OF TEST PHASE
+
+if [[ ${#all_failed_targets[@]} -gt 0 ]]; then
+    # Save failed test targets to a text file and exit with an error.
+    # The text file is later used by build-script to print test summaries.
+    for t in "${all_failed_targets[@]}"; do
+        printf "%s\n" "${t}" \
+            >> "${BUILD_DIR}/.swift-build-failed-test-targets"
+    done
+    exit 1
+fi
 
 
 LIPO_SRC_DIRS=()
@@ -3073,7 +3111,7 @@ for host in "${ALL_HOSTS[@]}"; do
             printJSONStartTimestamp dsymutil
             (cd "${host_symroot}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -not -name "*.a" -not -name "*.py" -print | \
-               xargs -t -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path} ${EXTRA_DSYMUTIL_ARGS[@]})
+               xargs -t -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path} --verify-dwarf=none ${EXTRA_DSYMUTIL_ARGS[@]})
             printJSONEndTimestamp dsymutil
 
             # Strip executables, shared libraries and static libraries in
@@ -3148,6 +3186,9 @@ function build_and_test_installable_package() {
           call ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string '${DARWIN_TOOLCHAIN_REPORT_URL}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add Aliases array" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
+          # Marker used to populate <allowed-os-versions> in the final toolchain .pkg distribution
+          call ${PLISTBUDDY_BIN} -c "Add MinimumSystemVersion string '${DARWIN_DEPLOYMENT_VERSION_OSX}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+
           aliases_count=0
           local IFS=","
           for alias_name in ${DARWIN_TOOLCHAIN_ALIAS}
@@ -3181,7 +3222,7 @@ function build_and_test_installable_package() {
               call tar -c -z -f "${package_for_host}" "${TOOLCHAIN_PREFIX/#\/}"
         else
             # BSD tar doesn't support --owner/--group.
-            if [[ "$(uname -s)" == "Darwin" || "$(uname -s)" == "FreeBSD" ]] ; then
+            if [[ "$(uname -s)" == "Darwin" || "$(uname -s)" == "FreeBSD" || "$(uname -s)" == "OpenBSD" ]] ; then
                 with_pushd "${host_install_destdir}" \
                     tar -c -z -f "${package_for_host}" "${host_install_prefix/#\/}"
             else

@@ -17,6 +17,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -35,10 +36,12 @@ class Traversal : public TypeVisitor<Traversal, bool>
   TypeWalker &Walker;
 
   bool visitErrorType(ErrorType *ty) { return false; }
-  bool visitUnresolvedType(UnresolvedType *ty) { return false; }
   bool visitPlaceholderType(PlaceholderType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
   bool visitIntegerType(IntegerType *ty) { return false; }
+  bool visitHiddenType(HiddenType *ty) { return false; }
+  bool visitJoinType(JoinType *ty) { return false; }
+  bool visitMeetType(MeetType *ty) { return false; }
   bool visitTypeAliasType(TypeAliasType *ty) {
     if (auto parent = ty->getParent())
       if (doIt(parent)) return true;
@@ -121,6 +124,11 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
     if (Type thrownError = ty->getThrownError()) {
       if (doIt(thrownError))
+        return true;
+    }
+
+    if (auto sendableDep = ty->getSendableDependentType()) {
+      if (doIt(sendableDep))
         return true;
     }
 
@@ -302,17 +310,16 @@ class Traversal : public TypeVisitor<Traversal, bool>
     }
     return false;
   }
-  
-  bool visitBuiltinFixedArrayType(BuiltinFixedArrayType *ty) {
-    if (ty->getSize() && doIt(ty->getSize()))  {
-      return true;
-    }
-    if (ty->getElementType() && doIt(ty->getElementType())) {
-      return true;
+
+  bool visitBuiltinGenericType(BuiltinGenericType *ty) {
+    for (auto replacement : ty->getSubstitutions().getReplacementTypes()) {
+      if (replacement && doIt(replacement)) {
+        return true;
+      }
     }
     return false;
   }
-
+  
 public:
   explicit Traversal(TypeWalker &walker) : Walker(walker) {}
 

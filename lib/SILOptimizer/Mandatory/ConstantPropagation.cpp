@@ -15,6 +15,9 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 using namespace swift;
 
@@ -42,6 +45,13 @@ private:
 
     if (Invalidation != SILAnalysis::InvalidationKind::Nothing) {
       invalidateAnalysis(Invalidation);
+      if ((Invalidation & SILAnalysis::InvalidationKind::Branches) != 0) {
+        removeUnreachableBlocks(*getFunction());
+        if (getFunction()->needBreakInfiniteLoops())
+          breakInfiniteLoops(getPassManager(), getFunction());
+        if (getFunction()->needCompleteLifetimes())
+          completeAllLifetimes(getPassManager(), getFunction());
+      }
     }
   }
 };

@@ -9,7 +9,8 @@
 name: 🪲 Report a bug
 description: >
   Report a deviation from expected or documented behavior, but not a crash.
-labels: [bug, triage needed]
+labels: [triage needed]
+type: Bug
 body:
   - type: markdown
     attributes:

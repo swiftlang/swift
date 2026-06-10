@@ -23,6 +23,9 @@ class Decl;
 /// Extra information associated with a source file that is lazily created and
 /// stored in a separately-allocated side structure.
 struct SourceFileExtras {
+  /// Set of compatibility memberwise initializers that we have emitted a
+  /// warning for.
+  llvm::DenseSet<const ConstructorDecl *> DiagnosedCompatMemberwiseInits;
 };
   
 }

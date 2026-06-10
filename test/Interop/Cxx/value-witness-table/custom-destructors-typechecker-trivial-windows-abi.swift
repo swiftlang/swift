@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -Xcc -DWIN_TRIVIAL
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -enable-experimental-cxx-interop -Xcc -DWIN_TRIVIAL
 
 // REQUIRES: OS=windows-msvc
 

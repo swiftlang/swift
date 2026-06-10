@@ -18,13 +18,14 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/BinaryFormat/COFF.h"
-#include "llvm/BinaryFormat/MachO.h"
 #include "llvm/BinaryFormat/ELF.h"
+#include "llvm/BinaryFormat/MachO.h"
+#include "llvm/BinaryFormat/Wasm.h"
 #include "llvm/Object/COFF.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Memory.h"
-#include "llvm/ADT/STLExtras.h"
 
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/ObjectFile.h"
@@ -40,6 +41,8 @@
 #include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Basic/Unreachable.h"
 
+#include <cstdint>
+#include <map>
 #include <set>
 #include <utility>
 #include <vector>
@@ -72,6 +75,11 @@
 #define HAS_DISPATCH_LOCK_IS_LOCKED 1
 #endif
 
+#define DEBUG_TYPE "reflection"
+#ifdef SWIFT_RUNTIME
+#undef LLVM_DEBUG
+#define LLVM_DEBUG(IGNORE)
+#endif
 namespace {
 
 template <unsigned PointerSize> struct MachOTraits;
@@ -81,6 +89,7 @@ template <> struct MachOTraits<4> {
   using SegmentCmd = const struct llvm::MachO::segment_command;
   using Section = const struct llvm::MachO::section;
   static constexpr size_t MagicNumber = llvm::MachO::MH_MAGIC;
+  static constexpr uint32_t SegmentLoadCommand = llvm::MachO::LC_SEGMENT;
 };
 
 template <> struct MachOTraits<8> {
@@ -88,6 +97,7 @@ template <> struct MachOTraits<8> {
   using SegmentCmd = const struct llvm::MachO::segment_command_64;
   using Section = const struct llvm::MachO::section_64;
   static constexpr size_t MagicNumber = llvm::MachO::MH_MAGIC_64;
+  static constexpr uint32_t SegmentLoadCommand = llvm::MachO::LC_SEGMENT_64;
 };
 
 template <unsigned char ELFClass> struct ELFTraits;
@@ -205,7 +215,9 @@ public:
     uint64_t Id;
     StoredPointer RunJob;
     StoredPointer AllocatorSlabPtr;
+    StoredPointer ParentTask;
     std::vector<StoredPointer> ChildTasks;
+    std::vector<StoredPointer> WaitingTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
     StoredPointer ResumeAsyncContext;
   };
@@ -252,54 +264,71 @@ public:
     auto Header = reinterpret_cast<typename T::Header *>(Buf.get());
     assert(Header->magic == T::MagicNumber && "invalid MachO file");
 
-    auto NumCommands = Header->sizeofcmds;
+    auto NumCommands = Header->ncmds;
+    auto SizeOfCommands = Header->sizeofcmds;
 
     // The layout of the executable is such that the commands immediately follow
     // the header.
     auto CmdStartAddress = ImageStart + sizeof(typename T::Header);
-    uint32_t SegmentCmdHdrSize = sizeof(typename T::SegmentCmd);
-    uint64_t Offset = 0;
+
+    // Read all of the load commands.
+    auto LoadCmdsBuf =
+        this->getReader().readBytes(CmdStartAddress, SizeOfCommands);
+    if (!LoadCmdsBuf)
+      return {};
+    auto LoadCmds = reinterpret_cast<const char *>(LoadCmdsBuf.get());
+
+    // Invoke `visitor(CmdHdr, Offset)` for each segment load command. Return
+    // false to stop iteration.
+    auto forEachSegment = [&](auto &&visitor) {
+      uint64_t Offset = 0;
+      for (unsigned I = 0; I < NumCommands; ++I) {
+        // Guard against malformed input; if the load command goes past the end
+        // of what we've read, bail out.
+        if (Offset + sizeof(llvm::MachO::load_command) > SizeOfCommands)
+          return;
+
+        auto Cmd = reinterpret_cast<const llvm::MachO::load_command *>(
+            LoadCmds + Offset);
+        auto CmdSize = Cmd->cmdsize;
+        if (Cmd->cmd == T::SegmentLoadCommand) {
+          // Check that the full segment command lies within the buffer too.
+          if (Offset + sizeof(typename T::SegmentCmd) > SizeOfCommands)
+            return;
+
+          auto CmdHdr =
+              reinterpret_cast<typename T::SegmentCmd *>(LoadCmds + Offset);
+          if (!visitor(CmdHdr, Offset))
+            return;
+        }
+        Offset += CmdSize;
+      }
+    };
 
     // Find the __TEXT segment.
     typename T::SegmentCmd *TextCommand = nullptr;
-    for (unsigned I = 0; I < NumCommands; ++I) {
-      auto CmdBuf = this->getReader().readBytes(CmdStartAddress + Offset,
-                                                SegmentCmdHdrSize);
-      if (!CmdBuf)
-        return {};
-      auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
-      if (strncmp(CmdHdr->segname, "__TEXT", sizeof(CmdHdr->segname)) == 0) {
-        TextCommand = CmdHdr;
-        savedBuffers.push_back(std::move(CmdBuf));
-        break;
-      }
-      Offset += CmdHdr->cmdsize;
-    }
+    uint64_t TextOffset = 0;
+    forEachSegment([&](auto *CmdHdr, uint64_t Offset) {
+      if (strncmp(CmdHdr->segname, "__TEXT", sizeof(CmdHdr->segname)) != 0)
+        return true;
+      TextCommand = CmdHdr;
+      TextOffset = Offset;
+      return false;
+    });
 
     // No __TEXT segment, bail out.
     if (!TextCommand)
       return {};
 
-   // Find the load command offset.
-    auto loadCmdOffset = ImageStart + Offset + sizeof(typename T::Header);
+    // The sections start immediately after the __TEXT segment's load command.
+    unsigned NumSect = TextCommand->nsects;
+    auto SectionsBuf = reinterpret_cast<const char *>(TextCommand + 1);
 
-    // Read the load command.
-    auto LoadCmdBuf = this->getReader().readBytes(
-        loadCmdOffset, sizeof(typename T::SegmentCmd));
-    if (!LoadCmdBuf)
-      return {};
-    auto LoadCmd = reinterpret_cast<typename T::SegmentCmd *>(LoadCmdBuf.get());
-
-    // The sections start immediately after the load command.
-    unsigned NumSect = LoadCmd->nsects;
-    auto SectAddress = loadCmdOffset + sizeof(typename T::SegmentCmd);
-    auto Sections = this->getReader().readBytes(
-        SectAddress, NumSect * sizeof(typename T::Section));
-    if (!Sections)
+    // Make sure they all lie within the buffer we've read.
+    if (TextOffset + NumSect * sizeof(typename T::Section) > SizeOfCommands)
       return {};
 
     auto Slide = ImageStart - TextCommand->vmaddr;
-    auto SectionsBuf = reinterpret_cast<const char *>(Sections.get());
 
     auto findMachOSectionByName = [&](llvm::StringRef Name)
         -> std::pair<RemoteRef<void>, uint64_t> {
@@ -366,14 +395,8 @@ public:
     auto TextSegmentEnd = TextSegmentStart + TextCommand->vmsize;
     textRanges.push_back(std::make_tuple(TextSegmentStart, TextSegmentEnd));
 
-    // Find the __DATA segments.
-    for (unsigned I = 0; I < NumCommands; ++I) {
-      auto CmdBuf = this->getReader().readBytes(CmdStartAddress + Offset,
-                                                SegmentCmdHdrSize);
-      if (!CmdBuf)
-        return {};
-      auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
-      // Look for any segment name starting with __DATA or __AUTH.
+    // Find the __DATA and __AUTH segments.
+    forEachSegment([&](auto *CmdHdr, uint64_t Offset) {
       if (strncmp(CmdHdr->segname, "__DATA", 6) == 0 ||
           strncmp(CmdHdr->segname, "__AUTH", 6) == 0) {
         auto DataSegmentStart = Slide + CmdHdr->vmaddr;
@@ -382,11 +405,9 @@ public:
                "invalid range for __DATA/__AUTH");
         dataRanges.push_back(std::make_tuple(DataSegmentStart, DataSegmentEnd));
       }
-      Offset += CmdHdr->cmdsize;
-    }
+      return true;
+    });
 
-    savedBuffers.push_back(std::move(Buf));
-    savedBuffers.push_back(std::move(Sections));
     return InfoID;
   }
 
@@ -557,6 +578,26 @@ public:
 
     if (sizeof(typename T::Section) > SectionEntrySize)
       return {};
+
+    // Special handling for large amount of sections.
+    // From the elf man page, describing e_shnum:
+    //
+    // If the number of entries in the section header table is
+    // larger than or equal to SHN_LORESERVE (0xff00), e_shnum
+    // holds the value zero and the real number of entries in the
+    // section header table is held in the sh_size member of the
+    // initial entry in section header table.  Otherwise, the
+    // sh_size member of the initial entry in the section header
+    // table holds the value zero.
+    if (SectionHdrNumEntries == 0 && SectionEntrySize > 0) {
+      auto SecBuf = readData(SectionHdrAddress, sizeof(typename T::Section));
+      if (!SecBuf)
+        return {};
+      const typename T::Section *FirstSectHdr =
+          reinterpret_cast<const typename T::Section *>(SecBuf);
+      SectionHdrNumEntries = FirstSectHdr->sh_size;
+    }
+
     if (SectionHdrNumEntries == 0)
       return {};
 
@@ -799,6 +840,297 @@ public:
     }
   }
 
+  /// Parses metadata information from a WebAssembly image.
+  ///
+  ///
+  /// \param[in] ImageStart
+  ///     A remote address pointing to the start of the image in the running
+  ///     process.
+  ///
+  /// \param[in] FileBuffer
+  ///     A buffer which contains the contents of the image's file
+  ///     in disk. If missing, all the information will be read using the
+  ///     instance's memory reader.
+  ///
+  /// \return The newly added reflection info ID if successful, \b std::nullopt
+  ///     otherwise.
+  std::optional<uint32_t>
+  readWasm(RemoteAddress ImageStart,
+           std::optional<llvm::sys::MemoryBlock> FileBuffer,
+           llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames) {
+    /// A WASM data segment. The reflection metadata "sections" are DATA
+    /// segments.
+    struct Segment {
+      RemoteAddress remoteAddr;
+      uint64_t offset;
+      uint64_t size;
+    };
+    std::map<std::string, Segment> sections;
+    std::vector<Segment> segments;
+    auto &reader = getReader();
+    RemoteAddress cursor = ImageStart;
+    cursor += sizeof(llvm::wasm::WasmMagic) + sizeof(llvm::wasm::WasmVersion);
+
+    /// Decode one byte and move the cursor.
+    auto decodeU8 = [&reader, &cursor](uint8_t &b) -> bool {
+      if (!reader.readInteger(cursor, 1, &b))
+        return false;
+      cursor += 1;
+      return true;
+    };
+
+    /// Decode 32-bit ULEB constants.
+    auto decodeULEB32 = [&](uint32_t &val) -> bool {
+      uint64_t result = 0;
+      uint8_t b;
+      for (uint8_t n = 0; n < 5; ++n) {
+        if (!decodeU8(b))
+          return false;
+        result |= (b & ~(1 << 7)) << 7 * n;
+        if ((b & (1 << 7)) == 0)
+          break;
+      }
+      if (result > std::numeric_limits<uint32_t>::max())
+        return false;
+      memcpy(&val, &result, 4);
+      return true;
+    };
+
+    /// Decode a string.
+    auto decodeString = [&](std::string &str) -> bool {
+      uint32_t len;
+      if (!decodeULEB32(len))
+        return false;
+      auto chars = reader.readBytes(cursor, len);
+      if (!chars)
+        return false;
+      str = std::string((const char *)chars.get(), len);
+      cursor += len;
+      chars.release();
+      return true;
+    };
+
+    /// Decode one section header.
+    auto decodeSection = [&]() -> bool {
+      uint8_t sectionID;
+      if (!decodeU8(sectionID))
+        return false;
+
+      if (sectionID > llvm::wasm::WASM_SEC_LAST_KNOWN)
+        return false;
+
+      uint32_t payloadLen;
+      if (!decodeULEB32(payloadLen))
+        return false;
+      RemoteAddress payloadStart = cursor;
+      std::string sectName;
+      if (sectionID == llvm::wasm::WASM_SEC_CUSTOM) {
+        if (!decodeString(sectName))
+          return false;
+        RemoteAddress sectionStart = cursor;
+        sections.insert(
+            {sectName, {cursor, 0, payloadLen - (sectionStart - cursor)}});
+      } else {
+        sectName = llvm::wasm::sectionTypeToString(sectionID);
+        sections.insert({sectName, {cursor, 0, payloadLen}});
+      }
+      LLVM_DEBUG(llvm::dbgs()
+                 << "section " << sectName << " size=" << payloadLen << "\n");
+
+      cursor = payloadStart + payloadLen;
+      return true;
+    };
+
+    // Decode the DATA segments.
+    auto decodeData = [&](uint64_t sectLength) -> bool {
+      RemoteAddress start = cursor;
+      RemoteAddress end = start + sectLength;
+      uint32_t count;
+
+      auto decodeActiveSegmentOffset = [&]() -> std::optional<uint32_t> {
+        uint32_t offset = 0;
+        while (true) {
+          uint8_t b;
+          if (!decodeU8(b))
+            return {};
+
+          if (b == llvm::wasm::WASM_OPCODE_I32_CONST) {
+            if (!decodeULEB32(offset)) // FIXME: Actually an SLEB.
+              return {};
+          } else if (b == llvm::wasm::WASM_OPCODE_END) {
+            break;
+          } else {
+            // Unhandled opcode.
+            return {};
+          }
+        }
+        return offset;
+      };
+
+      if (!decodeULEB32(count))
+        return false;
+      // Parse the segment header.
+      for (uint32_t i = 0; i < count && cursor < end; ++i) {
+        uint32_t flags;
+        uint32_t offset = 0;
+        if (!decodeULEB32(flags))
+          return false;
+        if ((flags & 2) == 2) {
+          uint32_t memidx;
+          if (!decodeULEB32(memidx))
+            return false;
+        }
+        if ((flags & 1) == 0) {
+          auto offsOrErr = decodeActiveSegmentOffset();
+          if (!offsOrErr)
+            return false;
+          offset = *offsOrErr;
+        }
+        uint32_t size;
+        if (!decodeULEB32(size))
+          return false;
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Segment[" << i << "]: flags=" << flags
+                   << " offset=" << offset << " size=" << size << "\n");
+        segments.push_back({cursor, offset, size});
+        cursor += size;
+      }
+      return true;
+    };
+    // Decode the NAMES table pointing to the DATA segments.
+    auto decodeNames = [&](uint64_t sectLength) -> bool {
+      RemoteAddress start = cursor;
+      RemoteAddress end = start + sectLength;
+      while (cursor < end) {
+        uint8_t type;
+        if (!decodeU8(type))
+          return false;
+        uint32_t len;
+        if (!decodeULEB32(len))
+          return false;
+        if (type == llvm::wasm::WASM_NAMES_DATA_SEGMENT) {
+          uint32_t count;
+          if (!decodeULEB32(count))
+            return false;
+          for (uint32_t i = 0; i < count; ++i) {
+            uint32_t idx;
+            if (!decodeULEB32(idx))
+              return false;
+            std::string sectName;
+            if (!decodeString(sectName))
+              return false;
+            if (idx >= segments.size())
+              return false;
+            LLVM_DEBUG(llvm::dbgs() << sectName << ": " << idx << "\n");
+            sections.insert({sectName, segments[idx]});
+          }
+        }
+        cursor += len;
+      }
+      return true;
+    };
+    // Decode the LINK section of object files.
+    auto decodeLinking = [&](RemoteAddress dataStart,
+                             uint64_t sectLength) -> bool {
+      RemoteAddress start = cursor;
+      RemoteAddress end = start + sectLength;
+
+      uint32_t version;
+      if (!decodeULEB32(version) || version != 2)
+        return false;
+      while (cursor < end) {
+        uint8_t type;
+        if (!decodeU8(type))
+          return false;
+        uint32_t len;
+        if (!decodeULEB32(len))
+          return false;
+        if (type == llvm::wasm::WASM_SEGMENT_INFO) {
+          uint32_t count;
+          if (!decodeULEB32(count))
+            return false;
+          for (uint32_t idx = 0; idx < count; ++idx) {
+            std::string sectName;
+            if (!decodeString(sectName))
+              return false;
+            uint32_t align;
+            if (!decodeULEB32(align))
+              return false;
+            uint32_t flags;
+            if (!decodeULEB32(flags))
+              return false;
+            LLVM_DEBUG(llvm::dbgs() << sectName << ": " << idx << "\n");
+            sections.insert({sectName, segments[idx]});
+          }
+        }
+        cursor += len;
+      }
+      return true;
+    };
+
+    while (decodeSection()) {
+    };
+    auto dataSect = sections.find("DATA");
+    if (dataSect == sections.end())
+      return false;
+
+    auto [dataStart, _, dataLength] = dataSect->second;
+    cursor = dataStart;
+    if (!decodeData(dataLength))
+      return false;
+
+    auto nameSect = sections.find("name");
+    if (nameSect != sections.end()) {
+      cursor = nameSect->second.remoteAddr;
+      if (!decodeNames(nameSect->second.size))
+        return false;
+    } else {
+      // This may be an object file?
+      auto linkingSect = sections.find("linking");
+      if (linkingSect == sections.end())
+        return false;
+      cursor = linkingSect->second.remoteAddr;
+      if (!decodeLinking(dataStart, linkingSect->second.size))
+        return false;
+    }
+
+    // Find reflection sections within the data section segments.
+    auto lookup =
+        [&](const std::string &name) -> std::pair<RemoteRef<void>, uint64_t> {
+      auto sectionIt = sections.find(name);
+      if (sectionIt == sections.end())
+        return {{}, 0};
+      auto &section = sectionIt->second;
+      RemoteAddress mappedSectionStart(0 + section.offset,
+                                       RemoteAddress::DefaultAddressSpace);
+      auto secBuf = reader.readBytes(section.remoteAddr, section.size);
+      auto secContents = RemoteRef<void>(mappedSectionStart, secBuf.get());
+      savedBuffers.push_back(std::move(secBuf));
+      LLVM_DEBUG(llvm::dbgs() << name << " @ " << section.offset << "\n");
+      return {secContents, section.size};
+    };
+
+    auto FieldMdSec = lookup("swift5_fieldmd");
+    auto AssocTySec = lookup("swift5_assocty");
+    auto BuiltinTySec = lookup("swift5_builtin");
+    auto CaptureSec = lookup("swift5_capture");
+    auto TypeRefMdSec = lookup("swift5_typeref");
+    auto ReflStrMdSec = lookup("swift5_reflstr");
+    auto ConformMdSec = lookup("swift5_protocol_conformances");
+    auto MPEnumMdSec = lookup("swift5_mpenum");
+
+    ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
+                           {AssocTySec.first, AssocTySec.second},
+                           {BuiltinTySec.first, BuiltinTySec.second},
+                           {CaptureSec.first, CaptureSec.second},
+                           {TypeRefMdSec.first, TypeRefMdSec.second},
+                           {ReflStrMdSec.first, ReflStrMdSec.second},
+                           {ConformMdSec.first, ConformMdSec.second},
+                           {MPEnumMdSec.first, MPEnumMdSec.second},
+                           PotentialModuleNames};
+    return addReflectionInfo(info);
+  }
+
   /// On success returns the ID of the newly registered Reflection Info.
   std::optional<uint32_t>
   addImage(RemoteAddress ImageStart,
@@ -827,7 +1159,6 @@ public:
       return readPECOFF(ImageStart, PotentialModuleNames);
     }
 
-
     // ELF.
     if (MagicBytes[0] == llvm::ELF::ElfMagic[0]
         && MagicBytes[1] == llvm::ELF::ElfMagic[1]
@@ -837,6 +1168,14 @@ public:
                      PotentialModuleNames);
     }
 
+    // WASM.
+    if (MagicBytes[0] == llvm::wasm::WasmMagic[0] &&
+        MagicBytes[1] == llvm::wasm::WasmMagic[1] &&
+        MagicBytes[2] == llvm::wasm::WasmMagic[2] &&
+        MagicBytes[3] == llvm::wasm::WasmMagic[3]) {
+      return readWasm(ImageStart, std::optional<llvm::sys::MemoryBlock>(),
+                      PotentialModuleNames);
+    }
     // We don't recognize the format.
     return std::nullopt;
   }
@@ -1344,6 +1683,10 @@ public:
     return Descriptor->getTypeContextDescriptorFlags().class_isActor();
   }
 
+  size_t metadataSize(RemoteAddress MetadataAddress) {
+    return this->readMetadataAndSize(MetadataAddress).second;
+  }
+
   /// Iterate the protocol conformance cache tree rooted at NodePtr, calling
   /// Call with the type and protocol in each node.
   void iterateConformanceTree(
@@ -1506,11 +1849,11 @@ public:
       return "failed to read value of " + AllocationPoolPointerName;
 
     struct PoolRange {
-      RemoteAddress Begin;
+      StoredPointer Begin;
       StoredSize Remaining;
     };
     struct PoolTrailer {
-      RemoteAddress PrevTrailer;
+      StoredPointer PrevTrailer;
       StoredSize PoolSize;
     };
     struct alignas(RemoteAddress) AllocationHeader {
@@ -1531,7 +1874,9 @@ public:
     unsigned LoopCount = 0;
     unsigned LoopLimit = 1000000;
 
-    auto TrailerPtr = Pool->Begin + Pool->Remaining;
+    auto PoolAddressSpace = AllocationPoolAddr->getResolvedAddress().getAddressSpace();
+
+    auto TrailerPtr = RemoteAddress(Pool->Begin + Pool->Remaining, PoolAddressSpace);
     while (TrailerPtr && LoopCount++ < LoopLimit) {
       auto TrailerBytes =
           getReader().readBytes(TrailerPtr, sizeof(PoolTrailer));
@@ -1563,7 +1908,7 @@ public:
         Offset += sizeof(AllocationHeader) + Header->Size;
       }
 
-      TrailerPtr = Trailer->PrevTrailer;
+      TrailerPtr = RemoteAddress(Trailer->PrevTrailer, PoolAddressSpace);
     }
     return std::nullopt;
   }
@@ -1760,6 +2105,63 @@ private:
     return {false, 0};
   }
 
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t nameFragmentOffset() const {
+    return asyncTaskSize;
+  }
+
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t childFragmentOffset(swift::JobFlags flags) const {
+    size_t offset = nameFragmentOffset();
+    if (flags.task_hasInitialTaskName())
+      offset += sizeof(NameFragment<Runtime>);
+    return offset;
+  }
+
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t groupChildFragmentOffset(swift::JobFlags flags) const {
+    size_t offset = childFragmentOffset(flags);
+    if (flags.task_isChildTask())
+      offset += sizeof(ChildFragment<Runtime>);
+    return offset;
+  }
+
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t futureFragmentOffset(swift::JobFlags flags) const {
+    size_t offset = groupChildFragmentOffset(flags);
+    if (flags.task_isGroupChildTask())
+      offset += sizeof(GroupChildFragment<Runtime>);
+    return offset;
+  }
+
+  /// Address of `NameFragment` for `task`.
+  RemoteAddress nameFragmentAddr(RemoteAddress task,
+                                 swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_hasInitialTaskName());
+    return task + nameFragmentOffset();
+  }
+
+  /// Address of `ChildFragment` for `task`.
+  RemoteAddress childFragmentAddr(RemoteAddress task,
+                                  swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_isChildTask());
+    return task + childFragmentOffset(flags);
+  }
+
+  /// Address of `GroupChildFragment` for `task`.
+  RemoteAddress groupChildFragmentAddr(RemoteAddress task,
+                                       swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_isGroupChildTask());
+    return task + groupChildFragmentOffset(flags);
+  }
+
+  /// Address of `FutureFragment` for `task`.
+  RemoteAddress futureFragmentAddr(RemoteAddress task,
+                                   swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_isFuture());
+    return task + futureFragmentOffset(flags);
+  }
+
   template <typename AsyncTaskType>
   std::pair<std::optional<std::string>, AsyncTaskInfo>
   asyncTaskInfo(RemoteAddress AsyncTaskPtr, unsigned ChildTaskLimit,
@@ -1796,6 +2198,15 @@ private:
         AsyncTaskObj->Id | ((uint64_t)AsyncTaskObj->PrivateStorage.Id << 32);
     Info.AllocatorSlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
     Info.RunJob = getRunJob(AsyncTaskObj.get());
+
+    Info.ParentTask = 0;
+    if (Info.IsChildTask && asyncTaskSize != 0) {
+      RemoteAddress ChildFragmentAddr = childFragmentAddr(AsyncTaskPtr, JobFlags);
+      auto ChildFragmentObj =
+          readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
+      if (ChildFragmentObj)
+        Info.ParentTask = ChildFragmentObj->Parent;
+    }
 
     // Find all child tasks.
     unsigned ChildTaskLoopCount = 0;
@@ -1840,7 +2251,7 @@ private:
                                 "iterate child tasks"),
                     Info};
 
-          RemoteAddress ChildFragmentAddr = ChildTaskAddress + asyncTaskSize;
+          RemoteAddress ChildFragmentAddr = childFragmentAddr(ChildTaskAddress, ChildJobFlags);
           auto ChildFragmentObj =
               readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
           if (ChildFragmentObj)
@@ -1855,6 +2266,37 @@ private:
 
       RecordPtr =
           RemoteAddress(RecordObj->Parent, RemoteAddress::DefaultAddressSpace);
+    }
+
+    // Read the wait queue from the FutureFragment, if this is a future task.
+    if (Info.IsFuture && asyncTaskSize != 0) {
+      RemoteAddress FutureFragmentAddr = futureFragmentAddr(AsyncTaskPtr, JobFlags);
+      auto FutureFragmentObj =
+          readObj<FutureFragment<Runtime>>(FutureFragmentAddr);
+      if (FutureFragmentObj) {
+        // The low 2 bits of WaitQueue are the status; the rest is the first
+        // waiting task pointer.
+        // See FutureFragment::WaitQueueItem in include/swift/ABI/Task.h.
+        const StoredPointer statusMask = 0x03;
+        StoredPointer WaitingTaskPtr =
+            FutureFragmentObj->WaitQueue & ~statusMask;
+
+        // Walk the singly linked list of waiting tasks.
+        unsigned WaitQueueLoopCount = 0;
+        while (WaitingTaskPtr && WaitQueueLoopCount++ < ChildTaskLimit) {
+          Info.WaitingTasks.push_back(WaitingTaskPtr);
+          // The next waiting task is stored in SchedulerPrivate[0] of the
+          // waiting task.
+          // See Job::NextWaitingTaskIndex and AsyncTask::getNextWaitingTask()
+          // in include/swift/ABI/Task.h.
+          RemoteAddress WaitingTaskAddress =
+              RemoteAddress(WaitingTaskPtr, RemoteAddress::DefaultAddressSpace);
+          auto WaitingTaskObj = readObj<AsyncTaskType>(WaitingTaskAddress);
+          if (!WaitingTaskObj)
+            break;
+          WaitingTaskPtr = WaitingTaskObj->SchedulerPrivate[0];
+        }
+      }
     }
 
     const auto TaskResumeContext = stripSignedPointer(
@@ -2021,14 +2463,16 @@ private:
     Builder.addField(*OffsetToFirstCapture,
                      /*alignment=*/sizeof(StoredPointer),
                      /*numExtraInhabitants=*/0,
-                     /*bitwiseTakable=*/true);
+                     /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
+                     /*afd*/ false);
 
     // Skip the closure's necessary bindings struct, if it's present.
     auto SizeOfNecessaryBindings = Info.NumBindings * sizeof(StoredPointer);
     Builder.addField(/*size=*/SizeOfNecessaryBindings,
                      /*alignment=*/sizeof(StoredPointer),
                      /*numExtraInhabitants=*/0,
-                     /*bitwiseTakable=*/true);
+                     /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
+                     /*afd*/ false);
 
     // FIXME: should be unordered_set but I'm too lazy to write a hash
     // functor
@@ -2075,6 +2519,10 @@ private:
       // substitutions.
       bool Progress = false;
       for (auto Source : Info.MetadataSources) {
+        // If either component of the source is NULL, something went wrong.
+        if (!Source.first || !Source.second)
+          return nullptr;
+
         // Don't read a source more than once.
         if (Done.count(Source))
           continue;
@@ -2153,6 +2601,9 @@ private:
   std::optional<RemoteAddress>
   readMetadataSource(RemoteAddress Context, const MetadataSource *MS,
                      const RecordTypeInfoBuilder &Builder) {
+    if (!MS)
+      return std::nullopt;
+
     switch (MS->getKind()) {
     case MetadataSourceKind::ClosureBinding: {
       unsigned Index = cast<ClosureBindingMetadataSource>(MS)->getIndex();

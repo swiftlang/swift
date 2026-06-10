@@ -3,7 +3,7 @@
 // RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
 // RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 
-// RUN: %target-sil-opt -sil-print-types -sdk %clang-importer-sdk-path -enable-sil-verify-all %s -sil-combine -jumpthread-simplify-cfg -I %t | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sdk %clang-importer-sdk-path -Xcc -isystem -Xcc %clang-importer-sdk-path/usr/include -enable-sil-verify-all %s -sil-combine -jumpthread-simplify-cfg -I %t | %FileCheck %s
 
 sil_stage canonical
 
@@ -43,7 +43,7 @@ bb1:
   return %15 : $()
 
 bb2:
-  %19 = unchecked_take_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
+  %19 = unchecked_inplace_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
   copy_addr [take] %19 to [init] %2 : $*CustomStringConvertible
   br bb1
 }
@@ -78,7 +78,7 @@ bb2:
   br bb1
 
 bb3:
-  %19 = unchecked_take_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
+  %19 = unchecked_inplace_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
   copy_addr [take] %19 to [init] %2 : $*CustomStringConvertible
   br bb1
 }
@@ -91,7 +91,6 @@ bb3:
 // CHECK: store
 // CHECK-NOT: checked_cast_addr_br
 // CHECK-NOT: bb1
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<any CustomStringConvertible>, #Optional.some!enumelt
 // CHECK: dealloc_stack
 // CHECK: return
 sil @convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> () {
@@ -144,10 +143,8 @@ private class D : C {
 //
 // CHECK-LABEL: sil @convert_checked_cast_addr_br_with_internal_type : $@convention(thin) (@in A, @inout _Stdout) -> ()
 // CHECK: checked_cast_addr_br
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<any CustomStringConvertible>, #Optional.some!enumelt
 // CHECK: dealloc_stack
 // CHECK: return
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<any CustomStringConvertible>, #Optional.none!enumelt
 // CHECK: }
 sil @convert_checked_cast_addr_br_with_internal_type : $@convention(thin) (@in A, @inout _Stdout) -> () {
 bb0(%0 : $*A, %1 : $*_Stdout):
@@ -186,7 +183,6 @@ bb22:
 // CHECK: store
 // CHECK-NOT: checked_cast_addr_br
 // CHECK-NOT: bb1
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<any CustomStringConvertible>, #Optional.none!enumelt
 // CHECK: dealloc_stack
 // CHECK: return
 sil @convert_checked_cast_addr_br_with_private_type : $@convention(thin) (@in B, @inout _Stdout) -> () {
@@ -224,10 +220,8 @@ bb22:
 //
 // CHECK-LABEL: sil @convert_checked_cast_addr_br_with_non_private_superclass : $@convention(thin) (@in D, @inout _Stdout) -> ()
 // CHECK: checked_cast_addr_br
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<any CustomStringConvertible>, #Optional.some!enumelt
 // CHECK: dealloc_stack
 // CHECK: return
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<any CustomStringConvertible>, #Optional.none!enumelt
 // CHECK: }
 sil @convert_checked_cast_addr_br_with_non_private_superclass : $@convention(thin) (@in D, @inout _Stdout) -> () {
 bb0(%0 : $*D, %1 : $*_Stdout):

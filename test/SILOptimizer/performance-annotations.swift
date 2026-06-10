@@ -22,7 +22,7 @@ struct Str : P {
     return a + x
   }
 
-  static let s = 27
+  static let s = 27 << 0
   static var s2 = 10 + s
   static var s3 = initFunc() // expected-error {{global/static variable initialization can cause locking}}
 }

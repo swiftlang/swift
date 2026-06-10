@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/ConformingMethodList.h"
-#include "ExprContextAnalysis.h"
 #include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -123,7 +122,7 @@ void ConformingMethodListCallbacks::readyForTypeChecking(SourceFile *SrcFile) {
   Type T = Res.Ty;
   WithSolutionSpecificVarTypesRAII VarType(Res.SolutionSpecificVarTypes);
 
-  if (!T || T->is<ErrorType>() || T->is<UnresolvedType>())
+  if (!T || T->is<ErrorType>())
     return;
 
   T = T->getRValueType();
@@ -135,7 +134,7 @@ void ConformingMethodListCallbacks::readyForTypeChecking(SourceFile *SrcFile) {
 
   auto interfaceTy = T;
   if (T->hasArchetype())
-    interfaceTy = interfaceTy->mapTypeOutOfContext();
+    interfaceTy = interfaceTy->mapTypeOutOfEnvironment();
 
   llvm::SmallPtrSet<ProtocolDecl*, 8> expectedProtocols;
   for (auto Name: ExpectedTypeNames) {

@@ -226,7 +226,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
 
       // The mangling for nonisolated(nonsending) function types was introduced
       // in Swift 6.2.
-      if (isolation.isNonIsolatedCaller())
+      if (isolation.isNonisolatedNonsending())
         return addRequirement(Swift_6_2);
 
       // The Swift 6.1 runtime fixes a bug preventing successful demangling
@@ -320,7 +320,7 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
   IRGenMangler mangler(IGM.Context);
   std::string symbolName =
     mangler.mangleSymbolNameForMangledMetadataAccessorString(
-                                                   "get_type_metadata", sig, t);
+                                                   "get_type_metadata", sig, t, role);
   auto constant = IGM.getAddrOfStringForMetadataRef(symbolName, /*align*/2,
                                                     /*low bit*/false,
     [&](ConstantInitBuilder &B) {
@@ -348,12 +348,25 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
         auto bindingsBufPtr = IGF.collectParameters().claimNext();
 
         auto substT = genericEnv
-          ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
+          ? genericEnv->mapTypeIntoEnvironment(t)->getCanonicalType()
           : t;
 
-        // If a type is noncopyable, lie about the resolved type unless the
-        // runtime is sufficiently aware of noncopyable types.
-        if (substT->isNoncopyable()) {
+        // If a type is noncopyable, lie about the resolved type to reflection
+        // APIs unless the runtime is sufficiently aware of noncopyable types.
+        bool shouldHideNoncopyableTypeFromOldRuntimes;
+        switch (role) {
+        case MangledTypeRefRole::Metadata:
+        case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+        case MangledTypeRefRole::FlatUnique:
+          shouldHideNoncopyableTypeFromOldRuntimes = false;
+          break;
+        case MangledTypeRefRole::FieldMetadata:
+        case MangledTypeRefRole::Reflection:
+          shouldHideNoncopyableTypeFromOldRuntimes = true;
+          break;
+        }
+        if (shouldHideNoncopyableTypeFromOldRuntimes
+            && substT->isNoncopyable()) {
           // Darwin-based platforms have ABI stability, and we want binaries
           // that use noncopyable types nongenerically today to be forward
           // compatible with a future OS runtime that supports noncopyable
@@ -371,16 +384,14 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
             // This is weird. When building the stdlib, we don't have access to
             // the swift_runtimeSupportsNoncopyableTypes symbol in the Swift.o,
             // so we'll emit an adrp + ldr to resolve the GOT address. However,
-            // this symbol is defined as an abolsute in the runtime object files
-            // to address 0x0 right now and ld doesn't quite understand how to
-            // fixup this GOT address when merging the runtime and stdlib. Just
-            // unconditionally fail the branch.
-            //
+            // this symbol is defined as an absolute in the runtime object files
+            // and ld doesn't quite understand how to fixup this GOT address
+            // when merging the runtime and stdlib. Just hardcode the value.
             // Note: When the value of this symbol changes, this MUST be
             // updated.
             if (IGM.getSwiftModule()->isStdlibModule()) {
               runtimeSupportsNoncopyableTypesSymbol
-                  = llvm::ConstantInt::get(IGM.Int8Ty, 0);
+                  = llvm::ConstantInt::get(IGM.Int8Ty, 1);
             } else {
               runtimeSupportsNoncopyableTypesSymbol
                   = IGM.Module.getOrInsertGlobal(
@@ -474,49 +485,57 @@ getTypeRefImpl(IRGenModule &IGM,
     break;
     
   case MangledTypeRefRole::FieldMetadata: {
-    // We want to keep fields of noncopyable type from being exposed to
-    // in-process runtime reflection libraries in older Swift runtimes, since
-    // they more than likely assume they can copy field values, and the language
-    // support for noncopyable types as dynamic or generic types isn't yet
-    // implemented as of the writing of this comment. If the type is
-    // noncopyable, use a function to emit the type ref which will look for a
-    // signal from future runtimes whether they support noncopyable types before
-    // exposing their metadata to them.
-    Type contextualTy = type;
-    if (sig) {
-      contextualTy = sig.getGenericEnvironment()->mapTypeIntoContext(type);
+    // If the deployment target's runtime doesn't have the isCopyable guards
+    // for Mirror, we need to hide unconditionally noncopyable fields behind
+    // an accessor function that checks swift_runtimeSupportsNoncopyableTypes
+    // at runtime, to prevent old Mirror implementations from crashing when
+    // they try to copy noncopyable field values.
+    bool needsNoncopyableGuard = false;
+    auto reflectionSafety =
+        IGM.Context.getNoncopyableReflectionSafetyAvailability();
+    if (!AvailabilityRange::forDeploymentTarget(IGM.Context)
+             .isContainedIn(reflectionSafety)) {
+      needsNoncopyableGuard = true;
     }
 
-    bool isAlwaysNoncopyable = false;
-    if (contextualTy->isNoncopyable()) {
-      isAlwaysNoncopyable = true;
+    if (needsNoncopyableGuard) {
+      Type contextualTy = type;
+      if (sig) {
+        contextualTy =
+            sig.getGenericEnvironment()->mapTypeIntoEnvironment(type);
+      }
 
-      // If the contextual type has any archetypes in it, it's plausible that
-      // we could end up with a copyable type in some instances. Look for those
-      // so we can permit unsafe reflection of the field, by assuming it could
-      // be Copyable.
-      if (contextualTy->hasArchetype()) {
-        // If this is a nominal type, check whether it can ever be copyable.
-        if (auto nominal = contextualTy->getAnyNominal()) {
-          // If it's a nominal that can ever be Copyable _and_ it's defined in
-          // the stdlib, assume that we could end up with a Copyable type.
-          if (nominal->canBeCopyable()
-              && nominal->getModuleContext()->isStdlibModule())
+      bool isAlwaysNoncopyable = false;
+      if (contextualTy->isNoncopyable()) {
+        isAlwaysNoncopyable = true;
+
+        // If the contextual type has any archetypes in it, it's plausible that
+        // we could end up with a copyable type in some instances. Look for
+        // those so we can permit unsafe reflection of the field, by assuming it
+        // could be Copyable.
+        if (contextualTy->hasArchetype()) {
+          // If this is a nominal type, check whether it can ever be copyable.
+          if (auto nominal = contextualTy->getAnyNominal()) {
+            // If it's a nominal that can ever be Copyable _and_ it's defined in
+            // the stdlib, assume that we could end up with a Copyable type.
+            if (nominal->canBeCopyable()
+                && nominal->getModuleContext()->isStdlibModule())
+              isAlwaysNoncopyable = false;
+          } else {
+            // Assume that we could end up with a Copyable type somehow.
+            // This allows you to reflect a 'T: ~Copyable' stored in a type.
             isAlwaysNoncopyable = false;
-        } else {
-          // Assume that we could end up with a Copyable type somehow.
-          // This allows you to reflect a 'T: ~Copyable' stored in a type.
-          isAlwaysNoncopyable = false;
+          }
         }
       }
-    }
 
-    // The getTypeRefByFunction strategy will emit a forward-compatible runtime
-    // check to see if the runtime can safely reflect such fields. Otherwise,
-    // the field will be artificially hidden to reflectors.
-    if (isAlwaysNoncopyable) {
-      IGM.IRGen.noteUseOfTypeMetadata(type);
-      return getTypeRefByFunction(IGM, sig, type, role);
+      // The getTypeRefByFunction strategy will emit a forward-compatible
+      // runtime check to see if the runtime can safely reflect such fields.
+      // Otherwise, the field will be artificially hidden to reflectors.
+      if (isAlwaysNoncopyable) {
+        IGM.IRGen.noteUseOfTypeMetadata(type);
+        return getTypeRefByFunction(IGM, sig, type, role);
+      }
     }
   }
   LLVM_FALLTHROUGH;
@@ -570,8 +589,7 @@ std::pair<llvm::Constant *, unsigned>
 IRGenModule::getLoweredTypeRef(SILType loweredType,
                                CanGenericSignature genericSig,
                                MangledTypeRefRole role) {
-  auto substTy =
-    substOpaqueTypesWithUnderlyingTypes(loweredType, genericSig);
+  auto substTy = substOpaqueTypesWithUnderlyingTypes(loweredType);
   auto type = substTy.getASTType();
   return getTypeRefImpl(*this, type, genericSig, role);
 }
@@ -587,8 +605,8 @@ IRGenModule::emitWitnessTableRefString(CanType type,
                                       ProtocolConformanceRef conformance,
                                       GenericSignature origGenericSig,
                                       bool shouldSetLowBit) {
-  std::tie(type, conformance)
-    = substOpaqueTypesWithUnderlyingTypes(type, conformance);
+  type = substOpaqueTypesWithUnderlyingTypes(type);
+  conformance = substOpaqueTypesWithUnderlyingTypes(conformance);
   
   auto origType = type;
   auto genericSig = origGenericSig.getCanonicalSignature();
@@ -628,7 +646,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
                 Address(bindingsBufPtr, Int8Ty, getPointerAlignment()),
                 MetadataState::Complete, genericEnv->getForwardingSubstitutionMap());
 
-            type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
+            type = genericEnv->mapTypeIntoEnvironment(type)->getCanonicalType();
           }
           if (origType->hasTypeParameter()) {
             conformance = conformance.subst(
@@ -904,8 +922,8 @@ public:
 private:
   const NominalTypeDecl *NTD;
 
-  void addField(reflection::FieldRecordFlags flags,
-                Type type, StringRef name) {
+  void addField(reflection::FieldRecordFlags flags, Type type,
+                std::optional<StringRef> name) {
     B.addInt32(flags.getRawValue());
 
     if (!type) {
@@ -928,8 +946,8 @@ private:
       }
     }
 
-    if (IGM.IRGen.Opts.EnableReflectionNames) {
-      auto fieldName = IGM.getAddrOfFieldName(name);
+    if (IGM.IRGen.Opts.EnableReflectionNames && name) {
+      auto fieldName = IGM.getAddrOfFieldName(*name);
       B.addRelativeAddress(fieldName);
     } else {
       B.addInt32(0);
@@ -991,11 +1009,13 @@ private:
     if (hasPayload && (decl->isIndirect() || enumDecl->isIndirect()))
       flags.setIsIndirectCase();
 
-    Type interfaceType = decl->isAvailableDuringLowering()
-                             ? decl->getPayloadInterfaceType()
-                             : nullptr;
-
-    addField(flags, interfaceType, decl->getBaseIdentifier().str());
+    // TODO: [availability] Unavailable elements should be skipped entirely.
+    if (decl->isAvailableDuringLowering()) {
+      addField(flags, decl->getPayloadInterfaceType(),
+               decl->getBaseIdentifier().str());
+    } else {
+      addField(flags, Type(), std::nullopt);
+    }
   }
 
   void layoutEnum() {
@@ -1463,7 +1483,7 @@ public:
 
         auto Source = SourceBuilder.createClosureBinding(i);
         auto BindingType = Bindings[i].getTypeParameter().subst(Subs);
-        auto InterfaceType = BindingType->mapTypeOutOfContext();
+        auto InterfaceType = BindingType->mapTypeOutOfEnvironment();
         SourceMap.emplace_back(Kind, InterfaceType->getCanonicalType(), Source);
         break;
       }
@@ -1533,7 +1553,7 @@ public:
       auto Src = Path.getMetadataSource(SourceBuilder, Root);
 
       auto SubstType = Req.getTypeParameter().subst(Subs);
-      auto InterfaceType = SubstType->mapTypeOutOfContext();
+      auto InterfaceType = SubstType->mapTypeOutOfEnvironment();
       SourceMap.emplace_back(Kind, InterfaceType->getCanonicalType(), Src);
     });
 
@@ -1587,7 +1607,7 @@ public:
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
-      addLoweredTypeRef(CaptureType.mapTypeOutOfContext(), sig);
+      addLoweredTypeRef(CaptureType.mapTypeOutOfEnvironment(), sig);
     }
 
     // Add the pairs that make up the generic param -> metadata source map

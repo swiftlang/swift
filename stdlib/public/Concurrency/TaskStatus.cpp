@@ -94,9 +94,8 @@ static void withStatusRecordLock(
               status, newStatus,
               /*success*/ SWIFT_MEMORY_ORDER_CONSUME,
               /*failure*/ std::memory_order_relaxed)) {
-        bool wasRunning = status.isRunning();
+        newStatus.traceStatusChanged(task, status, false);
         status = newStatus;
-        status.traceStatusChanged(task, false, wasRunning);
         break;
       }
     }
@@ -131,7 +130,7 @@ static void withStatusRecordLock(
             status, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task, false, status.isRunning());
+      newStatus.traceStatusChanged(task, status, false);
       break;
     }
   }
@@ -197,7 +196,7 @@ bool swift::addStatusRecord(AsyncTask *task, TaskStatusRecord *newRecord,
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
+        newStatus.traceStatusChanged(task, oldStatus, false);
         return true;
       } else {
         // Retry
@@ -303,7 +302,7 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
             oldStatus, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
+      newStatus.traceStatusChanged(task, oldStatus, false);
       return;
     }
 
@@ -644,18 +643,49 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
 /************************** TASK NAMING ***************************************/
 /******************************************************************************/
 
-void AsyncTask::pushInitialTaskName(const char* _taskName) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+// Disabling optimizations on this function prevents LLVM from translating it
+// into a strlen() call.
+__attribute__((noinline, optnone))
+static size_t swift_strlen(const char *text) {
+  size_t count = 0;
+  for (auto p = text; *p != 0; ++p) {
+    ++count;
+  }
+  return count;
+}
+
+static void swift_strcpy(char *dst, const char *src) {
+  while (*src != 0) {
+    *dst++ = *src++;
+  }
+  *dst = 0;
+}
+
+#else
+static size_t swift_strlen(const char *text) {
+  return strlen(text);
+}
+#endif
+
+void AsyncTask::initializeTaskName(const char *_taskName) {
   assert(_taskName && "Task name must not be null!");
-  assert(hasInitialTaskNameRecord() && "Attempted pushing name but task has no initial task name flag!");
+  assert(hasTaskName() &&
+         "Attempted to initialize the task name fragment but the task has no "
+         "initial task name flag!");
 
-  void *allocation = _swift_task_alloc_specific(
-      this, sizeof(class TaskNameStatusRecord));
-
-  // TODO: Copy the string maybe into the same allocation at an offset or retain the swift string?
-  auto taskNameLen = strlen(_taskName);
-  char* taskNameCopy = reinterpret_cast<char*>(
-      _swift_task_alloc_specific(this, taskNameLen + 1/*null terminator*/));
-#if defined(_WIN32)
+  // The name fragment is tail-allocated on the task, but the actual name string
+  // we allocate on the task local allocator;
+  //
+  // The task name string therefore must respect stack discipline and must be
+  // the first allocation made on the task-local allocator, as it will be the
+  // last thing we destroy.
+  auto taskNameLen = swift_strlen(_taskName);
+  char *taskNameCopy = reinterpret_cast<char *>(
+      _swift_task_alloc_specific(this, taskNameLen + 1 /*null terminator*/));
+#if SWIFT_CONCURRENCY_EMBEDDED
+  swift_strcpy(taskNameCopy, _taskName);
+#elif defined(_WIN32)
   static_cast<void>(strncpy_s(taskNameCopy, taskNameLen + 1,
                               _taskName, _TRUNCATE));
 #else
@@ -663,58 +693,19 @@ void AsyncTask::pushInitialTaskName(const char* _taskName) {
   taskNameCopy[taskNameLen] = '\0'; // make sure we null-terminate
 #endif
 
-  auto record =
-      ::new (allocation) TaskNameStatusRecord(taskNameCopy);
-  SWIFT_TASK_DEBUG_LOG("[TaskName] Create initial task name record %p "
-                       "for task:%p, name:%s", record, this, taskNameCopy);
-
-  addStatusRecord(this, record,
-                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
-                    return true; // always add the record
-                  });
-}
-
-void AsyncTask::dropInitialTaskNameRecord() {
-  if (!hasInitialTaskNameRecord()) {
-    return;
-  }
-
-  SWIFT_TASK_DEBUG_LOG("[TaskName] Drop initial task name record for task:%p", this);
-  TaskNameStatusRecord *record =
-      popStatusRecordOfType<TaskNameStatusRecord>(this);
-  assert(record &&
-         "hasInitialTaskNameRecord is true but we did not find a name record");
-  // Since we first allocated the record, and then the string copy, deallocate
-  // in LIFO order.
-  char *name = const_cast<char *>(record->getName());
-  _swift_task_dealloc_specific(this, name);
-  _swift_task_dealloc_specific(this, record);
+  nameFragment()->setName(taskNameCopy, taskNameLen);
+  SWIFT_TASK_DEBUG_LOG("[TaskName] Initialize name slot for task:%p, name:%s",
+                       this, taskNameCopy);
 }
 
 const char*
 AsyncTask::getTaskName() {
-  // We first check the executor preference status flag, in order to avoid
-  // having to scan through the records of the task checking if there was
-  // such record.
-  //
-  // This is an optimization in order to make the enqueue/run
-  // path of a task avoid excessive work if a task had many records.
-  if (!hasInitialTaskNameRecord()) {
+  if (!hasTaskName())
     return nullptr;
-  }
 
-  const char *data = nullptr;
-  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
-    for (auto record : status.records()) {
-      if (record->getKind() == TaskStatusRecordKind::TaskName) {
-        auto nameRecord = cast<TaskNameStatusRecord>(record);
-        data = nameRecord->getName();
-        return;
-      }
-    }
-  });
-
-  return data;
+  // Reads are trivial, no locking or record walks are involved;
+  // Just get the name fragment and pointed at name string.
+  return nameFragment()->getName();
 }
 
 /**************************************************************************/
@@ -734,12 +725,14 @@ void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
                                                   ActiveTaskStatus parentStatus,
                                                   TaskGroup *group) {
   // We can take the fast path of just modifying the ActiveTaskStatus in the
-  // child task since we know that it won't have any task status records and
-  // cannot be accessed by anyone else since it hasn't been linked in yet.
+  // child task since we know it cannot be accessed by anyone else yet -- it
+  // hasn't been linked in. There should be no status records yet: the task
+  // name now lives in a tail-allocated `NameFragment`, not on the chain.
   // Avoids the extra logic in `swift_task_cancel` and `swift_task_escalate`
   auto oldChildTaskStatus =
       child->_private()._status().load(std::memory_order_relaxed);
-  assert(oldChildTaskStatus.getInnermostRecord() == NULL);
+  assert(oldChildTaskStatus.getInnermostRecord() == NULL &&
+         "child task should have no records yet");
 
   auto newChildTaskStatus = oldChildTaskStatus;
 
@@ -830,7 +823,7 @@ void swift::_swift_taskGroup_cancel_unlocked(TaskGroup *group,
 /**************************************************************************/
 
 /// Perform any cancellation actions required by the given record.
-static void performCancellationAction(TaskStatusRecord *record) {
+static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord *record) {
   switch (record->getKind()) {
   // Child tasks need to be recursively cancelled.
   case TaskStatusRecordKind::ChildTask: {
@@ -853,6 +846,10 @@ static void performCancellationAction(TaskStatusRecord *record) {
   case TaskStatusRecordKind::CancellationNotification: {
     auto notification =
       cast<CancellationNotificationStatusRecord>(record);
+    if (status.hasCancellationShield()) {
+      SWIFT_TASK_DEBUG_LOG("cancellation shielded: skip cancellation handler invocation in task = %p", swift_task_getCurrent());
+      return; 
+    }
     notification->run();
     return;
   }
@@ -867,10 +864,6 @@ static void performCancellationAction(TaskStatusRecord *record) {
 
   // Cancellation has no impact on executor preference.
   case TaskStatusRecordKind::TaskExecutorPreference:
-    break;
-
-  // Cancellation has no impact on task names.
-  case TaskStatusRecordKind::TaskName:
     break;
 
   // This should never be found, but the compiler complains if we don't check.
@@ -889,7 +882,9 @@ static void swift_task_cancelImpl(AsyncTask *task) {
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
   while (true) {
-    if (oldStatus.isCancelled()) {
+    // Are we already cancelled? 
+    // Even if we have a cancellation shield active, we do want to set the isCancelled flag.
+    if (oldStatus.isCancelled(/*ignoreShield=*/false)) {
       return;
     }
 
@@ -905,10 +900,10 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     }
   }
 
-  newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
+  newStatus.traceStatusChanged(task, oldStatus, false);
   if (newStatus.getInnermostRecord() == nullptr) {
-     // No records, nothing to propagate
-     return;
+    // No records, nothing to propagate
+    return;
   }
 
   withStatusRecordLock(task, newStatus, [&](ActiveTaskStatus status) {
@@ -917,7 +912,9 @@ static void swift_task_cancelImpl(AsyncTask *task) {
       // modify this list that is being iterated. However, cancellation is
       // happening from outside of the task so we know that no new records will
       // be added since that's only possible while on task.
-      performCancellationAction(cur);
+      //
+      // Each action must independently take care of how to deal with cancellation shields.
+      performCancellationAction(newStatus, cur);
     }
   });
 }
@@ -968,9 +965,6 @@ static void performEscalationAction(TaskStatusRecord *record,
     return;
   /// Executor preference we can ignore.
   case TaskStatusRecordKind::TaskExecutorPreference:
-    return;
-  /// Task names don't matter to priority escalation.
-  case TaskStatusRecordKind::TaskName:
     return;
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:

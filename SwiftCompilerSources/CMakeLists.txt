@@ -70,18 +70,6 @@ set(SWIFT_COMPILER_SOURCES_SDK_FLAGS_default)
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
   set(sdk_path "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
   list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-sdk" "${sdk_path}")
-  if(NOT EXISTS "${sdk_path}/usr/include/c++")
-    # Darwin SDKs in Xcode 12 or older do not include libc++, which prevents clang from finding libc++ when invoked
-    # from ClangImporter. This results in build errors. To workaround this, let's explicitly pass the path to libc++
-    # to clang.
-    message(WARNING "Building with an outdated Darwin SDK: libc++ missing from the ${SWIFT_HOST_VARIANT_SDK} SDK. Will use libc++ from the toolchain.")
-    get_filename_component(absolute_libcxx_path "${CMAKE_C_COMPILER}/../../include/c++/v1" REALPATH)
-    if (EXISTS "${absolute_libcxx_path}")
-      list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-Xcc" "-isystem" "-Xcc" "${absolute_libcxx_path}")
-    else()
-      message(ERROR "libc++ not found in the toolchain.")
-    endif()
-  endif()
 elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
   list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
 endif()
@@ -108,6 +96,20 @@ function(add_swift_compiler_modules_library name)
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+
+  if(SWIFT_CACHING_BUILD AND BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    swift_append_caching_compile_flags(swift_compile_options)
+  endif()
+
+  # Pass the declared C++ stdlib for swift's internal clang.
+  set(swift_compile_cxx_flags ${CMAKE_CXX_FLAGS})
+  separate_arguments(swift_compile_cxx_flags)
+  foreach(cxx_flag ${swift_compile_cxx_flags})
+    if (cxx_flag MATCHES "^-stdlib=")
+      list(APPEND swift_compile_options "-Xcc" ${cxx_flag})
+      break()
+    endif()
+  endforeach()
 
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     if(SWIFT_MIN_RUNTIME_VERSION)
@@ -183,10 +185,6 @@ function(add_swift_compiler_modules_library name)
     list(APPEND sdk_option "-sdk" "${SWIFT_PATH_TO_SWIFT_SDK}")
     # For "swift/shims/*.h".
     list(APPEND sdk_option "-I" "${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib")
-
-    # Workaround a crash in the LoadableByAddress pass
-    # https://github.com/apple/swift/issues/73254
-    list(APPEND swift_compile_options "-Xllvm" "-sil-disable-pass=loadable-address")
 
     # MSVC 14.40 (VS 17.10, MSVC_VERSION 1940) added a requirement for Clang 17 or higher.
     # Swift 6.0 is the first version to include Clang 17.

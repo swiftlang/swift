@@ -33,14 +33,40 @@
 
 namespace swift {
 class ASTContext;
+class AvailabilityDomainAndRange;
 class CustomAvailabilityDomain;
 class DeclContext;
 class FuncDecl;
 class ModuleDecl;
 class ValueDecl;
 
+/// Discriminates whether a version tuple represents the `introduced:`,
+/// `deprecated:`, or `obsoleted:` version of an `@available` attribute.
+enum class AvailabilityVersionKind {
+  Introduced,
+  Deprecated,
+  Obsoleted,
+};
+
 /// Represents a dimension of availability (e.g. macOS platform or Swift
-/// language mode).
+/// language mode). The `Swift` domain is the bottom element of a lattice
+/// containing the platform domains representing ABI stable platforms like
+/// `macOS` and `iOS`:
+///
+///      *────────Swift──────SwiftLang──────Windows──...
+///  (universal)    │           Mode
+///                 │
+///             anyAppleOS
+///        ┌──────┬─┴──┬──────────────┐
+///        │      │    │              │
+///     watchOS macOS tvOS           iOS
+///        │      │    │       ┌──────┼───────────┐
+///     watchOS macOS tvOS     │      │           │
+///     AppExt AppExt AppExt iOS   visionOS   macCatalyst
+///                         AppExt    │           │
+///                                visionOS   macCatalyst
+///                                 AppExt      AppExt
+///
 class AvailabilityDomain final {
 public:
   enum class Kind : uint8_t {
@@ -49,7 +75,11 @@ public:
     Universal,
 
     /// Represents availability with respect to Swift language mode.
-    SwiftLanguage,
+    SwiftLanguageMode,
+
+    /// Represents availability with respect to the Swift runtime when it is not
+    /// built-in to the target platform.
+    StandaloneSwiftRuntime,
 
     /// Represents PackageDescription availability.
     PackageDescription,
@@ -127,6 +157,14 @@ private:
                : std::nullopt;
   }
 
+  std::optional<AvailabilityDomain>
+  getRemappedDomainOrNull(const ASTContext &ctx) const;
+
+  AvailabilityRange getRemappedRange(AvailabilityDomain toDomain,
+                                     const llvm::VersionTuple &version,
+                                     AvailabilityVersionKind versionKind,
+                                     const ASTContext &ctx) const;
+
 public:
   AvailabilityDomain() {}
 
@@ -140,8 +178,12 @@ public:
     return AvailabilityDomain(platformKind);
   }
 
-  static AvailabilityDomain forSwiftLanguage() {
-    return AvailabilityDomain(Kind::SwiftLanguage);
+  static AvailabilityDomain forSwiftLanguageMode() {
+    return AvailabilityDomain(Kind::SwiftLanguageMode);
+  }
+
+  static AvailabilityDomain forStandaloneSwiftRuntime() {
+    return AvailabilityDomain(Kind::StandaloneSwiftRuntime);
   }
 
   static AvailabilityDomain forPackageDescription() {
@@ -181,7 +223,13 @@ public:
 
   bool isPlatform() const { return getKind() == Kind::Platform; }
 
-  bool isSwiftLanguage() const { return getKind() == Kind::SwiftLanguage; }
+  bool isSwiftLanguageMode() const {
+    return getKind() == Kind::SwiftLanguageMode;
+  }
+
+  bool isStandaloneSwiftRuntime() const {
+    return getKind() == Kind::StandaloneSwiftRuntime;
+  }
 
   bool isPackageDescription() const {
     return getKind() == Kind::PackageDescription;
@@ -234,6 +282,10 @@ public:
   bool isActivePlatform(const ASTContext &ctx,
                         bool forTargetVariant = false) const;
 
+  /// Returns true if availability in this domain must be specified alone in
+  /// `@available` attributes and `if #available` queries.
+  bool mustBeSpecifiedAlone() const;
+
   /// Returns the domain's minimum available range for type checking. For
   /// example, for the domain of the platform that compilation is targeting,
   /// this version is specified with the `-target` option. For the Swift
@@ -257,15 +309,16 @@ public:
   ModuleDecl *getModule() const;
 
   /// Returns true if availability in `other` is a subset of availability in
-  /// this domain. The set of all availability domains form a lattice where the
-  /// universal domain (`*`) is the bottom element.
+  /// this domain or `this == other`.
   bool contains(const AvailabilityDomain &other) const;
 
   /// Returns true if availability in `other` is a subset of availability in
-  /// this domain or vice-versa.
-  bool isRelated(const AvailabilityDomain &other) const {
-    return contains(other) || other.contains(*this);
-  }
+  /// this domain and `this != other`.
+  bool isSupersetOf(const AvailabilityDomain &other) const;
+
+  /// Returns true if availability in `other` is a subset of availability in
+  /// this domain or vice-versa, or `this == other`.
+  bool isRelated(const AvailabilityDomain &other) const;
 
   /// Returns true for domains that are not contained by any domain other than
   /// the universal domain.
@@ -278,17 +331,20 @@ public:
 
   /// Returns the canonical domain that versions in this domain must be remapped
   /// to before making availability comparisons in the current compilation
-  /// context. Sets \p didRemap to `true` if a remap was required.
-  const AvailabilityDomain getRemappedDomain(const ASTContext &ctx,
-                                             bool &didRemap) const;
-
-  /// Returns the canonical domain that versions in this domain must be remapped
-  /// to before making availability comparisons in the current compilation
   /// context.
   const AvailabilityDomain getRemappedDomain(const ASTContext &ctx) const {
-    bool unused;
-    return getRemappedDomain(ctx, unused);
+    auto remappedDomain = getRemappedDomainOrNull(ctx);
+    return remappedDomain ? *remappedDomain : *this;
   }
+
+  /// Converts the domain and the given version into a canonical domain and
+  /// range that can be used for availability comparisons in the current current
+  /// compilation context. If no conversion is necessary or possible, the domain
+  /// and range are returned unmodified.
+  AvailabilityDomainAndRange
+  getRemappedDomainAndRange(const llvm::VersionTuple &version,
+                            AvailabilityVersionKind versionKind,
+                            const ASTContext &ctx) const;
 
   /// Returns true for a domain that is permanently always available, and
   /// therefore availability constraints in the domain are effectively the same

@@ -18,6 +18,7 @@ class Super {
 }
 
 class Sub: Super {
+  // TODO: test sync override of async method (https://github.com/swiftlang/swift/issues/88367)
   override func f() { } // expected-error{{method does not override any method from its superclass}}
   override func g() async { } // expected-error{{method does not override any method from its superclass}}
   override func h() async { }

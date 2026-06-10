@@ -1,8 +1,9 @@
 // RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -strict-concurrency=complete
-// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods -strict-concurrency=complete | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -enable-upcoming-feature GlobalActorIsolatedTypesUsability -disable-availability-checking -module-name sendable_methods -strict-concurrency=complete | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_InferSendableFromCaptures
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
 func outer() {
     @Sendable func sendable() {}
@@ -330,5 +331,37 @@ do {
     var g = Inner(f: Outer.ff)
 
     static func ff() {}
+  }
+}
+
+extension GenericE {
+  func foo() -> T { fatalError() }
+}
+
+func testClosureSendableDependence(_ x: NonSendable, _ fn: @Sendable () -> Void) {
+  // This is fine since we resolve the closure before we bind T.
+  func foo<T>(_ x: T, _ y: T) {}
+  foo(GenericE.a.foo, { (x, 0).1 })
+}
+
+@MainActor
+public protocol Q {
+    associatedtype V
+}
+
+// The base captures non-SendableMetatype `V` but it's also @MainActor isolated.
+public struct TestGlobalActorAndSendable<V: Q> : Q {
+  // Infers @MainActor
+  func test1() {
+  }
+
+  // Explicitly @MainActor
+  @MainActor func test2() {}
+
+  func compute(_: @MainActor () -> Void) {}
+
+  func compute() {
+    compute(test1) // Ok
+    compute(test2) // Ok
   }
 }

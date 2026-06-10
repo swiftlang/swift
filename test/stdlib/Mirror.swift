@@ -12,18 +12,16 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 //
-// RUN: if [ %target-runtime == "objc" ]; \
-// RUN: then \
+// RUN: %if objc_interop %{ \
 // RUN:   %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g && \
-// RUN:   %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror; \
-// RUN: else \
-// RUN:   %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -o %t/Mirror; \
-// RUN: fi
+// RUN:   %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror \
+// RUN: %} %else %{ \
+// RUN:   %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -o %t/Mirror \
+// RUN: %}
 // RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
 
 // REQUIRES: executable_test
-// REQUIRES: shell
 // REQUIRES: reflection
 
 // rdar://96439408
@@ -1028,9 +1026,8 @@ mirrors.test("Addressing") {
   expectNil(m.descendant(1, 1, "bork"))
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
 mirrors.test("Invalid Path Type")
+  .require(.crashTesting)
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -1041,7 +1038,6 @@ mirrors.test("Invalid Path Type")
   expectCrashLater()
   _ = m.descendant(X())
 }
-#endif
 
 mirrors.test("PlaygroundQuickLook") {
   // Customization works.

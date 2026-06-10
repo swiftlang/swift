@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -typecheck -verify -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=default -Xcc -D_CRT_SECURE_NO_WARNINGS %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -typecheck -verify -verify-ignore-unknown -I %S/Inputs -Xcc -D_CRT_SECURE_NO_WARNINGS %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -typecheck -verify -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=default -Xcc -D_CRT_SECURE_NO_WARNINGS %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -typecheck -verify -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -Xcc -D_CRT_SECURE_NO_WARNINGS %s
 
 import CustomStringBuiltins
 

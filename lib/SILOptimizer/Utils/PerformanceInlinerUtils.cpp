@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
@@ -716,7 +717,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 
   for (auto Param : SubstParams) {
     // Map the parameter into context
-    auto ContextTy = Callee->mapTypeIntoContext(Param->getCanonicalType());
+    auto ContextTy = Callee->mapTypeIntoEnvironment(Param->getCanonicalType());
     auto Archetype = ContextTy->getAs<ArchetypeType>();
     if (!Archetype)
       continue;
@@ -839,6 +840,12 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     if (CalleeSelf != SILValue(CallerSelf)) {
       return nullptr;
     }
+  }
+
+  if (AI.hasSubstitutions()) {
+    auto Subs = AI.getSubstitutionMap();
+    if (Subs.getRecursiveProperties().hasDynamicSelf())
+      return nullptr;
   }
 
   // Detect self-recursive calls.

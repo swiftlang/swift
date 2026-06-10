@@ -17,6 +17,8 @@
 #ifndef SWIFT_SILGEN_CLEANUP_H
 #define SWIFT_SILGEN_CLEANUP_H
 
+#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
+
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/DiverseStack.h"
@@ -226,15 +228,13 @@ public:
                              ArrayRef<SILValue> args = {},
                              ForUnwind_t forUnwind = NotForUnwind);
 
-  /// Emit a branch to the given jump destination,
-  /// threading out through any cleanups we need to run. This does not pop the
-  /// cleanup stack.
+  /// Emit the cleanups necessary before branching to
+  /// the given jump destination. This does not pop the cleanup stack, nor does
+  /// it emit the actual branch.
   ///
   /// \param dest       The destination scope and block.
-  /// \param branchLoc  The location of the branch instruction.
-  /// \param args       Arguments to pass to the destination block.
-  void emitCleanupsForBranch(JumpDest dest, SILLocation branchLoc,
-                             ArrayRef<SILValue> args = {},
+  /// \param forUnwind  Whether the cleanups for this dest is for unwinding.
+  void emitCleanupsBeforeBranch(JumpDest dest,
                              ForUnwind_t forUnwind = NotForUnwind);
 
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a

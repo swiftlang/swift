@@ -11,6 +11,9 @@ class X {
 }
 
 sil [ossa] @get_owned_X : $@convention(thin) () -> @owned X 
+sil [ossa] @get_owned_X_no_barrier : $@convention(thin) () -> @owned X {
+  [global:]
+}
 
 // Hoist the destroy_addr of an inout over a loop and over a deinit barrier to
 // the top of the enclosing function.
@@ -83,7 +86,7 @@ bb0(%instance : @owned $X, %second: $*X):
  %addr = alloc_stack $X
  store %instance to [init] %addr : $*X
  %scope = begin_access [modify] [static] %second : $*X
- %1 = function_ref @get_owned_X : $@convention(thin) () -> @owned X 
+ %1 = function_ref @get_owned_X_no_barrier : $@convention(thin) () -> @owned X 
  %14 = apply %1() : $@convention(thin) () -> @owned X 
  destroy_value %14 : $X
  end_access %scope : $*X

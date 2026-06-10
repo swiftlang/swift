@@ -81,12 +81,10 @@ static void _buildNameForMetadata(const Metadata *type,
 #if SWIFT_OBJC_INTEROP
   if (type->getKind() == MetadataKind::Class) {
     auto classType = static_cast<const ClassMetadata *>(type);
-    // Look through artificial subclasses.
-    while (classType->isTypeMetadata() && classType->isArtificialSubclass())
-      classType = classType->Superclass;
-
-    // Ask the Objective-C runtime to name ObjC classes.
-    if (!classType->isTypeMetadata()) {
+    // Ask the Objective-C runtime to name ObjC classes. isTypeMetadata should
+    // always be true here (pure ObjC classes get ObjCClassWrappers), but check
+    // it just to be sure.
+    if (!classType->isTypeMetadata() || !classType->getDescription()) {
       result += class_getName(classType);
       return;
     }
@@ -269,12 +267,7 @@ swift::swift_getFunctionFullNameFromMangledName(
       return TypeNamePair{nullptr, 0};
   }
 
-  // Read-only lookup failed, we may need to demangle and cache the entry.
-  // We have to copy the string to be able to refer to it "forever":
-  auto copy = (char *)malloc(mangledNameLength);
-  memcpy(copy, mangledNameStart, mangledNameLength);
-  mangledName = StringRef(copy, mangledNameLength);
-
+  // Read-only lookup failed. Demangle and cache the entry.
   std::string demangled;
   StackAllocatedDemangler<1024> Dem;
   NodePointer node = Dem.demangleSymbol(mangledName);
@@ -363,6 +356,11 @@ swift::swift_getFunctionFullNameFromMangledName(
   }
   demangled += ")";
 
+  // We have to copy the string to be able to refer to it "forever":
+  auto copy = (char *)malloc(mangledNameLength);
+  memcpy(copy, mangledNameStart, mangledNameLength);
+  llvm::StringRef copiedMangledName(copy, mangledNameLength);
+
   // We have to copy the string to be able to refer to it;
   auto size = demangled.size();
   auto result = (char *)malloc(size + 1);
@@ -372,7 +370,15 @@ swift::swift_getFunctionFullNameFromMangledName(
   {
     LazyMutex::ScopedLock guard(MangledToPrettyFunctionNameCacheLock);
 
-    cache.insert({mangledName, {result, size}});
+    auto [it, inserted] = cache.insert({copiedMangledName, {result, size}});
+    if (!inserted) {
+      // We raced with another thread and lost. Free our data and return theirs.
+      free(copy);
+      free(result);
+      return {it->second.first, it->second.second};
+    }
+
+    // Successfully inserted into the cache. Return our cached value.
     return TypeNamePair{result, size};
   }
 }

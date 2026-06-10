@@ -59,9 +59,9 @@ struct RequirementError {
     /// An unexpected value type used in a value generic,
     /// e.g. 'let N: String'.
     InvalidValueGenericType,
-    /// A value generic type was used to conform to a protocol,
-    /// e.g. 'where N: P' where N == 'let N: Int' and P is some protocol.
-    InvalidValueGenericConformance,
+    /// A generic value parameter was used as the subject of a subtype
+    /// constraint, e.g. `N: X` in `struct S<let N: Int> where N: X`.
+    InvalidValueGenericConstraint,
     /// A value generic type was used to same-type to an unrelated type,
     /// e.g. 'where N == Int' where N == 'let N: Int'.
     InvalidValueGenericSameType,
@@ -176,9 +176,12 @@ public:
     return {Kind::InvalidValueGenericType, requirement, loc};
   }
 
-  static RequirementError forInvalidValueGenericConformance(Requirement req,
-                                                            SourceLoc loc) {
-    return {Kind::InvalidValueGenericConformance, req, loc};
+  static RequirementError forInvalidValueGenericConstraint(Type subjectType,
+                                                           Type constraint,
+                                                           SourceLoc loc) {
+    Requirement requirement(RequirementKind::Conformance, subjectType,
+                            constraint);
+    return {Kind::InvalidValueGenericConstraint, requirement, loc};
   }
 
   static RequirementError forInvalidValueGenericSameType(Type subjectType,

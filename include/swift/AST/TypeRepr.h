@@ -41,6 +41,7 @@ namespace swift {
   class DeclRefTypeRepr;
   class TupleTypeRepr;
   class TypeDecl;
+  class IntegerLiteralExpr;
 
 enum class ParamSpecifier : uint8_t;
 
@@ -266,9 +267,7 @@ class AttributedTypeRepr final
       : TypeRepr(TypeReprKind::Attributed), Ty(Ty) {
     assert(!attrs.empty());
     Bits.AttributedTypeRepr.NumAttributes = attrs.size();
-    std::uninitialized_copy(attrs.begin(), attrs.end(),
-                            getTrailingObjects<TypeOrCustomAttr>());
-
+    std::uninitialized_copy(attrs.begin(), attrs.end(), getTrailingObjects());
   }
 
   friend TrailingObjects;
@@ -279,8 +278,7 @@ public:
                                     TypeRepr *ty);
 
   ArrayRef<TypeOrCustomAttr> getAttrs() const {
-    return llvm::ArrayRef(getTrailingObjects<TypeOrCustomAttr>(),
-                          Bits.AttributedTypeRepr.NumAttributes);
+    return getTrailingObjects(Bits.AttributedTypeRepr.NumAttributes);
   }
 
   TypeAttribute *get(TypeAttrKind kind) const;
@@ -870,12 +868,10 @@ public:
   SourceRange getBracesRange() const { return BraceLocs; }
 
   MutableArrayRef<TypeRepr*> getMutableElements() {
-    return llvm::MutableArrayRef(getTrailingObjects<TypeRepr *>(),
-                                 Bits.PackTypeRepr.NumElements);
+    return getTrailingObjects(Bits.PackTypeRepr.NumElements);
   }
   ArrayRef<TypeRepr*> getElements() const {
-    return llvm::ArrayRef(getTrailingObjects<TypeRepr *>(),
-                          Bits.PackTypeRepr.NumElements);
+    return getTrailingObjects(Bits.PackTypeRepr.NumElements);
   }
 
   static bool classof(const TypeRepr *T) {
@@ -958,8 +954,8 @@ public:
   }
 
   ArrayRef<TupleTypeReprElement> getElements() const {
-    return { getTrailingObjects<TupleTypeReprElement>(),
-             static_cast<size_t>(Bits.TupleTypeRepr.NumElements) };
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.TupleTypeRepr.NumElements));
   }
 
   void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
@@ -1040,13 +1036,13 @@ class CompositionTypeRepr final : public TypeRepr,
       : TypeRepr(TypeReprKind::Composition), FirstTypeLoc(FirstTypeLoc),
         CompositionRange(CompositionRange) {
     Bits.CompositionTypeRepr.NumTypes = Types.size();
-    std::uninitialized_copy(Types.begin(), Types.end(),
-                            getTrailingObjects<TypeRepr*>());
+    std::uninitialized_copy(Types.begin(), Types.end(), getTrailingObjects());
   }
 
 public:
   ArrayRef<TypeRepr *> getTypes() const {
-    return {getTrailingObjects<TypeRepr*>(), static_cast<size_t>(Bits.CompositionTypeRepr.NumTypes)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.CompositionTypeRepr.NumTypes));
   }
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }
@@ -1267,22 +1263,22 @@ public:
 /// \code
 ///   x : nonisolated(nonsending) () async -> Int
 /// \endcode
-class CallerIsolatedTypeRepr : public TypeRepr {
+class NonisolatedNonsendingTypeRepr : public TypeRepr {
   TypeRepr *Base;
   SourceLoc Loc;
 
 public:
-  CallerIsolatedTypeRepr(TypeRepr *Base, SourceLoc Loc)
-      : TypeRepr(TypeReprKind::CallerIsolated), Base(Base), Loc(Loc) {
+  NonisolatedNonsendingTypeRepr(TypeRepr *Base, SourceLoc Loc)
+      : TypeRepr(TypeReprKind::NonisolatedNonsending), Base(Base), Loc(Loc) {
     assert(Base);
   }
 
   TypeRepr *getBase() const { return Base; }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::CallerIsolated;
+    return T->getKind() == TypeReprKind::NonisolatedNonsending;
   }
-  static bool classof(const CallerIsolatedTypeRepr *T) { return true; }
+  static bool classof(const NonisolatedNonsendingTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const { return Loc; }
@@ -1655,43 +1651,43 @@ private:
   friend class TypeRepr;
 };
 
-/// A TypeRepr for an integer appearing in a type position.
-class IntegerTypeRepr final : public TypeRepr {
-  StringRef Value;
-  SourceLoc Loc;
-  SourceLoc MinusLoc;
+class GenericArgumentExprTypeRepr final : public TypeRepr {
+  /// Exactly the expr the programmer wrote
+  Expr *originalArgExpr;
+
+  /// Generic argument resolved to either a `TypeExpr`, `IntegerLiteralExpr`,
+  /// or `ErrorExpr`
+  Expr *resolvedExpr;
+
+  /// Required for being able to render the extracted text
+  /// of the original expression
+  ASTContext *Ctx;
 
 public:
-  IntegerTypeRepr(StringRef value, SourceLoc loc, SourceLoc minusLoc)
-    : TypeRepr(TypeReprKind::Integer), Value(value), Loc(loc),
-      MinusLoc(minusLoc) {}
+  GenericArgumentExprTypeRepr(Expr *E, ASTContext *Ctx)
+      : TypeRepr(TypeReprKind::GenericArgumentExpr), originalArgExpr(E),
+        resolvedExpr(nullptr), Ctx(Ctx) {}
 
-  StringRef getValue() const {
-    return Value;
-  }
+  // TODO: Use in indexing
+  Expr *getOriginalArgExpr() const { return originalArgExpr; }
+  Expr *getArgExpr() const { return resolvedExpr; }
+  void setArgExpr(Expr *E);
 
-  SourceLoc getLoc() const {
-    return Loc;
-  }
+  TypeExpr *getAsResolvedTypeExpr() const;
+  IntegerLiteralExpr *getAsResolvedIntegerLiteralExpr() const;
+  bool failedToResolve() const;
 
-  SourceLoc getMinusLoc() const {
-    return MinusLoc;
-  }
+  SourceLoc getLoc() const;
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::Integer;
+    return T->getKind() == TypeReprKind::GenericArgumentExpr;
   }
 
 private:
-  SourceLoc getStartLocImpl() const {
-    if (MinusLoc)
-      return MinusLoc;
-
-    return Loc;
-  }
-
-  SourceLoc getEndLocImpl() const { return Loc; }
-  SourceLoc getLocImpl() const { return Loc; }
+  SourceLoc getStartLocImpl() const;
+  SourceLoc getEndLocImpl() const;
+  SourceLoc getLocImpl() const { return getLoc(); }
+  StringRef getExprText(SmallVectorImpl<char> &scratch) const;
   void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
                  NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
@@ -1733,8 +1729,8 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::CompileTimeLiteral:
   case TypeReprKind::ConstValue:
   case TypeReprKind::LifetimeDependent:
-  case TypeReprKind::Integer:
-  case TypeReprKind::CallerIsolated:
+  case TypeReprKind::GenericArgumentExpr:
+  case TypeReprKind::NonisolatedNonsending:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

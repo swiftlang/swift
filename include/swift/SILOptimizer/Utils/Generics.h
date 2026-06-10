@@ -184,6 +184,7 @@ private:
 
   bool prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                        SubstitutionMap ParamSubs,
+                       bool isMandatory,
                        OptRemark::Emitter *ORE = nullptr);
   void performFullSpecializationPreparation(SILFunction *Callee,
                                             SubstitutionMap ParamSubs);
@@ -206,6 +207,7 @@ public:
                     ApplySite Apply, SILFunction *Callee,
                     SubstitutionMap ParamSubs, SerializedKind_t Serialized,
                     bool ConvertIndirectToDirect, bool dropUnusedArguments,
+                    bool isMandatory = false,
                     OptRemark::Emitter *ORE = nullptr);
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
@@ -216,7 +218,9 @@ public:
 
   ReabstractionInfo(CanSILFunctionType substitutedType,
                     SILDeclRef methodDecl,
+                    bool convertIndirectToDirect,
                     SILModule &M) :
+    ConvertIndirectToDirect(convertIndirectToDirect),
     SubstitutedType(substitutedType),
     methodDecl(methodDecl),
     M(&M), isWholeModule(M.isWholeModule()) {}
@@ -342,7 +346,7 @@ public:
   SILFunction *getNonSpecializedFunction() const { return Callee; }
 
   /// Map SIL type into a context of the specialized function.
-  SILType mapTypeIntoContext(SILType type) const;
+  SILType mapTypeIntoEnvironment(SILType type) const;
 
   SILModule &getModule() const { return *M; }
 

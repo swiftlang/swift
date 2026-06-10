@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=25000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=15000
 // Succeeds in 125ms with 19934 scopes
 
 // https://github.com/swiftlang/swift/issues/54466

@@ -84,7 +84,7 @@ extension Unicode.UTF8 {
    unexpected continuation byte errors. The more semantically-rich
    classification is reported.
 
-   For example, a surrogate count point sequence `ED A0 80` will be reported
+   For example, a surrogate code point sequence `ED A0 80` will be reported
    as three `.surrogateCodePointByte` errors rather than a `.truncatedScalar`
    followed by two `.unexpectedContinuationByte` errors.
 
@@ -223,7 +223,7 @@ extension UTF8 {
     // TODO: Fixed size buffer for non-contig inputs
     // TODO: Lifetime-dependent result variant
     let cus = Array(s)
-    return unsafe cus.withUnsafeBytes {
+    return cus.withUnsafeBytes {
       var bufPtr = unsafe $0
       var start = 0
       var errors: Array<UTF8.ValidationError> = []

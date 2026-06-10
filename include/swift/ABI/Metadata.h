@@ -195,6 +195,16 @@ static inline const FullMetadata<T> *asFullMetadata(const T *metadata) {
   return asFullMetadata(const_cast<T*>(metadata));
 }
 
+/// Given a full metadata pointer, produce the regular metadata pointer.
+template <class T>
+static inline T *asMetadata(FullMetadata<T> *metadata) {
+  return (T *) (((typename T::HeaderType*) metadata) + 1);
+}
+template <class T>
+static inline const T *asMetadata(const FullMetadata<T> *metadata) {
+  return asMetadata(const_cast<FullMetadata<T> *>(metadata));
+}
+
 // std::result_of is busted in Xcode 5. This is a simplified reimplementation
 // that isn't SFINAE-safe.
 namespace {
@@ -1740,6 +1750,17 @@ struct TargetFixedArrayTypeMetadata : public TargetMetadata<Runtime> {
 };
 using FixedArrayTypeMetadata = TargetFixedArrayTypeMetadata<InProcess>;
 
+/// The structure of `Builtin.Borrow` type metadata.
+template <typename Runtime>
+struct TargetBorrowTypeMetadata : public TargetMetadata<Runtime> {
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Referent;
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::Borrow;
+  }
+};
+using BorrowTypeMetadata = TargetBorrowTypeMetadata<InProcess>;
+
 /// The structure of tuple type metadata.
 template <typename Runtime>
 struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
@@ -3100,6 +3121,22 @@ struct swift_ptrauth_struct_context_descriptor(ContextDescriptor)
   const InvertibleProtocolSet *
   getInvertedProtocols() const;
 
+  /// Whether this type's primary definition is `~Protocol` and has no
+  /// conditional conformance to the protocol.
+  bool isUnconditionallySuppressing(InvertibleProtocolKind kind) const {
+    auto *inverted = getInvertedProtocols();
+    if (!inverted || !inverted->contains(kind))
+      return false;
+
+    if (auto *genericContext = getGenericContext()) {
+      if (genericContext->hasConditionalInvertedProtocols() &&
+          genericContext->getConditionalInvertedProtocols().contains(kind))
+        return false;
+    }
+
+    return true;
+  }
+
   /// Is this context part of a C-imported module?
   bool isCImportedContext() const;
 
@@ -3983,7 +4020,10 @@ struct TargetCanonicalSpecializedMetadatasListEntry {
 
 template <typename Runtime>
 struct TargetCanonicalSpecializedMetadataAccessorsListEntry {
-  TargetCompactFunctionPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false> accessor;
+  TargetCompactFunctionPointer<
+      Runtime, SWIFT_CC(swift) MetadataResponse(MetadataRequest),
+      /*Nullable*/ false>
+      accessor;
 };
 
 template <typename Runtime>
@@ -4297,8 +4337,9 @@ public:
     TargetCanonicalSpecializedMetadatasListCount<Runtime>;
   using MetadataListEntry = 
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
-  using MetadataAccessor = 
-    TargetCompactFunctionPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false>;
+  using MetadataAccessor = TargetCompactFunctionPointer<
+      Runtime, SWIFT_CC(swift) MetadataResponse(MetadataRequest),
+      /*Nullable*/ false>;
   using MetadataAccessorListEntry =
       TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>;
   using MetadataCachingOnceToken =

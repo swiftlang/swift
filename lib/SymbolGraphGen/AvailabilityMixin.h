@@ -49,6 +49,8 @@ struct Availability {
   /// If \c true, is unconditionally unavailable in this \c Domain.
   bool IsUnconditionallyUnavailable;
 
+  static StringRef getDomainDescription(AvailabilityDomain Domain);
+
   Availability(const SemanticAvailableAttr &AvAttr);
 
   /// Update this availability from a duplicate @available

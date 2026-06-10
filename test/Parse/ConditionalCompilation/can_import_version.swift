@@ -63,12 +63,15 @@ func canImportVersioned() {
   let buildLarger = 1
 #endif
   
-#if canImport(Foo, _version: 113.330.1.2.0) // expected-warning {{trailing components of version '113.330.1.2' are ignored}}
+#if canImport(Foo, _version: 113.330.1.2.0)
   let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
+#if canImport(Foo, _version: 113.330.1.2.0.0) // expected-warning {{trailing components of version '113.330.1.2.0' are ignored}}
+  let extraExtraComponent = 1 // expected-warning {{initialization of immutable value 'extraExtraComponent' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
 #if canImport(Foo, _underlyingVersion: 113.33) // expected-warning {{cannot find user version number for Clang module 'Foo'; version number ignored}}
-  // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for Clang module 'Foo'; version number ignored}}
   // Foo is a Swift module with no underlying clang module.
   let underlyingMinorSmaller = 1 // expected-warning {{initialization of immutable value 'underlyingMinorSmaller' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
@@ -132,13 +135,43 @@ func canImportVersionedString() {
   let buildLarger = 1
 #endif
 
-#if canImport(Foo, _version: "113.330.1.2.0") // expected-warning {{trailing components of version '113.330.1.2' are ignored}}
+#if canImport(Foo, _version: "113.330.1.2.0")
   let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
+#if canImport(Foo, _version: "113.330.1.2.0.0") // expected-warning {{trailing components of version '113.330.1.2.0' are ignored}}
+  let extraExtraComponent = 1 // expected-warning {{initialization of immutable value 'extraExtraComponent' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
 #if canImport(Foo, _underlyingVersion: "113.33") // expected-warning {{cannot find user version number for Clang module 'Foo'; version number ignored}}
-  // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for Clang module 'Foo'; version number ignored}}
   // Foo is a Swift module with no underlying clang module.
   let underlyingMinorSmaller = 1 // expected-warning {{initialization of immutable value 'underlyingMinorSmaller' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+}
+
+func testCanImportMissingModule() {
+#if canImport(NoSuchModule, _version: 1.0) // expected-warning {{cannot find module 'NoSuchModule' for canImport check; the directive will evaluate to false}}
+  // TODO(ParserValidation): expected-warning@-1 *{{cannot find module 'NoSuchModule' for canImport check; the directive will evaluate to false}}
+  let a = 1
+#endif
+
+#if canImport(NoSuchModule, _version: 2.0) // expected-warning {{cannot find module 'NoSuchModule' for canImport check; the directive will evaluate to false}}
+  // TODO(ParserValidation): expected-warning@-1 *{{cannot find module 'NoSuchModule' for canImport check; the directive will evaluate to false}}
+  let b = 1
+#endif
+
+#if canImport(NoSuchModule)
+#if canImport(NoSuchModule, _version: 1.0)
+  let c = 1
+#endif
+#endif
+
+#if canImport(NoSuchModule) && canImport(NoSuchModule, _version: 1.0)
+  let d = 1
+#endif
+
+#if canImport(AnotherMissingModule, _underlyingVersion: 1.0) // expected-warning {{cannot find module 'AnotherMissingModule' for canImport check; the directive will evaluate to false}}
+  // TODO(ParserValidation): expected-warning@-1 *{{cannot find module 'AnotherMissingModule' for canImport check; the directive will evaluate to false}}
+  let e = 1
 #endif
 }

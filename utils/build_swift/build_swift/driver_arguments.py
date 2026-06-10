@@ -71,7 +71,7 @@ def _apply_default_arguments(args):
 
     # Set the default build variant.
     if args.build_variant is None:
-        args.build_variant = 'Debug'
+        args.build_variant = 'RelWithDebInfo'
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -172,6 +172,13 @@ def _apply_default_arguments(args):
 
     if not args.android or not args.build_android:
         args.build_android = False
+
+    # By default, pedantic diagnostics are enabled only when assertions in
+    # the Swift project are also enabled. Otherwise we risk breaking
+    # no-assertions builds, which are not among the required pull request
+    # checks.
+    if args.swift_pedantic_diagnostics is None:
+        args.swift_pedantic_diagnostics = args.swift_assertions
 
     # By default use the same number of lit workers as build jobs.
     if not args.lit_jobs:
@@ -294,9 +301,6 @@ def _apply_default_arguments(args):
         args.test_watchos_host = False
         args.test_xros_host = False
         args.test_android_host = False
-
-    if args.build_wasmstdlib:
-        args.test_wasmstdlib = True
 
 
 def create_argument_parser():
@@ -487,6 +491,31 @@ def create_argument_parser():
     option('--sccache', toggle_true,
            default=os.environ.get('SWIFT_USE_SCCACHE') == '1',
            help='use sccache')
+    option('--enable-caching', toggle_true,
+           default=os.environ.get('SWIFT_USE_CACHING') == '1',
+           help='enable compilation caching using clang-cache and swift '
+                'cache-compile-job (incompatible with --sccache)')
+    option('--caching-cas-path', store_path,
+           default=None,
+           help='the path to the CAS directory for caching builds. '
+                'Defaults to $BUILD_ROOT/cas')
+    option('--caching-depscan-socket', store,
+           default='/tmp/clang-scand',
+           help='the socket path for the clang-cache depscan daemon')
+    option('--caching-plugin-path', store_path,
+           default=None,
+           help='the path to the CAS plugin for caching builds')
+    option('--caching-plugin-option', append,
+           help='options to pass to the CAS plugin. Can be specified '
+                'multiple times.')
+    option('--caching-prefix-map', toggle_true,
+           help='enable prefix mapping for cached builds. Maps source, '
+                'SDK, and toolchain paths to canonical prefixes.')
+    option('--caching-remote-service-path', store_path,
+           default=None,
+           help='the path to the remote caching service socket. Implies '
+                '--caching-prefix-map. Uses libToolchainCASPlugin.dylib '
+                'from Xcode if --caching-plugin-path is not provided.')
     option('--enable-asan', toggle_true,
            help='enable Address Sanitizer')
     option('--enable-ubsan', toggle_true,
@@ -859,15 +888,25 @@ def create_argument_parser():
 
     # Wasm options
 
-    option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
-           help='build the stdlib for WebAssembly target into a'
+    option(['--build-wasi-stdlib'], toggle_true('build_wasistdlib'),
+           help='build the stdlib for WASI target into a'
                 'separate build directory ')
-    option('--test-wasm-stdlib', toggle_true('test_wasmstdlib'),
-           help='test stdlib for WebAssembly')
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
     option(['--install-wasmkit'], toggle_true('install_wasmkit'),
            help='install SourceKitLSP')
+
+    # Emscripten options
+
+    option(['--build-emscripten-stdlib'],
+           toggle_true('build_emscriptenstdlib'),
+           help='build the stdlib for Emscripten target into a '
+                'separate build directory')
+    option(['--emscripten-path'], store_path,
+           help='path to the Emscripten checkout')
+    option(['--skip-test-emscripten-stdlib'],
+           toggle_false('test_emscriptenstdlib'),
+           help='skip testing stdlib for Emscripten')
 
     # Swift Testing options
 
@@ -950,7 +989,7 @@ def create_argument_parser():
 
     with mutually_exclusive_group():
 
-        set_defaults(build_variant='Debug')
+        set_defaults(build_variant='RelWithDebInfo')
 
         option(['-d', '--debug'], store('build_variant'),
                const='Debug',
@@ -1098,6 +1137,18 @@ def create_argument_parser():
            help='disable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
 
     # -------------------------------------------------------------------------
+    in_group('Diagnostics')
+
+    option('--swift-pedantic-diagnostics', store,
+           const=True,
+           help='Enable and escalate certain compiler warnings for code health '
+                '(e.g. unused code) to errors when building the Swift project '
+                '(default: enabled when assertions in the Swift project are '
+                'enabled)')
+    option('--no-swift-pedantic-diagnostics', store('swift_pedantic_diagnostics'),
+           const=False)
+
+    # -------------------------------------------------------------------------
     in_group('Select the CMake generator')
 
     set_defaults(cmake_generator=defaults.CMAKE_GENERATOR)
@@ -1198,6 +1249,11 @@ def create_argument_parser():
                 'Then re-builds the TSan runtime (compiler-rt) using this '
                 'freshly-built Clang and runs the TSan libdispatch tests.')
 
+    option('--continue-on-test-failure', toggle_true,
+           help='Continue building and testing remaining products even if '
+                'tests fail for a product. A non-zero exit code is still '
+                'returned at the end if any test failures occurred.')
+
     option('--skip-test-osx', toggle_false('test_osx'),
            help='skip testing Swift stdlibs for Mac OS X')
     option('--skip-test-linux', toggle_false('test_linux'),
@@ -1252,6 +1308,12 @@ def create_argument_parser():
            default=False,
            help='Build and preview standard library documentation with Swift-DocC.'
                 'Note: this builds Swift-DocC to perform the docs build.')
+    option('--stdlib-docs-static-hosting', toggle_true,
+           default=False,
+           help='Build the standard library documentation for static hosting.')
+    option('--stdlib-docs-hosting-base-path', store,
+           default='/',
+           help='The base path for hosting the standard library documentation.')
 
     option('--build-swift-clang-overlays', toggle_true,
            default=True,
@@ -1441,8 +1503,8 @@ def create_argument_parser():
            help='skip testing swift_inspect')
     option('--skip-test-swiftdocc', toggle_false('test_swiftdocc'),
            help='skip testing swift-docc')
-    option('--skip-test-wasm-stdlib', toggle_false('test_wasmstdlib'),
-           help='skip testing stdlib for WebAssembly')
+    option('--skip-test-wasi-stdlib', toggle_false('test_wasistdlib'),
+           help='skip testing stdlib for WASI')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
@@ -1451,7 +1513,7 @@ def create_argument_parser():
            help='enable building llvm using modules')
 
     option('--llvm-targets-to-build', store,
-           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR',
+           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',
            help='LLVM target generators to build')
 
     option('--llvm-ninja-targets', append,
@@ -1703,8 +1765,6 @@ Preparing to run this script
 ----------------------------
 
   See README.md for instructions on cloning Swift subprojects.
-
-If you intend to use the -l, -L, --lldb, or --debug-lldb options.
 
 That's it; you're ready to go!
 

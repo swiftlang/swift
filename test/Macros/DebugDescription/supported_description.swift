@@ -8,11 +8,14 @@
 struct MyStruct1: CustomStringConvertible {
   var description: String { "thirty" }
 }
-// CHECK: static let _lldb_summary = (
-// CHECK:     /* version */ 1 as UInt8,
-// CHECK:     /* record size */ 24 as UInt8,
-// CHECK:     /* "main.MyStruct1" */ 15 as UInt8, 109 as UInt8, 97 as UInt8, 105 as UInt8, 110 as UInt8, 46 as UInt8, 77 as UInt8, 121 as UInt8, 83 as UInt8, 116 as UInt8, 114 as UInt8, 117 as UInt8, 99 as UInt8, 116 as UInt8, 49 as UInt8, 0 as UInt8,
-// CHECK:     /* "thirty" */ 7 as UInt8, 116 as UInt8, 104 as UInt8, 105 as UInt8, 114 as UInt8, 116 as UInt8, 121 as UInt8, 0 as UInt8
+// CHECK: static let _lldb_summary: (
+// CHECK:   {{UInt8(, UInt8)*}}
+// CHECK: ) =
+// CHECK: (
+// CHECK:     /* version */ 1,
+// CHECK:     /* record size */ 24,
+// CHECK:     /* "main.MyStruct1" */ 15, 109, 97, 105, 110, 46, 77, 121, 83, 116, 114, 117, 99, 116, 49, 0,
+// CHECK:     /* "thirty" */ 7, 116, 104, 105, 114, 116, 121, 0
 // CHECK: )
 
 @DebugDescription
@@ -20,11 +23,14 @@ struct MyStruct2: CustomDebugStringConvertible {
   var description: String { "thirty" }
   var debugDescription: String { "eleven" }
 }
-// CHECK: static let _lldb_summary = (
-// CHECK:     /* version */ 1 as UInt8,
-// CHECK:     /* record size */ 24 as UInt8,
-// CHECK:     /* "main.MyStruct2" */ 15 as UInt8, 109 as UInt8, 97 as UInt8, 105 as UInt8, 110 as UInt8, 46 as UInt8, 77 as UInt8, 121 as UInt8, 83 as UInt8, 116 as UInt8, 114 as UInt8, 117 as UInt8, 99 as UInt8, 116 as UInt8, 50 as UInt8, 0 as UInt8,
-// CHECK:     /* "eleven" */ 7 as UInt8, 101 as UInt8, 108 as UInt8, 101 as UInt8, 118 as UInt8, 101 as UInt8, 110 as UInt8, 0 as UInt8
+// CHECK: static let _lldb_summary: (
+// CHECK:   {{UInt8(, UInt8)*}}
+// CHECK: ) =
+// CHECK: (
+// CHECK:     /* version */ 1,
+// CHECK:     /* record size */ 24,
+// CHECK:     /* "main.MyStruct2" */ 15, 109, 97, 105, 110, 46, 77, 121, 83, 116, 114, 117, 99, 116, 50, 0,
+// CHECK:     /* "eleven" */ 7, 101, 108, 101, 118, 101, 110, 0
 // CHECK: )
 
 @DebugDescription
@@ -33,8 +39,11 @@ struct MyStruct3: CustomDebugStringConvertible {
   var debugDescription: String { "eleven" }
   var lldbDescription: String { "two" }
 }
-// CHECK: static let _lldb_summary = (
-// CHECK:     /* version */ 1 as UInt8,
-// CHECK:     /* record size */ 21 as UInt8,
-// CHECK:     /* "main.MyStruct3" */ 15 as UInt8, 109 as UInt8, 97 as UInt8, 105 as UInt8, 110 as UInt8, 46 as UInt8, 77 as UInt8, 121 as UInt8, 83 as UInt8, 116 as UInt8, 114 as UInt8, 117 as UInt8, 99 as UInt8, 116 as UInt8, 51 as UInt8, 0 as UInt8,
-// CHECK:     /* "two" */ 4 as UInt8, 116 as UInt8, 119 as UInt8, 111 as UInt8, 0 as UInt8
+// CHECK: static let _lldb_summary: (
+// CHECK:   {{UInt8(, UInt8)*}}
+// CHECK: ) =
+// CHECK: (
+// CHECK:     /* version */ 1,
+// CHECK:     /* record size */ 21,
+// CHECK:     /* "main.MyStruct3" */ 15, 109, 97, 105, 110, 46, 77, 121, 83, 116, 114, 117, 99, 116, 51, 0,
+// CHECK:     /* "two" */ 4, 116, 119, 111, 0

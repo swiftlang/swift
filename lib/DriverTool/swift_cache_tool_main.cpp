@@ -65,12 +65,13 @@ enum ID {
 #undef OPTION
 };
 
-#define PREFIX(NAME, VALUE)                                                    \
-  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
-  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
-      NAME##_init, std::size(NAME##_init) - 1);
+#define OPTTABLE_STR_TABLE_CODE
 #include "SwiftCacheToolOptions.inc"
-#undef PREFIX
+#undef OPTTABLE_STR_TABLE_CODE
+
+#define OPTTABLE_PREFIXES_TABLE_CODE
+#include "SwiftCacheToolOptions.inc"
+#undef OPTTABLE_PREFIXES_TABLE_CODE
 
 static const OptTable::Info InfoTable[] = {
 #define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
@@ -80,7 +81,8 @@ static const OptTable::Info InfoTable[] = {
 
 class CacheToolOptTable : public llvm::opt::GenericOptTable {
 public:
-  CacheToolOptTable() : GenericOptTable(InfoTable) {}
+  CacheToolOptTable()
+      : GenericOptTable(OptionStrTable, OptionPrefixesTable, InfoTable) {}
 };
 
 class SwiftCacheToolInvocation {
@@ -133,8 +135,15 @@ public:
     }
 
     // Fallback to default path if not set.
-    if (CASOpts.CASPath.empty() && CASOpts.PluginPath.empty())
-      CASOpts.CASPath = getDefaultOnDiskCASPath();
+    if (CASOpts.CASPath.empty() && CASOpts.PluginPath.empty()) {
+      auto Path = getDefaultOnDiskCASPath();
+      if (!Path) {
+        llvm::errs() << llvm::toString(Path.takeError()) << "\n";
+        return 1;
+      }
+
+      CASOpts.CASPath = *Path;
+    }
 
     Inputs = ParsedArgs.getAllArgValues(OPT_INPUT);
     FrontendArgs = ParsedArgs.getAllArgValues(OPT__DASH_DASH);
@@ -194,7 +203,9 @@ private:
     }
     // drop swift-frontend executable path and leading `-frontend` from
     // command-line.
-    if (StringRef(FrontendArgs[0]).ends_with("swift-frontend"))
+    llvm::SmallString<261> path;
+    llvm::sys::path::native(Twine{FrontendArgs[0]}, path);
+    if (llvm::sys::path::filename(path).starts_with("swift-frontend"))
       FrontendArgs.erase(FrontendArgs.begin());
     if (StringRef(FrontendArgs[0]) == "-frontend")
       FrontendArgs.erase(FrontendArgs.begin());
@@ -375,7 +386,7 @@ readOutputEntriesFromFile(StringRef Path) {
 }
 
 int SwiftCacheToolInvocation::validateOutputs() {
-  auto DB = CASOpts.getOrCreateDatabases();
+  auto DB = CASOpts.CASConfiguration::createDatabases();
   if (!DB)
     report_fatal_error(DB.takeError());
 
@@ -503,7 +514,7 @@ int SwiftCacheToolInvocation::printIncludeTreeList() {
     llvm::errs() << llvm::toString(std::move(err)) << "\n";
     return 1;
   };
-  auto DB = CASOpts.getOrCreateDatabases();
+  auto DB = CASOpts.CASConfiguration::createDatabases();
   if (!DB) {
     return error(DB.takeError());
   }
@@ -540,7 +551,7 @@ int SwiftCacheToolInvocation::printCompileCacheKey() {
     llvm::errs() << "expect 1 CASID as input\n";
     return 1;
   }
-  auto DB = CASOpts.getOrCreateDatabases();
+  auto DB = CASOpts.CASConfiguration::createDatabases();
   if (!DB) {
     return error(DB.takeError());
   }

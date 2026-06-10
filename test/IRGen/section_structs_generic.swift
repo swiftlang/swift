@@ -1,18 +1,18 @@
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -parse-as-library -emit-ir %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -parse-as-library -emit-ir %s -o - | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_SymbolLinkageMarkers
+// REQUIRES: swift_feature_CompileTimeValuesPreview
 
 struct MyStruct1<T> {
     var a, b: T
 }
-@_section("__TEXT,__mysection") var g_MyStruct1 = MyStruct1<Int>(a: 42, b: 66)
+@section("__TEXT,__mysection") var g_MyStruct1 = MyStruct1<Int>(a: 42, b: 66)
 
 struct MyStruct2<T> {
     var a: T
     var b: (T, T)
 }
-@_section("__TEXT,__mysection") var g_MyStruct2 = MyStruct2<Int>(a: 42, b: (66, 67))
+@section("__TEXT,__mysection") var g_MyStruct2 = MyStruct2<Int>(a: 42, b: (66, 67))
 
 struct MyStruct3<T> {
     var a, b: T
@@ -21,13 +21,13 @@ struct MyStruct3<T> {
         self.b = b
     }
 }
-@_section("__TEXT,__mysection") var g_MyStruct3 = MyStruct3<Int>(a: 42, b: 77)
+@section("__TEXT,__mysection") var g_MyStruct3 = MyStruct3<Int>(a: 42, b: 77)
 
 struct MyStruct4<T> {
     var a: T
     var s: MyStruct1<T>
 }
-@_section("__TEXT,__mysection") var g_MyStruct4 = MyStruct4<Int>(a: 42, s: MyStruct1<Int>(a: 43, b: 44))
+@section("__TEXT,__mysection") var g_MyStruct4 = MyStruct4<Int>(a: 42, s: MyStruct1<Int>(a: 43, b: 44))
 
 struct MyStruct5<T> {
     var q: MyStruct4<T>
@@ -37,7 +37,7 @@ struct MyStruct5<T> {
         self.r = r
     }
 }
-@_section("__TEXT,__mysection") var g_MyStruct5 = MyStruct5<Int>(q: MyStruct4<Int>(a: 42, s: MyStruct1<Int>(a: 43, b: 44)), r: MyStruct4<Int>(a: 42, s: MyStruct1<Int>(a: 43, b: 44)))
+@section("__TEXT,__mysection") var g_MyStruct5 = MyStruct5<Int>(q: MyStruct4<Int>(a: 42, s: MyStruct1<Int>(a: 43, b: 44)), r: MyStruct4<Int>(a: 42, s: MyStruct1<Int>(a: 43, b: 44)))
 
 // CHECK: @"{{.*}}g_MyStruct1{{.*}}Gvp" = hidden global {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, %TSi <{ {{(i32|i64)}} 66 }> }>
 // CHECK: @"{{.*}}g_MyStruct2{{.*}}Gvp" = hidden global {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, <{ %TSi, %TSi }> <{ %TSi <{ {{(i32|i64)}} 66 }>, %TSi <{ {{(i32|i64)}} 67 }> }> }>

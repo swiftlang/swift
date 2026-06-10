@@ -17,19 +17,15 @@
 #include "swift/Basic/Feature.h"
 
 struct FeatureParsingTest : public ArgParsingTest {
-  static const std::string defaultLangMode;
+  static const swift::LanguageMode defaultLanguageMode;
 
   FeatureParsingTest();
 };
 
-struct FeatureWrapper final {
-  swift::Feature id;
+struct FeatureWrapper final : swift::Feature {
   std::string name;
-  std::string langMode;
 
-  FeatureWrapper(swift::Feature id);
-
-  operator swift::Feature() const { return id; }
+  FeatureWrapper(swift::Feature feature);
 };
 
 // MARK: - Printers
