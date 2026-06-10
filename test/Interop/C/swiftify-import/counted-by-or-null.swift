@@ -53,8 +53,8 @@ void shared(int len, int * __counted_by_or_null(len) p1, int * __counted_by_or_n
 // expected-expansion@+9:81{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != len - offset {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != (len - offset) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\((len - offset)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe complexExpr(len, offset, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
@@ -100,8 +100,8 @@ int * __counted_by_or_null(len) returnPointer(int len);
 // expected-expansion@+9:61{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func offByOne(_ len: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != len + 1 {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in offByOne: expected \\(len + 1) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != (len + CInt(1)) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in offByOne: expected \\((len + CInt(1))) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe offByOne(len, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
@@ -111,8 +111,8 @@ void offByOne(int len, int * __counted_by_or_null(len + 1) p);
 // expected-expansion@+9:85{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func offBySome(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != len + (1 + offset) {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in offBySome: expected \\(len + (1 + offset)) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != (len + ((CInt(1) + offset))) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in offBySome: expected \\((len + ((CInt(1) + offset)))) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe offBySome(len, offset, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
@@ -122,8 +122,8 @@ void offBySome(int len, int offset, int * __counted_by_or_null(len + (1 + offset
 // expected-expansion@+9:62{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func scalar(_ m: Int32, _ n: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != m * n {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in scalar: expected \\(m * n) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != (m * n) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in scalar: expected \\((m * n)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe scalar(m, n, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
@@ -133,8 +133,8 @@ void scalar(int m, int n, int * __counted_by_or_null(m * n) p);
 // expected-expansion@+9:75{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bitwise(_ m: Int32, _ n: Int32, _ o: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != m & n | ~o {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in bitwise: expected \\(m & n | ~o) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != ((m & n) | ~o) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in bitwise: expected \\(((m & n) | ~o)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe bitwise(m, n, o, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
@@ -144,8 +144,8 @@ void bitwise(int m, int n, int o, int * __counted_by_or_null(m & n | ~o) p);
 // expected-expansion@+9:79{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bitshift(_ m: Int32, _ n: Int32, _ o: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != m << (n >> o) {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in bitshift: expected \\(m << (n >> o)) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != (m << ((n >> o))) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in bitshift: expected \\((m << ((n >> o)))) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe bitshift(m, n, o, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
@@ -155,8 +155,8 @@ void bitshift(int m, int n, int o, int * __counted_by_or_null(m << (n >> o)) p);
 // expected-expansion@+9:52{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func constInt(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != 420 {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in constInt: expected \\(420) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != CInt(420) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in constInt: expected \\(CInt(420)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe constInt(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
@@ -166,17 +166,35 @@ void constInt(int * __counted_by_or_null(42 * 10) p);
 // expected-expansion@+9:74{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func constFloatCastedToInt(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != 0 {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in constFloatCastedToInt: expected \\(0) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != CInt(0) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in constFloatCastedToInt: expected \\(CInt(0)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe constFloatCastedToInt(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void constFloatCastedToInt(int * __counted_by_or_null((int) (4.2 / 12)) p);
 
-void sizeofType(int * __counted_by_or_null(sizeof(int *)) p);
+// expected-expansion@+9:148{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func sizeofType(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
+//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(8) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofType: expected \\(CUnsignedLongLong(8)) but got \\(p.count)")|}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    return unsafe sizeofType(p.baseAddress)|}}
+//   expected-remark@7{{macro content: |}|}}
+// }}
+void sizeofType(int * __counted_by_or_null((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(int *)) p);
 
-void sizeofParam(int * __counted_by_or_null(sizeof(p)) p);
+// expected-expansion@+9:145{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func sizeofParam(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
+//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(8) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofParam: expected \\(CUnsignedLongLong(8)) but got \\(p.count)")|}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    return unsafe sizeofParam(p.baseAddress)|}}
+//   expected-remark@7{{macro content: |}|}}
+// }}
+void sizeofParam(int * __counted_by_or_null((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(p)) p);
 
 void derefLen(int * len, int * __counted_by_or_null(*len) p);
 
@@ -186,21 +204,59 @@ void lAnd(int len, int * __counted_by_or_null(len && len) p);
 
 void lOr(int len, int * __counted_by_or_null(len || len) p);
 
+// expected-expansion@+9:77{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func floatCastToInt(_ meters: Float, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
+//   expected-remark@3{{macro content: |    if p.count != CInt(meters) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in floatCastToInt: expected \\(CInt(meters)) but got \\(p.count)")|}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    return unsafe floatCastToInt(meters, p.baseAddress)|}}
+//   expected-remark@7{{macro content: |}|}}
+// }}
 void floatCastToInt(float meters, int * __counted_by_or_null((int) meters) p);
 
 void pointerCastToInt(int *square, int * __counted_by_or_null((int) square) p);
 
+// expected-expansion@+11:58{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nanAsInt(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
+//   expected-remark@3{{macro content: |    if p.count != ((CInt(0) / CInt(0))) {|}}
+//   expected-error@3{{division by zero}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in nanAsInt: expected \\(((CInt(0) / CInt(0)))) but got \\(p.count)")|}}
+//   expected-error@4 2{{division by zero}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    return unsafe nanAsInt(p.baseAddress)|}}
+//   expected-remark@7{{macro content: |}|}}
+// }}
 void nanAsInt(int * __counted_by_or_null((int) (0 / 0)) p);
 
+// expected-expansion@+9:54{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func unsignedLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
+//   expected-remark@3{{macro content: |    if p.count != CUnsignedInt(2) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in unsignedLiteral: expected \\(CUnsignedInt(2)) but got \\(p.count)")|}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    return unsafe unsignedLiteral(p.baseAddress)|}}
+//   expected-remark@7{{macro content: |}|}}
+// }}
 void unsignedLiteral(int * __counted_by_or_null(2u) p);
 
+// expected-expansion@+9:50{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func longLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
+//   expected-remark@3{{macro content: |    if p.count != CLong(2) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in longLiteral: expected \\(CLong(2)) but got \\(p.count)")|}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    return unsafe longLiteral(p.baseAddress)|}}
+//   expected-remark@7{{macro content: |}|}}
+// }}
 void longLiteral(int * __counted_by_or_null(2l) p);
 
 // expected-expansion@+9:51{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func hexLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != 250 {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in hexLiteral: expected \\(250) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != CInt(250) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in hexLiteral: expected \\(CInt(250)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe hexLiteral(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
@@ -210,8 +266,8 @@ void hexLiteral(int * __counted_by_or_null(0xfa) p);
 // expected-expansion@+9:54{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func binaryLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != 2 {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in binaryLiteral: expected \\(2) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != CInt(2) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in binaryLiteral: expected \\(CInt(2)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe binaryLiteral(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
@@ -221,8 +277,8 @@ void binaryLiteral(int * __counted_by_or_null(0b10) p);
 // expected-expansion@+9:53{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func octalLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != 511 {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in octalLiteral: expected \\(511) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != CInt(511) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in octalLiteral: expected \\(CInt(511)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe octalLiteral(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
@@ -286,7 +342,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 7ff35b9ab50ae75a7f0ee983328b18de19a13f5feb1e4c0fdc38e0ad6596564d
+// GENERATED-HASH: e000162a354939bc180cd01a90e021ed3b491faebc6f2f8a1b456e1df822f915
 import Test
 
 func call_simple(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!) {
@@ -449,8 +505,16 @@ func call_allOrNull(_ len: Int32, _ p1: UnsafeMutablePointer<Int32>?, _ p2: Unsa
   return unsafe constInt(p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_floatCastToInt(_ meters: Float, _ p: UnsafeMutableBufferPointer<Int32>) {
+  return unsafe floatCastToInt(meters, p)
+}
+
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_hexLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {
   return unsafe hexLiteral(p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_longLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {
+  return unsafe longLiteral(p)
 }
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_mixedShared(_ p1: UnsafeMutableBufferPointer<Int32>?, _ p2: UnsafeMutableBufferPointer<Int32>) {
@@ -459,6 +523,10 @@ func call_allOrNull(_ len: Int32, _ p1: UnsafeMutablePointer<Int32>?, _ p2: Unsa
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_mixedThree(_ p1: UnsafeMutableBufferPointer<Int32>?, _ p2: UnsafeMutableBufferPointer<Int32>, _ p3: UnsafeMutableBufferPointer<Int32>?) {
   return unsafe mixedThree(p1, p2, p3)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nanAsInt(_ p: UnsafeMutableBufferPointer<Int32>) {
+  return unsafe nanAsInt(p)
 }
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: UnsafeMutableBufferPointer<Int32>) {
@@ -505,6 +573,18 @@ func call_allOrNull(_ len: Int32, _ p1: UnsafeMutablePointer<Int32>?, _ p2: Unsa
   return unsafe simpleFlipped(p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_sizeofParam(_ p: UnsafeMutableBufferPointer<Int32>) {
+  return unsafe sizeofParam(p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_sizeofType(_ p: UnsafeMutableBufferPointer<Int32>) {
+  return unsafe sizeofType(p)
+}
+
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_swiftAttr(_ p: UnsafeMutableBufferPointer<Int32>) {
   return unsafe swiftAttr(p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_unsignedLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {
+  return unsafe unsignedLiteral(p)
 }

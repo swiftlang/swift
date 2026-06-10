@@ -49,8 +49,8 @@ void shared(int len, void * __sized_by_or_null(len) p1, void * __sized_by_or_nul
 // expected-expansion@+9:80{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    if p.count != len - offset {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != (len - offset) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\((len - offset)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe complexExpr(len, offset, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
