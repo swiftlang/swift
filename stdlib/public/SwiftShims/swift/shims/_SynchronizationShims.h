@@ -16,6 +16,27 @@
 #include "SwiftStdbool.h"
 #include "SwiftStdint.h"
 
+#if defined(__wasi__) && defined(__wasm__)
+// Note: `__wasilibc_use_busy_futex` is a thread-local Wasm global defined by
+// wasi-libc in `__wasilibc_busywait.c`:
+// https://github.com/WebAssembly/wasi-libc/blob/wasi-sdk-32/libc-top-half/musl/src/thread/wasi-threads/__wasilibc_busywait.c#L33
+//
+// It becomes nonzero on the current thread after calling
+// `__wasilibc_enable_futex_busywait_on_current_thread()`.
+//
+// Background:
+// https://github.com/WebAssembly/wasi-libc/pull/562
+static inline __swift_uint32_t _swift_stdlib_wasilibc_use_busy_futex_get() {
+  __swift_uint32_t val;
+  __asm__(
+      ".globaltype __wasilibc_use_busy_futex, i32\n"
+      "global.get __wasilibc_use_busy_futex\n"
+      "local.set %0\n"
+      : "=r"(val));
+  return val;
+}
+#endif
+
 #if defined(__linux__)
 #include <errno.h>
 #include <linux/futex.h>
