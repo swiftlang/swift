@@ -14,7 +14,6 @@ let maybeInt: Any = 1
 switch maybeInt {
 case let intValue as? Int: _ = intValue
   // expected-error@-1 {{cannot conditionally downcast in a type-casting pattern}}{{21-22=}}
-  // expected-error@-2 {{expression pattern of type 'Int?' cannot match values of type 'Any'}}
 case let intValue as! Int: _ = intValue
   // expected-error@-1 {{cannot force downcast in a type-casting pattern}}{{21-22=}}
 case let intValue is Int: _ = intValue
