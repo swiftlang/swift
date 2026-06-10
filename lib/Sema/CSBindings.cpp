@@ -2258,27 +2258,35 @@ void BindingSet::addDefault(Constraint *constraint) {
   Defaults.push_back(constraint);
 }
 
-bool LiteralRequirement::isCoveredBy(Type type, ConstraintSystem &CS) const {
-  auto coversDefaultType = [](Type type, Type defaultType) -> bool {
-    if (!defaultType->hasUnboundGenericType())
-      return type->isEqual(defaultType);
+bool LiteralRequirement::isCoveredBy(AllowedBindingKind kind, Type type,
+                                     ConstraintSystem &CS) const {
+  if (CS.lookupConformance(type, getProtocol()))
+    return true;
 
+  if (!hasDefaultType())
+    return false;
+
+  auto defaultType = getDefaultType();
+  if (defaultType->hasUnboundGenericType()) {
     // For generic literal types, check whether we already have a
     // specialization of this generic within our list.
     // FIXME: This assumes that, e.g., the default literal
     // int/float/char/string types are never generic.
     auto nominal = defaultType->getAnyNominal();
-    if (!nominal)
-      return false;
+    return nominal && nominal == type->getAnyNominal();
+  } else {
+    switch (kind) {
+    case AllowedBindingKind::Exact:
+    case AllowedBindingKind::Fallback:
+      return type->isEqual(defaultType);
 
-    // FIXME: Check parents?
-    return nominal == type->getAnyNominal();
-  };
+    case AllowedBindingKind::Supertypes:
+      return !canPossiblyConvertTo(CS, defaultType, type, GenericSignature());
 
-  if (hasDefaultType() && coversDefaultType(type, getDefaultType()))
-    return true;
-
-  return bool(CS.lookupConformance(type, getProtocol()));
+    case AllowedBindingKind::Subtypes:
+      return !canPossiblyConvertTo(CS, type, defaultType, GenericSignature());
+    }
+  }
 }
 
 std::pair<bool, Type>
@@ -2306,7 +2314,7 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
     if (type->isTypeVariableOrMember() || type->isPlaceholder())
       return std::make_pair(false, Type());
 
-    if (isCoveredBy(type, CS)) {
+    if (isCoveredBy(binding.Kind, type, CS)) {
       return std::make_pair(true, requiresUnwrap ? type : Type());
     }
 

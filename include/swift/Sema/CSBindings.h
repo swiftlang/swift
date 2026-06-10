@@ -244,7 +244,7 @@ struct LiteralRequirement {
   bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
 
 private:
-  bool isCoveredBy(Type type, ConstraintSystem &CS) const;
+  bool isCoveredBy(AllowedBindingKind kind, Type type, ConstraintSystem &CS) const;
 };
 
 struct PotentialBindings {
