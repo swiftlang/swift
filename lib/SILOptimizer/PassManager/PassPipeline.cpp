@@ -576,6 +576,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // SILCombine can expose further opportunities for SimplifyCFG.
   P.addSimplifyCFG();
 
+  // Merging borrow scopes helps CSE
+  P.addMergeBorrowScopes();
   P.addCommonSubexpressionElimination();
   if (OpLevel == OptimizationLevelKind::HighLevel) {
     // Early RLE does not touch loads from Arrays. This is important because

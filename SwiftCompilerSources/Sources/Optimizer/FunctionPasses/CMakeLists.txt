@@ -35,6 +35,7 @@ swift_compiler_sources(Optimizer
   ObjectOutliner.swift
   ObjCBridgingOptimization.swift
   MandatoryDestroyHoisting.swift
+  MergeBorrowScopes.swift
   MergeCondFails.swift
   NamedReturnValueOptimization.swift
   RedundantLoadElimination.swift
