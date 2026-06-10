@@ -62,6 +62,7 @@
 
 namespace clang {
 class APValue;
+class BuiltinType;
 class DeclarationName;
 class MangleContext;
 class ObjCInterfaceDecl;
@@ -2076,6 +2077,20 @@ bool isSpecialAppKitFunctionKeyProperty(const clang::NamedDecl *decl);
 /// nested types other than pointers or references.
 bool hasSameUnderlyingType(const clang::Type *a,
                            const clang::TemplateTypeParmDecl *b);
+
+/// Map a `clang::BuiltinType` to its Swift stdlib counterpart as listed in
+/// `BuiltinMappedTypes.def`, if there is one.
+[[nodiscard]] std::optional<StringRef>
+getBuiltinTypeSwiftName(const clang::BuiltinType *bt);
+
+/// Return the Swift type name if `ty` is a `clang::BuiltinType` with a Swift
+/// counterpart.
+[[nodiscard]] std::optional<StringRef> static inline getBuiltinTypeSwiftName(
+    clang::QualType ty) {
+  if (const auto *bt = ty->getAs<clang::BuiltinType>())
+    return getBuiltinTypeSwiftName(bt);
+  return std::nullopt;
+}
 
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
