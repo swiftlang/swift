@@ -1005,9 +1005,6 @@ GROUPED_ERROR(regionbasedisolation_unknown_pattern, RegionIsolationUnknownPatter
       ())
 NOTE(regionbasedisolation_maybe_race, none,
      "access can happen concurrently", ())
-NOTE(regionbasedisolation_type_is_non_sendable, none,
-      "%0 is a non-Sendable type",
-      (Type))
 
 //===
 // Use After Send Emitter
@@ -1019,6 +1016,9 @@ GROUPED_ERROR(regionbasedisolation_named_send_yields_race,
 GROUPED_ERROR(regionbasedisolation_type_send_yields_race, SendingRisksDataRace, none,
       "sending value of non-Sendable type %0 risks causing data races",
       (Type))
+GROUPED_ERROR(regionbasedisolation_bare_send_yields_race, SendingRisksDataRace, none,
+      "sending %select{value|closure}0 risks causing data races",
+      (bool))
 NOTE(regionbasedisolation_type_use_after_send, none,
       "sending value of non-Sendable type %0 to %1 callee risks causing data races between %1 and local %2 uses",
       (Type, StringRef, StringRef))
@@ -1038,6 +1038,15 @@ NOTE(regionbasedisolation_named_info_send_yields_race_callee, none,
 NOTE(regionbasedisolation_type_isolated_capture_yields_race, none,
       "sending value of non-Sendable type %0 to %1 closure due to closure capture risks causing races in between %1 and %2 uses",
       (Type, StringRef, StringRef))
+NOTE(regionbasedisolation_bare_value_used_after_send, none,
+      "sending %select{value|closure}2 to %0 callee risks causing data races between %0 and local %1 uses",
+      (StringRef, StringRef, bool))
+NOTE(regionbasedisolation_bare_value_used_after_send_callee, none,
+      "sending %select{value|closure}3 to %0 %kind1 risks causing data races between %0 and local %2 uses",
+      (StringRef, const ValueDecl *, StringRef, bool))
+NOTE(regionbasedisolation_bare_value_isolated_capture_yields_race, none,
+      "sending %select{value|closure}2 to %0 closure due to closure capture risks causing races between %0 and %1 uses",
+      (StringRef, StringRef, bool))
 
 // Value captured in async let and reused.
 NOTE(regionbasedisolation_named_nonisolated_asynclet_name, none,
@@ -1059,6 +1068,12 @@ NOTE(regionbasedisolation_typed_use_after_sending, none,
 NOTE(regionbasedisolation_typed_use_after_sending_callee, none,
       "Passing value of non-Sendable type %0 as a 'sending' argument to %kind1 risks causing races in between local and caller code",
       (Type, const ValueDecl *))
+NOTE(regionbasedisolation_bare_value_used_after_sending, none,
+      "%select{value|closure}0 used after being passed as a 'sending' parameter; Later uses could race",
+      (bool))
+NOTE(regionbasedisolation_bare_value_used_after_sending_callee, none,
+      "%select{value|closure}1 used after being passed as a 'sending' parameter to %kind0; Later uses could race",
+      (const ValueDecl *, bool))
 
 //===
 // Sending Never Sendable Emitter
@@ -1081,6 +1096,12 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
      "Passing %0 value of non-Sendable type %1 as a 'sending' parameter risks "
      "causing races inbetween %0 uses and uses reachable from the callee",
      (StringRef, Type))
+NOTE(regionbasedisolation_bare_tns_passed_to_sending, none,
+     "passing %0 %select{value|closure}1 as a 'sending' parameter risks causing races inbetween %0 uses and uses reachable from the callee",
+     (StringRef, bool))
+NOTE(regionbasedisolation_bare_tns_passed_to_sending_callee, none,
+     "passing %0 %select{value|closure}2 as a 'sending' parameter to %kind1 risks causing races inbetween %0 uses and uses reachable from %1",
+     (StringRef, const ValueDecl *, bool))
 
 GROUPED_ERROR(regionbasedisolation_typed_tns_passed_sending_closure, SendingClosureRisksDataRace, none,
      "passing closure as a 'sending' parameter risks causing data races between %0 and concurrent execution of the closure",
@@ -1130,6 +1151,12 @@ NOTE(regionbasedisolation_typed_sendneversendable_via_arg, none,
 NOTE(regionbasedisolation_typed_sendneversendable_via_arg_callee, none,
       "sending %select{%0 |}4value of non-Sendable type %1 to %2 %kind3 risks causing races in between %select{%0 |code in the current isolation context }4and %2 uses",
       (StringRef, Type, StringRef, const ValueDecl *, bool))
+NOTE(regionbasedisolation_bare_sendneversendable_via_arg, none,
+      "sending %select{%0 |}2%select{value|closure}3 to %1 callee risks causing races in between %select{%0 |code in the current isolation context }2and %1 uses",
+      (StringRef, StringRef, bool, bool))
+NOTE(regionbasedisolation_bare_sendneversendable_via_arg_callee, none,
+      "sending %select{%0 |}3%select{value|closure}4 to %1 %kind2 risks causing races in between %select{%0 |code in the current isolation context }3and %1 uses",
+      (StringRef, StringRef, const ValueDecl *, bool, bool))
 
 NOTE(regionbasedisolation_isolated_conformance_introduced, none,
      "isolated conformance to %kind0 can be introduced here",
@@ -1182,18 +1209,19 @@ NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_actor_return_val
 //===
 // Out Sending
 
-GROUPED_ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_type, RegionIsolation, none,
-      "returning a %select{%1 |}2%0 value as a 'sending' result risks causing data races%select{; the value is accessible to code in the current isolation context|}2",
-      (Type, StringRef, bool))
-NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_type, none,
-      "returning a %select{%1 |}2%0 value risks causing races since the caller assumes the value can be safely sent to other isolation domains%select{, but the value is accessible to code in the current isolation context|}2",
-      (Type, StringRef, bool))
+
 GROUPED_ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_named, RegionIsolation, none,
       "returning %select{%1 |}2%0 as a 'sending' result risks causing data races%select{; %0 is accessible to code in the current isolation context|}2",
       (Identifier, StringRef, bool))
 NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
       "returning %select{%1 |}2%0 risks causing data races since the caller assumes that %0 can be safely sent to other isolation domains%select{, but %0 is accessible to code in the current isolation context|}2",
       (Identifier, StringRef, bool))
+GROUPED_ERROR(regionbasedisolation_bare_out_sending_cannot_be_actor_isolated, RegionIsolation, none,
+      "returning %select{value|closure}1 as a 'sending' result risks causing data races%select{; the %select{value|closure}1 is accessible to code in the current isolation context|}0",
+      (bool, bool))
+NOTE(regionbasedisolation_bare_out_sending_cannot_be_actor_isolated_note, none,
+      "returning %select{value|closure}1 risks causing races since the caller assumes the %select{value|closure}1 can be safely sent to other isolation domains%select{, but the %select{value|closure}1 is accessible to code in the current isolation context|}0",
+      (bool, bool))
 
 //===
 // non-Sendable Results

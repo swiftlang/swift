@@ -89,7 +89,7 @@ bb0:
   %2 = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-4 {{}}
   %3 = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   apply %3(%1) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   // expected-note @-1 {{access can happen concurrently}}
@@ -107,7 +107,7 @@ bb0:
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableKlass>(%3) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-4 {{}}
   yield %3 : $*NonSendableKlass, resume bb1, unwind bb2
   // expected-note @-1 {{access can happen concurrently}}
 
@@ -135,7 +135,7 @@ bb0:
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<FakeOptional<NonSendableKlass>>(%2) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-6 {{}}
   switch_enum_addr %2 : $*FakeOptional<NonSendableKlass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
   // expected-note @-1 {{access can happen concurrently}}
 
@@ -162,7 +162,7 @@ bb0:
   %1a = explicit_copy_value %1 : $NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1a) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-3 {{}}
   %3 = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   apply %3(%1) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   // expected-note @-1 {{access can happen concurrently}}
@@ -180,7 +180,7 @@ bb0:
   %1a = move_value %1 : $NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1a) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-3 {{}}
   %3 = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   apply %3(%1a) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   // expected-note @-1 {{access can happen concurrently}}
@@ -200,7 +200,7 @@ bb0:
   %4 = function_ref @transferMoveOnlyStructIndirectly : $@convention(thin) @async (@in_guaranteed NonSendableMoveOnlyStruct) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4(%unresolved) : $@convention(thin) @async (@in_guaranteed NonSendableMoveOnlyStruct) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
   %5 = function_ref @useMoveOnlyStructIndirectly : $@convention(thin) (@in_guaranteed NonSendableMoveOnlyStruct) -> ()
   apply %5(%unresolved) : $@convention(thin) (@in_guaranteed NonSendableMoveOnlyStruct) -> ()
   // expected-note @-1 {{access can happen concurrently}}
@@ -221,7 +221,7 @@ bb0:
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableKlass>(%project) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-6 {{}}
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %5<NonSendableKlass>(%project) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-note @-1 {{access can happen concurrently}}
@@ -241,7 +241,7 @@ bb0:
   %0c = moveonlywrapper_to_copyable [guaranteed] %0b : $@moveOnly NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%0c) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-3 {{}}
   end_borrow %0b : $@moveOnly NonSendableKlass
   %3 = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   %0bb = begin_borrow %0a : $@moveOnly NonSendableKlass
@@ -267,7 +267,7 @@ bb0:
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableKlass>(%unwrappedProject) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-6 {{}}
 
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %5<NonSendableKlass>(%unwrappedProject) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -301,7 +301,7 @@ bb0:
   %4 = function_ref @transfer_partial_apply : $@convention(thin) @async (@guaranteed @callee_owned () -> ()) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4(%pa) : $@convention(thin) @async (@guaranteed @callee_owned () -> ()) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-4 {{}}
   %bb2 = begin_borrow %unwrappedBox : ${ var NonSendableKlass }
   %p2 = project_box %bb2 : ${ var NonSendableKlass }, 0
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -326,7 +326,7 @@ bb0(%0 : @owned $NonSendableStruct):
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableStruct>(%2) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-8 {{}}
 
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %5<NonSendableStruct>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -345,7 +345,7 @@ bb0(%0 : $*NonSendableStruct):
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableStruct>(%2) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-4 {{}}
   %9999 = tuple ()
   return %9999 : $()
 }
@@ -358,7 +358,7 @@ bb0(%0 : @owned $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for 
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<() -> ()>(%blockAddr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %5<() -> ()>(%blockAddr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -376,7 +376,7 @@ bb0:
   %2 = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-4 {{}}
   fix_lifetime %1 : $NonSendableKlass
   // expected-note @-1 {{access can happen concurrently}}
   destroy_value %1 : $NonSendableKlass
@@ -391,7 +391,7 @@ bb0(%0 : $*NonSendableKlass):
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableKlass>(%1) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
   destroy_addr %0 : $*NonSendableKlass
   destroy_addr %1 : $*NonSendableKlass
   dealloc_stack %1 : $*NonSendableKlass
@@ -411,7 +411,7 @@ bb0:
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%2) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   // No error here since just a requires on the first.
   %useNonSendableKlass = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
@@ -439,7 +439,7 @@ sil [ossa] @mark_dependence_test_base_has_a_require : $@convention(thin) @async 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%2) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   // No error here since just a requires on the first.
   %useNonSendableKlass = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
@@ -464,7 +464,7 @@ sil [ossa] @mark_dependence_test_base_is_a_require : $@convention(thin) @async (
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-6 {{}}
 
   %1a = begin_borrow %1 : $NonSendableKlass
   %2 = mark_dependence %1a : $NonSendableKlass on %0 : $NonSendableKlass
@@ -531,10 +531,10 @@ bb0(%0 : $Builtin.RawPointer):
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%4) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-11 {{}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%6) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-9 {{}}
 
   destroy_value %4 : $NonSendableKlass
   destroy_value %6 : $NonSendableKlass
@@ -567,16 +567,15 @@ bb0(%0 : $Builtin.RawPointer):
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%0) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%2) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-23 {{}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%3a) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-23 {{}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%5a) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-21 {{}}
 
   %useRawPointer = function_ref @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
   apply %useRawPointer(%3a) : $@convention(thin) (Builtin.RawPointer) -> ()
@@ -603,7 +602,7 @@ bb0:
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-7 {{}}
 
   // Test that this is viewed as a use of %construct
   %3 = raw_pointer_to_ref %3a : $Builtin.RawPointer to $SendableKlass
@@ -624,7 +623,7 @@ bb0:
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   fix_lifetime %value : $NonSendableKlass
   // expected-note @-1 {{access can happen concurrently}}
@@ -644,14 +643,14 @@ bb0:
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   fix_lifetime %value : $SendableKlass
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
   // expected-note @-2 {{}}
-  // expected-note @-3 {{}}
+  // expected-note @-12 {{}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
   // expected-note @-1 {{access can happen concurrently}}
@@ -669,7 +668,7 @@ bb0:
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   %word = unchecked_trivial_bit_cast %value : $NonSendableKlass to $Builtin.Word
   // expected-note @-1 {{access can happen concurrently}}
@@ -704,7 +703,7 @@ bb0:
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   fix_lifetime %value : $NonSendableKlass
   // expected-note @-1 {{access can happen concurrently}}
@@ -724,14 +723,14 @@ bb0:
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   fix_lifetime %value : $SendableKlass
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
   // expected-note @-2 {{}}
-  // expected-note @-3 {{}}
+  // expected-note @-12 {{}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
   // expected-note @-1 {{access can happen concurrently}}
@@ -749,7 +748,7 @@ bb0:
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   %word = unchecked_bitwise_cast %value : $NonSendableKlass to $Builtin.Word
   // expected-note @-1 {{access can happen concurrently}}
@@ -785,7 +784,7 @@ bb0:
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   fix_lifetime %value : $NonSendableKlass
   // expected-note @-1 {{access can happen concurrently}}
@@ -807,14 +806,14 @@ bb0:
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   fix_lifetime %value : $SendableKlass
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{}}
   // expected-note @-2 {{}}
-  // expected-note @-3 {{}}
+  // expected-note @-12 {{}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
   // expected-note @-1 {{access can happen concurrently}}
@@ -833,7 +832,7 @@ bb0:
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
+  // expected-note @-5 {{}}
 
   %valueB = begin_borrow %value : $NonSendableKlass
   %word = unchecked_value_cast %valueB : $NonSendableKlass to $Builtin.Word
@@ -905,7 +904,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-4 {{}}
   %value2 = unchecked_ref_cast %value : $NonSendableKlass to $Builtin.BridgeObject
   %1 = classify_bridge_object %value2 : $Builtin.BridgeObject // expected-note {{access can happen concurrently}}
   destroy_value %value2 : $Builtin.BridgeObject
@@ -921,7 +920,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-4 {{}}
 
   %value2 = unchecked_ref_cast %value : $NonSendableKlass to $Builtin.BridgeObject
   %1 = bridge_object_to_word %value2 : $Builtin.BridgeObject to $Builtin.Word // expected-note {{access can happen concurrently}}
@@ -949,7 +948,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-7 {{}}
 
   destroy_value %value : $NonSendableKlass
   %1 = is_unique %a : $*NonSendableKlass // expected-note {{access can happen concurrently}}
@@ -971,7 +970,7 @@ bb0:
 
   %f = function_ref @transferStruct : $@convention(thin) @async (@guaranteed NonSendableStruct) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%1) : $@convention(thin) @async (@guaranteed NonSendableStruct) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-8 {{}}
 
   %s = struct_element_addr %a : $*NonSendableStruct, #NonSendableStruct.ns
   %f2 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -998,7 +997,7 @@ bb0:
 
   %f = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-10 {{}}
 
   %s = tuple_element_addr %a : $*(NonSendableKlass, NonSendableKlass), 0
   %f2 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -1059,7 +1058,7 @@ bb0:
   %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
   %f = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-3 {{}}
   %2 = begin_borrow %1 : $NonSendableKlass
   %3 = ref_tail_addr %2 : $NonSendableKlass, $*SendableKlass // expected-note {{access can happen concurrently}}
 
@@ -1096,14 +1095,14 @@ bb0:
   %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
   %f = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-3 {{}}
   %2 = begin_borrow %1 : $NonSendableKlass
   %3 = ref_tail_addr [immutable] %2 : $NonSendableKlass, $*NonSendableKlass // expected-note {{access can happen concurrently}}
 
   // Since this is as assign, we should be able to get a separate error on the ref_tail_addr
   %f2 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f2<NonSendableKlass>(%3) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-5 {{}}
 
   %f3 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %f3<NonSendableKlass>(%3) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
@@ -1120,14 +1119,14 @@ bb0:
   %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
   %f = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-3 {{}}
   %2 = begin_borrow %1 : $NonSendableKlass
   %3 = ref_tail_addr %2 : $NonSendableKlass, $*NonSendableKlass // expected-note {{access can happen concurrently}}
 
   // Since this is as assign, we should be able to get a separate error on the ref_tail_addr
   %f2 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f2<NonSendableKlass>(%3) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-5 {{}}
 
   %f3 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %f3<NonSendableKlass>(%3) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
@@ -1148,7 +1147,7 @@ bb0:
 
   %f2 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f2<NonSendableKlass>(%3) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-4 {{}}
 
   %f3 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %f3<NonSendableKlass>(%3) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
@@ -1170,7 +1169,7 @@ bb0:
 
   %f2 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f2<NonSendableKlass>(%3) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-4 {{}}
 
   %f3 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %f3<NonSendableKlass>(%3) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
@@ -1191,7 +1190,7 @@ bb0:
   // TODO: Improve diagnostic to make it clear that the reason we are failing is
   // that we could race on a write to the ref_element_addr.
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor]  %f(%1) : $@convention(thin) @async (@guaranteed KlassContainingKlasses) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-6 {{}}
 
   %2 = begin_borrow %1 : $KlassContainingKlasses
   %3 = ref_element_addr %2 : $KlassContainingKlasses, #KlassContainingKlasses.sMutable // expected-note {{access can happen concurrently}}
@@ -1234,7 +1233,7 @@ bb0:
   (%uniq, %2) = begin_cow_mutation %2a : $NonSendableKlass
   %f = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-5 {{}}
   destroy_value %2 : $NonSendableKlass
 
   %3a = copy_value %1 : $NonSendableKlass
@@ -1259,13 +1258,13 @@ bb0:
 
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%a) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-7 {{}}
 
   // This is a copy_addr [take] [init] + cast.
   unchecked_ref_cast_addr NonSendableKlass in %a : $*NonSendableKlass to NonSendableKlass in %b : $*NonSendableKlass // expected-note {{access can happen concurrently}}
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%b) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-12 {{}}
   %use = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %use<NonSendableKlass>(%b) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
 
@@ -1288,13 +1287,13 @@ bb0:
 
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%a) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-7 {{}}
 
   // This is a copy_addr [take] [init] + cast.
   unconditional_checked_cast_addr NonSendableKlass in %a : $*NonSendableKlass to NonSendableKlass in %b : $*NonSendableKlass // expected-note {{access can happen concurrently}}
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%b) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-12 {{}}
   %use = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %use<NonSendableKlass>(%b) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
 
@@ -1315,7 +1314,7 @@ bb0:
   %aValue = load [copy] %a : $*NonSendableKlass
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%a) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-7 {{}}
 
 
   %b = alloc_stack $@sil_unowned NonSendableKlass
@@ -1323,7 +1322,7 @@ bb0:
   destroy_value %aValue : $NonSendableKlass
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@sil_unowned NonSendableKlass>(%b) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-5 {{}}
   %use = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %use<@sil_unowned NonSendableKlass>(%b) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
 
@@ -1353,7 +1352,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-7 {{}}
 
   destroy_value %value : $NonSendableKlass
   mark_function_escape %a : $*NonSendableKlass // expected-note {{access can happen concurrently}}
@@ -1374,7 +1373,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-7 {{}}
 
   unmanaged_retain_value %value : $NonSendableKlass // expected-note {{access can happen concurrently}}
   destroy_value %value : $NonSendableKlass
@@ -1395,7 +1394,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-7 {{}}
 
   unmanaged_release_value %value : $NonSendableKlass // expected-note {{access can happen concurrently}}
   destroy_value %value : $NonSendableKlass
@@ -1416,7 +1415,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-7 {{}}
 
   unmanaged_autorelease_value %value : $NonSendableKlass // expected-note {{access can happen concurrently}}
   destroy_value %value : $NonSendableKlass
@@ -1439,7 +1438,7 @@ bb0:
   %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
   %2 = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (Builtin.RawPointer) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-3 {{}}
   %4 = integer_literal $Builtin.Word, 1
   %5 = bind_memory %1 : $Builtin.RawPointer, %4 : $Builtin.Word to $NonSendableKlass // expected-note {{access can happen concurrently}}
   %9999 = tuple ()
@@ -1452,7 +1451,7 @@ bb0:
   %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
   %2 = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (Builtin.RawPointer) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-3 {{}}
   %4 = integer_literal $Builtin.Word, 1
   %5 = rebind_memory %1 : $Builtin.RawPointer to %4 : $Builtin.Word // expected-note {{access can happen concurrently}}
   %9999 = tuple ()
@@ -1472,7 +1471,7 @@ bb0:
   store %0 to [init] %addr : $*NonSendableKlass
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%addr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-4 {{}}
 
   %addr2 = pack_element_get %index of %pack : $*Pack{NonSendableKlass, repeat each T} as $*NonSendableKlass // expected-note {{access can happen concurrently}}
   %f2 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -1504,7 +1503,7 @@ bb0:
 
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%addr0) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-9 {{}}
 
   %addr2 = pack_element_get %index1 of %pack : $*Pack{NonSendableKlass, SendableKlass, repeat each T} as $*SendableKlass // expected-note {{access can happen concurrently}}
   dealloc_pack %pack : $*Pack{NonSendableKlass, SendableKlass, repeat each T}
@@ -1528,14 +1527,14 @@ bb0:
   store %0 to [init] %addr : $*NonSendableKlass
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%addr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-4 {{}}
 
   pack_element_set %addr : $*NonSendableKlass into %index of %pack2 : $*Pack{NonSendableKlass, repeat each T}
   // expected-note @-1 {{access can happen concurrently}}
 
   // Now transfer %addr and use it.
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%addr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-11 {{}}
   %f2 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %f2<NonSendableKlass>(%addr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
 
@@ -1565,7 +1564,7 @@ bb0:
 
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%addr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-5 {{}}
 
   pack_element_set %alloc : $*SendableKlass into %index1 of %pack : $*Pack{NonSendableKlass, SendableKlass, repeat each T} // expected-note {{access can happen concurrently}}
 
@@ -1589,7 +1588,7 @@ bb0(%index : $Builtin.Word):
   %elt = tuple_pack_element_addr %pi of %tuple : $*(NonSendableKlass, T, T, Int) as $*@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001122") U_1
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001122") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-3 {{}}
 
   %elt2 = tuple_pack_element_addr %pi of %tuple : $*(NonSendableKlass, T, T, Int) as $*@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001122") U_1 // expected-note {{access can happen concurrently}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001122") U_1>(%elt2) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -1625,7 +1624,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-7 {{}}
 
   %9 = alloc_stack $Builtin.UnsafeValueBuffer
   begin_unpaired_access [read] [dynamic] [no_nested_conflict] %a : $*NonSendableKlass, %9 : $*Builtin.UnsafeValueBuffer // expected-note {{access can happen concurrently}}
@@ -1671,7 +1670,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-6 {{}}
 
   %b = load_unowned [take] %a : $*@sil_unowned NonSendableKlass // expected-note {{access can happen concurrently}}
   destroy_value %b : $NonSendableKlass
@@ -1688,7 +1687,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-4 {{}}
 
   %borrowedValue = begin_borrow %value : $NonSendableKlass
   %v = ref_to_unmanaged %borrowedValue : $NonSendableKlass to $@sil_unmanaged NonSendableKlass
@@ -1714,7 +1713,7 @@ bb0(%arg : $Builtin.Word):
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-4 {{}}
 
   %b = ref_to_bridge_object %value : $NonSendableKlass, %arg : $Builtin.Word
   %bridgeUse = function_ref @use_bridge_object : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> ()
@@ -1804,7 +1803,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-4 {{}}
 
   %value2 = move_value [var_decl] %value : $NonSendableKlass // expected-note {{access can happen concurrently}}
   destroy_value %value2 : $NonSendableKlass
@@ -1836,7 +1835,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{}}
-  // expected-note @-1 {{}}
+  // expected-note @-4 {{}}
 
   %value2 = begin_borrow [var_decl] %value : $NonSendableKlass // expected-note {{access can happen concurrently}}
   end_borrow %value2 : $NonSendableKlass

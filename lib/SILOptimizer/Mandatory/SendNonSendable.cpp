@@ -171,43 +171,6 @@ static std::optional<ValueDecl *> getSendingApplyCallee(SILInstruction *inst) {
   return decl;
 }
 
-static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
-                                            FullApplySite fai,
-                                            const Operand *op) {
-
-  Expr *foundExpr = nullptr;
-
-  // If we have self, then infer it.
-  if (fai.hasSelfArgument() && op == &fai.getSelfArgumentOperand()) {
-    if (auto callExpr = dyn_cast<CallExpr>(sourceApply))
-      if (auto calledExpr =
-              dyn_cast<DotSyntaxCallExpr>(callExpr->getDirectCallee()))
-        foundExpr = calledExpr->getBase();
-  } else {
-    // Otherwise, try to infer using the operand of the ApplyExpr.
-    unsigned argNum = [&]() -> unsigned {
-      if (fai.isCalleeOperand(*op))
-        return op->getOperandNumber();
-      return fai.getAppliedArgIndexWithoutIndirectResults(*op);
-    }();
-
-    // Something happened that we do not understand.
-    if (argNum >= sourceApply->getArgs()->size()) {
-      return nullptr;
-    }
-
-    foundExpr = sourceApply->getArgs()->getExpr(argNum);
-
-    // If we have an erasure expression, lets use the original type. We do
-    // this since we are not saying the specific parameter that is the
-    // issue and we are using the type to explain it to the user.
-    if (auto *erasureExpr = dyn_cast<ErasureExpr>(foundExpr))
-      foundExpr = erasureExpr->getSubExpr();
-  }
-
-  return foundExpr;
-}
-
 /// Attempt to infer a name for \p value. Returns none if we fail or if we are
 /// asked to force typed errors since we are testing.
 static std::optional<Identifier> inferNameHelper(SILValue value) {
@@ -257,6 +220,12 @@ static SourceLoc preciseSourceLocForValue(SILValue value) {
     if (auto astLoc = defInst->getLoc().getSourceLoc())
       return astLoc;
   return SourceLoc();
+}
+
+/// Returns true if \p value has a function/closure type, so bare diagnostics
+/// can say "closure" instead of "value".
+static bool isClosure(SILValue value) {
+  return value->getType().is<SILFunctionType>();
 }
 
 /// Emit a per-value note describing one side of an incompatible region merge.
@@ -1285,6 +1254,84 @@ public:
     emitRequireInstDiagnostics();
   }
 
+  void emitBareUseOfStronglySentValue(SILLocation loc) {
+    bool isClosureValue = isClosure(sendingOp->get());
+    diagnoseError(loc, diag::regionbasedisolation_bare_send_yields_race,
+                  isClosureValue)
+        .limitBehaviorIf(getBehaviorLimit());
+    SourceLoc valueLoc = preciseSourceLocForValue(sendingOp->get());
+    if (!valueLoc)
+      valueLoc = inferFirstNameProvidingLocHelper(sendingOp->get());
+    if (valueLoc) {
+      if (auto callee = getSendingCallee()) {
+        diagnoseNote(
+            valueLoc,
+            diag::regionbasedisolation_bare_value_used_after_sending_callee,
+            callee.value(), isClosureValue);
+      } else {
+        diagnoseNote(valueLoc,
+                     diag::regionbasedisolation_bare_value_used_after_sending,
+                     isClosureValue);
+      }
+    }
+    emitRequireInstDiagnostics();
+  }
+
+  void emitBareIsolationCrossing(SILLocation loc,
+                                  ApplyIsolationCrossing isolationCrossing) {
+    bool isClosureValue = isClosure(sendingOp->get());
+    diagnoseError(loc, diag::regionbasedisolation_bare_send_yields_race,
+                  isClosureValue)
+        .limitBehaviorIf(getBehaviorLimit());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
+    SourceLoc valueLoc = preciseSourceLocForValue(sendingOp->get());
+    if (!valueLoc)
+      valueLoc = inferFirstNameProvidingLocHelper(sendingOp->get());
+    if (valueLoc) {
+      if (auto callee = getSendingCallee()) {
+        diagnoseNote(
+            valueLoc,
+            diag::regionbasedisolation_bare_value_used_after_send_callee,
+            calleeIsolationStr, callee.value(), callerIsolationStr,
+            isClosureValue);
+      } else {
+        diagnoseNote(valueLoc,
+                     diag::regionbasedisolation_bare_value_used_after_send,
+                     calleeIsolationStr, callerIsolationStr, isClosureValue);
+      }
+    }
+    emitRequireInstDiagnostics();
+  }
+
+  void emitBareIsolationCrossingDueToCapture(
+      SILLocation loc, ApplyIsolationCrossing isolationCrossing) {
+    bool isClosureValue = isClosure(sendingOp->get());
+    diagnoseError(loc, diag::regionbasedisolation_bare_send_yields_race,
+                  isClosureValue)
+        .limitBehaviorIf(getBehaviorLimit());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
+    SourceLoc valueLoc = preciseSourceLocForValue(sendingOp->get());
+    if (!valueLoc)
+      valueLoc = inferFirstNameProvidingLocHelper(sendingOp->get());
+    if (valueLoc) {
+      diagnoseNote(
+          valueLoc,
+          diag::regionbasedisolation_bare_value_isolated_capture_yields_race,
+          calleeIsolationStr, callerIsolationStr, isClosureValue);
+    }
+    emitRequireInstDiagnostics();
+  }
+
   void emitUnknownPatternError() {
     EMIT_UNKNOWN_PATTERN_ERROR(UseAfterSendDiagnosticEmitter,
                                sendingOp->getUser(), getBehaviorLimit(),
@@ -1407,8 +1454,8 @@ bool UseAfterSendDiagnosticInferrer::initForIsolatedPartialApply(
     return true;
   }
 
-  diagnosticEmitter.emitTypedIsolationCrossingDueToCapture(
-      diagnosticOp->getUser()->getLoc(), baseInferredType, crossing);
+  diagnosticEmitter.emitBareIsolationCrossingDueToCapture(
+      diagnosticOp->getUser()->getLoc(), crossing);
   return true;
 }
 
@@ -1463,18 +1510,11 @@ void UseAfterSendDiagnosticInferrer::initForApply(Operand *op,
                                                   ApplyExpr *sourceApply) {
   auto isolationCrossing = sourceApply->getIsolationCrossing().value();
 
-  // Grab out full apply site and see if we can find a better expr.
   SILInstruction *i = const_cast<SILInstruction *>(op->getUser());
   auto fai = FullApplySite::isa(i);
-
   assert(!fai.getArgumentConvention(*op).isIndirectOutParameter() &&
          "An indirect out parameter is never sent");
-  auto *foundExpr = inferArgumentExprFromApplyExpr(sourceApply, fai, op);
-
-  auto inferredArgType =
-      foundExpr ? foundExpr->findOriginalType() : baseInferredType;
-  diagnosticEmitter.emitTypedIsolationCrossing(baseLoc, inferredArgType,
-                                               isolationCrossing);
+  diagnosticEmitter.emitBareIsolationCrossing(baseLoc, isolationCrossing);
 }
 
 /// This walker visits an AutoClosureExpr and looks for uses of a specific
@@ -1626,16 +1666,8 @@ void UseAfterSendDiagnosticInferrer::infer() {
       }
 
       // See if we have an ApplyExpr and if we can infer a better type.
-      Type type = baseInferredType;
-      if (auto *applyExpr =
-              sendingOp->getUser()->getLoc().getAsASTNode<ApplyExpr>()) {
-        if (auto *foundExpr =
-                inferArgumentExprFromApplyExpr(applyExpr, fas, sendingOp))
-          type = foundExpr->findOriginalType();
-      }
-
-      // Otherwise, emit the typed diagnostic.
-      return diagnosticEmitter.emitTypedUseOfStronglySentValue(baseLoc, type);
+      // Otherwise, emit the bare diagnostic.
+      return diagnosticEmitter.emitBareUseOfStronglySentValue(baseLoc);
     }
   }
 
@@ -1667,8 +1699,8 @@ void UseAfterSendDiagnosticInferrer::infer() {
 
   if (auto fas = FullApplySite::isa(sendingOp->getUser())) {
     if (auto isolationCrossing = fas.getIsolationCrossing()) {
-      return diagnosticEmitter.emitTypedIsolationCrossing(
-          baseLoc, baseInferredType, *isolationCrossing);
+      return diagnosticEmitter.emitBareIsolationCrossing(baseLoc,
+                                                         *isolationCrossing);
     }
   }
 
@@ -1977,6 +2009,62 @@ public:
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_typed_tns_passed_to_sending,
                    descriptiveKindStr, inferredType);
+    }
+  }
+
+  void emitBarePassToApply(SILLocation loc, ApplyIsolationCrossing crossing) {
+    SILValue value = sendingOperand->get();
+    bool isClosureValue = isClosure(value);
+    diagnoseError(loc, diag::regionbasedisolation_bare_send_yields_race,
+                  isClosureValue)
+        .limitBehaviorIf(getBehaviorLimit());
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), crossing.getCalleeIsolation());
+    SourceLoc valueLoc = preciseSourceLocForValue(value);
+    if (!valueLoc)
+      valueLoc = inferFirstNameProvidingLocHelper(value);
+    if (valueLoc) {
+      if (auto callee = getSendingCallee()) {
+        diagnoseNote(
+            valueLoc,
+            diag::regionbasedisolation_bare_sendneversendable_via_arg_callee,
+            descriptiveKindStr, calleeIsolationStr, callee.value(),
+            getIsolationRegionInfo()->isTaskIsolated(), isClosureValue);
+      } else {
+        diagnoseNote(
+            valueLoc,
+            diag::regionbasedisolation_bare_sendneversendable_via_arg,
+            descriptiveKindStr, calleeIsolationStr,
+            getIsolationRegionInfo()->isTaskIsolated(), isClosureValue);
+      }
+    }
+  }
+
+  void emitBareSendingNeverSendableToSendingParam(SILLocation loc) {
+    SILValue value = sendingOperand->get();
+    bool isClosureValue = isClosure(value);
+    diagnoseError(loc, diag::regionbasedisolation_bare_send_yields_race,
+                  isClosureValue)
+        .limitBehaviorIf(getBehaviorLimit());
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    SourceLoc valueLoc = preciseSourceLocForValue(value);
+    if (!valueLoc)
+      valueLoc = inferFirstNameProvidingLocHelper(value);
+    if (valueLoc) {
+      if (auto callee = getSendingCallee()) {
+        diagnoseNote(
+            valueLoc,
+            diag::regionbasedisolation_bare_tns_passed_to_sending_callee,
+            descriptiveKindStr, callee.value(), isClosureValue);
+      } else {
+        diagnoseNote(valueLoc,
+                     diag::regionbasedisolation_bare_tns_passed_to_sending,
+                     descriptiveKindStr, isClosureValue);
+      }
     }
   }
 
@@ -2530,14 +2618,7 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
           return true;
         }
 
-        Type type = op->get()->getType().getASTType();
-        if (auto *inferredArgExpr =
-                inferArgumentExprFromApplyExpr(sourceApply, fas, op)) {
-          type = inferredArgExpr->findOriginalType();
-        }
-
-        diagnosticEmitter.emitTypedSendingNeverSendableToSendingParam(loc,
-                                                                      type);
+        diagnosticEmitter.emitBareSendingNeverSendableToSendingParam(loc);
         return true;
       }
     }
@@ -2569,17 +2650,7 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
       return true;
     }
 
-    // Attempt to find the specific sugared ASTType if we can to emit a better
-    // diagnostic.
-    Type type = op->get()->getType().getASTType();
-    if (auto fas = FullApplySite::isa(op->getUser())) {
-      if (auto *inferredArgExpr =
-              inferArgumentExprFromApplyExpr(sourceApply, fas, op)) {
-        type = inferredArgExpr->findOriginalType();
-      }
-    }
-
-    diagnosticEmitter.emitPassToApply(loc, type, *isolation);
+    diagnosticEmitter.emitBarePassToApply(loc, *isolation);
     return true;
   }
 
@@ -2594,8 +2665,7 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
   // See if we are in SIL and have an apply site specified isolation.
   if (auto fas = FullApplySite::isa(op->getUser())) {
     if (auto isolation = fas.getIsolationCrossing()) {
-      diagnosticEmitter.emitPassToApply(loc, op->get()->getType().getASTType(),
-                                        *isolation);
+      diagnosticEmitter.emitBarePassToApply(loc, *isolation);
       return true;
     }
   }
@@ -3658,20 +3728,23 @@ void AssignNeverSendableIntoSendingResultDiagnosticEmitter::emit() {
     return;
   }
 
-  Type type = neverSentValue->getType().getASTType();
+  bool isClosureValue = isClosure(srcOperand->get());
 
   diagnoseError(
       srcOperand,
-      diag::regionbasedisolation_out_sending_cannot_be_actor_isolated_type,
-      type, descriptiveKindStr, isTaskIsolated)
+      diag::regionbasedisolation_bare_out_sending_cannot_be_actor_isolated,
+      isTaskIsolated, isClosureValue)
       .limitBehaviorIf(getConcurrencyDiagnosticBehavior());
 
-  diagnoseNote(
-      srcOperand,
-      diag::regionbasedisolation_out_sending_cannot_be_actor_isolated_note_type,
-      type, descriptiveKindStr, isTaskIsolated);
-  diagnoseNote(srcOperand, diag::regionbasedisolation_type_is_non_sendable,
-               type);
+  SourceLoc valueLoc = preciseSourceLocForValue(srcOperand->get());
+  if (!valueLoc)
+    valueLoc = inferFirstNameProvidingLocHelper(srcOperand->get());
+  if (valueLoc) {
+    diagnoseNote(
+        valueLoc,
+        diag::regionbasedisolation_bare_out_sending_cannot_be_actor_isolated_note,
+        isTaskIsolated, isClosureValue);
+  }
 }
 
 //===----------------------------------------------------------------------===//

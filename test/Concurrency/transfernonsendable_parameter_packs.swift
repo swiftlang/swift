@@ -59,9 +59,9 @@ func test_parameter_pack_actor_nonsendable_not_disconnected() async {
 
   // TODO: https://github.com/swiftlang/swift/issues/88417
   // The transfer non sendable pass should be updated to be able to find the name of packs.
-  await a.message(value) // expected-swift5-warning {{sending value of non-Sendable type 'NS' risks causing data races}}
-  // expected-swift6-error @-1 {{sending value of non-Sendable type 'NS' risks causing data races}}
-  // expected-note @-2 {{sending value of non-Sendable type 'NS' to actor-isolated instance method 'message' risks causing data races between actor-isolated and local nonisolated uses}}
+  await a.message(value) // expected-swift5-warning {{sending value risks causing data races}}
+  // expected-swift6-error @-1 {{sending value risks causing data races}}
+  // expected-note @-2 {{sending value to actor-isolated instance method 'message' risks causing data races between actor-isolated and local nonisolated uses}}
 
   print(value) // expected-note {{access can happen concurrently}}
 }
@@ -81,9 +81,9 @@ nonisolated(nonsending) func test_parameter_pack_actor_nonsending_nonsendable_no
 
   // TODO: https://github.com/swiftlang/swift/issues/88417
   // The transfer non sendable pass should avoid saying "local caller isolation inheriting-isolated".
-  await a.message(value) // expected-swift5-warning {{sending value of non-Sendable type 'NS' risks causing data races}}
-  // expected-swift6-error @-1 {{sending value of non-Sendable type 'NS' risks causing data races}}
-  // expected-note @-2 {{sending value of non-Sendable type 'NS' to actor-isolated instance method 'message' risks causing data races between actor-isolated and local caller isolation inheriting-isolated uses}}
+  await a.message(value) // expected-swift5-warning {{sending value risks causing data races}}
+  // expected-swift6-error @-1 {{sending value risks causing data races}}
+  // expected-note @-2 {{sending value to actor-isolated instance method 'message' risks causing data races between actor-isolated and local caller isolation inheriting-isolated uses}}
 
   print(value) // expected-note {{access can happen concurrently}}
 }

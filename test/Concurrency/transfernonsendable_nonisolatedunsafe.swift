@@ -856,8 +856,8 @@ class NonIsolatedUnsafeFieldGenericKlass<T> { // expected-complete-note 4{{}}
     // TODO: This diagnostic is unfortunate since we are erroring on the
     // temporary created by the class_method call.
     await transferToMainIndirect(varAddressOnly)
-    // expected-warning @-1 {{sending value of non-Sendable type 'T?' risks causing data races}}
-    // expected-note @-2 {{sending value of non-Sendable type 'T?' to main actor-isolated global function 'transferToMainIndirect' risks causing races in between code in the current isolation context and main actor-isolated uses}}
+    // expected-warning @-1 {{sending value risks causing data races}}
+    // expected-note @-2 {{sending value to main actor-isolated global function 'transferToMainIndirect' risks causing races in between code in the current isolation context and main actor-isolated uses}}
   }
 
   // This is safe since self will become MainActor isolated as a result of
