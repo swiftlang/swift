@@ -701,6 +701,8 @@ static bool usesFeatureBorrowInout(Decl *decl) {
   return decl == ctx.getRefDecl() || decl == ctx.getMutableRefDecl();
 }
 
+UNINTERESTING_FEATURE(BuiltinDereferenceable)
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
