@@ -6421,7 +6421,7 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
 }
 
 // Clone attributes that have been imported from Clang.
-void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl* toDecl) {
+static void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl *toDecl) {
   ASTContext &context = fromDecl->getASTContext();
   for (auto attr : fromDecl->getAttrs()) {
     switch (attr->getKind()) {
