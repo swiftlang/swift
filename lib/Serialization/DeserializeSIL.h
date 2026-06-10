@@ -112,11 +112,6 @@ namespace swift {
     llvm::DenseMap<SILBasicBlock*, unsigned> UndefinedBlocks;
     unsigned BasicBlockID = 0;
 
-    /// DebugValueInsts with reconstruction blocks, collected during
-    /// deserialization and matched to trailing SIL_DEBUG_RECONSTRUCTION_BLOCK
-    /// records.
-    std::vector<DebugValueInst *> DebugBBWorklist;
-    unsigned DebugBBWorklistIdx = 0;
 
     /// Return the SILBasicBlock of a given ID.
     SILBasicBlock *getBBForReference(SILFunction *Fn, unsigned ID);
@@ -139,8 +134,9 @@ namespace swift {
                                      SmallVectorImpl<uint64_t> &scratch);
     /// Read a debug reconstruction block and attach it to the next DVI
     /// in the worklist.
-    SILBasicBlock *readSILDebugReconstructionBlock(SILFunction *Fn,
-                                                   SmallVectorImpl<uint64_t> &scratch);
+    SILBasicBlock *readSILDebugReconstructionBlock(
+        SILFunction *Fn, SmallVectorImpl<uint64_t> &scratch,
+        ArrayRef<DebugValueInst *> DebugBBWorklist, unsigned &DebugBBWorklistIdx);
     /// Parse phi arguments from serialized triples and add them to BB.
     bool readBlockArgs(SILBasicBlock *BB, SILFunction *Fn,
                        ArrayRef<uint64_t> Args);
@@ -148,7 +144,8 @@ namespace swift {
     bool readSILInstruction(SILFunction *Fn,
                             SILBuilder &Builder,
                             unsigned RecordKind,
-                            SmallVectorImpl<uint64_t> &scratch);
+                            SmallVectorImpl<uint64_t> &scratch,
+                            SmallVectorImpl<DebugValueInst *> &DebugBBWorklist);
 
     /// Read the SIL function table.
     std::unique_ptr<SerializedFuncTable>

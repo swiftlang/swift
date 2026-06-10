@@ -849,6 +849,11 @@ void SILSerializer::writeDebugReconstructionBlock(const SILBasicBlock &DebugBB) 
   // Emit each instruction in the debug BB, with source locations.
   auto &SM = DebugBB.getParent()->getModule().getSourceManager();
   for (const SILInstruction &SI : DebugBB) {
+    // Although source locations within a debug reconstruction block are not
+    // useful, the deserializer will use the last valid SourceLoc for
+    // instructions. If not serialized, the last valid SourceLoc is usually
+    // the return statement, which has a ReturnKind location incompatible
+    // with regular instructions.
     writeSourceLoc(SI.getLoc(), SM);
     writeSILInstruction(SI);
   }
