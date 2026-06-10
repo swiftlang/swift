@@ -860,8 +860,10 @@ ManglingError Remangler::mangleDifferentiableFunctionType(Node *node,
 
 ManglingError Remangler::mangleGlobalActorFunctionType(Node *node,
                                                        unsigned depth) {
-  Buffer << "Y" << (char)node->getIndex(); // differentiability kind
-  return ManglingError::Success;
+  // The old mangling has no representation for global-actor isolation. We
+  // previously attempted to generate one, but it called node->getIndex() on a
+  // node that has no index. Instead, fail gracefully.
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,
@@ -2953,22 +2955,10 @@ ManglingError Remangler::mangleOpaqueReturnTypeParent(Node *node, unsigned depth
 ManglingError Remangler::mangleOpaqueReturnTypeOf(Node *node,
                                                   EntityContext &ctx,
                                                   unsigned depth) {
-  DEMANGLER_ASSERT(node->getNumChildren() >= 1, node);
-  Buffer << "QO";
-  return mangleEntityContext(node->getChild(0), ctx, depth + 1);
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleOpaqueType(Node *node, unsigned depth) {
-  DEMANGLER_ASSERT(node->getNumChildren() >= 2, node);
-  Buffer << "Qo";
-  mangleIndex(node->getChild(1)->getIndex());
-  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
-  if (node->getNumChildren() >= 3) {
-    Node *boundGenerics = node->getChild(2);
-    for (unsigned i = 0, e = boundGenerics->getNumChildren(); i < e; ++i)
-      RETURN_IF_ERROR(mangleChildNodes(boundGenerics->getChild(i), depth + 1));
-  }
-  Buffer << '_';
-  return ManglingError::Success;
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleOpaqueTypeDescriptor(Node *node,
                                                     unsigned depth) {

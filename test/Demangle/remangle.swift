@@ -23,10 +23,3 @@ RUN: swift-demangle -remangle-objc-rt '$sSIxip6foobarP' | %FileCheck -check-pref
 
 // CHECK-GENERICEXT: _TtGCs23_ContiguousArrayStorageGVEsVs15FlattenSequence5IndexGV24StdlibCollectionUnittest30MinimalBidirectionalCollectionGS3_Si_____
 RUN: swift-demangle -remangle-objc-rt '$ss23_ContiguousArrayStorageCys15FlattenSequenceVsE5IndexVy24StdlibCollectionUnittest020MinimalBidirectionalH0VyAIySiGG_GGD' | %FileCheck -check-prefix CHECK-GENERICEXT %s
-
-
-// CHECK-OPAQUE: _TCFF1A5outerFT_T_U_FT_Qo_QOFES_PS_1P8decorateFT_QuVS_4Impl_L_9MenuState
-RUN: swift-demangle -remangle-objc-rt '$s1A5outeryyFAA1PPAAE8decorateQryFQOyAA4ImplV_Qo_yXEfU_9MenuStateL_C' | %FileCheck -check-prefix CHECK-OPAQUE %s
-
-// CHECK-OPAQUE-RT: MenuState #1 in closure #1 () -> <<opaque return type of (extension in A):A.P.decorate() -> some>>.0 in A.outer() -> (){{$}}
-RUN: swift-demangle '_TCFF1A5outerFT_T_U_FT_Qo_QOFES_PS_1P8decorateFT_QuVS_4Impl_L_9MenuState' | %FileCheck -check-prefix CHECK-OPAQUE-RT %s
