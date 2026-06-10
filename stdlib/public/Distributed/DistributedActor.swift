@@ -186,7 +186,7 @@ import _Concurrency
 ///
 /// ```swift
 /// decoder.userInfo[.actorSystemKey] as? ActorSystem
-// ```
+/// ```
 ///
 /// The such obtained actor system is then used to ``resolve(id:using:)`` the decoded ``ID``.
 ///
