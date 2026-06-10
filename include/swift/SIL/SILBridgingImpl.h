@@ -628,6 +628,8 @@ BridgedOperand::OperandOwnership BridgedOperand::getOperandOwnership() const {
     return OperandOwnership::InstantaneousUse;
   case swift::OperandOwnership::UnownedInstantaneousUse:
     return OperandOwnership::UnownedInstantaneousUse;
+  case swift::OperandOwnership::DebugUse:
+    return OperandOwnership::DebugUse;
   case swift::OperandOwnership::ForwardingUnowned:
     return OperandOwnership::ForwardingUnowned;
   case swift::OperandOwnership::PointerEscape:

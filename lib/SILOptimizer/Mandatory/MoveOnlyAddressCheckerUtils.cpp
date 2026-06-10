@@ -1745,6 +1745,7 @@ struct CopiedLoadBorrowEliminationVisitor
       auto *nextUse = useWorklist.pop_back_val();
       switch (nextUse->getOperandOwnership()) {
       case OperandOwnership::NonUse:
+      case OperandOwnership::DebugUse:
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
         continue;

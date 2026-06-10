@@ -120,6 +120,7 @@ bool CheckerLivenessInfo::compute() {
         break;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
+      case OperandOwnership::DebugUse:
       case OperandOwnership::BitwiseEscape:
         liveness->updateForUse(user, /*lifetimeEnding*/ false);
         break;

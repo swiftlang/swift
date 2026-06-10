@@ -399,6 +399,7 @@ struct BridgedOperand {
     TrivialUse,
     InstantaneousUse,
     UnownedInstantaneousUse,
+    DebugUse,
     ForwardingUnowned,
     PointerEscape,
     BitwiseEscape,

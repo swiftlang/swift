@@ -1,0 +1,43 @@
+// RUN: %target-sil-opt -sil-print-types %s -ownership-model-eliminator | %FileCheck %s
+
+// Test that OwnershipModelEliminator kills debug_values that appear after
+// a destroy_value, since the object may be freed by the release.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct Job: ~Copyable {
+  var context: Builtin.Int64
+}
+
+// CHECK-LABEL: sil @test_destroy_kills_debug_value
+// CHECK:       bb0(%0 : $Job):
+// CHECK:         debug_value %0 : $Job, let, name "before_destroy", {{.*}}transform {
+// CHECK:           bb0(%0 : $Job):
+// CHECK:             %1 = struct_extract %0 : $Job, #Job.context
+// CHECK:             return %1 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         release_value %0
+// CHECK:         debug_value undef : $Job, let, name "after_destroy", {{.*}}transform
+// CHECK-LABEL: } // end sil function 'test_destroy_kills_debug_value'
+sil [ossa] @test_destroy_kills_debug_value : $@convention(thin) (@owned Job) -> () {
+bb0(%0 : @owned $Job):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #Job.context
+  end_borrow %1
+  debug_value %0 : $Job, let, name "before_destroy", transform {
+  bb0(%a : $Job):
+    %b = struct_extract %a, #Job.context
+    return %b : $Builtin.Int64
+  }
+  destroy_value %0
+  debug_value %0 : $Job, let, name "after_destroy", transform {
+  bb0(%c : $Job):
+    %d = struct_extract %c, #Job.context
+    return %d : $Builtin.Int64
+  }
+  %ret = tuple ()
+  return %ret : $()
+}
