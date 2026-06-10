@@ -736,6 +736,14 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
           searchValue = selfParam;
           continue;
         }
+        // For a top-level global addressor there is no self, but we can still
+        // recover the global variable's name from the callee (the addressor's
+        // AccessorDecl points back to the VarDecl via getStorage()).
+        auto fas = FullApplySite(addressorInvocation);
+        if (auto name = namer.getCalleeName(fas); !name.empty()) {
+          pushPathComponent(name, fas.getLoc().getSourceLoc());
+          return searchValue;
+        }
       }
     }
 

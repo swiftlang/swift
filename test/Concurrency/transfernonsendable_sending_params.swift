@@ -10,6 +10,7 @@
 ////////////////////////
 
 class NonSendableKlass {
+  var field = NonSendableKlass?.none
   func use() {}
 }
 
@@ -220,8 +221,14 @@ actor MyActor {
 }
 
 @MainActor func canAssignTransferringIntoGlobalActor3(_ x: sending NonSendableKlass) async {
-  await transferToCustom(globalKlass) // expected-warning {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
-  // expected-note @-1 {{sending main actor-isolated value of non-Sendable type 'NonSendableKlass' to global actor 'CustomActor'-isolated global function 'transferToCustom' risks causing races in between main actor-isolated and global actor 'CustomActor'-isolated uses}}
+  await transferToCustom(globalKlass) // expected-warning {{sending 'globalKlass' risks causing data races}}
+  // expected-note @-1 {{sending main actor-isolated 'globalKlass' to global actor 'CustomActor'-isolated global function 'transferToCustom' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
+}
+
+// Field access on a lazy global: the name should include the field component.
+@MainActor func canAssignTransferringIntoGlobalActor3Field(_ x: sending NonSendableKlass) async {
+  await transferToCustom(globalKlass.field) // expected-warning {{sending 'globalKlass.field' risks causing data races}}
+  // expected-note @-1 {{sending main actor-isolated 'globalKlass.field' to global actor 'CustomActor'-isolated global function 'transferToCustom' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
 
 func canTransferAssigningIntoLocal(_ x: sending NonSendableKlass) async {
