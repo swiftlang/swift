@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default -I %swift_src_root/lib/ClangImporter/SwiftBridging -Xcc -std=c++20 -enable-experimental-feature BorrowingSequence)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default -Xcc -std=c++20 -enable-experimental-feature BorrowingSequence)
 //
 // REQUIRES: swift_feature_BorrowingSequence
 // REQUIRES: executable_test
