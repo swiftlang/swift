@@ -39,6 +39,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/SmallPtrSetVector.h"
+#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
@@ -1059,6 +1060,10 @@ public:
   /// Determine if this type is an InlineArray<n, T> and, if so, provide the
   /// element type of the array.
   Type getInlineArrayElementType();
+
+  /// Determine if this type is an InlineArray<n, T> and, if so, provide the
+  /// count of the array as an integer.
+  std::optional<APInt> getInlineArrayCount();
 
   /// Determines the element type of a known
   /// [Autoreleasing]Unsafe[Mutable][Raw]Pointer variant, or returns null if the
@@ -8539,6 +8544,8 @@ class IntegerType final : public TypeBase, public llvm::FoldingSetNode {
 public:
   static IntegerType *get(StringRef value, bool isNegative,
                           const ASTContext &ctx);
+
+  static IntegerType *get(const APSInt &value, const ASTContext &ctx);
 
   APInt getValue() const;
 
