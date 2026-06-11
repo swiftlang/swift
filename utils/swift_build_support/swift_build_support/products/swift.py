@@ -59,7 +59,6 @@ class Swift(product.Product):
 
         # Add experimental cxx interop flags.
         self.cmake_options.extend(self._enable_experimental_cxx_interop)
-        self.cmake_options.extend(self._enable_cxx_interop_swift_bridging_header)
 
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
@@ -229,11 +228,6 @@ updated without updating swift.py?")
     def _enable_experimental_cxx_interop(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL',
                  self.args.enable_experimental_cxx_interop)]
-
-    @property
-    def _enable_cxx_interop_swift_bridging_header(self):
-        return [('SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL',
-                 self.args.enable_cxx_interop_swift_bridging_header)]
 
     @property
     def _enable_experimental_distributed(self):
