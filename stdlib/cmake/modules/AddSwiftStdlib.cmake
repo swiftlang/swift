@@ -79,6 +79,7 @@ endfunction()
 #   DEPLOYMENT_VERSION_TVOS version
 #   DEPLOYMENT_VERSION_WATCHOS version
 #   DEPLOYMENT_VERSION_XROS version
+#   NO_FREESTANDING_CXX # If TRUE, do not pass -ffreestanding for the embedded SDK.
 #
 # )
 function(_add_target_variant_c_compile_link_flags)
@@ -86,6 +87,7 @@ function(_add_target_variant_c_compile_link_flags)
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     DEPLOYMENT_VERSION_XROS
     MACCATALYST_BUILD_FLAVOR
+    NO_FREESTANDING_CXX
   )
   cmake_parse_arguments(CFLAGS
     ""
@@ -159,7 +161,9 @@ function(_add_target_variant_c_compile_link_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "embedded")
-    list(APPEND result "-ffreestanding")
+    if(NOT CFLAGS_NO_FREESTANDING_CXX)
+      list(APPEND result "-ffreestanding")
+    endif()
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
@@ -198,7 +202,8 @@ function(_add_target_variant_c_compile_flags)
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     DEPLOYMENT_VERSION_XROS
     RESULT_VAR_NAME ENABLE_LTO
-    MACCATALYST_BUILD_FLAVOR)
+    MACCATALYST_BUILD_FLAVOR
+    NO_FREESTANDING_CXX)
   cmake_parse_arguments(CFLAGS
     ""
     "${oneValueArgs}"
@@ -234,7 +239,8 @@ function(_add_target_variant_c_compile_flags)
     DEPLOYMENT_VERSION_WATCHOS "${CFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
     DEPLOYMENT_VERSION_XROS "${CFLAGS_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME result
-    MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
+    MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}"
+    NO_FREESTANDING_CXX "${CFLAGS_NO_FREESTANDING_CXX}")
 
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
   if(optimized)
@@ -847,6 +853,7 @@ function(add_swift_target_library_single target name)
         STATIC
         NO_SWIFTMODULE
         NO_LINK_NAME
+        NO_FREESTANDING_CXX
         INSTALL_WITH_SHARED
         IS_FRAGILE)
   set(SWIFTLIB_SINGLE_single_parameter_options
@@ -1603,6 +1610,7 @@ function(add_swift_target_library_single target name)
     DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME c_compile_flags
     MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
+    NO_FREESTANDING_CXX "${SWIFTLIB_SINGLE_NO_FREESTANDING_CXX}"
     )
 
   if(SWIFTLIB_SINGLE_SDK STREQUAL "WINDOWS")
@@ -3658,6 +3666,7 @@ endfunction()
 #     [IS_STDLIB] [IS_STDLIB_CORE] [IS_SDK_OVERLAY]
 #     [PARTIAL_SOURCES_INTENDED]
 #     [INSTALL_BINARY]
+#     [NO_FREESTANDING_CXX]
 #     <sources>...
 #     [GYB_SOURCES <sources>...]
 #     [SWIFT_COMPILE_FLAGS <flags>...]
@@ -3678,12 +3687,16 @@ endfunction()
 # embedded_amend_archive_commands_on_darwin_host (a no-op for hosts/targets
 # where it doesn't apply).
 #
+# When NO_FREESTANDING_CXX is set, the embedded SDK's default -ffreestanding
+# C/C++ compile flag is suppressed for this library. The Swift driver's
+# -Xcc;-ffreestanding (which affects the clang importer) is left untouched.
+#
 # SKIP_*_REGEX and ONLY_*_REGEX are both multi-valued. An entry is processed
 # only when *every* ONLY_*_REGEX category that has at least one pattern has
 # at least one match, AND no SKIP_*_REGEX pattern matches.
 function(add_embedded_swift_target_library prefix library_name)
   cmake_parse_arguments(EMBLIB
-    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY"
+    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX"
     "INSTALL_IN_COMPONENT;ARCHITECTURE_KEY"
     "GYB_SOURCES;SWIFT_COMPILE_FLAGS;C_COMPILE_FLAGS;FILE_DEPENDS;DEPENDS;SKIP_ARCH_REGEX;SKIP_MOD_REGEX;SKIP_TRIPLE_REGEX;ONLY_ARCH_REGEX;ONLY_MOD_REGEX;ONLY_TRIPLE_REGEX"
     ${ARGN})
@@ -3696,6 +3709,8 @@ function(add_embedded_swift_target_library prefix library_name)
                  EMBLIB_IS_SDK_OVERLAY_keyword)
   translate_flag(${EMBLIB_PARTIAL_SOURCES_INTENDED} "PARTIAL_SOURCES_INTENDED"
                  EMBLIB_PARTIAL_SOURCES_INTENDED_keyword)
+  translate_flag(${EMBLIB_NO_FREESTANDING_CXX}    "NO_FREESTANDING_CXX"
+                 EMBLIB_NO_FREESTANDING_CXX_keyword)
 
   if(NOT EMBLIB_ARCHITECTURE_KEY)
     set(EMBLIB_ARCHITECTURE_KEY "arch")
@@ -3798,6 +3813,7 @@ function(add_embedded_swift_target_library prefix library_name)
       ${EMBLIB_IS_SDK_OVERLAY_keyword}
       STATIC
       ${EMBLIB_PARTIAL_SOURCES_INTENDED_keyword}
+      ${EMBLIB_NO_FREESTANDING_CXX_keyword}
       ${EMBLIB_UNPARSED_ARGUMENTS}
       GYB_SOURCES ${EMBLIB_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS ${EMBLIB_SWIFT_COMPILE_FLAGS}
