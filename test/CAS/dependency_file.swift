@@ -30,7 +30,7 @@
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   %t/main.swift @%t/MyApp.cmd -emit-dependencies -emit-dependencies-path %t/main-2.d 2>&1 | %FileCheck %s --check-prefix=CACHE-HIT
 
-// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}main-2.d': key 'llvmcas://{{.*}}'
+// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}main-2.d': id 'llvmcas://{{.*}}'
 
 // RUN: %FileCheck %s --check-prefix=DEPS2 --input-file=%t/main-2.d -DTMP=%t
 // DEPS2: [[TMP]]{{/|\\}}main-2.o :
@@ -74,7 +74,7 @@
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   -cache-replay-prefix-map /^src %swift_src_root -cache-replay-prefix-map /^tmp %t -cache-replay-prefix-map /^sdk %t/sdk \
 // RUN:   /^tmp/main.swift @%t/MyApp-1.cmd -emit-dependencies -emit-dependencies-path %t/main-4.d 2>&1 | %FileCheck %s --check-prefix=CACHE-HIT4
-// CACHE-HIT4: remark: replay output file '{{.*}}{{/|\\}}main-4.d': key 'llvmcas://{{.*}}'
+// CACHE-HIT4: remark: replay output file '{{.*}}{{/|\\}}main-4.d': id 'llvmcas://{{.*}}'
 // RUN: %FileCheck %s --check-prefix=DEPS4 --input-file=%t/main-4.d -DTMP=%t
 // DEPS4: [[TMP]]{{/|\\}}main-4.o : [[TMP]]{{/|\\}}main.swift
 
