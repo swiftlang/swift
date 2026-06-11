@@ -353,14 +353,28 @@ func test_implicit_conversion_clash_with_partial_application_check() {
 }
 
 func test_ternary_and_nil_coalescing() {
-  func test(_: Double?) {}
+  func test1(_: Double?) {}
+  func test2(_: CGFloat?) {}
 
-  func ternary(v: CGFloat) {
-    test(true ? v : nil) // Ok
+  func ternary1(v: CGFloat, w: Double) {
+    test1(true ? v : nil)
+    test2(true ? v : nil)
+    test1(true ? w : nil)
+    test2(true ? w : nil)
   }
 
-  func test_nil_coalescing(v: CGFloat?) {
-    test(v ?? 0.0) // Ok
+  func ternary2(v: CGFloat?, w: Double?) {
+    test1(true ? v : nil)
+    test2(true ? v : nil)
+    test1(true ? w : nil)
+    test2(true ? w : nil)
+  }
+
+  func test_nil_coalescing(v: CGFloat?, w: Double?) {
+    test1(v ?? 0.0)
+    test2(v ?? 0.0)
+    test1(w ?? 0.0)
+    test2(w ?? 0.0)
   }
 }
 
