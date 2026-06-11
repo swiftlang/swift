@@ -986,7 +986,7 @@ extension Span where Element: ~Copyable {
 
 // MARK: usage hints
 //
-// `Span` is not a `Collection`. We add the following unavailable members exist
+// `Span` is not a `Collection`. We add the following unavailable members
 // to redirect users who reach for the `Collection` slicing API towards the
 // corresponding `extracting(...)` function.
 @available(SwiftCompatibilitySpan 5.0, *)
