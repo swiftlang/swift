@@ -3921,6 +3921,14 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
   return intType;
 }
 
+IntegerType *IntegerType::get(const APInt &value, const ASTContext &ctx) {
+  SmallString<16> countBuf;
+  value.abs().toStringUnsigned(countBuf);
+  auto countText = ctx.AllocateCopy(StringRef(countBuf));
+
+  return IntegerType::get(countText, value.isNegative(), ctx);
+}
+
 HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
                             ModuleDecl *definingModule) {
   llvm::FoldingSetNodeID id;
