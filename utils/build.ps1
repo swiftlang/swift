@@ -3328,7 +3328,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     $SwiftRuntime = Resolve-SDKRuntimeBin $Platform $SwiftSDK
     $Stage2BinDir = [IO.Path]::Combine((Get-ProjectBinaryCache $Platform Stage2Compilers), "bin")
     $CDispatchBinaryCache = Get-ProjectBinaryCache $Platform DynamicCDispatch
-    $env:Path = "$Stage2BinDir;$CDispatchBinaryCache;$CDispatchBinaryCache\bin;$(Get-CMarkBinaryCache $Platform)\src;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
+    $env:Path = "$SwiftRuntime;$Stage2BinDir;$CDispatchBinaryCache;$CDispatchBinaryCache\bin;$(Get-CMarkBinaryCache $Platform)\src;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
     $env:PYTHONUTF8 = "1"
     $TestingDefines = Get-CompilersDefines $Platform $Variant -Test -SwiftSDK $SwiftSDK
     # Stage2 tests must use the freshly-built native tools, not Stage1.
