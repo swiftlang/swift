@@ -1088,6 +1088,13 @@ private:
   // For details see SILNode::lastInitializedBitfieldID
   uint64_t lastInitializedBitfieldID : (64 - numCustomBits);
 
+  uint64_t getLastInitializedBitfieldID() const {
+    return lastInitializedBitfieldID;
+  }
+  void setLastInitializedBitfieldID(uint64_t bitfieldID) {
+    lastInitializedBitfieldID = bitfieldID;
+  }
+
 public:
   Operand(SILInstruction *owner)
       : Owner(owner), customBits(0), lastInitializedBitfieldID(0) {}

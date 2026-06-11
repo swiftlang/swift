@@ -133,6 +133,13 @@ private:
   /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
   uint64_t lastInitializedBitfieldID = 0;
 
+  uint64_t getLastInitializedBitfieldID() const {
+    return lastInitializedBitfieldID;
+  }
+  void setLastInitializedBitfieldID(uint64_t bitfieldID) {
+    lastInitializedBitfieldID = bitfieldID;
+  }
+
   // Used by `BasicBlockBitfield`.
   unsigned getCustomBits() const { return customBits; }
   // Used by `BasicBlockBitfield`.

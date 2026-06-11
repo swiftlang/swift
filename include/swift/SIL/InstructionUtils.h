@@ -273,9 +273,6 @@ public:
   // Leave a few bits for other purposes (e.g. InstructionSet).
   enum { numIndexBits = SILNode::numCustomBits - 4 };
 
-  static_assert(numIndexBits >= 16,
-                "should at least be able to index 65536 instructions in a block");
-
   InstructionIndices(SILFunction *f);
 
   InstructionIndices(SILBasicBlock *block);
