@@ -865,6 +865,8 @@ static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
 /// initializer of the type named by \p parsedName.
 static bool shouldImportAsInitializer(const clang::FunctionDecl *D,
                                       const ParsedDeclName &parsedName) {
+  if (isa<clang::CXXConstructorDecl>(D))
+    return true;
   if (auto *method = dyn_cast<clang::CXXMethodDecl>(D)) {
     if (!method->isStatic())
       return false;

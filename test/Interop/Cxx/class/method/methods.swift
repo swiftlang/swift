@@ -94,6 +94,11 @@ CxxMethodTestSuite.test("C++ static init method that is not an initializer") {
   expectEqual(HasNonInitializerStaticInitMethod.nonInitializer(42), 42)
 }
 
+CxxMethodTestSuite.test("C++ constructor with swift_name attribute") {
+  let instance = ConstructorWithRenamedLabel(renamed: 42)
+  expectEqual(instance.value, 42)
+}
+
 CxxMethodTestSuite.test("Inline factory function renamed to init") {
   let instance = WithFactory(x: 5)
   expectEqual(instance.x, 5)

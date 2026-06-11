@@ -45,6 +45,10 @@
 // CHECK:   static func nonInitializer(_ value: Int32) -> Int32
 // CHECK: }
 
+// CHECK: struct ConstructorWithRenamedLabel {
+// CHECK:   init(renamed v: Int32)
+// CHECK: }
+
 // CHECK: struct WithFactory {
 // CHECK:   init(x: Int32)
 // CHECK: }

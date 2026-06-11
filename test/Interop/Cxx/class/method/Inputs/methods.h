@@ -97,6 +97,12 @@ struct HasNonInitializerStaticInitMethod {
   // expected-note@-4 {{use backticks (e.g. 'swift_name("`init`(...)")')}}
 };
 
+struct ConstructorWithRenamedLabel {
+  int value;
+  __attribute__((swift_name("init(renamed:)")))
+  ConstructorWithRenamedLabel(int v) : value(v) {}
+};
+
 struct WithFactory {
   int x;
 };
