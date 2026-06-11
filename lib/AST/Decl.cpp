@@ -12582,7 +12582,7 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       case ActorIsolation::ActorInstance:
         auto isolatedVar = isolation.getActorInstance();
         return isolatedVar->isSelfParameter() ||
-            isolatedVar-isSelfParamCapture();
+               isolatedVar->isSelfParamCapture();
       }
     }
 
