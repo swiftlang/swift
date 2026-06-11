@@ -174,27 +174,27 @@ void constInt(int * __counted_by(42 * 10) p);
 // }}
 void constFloatCastedToInt(int * __counted_by((int) (4.2 / 12)) p);
 
-// expected-expansion@+9:140{{
+// expected-expansion@+9:139{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func sizeofType(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(8) {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofType: expected \\(CUnsignedLongLong(8)) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(1) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofType: expected \\(CUnsignedLongLong(1)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe sizeofType(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
-void sizeofType(int * __counted_by((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(int *)) p);
+void sizeofType(int * __counted_by((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(char)) p);
 
-// expected-expansion@+9:137{{
+// expected-expansion@+9:139{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func sizeofParam(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(8) {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofParam: expected \\(CUnsignedLongLong(8)) but got \\(p.count)")|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func sizeofParam(_ p: UnsafeMutableBufferPointer<CChar>) {|}}
+//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(1) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofParam: expected \\(CUnsignedLongLong(1)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe sizeofParam(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
-void sizeofParam(int * __counted_by((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(p)) p);
+void sizeofParam(char * __counted_by((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(*p)) p);
 
 void derefLen(int * len, int * __counted_by(*len) p);
 
@@ -412,7 +412,7 @@ func call_sizeofType(_ p: UnsafeMutablePointer<Int32>!) {
   return unsafe sizeofType(p)
 }
 
-func call_sizeofParam(_ p: UnsafeMutablePointer<Int32>!) {
+func call_sizeofParam(_ p: UnsafeMutablePointer<CChar>!) {
   return unsafe sizeofParam(p)
 }
 
@@ -580,7 +580,7 @@ func call_castParam2(_ p: UnsafeMutablePointer<Int32>!, _ len: UInt32) {
   return unsafe simpleFlipped(p)
 }
 
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_sizeofParam(_ p: UnsafeMutableBufferPointer<Int32>) {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_sizeofParam(_ p: UnsafeMutableBufferPointer<CChar>) {
   return unsafe sizeofParam(p)
 }
 
