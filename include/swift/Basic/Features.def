@@ -526,6 +526,12 @@ EXPERIMENTAL_FEATURE(SafeInteropWrappers, true)
 // behavior is already standard in the stabilized version.
 EXPERIMENTAL_FEATURE(SafeInteropWrappersNullAsEmptySpan, true)
 
+// Enable @c @implementation(safe) on Swift functions that use safe types to
+// implement a C-declared function with __counted_by/__sized_by/noescape
+// annotations. The compiler synthesizes an @_Unswiftify peer macro invocation
+// to generate the unsafe C-callable bridge.
+EXPERIMENTAL_FEATURE(SafeInteropImplementations, true)
+
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 

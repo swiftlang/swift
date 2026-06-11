@@ -2389,10 +2389,22 @@ bool Decl::hasOnlyCEntryPoint() const {
   if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
     // The @c syntax only provides C entrypoints, not Swift ones. The historical
     // @_cdecl introduces both Swift and C entrypoints.
-    if (!cdeclAttr->Underscored)
+    if (!cdeclAttr->Underscored) {
+      // Exception: `@c @implementation(safe)` keeps the Swift entry point and
+      // delegates the C entry point to an `@_Unswiftify` peer macro expansion.
+      if (hasSyntheticCEntryPointPeer())
+        return false;
       return true;
+    }
   }
 
+  return false;
+}
+
+bool Decl::hasSyntheticCEntryPointPeer() const {
+  if (auto *implAttr = getAttrs().getAttribute<ObjCImplementationAttr>(
+          /*AllowInvalid=*/true))
+    return implAttr->isSafeInteropImplementation();
   return false;
 }
 
@@ -5851,8 +5863,16 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   // If this is an @_objcImplementation member implementation, and we aren't in
   // a context where we would access its storage directly, forbid access. Name
   // lookups will instead find and use the matching interface decl.
+  //
+  // Exception: `@c @implementation(safe)` Swift functions remain callable from
+  // Swift. Their Swift entry point is the safe-typed function; the C entry
+  // point lives in an `@_Unswiftify` macro-expanded peer. Callers calling the
+  // safe function from Swift should resolve directly to it.
+  bool isSafeImpl = VD->hasSyntheticCEntryPointPeer();
+
   // FIXME: Passing `true` for `isAccessOnSelf` may cause false positives.
-  if ((VD->isObjCImplementation() ||
+  if (!isSafeImpl &&
+      (VD->isObjCImplementation() ||
          isObjCMemberImplementation(VD, getAccessLevel)) &&
       VD->getAccessSemanticsFromContext(useDC, /*isAccessOnSelf=*/true)
           != AccessSemantics::DirectToStorage)

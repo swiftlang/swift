@@ -6645,15 +6645,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         bool isImplicit;
         bool isCategoryNameInvalid;
         bool isEarlyAdopter;
+        bool isSafe;
         uint64_t categoryNameID;
         serialization::decls_block::ObjCImplementationDeclAttrLayout::
             readRecord(scratch, isImplicit, isCategoryNameInvalid,
-                       isEarlyAdopter, categoryNameID);
+                       isEarlyAdopter, isSafe, categoryNameID);
         Identifier categoryName = MF.getIdentifier(categoryNameID);
         Attr = new (ctx) ObjCImplementationAttr(categoryName, SourceLoc(),
                                                 SourceRange(), isEarlyAdopter,
                                                 isImplicit,
-                                                isCategoryNameInvalid);
+                                                isCategoryNameInvalid,
+                                                isSafe);
         break;
       }
 

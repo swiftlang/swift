@@ -26,6 +26,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/InternalMacro.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/RequirementSignature.h"
@@ -1956,6 +1957,16 @@ public:
   /// parameter required by the `SafeInteropWrappersNullAsEmptySpan` feature.
   /// Used to avoid emitting the same warning once per imported function.
   bool DiagnosedMissingNullableAsEmptySpanParam = false;
+
+  void
+  attachUnswiftifyForSafeImplementation(AbstractFunctionDecl *SafeSwiftDecl);
+
+private:
+  MacroDecl *UnswiftifyMacroDecl = nullptr;
+  std::unique_ptr<InternalMacro> UnswiftifyMacroImpl;
+public:
+  /// Lazily create (and cache) the internal `_Unswiftify` macro declaration.
+  MacroDecl *getUnswiftifyMacroDecl();
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

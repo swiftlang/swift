@@ -1107,6 +1107,17 @@ public:
   /// counterpart.
   bool hasOnlyCEntryPoint() const;
 
+  /// Whether this is an `@c @implementation(safe)` declaration whose C entry
+  /// point is provided by a synthesized `@_Unswiftify` peer rather than by this
+  /// declaration directly.
+  ///
+  /// Such a declaration keeps its Swift entry point (with safe-typed
+  /// parameters like `Span`), so C-representability checks, direct-access
+  /// restrictions, and header-signature-mismatch diagnostics that normally
+  /// apply to `@implementation` decls must be routed to the peer instead of
+  /// this one.
+  bool hasSyntheticCEntryPointPeer() const;
+
   /// True if this declaration provides an implementation for an imported
   /// Objective-C declaration. This implies various restrictions and special
   /// behaviors for it and, if it's an extension, its members.

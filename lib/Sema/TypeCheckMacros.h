@@ -94,6 +94,18 @@ bool accessorMacroIntroducesInitAccessor(
 bool isInvalidAttachedMacro(MacroRole role,
                             Decl *attachedTo);
 
+/// If \p decl carries an unprocessed `@implementation(safe)` attribute, run
+/// the safe-mode processing: match the imported C declaration, synthesize and
+/// attach the `@_Unswiftify` peer macro invocation, and disable the
+/// corresponding `@_SwiftifyImport`-generated peer overload. Marks the
+/// attribute's `isSafeProcessed` bit so subsequent calls are no-ops.
+///
+/// Called both from attribute checking (so that the diagnostic surface is
+/// available early) and from `ExpandPeerMacroRequest::evaluate` (so the
+/// synthesized `@_Unswiftify` attribute is present before peer-macro lookup
+/// inspects the attached macros, regardless of which path runs first).
+void processSafeImplementationIfNeeded(Decl *decl);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKMACROS_H */

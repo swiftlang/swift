@@ -6749,12 +6749,27 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
   if (impls.size() > 1) {
     llvm::sort(impls, OrderDecls());
 
+    auto *frontAttr = impls.front()
+                          ->getAttrs()
+                          .getAttribute<ObjCImplementationAttr>(
+                              /*AllowInvalid=*/true);
+    bool frontIsSafe = frontAttr && frontAttr->isSafeInteropImplementation();
+
     auto &diags = interfaces.front()->getASTContext().Diags;
     for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
       auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>(
           /*AllowInvalid=*/true);
       if (attr->isInvalid())
         continue;
+
+      // `@c @implementation(safe)` is expected to coexist with a
+      // macro-expanded peer of the same C name: the peer carries
+      // `@c @implementation` and provides the actual C entry point, while
+      // the safe original is a regular Swift symbol that the peer forwards
+      // to. Don't diagnose either as a duplicate of the other.
+      if (attr->isSafeInteropImplementation() || frontIsSafe)
+        continue;
+
       attr->setInvalid();
 
       // @objc @implementations for categories are diagnosed as category
@@ -6946,7 +6961,9 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   // Swift implementations (unlike the class path, which gathers them all in
   // `constructResult`), so we detect duplicates at match time: if this
   // interface was already matched to a *different* implementation, diagnose the
-  // source-later of the two.
+  // source-later of the two. `@c @implementation(safe)` is expected to coexist
+  // with its macro-expanded peer, so skip the diagnosis when either side is a
+  // safe interop implementation.
   if (Decl *other = importer->getCachedObjCImplementation(interface)) {
     auto getImplAttr = [](Decl *d) {
       return d->getAttrs().getAttribute<ObjCImplementationAttr>(
@@ -6954,7 +6971,10 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
     };
     auto *funcAttr = getImplAttr(func);
     auto *otherAttr = getImplAttr(other);
-    if (other != func && funcAttr && !funcAttr->isInvalid() &&
+    bool eitherSafe =
+        (funcAttr && funcAttr->isSafeInteropImplementation()) ||
+        (otherAttr && otherAttr->isSafeInteropImplementation());
+    if (other != func && !eitherSafe && funcAttr && !funcAttr->isInvalid() &&
         otherAttr && !otherAttr->isInvalid()) {
       Decl *first = other, *second = func;
       if (OrderDecls()(func, other))
@@ -8152,6 +8172,11 @@ bool ClangImporter::isSwiftFunctionWrapper(
 bool ClangImporter::Implementation::isSwiftFunctionWrapper(
     const clang::RecordDecl *decl) {
   return decl->getIdentifier() && decl->getName() == "__SwiftFunctionWrapper";
+}
+
+void ClangImporter::attachUnswiftifyForSafeImplementation(
+    AbstractFunctionDecl *safeSwiftDecl) {
+  Impl.attachUnswiftifyForSafeImplementation(safeSwiftDecl);
 }
 
 bool ClangImporter::isDeconstructedSwiftClosure(const clang::Type *type) const {

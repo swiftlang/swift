@@ -45,6 +45,8 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/Basic/SourceManager.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/SwiftNameTranslation.h"
@@ -56,6 +58,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/Decl.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1761,6 +1764,212 @@ static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
   return SourceRange();
 }
 
+/// Walk the macro-expanded peers of \p importedAFD, find the
+/// `@_SwiftifyImport`-generated safe wrapper(s), compare their signatures
+/// against the user's safe `@implementation(safe)` function \p safeAFD, and
+/// mark the swiftify-generated peers universally unavailable so they don't
+/// compete in overload resolution with the user's safe implementation.
+///
+/// `@_SwiftifyImport` may emit more than one safe overload for the same C
+/// function (e.g. an `UnsafeBufferPointer<T>`-typed overload when only
+/// `__counted_by` is present, plus a `Span<T>`-typed overload when
+/// `__noescape` is also present). The safe original is a structural match if
+/// it has the same parameter list as *any* generated overload; otherwise we
+/// diagnose against the first peer and let the user line up their C
+/// annotations accordingly (e.g. add `__noescape` to get a `Span` overload).
+///
+/// Returns true (and the caller should stop) when a diagnostic was emitted:
+/// either the C function has no swiftify annotations at all (no peers), so
+/// `@implementation(safe)` has no effect, or the safe signature matches no
+/// generated overload. Returns false when a matching peer was found and
+/// disabled, meaning there is a genuine unsafe entry point to synthesize.
+[[nodiscard]] static bool
+diagnoseAndDisableSwiftifyPeerOverload(AbstractFunctionDecl *safeAFD,
+                                       AbstractFunctionDecl *importedAFD) {
+  ASTContext &ctx = safeAFD->getASTContext();
+  SourceManager &sourceMgr = ctx.SourceMgr;
+
+  // `_SwiftifyImport` is attached eagerly during import, so its peer
+  // expansion has typically already happened by the time we reach here.
+  // Plain `ExpandPeerMacroRequest` evaluation returns the cached buffer IDs
+  // when that's the case, or runs the expansion now if it hasn't yet.
+  auto peerBuffers = evaluateOrDefault(
+      ctx.evaluator, ExpandPeerMacroRequest{importedAFD}, {});
+
+  // Returns true if \p peerFunc has the same parameter list as the user's
+  // safe original. Parameter types are compared by canonical equality —
+  // `UnsafeBufferPointer<T>` and `Span<T>` are *not* equivalent here. The
+  // user is expected to pick the C annotations (e.g. add `__noescape` to
+  // get a `Span` overload from `_SwiftifyImport`) so that the safe Swift
+  // signature matches a generated peer exactly.
+  auto *safeParams = safeAFD->getParameters();
+  auto signatureMatches = [&](AbstractFunctionDecl *peerFunc) -> bool {
+    auto *peerParams = peerFunc->getParameters();
+    if (safeParams->size() != peerParams->size())
+      return false;
+    for (unsigned i = 0, n = safeParams->size(); i < n; ++i) {
+      Type safeTy = safeParams->get(i)->getInterfaceType();
+      Type peerTy = peerParams->get(i)->getInterfaceType();
+      if (safeTy.isNull() || peerTy.isNull())
+        return false;
+      if (!safeTy->isEqual(peerTy))
+        return false;
+    }
+    return true;
+  };
+
+  // Collect all swiftify-generated peers across every `_SwiftifyImport`
+  // buffer attached to the imported decl. Treat the safe original as a
+  // structural match if *any* generated overload matches; otherwise report a
+  // single mismatch against the first peer with the same parameter count, or
+  // a parameter-count mismatch against the first peer overall.
+  SmallVector<AbstractFunctionDecl *, 2> swiftifyPeers;
+  for (unsigned bufferID : peerBuffers) {
+    const GeneratedSourceInfo *info =
+        sourceMgr.getGeneratedSourceInfo(bufferID);
+    if (!info || info->macroName != "_SwiftifyImport")
+      continue;
+
+    SourceLoc startLoc = sourceMgr.getLocForBufferStart(bufferID);
+    auto *moduleDecl = importedAFD->getModuleContext();
+    auto *peerFile = moduleDecl->getSourceFileContainingLocation(startLoc);
+    if (!peerFile)
+      continue;
+
+    for (auto *peer : peerFile->getTopLevelDecls())
+      if (auto *peerFunc = dyn_cast<AbstractFunctionDecl>(peer))
+        swiftifyPeers.push_back(peerFunc);
+  }
+
+  // No `_SwiftifyImport` peer means the matching C function carries no
+  // `__counted_by`/`__sized_by`/`noescape` annotations, so there is nothing
+  // for `@implementation(safe)` to invert and no distinct unsafe entry point
+  // to synthesize. Warn that the attribute has no effect and stop, rather than
+  // letting an `@_Unswiftify` peer be attached whose signature would just
+  // collide with the safe original.
+  if (swiftifyPeers.empty()) {
+    SourceLoc loc = safeAFD->getLoc();
+    if (auto *implAttr =
+            safeAFD->getAttrs().getAttribute<ObjCImplementationAttr>(
+                /*AllowInvalid=*/true))
+      loc = implAttr->getLocation();
+    ctx.Diags.diagnose(loc, diag::safe_implementation_no_annotations, safeAFD);
+    return true;
+  }
+
+  bool anyMatched = false;
+  AbstractFunctionDecl *firstSameArityPeer = nullptr;
+  for (auto *peer : swiftifyPeers) {
+    if (signatureMatches(peer)) {
+      anyMatched = true;
+    } else if (!firstSameArityPeer &&
+               peer->getParameters()->size() == safeParams->size()) {
+      firstSameArityPeer = peer;
+    }
+  }
+
+  // `swiftifyPeers` is guaranteed non-empty here (the no-peers case returned
+  // above), so an absence of a structural match is a real signature mismatch.
+  if (!anyMatched) {
+    AbstractFunctionDecl *reportAgainst =
+        firstSameArityPeer ? firstSameArityPeer : swiftifyPeers.front();
+    auto *peerParams = reportAgainst->getParameters();
+    if (peerParams->size() != safeParams->size()) {
+      ctx.Diags.diagnose(safeAFD,
+                         diag::safe_implementation_param_count_mismatch,
+                         safeAFD, safeParams->size(), peerParams->size());
+      ctx.Diags.diagnose(reportAgainst,
+                         diag::safe_implementation_swiftify_peer_here);
+      return true;
+    }
+    bool hadTypeMismatch = false;
+    for (unsigned i = 0, n = safeParams->size(); i < n; ++i) {
+      Type safeTy = safeParams->get(i)->getInterfaceType();
+      Type peerTy = peerParams->get(i)->getInterfaceType();
+      if (safeTy.isNull() || peerTy.isNull() || safeTy->isEqual(peerTy))
+        continue;
+      ctx.Diags.diagnose(safeParams->get(i),
+                         diag::safe_implementation_param_type_mismatch, safeAFD,
+                         i + 1, safeTy, peerTy);
+      ctx.Diags.diagnose(reportAgainst,
+                         diag::safe_implementation_swiftify_peer_here);
+      hadTypeMismatch = true;
+    }
+    if (hadTypeMismatch)
+      return true;
+  }
+
+  // Mark every swiftify-generated peer universally unavailable so that
+  // overload resolution prefers the user's `@implementation(safe)` function
+  // when their signatures collide.
+  for (auto *peer : swiftifyPeers) {
+    auto *unavailable = AvailableAttr::createUniversallyUnavailable(
+        ctx,
+        /*Message=*/"replaced by '@c @implementation(safe)' "
+                    "Swift implementation",
+        /*Rename=*/"");
+    peer->getAttrs().add(unavailable);
+  }
+
+  return false;
+}
+
+void swift::processSafeImplementationIfNeeded(Decl *decl) {
+  auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(decl);
+  if (!AFD)
+    return;
+
+  auto *attr = AFD->getAttrs().getAttribute<ObjCImplementationAttr>(
+      /*AllowInvalid=*/true);
+  if (!attr || !attr->isSafeInteropImplementation() || attr->isSafeProcessed())
+    return;
+
+  // Mark processed up front so reentrant queries (e.g. an
+  // `ExpandPeerMacroRequest` that comes back through here while the matched
+  // C decl is being resolved) don't recurse.
+  attr->setSafeProcessed();
+
+  ASTContext &ctx = AFD->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::SafeInteropImplementations))
+    return;
+
+  auto *cdeclAttr =
+      AFD->getAttrs().getAttribute<CDeclAttr>(/*AllowInvalid=*/true);
+  if (!cdeclAttr || cdeclAttr->Underscored)
+    return;
+
+  Decl *implDecl = AFD->getImplementedObjCDecl();
+  auto *importedAFD = dyn_cast_or_null<AbstractFunctionDecl>(implDecl);
+  const clang::FunctionDecl *clangFD = nullptr;
+  if (importedAFD)
+    clangFD = dyn_cast_or_null<clang::FunctionDecl>(
+        importedAFD->getClangDecl());
+  if (!clangFD)
+    return;
+
+  auto *clangLoader =
+      static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  if (!clangLoader)
+    return;
+
+  // The imported clang decl normally has `@_SwiftifyImport` attached, which
+  // synthesizes a peer that wraps the unsafe C function in safe Swift types.
+  // Now that the user has supplied their own `@implementation(safe)` wrapper,
+  // that synthesized peer is redundant and would compete in overload
+  // resolution. Walk the swiftify expansion, diagnose any structural
+  // signature mismatch against the safe original, and mark the synthesized
+  // peer as universally unavailable so callers pick up the user's safe
+  // implementation.
+  if (diagnoseAndDisableSwiftifyPeerOverload(AFD, importedAFD))
+    return;
+
+  // A matching `_SwiftifyImport` peer exists (verified above), so the C
+  // function has bounds/lifetime info to invert; synthesize the unsafe entry
+  // point. Any failure here is an internal inconsistency, not a user error, so
+  // there is nothing further to diagnose.
+  clangLoader->attachUnswiftifyForSafeImplementation(AFD);
+}
+
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   // If `D` is ABI-only, let ABIDeclChecker diagnose the bad attribute.
@@ -1893,12 +2102,54 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       attr->setCategoryNameInvalid();
     }
 
+    // `@implementation(safe)` requires the experimental feature and a
+    // non-underscored `@c` attribute. Diagnose both up front so that the
+    // expensive C-decl lookup and macro attachment below is skipped on
+    // misuse, and so the user gets a single clear error rather than a
+    // cascade.
+    if (attr->isSafeInteropImplementation()) {
+      if (!Ctx.LangOpts.hasFeature(Feature::SafeInteropImplementations)) {
+        diagnoseAndRemoveAttr(attr, diag::requires_experimental_feature,
+                              attr->getAttrName(),
+                              attr->isDeclModifier(),
+                              Feature(Feature::SafeInteropImplementations)
+                                  .getName());
+        return;
+      }
+      auto *cdeclAttr =
+          AFD->getAttrs().getAttribute<CDeclAttr>(/*AllowInvalid=*/true);
+      if (!cdeclAttr || cdeclAttr->Underscored) {
+        diagnoseAndRemoveAttr(attr,
+                              diag::attr_implementation_safe_requires_c, AFD);
+        return;
+      }
+    }
+
     if (!AFD->getImplementedObjCDecl()) {
       StringRef name = AFD->getCDeclName();
       if (name.empty())
         name = AFD->getNameStr();
       diagnose(attr->getLocation(),
                diag::attr_objc_implementation_func_not_found, name, AFD);
+      return;
+    }
+
+    // For `@c @implementation(safe)`, hand off to ClangImporter to attach
+    // the `@_Unswiftify` peer macro that will synthesize the C-callable
+    // bridge function. The original safe Swift function continues to be a
+    // pure Swift symbol (see `Decl::hasOnlyCEntryPoint`).
+    //
+    // We may run before or after `ExpandPeerMacroRequest{AFD}` is first
+    // evaluated. `processSafeImplementationIfNeeded` is idempotent (via the
+    // `isSafeProcessed` bit on the attribute) so either ordering works:
+    //   * If attribute checking runs first, the call below attaches the
+    //     `@_Unswiftify` macro before peer expansion ever inspects the
+    //     attached macros.
+    //   * If peer expansion runs first, `ExpandPeerMacroRequest::evaluate`
+    //     invokes the same helper before walking attached macros, so the
+    //     synthesized macro is in place by the time it iterates.
+    if (attr->isSafeInteropImplementation()) {
+      processSafeImplementationIfNeeded(AFD);
     }
   }
 }
@@ -2602,6 +2853,14 @@ bool IsCCompatibleDeclRequest::evaluate(Evaluator &evaluator,
                                         ValueDecl *VD) const {
   if (VD->isInvalid())
     return false;
+
+  // `@c @implementation(safe)` keeps the Swift function as a Swift symbol
+  // and emits the C entry point via a macro-expanded peer. The peer (not
+  // this decl) is what must satisfy the C-representability check, so skip
+  // the check on the safe original to avoid spurious "cannot be represented
+  // in C" errors on intentionally safe parameter types like `Span`.
+  if (VD->hasSyntheticCEntryPointPeer())
+    return true;
 
   if (auto FD = dyn_cast<FuncDecl>(VD)) {
     bool foundError = false;

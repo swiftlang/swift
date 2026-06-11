@@ -105,8 +105,6 @@ extension CImplStruct {
   static func staticFunc1(_: Int32) {
     // FIXME: Add underlying support for this
     // expected-error@-3 {{@c can only be applied to global functions}}
-    // FIXME: Lookup in an enclosing type is not working yet
-    // expected-error@-5 {{could not find imported function 'CImplStructStaticFunc1' matching static method 'staticFunc1'; make sure you import the module or header that declares it}}
   }
 }
 
@@ -119,3 +117,4 @@ func CImplDuplicate(_: CInt) {
 func CImplDuplicate(_: CInt) {
 // expected-error@-2 {{duplicate implementation of imported global function 'CImplDuplicate'}}
 }
+

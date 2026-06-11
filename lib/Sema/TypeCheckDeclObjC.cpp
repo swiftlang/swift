@@ -4176,6 +4176,28 @@ private:
       return;
     }
 
+    // `@c @implementation(safe)` originals intentionally have a different
+    // signature from the C header declaration (safe Swift types vs. unsafe C
+    // ones). The macro-expanded peer is what actually satisfies the header.
+    // Suppress mismatch diagnostics on the safe original so the user only
+    // sees real problems.
+    if (cand->hasSyntheticCEntryPointPeer()) {
+      switch (outcome) {
+      case MatchOutcome::WrongType:
+      case MatchOutcome::WrongSendability:
+      case MatchOutcome::WrongParameterOwnership:
+      case MatchOutcome::WrongWritability:
+      case MatchOutcome::WrongForeignErrorConvention:
+      case MatchOutcome::WrongSwiftName:
+      case MatchOutcome::WrongImplicitObjCName:
+      case MatchOutcome::WrongExplicitObjCName:
+        hasDiagnosed = true;
+        return;
+      default:
+        break;
+      }
+    }
+
     auto reqObjCName = getObjCName(req);
 
     switch (outcome) {
@@ -4580,6 +4602,15 @@ TypeCheckCDeclFunctionRequest::evaluate(Evaluator &evaluator,
                                         FuncDecl *FD,
                                         CDeclAttr *attr) const {
   auto &ctx = FD->getASTContext();
+
+  // `@c @implementation(safe)` keeps the Swift function as a Swift symbol
+  // and produces the C entry point through an `@_Unswiftify` peer macro
+  // expansion. The peer (not this decl) is the one that must satisfy C
+  // representability, so skip the check on the safe original to avoid
+  // spurious "cannot be marked '@c'" errors on intentionally safe types
+  // like `Span`.
+  if (FD->hasSyntheticCEntryPointPeer())
+    return {};
 
   auto lang = FD->getCDeclKind();
   assert(lang && "missing @c?");

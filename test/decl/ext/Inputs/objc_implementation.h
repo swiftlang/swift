@@ -299,3 +299,4 @@ void CImplStructStaticFunc1(int param) __attribute__((swift_name("CImplStruct.st
 struct ObjCStruct {
   int foo;
 };
+

@@ -49,6 +49,7 @@ namespace clang {
   class DiagnosticConsumer;
   class EnumConstantDecl;
   class EnumDecl;
+  class FunctionDecl;
   class MacroInfo;
   class Module;
   class ModuleMacro;
@@ -721,6 +722,16 @@ public:
       const clang::CXXRecordDecl *recordDecl) const override;
 
   bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const override;
+
+  /// For an `@c @implementation(safe)` Swift function whose matched C
+  /// declaration is \p clangDecl, synthesize and attach an `@_Unswiftify`
+  /// peer macro invocation that will expand to a C-callable bridge.
+  ///
+  /// The caller must have already established that the corresponding clang decl
+  /// carries bounds/lifetime info to invert (a `_SwiftifyImport` peer exists).
+  void
+  attachUnswiftifyForSafeImplementation(AbstractFunctionDecl *safeSwiftDecl);
+
   bool isDeconstructedSwiftClosure(const clang::Type *type) const override;
 
   const clang::FunctionType *extractCXXFunctionType(
