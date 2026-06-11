@@ -1889,6 +1889,8 @@ NOTE(note_make_optional,none,
       "add '?' to form the optional type %0", (Type))
 NOTE(note_make_implicitly_unwrapped_optional,none,
       "add '!' to form an implicitly unwrapped optional", ())
+NOTE(note_use_nil_for_cxx_optional,none,
+     "use the 'nil' literal instead", ())
 
 ERROR(invalid_ibdesignable_extension,none,
       "'@IBDesignable' can only be applied to classes and extensions "

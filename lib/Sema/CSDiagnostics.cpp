@@ -48,6 +48,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/TypeVariableType.h"
+#include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
@@ -2636,6 +2637,9 @@ bool ContextualFailure::diagnoseAsError() {
   if (diagnoseConversionToNil())
     return true;
 
+  if (diagnoseConversionFromStdNullopt())
+    return true;
+
   if (path.empty()) {
     if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
       Diag<Type, Type> diag;
@@ -3153,6 +3157,56 @@ bool ContextualFailure::diagnoseConversionToNil() const {
       diag.fixItInsertAfter(patternTR->getEndLoc(), ")?");
     }
   }
+
+  return true;
+}
+
+static bool isStdNulloptType(Type type) {
+  auto nominal = type->getAnyNominal();
+  if (!nominal)
+    return false;
+
+  auto clangDecl =
+      dyn_cast_or_null<clang::CXXRecordDecl>(nominal->getClangDecl());
+  if (!clangDecl)
+    return false;
+
+  return clangDecl->isInStdNamespace() && clangDecl->getIdentifier() &&
+         clangDecl->getName() == "nullopt_t";
+}
+
+bool ContextualFailure::diagnoseConversionFromStdNullopt() const {
+  if (!isStdNulloptType(getFromType()))
+    return false;
+  if (!conformsToKnownProtocol(getToType(), KnownProtocolKind::CxxOptional))
+    return false;
+
+  // Pick the appropriate "cannot convert" diagnostic.
+  auto diagnostic = getDiagnosticFor(CTP, getToType());
+  if (!diagnostic)
+    return false;
+
+  emitDiagnostic(*diagnostic, getFromType(), getToType())
+      .highlight(getSourceRange());
+
+  // Locate the source expression that has `nullopt_t` type so we can produce a
+  // fix-it that replaces it with `nil`. Only emit the fix-it when we can
+  // pinpoint the offending expression — otherwise the range could include
+  // unrelated code.
+  SourceRange replaceRange;
+  if (auto anchor = getAsExpr(getAnchor())) {
+    if (auto assignExpr = dyn_cast<AssignExpr>(anchor)) {
+      if (auto src = assignExpr->getSrc())
+        replaceRange = src->getSourceRange();
+    } else if (auto type = getType(anchor);
+               type && type->isEqual(getFromType())) {
+      replaceRange = anchor->getSourceRange();
+    }
+  }
+
+  auto note = emitDiagnostic(diag::note_use_nil_for_cxx_optional);
+  if (replaceRange.isValid())
+    note.fixItReplace(replaceRange, "nil");
 
   return true;
 }
