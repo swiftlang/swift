@@ -81,16 +81,27 @@ SILModule &SILBasicBlock::getModule() const {
   return getParent()->getModule();
 }
 
+void SILBasicBlock::recomputeInstructionIndices() {
+  uint64_t idx = instructionIndexStride;
+  for (SILInstruction &inst : *this) {
+    inst.asSILNode()->setIndexInList(idx);
+    idx += instructionIndexStride;
+  }
+}
+
 void SILBasicBlock::insert(iterator InsertPt, SILInstruction *I) {
   InstList.insert(InsertPt, I);
+  I->assignNewIndexInList();
 }
 
 void SILBasicBlock::push_back(SILInstruction *I) {
   InstList.push_back(I);
+  I->assignNewIndexInList();
 }
 
 void SILBasicBlock::push_front(SILInstruction *I) {
   InstList.push_front(I);
+  I->assignNewIndexInList();
 }
 
 void SILBasicBlock::eraseAllInstructions(SILModule &module) {
@@ -307,7 +318,9 @@ void SILBasicBlock::eraseArgument(int Index) {
 SILBasicBlock *SILBasicBlock::split(iterator I) {
   SILBasicBlock *New = Parent->createBasicBlockAfter(this);
   // Move all of the specified instructions from the original basic block into
-  // the new basic block.
+  // the new basic block. Zero their indices since they move to a new block.
+  for (auto it = I; it != end(); ++it)
+    it->clearIndexInList();
   New->InstList.splice(New->end(), InstList, I, end());
   return New;
 }
@@ -317,6 +330,7 @@ void SILBasicBlock::moveTo(SILBasicBlock::iterator To, SILInstruction *I) {
   InstList.splice(To, I->getParent()->InstList, I);
   ScopeCloner ScopeCloner(*Parent);
   I->setDebugScope(ScopeCloner.getOrCreateClonedScope(I->getDebugScope()));
+  I->assignNewIndexInList();
 }
 
 void

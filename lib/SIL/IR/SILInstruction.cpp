@@ -130,6 +130,20 @@ void SILInstruction::moveBefore(SILInstruction *Later) {
   SILBasicBlock::moveInstruction(this, Later);
 }
 
+bool SILInstruction::strictlyDominatesInBlock(const SILInstruction *other) const {
+  ASSERT(getParent() == other->getParent() &&
+         "Instructions must be in the same block");
+  uint32_t myIdx = getRawIndexInList();
+  uint32_t otherIdx = other->getRawIndexInList();
+
+  if (myIdx == 0 || otherIdx == 0) {
+    getParent()->recomputeInstructionIndices();
+    myIdx = getRawIndexInList();
+    otherIdx = other->getRawIndexInList();
+  }
+  return myIdx < otherIdx;
+}
+
 namespace swift::test {
 FunctionTest MoveBeforeTest("instruction_move_before",
                             [](auto &function, auto &arguments, auto &test) {
@@ -221,6 +235,45 @@ public:
 
 SILInstructionResultArray SILInstruction::getResultsImpl() const {
   return AllResultsAccessor().visit(const_cast<SILInstruction *>(this));
+}
+
+void SILInstruction::assignNewIndexInList() {
+  // Start with index 0 ("uncomputed"). We will assign a real value only if
+  // we can derive one from the neighbors without a full block recomputation.
+  clearIndexInList();
+
+  SILInstruction *prev = getPreviousInstruction();
+  uint64_t prevIdx = 0;
+  if (prev) {
+    prevIdx = prev->getRawIndexInList();
+    if (prevIdx == 0)
+      return; // Predecessor has no index — we cannot derive one either.
+  }
+
+  SILInstruction *next = getNextInstruction();
+  if (next) {
+    uint64_t nextIdx = next->getRawIndexInList();
+    if (nextIdx == 0)
+      return; // Successor has no index — gap size is unknown.
+
+    ASSERT(nextIdx > prevIdx);
+    uint64_t gap = nextIdx - prevIdx;
+    if (gap >= 2 * SILBasicBlock::instructionIndexStride) {
+      // Enough room to place this instruction at the standard stride distance
+      // from the predecessor, leaving space for future insertions on either side.
+      asSILNode()->setIndexInList(prevIdx + SILBasicBlock::instructionIndexStride);
+    } else if (gap >= 2) {
+      // Gap is tight but non-zero: increment by one so both neighbors remain
+      // correctly ordered. Future insertions here will likely need a recompute.
+      asSILNode()->setIndexInList(prevIdx + 1);
+    }
+    // gap == 1: neighbors are adjacent, no integer can fit between them.
+    // Leave the index as 0; strictlyDominatesInBlock will trigger a full recompute.
+  } else {
+    // This is the last instruction in the block: append at stride distance
+    // after the predecessor (no upper bound to worry about).
+    asSILNode()->setIndexInList(prevIdx + SILBasicBlock::instructionIndexStride);
+  }
 }
 
 // Initialize the static members of SILInstruction.

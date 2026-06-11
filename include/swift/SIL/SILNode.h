@@ -414,11 +414,16 @@ protected:
 
     // Used by `NodeBitfield`.
     uint16_t customBits = 0;
+
+    // If not 0, a monotonically increasing index in the basic block's instruction list.
+    uint16_t indexInList = 0;
   };
 
   /// The "bigger" version of `SmallCustomBits`.
   struct LargeCustomBits {
     uint64_t lastInitializedBitfieldID = 0;
+
+    uint32_t indexInList = 0;
 
     // The number of used custom bits does not depend on the input SIL, but is
     // a fixed property of optimization implementations. Therefore, in case of
@@ -429,6 +434,7 @@ protected:
 
     LargeCustomBits(SmallCustomBits smallBits) :
       lastInitializedBitfieldID(smallBits.lastInitializedBitfieldID),
+      indexInList(smallBits.indexInList),
       customBits(smallBits.customBits) {}
   };
 
@@ -455,6 +461,7 @@ protected:
   }
 
   // This happens if the function's bitfield ID overflows (= extremely unlikely)
+  // or for very large basic blocks (> 8K instructions).
   void switchToLargeCustomBits() {
     ASSERT(!hasLargeCustomBits);
     auto smallBits = smallCustomBits;
@@ -489,6 +496,21 @@ protected:
       largeCustomBits->customBits = value;
     } else {
       smallCustomBits.customBits = value;
+    }
+  }
+
+  // Used by `SILBasicBlock` for native instruction ordering.
+  uint32_t getIndexInList() const {
+    return hasLargeCustomBits ? largeCustomBits->indexInList : smallCustomBits.indexInList;
+  }
+  void setIndexInList(uint64_t index) {
+    if (!hasLargeCustomBits && index <= std::numeric_limits<uint16_t>::max()) {
+      smallCustomBits.indexInList = (uint16_t)index;
+    } else {
+      if (!hasLargeCustomBits)
+        switchToLargeCustomBits();
+      ASSERT(index <= std::numeric_limits<uint32_t>::max() && "too many instructions in basic block");
+      largeCustomBits->indexInList = (uint32_t)index;
     }
   }
 
@@ -535,8 +557,10 @@ public:
   void resetBitfields() {
     if (hasLargeCustomBits) {
       largeCustomBits->lastInitializedBitfieldID = 0;
+      largeCustomBits->indexInList = 0;
     } else {
       smallCustomBits.lastInitializedBitfieldID = 0;
+      smallCustomBits.indexInList = 0;
     }
   }
 
