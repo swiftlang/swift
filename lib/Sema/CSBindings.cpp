@@ -386,6 +386,9 @@ public:
     }
     if (BindingType)
       BindingType.print(out, PO);
+    else
+      out << "nil";
+
     if (!Viable)
       out << " [literal not viable]";
   }
