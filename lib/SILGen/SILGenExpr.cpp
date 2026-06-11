@@ -882,11 +882,8 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
   // load_borrow. And move from WillSharedBorrowSelf -> DidSharedBorrowSelf.
   if (SelfInitDelegationState == SILGenFunction::WillSharedBorrowSelf) {
     SelfInitDelegationState = SILGenFunction::DidSharedBorrowSelf;
-    // If guaranteed plus zero is not ok, we are accessing self in a way that is
-    // illegal before the delegating initializer is called (e.g. passing a
-    // stored property as an argument to self.init). Return an owned copy so
-    // that definite initialization diagnoses the misuse instead of crashing,
-    // mirroring the DidExclusiveBorrowSelf handling below.
+    // If +1 is requested, it's a misuse of self that we expect
+    // definite initialization to diagnose.
     if (!C.isGuaranteedPlusZeroOk()) {
       const auto &typeLowering = getTypeLowering(addr->getType());
       ManagedValue result = emitLoad(loc, addr, typeLowering, C, IsNotTake);
