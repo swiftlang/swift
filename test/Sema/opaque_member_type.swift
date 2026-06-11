@@ -28,5 +28,4 @@ func asParameter1(_: (some Q).X) {}
 func asParameter2(_: [(some Q).X]) {}
 
 // This is not fine, there is no way to infer the generic parameter.
-// FIXME: We ought to have a better diagnostic for this.
-func asParameter3(_: (some R).X) {} // expected-error {{generic parameter '_' is not used in function signature}}
+func asParameter3(_: (some R).X) {} // expected-error@:23 {{opaque generic parameter 'some R' appears in position that cannot be inferred from a function call}}
