@@ -6672,6 +6672,9 @@ ERROR(invalid_isolated_and_convention_attributes,none,
       (StringRef))
 GROUPED_ERROR(unreferenced_generic_parameter,NoUsage,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
+ERROR(non_inferrable_opaque_generic_parameter,none,
+      "opaque generic parameter %0 appears in position that cannot be inferred "
+      "from a function call", (TypeRepr *))
 ERROR(unexpected_ctype_for_non_c_convention,none,
       "convention '%0' does not support the 'cType' argument label, did you "
       "mean '@convention(c, cType: \"%1\")' or "
