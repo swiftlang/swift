@@ -283,12 +283,12 @@ bool SwiftDeclSynthesizer::isUnicodeScalar(Type type) {
          found->second->isUnicodeScalar();
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                const clang::APValue &value,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              const clang::APValue &value,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   // Create the integer literal value.
   Expr *expr = nullptr;
   switch (value.getKind()) {
@@ -379,12 +379,12 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
                         access);
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                StringRef value,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              StringRef value,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   ASTContext &ctx = ImporterImpl.SwiftContext;
 
   auto expr = new (ctx) StringLiteralExpr(value, SourceRange());
@@ -468,12 +468,12 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
   return createSingleReturnBody(ctx, expr);
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                Expr *valueExpr,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              Expr *valueExpr,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   auto &C = ImporterImpl.SwiftContext;
 
   VarDecl *var = nullptr;
