@@ -722,11 +722,11 @@ function Get-BisonExecutable {
 }
 
 function Get-PythonPath([Hashtable] $Platform) {
-  return [IO.Path]::Combine("$BinaryCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
+  return [IO.Path]::Combine("$BinaryCache", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
 
 function Get-EmbeddedPythonPath([Hashtable] $Platform) {
-  return [IO.Path]::Combine("$BinaryCache\", "EmbeddedPython$($Platform.Architecture.CMakeName)-$PythonVersion")
+  return [IO.Path]::Combine("$BinaryCache", "EmbeddedPython$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
 
 function Get-PythonExecutable {
@@ -734,7 +734,7 @@ function Get-PythonExecutable {
 }
 
 function Get-EmbeddedPythonInstallDir() {
-  return [IO.Path]::Combine("$ImageRoot\", "Program Files", "Swift", "Python-$PythonVersion")
+  return [IO.Path]::Combine("$ImageRoot", "Program Files", "Swift", "Python-$PythonVersion")
 }
 
 function Get-Syft {
@@ -743,16 +743,16 @@ function Get-Syft {
 
 function Get-InstallDir([Hashtable] $Platform) {
   if ($Platform -eq $HostPlatform) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files", "Swift")
+    return [IO.Path]::Combine("$ImageRoot", "Program Files", "Swift")
   }
   if ($Platform -eq $KnownPlatforms["WindowsARM64"]) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files (Arm64)", "Swift")
+    return [IO.Path]::Combine("$ImageRoot", "Program Files (Arm64)", "Swift")
   }
   if ($Platform -eq $KnownPlatforms["WindowsX64"]) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files (Amd64)", "Swift")
+    return [IO.Path]::Combine("$ImageRoot", "Program Files (Amd64)", "Swift")
   }
   if ($Platform -eq $KnownPlatforms["WindowsX86"]) {
-    return [IO.Path]::Combine("$ImageRoot\", "Program Files (x86)", "Swift")
+    return [IO.Path]::Combine("$ImageRoot", "Program Files (x86)", "Swift")
   }
   throw "Unknown Platform"
 }
