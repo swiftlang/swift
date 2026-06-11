@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -1941,6 +1942,7 @@ static void killDebugUses(SILValue value) {
 
 /// Kills every debug use of any result of \p inst.
 static void killDebugUses(SILInstruction *inst) {
+  recordMissingSalvage(inst);
   for (SILValue result : inst->getResults())
     killDebugUses(result);
 }
