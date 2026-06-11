@@ -45,7 +45,7 @@ public struct CaseInfo {
 
   /// For each associated value, we have the label's name and `nil` if there
   /// isn't one
-  var associatedValues: [String?]
+  var associatedValueLabels: [String?]
 }
 
 public struct StructTypeInfo {
