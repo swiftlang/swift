@@ -609,3 +609,13 @@ do {
     // expected-error@-1 {{return type of local function 'test3()' requires that 'S' inherit from 'A'}}
   }
 }
+
+// https://github.com/swiftlang/swift/issues/89853 - Make sure we don't emit a
+// second spurious diagnostic in the below cases:
+do {
+  func f1() -> some P3<Int, String> {}
+  // expected-error@-1 {{protocol type 'P3' specialized with too many type arguments (got 2, but expected 1)}}
+
+  func f2() -> some P33333 {}
+  // expected-error@-1 {{cannot find type 'P33333' in scope}}
+}

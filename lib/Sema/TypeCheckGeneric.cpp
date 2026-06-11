@@ -185,8 +185,10 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
                                 /*packElementOpener*/ nullptr)
                                 .resolveType(constraint);
 
-      if (constraintType->hasError())
+      if (constraintType->hasError()) {
+        currentRepr->setInvalid();
         return nullptr;
+      }
 
       RequirementKind kind;
       if (constraintType->isConstraintType())
