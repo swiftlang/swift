@@ -84,3 +84,9 @@ bb3:
   return %7 : $String
 }
 
+sil [ossa] @test_bit_fields : $@convention(thin) () -> () {
+bb0:
+  specify_test "basic_block_bits"
+  unreachable
+}
+
