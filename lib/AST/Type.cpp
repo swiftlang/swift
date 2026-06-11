@@ -1011,6 +1011,23 @@ Type TypeBase::getArrayElementType() {
   return arrayType->getGenericArgs()[0];
 }
 
+std::optional<APInt> TypeBase::getInlineArrayCount() {
+  if (!isInlineArray() && !is_InlineArray())
+    return std::nullopt;
+
+  auto arrayType = getAs<StructType>();
+  if (!arrayType)
+    return std::nullopt;
+
+  // InlineArray<n, T>
+  auto countType = arrayType->getGenericArgs()[0];
+
+  if (!countType->is<IntegerType>())
+    return std::nullopt;
+
+  return countType->castTo<IntegerType>()->getValue();
+}
+
 Type TypeBase::getInlineArrayElementType() {
   if (!isInlineArray() && !is_InlineArray())
     return Type();
