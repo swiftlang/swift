@@ -355,6 +355,34 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
   return clangModuleDependencies.get();
 }
 
+void ModuleDependencyScanningWorker::drainClangModuleDependencies(
+    const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeen,
+    clang::tooling::dependencies::LookupModuleOutputCallback lookupModuleOutput,
+    llvm::function_ref<std::optional<std::string>()> getNextName,
+    llvm::function_ref<
+        void(StringRef,
+             llvm::Expected<clang::tooling::dependencies::TranslationUnitDeps>)>
+        deliverResult) {
+  // Prototype: we should sink everything here into clang, so in the end
+  // this method's body becomes something like:
+  //    clangDepScanningWorker->computeDependency(CWD, commandline, alreadySeen,
+  //    lookupModuleOutput, getNextName, deliverResult);
+
+  // Prototype: the initialization only need CWD and the commandline, which we
+  // can easily pull out.
+  if (auto err = initializeClangScanningTool()) {
+    // Prototype: we can pass in a function_ref to do error handling as well.
+    // This way Swift has all the freedom to deal with the errors.
+    llvm::consumeError(std::move(err));
+    return;
+  }
+
+  while (auto name = getNextName()) {
+    deliverResult(*name, clangScanningTool.computeDependenciesByNameWithContext(
+                             *name, alreadySeen, lookupModuleOutput));
+  }
+}
+
 std::optional<clang::tooling::dependencies::TranslationUnitDeps>
 ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
     ModuleDependencyID moduleID,
@@ -579,7 +607,7 @@ ModuleDependencyScanner::create(SwiftDependencyScanningService &service,
               .getFrontendOptions()
               .EmitDependencyScannerRemarks));
 
-  if (scanner->ShareClangCompilerInstance && !useClangScanDrainLoop()) {
+  if (scanner->ShareClangCompilerInstance) {
     auto initError = scanner->initializeWorkerClangScanningTool();
 
     if (initError) {
@@ -645,7 +673,7 @@ ModuleDependencyScanner::ModuleDependencyScanner(
 }
 
 ModuleDependencyScanner::~ModuleDependencyScanner() {
-  if (ShareClangCompilerInstance && !useClangScanDrainLoop()) {
+  if (ShareClangCompilerInstance) {
     auto finError = finalizeWorkerClangScanningTool();
     assert(!finError && "ClangScanningTool finalization must succeed.");
   }
@@ -1349,50 +1377,65 @@ void ModuleDependencyScanner::performClangModuleLookupWithDrain(
         idsToQuery.push_back(
             getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
 
+  auto numIds = idsToQuery.size();
+  if (!numIds)
+    return;
+
   ConcurrentIdentifierQueue IdQueue(std::move(idsToQuery));
-  auto drainClangModules = [&](ModuleDependencyScanningWorker *W){
-    if (auto err = W->initializeClangScanningTool()) {
-      llvm::handleAllErrors(std::move(err), [&](const llvm::StringError &E) {
-        /* prototype, do not handle init error atm. */ });
-      return true;
-    }
+  auto callIntoClang = [&](ModuleDependencyScanningWorker *W) {
     auto lookupModuleOutput = [this](const auto &cd, auto mok) -> auto {
       return clangModuleOutputPathLookup(cd, mok);
     };
 
-    auto deliverResult = [&](Identifier id, auto &scanResult) {
+    auto getNextName = [&]() -> std::optional<std::string> {
+      if (auto next = IdQueue.tryPop()) {
+        return next->str().str();
+      } else
+        return std::nullopt;
+    };
+
+    auto deliverResult = [&](StringRef Name, auto scanResult) {
       std::lock_guard<std::mutex> guard(resultAccessLock);
+      ScanDiagnosticReporter.registerNamedClangModuleQuery();
+      NumLookups++;
       if (scanResult) {
         llvm::for_each(scanResult->ModuleGraph, [&result](const auto &dep) {
           result.discoveredDependencyInfos.try_emplace(dep.ID.ModuleName, dep);
         });
-        result.visibleModules.insert_or_assign(id.str(),
+        result.visibleModules.insert_or_assign(Name.str(),
                                                scanResult->VisibleModules);
+      } else {
+        llvm::handleAllErrors(
+            scanResult.takeError(), [&](const llvm::StringError &E) {
+              const auto &message = E.getMessage();
+              // Empty messages are cached loadModule failures already reported
+              // on the first lookup; "module 'X' not found" is expected and
+              // handled elsewhere.
+              if (message.empty() ||
+                  message.find("fatal error: module '" + Name.str() +
+                               "' not found") != std::string::npos)
+                return;
+              W->workerDiagnosticEngine->diagnose(
+                  SourceLoc(), diag::clang_dependency_scan_error, message);
+            });
       }
     };
 
-    // Since withDependencyScanningWorker already incremented the counter, we
-    // decrement it once to avoid a wrong count. Keeps NumLookups increment by 1
-    // per name.
-    NumLookups--;
-    while (auto next = IdQueue.tryPop()) {
-      NumLookups++;
-      auto Deps = W->scanFilesystemForClangModuleDependency(
-          *next, lookupModuleOutput, seenClangModules);
-      deliverResult(*next, Deps);
-    }
+    W->drainClangModuleDependencies(seenClangModules, lookupModuleOutput,
+                                    getNextName, deliverResult);
 
-    llvm::consumeError(W->finalizeClangScanningTool());
     return true;
   };
 
-  auto numIds = idsToQuery.size();
-  if (!numIds) return;
-
   unsigned NumDrainers = std::min<unsigned>(NumThreads, numIds);
   for (unsigned i = 0; i < NumDrainers; ++i) {
-    ScanningThreadPool.async(
-        [&]() { withDependencyScanningWorker(drainClangModules); });
+    ScanningThreadPool.async([&]() {
+      withDependencyScanningWorker(callIntoClang);
+      // Prototype: adjust the number since we should not need to increment in
+      // withDependencyScanningWorker because we already increment per name in
+      // deliverResults.
+      NumLookups--;
+    });
   }
   ScanningThreadPool.wait();
 }

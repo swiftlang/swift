@@ -196,6 +196,17 @@ private:
   createCacheKeyForEmbeddedHeader(std::string embeddedHeaderIncludeTree,
                                   std::string chainedHeaderIncludeTree);
 
+  // Prototype: this can replace scanFilesystemForClangModuleDependency.
+  void drainClangModuleDependencies(
+      const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeen,
+      clang::tooling::dependencies::LookupModuleOutputCallback
+          lookupModuleOutput,
+      llvm::function_ref<std::optional<std::string>()> getNextName,
+      llvm::function_ref<void(
+          StringRef,
+          llvm::Expected<clang::tooling::dependencies::TranslationUnitDeps>)>
+          deliverResult);
+
   // Worker-specific instance of CompilerInvocation
   std::unique_ptr<CompilerInvocation> workerCompilerInvocation;
   // Worker-specific SourceManager
