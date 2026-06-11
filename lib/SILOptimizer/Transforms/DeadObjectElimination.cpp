@@ -853,10 +853,26 @@ class DeadObjectElimination : public SILFunctionTransform {
 
 void
 DeadObjectElimination::removeInstructions(ArrayRef<SILInstruction*> toRemove) {
-  for (auto *I : toRemove) {
+  // Drop all result uses up front so each instruction satisfies
+  // InstructionDeleter's incidental-use precondition. This also prevents
+  // lifetime fixup from compensating uses within the dead graph itself.
+  // The dead-object analysis has already checked that these users are
+  // removable.
+  for (auto *I : toRemove)
     I->replaceAllUsesOfAllResultsWithUndef();
-    // Now we know that I should not have any uses... erase it from its parent.
-    deleter.forceDelete(I);
+
+  bool fixLifetimes = getFunction()->hasOwnership();
+
+  for (auto *I : toRemove) {
+    // Callers have already inserted compensating destroys for the consumed
+    // sources of dead stores, so fixing their lifetimes here would insert
+    // duplicate destroys. Other instructions may consume values defined
+    // outside the dead object graph, so let InstructionDeleter compensate
+    // for those consumes.
+    if (fixLifetimes && !isa<StoreInst>(I))
+      deleter.forceDeleteAndFixLifetimes(I);
+    else
+      deleter.forceDelete(I);
   }
 }
 
@@ -1079,18 +1095,12 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
     for (const Operand &Op : KPI->getPatternOperands()) {
       if (Op.get()->getType().isTrivial(*KPI->getFunction()))
         continue;
-      // In ossa, we are going to delete the dead keypath which was consuming
-      // the pattern operand and insert a destroy_value of the pattern operand
-      // value. This is shortening the pattern operand value's lifetime. Check
-      // if there was a pointer escape, if so bail out.
+      // In ossa, deleting the dead keypath compensates its consuming pattern
+      // operand with a destroy_value. This is shortening the pattern operand
+      // value's lifetime. Check if there was a pointer escape, if so bail out.
       if (findPointerEscape(Op.get())) {
         return false;
       }
-    }
-    for (const Operand &Op : KPI->getPatternOperands()) {
-      if (Op.get()->getType().isTrivial(*KPI->getFunction()))
-        continue;
-      SILBuilderWithScope(KPI).createDestroyValue(KPI->getLoc(), Op.get());
     }
   }
 
