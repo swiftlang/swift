@@ -766,10 +766,6 @@ option(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP
   "Enable experimental C++ interop modules"
   TRUE)
 
-option(SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER
-  "Install the <swift/bridging> C++ interoperability header alongside compiler"
-  TRUE)
-
 option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
   "Enable experimental distributed actors and functions"
   FALSE)

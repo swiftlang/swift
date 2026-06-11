@@ -1,5 +1,5 @@
-// RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=upcoming-swift -I %swift_src_root/lib/ClangImporter/SwiftBridging -module-to-print=RefCountingMethods -I %S/Inputs -source-filename=x | %FileCheck --check-prefixes=CHECK,CHECK-OFF %s
-// RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature ForeignReferenceTypeInheritance -I %swift_src_root/lib/ClangImporter/SwiftBridging -module-to-print=RefCountingMethods -I %S/Inputs -source-filename=x | %FileCheck --check-prefixes=CHECK,CHECK-ON %s
+// RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=upcoming-swift -module-to-print=RefCountingMethods -I %S/Inputs -source-filename=x | %FileCheck --check-prefixes=CHECK,CHECK-OFF %s
+// RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature ForeignReferenceTypeInheritance -module-to-print=RefCountingMethods -I %S/Inputs -source-filename=x | %FileCheck --check-prefixes=CHECK,CHECK-ON %s
 
 // REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
