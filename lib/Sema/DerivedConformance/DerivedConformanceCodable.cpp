@@ -140,7 +140,9 @@ addImplicitCodingKeys(NominalTypeDecl *target,
                       Identifier codingKeysEnumIdentifier) {
   auto &C = target->getASTContext();
   assert(target->lookupDirect(DeclName(codingKeysEnumIdentifier)).empty());
-
+  // use the target start location instead of an invalid location.
+  auto anchorLoc = target->getStartLoc();
+  
   // We want to look through all the var declarations of this type to create
   // enum cases based on those var names.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
@@ -149,8 +151,10 @@ addImplicitCodingKeys(NominalTypeDecl *target,
     InheritedEntry(TypeLoc::withoutLoc(codingKeyType))};
   ArrayRef<InheritedEntry> inherited = C.AllocateCopy(protoTypeLoc);
 
-  auto *enumDecl = new (C) EnumDecl(SourceLoc(), codingKeysEnumIdentifier,
+  auto *enumDecl = new (C) EnumDecl(anchorLoc, codingKeysEnumIdentifier,
                                     SourceLoc(), inherited, nullptr, target);
+
+  enumDecl->setBraces(anchorLoc);
   enumDecl->setImplicit();
   enumDecl->setSynthesized();
   enumDecl->setAccess(AccessLevel::Private);
