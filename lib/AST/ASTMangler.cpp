@@ -3249,7 +3249,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       // imported as a Swift enum.
       appendOperator("V");
     } else if (isa<clang::TypedefNameDecl>(namedDecl) ||
-               isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
+               isa<clang::ObjCCompatibleAliasDecl>(namedDecl) ||
+               isa<clang::NamespaceAliasDecl>(namedDecl)) {
       appendOperator("a");
     } else if (isa<clang::NamespaceDecl>(namedDecl)) {
       // Note: Namespaces are not really enums, but since namespaces are
