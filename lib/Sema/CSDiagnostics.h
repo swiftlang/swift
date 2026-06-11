@@ -699,6 +699,10 @@ public:
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
 
+  /// If we're trying to convert `std::nullopt_t` to a `std::optional`, suggest
+  /// using Swift's `nil` literal instead.
+  bool diagnoseConversionFromStdNullopt() const;
+
   /// Diagnose failed conversion in a `CoerceExpr`.
   bool diagnoseCoercionToUnrelatedType() const;
 
