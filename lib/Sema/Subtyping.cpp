@@ -592,10 +592,16 @@ static bool isCovariantInstanceType(Type t) {
          t->is<ArchetypeType>();
 }
 
-ConflictReason swift::constraints::canPossiblyConvertTo(
-    ConstraintSystem &cs,
-    Type lhs, Type rhs,
-    GenericSignature sig) {
+/// More meaningful overload for when you want a boolean result.
+bool swift::constraints::canConvertTo(ConstraintSystem &cs,
+                                      Type lhs, Type rhs,
+                                      GenericSignature sig) {
+  return !checkConversion(cs, lhs, rhs, sig);
+}
+
+ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
+                                                   Type lhs, Type rhs,
+                                                   GenericSignature sig) {
   if (lhs->isEqual(rhs))
     return std::nullopt;
 
@@ -687,12 +693,11 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
 
     case ConversionBehavior::Array: {
       // Array-to-Array conversions.
-      auto subResult = canPossiblyConvertTo(
-          cs,
-          lhs->getArrayElementType(),
-          rhs->getArrayElementType(), sig);
-      if (subResult)
-        return subResult | ConflictFlag::Array;
+      auto result = checkConversion(cs,
+                                    lhs->getArrayElementType(),
+                                    rhs->getArrayElementType(), sig);
+      if (result)
+        return result | ConflictFlag::Array;
 
       break;
     }
@@ -700,16 +705,14 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       // Dictionary-to-Dictionary conversions.
       auto lhsPair = *ConstraintSystem::isDictionaryType(lhs);
       auto rhsPair = *ConstraintSystem::isDictionaryType(rhs);
-      auto keyResult = canPossiblyConvertTo(
-          cs,
-          lhsPair.first,
-          rhsPair.first, sig);
+      auto keyResult = checkConversion(cs,
+                                       lhsPair.first,
+                                       rhsPair.first, sig);
       if (keyResult)
         return keyResult | ConflictFlag::DictionaryKey;
-      auto valueResult = canPossiblyConvertTo(
-          cs,
-          lhsPair.second,
-          rhsPair.second, sig);
+      auto valueResult = checkConversion(cs,
+                                         lhsPair.second,
+                                         rhsPair.second, sig);
       if (valueResult)
         return valueResult | ConflictFlag::DictionaryKey;
       break;
@@ -719,23 +722,19 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       auto lhsElt = *ConstraintSystem::isSetType(lhs);
       auto rhsElt = *ConstraintSystem::isSetType(rhs);
 
-      auto subResult = canPossiblyConvertTo(
-          cs,
-          lhsElt,
-          rhsElt, sig);
-      if (subResult)
-        return subResult | ConflictFlag::Set;
+      auto result = checkConversion(cs, lhsElt, rhsElt, sig);
+      if (result)
+        return result | ConflictFlag::Set;
       break;
     }
     case ConversionBehavior::Optional: {
       // Optional-to-optional conversion.
       auto argObjectType = lhs->getOptionalObjectType();
       auto objectType = rhs->getOptionalObjectType();
-      auto optionalToOptional = canPossiblyConvertTo(
-          cs, argObjectType, objectType, sig);
 
-      if (optionalToOptional)
-        return optionalToOptional | ConflictFlag::Optional;
+      auto result = checkConversion(cs, argObjectType, objectType, sig);
+      if (result)
+        return result | ConflictFlag::Optional;
       break;
     }
     case ConversionBehavior::Metatype: {
@@ -750,11 +749,9 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
         break;
       }
 
-      auto instanceConversion = canPossiblyConvertTo(
-          cs, argInstanceType, instanceType, sig);
-
-      if (instanceConversion)
-        return instanceConversion | ConflictFlag::Metatype;
+      auto result = checkConversion(cs, argInstanceType, instanceType, sig);
+      if (result)
+        return result | ConflictFlag::Metatype;
       break;
     }
     case ConversionBehavior::Function:
@@ -781,7 +778,7 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       for (unsigned i : indices(lhsTuple->getElements())) {
         auto lhsElt = lhsTuple->getElementType(i);
         auto rhsElt = rhsTuple->getElementType(i);
-        auto result = canPossiblyConvertTo(cs, lhsElt, rhsElt, sig);
+        auto result = checkConversion(cs, lhsElt, rhsElt, sig);
         if (result)
           return result | ConflictFlag::TupleElement;
       }
@@ -818,8 +815,7 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
 
     } else {
       // Attempt LValue-to-RValue conversion.
-      return canPossiblyConvertTo(cs, lhs->getWithoutSpecifierType(),
-                                  rhs, sig);
+      return checkConversion(cs, lhs->getWithoutSpecifierType(), rhs, sig);
     }
 
   // Handle case where the kinds don't match, and we're not converting
@@ -864,10 +860,9 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     case ConversionBehavior::Optional: {
       // We have a non-optional on the left. Try value-to-optional.
       auto objectType = rhs->getOptionalObjectType();
-      auto valueToOptional = canPossiblyConvertTo(
-          cs, lhs, objectType, sig);
-      if (valueToOptional)
-        return valueToOptional | ConflictFlag::Optional;
+      auto result = checkConversion(cs, lhs, objectType, sig);
+      if (result)
+        return result | ConflictFlag::Optional;
 
       break;
     }

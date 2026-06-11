@@ -1305,8 +1305,8 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Existing exact binding must be a supertype of the new lower bound.
-      if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
-                               GenericSignature())) {
+      if (!canConvertTo(CS, binding.BindingType, existing.BindingType,
+                        GenericSignature())) {
         SUBSUME_DEBUG("Exact vs supertype conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -1326,8 +1326,8 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Existing exact binding must be a subtype of the new upper bound.
-      if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
-                               GenericSignature())) {
+      if (!canConvertTo(CS, existing.BindingType, binding.BindingType,
+                        GenericSignature())) {
         SUBSUME_DEBUG("Exact vs subtype conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -1354,8 +1354,8 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Exact binding must be a supertype of the existing lower bound.
-      if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
-                               GenericSignature())) {
+      if (!canConvertTo(CS, existing.BindingType, binding.BindingType,
+                        GenericSignature())) {
         SUBSUME_DEBUG("Supertype vs exact conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -1403,8 +1403,8 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The existing lower bound should be a subtype of the new upper bound.
-      if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
-                               GenericSignature())) {
+      if (!canConvertTo(CS, existing.BindingType, binding.BindingType,
+                        GenericSignature())) {
         SUBSUME_DEBUG("Supertype vs subtype conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -1450,8 +1450,8 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The new exact binding should be a subtype of the existing upper bound.
-      if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
-                               GenericSignature())) {
+      if (!canConvertTo(CS, binding.BindingType, existing.BindingType,
+                        GenericSignature())) {
         SUBSUME_DEBUG("Subtype vs exact conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -1478,8 +1478,8 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The new lower bound should be a subtype of the existing upper bound.
-      if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
-                               GenericSignature())) {
+      if (!canConvertTo(CS, binding.BindingType, existing.BindingType,
+                        GenericSignature())) {
         SUBSUME_DEBUG("Subtype vs supertype conflict");
         return SubsumeBindingResult::Conflict;
       }
@@ -2299,12 +2299,12 @@ bool LiteralRequirement::isCoveredBy(AllowedBindingKind kind, Type type,
     case AllowedBindingKind::Supertypes:
       if (!type->getAnyNominal() && !type->isExistentialType())
         return false;
-      return !canPossiblyConvertTo(CS, defaultType, type, GenericSignature());
+      return canConvertTo(CS, defaultType, type, GenericSignature());
 
     case AllowedBindingKind::Subtypes:
       if (!type->getAnyNominal() && !type->isExistentialType())
         return false;
-      return !canPossiblyConvertTo(CS, type, defaultType, GenericSignature());
+      return canConvertTo(CS, type, defaultType, GenericSignature());
     }
   }
 }

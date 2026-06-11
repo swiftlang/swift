@@ -168,15 +168,19 @@ void simple_display(llvm::raw_ostream &out, ConflictReason reason);
 /// type variables are just assumed opaque.
 ///
 /// The answer is conservative, so we err on the side of saying that
-/// a convesion _can_ happen. We only return a non-empty ConflictReason
+/// a conversion _can_ happen. We only return a non-empty ConflictReason
 /// if the conversion will definitely fail.
 ///
 /// Even if the types do not contain type variables or type parameters,
 /// this does not give a completely accurate answer, yet.
-ConflictReason canPossiblyConvertTo(
-    ConstraintSystem &cs,
-    Type lhs, Type rhs,
-    GenericSignature sig);
+ConflictReason checkConversion(ConstraintSystem &cs,
+                               Type lhs, Type rhs,
+                               GenericSignature sig);
+
+/// More meaningful overload for when you want a boolean result.
+bool canConvertTo(ConstraintSystem &cs,
+                  Type lhs, Type rhs,
+                  GenericSignature sig);
 
 /// Computes the join between two types.
 ///
