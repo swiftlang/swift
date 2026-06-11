@@ -1311,6 +1311,409 @@ Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
 // Cross-encoding strcmp for Foundation
 Added: __swift_unicodeBuffersEqual_nonNormalizing
 
+// SE-0529: Add FilePath to the standard library
+// Swift.FilePath.components.getter : Swift.FilePath.ComponentView
+Added: _$ss8FilePathV10componentsAB13ComponentViewVvg
+// Swift.FilePath.components.modify : Swift.FilePath.ComponentView
+Added: _$ss8FilePathV10componentsAB13ComponentViewVvM
+// property descriptor for Swift.FilePath.components : Swift.FilePath.ComponentView
+Added: _$ss8FilePathV10componentsAB13ComponentViewVvpMV
+// Swift.FilePath.components.setter : Swift.FilePath.ComponentView
+Added: _$ss8FilePathV10componentsAB13ComponentViewVvs
+// Swift.FilePath.isAbsolute.getter : Swift.Bool
+Added: _$ss8FilePathV10isAbsoluteSbvg
+// property descriptor for Swift.FilePath.isAbsolute : Swift.Bool
+Added: _$ss8FilePathV10isAbsoluteSbvpMV
+// Swift.FilePath.description.getter : Swift.String
+Added: _$ss8FilePathV11descriptionSSvg
+// property descriptor for Swift.FilePath.description : Swift.String
+Added: _$ss8FilePathV11descriptionSSvpMV
+// Swift.FilePath.ComponentView.startIndex.getter : Swift.FilePath.ComponentView.Index
+Added: _$ss8FilePathV13ComponentViewV10startIndexAD0F0Vvg
+// property descriptor for Swift.FilePath.ComponentView.startIndex : Swift.FilePath.ComponentView.Index
+Added: _$ss8FilePathV13ComponentViewV10startIndexAD0F0VvpMV
+// Swift.FilePath.ComponentView.replaceSubrange<A where A: Swift.Collection, A.Element == Swift.FilePath.Component>(_: Swift.Range<Swift.FilePath.ComponentView.Index>, with: A) -> ()
+Added: _$ss8FilePathV13ComponentViewV15replaceSubrange_4withySnyAD5IndexVG_xtSlRzAB0C0V7ElementRtzlF
+// static Swift.FilePath.ComponentView.< infix(Swift.FilePath.ComponentView, Swift.FilePath.ComponentView) -> Swift.Bool
+Added: _$ss8FilePathV13ComponentViewV1loiySbAD_ADtFZ
+// static Swift.FilePath.ComponentView.== infix(Swift.FilePath.ComponentView, Swift.FilePath.ComponentView) -> Swift.Bool
+Added: _$ss8FilePathV13ComponentViewV2eeoiySbAD_ADtFZ
+// Swift.FilePath.ComponentView.hash(into: inout Swift.Hasher) -> ()
+Added: _$ss8FilePathV13ComponentViewV4hash4intoys6HasherVz_tF
+// Swift.FilePath.ComponentView.index(after: Swift.FilePath.ComponentView.Index) -> Swift.FilePath.ComponentView.Index
+Added: _$ss8FilePathV13ComponentViewV5index5afterAD5IndexVAH_tF
+// Swift.FilePath.ComponentView.index(before: Swift.FilePath.ComponentView.Index) -> Swift.FilePath.ComponentView.Index
+Added: _$ss8FilePathV13ComponentViewV5index6beforeAD5IndexVAH_tF
+// static Swift.FilePath.ComponentView.Index.< infix(Swift.FilePath.ComponentView.Index, Swift.FilePath.ComponentView.Index) -> Swift.Bool
+Added: _$ss8FilePathV13ComponentViewV5IndexV1loiySbAF_AFtFZ
+// static Swift.FilePath.ComponentView.Index.== infix(Swift.FilePath.ComponentView.Index, Swift.FilePath.ComponentView.Index) -> Swift.Bool
+Added: _$ss8FilePathV13ComponentViewV5IndexV2eeoiySbAF_AFtFZ
+// Swift.FilePath.ComponentView.Index.hash(into: inout Swift.Hasher) -> ()
+Added: _$ss8FilePathV13ComponentViewV5IndexV4hash4intoys6HasherVz_tF
+// Swift.FilePath.ComponentView.Index.hashValue.getter : Swift.Int
+Added: _$ss8FilePathV13ComponentViewV5IndexV9hashValueSivg
+// property descriptor for Swift.FilePath.ComponentView.Index.hashValue : Swift.Int
+Added: _$ss8FilePathV13ComponentViewV5IndexV9hashValueSivpMV
+// type metadata accessor for Swift.FilePath.ComponentView.Index
+Added: _$ss8FilePathV13ComponentViewV5IndexVMa
+// nominal type descriptor for Swift.FilePath.ComponentView.Index
+Added: _$ss8FilePathV13ComponentViewV5IndexVMn
+// type metadata for Swift.FilePath.ComponentView.Index
+Added: _$ss8FilePathV13ComponentViewV5IndexVN
+// protocol conformance descriptor for Swift.FilePath.ComponentView.Index : Swift.Hashable in Swift
+Added: _$ss8FilePathV13ComponentViewV5IndexVSHsMc
+// protocol witness table for Swift.FilePath.ComponentView.Index : Swift.Hashable in Swift
+Added: _$ss8FilePathV13ComponentViewV5IndexVSHsWP
+// protocol conformance descriptor for Swift.FilePath.ComponentView.Index : Swift.Comparable in Swift
+Added: _$ss8FilePathV13ComponentViewV5IndexVSLsMc
+// protocol witness table for Swift.FilePath.ComponentView.Index : Swift.Comparable in Swift
+Added: _$ss8FilePathV13ComponentViewV5IndexVSLsWP
+// protocol conformance descriptor for Swift.FilePath.ComponentView.Index : Swift.Equatable in Swift
+Added: _$ss8FilePathV13ComponentViewV5IndexVSQsMc
+// protocol witness table for Swift.FilePath.ComponentView.Index : Swift.Equatable in Swift
+Added: _$ss8FilePathV13ComponentViewV5IndexVSQsWP
+// Swift.FilePath.ComponentView.isEmpty.getter : Swift.Bool
+Added: _$ss8FilePathV13ComponentViewV7isEmptySbvg
+// property descriptor for Swift.FilePath.ComponentView.isEmpty : Swift.Bool
+Added: _$ss8FilePathV13ComponentViewV7isEmptySbvpMV
+// Swift.FilePath.ComponentView.endIndex.getter : Swift.FilePath.ComponentView.Index
+Added: _$ss8FilePathV13ComponentViewV8endIndexAD0F0Vvg
+// property descriptor for Swift.FilePath.ComponentView.endIndex : Swift.FilePath.ComponentView.Index
+Added: _$ss8FilePathV13ComponentViewV8endIndexAD0F0VvpMV
+// Swift.FilePath.ComponentView.codeUnits.getter : Swift.Span<Swift.Int8>
+Added: _$ss8FilePathV13ComponentViewV9codeUnitss4SpanVys4Int8VGvg
+// Swift.FilePath.ComponentView.hashValue.getter : Swift.Int
+Added: _$ss8FilePathV13ComponentViewV9hashValueSivg
+// property descriptor for Swift.FilePath.ComponentView.hashValue : Swift.Int
+Added: _$ss8FilePathV13ComponentViewV9hashValueSivpMV
+// Swift.FilePath.ComponentView.init() -> Swift.FilePath.ComponentView
+Added: _$ss8FilePathV13ComponentViewVADycfC
+// type metadata accessor for Swift.FilePath.ComponentView
+Added: _$ss8FilePathV13ComponentViewVMa
+// nominal type descriptor for Swift.FilePath.ComponentView
+Added: _$ss8FilePathV13ComponentViewVMn
+// type metadata for Swift.FilePath.ComponentView
+Added: _$ss8FilePathV13ComponentViewVN
+// protocol conformance descriptor for Swift.FilePath.ComponentView : Swift.Hashable in Swift
+Added: _$ss8FilePathV13ComponentViewVSHsMc
+// protocol witness table for Swift.FilePath.ComponentView : Swift.Hashable in Swift
+Added: _$ss8FilePathV13ComponentViewVSHsWP
+// protocol conformance descriptor for Swift.FilePath.ComponentView : Swift.BidirectionalCollection in Swift
+Added: _$ss8FilePathV13ComponentViewVSKsMc
+// protocol witness table for Swift.FilePath.ComponentView : Swift.BidirectionalCollection in Swift
+Added: _$ss8FilePathV13ComponentViewVSKsWP
+// protocol conformance descriptor for Swift.FilePath.ComponentView : Swift.Collection in Swift
+Added: _$ss8FilePathV13ComponentViewVSlsMc
+// protocol conformance descriptor for Swift.FilePath.ComponentView : Swift.Comparable in Swift
+Added: _$ss8FilePathV13ComponentViewVSLsMc
+// protocol witness table for Swift.FilePath.ComponentView : Swift.Collection in Swift
+Added: _$ss8FilePathV13ComponentViewVSlsWP
+// protocol witness table for Swift.FilePath.ComponentView : Swift.Comparable in Swift
+Added: _$ss8FilePathV13ComponentViewVSLsWP
+// protocol conformance descriptor for Swift.FilePath.ComponentView : Swift.RangeReplaceableCollection in Swift
+Added: _$ss8FilePathV13ComponentViewVSmsMc
+// protocol witness table for Swift.FilePath.ComponentView : Swift.RangeReplaceableCollection in Swift
+Added: _$ss8FilePathV13ComponentViewVSmsWP
+// protocol conformance descriptor for Swift.FilePath.ComponentView : Swift.Equatable in Swift
+Added: _$ss8FilePathV13ComponentViewVSQsMc
+// protocol witness table for Swift.FilePath.ComponentView : Swift.Equatable in Swift
+Added: _$ss8FilePathV13ComponentViewVSQsWP
+// protocol conformance descriptor for Swift.FilePath.ComponentView : Swift.Sequence in Swift
+Added: _$ss8FilePathV13ComponentViewVSTsMc
+// protocol witness table for Swift.FilePath.ComponentView : Swift.Sequence in Swift
+Added: _$ss8FilePathV13ComponentViewVSTsWP
+// Swift.FilePath.ComponentView.subscript.getter : (Swift.FilePath.ComponentView.Index) -> Swift.FilePath.Component
+Added: _$ss8FilePathV13ComponentViewVyAB0C0VAD5IndexVcig
+// property descriptor for Swift.FilePath.ComponentView.subscript(Swift.FilePath.ComponentView.Index) -> Swift.FilePath.Component
+Added: _$ss8FilePathV13ComponentViewVyAB0C0VAD5IndexVcipMV
+// Swift.FilePath.init(stringLiteral: Swift.String) -> Swift.FilePath
+Added: _$ss8FilePathV13stringLiteralABSS_tcfC
+// Swift.FilePath.withCodeUnits<A, B where B: Swift.Error>((Swift.UnsafePointer<Swift.Int8>, Swift.Int) throws(B) -> A) throws(B) -> A
+Added: _$ss8FilePathV13withCodeUnitsyxxSPys4Int8VG_Sitq_YKXEq_YKs5ErrorR_r0_lF
+// Swift.FilePath.isResourceFork.getter : Swift.Bool
+Added: _$ss8FilePathV14isResourceForkSbvg
+// Swift.FilePath.isResourceFork.modify : Swift.Bool
+Added: _$ss8FilePathV14isResourceForkSbvM
+// property descriptor for Swift.FilePath.isResourceFork : Swift.Bool
+Added: _$ss8FilePathV14isResourceForkSbvpMV
+// Swift.FilePath.isResourceFork.setter : Swift.Bool
+Added: _$ss8FilePathV14isResourceForkSbvs
+// Swift.FilePath.debugDescription.getter : Swift.String
+Added: _$ss8FilePathV16debugDescriptionSSvg
+// property descriptor for Swift.FilePath.debugDescription : Swift.String
+Added: _$ss8FilePathV16debugDescriptionSSvpMV
+// Swift.FilePath.withResourceFork() -> Swift.FilePath
+Added: _$ss8FilePathV16withResourceForkAByF
+// Swift.FilePath.withoutResourceFork() -> Swift.FilePath
+Added: _$ss8FilePathV19withoutResourceForkAByF
+// static Swift.FilePath.< infix(Swift.FilePath, Swift.FilePath) -> Swift.Bool
+Added: _$ss8FilePathV1loiySbAB_ABtFZ
+// Swift.FilePath.hasTrailingSeparator.getter : Swift.Bool
+Added: _$ss8FilePathV20hasTrailingSeparatorSbvg
+// Swift.FilePath.hasTrailingSeparator.modify : Swift.Bool
+Added: _$ss8FilePathV20hasTrailingSeparatorSbvM
+// property descriptor for Swift.FilePath.hasTrailingSeparator : Swift.Bool
+Added: _$ss8FilePathV20hasTrailingSeparatorSbvpMV
+// Swift.FilePath.hasTrailingSeparator.setter : Swift.Bool
+Added: _$ss8FilePathV20hasTrailingSeparatorSbvs
+// Swift.FilePath.withTrailingSeparator() -> Swift.FilePath
+Added: _$ss8FilePathV21withTrailingSeparatorAByF
+// Swift.FilePath.nullTerminatedCodeUnits.getter : Swift.Span<Swift.Int8>
+Added: _$ss8FilePathV23nullTerminatedCodeUnitss4SpanVys4Int8VGvg
+// Swift.FilePath.withoutTrailingSeparator() -> Swift.FilePath
+Added: _$ss8FilePathV24withoutTrailingSeparatorAByF
+// static Swift.FilePath.== infix(Swift.FilePath, Swift.FilePath) -> Swift.Bool
+Added: _$ss8FilePathV2eeoiySbAB_ABtFZ
+// Swift.FilePath.hash(into: inout Swift.Hasher) -> ()
+Added: _$ss8FilePathV4hash4intoys6HasherVz_tF
+// Swift.FilePath.init<A where A: Swift.Sequence, A.Element == Swift.FilePath.Component>(anchor: Swift.FilePath.Anchor?, _: A, resourceFork: Swift.Bool) -> Swift.FilePath
+Added: _$ss8FilePathV6anchor_12resourceForkA2B6AnchorVSg_xSbtcSTRzAB9ComponentV7ElementRtzlufC
+// Swift.FilePath.init<A where A: Swift.Sequence, A.Element == Swift.FilePath.Component>(anchor: Swift.FilePath.Anchor?, _: A, hasTrailingSeparator: Swift.Bool) -> Swift.FilePath
+Added: _$ss8FilePathV6anchor_20hasTrailingSeparatorA2B6AnchorVSg_xSbtcSTRzAB9ComponentV7ElementRtzlufC
+// Swift.FilePath.anchor.getter : Swift.FilePath.Anchor?
+Added: _$ss8FilePathV6anchorAB6AnchorVSgvg
+// Swift.FilePath.anchor.modify : Swift.FilePath.Anchor?
+Added: _$ss8FilePathV6anchorAB6AnchorVSgvM
+// property descriptor for Swift.FilePath.anchor : Swift.FilePath.Anchor?
+Added: _$ss8FilePathV6anchorAB6AnchorVSgvpMV
+// Swift.FilePath.anchor.setter : Swift.FilePath.Anchor?
+Added: _$ss8FilePathV6anchorAB6AnchorVSgvs
+// Swift.FilePath.Anchor.description.getter : Swift.String
+Added: _$ss8FilePathV6AnchorV11descriptionSSvg
+// property descriptor for Swift.FilePath.Anchor.description : Swift.String
+Added: _$ss8FilePathV6AnchorV11descriptionSSvpMV
+// Swift.FilePath.Anchor.init(stringLiteral: Swift.String) -> Swift.FilePath.Anchor
+Added: _$ss8FilePathV6AnchorV13stringLiteralADSS_tcfC
+// Swift.FilePath.Anchor.debugDescription.getter : Swift.String
+Added: _$ss8FilePathV6AnchorV16debugDescriptionSSvg
+// property descriptor for Swift.FilePath.Anchor.debugDescription : Swift.String
+Added: _$ss8FilePathV6AnchorV16debugDescriptionSSvpMV
+// static Swift.FilePath.Anchor.< infix(Swift.FilePath.Anchor, Swift.FilePath.Anchor) -> Swift.Bool
+Added: _$ss8FilePathV6AnchorV1loiySbAD_ADtFZ
+// static Swift.FilePath.Anchor.== infix(Swift.FilePath.Anchor, Swift.FilePath.Anchor) -> Swift.Bool
+Added: _$ss8FilePathV6AnchorV2eeoiySbAD_ADtFZ
+// Swift.FilePath.Anchor.hash(into: inout Swift.Hasher) -> ()
+Added: _$ss8FilePathV6AnchorV4hash4intoys6HasherVz_tF
+// Swift.FilePath.Anchor.isRooted.getter : Swift.Bool
+Added: _$ss8FilePathV6AnchorV8isRootedSbvg
+// property descriptor for Swift.FilePath.Anchor.isRooted : Swift.Bool
+Added: _$ss8FilePathV6AnchorV8isRootedSbvpMV
+// Swift.FilePath.Anchor.codeUnits.getter : Swift.Span<Swift.Int8>
+Added: _$ss8FilePathV6AnchorV9codeUnitss4SpanVys4Int8VGvg
+// Swift.FilePath.Anchor.hashValue.getter : Swift.Int
+Added: _$ss8FilePathV6AnchorV9hashValueSivg
+// property descriptor for Swift.FilePath.Anchor.hashValue : Swift.Int
+Added: _$ss8FilePathV6AnchorV9hashValueSivpMV
+// type metadata accessor for Swift.FilePath.Anchor
+Added: _$ss8FilePathV6AnchorVMa
+// nominal type descriptor for Swift.FilePath.Anchor
+Added: _$ss8FilePathV6AnchorVMn
+// type metadata for Swift.FilePath.Anchor
+Added: _$ss8FilePathV6AnchorVN
+// protocol conformance descriptor for Swift.FilePath.Anchor : Swift.CustomStringConvertible in Swift
+Added: _$ss8FilePathV6AnchorVs23CustomStringConvertiblesMc
+// protocol witness table for Swift.FilePath.Anchor : Swift.CustomStringConvertible in Swift
+Added: _$ss8FilePathV6AnchorVs23CustomStringConvertiblesWP
+// protocol conformance descriptor for Swift.FilePath.Anchor : Swift.ExpressibleByStringLiteral in Swift
+Added: _$ss8FilePathV6AnchorVs26ExpressibleByStringLiteralsMc
+// protocol witness table for Swift.FilePath.Anchor : Swift.ExpressibleByStringLiteral in Swift
+Added: _$ss8FilePathV6AnchorVs26ExpressibleByStringLiteralsWP
+// protocol conformance descriptor for Swift.FilePath.Anchor : Swift.CustomDebugStringConvertible in Swift
+Added: _$ss8FilePathV6AnchorVs28CustomDebugStringConvertiblesMc
+// protocol witness table for Swift.FilePath.Anchor : Swift.CustomDebugStringConvertible in Swift
+Added: _$ss8FilePathV6AnchorVs28CustomDebugStringConvertiblesWP
+// protocol conformance descriptor for Swift.FilePath.Anchor : Swift.ExpressibleByUnicodeScalarLiteral in Swift
+Added: _$ss8FilePathV6AnchorVs33ExpressibleByUnicodeScalarLiteralsMc
+// protocol witness table for Swift.FilePath.Anchor : Swift.ExpressibleByUnicodeScalarLiteral in Swift
+Added: _$ss8FilePathV6AnchorVs33ExpressibleByUnicodeScalarLiteralsWP
+// protocol conformance descriptor for Swift.FilePath.Anchor : Swift.ExpressibleByExtendedGraphemeClusterLiteral in Swift
+Added: _$ss8FilePathV6AnchorVs43ExpressibleByExtendedGraphemeClusterLiteralsMc
+// protocol witness table for Swift.FilePath.Anchor : Swift.ExpressibleByExtendedGraphemeClusterLiteral in Swift
+Added: _$ss8FilePathV6AnchorVs43ExpressibleByExtendedGraphemeClusterLiteralsWP
+// protocol conformance descriptor for Swift.FilePath.Anchor : Swift.Hashable in Swift
+Added: _$ss8FilePathV6AnchorVSHsMc
+// protocol witness table for Swift.FilePath.Anchor : Swift.Hashable in Swift
+Added: _$ss8FilePathV6AnchorVSHsWP
+// protocol conformance descriptor for Swift.FilePath.Anchor : Swift.Comparable in Swift
+Added: _$ss8FilePathV6AnchorVSLsMc
+// protocol witness table for Swift.FilePath.Anchor : Swift.Comparable in Swift
+Added: _$ss8FilePathV6AnchorVSLsWP
+// protocol conformance descriptor for Swift.FilePath.Anchor : Swift.Equatable in Swift
+Added: _$ss8FilePathV6AnchorVSQsMc
+// protocol witness table for Swift.FilePath.Anchor : Swift.Equatable in Swift
+Added: _$ss8FilePathV6AnchorVSQsWP
+// Swift.FilePath.Anchor.init(Swift.String) -> Swift.FilePath.Anchor?
+Added: _$ss8FilePathV6AnchorVyADSgSScfC
+// Swift.FilePath.isEmpty.getter : Swift.Bool
+Added: _$ss8FilePathV7isEmptySbvg
+// property descriptor for Swift.FilePath.isEmpty : Swift.Bool
+Added: _$ss8FilePathV7isEmptySbvpMV
+// Swift.FilePath.resolve() throws -> Swift.FilePath
+Added: _$ss8FilePathV7resolveAByKF
+// Swift.FilePath.init(codeUnits: Swift.Span<Swift.Int8>) -> Swift.FilePath?
+Added: _$ss8FilePathV9codeUnitsABSgs4SpanVys4Int8VG_tcfC
+// Swift.FilePath.codeUnits.getter : Swift.Span<Swift.Int8>
+Added: _$ss8FilePathV9codeUnitss4SpanVys4Int8VGvg
+// Swift.FilePath.Component.description.getter : Swift.String
+Added: _$ss8FilePathV9ComponentV11descriptionSSvg
+// property descriptor for Swift.FilePath.Component.description : Swift.String
+Added: _$ss8FilePathV9ComponentV11descriptionSSvpMV
+// Swift.FilePath.Component.init(stringLiteral: Swift.String) -> Swift.FilePath.Component
+Added: _$ss8FilePathV9ComponentV13stringLiteralADSS_tcfC
+// Swift.FilePath.Component.debugDescription.getter : Swift.String
+Added: _$ss8FilePathV9ComponentV16debugDescriptionSSvg
+// property descriptor for Swift.FilePath.Component.debugDescription : Swift.String
+Added: _$ss8FilePathV9ComponentV16debugDescriptionSSvpMV
+// static Swift.FilePath.Component.< infix(Swift.FilePath.Component, Swift.FilePath.Component) -> Swift.Bool
+Added: _$ss8FilePathV9ComponentV1loiySbAD_ADtFZ
+// static Swift.FilePath.Component.== infix(Swift.FilePath.Component, Swift.FilePath.Component) -> Swift.Bool
+Added: _$ss8FilePathV9ComponentV2eeoiySbAD_ADtFZ
+// Swift.FilePath.Component.hash(into: inout Swift.Hasher) -> ()
+Added: _$ss8FilePathV9ComponentV4hash4intoys6HasherVz_tF
+// Swift.FilePath.Component.kind.getter : Swift.FilePath.Component.Kind
+Added: _$ss8FilePathV9ComponentV4kindAD4KindOvg
+// property descriptor for Swift.FilePath.Component.kind : Swift.FilePath.Component.Kind
+Added: _$ss8FilePathV9ComponentV4kindAD4KindOvpMV
+// enum case for Swift.FilePath.Component.Kind.parentDirectory(Swift.FilePath.Component.Kind.Type) -> Swift.FilePath.Component.Kind
+Added: _$ss8FilePathV9ComponentV4KindO15parentDirectoryyA2FmFWC
+// enum case for Swift.FilePath.Component.Kind.currentDirectory(Swift.FilePath.Component.Kind.Type) -> Swift.FilePath.Component.Kind
+Added: _$ss8FilePathV9ComponentV4KindO16currentDirectoryyA2FmFWC
+// static Swift.FilePath.Component.Kind.== infix(Swift.FilePath.Component.Kind, Swift.FilePath.Component.Kind) -> Swift.Bool
+Added: _$ss8FilePathV9ComponentV4KindO2eeoiySbAF_AFtFZ
+// Swift.FilePath.Component.Kind.hash(into: inout Swift.Hasher) -> ()
+Added: _$ss8FilePathV9ComponentV4KindO4hash4intoys6HasherVz_tF
+// enum case for Swift.FilePath.Component.Kind.regular(Swift.FilePath.Component.Kind.Type) -> Swift.FilePath.Component.Kind
+Added: _$ss8FilePathV9ComponentV4KindO7regularyA2FmFWC
+// Swift.FilePath.Component.Kind.hashValue.getter : Swift.Int
+Added: _$ss8FilePathV9ComponentV4KindO9hashValueSivg
+// property descriptor for Swift.FilePath.Component.Kind.hashValue : Swift.Int
+Added: _$ss8FilePathV9ComponentV4KindO9hashValueSivpMV
+// type metadata accessor for Swift.FilePath.Component.Kind
+Added: _$ss8FilePathV9ComponentV4KindOMa
+// nominal type descriptor for Swift.FilePath.Component.Kind
+Added: _$ss8FilePathV9ComponentV4KindOMn
+// type metadata for Swift.FilePath.Component.Kind
+Added: _$ss8FilePathV9ComponentV4KindON
+// protocol conformance descriptor for Swift.FilePath.Component.Kind : Swift.Hashable in Swift
+Added: _$ss8FilePathV9ComponentV4KindOSHsMc
+// protocol witness table for Swift.FilePath.Component.Kind : Swift.Hashable in Swift
+Added: _$ss8FilePathV9ComponentV4KindOSHsWP
+// protocol conformance descriptor for Swift.FilePath.Component.Kind : Swift.Equatable in Swift
+Added: _$ss8FilePathV9ComponentV4KindOSQsMc
+// protocol witness table for Swift.FilePath.Component.Kind : Swift.Equatable in Swift
+Added: _$ss8FilePathV9ComponentV4KindOSQsWP
+// Swift.FilePath.Component.init(codeUnits: Swift.Span<Swift.Int8>) -> Swift.FilePath.Component?
+Added: _$ss8FilePathV9ComponentV9codeUnitsADSgs4SpanVys4Int8VG_tcfC
+// Swift.FilePath.Component.codeUnits.getter : Swift.Span<Swift.Int8>
+Added: _$ss8FilePathV9ComponentV9codeUnitss4SpanVys4Int8VGvg
+// Swift.FilePath.Component.hashValue.getter : Swift.Int
+Added: _$ss8FilePathV9ComponentV9hashValueSivg
+// property descriptor for Swift.FilePath.Component.hashValue : Swift.Int
+Added: _$ss8FilePathV9ComponentV9hashValueSivpMV
+// type metadata accessor for Swift.FilePath.Component
+Added: _$ss8FilePathV9ComponentVMa
+// nominal type descriptor for Swift.FilePath.Component
+Added: _$ss8FilePathV9ComponentVMn
+// type metadata for Swift.FilePath.Component
+Added: _$ss8FilePathV9ComponentVN
+// protocol conformance descriptor for Swift.FilePath.Component : Swift.CustomStringConvertible in Swift
+Added: _$ss8FilePathV9ComponentVs23CustomStringConvertiblesMc
+// protocol witness table for Swift.FilePath.Component : Swift.CustomStringConvertible in Swift
+Added: _$ss8FilePathV9ComponentVs23CustomStringConvertiblesWP
+// protocol conformance descriptor for Swift.FilePath.Component : Swift.ExpressibleByStringLiteral in Swift
+Added: _$ss8FilePathV9ComponentVs26ExpressibleByStringLiteralsMc
+// protocol witness table for Swift.FilePath.Component : Swift.ExpressibleByStringLiteral in Swift
+Added: _$ss8FilePathV9ComponentVs26ExpressibleByStringLiteralsWP
+// protocol conformance descriptor for Swift.FilePath.Component : Swift.CustomDebugStringConvertible in Swift
+Added: _$ss8FilePathV9ComponentVs28CustomDebugStringConvertiblesMc
+// protocol witness table for Swift.FilePath.Component : Swift.CustomDebugStringConvertible in Swift
+Added: _$ss8FilePathV9ComponentVs28CustomDebugStringConvertiblesWP
+// protocol conformance descriptor for Swift.FilePath.Component : Swift.ExpressibleByUnicodeScalarLiteral in Swift
+Added: _$ss8FilePathV9ComponentVs33ExpressibleByUnicodeScalarLiteralsMc
+// protocol witness table for Swift.FilePath.Component : Swift.ExpressibleByUnicodeScalarLiteral in Swift
+Added: _$ss8FilePathV9ComponentVs33ExpressibleByUnicodeScalarLiteralsWP
+// protocol conformance descriptor for Swift.FilePath.Component : Swift.ExpressibleByExtendedGraphemeClusterLiteral in Swift
+Added: _$ss8FilePathV9ComponentVs43ExpressibleByExtendedGraphemeClusterLiteralsMc
+// protocol witness table for Swift.FilePath.Component : Swift.ExpressibleByExtendedGraphemeClusterLiteral in Swift
+Added: _$ss8FilePathV9ComponentVs43ExpressibleByExtendedGraphemeClusterLiteralsWP
+// protocol conformance descriptor for Swift.FilePath.Component : Swift.Hashable in Swift
+Added: _$ss8FilePathV9ComponentVSHsMc
+// protocol witness table for Swift.FilePath.Component : Swift.Hashable in Swift
+Added: _$ss8FilePathV9ComponentVSHsWP
+// protocol conformance descriptor for Swift.FilePath.Component : Swift.Comparable in Swift
+Added: _$ss8FilePathV9ComponentVSLsMc
+// protocol witness table for Swift.FilePath.Component : Swift.Comparable in Swift
+Added: _$ss8FilePathV9ComponentVSLsWP
+// protocol conformance descriptor for Swift.FilePath.Component : Swift.Equatable in Swift
+Added: _$ss8FilePathV9ComponentVSQsMc
+// protocol witness table for Swift.FilePath.Component : Swift.Equatable in Swift
+Added: _$ss8FilePathV9ComponentVSQsWP
+// Swift.FilePath.Component.init(Swift.String) -> Swift.FilePath.Component?
+Added: _$ss8FilePathV9ComponentVyADSgSScfC
+// Swift.FilePath.hashValue.getter : Swift.Int
+Added: _$ss8FilePathV9hashValueSivg
+// property descriptor for Swift.FilePath.hashValue : Swift.Int
+Added: _$ss8FilePathV9hashValueSivpMV
+// static Swift.FilePath.separator.getter : Swift.Int8
+Added: _$ss8FilePathV9separators4Int8VvgZ
+// property descriptor for static Swift.FilePath.separator : Swift.Int8
+Added: _$ss8FilePathV9separators4Int8VvpZMV
+// Swift.FilePath.init() -> Swift.FilePath
+Added: _$ss8FilePathVABycfC
+// type metadata accessor for Swift.FilePath
+Added: _$ss8FilePathVMa
+// nominal type descriptor for Swift.FilePath
+Added: _$ss8FilePathVMn
+// type metadata for Swift.FilePath
+Added: _$ss8FilePathVN
+// protocol conformance descriptor for Swift.FilePath : Swift.CustomStringConvertible in Swift
+Added: _$ss8FilePathVs23CustomStringConvertiblesMc
+// protocol witness table for Swift.FilePath : Swift.CustomStringConvertible in Swift
+Added: _$ss8FilePathVs23CustomStringConvertiblesWP
+// protocol conformance descriptor for Swift.FilePath : Swift.ExpressibleByStringLiteral in Swift
+Added: _$ss8FilePathVs26ExpressibleByStringLiteralsMc
+// protocol witness table for Swift.FilePath : Swift.ExpressibleByStringLiteral in Swift
+Added: _$ss8FilePathVs26ExpressibleByStringLiteralsWP
+// protocol conformance descriptor for Swift.FilePath : Swift.CustomDebugStringConvertible in Swift
+Added: _$ss8FilePathVs28CustomDebugStringConvertiblesMc
+// protocol witness table for Swift.FilePath : Swift.CustomDebugStringConvertible in Swift
+Added: _$ss8FilePathVs28CustomDebugStringConvertiblesWP
+// protocol conformance descriptor for Swift.FilePath : Swift.ExpressibleByUnicodeScalarLiteral in Swift
+Added: _$ss8FilePathVs33ExpressibleByUnicodeScalarLiteralsMc
+// protocol witness table for Swift.FilePath : Swift.ExpressibleByUnicodeScalarLiteral in Swift
+Added: _$ss8FilePathVs33ExpressibleByUnicodeScalarLiteralsWP
+// protocol conformance descriptor for Swift.FilePath : Swift.ExpressibleByExtendedGraphemeClusterLiteral in Swift
+Added: _$ss8FilePathVs43ExpressibleByExtendedGraphemeClusterLiteralsMc
+// protocol witness table for Swift.FilePath : Swift.ExpressibleByExtendedGraphemeClusterLiteral in Swift
+Added: _$ss8FilePathVs43ExpressibleByExtendedGraphemeClusterLiteralsWP
+// protocol conformance descriptor for Swift.FilePath : Swift.Hashable in Swift
+Added: _$ss8FilePathVSHsMc
+// protocol witness table for Swift.FilePath : Swift.Hashable in Swift
+Added: _$ss8FilePathVSHsWP
+// protocol conformance descriptor for Swift.FilePath : Swift.Comparable in Swift
+Added: _$ss8FilePathVSLsMc
+// protocol witness table for Swift.FilePath : Swift.Comparable in Swift
+Added: _$ss8FilePathVSLsWP
+// protocol conformance descriptor for Swift.FilePath : Swift.Equatable in Swift
+Added: _$ss8FilePathVSQsMc
+// protocol witness table for Swift.FilePath : Swift.Equatable in Swift
+Added: _$ss8FilePathVSQsWP
+// Swift.FilePath.init(Swift.String) -> Swift.FilePath?
+Added: _$ss8FilePathVyABSgSScfC
+// Swift.String.init(validating: Swift.FilePath) -> Swift.String?
+Added: _$sSS10validatingSSSgs8FilePathV_tcfC
+// Swift.String.init(validating: Swift.FilePath.Anchor) -> Swift.String?
+Added: _$sSS10validatingSSSgs8FilePathV6AnchorV_tcfC
+// Swift.String.init(validating: Swift.FilePath.Component) -> Swift.String?
+Added: _$sSS10validatingSSSgs8FilePathV9ComponentV_tcfC
+// Swift.String.init(decoding: Swift.FilePath) -> Swift.String
+Added: _$sSS8decodingSSs8FilePathV_tcfC
+// Swift.String.init(decoding: Swift.FilePath.Anchor) -> Swift.String
+Added: _$sSS8decodingSSs8FilePathV6AnchorV_tcfC
+// Swift.String.init(decoding: Swift.FilePath.Component) -> Swift.String
+Added: _$sSS8decodingSSs8FilePathV9ComponentV_tcfC
+
+
 // Debug variable for metadata allocator back pointer
 Added: __swift_debug_allocationPoolBackPointerOffset
 
