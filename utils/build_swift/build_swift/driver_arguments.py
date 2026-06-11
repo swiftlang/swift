@@ -1512,6 +1512,12 @@ def create_argument_parser():
     option('--llvm-enable-modules', toggle_true('llvm_enable_modules'),
            help='enable building llvm using modules')
 
+    option('--llvm-enable-index-store', toggle_true('llvm_enable_index_store'),
+           default=True,
+           help='emit -index-store-path while building LLVM/Clang and Swift '
+                'host tools (gated on the host compiler accepting the flag, '
+                'so it is a no-op for older compilers). Defaults to ON.')
+
     option('--llvm-targets-to-build', store,
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',
            help='LLVM target generators to build')
