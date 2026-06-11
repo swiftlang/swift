@@ -534,7 +534,7 @@ extension OutputSpan where Element: ~Copyable {
       let dstEnd = dstCount + source.count
       precondition(dstEnd <= dst.count, "OutputSpan capacity overflow")
       unsafe dst
-        ._extracting(uncheckedFrom: dstCount, to: dstEnd)
+        .extracting(unchecked: Range(uncheckedBounds: (dstCount, dstEnd)))
         ._moveInitializeAll(fromContentsOf: source)
       dstCount &+= source.count
     }
@@ -545,7 +545,8 @@ extension OutputSpan where Element: ~Copyable {
   @_lifetime(source: copy source)
   internal mutating func _append(moving source: inout OutputSpan<Element>) {
     unsafe source.withUnsafeMutableBufferPointer { src, srcCount in
-      let items = unsafe src._extracting(uncheckedFrom: 0, to: srcCount)
+      let range = unsafe Range(uncheckedBounds: (0, srcCount))
+      let items = unsafe src.extracting(unchecked: range)
       unsafe self._append(moving: items)
       srcCount = 0
     }
@@ -562,7 +563,7 @@ extension OutputSpan where Element: Copyable {
       let dstEnd = dstCount + source.count
       precondition(dstEnd <= dst.count, "OutputSpan capacity overflow")
       unsafe dst
-        ._extracting(uncheckedFrom: dstCount, to: dstEnd)
+        .extracting(unchecked: Range(uncheckedBounds: (dstCount, dstEnd)))
         ._initializeAll(fromContentsOf: source)
       dstCount &+= source.count
     }

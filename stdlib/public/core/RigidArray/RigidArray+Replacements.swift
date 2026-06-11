@@ -170,7 +170,7 @@ extension _RigidArray where Element: ~Copyable {
     moving items: inout OutputSpan<Element>
   ) {
     unsafe items.withUnsafeMutableBufferPointer { buffer, count in
-      let source = unsafe buffer._extracting(first: count)
+      let source = unsafe buffer.extracting(first: count)
       unsafe replaceSubrange(subrange, moving: source)
       count = 0
     }
