@@ -822,7 +822,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   using namespace options;
   Opts.EnableCaching |= Args.hasFlag(
       OPT_cache_compile_job, OPT_no_cache_compile_job, /*Default=*/false);
-  Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks);
+  Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks) ||
+                               ::getenv("SWIFT_ENABLE_COMPILE_CACHE_REMARK");
   Opts.CacheSkipReplay |= Args.hasArg(OPT_cache_disable_replay);
   Opts.WriteOutputHashXAttr |= Args.hasArg(OPT_write_output_hash_xattr);
   if (const Arg *A = Args.getLastArg(OPT_cas_path))

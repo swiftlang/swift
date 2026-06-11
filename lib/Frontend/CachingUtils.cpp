@@ -299,11 +299,11 @@ static bool replayCachedCompilerOutputsImpl(
                     toString(std::move(E)));
       return failedReplay();
     }
-  }
 
-  if (CacheRemarks)
-    Diag.diagnose(SourceLoc(), diag::replay_output, "<cached-diagnostics>",
-                  DiagnosticsOutput->Key.toString());
+    if (CacheRemarks)
+      Diag.diagnose(SourceLoc(), diag::replay_output, "<cached-diagnostics>",
+                    DiagnosticsOutput->Proxy.getID().toString());
+  }
 
   // Replay the result only when everything is resolved.
   for (auto &Output : OutputProxies) {
@@ -350,7 +350,7 @@ static bool replayCachedCompilerOutputsImpl(
     }
     if (CacheRemarks)
       Diag.diagnose(SourceLoc(), diag::replay_output, Output.Path,
-                    Output.Key.toString());
+                    Output.Proxy.getID().toString());
   }
 
   if (DiagHelper)
@@ -392,6 +392,10 @@ bool replayCachedCompilerOutputs(
                       OutID.toString());
       return std::nullopt;
     }
+
+    if (CacheRemarks)
+      Diag.diagnose(SourceLoc(), diag::output_cache_hit, InputPath,
+                    OutID.toString());
 
     return *OutputRef;
   };
