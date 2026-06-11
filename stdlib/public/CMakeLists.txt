@@ -146,6 +146,18 @@ option(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM
        "Whether to build the Embedded Swift standard library using the hooks in swift/EmbeddedPlatform.h"
        FALSE)
 
+set(SWIFT_EMBEDDED_INTERFACE_LTO_TRIPLE_REGEX "" CACHE STRING
+    "If non-empty, embedded Swift target triples matching this regex are
+built using the Interface code-generation model with LLVM LTO. The
+resulting libraries' object files contain real code (rather than the
+empty/stub objects produced for the default Inlinable model). All other
+embedded triples build as before.")
+
+set(SWIFT_EMBEDDED_LTO_TYPE "llvm-full" CACHE STRING
+    "LTO type for embedded Swift libraries selected by
+SWIFT_EMBEDDED_INTERFACE_LTO_TRIPLE_REGEX. Either 'llvm-thin' or
+'llvm-full'.")
+
 set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
     "List of extra target triples to build the embedded Swift standard library for")
 
