@@ -3353,10 +3353,12 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       $CompilerCache = Get-ProjectBinaryCache $Platform Stage2Compilers
       $SwiftRTSubdir = "lib\swift\windows"
 
-      # Transitive dependency of _lldb.pyd
-      Copy-Item `
-        -Path (Join-Path $SwiftRuntime "swiftCore.dll") `
-        -Destination "$CompilerCache\lib\site-packages\lldb"
+      # Transitive dependency closure of _lldb.pyd.
+      $LLDBSitePackages = "$CompilerCache\lib\site-packages\lldb"
+      New-Item -ItemType Directory -Force $LLDBSitePackages | Out-Null
+      foreach ($RuntimeDLL in @(Get-WindowsSxSRuntimeDLLs $SwiftRuntime)) {
+        Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
+      }
 
       # Runtime dependencies of repl_swift.exe.  The Stage2-compiled swiftCore.dll
       # already lives in $CompilerCache\bin and is what repl_swift.exe is linked
@@ -3426,7 +3428,9 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       Write-Host ("  [{0,-4}] {1} ({2} dlls)" -f $Marker, $Candidate, $DllCount)
       if (-not $RuntimeSource -and $Exists -and $DllCount -gt 0) { $RuntimeSource = $Candidate }
     }
-    if (-not $RuntimeSource) { $RuntimeSource = $RuntimeSourceCandidates[0] }
+    if (-not $RuntimeSource) {
+      throw "Test-Compilers: no Swift runtime DLLs found in any candidate ($($RuntimeSourceCandidates -join ', ')). The platform SDK runtime was not staged; build the toolchain/SDK (e.g. with -Toolchain) before running the test phase."
+    }
 
     Invoke-IsolatingEnvVars {
       # Test-time tools execute on the build host.
