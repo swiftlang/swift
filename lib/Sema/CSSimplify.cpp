@@ -15087,14 +15087,19 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto impact =
         restriction == ConversionRestrictionKind::CGFloatToDouble ? 2 : 10;
 
+    // Slightly disfavor such conversions inside optionals and collections.
+    SmallVector<LocatorPathElt> originalPath;
+    auto anchor = locator.getLocatorParts(originalPath);
+
+    SourceRange range;
+    ArrayRef<LocatorPathElt> path(originalPath);
+    simplifyLocator(anchor, path, range);
+
+    if (!path.empty() && path.back().is<LocatorPathElt::GenericArgument>()) {
+      impact += 10;
+    }
+
     if (restriction == ConversionRestrictionKind::DoubleToCGFloat) {
-      SmallVector<LocatorPathElt> originalPath;
-      auto anchor = locator.getLocatorParts(originalPath);
-
-      SourceRange range;
-      ArrayRef<LocatorPathElt> path(originalPath);
-      simplifyLocator(anchor, path, range);
-
       if (path.empty() || llvm::all_of(path, [](const LocatorPathElt &elt) {
             return elt.is<LocatorPathElt::OptionalInjection>();
           })) {
