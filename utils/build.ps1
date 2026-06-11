@@ -1295,7 +1295,7 @@ function Export-WindowsManifestResource([string] $ImagePath,
 function Test-WindowsManifestHasExecutionLevel([string] $ManifestPath) {
   $Doc = New-Object System.Xml.XmlDocument
   $Doc.Load($ManifestPath)
-  return ($Doc.SelectSingleNode("//*[local-name()='trustInfo' or local-name()='requestedPrivileges' or local-name()='requestedExecutionLevel']") -ne $null)
+  return ([bool]$Doc.SelectSingleNode("//*[local-name()='trustInfo' or local-name()='requestedPrivileges' or local-name()='requestedExecutionLevel']"))
 }
 
 function Assert-WindowsManifestResourcesAreSxSSafe([string] $ImagePath,
@@ -2801,7 +2801,7 @@ function Build-EarlySwiftDriver([Hashtable] $Platform) {
         SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
         SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform EarlySwiftDriverSQLite)\SQLite3.lib";
 
-        # Prevent re-cloning the soruces
+        # Prevent re-cloning the sources
         FETCHCONTENT_SOURCE_DIR_ARGUMENTPARSER = "$SourceCache\swift-argument-parser";
         FETCHCONTENT_SOURCE_DIR_LLBUILD = "$SourceCache\llbuild";
         FETCHCONTENT_SOURCE_DIR_TOOLSSUPPORTCORE = "$SourceCache\swift-tools-support-core";
@@ -4644,7 +4644,7 @@ function Build-Subprocess([Hashtable] $Platform,
                           [Hashtable] $Compilers,
                           [string]    $SwiftSDK) {
   Build-CMakeProject `
-    -Src $sourceCache\swift-subprocess `
+    -Src $SourceCache\swift-subprocess `
     -Bin (Get-ProjectBinaryCache $Platform Subprocess) `
     -Platform $Platform `
     -CCompiler $Compilers.C `
@@ -5296,16 +5296,16 @@ function Repair-Toolchain([string] $ToolchainInstallRoot) {
     -Path $SwiftDriver `
     -Destination "$ToolchainInstallRoot\usr\bin\swiftc.exe"
 
-  # Merge swift swift-inspect.
-  copy-Item -Force `
+  # Copy swift-inspect tools.
+  Copy-Item -Force `
     -Path "$(Get-PlatformRoot $HostPlatform.OS)\Developer\Library\$(Get-ModuleTriple $HostPlatform)\bin\swift-inspect.exe" `
     -Destination "$ToolchainInstallRoot\usr\bin\swift-inspect.exe"
-  copy-Item -Force `
+  Copy-Item -Force `
     -Path "$(Get-PlatformRoot $HostPlatform.OS)\Developer\Library\$(Get-ModuleTriple $HostPlatform)\bin\SwiftInspectClient.dll" `
     -Destination "$ToolchainInstallRoot\usr\bin\SwiftInspectClient.dll"
 
   # Copy embeddable Python
-  New-Item -Type Directory -Path "$(Get-EmbeddedPythonInstallDir)" -ErrorAction Ignore | Out-Null
+  New-Item -ItemType Directory -Path "$(Get-EmbeddedPythonInstallDir)" -ErrorAction Ignore | Out-Null
   Copy-Item -Force -Recurse `
     -Path "$(Get-EmbeddedPythonPath $HostPlatform)\*" `
     -Destination "$(Get-EmbeddedPythonInstallDir)"
@@ -5628,7 +5628,7 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   }
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" $Stage
   # Extract installer engine to ease code-signing on swift.org CI
-  New-Item -Type Directory -Path "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)" -ErrorAction Ignore | Out-Null
+  New-Item -ItemType Directory -Path "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)" -ErrorAction Ignore | Out-Null
   Invoke-WithDotNetRuntime {
     Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn detach -acceptEula $WiX.EulaIdentifier "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)\"
   }
@@ -5873,13 +5873,13 @@ if ($Toolchain) {
 
     Repair-Toolchain $HostPlatform.NoAssertsToolchainInstallRoot
 
-    # Only compilers have NoAsserts enabled. Copy the rest of the Toolcahin binaries from the Asserts output
+    # Only compilers have NoAsserts enabled. Copy the rest of the Toolchain binaries from the Asserts output
     # Use robocopy for efficient copying
     #   /E : Copies subdirectories, including empty ones.
     #   /XC: Excludes existing files with the same timestamp but different file sizes.
     #   /XN: Excludes existing files that are newer than the copy in the source directory.
     #   /XO: Excludes existing files that are older than the copy in the source directory.
-    #   /NFL: Do not list coppied files in output
+    #   /NFL: Do not list copied files in output
     #   /NDL: Do not list directories in output
     #   /NJH: Do not write a job header
     #   /NC: Do not write file classes
