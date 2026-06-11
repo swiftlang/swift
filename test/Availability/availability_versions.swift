@@ -709,6 +709,9 @@ func switchStatements(point: CompassPoint) {
   switch point {
   case .West where true:
     _ = globalFuncAvailableOn52()
+    if #available(OSX 52, *) { // no warning
+      _ = globalFuncAvailableOn52()
+    }
   default:
     break
   }
