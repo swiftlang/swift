@@ -11959,7 +11959,8 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
     if (shouldAttemptFixes()) {
       auto *fix = AllowInvalidPropertyWrapperType::create(
           *this, wrapperType, getConstraintLocator(locator));
-      if (!recordFix(fix))
+      // The impact here matches that of a missing member, because it's the same problem.
+      if (!recordFix(fix, /*impact=*/5))
         return SolutionKind::Solved;
     }
 
@@ -11973,8 +11974,10 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
       !(typeInfo.projectedValueVar && typeInfo.hasProjectedValueInit)) {
     if (shouldAttemptFixes()) {
       auto *fix = RemoveProjectedValueArgument::create(
-          *this, wrapperType, cast<ParamDecl>(wrappedVar), getConstraintLocator(locator));
-      if (!recordFix(fix))
+          *this, wrapperType, cast<ParamDecl>(wrappedVar),
+          getConstraintLocator(locator));
+      // The impact here matches that of a missing member, because it's the same problem.
+      if (!recordFix(fix, /*impact=*/5))
         return SolutionKind::Solved;
     }
 
