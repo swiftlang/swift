@@ -38,6 +38,8 @@ class ClangInheritanceInfo;
 class ClangNode;
 class ConcreteDeclRef;
 class Decl;
+class AbstractFunctionDecl;
+class DeclName;
 class FuncDecl;
 class VarDecl;
 class DeclContext;
@@ -383,6 +385,18 @@ public:
   /// type, which wraps around a Swift closure along with its context.
   virtual bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const = 0;
   virtual bool isDeconstructedSwiftClosure(const clang::Type* type) const = 0;
+
+  /// For a safe-interop `@c @implementation` Swift function \p safeSwiftDecl
+  /// (whose matched imported C declaration carries bounds/lifetime info to
+  /// invert), synthesize and attach an implicit `@_Unswiftify` peer macro that
+  /// expands to the C-callable bridge. \p introducedPeerName is the compound
+  /// name of the C interface the generated peer exposes.
+  ///
+  /// The caller must have already established that a corresponding
+  /// `_SwiftifyImport` peer exists on the imported decl.
+  virtual void
+  attachUnswiftifyForSafeImplementation(AbstractFunctionDecl *safeSwiftDecl,
+                                        DeclName introducedPeerName) = 0;
 
   /// Given a functional C++ type, e.g. std::function, determine the
   /// corresponding C++ closure type.

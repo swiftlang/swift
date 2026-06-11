@@ -4492,6 +4492,28 @@ private:
       return;
     }
 
+    // `@c @implementation` originals intentionally have a different
+    // signature from the C header declaration (safe Swift types vs. unsafe C
+    // ones). The macro-expanded peer is what actually satisfies the header.
+    // Suppress mismatch diagnostics on the safe original so the user only
+    // sees real problems.
+    if (cand->hasSyntheticCEntryPointPeer()) {
+      switch (outcome) {
+      case MatchOutcome::WrongType:
+      case MatchOutcome::WrongSendability:
+      case MatchOutcome::WrongParameterOwnership:
+      case MatchOutcome::WrongWritability:
+      case MatchOutcome::WrongForeignErrorConvention:
+      case MatchOutcome::WrongSwiftName:
+      case MatchOutcome::WrongImplicitObjCName:
+      case MatchOutcome::WrongExplicitObjCName:
+        hasDiagnosed = true;
+        return;
+      default:
+        break;
+      }
+    }
+
     auto reqObjCName = getObjCName(req);
 
     switch (outcome) {
@@ -4952,6 +4974,25 @@ TypeCheckForeignFunctionRequest::evaluate(Evaluator &evaluator,
                                         FuncDecl *FD,
                                         DeclAttribute *attr) const {
   auto &ctx = FD->getASTContext();
+
+  // `@c @implementation` keeps the Swift function as a Swift symbol
+  // and produces the C entry point through an `@_Unswiftify` peer macro
+  // expansion. The peer (not this decl) is the one that must satisfy C
+  // representability, so skip the full representability check on the safe
+  // original to avoid spurious "cannot be marked '@c'" errors on intentionally
+  // safe types like `Span`.
+  //
+  // The generated peer is nonetheless a plain `@c` function and cannot be
+  // `async` or `throws`, so diagnose those here at the safe original's source
+  // location -- otherwise the only error would surface inside the synthesized
+  // peer buffer with no pointer back to the user's code.
+  if (FD->hasSyntheticCEntryPointPeer()) {
+    if (FD->hasAsync())
+      ctx.Diags.diagnose(attr->getLocation(), diag::attr_decl_async, attr, FD);
+    else if (FD->hasThrows())
+      ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_throws, attr);
+    return {};
+  }
 
   auto lang = FD->getCDeclKind();
   assert(lang && "missing @c/@cxx?");

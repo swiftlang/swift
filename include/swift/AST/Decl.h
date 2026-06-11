@@ -1109,6 +1109,17 @@ public:
   /// counterpart.
   bool hasOnlyCEntryPoint() const;
 
+  /// Whether this is an `@c @implementation` declaration whose C entry
+  /// point is provided by a synthesized `@_Unswiftify` peer rather than by this
+  /// declaration directly.
+  ///
+  /// Such a declaration keeps its Swift entry point (with safe-typed
+  /// parameters like `Span`), so C-representability checks, direct-access
+  /// restrictions, and header-signature-mismatch diagnostics that normally
+  /// apply to `@implementation` decls must be routed to the peer instead of
+  /// this one.
+  bool hasSyntheticCEntryPointPeer() const;
+
   /// True if this declaration provides an implementation for an imported
   /// Objective-C declaration. This implies various restrictions and special
   /// behaviors for it and, if it's an extension, its members.
@@ -1190,6 +1201,15 @@ public:
   /// given callback with each macro custom attribute and corresponding macro
   /// declaration.
   void forEachAttachedMacro(MacroRole role, MacroCallback) const;
+
+  /// Attach a compiler-synthesized \p macro to this declaration via an implicit
+  /// custom attribute.
+  ///
+  /// Unlike a source-written macro attribute, the attribute is bound directly
+  /// to \p macro (which is typically not discoverable by name lookup), and the
+  /// names \p macro introduces for the given \p role are registered so that
+  /// unqualified lookup finds its expansion.
+  void attachInternalMacro(MacroDecl *macro, MacroRole role);
 
   /// Retrieve the discriminator for the given custom attribute that names
   /// an attached macro.
@@ -8739,6 +8759,21 @@ public:
   const YieldList *getYields() const { return Yields; }
 
   void setYields(YieldList *Yields);
+
+  /// Whether any of this function's parameter types is a standard-library type
+  /// that `@_SwiftifyImport` generates for a safe wrapper: a `*Span` or a
+  /// `Unsafe*BufferPointer`. Such a signature marks an `@c @implementation`
+  /// function as a safe implementation of an imported C function whose unsafe
+  /// C entry point is provided by a synthesized `@_Unswiftify` peer.
+  ///
+  /// Only parameter types participate; a safe-interop result type is not yet
+  /// supported and is diagnosed separately (see `hasSafeInteropResultType`).
+  bool hasSafeInteropSignature() const;
+
+  /// Whether this function's result type is a "safe interop" standard-library
+  /// type. The inverse transform emits no result conversion, so such a result
+  /// is currently unsupported for a safe `@c @implementation`.
+  bool hasSafeInteropResultType() const;
 
   bool hasImplicitSelfDecl() const {
     return Bits.AbstractFunctionDecl.HasImplicitSelfDecl;

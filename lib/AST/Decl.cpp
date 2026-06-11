@@ -563,6 +563,36 @@ void Decl::forEachAttachedMacro(MacroRole role,
   }
 }
 
+void Decl::attachInternalMacro(MacroDecl *macro, MacroRole role) {
+  ASTContext &ctx = getASTContext();
+
+  // Build an implicit `@<macro>` custom attribute owned by this decl. A valid
+  // source location is required for the attribute to be expanded, so anchor it
+  // at this decl's location.
+  SourceLoc attrLoc = getLoc();
+  DeclNameRef macroName(macro->getBaseIdentifier());
+  auto *typeRepr =
+      UnqualifiedIdentTypeRepr::create(ctx, DeclNameLoc(attrLoc), macroName);
+  auto *typeExpr = new (ctx) TypeExpr(typeRepr);
+  auto *customAttr = CustomAttr::create(ctx, /*atLoc=*/attrLoc, typeExpr,
+                                        /*owner=*/this, /*implicit=*/true);
+  ASSERT(customAttr->AtLoc.isValid() &&
+         "macros with invalid source locations are not expanded");
+  addAttribute(customAttr);
+
+  // The macro is synthesized and never declared in source, so bind the
+  // attribute directly to it instead of relying on name lookup.
+  ctx.evaluator.cacheOutput(
+      ResolveMacroRequest{UnresolvedMacroReference(customAttr)},
+      ConcreteDeclRef(macro));
+
+  // Internal macros are attached during type checking, after the module's
+  // source lookup cache may already have been populated. The normal
+  // cache-population path won't find it; register the names it introduces
+  // explicitly so unqualified lookup of those names finds the expanded peer.
+  getModuleContext()->recordMacroIntroducedNames(this, customAttr, macro, role);
+}
+
 unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
                                              MacroRole role,
                                              const CustomAttr *attr) const {
@@ -2458,6 +2488,48 @@ bool ExtensionDecl::isForReparenting() const {
   return false;
 }
 
+/// Whether \p ty (looking through optional sugar) is one of the
+/// standard-library types that `@_SwiftifyImport` generates for a safe wrapper:
+/// a `*Span` or a `Unsafe*BufferPointer`.
+static bool isSafeInteropType(Type ty) {
+  if (!ty || ty->hasError())
+    return false;
+
+  auto *nominal = ty->lookThroughAllOptionalTypes()->getAnyNominal();
+  if (!nominal)
+    return false;
+
+  // Only types the forward transform actually produces belong here.
+  ASTContext &ctx = nominal->getASTContext();
+  const NominalTypeDecl *safeInteropTypes[] = {
+      ctx.getSpanDecl(),
+      ctx.getRawSpanDecl(),
+      ctx.getMutableSpanDecl(),
+      ctx.getMutableRawSpanDecl(),
+      ctx.getUnsafeBufferPointerDecl(),
+      ctx.getUnsafeMutableBufferPointerDecl(),
+      ctx.getUnsafeRawBufferPointerDecl(),
+      ctx.getUnsafeMutableRawBufferPointerDecl(),
+  };
+  return llvm::is_contained(safeInteropTypes, nominal);
+}
+
+bool AbstractFunctionDecl::hasSafeInteropSignature() const {
+  if (auto *params = getParameters()) {
+    for (auto *param : *params) {
+      if (isSafeInteropType(param->getInterfaceType()))
+        return true;
+    }
+  }
+  // FIXME: add support for safe return value
+  return false;
+}
+
+bool AbstractFunctionDecl::hasSafeInteropResultType() const {
+  auto *fd = dyn_cast<FuncDecl>(this);
+  return fd && isSafeInteropType(fd->getResultInterfaceType());
+}
+
 bool Decl::hasOnlyCEntryPoint() const {
   if (ExternAttr::find(getAttrs(), ExternKind::C))
     return true;
@@ -2466,13 +2538,26 @@ bool Decl::hasOnlyCEntryPoint() const {
     // The @c syntax only provides C entrypoints, not Swift ones. The historical
     // @_cdecl introduces both Swift and C entrypoints.
     if (!cdeclAttr->Underscored)
-      return true;
+      return !hasSyntheticCEntryPointPeer();
   }
 
   if (getAttrs().hasAttribute<CxxDeclAttr>())
     return true;
 
   return false;
+}
+
+bool Decl::hasSyntheticCEntryPointPeer() const {
+  auto *implAttr =
+      getAttrs().getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+  if (!implAttr)
+    return false;
+
+  // A `@c @implementation` is a safe implementation (whose C entry point is
+  // provided by a synthesized `@_Unswiftify` peer) when its signature uses
+  // safe-interop types.
+  auto *afd = dyn_cast<AbstractFunctionDecl>(this);
+  return afd && afd->hasSafeInteropSignature();
 }
 
 bool Decl::isObjCImplementation() const {
@@ -5991,11 +6076,22 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   // If this is an @_objcImplementation member implementation, and we aren't in
   // a context where we would access its storage directly, forbid access. Name
   // lookups will instead find and use the matching interface decl.
+  //
+  // Exception: the safe version of a safe interop @implementation function
+  // remains callable from Swift. It's C entry point lives in a separate,
+  // synthesized peer that calls into the Swift function.
+  //
   // FIXME: Passing `true` for `isAccessOnSelf` may cause false positives.
+  //
+  // `hasSyntheticCEntryPointPeer()` can only be true for an `@implementation`,
+  // so test it *after* the `@implementation` guards: in the common case it is
+  // never evaluated, avoiding a redundant walk of the attribute list on every
+  // lookup result.
   if ((VD->isObjCImplementation() ||
-         isObjCMemberImplementation(VD, getAccessLevel)) &&
-      VD->getAccessSemanticsFromContext(useDC, /*isAccessOnSelf=*/true)
-          != AccessSemantics::DirectToStorage)
+       isObjCMemberImplementation(VD, getAccessLevel)) &&
+      !VD->hasSyntheticCEntryPointPeer() &&
+      VD->getAccessSemanticsFromContext(useDC, /*isAccessOnSelf=*/true) !=
+          AccessSemantics::DirectToStorage)
     return false;
 
   if (VD->getASTContext().isAccessControlDisabled())

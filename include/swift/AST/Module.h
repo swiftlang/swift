@@ -55,6 +55,7 @@ namespace swift {
   class ASTContext;
   class ASTWalker;
   enum class CodeGenerationModel: uint8_t;
+  class CustomAttr;
   class CustomAvailabilityDomain;
   class Decl;
   class DeclAttribute;
@@ -67,6 +68,8 @@ namespace swift {
   enum class LibraryLevel : uint8_t;
   class LinkLibrary;
   class ModuleLoader;
+  class MacroDecl;
+  enum class MacroRole : uint32_t;
   class NominalTypeDecl;
   class EnumElementDecl;
   class OperatorDecl;
@@ -967,6 +970,14 @@ public:
   /// FIXME: Refactor main file parsing to not pump the parser incrementally.
   /// FIXME: Remove the integrated REPL.
   void clearLookupCache();
+
+  /// Register the auxiliary (macro-introduced) names of an attached \p macro
+  /// that was resolved and attached to \p anchor after this module's source
+  /// lookup cache was already populated. Needed for compiler-synthesized
+  /// attached macros (e.g. \c @_Unswiftify) that are not discoverable by name
+  /// lookup and therefore cannot be found by the normal cache-population path.
+  void recordMacroIntroducedNames(Decl *anchor, CustomAttr *attr,
+                                  MacroDecl *macro, MacroRole role);
 
   /// Finds all class members defined in this module.
   ///

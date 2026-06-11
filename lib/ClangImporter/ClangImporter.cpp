@@ -7093,6 +7093,14 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
   if (impls.size() > 1) {
     llvm::sort(impls, OrderDecls());
 
+    // Drop `@_Unswiftify` generated peers to prevent them showing up as
+    // duplicate implementations.
+    llvm::SmallPtrSet<Decl *, 4> implSet(impls.begin(), impls.end());
+    llvm::erase_if(impls, [&](Decl *impl) {
+      Decl *anchor = impl->getMacroExpansionOriginatingDecl();
+      return anchor && anchor != impl && implSet.contains(anchor);
+    });
+
     auto &diags = interfaces.front()->getASTContext().Diags;
     for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
       auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>(
@@ -7346,11 +7354,29 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
     return dyn_cast<AbstractFunctionDecl>(result);
   };
 
+  ASTContext &ctx = func->getASTContext();
+  bool safeImplEnabled =
+      ctx.LangOpts.hasFeature(Feature::SafeInteropImplementations);
+
   auto *clangLoader = func->getASTContext().getClangModuleLoader();
   for (ValueDecl *result : results) {
     AbstractFunctionDecl *resultFunc = asFunc(result);
     if (!resultFunc)
       continue;
+
+    // Remap _SwiftifyImport wrapper back to clang import
+    if (safeImplEnabled && resultFunc->isInMacroExpansionFromClangHeader() &&
+        resultFunc->getLoc().isValid()) {
+      const GeneratedSourceInfo *GSI = ctx.SourceMgr.getGeneratedSourceInfo(
+          ctx.SourceMgr.findBufferContainingLoc(resultFunc->getLoc()));
+      if (GSI && GSI->macroName == "_SwiftifyImport") {
+        if (auto headerFunc = dyn_cast_or_null<AbstractFunctionDecl>(
+                resultFunc->getMacroExpansionOriginatingDecl())) {
+          resultFunc = headerFunc;
+          result = resultFunc;
+        }
+      }
+    }
 
     // A virtual method of a foreign reference type is imported as a
     // synthesized `__synthesizedVirtualCall_` dynamic-dispatch thunk; it is
@@ -7362,9 +7388,13 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
     if (named->getCDeclName() != clangName)
       continue;
 
-    if (resultFunc->hasClangNode())
-      candidates.push_back(result);
-    else if (resultFunc->isObjCImplementation())
+    if (resultFunc->hasClangNode()) {
+      // The _SwiftifyImport remapping above can map a safe wrapper back to
+      // the same C decl that is also reached directly, so avoid registering it
+      // as a candidate twice.
+      if (!llvm::is_contained(candidates, result))
+        candidates.push_back(result);
+    } else if (resultFunc->isObjCImplementation())
       impls.push_back(result);
   }
 
@@ -8617,6 +8647,11 @@ bool ClangImporter::isSwiftFunctionWrapper(
 bool ClangImporter::Implementation::isSwiftFunctionWrapper(
     const clang::RecordDecl *decl) {
   return decl->getIdentifier() && decl->getName() == "__SwiftFunctionWrapper";
+}
+
+void ClangImporter::attachUnswiftifyForSafeImplementation(
+    AbstractFunctionDecl *safeSwiftDecl, DeclName introducedPeerName) {
+  Impl.attachUnswiftifyForSafeImplementation(safeSwiftDecl, introducedPeerName);
 }
 
 bool ClangImporter::isDeconstructedSwiftClosure(const clang::Type *type) const {

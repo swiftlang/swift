@@ -2023,6 +2023,45 @@ ERROR(attr_objc_implementation_no_category_for_func,none,
       "%kind0 does not belong to an Objective-C category; remove the category "
       "name from this attribute",
       (ValueDecl*))
+ERROR(implementation_safe_requires_c,none,
+      "'@implementation' of %kind0 with a safe-interop parameter or result "
+      "type requires a non-underscored '@c' attribute",
+      (ValueDecl*))
+ERROR(implementation_safe_requires_feature,none,
+      "'@implementation' of %kind0 with a safe-interop parameter or result "
+      "type requires the experimental feature 'SafeInteropImplementations'",
+      (ValueDecl *))
+ERROR(implementation_safe_no_annotations,none,
+      "cannot lower safe-interop '@implementation' of %kind0 to a C signature",
+      (ValueDecl *))
+NOTE(implementation_safe_no_swiftify_peer_here,none,
+     "no safe wrapper was generated for the matching C declaration", ())
+ERROR(implementation_safe_cannot_lower,none,
+      "cannot generate a C entry point for safe-interop '@implementation' of "
+      "%kind0; its parameters do not correspond to the generated safe wrapper",
+      (ValueDecl *))
+ERROR(implementation_safe_param_type_mismatch,none,
+      "'@implementation' %kind0 parameter %1 has type %2, but the corresponding"
+      " safe wrapper has parameter type %3",
+      (ValueDecl *, unsigned, Type, Type))
+ERROR(implementation_safe_param_ownership_mismatch,none,
+      "'@implementation' %kind0 parameter %1 is declared '%2', but the "
+      "corresponding safe wrapper parameter is '%3'",
+      (ValueDecl *, unsigned, StringRef, StringRef))
+ERROR(implementation_safe_result_type_mismatch,none,
+      "'@implementation' %kind0 has result type %1, but the corresponding safe "
+      "wrapper has result type %2",
+      (ValueDecl *, Type, Type))
+NOTE(implementation_safe_swiftify_peer_here,none,
+     "this safe wrapper was synthesized for the matching C declaration", ())
+ERROR(implementation_safe_no_matching_wrapper,none,
+      "'@implementation' %kind0 does not match any safe wrapper generated for "
+      "the matching C declaration",
+      (ValueDecl *))
+ERROR(implementation_safe_result,none,
+      "safe-interop '@implementation' of %kind0 does not yet support a "
+      "safe-interop result type %1",
+      (ValueDecl *, Type))
 ERROR(attr_objc_implementation_no_conformance,none,
       "'@objc @implementation' extension cannot add conformance to %0; "
       "add this conformance %select{with an ordinary extension|"

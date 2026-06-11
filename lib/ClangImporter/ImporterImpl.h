@@ -2016,6 +2016,14 @@ public:
   /// Used to avoid emitting the same warning once per imported function.
   bool DiagnosedMissingNullableAsEmptySpanParam = false;
 
+  void
+  attachUnswiftifyForSafeImplementation(AbstractFunctionDecl *safeSwiftDecl,
+                                        DeclName introducedPeerName);
+
+  /// Create the internal _Unswiftify macro declaration for a single
+  /// attachment, whose peer introduces a peer with \p introducedName.
+  MacroDecl *createUnswiftifyMacroDecl(DeclName introducedName);
+
   /// Find the lookup table that corresponds to the given Clang module.
   ///
   /// \param clangModule The module, or null to indicate that we're talking
