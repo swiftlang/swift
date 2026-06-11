@@ -3194,12 +3194,13 @@ StorageRestrictionsAttr::StorageRestrictionsAttr(
 StorageRestrictionsAttr *
 StorageRestrictionsAttr::create(
     ASTContext &ctx, SourceLoc atLoc, SourceRange range,
-    ArrayRef<Identifier> initializes, ArrayRef<Identifier> accesses) {
+    ArrayRef<Identifier> initializes, ArrayRef<Identifier> accesses,
+    bool implicit) {
   unsigned size =
       totalSizeToAlloc<Identifier>(initializes.size() + accesses.size());
   void *mem = ctx.Allocate(size, alignof(StorageRestrictionsAttr));
   return new (mem) StorageRestrictionsAttr(atLoc, range, initializes, accesses,
-                                           /*implicit=*/false);
+                                           implicit);
 }
 
 bool StorageRestrictionsAttr::
@@ -3499,6 +3500,24 @@ StorageRestrictionsAttr::getAccessesProperties(AccessorDecl *attachedTo) const {
                                const_cast<StorageRestrictionsAttr *>(this),
                                attachedTo, getAccessesNames()},
                            {});
+}
+
+void StorageRestrictionsAttr::
+setInitializesProperties(ArrayRef<VarDecl *> newValue,
+                         AccessorDecl *attachedTo) {
+  auto &ctx = attachedTo->getASTContext();
+  InitAccessorReferencedVariablesRequest request(this, attachedTo,
+                                                 getInitializesNames());
+  ctx.evaluator.cacheOutput(request, ctx.AllocateCopy(newValue));
+}
+
+void StorageRestrictionsAttr::
+setAccessesProperties(ArrayRef<VarDecl *> newValue,
+                      AccessorDecl *attachedTo) {
+  auto &ctx = attachedTo->getASTContext();
+  InitAccessorReferencedVariablesRequest request(this, attachedTo,
+                                                 getAccessesNames());
+  ctx.evaluator.cacheOutput(request, ctx.AllocateCopy(newValue));
 }
 
 AllowFeatureSuppressionAttr::AllowFeatureSuppressionAttr(

@@ -1627,10 +1627,15 @@ public:
   }
 
   static UnresolvedDeclRefExpr *createImplicit(
+      ASTContext &C, DeclNameRef nameRef,
+      DeclRefKind refKind = DeclRefKind::Ordinary) {
+    return new (C) UnresolvedDeclRefExpr(nameRef, refKind, DeclNameLoc());
+  }
+
+  static UnresolvedDeclRefExpr *createImplicit(
       ASTContext &C, DeclName name,
       DeclRefKind refKind = DeclRefKind::Ordinary) {
-    return new (C) UnresolvedDeclRefExpr(DeclNameRef(name), refKind,
-                                         DeclNameLoc());
+    return UnresolvedDeclRefExpr::createImplicit(C, DeclNameRef(name), refKind);
   }
 
   static UnresolvedDeclRefExpr *createImplicit(
@@ -2105,8 +2110,8 @@ class DotSelfExpr : public IdentityExpr {
   
 public:
   DotSelfExpr(Expr *subExpr, SourceLoc dot, SourceLoc self,
-              Type ty = Type())
-    : IdentityExpr(ExprKind::DotSelf, subExpr, ty),
+              Type ty = Type(), bool implicit = false)
+    : IdentityExpr(ExprKind::DotSelf, subExpr, ty, implicit),
       DotLoc(dot), SelfLoc(self)
   {}
   
@@ -5126,7 +5131,7 @@ public:
   /// \param fn The function being called
   /// \param argList The argument list.
   static CallExpr *create(ASTContext &ctx, Expr *fn, ArgumentList *argList,
-                          bool implicit);
+                          bool implicit, Type ty = Type());
 
   /// Create a new implicit call expression without any source-location
   /// information.
@@ -5134,15 +5139,16 @@ public:
   /// \param fn The function being called.
   /// \param argList The argument list.
   static CallExpr *createImplicit(ASTContext &ctx, Expr *fn,
-                                  ArgumentList *argList) {
-    return create(ctx, fn, argList, /*implicit*/ true);
+                                  ArgumentList *argList, Type ty = Type()) {
+    return create(ctx, fn, argList, /*implicit*/ true, ty);
   }
 
   /// Create a new implicit call expression with no arguments and no
   /// source-location information.
   ///
   /// \param fn The nullary function being called.
-  static CallExpr *createImplicitEmpty(ASTContext &ctx, Expr *fn);
+  static CallExpr *createImplicitEmpty(ASTContext &ctx, Expr *fn,
+                                       Type ty = Type());
 
   SourceLoc getStartLoc() const {
     SourceLoc fnLoc = getFn()->getStartLoc();

@@ -2116,10 +2116,16 @@ public:
   ArrayRef<VarDecl *> getInitializesProperties(AccessorDecl *attachedTo) const;
   ArrayRef<VarDecl *> getAccessesProperties(AccessorDecl *attachedTo) const;
 
+  void setInitializesProperties(ArrayRef<VarDecl *> newValue,
+                                AccessorDecl *attachedTo);
+  void setAccessesProperties(ArrayRef<VarDecl *> newValue,
+                             AccessorDecl *attachedTo);
+
   static StorageRestrictionsAttr *create(ASTContext &ctx, SourceLoc atLoc,
                                          SourceRange range,
                                          ArrayRef<Identifier> initializes,
-                                         ArrayRef<Identifier> accesses);
+                                         ArrayRef<Identifier> accesses,
+                                         bool implicit = false);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::StorageRestrictions;
