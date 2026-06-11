@@ -110,19 +110,24 @@ extension ContinuousClock: Clock {
   /// `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
-  @diagnose(UselessAvailabilityCheck, as: ignored)
-  @_alwaysEmitIntoClient
   @abi(
     nonisolated(nonsending) func sleepNonisolatedNonsending(
       until deadline: Instant, tolerance: Swift.Duration?
     ) async throws
   )
+  @_alwaysEmitIntoClient
   public nonisolated(nonsending) func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    try await Task._sleep(until: deadline,
-                          tolerance: tolerance,
-                          clock: self)
+    // If the ABI symbol for `nonisolated(nonsending)` Task::_sleep is
+    // available, let's use that, otherwise fallback to the version that hops.
+    if #available(anyAppleOS 27, *) {
+      try await Task._sleep(until: deadline,
+                            tolerance: tolerance,
+                            clock: self)
+    } else {
+      try await __abi_sleep(until: deadline, tolerance: tolerance)
+    }
   }
 
   @abi(
@@ -130,13 +135,18 @@ extension ContinuousClock: Clock {
       until deadline: Instant, tolerance: Swift.Duration?
     ) async throws
   )
+  @diagnose(UselessAvailabilityCheck, as: ignored)
   @usableFromInline
   internal func __abi_sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    try await Task._sleep(until: deadline,
-                          tolerance: tolerance,
-                          clock: self)
+    if #available(StdlibDeploymentTarget 6.3, *) {
+      try await Task._sleep(until: deadline,
+                            tolerance: tolerance,
+                            clock: self)
+    } else {
+      fatalError("we should never get here; if we have, availability is broken")
+    }
   }
 
 #else
