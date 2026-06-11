@@ -897,8 +897,7 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
   // If we are already in the did shared borrow self state, just return the
   // shared borrow value.
   if (SelfInitDelegationState == SILGenFunction::DidSharedBorrowSelf) {
-    // As above, fall back to an owned copy when guaranteed plus zero is not ok
-    // so that definite initialization can diagnose the illegal use of self.
+    // As above, +1 indicates a misuse of self for definite initialization to diagnose.
     if (!C.isGuaranteedPlusZeroOk()) {
       const auto &typeLowering = getTypeLowering(addr->getType());
       ManagedValue result = emitLoad(loc, addr, typeLowering, C, IsNotTake);
