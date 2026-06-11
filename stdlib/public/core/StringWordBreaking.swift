@@ -668,7 +668,7 @@ extension String {
   ///     addressing a word boundary.
   /// - Returns: A valid index less than equal to the input that is guaranteed to
   ///     identify some word boundary at or before `i`.
-  @available(SwiftStdlib 6.3, *)
+  @available(StdlibDeploymentTarget 6.3, *)
   public func _wordIndex(somewhereAtOrBefore i: Index) -> Index {
     var j = _guts.validateInclusiveScalarIndex(i)
     if j == endIndex {
