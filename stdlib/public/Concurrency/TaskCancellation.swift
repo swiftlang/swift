@@ -99,7 +99,7 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
 ///   - handler: A closure to execute on cancellation.
 ///     If the task is canceled, this closure is called at most once;
 ///     otherwise, it isn't called.
-///   - isolation: The actor that the operation and cancellation handler are isolated to.
+///   - isolation: The actor that the operation is isolated to.
 ///
 /// This differs from the operation cooperatively checking for cancellation
 /// and reacting to it in that the cancellation handler is _always_ and
