@@ -325,7 +325,13 @@ bool PotentialBinding::isViableForJoin() const {
          !BindingType->hasLValueType() &&
          !BindingType->hasTypeVariable() &&
          !BindingType->hasPlaceholder() &&
-         !BindingType->hasUnboundGenericType();
+         !BindingType->hasUnboundGenericType() &&
+         /// FIXME: The old join code didn't understand existentials, so it
+         /// did not join 'Any' with 'any Sendable'. The compatibility hack
+         /// where 'any Sendable' can bind to 'Any' relies on this behavior.
+         /// Continue to simulate it for now by skipping joins involving
+         /// 'any Sendable' specifically.
+         !BindingType->isSendableExistential();
 }
 
 namespace {
