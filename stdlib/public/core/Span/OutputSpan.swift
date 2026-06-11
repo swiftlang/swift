@@ -521,6 +521,7 @@ extension OutputSpan {
   }
 }
 
+#if !SPAN_COMPATIBILITY_STUB
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
@@ -577,3 +578,4 @@ extension OutputSpan where Element: Copyable {
     }
   }
 }
+#endif // !SPAN_COMPATIBILITY_STUB
