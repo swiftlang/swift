@@ -189,6 +189,58 @@ bool SILParser::parseVerbatim(StringRef name) {
   return false;
 }
 
+static bool parseSILProfileCounter(SILParser &SP, ProfileCounter &Counter) {
+  uint64_t Count = 0;
+  if (SP.P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(") ||
+      SP.parseInteger(Count, diag::sil_invalid_constant) ||
+      SP.P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+    return true;
+
+  Counter = ProfileCounter(Count);
+  return false;
+}
+
+static bool startsWithSILProfileCounter(SILParser &SP) {
+  return SP.P.Tok.is(tok::sil_exclamation) ||
+         (SP.P.Tok.is(tok::comma) && SP.P.peekToken().is(tok::sil_exclamation));
+}
+
+static bool parseSILCondBranchProfileCounters(SILParser &SP,
+                                              ProfileCounter &TrueCount,
+                                              ProfileCounter &FalseCount) {
+  while (startsWithSILProfileCounter(SP)) {
+    SP.P.consumeIf(tok::comma);
+    if (SP.P.parseToken(tok::sil_exclamation,
+                        diag::expected_tok_in_sil_instr, "!"))
+      return true;
+
+    Identifier Id;
+    SourceLoc IdLoc;
+    if (SP.parseSILIdentifier(Id, IdLoc, diag::expected_tok_in_sil_instr,
+                              "true_count or false_count"))
+      return true;
+
+    ProfileCounter Count;
+    if (parseSILProfileCounter(SP, Count))
+      return true;
+
+    if (Id.str() == "true_count") {
+      TrueCount = Count;
+      continue;
+    }
+    if (Id.str() == "false_count") {
+      FalseCount = Count;
+      continue;
+    }
+
+    SP.P.diagnose(IdLoc, diag::expected_tok_in_sil_instr,
+                  "true_count or false_count");
+    return true;
+  }
+
+  return false;
+}
+
 SILParser::~SILParser() {
   for (auto &Entry : ForwardRefLocalValues) {
     if (ValueBase *dummyVal = LocalValues[Entry.first()]) {
@@ -5493,6 +5545,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       Identifier BBName, BBName2;
       SourceLoc NameLoc, NameLoc2;
       SmallVector<SILValue, 6> Args, Args2;
+      ProfileCounter TrueCount, FalseCount;
       if (parseValueName(Cond) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseSILIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
@@ -5500,14 +5553,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseSILIdentifier(BBName2, NameLoc2,
                              diag::expected_sil_block_name) ||
-          parseSILBBArgsAtBranch(Args2, B) || parseSILDebugLocation(InstLoc, B))
+          parseSILBBArgsAtBranch(Args2, B) ||
+          parseSILCondBranchProfileCounters(*this, TrueCount, FalseCount) ||
+          parseSILDebugLocation(InstLoc, B))
         return true;
 
       auto I1Ty = SILType::getBuiltinIntegerType(1, SILMod.getASTContext());
       SILValue CondVal = getLocalValue(Cond, I1Ty, InstLoc, B);
       ResultVal = B.createCondBranch(
           InstLoc, CondVal, getBBForReference(BBName, NameLoc), Args,
-          getBBForReference(BBName2, NameLoc2), Args2);
+          getBBForReference(BBName2, NameLoc2), Args2, TrueCount, FalseCount);
       break;
     }
     case SILInstructionKind::UnreachableInst:
