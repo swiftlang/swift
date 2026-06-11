@@ -669,6 +669,28 @@ public func swift_release_n(object: Builtin.RawPointer, n: UInt32) {
   unsafe swift_release_n_(object: o, n: n)
 }
 
+// Non-atomic refcount entry points. For now, just route to the atomic versions.
+// This can be optimized later.
+@c @discardableResult
+public func swift_nonatomic_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
+  return swift_retain(object: object)
+}
+
+@c @discardableResult
+public func swift_nonatomic_retain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
+  return swift_retain_n(object: object, n: n)
+}
+
+@c
+public func swift_nonatomic_release(object: Builtin.RawPointer) {
+  swift_release(object: object)
+}
+
+@c
+public func swift_nonatomic_release_n(object: Builtin.RawPointer, n: UInt32) {
+  swift_release_n(object: object, n: n)
+}
+
 func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBoxRelease: Bool = false) {
   guard let object = unsafe object else {
     return
