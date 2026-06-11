@@ -75,7 +75,7 @@ public func qwerty(_ x: A) {
   """)
   public final func method() {
   // expected-expansion@+6:4{{
-  //   expected-error@1{{could not find imported function '' matching instance method 'method(fromHeader1:)'; make sure you import the module or header that declares it}}
+  //   expected-error@1{{could not find imported function 'method' matching instance method 'method(fromHeader1:)'; make sure you import the module or header that declares it}}
   //   expected-remark@1{{macro content: |@objc @implementation public func method(fromHeader1: CInt) {|}}
   //   expected-remark@2{{macro content: |  print(fromHeader1)|}}
   //   expected-remark@3{{macro content: |}|}}
