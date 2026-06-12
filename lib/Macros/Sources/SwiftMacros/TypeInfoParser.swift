@@ -106,7 +106,8 @@ public enum TypeInfoParseError: Error {
 
 /// Parses a string literal and returns its contents. Throws in case of error.
 func parseString(node: ExprSyntax) throws -> String {
-  guard let res = node.as(StringLiteralExprSyntax.self)?.representedLiteralValue else {
+  guard let res = node.as(StringLiteralExprSyntax.self)?.representedLiteralValue
+  else {
     throw TypeInfoParseError.expectedStringLiteral(got: node)
   }
   return res
@@ -122,7 +123,9 @@ func parseBool(node: ExprSyntax) throws -> Bool {
 
 /// Parses either `nil` or an expression with the `parser` parsing function.
 /// Throws if `parser` throws
-func parseOptional<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws -> T? {
+func parseOptional<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws
+  -> T?
+{
   // Eagerly checks if it is nil. This means that T?? can never be some(nil)
   // parsed this way as we just expect either nil or a value.
   if node.is(NilLiteralExprSyntax.self) {
@@ -134,7 +137,9 @@ func parseOptional<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws
 /// Parses an array literal containing elements parsed with the `parse` function
 /// and returns them all. Will throw if it is not an array literal or if one
 /// of the elements throws during parsing.
-func parseArray<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws -> [T] {
+func parseArray<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws
+  -> [T]
+{
   guard let arr = node.as(ArrayExprSyntax.self) else {
     throw TypeInfoParseError.expectedArrayLiteral(got: node)
   }
@@ -162,21 +167,27 @@ struct ArgParser<T> {
   /// Returns an argument with the `name` label of type `U?` where `U`
   /// expressions can be parsed using the `parser` function.
   static func optionalArg<U>(
-    _ name: String?, parser: @escaping (ExprSyntax) throws -> U
+    _ name: String?,
+    parser: @escaping (ExprSyntax) throws -> U
   ) -> ArgParser<U?> {
     .init(
       name: name,
-      parser: { node in try parseOptional(node: node, parser: parser) })
+      parser: { node in try parseOptional(node: node, parser: parser) }
+    )
   }
 
   /// Returns an argument with the `name` label of type `[U]` where `U`
   /// expressions can be parsed using the `parser` function.
-  static func arrayArg<U>(_ name: String?, parser: @escaping (ExprSyntax) throws -> U) -> ArgParser<
+  static func arrayArg<U>(
+    _ name: String?,
+    parser: @escaping (ExprSyntax) throws -> U
+  ) -> ArgParser<
     [U]
   > {
     .init(
       name: name,
-      parser: { node in try parseArray(node: node, parser: parser) })
+      parser: { node in try parseArray(node: node, parser: parser) }
+    )
   }
 
   /// Returns a new argument with the same name but expecting an array of the
@@ -232,7 +243,9 @@ extension LabeledExprListSyntax {
     /// be able to parse the next one. This could not be a closure as it is
     /// generic in the type of the parsed expression `T`.
     func makeArg<T>(
-      _ info: ArgParser<T>, _ elems: inout [LabeledExprSyntax], _ idx: inout Int
+      _ info: ArgParser<T>,
+      _ elems: inout [LabeledExprSyntax],
+      _ idx: inout Int
     ) throws -> T {
       let val = try info.expect(arg: elems[idx])
       idx += 1
@@ -263,26 +276,24 @@ extension NominalTypeInfo: TypeInfoProtocol {
     //       kind: <NominalTypeKind>,
     //       isUnsafe: <Bool>)
 
-    guard let fcall = node.as(FunctionCallExprSyntax.self) else {
-      throw TypeInfoParseError.expectedFunctionCall(got: node)
-    }
-
-    guard fcall.calledExpression.trimmedDescription == "NominalTypeInfo" else {
-      throw TypeInfoParseError.expectedFunctionCallNames(
-        names: ["NominalTypeInfo"], got: node)
-    }
-
-    let parsed = try fcall.arguments.expect(
+    let (name, kind, isUnsafe) = try getNamedFuncallArgs(
+      node: node,
+      name: "NominalTypeInfo"
+    )
+    .expect(
       .stringArg("name"),
       .init(name: "kind", parser: NominalTypeKind.fromSyntax),
-      .boolArg("isUnsafe"))
+      .boolArg("isUnsafe")
+    )
 
-    return Self(name: parsed.0, kind: parsed.1, isUnsafe: parsed.2)
+    return Self(name: name, kind: kind, isUnsafe: isUnsafe)
   }
 
   public var syntax: ExprSyntax {
     """
-    NominalTypeInfo(name: \(stringlit(name)), kind: \(kind.syntax), isUnsafe: \(boollit(isUnsafe)))
+    NominalTypeInfo(name: \(stringlit(name)), 
+                    kind: \(kind.syntax), 
+                    isUnsafe: \(boollit(isUnsafe)))
     """
   }
 }
@@ -302,15 +313,19 @@ extension NominalTypeKind: TypeInfoProtocol {
       return try .structLike(
         fcall.arguments.expect(
           ArgParser(name: nil, parser: StructTypeInfo.fromSyntax)
-        ))
+        )
+      )
     case "enumLike":
       return try .enumLike(
         fcall.arguments.expect(
           ArgParser(name: nil, parser: EnumTypeInfo.fromSyntax)
-        ))
+        )
+      )
     default:
       throw TypeInfoParseError.expectedFunctionCallNames(
-        names: ["structLike", "enumLike"], got: fcall.calledExpression)
+        names: ["structLike", "enumLike"],
+        got: fcall.calledExpression
+      )
     }
   }
 
@@ -328,21 +343,32 @@ extension NominalTypeKind: TypeInfoProtocol {
   }
 }
 
+private func getNamedFuncallArgs(node: ExprSyntax, name: String) throws
+  -> LabeledExprListSyntax
+{
+  guard let fcall = node.as(FunctionCallExprSyntax.self) else {
+    throw TypeInfoParseError.expectedFunctionCall(got: node)
+  }
+  guard fcall.calledExpression.trimmedDescription == name else {
+    throw TypeInfoParseError.expectedFunctionCallNames(
+      names: [name],
+      got: fcall.calledExpression
+    )
+  }
+  return fcall.arguments
+}
+
 extension StructTypeInfo: TypeInfoProtocol {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
     //   StructTypeInfo(properties: <[StoredProperty]>)
 
-    guard let fcall = node.as(FunctionCallExprSyntax.self) else {
-      throw TypeInfoParseError.expectedFunctionCall(got: node)
-    }
-    guard fcall.calledExpression.trimmedDescription == "StructTypeInfo" else {
-      throw TypeInfoParseError.expectedFunctionCallNames(
-        names: ["StructTypeInfo"], got: fcall.calledExpression)
-    }
     return Self(
-      properties: try fcall.arguments.expect(
-        .arrayArg("properties", parser: StoredProperty.fromSyntax)))
+      properties: try getNamedFuncallArgs(node: node, name: "StructTypeInfo")
+        .expect(
+          .arrayArg("properties", parser: StoredProperty.fromSyntax)
+        )
+    )
   }
 
   public var syntax: ExprSyntax {
@@ -356,22 +382,15 @@ extension EnumTypeInfo: TypeInfoProtocol {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
     //   EnumTypeInfo(isObjC: <Bool>, cases: <[EnumCaseInfo]>)
-
-    guard let fcall = node.as(FunctionCallExprSyntax.self) else {
-      throw TypeInfoParseError.expectedFunctionCall(got: node)
-    }
-
-    guard fcall.calledExpression.trimmedDescription == "EnumTypeInfo" else {
-      throw TypeInfoParseError.expectedFunctionCallNames(
-        names: ["EnumTypeInfo"], got: fcall.calledExpression)
-    }
-
-    let parsed = try fcall.arguments.expect(
+    let (isObjC, cases) = try getNamedFuncallArgs(
+      node: node,
+      name: "EnumTypeInfo"
+    )
+    .expect(
       .boolArg("isObjC"),
       .arrayArg("cases", parser: EnumCaseInfo.fromSyntax)
     )
-
-    return Self(isObjC: parsed.0, cases: parsed.1)
+    return Self(isObjC: isObjC, cases: cases)
   }
 
   public var syntax: ExprSyntax {
@@ -390,22 +409,22 @@ extension StoredProperty: TypeInfoProtocol {
     //       isVar: <Bool>,
     //       isStatic: <Bool>)
 
-    guard let fcall = node.as(FunctionCallExprSyntax.self) else {
-      throw TypeInfoParseError.expectedFunctionCall(got: node)
-    }
-
-    guard fcall.calledExpression.trimmedDescription == "StoredProperty" else {
-      throw TypeInfoParseError.expectedFunctionCallNames(
-        names: ["StoredProperty"], got: fcall.calledExpression)
-    }
-
-    let parsed = try fcall.arguments.expect(
+    let (name, typeName, isVar, isStatic) = try getNamedFuncallArgs(
+      node: node,
+      name: "StoredProperty"
+    ).expect(
       .stringArg("name"),
       .stringArg("typeName"),
       .boolArg("isVar"),
-      .boolArg("isStatic"))
+      .boolArg("isStatic")
+    )
 
-    return Self(name: parsed.0, typeName: parsed.1, isVar: parsed.2, isStatic: parsed.3)
+    return Self(
+      name: name,
+      typeName: typeName,
+      isVar: isVar,
+      isStatic: isStatic
+    )
   }
 
   public var syntax: ExprSyntax {
@@ -420,21 +439,15 @@ extension EnumCaseInfo: TypeInfoProtocol {
     // Expecting:
     //   EnumCaseInfo(name: <String>, associatedValueLabels: <[String?]>)
 
-    guard let fcall = node.as(FunctionCallExprSyntax.self) else {
-      throw TypeInfoParseError.expectedFunctionCall(got: node)
-    }
-
-    guard fcall.calledExpression.trimmedDescription == "EnumCaseInfo" else {
-      throw TypeInfoParseError.expectedFunctionCallNames(
-        names: ["EnumCaseInfo"], got: fcall.calledExpression)
-    }
-
-    let parsed = try fcall.arguments.expect(
+    let (name, associatedValueLabels) = try getNamedFuncallArgs(
+      node: node,
+      name: "StoredProperty"
+    ).expect(
       .stringArg("name"),
       .stringArg("associatedValueLabels").toOptional().toArray()
     )
 
-    return Self(name: parsed.0, associatedValueLabels: parsed.1)
+    return Self(name: name, associatedValueLabels: associatedValueLabels)
   }
 
   public var syntax: ExprSyntax {
@@ -448,7 +461,9 @@ extension TypeInfoProtocol {
 
   /// Returns the parsed `Self` from a payloaded string literal containing
   /// Swift syntax.
-  public static func fromStringLit(strlit: StringLiteralExprSyntax) throws -> Self {
+  public static func fromStringLit(strlit: StringLiteralExprSyntax) throws
+    -> Self
+  {
     guard let underlying = strlit.representedLiteralValue else {
       throw TypeInfoParseError.expectedStrLitAsInput(got: ExprSyntax(strlit))
     }
@@ -481,7 +496,8 @@ func arraySyntax<T: TypeInfoProtocol>(_ values: [T]) -> ExprSyntax {
 
 /// Creates an array syntax node, with the element values from the mapping of
 /// `values` by the `toSyntax` function.
-func arraySyntax<T>(_ values: [T], _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax {
+func arraySyntax<T>(_ values: [T], _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax
+{
   ExprSyntax(ArrayExprSyntax(expressions: values.map(toSyntax)))
 }
 
@@ -493,7 +509,8 @@ func optionalSyntax<T: TypeInfoProtocol>(_ value: T?) -> ExprSyntax {
 
 /// Creates a `nil` syntax node if `value` is `nil` and the syntax node
 /// produced by calling `toSyntax` on `value` otherwise.
-func optionalSyntax<T>(_ value: T?, _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax {
+func optionalSyntax<T>(_ value: T?, _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax
+{
   if let value = value {
     toSyntax(value)
   } else {
