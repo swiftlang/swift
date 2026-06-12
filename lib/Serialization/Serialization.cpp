@@ -3061,6 +3061,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::ObjCRuntimeName:
     case DeclAttrKind::RestatedObjCConformance:
     case DeclAttrKind::ClangImporterSynthesizedType:
+    case DeclAttrKind::CArrayProjection:
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
     case DeclAttrKind::Diagnose:

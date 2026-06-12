@@ -321,6 +321,7 @@ extension ASTGenVisitor {
         .UnsafeNonEscapableResult,
         .UsableFromInline,
         .Used,
+        .CArrayProjection,
         .WarnUnqualifiedAccess,
         .WeakLinked,
         .UnsafeSelfDependentResult:
