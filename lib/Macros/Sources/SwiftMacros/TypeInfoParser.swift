@@ -142,7 +142,7 @@ func parseArray<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws ->
 }
 
 /// Helper struct to represent an function call argument to be parsed.
-struct ArgInfo<T> {
+struct ArgParser<T> {
   /// The label of the argument, `nil` if there is none.
   var name: String?
 
@@ -150,12 +150,12 @@ struct ArgInfo<T> {
   var parser: (ExprSyntax) throws -> T
 
   /// Returns a string argument with the `name` label.
-  static func stringArg(_ name: String?) -> ArgInfo<String> {
+  static func stringArg(_ name: String?) -> ArgParser<String> {
     .init(name: name, parser: parseString)
   }
 
   /// Returns a boolean argument with the `name` label.
-  static func boolArg(_ name: String?) -> ArgInfo<Bool> {
+  static func boolArg(_ name: String?) -> ArgParser<Bool> {
     .init(name: name, parser: parseBool)
   }
 
@@ -163,7 +163,7 @@ struct ArgInfo<T> {
   /// expressions can be parsed using the `parser` function.
   static func optionalArg<U>(
     _ name: String?, parser: @escaping (ExprSyntax) throws -> U
-  ) -> ArgInfo<U?> {
+  ) -> ArgParser<U?> {
     .init(
       name: name,
       parser: { node in try parseOptional(node: node, parser: parser) })
@@ -171,7 +171,7 @@ struct ArgInfo<T> {
 
   /// Returns an argument with the `name` label of type `[U]` where `U`
   /// expressions can be parsed using the `parser` function.
-  static func arrayArg<U>(_ name: String?, parser: @escaping (ExprSyntax) throws -> U) -> ArgInfo<
+  static func arrayArg<U>(_ name: String?, parser: @escaping (ExprSyntax) throws -> U) -> ArgParser<
     [U]
   > {
     .init(
@@ -181,13 +181,13 @@ struct ArgInfo<T> {
 
   /// Returns a new argument with the same name but expecting an array of the
   /// elements expected by `self`. This is meant to be used like a builder.
-  func toArray() -> ArgInfo<[T]> {
+  func toArray() -> ArgParser<[T]> {
     .arrayArg(name, parser: parser)
   }
 
   /// Returns a new argument with the same name but expecting an optional of the
   /// elements expected by `self`. This is meant to be used like a builder.
-  func toOptional() -> ArgInfo<T?> {
+  func toOptional() -> ArgParser<T?> {
     .optionalArg(name, parser: parser)
   }
 
@@ -215,7 +215,7 @@ extension LabeledExprListSyntax {
   /// try to parse the argument list as expected by the infos. Throws if one
   /// of the arguments fails to parse.
   func expect<each ArgType>(
-    _ infos: repeat ArgInfo<each ArgType>
+    _ infos: repeat ArgParser<each ArgType>
   ) throws -> (repeat each ArgType) {
     // Building the list of arguments syntax
     var lst = self.map { $0 }
@@ -232,7 +232,7 @@ extension LabeledExprListSyntax {
     /// be able to parse the next one. This could not be a closure as it is
     /// generic in the type of the parsed expression `T`.
     func makeArg<T>(
-      _ info: ArgInfo<T>, _ elems: inout [LabeledExprSyntax], _ idx: inout Int
+      _ info: ArgParser<T>, _ elems: inout [LabeledExprSyntax], _ idx: inout Int
     ) throws -> T {
       let val = try info.expect(arg: elems[idx])
       idx += 1
@@ -246,7 +246,7 @@ extension LabeledExprListSyntax {
 }
 
 /// Protocol for `NominalTypeInfo` and associated types to conform to.
-public protocol TypeInfoSyntax: Equatable {
+public protocol TypeInfoProtocol: Equatable {
   /// Parses `node` into `Self` and throws if an error occured
   static func fromSyntax(node: ExprSyntax) throws -> Self
 
@@ -254,7 +254,7 @@ public protocol TypeInfoSyntax: Equatable {
   var syntax: ExprSyntax { get }
 }
 
-extension NominalTypeInfo: TypeInfoSyntax {
+extension NominalTypeInfo: TypeInfoProtocol {
 
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
@@ -287,7 +287,7 @@ extension NominalTypeInfo: TypeInfoSyntax {
   }
 }
 
-extension NominalTypeKind: TypeInfoSyntax {
+extension NominalTypeKind: TypeInfoProtocol {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
     //   NominalTypeKind(structLike(<StructTypeInfo>))
@@ -301,12 +301,12 @@ extension NominalTypeKind: TypeInfoSyntax {
     case "structLike":
       return try .structLike(
         fcall.arguments.expect(
-          ArgInfo(name: nil, parser: StructTypeInfo.fromSyntax)
+          ArgParser(name: nil, parser: StructTypeInfo.fromSyntax)
         ))
     case "enumLike":
       return try .enumLike(
         fcall.arguments.expect(
-          ArgInfo(name: nil, parser: EnumTypeInfo.fromSyntax)
+          ArgParser(name: nil, parser: EnumTypeInfo.fromSyntax)
         ))
     default:
       throw TypeInfoParseError.expectedFunctionCallNames(
@@ -328,7 +328,7 @@ extension NominalTypeKind: TypeInfoSyntax {
   }
 }
 
-extension StructTypeInfo: TypeInfoSyntax {
+extension StructTypeInfo: TypeInfoProtocol {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
     //   StructTypeInfo(properties: <[StoredProperty]>)
@@ -347,12 +347,12 @@ extension StructTypeInfo: TypeInfoSyntax {
 
   public var syntax: ExprSyntax {
     """
-    StructTypeInfo(properties: \(arrSyntax(properties)))
+    StructTypeInfo(properties: \(arraySyntax(properties)))
     """
   }
 }
 
-extension EnumTypeInfo: TypeInfoSyntax {
+extension EnumTypeInfo: TypeInfoProtocol {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
     //   EnumTypeInfo(isObjC: <Bool>, cases: <[EnumCaseInfo]>)
@@ -376,12 +376,12 @@ extension EnumTypeInfo: TypeInfoSyntax {
 
   public var syntax: ExprSyntax {
     """
-    EnumTypeInfo(isObjC: \(boollit(isObjC)), cases: \(arrSyntax(cases)))
+    EnumTypeInfo(isObjC: \(boollit(isObjC)), cases: \(arraySyntax(cases)))
     """
   }
 }
 
-extension StoredProperty: TypeInfoSyntax {
+extension StoredProperty: TypeInfoProtocol {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
     //   StoredProperty(
@@ -415,10 +415,10 @@ extension StoredProperty: TypeInfoSyntax {
   }
 }
 
-extension EnumCaseInfo: TypeInfoSyntax {
+extension EnumCaseInfo: TypeInfoProtocol {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
-    //   EnumCaseInfo(name: <String>, associatedValues: <[String?]>)
+    //   EnumCaseInfo(name: <String>, associatedValueLabels: <[String?]>)
 
     guard let fcall = node.as(FunctionCallExprSyntax.self) else {
       throw TypeInfoParseError.expectedFunctionCall(got: node)
@@ -431,20 +431,20 @@ extension EnumCaseInfo: TypeInfoSyntax {
 
     let parsed = try fcall.arguments.expect(
       .stringArg("name"),
-      .stringArg("associatedValues").toOptional().toArray()
+      .stringArg("associatedValueLabels").toOptional().toArray()
     )
 
-    return Self(name: parsed.0, associatedValues: parsed.1)
+    return Self(name: parsed.0, associatedValueLabels: parsed.1)
   }
 
   public var syntax: ExprSyntax {
     """
-    EnumCaseInfo(name: \(stringlit(name)), associatedValues: \(arrSyntax(associatedValues, {optSyntax($0, stringlit)})))
+    EnumCaseInfo(name: \(stringlit(name)), associatedValueLabels: \(arraySyntax(associatedValueLabels, {optionalSyntax($0, stringlit)})))
     """
   }
 }
 
-extension TypeInfoSyntax {
+extension TypeInfoProtocol {
 
   /// Returns the parsed `Self` from a payloaded string literal containing
   /// Swift syntax.
@@ -475,20 +475,20 @@ func boollit(_ b: Bool) -> ExprSyntax {
 
 /// Creates an array syntax node, with the element values from which we can
 /// derive syntax.
-func arrSyntax<T: TypeInfoSyntax>(_ values: [T]) -> ExprSyntax {
-  arrSyntax(values, \.syntax)
+func arraySyntax<T: TypeInfoProtocol>(_ values: [T]) -> ExprSyntax {
+  arraySyntax(values, \.syntax)
 }
 
 /// Creates an array syntax node, with the element values from the mapping of
 /// `values` by the `toSyntax` function.
-func arrSyntax<T>(_ values: [T], _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax {
+func arraySyntax<T>(_ values: [T], _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax {
   ExprSyntax(ArrayExprSyntax(expressions: values.map(toSyntax)))
 }
 
 /// Creates a `nil` syntax node if `value` is `nil` and the derived syntax of
 /// `value` otherwise.
-func optSyntax<T: TypeInfoSyntax>(_ value: T?) -> ExprSyntax {
-  optSyntax(value, \.syntax)
+func optionalSyntax<T: TypeInfoProtocol>(_ value: T?) -> ExprSyntax {
+  optionalSyntax(value, \.syntax)
 }
 
 /// Creates a `nil` syntax node if `value` is `nil` and the syntax node
