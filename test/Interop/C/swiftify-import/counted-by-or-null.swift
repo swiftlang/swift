@@ -174,27 +174,27 @@ void constInt(int * __counted_by_or_null(42 * 10) p);
 // }}
 void constFloatCastedToInt(int * __counted_by_or_null((int) (4.2 / 12)) p);
 
-// expected-expansion@+9:148{{
+// expected-expansion@+9:147{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func sizeofType(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(8) {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofType: expected \\(CUnsignedLongLong(8)) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(1) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofType: expected \\(CUnsignedLongLong(1)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe sizeofType(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
-void sizeofType(int * __counted_by_or_null((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(int *)) p);
+void sizeofType(int * __counted_by_or_null((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(char)) p);
 
-// expected-expansion@+9:145{{
+// expected-expansion@+9:147{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func sizeofParam(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(8) {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofParam: expected \\(CUnsignedLongLong(8)) but got \\(p.count)")|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func sizeofParam(_ p: UnsafeMutableBufferPointer<CChar>) {|}}
+//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(1) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofParam: expected \\(CUnsignedLongLong(1)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe sizeofParam(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
-void sizeofParam(int * __counted_by_or_null((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(p)) p);
+void sizeofParam(char * __counted_by_or_null((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(*p)) p);
 
 void derefLen(int * len, int * __counted_by_or_null(*len) p);
 
@@ -342,7 +342,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: e000162a354939bc180cd01a90e021ed3b491faebc6f2f8a1b456e1df822f915
+// GENERATED-HASH: 19f99bb82d98eb9be79152b553574e846edb65c7c742474434310eae187a3c05
 import Test
 
 func call_simple(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!) {
@@ -413,7 +413,7 @@ func call_sizeofType(_ p: UnsafeMutablePointer<Int32>!) {
   return unsafe sizeofType(p)
 }
 
-func call_sizeofParam(_ p: UnsafeMutablePointer<Int32>!) {
+func call_sizeofParam(_ p: UnsafeMutablePointer<CChar>!) {
   return unsafe sizeofParam(p)
 }
 
@@ -573,7 +573,7 @@ func call_allOrNull(_ len: Int32, _ p1: UnsafeMutablePointer<Int32>?, _ p2: Unsa
   return unsafe simpleFlipped(p)
 }
 
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_sizeofParam(_ p: UnsafeMutableBufferPointer<Int32>) {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_sizeofParam(_ p: UnsafeMutableBufferPointer<CChar>) {
   return unsafe sizeofParam(p)
 }
 

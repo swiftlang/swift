@@ -2549,11 +2549,15 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
 
   // Short-circuiting.
   if (repr->isInvalid()) return ErrorType::get(ctx);
-  // Reject member type access only when the base is explicitly written as an
-  // opaque type, e.g. `(some P).T`.
+  // Reject member type access only when the base is both explicitly written as
+  // an opaque type and resolves to an opaque archetype, e.g. `(some P).T` in
+  // result/binding position. Accessing a member on an opaque parameter,
+  // e.g. `func foo(_: (some P).S)`, is sugar for a generic parameter and is
+  // well-formed.
   auto *baseRepr = repr->getBase()->getWithoutParens();
-  if (isa<OpaqueReturnTypeRepr>(baseRepr) ||
-      isa<NamedOpaqueReturnTypeRepr>(baseRepr)) {
+  if ((isa<OpaqueReturnTypeRepr>(baseRepr) ||
+       isa<NamedOpaqueReturnTypeRepr>(baseRepr)) &&
+      parentTy->is<OpaqueTypeArchetypeType>()) {
     if (!options.contains(TypeResolutionFlags::SilenceDiagnostics)) {
       diagnose(repr->getNameLoc(), diag::opaque_type_member_type,
                repr->getNameRef(), parentTy)
