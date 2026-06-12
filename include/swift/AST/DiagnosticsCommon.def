@@ -20,8 +20,11 @@
 #define DEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
 
+// NOTE: This must be the first diagnostic such that matches the default
+// DiagID of 0.
 ERROR(invalid_diagnostic,none,
-      "INTERNAL ERROR: this diagnostic should not be produced", ())
+      "INTERNAL ERROR: this diagnostic should not be produced; "
+      SWIFT_BUG_REPORT_MESSAGE, ())
 
 NOTE(kind_declname_declared_here,none,
      "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
