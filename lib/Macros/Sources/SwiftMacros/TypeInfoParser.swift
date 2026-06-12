@@ -60,17 +60,17 @@ public struct StoredProperty {
   /// Textual representation of the property's type.
   var typeName: String
 
-  /// Wether the property was introduced with `var`
+  /// Whether the property was introduced with `var`
   var isVar: Bool
 
-  /// Wether the property is static
+  /// Whether the property is static
   var isStatic: Bool
 }
 
-/// Error type thrown by the various parsign functions in case of ill-formed
+/// Error type thrown by the various parsing functions in case of ill-formed
 /// input
 public enum TypeInfoParseError: Error {
-  /// Inside a function call, we expected a specific label if `expected is a
+  /// Inside a function call, we expected a specific label if `expected` is a
   /// string or no label if it is `nil` but we got the `got` syntax node
   /// instead.
   case badArgName(expected: String?, got: LabeledExprSyntax)
