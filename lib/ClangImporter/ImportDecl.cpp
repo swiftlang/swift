@@ -4635,7 +4635,9 @@ namespace {
         if (result)
           return result;
       }
-      auto method = VisitFunctionDecl(decl);
+      auto *method = cast_or_null<ValueDecl>(VisitFunctionDecl(decl));
+      if (!method)
+        return nullptr;
 
       // For regular methods (not operators, constructors, etc.), if the return
       // type is an uninstantiated templated class, instantiate it now and
@@ -4651,8 +4653,8 @@ namespace {
       // This post-import behavior is gated on ImportCxxMembersLazily, because
       // without that feature, IsSafeUseOfCxxDecl relies on ClangImporter
       // (over-)eagerly instantiating typedef members.
-      if (method && Impl.SwiftContext.LangOpts.hasFeature(
-                        Feature::ImportCxxMembersLazily)) {
+      if (Impl.SwiftContext.LangOpts.hasFeature(
+              Feature::ImportCxxMembersLazily)) {
         if (!isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
                  clang::CXXConversionDecl>(decl) &&
             decl->getOverloadedOperator() ==
@@ -4679,9 +4681,8 @@ namespace {
           Impl.getNameImporter().clearCachedName(decl, Impl.CurrentVersion);
           if (auto updatedName =
                   Impl.importFullName(decl, Impl.CurrentVersion)) {
-            auto *valueDecl = cast<ValueDecl>(method);
-            if (valueDecl->getName() != updatedName.getDeclName())
-              valueDecl->setName(updatedName.getDeclName());
+            if (method->getName() != updatedName.getDeclName())
+              method->setName(updatedName.getDeclName());
           }
         }
       }
@@ -4689,18 +4690,17 @@ namespace {
       // Do not expose constructors of abstract C++ classes.
       if (auto recordDecl =
               dyn_cast<clang::CXXRecordDecl>(decl->getDeclContext())) {
-        if (isa<clang::CXXConstructorDecl>(decl) && recordDecl->isAbstract() &&
-            isa_and_nonnull<ValueDecl>(method)) {
+        if (isa<clang::CXXConstructorDecl>(decl) && recordDecl->isAbstract()) {
           Impl.markUnavailable(
-              cast<ValueDecl>(method),
+              method,
               "constructors of abstract C++ classes are unavailable in Swift");
           return method;
         }
       }
 
       if (decl->isVirtual()) {
-        if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
-          if (isa_and_nonnull<StructDecl>(method->getDeclContext())) {
+        if (auto funcDecl = dyn_cast<FuncDecl>(method)) {
+          if (isa<StructDecl>(method->getDeclContext())) {
             // If this is a method of a Swift struct, any possible override of
             // this method would get sliced away, and an invocation would get
             // dispatched statically. This is fine because it matches the C++
@@ -4712,7 +4712,7 @@ namespace {
                                    "virtual function is not available in Swift "
                                    "because it is pure");
             }
-          } else if (isa_and_nonnull<ClassDecl>(funcDecl->getDeclContext())) {
+          } else if (isa<ClassDecl>(funcDecl->getDeclContext())) {
             // This is a foreign reference type. Since `class T` on the Swift
             // side is mapped from `T*` on the C++ side, an invocation of a
             // virtual method `t->method()` should get dispatched dynamically.
@@ -4747,7 +4747,7 @@ namespace {
 
       if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
           hasComputedPropertyAttr(decl)) {
-        if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
+        if (auto funcDecl = dyn_cast<FuncDecl>(method)) {
           auto parent = funcDecl->getParent()->getSelfNominalTypeDecl();
           CXXMethodBridging bridgingInfo(decl);
           if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
