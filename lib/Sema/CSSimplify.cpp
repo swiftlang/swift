@@ -1199,7 +1199,8 @@ public:
                                               CS.getConstraintLocator(Locator));
 
       // Not having an argument is the same impact as having a type mismatch.
-      (void)CS.recordFix(fix, /*impact=*/MissingArguments.size() * 2);
+      (void)CS.recordFix(fix,
+                         FixImpact::TypeMismatch * MissingArguments.size());
     }
   }
 
@@ -1326,8 +1327,10 @@ public:
     //
     // If there are not only labeling problems but also some of the
     // arguments are missing, let's account of that in the impact.
-    auto impact = 1 + numOutOfOrder + numExtraneous * 2 + numRenames * 3 +
-                  MissingArguments.size() * 2;
+    auto impact = FixImpact::Mismatch + numOutOfOrder +
+                  FixImpact::TypeMismatch * numExtraneous +
+                  (FixImpact::TypeMismatch + 1) * numRenames +
+                  FixImpact::TypeMismatch * MissingArguments.size();
     return CS.recordFix(fix, impact);
   }
 
@@ -1509,7 +1512,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       (void)cs.recordFix(
           AddMissingArguments::create(cs, synthesizedArgs,
                                       cs.getConstraintLocator(locator)),
-          /*impact=*/synthesizedArgs.size() * 2);
+          FixImpact::TypeMismatch * synthesizedArgs.size());
     }
   }
 
@@ -1594,7 +1597,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
           }
         }
 
-        if (cs.recordFix(fix, /*impact=*/extraArguments.size() * 5))
+        if (cs.recordFix(fix,
+                         FixImpact::InvalidReference * extraArguments.size()))
           return cs.getTypeMatchFailure(locator);
       }
     }
@@ -2571,12 +2575,12 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   return fixRequirementFailure(cs, type1, type2, anchor, path);
 }
 
-static unsigned
+static FixImpact
 assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
                                ConstraintLocatorBuilder locator) {
   assert(requirementType);
 
-  unsigned impact = 1;
+  auto impact = FixImpact::Mismatch;
   auto anchor = locator.getAnchor();
   if (!anchor)
     return impact;
@@ -2604,12 +2608,12 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
       isExpr<UnresolvedMemberExpr>(anchor)) {
     auto *calleeLoc = cs.getCalleeLocator(cs.getConstraintLocator(locator));
     if (!cs.findSelectedOverloadFor(calleeLoc))
-      return 10;
+      return FixImpact::InvalidAST;
   }
 
   if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
     if (isResultBuilderMethodReference(cs.getASTContext(), UDE))
-      return 12;
+      return FixImpact::InvalidAST + 2;
   }
 
   auto resolvedTy = cs.simplifyType(requirementType);
@@ -2620,7 +2624,7 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   if (auto *ODRE = getAsExpr<OverloadedDeclRefExpr>(anchor)) {
     if (locator.isForRequirement(RequirementKind::Conformance) &&
         resolvedTy->is<ArchetypeType>() && ODRE->isForOperator()) {
-      ++impact;
+      impact += 1;
     }
   }
 
@@ -2629,19 +2633,19 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
     // or foundation type, as it's unlikely to be a good suggestion.
     {
       if (resolvedTy->isStdlibType()) {
-        impact += 2;
+        impact += FixImpact::TypeMismatch;
       }
 
       if (auto *NTD = resolvedTy->getAnyNominal()) {
         if (getKnownFoundationEntity(NTD->getNameStr()))
-          impact += 2;
+          impact += FixImpact::TypeMismatch;
       }
     }
 
     // Also do the same for the builtin compiler types Any and AnyObject, but
     // bump the impact even higher as they cannot conform to protocols at all.
     if (resolvedTy->isAny() || resolvedTy->isAnyObject())
-      impact += 4;
+      impact += FixImpact::TypeMismatch * 2;
   }
 
   // If this requirement is associated with an overload choice let's
@@ -2804,7 +2808,7 @@ static bool fixExtraneousArguments(ConstraintSystem &cs,
   return cs.recordFix(
       RemoveExtraneousArguments::create(cs, contextualType, extraneous,
                                         cs.getConstraintLocator(locator)),
-      /*impact=*/numExtraneous * 2);
+      /*impact=*/FixImpact::TypeMismatch * numExtraneous);
 }
 
 bool ConstraintSystem::hasPreconcurrencyCallee(
@@ -3970,7 +3974,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       auto *fix = IgnoreAssignmentDestinationType::create(
           *this, type1, type2, getConstraintLocator(locator));
 
-      if (recordFix(fix, /*impact=*/numMismatches))
+      if (recordFix(fix, /*impact=*/FixImpact::Mismatch * numMismatches))
         return getTypeMatchFailure(locator);
 
       return getTypeMatchSuccess();
@@ -4146,14 +4150,14 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       }
     }
 
-    unsigned impact = 1;
+    auto impact = FixImpact::Mismatch;
 
     if (type1->getAnyPointerElementType() &&
         type2->getAnyPointerElementType()) {
       // If this is a pointer <-> pointer conversion of different kind,
       // there is a dedicated restriction/fix for that in some cases.
       // To accommodate that, let's increase the impact of this fix.
-      impact += 2;
+      impact += FixImpact::TypeMismatch;
     } else {
       // Increase the solution's score for each mismatch this fixes.
       impact += mismatches.size() - 1;
@@ -4368,7 +4372,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
             }
             auto fix = AllowArgumentMismatch::create(
                   *this, type1, proto, getConstraintLocator(anchor, path));
-            if (recordFix(fix, /*impact=*/2))
+            if (recordFix(fix, FixImpact::TypeMismatch))
               return getTypeMatchFailure(locator);
             break;
           }
@@ -4377,7 +4381,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               last.is<LocatorPathElt::TupleElement>()) {
             auto *fix = CollectionElementContextualMismatch::create(
                 *this, type1, type2, getConstraintLocator(anchor, path));
-            if (recordFix(fix, /*impact=*/2))
+            if (recordFix(fix, FixImpact::TypeMismatch))
               return getTypeMatchFailure(locator);
             break;
           }
@@ -9356,8 +9360,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           // Since this is a conformance requirement failure (where the
           // source is most likely an argument), let's increase its impact
           // to disambiguate vs. conversion failure of the same kind.
-          return recordFix(fix, /*impact=*/2) ? SolutionKind::Error
-                                              : SolutionKind::Solved;
+          return recordFix(fix, FixImpact::TypeMismatch) ? SolutionKind::Error
+                                                         : SolutionKind::Solved;
         }
       }
 
@@ -9430,8 +9434,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
          kind == ConstraintKind::NonisolatedConformsTo) &&
         path.back().is<LocatorPathElt::ApplyArgToParam>()) {
       auto *fix = AllowArgumentMismatch::create(*this, type, protocolTy, loc);
-      return recordFix(fix, /*impact=*/2) ? SolutionKind::Error
-                                          : SolutionKind::Solved;
+      return recordFix(fix, FixImpact::TypeMismatch) ? SolutionKind::Error
+                                                     : SolutionKind::Solved;
     }
 
     // If this is an implicit Hashable conformance check generated for each
@@ -10188,7 +10192,7 @@ ConstraintSystem::simplifyBindTupleOfFunctionParamsConstraint(
   if (unwrapCount > 0) {
     auto *fix = ForceOptional::create(*this, simplifiedCopy, second,
                                       getConstraintLocator(locator));
-    if (recordFix(fix, /*impact=*/unwrapCount))
+    if (recordFix(fix, FixImpact::Mismatch * unwrapCount))
       return SolutionKind::Error;
   }
   return SolutionKind::Solved;
@@ -11728,11 +11732,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                                  alreadyDiagnosed, locator);
 
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
-      auto impact = 5;
+      auto impact = FixImpact::InvalidReference;
       // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
-        impact += 10;
+        impact += FixImpact::InvalidAST;
       }
 
       if (recordFix(fix, impact))
@@ -12023,7 +12027,7 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
       auto *fix = AllowInvalidPropertyWrapperType::create(
           *this, wrapperType, getConstraintLocator(locator));
       // The impact here matches that of a missing member, because it's the same problem.
-      if (!recordFix(fix, /*impact=*/5))
+      if (!recordFix(fix, FixImpact::InvalidReference))
         return SolutionKind::Solved;
     }
 
@@ -12040,7 +12044,7 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
           *this, wrapperType, cast<ParamDecl>(wrappedVar),
           getConstraintLocator(locator));
       // The impact here matches that of a missing member, because it's the same problem.
-      if (!recordFix(fix, /*impact=*/5))
+      if (!recordFix(fix, FixImpact::InvalidReference))
         return SolutionKind::Solved;
     }
 
@@ -12321,7 +12325,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     return !recordFix(
         AllowArgumentMismatch::create(*this, typeVar, contextualType,
                                       getConstraintLocator(locator)),
-        /*impact=*/15);
+        /*impact=*/FixImpact::InvalidAST + FixImpact::FunctionTypeMismatch);
   }
 
   // Determine whether a result builder will be applied.
@@ -13671,7 +13675,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     // Record any fixes we attempted to get to the correct solution.
     auto *fix = ForceOptional::create(*this, origType2, func1,
                                       getConstraintLocator(locator));
-    if (recordFix(fix, /*impact=*/unwrapCount))
+    if (recordFix(fix, FixImpact::Mismatch * unwrapCount))
       return SolutionKind::Error;
 
     return SolutionKind::Solved;
@@ -13696,7 +13700,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
       auto *fix = ForceOptional::create(*this, origType2, func1,
                                         getConstraintLocator(locator));
-      if (recordFix(fix, /*impact=*/unwrapCount))
+      if (recordFix(fix, FixImpact::Mismatch * unwrapCount))
         return SolutionKind::Error;
     }
 
@@ -13722,11 +13726,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
       return SolutionKind::Solved;
 
     auto *fix = RemoveInvalidCall::create(*this, getConstraintLocator(locator));
-    // Let's make this fix as high impact so if there is a function or member
+    // Let's make this fix a high impact so if there is a function or member
     // overload with e.g. argument-to-parameter type mismatches or missing/extra
     // arguments it would take a higher priority.
-    return recordFix(fix, /*impact=*/4) ? SolutionKind::Error
-                                        : SolutionKind::Solved;
+    return recordFix(fix, FixImpact::InvalidApplication) ? SolutionKind::Error
+                                                         : SolutionKind::Solved;
   }
 
   return result;
@@ -14100,13 +14104,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
       return SolutionKind::Solved;
 
     auto recordShapeFix = [&](ConstraintFix *fix,
-                              unsigned impact) -> SolutionKind {
+                              FixImpact impact) -> SolutionKind {
       return recordFix(fix, impact) ? SolutionKind::Error
                                     : SolutionKind::Solved;
     };
 
     auto recordShapeMismatchFix = [&]() -> SolutionKind {
-      unsigned impact = 1;
+      auto impact = FixImpact::Mismatch;
       if (locator.endsWith<LocatorPathElt::AnyRequirement>())
         impact = assessRequirementFailureImpact(*this, shape1, locator);
 
@@ -14157,9 +14161,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
                 DestructureTupleToMatchPackExpansionParameter::create(
                     *this,
                     (type2->is<PackType>()
-                     ? type2->castTo<PackType>()
-                     : PackType::getSingletonPackExpansion(type2)), loc),
-                /*impact=*/2 * numParams);
+                         ? type2->castTo<PackType>()
+                         : PackType::getSingletonPackExpansion(type2)),
+                    loc),
+                FixImpact::TypeMismatch * numParams);
           }
         }
 
@@ -14179,7 +14184,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
 
           return recordShapeFix(
               AddMissingArguments::create(*this, synthesizedArgs, argListLoc),
-              /*impact=*/2 * synthesizedArgs.size());
+              FixImpact::TypeMismatch * synthesizedArgs.size());
         } else {
           auto argIdx = argLoc.getArgIdx() + numParams;
           SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4>
@@ -14198,7 +14203,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
               RemoveExtraneousArguments::create(
                   *this, overload->openedType->castTo<FunctionType>(),
                   extraneousArgs, argListLoc),
-              /*impact=*/2 * extraneousArgs.size());
+              FixImpact::TypeMismatch * extraneousArgs.size());
         }
       }
     }
@@ -14606,7 +14611,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                                                  getConstraintLocator(locator));
 
     // Treat this as a contextual type mismatch.
-    unsigned baseImpact = 2;
+    auto baseImpact = FixImpact::TypeMismatch;
     // It's possible to implicitly promote pointer into an optional
     // before matching base types if other side is an optional, so
     // score needs to account for number of such promotions.
@@ -14621,7 +14626,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto *loc = getConstraintLocator(locator);
     // Since this is a contextual type mismatch, let's start from higher
     // impact than regular fix to avoid ambiguities.
-    auto impact = 2;
+    auto impact = FixImpact::TypeMismatch;
     if (loc->isForAssignment() || loc->isForCoercion() ||
         loc->isForContextualType() ||
         loc->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
@@ -15368,8 +15373,9 @@ ConstraintSystem::simplifyPointerToCPointerRestriction(
   if (shouldAttemptFixes() && !inCorrectPosition) {
     auto *fix = AllowArgumentMismatch::create(*this, type1, type2,
                                               getConstraintLocator(locator));
-    return recordFix(fix, /*impact=*/2) ? SolutionKind::Error
-                                        : SolutionKind::Solved;
+    return recordFix(fix, /*impact=*/FixImpact::TypeMismatch)
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
   }
 
   return SolutionKind::Error;
@@ -15384,7 +15390,7 @@ static bool isAugmentingFix(ConstraintFix *fix) {
   }
 }
 
-bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact,
+bool ConstraintSystem::recordFix(ConstraintFix *fix, FixImpact impact,
                                  PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
@@ -15416,7 +15422,8 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact,
 
   // If this should affect the solution score, do so.
   if (auto impactScoreKind = fix->impact())
-    increaseScore(*impactScoreKind, fix->getLocator(), impact);
+    increaseScore(*impactScoreKind, fix->getLocator(),
+                  static_cast<unsigned>(impact));
 
   // If we've made the current solution worse than the best solution we've seen
   // already, stop now.
@@ -15545,11 +15552,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     SmallVector<Type, 4> unwraps2;
     type2->lookThroughAllOptionalTypes(unwraps2);
 
-    unsigned impact = 1;
+    auto impact = FixImpact::None;
     if (unwraps1.size() > unwraps2.size())
-      impact = unwraps1.size() - unwraps2.size();
+      impact += (unwraps1.size() - unwraps2.size());
     else if (unwraps2.size() > unwraps1.size())
-      impact = unwraps2.size() - unwraps1.size();
+      impact += (unwraps2.size() - unwraps1.size());
+    else
+      impact = FixImpact::Mismatch;
 
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
@@ -15592,7 +15601,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowTupleTypeMismatch: {
     if (fix->getAs<AllowTupleTypeMismatch>()->isElementMismatch()) {
       auto *locator = fix->getLocator();
-      if (recordFix(fix, /*impact*/locator->isForContextualType() ? 5 : 1))
+      if (recordFix(fix, FixImpact::Mismatch *
+                             (locator->isForContextualType() ? 5 : 1)))
         return SolutionKind::Error;
       return SolutionKind::Solved;
     }
@@ -15648,7 +15658,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::AllowFunctionTypeMismatch: {
-    if (recordFix(fix, /*impact=*/5))
+    if (recordFix(fix, FixImpact::FunctionTypeMismatch))
       return SolutionKind::Error;
     return SolutionKind::Solved;
   }
@@ -15662,7 +15672,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     case ConversionEphemeralness::Ephemeral:
       // Record the fix with an impact of zero. This ensures that non-ephemeral
       // diagnostics don't impact solver behavior.
-      if (recordFix(fix, /*impact*/ 0))
+      if (recordFix(fix, FixImpact::None))
         return SolutionKind::Error;
 
       return SolutionKind::Solved;
@@ -15734,9 +15744,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::GenericArgumentsMismatch: {
-    unsigned impact = 1;
+    auto impact = FixImpact::Mismatch;
     if (type1->isMarkerExistential() || type2->isMarkerExistential())
-      ++impact;
+      impact += 1;
 
     // If generic arguments mismatch ends up being recorded on the result
     // of the chain or a try expression it means that there is a contextual 
@@ -15751,23 +15761,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // `bind` choice from considered better.
     if (fix->directlyAt<OptionalEvaluationExpr>() ||
         fix->directlyAt<AnyTryExpr>())
-      impact += 2;
+      impact += FixImpact::TypeMismatch;
 
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
   case FixKind::IgnoreThrownErrorMismatch: {
-    return recordFix(fix, 2) ? SolutionKind::Error : SolutionKind::Solved;
+    return recordFix(fix, FixImpact::TypeMismatch) ? SolutionKind::Error
+                                                   : SolutionKind::Solved;
   }
   case FixKind::IgnoreInvalidASTNode: {
-    return recordFix(fix, 10) ? SolutionKind::Error : SolutionKind::Solved;
+    return recordFix(fix, FixImpact::InvalidAST) ? SolutionKind::Error
+                                                 : SolutionKind::Solved;
   }
   case FixKind::IgnoreUnresolvedPatternVar: {
-    return recordFix(fix, 100) ? SolutionKind::Error : SolutionKind::Solved;
+    return recordFix(fix, FixImpact::InvalidAST * 10) ? SolutionKind::Error
+                                                      : SolutionKind::Solved;
   }
 
   case FixKind::AllowInvalidMemberReferenceInInitAccessor: {
-    return recordFix(fix, 5) ? SolutionKind::Error : SolutionKind::Solved;
+    return recordFix(fix, FixImpact::InvalidReference) ? SolutionKind::Error
+                                                       : SolutionKind::Solved;
   }
 
   case FixKind::ExplicitlyConstructRawRepresentable: {
@@ -15776,14 +15790,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // different overloads of a binary operator and `.rawValue` is a
     // better fix because raw representable has a failable constructor.
     return recordFix(fix,
-                     /*impact=*/isExpr<BinaryExpr>(locator.getAnchor()) ? 2 : 1)
+                     /*impact=*/isExpr<BinaryExpr>(locator.getAnchor())
+                         ? FixImpact::TypeMismatch
+                         : FixImpact::Mismatch)
                ? SolutionKind::Error
                : SolutionKind::Solved;
   }
 
   case FixKind::TreatRValueAsLValue: {
-    unsigned impact =
-        TreatRValueAsLValue::assessImpact(*this, fix->getLocator());
+    auto impact = TreatRValueAsLValue::assessImpact(*this, fix->getLocator());
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -15799,7 +15814,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
 
   case FixKind::AllowArgumentTypeMismatch:
   case FixKind::IgnoreDefaultExprTypeMismatch: {
-    auto impact = 2;
+    auto impact = FixImpact::TypeMismatch;
     // If there are any other argument mismatches already detected for this
     // call, we increase the score even higher so more argument fixes means
     // less viable is the overload.
@@ -15809,7 +15824,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                      ? fixLocator->getAnchor() == locator.getAnchor()
                      : false;
         }))
-      impact += 3;
+      impact += FixImpact::TypeMismatch + 1;
 
     // Passing a closure to a parameter that doesn't expect one should
     // be scored lower because there might be an overload that expects
@@ -15817,7 +15832,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (!type2->lookThroughAllOptionalTypes()->is<FunctionType>()) {
       auto argument = simplifyLocatorToAnchor(fix->getLocator());
       if (isExpr<ClosureExpr>(argument)) {
-        impact += 2;
+        impact += FixImpact::TypeMismatch;
       }
     }
 
@@ -15832,10 +15847,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // `String` doesn't match `Int`.
     {
       if (type2->is<BuiltinRawPointerType>())
-        impact += 1;
+        impact += FixImpact::Mismatch;
 
       if (type2->getAnyNominal() == getASTContext().getOpaquePointerDecl())
-        impact += 1;
+        impact += FixImpact::Mismatch;
     }
 
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
@@ -15855,7 +15870,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     auto dictTy = type2->lookThroughAllOptionalTypes(optionals);
 
     // If the fix is worse than the best solution, there's no point continuing.
-    if (recordFix(fix, optionals.size() + 1))
+    if (recordFix(fix, FixImpact::Mismatch + optionals.size()))
       return SolutionKind::Error;
 
     // Extract the dictionary key type.
@@ -15884,7 +15899,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreAssignmentDestinationType:
   case FixKind::AllowConversionThroughInOut:
   case FixKind::IgnoreCollectionElementContextualMismatch: {
-    auto impact = 1;
+    auto impact = FixImpact::Mismatch;
 
     auto locator = fix->getLocator();
     if (auto branchElt =
@@ -15898,13 +15913,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       // one is available and that would result in two fixes - one for
       // each mismatched branch.
       if (branchElt->forElse()) {
-        impact = 10;
+        impact = FixImpact::TypeMismatch * 5;
       } else {
         // Also increase impact for `then` branch lower than `else` to still
         // eliminate ambiguity, but slightly worst than the average fix to avoid
         // so the solution which record this fix wouldn't be picked over one
         // that has contextual mismatch fix on the result of ternary expression.
-        impact = 5;
+        impact += FixImpact::TypeMismatch * 2;
       }
     }
     using SingleValueStmtResult = LocatorPathElt::SingleValueStmtResult;
@@ -15912,14 +15927,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       // Similar to a ternary, except we have N branches. Let's prefer the fix
       // on the first branch, and discount subsequent branches by index.
       if (branchElt->getIndex() > 0)
-        impact = 9 + branchElt->getIndex();
+        impact = FixImpact::TypeMismatch * 5 + (branchElt->getIndex() - 1);
     }
     // Increase impact of invalid conversions to `Any` and `AnyHashable`
     // associated with collection elements (i.e. for-in sequence element)
     // because it means that other side is structurally incompatible.
     if (fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch) {
       if (type2->isAny() || type2->isAnyHashable())
-        ++impact;
+        impact += FixImpact::Mismatch;
     }
 
     if (recordFix(fix, impact))
@@ -15932,7 +15947,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       // are completely disjoint and adjust impact of
       // the fix accordingly.
       if (type2->is<FunctionType>()) {
-        increaseScore(SK_Fix, locator, 10);
+        increaseScore(
+            SK_Fix, locator,
+            static_cast<unsigned>(FixImpact::FunctionTypeMismatch * 2));
       } else {
         // If type produced by expression is a function type
         // with result type matching contextual, it should have
@@ -16635,8 +16652,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
       // TODO(diagnostics): Impact should be associated with a fix unless
       // it's a contextual problem, then only solver can decide what the impact
       // would be in each particular situation.
-      auto impact =
-          fix->getKind() == FixKind::AddQualifierToAccessTopLevelName ? 10 : 1;
+      auto impact = fix->getKind() == FixKind::AddQualifierToAccessTopLevelName
+                        ? FixImpact::InvalidAST
+                        : FixImpact::Mismatch;
       if (recordFix(fix, impact))
         return SolutionKind::Error;
     }
