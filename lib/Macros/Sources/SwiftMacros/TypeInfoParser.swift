@@ -481,37 +481,37 @@ extension TypeInfoProtocol {
 }
 
 /// Creates a string literal syntax node with `str` contents.
-func stringlit(_ str: String) -> ExprSyntax {
+fileprivate func stringlit(_ str: String) -> ExprSyntax {
   ExprSyntax(StringLiteralExprSyntax(content: str))
 }
 
 /// Creates a bool literal syntax node with the value `b`.
-func boollit(_ b: Bool) -> ExprSyntax {
+fileprivate func boollit(_ b: Bool) -> ExprSyntax {
   ExprSyntax(BooleanLiteralExprSyntax(booleanLiteral: b))
 }
 
 /// Creates an array syntax node, with the element values from which we can
 /// derive syntax.
-func arraySyntax<T: TypeInfoProtocol>(_ values: [T]) -> ExprSyntax {
+fileprivate func arraySyntax<T: TypeInfoProtocol>(_ values: [T]) -> ExprSyntax {
   arraySyntax(values, \.syntax)
 }
 
 /// Creates an array syntax node, with the element values from the mapping of
 /// `values` by the `toSyntax` function.
-func arraySyntax<T>(_ values: [T], _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax
+fileprivate func arraySyntax<T>(_ values: [T], _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax
 {
   ExprSyntax(ArrayExprSyntax(expressions: values.map(toSyntax)))
 }
 
 /// Creates a `nil` syntax node if `value` is `nil` and the derived syntax of
 /// `value` otherwise.
-func optionalSyntax<T: TypeInfoProtocol>(_ value: T?) -> ExprSyntax {
+fileprivate func optionalSyntax<T: TypeInfoProtocol>(_ value: T?) -> ExprSyntax {
   optionalSyntax(value, \.syntax)
 }
 
 /// Creates a `nil` syntax node if `value` is `nil` and the syntax node
 /// produced by calling `toSyntax` on `value` otherwise.
-func optionalSyntax<T>(_ value: T?, _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax
+fileprivate func optionalSyntax<T>(_ value: T?, _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax
 {
   if let value = value {
     toSyntax(value)
