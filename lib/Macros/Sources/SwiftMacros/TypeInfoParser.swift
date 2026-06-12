@@ -36,11 +36,11 @@ public struct EnumTypeInfo {
   var isObjC: Bool
 
   /// Information on all its cases
-  var cases: [CaseInfo]
+  var cases: [EnumCaseInfo]
 }
 
 /// Represents information on a single case of an enumeration.
-public struct CaseInfo {
+public struct EnumCaseInfo {
   var name: String
 
   /// For each associated value, we have the label's name and `nil` if there
@@ -355,7 +355,7 @@ extension StructTypeInfo: TypeInfoSyntax {
 extension EnumTypeInfo: TypeInfoSyntax {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
-    //   EnumTypeInfo(isObjC: <Bool>, cases: <[CaseInfo]>)
+    //   EnumTypeInfo(isObjC: <Bool>, cases: <[EnumCaseInfo]>)
 
     guard let fcall = node.as(FunctionCallExprSyntax.self) else {
       throw TypeInfoParseError.expectedFunctionCall(got: node)
@@ -368,7 +368,7 @@ extension EnumTypeInfo: TypeInfoSyntax {
 
     let parsed = try fcall.arguments.expect(
       .boolArg("isObjC"),
-      .arrArg("cases", parser: CaseInfo.fromSyntax)
+      .arrArg("cases", parser: EnumCaseInfo.fromSyntax)
     )
 
     return Self(isObjC: parsed.0, cases: parsed.1)
@@ -415,18 +415,18 @@ extension StoredProperty: TypeInfoSyntax {
   }
 }
 
-extension CaseInfo: TypeInfoSyntax {
+extension EnumCaseInfo: TypeInfoSyntax {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
-    //   CaseInfo(name: <String>, associatedValues: <[String?]>)
+    //   EnumCaseInfo(name: <String>, associatedValues: <[String?]>)
 
     guard let fcall = node.as(FunctionCallExprSyntax.self) else {
       throw TypeInfoParseError.expectedFunctionCall(got: node)
     }
 
-    guard fcall.calledExpression.trimmedDescription == "CaseInfo" else {
+    guard fcall.calledExpression.trimmedDescription == "EnumCaseInfo" else {
       throw TypeInfoParseError.expectedFunctionCallNames(
-        names: ["CaseInfo"], got: fcall.calledExpression)
+        names: ["EnumCaseInfo"], got: fcall.calledExpression)
     }
 
     let parsed = try fcall.arguments.expect(
@@ -439,7 +439,7 @@ extension CaseInfo: TypeInfoSyntax {
 
   public var syntax: ExprSyntax {
     """
-    CaseInfo(name: \(stringlit(name)), associatedValues: \(arrSyntax(associatedValues, {optSyntax($0, stringlit)})))
+    EnumCaseInfo(name: \(stringlit(name)), associatedValues: \(arrSyntax(associatedValues, {optSyntax($0, stringlit)})))
     """
   }
 }
@@ -493,7 +493,7 @@ func optSyntax<T: TypeInfoSyntax>(_ value: T?) -> ExprSyntax {
 
 /// Creates a `nil` syntax node if `value` is `nil` and the syntax node
 /// produced by calling `toSyntax` on `value` otherwise.
-func optSyntax<T>(_ value: T?, _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax {
+func optionalSyntax<T>(_ value: T?, _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax {
   if let value = value {
     toSyntax(value)
   } else {
