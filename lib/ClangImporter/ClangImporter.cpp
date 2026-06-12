@@ -6619,7 +6619,10 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
 
     auto &diags = interfaces.front()->getASTContext().Diags;
     for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
-      auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>();
+      auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>(
+          /*AllowInvalid=*/true);
+      if (attr->isInvalid())
+        continue;
       attr->setInvalid();
 
       // @objc @implementations for categories are diagnosed as category
