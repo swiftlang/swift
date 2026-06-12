@@ -383,3 +383,14 @@ func test_transitive_key_path_root_inference2(x: Int?) -> any Shape {
   let shape = x.map(Polygon.init).map(\.shape) ?? Empty()
   return shape
 }
+
+// Interaction between closure return defaulting to Void and keypath
+// root inference
+func rdar174707424() {
+  @discardableResult
+  func f<N, V>(_ n: N, _ kp: KeyPath<N, V>) -> N { n }
+
+  let _: (S) -> Void = {
+    f($0, \.i)
+  }
+}
