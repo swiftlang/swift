@@ -469,20 +469,14 @@ extension TypeInfoProtocol {
 
   /// Returns the parsed `Self` from a payloaded string literal containing
   /// Swift syntax.
-  public static func fromStringLit(strlit: StringLiteralExprSyntax) throws
-    -> Self
-  {
-    guard let underlying = strlit.representedLiteralValue else {
-      throw TypeInfoParseError.expectedStrLitAsInput(got: ExprSyntax(strlit))
-    }
-    return try fromSyntax(node: "\(raw: underlying)")
-  }
-
   public static func fromStringLit(expr: ExprSyntax) throws -> Self {
-    guard let strlit = expr.as(StringLiteralExprSyntax.self) else {
+    guard
+      let underlying = expr.as(StringLiteralExprSyntax.self)?
+        .representedLiteralValue
+    else {
       throw TypeInfoParseError.expectedStrLitAsInput(got: expr)
     }
-    return try fromStringLit(strlit: strlit)
+    return try fromSyntax(node: "\(raw: underlying)")
   }
 }
 
