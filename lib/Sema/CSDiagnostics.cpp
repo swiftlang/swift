@@ -2711,11 +2711,7 @@ bool ContextualFailure::diagnoseAsError() {
     break;
   }
   case ConstraintLocator::CoercionOperand:
-  case ConstraintLocator::InstanceType: {
-    if (diagnoseCoercionToUnrelatedType())
-      return true;
-    break;
-  }
+    return diagnoseCoercionToUnrelatedType();
 
   case ConstraintLocator::TernaryBranch: {
     auto *ternaryExpr = castToExpr<TernaryExpr>(getRawAnchor());
