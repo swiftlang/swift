@@ -223,7 +223,7 @@ extension Task {
   @_transparent
   public var isCancelled: Bool {
     // This is @available(SwiftStdlib 6.4, *) but can't use SwiftStdlib in transparent function
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) {
+    if #available(anyAppleOS 27, *) {
       let ignoreTaskCancellationShield: UInt64 = 0x1
       return unsafe _taskIsCancelledWithFlags(_AsyncTask(_task), flags: ignoreTaskCancellationShield)
     } else {
