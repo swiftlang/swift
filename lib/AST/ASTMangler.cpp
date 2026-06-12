@@ -3178,7 +3178,6 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
         return false;
     }
 
-    auto *nominal = dyn_cast<NominalTypeDecl>(decl);
     auto namedDecl = getClangDeclForMangling(decl);
     if (!namedDecl) {
       if (auto typedefType = getTypeDefForCXXCFOptionsDefinition(decl)) {
@@ -3215,7 +3214,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       // `ClassTemplateSpecializationDecl`'s name does not include information about
       // template arguments, and in order to prevent name clashes we use the
       // name of the Swift decl which does include template arguments.
-      appendIdentifier(nominal->getName().str(),
+      appendIdentifier(decl->getName().str(),
                        /*allowRawIdentifiers=*/false);
     } else {
       appendIdentifier(namedDecl->getName());
@@ -3234,14 +3233,15 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       // imported as a Swift enum.
       appendOperator("V");
     } else if (isa<clang::TypedefNameDecl>(namedDecl) ||
-               isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
+               isa<clang::ObjCCompatibleAliasDecl>(namedDecl) ||
+               isa<clang::NamespaceAliasDecl>(namedDecl)) {
       appendOperator("a");
     } else if (isa<clang::NamespaceDecl>(namedDecl)) {
       // Note: Namespaces are not really enums, but since namespaces are
       // imported as enums, be consistent.
       appendOperator("O");
     } else if (isa<clang::ClassTemplateDecl>(namedDecl)) {
-      appendIdentifier(nominal->getName().str(),
+      appendIdentifier(decl->getName().str(),
                        /*allowRawIdentifiers=*/false);
     } else {
       llvm_unreachable("unknown imported Clang type");
