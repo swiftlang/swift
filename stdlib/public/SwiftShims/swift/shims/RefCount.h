@@ -716,7 +716,7 @@ class RefCounts {
 
   SWIFT_NOINLINE
   SWIFT_REFCOUNT_CC
-  HeapObject *incrementSlow(RefCountBits oldbits, uint32_t inc);
+  HeapObject *incrementSlow(RefCountBits oldbits, uint32_t inc, uint32_t *count);
 
   SWIFT_NOINLINE
   void incrementNonAtomicSlow(RefCountBits oldbits, uint32_t inc);
@@ -817,7 +817,8 @@ class RefCounts {
   // can be directly returned from swift_retain. This makes the call to
   // incrementSlow() a tail call.
   SWIFT_ALWAYS_INLINE
-  HeapObject *increment(HeapObject *returning, uint32_t inc = 1) {
+  HeapObject *increment(HeapObject *returning, uint32_t inc = 1,
+                        uint32_t *count = nullptr) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     
     // Constant propagation will remove this in swift_retain, it should only
@@ -831,12 +832,17 @@ class RefCounts {
       newbits = oldbits;
       bool fast = newbits.incrementStrongExtraRefCount(inc);
       if (SWIFT_UNLIKELY(!fast)) {
-        if (oldbits.isImmortal(false))
+        if (oldbits.isImmortal(false)) {
+          // Immortal objects are never deallocated, so reading the (saturated)
+          // count is safe here.
+          if (count) *count = getCount();
           return getHeapObject();
-        return incrementSlow(oldbits, inc);
+        }
+        return incrementSlow(oldbits, inc, count);
       }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
+    if (count) *count = newbits.getStrongExtraRefCount() + 1;
     return returning;
   }
 
@@ -901,8 +907,8 @@ class RefCounts {
   // Decrement the reference count.
   // Return true if the caller should now deinit the object.
   SWIFT_ALWAYS_INLINE
-  bool decrementShouldDeinit(uint32_t dec) {
-    return doDecrement<DontPerformDeinit>(dec);
+  bool decrementShouldDeinit(uint32_t dec, uint32_t *count) {
+    return doDecrement<DontPerformDeinit>(dec, count);
   }
 
   SWIFT_ALWAYS_INLINE
@@ -911,8 +917,8 @@ class RefCounts {
   }
 
   SWIFT_ALWAYS_INLINE
-  void decrementAndMaybeDeinit(uint32_t dec) {
-    doDecrement<DoPerformDeinit>(dec);
+  void decrementAndMaybeDeinit(uint32_t dec, uint32_t *count) {
+    doDecrement<DoPerformDeinit>(dec, count);
   }
 
   SWIFT_ALWAYS_INLINE
@@ -1002,7 +1008,8 @@ class RefCounts {
   // Second slow path of doDecrement, where the
   // object may have a side table entry.
   template <PerformDeinit performDeinit>
-  bool doDecrementSideTable(RefCountBits oldbits, uint32_t dec);
+  bool doDecrementSideTable(RefCountBits oldbits, uint32_t dec,
+                            uint32_t *count = nullptr);
 
   // Second slow path of doDecrementNonAtomic, where the
   // object may have a side table entry.
@@ -1013,12 +1020,15 @@ class RefCounts {
   // Side table is handled in the second slow path, doDecrementSideTable().
   template <PerformDeinit performDeinit>
   SWIFT_REFCOUNT_CC
-  bool doDecrementSlow(RefCountBits oldbits, uint32_t dec) {
+  bool doDecrementSlow(RefCountBits oldbits, uint32_t dec, uint32_t *count) {
     RefCountBits newbits;
     
     // Constant propagation will remove this in swift_release, it should only
     // be present in swift_release_n.
     if (dec != 1 && oldbits.isImmortal(true)) {
+      // Immortal objects are never deallocated, so reading the (saturated)
+      // count is safe here.
+      if (count) *count = getCount();
       return false;
     }
     
@@ -1033,10 +1043,13 @@ class RefCounts {
         deinitNow = false;
       }
       else if (oldbits.isImmortal(false)) {
+        // Immortal objects are never deallocated, so reading the (saturated)
+        // count is safe here.
+        if (count) *count = getCount();
         return false;
       } else if (oldbits.hasSideTable()) {
         // Decrement failed because we're on some other slow path.
-        return doDecrementSideTable<performDeinit>(oldbits, dec);
+        return doDecrementSideTable<performDeinit>(oldbits, dec, count);
       }
       else {
         // Decrement underflowed. Begin deinit.
@@ -1055,6 +1068,8 @@ class RefCounts {
       _swift_release_dealloc(getHeapObject());
     }
 
+    if (count)
+      *count = deinitNow ? 0 : (newbits.getStrongExtraRefCount() + 1);
     return deinitNow;
   }
 
@@ -1109,13 +1124,16 @@ class RefCounts {
   // the caller because the compiler can optimize this arrangement better.
   template <PerformDeinit performDeinit>
   SWIFT_ALWAYS_INLINE
-  bool doDecrement(uint32_t dec) {
+  bool doDecrement(uint32_t dec, uint32_t *count) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
     
     // Constant propagation will remove this in swift_release, it should only
     // be present in swift_release_n.
     if (dec != 1 && oldbits.isImmortal(true)) {
+      // Immortal objects are never deallocated, so reading the (saturated)
+      // count is safe here.
+      if (count) *count = getCount();
       return false;
     }
     
@@ -1125,15 +1143,19 @@ class RefCounts {
         newbits.decrementStrongExtraRefCount(dec);
       if (SWIFT_UNLIKELY(!fast)) {
         if (oldbits.isImmortal(false)) {
+            // Immortal objects are never deallocated, so reading the (saturated)
+            // count is safe here.
+            if (count) *count = getCount();
             return false;
         }
         // Slow paths include side table; deinit; underflow
-        return doDecrementSlow<performDeinit>(oldbits, dec);
+        return doDecrementSlow<performDeinit>(oldbits, dec, count);
       }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_release,
                                               std::memory_order_relaxed));
 
+    if (count) *count = newbits.getStrongExtraRefCount() + 1;
     return false;  // don't deinit
   }
 
@@ -1381,13 +1403,13 @@ class HeapObjectSideTableEntry {
 
   // STRONG
   
-  void incrementStrong(uint32_t inc) {
-    refCounts.increment(nullptr, inc);
+  void incrementStrong(uint32_t inc, uint32_t *count) {
+    refCounts.increment(nullptr, inc, count);
   }
 
   template <PerformDeinit performDeinit>
-  bool decrementStrong(uint32_t dec) {
-    return refCounts.doDecrement<performDeinit>(dec);
+  bool decrementStrong(uint32_t dec, uint32_t *count) {
+    return refCounts.doDecrement<performDeinit>(dec, count);
   }
 
   template <PerformDeinit performDeinit>
@@ -1564,18 +1586,18 @@ RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
 // threat of concurrent read of a weak reference.
 template <>
 template <PerformDeinit performDeinit>
-inline bool RefCounts<SideTableRefCountBits>::
-doDecrementNonAtomic(uint32_t dec) {
-  return doDecrement<performDeinit>(dec);
+inline bool
+RefCounts<SideTableRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
+  return doDecrement<performDeinit>(dec, nullptr);
 }
 
 
 template <>
 template <PerformDeinit performDeinit>
 inline bool RefCounts<InlineRefCountBits>::
-doDecrementSideTable(InlineRefCountBits oldbits, uint32_t dec) {
+doDecrementSideTable(InlineRefCountBits oldbits, uint32_t dec, uint32_t *count) {
   auto side = oldbits.getSideTable();
-  return side->decrementStrong<performDeinit>(dec);
+  return side->decrementStrong<performDeinit>(dec, count);
 }
 
 template <>
@@ -1589,7 +1611,8 @@ doDecrementNonAtomicSideTable(InlineRefCountBits oldbits, uint32_t dec) {
 template <>
 template <PerformDeinit performDeinit>
 inline bool RefCounts<SideTableRefCountBits>::
-doDecrementSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
+doDecrementSideTable(SideTableRefCountBits oldbits, uint32_t dec,
+                     uint32_t *count) {
   swift::crash("side table refcount must not have "
                "a side table entry of its own");
 }
