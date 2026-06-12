@@ -829,13 +829,13 @@ public:
           // The current basic block must be a successor of the dbg.value().
           continue;
 
-        llvm::SmallVector<llvm::DbgValueInst *, 4> DbgValues;
-        llvm::findDbgValues(DbgValues, Var);
-        for (auto *DVI : DbgValues)
-          if (DVI->getParent() == BB)
+        llvm::SmallVector<llvm::DbgVariableRecord *, 4> DbgValues;
+        llvm::findDbgValues(Var, DbgValues);
+        for (auto *DVR : DbgValues)
+          if (DVR->getParent() == BB)
             IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
-                DVI->getValue(), DVI->getVariable(), DVI->getExpression(),
-                DVI->getDebugLoc(), CurBB->getFirstInsertionPt());
+                DVR->getValue(), DVR->getVariable(), DVR->getExpression(),
+                DVR->getDebugLoc(), CurBB->getFirstInsertionPt());
       }
     }
   }
@@ -6178,9 +6178,8 @@ static bool InCoroContext(SILFunction &f, SILInstruction &i) {
 /// loads, need a special case.
 static void salvageDebugReconstructionInst(llvm::Instruction *I) {
   if (auto *LI = dyn_cast<llvm::LoadInst>(I)) {
-    llvm::SmallVector<llvm::DbgVariableIntrinsic *, 1> DbgInsts;
     llvm::SmallVector<llvm::DbgVariableRecord *, 2> DbgRecords;
-    llvm::findDbgUsers(DbgInsts, LI, &DbgRecords);
+    llvm::findDbgUsers(LI, DbgRecords);
     llvm::Value *Addr = LI->getPointerOperand();
     for (llvm::DbgVariableRecord *DVR : DbgRecords) {
       // Insert DW_OP_deref after each arg that references the load.
@@ -6217,9 +6216,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
-  auto VarInfo = i->getVarInfo();
-  assert(VarInfo && "debug_value without debug info");
-  if (isa<SILUndef>(SILVal) && VarInfo->Name == "$error") {
+  auto VarInfo = i->getCompleteVarInfo();
+  if (isa<SILUndef>(SILVal) && VarInfo.Name == "$error") {
     // We cannot track the location of inlined error arguments because it has no
     // representation in SIL.
     if (!IsAddrVal && !i->getDebugScope()->InlinedCallSite) {
@@ -6235,15 +6233,9 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   bool IsInCoro = InCoroContext(*CurSILFn, *i);
 
   bool IsAnonymous = false;
-  VarInfo->Name = getVarName(i, IsAnonymous);
+  VarInfo.Name = getVarName(i, IsAnonymous);
   DebugTypeInfo DbgTy;
-  SILType SILTy;
-  if (auto MaybeSILTy = VarInfo->Type) {
-    // If there is auxiliary type info, use it
-    SILTy = *MaybeSILTy;
-  } else {
-    SILTy = SILVal->getType();
-  }
+  SILType SILTy = *VarInfo.Type;
 
   auto RealTy = SILTy.getASTType();
   VarDecl *VD = i->getDecl();
@@ -6251,13 +6243,13 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     // The source location of a DebugValueInst inserted by the SIL optimizer is
     // not necessarily the VarDecl, as it can be the source location of the
     // update point this DebugValueInst represents.
-    VD = VarInfo->getDecl();
+    VD = VarInfo.getDecl();
   }
   // Figure out the debug variable type
   if (VD) {
     DbgTy = DebugTypeInfo::getLocalVariable(VD, RealTy, getTypeInfo(SILTy),
                                             IGM);
-  } else if (!SILTy.hasArchetype() && !VarInfo->Name.empty()) {
+  } else if (!SILTy.hasArchetype() && !VarInfo.Name.empty()) {
     // Handle the cases that read from a SIL file
     DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy), IGM);
   } else
@@ -6319,13 +6311,13 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     auto Addr = getLoweredValue(SILVal).getAddressOfBox();
     auto *Storage = Addr.getAddress();
 
-    VarInfo->DIExpr.prependElements(
+    VarInfo.DIExpr.prependElements(
         {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
 
     Copy.emplace_back(emitShadowCopyIfNeeded(
         Storage, TI.getStorageType(),
-        i->getDebugScope(), *VarInfo, IsAnonymous,
-        i->usesMoveableValueDebugInfo(), &VarInfo->DIExpr));
+        i->getDebugScope(), VarInfo, IsAnonymous,
+        i->usesMoveableValueDebugInfo(), &VarInfo.DIExpr));
   } else if (IsAddrVal) {
     auto &TI = getTypeInfo(SILVal->getType());
     auto Addr = getLoweredAddress(SILVal);
@@ -6333,12 +6325,12 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
     Copy.emplace_back(emitShadowCopyIfNeeded(
         Storage, TI.getStorageType(),
-        i->getDebugScope(), *VarInfo, IsAnonymous,
-        i->usesMoveableValueDebugInfo(), &VarInfo->DIExpr));
+        i->getDebugScope(), VarInfo, IsAnonymous,
+        i->usesMoveableValueDebugInfo(), &VarInfo.DIExpr));
   } else {
-    emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
+    emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), VarInfo, IsAnonymous,
                            i->usesMoveableValueDebugInfo(), Copy,
-                           &VarInfo->DIExpr);
+                           &VarInfo.DIExpr);
   }
 
   bindArchetypes(DbgTy.getType());
@@ -6346,7 +6338,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     return;
 
   emitDebugVariableDeclaration(
-      Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), *VarInfo,
+      Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), VarInfo,
       IsInCoro, AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
 
   // Erase any LLVM instructions emitted by the debug BB. They were only needed

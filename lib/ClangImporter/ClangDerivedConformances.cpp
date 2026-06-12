@@ -990,6 +990,9 @@ static void conformToCxxBorrowingSequenceIfNeeded(
   PrettyStackTraceDecl trace("trying to conform to CxxBorrowingSequence", decl);
   ASTContext &ctx = decl->getASTContext();
 
+  if (!ctx.LangOpts.hasFeature(Feature::BorrowingSequence))
+    return;
+
   ProtocolDecl *cxxIteratorProto =
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
   ProtocolDecl *cxxBorrowingSequenceProto =

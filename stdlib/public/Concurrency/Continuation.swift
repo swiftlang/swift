@@ -69,8 +69,12 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   /// - Parameter value: The value to return from the continuation
   @_alwaysEmitIntoClient
   public consuming func resume(returning value: consuming sending Success) where Failure == Never {
+    #if $BuiltinContinuationNonCopyableSuccess
     Builtin.resumeNonThrowingContinuationReturning(context, value)
     discard self // prevent deinit from firing
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting the continuation by having it return
@@ -79,8 +83,12 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   /// - Parameter value: The value to return from the continuation
   @_alwaysEmitIntoClient
   public consuming func resume(returning value: consuming sending Success) {
+    #if $BuiltinContinuationNonCopyableSuccess
     Builtin.resumeThrowingContinuationReturning(context, value)
     discard self // prevent deinit from firing
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting the continuation by having it throw an error
@@ -89,8 +97,12 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   /// - Parameter error: The error to throw from the continuation
   @_alwaysEmitIntoClient
   public consuming func resume(throwing error: __owned Failure) {
+    #if $BuiltinContinuationNonCopyableSuccess
     Builtin.resumeThrowingContinuationThrowing(context, error)
     discard self // prevent deinit from firing
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting the continuation by having it either
@@ -103,6 +115,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   public consuming func resume(
     with result: consuming sending Result<Success, Failure>
   ) {
+    #if $BuiltinContinuationNonCopyableSuccess
     switch consume result {
     case .success(let val):
       Builtin.resumeThrowingContinuationReturning(context, val)
@@ -110,6 +123,9 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
       Builtin.resumeThrowingContinuationThrowing(context, err)
     }
     discard self // prevent deinit from firing
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting the continuation by having it return
@@ -149,6 +165,7 @@ public nonisolated(nonsending) func withContinuation<Success: ~Copyable, Failure
   throwing: Failure.Type,
   _ body: (consuming Continuation<Success, Failure>) -> Void
 ) async throws(Failure) -> sending Success {
+  #if $BuiltinContinuationNonCopyableSuccess
   do {
     return try await Builtin.withUnsafeThrowingContinuation {
       body(Continuation($0))
@@ -156,6 +173,9 @@ public nonisolated(nonsending) func withContinuation<Success: ~Copyable, Failure
   } catch {
     throw error as! Failure
   }
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
 }
 
 /// Invokes the passed in closure with a non-copyable continuation for the current task.
@@ -181,9 +201,13 @@ public nonisolated(nonsending) func withContinuation<Success: ~Copyable>(
   of: Success.Type = Success.self,
   _ body: (consuming Continuation<Success, Never>) -> Void
 ) async -> sending Success {
+  #if $BuiltinContinuationNonCopyableSuccess
   return await Builtin.withUnsafeContinuation {
     body(Continuation($0))
   }
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
 }
 
 // ==== -----------------------------------------------------------------------

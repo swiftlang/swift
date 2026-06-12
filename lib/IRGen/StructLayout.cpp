@@ -243,6 +243,19 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
     if (IGM.isResilient(decl, ResilienceExpansion::Minimal))
       IsKnownAlwaysFixedSize = IsNotFixedSize;
 
+    // Force non-loadable when the struct has stored properties of hidden types.
+    // With a stored property of hidden type, having the library and client side
+    // to agree on expansion scheme is challenging and error-prone. Therefore,
+    // we make these types always address-only.
+    if (decl->getAttrs().hasAttribute<HasHiddenStoredPropertiesAttr>()) {
+      IsLoadable = false;
+      // Set zero spare bits so both sides agree on 0 extra inhabitants
+      // (the client can't know the hidden field's
+      // spare-bit pattern, so Optional<S> must use a tag byte).
+      SpareBits =
+          SpareBitVector::getConstant(MinimumSize.getValueInBits(), false);
+    }
+
     applyLayoutAttributes(IGM, decl, IsFixedLayout, MinimumAlign);
   }
 }

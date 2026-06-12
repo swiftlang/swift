@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -Xcc -isystem -Xcc %clang-importer-sdk-path/usr/include) -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
 import ctypes
 struct S {

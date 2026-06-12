@@ -1735,14 +1735,24 @@ Type TypeResolution::applyUnboundGenericArguments(
         return BoundGenericType::get(nominalDecl, parentTy, genericArgs);
       }
 
+      // We have a generic type alias referenced with an unbound generic
+      // base, which is only valid if all of the unbound generic type's
+      // generic parameters are fixed to concrete types by the generic
+      // signature of the type alias, eg:
+      //
+      // struct G<T> {
+      //   typealias A<U> = Int where T == String
+      // }
       if (!resultType->hasTypeParameter())
         return resultType;
 
       auto genericSig = decl->getGenericSignature();
       auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
-      for (auto gp : parentSig.getGenericParams())
+      for (auto gp : parentSig.getGenericParams()) {
+        ASSERT(genericSig->isConcreteType(gp));
         subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
             genericSig->getConcreteType(gp);
+      }
     } else {
       subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     }
@@ -2539,11 +2549,15 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
 
   // Short-circuiting.
   if (repr->isInvalid()) return ErrorType::get(ctx);
-  // Reject member type access only when the base is explicitly written as an
-  // opaque type, e.g. `(some P).T`.
+  // Reject member type access only when the base is both explicitly written as
+  // an opaque type and resolves to an opaque archetype, e.g. `(some P).T` in
+  // result/binding position. Accessing a member on an opaque parameter,
+  // e.g. `func foo(_: (some P).S)`, is sugar for a generic parameter and is
+  // well-formed.
   auto *baseRepr = repr->getBase()->getWithoutParens();
-  if (isa<OpaqueReturnTypeRepr>(baseRepr) ||
-      isa<NamedOpaqueReturnTypeRepr>(baseRepr)) {
+  if ((isa<OpaqueReturnTypeRepr>(baseRepr) ||
+       isa<NamedOpaqueReturnTypeRepr>(baseRepr)) &&
+      parentTy->is<OpaqueTypeArchetypeType>()) {
     if (!options.contains(TypeResolutionFlags::SilenceDiagnostics)) {
       diagnose(repr->getNameLoc(), diag::opaque_type_member_type,
                repr->getNameRef(), parentTy)
@@ -6587,7 +6601,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       auto kp = getKnownProtocolKind(ip);
 
       if (layout.requiresClass()) {
-        auto superclass = layout.getSuperclass();
+        auto superclass = layout.explicitSuperclass;
         diagnose(repr->getStartLoc(),
                  diag::inverse_with_class_constraint,
                  !superclass,
@@ -6996,10 +7010,10 @@ private:
   /// a type representation with the given parent requires paretheses.
   static bool anySyntaxNeedsParens(TypeRepr *parent) {
     switch (parent->getKind()) {
-    case TypeReprKind::Optional:
-    case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Protocol:
       return true;
+    case TypeReprKind::Optional:
+    case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Metatype:
     case TypeReprKind::Attributed:
     case TypeReprKind::Error:
@@ -7108,7 +7122,9 @@ private:
 
       // Look through parens, inverses, `.Type` metatypes, and compositions.
       if ((*it)->isParenType() || isa<InverseTypeRepr>(*it) ||
-          isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it)) {
+          isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it) ||
+          isa<OptionalTypeRepr>(*it) ||
+          isa<ImplicitlyUnwrappedOptionalTypeRepr>(*it)) {
         continue;
       }
 

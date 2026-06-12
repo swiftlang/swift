@@ -922,7 +922,12 @@ DECL_ATTR(diagnose, Diagnose,
   OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar | OnNominalType | OnExtension | OnEnumElement | OnAccessor | OnImport | OnTypeAlias | OnAssociatedType | OnMacro,
   AllowMultipleAttributes | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   174)
-LAST_DECL_ATTR(Diagnose)
+
+SIMPLE_DECL_ATTR(_hasHiddenStoredProperties, HasHiddenStoredProperties,
+  OnStruct,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  175)
+LAST_DECL_ATTR(HasHiddenStoredProperties)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

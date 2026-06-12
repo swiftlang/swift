@@ -1731,6 +1731,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     case SourceFileKind::Library:
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
+    case SourceFileKind::SyntheticMacro:
       break;
     }
   }
@@ -2401,8 +2402,11 @@ public:
         !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
         ID->getAccessLevel() == AccessLevel::Public) {
       auto importer = ID->getModuleContext();
-      Ctx.Diags.diagnose(ID, diag::error_import_of_ipi_module,
-                         target->getName(), importer->getName());
+      unsigned importerLevel =
+          Ctx.LangOpts.LibraryLevel == LibraryLevel::API ? 0 : 1;
+      Ctx.Diags.diagnose(ID, diag::warn_import_of_ipi_module,
+                         target->getName(), importer->getName(),
+                         importerLevel);
     }
 
     // Preconcurrency imports aren't strictly memory-safe when we have strict
@@ -2777,6 +2781,7 @@ public:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             var->diagnose(diag::opaque_type_var_no_init);
             break;
           }
@@ -2802,6 +2807,7 @@ public:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             break;
           }
 
@@ -2824,6 +2830,7 @@ public:
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             break;
           }
 

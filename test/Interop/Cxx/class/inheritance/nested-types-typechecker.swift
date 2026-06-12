@@ -71,16 +71,14 @@ func siblings(
 // and vice versa
 func assigner() {
   let _: Base.EnumClass = Derived.EnumClass.ecb
-  let _: Base.Enum = Derived.ea // expected-error {{type 'Derived' has no member 'ea'}}
-                                // ^FIXME: nested enums are broken, so inherited nested enums are broken too
+  let _: Base.Enum = Derived.ea
   let _: Base.Struct = Derived.Struct(sa: 4, sb: 2)
   let _: Base.Parent = Derived.Parent()
   let _: Base.Parent.Child = Derived.Parent.Child(pca: 42)
   let _: Base.Union = Derived.Union(ua: 42)
 
   let _: Derived.EnumClass = Base.EnumClass.ecc
-  let _: Derived.Enum = Base.ea // expected-error {{type 'Base' has no member 'ea'}}
-                                // ^FIXME: nested enums are broken, so inherited nested enums are broken too
+  let _: Derived.Enum = Base.ea
   let _: Derived.Struct = Base.Struct(sa: 4, sb: 2)
   let _: Derived.Parent = Base.Parent()
   let _: Derived.Parent.Child = Base.Parent.Child(pca: 42)

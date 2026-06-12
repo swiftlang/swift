@@ -203,6 +203,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
+    case SourceFileKind::SyntheticMacro:
       braceItemListKind = BraceItemListKind::MacroExpansion;
       break;
     }
@@ -8546,9 +8547,9 @@ void Parser::parseTopLevelAccessors(
     if (accessorStatus.isError())
       break;
 
-    (void)parseAccessorAfterIntroducer(loc, kind, accessors, hasEffectfulGet,
-                                       parsingLimitedSyntax, attributes,
-                                       PD_Default, storage, status);
+    (void)parseAccessorAfterIntroducer(
+        loc, kind, accessors, hasEffectfulGet, parsingLimitedSyntax, attributes,
+        getParseDeclOptions(storage->getDeclContext()), storage, status);
     if (IsFirstAccessor) {
       IsFirstAccessor = false;
     }
@@ -10472,6 +10473,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
+    case SourceFileKind::SyntheticMacro:
       if (Tok.is(tok::identifier)) {
         diagnose(Tok, diag::destructor_has_name).fixItRemove(Tok.getLoc());
         consumeToken();

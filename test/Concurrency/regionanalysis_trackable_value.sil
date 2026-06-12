@@ -1253,3 +1253,547 @@ bb0(%0 : $*MainActorStruct):
   %r = tuple ()
   return %r : $()
 }
+
+////////////////////////////////////////////////////////////////////////////
+// MARK: Non-Sendable value projected out of a Sendable aggregate          //
+//                                                                         //
+// A non-Sendable value reached *through* a Sendable access base (the      //
+// field of an @unchecked Sendable struct/class/enum, possibly several     //
+// projections deep, or a global-actor struct's @unchecked Sendable field) //
+// is disconnected: it must not inherit the actor / global-actor isolation //
+// of the underlying base. getUnderlyingTrackedValue roots the value at    //
+// the projection out of the nearest Sendable boundary, so this is         //
+// depth-independent. The negative guards confirm we do NOT over-          //
+// disconnect a directly-stored non-Sendable property (whose isolation     //
+// comes from its own declaration), even when deeply nested.               //
+////////////////////////////////////////////////////////////////////////////
+
+struct SendableStructBox : @unchecked Sendable {
+  let ns: NonSendableKlass
+}
+class SendableKlassBox : @unchecked Sendable {
+  let ns: NonSendableKlass
+}
+enum SendableEnumBox : @unchecked Sendable {
+  case value(NonSendableKlass)
+}
+struct SendableTupleBox : @unchecked Sendable {
+  let t: (NonSendableKlass, NonSendableKlass)
+}
+
+actor SendableBoxActor {
+  let sStructBox: SendableStructBox
+  let sKlassBox: SendableKlassBox
+  let sEnumBox: SendableEnumBox
+  let sTupleBox: SendableTupleBox
+}
+
+actor DirectActor {
+  let ns: NonSendableKlass
+}
+
+// An actor / global-actor-isolated class used only as a 'self' reference for
+// ref_tail_addr (so there is no intervening load).
+actor TailActor {}
+@MainActor class GAClass {}
+
+// Global-actor-isolated structs/enums that *contain* an @unchecked Sendable
+// field, plus a directly-stored non-Sendable field for contrast.
+@MainActor struct GAStruct {
+  var ns: NonSendableKlass
+  var box: SendableStructBox
+}
+@MainActor struct GAGenericStruct<T> {
+  var field: T
+  var ns: NonSendableKlass
+  var box: SendableStructBox
+}
+@MainActor enum GAEnum {
+  case box(SendableStructBox)
+}
+@MainActor enum GAGenericEnum<T> {
+  case box(SendableStructBox)
+  case other(T)
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Actor instance base -- address projections taken directly off the
+// actor's stored @unchecked Sendable field (no load). These were the cases
+// that wrongly inherited the actor's isolation; they must be disconnected.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_struct_element_addr: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sStructBox
+// CHECK: end running test 1 of 1 on tv_actor_struct_element_addr: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_struct_element_addr : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sStructBox
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_enum_data_addr: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %2 = unchecked_take_enum_data_addr %1 : $*SendableEnumBox, #SendableEnumBox.value!enumelt
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sEnumBox
+// CHECK: end running test 1 of 1 on tv_actor_enum_data_addr: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_enum_data_addr : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sEnumBox
+  %2 = unchecked_take_enum_data_addr %1 : $*SendableEnumBox, #SendableEnumBox.value!enumelt
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_tuple_element_addr: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %2 = struct_element_addr %1 : $*SendableTupleBox, #SendableTupleBox.t
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sTupleBox
+// CHECK: end running test 1 of 1 on tv_actor_tuple_element_addr: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_tuple_element_addr : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sTupleBox
+  %2 = struct_element_addr %1 : $*SendableTupleBox, #SendableTupleBox.t
+  %3 = tuple_element_addr %2 : $*(NonSendableKlass, NonSendableKlass), 0
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %3 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Class projections out of an @unchecked Sendable class (the load of the
+// class reference already decouples it from the actor). Disconnected.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_ref_element_addr: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %4 = ref_element_addr [immutable] %3 : $SendableKlassBox, #SendableKlassBox.ns
+// CHECK: end running test 1 of 1 on tv_actor_ref_element_addr: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_ref_element_addr : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sKlassBox
+  %2 = load [copy] %1 : $*SendableKlassBox
+  %3 = begin_borrow %2 : $SendableKlassBox
+  %4 = ref_element_addr [immutable] %3 : $SendableKlassBox, #SendableKlassBox.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %4 : $*NonSendableKlass
+  end_borrow %3 : $SendableKlassBox
+  destroy_value %2 : $SendableKlassBox
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_ref_tail_addr: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %4 = ref_tail_addr [immutable] %3 : $SendableKlassBox, $NonSendableKlass
+// CHECK: end running test 1 of 1 on tv_actor_ref_tail_addr: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_ref_tail_addr : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sKlassBox
+  %2 = load [copy] %1 : $*SendableKlassBox
+  %3 = begin_borrow %2 : $SendableKlassBox
+  %4 = ref_tail_addr [immutable] %3 : $SendableKlassBox, $NonSendableKlass
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %4 : $*NonSendableKlass
+  end_borrow %3 : $SendableKlassBox
+  destroy_value %2 : $SendableKlassBox
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: ref_tail_addr taken directly off an actor's / global-actor class's own
+// 'self' reaching an @unchecked Sendable tail element (no load), then
+// projecting a property out of that element. Disconnected.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_tail_self_box_property: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = ref_tail_addr [immutable] %0 : $TailActor, $SendableStructBox
+// CHECK: end running test 1 of 1 on tv_actor_tail_self_box_property: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_tail_self_box_property : $@convention(method) (@guaranteed TailActor) -> () {
+bb0(%0 : @guaranteed $TailActor):
+  %1 = ref_tail_addr [immutable] %0 : $TailActor, $SendableStructBox
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_globalactor_class_tail_self_box_property: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = ref_tail_addr [immutable] %0 : $GAClass, $SendableStructBox
+// CHECK: end running test 1 of 1 on tv_globalactor_class_tail_self_box_property: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_globalactor_class_tail_self_box_property : $@convention(method) (@guaranteed GAClass) -> () {
+bb0(%0 : @guaranteed $GAClass):
+  %1 = ref_tail_addr [immutable] %0 : $GAClass, $SendableStructBox
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Negative guards -- a directly-stored non-Sendable property (no
+// @unchecked Sendable wrapper) keeps its declared isolation.
+//===----------------------------------------------------------------------===//
+
+// The actor's own non-Sendable stored property stays actor-isolated.
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_direct_field: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: actor-isolated].
+// CHECK: Rep Value:   %1 = ref_element_addr [immutable] %0 : $DirectActor, #DirectActor.ns
+// CHECK: end running test 1 of 1 on tv_actor_direct_field: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_direct_field : $@convention(method) (@guaranteed DirectActor) -> () {
+bb0(%0 : @guaranteed $DirectActor):
+  %1 = ref_element_addr [immutable] %0 : $DirectActor, #DirectActor.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %1 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// A @MainActor struct's directly-stored non-Sendable field stays main-actor-isolated.
+// CHECK-LABEL: begin running test 1 of 1 on tv_globalactor_struct_direct_field: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: main actor-isolated].
+// CHECK: Rep Value:   %1 = struct_element_addr %0 : $*GAStruct, #GAStruct.ns
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %0 = alloc_stack $GAStruct                      // users: %2, %1
+// CHECK: end running test 1 of 1 on tv_globalactor_struct_direct_field: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_globalactor_struct_direct_field : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $GAStruct
+  %1 = struct_element_addr %0 : $*GAStruct, #GAStruct.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %1 : $*NonSendableKlass
+  dealloc_stack %0 : $*GAStruct
+  %r = tuple ()
+  return %r : $()
+}
+
+// A generic (address-only) @MainActor struct's directly-stored non-Sendable
+// field stays main-actor-isolated.
+// CHECK-LABEL: begin running test 1 of 1 on tv_globalactor_generic_struct_direct_field: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: main actor-isolated].
+// CHECK: Rep Value:   %2 = struct_element_addr %1 : $*GAGenericStruct<T>, #GAGenericStruct.ns
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = alloc_stack $GAGenericStruct<T>            // users: %3, %2
+// CHECK: end running test 1 of 1 on tv_globalactor_generic_struct_direct_field: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_globalactor_generic_struct_direct_field : $@convention(thin) <T> (@in T) -> () {
+bb0(%arg : $*T):
+  %0 = alloc_stack $GAGenericStruct<T>
+  %1 = struct_element_addr %0 : $*GAGenericStruct<T>, #GAGenericStruct.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %1 : $*NonSendableKlass
+  dealloc_stack %0 : $*GAGenericStruct<T>
+  destroy_addr %arg : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Object projections (the load already decouples them). Disconnected.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_struct_extract: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %4 = struct_extract %3 : $SendableStructBox, #SendableStructBox.ns
+// CHECK: end running test 1 of 1 on tv_actor_struct_extract: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_struct_extract : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sStructBox
+  %2 = load [copy] %1 : $*SendableStructBox
+  %3 = begin_borrow %2 : $SendableStructBox
+  %4 = struct_extract %3 : $SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %4 : $NonSendableKlass
+  end_borrow %3 : $SendableStructBox
+  destroy_value %2 : $SendableStructBox
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_tuple_extract: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %5 = tuple_extract %4 : $(NonSendableKlass, NonSendableKlass), 0
+// CHECK: end running test 1 of 1 on tv_actor_tuple_extract: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_tuple_extract : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sTupleBox
+  %2 = load [copy] %1 : $*SendableTupleBox
+  %3 = begin_borrow %2 : $SendableTupleBox
+  %4 = struct_extract %3 : $SendableTupleBox, #SendableTupleBox.t
+  %5 = tuple_extract %4 : $(NonSendableKlass, NonSendableKlass), 0
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %5 : $NonSendableKlass
+  end_borrow %3 : $SendableTupleBox
+  destroy_value %2 : $SendableTupleBox
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_unchecked_enum_data: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %3 = unchecked_enum_data %2 : $SendableEnumBox, #SendableEnumBox.value!enumelt
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sEnumBox
+// CHECK: end running test 1 of 1 on tv_actor_unchecked_enum_data: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_unchecked_enum_data : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sEnumBox
+  %2 = load [copy] %1 : $*SendableEnumBox
+  %3 = unchecked_enum_data %2 : $SendableEnumBox, #SendableEnumBox.value!enumelt
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %3 : $NonSendableKlass
+  destroy_value %3 : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_destructure_struct: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value: **%3** = destructure_struct %2 : $SendableStructBox
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sStructBox
+// CHECK: end running test 1 of 1 on tv_actor_destructure_struct: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_destructure_struct : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sStructBox
+  %2 = load [copy] %1 : $*SendableStructBox
+  (%3) = destructure_struct %2 : $SendableStructBox
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %3 : $NonSendableKlass
+  destroy_value %3 : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_actor_destructure_tuple: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value: **%3** = destructure_struct %2 : $SendableTupleBox
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sTupleBox
+// CHECK: end running test 1 of 1 on tv_actor_destructure_tuple: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_actor_destructure_tuple : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sTupleBox
+  %2 = load [copy] %1 : $*SendableTupleBox
+  (%3) = destructure_struct %2 : $SendableTupleBox
+  (%4, %5) = destructure_tuple %3 : $(NonSendableKlass, NonSendableKlass)
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %4 : $NonSendableKlass
+  destroy_value %4 : $NonSendableKlass
+  destroy_value %5 : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Global-actor-isolated aggregate that *contains* an @unchecked Sendable
+// field. Projecting a property out of that nested @unchecked Sendable field is
+// disconnected -- the wrapper breaks the global-actor isolation chain even
+// though the aggregate itself is global-actor-isolated.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_globalactor_struct_nested_box: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %0 = alloc_stack $GAStruct                      // users: %3, %1
+// CHECK: end running test 1 of 1 on tv_globalactor_struct_nested_box: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_globalactor_struct_nested_box : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $GAStruct
+  %1 = struct_element_addr %0 : $*GAStruct, #GAStruct.box
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  dealloc_stack %0 : $*GAStruct
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_globalactor_generic_struct_nested_box: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %3 = struct_element_addr %2 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = alloc_stack $GAGenericStruct<T>            // users: %4, %2
+// CHECK: end running test 1 of 1 on tv_globalactor_generic_struct_nested_box: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_globalactor_generic_struct_nested_box : $@convention(thin) <T> (@in T) -> () {
+bb0(%arg : $*T):
+  %0 = alloc_stack $GAGenericStruct<T>
+  %1 = struct_element_addr %0 : $*GAGenericStruct<T>, #GAGenericStruct.box
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  dealloc_stack %0 : $*GAGenericStruct<T>
+  destroy_addr %arg : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_globalactor_enum_nested_box: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value: %0 = argument of bb0 : $*GAEnum
+// CHECK: end running test 1 of 1 on tv_globalactor_enum_nested_box: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_globalactor_enum_nested_box : $@convention(thin) (@in GAEnum) -> () {
+bb0(%0 : $*GAEnum):
+  %1 = unchecked_take_enum_data_addr %0 : $*GAEnum, #GAEnum.box!enumelt
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  destroy_addr %1 : $*SendableStructBox
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on tv_globalactor_generic_enum_nested_box: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value: %0 = argument of bb0 : $*GAGenericEnum<T>
+// CHECK: end running test 1 of 1 on tv_globalactor_generic_enum_nested_box: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_globalactor_generic_enum_nested_box : $@convention(thin) <T> (@in GAGenericEnum<T>) -> () {
+bb0(%0 : $*GAGenericEnum<T>):
+  %1 = unchecked_take_enum_data_addr %0 : $*GAGenericEnum<T>, #GAGenericEnum.box!enumelt
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  destroy_addr %1 : $*SendableStructBox
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Deep projections -- the @unchecked Sendable boundary is several
+// projections above the traced leaf (or below a non-Sendable projection).
+// getUnderlyingTrackedValue roots the leaf at the projection out of the nearest
+// Sendable boundary, so the result is depth-independent.
+//===----------------------------------------------------------------------===//
+
+struct Inner2 { let ns: NonSendableKlass }
+struct Inner { let inner2: Inner2 }
+struct DeepBox : @unchecked Sendable { let inner: Inner }
+struct Outer { let s: SendableStructBox }
+struct PInner2 { let ns: NonSendableKlass }
+struct PInner { let inner2: PInner2 }
+struct POuter { let inner: PInner }
+
+actor DeepActor {
+  let deep: DeepBox
+  let outer: Outer
+  let plain: POuter
+}
+
+// @unchecked Sendable boundary (DeepBox) is THREE projections above the leaf.
+// CHECK-LABEL: begin running test 1 of 1 on tv_deep_sendable_above_leaf: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %2 = struct_element_addr %1 : $*DeepBox, #DeepBox.inner
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = ref_element_addr [immutable] %0 : $DeepActor, #DeepActor.deep
+// CHECK: end running test 1 of 1 on tv_deep_sendable_above_leaf: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_deep_sendable_above_leaf : $@convention(method) (@guaranteed DeepActor) -> () {
+bb0(%0 : @guaranteed $DeepActor):
+  %1 = ref_element_addr [immutable] %0 : $DeepActor, #DeepActor.deep
+  %2 = struct_element_addr %1 : $*DeepBox, #DeepBox.inner
+  %3 = struct_element_addr %2 : $*Inner, #Inner.inner2
+  %4 = struct_element_addr %3 : $*Inner2, #Inner2.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %4 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// @unchecked Sendable boundary (SendableStructBox) sits below a non-Sendable
+// Outer projection.
+// CHECK-LABEL: begin running test 1 of 1 on tv_deep_sendable_below_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK: Rep Value:   %3 = struct_element_addr %2 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK: Rep Value:   %1 = ref_element_addr [immutable] %0 : $DeepActor, #DeepActor.outer
+// CHECK: end running test 1 of 1 on tv_deep_sendable_below_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_deep_sendable_below_nonsendable : $@convention(method) (@guaranteed DeepActor) -> () {
+bb0(%0 : @guaranteed $DeepActor):
+  %1 = ref_element_addr [immutable] %0 : $DeepActor, #DeepActor.outer
+  %2 = struct_element_addr %1 : $*Outer, #Outer.s
+  %3 = struct_element_addr %2 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %3 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// NEGATIVE GUARD: deeply-nested storage with NO @unchecked Sendable boundary
+// anywhere stays actor-isolated -- it roots at the actor field, and the fix
+// must not over-disconnect it.
+// CHECK-LABEL: begin running test 1 of 1 on tv_deep_plain_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: actor-isolated].
+// CHECK: Rep Value:   %1 = ref_element_addr [immutable] %0 : $DeepActor, #DeepActor.plain
+// CHECK: end running test 1 of 1 on tv_deep_plain_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tv_deep_plain_nonsendable : $@convention(method) (@guaranteed DeepActor) -> () {
+bb0(%0 : @guaranteed $DeepActor):
+  %1 = ref_element_addr [immutable] %0 : $DeepActor, #DeepActor.plain
+  %2 = struct_element_addr %1 : $*POuter, #POuter.inner
+  %3 = struct_element_addr %2 : $*PInner, #PInner.inner2
+  %4 = struct_element_addr %3 : $*PInner2, #PInner2.ns
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  debug_value [trace] %4 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}

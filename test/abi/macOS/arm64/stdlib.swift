@@ -958,6 +958,8 @@ Added: _$ss13_SwiftifyInfoO11nonescapingyABs01_A4ExprO_tcABmFWC
 Added: _$ss13_SwiftifyInfoO7endedByyABs01_A4ExprO_SitcABmFWC
 Added: _$ss13_SwiftifyInfoO7sizedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO13sizedByOrNullyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO15countedByOrNullyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO18lifetimeDependenceyABs01_A4ExprO_AEs01_D4TypeOtcABmFWC
 Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
@@ -1263,7 +1265,7 @@ Added: __ZN5swift26getResilientMetadataBoundsEPKNS_21TargetClassDescriptorINS_9I
 // Ref
 Added: _$ss3RefVMa
 Added: _$ss3RefVMn
-Added: _$ss3RefVsRi_zRi0_zrlE7builtinxBWvg
+Added: _$ss3RefVsRi_zrlE7builtinxBWvg
 
 // MutableRef
 Added: _$ss10MutableRefVMa
@@ -1308,3 +1310,31 @@ Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
 
 // Cross-encoding strcmp for Foundation
 Added: __swift_unicodeBuffersEqual_nonNormalizing
+
+// Debug variable for metadata allocator back pointer
+Added: __swift_debug_allocationPoolBackPointerOffset
+
+// _RigidArray
+Added: _$ss11_RigidArrayVMa
+Added: _$ss11_RigidArrayVMn
+Added: _$ss11_RigidArrayVsRi_zrlE6_countSivM
+Added: _$ss11_RigidArrayVsRi_zrlE6_countSivg
+Added: _$ss11_RigidArrayVsRi_zrlE6_countSivs
+Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvM
+Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvg
+Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvs
+Added: _$ss11_RigidArrayVsSHRzRi_zrlE9hashValueSivg
+Added: _$ss11_RigidArrayVyxGSHsSHRzRi_zrlMc
+Added: _$ss11_RigidArrayVyxGSQsSQRzRi_zrlMc
+
+// UniqueArray
+Added: _$ss11UniqueArrayVMa
+Added: _$ss11UniqueArrayVMn
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages06_RigidB0VyxGvM
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages06_RigidB0VyxGvr
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages06_RigidB0VyxGvs
+Added: _$ss11UniqueArrayVsSHRzRi_zrlE9hashValueSivg
+Added: _$ss11UniqueArrayVyxGSHsSHRzRi_zrlMc
+Added: _$ss11UniqueArrayVyxGSQsSQRzRi_zrlMc
+Added: _$ss11UniqueArrayVsRi_zrlE11descriptionSSvg
+Added: _$ss11UniqueArrayVsRi_zrlE16debugDescriptionSSvg

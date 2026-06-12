@@ -89,7 +89,15 @@ struct ExistentialLayout {
   /// Returns the existential's superclass, if any; this is either an explicit
   /// superclass term in a composition type, or the superclass of one of the
   /// protocols.
-  Type getSuperclass() const;
+  ///
+  /// FIXME: This is bogus if the protocol has a superclass that involves an
+  /// associated type, because the superclass type is unsubstituted in
+  /// the protocol case (it can't be substituted with anything, except
+  /// perhaps an existential archetype), but the caller has no way to tell.
+  ///
+  /// Do not introduce new uses of this function! It's awkwardly named on
+  /// purpose.
+  Type getExplicitSuperclassOrProtocolSuperclass() const;
 
   /// Does this existential contain the Error protocol?
   bool isExistentialWithError(ASTContext &ctx) const;

@@ -264,6 +264,14 @@ extension GenericStruct where T == ReallyInternalAlias_BAD {
   @usableFromInline internal func constrainedToPrivateAlias() {}
 }
 
+internal let internalAliasConstant_BAD: InternalAlias_BAD = PublicAliasBase()
+// CHECK: public let publicValueFromInternalAlias: AccessFilter::PublicAlias
+public let publicValueFromInternalAlias: PublicAlias = internalAliasConstant_BAD
+
+internal let internalGenericAliasConstant_BAD: GenericStruct<InternalAlias_BAD> = GenericStruct<InternalAlias_BAD>()
+// CHECK: public let publicGenericValueFromInternalAlias: AccessFilter::GenericStruct<AccessFilter::PublicAlias>
+public let publicGenericValueFromInternalAlias: GenericStruct<PublicAlias> = internalGenericAliasConstant_BAD
+
 extension GenericStruct {
   // For the next extension's test.
   public func requirement() {}

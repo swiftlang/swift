@@ -26,35 +26,35 @@ func testAsyncSequence1Sendable<Seq: AsyncSequence>(_ seq: Seq) async throws whe
 
 func testAsyncSequenceTypedPattern<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.Element == Int {
   async let result: Int = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{sending 'seq' risks causing data races}}
-  // expected-transferring-tns-note @-1 {{sending task-isolated 'seq' into async let risks causing data races between nonisolated and task-isolated uses}}
+  // expected-transferring-tns-note @-1 {{sending 'seq' into async let risks causing data races between nonisolated code and code in the current isolation context}}
   let _ = try! await result
 }
 
 func testAsyncSequenceTypedPattern1<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.Element == Int {
   async let _: Int = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{sending 'seq' risks causing data races}}
-  // expected-transferring-tns-note @-1 {{sending task-isolated 'seq' into async let risks causing data races between nonisolated and task-isolated uses}}
+  // expected-transferring-tns-note @-1 {{sending 'seq' into async let risks causing data races between nonisolated code and code in the current isolation context}}
 }
 
 func testAsyncSequence<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.Element == Int {
   async let result = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{sending 'seq' risks causing data races}}
-  // expected-transferring-tns-note @-1 {{sending task-isolated 'seq' into async let risks causing data races between nonisolated and task-isolated uses}}
+  // expected-transferring-tns-note @-1 {{sending 'seq' into async let risks causing data races between nonisolated code and code in the current isolation context}}
   let _ = try! await result
 }
 
 func testAsyncSequence1<Seq: AsyncSequence>(_ seq: Seq) async throws where Seq.Element == Int {
   async let _ = seq.reduce(0) { $0 + $1 } // expected-transferring-tns-warning {{sending 'seq' risks causing data races}}
-  // expected-transferring-tns-note @-1 {{sending task-isolated 'seq' into async let risks causing data races between nonisolated and task-isolated uses}}
+  // expected-transferring-tns-note @-1 {{sending 'seq' into async let risks causing data races between nonisolated code and code in the current isolation context}}
 }
 
 func testAsyncSequence3<Seq>(_ seq: Seq) async throws where Seq: AsyncSequence, Seq.Element == Int {
   async let result = seq // expected-transferring-tns-warning {{sending 'seq' risks causing data races}}
-  // expected-transferring-tns-note @-1 {{sending task-isolated 'seq' into async let risks causing data races between nonisolated and task-isolated uses}}
+  // expected-transferring-tns-note @-1 {{sending 'seq' into async let risks causing data races between nonisolated code and code in the current isolation context}}
   let _ = await result
 }
 
 func testAsyncSequence4<Seq>(_ seq: Seq) async throws where Seq: AsyncSequence, Seq.Element == Int {
   async let _ = seq // expected-transferring-tns-warning {{sending 'seq' risks causing data races}}
-  // expected-transferring-tns-note @-1 {{sending task-isolated 'seq' into async let risks causing data races between nonisolated and task-isolated uses}}
+  // expected-transferring-tns-note @-1 {{sending 'seq' into async let risks causing data races between nonisolated code and code in the current isolation context}}
 }
 
 func search(query: String, entities: [String]) async throws -> [String] {

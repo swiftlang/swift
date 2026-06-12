@@ -509,7 +509,12 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
         auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
         if (!LiveBlock->args_empty()) {
           auto *LiveBlockArg = LiveBlock->getArgument(0);
-          auto NewValue = EI->hasOperand() ? EI->getOperand() : EI;
+          // The default block receives the whole enum value, not the extracted
+          // payload. Only use the payload for explicitly matched case blocks.
+          bool isDefaultBlock = SEI->hasDefault() && LiveBlock == SEI->getDefaultBB();
+          SILValue NewValue = (!isDefaultBlock && EI->hasOperand())
+                                  ? EI->getOperand()
+                                  : SILValue(EI);
           LiveBlockArg->replaceAllUsesWith(NewValue);
           LiveBlock->eraseArgument(0);
           SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);

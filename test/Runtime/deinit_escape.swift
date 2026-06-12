@@ -11,6 +11,11 @@ var DeinitEscapeTestSuite = TestSuite("DeinitEscape")
 var globalObjects1: [AnyObject] = []
 var globalObjects2: [AnyObject] = []
 
+@inline(never)
+func clearGlobalObjects1() {
+  globalObjects1 = []
+}
+
 DeinitEscapeTestSuite.test("deinit escapes self") {
   expectCrashLater()
 
@@ -19,8 +24,13 @@ DeinitEscapeTestSuite.test("deinit escapes self") {
       globalObjects2.append(self)
     }
   }
-  globalObjects1.append(C())
-  globalObjects1 = []
+  do {
+    let c = C()
+    globalObjects1.append(c)
+    _blackHole(c)
+  }
+
+  clearGlobalObjects1()
 
   expectUnreachable()
 }

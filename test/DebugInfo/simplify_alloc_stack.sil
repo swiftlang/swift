@@ -1,0 +1,84 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=alloc_stack | %FileCheck %s
+
+import Swift
+import Builtin
+
+protocol P {
+  func foo()
+}
+
+// CHECK-LABEL: sil [ossa] @expand_enum_with_debug_value :
+// CHECK:         [[A:%[0-9]+]] = alloc_stack $Int
+// CHECK:         debug_value [[A]], var, name "x", type $Optional<Int>, transform {
+// CHECK:         bb0(%[[ARG:[0-9]+]] : $*Int):
+// CHECK:           %[[LOAD:[0-9]+]] = load %[[ARG]]
+// CHECK:           %[[ENUM:[0-9]+]] = enum $Optional<Int>, #Optional.some!enumelt, %[[LOAD]]
+// CHECK:           return %[[ENUM]]
+// CHECK:         }
+// CHECK:       } // end sil function 'expand_enum_with_debug_value'
+sil [ossa] @expand_enum_with_debug_value : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Optional<Int>, var, name "x"
+  %2 = init_enum_data_addr %1, #Optional.some!enumelt
+  store %0 to [trivial] %2 : $*Int
+  inject_enum_addr %1, #Optional.some!enumelt
+  %5 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  destroy_addr %5
+  dealloc_stack %1
+  %r = tuple ()
+  return %r : $()
+}
+
+// When the enum payload is an opaque (existential) type, the debug_value
+// cannot be salvaged with a load (IRGen can't emit it). It must be killed.
+// CHECK-LABEL: sil [ossa] @expand_enum_with_opaque_payload :
+// CHECK:         alloc_stack $any P
+// CHECK:         debug_value undef : $*Optional<any P>, var, name "x", type $Optional<any P>, expr op_deref
+// CHECK-NOT:     transform
+// CHECK:       } // end sil function 'expand_enum_with_opaque_payload'
+sil [ossa] @expand_enum_with_opaque_payload : $@convention(thin) (@in any P) -> () {
+bb0(%0 : $*any P):
+  %1 = alloc_stack $Optional<any P>, var, name "x"
+  %2 = init_enum_data_addr %1 : $*Optional<any P>, #Optional.some!enumelt
+  copy_addr [take] %0 to [init] %2 : $*any P
+  inject_enum_addr %1 : $*Optional<any P>, #Optional.some!enumelt
+  %5 = unchecked_take_enum_data_addr %1 : $*Optional<any P>, #Optional.some!enumelt
+  destroy_addr %5 : $*any P
+  dealloc_stack %1 : $*Optional<any P>
+  %r = tuple ()
+  return %r : $()
+}
+
+enum TwoCase {
+  case a(Int)
+  case b(Int)
+}
+
+// When the enum has multiple different case indices, we can't reconstruct
+// the enum in debug info. The debug_value must be killed.
+// CHECK-LABEL: sil [ossa] @expand_enum_mismatching_cases :
+// CHECK:         alloc_stack $Int
+// CHECK:         debug_value undef : $TwoCase, var, name "x"
+// CHECK-NOT:     transform
+// CHECK:       } // end sil function 'expand_enum_mismatching_cases'
+sil [ossa] @expand_enum_mismatching_cases : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $TwoCase, var, name "x"
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = init_enum_data_addr %1 : $*TwoCase, #TwoCase.a!enumelt
+  store %0 to [trivial] %2 : $*Int
+  inject_enum_addr %1 : $*TwoCase, #TwoCase.a!enumelt
+  br bb3
+bb2:
+  %3 = init_enum_data_addr %1 : $*TwoCase, #TwoCase.b!enumelt
+  store %0 to [trivial] %3 : $*Int
+  inject_enum_addr %1 : $*TwoCase, #TwoCase.b!enumelt
+  br bb3
+bb3:
+  %5 = unchecked_take_enum_data_addr %1 : $*TwoCase, #TwoCase.a!enumelt
+  destroy_addr %5 : $*Int
+  dealloc_stack %1 : $*TwoCase
+  %r = tuple ()
+  return %r : $()
+}

@@ -126,6 +126,13 @@ VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_ENABLED_PROCESSES, string, "",
 VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING, boolean, false,
          "Enable debug logging of prespecializations library use.")
 
+VARIABLE(SWIFT_DEBUG_DISABLE_NONCANONICAL_STATIC_SPECIALIZATIONS, boolean, false,
+         "Ignore compiler-emitted noncanonical static specialization metadata. "
+         "When set, swift_getCanonicalSpecializedMetadata routes through the "
+         "normal generic-metadata instantiation path instead of canonicalizing "
+         "the static metadata pointer. Lets the prespecializations library win "
+         "for types that also have a noncanonical static spec in some dylib.")
+
 VARIABLE(SWIFT_ROOT, string, "",
          "Overrides the root directory of the Swift installation. "
          "This is used to locate auxiliary files relative to the runtime "

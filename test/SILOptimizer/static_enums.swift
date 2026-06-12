@@ -6,6 +6,8 @@
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: swift_in_compiler
+// wasm32: non-inline String static-init body not materialized
+// UNSUPPORTED: OS=wasip1
 
 
 // CHECK-LABEL: sil_global @$s4test6optIntSiSgvp : $Optional<Int> = {

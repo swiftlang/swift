@@ -7,6 +7,9 @@
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
+// CHECK-IR shape differs on wasm32: optimized vector-reduce form not produced, trap retained
+// XFAIL: OS=wasip1
+
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0a1_B11_sum_w_trapySis11MutableSpanVySiGF :
 // CHECK-SIL: bb3({{.*}}):
 // CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"

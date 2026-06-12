@@ -69,6 +69,9 @@ func runCSE(
   if context.needBreakInfiniteLoops {
     breakInfiniteLoops(in: function, context)
   }
+  if context.needCompleteLifetimes {
+    completeLifetimes(in: function, context)
+  }
 }
 
 // -----------------------------------------------------------------------
@@ -84,32 +87,36 @@ private func processFunction(
   _ lazyPropertyGetters: inout [ApplyInst],
   _ context: FunctionPassContext
 ) {
-  // Process the entry block, then drive the DFS.
-  if !processBlock(startBlock, &map, runsOnHighLevelSil, &lazyPropertyGetters, context) {
-    return
-  }
+  // Each stack frame holds the block being visited and an iterator for
+  // supplying the next unprocessed dominator-tree child so we can resume after
+  // processing each child.
+  var dfsStack: [(block: BasicBlock, childIt: DomChildren.Iterator)] = []
 
-  // Each stack frame holds the block being visited and an index into its
-  // dominator-tree children so we can resume after processing each child.
-  var dfsStack: [(block: BasicBlock, childIndex: Int)] = [(startBlock, 0)]
+  var block = startBlock
+  while true {
+    // Process this block and push it to the stack.
+    guard processBlock(block, &map, runsOnHighLevelSil, &lazyPropertyGetters, context) else {
+      return
+    }
 
-  while !dfsStack.isEmpty {
-    let (block, childIndex) = dfsStack[dfsStack.count - 1]
-    let children = context.dominatorTree.getChildren(of: block)
+    dfsStack.append((block, context.dominatorTree.getChildren(of: block).makeIterator()))
 
-    if childIndex < children.count {
-      // Advance the child pointer for this frame, then visit the next child.
-      dfsStack[dfsStack.count - 1].childIndex += 1
-      let child = children[childIndex]
-      if !processBlock(child, &map, runsOnHighLevelSil, &lazyPropertyGetters, context) {
-        return
+    // Find the next block to visit. This will be the next child of the deepest
+    // stack frame that has unprocessed children.
+    while true {
+      if let child = dfsStack[dfsStack.count - 1].childIt.next() {
+        block = child
+        break
       }
-      dfsStack.append((child, 0))
-    } else {
+
       // All children exhausted — pop this block's entries from the map
       // and remove its frame from the DFS stack.
-      map.pop(block: block)
-      dfsStack.removeLast()
+      map.pop(block: dfsStack.removeLast().block)
+
+      if dfsStack.isEmpty {
+        // Nothing left in the stack — we're done.
+        return
+      }
     }
   }
 }
@@ -281,7 +288,7 @@ private func processLazyPropertyGetters(
     context.erase(instruction: sei)
   }
 
-  if (context.needFixStackNesting) {
+  if context.needFixStackNesting {
     context.fixStackNesting(in: function)
   }
 }
@@ -608,7 +615,8 @@ struct InstructionReference: Hashable {
   let hash: Int
 
   /// Returns `nil` if `inst` is not eligible for CSE.
-  init?(inst: Instruction, runsOnHighLevelSil: Bool = false, calleeAnalysis: CalleeAnalysis? = nil) {
+  init?(inst: Instruction, runsOnHighLevelSil: Bool = false, calleeAnalysis: CalleeAnalysis? = nil)
+  {
     guard
       let h = getHash(
         of: inst,

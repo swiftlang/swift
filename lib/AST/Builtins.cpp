@@ -984,6 +984,11 @@ static ValueDecl *getAssumeAlignment(ASTContext &ctx, Identifier id) {
                             _rawPointer);
 }
 
+static ValueDecl *getDereferenceable(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer, _word),
+                            _rawPointer);
+}
+
 static ValueDecl *getCopyArrayOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted,
@@ -3090,6 +3095,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (Types.size() != 1) return nullptr;
     return getGepOperation(Context, Id, Types[0]);
 
+  case BuiltinValueKind::GepProjection:
+    if (Types.size() != 1) return nullptr;
+    return getGepOperation(Context, Id, Types[0]);
+
   case BuiltinValueKind::GetTailAddr:
     if (Types.size() != 1) return nullptr;
     return getGetTailAddrOperation(Context, Id, Types[0]);
@@ -3110,6 +3119,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty())
       return nullptr;
     return getAssumeAlignment(Context, Id);
+
+  case BuiltinValueKind::Dereferenceable:
+    if (!Types.empty())
+      return nullptr;
+    return getDereferenceable(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)

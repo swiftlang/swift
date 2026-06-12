@@ -219,7 +219,7 @@ syn region swiftPreprocFalse
       \ start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
 
 syn match swiftAttribute
-      \ /@\<\w\+\>/ skipwhite skipempty nextgroup=swiftType,swiftTypeDefinition
+      \ /@\<\w\+\>/ skipwhite skipempty nextgroup=swiftAttribute,swiftDefinitionModifier,swiftImport,swiftType,swiftTypeAliasDefinition,swiftTypeDefinition
 
 syn keyword swiftTodo MARK TODO FIXME contained
 

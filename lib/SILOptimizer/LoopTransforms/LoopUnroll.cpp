@@ -15,21 +15,21 @@
 #include "llvm/ADT/DepthFirstIterator.h"
 
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
-#include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
+#include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
-#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -50,7 +50,29 @@ class LoopCloner : public SILCloner<LoopCloner> {
 
 public:
   LoopCloner(SILLoop *Loop)
-      : SILCloner<LoopCloner>(*Loop->getHeader()->getParent()), Loop(Loop) {}
+      : SILCloner<LoopCloner>(*Loop->getHeader()->getParent()), Loop(Loop),
+        mustCloneScopes(false), scopeCloner(*Loop->getHeader()->getParent()) {
+
+    // If any debug info-carrying instructions use a @pack_element type that was
+    // opened inside the loop, we must clone the debug scopes. Otherwise, two
+    // instances of the same variable (with the same scope, location and name)
+    // from different iterations of the loop could have different types, after
+    // the @pack_element type is replaced with the appropriate concrete type for
+    // each iteration. This could cause a verification error.
+    for (SILBasicBlock *BB : Loop->getBlocks()) {
+      for (auto &inst : *BB) {
+        if (auto opei = dyn_cast<OpenPackElementInst>(&inst)) {
+          for (SILInstruction *user : opei->getUsers()) {
+            DebugVarCarryingInst debugVarCarryingInst(user);
+            if (debugVarCarryingInst.getKind() !=
+                DebugVarCarryingInst::Kind::Invalid) {
+              mustCloneScopes = true;
+            }
+          }
+        }
+      }
+    }
+  }
 
   /// Clone the basic blocks in the loop.
   void cloneLoop();
@@ -73,6 +95,15 @@ protected:
   // SILCloner CRTP override.
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     SILCloner<LoopCloner>::postProcess(Orig, Cloned);
+  }
+
+private:
+  bool mustCloneScopes;
+  ScopeCloner scopeCloner;
+  const SILDebugScope *remapScope(const SILDebugScope *DS) {
+    if (mustCloneScopes)
+      return scopeCloner.getOrCreateClonedScope(DS);
+    return SILCloner<LoopCloner>::remapScope(DS);
   }
 };
 

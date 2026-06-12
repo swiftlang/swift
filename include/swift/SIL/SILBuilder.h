@@ -281,6 +281,8 @@ public:
   /// If we have a SILFunction, return SILFunction::hasOwnership(). If we have a
   /// SILGlobalVariable, just return false.
   bool hasOwnership() const {
+    if (BB && BB->isDebugReconstructionBlock())
+      return false;
     if (F)
       return F->hasOwnership();
     return false;
@@ -800,7 +802,7 @@ public:
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
     ASSERT((Qualifier != LoadOwnershipQualifier::Unqualified) ||
-           !hasOwnership() || (BB && BB->isDebugReconstructionBlock()) &&
+           !hasOwnership() &&
            "Unqualified inst in qualified function");
     ASSERT((Qualifier == LoadOwnershipQualifier::Unqualified) ||
            hasOwnership() && "Qualified inst in unqualified function");
@@ -2657,9 +2659,11 @@ public:
   //===--------------------------------------------------------------------===//
 
   IndexAddrInst *createIndexAddr(SILLocation Loc, SILValue Operand,
-                                 SILValue Index, bool needsStackProtection) {
+                                 SILValue Index, bool needsStackProtection,
+                                 bool isProjection) {
     return insert(new (getModule()) IndexAddrInst(getSILDebugLocation(Loc),
-                                    Operand, Index, needsStackProtection));
+                                    Operand, Index, needsStackProtection,
+                                    isProjection));
   }
 
   TailAddrInst *createTailAddr(SILLocation Loc, SILValue Operand,

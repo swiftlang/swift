@@ -296,9 +296,15 @@ public struct Builder {
     return notifyNew(dr.getAs(PointerToAddressInst.self))
   }
 
-  public func createIndexAddr(base: Value, index: Value, needStackProtection: Bool) -> IndexAddrInst {
-    let dr = bridged.createIndexAddr(base.bridged, index.bridged, needStackProtection)
+  public func createIndexAddr(base: Value, index: Value, needStackProtection: Bool,
+                              isProjection: Bool) -> IndexAddrInst {
+    let dr = bridged.createIndexAddr(base.bridged, index.bridged, needStackProtection, isProjection)
     return notifyNew(dr.getAs(IndexAddrInst.self))
+  }
+
+  public func createIndexRawPointer(base: Value, index: Value) -> IndexRawPointerInst {
+    let dr = bridged.createIndexRawPointer(base.bridged, index.bridged)
+    return notifyNew(dr.getAs(IndexRawPointerInst.self))
   }
 
   public func createUncheckedRefCast(from value: Value, to type: Type) -> UncheckedRefCastInst {
@@ -879,6 +885,11 @@ public struct Builder {
   public func createFixLifetime(operand: Value) -> FixLifetimeInst {
     let fixLifetime = bridged.createFixLifetime(operand.bridged)
     return notifyNew(fixLifetime.getAs(FixLifetimeInst.self))
+  }
+
+  public func createDropDeinit(of value: Value) -> DropDeinitInst {
+    let dropDeinit = bridged.createDropDeinit(value.bridged)
+    return notifyNew(dropDeinit.getAs(DropDeinitInst.self))
   }
 }
 

@@ -1543,17 +1543,6 @@ static bool constantFoldInstruction(Operand *Op,
       return true;
     }
   }
-
-  // Constant fold indexing insts of a 0 integer literal.
-  if (auto *II = dyn_cast<IndexingInst>(User)) {
-    if (auto *IntLiteral = dyn_cast<IntegerLiteralInst>(II->getIndex())) {
-      if (!IntLiteral->getValue()) {
-        Results.push_back(II->getBase());
-        return true;
-      }
-    }
-  }
-
   return false;
 }
 

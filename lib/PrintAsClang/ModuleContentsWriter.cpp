@@ -40,6 +40,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <utility>
 
@@ -932,7 +933,7 @@ public:
   void write() {
     SmallVector<Decl *, 64> decls;
     M.getTopLevelDeclsWithAuxiliaryDecls(decls);
-    llvm::DenseSet<const ValueDecl *> removedValueDecls;
+    llvm::SmallSetVector<const ValueDecl *, 4> removedValueDecls;
 
     auto newEnd =
         std::remove_if(decls.begin(), decls.end(),
@@ -1083,7 +1084,8 @@ public:
             }),
         removedVDList.end());
     // Sort the unavaiable decls by their name and kind.
-    llvm::sort(removedVDList, [](const ValueDecl *lhs, const ValueDecl *rhs) {
+    llvm::stable_sort(removedVDList, [](const ValueDecl *lhs,
+                                        const ValueDecl *rhs) {
       auto getSortKey = [](const ValueDecl *vd) {
         std::string sortKey;
         llvm::raw_string_ostream os(sortKey);

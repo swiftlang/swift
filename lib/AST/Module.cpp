@@ -1183,13 +1183,15 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return std::nullopt;
   }
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
   if (Kind != SourceFileKind::MacroExpansion &&
-      Kind != SourceFileKind::DefaultArgument)
+      Kind != SourceFileKind::DefaultArgument &&
+      Kind != SourceFileKind::SyntheticMacro)
     return nullptr;
 
   auto sourceLoc = getGeneratedSourceFileInfo()->originalSourceRange.getStart();
@@ -1198,7 +1200,8 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
 
 ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
   if (Kind != SourceFileKind::MacroExpansion &&
-      Kind != SourceFileKind::DefaultArgument)
+      Kind != SourceFileKind::DefaultArgument &&
+      Kind != SourceFileKind::SyntheticMacro)
     return nullptr;
 
   return ASTNode::getFromOpaqueValue(getGeneratedSourceFileInfo()->astNode);
@@ -3358,6 +3361,10 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
 
   if (module->isNonSwiftModule()) {
     if (auto *underlying = module->findUnderlyingClangModule()) {
+      if (llvm::is_contained(ctx.LangOpts.IPIClangModuleNames,
+                             module->getName().str()))
+        return LibraryLevel::IPI;
+
       // Imported clangmodules are SPI if they are defined by a private
       // modulemap or from the PrivateFrameworks folder in the SDK.
       bool moduleIsSPI = underlying->ModuleMapIsPrivate ||

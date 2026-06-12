@@ -98,11 +98,10 @@ llvm::StructType *IRGenModule::createTransientStructType(
   return createStructType(*this, name, types, packed);
 }
 
-static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
-                                                      llvm::LLVMContext &LLVMContext,
-                                                      const IRGenOptions &Opts,
-                                                      StringRef ModuleName,
-                                                      StringRef PD) {
+static std::unique_ptr<clang::CodeGenerator>
+createClangCodeGenerator(ASTContext &Context, llvm::LLVMContext &LLVMContext,
+                         const IRGenOptions &Opts, StringRef ModuleName,
+                         StringRef PD) {
   auto Loader = Context.getClangModuleLoader();
   auto *Importer = static_cast<ClangImporter*>(&*Loader);
   assert(Importer && "No clang module loader!");
@@ -130,9 +129,9 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                   .getHeaderSearchInfo()
                   .getHeaderSearchOpts();
   auto &PPO = Importer->getClangPreprocessor().getPreprocessorOpts();
-  auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
-                                                ModuleName, &VFS, HSI, PPO, CGO,
-                                                LLVMContext);
+  auto ClangCodeGen =
+      clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(), ModuleName, &VFS,
+                               HSI, PPO, CGO, LLVMContext);
   ClangCodeGen->Initialize(ClangContext, CGTI);
   return ClangCodeGen;
 }
@@ -2291,8 +2290,17 @@ IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
   if (GenModules.size() == 1)
     return getPrimaryIGM();
 
- IRGenModule *IGM = GenModules[SF];
- assert(IGM);
+ IRGenModule *IGM = GenModules.lookup(SF);
+
+ if (!IGM) {
+   // SF is a macro expansion buffer from a _SwiftifyImport macro attached
+   // to a function imported from clang module, so it doesn't have a mapping
+   // in GenModule. The contents are @_alwaysEmitIntoClient, so for all intents
+   // and purposes they belong to the primary module.
+   ASSERT(SF->getParentModule()->findUnderlyingClangModule());
+   return getPrimaryIGM();
+ }
+
  return IGM;
 }
 
@@ -2305,9 +2313,7 @@ IRGenModule *IRGenerator::getGenModule(DeclContext *ctxt) {
     return getPrimaryIGM();
   }
 
-  IRGenModule *IGM = GenModules[SF];
-  assert(IGM);
-  return IGM;
+  return getGenModule(SF);
 }
 
 IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
@@ -2432,9 +2438,9 @@ bool swift::writeEmptyOutputFilesFor(
       continue;
 
     std::unique_ptr<llvm::LLVMContext> llvmContext(new llvm::LLVMContext());
-    std::unique_ptr<clang::CodeGenerator> clangCodeGen(
-      createClangCodeGenerator(const_cast<ASTContext&>(Context),
-                               *llvmContext, IRGenOpts, fileName, ""));
+    auto clangCodeGen =
+        createClangCodeGenerator(const_cast<ASTContext &>(Context),
+                                 *llvmContext, IRGenOpts, fileName, "");
     auto *llvmModule = clangCodeGen->GetModule();
 
     auto *clangImporter = static_cast<ClangImporter *>(

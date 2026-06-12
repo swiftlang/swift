@@ -433,9 +433,9 @@ NormalProtocolConformance::getExplicitCodeGenerationModel() const {
   return std::nullopt;
 }
 
-static std::optional<CodeGenerationModel>
-getRequiredCodeGenerationModel(const NormalProtocolConformance *conformance) {
-  auto dc = conformance->getDeclContext();
+std::optional<CodeGenerationModel>
+NormalProtocolConformance::getRequiredCodeGenerationModel() const {
+  auto dc = getDeclContext();
   bool isEmbedded = dc->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
   // A conformance in a generic context must be @export(implementation) in
@@ -446,7 +446,7 @@ getRequiredCodeGenerationModel(const NormalProtocolConformance *conformance) {
   }
 
   // Synthesized conformances are always @export(implementation).
-  if (conformance->isSynthesized())
+  if (isSynthesized())
     return CodeGenerationModel::Implementation;
 
   // Other conformances must be @export(interface) in non-Embedded Swift,
@@ -460,11 +460,11 @@ getRequiredCodeGenerationModel(const NormalProtocolConformance *conformance) {
 
 CodeGenerationModel
 NormalProtocolConformance::getEffectiveCodeGenerationModel() const {
+  if (auto required = getRequiredCodeGenerationModel())
+    return *required;
+
   if (auto explicitModel = getExplicitCodeGenerationModel())
     return *explicitModel;
-
-  if (auto required = getRequiredCodeGenerationModel(this))
-    return *required;
 
   // Otherwise, apply the module-level default.
   return getDeclContext()->getParentModule()->codeGenerationModel();
@@ -1555,7 +1555,6 @@ createProtocolToProtocolConformances(ProtocolDecl *protocol) {
 
   for (auto &[newBase, ext, index] : protocol->getReparentingProtocols()) {
     // We say that 'Self' is what conforms to the @reparented entry.
-    auto conformingType = protocol->getDeclaredInterfaceType();
     auto const &entry = ext->getInherited().getEntry(index);
     assert(entry.isReparented());
 
@@ -1564,7 +1563,7 @@ createProtocolToProtocolConformances(ProtocolDecl *protocol) {
       loc = ext->getLoc();
 
     conformances.push_back(ctx.getNormalConformance(
-        conformingType, newBase, loc, entry.getTypeRepr(), /*dc=*/ext,
+        ctx.TheSelfType, newBase, loc, entry.getTypeRepr(), /*dc=*/ext,
         ProtocolConformanceState::Incomplete,
         ProtocolConformanceFlags::Reparented));
   }

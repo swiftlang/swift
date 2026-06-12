@@ -426,7 +426,7 @@ bool ExistentialLayout::requiresClass() const {
   return false;
 }
 
-Type ExistentialLayout::getSuperclass() const {
+Type ExistentialLayout::getExplicitSuperclassOrProtocolSuperclass() const {
   if (explicitSuperclass)
     return explicitSuperclass;
 
@@ -495,7 +495,7 @@ NominalTypeDecl *TypeBase::getAnyActor() {
   // Existential types: check for Actor protocol.
   if (isExistentialType()) {
     auto layout = getExistentialLayout();
-    if (auto superclass = layout.getSuperclass()) {
+    if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass()) {
       if (auto actor = superclass->getAnyActor())
         return actor;
     }
@@ -1527,10 +1527,7 @@ static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
   return paramType->is<AnyFunctionType>();
 }
 
-ParameterListInfo::ParameterListInfo(
-    ArrayRef<AnyFunctionType::Param> params,
-    const ValueDecl *paramOwner,
-    bool skipCurriedSelf) {
+ParameterListInfo::ParameterListInfo(ArrayRef<AnyFunctionType::Param> params) {
   defaultArguments.resize(params.size());
   propertyWrappers.resize(params.size());
   implicitSelfCapture.resize(params.size());
@@ -1538,7 +1535,13 @@ ParameterListInfo::ParameterListInfo(
   alwaysInheritActorContext.resize(params.size());
   variadicGenerics.resize(params.size());
   sendingParameters.resize(params.size());
+  acceptsUnlabeledTrailingClosures.resize(params.size());
+}
 
+ParameterListInfo::ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                                     const ValueDecl *paramOwner,
+                                     bool skipCurriedSelf)
+    : ParameterListInfo(params) {
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
   //
@@ -1568,46 +1571,67 @@ ParameterListInfo::ParameterListInfo(
   if (params.size() != paramList->size())
     return;
 
-  // Now we have enough information to determine which parameters accept
-  // unlabeled trailing closures.
-  acceptsUnlabeledTrailingClosures.resize(params.size());
-
   // Note which parameters have default arguments and/or accept unlabeled
   // trailing closure arguments with the forward-scan rule.
   for (auto i : range(0, params.size())) {
-    auto param = paramList->get(i);
-    if (param->isDefaultArgument()) {
-      defaultArguments.set(i);
-    }
+    setFlagsFor(paramList->get(i), i);
+  }
+}
 
-    if (allowsUnlabeledTrailingClosureParameter(param)) {
-      acceptsUnlabeledTrailingClosures.set(i);
-    }
+ParameterListInfo::ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                                     bool skipCurriedSelf,
+                                     ConcreteDeclRef declRef)
+  : ParameterListInfo(params) {
+  if (!declRef || params.empty())
+    return;
 
-    if (param->hasExternalPropertyWrapper()) {
-      propertyWrappers.set(i);
-    }
+  auto *decl = declRef.getDecl();
+  if (decl->hasCurriedSelf() && !skipCurriedSelf)
+    return;
 
-    if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>()) {
-      implicitSelfCapture.set(i);
-    }
+  auto *paramList = decl->getParameterList();
+  if (!paramList)
+    return;
 
-    if (auto *attr =
-            param->getAttrs().getAttribute<InheritActorContextAttr>()) {
-      if (attr->isAlways()) {
-        alwaysInheritActorContext.set(i);
-      } else {
-        inheritActorContext.set(i);
-      }
+  auto subs = declRef.getSubstitutions();
+  for (auto i : indices(params)) {
+    if (auto *param = subs ? getParameterAt(declRef, i) : paramList->get(i)) {
+      setFlagsFor(param, i);
     }
+  }
+}
 
-    if (param->getInterfaceType()->is<PackExpansionType>()) {
-      variadicGenerics.set(i);
-    }
+void ParameterListInfo::setFlagsFor(const ParamDecl *param, unsigned index) {
+  if (param->isDefaultArgument()) {
+    defaultArguments.set(index);
+  }
 
-    if (param->isSending()) {
-      sendingParameters.set(i);
+  if (allowsUnlabeledTrailingClosureParameter(param)) {
+    acceptsUnlabeledTrailingClosures.set(index);
+  }
+
+  if (param->hasExternalPropertyWrapper()) {
+    propertyWrappers.set(index);
+  }
+
+  if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>()) {
+    implicitSelfCapture.set(index);
+  }
+
+  if (auto *attr = param->getAttrs().getAttribute<InheritActorContextAttr>()) {
+    if (attr->isAlways()) {
+      alwaysInheritActorContext.set(index);
+    } else {
+      inheritActorContext.set(index);
     }
+  }
+
+  if (param->getInterfaceType()->is<PackExpansionType>()) {
+    variadicGenerics.set(index);
+  }
+
+  if (param->isSending()) {
+    sendingParameters.set(index);
   }
 }
 
@@ -2456,8 +2480,10 @@ Type TypeBase::getSuperclass(bool useArchetypes) {
     if (auto dynamicSelfTy = getAs<DynamicSelfType>())
       return dynamicSelfTy->getSelfType();
 
-    if (isExistentialType())
-      return getExistentialLayout().getSuperclass();
+    if (isExistentialType()) {
+    // FIXME: This is broken, see the comment on that getter method.
+      return getExistentialLayout().getExplicitSuperclassOrProtocolSuperclass();
+    }
 
     // No other types have superclasses.
     return Type();
@@ -4695,7 +4721,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::ProtocolComposition: {
     auto layout = type->getExistentialLayout();
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
-    if (auto superclass = layout.getSuperclass())
+    if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass())
       return superclass->getReferenceCounting();
     return ReferenceCounting::Unknown;
   }

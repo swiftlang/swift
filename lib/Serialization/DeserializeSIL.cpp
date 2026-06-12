@@ -2596,7 +2596,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                       getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         getLocalValue(Builder.maybeGetFunction(), ValID2,
                       getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)),
-        /*needsStackProtection=*/Attr != 0);
+        /*needsStackProtection=*/(Attr & 1) != 0,
+        /*isProjection=*/(Attr & 2) != 0);
     break;
   }
   case SILInstructionKind::TailAddrInst: {
@@ -4317,6 +4318,19 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
                             << " for SILGlobalVariable\n");
     return nullptr;
+  }
+
+  // A SIL global variable that uses the Interface code generation model has a
+  // unique strong definition in its defining module. When deserialized into a
+  // different module, mark its linkage as externally available so that the
+  // importer references the defining module's symbol rather than emitting
+  // its own definition.
+  if (codeGenerationModel &&
+      static_cast<CodeGenerationModel>(codeGenerationModel - 1) ==
+          CodeGenerationModel::Interface &&
+      MF->getAssociatedModule() != SILMod.getSwiftModule()) {
+    linkage = addExternalToLinkage(*linkage);
+    IsDeclaration = true;
   }
 
   VarDecl *globalDecl = nullptr;

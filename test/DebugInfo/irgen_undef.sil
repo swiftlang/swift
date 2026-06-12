@@ -58,6 +58,18 @@ bb0:
 return %0 : $Builtin.Int64
 }
 
+// CHECK-LABEL: define {{.*}} @float_constant
+sil @float_constant : $@convention(thin) (Builtin.FPIEEE64) -> (Builtin.FPIEEE64) {
+bb0(%0 : $Builtin.FPIEEE64):
+  // CHECK: #dbg_value(double 2.000000e+00, ![[FCONST_VAR:[0-9]+]], !DIExpression()
+  debug_value undef : $Builtin.FPIEEE64, var, name "fconst", transform {
+  bb0:
+    %1 = float_literal $Builtin.FPIEEE64, 0x4000000000000000 // 2.0
+    return %1 : $Builtin.FPIEEE64
+  }
+  return %0 : $Builtin.FPIEEE64
+}
+
 
 // CHECK: ![[JUST_UNDEF_VAR]] = !DILocalVariable(name: "optimizedout"
 // CHECK: ![[CURRENT_VAR]] = !DILocalVariable(name: "current"
@@ -66,3 +78,4 @@ return %0 : $Builtin.Int64
 // CHECK: ![[CONST_VAR]] = !DILocalVariable(name: "const"
 // CHECK: ![[CONSTINT_VAR]] = !DILocalVariable(name: "constint"
 // CHECK: ![[CONSTUPLE_VAR]] = !DILocalVariable(name: "constuple"
+// CHECK: ![[FCONST_VAR]] = !DILocalVariable(name: "fconst"

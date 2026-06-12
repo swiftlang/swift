@@ -458,6 +458,18 @@ void printWithCompatibilityFeatureChecks(ASTPrinter &printer,
 bool escapeIdentifierInContext(Identifier name, PrintNameContext context,
                                bool isSpecializedCxxType = false);
 
+/// Escape a raw identifier (keyword or containing spaces/special characters)
+/// using backticks if needed, and write it to the output stream.
+void printIdentifierEscapingIfNeeded(
+    StringRef identifier, llvm::raw_ostream &os,
+    PrintNameContext context = PrintNameContext::Normal);
+
+/// Escape a raw identifier (keyword or containing spaces/special characters)
+/// using backticks if needed, and return it as a string.
+std::string
+identifierEscapingIfNeeded(StringRef identifier,
+                           PrintNameContext context = PrintNameContext::Normal);
+
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_ASTPRINTER_H

@@ -1,4 +1,6 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterator -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterator -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature BorrowingSequence | %FileCheck %s
+
+// REQUIRES: swift_feature_BorrowingSequence
 
 // CHECK: struct ConstIterator : UnsafeCxxInputIterator {
 // CHECK:   func __operatorStar() -> UnsafePointer<Int32>

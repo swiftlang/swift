@@ -28,6 +28,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -43,6 +44,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
 #include "clang/AST/DeclTemplate.h"
@@ -6226,7 +6228,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   // Determine whether this application has curried self.
   bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
   // Determine the parameter bindings.
-  ParameterListInfo paramInfo(params, callee.getDecl(), skipCurriedSelf);
+  ParameterListInfo paramInfo(params, skipCurriedSelf, callee);
 
   // If this application is an init(wrappedValue:) call that needs an injected
   // wrapped value placeholder, the first non-defaulted argument must be
@@ -8494,8 +8496,16 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto *calleeLoc = cs.getConstraintLocator(calleeLocator);
   auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc);
   if (overload) {
-    auto *decl = overload->choice.getDeclOrNull();
-    callee = resolveConcreteDeclRef(decl, calleeLoc);
+    // If this is a call through an implicit `dynamicMember:` subscript,
+    // of a `@dynamicMemberLookup` type there is no callee because the
+    // call happens on a value returned by the subscript invocation and
+    // not necessary the member looked up.
+    if (overload->choice.isKeyPathDynamicMemberLookup()) {
+      callee = ConcreteDeclRef();
+    } else {
+      auto *decl = overload->choice.getDeclOrNull();
+      callee = resolveConcreteDeclRef(decl, calleeLoc);
+    }
   }
 
   // Make sure we have a function type that is callable. This helps ensure
@@ -9355,6 +9365,20 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
   if (wrappedVar) {
     if (!finalPatternType->hasError() && !finalPatternType->is<TypeVariableType>())
       finalPatternType = computeWrappedValueType(wrappedVar, finalPatternType);
+  } else if (auto *typedPattern =
+                 dyn_cast<TypedPattern>(target.getInitializationPattern())) {
+    // When the pattern carries an explicit type annotation, prefer the type
+    // the solver assigned to the pattern over the type of the coerced
+    // initializer expression. The two share a canonical type, but if their
+    // sugar differs the initializer's sugar wins through coercion, which can
+    // have surprising results like printing an internal typealias into a
+    // .swiftinterface for a public stored property.
+
+    // FIXME: https://github.com/swiftlang/swift/issues/89690
+    // The final type could be set to the init type unconditionally without any
+    // regressions if constructor types were resugared consistently.
+    if (typedPattern->getTypeRepr())
+      finalPatternType = initType;
   }
 
   finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
@@ -9797,8 +9821,14 @@ ConstraintSystem::applySolution(Solution &solution,
     auto isValidType = [&](Type ty) {
       return !ty->hasError() && !ty->hasTypeVariableOrPlaceholder();
     };
-    for (auto &[_, type] : solution.typeBindings) {
-      ASSERT(isValidType(type) && "type binding has invalid type");
+    for (auto pair : solution.typeBindings) {
+      if (!isValidType(pair.second)) {
+        ABORT([&](llvm::raw_ostream &out) {
+          out << "Type binding has invalid type:\n";
+          pair.first->dump(out);
+          pair.second->dump(out);
+        });
+      }
     }
     for (auto &[_, type] : solution.nodeTypes) {
       ASSERT(isValidType(solution.simplifyType(type)) &&

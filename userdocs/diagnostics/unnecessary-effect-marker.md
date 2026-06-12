@@ -34,3 +34,6 @@ func caller() async throws {
 }
 ```
 
+## See Also
+
+- <doc:unnecessary-unsafe>

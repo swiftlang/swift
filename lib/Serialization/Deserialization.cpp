@@ -8403,7 +8403,7 @@ Expected<Type> DESERIALIZE_TYPE(HIDDEN_TYPE)(ModuleFile &MF,
 
   decls_block::HiddenTypeLayout::readRecord(scratch);
 
-  return HiddenType::get(ctx, blobData);
+  return HiddenType::get(ctx, blobData, MF.getAssociatedModule());
 }
 } // namespace decls_block
 } // namespace serialization

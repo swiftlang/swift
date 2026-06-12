@@ -238,7 +238,8 @@ extension OutputSpan where Element: ~Copyable {
   public subscript(unchecked index: Index) -> Element {
     @_unsafeSelfDependentResult
     borrow {
-      Builtin.borrowAt(unsafe _unsafeAddressOfElement(unchecked: index))
+      unsafe UnsafePointer<Element>(
+        _unsafeAddressOfElement(unchecked: index)).pointee
     }
     @_unsafeSelfDependentResult
     @_lifetime(self: copy self)
@@ -517,5 +518,61 @@ extension OutputSpan {
     for buffer: Slice<UnsafeMutableBufferPointer<Element>>
   ) -> Int {
     unsafe finalize(for: UnsafeMutableBufferPointer(rebasing: buffer))
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension OutputSpan where Element: ~Copyable {
+  @_alwaysEmitIntoClient
+  @_lifetime(self: copy self)
+  internal mutating func _append(
+    moving source: UnsafeMutableBufferPointer<Element>
+  ) {
+    guard source.count > 0 else { return }
+    unsafe self.withUnsafeMutableBufferPointer { dst, dstCount in
+      let dstEnd = dstCount + source.count
+      precondition(dstEnd <= dst.count, "OutputSpan capacity overflow")
+      unsafe dst
+        ._extracting(uncheckedFrom: dstCount, to: dstEnd)
+        ._moveInitializeAll(fromContentsOf: source)
+      dstCount &+= source.count
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  @_lifetime(self: copy self)
+  @_lifetime(source: copy source)
+  internal mutating func _append(moving source: inout OutputSpan<Element>) {
+    unsafe source.withUnsafeMutableBufferPointer { src, srcCount in
+      let items = unsafe src._extracting(uncheckedFrom: 0, to: srcCount)
+      unsafe self._append(moving: items)
+      srcCount = 0
+    }
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension OutputSpan where Element: Copyable {
+  @_alwaysEmitIntoClient
+  @_lifetime(self: copy self)
+  internal mutating func _append(copying source: UnsafeBufferPointer<Element>) {
+    unsafe self.withUnsafeMutableBufferPointer { dst, dstCount in
+      let dstEnd = dstCount + source.count
+      precondition(dstEnd <= dst.count, "OutputSpan capacity overflow")
+      unsafe dst
+        ._extracting(uncheckedFrom: dstCount, to: dstEnd)
+        ._initializeAll(fromContentsOf: source)
+      dstCount &+= source.count
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  @_lifetime(self: copy self)
+  internal mutating func _append(copying source: Span<Element>) {
+    source.withUnsafeBufferPointer { buffer in
+      unsafe self._append(copying: buffer)
+    }
   }
 }

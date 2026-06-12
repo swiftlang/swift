@@ -1367,8 +1367,7 @@ public typealias ParamAttrs6 = (@autoclosure () -> ()) -> ()
 // The following type only has the internal parameter name inferred from the
 // closure on the right-hand side of `=`. Thus, it is only part of the `Type`
 // and not part of the `TypeRepr`.
-// PASS_PRINT_AST_TYPE: public var ParamAttrs7: (_ f: @escaping () -> ()) -> ()
-// PASS_PRINT_AST_TYPEREPR: public var ParamAttrs7: (@escaping () -> ()) -> ()
+// PASS_PRINT_AST: public var ParamAttrs7: (@escaping () -> ()) -> ()
 public var ParamAttrs7: (@escaping () -> ()) -> () = { f in f() }
 
 // PASS_PRINT_AST: public var ParamAttrs8: (_ f: @escaping () -> ()) -> ()

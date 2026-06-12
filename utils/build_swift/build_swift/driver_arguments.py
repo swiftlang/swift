@@ -896,6 +896,18 @@ def create_argument_parser():
     option(['--install-wasmkit'], toggle_true('install_wasmkit'),
            help='install SourceKitLSP')
 
+    # Emscripten options
+
+    option(['--build-emscripten-stdlib'],
+           toggle_true('build_emscriptenstdlib'),
+           help='build the stdlib for Emscripten target into a '
+                'separate build directory')
+    option(['--emscripten-path'], store_path,
+           help='path to the Emscripten checkout')
+    option(['--skip-test-emscripten-stdlib'],
+           toggle_false('test_emscriptenstdlib'),
+           help='skip testing stdlib for Emscripten')
+
     # Swift Testing options
 
     option('--swift-testing', toggle_true('build_swift_testing'),
@@ -1602,10 +1614,6 @@ def create_argument_parser():
     option('--enable-experimental-cxx-interop', toggle_true,
            default=True,
            help='Enable experimental C++ interop.')
-
-    option('--enable-cxx-interop-swift-bridging-header', toggle_true,
-           default=True,
-           help='Ship the <swift/bridging> header for C++ interop')
 
     option('--enable-experimental-distributed', toggle_true,
            default=True,

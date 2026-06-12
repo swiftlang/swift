@@ -74,6 +74,7 @@ static bool shouldInferAttributeInContext(const DeclContext *dc) {
         case SourceFileKind::MacroExpansion:
         case SourceFileKind::Main:
         case SourceFileKind::SIL:
+        case SourceFileKind::SyntheticMacro:
           return true;
         }
       }
@@ -141,7 +142,9 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
     llvm_unreachable("constructor cannot have erased isolation");
 
   case ActorIsolation::GlobalActor:
-    return ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    return ctor->getASTContext().LangOpts.hasFeature(
+               Feature::FlowIsolationGlobalActor) &&
+           ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
                StrictConcurrency::Complete &&
            !ctor->hasAsync();
   case ActorIsolation::ActorInstance:
@@ -355,6 +358,8 @@ swift::checkGlobalActorAttributes(SourceLoc loc, ArrayRef<CustomAttr *> attrs) {
       ctx.Diags.diagnose(attr->getLocation(), diag::multiple_global_actors_note,
                          nominal);
 
+      const_cast<CustomAttr *>(attr)->setInvalid();
+
       continue;
     }
 
@@ -434,8 +439,9 @@ GlobalActorAttributeRequest::evaluate(
     if (auto classDecl = dyn_cast<ClassDecl>(nominal)){
       if (classDecl->isActor()) {
         // ... except for actors.
-        nominal->diagnose(diag::global_actor_on_actor_class, nominal->getName())
-            .highlight(globalActorAttr->getRangeWithAt());
+        diagnoseAndRemoveAttr(nominal, globalActorAttr,
+                              diag::global_actor_on_actor_class,
+                              nominal->getName());
         return std::nullopt;
       }
     }
@@ -448,15 +454,16 @@ GlobalActorAttributeRequest::evaluate(
           (var->getDeclContext()->isAsyncContext() ||
            var->getASTContext().LangOpts.StrictConcurrencyLevel >=
              StrictConcurrency::Complete)) {
-        var->diagnose(diag::global_actor_top_level_var)
-            .highlight(globalActorAttr->getRangeWithAt());
+        diagnoseAndRemoveAttr(var, globalActorAttr,
+                              diag::global_actor_top_level_var);
         return std::nullopt;
       }
 
       // ... and not if it's local property
       if (var->getDeclContext()->isLocalContext()) {
-        var->diagnose(diag::global_actor_on_local_variable, var->getName())
-            .highlight(globalActorAttr->getRangeWithAt());
+        diagnoseAndRemoveAttr(var, globalActorAttr,
+                              diag::global_actor_on_local_variable,
+                              var->getName());
         return std::nullopt;
       }
     }
@@ -502,14 +509,17 @@ GlobalActorAttributeRequest::evaluate(
         }
 
         // In Swift 6, once the diag above is an error, it is disallowed.
-        if (ctx.isLanguageModeAtLeast(LanguageMode::v6))
+        if (ctx.isLanguageModeAtLeast(LanguageMode::v6)) {
+          globalActorAttr->setInvalid();
           return std::nullopt;
+        }
       }
     }
     // Functions are okay.
   } else {
     // Everything else is disallowed.
-    decl->diagnose(diag::global_actor_disallowed, decl);
+    diagnoseAndRemoveAttr(decl, globalActorAttr, diag::global_actor_disallowed,
+                          decl);
     return std::nullopt;
   }
 
@@ -924,6 +934,7 @@ static bool shouldDiagnosePreconcurrencyImports(SourceFile &sf) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
+  case SourceFileKind::SyntheticMacro:
       return true;
   }
 }
@@ -5166,8 +5177,7 @@ ActorIsolation swift::determineClosureActorIsolation(
 /// inference rules). Returns \c None if there were no attributes on this
 /// declaration.
 static std::optional<ActorIsolation>
-getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
-                           bool onlyExplicit = false) {
+getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true) {
   // Look up attributes on the declaration that can affect its actor isolation.
   // If any of them are present, use that attribute.
 
@@ -5181,22 +5191,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   auto globalActorAttr = decl->getGlobalActorAttr();
   auto concurrentAttr = decl->getAttrs().getAttribute<ConcurrentAttr>();
 
-  // Remove implicit attributes if we only care about explicit ones.
-  if (onlyExplicit) {
-    if (nonisolatedAttr && nonisolatedAttr->isImplicit())
-      nonisolatedAttr = nullptr;
-    if (isolatedAttr && isolatedAttr->isImplicit())
-      isolatedAttr = nullptr;
-    if (globalActorAttr && globalActorAttr->first->isImplicit())
-      globalActorAttr = std::nullopt;
-    if (concurrentAttr && concurrentAttr->isImplicit())
-      concurrentAttr = nullptr;
-  }
-
-  unsigned numIsolationAttrs =
-      (isolatedAttr ? 1 : 0) + (nonisolatedAttr ? 1 : 0) +
-      (globalActorAttr ? 1 : 0) + (concurrentAttr ? 1 : 0);
-  if (numIsolationAttrs == 0) {
+  if (!(isolatedAttr || nonisolatedAttr || globalActorAttr || concurrentAttr)) {
     if (isa<DestructorDecl>(decl) && !decl->isImplicit()) {
       return cast<DestructorDecl>(decl)->isAsync()
                  ? ActorIsolation::forNonisolatedConcurrent()
@@ -5959,7 +5954,7 @@ static OverrideIsolationResult validOverrideIsolation(
   auto &ctx = declContext->getASTContext();
 
   // Normally we are checking if overriding declaration can be called by calling
-  // overriden declaration. But in case of destructors, overriden declaration is
+  // overridden declaration. But in case of destructors, overridden declaration is
   // always callable by definition and we are checking that subclass deinit can
   // call super deinit.
   bool isDtor = isa<DestructorDecl>(value);
@@ -7729,6 +7724,7 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
         case SourceFileKind::MacroExpansion:
         case SourceFileKind::Main:
         case SourceFileKind::SIL:
+        case SourceFileKind::SyntheticMacro:
           break;
         }
       }
@@ -8759,10 +8755,13 @@ ActorReferenceResult ActorReferenceResult::Builder::build() {
   // type is Sendable. Note that if the init is a nonisolated actor init,
   // Sendable checking is already performed on arguments at the call-site.
   if (auto *init = dyn_cast<ConstructorDecl>(fromDC)) {
-    // If strict concurrency is complete, we allow for users to initialize
-    // global actor non-Sendable types in initializers more aggressively through
-    // the usage of flow isolation.
-    if (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    // When the FlowIsolationGlobalActor feature is enabled under complete
+    // strict concurrency, we allow users to initialize global actor
+    // non-Sendable types in initializers more aggressively by deferring the
+    // check to the SIL-level flow-isolation pass.
+    if (fromDC->getASTContext().LangOpts.hasFeature(
+            Feature::FlowIsolationGlobalActor) &&
+        fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete &&
         referencedActor && referencedActor->isSelf() &&
         checkedByFlowIsolation(fromDC, *referencedActor, decl, declRefLoc,

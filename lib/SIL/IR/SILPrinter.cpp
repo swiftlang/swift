@@ -3104,6 +3104,7 @@ public:
 
   void visitIndexAddrInst(IndexAddrInst *IAI) {
     *this << (IAI->needsStackProtection() ? "[stack_protection] " : "")
+          << (IAI->isProjection() ? "[projection] " : "")
           << getIDAndType(IAI->getBase()) << ", "
           << getIDAndType(IAI->getIndex());
   }

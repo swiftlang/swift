@@ -345,13 +345,16 @@ static bool growingSubstitutions(SubstitutionMap Subs1,
 /// The specialization graph is represented by means of SpecializationInformation.
 /// We use this meta-information about specializations to detect cycles in this
 /// graph.
-static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
+static bool createsInfiniteSpecializationLoop(ApplySite Apply, bool isMandatory) {
   if (!Apply)
     return false;
   auto *Callee = Apply.getCalleeFunction();
   SILFunction *Caller = nullptr;
   Caller = Apply.getFunction();
-  int numAcceptedCycles = 1;
+
+  // If there is a specialization loop and it is not infinite, we should allow this in embedded swift.
+  // Still, there is a hard coded limit, but 10 should be good enough for real world scenarios.
+  int numAcceptedCycles = isMandatory ? 10 : 1;
 
   // Name of the function to be specialized.
   auto GenericFunc = Callee;
@@ -555,6 +558,7 @@ static bool canDropMetatypeArg(ApplySite apply, SILFunction *callee,
 /// Returns true otherwise.
 bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                                         SubstitutionMap ParamSubs,
+                                        bool isMandatory,
                                         OptRemark::Emitter *ORE) {
   assert(ParamSubs.hasAnySubstitutableParams());
 
@@ -673,7 +677,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
   // Check if specializing this call site would create in an infinite generic
   // specialization loop.
-  if (createsInfiniteSpecializationLoop(Apply)) {
+  if (createsInfiniteSpecializationLoop(Apply, isMandatory)) {
     REMARK_OR_DEBUG(ORE, [&]() {
       return RemarkMissed("SpecializationLoop", *Apply.getInstruction())
              << IndentDebug(4)
@@ -696,19 +700,20 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 bool ReabstractionInfo::canBeSpecialized(ApplySite Apply, SILFunction *Callee,
                                          SubstitutionMap ParamSubs) {
   ReabstractionInfo ReInfo(Callee->getModule());
-  return ReInfo.prepareAndCheck(Apply, Callee, ParamSubs);
+  return ReInfo.prepareAndCheck(Apply, Callee, ParamSubs, /*isMandatory=*/ false);
 }
 
 ReabstractionInfo::ReabstractionInfo(
     ModuleDecl *targetModule, bool isWholeModule, ApplySite Apply,
     SILFunction *Callee, SubstitutionMap ParamSubs, SerializedKind_t Serialized,
     bool ConvertIndirectToDirect, bool dropUnusedArguments,
+    bool isMandatory,
     OptRemark::Emitter *ORE)
     : ConvertIndirectToDirect(ConvertIndirectToDirect),
       dropUnusedArguments(dropUnusedArguments), M(&Callee->getModule()),
       TargetModule(targetModule), isWholeModule(isWholeModule),
       Serialized(Serialized) {
-  if (!prepareAndCheck(Apply, Callee, ParamSubs, ORE))
+  if (!prepareAndCheck(Apply, Callee, ParamSubs, isMandatory, ORE))
     return;
 
   SILFunction *Caller = nullptr;
@@ -3241,7 +3246,7 @@ static bool usePrespecialized(
           funcBuilder.getModule().isWholeModule(), apply, refF, newSubstMap,
           apply.getFunction()->getSerializedKind(),
           /*ConvertIndirectToDirect=*/ true,
-          /*dropUnusedArguments=*/ false, nullptr);
+          /*dropUnusedArguments=*/ false);
 
       if (layoutReInfo.getSpecializedType() == reInfo.getSpecializedType()) {
         layoutMatches.push_back(
@@ -3354,6 +3359,7 @@ void swift::trySpecializeApplyOfGeneric(
                            Apply.getSubstitutionMap(), serializedKind,
                            /*ConvertIndirectToDirect=*/ true,
                            /*dropUnusedArguments=*/ true,
+                           isMandatory,
                            &ORE);
   if (!ReInfo.canBeSpecialized())
     return;

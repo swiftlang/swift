@@ -19,6 +19,7 @@
 
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -107,8 +108,18 @@ struct SubstitutionMapWithLocalArchetypes {
         origType->getCanonicalType(), proto);
     }
 
-    return ProtocolConformanceRef::forAbstract(
-      origType.subst(IFS), proto);
+    // If IFS has an active pack expansion, then substituting a
+    // PackArchetypeType could cause a PackElementType to be introduced,
+    // possibly erroneously. ProtocolConformanceRef::forAbstract cannot handle
+    // PackElementType types, so set the PreservePackExpansionLevel flag
+    // prevents this.
+    //
+    // TODO: Rework handling of pack type level to make this flag unnecessary.
+    auto optionsPreservingPackExpansionLevel =
+        IFS.getOptions() | SubstFlags::PreservePackExpansionLevel;
+    return IFS.withNewOptions(optionsPreservingPackExpansionLevel, [&]() {
+      return ProtocolConformanceRef::forAbstract(origType.subst(IFS), proto);
+    });
   }
 
   void dump(llvm::raw_ostream &out) const {
@@ -442,6 +453,13 @@ public:
       return;
     if (VarInfo->Type)
       VarInfo->Type = getOpType(*VarInfo->Type);
+    // Remap types embedded in the debug info expression, within op_tuple_fragment.
+    for (auto &Elt : VarInfo->DIExpr.elements()) {
+      if (auto Ty = Elt.getAsType()) {
+        Elt = SILDIExprElement::createType(
+            getOpASTType(Ty->getCanonicalType()));
+      }
+    }
     // Don't remap locations for debug values.
     if (VarInfo->Scope)
       VarInfo->Scope = getOpScope(VarInfo->Scope);
@@ -3667,7 +3685,8 @@ SILCloner<ImplClass>::visitIndexAddrInst(IndexAddrInst *Inst) {
       Inst, getBuilder().createIndexAddr(getOpLocation(Inst->getLoc()),
                                          getOpValue(Inst->getBase()),
                                          getOpValue(Inst->getIndex()),
-                                         Inst->needsStackProtection()));
+                                         Inst->needsStackProtection(),
+                                         Inst->isProjection()));
 }
 
 template<typename ImplClass>

@@ -21,6 +21,7 @@
 #include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -46,8 +47,10 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -145,6 +148,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E))
         checkForInvalidKeyPath(KPE);
+
+      // Verify that a 'super' call does not target a pure virtual C++ method.
+      if (auto selfApply = dyn_cast<SelfApplyExpr>(E))
+        checkSuperCallToPureVirtualCXXMethod(selfApply);
 
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
@@ -339,6 +346,34 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       return Action::Continue(E);
+    }
+
+    /// A `super` call statically dispatches to the base class implementation.
+    /// A pure virtual C++ method of a foreign reference type has none.
+    void checkSuperCallToPureVirtualCXXMethod(SelfApplyExpr *selfApply) {
+      if (!selfApply->getBase()->isSuperExpr())
+        return;
+
+      auto func = dyn_cast_or_null<FuncDecl>(
+          selfApply->getCalledValue(/*skipFunctionConversions=*/true));
+      if (!func)
+        return;
+
+      auto classDecl = func->getDeclContext()->getSelfClassDecl();
+      if (!classDecl || !classDecl->isForeignReferenceType())
+        return;
+
+      auto clangImporter = Ctx.getClangModuleLoader();
+      auto original = clangImporter->getOriginalForVirtualThunk(func);
+      if (!original)
+        return;
+
+      if (auto methodDecl = dyn_cast_or_null<clang::CXXMethodDecl>(
+              original->getClangDecl())) {
+        if (methodDecl->isPureVirtual())
+          Ctx.Diags.diagnose(selfApply->getFn()->getLoc(),
+                             diag::cxx_super_pure_virtual_call, func);
+      }
     }
 
     /// Visit each component of the keypath and emit a diagnostic if they
@@ -2949,20 +2984,24 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
 
     if (!oldName.has_value() && newName.has_value()) {
       ++numMissing;
-      missingBuffer += newName->str();
+      missingBuffer += identifierEscapingIfNeeded(
+          newName->str(), PrintNameContext::FunctionParameterExternal);
       missingBuffer += ':';
     } else if (oldName.has_value() && !newName.has_value()) {
       ++numExtra;
-      extraBuffer += oldName->str();
+      extraBuffer += identifierEscapingIfNeeded(
+          oldName->str(), PrintNameContext::FunctionParameterExternal);
       extraBuffer += ':';
     } else if (oldName->empty()) {
       // In the cases from here onwards oldValue and newValue are not null
       ++numMissing;
-      missingBuffer += newName->str();
+      missingBuffer += identifierEscapingIfNeeded(
+          newName->str(), PrintNameContext::FunctionParameterExternal);
       missingBuffer += ":";
     } else if (newName->empty()) {
       ++numExtra;
-      extraBuffer += oldName->str();
+      extraBuffer += identifierEscapingIfNeeded(
+          oldName->str(), PrintNameContext::FunctionParameterExternal);
       extraBuffer += ':';
     } else {
       ++numWrong;
@@ -2986,7 +3025,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
         if (haveName.empty())
           haveBuffer += '_';
         else
-          haveBuffer += haveName.str();
+          haveBuffer += identifierEscapingIfNeeded(
+              haveName.str(), PrintNameContext::FunctionParameterExternal);
         haveBuffer += ':';
       }
 
@@ -2994,7 +3034,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
         if (expected.empty())
           expectedBuffer += '_';
         else
-          expectedBuffer += expected.str();
+          expectedBuffer += identifierEscapingIfNeeded(
+              expected.str(), PrintNameContext::FunctionParameterExternal);
         expectedBuffer += ':';
       }
 
@@ -3044,13 +3085,9 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
       continue;
     }
 
-    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
     llvm::SmallString<16> newStr;
-    if (newNameIsReserved)
-      newStr += "`";
-    newStr += newName.str();
-    if (newNameIsReserved)
-      newStr += "`";
+    newStr = identifierEscapingIfNeeded(
+        newName.str(), PrintNameContext::FunctionParameterExternal);
 
     // If the argument was previously unlabeled, insert the new label. Note that
     // we don't do this for labeled trailing closures as they write unlabeled

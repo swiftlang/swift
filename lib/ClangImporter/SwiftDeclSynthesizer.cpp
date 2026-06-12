@@ -1422,6 +1422,7 @@ SwiftDeclSynthesizer::makeEnumRawValueConstructor(EnumDecl *enumDecl) {
                               /*ThrownType=*/TypeLoc(), paramPL,
                               /*GenericParams=*/nullptr, enumDecl);
   ctorDecl->setImplicit();
+  ctorDecl->setSynthesized();
   ctorDecl->copyFormalAccessFrom(enumDecl);
   ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);
   return ctorDecl;
@@ -2078,7 +2079,7 @@ FuncDecl *SwiftDeclSynthesizer::makeSuccessorFunc(FuncDecl *incrementFunc) {
   auto result = FuncDecl::createImplicit(
       ctx, StaticSpellingKind::None, name, SourceLoc(),
       /*Async*/ false, /*Throws*/ false, /*ThrownType=*/Type(),
-      /*GenericParams*/ nullptr, params, returnTy, dc);
+      /*GenericParams*/ nullptr, params, returnTy, dc, /*isSynthesized=*/true);
 
   result->copyFormalAccessFrom(incrementFunc);
   result->setIsDynamic(false);
@@ -2420,9 +2421,10 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
 
   auto topLevelStaticFuncDecl = FuncDecl::createImplicit(
       ctx, StaticSpellingKind::None, opDeclName, SourceLoc(),
-      /*Async*/ false, /*Throws*/ false, /*ThrownType=*/Type(), 
+      /*Async*/ false, /*Throws*/ false, /*ThrownType=*/Type(),
       genericParamList, ParameterList::create(ctx, newParams),
-      operatorMethod->getResultInterfaceType(), parentCtx);
+      operatorMethod->getResultInterfaceType(), parentCtx,
+      /*isSynthesized=*/true);
 
   topLevelStaticFuncDecl->copyFormalAccessFrom(operatorMethod);
   topLevelStaticFuncDecl->setIsDynamic(false);
@@ -3170,47 +3172,49 @@ synthesizeAvailabilityDomainPredicateBody(AbstractFunctionDecl *afd,
   auto funcDecl = cast<FuncDecl>(afd);
   ASTContext &ctx = funcDecl->getASTContext();
 
-  // FIXME: The need for an intermediate function to call could be eliminated if
-  // Clang provided the predicate function decl directly, rather than a call
-  // expression that must be wrapped in a function.
-  // Synthesize `return {domain predicate expression}`.
-  auto clangHelperReturnStmt =
-      createClangReturnStmt(clangCtx, domainInfo.second.Call);
-
-  // Synthesize `int __XYZ_isAvailable() { return {predicate expr}; }`.
-  auto clangDeclName = clang::DeclarationName(
-      &clangCtx.Idents.get("__" + domainInfo.first.str() + "_isAvailable"));
-  auto clangDeclContext = clangCtx.getTranslationUnitDecl();
-  clang::QualType funcTy =
-      clangCtx.getFunctionType(domainInfo.second.Call->getType(), {},
-                               clang::FunctionProtoType::ExtProtoInfo());
-
-  auto clangHelperFuncDecl =
-      createClangFunctionDecl(clangCtx, clangDeclContext, clangDeclName, funcTy);
-  clangHelperFuncDecl->setBody(clangHelperReturnStmt);
-
-  // Import `func __XYZ_isAvailable() -> Bool` into Swift.
-  auto helperFuncDecl = dyn_cast_or_null<FuncDecl>(
-      ctx.getClangModuleLoader()->importDeclDirectly(clangHelperFuncDecl));
-  if (!helperFuncDecl)
+  // Extract the user's predicate function from the call expression that Clang
+  // built for us.
+  auto *clangCallExpr =
+      cast<clang::CallExpr>(domainInfo.second.Call->IgnoreImplicit());
+  auto *clangPredicateDecl = clangCallExpr->getDirectCallee();
+  if (!clangPredicateDecl)
     return {nullptr, /*isTypeChecked=*/true};
 
-  auto helperFuncRef = new (ctx) DeclRefExpr(ConcreteDeclRef(helperFuncDecl),
-                                             DeclNameLoc(), /*Implicit=*/true);
-  helperFuncRef->setType(helperFuncDecl->getInterfaceType());
+  // Import `func {predicate}() -> CInt` into Swift.
+  auto predicateFuncDecl = dyn_cast_or_null<FuncDecl>(
+      ctx.getClangModuleLoader()->importDeclDirectly(clangPredicateDecl));
+  if (!predicateFuncDecl)
+    return {nullptr, /*isTypeChecked=*/true};
 
-  // Synthesize `__XYZ_isAvailable()`.
-  auto helperCall = CallExpr::createImplicit(
-      ctx, helperFuncRef, ArgumentList::createImplicit(ctx, {}));
-  helperCall->setType(helperFuncDecl->getResultInterfaceType());
-  helperCall->setThrows(nullptr);
+  auto *predicateFuncRef = new (ctx) DeclRefExpr(
+      ConcreteDeclRef(predicateFuncDecl), DeclNameLoc(), /*Implicit=*/true);
+  predicateFuncRef->setType(predicateFuncDecl->getInterfaceType());
 
-  // Synthesize `__XYZ_isAvailable()._value`.
+  // Synthesize `{predicate}()`.
+  auto *predicateCall = CallExpr::createImplicit(
+      ctx, predicateFuncRef, ArgumentList::createImplicit(ctx, {}));
+  predicateCall->setType(predicateFuncDecl->getResultInterfaceType());
+  predicateCall->setThrows(nullptr);
+
+  // The Clang predicate returns `int`; convert the result to `Builtin.Int1`
+  // by writing `({predicate}() != 0)._value`. The type checker resolves the
+  // operator and member references.
+  auto *zeroLiteral =
+      IntegerLiteralExpr::createFromUnsigned(ctx, 0, SourceLoc());
+  auto *neqOp = new (ctx)
+      UnresolvedDeclRefExpr(DeclNameRef(ctx.getIdentifier("!=")),
+                            DeclRefKind::BinaryOperator, DeclNameLoc());
+  auto *neqExpr = BinaryExpr::create(ctx, predicateCall, neqOp, zeroLiteral,
+                                     /*implicit=*/true);
+
   auto *memberRef =
-      UnresolvedDotExpr::createImplicit(ctx, helperCall, ctx.Id_value_);
+      UnresolvedDotExpr::createImplicit(ctx, neqExpr, ctx.Id_value_);
 
-  // Synthesize `return __XYZ_isAvailable()._value`.
-  return createSingleReturnBody(ctx, memberRef, /*isTypeChecked=*/false);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, memberRef);
+  auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
+                                /*implicit=*/true);
+
+  return {body, /*isTypeChecked=*/false};
 }
 
 /// Mark the given declaration as always deprecated for the given reason.
@@ -3628,7 +3632,9 @@ FuncDecl *SwiftDeclSynthesizer::makeAvailabilityDomainPredicate(
       BuiltinIntegerType::get(1, ctx), ImporterImpl.ImportedHeaderUnit);
   funcDecl->setBodySynthesizer(synthesizeAvailabilityDomainPredicateBody,
                                (void *)var);
-  funcDecl->setAccess(AccessLevel::Private);
+  funcDecl->setAccess(AccessLevel::Public);
+  funcDecl->addAttribute(
+      new (ctx) ExportAttr(ExportKind::Implementation, /*IsImplicit=*/true));
 
   ImporterImpl.availabilityDomainPredicates[var] = funcDecl;
 

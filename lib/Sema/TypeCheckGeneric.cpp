@@ -185,8 +185,10 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
                                 /*packElementOpener*/ nullptr)
                                 .resolveType(constraint);
 
-      if (constraintType->hasError())
+      if (constraintType->hasError()) {
+        currentRepr->setInvalid();
         return nullptr;
+      }
 
       RequirementKind kind;
       if (constraintType->isConstraintType())
@@ -674,8 +676,8 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
       if (paramDecl->isOpaqueType()) {
         paramDecl->getASTContext().Diags
           .diagnose(paramDecl->getOpaqueTypeRepr()->getLoc(),
-                    diag::unreferenced_generic_parameter,
-                    paramDecl->getNameStr());
+                    diag::non_inferrable_opaque_generic_parameter,
+                    paramDecl->getOpaqueTypeRepr());
       } else {
         paramDecl->diagnose(diag::unreferenced_generic_parameter,
                             paramDecl->getNameStr());

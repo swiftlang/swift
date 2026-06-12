@@ -289,7 +289,8 @@ public:
                        std::optional<OptionalTypeKind> optionalKind,
                        bool isInOutParam) {
     bool hasSwiftSuperClass = false;
-    if (auto superClass = ty->getExistentialLayout().getSuperclass()) {
+    if (auto superClass = ty->getExistentialLayout()
+          .getExplicitSuperclassOrProtocolSuperclass()) {
       auto *CD = superClass->getClassOrBoundGenericClass();
       hasSwiftSuperClass = !CD->isObjC();
     }

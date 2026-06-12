@@ -13,6 +13,8 @@
 // Note: All atomic accesses on Wasm are sequentially consistent regardless of
 // what ordering we tell LLVM to use.
 
+import _SynchronizationShims
+
 @_extern(c, "llvm.wasm.memory.atomic.wait32")
 internal func _swift_stdlib_wait(
   on: UnsafePointer<UInt32>,
@@ -26,6 +28,22 @@ internal func _swift_stdlib_wake(on: UnsafePointer<UInt32>, count: UInt32) -> UI
 extension Atomic where Value == _MutexHandle.State {
   internal borrowing func _wait(expected: _MutexHandle.State) {
     #if _runtime(_multithreaded)
+    #if os(WASI)
+    if _swift_stdlib_wasilibc_use_busy_futex_get() != 0 {
+      // Note: On WebAssembly in a web browser, waiting on the main thread with
+      // `memory.atomic.wait32` is not allowed. When wasi-libc busy-futex mode
+      // is enabled, use bounded polling instead so `Mutex` remains usable on
+      // the main thread for `wasm32-unknown-wasip1-threads`.
+      var remaining: UInt32 = 1024
+      while remaining > 0 {
+        if load(ordering: .relaxed) != expected {
+          return
+        }
+        remaining &-= 1
+      }
+      return
+    }
+    #endif
     _ = unsafe _swift_stdlib_wait(
       on: .init(_rawAddress),
       expected: expected.rawValue,

@@ -972,6 +972,10 @@ static Operand *getProjectedDefOperand(SILValue value) {
   case ValueKind::MarkUnresolvedNonCopyableValueInst:
     return &cast<MarkUnresolvedNonCopyableValueInst>(value)->getOperandRef();
 
+  case ValueKind::MarkDependenceInst:
+    return &cast<MarkDependenceInst>(value)
+                ->getAllOperands()[MarkDependenceInst::Dependent];
+
   case ValueKind::MoveValueInst:
     return &cast<MoveValueInst>(value)->getOperandRef();
 
@@ -1018,7 +1022,12 @@ static Operand *getProjectedDefOperand(SILValue value) {
 /// is address-only, then the operand must be address-only and therefore must
 /// mapped to ValueStorage.
 ///
-/// If \p value is an unchecked_bitwise_cast, then return the cast operand.
+/// If \p value is an unchecked_bitwise_cast or unchecked_value_cast with an
+/// address-only source operand, then return the cast operand. When the source
+/// operand is loadable, return nullptr instead: the cast result needs its own
+/// storage so the loadable source value can be stored into an
+/// unchecked_addr_cast view of that storage. The DefRewriter handles this
+/// case.
 ///
 /// open_existential_value must reuse storage because the boxed value is shared
 /// with other instances of the existential. An explicit copy is needed to
@@ -1036,8 +1045,20 @@ static Operand *getReusedStorageOperand(SILValue value) {
   case ValueKind::OpenExistentialValueInst:
   case ValueKind::OpenExistentialBoxValueInst:
   case ValueKind::UncheckedEnumDataInst:
-  case ValueKind::UncheckedBitwiseCastInst:
     return &cast<SingleValueInstruction>(value)->getOperandRef(0);
+
+  case ValueKind::UncheckedValueCastInst:
+  case ValueKind::UncheckedBitwiseCastInst: {
+    // Only share storage when the source is address-only. A loadable source
+    // has no ValueStorage to share; the DefRewriter materializes fresh storage
+    // for the cast result and stores the loadable source through an
+    // unchecked_addr_cast view.
+    auto *castInst = cast<SingleValueInstruction>(value);
+    if (!castInst->getOperand(0)->getType().isAddressOnly(
+            *castInst->getFunction()))
+      return nullptr;
+    return &castInst->getOperandRef(0);
+  }
 
   case ValueKind::SILPhiArgument: {
     if (auto *term = cast<SILPhiArgument>(value)->getTerminatorForResult()) {
@@ -3561,6 +3582,29 @@ protected:
     pass.deleter.forceDelete(fli);
   }
 
+  void visitMarkDependenceInst(MarkDependenceInst *mdi) {
+    if (use->getOperandNumber() == MarkDependenceInst::Base) {
+      SILValue baseAddr = addrMat.materializeAddress(use->get());
+      mdi->setBase(baseAddr);
+      return;
+    }
+    assert(use->getOperandNumber() == MarkDependenceInst::Dependent);
+    SILValue valueAddr =
+        pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    builder.createMarkDependenceAddr(mdi->getLoc(), valueAddr, mdi->getBase(),
+                                     mdi->dependenceKind());
+    markRewritten(mdi, valueAddr);
+  }
+
+  void visitMarkDependenceAddrInst(MarkDependenceAddrInst *mdai) {
+    if (use->getOperandNumber() != MarkDependenceAddrInst::Base) {
+      visitSILInstruction(mdai);
+      return;
+    }
+    SILValue baseAddr = addrMat.materializeAddress(use->get());
+    mdai->setBase(baseAddr);
+  }
+
   void visitBranchInst(BranchInst *) {
     pass.getPhiRewriter().materializeOperand(use);
 
@@ -3737,9 +3781,8 @@ protected:
   // Extract from an opaque pack tuple.
   void visitTuplePackExtractInst(TuplePackExtractInst *extractInst);
 
-  void
-  visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCastInst) {
-    SILValue srcVal = uncheckedCastInst->getOperand();
+  void rewriteOpaqueUncheckedCastUse(SingleValueInstruction *uncheckedCastInst) {
+    SILValue srcVal = uncheckedCastInst->getOperand(0);
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
 
     auto destAddr = builder.createUncheckedAddrCast(
@@ -3766,6 +3809,15 @@ protected:
     uncheckedCastInst->replaceAllUsesWith(load);
     pass.deleter.forceDelete(uncheckedCastInst);
     emitEndBorrows(load, pass);
+  }
+
+  void
+  visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCastInst) {
+    rewriteOpaqueUncheckedCastUse(uncheckedCastInst);
+  }
+
+  void visitUncheckedValueCastInst(UncheckedValueCastInst *uncheckedCastInst) {
+    rewriteOpaqueUncheckedCastUse(uncheckedCastInst);
   }
 
   void visitUnconditionalCheckedCastInst(
@@ -4209,6 +4261,31 @@ protected:
     ApplyRewriter(applyInst, pass).convertApplyWithIndirectResults();
   }
 
+  void rewriteOpaqueUncheckedCastDef(SingleValueInstruction *uncheckedCast) {
+    SILValue srcVal = uncheckedCast->getOperand(0);
+    assert(!srcVal->getType().isAddressOnly(*pass.function) &&
+           "opaque operand should share storage via getReusedStorageOperand");
+
+    addrMat.materializeAddress(uncheckedCast);
+    SILValue destAddr = storage.storageAddress;
+    auto loc = uncheckedCast->getLoc();
+    SILValue srcView = builder.createUncheckedAddrCast(
+        loc, destAddr, srcVal->getType().getAddressType());
+    auto qual = srcVal->getType().isTrivial(*pass.function)
+                    ? StoreOwnershipQualifier::Trivial
+                    : StoreOwnershipQualifier::Init;
+    builder.createStore(loc, srcVal, srcView, qual);
+    storage.markRewritten();
+  }
+
+  void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCast) {
+    rewriteOpaqueUncheckedCastDef(uncheckedCast);
+  }
+
+  void visitUncheckedValueCastInst(UncheckedValueCastInst *uncheckedCast) {
+    rewriteOpaqueUncheckedCastDef(uncheckedCast);
+  }
+
   void visitBeginApplyInst(BeginApplyInst *bai) {
     CallArgRewriter(bai, pass).rewriteArguments();
     ApplyRewriter(bai, pass).convertBeginApplyWithOpaqueYield();
@@ -4216,6 +4293,16 @@ protected:
 
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
+    case BuiltinValueKind::ZeroInitializer: {
+      // Value-form `builtin "zeroInitializer"() : $T` with an opaque T.
+      assert(bi->getNumOperands() == 0 &&
+             "address-form zeroInitializer should not appear as an opaque def");
+      addrMat.materializeAddress(bi);
+      SILValue destAddr = storage.storageAddress;
+      builder.createZeroInitAddr(bi->getLoc(), destAddr);
+      storage.markRewritten();
+      break;
+    }
     default:
       bi->dump();
       llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");

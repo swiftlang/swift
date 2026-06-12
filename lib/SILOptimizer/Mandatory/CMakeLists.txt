@@ -10,7 +10,6 @@ target_sources(swiftSILOptimizer PRIVATE
   PhiStorageOptimizer.cpp
   ConstantPropagation.cpp
   DiagnoseUnnecessaryPreconcurrencyImports.cpp
-  DebugInfoCanonicalizer.cpp
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp

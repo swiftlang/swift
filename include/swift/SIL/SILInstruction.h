@@ -5626,7 +5626,8 @@ class DebugValueInst final
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                  SILDebugVariable Var, PoisonRefs_t poisonRefs,
-                 UsesMoveableValueDebugInfo_t operandWasMoved, bool trace);
+                 UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
+                 bool prependDeref);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
                                 PoisonRefs_t poisonRefs,
@@ -5664,6 +5665,12 @@ public:
     return getLoc().strippedForDebugVariable();
   }
 
+  /// Returns the effective variable type for this debug value.
+  /// If there is a stored type, returns that. If there is a debug
+  /// reconstruction block, returns its return type. Otherwise returns the
+  /// SSA operand type.
+  SILType getVarType() const;
+
   /// Return the debug variable information attached to this instruction.
   ///
   /// \param includeLoc If true (by default), always return a variable with
@@ -5686,7 +5693,7 @@ public:
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
     else if (includeType)
-      AuxVarType = getOperand()->getType().getObjectType();
+      AuxVarType = getVarType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
@@ -5704,7 +5711,7 @@ public:
     // Make a temporary copy to prepend a deref. This is safe as
     // SILDebugVariable contains a copy of the expression.
     llvm::SmallVector<SILDIExprElement, 4> DIExprCopy;
-    if (sharedUInt8().DebugValueInst.prependDeref) {
+    if (hasDeref()) {
       DIExprCopy.push_back(SILDIExprElement::createOperator(
           SILDIExprOperator::Dereference));
       DIExprCopy.append(DIExprElements.begin(), DIExprElements.end());
@@ -5742,12 +5749,29 @@ public:
     return DVI && DVI->hasAddrVal()? DVI : nullptr;
   }
 
+  /// Whether this debug value has a DIExpr with a deref.
+  /// For address-only types with a debug reconstruction block, the deref
+  /// applies after the BB's result. Otherwise, this is incompatible with
+  /// debug reconstruction blocks.
+  bool hasDeref() const {
+    return sharedUInt8().DebugValueInst.prependDeref;
+  }
+
   /// Prepends a deref operator to this debug_value in place.
   /// This must be called when the operand is changed from an object type to
   /// an address type (when moved to the stack, for example).
   /// If a reconstruction block exists, a load is added at the beginning.
   /// Otherwise, it will be prepended to the DIExpr.
   void prependDeref();
+
+  /// Removes a deref operator to this debug_value in place.
+  /// This must be called when the operand is changed from an address type to
+  /// an object type (when moved from the stack to a register, for example).
+  /// Asserts that the type is loadable (cannot strip deref for address-only).
+  /// If a reconstruction block exists, a load is removed at the beginning. If
+  /// there is no load at the beginning, the operand is killed, marking the
+  /// variable as optimized away.
+  void stripDeref();
 
   /// Validates the type chain of the DIExpr.
   /// Starting from VarType, narrows through fragments (outermost first)
@@ -5772,6 +5796,9 @@ public:
     ReconstructionBlock = BB;
   }
 
+  /// Clones the reconstruction block from \p src onto this debug value.
+  void cloneReconstructionBlockFrom(DebugValueInst *src);
+
   /// Returns a variable reconstruction basic block for this debug value.
   /// If this debug value has no debug reconstruction block, a new one is
   /// created and attached to this instruction.
@@ -5780,6 +5807,15 @@ public:
   /// If this debug_value has an undef operand, the reconstruction block
   /// has no arguments and returns undef directly.
   SILBasicBlock *getOrCreateDebugReconstructionBlock();
+
+  /// Drops the operand from this debug value.
+  /// This function must be called by passes whenever the operand of this debug
+  /// value is no longer valid and cannot be salvaged.
+  /// This will replace the operand with an undef, and clear any DIExpr or debug
+  /// reconstruction block.
+  /// If \p varType is specified, the undef will use that type (in the
+  /// appropriate address/object form) instead of the current operand's type.
+  void killOperand(SILType operandType = SILType());
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds
@@ -10234,14 +10270,23 @@ class IndexAddrInst
   enum { Base, Index };
 
   IndexAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILValue Index,
-                bool needsStackProtection)
+                bool needsStackProtection, bool isProjection)
       : InstructionBase(DebugLoc, Operand->getType(), Operand, Index) {
     sharedUInt8().IndexAddrInst.needsStackProtection = needsStackProtection;
+    sharedUInt8().IndexAddrInst.isProjection = isProjection;
   }
 
 public:
   bool needsStackProtection() const {
     return sharedUInt8().IndexAddrInst.needsStackProtection;
+  }
+  /// True if this instruction projects a single array element address from an
+  /// array base, as opposed to being used for general pointer arithmetic.
+  /// When set, the result cannot be used to reach other array elements (e.g.
+  /// by chaining index_addr instructions); without this flag such chaining is
+  /// permitted.
+  bool isProjection() const {
+    return sharedUInt8().IndexAddrInst.isProjection;
   }
 };
 

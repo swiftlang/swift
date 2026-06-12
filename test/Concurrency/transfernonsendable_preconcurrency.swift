@@ -109,17 +109,17 @@ func testNeverTransfer(_ x: PreCUncheckedNonSendableKlass) async {
 func testNeverTransferExplicit(_ x: PreCUncheckedExplicitlyNonSendableKlass) async {
   await transferToMain(x)
   // expected-swift-5-warning @-1 {{sending 'x' risks causing data races}}
-  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-swift-5-note @-2 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-swift-6-warning @-3 {{sending 'x' risks causing data races}}
-  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-swift-6-note @-4 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func testNeverTransferNormal(_ x: PostCUncheckedNonSendableKlass) async {
   await transferToMain(x)
   // expected-swift-5-warning @-1 {{sending 'x' risks causing data races}}
-  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-swift-5-note @-2 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-swift-6-error @-3 {{sending 'x' risks causing data races}}
-  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-swift-6-note @-4 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func testNeverTransferInexactMatch(_ x: (PreCUncheckedNonSendableKlass, PreCUncheckedNonSendableKlass)) async {
@@ -129,9 +129,9 @@ func testNeverTransferInexactMatch(_ x: (PreCUncheckedNonSendableKlass, PreCUnch
 func testNeverTransferInexactMatchExplicit(_ x: (PreCUncheckedExplicitlyNonSendableKlass, PreCUncheckedExplicitlyNonSendableKlass)) async {
   await transferToMain(x)
   // expected-swift-5-warning @-1 {{sending 'x' risks causing data races}}
-  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-swift-5-note @-2 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-swift-6-warning @-3 {{sending 'x' risks causing data races}}
-  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-swift-6-note @-4 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 

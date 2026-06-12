@@ -110,12 +110,22 @@ struct BridgedDeadEndBlocksAnalysis {
   BRIDGED_INLINE bool isDeadEnd(BridgedBasicBlock block) const;
 };
 
+struct BridgedDomTree;
+
+class BridgedDomChildrenIterator {
+  void *_Nullable node;
+
+public:
+  BRIDGED_INLINE BridgedDomChildrenIterator(BridgedDomTree tree,
+                                            BridgedBasicBlock bb);
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock next();
+};
+
 struct BridgedDomTree {
   swift::DominanceInfo * _Nonnull di;
 
   BRIDGED_INLINE bool dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
-  BRIDGED_INLINE SwiftInt getNumberOfChildren(BridgedBasicBlock bb) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getChildAt(BridgedBasicBlock bb, SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getImmediateDominator(BridgedBasicBlock block) const;
 };
 

@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/LLVM.h"
@@ -29,6 +30,8 @@
 #include "swift/Parse/ParseVersion.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -160,8 +163,8 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
 
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
   Invocation.getLangOptions().AttachCommentsToDecls = true;
-  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
-                                                    Invocation.getFrontendOptions());
+  Invocation.getLangOptions().setCxxInteropFromArgs(
+      ParsedArgs, Diags, Invocation.getFrontendOptions());
   Invocation.computeCXXStdlibOptions();
 
   if (ParsedArgs.hasArg(OPT_disable_safe_interop_wrappers))
@@ -203,7 +206,8 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
     return EXIT_FAILURE;
   }
 
-  (void)CI.getMainModule(); // clang modules inherit default imports from main module
+  (void)CI.getMainModule(); // clang modules inherit default imports from main
+                            // module
   auto M = CI.getASTContext().getModuleByName(ModuleName);
   if (!M) {
     llvm::errs() << "Couldn't load module '" << ModuleName << '\''
@@ -278,6 +282,120 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
       PrintOptions::printModuleInterface(/*printFullConvention=*/true);
   if (ParsedArgs.hasArg(OPT_print_fully_qualified_types)) {
     printOpts.FullyQualifiedTypes = true;
+  }
+
+  // Show user-facing synthesized members but do not show other implicit decls
+  printOpts.SkipImplicit = true;
+  printOpts.AlwaysPrintSynthesized = true;
+
+  // -synthesized-interface-show=<list> and -minimum-access-level
+  //
+  // Items within a single comma-separated list are additive. Repeated
+  // -synthesized-interface-show= invocations follow last-wins semantics:
+  // each invocation resets the show state before applying its items.
+  std::optional<AccessLevel> MinAccessLevel;
+  struct Opts {
+    bool ShowUnavailable = false;
+    bool ShowImplicitAttrs = false;
+    bool ShowQualifiedTypes = false;
+    bool ShowCompilerInternals = false;
+
+    bool apply(StringRef name) {
+      if (name == "unavailable") {
+        ShowUnavailable = true;
+        return true;
+      }
+      if (name == "implicit-attrs") {
+        ShowImplicitAttrs = true;
+        return true;
+      }
+      if (name == "qualified-types") {
+        ShowQualifiedTypes = true;
+        return true;
+      }
+      if (name == "minimal") {
+        return true;
+      }
+      if (name == "all") {
+        ShowUnavailable = true;
+        ShowImplicitAttrs = true;
+        ShowQualifiedTypes = true;
+        return true;
+      }
+      if (name == "compiler-internal-details") {
+        ShowUnavailable = true;
+        ShowImplicitAttrs = true;
+        ShowQualifiedTypes = true;
+        ShowCompilerInternals = true;
+        return true;
+      }
+      return false;
+    }
+
+    static bool isShorthand(StringRef item) {
+      return item == "all" || item == "minimal" ||
+             item == "compiler-internal-details";
+    };
+  };
+
+  Opts opts{};
+
+  for (const auto *A : ParsedArgs.filtered(OPT_synthesize_interface_show,
+                                           OPT_minimum_access_level)) {
+    auto &Opt = A->getOption();
+    StringRef Value = A->getValue();
+    if (Opt.matches(OPT_minimum_access_level)) {
+      auto Parsed = llvm::StringSwitch<std::optional<AccessLevel>>(Value)
+                        .Case("private", AccessLevel::Private)
+                        .Case("fileprivate", AccessLevel::FilePrivate)
+                        .Case("internal", AccessLevel::Internal)
+                        .Case("package", AccessLevel::Package)
+                        .Case("public", AccessLevel::Public)
+                        .Case("open", AccessLevel::Open)
+                        .Default(std::nullopt);
+      if (!Parsed) {
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                       "-minimum-access-level", Value);
+        return EXIT_FAILURE;
+      }
+      MinAccessLevel = *Parsed;
+      continue;
+    }
+
+    if (Opt.matches(OPT_synthesize_interface_show)) {
+      opts = {}; // Reset state for last-win semantics across multiple args
+
+      if (Opts::isShorthand(Value)) {
+        // Shorthands cannot be combined with other item in the same list
+        opts.apply(Value);
+      } else {
+        SmallVector<StringRef, 2> Items;
+        Value.split(Items, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+        for (auto Item : Items) {
+          if (Opts::isShorthand(Item) || !opts.apply(Item)) {
+            Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                           "-synthesized-interface-show", Item);
+            return EXIT_FAILURE;
+          }
+        }
+      }
+      continue;
+    }
+    llvm_unreachable("unhandled arg");
+  }
+
+  printOpts.SkipUnavailable = !opts.ShowUnavailable;
+  printOpts.PrintImplicitAttrs = opts.ShowImplicitAttrs;
+  printOpts.QualifyImportedTypes = opts.ShowQualifiedTypes;
+  if (opts.ShowCompilerInternals) {
+    printOpts.SkipUnsafeCXXMethods = false;
+    printOpts.SkipImplicit = false;
+  }
+
+  if (MinAccessLevel) {
+    printOpts.AccessFilter = *MinAccessLevel;
+    if (printOpts.AccessFilter < AccessLevel::Public)
+      printOpts.PrintAccess = true;
   }
 
   swift::OptionSet<swift::ide::ModuleTraversal> traversalOpts = std::nullopt;

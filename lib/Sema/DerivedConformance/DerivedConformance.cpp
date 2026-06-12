@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "DerivedConformance.h"
+#include "CodeSynthesis.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
@@ -24,7 +25,12 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 

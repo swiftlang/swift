@@ -2286,7 +2286,7 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
                                     /*ShouldOwnClient=*/false);
   clonedInstance->createSourceManager();
   clonedInstance->setTarget(&Impl.Instance->getTarget());
-  clonedInstance->setOutputBackend(Impl.SwiftContext.OutputBackend);
+  clonedInstance->setOutputManager(Impl.SwiftContext.OutputBackend);
 
   return clonedInstance;
 }
@@ -6485,11 +6485,10 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
     }
 
     auto out = FuncDecl::createImplicit(
-        context, fn->getStaticSpelling(), fn->getName(),
-        fn->getNameLoc(), fn->hasAsync(), fn->hasThrows(),
-        fn->getThrownInterfaceType(),
+        context, fn->getStaticSpelling(), fn->getName(), fn->getNameLoc(),
+        fn->hasAsync(), fn->hasThrows(), fn->getThrownInterfaceType(),
         fn->getGenericParams(), fn->getParameters(),
-        fn->getResultInterfaceType(), newContext);
+        fn->getResultInterfaceType(), newContext, /*isSynthesized=*/true);
     cloneImportedAttributes(decl, out);
     out->setAccess(access);
     inheritance.setUnavailableIfNecessary(decl, out);
@@ -7400,18 +7399,18 @@ ClangImporter::instantiateCXXClassTemplate(
 // "long long" and then back into Swift as "Int64" not "Int."
 static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
                                       AbstractFunctionDecl *newDecl) {
-  auto originalFnSubst = oldDecl->getInterfaceType()
-                             ->getAs<GenericFunctionType>()
-                             ->substGenericArgs(subst);
+  auto *originalFnSubst = oldDecl->getInterfaceType()
+                              ->castTo<GenericFunctionType>()
+                              ->substGenericArgs(subst);
   // AbstractFunctionDecl interface types with an implicit self are curried as:
   //   (Self[.Type]) -> (Generic) -> Result
   // Strip the outer self arrow to get the (Generic) -> Result layer, which is
   // what the rest of this function compares against newDecl's parameters.
-  // SubscriptDecl interface types are not curried this way (they are already
-  // (Generic) -> Element; see InterfaceTypeRequest::evaluate).
+  // This mirrors what AbstractFunctionDecl::getMethodInterfaceType() does, but
+  // on the result of substituting into the generic interface type.
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(oldDecl);
-      afd && afd->hasImplicitSelfDecl())
-    originalFnSubst = cast<FunctionType>(originalFnSubst->getResult().getPointer());
+      afd && afd->getDeclContext()->isTypeContext())
+    originalFnSubst = originalFnSubst->getResult()->castTo<FunctionType>();
 
   SmallVector<ParamDecl *, 4> fixedParameters;
   unsigned parameterIndex = 0;
@@ -8020,6 +8019,14 @@ ValueDecl *ClangImporter::Implementation::getOriginalForClonedMember(
   return nullptr;
 }
 
+FuncDecl *ClangImporter::Implementation::getOriginalForVirtualThunk(
+    const FuncDecl *decl) {
+  auto result = virtualThunkToOriginal.find(decl);
+  if (result != virtualThunkToOriginal.end())
+    return result->getSecond();
+  return nullptr;
+}
+
 bool ClangImporter::Implementation::isMemberSynthesizedPerType(
     const ValueDecl *decl) {
   return membersSynthesizedPerType.contains(decl);
@@ -8038,6 +8045,11 @@ ClangImporter::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
 
 ValueDecl *ClangImporter::getOriginalForClonedMember(const ValueDecl *decl) {
   return Impl.getOriginalForClonedMember(decl);
+}
+
+FuncDecl *
+ClangImporter::getOriginalForVirtualThunk(const FuncDecl *decl) {
+  return Impl.getOriginalForVirtualThunk(decl);
 }
 
 ValueDecl *ClangImporter::getCalledBaseCxxMethod(const ValueDecl *decl) {

@@ -316,6 +316,8 @@ static void insertDebugValueBefore(SILInstruction *insertPt,
   if (!debugVar) {
     return;
   }
+  ASSERT(!debugVar.hasDebugReconstructionBlock() &&
+         "Unexpected debug reconstruction block in Mandatory Pass");
   auto varInfo = debugVar.getVarInfo();
   if (!varInfo) {
     return;
@@ -1050,6 +1052,11 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
         llvm_unreachable("Working with addresses");
       }
     }
+  }
+
+  // A stored borrow is always initialized.
+  if (isa<StoreBorrowInst>(operand)) {
+    return true;
   }
 
   // A read or write access always begins on an initialized value.

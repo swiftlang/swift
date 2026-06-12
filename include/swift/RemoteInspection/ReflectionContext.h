@@ -271,7 +271,7 @@ public:
     // the header.
     auto CmdStartAddress = ImageStart + sizeof(typename T::Header);
 
-    // Read all of the load commands into .
+    // Read all of the load commands.
     auto LoadCmdsBuf =
         this->getReader().readBytes(CmdStartAddress, SizeOfCommands);
     if (!LoadCmdsBuf)
@@ -283,12 +283,19 @@ public:
     auto forEachSegment = [&](auto &&visitor) {
       uint64_t Offset = 0;
       for (unsigned I = 0; I < NumCommands; ++I) {
+        // Guard against malformed input; if the load command goes past the end
+        // of what we've read, bail out.
         if (Offset + sizeof(llvm::MachO::load_command) > SizeOfCommands)
           return;
+
         auto Cmd = reinterpret_cast<const llvm::MachO::load_command *>(
             LoadCmds + Offset);
         auto CmdSize = Cmd->cmdsize;
         if (Cmd->cmd == T::SegmentLoadCommand) {
+          // Check that the full segment command lies within the buffer too.
+          if (Offset + sizeof(typename T::SegmentCmd) > SizeOfCommands)
+            return;
+
           auto CmdHdr =
               reinterpret_cast<typename T::SegmentCmd *>(LoadCmds + Offset);
           if (!visitor(CmdHdr, Offset))
@@ -315,15 +322,13 @@ public:
 
     // The sections start immediately after the __TEXT segment's load command.
     unsigned NumSect = TextCommand->nsects;
-    auto SectAddress =
-        CmdStartAddress + TextOffset + sizeof(typename T::SegmentCmd);
-    auto Sections = this->getReader().readBytes(
-        SectAddress, NumSect * sizeof(typename T::Section));
-    if (!Sections)
+    auto SectionsBuf = reinterpret_cast<const char *>(TextCommand + 1);
+
+    // Make sure they all lie within the buffer we've read.
+    if (TextOffset + NumSect * sizeof(typename T::Section) > SizeOfCommands)
       return {};
 
     auto Slide = ImageStart - TextCommand->vmaddr;
-    auto SectionsBuf = reinterpret_cast<const char *>(Sections.get());
 
     auto findMachOSectionByName = [&](llvm::StringRef Name)
         -> std::pair<RemoteRef<void>, uint64_t> {
@@ -403,8 +408,6 @@ public:
       return true;
     });
 
-    savedBuffers.push_back(std::move(Buf));
-    savedBuffers.push_back(std::move(Sections));
     return InfoID;
   }
 
@@ -1680,6 +1683,10 @@ public:
     return Descriptor->getTypeContextDescriptorFlags().class_isActor();
   }
 
+  size_t metadataSize(RemoteAddress MetadataAddress) {
+    return this->readMetadataAndSize(MetadataAddress).second;
+  }
+
   /// Iterate the protocol conformance cache tree rooted at NodePtr, calling
   /// Call with the type and protocol in each node.
   void iterateConformanceTree(
@@ -2098,6 +2105,63 @@ private:
     return {false, 0};
   }
 
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t nameFragmentOffset() const {
+    return asyncTaskSize;
+  }
+
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t childFragmentOffset(swift::JobFlags flags) const {
+    size_t offset = nameFragmentOffset();
+    if (flags.task_hasInitialTaskName())
+      offset += sizeof(NameFragment<Runtime>);
+    return offset;
+  }
+
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t groupChildFragmentOffset(swift::JobFlags flags) const {
+    size_t offset = childFragmentOffset(flags);
+    if (flags.task_isChildTask())
+      offset += sizeof(ChildFragment<Runtime>);
+    return offset;
+  }
+
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t futureFragmentOffset(swift::JobFlags flags) const {
+    size_t offset = groupChildFragmentOffset(flags);
+    if (flags.task_isGroupChildTask())
+      offset += sizeof(GroupChildFragment<Runtime>);
+    return offset;
+  }
+
+  /// Address of `NameFragment` for `task`.
+  RemoteAddress nameFragmentAddr(RemoteAddress task,
+                                 swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_hasInitialTaskName());
+    return task + nameFragmentOffset();
+  }
+
+  /// Address of `ChildFragment` for `task`.
+  RemoteAddress childFragmentAddr(RemoteAddress task,
+                                  swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_isChildTask());
+    return task + childFragmentOffset(flags);
+  }
+
+  /// Address of `GroupChildFragment` for `task`.
+  RemoteAddress groupChildFragmentAddr(RemoteAddress task,
+                                       swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_isGroupChildTask());
+    return task + groupChildFragmentOffset(flags);
+  }
+
+  /// Address of `FutureFragment` for `task`.
+  RemoteAddress futureFragmentAddr(RemoteAddress task,
+                                   swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_isFuture());
+    return task + futureFragmentOffset(flags);
+  }
+
   template <typename AsyncTaskType>
   std::pair<std::optional<std::string>, AsyncTaskInfo>
   asyncTaskInfo(RemoteAddress AsyncTaskPtr, unsigned ChildTaskLimit,
@@ -2137,8 +2201,7 @@ private:
 
     Info.ParentTask = 0;
     if (Info.IsChildTask && asyncTaskSize != 0) {
-      // Parent information ("child fragment") is right after the task itself.
-      RemoteAddress ChildFragmentAddr = AsyncTaskPtr + asyncTaskSize;
+      RemoteAddress ChildFragmentAddr = childFragmentAddr(AsyncTaskPtr, JobFlags);
       auto ChildFragmentObj =
           readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
       if (ChildFragmentObj)
@@ -2188,7 +2251,7 @@ private:
                                 "iterate child tasks"),
                     Info};
 
-          RemoteAddress ChildFragmentAddr = ChildTaskAddress + asyncTaskSize;
+          RemoteAddress ChildFragmentAddr = childFragmentAddr(ChildTaskAddress, ChildJobFlags);
           auto ChildFragmentObj =
               readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
           if (ChildFragmentObj)
@@ -2207,17 +2270,7 @@ private:
 
     // Read the wait queue from the FutureFragment, if this is a future task.
     if (Info.IsFuture && asyncTaskSize != 0) {
-      // The FutureFragment is located after AsyncTask, ChildFragment (if
-      // child), and GroupChildFragment (if group child).
-      // See AsyncTask::futureFragment() in include/swift/ABI/Task.h.
-      auto FutureFragmentAddr = AsyncTaskPtr + asyncTaskSize;
-      if (Info.IsChildTask)
-        FutureFragmentAddr =
-            FutureFragmentAddr + sizeof(ChildFragment<Runtime>);
-      if (Info.IsGroupChildTask)
-        FutureFragmentAddr =
-            FutureFragmentAddr + sizeof(GroupChildFragment<Runtime>);
-
+      RemoteAddress FutureFragmentAddr = futureFragmentAddr(AsyncTaskPtr, JobFlags);
       auto FutureFragmentObj =
           readObj<FutureFragment<Runtime>>(FutureFragmentAddr);
       if (FutureFragmentObj) {
@@ -2466,6 +2519,10 @@ private:
       // substitutions.
       bool Progress = false;
       for (auto Source : Info.MetadataSources) {
+        // If either component of the source is NULL, something went wrong.
+        if (!Source.first || !Source.second)
+          return nullptr;
+
         // Don't read a source more than once.
         if (Done.count(Source))
           continue;
@@ -2544,6 +2601,9 @@ private:
   std::optional<RemoteAddress>
   readMetadataSource(RemoteAddress Context, const MetadataSource *MS,
                      const RecordTypeInfoBuilder &Builder) {
+    if (!MS)
+      return std::nullopt;
+
     switch (MS->getKind()) {
     case MetadataSourceKind::ClosureBinding: {
       unsigned Index = cast<ClosureBindingMetadataSource>(MS)->getIndex();

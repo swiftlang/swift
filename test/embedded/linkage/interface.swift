@@ -158,6 +158,20 @@ public func makeIntStruct() -> any Greeter { MyGenericStruct(42) }
 public func makeIntEnum() -> any Greeter { MyGenericEnum<Int>.some(1) }
 public func makeIntClass() -> any Greeter { MyGenericClass(7) }
 
+// Default-argument generators are synthesized helpers are always
+// `[export_implementation]`.
+// ROOT-IR-DAG: define {{(linkonce_odr hidden |hidden |protected )?}}swiftcc {{.*}} @"$e4Root15funcWithDefault_3msgySi_s12StaticStringVtFfA0_"
+// ROOT-IR-NOT: @"$e4Root15funcWithDefault_3msgySi_s12StaticStringVtFfA0_"{{[^"]*}} = available_externally
+#if EXPLICIT_EXPORT
+@export(interface)
+#endif
+public func funcWithDefault(_ x: Int, msg: StaticString = "hi") {}
+
+// Force the default-argument generator to be pulled into Root's own SIL/IR
+// output by calling `funcWithDefault` from within Root without specifying
+// `msg`.
+public func callsFuncWithDefault() { funcWithDefault(0) }
+
 //--- Client.swift
 import Root
 
@@ -209,4 +223,12 @@ public func useGreeters() {
   ge.greet()
   let gc: any Greeter = MyGenericClass(7)
   gc.greet()
+}
+
+// Default-argument generators get pulled into the client by the SIL Linker
+// and emitted as `linkonce_odr` so the linker can merge copies across TUs.
+// CLIENT-SIL-DAG: sil shared [export_implementation] @$e4Root15funcWithDefault_3msgySi_s12StaticStringVtFfA0_
+// CLIENT-IR-DAG: define linkonce_odr hidden swiftcc {{.*}} @"$e4Root15funcWithDefault_3msgySi_s12StaticStringVtFfA0_"
+public func callFuncWithDefault() {
+  funcWithDefault(42)
 }

@@ -87,11 +87,6 @@ static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
 #endif
                                                                 ));
 
-// Verify the type chain of debug_value instructions. Disabled by default
-// while we fix all root causes.
-static llvm::cl::opt<bool> VerifyDebugValueExpr("verify-debug-value-expr",
-                                                llvm::cl::init(false));
-
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
@@ -1806,28 +1801,12 @@ public:
   void checkDebugVariable(SILInstruction *inst) {
     std::optional<SILDebugVariable> varInfo;
     if (auto di = DebugVarCarryingInst(inst))
-      varInfo = di.getVarInfo();
+      varInfo = di.getCompleteVarInfo();
 
     if (!varInfo)
       return;
 
-    // Retrieve debug variable type
-    SILType SSAType;
-    switch (inst->getKind()) {
-    case SILInstructionKind::AllocStackInst:
-    case SILInstructionKind::AllocBoxInst:
-      // TODO: unwrap box for AllocBox
-      SSAType = inst->getResult(0)->getType().getObjectType();
-      break;
-    case SILInstructionKind::DebugValueInst:
-      SSAType = inst->getOperand(0)->getType();
-      break;
-    default:
-      llvm_unreachable("impossible instruction kind");
-    }
-    
-    SILType DebugVarTy = varInfo->Type ? *varInfo->Type :
-      SSAType.getObjectType();
+    SILType DebugVarTy = *varInfo->Type;
 
     auto *debugScope = inst->getDebugScope();
     if (varInfo->ArgNo)
@@ -1980,9 +1959,7 @@ public:
     }
 
     // Type chain: SSA operand -> DebugBB -> deref -> fragments -> vartype
-    if (VerifyDebugValueExpr)
-      require(inst->isExprTypeValid(),
-              "debug_value type chain should hold");
+    require(inst->isExprTypeValid(), "debug_value type chain should hold");
   }
 
   void checkInstructionsDebugInfo(SILInstruction *inst) {
@@ -5179,7 +5156,7 @@ public:
               "init_existential of class existential with non-class type");
     }
 
-    if (auto superclass = layout.getSuperclass()) {
+    if (auto superclass = layout.explicitSuperclass) {
       require(superclass->isExactSuperclassOf(concreteType),
               "init_existential of subclass existential with wrong type");
     }

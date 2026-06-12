@@ -1301,6 +1301,9 @@ bool BridgedInstruction::AddressToPointerInst_needsStackProtection() const {
 bool BridgedInstruction::IndexAddrInst_needsStackProtection() const {
   return getAs<swift::IndexAddrInst>()->needsStackProtection();
 }
+bool BridgedInstruction::IndexAddrInst_isProjection() const {
+  return getAs<swift::IndexAddrInst>()->isProjection();
+}
 
 BridgedConformanceArray BridgedInstruction::InitExistentialRefInst_getConformances() const {
   return {getAs<swift::InitExistentialRefInst>()->getConformances()};
@@ -1929,6 +1932,10 @@ BridgedCanType BridgedInstruction::TypeValueInst_getParamType() const {
   return getAs<swift::TypeValueInst>()->getParamType();
 }
 
+BridgedCanType BridgedInstruction::AllocPackInst_getPackType() const {
+  return getAs<swift::AllocPackInst>()->getPackType();
+}
+
 BridgedCanType BridgedInstruction::PackLengthInst_getPackType() const {
   return getAs<swift::PackLengthInst>()->getPackType();
 }
@@ -2012,6 +2019,23 @@ bool BridgedInstruction::DebugValue_hasVarInfo() const {
 }
 BridgedSILDebugVariable BridgedInstruction::DebugValue_getVarInfo() const {
   return BridgedSILDebugVariable(getAs<swift::DebugValueInst>()->getVarInfo().value());
+}
+
+OptionalBridgedBasicBlock BridgedInstruction::DebugValue_getDebugReconstructionBlock() const {
+  return {getAs<swift::DebugValueInst>()->getDebugReconstructionBlock()};
+}
+BridgedBasicBlock BridgedInstruction::DebugValue_getOrCreateDebugReconstructionBlock() const {
+  return {getAs<swift::DebugValueInst>()->getOrCreateDebugReconstructionBlock()};
+}
+
+void BridgedInstruction::DebugValue_stripDeref() const {
+  getAs<swift::DebugValueInst>()->stripDeref();
+}
+void BridgedInstruction::DebugValue_prependDeref() const {
+  getAs<swift::DebugValueInst>()->prependDeref();
+}
+void BridgedInstruction::DebugValue_killOperand(BridgedType operandType) const {
+  getAs<swift::DebugValueInst>()->killOperand(operandType.unbridged());
 }
 
 bool BridgedInstruction::AllocStack_hasVarInfo() const {
@@ -2125,6 +2149,10 @@ void BridgedBasicBlock::moveAllInstructionsToEnd(BridgedBasicBlock dest) const {
 
 void BridgedBasicBlock::moveArgumentsTo(BridgedBasicBlock dest) const {
   dest.unbridged()->moveArgumentList(unbridged());
+}
+
+bool BridgedBasicBlock::isDebugReconstructionBlock() const {
+  return unbridged()->isDebugReconstructionBlock();
 }
 
 OptionalBridgedSuccessor BridgedBasicBlock::getFirstPred() const {
@@ -2567,9 +2595,15 @@ BridgedInstruction BridgedBuilder::createPointerToAddress(BridgedValue pointer, 
 }
 
 BridgedInstruction BridgedBuilder::createIndexAddr(BridgedValue base, BridgedValue index,
-                                                   bool needsStackProtection) const {
+                                                   bool needsStackProtection,
+                                                   bool isProjection) const {
   return {unbridged().createIndexAddr(regularLoc(), base.getSILValue(), index.getSILValue(),
-                                      needsStackProtection)};
+                                      needsStackProtection, isProjection)};
+}
+
+BridgedInstruction BridgedBuilder::createIndexRawPointer(BridgedValue base,
+                                                          BridgedValue index) const {
+  return {unbridged().createIndexRawPointer(regularLoc(), base.getSILValue(), index.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createUncheckedRefCast(BridgedValue op, BridgedType type) const {
@@ -3080,6 +3114,10 @@ BridgedInstruction BridgedBuilder::createMakeAddrBorrow(BridgedValue referent) c
 
 BridgedInstruction BridgedBuilder::createFixLifetime(BridgedValue operand) const {
   return {unbridged().createFixLifetime(regularLoc(), operand.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createDropDeinit(BridgedValue operand) const {
+  return {unbridged().createDropDeinit(regularLoc(), operand.getSILValue())};
 }
 
 //===----------------------------------------------------------------------===//

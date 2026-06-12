@@ -99,7 +99,7 @@ func testUnsafeAsSequenceForEach() {
 
   for unsafe _ in unsafe uas { } // expected-warning{{no unsafe operations occur within 'unsafe' expression}}
 
-  for unsafe _ in [1, 2, 3] { } // expected-warning{{no unsafe operations occur within 'unsafe' for-in loop}}
+  for unsafe _ in [1, 2, 3] { } // expected-warning{{no unsafe operations occur within 'unsafe' for-in loop}}{{group-name=UnnecessaryUnsafe}}
 }
 
 func testForInUnsafeAmbiguity(_ integers: [Int]) {

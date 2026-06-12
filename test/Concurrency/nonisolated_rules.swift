@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature FlowIsolationGlobalActor
+
+// REQUIRES: swift_feature_FlowIsolationGlobalActor
 
 // REQUIRES: concurrency
 

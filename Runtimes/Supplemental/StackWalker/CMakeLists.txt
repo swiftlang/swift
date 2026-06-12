@@ -30,6 +30,7 @@ find_package(SwiftDarwin)
 endif()
 
 include(GNUInstallDirs)
+include(ResourceEmbedding)
 
 # NOTE: we disable availability checking because we need to use code from the
 # RuntimeModule, but we also need to build with an availability version below
@@ -92,3 +93,4 @@ target_link_libraries(swift-backtrace PRIVATE
 
 install(TARGETS swift-backtrace
   RUNTIME DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}/swift")
+embed_version_info(swift-backtrace)

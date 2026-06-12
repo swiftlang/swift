@@ -574,6 +574,26 @@ static ManagedValue emitBuiltinGepRaw(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(offsetPtr);
 }
 
+static ManagedValue emitBuiltinGepImpl(SILGenFunction &SGF,
+                                       SILLocation loc,
+                                       SubstitutionMap substitutions,
+                                       ArrayRef<ManagedValue> args,
+                                       bool isProjection) {
+  SILType ElemTy = SGF.getLoweredType(substitutions.getReplacementTypes()[0]);
+  SILType RawPtrType = args[0].getUnmanagedValue()->getType();
+  SILValue addr = SGF.B.createPointerToAddress(loc,
+                                               args[0].getUnmanagedValue(),
+                                               ElemTy.getAddressType(),
+                                               /*strict*/ true,
+                                               /*invariant*/ false);
+  addr = SGF.B.createIndexAddr(loc, addr, args[1].getUnmanagedValue(),
+                               /*needsStackProtection=*/ true,
+                               isProjection);
+  addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType,
+                                      /*needsStackProtection=*/ true);
+  return ManagedValue::forObjectRValueWithoutOwnership(addr);
+}
+
 /// Specialized emitter for Builtin.gep.
 static ManagedValue emitBuiltinGep(SILGenFunction &SGF,
                                    SILLocation loc,
@@ -583,20 +603,19 @@ static ManagedValue emitBuiltinGep(SILGenFunction &SGF,
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "gep should have two substitutions");
   assert(args.size() == 3 && "gep should be given three arguments");
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args, /*isProjection=*/ false);
+}
 
-  SILType ElemTy = SGF.getLoweredType(substitutions.getReplacementTypes()[0]);
-  SILType RawPtrType = args[0].getUnmanagedValue()->getType();
-  SILValue addr = SGF.B.createPointerToAddress(loc,
-                                               args[0].getUnmanagedValue(),
-                                               ElemTy.getAddressType(),
-                                               /*strict*/ true,
-                                               /*invariant*/ false);
-  addr = SGF.B.createIndexAddr(loc, addr, args[1].getUnmanagedValue(),
-                               /*needsStackProtection=*/ true);
-  addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType,
-                                      /*needsStackProtection=*/ true);
-
-  return ManagedValue::forObjectRValueWithoutOwnership(addr);
+/// Specialized emitter for Builtin.gepProjection.
+static ManagedValue emitBuiltinGepProjection(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             SubstitutionMap substitutions,
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
+  assert(substitutions.getReplacementTypes().size() == 1 &&
+         "gepProjection should have two substitutions");
+  assert(args.size() == 3 && "gepProjection should be given three arguments");
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args, /*isProjection=*/ true);
 }
 
 /// Specialized emitter for Builtin.getTailAddr.

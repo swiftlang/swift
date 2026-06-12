@@ -5246,7 +5246,7 @@ static ThrownErrorClassification classifyThrownErrorType(Type type) {
 
   // All three cases come up. The first one from the "real" witness matcher,
   // and the other two from associated type inference.
-  if (type->hasTypeVariable() ||
+  if (type->hasTypeVariableOrPlaceholder() ||
       type->hasTypeParameter() ||
       type->hasPrimaryArchetype())
     return ThrownErrorClassification::Dependent;

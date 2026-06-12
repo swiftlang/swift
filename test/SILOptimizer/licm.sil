@@ -116,11 +116,11 @@ bb2(%48 : $Builtin.Word):
   %60 = integer_literal $Builtin.Word, 100
   %61 = unchecked_ref_cast %6 : $Builtin.NativeObject to $C
   %62 = ref_tail_addr %61 : $C, $Builtin.NativeObject
-  %63 = index_addr %62 : $*Builtin.NativeObject, %52 : $Builtin.Word
+  %63 = index_addr [projection] %62 : $*Builtin.NativeObject, %52 : $Builtin.Word
   %64 = load %63 : $*Builtin.NativeObject
   %96 = unchecked_ref_cast %64 : $Builtin.NativeObject to $Storage
   %97 = ref_tail_addr %96 : $Storage, $Int
-  %99 = index_addr %97 : $*Int, %48 : $Builtin.Word
+  %99 = index_addr [projection] %97 : $*Int, %48 : $Builtin.Word
   store %1 to %99 : $*Int
   %101 = builtin "cmp_eq_Word"(%58 : $Builtin.Word, %60 : $Builtin.Word) : $Builtin.Int1
   cond_br %101, bb1, bb2(%58 : $Builtin.Word)
@@ -1520,7 +1520,7 @@ public struct UInt64Wrapper {
 // that it now loads the UInt64Wrapper instead of Builtin.Int64
 // CHECK-LABEL: sil @testTailProjection : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   [[A:%.*]] = index_addr %4 : $*UInt64Wrapper, %1 : $Builtin.Word
+// CHECK:   [[A:%.*]] = index_addr [projection] %4 : $*UInt64Wrapper, %1 : $Builtin.Word
 // CHECK:   store %{{.*}} to [[A]] : $*UInt64Wrapper
 // CHECK:   load %5 : $*UInt64Wrapper
 // CHECK:   br bb1
@@ -1544,7 +1544,7 @@ bb0:
   %2 = integer_literal $Builtin.Word, 2
   %3 = alloc_ref [tail_elems $UInt64Wrapper * %2 : $Builtin.Word] $Storage
   %4 = ref_tail_addr %3 : $Storage, $UInt64Wrapper
-  %5 = index_addr %4 : $*UInt64Wrapper, %1 : $Builtin.Word
+  %5 = index_addr [projection] %4 : $*UInt64Wrapper, %1 : $Builtin.Word
   %6 = struct $UInt64 (%0 : $Builtin.Int64)
   %7 = struct $UInt64Wrapper (%6 : $UInt64)
   store %7 to %5 : $*UInt64Wrapper
@@ -2359,5 +2359,32 @@ bb3:
   destroy_value %1
   %r = tuple ()
   return %r
+}
+
+// CHECK-LABEL: sil [ossa] @licm_trivial_store_to_nontrivial_addr :
+// CHECK:         load [take] %0 : $*Optional<String>
+// CHECK:       bb1({{%[0-9]+}} : @owned $Optional<String>):
+// CHECK:       bb3:
+// CHECK:         store {{%[0-9]+}} to [trivial] %0
+// CHECK-LABEL: } // end sil function 'licm_trivial_store_to_nontrivial_addr'
+sil [ossa] @licm_trivial_store_to_nontrivial_addr : $@convention(thin) () -> @out Optional<String> {
+bb0(%0 : $*Optional<String>):
+  %none = enum $Optional<String>, #Optional.none!enumelt
+  store %none to [trivial] %0 : $*Optional<String>
+  br bb1
+
+bb1:
+  %loaded = load [take] %0 : $*Optional<String>
+  destroy_value %loaded : $Optional<String>
+  %none2 = enum $Optional<String>, #Optional.none!enumelt
+  store %none2 to [trivial] %0 : $*Optional<String>
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r : $()
 }
 

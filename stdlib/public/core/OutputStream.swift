@@ -560,19 +560,29 @@ internal struct _Stdout: TextOutputStream {
   internal init() {}
 
   internal mutating func _lock() {
+    #if !$Embedded
     _swift_stdlib_flockfile_stdout()
+    #endif
   }
 
   internal mutating func _unlock() {
+    #if !$Embedded
     _swift_stdlib_funlockfile_stdout()
+    #endif
   }
 
   internal mutating func write(_ string: String) {
     if string.isEmpty { return }
 
     var string = string
-    _ = string.withUTF8 { utf8 in
-      unsafe _swift_stdlib_fwrite_stdout(utf8.baseAddress!, 1, utf8.count)
+    string.withUTF8 { utf8 in
+      #if $Embedded
+      // Route through the embedded platform's stdout entry point
+      // (in EmbeddedPrint.swift).
+      unsafe writeChars(utf8)
+      #else
+      _ = unsafe _swift_stdlib_fwrite_stdout(utf8.baseAddress!, 1, utf8.count)
+      #endif
     }
   }
 }

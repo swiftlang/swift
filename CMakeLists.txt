@@ -466,9 +466,8 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows" AND BOOTSTRAPPING_MODE STREQUAL "HO
 endif()
 
 if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
     # In debug builds, to workaround a problem with LLDB's `po` command (rdar://115770255).
-    # If the host Swift version is less than 5.8, use pure mode to workaround a C++ interop compiler crash.
     set(BRIDGING_MODE "PURE")
   else()
     set(BRIDGING_MODE "INLINE")
@@ -516,6 +515,9 @@ set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
 
 set(SWIFT_WASI_SYSROOT_PATH "" CACHE PATH
   "Path to the directory that contains WASI Sysroot")
+
+set(SWIFT_EMSCRIPTEN_SYSROOT_PATH "" CACHE PATH
+  "Path to the directory that contains Emscripten Sysroot")
 
 option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
        "Should we generate sib targets for the stdlib or not?"
@@ -762,10 +764,6 @@ option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
 
 option(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP
   "Enable experimental C++ interop modules"
-  TRUE)
-
-option(SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER
-  "Install the <swift/bridging> C++ interoperability header alongside compiler"
   TRUE)
 
 option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
