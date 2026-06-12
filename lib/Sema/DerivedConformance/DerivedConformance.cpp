@@ -1143,7 +1143,7 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
 /// relevant information to \p out.
 static void printCaseInfo(llvm::raw_ostream &out, const EnumElementDecl *decl) {
   out << "CaseInfo(name: " << QuotedString(decl->getNameStr())
-      << ", associatedValues: [";
+      << ", associatedValueLabels: [";
   llvm::interleaveComma(decl->getName().getArgumentNames(), out,
                         [&](Identifier name) {
                           if (name.empty()) {
