@@ -5828,8 +5828,7 @@ getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
   const bool hasMainActor = !ctx.getMainActorType().isNull();
 
   return isMainFunction && hasMainActor
-             ? ActorIsolation::forGlobalActor(
-                   ctx.getMainActorType()->mapTypeOutOfEnvironment())
+             ? ActorIsolation::forGlobalActor(ctx.getMainActorType())
              : std::optional<ActorIsolation>();
 }
 
@@ -6329,9 +6328,9 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
     DefaultIsolation defaultIsolation =
         getDefaultIsolationForContext(value->getDeclContext());
     // If we are required to use main actor... just use that.
-    if (defaultIsolation == DefaultIsolation::MainActor)
-      if (auto result =
-              globalActorHelper(ctx.getMainActorType()->mapTypeOutOfEnvironment()))
+    if (defaultIsolation == DefaultIsolation::MainActor &&
+        ctx.getMainActorType())
+      if (auto result = globalActorHelper(ctx.getMainActorType()))
         return *result;
   }
 
@@ -7213,8 +7212,7 @@ void swift::checkGlobalIsolation(VarDecl *var) {
       diag.fixItReplace(fixItLoc, "let");
   }
 
-  auto mainActor = var->getASTContext().getMainActorType();
-  if (mainActor) {
+  if (auto mainActor = var->getASTContext().getMainActorType()) {
     diagVar
         ->diagnose(diag::add_globalactor_to_decl, mainActor->getString(),
                    diagVar, mainActor)
@@ -7896,9 +7894,10 @@ static Type applyUnsafeConcurrencyToParameterType(
     return type;
 
   auto isolation = fnType->getIsolation();
-  if (mainActor)
-    isolation = FunctionTypeIsolation::forGlobalActor(
-                  type->getASTContext().getMainActorType());
+  if (mainActor) {
+    if (auto mainActorTy = type->getASTContext().getMainActorType())
+      isolation = FunctionTypeIsolation::forGlobalActor(mainActorTy);
+  }
 
   return fnType->withExtInfo(fnType->getExtInfo()
                                .withSendable(sendable)
