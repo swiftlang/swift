@@ -257,6 +257,7 @@ EXPECTED_DEFAULTS = {
     'llvm_build_variant': 'RelWithDebInfo',
     'llvm_cmake_options': [],
     'llvm_enable_modules': False,
+    'llvm_enable_index_store': True,
     'llvm_include_tests': True,
     'llvm_ninja_targets': [],
     'llvm_ninja_targets_for_cross_compile_hosts': [],
@@ -742,6 +743,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--swift-disable-dead-stripping'),
     EnableOption('--clean-early-swift-driver', dest='clean_early_swift_driver'),
     EnableOption('--llvm-enable-modules'),
+    EnableOption('--llvm-enable-index-store'),
     EnableOption('--build-llvm', dest='_build_llvm'),
 
     DisableOption('--skip-build-cmark', dest='build_cmark'),

@@ -154,6 +154,21 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
   endif()
 
+  # NOTE: We deliberately do NOT pass -index-store-path here.
+  # add_swift_compiler_modules_library invokes swiftc as
+  #   swiftc -wmo -c -o ${module}.o source1.swift source2.swift ...
+  # i.e. WMO with a single merged object output for many input source files.
+  # The Swift indexer walks every SourceFile in the module and expects an
+  # index-unit-output token per source (IndexRecord.cpp's
+  # error_index_inputs_more_than_outputs), but in WMO+single-output mode
+  # only the last input "produces a main output" so only one token is
+  # available - swiftc emits "index output filenames do not match input
+  # source files" and fails. FrontendTool.cpp:2379 has a FIXME calling out
+  # this exact limitation. Until that FIXME is resolved (or the
+  # SwiftCompilerSources build switches to per-source outputs via an
+  # output-file-map), the libswift compiler modules cannot be added to the
+  # IndexStore from this build path.
+
   get_bootstrapping_path(build_dir ${CMAKE_CURRENT_BINARY_DIR} "${ALS_BOOTSTRAPPING}")
 
   set(sdk_option ${SWIFT_COMPILER_SOURCES_SDK_FLAGS})
