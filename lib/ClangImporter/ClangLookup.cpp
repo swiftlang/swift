@@ -68,14 +68,16 @@ namespace {
 ///
 /// Validates that the name we looked up matches the resulting imported name.
 class CollectLookupResults {
+  ClangImporter::Implementation &impl;
   /// Match by base name, since that is what MemberLookupTable is keyed on for
   /// laziness (i.e., see type of MemberLookupTable::isLazilyComplete).
   DeclBaseName name;
   TinyPtrVector<ValueDecl *> &result;
 
 public:
-  CollectLookupResults(DeclBaseName name, TinyPtrVector<ValueDecl *> &result)
-      : name(name), result(result) {}
+  CollectLookupResults(ClangImporter::Implementation &impl,
+                       DeclBaseName name, TinyPtrVector<ValueDecl *> &result)
+      : impl(impl), name(name), result(result) {}
 
   void add(ValueDecl *imported) {
     if (imported->getBaseName() == name)
@@ -99,6 +101,11 @@ public:
 
       result.push_back(valueDecl);
     });
+
+    // Apply the same logic to alternate decls.
+    for (auto alt : impl.getAlternateDecls(imported))
+      if (alt->getDeclContext() == imported->getDeclContext())
+        add(alt);
   }
 };
 } // anonymous namespace
@@ -179,7 +186,10 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
   auto foundDecls = lookupTable->lookup(SerializedSwiftName(name.getBaseName()),
                                         EffectiveClangContext());
 
-  CollectLookupResults collector(name.getBaseName(), result);
+  ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
+  auto &impl = static_cast<ClangImporter *>(clangModuleLoader)->Impl;
+
+  CollectLookupResults collector(impl, name.getBaseName(), result);
   llvm::SmallPtrSet<clang::NamedDecl *, 8> seenDecls;
   for (SwiftLookupTable::SingleEntry foundEntry : foundDecls) {
     auto *foundDecl = foundEntry.dyn_cast<clang::NamedDecl *>();
@@ -345,12 +355,14 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     }
   }
 
+  ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
+  auto &impl = static_cast<ClangImporter *>(clangModuleLoader)->Impl;
+
   // The set of declarations we found.
   TinyPtrVector<ValueDecl *> result;
-  CollectLookupResults collector(name.getBaseName(), result);
+  CollectLookupResults collector(impl, name.getBaseName(), result);
 
   // Find the results that are actually a member of "recordDecl".
-  ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
   for (const clang::NamedDecl *found : directResults) {
     // We should not import 'found' if the following are all true:
     //
