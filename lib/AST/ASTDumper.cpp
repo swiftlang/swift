@@ -495,6 +495,9 @@ static StringRef getDumpString(Associativity value) {
 
   llvm_unreachable("Unhandled Associativity in switch.");
 }
+static StringRef getDumpString(CArrayProjection projection) {
+  return getCArrayProjectionSpelling(projection);
+}
 static StringRef getDumpString(CheckedCastKind kind) {
   return getCheckedCastKindName(kind);
 }
@@ -3269,6 +3272,10 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
     cast<ModuleDecl>(this)->getReverseFullModuleName().printForward(os);
   }
 
+  if (auto attr = getAttrs().getAttribute<CArrayProjectionAttr>())
+    os << " c-array-projection("
+       << getCArrayProjectionSpelling(attr->getProjection()) << ")";
+
   if (getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
     os << " known-to-be-local";
   }
@@ -5085,6 +5092,14 @@ public:
 // Dumping for DeclAttributes
 //===----------------------------------------------------------------------===//
 
+StringRef swift::getCArrayProjectionSpelling(CArrayProjection value) {
+  switch (value) {
+  case CArrayProjection::Modern: return "modern";
+  case CArrayProjection::Legacy: return "legacy";
+  }
+  llvm_unreachable("unknown CArrayProjection");
+}
+
 namespace {
 class PrintAttribute : public AttributeVisitor<PrintAttribute, void, Label>,
                        public PrintBase {
@@ -5511,6 +5526,11 @@ public:
     printCommon(Attr, "nonisolated_attr", label);
     printFlag(Attr->isUnsafe(), "unsafe");
     printFlag(Attr->isNonSending(), "nonsending");
+    printFoot();
+  }
+  void visitCArrayProjectionAttr(CArrayProjectionAttr *Attr, Label label) {
+    printCommon(Attr, "c_array_projection", label);
+    printField(Attr->getProjection(), Label::optional("projection"));
     printFoot();
   }
   void visitInheritActorContextAttr(InheritActorContextAttr *Attr,
