@@ -537,6 +537,25 @@ function(_compile_swift_files
   # Don't include libarclite in any build products by default.
   list(APPEND swift_flags "-no-link-objc-runtime")
 
+  # _compile_swift_files invokes swiftc directly via add_custom_command, so
+  # the parent CMakeLists' add_compile_options($<COMPILE_LANGUAGE:Swift>...)
+  # forwarding of LLVM_ENABLE_INDEX_STORE does not reach these compiles.
+  # Re-do the forwarding here so the stdlib (and SDK overlay) Swift sources
+  # land in the same IndexStore as the rest of the toolchain.
+  #
+  # IMPORTANT: only do this when we are in file-map mode (one .o per .swift,
+  # i.e. num_outputs > 1). In single-output WMO mode swiftc cannot match
+  # per-source index unit tokens to inputs and bails with
+  # "index output filenames do not match input source files" - see
+  # FrontendTool.cpp:2379 / IndexRecord.cpp:882. The SwiftCompilerSources
+  # build hits exactly that path and is intentionally left unindexed.
+  #
+  # SWIFT_SUPPORTS_INDEX_STORE was probed against CMAKE_Swift_COMPILER at
+  # the parent project scope.
+  if(LLVM_ENABLE_INDEX_STORE AND SWIFT_SUPPORTS_INDEX_STORE AND num_outputs GREATER 1)
+    list(APPEND swift_flags "-index-store-path" "${INDEX_DATA_STORE_PATH}")
+  endif()
+
   if(SWIFT_SIL_VERIFY_ALL)
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()

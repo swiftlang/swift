@@ -406,6 +406,18 @@ class CMakeProduct(product.Product):
         swift_cmake_options.define('LLVM_LIT_ARGS', '{} -j {}'.format(
             self.args.lit_args, self.args.lit_jobs))
 
+        # Forward LLVM_ENABLE_INDEX_STORE to both the LLVM and Swift host
+        # configures. HandleLLVMOptions.cmake (used by both) gates the
+        # actual -index-store-path append on a check_{c,cxx}_compiler_flag
+        # probe, so this is a no-op when the host compiler does not
+        # understand the flag.
+        llvm_cmake_options.define(
+            'LLVM_ENABLE_INDEX_STORE:BOOL',
+            cmake.CMakeOptions.true_false(self.args.llvm_enable_index_store))
+        swift_cmake_options.define(
+            'LLVM_ENABLE_INDEX_STORE:BOOL',
+            cmake.CMakeOptions.true_false(self.args.llvm_enable_index_store))
+
         if self.args.clang_profile_instr_use:
             llvm_cmake_options.define('LLVM_PROFDATA_FILE',
                                       self.args.clang_profile_instr_use)

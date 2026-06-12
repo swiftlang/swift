@@ -980,6 +980,24 @@ else()
   swift_common_unified_build_config(SWIFT)
 endif()
 
+# Mirror HandleLLVMOptions.cmake's LLVM_ENABLE_INDEX_STORE behavior for the
+# Swift compile language. HandleLLVMOptions only appends -index-store-path to
+# CMAKE_C_FLAGS / CMAKE_CXX_FLAGS, so swiftc invocations would otherwise miss
+# the flag. Forwarding it here lets sourcekit-lsp's IndexStoreDB resolve
+# Swift-side symbols (stdlib, swift-syntax, libswift compiler modules) and
+# answer cross-language queries between Swift and the C++ toolchain. Probe
+# CMAKE_Swift_COMPILER for the flag so we no-op against a swiftc that does
+# not understand it, matching the check_{c,cxx}_compiler_flag gating used on
+# the C/C++ side.
+if(LLVM_ENABLE_INDEX_STORE AND CMAKE_Swift_COMPILER AND NOT XCODE AND NOT MSVC_IDE)
+  swift_supports_compiler_arguments(SWIFT_SUPPORTS_INDEX_STORE
+    -index-store-path "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/IndexStore")
+  if(SWIFT_SUPPORTS_INDEX_STORE)
+    add_compile_options(
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-index-store-path ${INDEX_DATA_STORE_PATH}>")
+  endif()
+endif()
+
 include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
