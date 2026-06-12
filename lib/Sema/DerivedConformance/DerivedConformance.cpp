@@ -1141,8 +1141,8 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
 
 /// Prints a string containing swift syntax describing the case \p  decl with
 /// relevant information to \p out.
-static void printCaseInfo(llvm::raw_ostream &out, const EnumElementDecl *decl) {
-  out << "CaseInfo(name: " << QuotedString(decl->getNameStr())
+static void printEnumCaseInfo(llvm::raw_ostream &out, const EnumElementDecl *decl) {
+  out << "EnumCaseInfo(name: " << QuotedString(decl->getNameStr())
       << ", associatedValueLabels: [";
   llvm::interleaveComma(decl->getName().getArgumentNames(), out,
                         [&](Identifier name) {
@@ -1163,7 +1163,7 @@ static void printEnumTypeKind(llvm::raw_ostream &out, EnumDecl *decl) {
       << ", cases: [";
   llvm::interleaveComma(decl->getAllElements(), out,
                         [&](const EnumElementDecl *elem) {
-                          printCaseInfo(out, elem);
+                          printEnumCaseInfo(out, elem);
                         });
   out << "]))";
 }
