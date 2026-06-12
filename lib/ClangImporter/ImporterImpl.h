@@ -499,6 +499,8 @@ public:
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
 
+  const CArrayProjection VisibleCArrayProjection;
+
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
 

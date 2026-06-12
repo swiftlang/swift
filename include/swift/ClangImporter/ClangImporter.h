@@ -531,6 +531,7 @@ public:
       std::vector<std::string> &swiftArgs);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
+  CArrayProjection getVisibleCArrayProjection() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
   clang::Sema &getClangSema() const override;

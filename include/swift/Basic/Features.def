@@ -648,6 +648,16 @@ EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
 /// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
 EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
 
+/// Import C arrays using newer types like InlineArray. This flag has no effect
+/// if the minimum deployment target is not high enough to guarantee InlineArray
+/// will be available.
+EXPERIMENTAL_FEATURE(ModernImportedCArrays, true)
+
+/// Import C arrays using newer types like InlineArray. This flag limits the
+/// availability of affected declarations and is not expected to be incorporated
+/// into a future language version.
+EXPERIMENTAL_FEATURE(ModernImportedCArraysOnly, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
