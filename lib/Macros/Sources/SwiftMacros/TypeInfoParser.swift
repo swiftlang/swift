@@ -122,7 +122,7 @@ func parseBool(node: ExprSyntax) throws -> Bool {
 
 /// Parses either `nil` or an expression with the `parser` parsing function.
 /// Throws if `parser` throws
-func parseOpt<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws -> T? {
+func parseOptional<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws -> T? {
   // Eagerly checks if it is nil. This means that T?? can never be some(nil)
   // parsed this way as we just expect either nil or a value.
   if node.is(NilLiteralExprSyntax.self) {
@@ -134,7 +134,7 @@ func parseOpt<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws -> T
 /// Parses an array literal containing elements parsed with the `parse` function
 /// and returns them all. Will throw if it is not an array literal or if one
 /// of the elements throws during parsing.
-func parseArr<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws -> [T] {
+func parseArray<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws -> [T] {
   guard let arr = node.as(ArrayExprSyntax.self) else {
     throw TypeInfoParseError.expectedArrayLiteral(got: node)
   }
@@ -161,34 +161,34 @@ struct ArgInfo<T> {
 
   /// Returns an argument with the `name` label of type `U?` where `U`
   /// expressions can be parsed using the `parser` function.
-  static func optArg<U>(
+  static func optionalArg<U>(
     _ name: String?, parser: @escaping (ExprSyntax) throws -> U
   ) -> ArgInfo<U?> {
     .init(
       name: name,
-      parser: { node in try parseOpt(node: node, parser: parser) })
+      parser: { node in try parseOptional(node: node, parser: parser) })
   }
 
   /// Returns an argument with the `name` label of type `[U]` where `U`
   /// expressions can be parsed using the `parser` function.
-  static func arrArg<U>(_ name: String?, parser: @escaping (ExprSyntax) throws -> U) -> ArgInfo<
+  static func arrayArg<U>(_ name: String?, parser: @escaping (ExprSyntax) throws -> U) -> ArgInfo<
     [U]
   > {
     .init(
       name: name,
-      parser: { node in try parseArr(node: node, parser: parser) })
+      parser: { node in try parseArray(node: node, parser: parser) })
   }
 
   /// Returns a new argument with the same name but expecting an array of the
   /// elements expected by `self`. This is meant to be used like a builder.
-  func toArr() -> ArgInfo<[T]> {
-    .arrArg(name, parser: parser)
+  func toArray() -> ArgInfo<[T]> {
+    .arrayArg(name, parser: parser)
   }
 
   /// Returns a new argument with the same name but expecting an optional of the
   /// elements expected by `self`. This is meant to be used like a builder.
-  func toOpt() -> ArgInfo<T?> {
-    .optArg(name, parser: parser)
+  func toOptional() -> ArgInfo<T?> {
+    .optionalArg(name, parser: parser)
   }
 
   /// Returns the parsed argument from `arg` and throws if the name is
@@ -342,7 +342,7 @@ extension StructTypeInfo: TypeInfoSyntax {
     }
     return Self(
       properties: try fcall.arguments.expect(
-        .arrArg("properties", parser: StoredProperty.fromSyntax)))
+        .arrayArg("properties", parser: StoredProperty.fromSyntax)))
   }
 
   public var syntax: ExprSyntax {
@@ -368,7 +368,7 @@ extension EnumTypeInfo: TypeInfoSyntax {
 
     let parsed = try fcall.arguments.expect(
       .boolArg("isObjC"),
-      .arrArg("cases", parser: EnumCaseInfo.fromSyntax)
+      .arrayArg("cases", parser: EnumCaseInfo.fromSyntax)
     )
 
     return Self(isObjC: parsed.0, cases: parsed.1)
@@ -431,7 +431,7 @@ extension EnumCaseInfo: TypeInfoSyntax {
 
     let parsed = try fcall.arguments.expect(
       .stringArg("name"),
-      .stringArg("associatedValues").toOpt().toArr()
+      .stringArg("associatedValues").toOptional().toArray()
     )
 
     return Self(name: parsed.0, associatedValues: parsed.1)
