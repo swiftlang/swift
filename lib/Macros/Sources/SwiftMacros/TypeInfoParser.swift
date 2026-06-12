@@ -104,46 +104,54 @@ public enum TypeInfoParseError: Error {
   case expectedStrLitAsInput(got: ExprSyntax)
 }
 
-/// Parses a string literal and returns its contents. Throws in case of error.
-func parseString(node: ExprSyntax) throws -> String {
-  guard let res = node.as(StringLiteralExprSyntax.self)?.representedLiteralValue
-  else {
-    throw TypeInfoParseError.expectedStringLiteral(got: node)
-  }
-  return res
-}
+private struct Parser {
 
-/// Parses a bool literal and returns its contents. Throws in case of error.
-func parseBool(node: ExprSyntax) throws -> Bool {
-  guard let lit = node.as(BooleanLiteralExprSyntax.self) else {
-    throw TypeInfoParseError.expectedBoolLiteral(got: node)
+  /// Parses a string literal and returns its contents. Throws in case of error.
+  static func parseString(node: ExprSyntax) throws -> String {
+    guard
+      let res = node.as(StringLiteralExprSyntax.self)?.representedLiteralValue
+    else {
+      throw TypeInfoParseError.expectedStringLiteral(got: node)
+    }
+    return res
   }
-  return lit.trimmedDescription == "true"
-}
 
-/// Parses either `nil` or an expression with the `parser` parsing function.
-/// Throws if `parser` throws
-func parseOptional<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws
-  -> T?
-{
-  // Eagerly checks if it is nil. This means that T?? can never be some(nil)
-  // parsed this way as we just expect either nil or a value.
-  if node.is(NilLiteralExprSyntax.self) {
-    return nil
+  /// Parses a bool literal and returns its contents. Throws in case of error.
+  static func parseBool(node: ExprSyntax) throws -> Bool {
+    guard let lit = node.as(BooleanLiteralExprSyntax.self) else {
+      throw TypeInfoParseError.expectedBoolLiteral(got: node)
+    }
+    return lit.trimmedDescription == "true"
   }
-  return try parser(node)
-}
 
-/// Parses an array literal containing elements parsed with the `parse` function
-/// and returns them all. Will throw if it is not an array literal or if one
-/// of the elements throws during parsing.
-func parseArray<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T) throws
-  -> [T]
-{
-  guard let arr = node.as(ArrayExprSyntax.self) else {
-    throw TypeInfoParseError.expectedArrayLiteral(got: node)
+  /// Parses either `nil` or an expression with the `parser` parsing function.
+  /// Throws if `parser` throws
+  static func parseOptional<T>(
+    node: ExprSyntax,
+    parser: (ExprSyntax) throws -> T
+  ) throws
+    -> T?
+  {
+    // Eagerly checks if it is nil. This means that T?? can never be some(nil)
+    // parsed this way as we just expect either nil or a value.
+    if node.is(NilLiteralExprSyntax.self) {
+      return nil
+    }
+    return try parser(node)
   }
-  return try arr.elements.map({ try parser($0.expression) })
+
+  /// Parses an array literal containing elements parsed with the `parse` function
+  /// and returns them all. Will throw if it is not an array literal or if one
+  /// of the elements throws during parsing.
+  static func parseArray<T>(node: ExprSyntax, parser: (ExprSyntax) throws -> T)
+    throws
+    -> [T]
+  {
+    guard let arr = node.as(ArrayExprSyntax.self) else {
+      throw TypeInfoParseError.expectedArrayLiteral(got: node)
+    }
+    return try arr.elements.map({ try parser($0.expression) })
+  }
 }
 
 /// Helper struct to represent an function call argument to be parsed.
@@ -156,12 +164,12 @@ struct ArgParser<T> {
 
   /// Returns a string argument with the `name` label.
   static func stringArg(_ name: String?) -> ArgParser<String> {
-    .init(name: name, parser: parseString)
+    .init(name: name, parser: Parser.parseString)
   }
 
   /// Returns a boolean argument with the `name` label.
   static func boolArg(_ name: String?) -> ArgParser<Bool> {
-    .init(name: name, parser: parseBool)
+    .init(name: name, parser: Parser.parseBool)
   }
 
   /// Returns an argument with the `name` label of type `U?` where `U`
@@ -172,7 +180,7 @@ struct ArgParser<T> {
   ) -> ArgParser<U?> {
     .init(
       name: name,
-      parser: { node in try parseOptional(node: node, parser: parser) }
+      parser: { node in try Parser.parseOptional(node: node, parser: parser) }
     )
   }
 
@@ -186,7 +194,7 @@ struct ArgParser<T> {
   > {
     .init(
       name: name,
-      parser: { node in try parseArray(node: node, parser: parser) }
+      parser: { node in try Parser.parseArray(node: node, parser: parser) }
     )
   }
 
