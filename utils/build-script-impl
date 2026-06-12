@@ -199,6 +199,7 @@ KNOWN_SETTINGS=(
     ## LLVM Options
     llvm-enable-lto                               ""                "Must be set to one of 'thin' or 'full'"
     llvm-enable-modules                           "0"               "enable building llvm using modules"
+    llvm-enable-index-store                       "1"               "enable '-index-store-path' when compiling LLVM/Clang and Swift host tools (gated on the host compiler accepting the flag)"
     llvm-install-components                       ""                "a semicolon-separated list of LLVM components to install"
     llvm-lit-args                                 ""                "If set, override the lit args passed to LLVM"
     enable-llvm-assertions                        "1"               "set to enable llvm assertions"
@@ -809,6 +810,16 @@ function set_build_options_for_host() {
             ;;
     esac
 
+    # Forward -DLLVM_ENABLE_INDEX_STORE to both the LLVM and Swift host
+    # configures. HandleLLVMOptions.cmake (used by both) gates the actual
+    # -index-store-path append on a check_{c,cxx}_compiler_flag probe, so
+    # this is a no-op when the host compiler does not understand the flag.
+    llvm_cmake_options+=(
+        -DLLVM_ENABLE_INDEX_STORE:BOOL="$(true_false ${LLVM_ENABLE_INDEX_STORE})"
+    )
+    swift_cmake_options+=(
+        -DLLVM_ENABLE_INDEX_STORE:BOOL="$(true_false ${LLVM_ENABLE_INDEX_STORE})"
+    )
 
     # If we are asked to not generate test targets for LLVM and or Swift,
     # disable as many LLVM tools as we can. This improves compile time when
