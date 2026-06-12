@@ -152,7 +152,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/StackList.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -512,9 +512,6 @@ struct AddressLoweringState {
   // Dominators remain valid throughout this pass.
   DominanceInfo *domInfo;
 
-  // Dead-end blocks remain valid through this pass.
-  DeadEndBlocks *deBlocks;
-
   InstructionDeleter deleter;
 
   // All opaque values mapped to their associated storage.
@@ -549,10 +546,12 @@ struct AddressLoweringState {
   // legal to reuse use projections for non-canonical users or for phis.
   SmallVector<SILValue, 16> useProjections;
 
+  SILLoopAnalysis *SLA;
+
   AddressLoweringState(SILFunction *function, DominanceInfo *domInfo,
-                       DeadEndBlocks *deBlocks)
+                       SILLoopAnalysis *SLA)
       : function(function), loweredFnConv(getLoweredFnConv(function)),
-        domInfo(domInfo), deBlocks(deBlocks) {
+        domInfo(domInfo), SLA(SLA) {
     for (auto &block : *function) {
       if (block.getTerminator()->isFunctionExiting())
         exitingInsts.push_back(block.getTerminator());
@@ -1198,6 +1197,12 @@ bool ValueStorageMap::isComposingUseProjection(Operand *oper) const {
 }
 
 namespace {
+enum class SinkResult {
+  NoUsers,
+  Unmoved,
+  Moved,
+};
+
 /// Allocate storage on the stack for every opaque value defined in this
 /// function in postorder. If the definition is an argument of this function,
 /// simply replace the function argument with an address representing the
@@ -1255,6 +1260,8 @@ protected:
     pass.valueStorageMap.getStorage(value).storageAddress =
         createStackAllocation(value);
   }
+
+  SinkResult sinkToUses(SingleValueInstruction *svi, DominanceInfo *domInfo);
 };
 } // end anonymous namespace
 
@@ -1592,13 +1599,8 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
   return alloc;
 }
 
-namespace {
-enum class SinkResult {
-  NoUsers,
-  Unmoved,
-  Moved,
-};
-SinkResult sinkToUses(SingleValueInstruction *svi, DominanceInfo *domInfo) {
+SinkResult OpaqueStorageAllocation::sinkToUses(SingleValueInstruction *svi,
+                                               DominanceInfo *domInfo) {
   // Fast paths for 0 and 1 users.
 
   if (svi->use_begin() == svi->use_end()) {
@@ -1618,8 +1620,22 @@ SinkResult sinkToUses(SingleValueInstruction *svi, DominanceInfo *domInfo) {
 
   SILBasicBlock *lca = domInfo->getLeastCommonAncestorOfUses(svi);
 
-  // The lca may contain a user.  Look for the user to insert before it.
+  // If the materialized address is itself an alloc_stack, avoid sinking it
+  // into a loop.
+  // The deallocs were placed based on the alloc's current location.
+  // Relocating the alloc into a loop would re-execute it every iteration
+  // without matching deallocs on the back-edge, breaking stack discipline.
+  if (auto *asi = dyn_cast<AllocStackInst>(svi)) {
+    auto *LI = pass.SLA->get(asi->getFunction());
+    auto *startNode = domInfo->getNode(asi->getParent());
+    for (auto node = domInfo->getNode(lca); node && node != startNode;
+         node = node->getIDom()) {
+      if (LI->isLoopHeader(node->getBlock()))
+        return SinkResult::Unmoved;
+    }
+  }
 
+  // The lca may contain a user.  Look for the user to insert before it.
   InstructionSet userSet(svi->getFunction());
   for (auto user : svi->getUsers()) {
     userSet.insert(user);
@@ -1638,7 +1654,6 @@ SinkResult sinkToUses(SingleValueInstruction *svi, DominanceInfo *domInfo) {
   svi->moveBefore(&lca->back());
   return SinkResult::Moved;
 }
-} // end anonymous namespace
 
 void OpaqueStorageAllocation::finalizeOpaqueStorage() {
   SmallVector<SILBasicBlock *, 4> boundary;
@@ -1661,7 +1676,11 @@ void OpaqueStorageAllocation::finalizeOpaqueStorage() {
     // a use projection.
     computeDominatedBoundaryBlocks(alloc->getParent(), pass.domInfo, boundary);
     for (SILBasicBlock *deallocBlock : boundary) {
-      if (pass.deBlocks->isDeadEnd(deallocBlock))
+      // Owned values need not be destroyed on paths terminating in
+      // `unreachable`, so the corresponding storage need not be deallocated
+      // there either; emitting a dealloc_stack in such a block could free
+      // storage that was never deinitialized.
+      if (DeadEndBlocks::triviallyEndsInUnreachable(deallocBlock))
         continue;
       auto deallocBuilder = pass.getBuilder(deallocBlock->back().getIterator());
       deallocBuilder.createDeallocStack(pass.genLoc(), alloc);
@@ -4700,10 +4719,9 @@ void AddressLowering::runOnFunction(SILFunction *function) {
   removeUnreachableBlocks(*function);
 
   auto *dominance = PM->getAnalysis<DominanceAnalysis>();
-  auto *deadEnds = PM->getAnalysis<DeadEndBlocksAnalysis>();
+  auto *SLA = PM->getAnalysis<SILLoopAnalysis>();
 
-  AddressLoweringState pass(function, dominance->get(function),
-                            deadEnds->get(function));
+  AddressLoweringState pass(function, dominance->get(function), SLA);
 
   // ## Step #1: Map opaque values
   //
