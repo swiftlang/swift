@@ -1684,20 +1684,27 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
     if (unwrappedType->is<ExistentialType>()) {
       auto layout = unwrappedType->getExistentialLayout();
       if (layout.containsNonMarkerProtocols()) {
-        if (auto superclassTy = layout.explicitSuperclass) {
-          bool condition = llvm::any_of(Protocols,
-              [&](ProtocolDecl *proto) {
-            return (!proto->existentialConformsToSelf() &&
-                    CS.lookupConformance(superclassTy, proto));
-          });
+        if (auto superclassTy = layout.getExplicitSuperclassOrProtocolSuperclass()) {
+          // Presence of a type parameter means we have something like this,
+          // which we cannot support here:
+          //
+          //   protocol P: G<Self.A> { ... }
+          //
+          if (!superclassTy->hasTypeParameter()) {
+            bool condition = llvm::any_of(Protocols,
+                [&](ProtocolDecl *proto) {
+              return (!proto->existentialConformsToSelf() &&
+                      CS.lookupConformance(superclassTy, proto));
+            });
 
-          if (condition) {
-            for (unsigned i = 0; i < optionals.size(); ++i)
-              superclassTy = OptionalType::get(superclassTy);
-            binding.BindingType = superclassTy;
+            if (condition) {
+              for (unsigned i = 0; i < optionals.size(); ++i)
+                superclassTy = OptionalType::get(superclassTy);
+              binding.BindingType = superclassTy;
 
-            LLVM_DEBUG(llvm::dbgs() << "Reduce supertype of existential to superclass: "
-                                    << binding.BindingType.getString() << "\n");
+              LLVM_DEBUG(llvm::dbgs() << "Reduce supertype of existential to superclass: "
+                                      << binding.BindingType.getString() << "\n");
+            }
           }
         }
       }
