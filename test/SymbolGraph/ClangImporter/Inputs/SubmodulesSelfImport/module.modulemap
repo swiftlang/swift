@@ -1,0 +1,9 @@
+module SelfImport {
+  umbrella "."
+  export *
+
+  module Sub {
+    header "Sub.h"
+    export *
+  }
+}

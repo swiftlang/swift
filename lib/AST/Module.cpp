@@ -1529,6 +1529,9 @@ collectExportedImports(const ModuleDecl *topLevelModule,
         file->getImportedModules(exportedImports,
                                  ModuleDecl::ImportFilterKind::Exported);
         for (const auto &im : exportedImports) {
+          // Prevent self-import cycles where a submodule re-exports its parent's headers.
+          if (im.importedModule == topLevelModule)
+            continue;
           // Skip collecting the underlying clang module as we already have the relevant import.
           if (!module->isClangOverlayOf(im.importedModule))
             importCollector.collect(im);
