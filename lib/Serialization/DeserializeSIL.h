@@ -165,7 +165,8 @@ namespace swift {
     readDebugScopes(SILFunction *F, SmallVectorImpl<uint64_t> &scratch,
                     SILBuilder &Builder, unsigned kind);
     llvm::Expected<unsigned> readNextRecord(SmallVectorImpl<uint64_t> &scratch);
-    std::optional<SILLocation> readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch);
+    llvm::Expected<std::optional<SILLocation>>
+    readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch);
 
     llvm::DenseMap<unsigned, const SILDebugScope *> ParsedScopes;
     llvm::SmallVector<SILLocation::FilenameAndLocation *> ParsedLocs;
