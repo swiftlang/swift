@@ -984,6 +984,58 @@ extension Span where Element: ~Copyable {
   }
 }
 
+// MARK: usage hints
+//
+// `Span` is not a `Collection`. We add the following unavailable members
+// to redirect users who reach for the `Collection` slicing API towards the
+// corresponding `extracting(...)` function.
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Span where Element: ~Copyable {
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(_:)")
+  public subscript(bounds: Range<Index>) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(_:)")
+  public subscript(bounds: some RangeExpression<Index>) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(_:)")
+  public subscript(bounds: UnboundedRange) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(first:)")
+  public func prefix(_ maxLength: Int) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(last:)")
+  public func suffix(_ maxLength: Int) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(droppingFirst:)")
+  public func dropFirst(_ k: Int = 1) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(droppingLast:)")
+  public func dropLast(_ k: Int = 1) -> Self {
+    Builtin.unreachable()
+  }
+}
+
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element == UInt8 {
