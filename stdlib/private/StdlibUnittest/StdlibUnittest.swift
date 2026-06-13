@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -2156,8 +2156,13 @@ public final class TestSuite {
       return self
     }
 
-    public func crashOutputMatches(_ string: String) -> _TestBuilder {
-      _data._crashOutputMatches.append(string)
+    public func crashOutputMatches(
+      _ string: String,
+      when predicate: Bool = true
+    ) -> _TestBuilder {
+      if predicate {
+        _data._crashOutputMatches.append(string)
+      }
       return self
     }
 

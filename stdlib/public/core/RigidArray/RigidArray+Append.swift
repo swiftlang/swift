@@ -76,7 +76,7 @@ extension _RigidArray where Element: ~Copyable {
   ) throws(E) {
     _precondition(newItemCount >= 0, "Cannot add a negative number of items")
     _precondition(freeCapacity >= newItemCount, "RigidArray capacity overflow")
-    let buffer = unsafe _freeSpace._extracting(first: newItemCount)
+    let buffer = unsafe _freeSpace.extracting(first: newItemCount)
     var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
     defer {
       _count &+= unsafe span.finalize(for: buffer)
@@ -127,7 +127,7 @@ extension _RigidArray where Element: ~Copyable {
     moving items: inout OutputSpan<Element>
   ) {
     unsafe items.withUnsafeMutableBufferPointer { buffer, count in
-      let source = unsafe buffer._extracting(first: count)
+      let source = buffer.extracting(first: count)
       unsafe self.append(moving: source)
       count = 0
     }
