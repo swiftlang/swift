@@ -726,7 +726,7 @@ extension MutableRawSpan {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Index range out of bounds"
+      "Byte offset range out of bounds"
     )
     return unsafe _mutatingExtracting(unchecked: bounds)
   }
@@ -772,7 +772,7 @@ extension MutableRawSpan {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Index range out of bounds"
+      "Byte offset range out of bounds"
     )
     return unsafe _consumingExtracting(unchecked: bounds)
   }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1208,7 +1208,159 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
   }
 }
-  
+
+extension Unsafe${Mutable}RawBufferPointer {
+  /// Constructs a standalone buffer pointer over the bytes within the supplied
+  /// range of positions in the memory region addressed by this buffer pointer.
+  ///
+  /// The returned buffer's first byte is always at offset 0; unlike buffer
+  /// slices, extracted buffers do not generally share their indices with the
+  /// original buffer pointer.
+  ///
+  /// - Parameter bounds: A valid range of byte offsets within this buffer.
+  /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  @_alwaysEmitIntoClient
+  @safe
+  public func extracting(_ bounds: Range<Int>) -> Self {
+    _precondition(_checkBounds(bounds), "Byte offset out of range")
+    guard let start = baseAddress else {
+      return unsafe Self(_uncheckedStart: nil, count: 0)
+    }
+    return unsafe Self(_uncheckedStart: start + bounds.lowerBound,
+                       count: bounds.count)
+  }
+
+  /// Constructs a standalone buffer pointer over the bytes within the supplied
+  /// range of positions in the memory region addressed by this buffer pointer.
+  ///
+  /// The returned buffer's first byte is always at offset 0; unlike buffer
+  /// slices, extracted buffers do not generally share their indices with the
+  /// original buffer pointer.
+  ///
+  /// - Parameter bounds: A valid range of byte offsets within this buffer.
+  /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  @_alwaysEmitIntoClient
+  @safe
+  public func extracting(_ bounds: some RangeExpression<Int>) -> Self {
+    extracting(bounds.relative(to: unsafe Range(uncheckedBounds: (0, count))))
+  }
+
+  /// Extracts and returns a copy of the entire buffer.
+  ///
+  /// - Returns: The same buffer as `self`.
+  @_alwaysEmitIntoClient
+  @safe
+  public func extracting(_ bounds: UnboundedRange) -> Self {
+    unsafe self
+  }
+
+  /// Constructs a standalone buffer pointer over the bytes within the supplied
+  /// range of positions in the memory region addressed by this buffer pointer.
+  ///
+  /// The returned buffer's first byte is always at offset 0; unlike buffer
+  /// slices, extracted buffers do not generally share their indices with the
+  /// original buffer pointer.
+  ///
+  /// This function does not validate `bounds`; this is an unsafe operation.
+  ///
+  /// - Parameter bounds: A valid range of byte offsets within this buffer.
+  /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  @_alwaysEmitIntoClient
+  public func extracting(unchecked bounds: Range<Int>) -> Self {
+    let newStart = unsafe baseAddress?.advanced(by: bounds.lowerBound)
+    return unsafe Self(_uncheckedStart: newStart, count: bounds.count)
+  }
+
+  /// Constructs a standalone buffer pointer over the bytes within the supplied
+  /// range of positions in the memory region addressed by this buffer pointer.
+  ///
+  /// The returned buffer's first byte is always at offset 0; unlike buffer
+  /// slices, extracted buffers do not generally share their indices with the
+  /// original buffer pointer.
+  ///
+  /// This function does not validate `bounds`; this is an unsafe operation.
+  ///
+  /// - Parameter bounds: A valid range of byte offsets within this buffer.
+  /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  @_alwaysEmitIntoClient
+  public func extracting(unchecked bounds: ClosedRange<Int>) -> Self {
+    let range = unsafe Range(
+      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
+    )
+    return unsafe extracting(unchecked: range)
+  }
+
+  /// Constructs a standalone buffer pointer over the initial bytes of
+  /// this buffer, up to the specified maximum length.
+  ///
+  /// If the maximum length exceeds the length of this buffer,
+  /// the result contains all the bytes.
+  ///
+  /// - Parameter maxLength: The maximum number of bytes to return.
+  ///   `maxLength` must be greater than or equal to zero.
+  /// - Returns: A buffer pointer with at most `maxLength` bytes.
+  @_alwaysEmitIntoClient
+  @safe
+  public func extracting(first maxLength: Int) -> Self {
+    _precondition(maxLength >= 0, "Can't have a prefix of negative length")
+    let newCount = Swift.min(maxLength, count)
+    return unsafe Self(_uncheckedStart: baseAddress, count: newCount)
+  }
+
+  /// Returns a buffer pointer over all but the given number of trailing bytes.
+  ///
+  /// If the number of bytes to drop exceeds the number of bytes in the buffer,
+  /// the result is an empty buffer.
+  ///
+  /// - Parameter k: The number of bytes to drop off the end of the buffer.
+  ///   `k` must be greater than or equal to zero.
+  /// - Returns: A buffer pointer leaving off the specified number of trailing
+  ///   bytes.
+  @_alwaysEmitIntoClient
+  @safe
+  public func extracting(droppingLast k: Int) -> Self {
+    _precondition(k >= 0, "Can't drop a negative number of bytes")
+    let droppedCount = Swift.min(k, count)
+    return unsafe Self(_uncheckedStart: baseAddress,
+                       count: count &- droppedCount)
+  }
+
+  /// Returns a buffer pointer containing the trailing bytes of this buffer,
+  /// up to the given maximum length.
+  ///
+  /// If the maximum length exceeds the length of this buffer,
+  /// the result contains all the bytes.
+  ///
+  /// - Parameter maxLength: The maximum number of bytes to return.
+  ///   `maxLength` must be greater than or equal to zero.
+  /// - Returns: A buffer pointer with at most `maxLength` bytes.
+  @_alwaysEmitIntoClient
+  @safe
+  public func extracting(last maxLength: Int) -> Self {
+    _precondition(maxLength >= 0, "Can't have a suffix of negative length")
+    let newCount = Swift.min(maxLength, count)
+    let newStart = unsafe baseAddress?.advanced(by: count &- newCount)
+    return unsafe Self(_uncheckedStart: newStart, count: newCount)
+  }
+
+  /// Returns a buffer pointer over all but the given number of initial bytes.
+  ///
+  /// If the number of bytes to drop exceeds the number of bytes in the buffer,
+  /// the result is an empty buffer.
+  ///
+  /// - Parameter k: The number of bytes to drop from the beginning of the
+  ///   buffer. `k` must be greater than or equal to zero.
+  /// - Returns: A buffer pointer starting after the specified number of bytes.
+  @_alwaysEmitIntoClient
+  @safe
+  public func extracting(droppingFirst k: Int) -> Self {
+    _precondition(k >= 0, "Can't drop a negative number of bytes")
+    let droppedCount = Swift.min(k, count)
+    let newStart = unsafe baseAddress?.advanced(by: droppedCount)
+    return unsafe Self(_uncheckedStart: newStart, count: count &- droppedCount)
+  }
+}
+
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Unsafe${Mutable}RawBufferPointer {
