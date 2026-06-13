@@ -709,7 +709,8 @@ bool swift::constraints::isPossibleSupertypeOfFunctionType(Type type) {
     auto layout = type->getExistentialLayout();
 
     // Revisit this if functions ever conform to arbitrary protocols!
-    if (!layout.containsNonMarkerProtocols() && !layout.getSuperclass())
+    if (!layout.containsNonMarkerProtocols() &&
+        !layout.getExplicitSuperclassOrProtocolSuperclass())
       return true;
   }
 

@@ -62,6 +62,7 @@
 
 namespace clang {
 class APValue;
+class BuiltinType;
 class DeclarationName;
 class MangleContext;
 class ObjCInterfaceDecl;
@@ -688,6 +689,10 @@ public:
 
   llvm::SmallPtrSet<const clang::Decl *, 1> synthesizedAndAlwaysVisibleDecls;
 
+  /// For virtual methods of foreign reference types, whenever a virtual thunk
+  /// is generated, keep track of the original C++ method.
+  llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
+
 private:
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
@@ -785,6 +790,8 @@ public:
                                   ClangInheritanceInfo inheritance);
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
+  FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
+
   bool isMemberSynthesizedPerType(const ValueDecl *decl);
   void markMemberSynthesizedPerType(const ValueDecl *decl);
 
@@ -2071,6 +2078,20 @@ bool isSpecialAppKitFunctionKeyProperty(const clang::NamedDecl *decl);
 bool hasSameUnderlyingType(const clang::Type *a,
                            const clang::TemplateTypeParmDecl *b);
 
+/// Map a `clang::BuiltinType` to its Swift stdlib counterpart as listed in
+/// `BuiltinMappedTypes.def`, if there is one.
+[[nodiscard]] std::optional<StringRef>
+getBuiltinTypeSwiftName(const clang::BuiltinType *bt);
+
+/// Return the Swift type name if `ty` is a `clang::BuiltinType` with a Swift
+/// counterpart.
+[[nodiscard]] std::optional<StringRef> static inline getBuiltinTypeSwiftName(
+    clang::QualType ty) {
+  if (const auto *bt = ty->getAs<clang::BuiltinType>())
+    return getBuiltinTypeSwiftName(bt);
+  return std::nullopt;
+}
+
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                                   ASTContext &ctx, bool ignoreClangTarget);
@@ -2281,8 +2302,8 @@ ImportedType findOptionSetEnum(clang::QualType type,
 /// and with the given name.
 ///
 /// The name we're looking for is the Swift name.
-llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(NominalTypeDecl* decl, StringRef name);
+TinyPtrVector<ValueDecl *> getValueDeclsForName(NominalTypeDecl *decl,
+                                                StringRef name);
 
 template <typename T>
 const T *

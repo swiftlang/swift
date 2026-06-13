@@ -1,0 +1,12 @@
+Name: RawMigration
+Globals:
+  - Name: ANTOldGlobalValue
+    SwiftName: "`global value`"
+  - Name: ANTOldGlobalWithSpace
+    SwiftName: "`global with space`"
+Functions:
+  - Name: oldGlobalWithArgs
+    SwiftName: "`global function`(`with arg`:)"
+Typedefs:
+  - Name: OldStruct
+    SwiftName: "`Old Struct`"

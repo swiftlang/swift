@@ -114,7 +114,12 @@ swift::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
       auto layout = type->getExistentialLayout();
       if (llvm::all_of(layout.getProtocols(),
                        [](const auto *P) { return P->isMarkerProtocol(); })) {
-        if (auto conformance = lookupSuperclassConformance(layout.explicitSuperclass)) {
+        // Since we know we have a marker protocol or something similar at
+        // point, this usage of getExplicitSuperclassOrProtocolSuperclass()
+        // is _probably_ OK. However, we should still clean it up. See the
+        // comment on that getter method.
+        if (auto conformance = lookupSuperclassConformance(
+            layout.getExplicitSuperclassOrProtocolSuperclass())) {
           return ProtocolConformanceRef(
               ctx.getInheritedConformance(type, conformance.getConcrete()));
         }
@@ -154,7 +159,8 @@ swift::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
   // If the existential is class-constrained, the class might conform
   // concretely.
-  if (auto conformance = lookupSuperclassConformance(layout.getSuperclass()))
+  if (auto conformance = lookupSuperclassConformance(
+        layout.getExplicitSuperclassOrProtocolSuperclass()))
     return conformance;
 
   // If the protocol is SendableMetatype, and there are no non-marker protocol

@@ -1569,6 +1569,12 @@ public:
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
+  /// Creates a standalone debug reconstruction block that is NOT inserted into
+  /// the function's BlockList. This should only be called by the cloner and
+  /// the SIL parser, optimization passes should go through the debug value
+  /// instruction's getOrCreateDebugReconstructionBlock.
+  SILBasicBlock *createEmptyDebugReconstructionBlock();
+
   /// Removes and destroys \p BB;
   void eraseBlock(SILBasicBlock *BB) {
     assert(BB->getParent() == this);

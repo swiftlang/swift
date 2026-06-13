@@ -94,7 +94,7 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
   guard copy.parentFunction.hasOwnership ||
         allocStack.isDestroyedOnAllPaths(context) ||
         // We can easily remove a dead alloc_stack
-        allocStack.uses.ignore(user: copy).ignore(usersOfType: DeallocStackInst.self).isEmpty
+        allocStack.uses.ignore(user: copy).hasOnlyUsers(ofType: DeallocStackInst.self)
   else {
     return
   }

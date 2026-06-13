@@ -503,15 +503,15 @@ extension InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript(_ i: Index) -> Element {
     @_transparent
-    unsafeAddress {
+    borrow {
       _checkIndex(i)
-      return unsafe _address + i
+      return unsafe self[unchecked: i]
     }
 
     @_transparent
-    unsafeMutableAddress {
+    mutate {
       _checkIndex(i)
-      return unsafe _mutableAddress + i
+      return unsafe &self[unchecked: i]
     }
   }
 
@@ -530,13 +530,15 @@ extension InlineArray where Element: ~Copyable {
   @unsafe
   public subscript(unchecked i: Index) -> Element {
     @_transparent
-    unsafeAddress {
-      unsafe _protectedAddress + i
+    @_unsafeSelfDependentResult
+    borrow {
+      unsafe _protectedAddress.project(i).pointee
     }
 
     @_transparent
-    unsafeMutableAddress {
-      unsafe _protectedMutableAddress + i
+    @_unsafeSelfDependentResult
+    mutate {
+      unsafe &_protectedMutableAddress.project(i).pointee
     }
   }
 }
@@ -591,7 +593,7 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_transparent
     borrowing get {
       guard count > 0 else {
@@ -611,7 +613,7 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     @_transparent
     mutating get {
       guard count > 0 else {
@@ -634,7 +636,7 @@ extension InlineArray: BorrowingSequence where Element: ~Copyable {
   
   @available(SwiftStdlib 6.4, *)
   @inlinable
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   public func makeBorrowingIterator() -> SpanIterator<Element> {
     SpanIterator(self.span)
   }

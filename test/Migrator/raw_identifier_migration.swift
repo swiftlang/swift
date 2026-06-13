@@ -1,0 +1,35 @@
+// RUN: %empty-directory(%t)
+// RUN: not %target-swift-frontend -typecheck -update-code -primary-file %s -I %S/Inputs -emit-migrated-file-path %t/result.swift
+// RUN: diff -u %S/raw_identifier_migration.swift.expected %t/result.swift
+
+import RawMigration
+
+@available(*, unavailable, renamed: "`new swift name`")
+func oldSwiftFunc() {}
+
+@available(*, unavailable, renamed: "test(`with raw`:)")
+func oldSwiftFuncArgs(`raw`: Int) {}
+
+struct SomeStruct {
+  @available(*, unavailable, renamed: "`new member`")
+  func oldMember() {}
+  func `new member`() {}
+}
+
+func testMigration() {
+  _ = ANTOldGlobalValue
+  _ = ANTOldGlobalWithSpace
+  oldGlobalWithArgs(1)
+  let _ : OldStruct
+  
+  oldSwiftFunc()
+  oldSwiftFuncArgs(`raw`: 1)
+}
+
+func testMember(s: SomeStruct) {
+  s.oldMember()
+}
+
+func `new swift name`() {}
+func test(`with raw`: Int) {}
+

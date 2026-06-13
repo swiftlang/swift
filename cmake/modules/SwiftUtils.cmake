@@ -254,6 +254,14 @@ function(is_sdk_requested name result_var_name)
   endif()
 endfunction()
 
+function(is_wasm_sdk sdk result_var_name)
+  if(DEFINED SWIFT_SDK_${sdk}_ARCH_wasm32_TRIPLE)
+    set("${result_var_name}" TRUE PARENT_SCOPE)
+  else()
+    set("${result_var_name}" FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Append Swift compilation-caching flags (driven by the SWIFT_CACHING_BUILD_*
 # cache variables) to the named list variable. Callers are responsible for
 # deciding whether caching applies to their target (e.g. checking

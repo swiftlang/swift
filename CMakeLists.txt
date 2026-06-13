@@ -244,6 +244,10 @@ option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
     NOTE: Disabling this will cause many String methods to crash."
     TRUE)
 
+option(SWIFT_STDLIB_ENABLE_SOURCE_INFO
+    "Build .swiftsourceinfo files for the standard library to provide a link back to the standard library sources"
+    FALSE)
+
 option(SWIFT_BUILD_CLANG_OVERLAYS
   "Build Swift overlays for the clang builtin modules"
   TRUE)
@@ -462,9 +466,8 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows" AND BOOTSTRAPPING_MODE STREQUAL "HO
 endif()
 
 if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
     # In debug builds, to workaround a problem with LLDB's `po` command (rdar://115770255).
-    # If the host Swift version is less than 5.8, use pure mode to workaround a C++ interop compiler crash.
     set(BRIDGING_MODE "PURE")
   else()
     set(BRIDGING_MODE "INLINE")
@@ -512,6 +515,9 @@ set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
 
 set(SWIFT_WASI_SYSROOT_PATH "" CACHE PATH
   "Path to the directory that contains WASI Sysroot")
+
+set(SWIFT_EMSCRIPTEN_SYSROOT_PATH "" CACHE PATH
+  "Path to the directory that contains Emscripten Sysroot")
 
 option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
        "Should we generate sib targets for the stdlib or not?"
@@ -760,10 +766,6 @@ option(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP
   "Enable experimental C++ interop modules"
   TRUE)
 
-option(SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER
-  "Install the <swift/bridging> C++ interoperability header alongside compiler"
-  TRUE)
-
 option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
   "Enable experimental distributed actors and functions"
   FALSE)
@@ -862,16 +864,6 @@ endif()
 
 # Add any extra C++ compilation options that were passed down.
 add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${SWIFT_EXTRA_CXX_FLAGS}>)
-
-if(CMAKE_C_COMPILER_ID MATCHES Clang)
-  add_compile_options($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:-Werror=gnu>)
-endif()
-
-# Make some warnings errors as they are commonly occurring and flood the build
-# with unnecessary noise.
-if(CMAKE_C_COMPILER_ID MATCHES Clang)
-  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror=c++98-compat-extra-semi>)
-endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
   include(CheckCXXCompilerFlag)
@@ -986,6 +978,24 @@ if(SWIFT_BUILT_STANDALONE)
   swift_common_standalone_build_config(SWIFT)
 else()
   swift_common_unified_build_config(SWIFT)
+endif()
+
+# Mirror HandleLLVMOptions.cmake's LLVM_ENABLE_INDEX_STORE behavior for the
+# Swift compile language. HandleLLVMOptions only appends -index-store-path to
+# CMAKE_C_FLAGS / CMAKE_CXX_FLAGS, so swiftc invocations would otherwise miss
+# the flag. Forwarding it here lets sourcekit-lsp's IndexStoreDB resolve
+# Swift-side symbols (stdlib, swift-syntax, libswift compiler modules) and
+# answer cross-language queries between Swift and the C++ toolchain. Probe
+# CMAKE_Swift_COMPILER for the flag so we no-op against a swiftc that does
+# not understand it, matching the check_{c,cxx}_compiler_flag gating used on
+# the C/C++ side.
+if(LLVM_ENABLE_INDEX_STORE AND CMAKE_Swift_COMPILER AND NOT XCODE AND NOT MSVC_IDE)
+  swift_supports_compiler_arguments(SWIFT_SUPPORTS_INDEX_STORE
+    -index-store-path "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/IndexStore")
+  if(SWIFT_SUPPORTS_INDEX_STORE)
+    add_compile_options(
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-index-store-path ${INDEX_DATA_STORE_PATH}>")
+  endif()
 endif()
 
 include(SwiftComponents)
@@ -1435,6 +1445,9 @@ swift_get_host_triple(SWIFT_HOST_TRIPLE)
 set(SWIFT_HOST_MODULE_TRIPLE "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_MODULE}")
 set(SWIFT_HOST_LIBRARIES_DEST_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/host")
 
+message(STATUS "Building with pedantic diagnostics: ${SWIFT_PEDANTIC_DIAGNOSTICS}")
+message(STATUS "")
+
 if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
   message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
@@ -1747,6 +1760,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
           -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency}
+          -DSwiftCore_ENABLE_SOURCE_INFO=${SWIFT_STDLIB_ENABLE_SOURCE_INFO}
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
       if(_stdlib_needs_swift_frontend)
         add_dependencies("${stdlib_target}-core" swift-frontend)

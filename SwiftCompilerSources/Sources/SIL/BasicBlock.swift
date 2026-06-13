@@ -44,6 +44,8 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
 
   public var bridged: BridgedBasicBlock { BridgedBasicBlock(SwiftObject(self)) }
 
+  public var isDebugReconstructionBlock: Bool { bridged.isDebugReconstructionBlock() }
+
   //===----------------------------------------------------------------------===//
   //                                  Arguments
   //===----------------------------------------------------------------------===//

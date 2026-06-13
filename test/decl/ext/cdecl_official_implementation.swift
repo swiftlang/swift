@@ -81,3 +81,13 @@ extension CImplStruct {
     // expected-error@-5 {{could not find imported function 'CImplStructStaticFunc1' matching static method 'staticFunc1'; make sure you import the module or header that declares it}}
   }
 }
+
+@implementation @c
+func CImplDuplicate(_: CInt) {
+// expected-note@-1{{previously implemented here}}
+}
+
+@implementation @c
+func CImplDuplicate(_: CInt) {
+// expected-error@-2 {{duplicate implementation of imported global function 'CImplDuplicate'}}
+}

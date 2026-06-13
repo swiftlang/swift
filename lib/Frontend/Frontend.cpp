@@ -33,6 +33,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/Version.h"
 #include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
@@ -87,7 +88,20 @@ std::string CompilerInvocation::getPCHHash() const {
 std::string CompilerInvocation::getModuleScanningHash() const {
   using llvm::hash_combine;
 
-  auto Code = hash_combine(LangOpts.getModuleScanningHashComponents(),
+  // The compiler version is folded into the hash so that swapping the
+  // swift-frontend binary forces the serialized scanner cache to be
+  // discarded. Without this, a Clang module's contextHash can shift
+  // (for example because ClangImporter injects -D__SWIFT_COMPILER_VERSION
+  // into every Clang invocation), causing the live scan to produce a new
+  // variant of a module already in the loaded cache.
+  static const char *forcedDependencyScanVersion =
+      ::getenv("SWIFT_DEBUG_FORCE_DEPENDENCY_SCAN_VERSION");
+  std::string compilerVersion = forcedDependencyScanVersion
+                                    ? std::string(forcedDependencyScanVersion)
+                                    : version::getSwiftFullVersion();
+
+  auto Code = hash_combine(compilerVersion,
+                           LangOpts.getModuleScanningHashComponents(),
                            FrontendOpts.getModuleScanningHashComponents(),
                            ClangImporterOpts.getModuleScanningHashComponents(),
                            SearchPathOpts.getModuleScanningHashComponents(),
@@ -442,7 +456,8 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
         SourceMgr, InputSourceCodeBufferIDs, diagOpts.AdditionalVerifierFiles,
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
         diagOpts.VerifyIgnoreUnknown, diagOpts.VerifyIgnoreUnrelated,
-        diagOpts.VerifyIgnoreMacroLocationNote, diagOpts.UseColor,
+        diagOpts.VerifyIgnoreMacroLocationNote, diagOpts.VerifyChildNotes,
+        diagOpts.UseColor,
         diagOpts.AdditionalDiagnosticVerifierPrefixes);
 
     addDiagnosticConsumer(DiagVerifier.get());
@@ -1155,6 +1170,8 @@ static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
 #if SWIFT_IMPLICIT_CONCURRENCY_IMPORT
   if (target.isOSWASI())
     return true;
+  if (target.isOSEmscripten())
+    return true;
   if (target.isOSOpenBSD())
     return true;
   if (target.isOSFreeBSD())
@@ -1554,12 +1571,12 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
     if (Invocation.getLangOptions().hasFeature(Feature::Embedded)) {
-      bool isImplementation =
-          Invocation.getLangOptions().hasFeature(Feature::DeferredCodeGen);
-      MainModule->setCodeGenerationModel(
-          isImplementation ? CodeGenerationModel::Implementation
-                           : CodeGenerationModel::Inlinable);
+      CodeGenerationModel model =
+          Invocation.getLangOptions().CodeGenerationModelOverride
+              .value_or(CodeGenerationModel::Inlinable);
+      MainModule->setCodeGenerationModel(model);
     } else {
+      // CodeGenerationModelOverride is rejected at parse time outside Embedded.
       MainModule->setCodeGenerationModel(CodeGenerationModel::Interface);
     }
     if (Invocation.getSILOptions().CMOMode ==
@@ -1966,6 +1983,41 @@ void CompilerInstance::emitEndOfPipelineDebuggingOutput() {
                        << "\n";
         }
       }
+    }
+  }
+
+  if (opts.DumpHiddenTypeLayouts) {
+    // Dump every hidden-type layout known to this compilation:
+    // both local and imported.
+    auto dumpHiddenLayouts = [](ModuleDecl *M) {
+      auto layouts = M->getSortedHiddenTypeLayouts();
+      if (layouts.empty())
+        return;
+      llvm::outs() << "Module: " << M->getName() << "\n";
+      for (auto &entry : layouts) {
+        const auto &layout = entry.second;
+        llvm::outs() << "  " << entry.first
+                     << ": size=" << layout.size
+                     << ", alignment=" << layout.alignment
+                     << ", stride=" << layout.stride
+                     << ", bitwiseCopyable="
+                     << (layout.bitwiseCopyable ? "true" : "false")
+                     << ", opaque=" << (layout.isOpaque ? "true" : "false")
+                     << "\n";
+      }
+    };
+
+    dumpHiddenLayouts(getMainModule());
+    SmallVector<ModuleDecl *, 8> sortedLoaded;
+    for (auto &entry : ctx.getLoadedModules())
+      sortedLoaded.push_back(entry.second);
+    llvm::sort(sortedLoaded, [](ModuleDecl *a, ModuleDecl *b) {
+      return a->getName().str() < b->getName().str();
+    });
+    for (ModuleDecl *M : sortedLoaded) {
+      if (M == getMainModule())
+        continue;
+      dumpHiddenLayouts(M);
     }
   }
 }

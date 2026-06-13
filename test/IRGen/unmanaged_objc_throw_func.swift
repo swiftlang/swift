@@ -17,7 +17,8 @@ import Foundation
     // CHECK-NEXT: %[[T1:.+]] = extractvalue { ptr, ptr } %[[T0]], 0
     // CHECK-NEXT:            = extractvalue { ptr, ptr } %[[T0]], 1
     // CHECK-NEXT: %[[T2:.+]] = getelementptr inbounds i8, ptr %[[T1]]
-    // CHECK-NEXT: %._value = getelementptr inbounds{{.*}} %TSi, ptr %[[T2]], i32 0, i32 0
+    // CHECK-NEXT: %[[T3:.+]] = getelementptr inbounds %TSi, ptr %[[T2]]
+    // CHECK-NEXT: %._value = getelementptr inbounds{{.*}} %TSi, ptr %[[T3]], i32 0, i32 0
     // CHECK:      %[[T7:.+]] = call swiftcc ptr @"$ss27_finalizeUninitializedArrayySayxGABnlF"(ptr %[[T1]], ptr @"$sSiN")
     // CHECK:      %[[T4:.+]] = call swiftcc ptr @"$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF"(ptr %[[T7]], ptr @"$sSiN")
     // CHECK-NEXT: call void @swift_bridgeObjectRelease(ptr %{{[0-9]+}}) #{{[0-9]+}}

@@ -7,6 +7,7 @@
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
+// UNSUPPORTED: CPU=armv7k && OS=watchos
 
 // CHECK-NOT: @"$s7Generic11OneArgumentVy0C07IntegerVGMN" =
 

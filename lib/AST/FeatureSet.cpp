@@ -129,7 +129,6 @@ UNINTERESTING_FEATURE(FlowSensitiveConcurrencyCaptures)
 UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
-UNINTERESTING_FEATURE(DeferredCodeGen)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
 UNINTERESTING_FEATURE(NoImplicitCopy)
@@ -277,6 +276,21 @@ static bool usesFeatureLifetimes(Decl *decl) {
   if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
     return !varDecl->getTypeInContext()->isEscapable();
   }
+  return false;
+}
+
+static PreInverseGenericsAttr *getPreInverseGenericsExcept(Decl *decl) {
+  if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
+    for (auto i : range(pbd->getNumPatternEntries()))
+      if (auto anchorVar = pbd->getAnchoringVarDecl(i))
+        return getPreInverseGenericsExcept(anchorVar);
+
+  return decl->getAttrs().getAttribute<PreInverseGenericsAttr>();
+}
+
+static bool usesFeaturePreInverseGenericsExcept(Decl *decl) {
+  if (auto *attr = getPreInverseGenericsExcept(decl))
+    return attr->hasExcept(decl);
   return false;
 }
 
@@ -443,31 +457,18 @@ static bool usesFeatureIsolatedConformances(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
-  return false;
-}
+UNINTERESTING_FEATURE(ConcurrencySyntaxSugar)
 
 static bool usesFeatureCompileTimeValues(Decl *decl) {
   return decl->getAttrs().hasAttribute<ConstValAttr>() ||
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
 }
 
-static bool usesFeatureClosureBodyMacro(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinTaskCancellationShield(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinAddTaskLocalValue(Decl *decl) {
-  return false;
-}
-
+UNINTERESTING_FEATURE(ClosureBodyMacro)
+UNINTERESTING_FEATURE(BuiltinConcurrencyStackNesting)
+UNINTERESTING_FEATURE(BuiltinTaskCancellationShield)
+UNINTERESTING_FEATURE(BuiltinAddTaskLocalValue)
+UNINTERESTING_FEATURE(BuiltinContinuationNonCopyableSuccess)
 UNINTERESTING_FEATURE(CompileTimeValuesPreview)
 UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
@@ -476,6 +477,7 @@ UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(ImportCxxMembersLazily)
+UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -501,6 +503,7 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 UNINTERESTING_FEATURE(CustomAvailability)
 UNINTERESTING_FEATURE(BuiltinMarkDependence)
+UNINTERESTING_FEATURE(BuiltinGepProjection)
 
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.
@@ -684,6 +687,21 @@ static bool usesFeatureReparenting(Decl *decl) {
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowingSequence)
 UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
+UNINTERESTING_FEATURE(FlowIsolationGlobalActor)
+
+UNINTERESTING_FEATURE(DeriveConformancesViaMacros)
+
+static bool usesFeatureBorrowInout(Decl *decl) {
+  auto &ctx = decl->getASTContext();
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    decl = ext->getExtendedNominal();
+  }
+
+  return decl == ctx.getRefDecl() || decl == ctx.getMutableRefDecl();
+}
+
+UNINTERESTING_FEATURE(BuiltinDereferenceable)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

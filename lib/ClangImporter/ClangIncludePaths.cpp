@@ -21,6 +21,7 @@
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/ToolChain.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Options/Options.h"
 #include "llvm/WindowsDriver/MSVCPaths.h"
 
 using namespace swift;
@@ -154,11 +155,11 @@ static std::optional<Path> findFirstIncludeDir(
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   // C++ stdlib paths are added as `-internal-isystem`.
   std::vector<std::string> includeDirs =
-      args.getAllArgValues(clang::driver::options::OPT_internal_isystem);
+      args.getAllArgValues(clang::options::OPT_internal_isystem);
   // C stdlib paths are added as `-internal-externc-isystem`.
   llvm::append_range(includeDirs,
                      args.getAllArgValues(
-                         clang::driver::options::OPT_internal_externc_isystem));
+                         clang::options::OPT_internal_externc_isystem));
 
   for (const auto &includeDir : includeDirs) {
     Path dir(includeDir);
@@ -205,8 +206,8 @@ ClangImporter::createClangArgs(const ClangImporterOptions &ClangImporterOpts,
   // the SDK/sysroot set above; --sysroot= is checked first as the canonical
   // driver-level form.
   if (const auto *A = clangDriverArgs.getLastArg(
-          clang::driver::options::OPT__sysroot_EQ,
-          clang::driver::options::OPT_isysroot))
+          clang::options::OPT__sysroot_EQ,
+          clang::options::OPT_isysroot))
     clangDriver.SysRoot = A->getValue();
   return clangDriverArgs;
 }
@@ -313,9 +314,9 @@ static void getLibStdCxxFileMapping(
   auto parsedStdlibArgs = parseClangDriverArgs(clangDriver, stdlibArgStrings);
 
   // If we were explicitly asked to not bring in the C++ stdlib, bail.
-  if (parsedStdlibArgs.hasArg(clang::driver::options::OPT_nostdinc,
-                              clang::driver::options::OPT_nostdincxx,
-                              clang::driver::options::OPT_nostdlibinc))
+  if (parsedStdlibArgs.hasArg(clang::options::OPT_nostdinc,
+                              clang::options::OPT_nostdincxx,
+                              clang::options::OPT_nostdlibinc))
     return;
 
   Path cxxStdlibDir;
@@ -384,7 +385,7 @@ static void getLibStdCxxFileMapping(
     return;
   }
 
-  constexpr StringRef additionalFiles[] = {
+  std::vector<StringRef> additionalFiles = {
       // libstdc++ 4.8.5 bundled with CentOS 7 does not include corecvt.
       "codecvt",
       // C++17 and newer:
@@ -444,12 +445,28 @@ static void getLibStdCxxFileMapping(
       "span",
       "stop_token",
       "syncstream",
+      "version",
       // C++23 and newer:
       "expected",
       "flat_map",
       "flat_set",
       "mdspan",
-    };
+      "print",
+      "spanstream",
+      "stacktrace",
+      "stdfloat",
+  };
+  // <coroutine> in libstdc++ has an #error that fires if coroutines were not
+  // enabled via a compile time flag. This prevents us from listing <coroutine>
+  // in the modulemap unconditionally.
+  // <generator> relies on <coroutine>.
+  if (parsedStdlibArgs.hasFlag(clang::options::OPT_fcoroutines,
+                               clang::options::OPT_fno_coroutines,
+                               /*default*/ false)) {
+    additionalFiles.push_back("coroutine");
+    additionalFiles.push_back("generator");
+  }
+
   std::string additionalHeaderDirectives;
   llvm::raw_string_ostream os(additionalHeaderDirectives);
   os << contents.substr(0, headerInjectionPoint);
@@ -665,6 +682,14 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
                          suppressDiagnostic);
 
     // WASI's module map needs fixing
+    result.requiresBuiltinHeadersInSystemModules = true;
+  } else if (triple.isOSEmscripten()) {
+    // Emscripten Mappings
+    libcFileMapping =
+      getLibcFileMapping(ctx, "emscripten-libc.modulemap", std::nullopt, vfs,
+                         suppressDiagnostic);
+
+    // Emscripten's module map needs fixing
     result.requiresBuiltinHeadersInSystemModules = true;
   } else if (triple.isMusl()) {
     libcFileMapping =

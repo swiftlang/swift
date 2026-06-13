@@ -1984,7 +1984,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       const IndexAddrInst *IAI = cast<IndexAddrInst>(&SI);
       operand = IAI->getBase();
       operand2 = IAI->getIndex();
-      Attr = (IAI->needsStackProtection() ? 1 : 0);
+      Attr = (IAI->needsStackProtection() ? 1 : 0) | (IAI->isProjection() ? 2 : 0);
     }
     SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILTwoOperandsLayout::Code],
@@ -3306,6 +3306,9 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
                                  (unsigned)g.markedAsUsed(),
+                                 g.codeGenerationModel()
+                                     ? (static_cast<unsigned>(*g.codeGenerationModel()) + 1)
+                                     : 0,
                                  numTrailingRecords,
                                  TyID, dID, parentModuleID);
 

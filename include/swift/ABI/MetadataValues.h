@@ -264,6 +264,8 @@ public:
   }
   
   /// True if values of this type can be copied.
+  /// NOTE: This is NOT accurate for types that are conditionally Copyable.
+  /// You may need to use `checkInvertibleRequirements`.
   bool isCopyable() const { return !(Data & IsNonCopyable); }
   constexpr TargetValueWitnessFlags withCopyable(bool isCopyable) const {
     return TargetValueWitnessFlags((Data & ~IsNonCopyable) |
@@ -2894,8 +2896,8 @@ enum class TaskStatusRecordKind : uint8_t {
   /// enqueued on.
   TaskExecutorPreference = 5,
 
-  /// A human-readable task name.
-  TaskName = 6,
+  /// Deprecated: A human-readable task name, replaced by `NameFragment`.
+  // DEPRECATED: TaskName = 6,
 
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,

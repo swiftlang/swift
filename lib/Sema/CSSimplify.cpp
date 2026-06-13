@@ -2973,13 +2973,16 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
   // function-conversion score to make sure this solution is worse than
   // an exact match.
   // FIXME: there may be a better way. see https://github.com/apple/swift/pull/62514
-  auto matchIfConversion = [&](bool isErasure = false) -> bool {
+  auto matchIfConversion = [&](bool isErasure = false,
+                               bool shouldIncreaseScore = true) -> bool {
     // We generally require a conversion here, but allow some lassitude
     // if we're doing witness-matching.
     if (kind < ConstraintKind::Subtype &&
         !(isErasure && isWitnessMatching(locator)))
       return false;
-    increaseScore(SK_FunctionConversion, locator);
+
+    if (shouldIncreaseScore)
+      increaseScore(SK_FunctionConversion, locator);
     return true;
   };
 
@@ -3041,7 +3044,40 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     // For synchronous: Thunk would call the function without
     // a hop.
     case FunctionTypeIsolation::Kind::NonIsolated:
-      return matchIfConversion();
+      // When a nonisolated/@concurrent closure is passed to a
+      // nonisolated(nonsending) parameter the solver has to be conservative
+      // and produce a conversion that could be dissolved by actor
+      // isolation checker when it determines that nonisolated(nonsending)
+      // could be assumed onto the closure direct (i.e. when there are no
+      // isolated captures involved), so let's not increase a score unless
+      // closure states it's isolation explicitly to avoid picking a subpar
+      // solution.
+      bool shouldIncreaseScore = true;
+      if (func1->isAsync()) {
+        auto *expr = locator.trySimplifyToExpr();
+
+        if (expr)
+          expr = expr->getSemanticsProvidingExpr();
+
+        if (auto *cast = getAsExpr<ExplicitCastExpr>(expr))
+          expr = cast->getSubExpr();
+
+        // Look through captures, we only care about the closure itself.
+        if (auto *captureList = getAsExpr<CaptureListExpr>(expr))
+          expr = captureList->getClosureBody();
+
+        if (auto *closure = getAsExpr<ClosureExpr>(expr)) {
+          shouldIncreaseScore =
+              closure->getAttrs().hasAttribute<ConcurrentAttr>();
+        }
+      } else {
+        // Converting a sync function to nonisolated(nonsending) async one
+        // doesn't require a thunk.
+        shouldIncreaseScore = false;
+      }
+
+      return matchIfConversion(
+          /*isErasure=*/false, shouldIncreaseScore);
     }
     llvm_unreachable("bad kind");
 
@@ -5607,6 +5643,11 @@ bool ConstraintSystem::repairFailures(
     if (isExpr<ErrorExpr>(anchor))
       return true;
 
+    if (getAsPattern<ExprPattern>(anchor)) {
+      if (lhs->isPlaceholder() || rhs->isPlaceholder())
+        return true;
+    }
+
     // This could be:
     // - `InOutExpr` used with r-value e.g. `foo(&x)` where `x` is a `let`.
     // - `ForceValueExpr` e.g. `foo.bar! = 42` where `bar` or `foo` are
@@ -7102,6 +7143,13 @@ bool ConstraintSystem::repairFailures(
 
     break;
   }
+
+  case ConstraintLocator::KeyPathDynamicMember: {
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+      return true;
+    break;
+  }
+
   default:
     break;
   }
@@ -8152,17 +8200,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     // Special implicit nominal conversions.
     if (!type1->is<LValueType>()) {
-      // Array -> Array.
       if (desugar1->isArray() && desugar2->isArray()) {
-        conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
-      // Dictionary -> Dictionary.
+        // Array -> Array.
+        auto elementType = type1->getArrayElementType();
+        if (!elementType->isForeignReferenceType())
+          conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
       } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
-        conversionsOrFixes.push_back(
-          ConversionRestrictionKind::DictionaryUpcast);
-      // Set -> Set.
+        // Dictionary -> Dictionary.
+        auto keyValueTypes = *isDictionaryType(desugar1);
+        if (!keyValueTypes.first->isForeignReferenceType() &&
+            !keyValueTypes.second->isForeignReferenceType())
+          conversionsOrFixes.push_back(
+              ConversionRestrictionKind::DictionaryUpcast);
       } else if (isSetType(desugar1) && isSetType(desugar2)) {
-        conversionsOrFixes.push_back(
-          ConversionRestrictionKind::SetUpcast);
+        // Set -> Set.
+        auto elementType = *isSetType(desugar1);
+        if (!elementType->isForeignReferenceType())
+          conversionsOrFixes.push_back(ConversionRestrictionKind::SetUpcast);
       }
     }
   }
@@ -11674,19 +11728,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                                  alreadyDiagnosed, locator);
 
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
-      auto impact = 4;
+      auto impact = 5;
       // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
         impact += 10;
-      }
-
-      auto *anchorExpr = getAsExpr(locator->getAnchor());
-      if (anchorExpr) {
-        // Increasing the impact for missing member in any argument position
-        // which may be less likely than other potential mistakes
-        if (getArgumentLocator(anchorExpr))
-          impact += 5;
       }
 
       if (recordFix(fix, impact))
@@ -11976,7 +12022,8 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
     if (shouldAttemptFixes()) {
       auto *fix = AllowInvalidPropertyWrapperType::create(
           *this, wrapperType, getConstraintLocator(locator));
-      if (!recordFix(fix))
+      // The impact here matches that of a missing member, because it's the same problem.
+      if (!recordFix(fix, /*impact=*/5))
         return SolutionKind::Solved;
     }
 
@@ -11990,8 +12037,10 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
       !(typeInfo.projectedValueVar && typeInfo.hasProjectedValueInit)) {
     if (shouldAttemptFixes()) {
       auto *fix = RemoveProjectedValueArgument::create(
-          *this, wrapperType, cast<ParamDecl>(wrappedVar), getConstraintLocator(locator));
-      if (!recordFix(fix))
+          *this, wrapperType, cast<ParamDecl>(wrappedVar),
+          getConstraintLocator(locator));
+      // The impact here matches that of a missing member, because it's the same problem.
+      if (!recordFix(fix, /*impact=*/5))
         return SolutionKind::Solved;
     }
 
@@ -13311,8 +13360,49 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     underlyingType =
         getFixedTypeRecursive(underlyingType, flags, /*wantRValue=*/true);
     if (underlyingType->isPlaceholder()) {
-      recordAnyTypeVarAsPotentialHole(func1);
+      if (isForCodeCompletion()) {
+        // In code completion mode it's important to attempt to infer as much
+        // type information as possible from the context, so let's delay placeholder
+        // propagation to give parameters a chance to be inferred from
+        // arguments and the result type a chance to be inferred from context.
+        recordAnyTypeVarAsPotentialHole(func1);
+      } else {
+        // In diagnostic mode, propagate function value placeholder to
+        // arguments and result. This helps to avoid recording extraneous
+        // fixes because generic parameters and leading-dot syntax arguments
+        // cannot be inferred in this case.
+        //
+        // Note that `recordTypeVariablesAsHoles` is not used here because
+        // an existing hole from a function value is propagated to
+        // arguments/result instead of creating a direct one per type variable
+        // like that method would do, this is an important distinction later on,
+        // when solver decides whether to add a fix or not when a hole is
+        // subsequently propagated to other locations like leading-dot syntax
+        // base or literals.
+        Type(func1).visit([&](Type componentTy) {
+          if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+            if (!typeVar->getImpl().hasRepresentativeOrFixed())
+              assignFixedType(typeVar, underlyingType);
+          }
+        });
+      }
       return SolutionKind::Solved;
+    }
+
+    if (!isForCodeCompletion()) {
+      auto argsTy = simplifyType(func1)->castTo<FunctionType>();
+      // Short-circuit calls where all arguments are invalid, otherwise the
+      // solver would end up producing a solution for every overload which
+      // it cannot disambiguate which quickly turns into "too complex" situation.
+      if (argsTy->getNumParams() > 0 &&
+          llvm::all_of(argsTy->getParams(),
+                       [](const FunctionType::Param &param) {
+                         return param.getPlainType()->isPlaceholder();
+                       })) {
+        recordTypeVariablesAsHoles(func1);
+        recordTypeVariablesAsHoles(type2);
+        return SolutionKind::Solved;
+      }
     }
   }
 
@@ -13633,10 +13723,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
     auto *fix = RemoveInvalidCall::create(*this, getConstraintLocator(locator));
     // Let's make this fix as high impact so if there is a function or member
-    // overload with e.g. argument-to-parameter type mismatches it would take
-    // a higher priority.
-    return recordFix(fix, /*impact=*/3) ? SolutionKind::Error
-                                         : SolutionKind::Solved;
+    // overload with e.g. argument-to-parameter type mismatches or missing/extra
+    // arguments it would take a higher priority.
+    return recordFix(fix, /*impact=*/4) ? SolutionKind::Error
+                                        : SolutionKind::Solved;
   }
 
   return result;
@@ -16651,7 +16741,19 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getFirstType(), constraint.getSecondType(),
         /*flags*/ std::nullopt, constraint.getLocator());
 
-  case ConstraintKind::Disjunction:
+  case ConstraintKind::Disjunction: {
+    if (shouldAttemptFixes()) {
+      auto *choice = constraint.getNestedConstraints()[0];
+      if (choice->getKind() == ConstraintKind::BindOverload) {
+        if (auto *choiceTy = choice->getFirstType()->getAs<TypeVariableType>()) {
+          auto resolvedTy = getFixedType(choiceTy);
+          if (resolvedTy && resolvedTy->isPlaceholder())
+            return SolutionKind::Solved;
+        }
+      }
+    }
+    LLVM_FALLTHROUGH;
+  }
   case ConstraintKind::Conjunction:
     // See {Dis, Con}junctionStep class in CSStep.cpp for solving
     return SolutionKind::Unsolved;

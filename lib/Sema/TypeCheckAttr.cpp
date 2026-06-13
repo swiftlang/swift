@@ -180,6 +180,7 @@ public:
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
+  IGNORED_ATTR(HasHiddenStoredProperties)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Effects)
@@ -222,7 +223,6 @@ public:
   IGNORED_ATTR(Documentation)
   IGNORED_ATTR(LexicalLifetimes)
   IGNORED_ATTR(AllowFeatureSuppression)
-  IGNORED_ATTR(PreInverseGenerics)
   IGNORED_ATTR(Safe)
   IGNORED_ATTR(Diagnose)
 #undef IGNORED_ATTR
@@ -523,7 +523,8 @@ public:
   void visitSendableAttr(SendableAttr *attr);
 
   void visitMacroRoleAttr(MacroRoleAttr *attr);
-  
+
+  void visitPreInverseGenericsAttr(PreInverseGenericsAttr *attr);
   void visitRawLayoutAttr(RawLayoutAttr *attr);
 
   void visitNonEscapableAttr(NonEscapableAttr *attr);
@@ -3830,21 +3831,19 @@ void AttributeChecker::visitExportAttr(ExportAttr *attr) {
   if (auto other = D->getAttrs().getAttribute<ExternAttr>())
     diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
 
-  // In Embedded Swift, @export(interface) is not supported on generic types
-  // or on extensions of generic types: IRGen emits a unique strong definition
-  // of the type metadata / conformance witness tables, and per-specialization
-  // emission of those globals is not compatible with that.
+  // In Embedded Swift, @export(interface) is not supported on generic types,
+  // extensions of generic types, or generic functions: IRGen emits a unique
+  // strong definition of the type metadata / conformance witness tables /
+  // function, and per-specialization emission of those globals is not
+  // compatible with that.
   if (attr->exportKind == ExportKind::Interface &&
       Ctx.LangOpts.hasFeature(Feature::Embedded)) {
-    bool isGeneric = false;
-    if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
-      isGeneric = nominal->isGenericContext();
-    else if (auto *ext = dyn_cast<ExtensionDecl>(D))
-      isGeneric = ext->isGenericContext();
-    if (isGeneric) {
-      diagnoseAndRemoveAttr(attr,
-                            diag::export_interface_on_generic_in_embedded_swift,
-                            D);
+    if (auto required = D->getRequiredCodeGenerationModel()) {
+      if (*required != CodeGenerationModel::Interface) {
+        diagnoseAndRemoveAttr(attr,
+                              diag::export_interface_on_generic_in_embedded_swift,
+                              D);
+      }
     }
   }
 }
@@ -8710,6 +8709,73 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
       {});
 }
 
+void AttributeChecker::visitPreInverseGenericsAttr(
+    PreInverseGenericsAttr *attr) {
+  if (attr->hasExcept(D) &&
+      !Ctx.LangOpts.hasFeature(Feature::PreInverseGenericsExcept) &&
+      !D->getDeclContext()->isInSwiftinterface()) {
+    Ctx.Diags.diagnose(attr->getLocation(),
+                       diag::attribute_requires_experimental_feature, attr,
+                       "PreInverseGenericsExcept");
+  }
+
+  // Trigger the request to resolve and validate the optional 'except:' argument.
+  (void)attr->getAllowedInverses(D);
+}
+
+Type
+ResolvePreInverseGenericsRequest::evaluate(Evaluator &evaluator,
+                                           Decl *decl,
+                                           PreInverseGenericsAttr *attr) const {
+  // Declarations deserialized from a module file should have the resolved
+  // type cached already and never reach here.
+  if (auto fileUnit =
+          dyn_cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext()))
+    if (fileUnit->getKind() == FileUnitKind::SerializedAST)
+      llvm::report_fatal_error("cannot resolve serialized @_preInverseGenerics "
+                               "as it is missing the TypeRepr!");
+
+  auto &ctx = decl->getASTContext();
+  auto *typeRepr = attr->ExceptTypeRepr;
+
+  // Mangle zero inverses by returning the composition that contains none.
+  // This is also the fall-back if they didn't provide a valid except: argument.
+  if (!typeRepr)
+    return ctx.TheAnyType;
+
+  auto resolution = TypeResolution::forInterface(
+      decl->getDeclContext(),
+      TypeResolutionOptions(TypeResolverContext::GenericRequirement),
+      /*unboundTyOpener=*/nullptr, /*placeholderHandler=*/nullptr,
+      /*packElementOpener=*/nullptr);
+  Type resolvedTy = resolution.resolveType(typeRepr);
+
+  if (!resolvedTy || resolvedTy->hasError()) {
+    ctx.Diags.diagnose(attr->getLocation(),
+                       diag::attr_pre_inverse_generics_invalid_except);
+    return ctx.TheAnyType;
+  }
+
+  // Don't permit compositions with non-inverse members.
+  // Don't permit `@_preInverseGenerics(except: Any)` as that's just confusing.
+  auto *pct = resolvedTy->getCanonicalType()->getAs<ProtocolCompositionType>();
+  if (!pct || !pct->getMembers().empty() || pct->getCanonicalType() == ctx.TheAnyType) {
+    ctx.Diags.diagnose(attr->getLocation(),
+                       diag::attr_pre_inverse_generics_invalid_except);
+    return ctx.TheAnyType;
+  }
+
+  // TheUnconstrainedAnyType contains all inverses currently known.
+  // Just warn that `except: <all inverses>` is the same as not writing the
+  // attribute, according to this version of the compiler.
+  if (pct->getCanonicalType() == ctx.TheUnconstrainedAnyType) {
+    ctx.Diags.diagnose(attr->getLocation(),
+                       diag::attr_pre_inverse_generics_except_all);
+  }
+
+  return pct;
+}
+
 void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
   if (!Ctx.LangOpts.hasFeature(Feature::RawLayout)) {
     diagnoseAndRemoveAttr(attr, diag::attr_rawlayout_experimental);
@@ -9036,7 +9102,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
 
   // Handle types separately
   if (isa<NominalTypeDecl>(attached)) {
-    if (!parsedName.ContextName.empty())
+    if (parsedName.isMember())
       return nullptr;
 
     SmallVector<ValueDecl *, 1> lookupResults;

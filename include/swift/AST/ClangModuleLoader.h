@@ -223,6 +223,10 @@ public:
   /// Returns the original method if \param decl is a clone from a base class
   virtual ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) = 0;
 
+  /// If \param decl is a synthesized thunk for a virtual method of a foreign
+  /// reference type, returns the originally-imported (un-thunked) method.
+  virtual FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) = 0;
+
   /// Returns the forwarding method in the derived class that calls the base
   /// method.
   virtual ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) = 0;

@@ -367,13 +367,8 @@ suite.test("storeBytes(repeating:count:as:) unsafe")
 }
 
 suite.test("_mutatingExtracting()")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+.require(.minimumStdlib(.stdlib_6_2))
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
   let capacity = 4
   var b = (0..<capacity).map(Int8.init)
   b.withUnsafeMutableBytes {
@@ -394,12 +389,27 @@ suite.test("_mutatingExtracting()")
     sub = span._mutatingExtracting(2...)
     expectEqual(sub.byteCount, 2)
     expectEqual(sub.unsafeLoad(as: UInt8.self), 2)
+
+    sub = span._mutatingExtracting(1...2)
+    expectEqual(sub.byteCount, 2)
+    expectEqual(sub.unsafeLoad(as: UInt8.self), 1)
   }
 }
 
-suite.test("_consumingExtracting()")
-.require(.stdlib_6_2).code {
+suite.test("_mutatingExtracting() bounds checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Byte offset range out of bounds", when: _isDebugAssertConfiguration())
+.code {
+  var b: ContiguousArray<Int> = [1, 2, 3, 4]
+  var span = MutableRawSpan(elements: b.mutableSpan)
+  expectCrashLater()
+  _ = span._mutatingExtracting(2 ..< .max)
+}
 
+suite.test("_consumingExtracting()")
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
   let c = 16
   let b = UnsafeMutableRawBufferPointer.allocate(byteCount: c, alignment: c)
   defer { b.deallocate() }
@@ -424,16 +434,26 @@ suite.test("_consumingExtracting()")
   span = span._consumingExtracting(2...)
   expectEqual(span.byteCount, c-2)
   expectEqual(span.unsafeLoad(as: UInt8.self), 2)
+
+  span = b.mutableBytes._consumingExtracting(1...2)
+  expectEqual(span.byteCount, 2)
+  expectEqual(span.unsafeLoad(as: UInt8.self), 1)
+}
+
+suite.test("_consumingExtracting() bounds checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Byte offset range out of bounds", when: _isDebugAssertConfiguration())
+.code {
+  var b: ContiguousArray<Int> = [1, 2, 3, 4]
+  var span = MutableRawSpan(elements: b.mutableSpan)
+  expectCrashLater()
+  _ = span._consumingExtracting(2 ..< .max)
 }
 
 suite.test("_mutatingExtracting(unchecked:)")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+.require(.minimumStdlib(.stdlib_6_2))
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
   let capacity = 32
   var b = (0..<capacity).map(UInt8.init)
   b.withUnsafeMutableBytes {
@@ -446,8 +466,8 @@ suite.test("_mutatingExtracting(unchecked:)")
 }
 
 suite.test("_consumingExtracting(unchecked:)")
-.require(.stdlib_6_2).code {
-
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
   let capacity = 32
   var b = (0..<capacity).map(UInt8.init)
   b.withUnsafeMutableBytes {
@@ -460,13 +480,8 @@ suite.test("_consumingExtracting(unchecked:)")
 }
 
 suite.test("_mutatingExtracting prefixes")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+.require(.minimumStdlib(.stdlib_6_2))
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
   let capacity = 4
   var a = Array(0..<UInt8(capacity))
   a.withUnsafeMutableBytes {
@@ -483,6 +498,9 @@ suite.test("_mutatingExtracting prefixes")
       UInt8(capacity-1)
     )
 
+    prefix = span._mutatingExtracting(first: capacity + 5)
+    expectEqual(prefix.byteCount, capacity)
+
     prefix = span._mutatingExtracting(droppingLast: capacity)
     expectEqual(prefix.isEmpty, true)
 
@@ -491,6 +509,9 @@ suite.test("_mutatingExtracting prefixes")
       prefix.unsafeLoad(fromByteOffset: capacity-2, as: UInt8.self),
       UInt8(capacity-2)
     )
+
+    prefix = span._mutatingExtracting(droppingLast: capacity + 5)
+    expectEqual(prefix.byteCount, 0)
   }
 
   do {
@@ -502,9 +523,31 @@ suite.test("_mutatingExtracting prefixes")
   }
 }
 
-suite.test("_consumingExtracting prefixes")
-.require(.stdlib_6_2).code {
+suite.test("_mutatingExtracting(first:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't have a prefix of negative length", when: _isDebugAssertConfiguration())
+.code {
+  var b: ContiguousArray<Int> = [1, 2, 3, 4]
+  var span = MutableRawSpan(elements: b.mutableSpan)
+  expectCrashLater()
+  _ = span._mutatingExtracting(first: -1)
+}
 
+suite.test("_mutatingExtracting(droppingLast:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
+.code {
+  var b: ContiguousArray<Int> = [1, 2, 3, 4]
+  var span = MutableRawSpan(elements: b.mutableSpan)
+  expectCrashLater()
+  _ = span._mutatingExtracting(droppingLast: -1)
+}
+
+suite.test("_consumingExtracting prefixes")
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
   let capacity = 4
   var a = Array(0..<UInt8(capacity))
   a.withUnsafeMutableBytes {
@@ -520,6 +563,9 @@ suite.test("_consumingExtracting prefixes")
       UInt8(capacity-1)
     )
 
+    span = $0.mutableBytes._consumingExtracting(first: capacity + 5)
+    expectEqual(span.byteCount, capacity)
+
     span = $0.mutableBytes._consumingExtracting(droppingLast: capacity)
     expectEqual(span.isEmpty, true)
 
@@ -528,6 +574,9 @@ suite.test("_consumingExtracting prefixes")
       span.unsafeLoad(fromByteOffset: capacity-2, as: UInt8.self),
       UInt8(capacity-2)
     )
+
+    span = $0.mutableBytes._consumingExtracting(droppingLast: capacity + 5)
+    expectEqual(span.byteCount, 0)
   }
 
   do {
@@ -541,14 +590,31 @@ suite.test("_consumingExtracting prefixes")
   }
 }
 
-suite.test("_mutatingExtracting suffixes")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+suite.test("_consumingExtracting(first:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't have a prefix of negative length", when: _isDebugAssertConfiguration())
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
+  var b: ContiguousArray<Int> = [1, 2, 3, 4]
+  var span = MutableRawSpan(elements: b.mutableSpan)
+  expectCrashLater()
+  _ = span._consumingExtracting(first: -1)
+}
 
+suite.test("_consumingExtracting(droppingLast:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
+.code {
+  var b: ContiguousArray<Int> = [1, 2, 3, 4]
+  var span = MutableRawSpan(elements: b.mutableSpan)
+  expectCrashLater()
+  _ = span._consumingExtracting(droppingLast: -1)
+}
+
+suite.test("_mutatingExtracting suffixes")
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
   let capacity = 4
   var a = Array(0..<UInt8(capacity))
   a.withUnsafeMutableBytes {
@@ -565,11 +631,17 @@ suite.test("_mutatingExtracting suffixes")
     prefix = span._mutatingExtracting(last: 1)
     expectEqual(prefix.unsafeLoad(as: UInt8.self), UInt8(capacity-1))
 
+    prefix = span._mutatingExtracting(last: capacity + 5)
+    expectEqual(prefix.byteCount, capacity)
+
     prefix = span._mutatingExtracting(droppingFirst: capacity)
     expectTrue(prefix.isEmpty)
 
     prefix = span._mutatingExtracting(droppingFirst: 1)
     expectEqual(prefix.unsafeLoad(as: UInt8.self), 1)
+
+    prefix = span._mutatingExtracting(droppingFirst: capacity + 5)
+    expectEqual(prefix.byteCount, 0)
   }
 
   do {
@@ -581,9 +653,31 @@ suite.test("_mutatingExtracting suffixes")
   }
 }
 
-suite.test("_consumingExtracting suffixes")
-.require(.stdlib_6_2).code {
+suite.test("_mutatingExtracting(last:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't have a suffix of negative length", when: _isDebugAssertConfiguration())
+.code {
+  var b: ContiguousArray<Int> = [1, 2, 3, 4]
+  var span = MutableRawSpan(elements: b.mutableSpan)
+  expectCrashLater()
+  _ = span._mutatingExtracting(last: -1)
+}
 
+suite.test("_mutatingExtracting(droppingFirst:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
+.code {
+  var b: ContiguousArray<Int> = [1, 2, 3, 4]
+  var span = MutableRawSpan(elements: b.mutableSpan)
+  expectCrashLater()
+  _ = span._mutatingExtracting(droppingFirst: -1)
+}
+
+suite.test("_consumingExtracting suffixes")
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
   let capacity = 4
   var a = Array(0..<UInt8(capacity))
   a.withUnsafeMutableBytes {
@@ -599,11 +693,17 @@ suite.test("_consumingExtracting suffixes")
     span = $0.mutableBytes._consumingExtracting(last: 1)
     expectEqual(span.unsafeLoad(as: UInt8.self), UInt8(capacity-1))
 
+    span = $0.mutableBytes._consumingExtracting(last: capacity + 5)
+    expectEqual(span.byteCount, capacity)
+
     span = $0.mutableBytes._consumingExtracting(droppingFirst: capacity)
     expectEqual(span.isEmpty, true)
 
     span = $0.mutableBytes._consumingExtracting(droppingFirst: 1)
     expectEqual(span.unsafeLoad(as: UInt8.self), 1)
+
+    span = $0.mutableBytes._consumingExtracting(droppingFirst: capacity + 5)
+    expectEqual(span.byteCount, 0)
   }
 
   do {
@@ -615,6 +715,28 @@ suite.test("_consumingExtracting suffixes")
     span = b.mutableBytes._consumingExtracting(droppingFirst: 1)
     expectEqual(span.byteCount, b.count)
   }
+}
+
+suite.test("_consumingExtracting(last:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't have a suffix of negative length", when: _isDebugAssertConfiguration())
+.code {
+  var b: ContiguousArray<Int> = [1, 2, 3, 4]
+  var span = MutableRawSpan(elements: b.mutableSpan)
+  expectCrashLater()
+  _ = span._consumingExtracting(last: -1)
+}
+
+suite.test("_consumingExtracting(droppingFirst:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
+.code {
+  var b: ContiguousArray<Int> = [1, 2, 3, 4]
+  var span = MutableRawSpan(elements: b.mutableSpan)
+  expectCrashLater()
+  _ = span._consumingExtracting(droppingFirst: -1)
 }
 
 suite.test("MutableRawSpan from UnsafeMutableRawBufferPointer")

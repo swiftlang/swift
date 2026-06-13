@@ -1,11 +1,16 @@
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -F %S/Inputs/frameworks %s 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PUBLIC %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -F %S/Inputs/frameworks -verify -verify-ignore-unrelated -verify-additional-prefix public- %s
 
 // RUN: echo '#import <CategoryOverrides/Private.h>' > %t.h
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.h %s 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s --allow-empty
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.h -verify -verify-ignore-unrelated -verify-additional-prefix private- %s
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-pch -F %S/Inputs/frameworks -o %t.pch %t.h
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.pch %s 2>&1 | %FileCheck --allow-empty -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.h -pch-output-dir %t/pch %s 2>&1 | %FileCheck --allow-empty -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.pch -verify -verify-ignore-unrelated -verify-additional-prefix private- %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -enable-objc-interop -import-objc-header %t.h -pch-output-dir %t/pch -verify -verify-ignore-unrelated -verify-additional-prefix private- %s
+
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print CategoryOverrides -F %S/Inputs/frameworks -source-filename %s | %FileCheck %s --check-prefix=CHECK-PUBLIC
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -source-filename %s -print-header -header-to-print %S/Inputs/frameworks/CategoryOverrides.framework/PrivateHeaders/Private.h --cc-args %target-cc-options -F %S/Inputs/frameworks -fsyntax-only %t.h | %FileCheck %s --check-prefix=CHECK-PRIVATE
+
+// REQUIRES: objc_interop
 
 import CategoryOverrides
 
@@ -18,23 +23,20 @@ import CategoryOverrides
 // This configuration appears as an undiagnosed redeclaration of a property and
 // function, which is illegal.
 func colors() {
-  // CHECK-PUBLIC: cannot call value of non-function type 'MyColor?'
-  // CHECK-PRIVATE-NOT: cannot call value of non-function type 'MyColor?'
   let _ : MyColor = MyColor.systemRed
   let _ : MyColor = MyColor.systemRed()!
+  // expected-public-error@-1 {{cannot call value of non-function type 'MyColor?'}}
 }
 
 // Another manifestation of the above for an instance property this time.
 func structs(_ base: MyBaseClass, _ derived: MyDerivedClass) {
-  // CHECK-PUBLIC: cannot call value of non-function type 'SomeStruct'
-  // CHECK-PRIVATE-NOT: cannot call value of non-function type 'SomeStruct'
   let _ : SomeStruct = base.myStructure
   let _ : SomeStruct = base.myStructure()
+  // expected-public-error@-1 {{cannot call value of non-function type 'SomeStruct'}}
 
-  // CHECK-PUBLIC: cannot call value of non-function type 'SomeStruct'
-  // CHECK-PRIVATE-NOT: cannot call value of non-function type 'SomeStruct'
   let _ : SomeStruct = derived.myStructure
   let _ : SomeStruct = derived.myStructure()
+  // expected-public-error@-1 {{cannot call value of non-function type 'SomeStruct'}}
 }
 
 // A category declared in a (private) header can introduce overrides of a property
@@ -43,15 +45,12 @@ func structs(_ base: MyBaseClass, _ derived: MyDerivedClass) {
 // This configuration appears as an undiagnosed override in a Swift extension,
 // which is illegal.
 func takesADerivedClass(_ x: MyDerivedClass) {
-  // CHECK-PUBLIC-NOT: has no member 'derivedMember'
-  // CHECK-PRIVATE-NOT: has no member 'derivedMember'
   x.derivedMember = Base()
 }
 
 func takesABaseClass(_ x: MyBaseClass) {
-  // CHECK-PUBLIC: has no member 'derivedMember'
-  // CHECK-PRIVATE-NOT: has no member 'derivedMember'
   x.derivedMember = Base()
+  // expected-public-error@-1 {{has no member 'derivedMember'}}
 }
 
 // A category declared in a (private) header can introduce overrides of a
@@ -74,29 +73,111 @@ extension Refinery {
 }
 
 func takesARefinery(_ x: Refinery) {
-  // CHECK: cannot assign to property: 'sugar' is a get-only property
   x.sugar = .caster
+  // expected-error@-1 {{cannot assign to property: 'sugar' is a get-only property}}
 }
 
 func takesAnExtraRefinery(_ x: ExtraRefinery) {
-  // CHECK: has no member 'sugar'
   x.sugar = .caster
+  // expected-error@-1 {{has no member 'sugar'}}
+  // expected-error@-2 {{cannot infer contextual base in reference to member 'caster'}}
   x.setSugar(0)
+  // expected-public-error@-1 {{has no member 'setSugar'}}
+  // expected-private-error@-2 {{cannot convert value of type 'Int' to expected argument type '__RefinedSugar'}}
 }
 
 func nullabilityRefinementProto(_ x: MyBaseClass) {
-  // CHECK-PUBLIC: has no member 'requirement'
-  // CHECK-PRIVATE-NOT: has no member 'requirement'
-  // CHECK-PRIVATE-NOT: value of optional type 'Base?'
   let _ : Base = x.requirement
+  // expected-public-error@-1 {{has no member 'requirement'}}
 }
 
 func readwriteRefinementProto(_ x: MyDerivedClass) {
-  // CHECK-PUBLIC: has no member 'answer'
-  // CHECK-PRIVATE-NOT: has no member 'answer'
   if x.answer == 0 {
-    // CHECK-PUBLIC: has no member 'answer'
-    // CHECK-PRIVATE-NOT: has no member 'answer'
+    // expected-public-error@-1 {{has no member 'answer'}}
     x.answer = 42
+    // expected-public-error@-1 {{has no member 'answer'}}
   }
 }
+
+// CHECK-PUBLIC:      class Base {
+// CHECK-PUBLIC-NEXT:   init()
+// CHECK-PUBLIC-NEXT: }
+// CHECK-PUBLIC-NEXT: struct SomeStruct_s {
+// CHECK-PUBLIC-NEXT:   init()
+// CHECK-PUBLIC-NEXT:   init(inner: Int32)
+// CHECK-PUBLIC-NEXT:   var inner: Int32
+// CHECK-PUBLIC-NEXT: }
+// CHECK-PUBLIC-NEXT: typealias SomeStruct = SomeStruct_s
+// CHECK-PUBLIC-NEXT: class MyColor : Base {
+// CHECK-PUBLIC-NEXT:   class var systemRed: MyColor! { get }
+// CHECK-PUBLIC-NEXT:   @available(swift, obsoleted: 3, renamed: "systemRed")
+// CHECK-PUBLIC-NEXT:   class var systemRedColor: MyColor! { get }
+// CHECK-PUBLIC-NEXT:   init()
+// CHECK-PUBLIC-NEXT: }
+// CHECK-PUBLIC-NEXT: class MyBaseClass : Base {
+// CHECK-PUBLIC-NEXT:   var myStructure: SomeStruct { get }
+// CHECK-PUBLIC-NEXT:   init()
+// CHECK-PUBLIC-NEXT: }
+// CHECK-PUBLIC-NEXT: class MyDerivedClass : MyBaseClass {
+// CHECK-PUBLIC-NEXT:   var derivedMember: Base?
+// CHECK-PUBLIC-NEXT:   init()
+// CHECK-PUBLIC-NEXT: }
+// CHECK-PUBLIC-NEXT: struct __RefinedSugar : Hashable, Equatable, RawRepresentable {
+// CHECK-PUBLIC-NEXT:   init(_ rawValue: [[ENUM_RAW_VALUE_TYPE:.*]])
+// CHECK-PUBLIC-NEXT:   init(rawValue: [[ENUM_RAW_VALUE_TYPE]])
+// CHECK-PUBLIC-NEXT:   var rawValue: [[ENUM_RAW_VALUE_TYPE]]
+// CHECK-PUBLIC-NEXT:   typealias RawValue = [[ENUM_RAW_VALUE_TYPE]]
+// CHECK-PUBLIC-NEXT: }
+// CHECK-PUBLIC-NEXT: var __Caster: __RefinedSugar { get }
+// CHECK-PUBLIC-NEXT: var __Grantulated: __RefinedSugar { get }
+// CHECK-PUBLIC-NEXT: var __Confectioners: __RefinedSugar { get }
+// CHECK-PUBLIC-NEXT: var __Cane: __RefinedSugar { get }
+// CHECK-PUBLIC-NEXT: var __Demerara: __RefinedSugar { get }
+// CHECK-PUBLIC-NEXT: var __Turbinado: __RefinedSugar { get }
+// CHECK-PUBLIC-NEXT: class Refinery : Base {
+// CHECK-PUBLIC-NEXT:   var __sugar: __RefinedSugar { get }
+// CHECK-PUBLIC-NEXT:   init()
+// CHECK-PUBLIC-NEXT: }
+// CHECK-PUBLIC-NEXT: class ExtraRefinery : Base {
+// CHECK-PUBLIC-NEXT:   var __sugar: __RefinedSugar { get }
+// CHECK-PUBLIC-NEXT:   init()
+// CHECK-PUBLIC-NEXT: }
+// CHECK-PUBLIC-NEXT: protocol NullableProtocol {
+// CHECK-PUBLIC-NEXT:   var requirement: Base? { get }
+// CHECK-PUBLIC-NEXT: }
+// CHECK-PUBLIC-NEXT: protocol NonNullProtocol : NullableProtocol {
+// CHECK-PUBLIC-NEXT:   var requirement: Base { get }
+// CHECK-PUBLIC-NEXT: }
+// CHECK-PUBLIC-NEXT: protocol ReadonlyProtocol {
+// CHECK-PUBLIC-NEXT:   var answer: Int32 { get }
+// CHECK-PUBLIC-NEXT: }
+// CHECK-PUBLIC-NEXT: protocol ReadwriteProtocol : ReadonlyProtocol {
+// CHECK-PUBLIC-NEXT:   var answer: Int32 { get set }
+// CHECK-PUBLIC-NEXT: }
+
+// CHECK-PRIVATE:      import CategoryOverrides
+// CHECK-PRIVATE-NEXT: extension MyBaseClass {
+// CHECK-PRIVATE-NEXT:   var derivedMember: Base?
+// CHECK-PRIVATE-NEXT: }
+// CHECK-PRIVATE-NEXT: extension MyColor {
+// CHECK-PRIVATE-NEXT:   class func systemRed() -> MyColor!
+// CHECK-PRIVATE-NEXT:   @available(swift, obsoleted: 3, renamed: "systemRed()")
+// CHECK-PRIVATE-NEXT:   class func systemRedColor() -> MyColor!
+// CHECK-PRIVATE-NEXT: }
+// CHECK-PRIVATE-NEXT: protocol MyPrivateProtocol {
+// CHECK-PRIVATE-NEXT:   func myStructure() -> SomeStruct
+// CHECK-PRIVATE-NEXT: }
+// CHECK-PRIVATE-NEXT: extension MyBaseClass : MyPrivateProtocol {
+// CHECK-PRIVATE-NEXT:   func myStructure() -> SomeStruct
+// CHECK-PRIVATE-NEXT: }
+// CHECK-PRIVATE-NEXT: extension Refinery {
+// CHECK-PRIVATE-NEXT: }
+// CHECK-PRIVATE-NEXT: extension ExtraRefinery {
+// CHECK-PRIVATE-NEXT:   func setSugar(_ sugar: __RefinedSugar)
+// CHECK-PRIVATE-NEXT: }
+// CHECK-PRIVATE-NEXT: extension MyBaseClass : NonNullProtocol {
+// CHECK-PRIVATE-NEXT:   var requirement: Base { get }
+// CHECK-PRIVATE-NEXT: }
+// CHECK-PRIVATE-NEXT: extension MyDerivedClass : ReadwriteProtocol {
+// CHECK-PRIVATE-NEXT:   var answer: Int32
+// CHECK-PRIVATE-NEXT: }

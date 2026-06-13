@@ -3,6 +3,11 @@ module MemberInline {
   requires cplusplus
 }
 
+module DefaultedComparisons {
+  header "defaulted-comparisons.h"
+  requires cplusplus
+}
+
 module MemberOutOfLine {
   header "member-out-of-line.h"
   requires cplusplus

@@ -235,7 +235,8 @@ namespace {
 
       if (theClass->isNativeNSObjectSubclass()) {
         // For layout purposes, we don't have ObjC ancestry.
-      } else if (theClass->hasSuperclass()) {
+      } else if (theClass->hasSuperclass() &&
+                 !theClass->isForeignReferenceType()) {
         SILType superclassType = classType.getSuperclass();
         auto superclassDecl = superclassType.getClassOrBoundGenericClass();
         assert(superclassType && superclassDecl);
@@ -1067,8 +1068,8 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     emitClassMetadata(*this, D, fragileLayout, resilientLayout);
     emitFieldDescriptor(D);
   } else {
-    bool isExportInterface = !D->isGenericContext() &&
-        D->getExplicitCodeGenerationModel() == CodeGenerationModel::Interface;
+    bool isExportInterface =
+      D->getEffectiveCodeGenerationModel() == CodeGenerationModel::Interface;
     if (isExportInterface) {
       emitEmbeddedClassMetadata(*this, D);
     } else {

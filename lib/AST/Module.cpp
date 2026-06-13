@@ -1183,13 +1183,15 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return std::nullopt;
   }
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
   if (Kind != SourceFileKind::MacroExpansion &&
-      Kind != SourceFileKind::DefaultArgument)
+      Kind != SourceFileKind::DefaultArgument &&
+      Kind != SourceFileKind::SyntheticMacro)
     return nullptr;
 
   auto sourceLoc = getGeneratedSourceFileInfo()->originalSourceRange.getStart();
@@ -1198,7 +1200,8 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
 
 ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
   if (Kind != SourceFileKind::MacroExpansion &&
-      Kind != SourceFileKind::DefaultArgument)
+      Kind != SourceFileKind::DefaultArgument &&
+      Kind != SourceFileKind::SyntheticMacro)
     return nullptr;
 
   return ASTNode::getFromOpaqueValue(getGeneratedSourceFileInfo()->astNode);
@@ -2306,6 +2309,43 @@ bool ModuleDecl::isExternallyConsumed() const {
 }
 
 //===----------------------------------------------------------------------===//
+// Hidden-Type Layouts
+//===----------------------------------------------------------------------===//
+
+void ModuleDecl::recordHiddenTypeLayout(StringRef mangledName,
+                                        const AbstractTypeLayout &layout) {
+  auto result = HiddenTypeLayouts.try_emplace(mangledName, layout);
+  if (!result.second) {
+    ASSERT(result.first->second.size == layout.size &&
+           result.first->second.alignment == layout.alignment &&
+           result.first->second.stride == layout.stride &&
+           result.first->second.bitwiseCopyable == layout.bitwiseCopyable &&
+           result.first->second.isOpaque == layout.isOpaque &&
+           "conflicting hidden-type layouts for the same mangled name");
+  }
+}
+
+std::optional<AbstractTypeLayout>
+ModuleDecl::lookupHiddenTypeLayout(StringRef mangledName) const {
+  auto it = HiddenTypeLayouts.find(mangledName);
+  if (it == HiddenTypeLayouts.end())
+    return std::nullopt;
+  return it->second;
+}
+
+SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4>
+ModuleDecl::getSortedHiddenTypeLayouts() const {
+  SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4> result;
+  result.reserve(HiddenTypeLayouts.size());
+  for (auto &entry : HiddenTypeLayouts)
+    result.emplace_back(entry.getKey(), entry.getValue());
+  llvm::sort(result, [](const auto &a, const auto &b) {
+    return a.first < b.first;
+  });
+  return result;
+}
+
+//===----------------------------------------------------------------------===//
 // Cross-Import Overlays
 //===----------------------------------------------------------------------===//
 
@@ -3321,6 +3361,10 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
 
   if (module->isNonSwiftModule()) {
     if (auto *underlying = module->findUnderlyingClangModule()) {
+      if (llvm::is_contained(ctx.LangOpts.IPIClangModuleNames,
+                             module->getName().str()))
+        return LibraryLevel::IPI;
+
       // Imported clangmodules are SPI if they are defined by a private
       // modulemap or from the PrivateFrameworks folder in the SDK.
       bool moduleIsSPI = underlying->ModuleMapIsPrivate ||

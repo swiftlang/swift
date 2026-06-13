@@ -250,7 +250,7 @@ extension Task {
   /// - SeeAlso: `Task.checkCancellation()`
   /// - SeeAlso: `withTaskCancellationHandler(operation:onCancel:isolation:)`
   public func cancel() {
-    Builtin.cancelAsyncTask(_task)
+    unsafe _taskCancel(_AsyncTask(_task))
   }
 }
 
@@ -433,7 +433,7 @@ extension Task where Success == Never, Failure == Never {
     unsafe withUnsafeCurrentTask { task in
       // If we are running on behalf of a task, use that task's priority.
       if let unsafeTask = unsafe task {
-         return unsafe TaskPriority(rawValue: _taskBasePriority(unsafeTask._task))
+         return unsafe TaskPriority(rawValue: _taskBasePriority(unsafeTask._rawTask))
       }
       return nil
     }
@@ -637,7 +637,7 @@ extension Task {
   @inlinable
   @available(SwiftStdlib 6.4, *)
   public var name: String? {
-    if let name = unsafe _getTaskName(self._task) {
+    if let name = unsafe _getTaskName(_AsyncTask(self._task)) {
       unsafe String(cString: name)
     } else {
       nil
@@ -669,9 +669,13 @@ extension Task where Success == Never, Failure == Never {
           continuation: continuation)
 
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-      let executor = Task.currentExecutor
+      if #available(StdlibDeploymentTarget 6.3, *) {
+        let executor = Task.currentExecutor
 
-      executor.enqueue(ExecutorJob(context: job))
+        executor.enqueue(ExecutorJob(context: job))
+      } else {
+        fatalError("we shouldn't get here; if we have, availability is broken")
+      }
       #else
       _enqueueJobGlobal(job)
       #endif
@@ -690,11 +694,9 @@ extension Task where Success == Never, Failure == Never {
 /// and that function isn't executing in the context of any task,
 /// the unsafe task handle is `nil`.
 ///
-/// Don't store an unsafe task reference
-/// for use outside this method's closure.
-/// Storing an unsafe reference doesn't affect the task's actual life cycle,
+/// Storing an unsafe reference to a task doesn't affect the task's actual life cycle,
 /// and the behavior of accessing an unsafe task reference
-/// outside of the `withUnsafeCurrentTask(body:)` method's closure isn't defined.
+/// outside of the `withUnsafeCurrentTask(body:)` method's closure is unsafe and undefined behavior.
 /// There's no safe way to retrieve a reference to the current task
 /// and save it for long-term use.
 /// To query the current task without saving a reference to it,
@@ -711,30 +713,67 @@ extension Task where Success == Never, Failure == Never {
 /// - Returns: The return value, if any, of the `body` closure.
 @available(SwiftStdlib 5.1, *)
 public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) rethrows -> T {
-  guard let _task = _getCurrentAsyncTask() else {
+  guard let _task = unsafe _getCurrentAsyncTask() else {
     return try body(nil)
   }
-
-  // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
-  //        with "destroying a task that never completed" in the task's destroy.
-  //        How do we solve this properly?
-  Builtin.retain(_task)
 
   return try unsafe body(UnsafeCurrentTask(_task))
 }
 
+/// Calls a closure with an unsafe reference to the current task.
+///
+/// If you call this function from the body of an asynchronous function,
+/// the unsafe task handle passed to the closure is always non-`nil`
+/// because an asynchronous function always runs in the context of a task.
+///
+/// The operation is guaranteed to execute on the caller's isolation.
+///
+/// Storing an unsafe reference to a task doesn't affect the task's actual life cycle,
+/// and the behavior of accessing an unsafe task reference
+/// outside of the `withUnsafeCurrentTask(body:)` method's closure is unsafe and undefined behavior.
+/// There's no safe way to retrieve a reference to the current task
+/// and save it for long-term use.
+/// To query the current task without saving a reference to it,
+/// use properties like `currentPriority`.
+/// If you need to store a reference to a task,
+/// create an unstructured task using `Task.detached(priority:operation:)` instead.
+///
+/// - Parameters:
+///   - body: A closure that takes an `UnsafeCurrentTask` parameter.
+///     If `body` has a return value,
+///     that value is also used as the return value
+///     for the `withUnsafeCurrentTask(body:)` function.
+///
+/// - Returns: The return value, if any, of the `body` closure.
 @available(SwiftStdlib 6.0, *)
-public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> T) async rethrows -> T {
-  guard let _task = _getCurrentAsyncTask() else {
+// Note: Could not be always-emit-into client since the UnsafeCurrentTask initializer was not usableFromInline
+// in 6.0, so we can't make this symbol more available than the availability of UnsafeCurrentTask.init.
+@abi(
+  // abi only necessary to avoid redeclaration clash with previous declaration (__abi_withUnsafeCurrentTask)
+  nonisolated(nonsending) func withUnsafeCurrentTaskNonsending<T>(
+    body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
+  ) async rethrows -> T
+)
+public nonisolated(nonsending) func withUnsafeCurrentTask<T>(
+  body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
+) async rethrows -> T {
+  guard let _task = unsafe _getCurrentAsyncTask() else {
     return try await body(nil)
   }
 
-  // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
-  //        with "destroying a task that never completed" in the task's destroy.
-  //        How do we solve this properly?
-  Builtin.retain(_task)
-
   return try unsafe await body(UnsafeCurrentTask(_task))
+}
+
+// Old version for ABI compatibility
+@available(SwiftStdlib 6.0, *)
+@usableFromInline
+@abi(
+  func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> T) async rethrows -> T
+)
+internal func __abi_withUnsafeCurrentTask<T>(
+  body: (UnsafeCurrentTask?) async throws -> T
+) async rethrows -> T {
+  unsafe try await withUnsafeCurrentTask(body: body)
 }
 
 /// An unsafe reference to the current task.
@@ -764,11 +803,30 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> 
 public struct UnsafeCurrentTask {
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
-  internal let _task: Builtin.NativeObject
+  internal let _rawTask: _AsyncTask
+
+  /// ABI-compat shim for the old `_task: Builtin.NativeObject` accessor.
+  /// Inlined client code compiled against earlier stdlibs references the
+  /// mangled `_$sSct5_taskBovg` / `_$sSct5_taskBovpMV` symbols; preserving
+  /// them keeps that code linking. The old caller's calling convention
+  /// expects a `+1` owned reference, so we retain on each call.
+  @usableFromInline
+  @available(SwiftStdlib 5.1, *)
+  internal var _task: Builtin.NativeObject {
+    @_transparent
+    get {
+      let ref: Builtin.NativeObject =
+        unsafe Builtin.bridgeFromRawPointer(_rawTask._rawValue)
+      Builtin.retain(ref)
+      return ref
+    }
+  }
 
   // May only be created by the standard library.
-  internal init(_ task: Builtin.NativeObject) {
-    unsafe self._task = task
+  @usableFromInline // Since 6.4
+  @available(SwiftStdlib 5.1, *)
+  internal init(_ asyncTask: _AsyncTask) {
+    unsafe self._rawTask = asyncTask
   }
 
   /// A Boolean value that indicates whether the current task was canceled.
@@ -819,7 +877,7 @@ public struct UnsafeCurrentTask {
     if #available(SwiftStdlib 6.4, *) {
       unsafe _isCancelled(ignoreTaskCancellationShield: true)
     } else {
-      unsafe _taskIsCancelled(_task)
+      unsafe _taskIsCancelled(_rawTask)
     }
   }
 
@@ -828,7 +886,7 @@ public struct UnsafeCurrentTask {
   @_alwaysEmitIntoClient
   internal func _isCancelled(ignoreTaskCancellationShield: Bool) -> Bool {
     let flags: UInt64 = ignoreTaskCancellationShield ? 0x1 : 0x0
-    return unsafe _taskIsCancelledWithFlags(_task, flags: flags)
+    return unsafe _taskIsCancelledWithFlags(_rawTask, flags: flags)
   }
 
   /// The current task's priority.
@@ -836,7 +894,7 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: `TaskPriority`
   /// - SeeAlso: `Task.currentPriority`
   public var priority: TaskPriority {
-    unsafe TaskPriority(rawValue: _taskCurrentPriority(_task))
+    unsafe TaskPriority(rawValue: _taskCurrentPriority(_rawTask))
   }
 
   /// The current task's base priority.
@@ -845,7 +903,7 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: `Task.basePriority`
   @available(SwiftStdlib 5.9, *)
   public var basePriority: TaskPriority {
-    unsafe TaskPriority(rawValue: _taskBasePriority(_task))
+    unsafe TaskPriority(rawValue: _taskBasePriority(_rawTask))
   }
 
   /// Cancel the current task.
@@ -859,7 +917,7 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   /// - SeeAlso: ``Task/hasActiveTaskCancellationShield``
   public func cancel() {
-    unsafe _taskCancel(_task)
+    unsafe _taskCancel(_rawTask)
   }
 
   /// Checks if this task is executing in a scope with a task cancellation shield activated by the
@@ -884,7 +942,7 @@ public struct UnsafeCurrentTask {
   public var hasActiveCancellationShield: Bool {
     @_alwaysEmitIntoClient
     get {
-      unsafe _taskHasActiveCancellationShield(_task)
+      unsafe _taskHasActiveCancellationShield(_rawTask)
     }
   }
 
@@ -892,7 +950,7 @@ public struct UnsafeCurrentTask {
   @inlinable
   @available(SwiftStdlib 6.4, *)
   public var name: String? {
-    if let name = unsafe _getTaskName(self._task) {
+    if let name = unsafe _getTaskName(_rawTask) {
       unsafe String(cString: name)
     } else {
       nil
@@ -907,22 +965,46 @@ extension UnsafeCurrentTask: Sendable { }
 @available(SwiftStdlib 5.1, *)
 extension UnsafeCurrentTask: @unsafe Hashable {
   public func hash(into hasher: inout Hasher) {
-    unsafe UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
+    unsafe UnsafeRawPointer(_rawTask._rawValue).hash(into: &hasher)
   }
 }
 
 @available(SwiftStdlib 5.1, *)
 extension UnsafeCurrentTask: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
-    unsafe UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
-      UnsafeRawPointer(Builtin.bridgeToRawPointer(rhs._task))
+    unsafe Bool(Builtin.cmp_eq_RawPointer(lhs._rawTask._rawValue, rhs._rawTask._rawValue))
   }
 }
 
 // ==== Internal ---------------------------------------------------------------
+
+/// Opaque non-owning handle to an `AsyncTask` object.
+@available(SwiftStdlib 5.1, *)
+@frozen
+@unsafe
+@usableFromInline
+internal struct _AsyncTask {
+  @usableFromInline
+  internal let _rawValue: Builtin.RawPointer
+
+  @usableFromInline @_transparent
+  internal init(_ rawValue: Builtin.RawPointer) {
+    unsafe self._rawValue = rawValue
+  }
+
+  /// Bridge a `Task._task` (a `Builtin.NativeObject` strong reference) into
+  /// a non-owning `_AsyncTask`. The caller's `Builtin.NativeObject` keeps
+  /// the task alive for the duration the wrapper is used.
+  @usableFromInline @_transparent
+  internal init(_ task: Builtin.NativeObject) {
+    unsafe self._rawValue = Builtin.bridgeToRawPointer(task)
+  }
+}
+
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getCurrent")
-public func _getCurrentAsyncTask() -> Builtin.NativeObject?
+@usableFromInline
+internal func _getCurrentAsyncTask() -> _AsyncTask?
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getJobFlags")
@@ -1010,7 +1092,11 @@ internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> (
   }
 
   let job = Builtin.convertTaskToJob(theTask)
-  MainActor.executor.enqueue(ExecutorJob(context: job))
+  if #available(StdlibDeploymentTarget 6.3, *) {
+    MainActor.executor.enqueue(ExecutorJob(context: job))
+  } else {
+    fatalError("we shouldn't get here; if we have, availability is broken")
+  }
 
   _asyncMainDrainQueue()
 }
@@ -1029,34 +1115,39 @@ public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_cancel")
-public func _taskCancel(_ task: Builtin.NativeObject)
+@usableFromInline
+internal func _taskCancel(_ task: _AsyncTask)
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_isCancelled")
 @usableFromInline
-func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
+internal func _taskIsCancelled(_ task: _AsyncTask) -> Bool
 
 @available(SwiftStdlib 6.4, *)
 @_silgen_name("swift_task_isCancelledWithFlags")
 @usableFromInline
-func _taskIsCancelledWithFlags(_ task: Builtin.NativeObject, flags: UInt64) -> Bool
+internal func _taskIsCancelledWithFlags(_ task: _AsyncTask, flags: UInt64) -> Bool
 
 @available(SwiftStdlib 6.4, *)
 @_silgen_name("swift_task_hasActiveCancellationShield")
 @usableFromInline
-internal func _taskHasActiveCancellationShield(_ task: Builtin.NativeObject) -> Bool
+internal func _taskHasActiveCancellationShield(_ task: _AsyncTask) -> Bool
 
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_currentPriority")
-internal func _taskCurrentPriority(_ task: Builtin.NativeObject) -> UInt8
+@usableFromInline
+internal func _taskCurrentPriority(_ task: _AsyncTask) -> UInt8
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_escalate")
 @discardableResult
-internal func _taskEscalate(_ task: Builtin.NativeObject, newPriority: UInt8) -> UInt8
+@usableFromInline
+internal func _taskEscalate(_ task: _AsyncTask, newPriority: UInt8) -> UInt8
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_basePriority")
-internal func _taskBasePriority(_ task: Builtin.NativeObject) -> UInt8
+@usableFromInline
+internal func _taskBasePriority(_ task: _AsyncTask) -> UInt8
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_createNullaryContinuationJob")
@@ -1103,7 +1194,7 @@ internal func _getCurrentTaskName() -> UnsafePointer<UInt8>?
 @available(StdlibDeploymentTarget 6.4, *)
 @usableFromInline
 @_silgen_name("swift_task_getTaskName")
-internal func _getTaskName(_ job: Builtin.NativeObject) -> UnsafePointer<UInt8>?
+internal func _getTaskName(_ job: _AsyncTask) -> UnsafePointer<UInt8>?
 
 @available(SwiftStdlib 6.2, *)
 internal func _getCurrentTaskNameString() -> String? {

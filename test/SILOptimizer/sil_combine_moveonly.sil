@@ -48,6 +48,12 @@ enum NonCopyableForwardingEnum : ~Copyable {
   deinit
 }
 
+enum NonCopyableWithoutDeinit: ~Copyable {
+  case a(S)
+  case b(S)
+  case c(Int)
+}
+
 sil @getWrappedValue : $@convention(thin) <T> (@in_guaranteed Wrapper<T>) -> @out T
 
 // Test that a release_value is not removed for a struct-with-deinit.
@@ -207,6 +213,19 @@ bb0(%0 : $*MaybeFileDescriptor):
 sil @dont_fold_destroy_of_take_enum_with_deinit : $@convention(thin) (@in MaybeFileDescriptor) -> () {
 bb0(%0 : $*MaybeFileDescriptor):
   %1 = unchecked_take_enum_data_addr %0, #MaybeFileDescriptor.some!enumelt
+  destroy_addr %1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_fold_destroy_of_take_non_copyable_enum :
+// CHECK:       bb0(%0 : $*NonCopyableWithoutDeinit):
+// CHECK-NEXT:    %1 = unchecked_take_enum_data_addr %0
+// CHECK-NEXT:    destroy_addr %1
+// CHECK:       } // end sil function 'dont_fold_destroy_of_take_non_copyable_enum'
+sil @dont_fold_destroy_of_take_non_copyable_enum : $@convention(thin) (@in NonCopyableWithoutDeinit) -> () {
+bb0(%0 : $*NonCopyableWithoutDeinit):
+  %1 = unchecked_take_enum_data_addr %0, #NonCopyableWithoutDeinit.a!enumelt
   destroy_addr %1
   %r = tuple ()
   return %r : $()

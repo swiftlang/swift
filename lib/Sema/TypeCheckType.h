@@ -749,7 +749,8 @@ public:
   /// \see applyGenericArguments
   Type applyUnboundGenericArguments(GenericTypeDecl *decl, Type parentTy,
                                     SourceLoc loc,
-                                    ArrayRef<Type> genericArgs) const;
+                                    ArrayRef<Type> genericArgs,
+                                    bool *diagnosedRequirementFailure=nullptr) const;
 };
 
 void diagnoseInvalidGenericArguments(SourceLoc loc, ValueDecl *decl,

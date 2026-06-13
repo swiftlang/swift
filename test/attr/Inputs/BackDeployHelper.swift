@@ -101,6 +101,15 @@ public func trivial() {
 
 @available(BackDeploy 1.0, *)
 @backDeployed(before: BackDeploy 2.0)
+public func trivialWithNestedFunc() {
+  func nested() {
+    testPrint(handle: #dsohandle, "trivialWithNestedFunc")
+  }
+  nested()
+}
+
+@available(BackDeploy 1.0, *)
+@backDeployed(before: BackDeploy 2.0)
 public func pleaseThrow(_ shouldThrow: Bool) throws -> Bool {
   if shouldThrow { throw BadError.bad }
   return !shouldThrow

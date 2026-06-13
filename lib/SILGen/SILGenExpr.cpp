@@ -3588,7 +3588,7 @@ static ManagedValue emitKeyPathRValueBase(SILGenFunction &subSGF,
 
   // If base is a metatype, it cannot be opened as an existential or upcasted
   // from a class.
-  if (baseType->is<MetatypeType>())
+  if (baseType->is<AnyMetatypeType>())
     return paramSubstValue;
   
   // Pop open an existential container base.
@@ -4896,7 +4896,7 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
       if (!var->getDeclContext()->isTypeContext()) {
         componentTy = var->getInterfaceType()->getCanonicalType();
       } else if (var->getDeclContext()->getSelfProtocolDecl() &&
-                 baseTy->isExistentialType()) {
+                 baseTy->isAnyExistentialType()) {
         componentTy = var->getValueInterfaceType()->getCanonicalType();
         ASSERT(!componentTy->hasTypeParameter());
       } else {
@@ -5248,14 +5248,11 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
   SmallVector<CleanupHandle, 8> cleanups;
 
   for (unsigned index : range(E->getNumElements())) {
-    auto destAddr = addr;
-
-    if (index != 0) {
-      SILValue indexValue = SGF.B.createIntegerLiteral(
-          E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-      destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
-                                   /*needsStackProtection=*/ false);
-    }
+    SILValue indexValue = SGF.B.createIntegerLiteral(
+        E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+    SILValue destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
+                                 /*needsStackProtection=*/ false,
+                                 /*isProjection=*/ true);
 
     // Create a dormant cleanup for the value in case we exit before the
     // full vector has been constructed.
@@ -5329,13 +5326,10 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   SmallVector<CleanupHandle, 8> cleanups;
 
   for (unsigned index : range(E->getNumElements())) {
-    auto destAddr = varargsInfo.getBaseAddress();
-    if (index != 0) {
-      SILValue indexValue = SGF.B.createIntegerLiteral(
-          loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-      destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue,
-              /*needsStackProtection=*/ false);
-    }
+    SILValue indexValue = SGF.B.createIntegerLiteral(
+        loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+    SILValue destAddr = SGF.B.createIndexAddr(loc, varargsInfo.getBaseAddress(), indexValue,
+            /*needsStackProtection=*/ false, /*isProjection=*/ true);
     auto &destTL = varargsInfo.getBaseTypeLowering();
     // Create a dormant cleanup for the value in case we exit before the
     // full array has been constructed.

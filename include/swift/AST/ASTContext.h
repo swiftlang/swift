@@ -1501,6 +1501,16 @@ public:
   /// the language options.
   bool shouldPerformTypoCorrection();
 
+  /// Record that, when emitting the current module, references to \p type in
+  /// stored properties of public types should be substituted with a
+  /// \c HiddenType carrying \p mangledName.
+  void recordTypeToHideWhenEmittingModule(CanType type, StringRef mangledName);
+
+  /// If \p type was recorded as needing to be hidden when emitting the current
+  /// module, return its mangled name; otherwise return \c std::nullopt.
+  std::optional<StringRef>
+  lookupTypeToHideWhenEmittingModule(CanType type) const;
+
 private:
   friend class IntrinsicInfo;
   /// Retrieve an LLVMContext that is used for scratch space for intrinsic lookup.

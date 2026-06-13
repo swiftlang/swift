@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -263,6 +263,13 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     unsafe Range(uncheckedBounds: (0, count))
   }
 
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  @safe
+  public func _checkBounds(_ bounds: Range<Index>) -> Bool {
+    0 <= bounds.lowerBound && bounds.upperBound <= count
+  }
+
   @_transparent
   @_preInverseGenerics
   public func index(after i: Int) -> Int {
@@ -511,8 +518,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @safe
   public func extracting(_ bounds: Range<Int>) -> Self {
-    _precondition(bounds.lowerBound >= 0 && bounds.upperBound <= count,
-      "Index out of range")
+    _precondition(_checkBounds(bounds), "Index out of range")
     guard let start = self.baseAddress else {
       return unsafe Self(start: nil, count: 0)
     }
@@ -565,14 +571,182 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// Note that unlike slicing, the `extracting` operation remains available
   /// even if `Element` happens to be noncopyable.
-  //
+  ///
   /// - Returns: The same buffer as `self`.
   @_alwaysEmitIntoClient
   @safe
   public func extracting(_ bounds: UnboundedRange) -> Self {
     unsafe self
   }
+
+  /// Constructs a standalone buffer pointer over the items within the supplied
+  /// range of positions in the memory region addressed by this buffer pointer.
+  ///
+  /// The returned buffer's first item is always at index 0; unlike buffer
+  /// slices, extracted buffers do not generally share their indices with the
+  /// original buffer pointer.
+  ///
+  /// This function does not validate `bounds`; this is an unsafe operation.
+  ///
+  /// - Parameter bounds: A valid range of indices within this buffer.
+  /// - Returns: A new buffer pointer over the items at `bounds`.
+  @_alwaysEmitIntoClient
+  public func extracting(unchecked bounds: Range<Int>) -> Self {
+    let newStart = unsafe _position?.advanced(by: bounds.lowerBound)
+    return unsafe Self(start: newStart, count: bounds.count)
+  }
+
+  /// Constructs a standalone buffer pointer over the items within the supplied
+  /// range of positions in the memory region addressed by this buffer pointer.
+  ///
+  /// The returned buffer's first item is always at index 0; unlike buffer
+  /// slices, extracted buffers do not generally share their indices with the
+  /// original buffer pointer.
+  ///
+  /// This function does not validate `bounds`; this is an unsafe operation.
+  ///
+  /// - Parameter bounds: A valid range of indices within this buffer.
+  /// - Returns: A new buffer pointer over the items at `bounds`.
+  @_alwaysEmitIntoClient
+  public func extracting(unchecked bounds: ClosedRange<Int>) -> Self {
+    let range = unsafe Range(
+      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
+    )
+    return unsafe extracting(unchecked: range)
+  }
+
+  /// Constructs a standalone buffer pointer over the initial elements of
+  /// this buffer, up to the specified maximum length.
+  ///
+  /// If the maximum length exceeds the length of this buffer,
+  /// the result contains all the elements.
+  ///
+  /// - Parameter maxLength: The maximum number of elements to return.
+  ///   `maxLength` must be greater than or equal to zero.
+  /// - Returns: A buffer pointer with at most `maxLength` elements.
+  @_alwaysEmitIntoClient
+  @safe
+  public func extracting(first maxLength: Int) -> Self {
+    _precondition(maxLength >= 0, "Can't have a prefix of negative length")
+    let newCount = Swift.min(maxLength, count)
+    return unsafe Self(_uncheckedStart: _position, count: newCount)
+  }
+
+  /// Returns a buffer pointer over all but the given number of trailing
+  /// elements.
+  ///
+  /// If the number of elements to drop exceeds the number of elements in
+  /// the buffer, the result is an empty buffer.
+  ///
+  /// - Parameter k: The number of elements to drop off the end of the buffer.
+  ///   `k` must be greater than or equal to zero.
+  /// - Returns: A buffer pointer leaving off the specified number of trailing
+  ///   elements.
+  @_alwaysEmitIntoClient
+  @safe
+  public func extracting(droppingLast k: Int) -> Self {
+    _precondition(k >= 0, "Can't drop a negative number of elements")
+    let droppedCount = Swift.min(k, count)
+    return unsafe Self(_uncheckedStart: _position, count: count &- droppedCount)
+  }
+
+  /// Returns a buffer pointer containing the trailing elements of this buffer,
+  /// up to the given maximum length.
+  ///
+  /// If the maximum length exceeds the length of this buffer,
+  /// the result contains all the elements.
+  ///
+  /// - Parameter maxLength: The maximum number of elements to return.
+  ///   `maxLength` must be greater than or equal to zero.
+  /// - Returns: A buffer pointer with at most `maxLength` elements.
+  @_alwaysEmitIntoClient
+  @safe
+  public func extracting(last maxLength: Int) -> Self {
+    _precondition(maxLength >= 0, "Can't have a suffix of negative length")
+    let newCount = Swift.min(maxLength, count)
+    let newStart = unsafe _position?.advanced(by: count &- newCount)
+    return unsafe Self(_uncheckedStart: newStart, count: newCount)
+  }
+
+  /// Returns a buffer pointer over all but the given number of initial
+  /// elements.
+  ///
+  /// If the number of elements to drop exceeds the number of elements in
+  /// the buffer, the result is an empty buffer.
+  ///
+  /// - Parameter k: The number of elements to drop from the beginning of the
+  ///   buffer. `k` must be greater than or equal to zero.
+  /// - Returns: A buffer pointer starting after the specified number of
+  ///   elements.
+  @_alwaysEmitIntoClient
+  @safe
+  public func extracting(droppingFirst k: Int) -> Self {
+    _precondition(k >= 0, "Can't drop a negative number of elements")
+    let droppedCount = Swift.min(k, count)
+    let newStart = unsafe _position?.advanced(by: droppedCount)
+    return unsafe Self(_uncheckedStart: newStart, count: count &- droppedCount)
+  }
 }
+
+%if Mutable:
+extension UnsafeMutableBufferPointer where Element: Copyable {
+  /// Initialize slots at the start of this buffer by copying data from `source`.
+  ///
+  /// If `Element` is not bitwise copyable, then the memory region addressed by `self` must be
+  /// entirely uninitialized, while `source` must be fully initialized.
+  ///
+  /// The `source` buffer must fit entirely in `self`.
+  ///
+  /// - Returns: The index after the last item that was initialized in this buffer.
+  @_alwaysEmitIntoClient
+  internal func _initializePrefix(
+    copying source: UnsafeBufferPointer<Element>
+  ) -> Int {
+    if source.isEmpty { return 0 }
+    _precondition(source.count <= self.count)
+    unsafe self.baseAddress._unsafelyUnwrappedUnchecked.initialize(
+      from: source.baseAddress._unsafelyUnwrappedUnchecked,
+      count: source.count
+    )
+    return source.count
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _initializeAll(fromContentsOf source: Self) {
+    let i = unsafe self.initialize(fromContentsOf: source)
+    _internalInvariant(i == self.endIndex)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _initializeAll(
+    fromContentsOf source: UnsafeBufferPointer<Element>
+  ) {
+    let i = unsafe self.initialize(fromContentsOf: source)
+    _internalInvariant(i == self.endIndex)
+  }
+}
+
+extension UnsafeMutableBufferPointer where Element: ~Copyable {
+  @_alwaysEmitIntoClient
+  internal func _moveInitializePrefix(
+    from source: UnsafeMutableBufferPointer<Element>
+  ) -> Int {
+    if source.isEmpty { return 0 }
+    _debugPrecondition(source.count <= self.count)
+    unsafe self.baseAddress._unsafelyUnwrappedUnchecked.moveInitialize(
+      from: source.baseAddress._unsafelyUnwrappedUnchecked,
+      count: source.count
+    )
+    return source.count
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _moveInitializeAll(fromContentsOf source: Self) {
+    let i = unsafe self.moveInitialize(fromContentsOf: source)
+    _internalInvariant(i == self.endIndex)
+  }
+}
+%end
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
@@ -595,7 +769,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_transparent
     get {
       unsafe Span(_unsafeElements: self)
@@ -621,7 +795,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_transparent
     get {
       unsafe MutableSpan(_unsafeElements: self)
@@ -791,15 +965,13 @@ extension Unsafe${Mutable}BufferPointer:
     bounds: Range<Int>
   ) -> Slice<Unsafe${Mutable}BufferPointer<Element>> {
     get {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
+      _debugPrecondition(_checkBounds(bounds), "Index out of range")
       return unsafe Slice(
         base: self, bounds: bounds)
     }
 %  if Mutable:
     nonmutating set {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
+      _debugPrecondition(_checkBounds(bounds), "Index out of range")
       unsafe _debugPrecondition(bounds.count == newValue.count)
 
       // FIXME: swift-3-indexing-model: tests.
@@ -878,8 +1050,8 @@ extension Unsafe${Mutable}BufferPointer {
     // degradation wrt passing around pointers not wrapped in a BufferPointer
     // construct.
     _debugPrecondition(
-      unsafe slice.startIndex >= 0 && slice.endIndex <= slice.base.count,
-      "Invalid slice")
+      unsafe slice.base._checkBounds(slice._bounds), "Invalid slice"
+    )
     let base = unsafe slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = unsafe slice.endIndex &- slice.startIndex
     unsafe self.init(start: base, count: count)
@@ -908,6 +1080,17 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameter slice: The buffer slice to rebase.
   @inlinable @_transparent // unsafe-performance
   public init(rebasing slice: Slice<UnsafeMutableBufferPointer<Element>>) {
+    // NOTE: `Slice` does not guarantee that its start/end indices are valid
+    // in `base` -- it merely ensures that `startIndex <= endIndex`.
+    // We need manually check that we aren't given an invalid slice,
+    // or the resulting collection would allow access that was
+    // out-of-bounds with respect to the original base buffer.
+    // We only do this in debug builds to prevent a measurable performance
+    // degradation wrt passing around pointers not wrapped in a BufferPointer
+    // construct.
+    _debugPrecondition(
+      unsafe slice.base._checkBounds(slice._bounds), "Invalid slice"
+    )
     let base = unsafe slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = unsafe slice.endIndex &- slice.startIndex
     unsafe self.init(start: base, count: count)

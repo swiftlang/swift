@@ -308,6 +308,10 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValuePhiArg(
              variableNamePath.print(llvm::dbgs()));
 
   unsigned oldSnapShotIndex = variableNamePath.pushSnapShot();
+  // Also save firstNameProvidingLoc so we can restore it on failure --
+  // otherwise a failed phi branch could leave us pointing at a loc that
+  // never contributed to the final name path.
+  SourceLoc oldFirstNameProvidingLoc = firstNameProvidingLoc;
   LLVM_DEBUG(llvm::dbgs() << "After pushing a snap shot!\n";
              variableNamePath.print(llvm::dbgs()));
 
@@ -319,6 +323,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValuePhiArg(
   }
 
   variableNamePath.popSnapShot(oldSnapShotIndex);
+  firstNameProvidingLoc = oldFirstNameProvidingLoc;
   LLVM_DEBUG(llvm::dbgs() << "After popping a snap shot!\n";
              variableNamePath.print(llvm::dbgs()));
   return SILValue();
@@ -351,9 +356,107 @@ constexpr StringLiteral UnknownDeclString = "<unknown decl>";
 
 } // namespace
 
+/// Helper that names the result of a call. Looks through partial_apply and
+/// closure-forming / conversion instructions on the callee to recover the
+/// underlying function reference, and recovers the call's self value (directly
+/// or as captured by a partial_apply) so the result can be named 'self.member'.
+///
+/// Holds a back-reference to its owning inferrer so it can push path components
+/// and (in the future) stash state across queries.
+struct VariableNameInferrer::CallResultNamer {
+  VariableNameInferrer &owner;
+
+  explicit CallResultNamer(VariableNameInferrer &owner) : owner(owner) {}
+
+  /// The call (apply / try_apply / begin_apply) that produces \p value, if
+  /// any. 'apply' and 'begin_apply' produce their result as the defining
+  /// instruction; a 'try_apply' delivers its result as the normal successor's
+  /// block argument, so look through the terminator in that case.
+  static FullApplySite getCallProducing(SILValue value) {
+    if (auto *inst = value->getDefiningInstruction())
+      return FullApplySite::isa(inst);
+    if (auto *arg = dyn_cast<SILArgument>(value))
+      if (auto *term = arg->getTerminatorForResult())
+        return FullApplySite::isa(term);
+    return FullApplySite();
+  }
+
+  /// Strip closure-forming / conversion / ownership-forwarding instructions
+  /// from a callee value (everything except partial_apply itself).
+  static SILValue stripCalleeConversions(SILValue v) {
+    while (isa<ThinToThickFunctionInst>(v) || isa<ConvertFunctionInst>(v) ||
+           isa<ConvertEscapeToNoEscapeInst>(v) || isa<CopyValueInst>(v) ||
+           isa<BeginBorrowInst>(v) || isa<MoveValueInst>(v)) {
+      v = cast<SingleValueInstruction>(v)->getOperand(0);
+    }
+    return v;
+  }
+
+  /// The user-facing name of the function/method invoked by \p call, or an
+  /// empty StringRef if one cannot be determined. Looks through an
+  /// immediately-invoked partial_apply to the underlying function reference.
+  StringRef getCalleeName(FullApplySite call) const {
+    SILValue callee = stripCalleeConversions(call.getCallee());
+    while (auto *pai = dyn_cast<PartialApplyInst>(callee))
+      callee = stripCalleeConversions(pai->getCallee());
+
+    // A dynamically dispatched method (class_method, witness_method, ...): use
+    // the referenced member's name (which also handles accessors).
+    if (auto *mi = dyn_cast<MethodInst>(callee))
+      return getNameFromDecl(mi->getMember().getDecl());
+
+    // A direct call: prefer the referenced function's own decl name.
+    if (auto *f = dyn_cast<FunctionRefBaseInst>(callee)) {
+      auto *fn = f->getInitiallyReferencedFunction();
+      if (auto declRef = fn->getDeclRef())
+        if (auto *decl = declRef.getDecl())
+          return getNameFromDecl(decl);
+      // Fall back to the SILFunction's name (e.g. for SIL-only declarations
+      // that carry no AST decl).
+      return fn->getName();
+    }
+
+    return StringRef();
+  }
+
+  /// The self value associated with \p call, if any: either the call's own
+  /// self argument (a direct method call) or, when the callee is a
+  /// partial_apply that captured self, that captured self. Self is always the
+  /// last parameter, so a non-empty partial_apply of a method captures it as
+  /// its last applied argument.
+  SILValue getCalleeSelfValue(FullApplySite call) const {
+    if (call.hasSelfArgument())
+      return call.getSelfArgument();
+    SILValue callee = stripCalleeConversions(call.getCallee());
+    if (auto *pai = dyn_cast<PartialApplyInst>(callee)) {
+      ApplySite site(pai);
+      if (site.getSubstCalleeType()->hasSelfParam() &&
+          site.getNumArguments() >= 1)
+        return site.getArgument(site.getNumArguments() - 1);
+    }
+    return SILValue();
+  }
+
+  /// If \p call can be named, push the callee (member) name and return its
+  /// self value so the walk continues into it -- producing 'self.member'.
+  /// Returns SILValue() if there is no name or no self.
+  SILValue nameThroughSelf(FullApplySite call) {
+    auto name = getCalleeName(call);
+    if (name.empty())
+      return SILValue();
+    auto self = getCalleeSelfValue(call);
+    if (!self)
+      return SILValue();
+    owner.pushPathComponent(name, call.getLoc().getSourceLoc());
+    return self;
+  }
+};
+
 SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     SILValue searchValue, ValueSet &visitedValues) {
   assert(searchValue);
+
+  CallResultNamer namer(*this);
 
   while (true) {
     assert(searchValue);
@@ -371,7 +474,8 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     if (auto *use = getAnyDebugUse(searchValue)) {
       if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
         assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
-        variableNamePath.push_back(debugVar.getName());
+        pushPathComponent(debugVar.getName(),
+                          searchValue.getLoc().getSourceLoc());
 
         // We return the value, not the debug_info.
         return searchValue;
@@ -394,7 +498,8 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
             if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
               assert(debugVar.getKind() ==
                      DebugVarCarryingInst::Kind::DebugValue);
-              variableNamePath.push_back(debugVar.getName());
+              pushPathComponent(debugVar.getName(),
+                                searchValue.getLoc().getSourceLoc());
 
               // We return the value, not the debug_info.
               return searchValue;
@@ -408,7 +513,8 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       if (auto *debugUse = getAnyDebugUse(bbi)) {
         if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
           assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
-          variableNamePath.push_back(debugVar.getName());
+          pushPathComponent(debugVar.getName(),
+                            searchValue.getLoc().getSourceLoc());
 
           // We return the value, not the debug_info.
           return searchValue;
@@ -435,12 +541,14 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         return SILValue();
       }
 
-      variableNamePath.push_back(DebugVarCarryingInst(allocInst).getName());
+      pushPathComponent(DebugVarCarryingInst(allocInst).getName(),
+                        allocInst->getLoc().getSourceLoc());
       return allocInst;
     }
 
     if (auto *abi = dyn_cast<AllocBoxInst>(searchValue)) {
-      variableNamePath.push_back(DebugVarCarryingInst(abi).getName());
+      pushPathComponent(DebugVarCarryingInst(abi).getName(),
+                        abi->getLoc().getSourceLoc());
       return abi;
     }
 
@@ -452,7 +560,8 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     }
 
     if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
-      variableNamePath.push_back(VarDeclCarryingInst(globalAddrInst).getName());
+      pushPathComponent(VarDeclCarryingInst(globalAddrInst).getName(),
+                        globalAddrInst->getLoc().getSourceLoc());
       return globalAddrInst;
     }
 
@@ -462,43 +571,50 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     }
 
     if (auto *rei = dyn_cast<RefElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(VarDeclCarryingInst(rei).getName());
+      pushPathComponent(VarDeclCarryingInst(rei).getName(),
+                        rei->getLoc().getSourceLoc());
       searchValue = rei->getOperand();
       continue;
     }
 
     if (auto *sei = dyn_cast<StructExtractInst>(searchValue)) {
-      variableNamePath.push_back(getNameFromDecl(sei->getField()));
+      pushPathComponent(getNameFromDecl(sei->getField()),
+                        sei->getLoc().getSourceLoc());
       searchValue = sei->getOperand();
       continue;
     }
 
     if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(searchValue)) {
-      variableNamePath.push_back(getNameFromDecl(uedi->getElement()));
+      pushPathComponent(getNameFromDecl(uedi->getElement()),
+                        uedi->getLoc().getSourceLoc());
       searchValue = uedi->getOperand();
       continue;
     }
 
     if (auto *tei = dyn_cast<TupleExtractInst>(searchValue)) {
-      variableNamePath.push_back(getStringRefForIndex(tei->getFieldIndex()));
+      pushPathComponent(getStringRefForIndex(tei->getFieldIndex()),
+                        tei->getLoc().getSourceLoc());
       searchValue = tei->getOperand();
       continue;
     }
 
     if (auto *sei = dyn_cast<StructElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(getNameFromDecl(sei->getField()));
+      pushPathComponent(getNameFromDecl(sei->getField()),
+                        sei->getLoc().getSourceLoc());
       searchValue = sei->getOperand();
       continue;
     }
 
     if (auto *tei = dyn_cast<TupleElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(getStringRefForIndex(tei->getFieldIndex()));
+      pushPathComponent(getStringRefForIndex(tei->getFieldIndex()),
+                        tei->getLoc().getSourceLoc());
       searchValue = tei->getOperand();
       continue;
     }
 
     if (auto *utedai = dyn_cast<UncheckedEnumDataAddrInstBase>(searchValue)) {
-      variableNamePath.push_back(getNameFromDecl(utedai->getElement()));
+      pushPathComponent(getNameFromDecl(utedai->getElement()),
+                        utedai->getLoc().getSourceLoc());
       searchValue = utedai->getEnum();
       continue;
     }
@@ -508,7 +624,13 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     // them and add the case to the variableNamePath.
     if (auto *e = dyn_cast<EnumInst>(searchValue)) {
       if (e->hasOperand()) {
-        variableNamePath.push_back(getNameFromDecl(e->getElement()));
+        // Do not push a path component for Optional.some wrapping — the
+        // programmer never writes 'x.some' in source, so adding '.some' to the
+        // inferred name produces confusing diagnostics like
+        // "'negotiator.some' cannot be returned".
+        if (!e->getType().getOptionalObjectType())
+          pushPathComponent(getNameFromDecl(e->getElement()),
+                            e->getLoc().getSourceLoc());
         searchValue = e->getOperand();
         continue;
       }
@@ -516,8 +638,9 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
 
     if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
             searchValue->getDefiningInstruction())) {
-      variableNamePath.push_back(
-          getStringRefForIndex(*dti->getIndexOfResult(searchValue)));
+      pushPathComponent(
+          getStringRefForIndex(*dti->getIndexOfResult(searchValue)),
+          dti->getLoc().getSourceLoc());
       searchValue = dti->getOperand();
       continue;
     }
@@ -525,15 +648,16 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
             searchValue->getDefiningInstruction())) {
       unsigned index = *dsi->getIndexOfResult(searchValue);
-      variableNamePath.push_back(
-          getNameFromDecl(dsi->getStructDecl()->getStoredProperties()[index]));
+      pushPathComponent(
+          getNameFromDecl(dsi->getStructDecl()->getStoredProperties()[index]),
+          dsi->getLoc().getSourceLoc());
       searchValue = dsi->getOperand();
       continue;
     }
 
     if (auto *fArg = dyn_cast<SILFunctionArgument>(searchValue)) {
       if (auto *decl = fArg->getDecl()) {
-        variableNamePath.push_back(decl->getBaseName().userFacingName());
+        pushPathComponent(decl->getBaseName().userFacingName(), decl->getLoc());
         return fArg;
       }
     }
@@ -559,42 +683,26 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       }
     }
 
-    auto getNamePathComponentFromCallee = [&](FullApplySite call) -> SILValue {
-      // Use the name of the property being accessed if we can get to it.
-      if (call.getSubstCalleeType()->hasSelfParam()) {
-        if (auto *f = dyn_cast<FunctionRefBaseInst>(call.getCallee())) {
-          if (auto dc = f->getInitiallyReferencedFunction()->getDeclContext()) {
-            variableNamePath.push_back(getNameFromDecl(dc->getAsDecl()));
-            return call.getSelfArgument();
-          }
-        }
+    // Name a call result (apply / try_apply / begin_apply). Read/modify
+    // (begin_apply) accessors are always looked through; other calls only when
+    // InferSelfThroughAllAccessors is set.
+    if (auto fas = CallResultNamer::getCallProducing(searchValue)) {
+      bool isBeginApply = isa<BeginApplyInst>(fas.getInstruction());
+      if (isBeginApply ||
+          options.contains(Flag::InferSelfThroughAllAccessors)) {
+        if (auto name = namer.getCalleeName(fas); !name.empty()) {
+          pushPathComponent(name, fas.getLoc().getSourceLoc());
 
-        if (auto *mi = dyn_cast<MethodInst>(call.getCallee())) {
-          variableNamePath.push_back(
-              getNameFromDecl(mi->getMember().getDecl()));
-          return call.getSelfArgument();
-        }
-      }
-
-      return SILValue();
-    };
-
-    // Read or modify accessor.
-    if (auto bai = dyn_cast_or_null<BeginApplyInst>(
-            searchValue->getDefiningInstruction())) {
-      if (auto selfParam = getNamePathComponentFromCallee(bai)) {
-        searchValue = selfParam;
-        continue;
-      }
-    }
-
-    if (options.contains(Flag::InferSelfThroughAllAccessors)) {
-      if (auto *inst = searchValue->getDefiningInstruction()) {
-        if (auto fas = FullApplySite::isa(inst)) {
-          if (auto selfParam = getNamePathComponentFromCallee(fas)) {
-            searchValue = selfParam;
+          // If there is a self value (directly, or captured by a
+          // partial_apply), continue into it to produce 'self.member'.
+          if (auto self = namer.getCalleeSelfValue(fas)) {
+            searchValue = self;
             continue;
           }
+
+          // Otherwise treat the result as the root, naming it after the
+          // callee.
+          return searchValue;
         }
       }
     }
@@ -603,7 +711,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     if (searchValue->isBorrowAccessorResult()) {
       if (auto fas =
               FullApplySite::isa(searchValue->getDefiningInstruction())) {
-        if (auto selfParam = getNamePathComponentFromCallee(fas)) {
+        if (auto selfParam = namer.nameThroughSelf(fas)) {
           searchValue = selfParam;
           continue;
         }
@@ -624,10 +732,17 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       }
 
       if (addressorInvocation) {
-        if (auto selfParam =
-                getNamePathComponentFromCallee(addressorInvocation)) {
+        if (auto selfParam = namer.nameThroughSelf(addressorInvocation)) {
           searchValue = selfParam;
           continue;
+        }
+        // For a top-level global addressor there is no self, but we can still
+        // recover the global variable's name from the callee (the addressor's
+        // AccessorDecl points back to the VarDecl via getStorage()).
+        auto fas = FullApplySite(addressorInvocation);
+        if (auto name = namer.getCalleeName(fas); !name.empty()) {
+          pushPathComponent(name, fas.getLoc().getSourceLoc());
+          return searchValue;
         }
       }
     }
@@ -661,7 +776,16 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         isa<CopyableToMoveOnlyWrapperValueInst>(searchValue) ||
         isa<EndInitLetRefInst>(searchValue) ||
         isa<ConvertEscapeToNoEscapeInst>(searchValue) ||
-        isa<ConvertFunctionInst>(searchValue)) {
+        isa<ConvertFunctionInst>(searchValue) ||
+        // Look through existential type-erasure wrappers so that name inference
+        // can reach the concrete value underneath. For example, when a named
+        // variable of a concrete class type is wrapped in `any Protocol` before
+        // being stored into an indirect return slot, init_existential_ref sits
+        // between the concrete copy_value and the enum wrapping. Without
+        // looking through it the inferrer gives up and the diagnostic falls back
+        // to the generic "unknown pattern" catch-all.
+        isa<InitExistentialRefInst>(searchValue) ||
+        isa<InitExistentialAddrInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }
@@ -726,6 +850,21 @@ VariableNameInferrer::inferNameAndRoot(SILValue value) {
   if (!rootValue)
     return {};
   return {{fn->getASTContext().getIdentifier(resultingName), rootValue}};
+}
+
+std::optional<std::pair<Identifier, SourceLoc>>
+VariableNameInferrer::inferNameAndFirstPathComponent(SILValue value) {
+  auto *fn = value->getFunction();
+  if (!fn)
+    return {};
+  VariableNameInferrer::Options options;
+  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+  SmallString<64> resultingName;
+  VariableNameInferrer inferrer(fn, options, resultingName);
+  if (!inferrer.inferByWalkingUsesToDefs(value))
+    return {};
+  return {{fn->getASTContext().getIdentifier(resultingName),
+           inferrer.getFirstNameProvidingLoc()}};
 }
 
 //===----------------------------------------------------------------------===//

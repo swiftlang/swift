@@ -1164,8 +1164,6 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     TracedOp.start(TraceInfo);
   }
 
-  CloseClangModuleFiles scopedCloseFiles(
-      *CompIns.getASTContext().getClangModuleLoader());
   CompIns.performSema();
 
   llvm::SmallPtrSet<ModuleDecl *, 16> Visited;

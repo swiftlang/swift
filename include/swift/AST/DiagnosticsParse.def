@@ -329,9 +329,6 @@ ERROR(accessor_requires_coroutine_accessors,none,
       (StringRef))
 WARNING(old_coroutine_accessor,none,
       "'%1' is deprecated; please use 'yielding %0' instead", (StringRef, StringRef))
-ERROR(accessor_requires_borrow_and_mutate_accessors,none,
-      "%0 requires '-enable-experimental-feature BorrowAndMutateAccessors'",
-      (StringRef))
 ERROR(borrow_mutate_pair_restrict,none,
       "A '%0' accessor can only be defined along with a '%1' accessor",
       (StringRef, StringRef))
@@ -636,9 +633,6 @@ ERROR(sil_operand_not_ref_storage_address,none,
 ERROR(sil_operand_has_wrong_ownership_kind,none,
       "operand has ownership kind %0 but ownership kind %1 was expected",
       (StringRef, StringRef))
-ERROR(sil_operand_has_incompatible_ownership_kind,none,
-      "operand has ownership kind %0 but ownership kind compatible with %1 was expected",
-      (StringRef, StringRef))
 ERROR(sil_integer_literal_not_integer_type,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
 ERROR(sil_integer_literal_not_well_formed,none,
@@ -837,6 +831,8 @@ ERROR(sil_coverage_invalid_operator, none,
 
 ERROR(expected_type,PointsToFirstBadToken,
       "expected type", ())
+ERROR(confusing_some_any_optional_composition,none,
+      "confusing use of optional after a 'some' or 'any' composition; use parentheses to clarify precedence", ())
 ERROR(expected_init_value,PointsToFirstBadToken,
       "expected initial value after '='", ())
 
@@ -1902,6 +1898,9 @@ ERROR(attr_rawlayout_expected_integer_alignment,none,
 ERROR(attr_rawlayout_expected_params,none,
       "expected %1 argument after %0 argument in '@_rawLayout'", (StringRef, StringRef))
 
+ERROR(attr_pre_inverse_generics_expected_except,none,
+      "expected 'except:' argument in '@_preInverseGenerics'", ())
+
 ERROR(attr_extern_expected_label,none,
       "expected %0 argument to '@_extern'", (StringRef))
 
@@ -1976,8 +1975,9 @@ ERROR(unsupported_conditional_compilation_integer,none,
       (StringRef, StringRef))
 ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
-ERROR(compiler_version_too_many_components,none,
-      "compiler version must not have more than five components", ())
+WARNING(compiler_version_too_many_components,none,
+      "trailing components of version '%0' are ignored",
+      (StringRef))
 GROUPED_WARNING(unused_compiler_version_component,NoUsage,NoUsage,
       "the second version component is not used for comparison in legacy "
       "compiler versions%select{|; are you trying to encode a new Swift "
@@ -2132,9 +2132,9 @@ ERROR(extra_tokens_after_expression,PointsToFirstBadToken,
       "extra tokens after expression in macro expansion", ())
 
 ERROR(parser_round_trip_error,none,
-      "source file did not round-trip through the new Swift parser", ())
+      "source file did not round-trip through SwiftSyntax", ())
 ERROR(parser_new_parser_errors,none,
-      "new Swift parser generated errors for code that C++ parser accepted",
+      "SwiftSyntax generated errors for code that C++ parser accepted",
        ())
 
 // MARK: Reference Binding Diagnostics
@@ -2189,11 +2189,6 @@ ERROR(expected_rparen_after_lifetime_dependence, PointsToFirstBadToken,
 
 ERROR(expected_param_index_lifetime_dependence, PointsToFirstBadToken,
       "expected unsigned parameter index in lifetime dependence specifier", ())
-
-ERROR(lifetime_dependence_invalid_init_return, PointsToFirstBadToken,
-      "expected Self return type for initializers with lifetime dependence "
-      "specifiers",
-      ())
 
 ERROR(sending_before_parameter_specifier,none,
       "'sending' must be placed after specifier '%0'", (StringRef))

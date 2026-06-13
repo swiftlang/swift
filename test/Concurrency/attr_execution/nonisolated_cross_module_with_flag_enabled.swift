@@ -94,6 +94,9 @@ public struct TestGenericTypeAlias {
   public subscript<U>(_: G<U>) -> Bool { false }
 }
 
+// CHECK: nonisolated(nonsending) public func test(_: nonisolated(nonsending) sending @escaping () async -> Swift::Void) async
+public func test(_: nonisolated(nonsending) sending @escaping () async -> Void) async {}
+
 //--- Client.swift
 import A
 

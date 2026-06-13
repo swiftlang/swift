@@ -325,9 +325,6 @@ enum r23942743 {
   case Tomato(cloud: String)
 }
 let _ = .Tomato(cloud: .none)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
-// expected-error@-1 {{cannot infer contextual base in reference to member 'none'}}
-
-
 
 // https://github.com/apple/swift/issues/43267
 // REGRESSION: Assertion failed: (baseTy && "Couldn't find appropriate context"), function getMemberSubstitutions

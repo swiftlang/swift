@@ -1762,6 +1762,7 @@ public:
       if (!hasDidSetOrWillSetDynamicReplacement) {
         emitTypeMemberGlobalVariable(SGM, vd);
         visitAccessors(vd);
+        SGM.tryEmitPropertyDescriptor(vd);
         return;
       }
     }

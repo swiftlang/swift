@@ -662,6 +662,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::FoldingSet<IntegerType> IntegerTypes;
   llvm::FoldingSet<HiddenType> HiddenTypes;
+  llvm::DenseMap<CanType, StringRef> TypesToHideWhenEmittingModule;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -2805,20 +2806,26 @@ bool ASTContext::canImportModuleImpl(
   auto ModuleNameStr = FullModuleName.str().str();
 
   // If we've failed loading this module before, don't look for it again.
-  if (FailedModuleImportNames.count(ModuleNameStr))
+  // For versioned source `canImport` queries, fall through anyway so that the
+  // missing-module diagnostic still fires at every use site.
+  if (FailedModuleImportNames.count(ModuleNameStr) &&
+      !(isSourceCanImport && !version.empty()))
     return false;
 
-  auto missingVersion = [this, &loc, &ModuleName,
-                         &isUnderlyingVersion]() -> bool {
+  auto missingVersion = [this, &loc, &ModuleName, &isUnderlyingVersion,
+                         isSourceCanImport]() -> bool {
     // The module version could not be parsed from the preferred source for
-    // this query. Diagnose and return `true` to indicate that the unversioned
-    // module will satisfy the query.
-    auto mID = ModuleName[0];
-    auto diagLoc = mID.Loc;
-    if (mID.Loc.isInvalid())
-      diagLoc = loc;
-    Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
-                   isUnderlyingVersion);
+    // this query. Diagnose (only for source-level `#if canImport` queries) and
+    // return `true` to indicate that the unversioned module will satisfy the
+    // query.
+    if (isSourceCanImport) {
+      auto mID = ModuleName[0];
+      auto diagLoc = mID.Loc;
+      if (mID.Loc.isInvalid())
+        diagLoc = loc;
+      Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
+                     isUnderlyingVersion);
+    }
     return true;
   };
 
@@ -2928,8 +2935,15 @@ bool ASTContext::canImportModuleImpl(
   // Retrieve a module version from each module loader that can find the module
   // and use the best source available for the query.
   ModuleLoader::ModuleVersionInfo versionInfo, underlyingVersionInfo;
-  if (!lookupVersionedModule(versionInfo, underlyingVersionInfo))
+  if (!lookupVersionedModule(versionInfo, underlyingVersionInfo)) {
+    if (isSourceCanImport) {
+      // Diagnose the missing module in case it is a typo.
+      auto mID = ModuleName[0];
+      auto diagLoc = mID.Loc.isValid() ? mID.Loc : loc;
+      Diags.diagnose(diagLoc, diag::canimport_missing_module, mID.Item.str());
+    }
     return false;
+  }
 
   const auto &queryVersion =
       isUnderlyingVersion ? underlyingVersionInfo : versionInfo;
@@ -3102,7 +3116,8 @@ ASTContext::getNormalConformance(Type conformingType,
                                  DeclContext *dc,
                                  ProtocolConformanceState state,
                                  ProtocolConformanceOptions options) {
-  assert(dc->isTypeContext());
+  ASSERT(dc->isTypeContext());
+  ASSERT(!conformingType->is<ProtocolType>());
 
   llvm::FoldingSetNodeID id;
   NormalProtocolConformance::Profile(id, protocol, dc);
@@ -3882,9 +3897,10 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
   return intType;
 }
 
-HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName) {
+HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
+                            ModuleDecl *definingModule) {
   llvm::FoldingSetNodeID id;
-  HiddenType::Profile(id, mangledName);
+  HiddenType::Profile(id, mangledName, definingModule);
 
   void *insertPos;
   if (auto *hidden =
@@ -3895,10 +3911,32 @@ HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName) {
   auto nameCopy = ctx.AllocateCopy(mangledName);
 
   auto *hidden = new (ctx, AllocationArena::Permanent)
-      HiddenType(nameCopy, ctx);
+      HiddenType(nameCopy, definingModule, ctx);
 
   ctx.getImpl().HiddenTypes.InsertNode(hidden, insertPos);
   return hidden;
+}
+
+void ASTContext::recordTypeToHideWhenEmittingModule(CanType type,
+                                                    StringRef mangledName) {
+  // Allocate a stable copy so the StringRef survives even if the caller's
+  // storage for the mangled name is later moved or freed.
+  auto nameCopy = AllocateCopy(mangledName);
+  auto result =
+      getImpl().TypesToHideWhenEmittingModule.try_emplace(type, nameCopy);
+  if (!result.second) {
+    ASSERT(result.first->second == nameCopy &&
+           "conflicting hide-on-emit mangled names for the same type");
+  }
+}
+
+std::optional<StringRef>
+ASTContext::lookupTypeToHideWhenEmittingModule(CanType type) const {
+  auto &map = getImpl().TypesToHideWhenEmittingModule;
+  auto it = map.find(type);
+  if (it == map.end())
+    return std::nullopt;
+  return it->second;
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
@@ -6313,7 +6351,9 @@ GenericEnvironment::forOpenedExistential(
   auto layout = existential->getExistentialLayout();
   auto properties = ArchetypeType::archetypeProperties(
       RecursiveTypeProperties::HasOpenedExistential,
-      layout.getProtocols(), layout.getSuperclass(), subs);
+      layout.getProtocols(),
+      layout.getExplicitSuperclassOrProtocolSuperclass(),
+      subs);
 
   auto arena = getArena(properties);
 

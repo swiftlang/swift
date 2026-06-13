@@ -74,7 +74,7 @@ extension StructInA2 {
 }
 
 public protocol ProtocolInB1 {
-  func defaultedRequirementInB()
+  func defaultedRequirementInB() // has an inherited default
 }
 
 extension ProtocolInB1 {
@@ -82,8 +82,17 @@ extension ProtocolInB1 {
 }
 
 public protocol ProtocolInB2 {
-  func defaultedRequirementInC()
+  func defaultedRequirementInC() // has a retroactive default (in C)
 }
+
+public protocol ProtocolInB3 {
+  func defaultedRequirementInB() // has a retroactive default (in a constrained extension)
+}
+
+extension ProtocolInB3 where Self: EmptyProtocolInA {
+  public func defaultedRequirementInB() { }
+}
+
 
 public struct EquatableInB: Equatable {
   public static func ==(_: EquatableInB, _: EquatableInB) -> Bool {

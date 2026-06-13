@@ -305,7 +305,7 @@ public func _copy<T>(_ value: T) -> T {
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(borrow source)
+@_lifetime(borrow source)
 public func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -321,7 +321,7 @@ public func _overrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(copy source)
+@_lifetime(copy source)
 public func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -337,7 +337,7 @@ public func _overrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(&source)
+@_lifetime(&source)
 public func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -354,7 +354,7 @@ public func _overrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(dependent: borrow source)
+@_lifetime(dependent: borrow source)
 public func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(

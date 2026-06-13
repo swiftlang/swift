@@ -25,8 +25,21 @@ set(swift_concurrency_incorporate_object_libraries_so swiftThreading)
 
 if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
   if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    include_directories(AFTER
-                          ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+    set(swift_concurrency_dispatch_include_directories
+      ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+    if(TARGET dispatch)
+      get_target_property(dispatch_include_directories
+        dispatch INTERFACE_INCLUDE_DIRECTORIES)
+      if(dispatch_include_directories)
+        list(APPEND swift_concurrency_dispatch_include_directories
+          ${dispatch_include_directories})
+      endif()
+    endif()
+    list(REMOVE_DUPLICATES swift_concurrency_dispatch_include_directories)
+    foreach(directory ${swift_concurrency_dispatch_include_directories})
+      list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+        "-I${directory}")
+    endforeach()
 
     # FIXME: we can't rely on libdispatch having been built for the
     # target at this point in the process.  Currently, we're relying
@@ -167,6 +180,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   PlatformExecutorWindows.swift
   PlatformExecutorOpenBSD.swift
   PlatformExecutorFreeBSD.swift
+  Result+AsyncInit.swift
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES

@@ -699,6 +699,10 @@ public:
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
 
+  /// If we're trying to convert `std::nullopt_t` to a `std::optional`, suggest
+  /// using Swift's `nil` literal instead.
+  bool diagnoseConversionFromStdNullopt() const;
+
   /// Diagnose failed conversion in a `CoerceExpr`.
   bool diagnoseCoercionToUnrelatedType() const;
 
@@ -1808,6 +1812,20 @@ public:
         BaseType(resolveType(baseType)->getRValueType()) {}
 
   Type getBaseType() const { return BaseType; }
+
+  bool diagnoseAsError() override;
+};
+
+class InvalidProtocolMetatypeStaticMemberRefInKeyPath final
+    : public InvalidMemberRefInKeyPath {
+  Type BaseType;
+
+public:
+  InvalidProtocolMetatypeStaticMemberRefInKeyPath(
+      const Solution &solution, Type baseType, ValueDecl *member,
+      ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator),
+        BaseType(resolveType(baseType)->getRValueType()) {}
 
   bool diagnoseAsError() override;
 };

@@ -41,6 +41,7 @@ class SwiftTestCase(unittest.TestCase):
 
         # Setup args
         self.args = argparse.Namespace(
+            swift_pedantic_diagnostics=True,
             enable_tsan_runtime=False,
             compiler_vendor='none',
             swift_compiler_version=None,
@@ -57,7 +58,6 @@ class SwiftTestCase(unittest.TestCase):
             enable_experimental_differentiable_programming=False,
             enable_experimental_concurrency=False,
             enable_experimental_cxx_interop=False,
-            enable_cxx_interop_swift_bridging_header=False,
             enable_experimental_distributed=False,
             enable_experimental_observation=False,
             enable_experimental_parser_validation=False,
@@ -114,7 +114,6 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=FALSE',
-            '-DSWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION:BOOL=FALSE',
@@ -138,6 +137,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS:STRING=6.0',
             '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS:STRING=1.0',
             '-DHELLO=YES',
+            '-DSWIFT_PEDANTIC_DIAGNOSTICS:BOOL=TRUE',
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -156,7 +156,6 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=FALSE',
-            '-DSWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION:BOOL=FALSE',
@@ -180,6 +179,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS:STRING=6.0',
             '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS:STRING=1.0',
             '-DHELLO=YES',
+            '-DSWIFT_PEDANTIC_DIAGNOSTICS:BOOL=TRUE',
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 
@@ -418,18 +418,6 @@ class SwiftTestCase(unittest.TestCase):
             [option for option in swift.cmake_options
              if 'DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP' in option])
 
-    def test_experimental_cxx_interop_bridging_header_flags(self):
-        self.args.enable_cxx_interop_swift_bridging_header = True
-        swift = Swift(
-            args=self.args,
-            toolchain=self.toolchain,
-            source_dir='/path/to/src',
-            build_dir='/path/to/build')
-        self.assertEqual(
-            ['-DSWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL=TRUE'],
-            [option for option in swift.cmake_options
-             if 'DSWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER' in option])
-
     def test_experimental_distributed_flags(self):
         self.args.enable_experimental_distributed = True
         swift = Swift(
@@ -605,3 +593,24 @@ class SwiftTestCase(unittest.TestCase):
              'TRUE'],
             [x for x in swift.cmake_options
              if 'DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS' in x])
+
+    def test_swift_pedantic_diagnostics(self):
+        self.args.swift_pedantic_diagnostics = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn(
+            '-DSWIFT_PEDANTIC_DIAGNOSTICS:BOOL=TRUE',
+            swift.cmake_options)
+
+        self.args.swift_pedantic_diagnostics = False
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn(
+            '-DSWIFT_PEDANTIC_DIAGNOSTICS:BOOL=FALSE',
+            swift.cmake_options)

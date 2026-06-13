@@ -6,6 +6,10 @@
 // For some reason we don't get exclusivity violations on older OSes
 // UNSUPPORTED: back_deployment_runtime
 
+// expectCrashLater() relies on StdlibUnittest's spawnChild, which is
+// `fatalError` on WASI (no fork()/posix_spawn()).
+// UNSUPPORTED: OS=wasip1
+
 import StdlibUnittest
 
 

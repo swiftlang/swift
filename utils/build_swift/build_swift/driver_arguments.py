@@ -173,6 +173,13 @@ def _apply_default_arguments(args):
     if not args.android or not args.build_android:
         args.build_android = False
 
+    # By default, pedantic diagnostics are enabled only when assertions in
+    # the Swift project are also enabled. Otherwise we risk breaking
+    # no-assertions builds, which are not among the required pull request
+    # checks.
+    if args.swift_pedantic_diagnostics is None:
+        args.swift_pedantic_diagnostics = args.swift_assertions
+
     # By default use the same number of lit workers as build jobs.
     if not args.lit_jobs:
         args.lit_jobs = args.build_jobs
@@ -889,6 +896,18 @@ def create_argument_parser():
     option(['--install-wasmkit'], toggle_true('install_wasmkit'),
            help='install SourceKitLSP')
 
+    # Emscripten options
+
+    option(['--build-emscripten-stdlib'],
+           toggle_true('build_emscriptenstdlib'),
+           help='build the stdlib for Emscripten target into a '
+                'separate build directory')
+    option(['--emscripten-path'], store_path,
+           help='path to the Emscripten checkout')
+    option(['--skip-test-emscripten-stdlib'],
+           toggle_false('test_emscriptenstdlib'),
+           help='skip testing stdlib for Emscripten')
+
     # Swift Testing options
 
     option('--swift-testing', toggle_true('build_swift_testing'),
@@ -1116,6 +1135,18 @@ def create_argument_parser():
            store('swift_stdlib_strict_availability'),
            const=False,
            help='disable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
+
+    # -------------------------------------------------------------------------
+    in_group('Diagnostics')
+
+    option('--swift-pedantic-diagnostics', store,
+           const=True,
+           help='Enable and escalate certain compiler warnings for code health '
+                '(e.g. unused code) to errors when building the Swift project '
+                '(default: enabled when assertions in the Swift project are '
+                'enabled)')
+    option('--no-swift-pedantic-diagnostics', store('swift_pedantic_diagnostics'),
+           const=False)
 
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')
@@ -1481,6 +1512,12 @@ def create_argument_parser():
     option('--llvm-enable-modules', toggle_true('llvm_enable_modules'),
            help='enable building llvm using modules')
 
+    option('--llvm-enable-index-store', toggle_true('llvm_enable_index_store'),
+           default=True,
+           help='emit -index-store-path while building LLVM/Clang and Swift '
+                'host tools (gated on the host compiler accepting the flag, '
+                'so it is a no-op for older compilers). Defaults to ON.')
+
     option('--llvm-targets-to-build', store,
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',
            help='LLVM target generators to build')
@@ -1583,10 +1620,6 @@ def create_argument_parser():
     option('--enable-experimental-cxx-interop', toggle_true,
            default=True,
            help='Enable experimental C++ interop.')
-
-    option('--enable-cxx-interop-swift-bridging-header', toggle_true,
-           default=True,
-           help='Ship the <swift/bridging> header for C++ interop')
 
     option('--enable-experimental-distributed', toggle_true,
            default=True,

@@ -42,11 +42,11 @@
 // RUN:  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --allow-empty --check-prefix=SKIP-CACHE %s
 
 // CACHE-MISS: remark: cache miss for input
-// CACHE-HIT: remark: replay output file '<cached-diagnostics>': key 'llvmcas://{{.*}}'
-// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}test.o': key 'llvmcas://{{.*}}'
-// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}Test.swiftmodule': key 'llvmcas://{{.*}}'
-// CACHE-HIT-CLANG: remark: replay output file '<cached-diagnostics>': key 'llvmcas://{{.*}}'
-// CACHE-HIT-CLANG: remark: replay output file '{{.*}}{{/|\\}}Dummy-{{.*}}.pcm': key 'llvmcas://{{.*}}'
+// CACHE-HIT: remark: replay output file '<cached-diagnostics>': id 'llvmcas://{{.*}}'
+// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}test.o': id 'llvmcas://{{.*}}'
+// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}Test.swiftmodule': id 'llvmcas://{{.*}}'
+// CACHE-HIT-CLANG: remark: replay output file '<cached-diagnostics>': id 'llvmcas://{{.*}}'
+// CACHE-HIT-CLANG: remark: replay output file '{{.*}}{{/|\\}}Dummy-{{.*}}.pcm': id 'llvmcas://{{.*}}'
 // SKIP-CACHE-NOT: remark:
 
 //--- test.swift

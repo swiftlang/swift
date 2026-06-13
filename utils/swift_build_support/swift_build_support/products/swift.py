@@ -59,7 +59,6 @@ class Swift(product.Product):
 
         # Add experimental cxx interop flags.
         self.cmake_options.extend(self._enable_experimental_cxx_interop)
-        self.cmake_options.extend(self._enable_cxx_interop_swift_bridging_header)
 
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
@@ -94,6 +93,9 @@ class Swift(product.Product):
         self.cmake_options.extend(self._enable_embedded_stdlib_cross_compiling)
 
         self.cmake_options.extend(self._enable_stdlib_symbol_graphs)
+
+        # Add pedantic diagnostics flag.
+        self.cmake_options.extend(self._swift_pedantic_diagnostics)
 
         self.cmake_options.extend(
             self._swift_tools_ld64_lto_codegen_only_for_supporting_targets)
@@ -228,11 +230,6 @@ updated without updating swift.py?")
                  self.args.enable_experimental_cxx_interop)]
 
     @property
-    def _enable_cxx_interop_swift_bridging_header(self):
-        return [('SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL',
-                 self.args.enable_cxx_interop_swift_bridging_header)]
-
-    @property
     def _enable_experimental_distributed(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL',
                  self.args.enable_experimental_distributed)]
@@ -311,6 +308,11 @@ updated without updating swift.py?")
     def _enable_new_runtime_build(self):
         return [('SWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL',
                  self.args.enable_new_runtime_build)]
+
+    @property
+    def _swift_pedantic_diagnostics(self):
+        return [('SWIFT_PEDANTIC_DIAGNOSTICS:BOOL',
+                  self.args.swift_pedantic_diagnostics)]
 
     @property
     def _darwin_test_deployment_versions(self):

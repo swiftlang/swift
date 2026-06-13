@@ -403,16 +403,19 @@ internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
 
 @usableFromInline
 @_silgen_name("_swift_getSwiftClassInstanceExtents")
+@_unavailableInEmbedded
 internal func getSwiftClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 @usableFromInline
 @_silgen_name("_swift_getObjCClassInstanceExtents")
+@_unavailableInEmbedded
 internal func getObjCClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
   return Int(getObjCClassInstanceExtents(theClass).positive)
@@ -725,6 +728,7 @@ internal func _swift_class_getSuperclass(_ t: AnyClass) -> AnyClass?
 
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
 /// a root class or class protocol.
+@_unavailableInEmbedded
 public func _getSuperclass(_ t: AnyClass) -> AnyClass? {
   return _swift_class_getSuperclass(t)
 }
@@ -733,6 +737,7 @@ public func _getSuperclass(_ t: AnyClass) -> AnyClass? {
 /// not a class, is a root class, or is a class protocol.
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 public // @testable
 func _getSuperclass(_ t: Any.Type) -> AnyClass? {
   return (t as? AnyClass).flatMap { _getSuperclass($0) }

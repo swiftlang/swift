@@ -19,7 +19,6 @@ import StdlibUnittest
 var suite = TestSuite("Span Tests")
 defer { runAllTests() }
 
-@available(SwiftStdlib 6.2, *)
 extension Span where Element: Equatable {
 
   /// Returns a Boolean value indicating whether this and another span
@@ -342,13 +341,8 @@ suite.test("subscript with BitwiseCopyable element")
 }
 
 suite.test("extracting() functions")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+.require(.minimumStdlib(.stdlib_6_2))
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
   let capacity = 4
   let b = (0..<capacity).map(String.init)
   b.withUnsafeBufferPointer {
@@ -357,20 +351,29 @@ suite.test("extracting() functions")
     let sub2 = span.extracting(..<2)
     let sub3 = span.extracting(...)
     let sub4 = span.extracting(2...)
+    let sub5 = span.extracting(1...2)
     expectTrue(sub1._elementsEqual(sub2))
     expectTrue(sub3._elementsEqual(span))
     expectFalse(sub4._elementsEqual(sub3))
+    expectEqual(sub5.count, 2)
+    expectTrue(sub5._elementsEqual(span.extracting(1..<3)))
   }
 }
 
-suite.test("extracting(unchecked:) functions")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+suite.test("extracting() bounds checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Index range out of bounds", when: _isDebugAssertConfiguration())
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
+  let b: ContiguousArray<Int> = [1, 2, 3, 4]
+  let span = b.span
+  expectCrashLater()
+  _ = span.extracting(2 ..< .max)
+}
 
+suite.test("extracting(unchecked:) functions")
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
   let capacity = 32
   let b = (0..<capacity).map(String.init)
   b.withUnsafeBufferPointer {
@@ -383,13 +386,8 @@ suite.test("extracting(unchecked:) functions")
 }
 
 suite.test("prefix extracting() functions")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+.require(.minimumStdlib(.stdlib_6_2))
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
   let capacity = 4
   let a = Array(0..<capacity)
   a.withUnsafeBufferPointer {
@@ -397,8 +395,10 @@ suite.test("prefix extracting() functions")
     expectEqual(span.count, capacity)
     expectEqual(span.extracting(first: 1)[0], 0)
     expectEqual(span.extracting(first: capacity)[capacity-1], capacity-1)
+    expectEqual(span.extracting(first: capacity + 5).count, capacity)
     expectEqual(span.extracting(droppingLast: capacity).count, 0)
     expectEqual(span.extracting(droppingLast: 1)[capacity-2], capacity-2)
+    expectEqual(span.extracting(droppingLast: capacity + 5).count, 0)
   }
 
   do {
@@ -410,14 +410,31 @@ suite.test("prefix extracting() functions")
   }
 }
 
-suite.test("suffix extracting() functions")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+suite.test("extracting(first:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't have a prefix of negative length", when: _isDebugAssertConfiguration())
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
+  let b: ContiguousArray<Int> = [1, 2, 3, 4]
+  let span = b.span
+  expectCrashLater()
+  _ = span.extracting(first: -1)
+}
 
+suite.test("extracting(droppingLast:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't drop a negative number of elements", when: _isDebugAssertConfiguration())
+.code {
+  let b: ContiguousArray<Int> = [1, 2, 3, 4]
+  let span = b.span
+  expectCrashLater()
+  _ = span.extracting(droppingLast: -1)
+}
+
+suite.test("suffix extracting() functions")
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
   let capacity = 4
   let a = Array(0..<capacity)
   a.withUnsafeBufferPointer {
@@ -426,8 +443,10 @@ suite.test("suffix extracting() functions")
     expectEqual(span.extracting(last: capacity)[0], 0)
     expectEqual(span.extracting(last: capacity-1)[0], 1)
     expectEqual(span.extracting(last: 1)[0], capacity-1)
+    expectEqual(span.extracting(last: capacity + 5).count, capacity)
     expectEqual(span.extracting(droppingFirst: capacity).count, 0)
     expectEqual(span.extracting(droppingFirst: 1)[0], 1)
+    expectEqual(span.extracting(droppingFirst: capacity + 5).count, 0)
   }
 
   do {
@@ -437,6 +456,28 @@ suite.test("suffix extracting() functions")
     expectEqual(span.extracting(last: 1).count, b.count)
     expectEqual(span.extracting(droppingFirst: 1).count, b.count)
   }
+}
+
+suite.test("extracting(last:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't have a suffix of negative length", when: _isDebugAssertConfiguration())
+.code {
+  let b: ContiguousArray<Int> = [1, 2, 3, 4]
+  let span = b.span
+  expectCrashLater()
+  _ = span.extracting(last: -1)
+}
+
+suite.test("extracting(droppingFirst:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't drop a negative number of elements", when: _isDebugAssertConfiguration())
+.code {
+  let b: ContiguousArray<Int> = [1, 2, 3, 4]
+  let span = b.span
+  expectCrashLater()
+  _ = span.extracting(droppingFirst: -1)
 }
 
 suite.test("withUnsafeBufferPointer")

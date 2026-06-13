@@ -34,6 +34,14 @@
 
 // CHECKELF: .section{{.*}}"__TEXT,__mysection","axR"
 // CHECKELF-NOT: .section
+// CHECKELF: $s7section2g6Sivg:
+
+// CHECKELF: .section{{.*}}"__TEXT,__mymutsection","axR"
+// CHECKELF-NOT: .section
+// CHECKELF: $s7section2g6Sivs:
+
+// CHECKELF: .section{{.*}}"__TEXT,__mysection","axR"
+// CHECKELF-NOT: .section
 // CHECKELF: $s7section8MyStructV3fooyyF:
 
 // CHECKELF: .section{{.*}}"__DATA,__mysection","awR"

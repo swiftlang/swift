@@ -186,6 +186,8 @@ def verify_ignore_unrelated: Flag<["-"], "verify-ignore-unrelated">,
   HelpText<"Allow diagnostics in files outside those with expected diagnostics in verify mode">;
 def verify_ignore_macro_note: Flag<["-"], "verify-ignore-macro-note">,
   HelpText<"Skip verifying notes about macro location">;
+def verify_child_notes: Flag<["-"], "verify-child-notes">,
+  HelpText<"Verify child notes in child diagnostics blocks">;
 def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
@@ -195,6 +197,17 @@ def expansion_remarks:  Flag<["-"], "Rmacro-expansions">,
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
+
+def swift_diagnostics_assert_on_error : Flag<["-"], "diagnostics-assert-on-error">,
+  HelpText<"Trap when an error diagnostic is emitted. For compiler developers only.">;
+
+def swift_diagnostics_assert_on_warning : Flag<["-"], "diagnostics-assert-on-warning">,
+  HelpText<"Trap when a warning diagnostic is emitted. For compiler developers only.">;
+
+def swift_diagnostics_assert_on_group : Separate<["-"], "diagnostics-assert-on-group">,
+  MetaVarName<"<diagnostic_group>">,
+  HelpText<"Trap when any diagnostic in the given group is emitted. "
+           "For compiler developers only.">;
 
 def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
   HelpText<"Automatically import declared cross-import overlays.">;
@@ -303,6 +316,11 @@ def parallel_scan : Flag<["-"], "parallel-scan">,
    HelpText<"Perform dependency scanning in-parallel.">;
 def no_parallel_scan : Flag<["-"], "no-parallel-scan">,
    HelpText<"Perform dependency scanning in a single-threaded fashion.">;
+
+def no_clang_compiler_instance_sharing
+    : Flag<["-"], "no-clang-scanner-instance-sharing">,
+      HelpText<"Disable sharing of the Clang compiler instance across "
+               "dependency scans.">;
 
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
   HelpText<"Always run SIL copy propagation with lexical lifetimes to shorten object "
@@ -728,6 +746,10 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
 def dump_abstract_layout : Flag<["-"], "dump-abstract-layout">,
   HelpText<"Dump abstract layout information for Clang-backed types">;
 
+def dump_hidden_type_layouts : Flag<["-"], "dump-hidden-type-layouts">,
+  HelpText<"Dump every hidden-type layout known to this compilation, "
+           "including those deserialized from imported swiftmodules">;
+
 def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
                                HelpText<"Dump availability scopes to stderr">;
 
@@ -1090,6 +1112,11 @@ def sil_verify_none : Flag<["-"], "sil-verify-none">,
 
 def sil_ownership_verify_all : Flag<["-"], "sil-ownership-verify-all">,
   HelpText<"Verify ownership after each transform">;
+
+def sil_region_isolation_assert_on_unknown_pattern :
+  Flag<["-"], "sil-region-isolation-assert-on-unknown-pattern">,
+  HelpText<"Abort if SIL region isolation detects an unknown pattern. "
+           "For compiler developers only.">;
 
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;

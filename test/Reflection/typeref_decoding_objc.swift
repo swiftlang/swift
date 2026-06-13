@@ -15,6 +15,7 @@
 
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
+// UNSUPPORTED: CPU=armv7k && OS=watchos
 
 // CHECK: FIELDS:
 // CHECK: =======

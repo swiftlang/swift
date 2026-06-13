@@ -81,5 +81,5 @@ func sendingTransferNonSendableError(_ x: NonSendableKlass) {
 
 func sendingTransferNonSendableError(_ x: NonSendableKlass) async {
   await transferToMain(x) // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated value of non-Sendable type 'NonSendableKlass' to main actor-isolated global function 'transferToMain' risks causing races in between task-isolated and main actor-isolated uses}}
+  // expected-note @-1 {{sending value of non-Sendable type 'NonSendableKlass' to main actor-isolated global function 'transferToMain' risks causing races in between code in the current isolation context and main actor-isolated uses}}
 }

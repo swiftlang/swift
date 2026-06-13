@@ -98,6 +98,20 @@ struct ModuleBuffers {
                   ModuleSourceInfoBuffer(std::move(ModuleSourceInfoBuffer)) {}
 };
 
+/// Parse `-enable-experimental-feature`, `-disable-experimental-feature`,
+/// `-enable-upcoming-feature`, and `-disable-upcoming-feature` arguments from
+/// \p Args and apply the resulting feature state to \p Opts. Also processes
+/// pseudo-features such as `StrictConcurrency=...`, `AvailabilityMacro=...`,
+/// `RequiresObjC=...`, `CodeGenerationModel=...`, and `ApproachableConcurrency`.
+///
+/// The last-specified flag for a given feature wins. Shared by
+/// `swift-frontend` and `swift-synthesize-interface`.
+///
+/// \returns true if any argument was malformed in a way that should prevent
+/// further compilation.
+bool parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
+                      DiagnosticEngine &Diags);
+
 /// The abstract configuration of the compiler, including:
 ///   - options for all stages of translation,
 ///   - information about the build environment,
@@ -277,9 +291,6 @@ public:
   /// @note This should be called once, after search path options and frontend
   ///       options have been parsed.
   void setDefaultPrebuiltCacheIfNecessary();
-
-  /// If we haven't explicitly passed -blocklist-paths, set it to the default value.
-  void setDefaultBlocklistsIfNecessary();
 
   /// If we haven't explicitly passed '-in-process-plugin-server-path', infer
   /// it as a default value.

@@ -57,8 +57,10 @@ extension Optional where Wrapped: ~Copyable {
 
 let suite = TestSuite("RefMutableRef")
 
-if #available(SwiftStdlib 6.4, *) {
-suite.test("Ref") {
+suite.test("Ref")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
   var foo = Foo()
 
   do {
@@ -80,37 +82,11 @@ suite.test("Ref") {
 
   expectEqual(int, 321)
 }
-}
 
-if #available(SwiftStdlib 6.4, *) {
-suite.test("Ref inside a Ref") {
-  var foo = Foo()
+suite.test("MutableRef")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
 
-  do {
-    let borrowFoo = Ref(foo)
-    let borrowBorrowFoo = Ref(borrowFoo)
-
-    expectEqual(borrowBorrowFoo.value.value.x, 128)
-  }
-
-  foo.bar()
-
-  let a = Atomic(123)
-  let ba = BorrowingAtomic(a)
-  let borrowBa = Ref(ba)
-  var int = borrowBa.value.load()
-
-  expectEqual(int, 123)
-
-  borrowBa.value.store(321)
-  int = borrowBa.value.load()
-
-  expectEqual(int, 321)
-}
-}
-
-if #available(SwiftStdlib 6.4, *) {
-suite.test("MutableRef") {
   var x: _? = 123
 
   var y = x.mutate()!
@@ -134,40 +110,30 @@ suite.test("MutableRef") {
 
   expectEqual(a, 64)
 }
+
+suite.test("Sendability")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  func isSendable<T: ~Copyable & ~Escapable>(_: T.Type) -> Bool { false }
+  func isSendable<T: Sendable & ~Copyable & ~Escapable>(_: T.Type) -> Bool { true }
+
+  expectTrue(isSendable(Ref<Int>.self))
+  expectTrue(isSendable(MutableRef<Int>.self))
+
+  expectFalse(isSendable(Ref<UnsafeMutableRawPointer>.self))
+  expectFalse(isSendable(MutableRef<UnsafeRawPointer>.self))
 }
 
-if #available(SwiftStdlib 6.4, *) {
-suite.test("MutableRef inside a Ref") {
-  var x: _? = 123
+suite.test("BitwiseCopyability")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
 
-  var y = x.mutate()!
+  func isBitwiseCopyable<T: ~Copyable & ~Escapable>(_: T.Type) -> Bool { false }
+  func isBitwiseCopyable<T: BitwiseCopyable & ~Escapable>(_: T.Type) -> Bool { true }
 
-  do {
-    let borrowY = Ref(y)
-
-    // The following correctly doesn't compile. We cannot mutate a value within
-    // a `MutableRef` if it is behind a `Ref`.
-    // borrowY.value.value &+= 321
-
-    // But we should be able to read its value though.
-    expectEqual(borrowY.value.value, 123)
-  }
-
-  var a: Int? = nil
-
-  var b = a.insert(128)
-
-  do {
-    let borrowB = Ref(b)
-
-    expectEqual(borrowB.value.value, 128)
-
-    // Again, the following shouldn't compile (it doesn't).
-    // borrowB.value.value &-= 64
-  }
-
-  expectEqual(a, 128)
-}
+  expectTrue(isBitwiseCopyable(Ref<Int>.self))
+  expectFalse(isBitwiseCopyable(MutableRef<Int>.self))
 }
 
 runAllTests()

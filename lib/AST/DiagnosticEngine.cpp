@@ -606,7 +606,7 @@ bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID grou
       sf->getExportedSourceFile()) {
     auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
     return swift_ASTGen_isWarningGroupEnabledInFile(
-        sf->getExportedSourceFile(),
+        sf->getExportedSourceFile(), sf->getASTContext(),
         BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
         StringRef(getDiagGroupInfoByID(groupID).name));
   }
@@ -1327,15 +1327,6 @@ DiagnosticBehavior toDiagnosticBehavior(DiagnosticKind kind, bool isFatal) {
   llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
-// A special option only for compiler writers that causes Diagnostics to assert
-// when a failure diagnostic is emitted. Intended for use in the debugger.
-llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
-                                  llvm::cl::init(false));
-// A special option only for compiler writers that causes Diagnostics to assert
-// when a warning diagnostic is emitted. Intended for use in the debugger.
-llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
-                                    llvm::cl::init(false));
-
 std::optional<DiagnosticBehavior>
 DiagnosticState::determineUserControlledWarningBehavior(
     const Diagnostic &diag, SourceManager &sourceMgr) const {
@@ -1381,7 +1372,7 @@ DiagnosticState::determineUserControlledWarningBehavior(
         auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
         WarningGroupBehavior behavior =
             swift_ASTGen_warningGroupBehaviorAtPosition(
-                SF->getExportedSourceFile(),
+                SF->getExportedSourceFile(), SF->getASTContext(),
                 BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
                 StringRef(getDiagGroupInfoByID(diag.getGroupID()).name), loc);
         switch (behavior) {
@@ -1472,8 +1463,8 @@ void DiagnosticState::updateFor(DiagnosticBehavior behavior) {
     anyErrorOccurred = true;
   }
 
-  ASSERT((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-  ASSERT((!AssertOnWarning || (behavior != DiagnosticBehavior::Warning)) &&
+  ASSERT((!assertOnError || !anyErrorOccurred) && "We emitted an error?!");
+  ASSERT((!assertOnWarning || (behavior != DiagnosticBehavior::Warning)) &&
          "We emitted a warning?!");
 
   previousBehavior = behavior;
@@ -1539,6 +1530,15 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   auto behavior = state.determineBehavior(diagnostic, SourceMgr);
   state.updateFor(behavior);
 
+  if (behavior != DiagnosticBehavior::Ignore) {
+    auto groupID = diagnostic.getGroupID();
+    if (groupID != DiagGroupID::no_group &&
+        state.shouldAssertOnGroup(groupID)) {
+      ASSERT(false && "Trapping on diagnostic group (see "
+                      "-diagnostics-assert-on-group)");
+    }
+  }
+
   if (behavior == DiagnosticBehavior::Ignore)
     return std::nullopt;
 
@@ -1583,6 +1583,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
       case GeneratedSourceInfo::PrettyPrinted:
       case GeneratedSourceInfo::DefaultArgument:
       case GeneratedSourceInfo::AttributeFromClang:
+      case GeneratedSourceInfo::SyntheticMacro:
         fixIts = {};
         break;
       case GeneratedSourceInfo::ReplacedFunctionBody:
@@ -1631,6 +1632,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return DeclName();
   }
 }
@@ -1693,6 +1695,7 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
     case GeneratedSourceInfo::DefaultArgument:
     case GeneratedSourceInfo::ReplacedFunctionBody:
     case GeneratedSourceInfo::AttributeFromClang:
+    case GeneratedSourceInfo::SyntheticMacro:
       return childNotes;
     }
 

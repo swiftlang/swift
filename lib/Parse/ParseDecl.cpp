@@ -203,6 +203,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
+    case SourceFileKind::SyntheticMacro:
       braceItemListKind = BraceItemListKind::MacroExpansion;
       break;
     }
@@ -2742,6 +2743,48 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                      "by attribute parsing code");
   case DeclAttrKind::SetterAccess:
     llvm_unreachable("handled by DeclAttrKind::AccessControl");
+
+  case DeclAttrKind::PreInverseGenerics: {
+    TypeRepr *exceptType = nullptr;
+    Type resolvedExceptType;
+    SourceLoc rParenLoc = Loc;
+
+    // The @_preInverseGenericsExceptCopyable spelling is a shorthand for
+    // @_preInverseGenerics(except: ~Copyable) to avoid condfails during the
+    // Span<~E> adoption.
+    //
+    // We inject the resolved 'except:' type directly into the attribute.
+    if (AttrName == "_preInverseGenericsExceptCopyable") {
+      resolvedExceptType = ProtocolCompositionType::getInverseOf(
+          Context, InvertibleProtocolKind::Copyable);
+    } else if (consumeIfAttributeLParen()) {
+      if (Tok.getText() != "except" || peekToken().isNot(tok::colon)) {
+        diagnose(Tok, diag::attr_pre_inverse_generics_expected_except);
+        skipUntil(tok::r_paren);
+        consumeIf(tok::r_paren);
+        return makeParserSuccess();
+      }
+      consumeToken(tok::identifier);
+      consumeToken(tok::colon);
+
+      auto type = parseType(diag::expected_type);
+      if (type.isNull())
+        return makeParserSuccess();
+      exceptType = type.get();
+
+      if (!consumeIf(tok::r_paren, rParenLoc)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_rparen,
+                 AttrName, /*isModifier=*/false);
+        return makeParserSuccess();
+      }
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) PreInverseGenericsAttr(
+          AtLoc, SourceRange(AtLoc.isValid() ? AtLoc : Loc, rParenLoc),
+          exceptType, resolvedExceptType));
+    break;
+  }
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
@@ -8504,9 +8547,9 @@ void Parser::parseTopLevelAccessors(
     if (accessorStatus.isError())
       break;
 
-    (void)parseAccessorAfterIntroducer(loc, kind, accessors, hasEffectfulGet,
-                                       parsingLimitedSyntax, attributes,
-                                       PD_Default, storage, status);
+    (void)parseAccessorAfterIntroducer(
+        loc, kind, accessors, hasEffectfulGet, parsingLimitedSyntax, attributes,
+        getParseDeclOptions(storage->getDeclContext()), storage, status);
     if (IsFirstAccessor) {
       IsFirstAccessor = false;
     }
@@ -10430,6 +10473,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
+    case SourceFileKind::SyntheticMacro:
       if (Tok.is(tok::identifier)) {
         diagnose(Tok, diag::destructor_has_name).fixItRemove(Tok.getLoc());
         consumeToken();

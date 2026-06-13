@@ -16,6 +16,9 @@
 // CHECK-NEXT:     var rawValue: {{UInt32|Int32}}
 // CHECK-NEXT:     typealias RawValue = {{UInt32|Int32}}
 // CHECK-NEXT:   }
+// CHECK-NEXT:   static var ea: Base.Enum { get }
+// CHECK-NEXT:   static var eb: Base.Enum { get }
+// CHECK-NEXT:   static var ec: Base.Enum { get }
 // CHECK-NEXT:   struct Struct {
 // CHECK-NEXT:     init(sa: Int32, sb: Int32)
 // CHECK-NEXT:     init()
@@ -43,6 +46,9 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   typealias EnumClass = Base.EnumClass
 // CHECK-NEXT:   typealias Enum = Base.Enum
+// CHECK-NEXT:   static var ea: Base.Enum { get }
+// CHECK-NEXT:   static var eb: Base.Enum { get }
+// CHECK-NEXT:   static var ec: Base.Enum { get }
 // CHECK-NEXT:   typealias Struct = Base.Struct
 // CHECK-NEXT:   typealias Parent = Base.Parent
 // CHECK-NEXT:   typealias Union = Base.Union
@@ -52,6 +58,9 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   typealias EnumClass = Base.EnumClass
 // CHECK-NEXT:   typealias Enum = Base.Enum
+// CHECK-NEXT:   static var ea: Base.Enum { get }
+// CHECK-NEXT:   static var eb: Base.Enum { get }
+// CHECK-NEXT:   static var ec: Base.Enum { get }
 // CHECK-NEXT:   typealias Struct = Base.Struct
 // CHECK-NEXT:   typealias Parent = Base.Parent
 // CHECK-NEXT:   typealias Union = Base.Union
@@ -61,6 +70,9 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   typealias EnumClass = Base.EnumClass
 // CHECK-NEXT:   typealias Enum = Base.Enum
+// CHECK-NEXT:   static var ea: Base.Enum { get }
+// CHECK-NEXT:   static var eb: Base.Enum { get }
+// CHECK-NEXT:   static var ec: Base.Enum { get }
 // CHECK-NEXT:   typealias Struct = Base.Struct
 // CHECK-NEXT:   typealias Parent = Base.Parent
 // CHECK-NEXT:   typealias Union = Base.Union

@@ -73,8 +73,8 @@ for %%I in (%TestsList%) do (
 set "TestArg=-Test !TestArg!"
 
 :: Build the packaging arguments (skipped for normal PRs and an added stage for toolchain PRs)
-set "PackagingArg=-SkipPackaging"
-if not "%INCLUDE_PACKAGING%"=="" set "PackagingArg=-Stage %PackageRoot%"
+set "PackagingArg="
+if not "%INCLUDE_PACKAGING%"=="" set "PackagingArg=-Package -Stage %PackageRoot%"
 
 :: Build the arguments related to Windows SDK builds
 set "WindowsSDKArgs=-Windows"
@@ -125,7 +125,7 @@ set "args=%args% --skip-repository ninja"
 set "args=%args% --skip-repository swift-integration-tests"
 set "args=%args% --skip-repository swift-stress-tester"
 
-call "%SourceRoot%\swift\utils\update-checkout.cmd" %args% --clone --skip-history --reset-to-remote --github-comment "%ghprbCommentBody%"
+call "%SourceRoot%\swift\utils\update-checkout.cmd" %args% --clone --skip-history --reset-to-remote --github-comment "!ghprbCommentBody!"
 
 goto :eof
 endlocal

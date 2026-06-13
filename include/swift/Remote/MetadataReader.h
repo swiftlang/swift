@@ -1243,6 +1243,23 @@ public:
       TypeCache[TypeCacheKey] = BuiltForeign;
       return BuiltForeign;
     }
+    case MetadataKind::FixedArray: {
+      auto fixedArray = cast<TargetFixedArrayTypeMetadata<Runtime>>(Meta);
+      auto elementAddress = RemoteAddress(
+          fixedArray->Element, MetadataAddress.getAddressSpace());
+      auto Element =
+          readTypeFromMetadata(elementAddress, false, recursion_limit);
+      if (!Element) return BuiltType();
+
+      auto count = static_cast<intptr_t>(fixedArray->Count);
+      BuiltType Size = (count < 0) ? Builder.createNegativeIntegerType(count)
+                                   : Builder.createIntegerType(count);
+      if (!Size) return BuiltType();
+
+      auto BuiltFixedArray = Builder.createBuiltinFixedArrayType(Size, Element);
+      TypeCache[TypeCacheKey] = BuiltFixedArray;
+      return BuiltFixedArray;
+    }
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
@@ -1540,15 +1557,16 @@ public:
   ///   - address: The address of the value.
   ///   - ptr: The bytes that have been read so far. On return, the full object.
   ///   - existingByteCount: The number of bytes in ptr.
+  /// Returns the full size, or 0 if an error occurred.
   template <typename BaseTy>
-  bool readFullTrailingObjects(RemoteAddress address,
-                               MemoryReader::ReadBytesResult &ptr,
-                               size_t existingByteCount) {
+  size_t readFullTrailingObjects(RemoteAddress address,
+                                 MemoryReader::ReadBytesResult &ptr,
+                                 size_t existingByteCount) {
     // Read the full base descriptor if it's bigger than what we have so far.
     if (sizeof(BaseTy) > existingByteCount) {
       ptr = Reader->template readObj<BaseTy>(address);
       if (!ptr)
-        return false;
+        return -1;
     }
 
     // We don't know how much memory we need to read to get all the trailing
@@ -1571,15 +1589,15 @@ public:
       if (thisSize > sizeSoFar) {
         // Make sure we haven't ended up with a ridiculous size.
         if (thisSize > MaxMetadataSize)
-          return false;
+          return -1;
 
         ptr = Reader->readBytes(address, thisSize);
         if (!ptr)
-          return false;
+          return -1;
         sizeSoFar = thisSize;
       }
     }
-    return true;
+    return sizeSoFar;
   }
 
   /// Demangle the entity represented by a symbolic reference to a given symbol name.
@@ -2145,9 +2163,13 @@ protected:
                          reinterpret_cast<const TargetMetadata<Runtime> *>(
                              cached->second.get()));
 
+    return readMetadataAndSize(address).first;
+  }
+
+  std::pair<MetadataRef, size_t> readMetadataAndSize(RemoteAddress address) {
     StoredPointer KindValue = 0;
     if (!Reader->readInteger(address, &KindValue))
-      return nullptr;
+      return {nullptr, 0};
 
     switch (getEnumeratedMetadataKind(KindValue)) {
       case MetadataKind::Class:
@@ -2171,12 +2193,12 @@ protected:
         RemoteAddress signedShapePtr;
         if (!Reader->template readRemoteAddress<StoredPointer>(shapeAddress,
                                                                signedShapePtr))
-          return nullptr;
+          return {nullptr, 0};
         auto shapePtr = stripSignedPointer(signedShapePtr);
 
         auto shape = readShape(shapePtr);
         if (!shape)
-          return nullptr;
+          return {nullptr, 0};
 
         auto totalSize =
             sizeof(TargetExtendedExistentialTypeMetadata<Runtime>)
@@ -2208,13 +2230,13 @@ protected:
           TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements();
         StoredSize numElements;
         if (!Reader->readInteger(numElementsAddress, &numElements))
-          return nullptr;
+          return {nullptr, 0};
         auto totalSize = sizeof(TargetTupleTypeMetadata<Runtime>) +
                          numElements * sizeof(TupleTypeMetadata::Element);
 
         // Make sure the number of elements is reasonable
         if (numElements >= 256)
-          return nullptr;
+          return {nullptr, 0};
 
         return _readMetadata(address, totalSize);
       }
@@ -2225,7 +2247,7 @@ protected:
 
     // We can fall out here if the value wasn't actually a valid
     // MetadataKind.
-    return nullptr;
+    return {nullptr, 0};
   }
 
   RemoteAddress
@@ -2298,7 +2320,7 @@ protected:
 
 private:
   template <template <class R> class M>
-  MetadataRef _readMetadataFixedSize(RemoteAddress address) {
+  std::pair<MetadataRef, size_t> _readMetadataFixedSize(RemoteAddress address) {
     static_assert(!ABI::typeHasTrailingObjects<M<Runtime>>(),
                   "Type must not have trailing objects. Use "
                   "_readMetadataVariableSize for types that have them.");
@@ -2307,23 +2329,23 @@ private:
   }
 
   template <template <class R> class M>
-  MetadataRef _readMetadataVariableSize(RemoteAddress address) {
+  std::pair<MetadataRef, size_t> _readMetadataVariableSize(RemoteAddress address) {
     static_assert(ABI::typeHasTrailingObjects<M<Runtime>>(),
                   "Type must have trailing objects. Use _readMetadataFixedSize "
                   "for types that don't.");
 
     MemoryReader::ReadBytesResult bytes;
     auto readResult = readFullTrailingObjects<M<Runtime>>(address, bytes, 0);
-    if (!readResult)
-      return nullptr;
-    return _cacheMetadata(address, bytes);
+    if (readResult == 0)
+      return {nullptr, 0};
+    return {_cacheMetadata(address, bytes), readResult};
   }
 
-  MetadataRef _readMetadata(RemoteAddress address, size_t sizeAfter) {
+  std::pair<MetadataRef, size_t> _readMetadata(RemoteAddress address, size_t sizeAfter) {
     if (sizeAfter > MaxMetadataSize)
-      return nullptr;
+      return {nullptr, 0};
     auto readResult = Reader->readBytes(address, sizeAfter);
-    return _cacheMetadata(address, readResult);
+    return {_cacheMetadata(address, readResult), sizeAfter};
   }
 
   MetadataRef _cacheMetadata(RemoteAddress address,
@@ -3150,13 +3172,27 @@ private:
     
     auto numGenericArgs =
       generics->getGenericContextHeader().getNumArguments();
-    
+
     auto offsetToGenericArgs = readGenericArgsOffset(metadata, descriptor);
     if (!offsetToGenericArgs)
       return {};
 
-    auto genericArgsAddr = getAddress(metadata)
+    auto genericArgsBaseAddr = getAddress(metadata)
       + sizeof(StoredPointer) * *offsetToGenericArgs;
+
+    // The generic argument layout begins with one StoredSize "shape class"
+    // entry per same-shape equivalence class. These hold pack lengths for
+    // pack-typed key arguments. Skip past them to reach the metadata pointers.
+    auto packShapeHeader = generics->getGenericPackShapeHeader();
+    auto packShapeDescriptors = generics->getGenericPackShapeDescriptors();
+    if (numGenericArgs < packShapeHeader.NumShapeClasses)
+      return {};
+    numGenericArgs -= packShapeHeader.NumShapeClasses;
+
+    auto genericArgsAddr = genericArgsBaseAddr
+      + sizeof(StoredPointer) * packShapeHeader.NumShapeClasses;
+
+    unsigned packIndex = 0;
 
     std::vector<BuiltType> builtSubsts;
     for (auto param : generics->getGenericParams()) {
@@ -3187,10 +3223,65 @@ private:
           return {};
         }
         break;
-        
+
       case GenericParamKind::TypePack:
-        // assert(false && "Packs not supported here yet");
-        return {};
+        if (param.hasKeyArgument()) {
+          if (numGenericArgs == 0)
+            return {};
+          --numGenericArgs;
+
+          // Find the matching pack shape descriptor. By invariant the
+          // metadata pack descriptors come before any witness table pack
+          // descriptors, in the same order as the pack-typed parameters
+          // with key arguments, so the next descriptor is ours.
+          if (packIndex >= packShapeDescriptors.size())
+            return {};
+          const auto &packDescriptor = packShapeDescriptors[packIndex++];
+          if (packDescriptor.Kind != GenericPackKind::Metadata)
+            return {};
+
+          // The pack length is stored in the shape class slot at the
+          // start of the generic argument layout.
+          auto packLengthAddr = genericArgsBaseAddr
+            + sizeof(StoredPointer) * packDescriptor.ShapeClass;
+          StoredSize packLength;
+          if (!Reader->readInteger(packLengthAddr, &packLength))
+            return {};
+
+          // Read the pack pointer. Its low bit indicates heap vs. stack
+          // lifetime; the actual element array is at the address with the
+          // low bit cleared.
+          StoredPointer rawPackPtr;
+          if (!Reader->readInteger(genericArgsAddr, &rawPackPtr))
+            return {};
+          genericArgsAddr += sizeof(StoredPointer);
+
+          auto packElementsAddr = RemoteAddress(
+              rawPackPtr & ~StoredPointer(1),
+              genericArgsAddr.getAddressSpace());
+
+          std::vector<BuiltType> elements;
+          elements.reserve(packLength);
+          for (StoredSize i = 0; i < packLength; ++i) {
+            RemoteAddress elementMetadata;
+            if (!Reader->template readRemoteAddress<StoredPointer>(
+                    packElementsAddr, elementMetadata)) {
+              return {};
+            }
+            packElementsAddr += sizeof(StoredPointer);
+
+            auto builtElement = readTypeFromMetadata(
+                elementMetadata, false, recursion_limit);
+            if (!builtElement)
+              return {};
+            elements.push_back(builtElement);
+          }
+
+          builtSubsts.push_back(Builder.createPackType(elements));
+        } else {
+          return {};
+        }
+        break;
 
       default:
         // We don't know about this kind of parameter.

@@ -1,13 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-clang -x c -Wno-unused-command-line-argument -Wl,--build-id -g %S/Inputs/fib.c -o %t/fib
-// RUN: %target-clang -x c -Wno-unused-command-line-argument -g %S/Inputs/fib.c -o %t/fib-no-uuid
-// RUN: %target-clang -x c -Wno-unused-command-line-argument -Wl,--build-id -Wl,--compress-debug-sections=zlib-gnu -g %S/Inputs/fib.c -o %t/fib-compress-gnu
-// RUN: %target-clang -x c -Wno-unused-command-line-argument -Wl,--build-id -Wl,--compress-debug-sections=zlib -g %S/Inputs/fib.c -o %t/fib-compress-zlib
 // RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -g -o %t/ElfReader
-// RUN: %target-run %t/ElfReader %t/fib | %FileCheck %s
-// RUN: %target-run %t/ElfReader %t/fib-no-uuid | %FileCheck %s --check-prefix NOUUID
+// RUN: %target-run %t/ElfReader %S/Inputs/fib | %FileCheck %s
+// RUN: %target-run %t/ElfReader %S/Inputs/fib-compress-gnu | %FileCheck %s --check-prefix COMPRESS-GNU
+// RUN: %target-run %t/ElfReader %S/Inputs/fib-compress-zlib | %FileCheck %s --check-prefix COMPRESS-ZLIB
+// RUN: %target-run %t/ElfReader %S/Inputs/fib-no-uuid | %FileCheck %s --check-prefix NOUUID
 
-// REQUIRES: OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: backtracing
 
 @_spi(ElfTest) import Runtime
@@ -41,6 +39,30 @@ struct ElfReader {
     // CHECK-NEXT:   .debug_str_offsets: found
     // CHECK-NEXT:   .debug_line_str: found
     // CHECK-NEXT:   .debug_rnglists: not found
+
+    // COMPRESS-GNU: {{.*}}/fib-compress-gnu is a {{(32|64)}}-bit ELF image
+    // COMPRESS-GNU-NEXT:   uuid: {{[0-9a-f]+}}
+    // COMPRESS-GNU-NEXT:   .debug_info: found
+    // COMPRESS-GNU-NEXT:   .debug_line: found
+    // COMPRESS-GNU-NEXT:   .debug_abbrev: found
+    // COMPRESS-GNU-NEXT:   .debug_ranges: not found
+    // COMPRESS-GNU-NEXT:   .debug_str: found
+    // COMPRESS-GNU-NEXT:   .debug_addr: found
+    // COMPRESS-GNU-NEXT:   .debug_str_offsets: found
+    // COMPRESS-GNU-NEXT:   .debug_line_str: found
+    // COMPRESS-GNU-NEXT:   .debug_rnglists: not found
+
+    // COMPRESS-ZLIB: {{.*}}/fib-compress-zlib is a {{(32|64)}}-bit ELF image
+    // COMPRESS-ZLIB-NEXT:   uuid: {{[0-9a-f]+}}
+    // COMPRESS-ZLIB-NEXT:   .debug_info: found
+    // COMPRESS-ZLIB-NEXT:   .debug_line: found
+    // COMPRESS-ZLIB-NEXT:   .debug_abbrev: found
+    // COMPRESS-ZLIB-NEXT:   .debug_ranges: not found
+    // COMPRESS-ZLIB-NEXT:   .debug_str: found
+    // COMPRESS-ZLIB-NEXT:   .debug_addr: found
+    // COMPRESS-ZLIB-NEXT:   .debug_str_offsets: found
+    // COMPRESS-ZLIB-NEXT:   .debug_line_str: found
+    // COMPRESS-ZLIB-NEXT:   .debug_rnglists: not found
 
     // NOUUID: {{.*}}/fib-no-uuid is a {{(32|64)}}-bit ELF image
     // NOUUID-NEXT:   uuid: <no uuid>

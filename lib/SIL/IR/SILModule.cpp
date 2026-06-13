@@ -231,6 +231,12 @@ void SILModule::scheduleForDeletion(SILInstruction *I) {
 
 void SILModule::flushDeletedInsts() {
   for (SILInstruction *instToDelete : scheduledForDeletion) {
+    for (SILValue result: instToDelete->getResults()) {
+      ASSERT(result->use_empty() && "deleted instruction is still used");
+    }
+    for (Operand &op : instToDelete->getAllOperands()) {
+      ASSERT(!op.get() && "deleted instruction is using a value");
+    }
     SILInstruction::destroy(instToDelete);
     AlignedFree(instToDelete);
   }
@@ -914,6 +920,16 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
   for (auto &op : inst->getAllOperands()) {
     if (auto *undef = dyn_cast<SILUndef>(op.get())) {
       op.set(SILUndef::get(inst->getFunction(), undef->getType()));
+    }
+  }
+
+  // Update parent of any debug-only reconstruction blocks.
+  if (auto *DVI = dyn_cast<DebugValueInst>(inst)) {
+    if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
+      DebugBB->setParentFunction(inst->getFunction());
+      for (auto &I : *DebugBB) {
+        notifyMovedInstruction(&I, fromFunction);
+      }
     }
   }
 

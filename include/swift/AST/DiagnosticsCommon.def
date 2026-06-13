@@ -228,9 +228,6 @@ REMARK(warn_scanner_deserialize_failed, none,
 REMARK(remark_reuse_cache, none,
        "Incremental module scan: Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
 
-REMARK(remark_scanner_uncached_lookups, none,
-       "Module Dependency Scanner queries executed: '%0'.", (unsigned))
-
 REMARK(remark_save_cache, none,
        "Incremental module scan: Serializing module scanning dependency cache to: '%0'.", (StringRef))
 
@@ -290,7 +287,6 @@ ERROR(borrow_mutate_accessor_not_supported_in_decl, none,
 NOTE(bridged_note, none, "%0", (StringRef))
 WARNING(bridged_warning, none,"%0", (StringRef))
 ERROR(bridged_error, none, "%0", (StringRef))
-ERROR(bridged_fatal_error, Fatal, "%0", (StringRef))
 REMARK(bridged_remark, none, "%0", (StringRef))
 
 //------------------------------------------------------------------------------

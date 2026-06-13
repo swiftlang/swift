@@ -650,6 +650,20 @@ final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariable
   public var debugVariable: DebugVariable? {
     return bridged.DebugValue_hasVarInfo() ? bridged.DebugValue_getVarInfo() : nil
   }
+
+  public var debugReconstructionBlock: BasicBlock? {
+    bridged.DebugValue_getDebugReconstructionBlock().block
+  }
+
+  public func getOrCreateDebugReconstructionBlock() -> BasicBlock {
+    bridged.DebugValue_getOrCreateDebugReconstructionBlock().block
+  }
+
+  public func stripDeref() { bridged.DebugValue_stripDeref() }
+  public func prependDeref() { bridged.DebugValue_prependDeref() }
+  public func killOperand(withType type: Type? = nil) {
+    bridged.DebugValue_killOperand(type?.bridged ?? BridgedType())
+  }
 }
 
 final public class DebugStepInst : Instruction {}
@@ -936,12 +950,29 @@ public protocol IndexingInstruction: SingleValueInstruction {
 extension IndexingInstruction {
   public var base: Value { operands[0].value }
   public var index: Value { operands[1].value }
+
+  public var constantIndex: Int? {
+    if let literal = index as? IntegerLiteralInst,
+       let indexValue = literal.value
+    {
+      return indexValue
+    }
+    return nil
+  }
 }
 
 final public
 class IndexAddrInst : SingleValueInstruction, IndexingInstruction {
   public var needsStackProtection: Bool {
     bridged.IndexAddrInst_needsStackProtection()
+  }
+  /// True if this instruction projects a single array element address from an
+  /// array base, as opposed to being used for general pointer arithmetic.
+  /// When set, the result cannot be used to reach other array elements (e.g.
+  /// by chaining `index_addr` instructions); without this flag such chaining
+  /// is permitted.
+  public var isProjection: Bool {
+    bridged.IndexAddrInst_isProjection()
   }
 }
 
@@ -1032,7 +1063,11 @@ class ValueMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 final public
 class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class ObjCProtocolInst : SingleValueInstruction {}
+final public class ObjCProtocolInst : SingleValueInstruction {
+  public var protocolDecl: ProtocolDecl {
+    bridged.ObjCProtocolInst_getProtocol().getAs(ProtocolDecl.self)
+  }
+}
 
 final public class TypeValueInst: SingleValueInstruction, UnaryInstruction {
   public var paramType: CanonicalType {
@@ -1118,10 +1153,16 @@ final public class IntegerLiteralInst : SingleValueInstruction {
 }
 
 final public class FloatLiteralInst : SingleValueInstruction {
+  /// The bit pattern of the literal as an integer.
+  /// Returns nil if the bit pattern does not fit in an Int (e.g. Float80).
+  public var bits: Int? {
+    let b = bridged.FloatLiteralInst_getBits()
+    return b.hasValue ? b.value : nil
+  }
 }
 
 final public class StringLiteralInst : SingleValueInstruction {
-  public enum Encoding {
+  public enum Encoding: Hashable {
     case Bytes
     case UTF8
     /// UTF-8 encoding of an Objective-C selector.
@@ -1432,7 +1473,7 @@ final public class ExplicitCopyValueInst : SingleValueInstruction, CopyingInstru
 final public class UnownedCopyValueInst : SingleValueInstruction, CopyingInstruction {}
 final public class WeakCopyValueInst : SingleValueInstruction, CopyingInstruction {}
 
-final public class UncheckedOwnershipConversionInst : SingleValueInstruction {}
+final public class UncheckedOwnershipConversionInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {
   public var fromValue: Value { operand.value }
@@ -1995,7 +2036,11 @@ final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruc
 //                           parameter pack instructions
 //===----------------------------------------------------------------------===//
 
-final public class AllocPackInst : SingleValueInstruction, Allocation {}
+final public class AllocPackInst : SingleValueInstruction, Allocation {
+  public var packType: CanonicalType {
+    CanonicalType(bridged: bridged.AllocPackInst_getPackType())
+  }
+}
 final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
 
 final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
@@ -2037,9 +2082,16 @@ final public class TuplePackElementAddrInst: SingleValueInstruction {
   public var tupleOperand: Operand { operands[1] }
 }
 
-final public class PackElementGetInst: SingleValueInstruction {}
+final public class PackElementGetInst: SingleValueInstruction {
+  public var indexOperand: Operand { operands[0] }
+  public var packOperand: Operand { operands[1] }
+}
 
-final public class PackElementSetInst: Instruction {}
+final public class PackElementSetInst: Instruction {
+  public var valueOperand: Operand { operands[0] }
+  public var indexOperand: Operand { operands[1] }
+  public var packOperand: Operand { operands[2] }
+}
 
 //===----------------------------------------------------------------------===//
 //                            terminator instructions
@@ -2184,9 +2236,9 @@ final public class CondBranchInst : TermInst {
 final public class SwitchValueInst : TermInst {
 }
 
-final public class SwitchEnumInst : TermInst {
+final public class SwitchEnumInst : TermInst, UnaryInstruction {
 
-  public var enumOp: Value { operands[0].value }
+  public var enumOp: Value { operand.value }
 
   public struct CaseIndexArray : RandomAccessCollection {
     fileprivate let switchEnum: SwitchEnumInst

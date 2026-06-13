@@ -959,7 +959,7 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
     return nullptr;
   }
 
-  auto clangModule = clangImporter->getClangOwningModule(decl->getClangDecl());
+  auto clangModule = clangImporter->getClangOwningModule(decl->getClangNode());
   if (!clangModule)
     return nullptr;
 
@@ -1220,6 +1220,11 @@ bool Decl::hasExplicitIsolationAttribute() const {
     if (!isolatedAttr->isImplicit()) {
       return true;
     }
+  }
+
+  if (auto concurrentAttr = getAttrs().getAttribute<ConcurrentAttr>()) {
+    if (!concurrentAttr->isImplicit())
+      return true;
   }
 
   if (auto globalActorAttr = getGlobalActorAttr()) {
@@ -2366,17 +2371,98 @@ Decl::getExplicitCodeGenerationModel() const {
   if (sawInlinable)
     return CodeGenerationModel::Inlinable;
 
+  // An accessor inherits its code generation model from the variable or
+  // subscript it implements, so that `@export(...)` on a var or subscript
+  // controls the linkage of its accessors as well as its storage.
+  //
+  // We only inherit when the storage has effective public visibility.
+  if (auto accessor = dyn_cast<AccessorDecl>(this)) {
+    if (auto storage = accessor->getStorage()) {
+      AccessScope access =
+          storage->getFormalAccessScope(
+              nullptr, /*treatUsableFromInlineAsPublic*/false,
+              /*ignoreImportAccessLevel*/false);
+      if (access.isPublic())
+        return storage->getExplicitCodeGenerationModel();
+    }
+  }
+
+  return std::nullopt;
+}
+
+/// Determine the code generation model that is required by the given
+/// declaration.
+///
+/// This accounts for limitations of the code generation model. For example,
+/// a generic declaration can only be treated as @export(implementation) in
+/// Embedded Swift, because there are no unspecialized generics.
+std::optional<CodeGenerationModel>
+Decl::getRequiredCodeGenerationModel() const {
+  bool isEmbedded = getASTContext().LangOpts.hasFeature(Feature::Embedded);
+
+  // A generic declaration must be @export(implementation) in Embedded Swift.
+  auto dc = getInnermostDeclContext();
+  if (auto sig = dc->getGenericSignatureOfContext()) {
+    if (!sig->areAllParamsConcrete() && isEmbedded)
+      return CodeGenerationModel::Implementation;
+  }
+
+  // Foreign types are always @export(implementation).
+  if (auto nominal = dyn_cast<NominalTypeDecl>(this)) {
+    if (isa<ClangModuleUnit>(nominal->getModuleScopeContext()))
+      return CodeGenerationModel::Implementation;
+  }
+
+  // Types must be @export(interface) in non-Embedded Swift, because the type
+  // metadata symbols need to be unique.
+  if (isa<TypeDecl>(this) && !isEmbedded)
+    return CodeGenerationModel::Interface;
+
   return std::nullopt;
 }
 
 CodeGenerationModel
 Decl::getEffectiveCodeGenerationModel() const {
+  // If there is a required code generation model, return that. This overrides
+  // any explicitly-written model, which is diagnosed in attribute checking.
+  if (auto required = getRequiredCodeGenerationModel())
+    return *required;
+
   // If there is an explicit attribute that specifies the model for this
   // declaration, use it.
   if (auto explicitModel = getExplicitCodeGenerationModel())
     return *explicitModel;
 
-  // Otherwise, apply the model-level defaults.
+  // A *synthesized* member of a nominal type or extension inherits its code
+  // generation model from the enclosing type/extension's *explicit* model,
+  // so that `@export(...)` on a type or extension controls the linkage of
+  // its compiler-synthesized members (e.g. derived `Equatable.==`, the
+  // implicit memberwise initializer). We deliberately do *not* propagate
+  // to user-written members — those can carry `@export(...)` directly if
+  // the author wants that linkage, and inheriting silently would surprise
+  // users who expect their explicit members to keep the default linkage.
+  //
+  // We only inherit when the member itself has effective public visibility,
+  // to avoid promoting internal/private members to public symbols in
+  // importing modules.
+  if (auto *valueDecl = dyn_cast<ValueDecl>(this)) {
+    if (valueDecl->isSynthesized()) {
+      AccessScope access =
+          valueDecl->getFormalAccessScope(
+              nullptr, /*treatUsableFromInlineAsPublic*/false,
+              /*ignoreImportAccessLevel*/false);
+      if (access.isPublic()) {
+        if (auto *parent = getDeclContext()->getAsDecl()) {
+          if (isa<NominalTypeDecl>(parent) || isa<ExtensionDecl>(parent)) {
+            if (auto parentModel = parent->getExplicitCodeGenerationModel())
+              return *parentModel;
+          }
+        }
+      }
+    }
+  }
+
+  // Otherwise, apply the module-level default.
   return getModuleContext()->codeGenerationModel();
 }
 
@@ -5413,6 +5499,32 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
                                                treatUsableFromInlineAsPublic);
   const DeclContext *resultDC = VD->getDeclContext();
 
+  // For a DeclContext that introduces a type or extends one,
+  // restrict `access` by that type's adjusted formal access and return
+  // the type's own enclosing DeclContext to continue walking. Returns
+  // nullptr for any other kind of context.
+  auto adjustForEnclosingType =
+      [&](const DeclContext *dc) -> const DeclContext * {
+    if (auto enclosing = dyn_cast<GenericTypeDecl>(dc)) {
+      access = std::min(access,
+                        getAdjustedFormalAccess(enclosing, useDC,
+                                                treatUsableFromInlineAsPublic));
+      return enclosing->getDeclContext();
+    }
+    if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+      // Just check the base type. If it's a constrained extension, Sema
+      // should have already enforced access more strictly.
+      auto *nominal = ext->getExtendedNominal();
+      if (!nominal || nominal->getParentModule() != ext->getParentModule())
+        return nullptr;
+      access =
+          std::min(access, getAdjustedFormalAccess(
+                               nominal, useDC, treatUsableFromInlineAsPublic));
+      return nominal->getDeclContext();
+    }
+    return nullptr;
+  };
+
   while (!resultDC->isModuleScopeContext()) {
     if (isa<TopLevelCodeDecl>(resultDC)) {
       return AccessScope(resultDC->getModuleScopeContext(),
@@ -5422,24 +5534,20 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     if (resultDC->isLocalContext() || access == AccessLevel::Private)
       return AccessScope(resultDC, /*private*/ true);
 
-    if (auto enclosingNominal = dyn_cast<GenericTypeDecl>(resultDC)) {
-      auto enclosingAccess =
-          getAdjustedFormalAccess(enclosingNominal, useDC,
-                                  treatUsableFromInlineAsPublic);
-      access = std::min(access, enclosingAccess);
-
-    } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(resultDC)) {
-      // Just check the base type. If it's a constrained extension, Sema should
-      // have already enforced access more strictly.
-      if (auto nominal = enclosingExt->getExtendedNominal()) {
-        if (nominal->getParentModule() == enclosingExt->getParentModule()) {
-          auto nominalAccess =
-              getAdjustedFormalAccess(nominal, useDC,
-                                      treatUsableFromInlineAsPublic);
-          access = std::min(access, nominalAccess);
-        }
+    if (isa<GenericTypeDecl>(resultDC)) {
+      // Restrict by this nominal's access. The outer parent walk below
+      // will pick up any types that enclose it.
+      adjustForEnclosingType(resultDC);
+    } else if (isa<ExtensionDecl>(resultDC)) {
+      // Restrict by the extended nominal and any types that enclose it.
+      // Extensions are always at file scope, so the parent walk below would
+      // otherwise skip those types entirely. We don't redirect `resultDC` here,
+      // because `fileprivate` and `private` scopes must continue to resolve to
+      // the file containing the declaration, which may differ from the file
+      // containing the extended type.
+      for (const DeclContext *dc = adjustForEnclosingType(resultDC);
+           dc != nullptr; dc = adjustForEnclosingType(dc)) {
       }
-
     } else {
       llvm_unreachable("unknown DeclContext kind");
     }
@@ -6682,7 +6790,10 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 
   if (member.isSimpleName() && !baseName.isSpecial()) {
     if (baseName.getIdentifier() == Context.Id_CodingKeys) {
-      action.emplace(ImplicitMemberAction::ResolveCodingKeys);
+      // Only request CodingKeys synthesis if no explicit CodingKeys exists.
+      // lookupDirect does not trigger synthesis, so this is safe from cycles.
+      if (lookupDirect(DeclName(Context.Id_CodingKeys)).empty())
+        action.emplace(ImplicitMemberAction::ResolveCodingKeys);
     }
   } else {
     auto argumentNames = member.getArgumentNames();
@@ -10092,7 +10203,7 @@ SubscriptDecl::getDynamicMemberParamTypeAsKeyPathType(Type paramTy) {
       return nullptr;
     }
 
-    paramTy = layout.getSuperclass();
+    paramTy = layout.explicitSuperclass;
     if (!paramTy) {
       return nullptr;
     }
@@ -11485,13 +11596,14 @@ FuncDecl *FuncDecl::createImplicit(ASTContext &Context,
                                    bool Throws, Type ThrownType,
                                    GenericParamList *GenericParams,
                                    ParameterList *BodyParams, Type FnRetType,
-                                   DeclContext *Parent) {
+                                   DeclContext *Parent, bool isSynthesized) {
   assert(FnRetType);
   auto *const FD = FuncDecl::createImpl(
       Context, SourceLoc(), StaticSpelling, SourceLoc(), Name, NameLoc, Async,
       SourceLoc(), Throws, SourceLoc(), TypeLoc::withoutLoc(ThrownType),
       GenericParams, Parent, ClangNode());
   FD->setImplicit();
+  FD->setSynthesized(isSynthesized);
   FD->setParameters(BodyParams);
   FD->setResultInterfaceType(FnRetType);
   return FD;
@@ -12528,6 +12640,18 @@ ActorIsolation swift::getActorIsolationOfContext(
   }
 
   if (auto *init = dyn_cast<Initializer>(dcToUse)) {
+    // The initializer of a 'lazy' stored property is emitted into the property's
+    // synthesized getter, which is isolated to the property. So unlike an
+    // ordinary stored-property default value -- whose required isolation is
+    // computed and validated separately, and which is reported as unspecified
+    // here -- the lazy initializer, and any closures within it, run with the
+    // lazy variable's actor isolation and should inherit it.
+    if (auto *pbi = dyn_cast<PatternBindingInitializer>(init)) {
+      if (auto *lazyVar = pbi->getInitializedLazyVar()) {
+        return getActorIsolation(lazyVar);
+      }
+    }
+
     // FIXME: force default argument initializers to report a meaningless
     // isolation in order to break a bunch of cycles with the way that
     // isolation is computed for them.
@@ -13424,6 +13548,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return origDC;
   }
 }

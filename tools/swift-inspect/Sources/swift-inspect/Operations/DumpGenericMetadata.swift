@@ -130,15 +130,14 @@ internal struct DumpGenericMetadata: ParsableCommand {
 
       // Update summary
       generics.forEach { metadata in
-        if let allocation = metadata.allocation {
-          let name = metadata.name
-          if metadataSummary.keys.contains(name) {
-            metadataSummary[name]!.totalSize += allocation.size
-            metadataSummary[name]!.processes.insert(process.processName)
-          } else {
-            metadataSummary[name] = MetadataSummary(totalSize: allocation.size,
-                                                    processes: Set([process.processName]))
-            }
+        let size = metadata.allocation?.size ?? swift_reflection_metadataSize(process.context, metadata.ptr)
+        let name = metadata.name
+        if metadataSummary.keys.contains(name) {
+          metadataSummary[name]!.totalSize += size
+          metadataSummary[name]!.processes.insert(process.processName)
+        } else {
+          metadataSummary[name] = MetadataSummary(totalSize: size,
+                                                  processes: Set([process.processName]))
         }
       }
 

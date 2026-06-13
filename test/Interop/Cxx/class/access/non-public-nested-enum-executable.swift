@@ -1,20 +1,7 @@
-// RUN: split-file %s %t
-
-// RUN: %target-build-swift -module-name main %t/base.swift -I %t/Inputs -o %t/base -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
-// RUN: %target-codesign %t/base
-// RUN: %target-run %t/base
-
-// RUN: %target-build-swift -module-name main %t/not-base.swift -I %t/Inputs -o %t/not-base -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
-// RUN: %target-codesign %t/not-base
-// RUN: %target-run %t/not-base
-
-// RUN: %target-build-swift -module-name main %t/derived.swift -I %t/Inputs -o %t/derived -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
-// RUN: %target-codesign %t/derived
-// RUN: %target-run %t/derived
-
-// RUN: %target-build-swift -module-name main %t/not-derived.swift -I %t/Inputs -o %t/not-derived -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
-// RUN: %target-codesign %t/not-derived
-// RUN: %target-run %t/not-derived
+// RUN: %target-run-simple-swift-split-file(base.swift -I %t/Inputs -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers)
+// RUN: %target-run-simple-swift-split-file(not-base.swift -I %t/Inputs -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers)
+// RUN: %target-run-simple-swift-split-file(derived.swift -I %t/Inputs -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers)
+// RUN: %target-run-simple-swift-split-file(not-derived.swift -I %t/Inputs -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_ImportNonPublicCxxMembers

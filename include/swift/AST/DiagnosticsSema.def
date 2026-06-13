@@ -728,6 +728,9 @@ ERROR(expr_keypath_application_root_type_mismatch, none,
       (Type, Type))
 ERROR(expr_swift_keypath_anyobject_root,none,
       "the root type of a Swift key path cannot be 'AnyObject'", ())
+ERROR(expr_keypath_protocol_metatype_static_member,none,
+      "key path cannot refer to static member %0 of protocol type %1",
+      (DeclNameRef, Type))
 ERROR(expr_keypath_multiparam_func_conversion, none,
       "cannot convert key path into a multi-argument function type %0", (Type))
 ERROR(cannot_convert_type_to_keypath_subscript_index,none,
@@ -1328,6 +1331,10 @@ GROUPED_WARNING(cannot_find_module_version,ModuleVersionMissing,none,
         "cannot find user version number for%select{| Clang}1 module '%0';"
         " version number ignored", (StringRef, bool))
 
+GROUPED_WARNING(canimport_missing_module,CanImportMissingModule,none,
+        "cannot find module '%0' for canImport check; the directive will"
+        " evaluate to false", (StringRef))
+
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
       "ambiguous operator declarations found for operator", ())
@@ -1882,6 +1889,8 @@ NOTE(note_make_optional,none,
       "add '?' to form the optional type %0", (Type))
 NOTE(note_make_implicitly_unwrapped_optional,none,
       "add '!' to form an implicitly unwrapped optional", ())
+NOTE(note_use_nil_for_cxx_optional,none,
+     "use the 'nil' literal instead", ())
 
 ERROR(invalid_ibdesignable_extension,none,
       "'@IBDesignable' can only be applied to classes and extensions "
@@ -4027,9 +4036,10 @@ NOTE(spi_only_import_conflict_here,none,
 ERROR(error_public_import_of_private_module,none,
       "private module %0 is imported publicly from the public module %1",
       (Identifier, Identifier))
-ERROR(error_import_of_ipi_module,none,
-      "Project internal module %0 cannot be imported publicly from non-internal module %1",
-      (Identifier, Identifier))
+GROUPED_WARNING(warn_import_of_ipi_module,PublicImportOfProjectInternalModule,none,
+      "Project internal module %0 cannot be imported publicly because "
+      "%1 has '-library-level %select{api|spi}2'",
+      (Identifier, Identifier, unsigned))
 
 ERROR(inconsistent_implicit_access_level_on_import,none,
       "ambiguous implicit access level for import of %0; it is imported as "
@@ -4461,6 +4471,13 @@ ERROR(attr_rawlayout_cannot_have_alignment_attr,none,
 ERROR(attr_rawlayout_invalid_count_type,none,
       "'@_rawLayout' count must either be integer literal or a generic "
       "argument", ())
+
+ERROR(attr_pre_inverse_generics_invalid_except,none,
+      "'except' argument to '@_preInverseGenerics' must consist only of "
+      "inverse constraints such as '~Copyable' or '~Escapable'", ())
+WARNING(attr_pre_inverse_generics_except_all,none,
+      "'@_preInverseGenerics' that excepts all inverse constraints is "
+      "equivalent to not using the attribute", ())
 
 // lazy
 ERROR(lazy_not_on_let,none,
@@ -5258,7 +5275,7 @@ ERROR(capture_across_type_decl,none,
       "scope",
       (const NominalTypeDecl *, const ValueDecl *))
 
-ERROR(isolated_any_conversion_to_synchronous_func,none,
+GROUPED_ERROR(isolated_any_conversion_to_synchronous_func,ConversionFromIsolatedAnyToSynchronous,none,
       "converting @isolated(any) function of type %0 to synchronous function type %1 is not allowed",
       (Type, Type))
 
@@ -5313,12 +5330,12 @@ ERROR(implicit_async_super_init,none,
       "'super.init' is 'async' and requires an explicit call",
       ())
 
-WARNING(if_always_true,none,
+GROUPED_WARNING(if_always_true,UselessConditionalStatement,none,
         "'if' condition is always true", ())
-WARNING(while_always_true,none,
+GROUPED_WARNING(while_always_true,UselessConditionalStatement,none,
         "'while' condition is always true", ())
 
-WARNING(guard_always_succeeds,none,
+GROUPED_WARNING(guard_always_succeeds,UselessConditionalStatement,none,
         "'guard' condition is always true, body is unreachable", ())
 
 
@@ -5681,6 +5698,9 @@ NOTE(because_rethrows_default_argument_throws,none,
 NOTE(because_rethrows_conformance_throws,none,
      "call is to 'rethrows' function, but a conformance has a throwing witness", ())
 
+ERROR(for_throw_without_try,none,
+      "for-in loop can throw, but is not marked with 'try'", ())
+
 ERROR(throwing_call_in_nonthrowing_autoclosure,none,
       "%0 can throw, but it is executed in a non-throwing "
       "autoclosure",(StringRef))
@@ -5744,7 +5764,7 @@ NOTE(note_error_to_optional,none,
 NOTE(note_disable_error_propagation,none,
       "did you mean to disable error propagation?", ())
 
-WARNING(no_throw_in_try,none,
+GROUPED_WARNING(no_throw_in_try,UnnecessaryEffectMarker,none,
         "no calls to throwing functions occur within 'try' expression", ())
 
 WARNING(no_throw_in_do_with_catch,none,
@@ -5771,7 +5791,7 @@ NOTE(async_call_without_await_in_autoclosure,none,
 NOTE(async_call_without_await_in_async_let,none,
       "call is 'async' in an 'async let' initializer", ())
 
-WARNING(no_async_in_await,none,
+GROUPED_WARNING(no_async_in_await,UnnecessaryEffectMarker,none,
         "no 'async' operations occur within 'await' expression", ())
 ERROR(async_in_nonasync_function,none,
       "%select{'async'|'async' call|'await'|'async let'|'async' property access|'async' subscript access}0 in "
@@ -6599,6 +6619,12 @@ ERROR(invalid_ownership_incompatible_class,none,
 ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
       "%0 is incompatible with 'weak' references, because it is a foreign reference type",
       (Type))
+ERROR(downcast_to_foreign_reference_type,none,
+      "downcast from %0 to %1 is not supported for foreign reference types",
+      (Type, Type))
+ERROR(cxx_super_pure_virtual_call,none,
+      "cannot use 'super' to call C++ pure virtual method %0; it has no base "
+      "class implementation", (const ValueDecl *))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,
@@ -6646,6 +6672,9 @@ ERROR(invalid_isolated_and_convention_attributes,none,
       (StringRef))
 GROUPED_ERROR(unreferenced_generic_parameter,NoUsage,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
+ERROR(non_inferrable_opaque_generic_parameter,none,
+      "opaque generic parameter %0 appears in position that cannot be inferred "
+      "from a function call", (TypeRepr *))
 ERROR(unexpected_ctype_for_non_c_convention,none,
       "convention '%0' does not support the 'cType' argument label, did you "
       "mean '@convention(c, cType: \"%1\")' or "
@@ -7371,9 +7400,10 @@ ERROR(availability_inout_accessor_only_in, none,
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
 
-WARNING(availability_query_useless_enclosing_scope, none,
-        "unnecessary check for '%0'; enclosing scope ensures guard "
-        "will always be true", (StringRef))
+GROUPED_WARNING(availability_query_useless_enclosing_scope,
+                UselessAvailabilityCheck, none,
+                "unnecessary check for '%0'; enclosing scope ensures guard "
+                "will always be true", (StringRef))
 
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
@@ -8351,9 +8381,6 @@ ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
 
-ERROR(experimental_macro,none,
-      "macro %0 is experimental",
-      (DeclName))
 ERROR(experimental_closure_body_macro,none,
       "function body macros on closures is experimental",
       ())
@@ -8499,12 +8526,6 @@ ERROR(inverse_conditional_must_be_fully_explicit,none,
         "conditional conformance to %0 must explicitly "
         "state whether %1 is required to conform to %2 or not",
         (const ProtocolDecl *, Type, const ProtocolDecl *))
-NOTE(make_inverse_conditional_non_requirement_explicit,none,
-     "specify that the conformance does not require %0 to conform to %1",
-     (Type, const ProtocolDecl *))
-NOTE(make_inverse_conditional_requirement_explicit,none,
-     "specify that the conformance requires %0 to conform to %1",
-     (Type, const ProtocolDecl *))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
@@ -8515,9 +8536,8 @@ NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
-ERROR(noncopyable_generics_variadic, none,
-      "noncopyable type %0 cannot be used within a variadic type yet",
-      (Type))
+NOTE(noncopyable_or_nonescaping_variadic, none,
+     "required because variadic parameter type must be stored inside an 'Array'", ())
 NOTE(noncopyable_generics_implicit_conformance_req, none,
      "'where %noformat0: %noformat1' is implicit here",
      (Type, Type))
@@ -8583,6 +8603,11 @@ ERROR(for_loop_sequence_conformance_unavailable,none,
       "for-in loop requires %0 to conform to %1, which is "
       "only available in %2 %3 or newer",
       (Type, ProtocolDecl *, StringRef, StringRef))
+
+ERROR(for_loop_sequence_conformance_unavailable_unconditionally,none,
+      "for-in loop requires %0 to conform to %1, "
+      "but the conformance is unavailable",
+      (Type, ProtocolDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors
@@ -8653,16 +8678,9 @@ ERROR(lifetime_dependence_duplicate_param_id, none,
 ERROR(lifetime_dependence_cannot_use_kind, none,
       "invalid use of %0 lifetime dependence for %1 ownership",
       (StringRef, StringRef))
-ERROR(lifetime_dependence_cannot_use_parsed_scoped_consuming, none,
-      "invalid use of scoped lifetime dependence with consuming ownership",
-      ())
 ERROR(lifetime_dependence_only_on_function_method_init_result, none,
       "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers", ())
-ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
-      "expected 'nil' or 'self' as return values in an initializer with "
-      "lifetime dependent specifiers",
-       ())
 ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
       "lifetime dependence specifiers cannot be applied to tuple elements", ())
 ERROR(lifetime_dependence_contextual_keyword_conflict_name, none,
@@ -8696,10 +8714,6 @@ NOTE(lifetime_escapable_source_requires_escapable_note, none,
      "use '@_lifetime(%0%1)' instead", (StringRef, StringRef))
 ERROR(lifetime_dependence_unknown_type, none,
       "lifetime dependence checking failed due to unknown %0 type", (StringRef))
-
-ERROR(borrow_inout_experimental,none,
-      "'%0' is an experimental feature",
-      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements
@@ -8862,9 +8876,9 @@ GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
-WARNING(no_unsafe_in_unsafe,none,
+GROUPED_WARNING(no_unsafe_in_unsafe,UnnecessaryUnsafe,none,
         "no unsafe operations occur within 'unsafe' expression", ())
-WARNING(no_unsafe_in_unsafe_for,none,
+GROUPED_WARNING(no_unsafe_in_unsafe_for,UnnecessaryUnsafe,none,
         "no unsafe operations occur within 'unsafe' for-in loop", ())
 NOTE(make_subclass_unsafe,none,
      "make class %0 '@unsafe' to allow unsafe overrides of safe superclass "
@@ -9270,10 +9284,6 @@ GROUPED_WARNING(perf_hint_closure_returns_array,ReturnTypeImplicitCopy,none,
                 "Performance: closure returns a%select{ dictionary|n array}0, leading to implicit copies. "
                 "Consider using an 'inout' parameter instead.", (bool))
 
-GROUPED_WARNING(perf_hint_param_expects_existential,ExistentialType,none,
-                "Performance: %0 expects an existential, leading to heap allocation, reference counting, "
-                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
-                (const ParamDecl*))
 GROUPED_WARNING(perf_hint_func_returns_existential,ExistentialType,none,
                 "Performance: %0 returns an existential, leading to heap allocation, reference counting, "
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
@@ -9306,7 +9316,7 @@ ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
 REMARK(macro_expansion_line, none, "macro content: |%0|", (StringRef))
 
 GROUPED_WARNING(oslog_missing_string_section,OSLog,none,
-                "global variable 'osLogStringSectionName' is missing from the OSLog module; defaulting to '__TEXT,__oslogstring,cstring_literals'", ())
+                "global variable 'osLogStringSectionName' is missing from the 'os' module; defaulting to '__TEXT,__oslogstring,cstring_literals'", ())
 GROUPED_ERROR(oslog_string_section_not_literal,OSLog,none,
               "global variable 'osLogStringSectionName' requires a string literal initializer", ())
 

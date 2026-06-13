@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1001; // HiddenType record
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1005; // index_addr projection flag
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -866,6 +866,12 @@ enum BlockID {
   ///
   /// \sa decl_member_tables_block
   DECL_MEMBER_TABLES_BLOCK_ID,
+
+  /// The hidden-type layouts block, which records layout information
+  /// for stored property that is hidden from module clients.
+  ///
+  /// \sa hidden_type_layouts_block
+  HIDDEN_TYPE_LAYOUTS_BLOCK_ID,
 
   /// The module documentation container block, which contains all other
   /// documentation blocks.
@@ -2590,6 +2596,12 @@ namespace decls_block {
   >;
 #include "swift/AST/DeclAttr.def"
 
+  using PreInverseGenericsDeclAttrLayout = BCRecordLayout<
+    PreInverseGenerics_DECL_ATTR,
+    BCFixed<1>, // implicit
+    TypeIDField // except type
+  >;
+
   using DynamicReplacementDeclAttrLayout = BCRecordLayout<
     DynamicReplacement_DECL_ATTR,
     BCFixed<1>, // implicit flag
@@ -2868,6 +2880,23 @@ namespace decl_member_tables_block {
     DECL_MEMBERS, // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // maps from DeclIDs to DeclID vectors
+  >;
+}
+
+/// \sa HIDDEN_TYPE_LAYOUTS_BLOCK_ID
+namespace hidden_type_layouts_block {
+  enum RecordKind {
+    HIDDEN_TYPE_LAYOUT = 1,
+  };
+
+  using HiddenTypeLayoutLayout = BCRecordLayout<
+    HIDDEN_TYPE_LAYOUT,
+    BCVBR<32>,    // size (bytes)
+    BCVBR<8>,     // alignment (bytes)
+    BCVBR<32>,    // stride (bytes)
+    BCFixed<1>,   // bitwiseCopyable (always 1 in V1)
+    BCFixed<1>,   // opaque (always 0 in V1)
+    BCBlob        // mangled name of the hidden type
   >;
 }
 

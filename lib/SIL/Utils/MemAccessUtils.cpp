@@ -2657,7 +2657,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::DestroyArray:
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::TSanInoutAccess:
-    case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:

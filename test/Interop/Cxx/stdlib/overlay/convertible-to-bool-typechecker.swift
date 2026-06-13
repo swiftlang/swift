@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -enable-experimental-cxx-interop
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=swift-6
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default
 
 import ConvertibleToBool
 
@@ -24,3 +22,4 @@ let _ = Bool(fromCxx: ProtectedInheritedBoolBox()) // expected-error {{initializ
 let _ = Bool(fromCxx: PublicUsingBoolBox())
 let _ = Bool(fromCxx: ProtectedUsingBoolBox()) // expected-error {{initializer 'init(fromCxx:)' requires that 'ProtectedUsingBoolBox' conform to 'CxxConvertibleToBool'}}
 
+let _: Bool = BoolBox().__convertToBool() // expected-warning {{use Bool(fromCxx:)}}

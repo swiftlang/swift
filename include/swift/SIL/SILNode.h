@@ -204,7 +204,9 @@ protected:
     SHARED_FIELD(RefElementAddrInst, bool immutable);
     SHARED_FIELD(RefTailAddrInst, bool immutable);
     SHARED_FIELD(AddressToPointerInst, bool needsStackProtection);
-    SHARED_FIELD(IndexAddrInst, bool needsStackProtection);
+    SHARED_FIELD(IndexAddrInst, uint8_t
+        needsStackProtection : 1,
+        isProjection : 1);
     SHARED_FIELD(HopToExecutorInst, bool mandatory);
     SHARED_FIELD(DestroyValueInst, uint8_t
         poisonRefs : 1,
@@ -222,7 +224,8 @@ protected:
     SHARED_FIELD(DebugValueInst, uint8_t
                  poisonRefs : 1,
                  usesMoveableValueDebugInfo : 1,
-                 trace : 1);
+                 trace : 1,
+                 prependDeref : 1);
 
     SHARED_FIELD(AllocStackInst, uint8_t
                  dynamicLifetime : 1,

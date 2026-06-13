@@ -71,7 +71,7 @@ func testConvertIsolatedAnyToNonIsolated(fn: @Sendable @isolated(any) () -> ()) 
 
 func requireSendableNonIsolated_sync(_ fn: @Sendable () -> ()) {}
 func testConvertIsolatedAnyToNonIsolated_sync(fn: @Sendable @isolated(any) () -> ()) {
-  // expected-warning @+1 {{converting @isolated(any) function of type '@isolated(any) @Sendable () -> ()' to synchronous function type '@Sendable () -> ()' is not allowed; this will be an error in a future Swift language mode}}
+  // expected-warning @+1 {{converting @isolated(any) function of type '@isolated(any) @Sendable () -> ()' to synchronous function type '@Sendable () -> ()' is not allowed; this will be an error in a future Swift language mode}}{{group-name=ConversionFromIsolatedAnyToSynchronous}}
   requireSendableNonIsolated_sync(fn)
 }
 

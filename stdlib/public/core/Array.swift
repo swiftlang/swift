@@ -1756,7 +1756,7 @@ extension Array {
   /// - Complexity: O(1) for native arrays, amortized O(1) for bridged arrays.
   @available(SwiftStdlib 6.2, *)
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_alwaysEmitIntoClient
     borrowing get {
 #if _runtime(_ObjC)
@@ -1883,7 +1883,7 @@ extension Array {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     mutating get {
       // _makeMutableAndUnique*() inserts begin_cow_mutation.
       // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.

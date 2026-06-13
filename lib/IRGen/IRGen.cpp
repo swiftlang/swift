@@ -71,8 +71,8 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/StandardInstrumentations.h"
+#include "llvm/Plugins/PassPlugin.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Remarks/Remark.h"
 #include "llvm/Remarks/RemarkStreamer.h"
@@ -499,7 +499,7 @@ void swift::performLLVMOptimizations(
                                            llvm::ThinOrFullLTOPhase) {
       std::vector<std::string> allowlistFiles;
       std::vector<std::string> ignorelistFiles;
-      MPM.addPass(SanitizerCoveragePass(Opts.SanitizeCoverage,
+      MPM.addPass(SanitizerCoveragePass(Opts.SanitizeCoverage, /*VFS=*/FS,
                                         allowlistFiles, ignorelistFiles));
     });
   }

@@ -122,3 +122,11 @@ u[getValPtr] = uGetValPtr // expected-error {{subscript is get-only}}
 
 let deprecatedIdx = Overloaded.DeprecatedIndex(index: 0)
 let _: CUnsignedInt = v[deprecatedIdx] // expected-warning {{deprecated: use GetVal instead}}
+
+var tri = TemplatedReturningInt()
+tri[CInt(0)] = CInt(4)
+let _ = tri[CInt(0)]
+
+var tti = TemplatedTakingInt()
+tti[CInt(0)] = CInt(4)
+let _: CInt = tti[CInt(0)]

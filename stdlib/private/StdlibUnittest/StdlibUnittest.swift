@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -803,6 +803,7 @@ public func expectCrash(withMessage message: String = "", executing: () -> Void)
 }
 
 func _defaultTestSuiteFailedCallback() {
+  fflush(nil)
   abort()
 }
 
@@ -813,6 +814,7 @@ public func _setTestSuiteFailedCallback(_ callback: @escaping () -> Void) {
 }
 
 func _defaultTrappingExpectationFailedCallback() {
+  fflush(nil)
   abort()
 }
 
@@ -2154,8 +2156,13 @@ public final class TestSuite {
       return self
     }
 
-    public func crashOutputMatches(_ string: String) -> _TestBuilder {
-      _data._crashOutputMatches.append(string)
+    public func crashOutputMatches(
+      _ string: String,
+      when predicate: Bool = true
+    ) -> _TestBuilder {
+      if predicate {
+        _data._crashOutputMatches.append(string)
+      }
       return self
     }
 
@@ -2249,6 +2256,7 @@ public enum StdlibVersion: String {
   case stdlib_6_2  = "6.2"
   case stdlib_6_3  = "6.3"
   case stdlib_6_4  = "6.4"
+  case stdlib_6_5  = "6.5"
 
   var isAvailable: Bool {
     switch self {
@@ -2270,6 +2278,8 @@ public enum StdlibVersion: String {
       return if #available(SwiftStdlib 6.3, *)  { true } else { false }
     case .stdlib_6_4:
       return if #available(SwiftStdlib 6.4, *)  { true } else { false }
+    case .stdlib_6_5:
+      return if #available(SwiftStdlib 6.5, *)  { true } else { false }
     }
   }
 }

@@ -41,13 +41,7 @@ const SILDIExprInfo *SILDIExprInfo::get(SILDIExprOperator Op) {
       {SILDIExprOperator::TupleFragment,
        {"op_tuple_fragment",
          {SILDIExprElement::TypeKind, SILDIExprElement::ConstIntKind}}},
-      {SILDIExprOperator::Dereference, {"op_deref", {}}},
-      {SILDIExprOperator::Plus, {"op_plus", {}}},
-      {SILDIExprOperator::Minus, {"op_minus", {}}},
-      {SILDIExprOperator::ConstUInt,
-       {"op_constu", {SILDIExprElement::ConstIntKind}}},
-      {SILDIExprOperator::ConstSInt,
-       {"op_consts", {SILDIExprElement::ConstIntKind}}}};
+      {SILDIExprOperator::Dereference, {"op_deref", {}}}};
 
   return Infos.count(Op) ? &Infos.at(Op) : nullptr;
 }

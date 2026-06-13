@@ -228,7 +228,7 @@ static void printImports(raw_ostream &out,
   // Track the `public` imports here to determine whether to override.
   ImportSet publicImportSet = getImports(allImportFilter);
 
-  // Used to determine whether `package import` should be overriden below.
+  // Used to determine whether `package import` should be overridden below.
   ImportSet packageOnlyImportSet;
   if (Opts.printPackageInterface()) {
     packageOnlyImportSet =

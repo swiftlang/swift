@@ -41,6 +41,10 @@ public typealias CUnsignedLong = UInt
 /// The C 'unsigned long long' type.
 public typealias CUnsignedLongLong = UInt64
 
+/// The C 'unsigned __int128' type.
+@available(SwiftStdlib 6.0, *)
+public typealias CUnsignedInt128 = UInt128
+
 /// The C 'signed char' type.
 public typealias CSignedChar = Int8
 
@@ -63,6 +67,10 @@ public typealias CLong = Int
 
 /// The C 'long long' type.
 public typealias CLongLong = Int64
+
+/// The C '__int128' type.
+@available(SwiftStdlib 6.0, *)
+public typealias CInt128 = Int128
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 /// The C '_Float16' type.

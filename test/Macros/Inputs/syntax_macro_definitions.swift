@@ -2245,6 +2245,54 @@ public struct StaticFooFuncMacro: DeclarationMacro {
   }
 }
 
+public struct ProtocolRequirementMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func macroRequirement() -> Int",
+    ]
+  }
+}
+
+public struct ProtocolAssociatedTypeMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "associatedtype MacroAssociatedType",
+      "func makeMacroAssociatedValue() -> MacroAssociatedType",
+    ]
+  }
+}
+
+public struct PeerProtocolRequirementMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func peerRequirement() -> Int",
+    ]
+  }
+}
+
+public struct MemberProtocolRequirementMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func memberRequirement() -> Int",
+    ]
+  }
+}
+
 public struct SelfAlwaysEqualOperator: DeclarationMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
@@ -3057,3 +3105,17 @@ public struct CustomConditionCheckMacro: ExpressionMacro {
     return "\(literal: isSet)"
   }
 }
+
+public enum BorrowMutateMacro: AccessorMacro {
+    public static func expansion(
+        of node: AttributeSyntax,
+        providingAccessorsOf declaration: some DeclSyntaxProtocol,
+        in context: some MacroExpansionContext
+    ) throws -> [AccessorDeclSyntax] {
+        [
+            "borrow { _x }",
+            "mutate { return &_x }",
+        ]
+    }
+}
+

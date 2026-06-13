@@ -45,10 +45,12 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
 - <doc:old-suppressed-associatedtypes>
+- <doc:canimport-missing-module>
 - <doc:module-version-missing>
 - <doc:module-self-import>
 - <doc:oslog>
 - <doc:option-obsoleted-by-module-selectors>
+- <doc:public-import-of-project-internal-module>
 - <doc:result-builder-methods>
 - <doc:spi-import-ignored>
 - <doc:semantic-copies>
@@ -56,12 +58,16 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:strict-memory-safety>
 - <doc:unavailable-sendable-conformance>
 - <doc:unknown-warning-group>
+- <doc:unnecessary-effect-marker>
+- <doc:unnecessary-unsafe>
 - <doc:unsupported-scoped-import>
 - <doc:untyped-throws>
 - <doc:unused-import-access>
 - <doc:no-use-throwing-unstructured-task>
 - <doc:no-usage>
 - <doc:use-any-apple-os-availability>
+- <doc:useless-availability-check>
+- <doc:useless-conditional-statement>
 
 
 ## Topics
@@ -74,6 +80,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:sendable-closure-captures>
 - <doc:compilation-caching>
 - <doc:string-interpolation-conformance>
+- <doc:conversion-from-isolated-any-to-synchronous>
 - <doc:region-isolation-cross-isolation-data-race>
 - <doc:deprecated-declaration>
 - <doc:implementation-only-deprecated>
@@ -90,6 +97,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
 - <doc:old-suppressed-associatedtypes>
+- <doc:canimport-missing-module>
 - <doc:missing-module-on-known-paths>
 - <doc:module-version-missing>
 - <doc:module-not-testable>
@@ -103,6 +111,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:property-wrapper-requirements>
 - <doc:conformance-isolation>
 - <doc:protocol-type-non-conformance>
+- <doc:public-import-of-project-internal-module>
 - <doc:result-builder-methods>
 - <doc:spi-import-ignored>
 - <doc:semantic-copies>
@@ -116,6 +125,8 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:opaque-type-inference>
 - <doc:region-isolation-unknown-pattern>
 - <doc:unknown-warning-group>
+- <doc:unnecessary-effect-marker>
+- <doc:unnecessary-unsafe>
 - <doc:availability-unrecognized-name>
 - <doc:mutable-global-variable>
 - <doc:unsupported-scoped-import>
@@ -124,4 +135,6 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:no-use-throwing-unstructured-task>
 - <doc:no-usage>
 - <doc:use-any-apple-os-availability>
+- <doc:useless-availability-check>
+- <doc:useless-conditional-statement>
 - <doc:existential-member-access-limitations>

@@ -413,6 +413,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
+  case SourceFileKind::SyntheticMacro:
     diagnoseObjCMethodConflicts(SF);
     diagnoseObjCCategoryConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
@@ -439,7 +440,8 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::MacroExpansion:
-  case SourceFileKind::Main: {
+  case SourceFileKind::Main:
+  case SourceFileKind::SyntheticMacro: {
     CustomDerivativesRequest request(&SF);
     evaluateOrDefault(SF.getASTContext().evaluator, request, {});
     return;
@@ -451,8 +453,8 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
 }
 
 void swift::handleOSLogStringSectionName(ModuleDecl &module) {
-  /// We only care about the OSLog module.
-  if (!module.getName().is("OSLog"))
+  /// We only care about the os module.
+  if (!module.getName().is("os"))
     return;
 
   /// The name of the variable that defines the section name.

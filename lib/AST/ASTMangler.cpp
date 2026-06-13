@@ -104,18 +104,21 @@ bool ASTMangler::tryMangleSubstitution(const Decl *decl) {
   return Mangler::tryMangleSubstitution(decl);
 }
 
-bool ASTMangler::inversesAllowed(const Decl *decl) {
+InvertibleProtocolSet ASTMangler::inversesAllowed(const Decl *decl) {
   if (!decl)
-    return true;
+    return InvertibleProtocolSet::allKnown();
 
   if (auto accessor = dyn_cast<AccessorDecl>(decl))
     if (auto *storage = accessor->getStorage())
       decl = storage;
 
-  return !decl->getAttrs().hasAttribute<PreInverseGenericsAttr>();
+  if (auto *attr = decl->getAttrs().getAttribute<PreInverseGenericsAttr>())
+    return attr->getAllowedInverses(decl);
+
+  return InvertibleProtocolSet::allKnown();
 }
 
-bool ASTMangler::inversesAllowedIn(const DeclContext *ctx) {
+InvertibleProtocolSet ASTMangler::inversesAllowedIn(const DeclContext *ctx) {
   assert(ctx);
   return inversesAllowed(ctx->getInnermostDeclarationDeclContext());
 }
@@ -159,7 +162,7 @@ static StringRef getCodeForAccessorKind(AccessorKind kind) {
 
 std::string ASTMangler::mangleClosureEntity(const AbstractClosureExpr *closure,
                                             SymbolKind SKind) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowedIn(closure));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowedIn(closure));
   beginMangling();
   appendClosureEntity(closure);
   appendSymbolKind(SKind);
@@ -167,7 +170,7 @@ std::string ASTMangler::mangleClosureEntity(const AbstractClosureExpr *closure,
 }
 
 std::string ASTMangler::mangleEntity(const ValueDecl *decl, SymbolKind SKind) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(decl));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(decl));
   beginMangling();
   appendEntity(decl);
   appendSymbolKind(SKind);
@@ -177,7 +180,7 @@ std::string ASTMangler::mangleEntity(const ValueDecl *decl, SymbolKind SKind) {
 std::string ASTMangler::mangleDestructorEntity(const DestructorDecl *decl,
                                                DestructorKind kind,
                                                SymbolKind SKind) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(decl));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(decl));
   beginMangling();
   appendDestructorEntity(decl, kind);
   appendSymbolKind(SKind);
@@ -187,7 +190,7 @@ std::string ASTMangler::mangleDestructorEntity(const DestructorDecl *decl,
 std::string ASTMangler::mangleConstructorEntity(const ConstructorDecl *ctor,
                                                 bool isAllocating,
                                                 SymbolKind SKind) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(ctor));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(ctor));
   beginMangling();
   appendConstructorEntity(ctor, isAllocating);
   appendSymbolKind(SKind);
@@ -197,7 +200,7 @@ std::string ASTMangler::mangleConstructorEntity(const ConstructorDecl *ctor,
 std::string ASTMangler::mangleIVarInitDestroyEntity(const ClassDecl *decl,
                                                     bool isDestroyer,
                                                     SymbolKind SKind) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(decl));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(decl));
   beginMangling();
   BaseEntitySignature base(decl);
   appendContext(decl, base, decl->getAlternateModuleName());
@@ -210,7 +213,7 @@ std::string ASTMangler::mangleAccessorEntity(AccessorKind kind,
                                              const AbstractStorageDecl *decl,
                                              bool isStatic,
                                              SymbolKind SKind) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(decl));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(decl));
   beginMangling();
   appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
   appendSymbolKind(SKind);
@@ -220,7 +223,7 @@ std::string ASTMangler::mangleAccessorEntity(AccessorKind kind,
 std::string ASTMangler::mangleDefaultArgumentEntity(const DeclContext *func,
                                                     unsigned index,
                                                     SymbolKind SKind) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowedIn(func));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowedIn(func));
   beginMangling();
   appendDefaultArgumentEntity(func, index);
   appendSymbolKind(SKind);
@@ -229,7 +232,7 @@ std::string ASTMangler::mangleDefaultArgumentEntity(const DeclContext *func,
 
 std::string ASTMangler::mangleInitializerEntity(const VarDecl *var,
                                                 SymbolKind SKind) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(var));
   beginMangling();
   appendInitializerEntity(var);
   appendSymbolKind(SKind);
@@ -238,7 +241,7 @@ std::string ASTMangler::mangleInitializerEntity(const VarDecl *var,
 
 std::string ASTMangler::mangleBackingInitializerEntity(const VarDecl *var,
                                                        SymbolKind SKind) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(var));
   beginMangling();
   appendBackingInitializerEntity(var);
   appendSymbolKind(SKind);
@@ -248,7 +251,7 @@ std::string ASTMangler::mangleBackingInitializerEntity(const VarDecl *var,
 std::string
 ASTMangler::manglePropertyWrappedFieldInitAccessorEntity(const VarDecl *var,
                                                          SymbolKind SKind) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(var));
   beginMangling();
   appendPropertyWrappedFieldInitAccessorEntity(var);
   appendSymbolKind(SKind);
@@ -257,7 +260,7 @@ ASTMangler::manglePropertyWrappedFieldInitAccessorEntity(const VarDecl *var,
 
 std::string ASTMangler::mangleInitFromProjectedValueEntity(const VarDecl *var,
                                                            SymbolKind SKind) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(var));
   beginMangling();
   appendInitFromProjectedValueEntity(var);
   appendSymbolKind(SKind);
@@ -295,7 +298,7 @@ std::string ASTMangler::mangleConstructorVTableThunk(
 }
 
 std::string ASTMangler::mangleWitnessTable(const ProtocolConformance *C) {
-  llvm::SaveAndRestore X(AllowInverses,
+  llvm::SaveAndRestore X(AllowedInverses,
                          inversesAllowedIn(C->getDeclContext()));
 
   beginMangling();
@@ -950,9 +953,7 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   Node *NewGlobal = Dem.createNode(Node::Kind::Global);
   NewGlobal->addChild(TyMangling, Dem);
   auto mangling = mangleNodeOld(NewGlobal);
-  if (!mangling.isSuccess()) {
-    llvm_unreachable("unexpected mangling failure");
-  }
+  ASSERT(mangling.isSuccess());
   return mangling.result();
 #endif
 }
@@ -1011,6 +1012,9 @@ std::string ASTMangler::mangleAnyDecl(const ValueDecl *decl, bool addPrefix) {
     beginManglingWithoutPrefix();
   }
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
+  // Honor @_preInverseGenerics, matching mangleEntity.
+  llvm::SaveAndRestore<InvertibleProtocolSet> inversesRAII(
+      AllowedInverses, inversesAllowed(decl));
 
   appendAnyDecl(decl);
 
@@ -1634,7 +1638,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       // ExtendedExistentialTypeShapes consider existential metatypes to
       // be part of the existential, so if we're symbolically referencing
       // shapes, we need to handle that at this level.
-      if (EMT->getExistentialLayout().needsExtendedShape(AllowInverses)) {
+      if (EMT->getExistentialLayout().needsExtendedShape(AllowedInverses)) {
         auto referent = SymbolicReferent::forExtendedExistentialTypeShape(EMT);
         if (canSymbolicReference(referent)) {
           appendSymbolicExtendedExistentialType(referent, EMT, sig, forDecl);
@@ -1643,7 +1647,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       }
 
       if (EMT->getInstanceType()->isExistentialType() &&
-          EMT->getExistentialLayout().needsExtendedShape(AllowInverses))
+          EMT->getExistentialLayout().needsExtendedShape(AllowedInverses))
         appendConstrainedExistential(EMT->getInstanceType(), sig, forDecl);
       else
         appendType(EMT->getInstanceType(), sig, forDecl);
@@ -1699,7 +1703,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
           return appendType(strippedTy, sig, forDecl);
       }
 
-      if (PCT->getExistentialLayout().needsExtendedShape(AllowInverses))
+      if (PCT->getExistentialLayout().needsExtendedShape(AllowedInverses))
         return appendConstrainedExistential(PCT, sig, forDecl);
 
       // We mangle ProtocolType and ProtocolCompositionType using the
@@ -1714,7 +1718,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::Existential: {
       auto *ET = cast<ExistentialType>(tybase);
 
-      if (ET->getExistentialLayout().needsExtendedShape(AllowInverses)) {
+      if (ET->getExistentialLayout().needsExtendedShape(AllowedInverses)) {
         auto referent = SymbolicReferent::forExtendedExistentialTypeShape(ET);
         if (canSymbolicReference(referent)) {
           appendSymbolicExtendedExistentialType(referent, ET, sig, forDecl);
@@ -2964,14 +2968,23 @@ void ASTMangler::appendSymbolicReference(SymbolicReferent referent) {
 static void reconcileInverses(
            SmallVector<InverseRequirement, 2> &inverses,
            GenericSignature sig,
+           InvertibleProtocolSet allowedInverses,
            std::optional<unsigned> inversesAlreadyMangledDepth,
            std::optional<unsigned> suppressedInnermostDepth) {
+  if (inverses.empty())
+    return;
+
   CanGenericSignature baseSig;
   if (sig)
     baseSig = sig.getCanonicalSignature();
 
-  if (baseSig || inversesAlreadyMangledDepth || suppressedInnermostDepth)
-    llvm::erase_if(inverses, [&](InverseRequirement const& inv) -> bool {
+  if (baseSig || inversesAlreadyMangledDepth || suppressedInnermostDepth ||
+      allowedInverses != InvertibleProtocolSet::allKnown()) {
+    llvm::erase_if(inverses, [&](InverseRequirement const &inv) -> bool {
+      // Drop inverses that aren't to be mangled due to @_preInverseGenerics.
+      if (!allowedInverses.contains(inv.getKind()))
+        return true;
+
       // Drop inverses that aren't applicable in the nested / child signature,
       // because of an added requirement.
       if (baseSig && baseSig->requiresProtocol(inv.subject, inv.protocol))
@@ -2991,6 +3004,7 @@ static void reconcileInverses(
 
       return false;
     });
+  }
 
   // Sort inverse requirements for stability.
   llvm::array_pod_sort(
@@ -3723,14 +3737,10 @@ void ASTMangler::gatherGenericSignatureParts(GenericSignature sig,
   auto &inverseReqs = parts.inverses;
   canSig->getRequirementsWithInverses(reqs, inverseReqs);
 
-  // Process inverses relative to the base entity's signature.
-  if (AllowInverses) {
-    // Simplify and canonicalize inverses.
-    reconcileInverses(inverseReqs, base.getSignature(), base.getDepth(),
-                      base.getSuppressedInnermostInversesDepth());
-  } else {
-    inverseReqs.clear();
-  }
+  // Simplify and canonicalize the inverses.
+  reconcileInverses(inverseReqs, base.getSignature(), AllowedInverses,
+                    base.getDepth(),
+                    base.getSuppressedInnermostInversesDepth());
   base.setDepth(canSig->getMaxDepth());
 
   unsigned &initialParamDepth = parts.initialParamDepth;
@@ -4147,14 +4157,14 @@ void ASTMangler::appendDefaultArgumentEntity(const DeclContext *func,
 }
 
 void ASTMangler::appendInitializerEntity(const VarDecl *var) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(var));
   BaseEntitySignature base(var);
   appendEntity(var, base, "vp", var->isStatic());
   appendOperator("fi");
 }
 
 void ASTMangler::appendBackingInitializerEntity(const VarDecl *var) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(var));
   BaseEntitySignature base(var);
   appendEntity(var, base, "vp", var->isStatic());
   appendOperator("fP");
@@ -4162,14 +4172,14 @@ void ASTMangler::appendBackingInitializerEntity(const VarDecl *var) {
 
 void ASTMangler::appendPropertyWrappedFieldInitAccessorEntity(
     const VarDecl *var) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(var));
   BaseEntitySignature base(var);
   appendEntity(var, base, "vp", var->isStatic());
   appendOperator("fF");
 }
 
 void ASTMangler::appendInitFromProjectedValueEntity(const VarDecl *var) {
-  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(var));
   BaseEntitySignature base(var);
   appendEntity(var, base, "vp", var->isStatic());
   appendOperator("fW");
@@ -4466,7 +4476,17 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
       conformance->getDeclContext()->getModuleScopeContext();
   Mod = topLevelSubcontext->getParentModule();
 
-  auto conformingType = conformance->getType();
+  Type conformingType;
+  if (isa<NormalProtocolConformance>(conformance) &&
+      conformance->isReparented()) {
+    // Note: The conforming type of a reparented conformance used to be the
+    // protocol, but that interacted badly with type substitution. Instead
+    // we set the conforming type to be the Self type parameter, but that
+    // requires a special case here to maintain the previous mangling.
+    conformingType = conformance->getDeclContext()->getDeclaredInterfaceType();
+  } else {
+    conformingType = conformance->getType();
+  }
   appendType(conformingType->getCanonicalType(), nullptr);
 
   appendProtocolName(conformance->getProtocol());
@@ -4979,6 +4999,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return appendMacroExpansionLoc();
   }
   
@@ -5031,6 +5052,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     llvm_unreachable("Exited above");
   }
 
@@ -5351,6 +5373,9 @@ void ASTMangler::extractExistentialInverseRequirements(
     return;
 
   for (auto ip : PCT->getInverses()) {
+    if (!AllowedInverses.contains(ip))
+      continue;
+
     auto *proto = Context.getProtocol(getKnownProtocolKind(ip));
     assert(proto);
     ASSERT(!getABIDecl(proto) && "can't use @abi on inverse protocols");
@@ -5370,8 +5395,7 @@ void ASTMangler::gatherExistentialRequirements(
     for (auto memberTy : compositionTy->getMembers())
       gatherExistentialRequirements(reqs, inverses, memberTy);
 
-    if (AllowInverses)
-      extractExistentialInverseRequirements(inverses, compositionTy);
+    extractExistentialInverseRequirements(inverses, compositionTy);
   }
 }
 

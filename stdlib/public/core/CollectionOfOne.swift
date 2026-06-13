@@ -159,6 +159,17 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   }
 }
 
+extension CollectionOfOne {
+  @_alwaysEmitIntoClient
+  public func withContiguousStorageIfAvailable<R: ~Copyable, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
+    try withUnsafePointer(to: _element) { pointer throws(E) -> R in
+      try unsafe body(UnsafeBufferPointer(start: pointer, count: 1))
+    }
+  }
+}
+
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension CollectionOfOne {
@@ -170,7 +181,7 @@ extension CollectionOfOne {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     get {
       let pointer = unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(self))
       let span = unsafe Span(_unsafeStart: pointer, count: 1)
@@ -185,7 +196,7 @@ extension CollectionOfOne {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     mutating get {
       let pointer = unsafe UnsafeMutablePointer<Element>(
         Builtin.addressOfBorrow(self)

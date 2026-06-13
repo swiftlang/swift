@@ -453,10 +453,10 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
-    //FIXME: change to unsafeRawAddress when ready
-    unsafeAddress {
+    @_transparent
+    borrow {
       _checkIndex(position)
-      return unsafe _unsafeAddressOfElement(unchecked: position)
+      return unsafe self[unchecked: position]
     }
   }
 
@@ -472,9 +472,10 @@ extension Span where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
-    //FIXME: change to unsafeRawAddress when ready
-    unsafeAddress {
-      unsafe _unsafeAddressOfElement(unchecked: position)
+    @_unsafeSelfDependentResult
+    borrow {
+      unsafe UnsafePointer<Element>(
+        _unsafeAddressOfElement(unchecked: position)).pointee
     }
   }
 
@@ -482,10 +483,13 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal func _unsafeAddressOfElement(
     unchecked position: Index
-  ) -> UnsafePointer<Element> {
+  ) -> Builtin.RawPointer {
+#if $BuiltinGepProjection
+    unsafe Builtin.gepProjection_Word(_start()._rawValue, position._builtinWordValue, Element.self)
+#else
     let elementOffset = position &* MemoryLayout<Element>.stride
-    let address = unsafe _start().advanced(by: elementOffset)
-    return unsafe address.assumingMemoryBound(to: Element.self)
+    return unsafe _start().advanced(by: elementOffset)._rawValue
+#endif
   }
 }
 
@@ -500,6 +504,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
+    @_transparent
     get {
       _checkIndex(position)
       return unsafe self[unchecked: position]
@@ -519,9 +524,8 @@ extension Span where Element: BitwiseCopyable {
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
     get {
-      let elementOffset = position &* MemoryLayout<Element>.stride
-      let address = unsafe _start().advanced(by: elementOffset)
-      return unsafe address.loadUnaligned(as: Element.self)
+      let address = unsafe _unsafeAddressOfElement(unchecked: position)
+      return unsafe UnsafeRawPointer(address).loadUnaligned(as: Element.self)
     }
   }
 }
@@ -980,6 +984,58 @@ extension Span where Element: ~Copyable {
   }
 }
 
+// MARK: usage hints
+//
+// `Span` is not a `Collection`. We add the following unavailable members
+// to redirect users who reach for the `Collection` slicing API towards the
+// corresponding `extracting(...)` function.
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Span where Element: ~Copyable {
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(_:)")
+  public subscript(bounds: Range<Index>) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(_:)")
+  public subscript(bounds: some RangeExpression<Index>) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(_:)")
+  public subscript(bounds: UnboundedRange) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(first:)")
+  public func prefix(_ maxLength: Int) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(last:)")
+  public func suffix(_ maxLength: Int) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(droppingFirst:)")
+  public func dropFirst(_ k: Int = 1) -> Self {
+    Builtin.unreachable()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, renamed: "extracting(droppingLast:)")
+  public func dropLast(_ k: Int = 1) -> Self {
+    Builtin.unreachable()
+  }
+}
+
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element == UInt8 {
@@ -1007,3 +1063,38 @@ extension Span: BorrowingSequence where Element: ~Copyable {
   }
 }
 #endif
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Span where Element: Equatable & ~Copyable {
+  @_alwaysEmitIntoClient
+  internal func _elementsEqual(to other: borrowing Self) -> Bool {
+    return self.withUnsafeBufferPointer { a in
+      other.withUnsafeBufferPointer { b in
+        guard a.count == b.count else { return false }
+        guard unsafe a.baseAddress != b.baseAddress else { return true }
+        var i = 0
+        while i < self.count {
+          guard unsafe a[i] == b[i] else { return false }
+          i &+= 1
+        }
+        return true
+      }
+    }
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Span where Element: Hashable & ~Copyable {
+  @_alwaysEmitIntoClient
+  internal func _hashContents(into hasher: inout Hasher) {
+    // Note: no discriminating combine call -- caller is expected to do that
+    // separately when needed.
+    var i = 0
+    while i < self.count {
+      hasher.combine(unsafe self[unchecked: i])
+      i &+= 1
+    }
+  }
+}

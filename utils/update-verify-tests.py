@@ -16,10 +16,7 @@ from update_verify_tests.core import check_expectations
   - regexes matchers
   - multiple checks targeting the same line are supported, but a line may only contain one check
   - if multiple checks targeting the same line are failing the script is not guaranteed to produce a minimal diff
-  - remarks
-  - expansions
   - columns
-  - fix-its
   - doc files
 
 Example usage:
@@ -30,9 +27,13 @@ Example usage:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--prefix", default="", help="The prefix passed to -verify")
+    parser.add_argument(
+        "--prefix", default="", help="The prefix passed to -verify"
+    )
     args = parser.parse_args()
-    (err, updated_files) = check_expectations(sys.stdin.readlines(), args.prefix)
+    (err, updated_files) = check_expectations(
+        sys.stdin.readlines(), args.prefix
+    )
     if err:
         print(err)
         sys.exit(1)

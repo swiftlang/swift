@@ -56,7 +56,7 @@ SILBasicBlock::~SILBasicBlock() {
 }
 
 int SILBasicBlock::getDebugID() const {
-  if (!getParent())
+  if (!getParent() || isDebugReconstructionBlock())
     return -1;
   int idx = 0;
   for (const SILBasicBlock &B : *getParent()) {
@@ -103,7 +103,7 @@ void SILBasicBlock::erase(SILInstruction *I) {
 }
 
 void SILBasicBlock::erase(SILInstruction *I, SILModule &module) {
-  assert(!I->isDeleted() && "double delete of instruction");
+  ASSERT(!I->isDeleted() && "double delete of instruction");
   module.willDeleteInstruction(I);
   InstList.remove(I);
   I->asSILNode()->markAsDeleted();

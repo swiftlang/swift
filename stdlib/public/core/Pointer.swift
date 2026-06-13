@@ -300,6 +300,27 @@ extension _Pointer /*: Strideable*/ {
     return Self(Builtin.gep_Word(
       self._rawValue, n._builtinWordValue, Pointee.self))
   }
+
+  /// Returns a pointer to the element at the given index, marking the result
+  /// as a projection of this pointer's pointee array.
+  ///
+  /// Unlike `advanced(by:)`, the returned pointer carries the `[projection]`
+  /// flag in SIL, indicating that it accesses exactly one element and cannot
+  /// be used for general pointer arithmetic by chaining index operations.
+  ///
+  /// - Parameter i: The index of the element to project.
+  /// - Returns: A pointer to the element at position `i`.
+  @_transparent
+  @_alwaysEmitIntoClient
+  internal func project(_ i: Int) -> Self {
+#if $BuiltinGepProjection
+    return Self(Builtin.gepProjection_Word(
+      self._rawValue, i._builtinWordValue, Pointee.self))
+#else
+    return Self(Builtin.gep_Word(
+      self._rawValue, i._builtinWordValue, Pointee.self))
+#endif
+  }
 }
 
 extension _Pointer /*: Hashable */ {

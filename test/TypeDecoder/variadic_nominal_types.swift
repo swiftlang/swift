@@ -1,3 +1,4 @@
+// UNSUPPORTED: CPU=armv7k && OS=watchos
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -emit-executable %s -g -o %t/variadic_nominal_types -emit-module -target %target-swift-5.9-abi-triple
