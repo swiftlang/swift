@@ -2352,8 +2352,7 @@ namespace {
           return;
       }
 
-      auto nominal = normal->getDeclContext()->getSelfNominalTypeDecl();
-      auto sig = nominal->getGenericSignatureOfContext();
+      auto sig = normal->getGenericSignature();
       auto metadata = irgen::addGenericRequirements(
           IGM, B, sig, condReqs, inverses);
 
