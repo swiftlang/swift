@@ -1572,6 +1572,9 @@ func testNilCoalescingOperatorRemoveFix() {
       ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-1:9-+0:12=}}
 }
 
+// FIXME: https://github.com/swiftlang/swift/issues/89918
+let _ = type(of: Int.foo) // expected-error {{failed to produce diagnostic}}
+
 // https://github.com/apple/swift/issues/74617
 struct Foo_74617 {
   public var bar: Float { 123 }
