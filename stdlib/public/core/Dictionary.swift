@@ -1040,7 +1040,7 @@ extension Dictionary {
     let result: _NativeDictionary<Key, T> =
       try self.reduce(into: _NativeDictionary<Key, T>()) { (result, element) in
       if let value = try transform(element.value) {
-        result._unsafeInsertNew(key: element.key, value: value)
+        result.insertNew(key: element.key, value: value)
       }
     }
     return Dictionary<Key, T>(_native: result)
@@ -1067,7 +1067,7 @@ extension Dictionary {
     var result: _NativeDictionary<Key, T> = .init()
     for (key, original): (Key, Value) in self {
       if let value = try transform(key, original) {
-        result._unsafeInsertNew(key: key, value: value)
+        result.insertNew(key: key, value: value)
       }
     }
     return Dictionary<Key, T>(_native: result)
