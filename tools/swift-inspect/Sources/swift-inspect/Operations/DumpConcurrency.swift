@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !os(Linux)
-
 import ArgumentParser
 import SwiftRemoteMirror
 #if canImport(string_h)
@@ -19,6 +17,10 @@ import string_h
 #endif
 #if canImport(ucrt)
 import ucrt
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Android)
+import Android
 #endif
 
 struct DumpConcurrency: ParsableCommand {
@@ -475,5 +477,3 @@ fileprivate class ConcurrencyDumper {
     }
   }
 }
-
-#endif
