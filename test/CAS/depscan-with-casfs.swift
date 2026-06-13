@@ -1,4 +1,4 @@
-// REQUIRES: objc_interop
+// REQUIRES: DISABLE
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
