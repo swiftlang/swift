@@ -363,6 +363,14 @@ func test_ternary_and_nil_coalescing() {
     test2(true ? w : nil)
   }
 
+  func ternary1a(v: CGFloat) -> Double? {
+    return true ? v : nil
+  }
+
+  func ternary1b(w: Double) -> CGFloat? {
+    return true ? w : nil
+  }
+
   func ternary2(v: CGFloat?, w: Double?) {
     test1(true ? v : nil)
     test2(true ? v : nil)

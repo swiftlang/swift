@@ -15096,7 +15096,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     simplifyLocator(anchor, path, range);
 
     if (!path.empty() && path.back().is<LocatorPathElt::GenericArgument>()) {
-      impact += 10;
+      impact += 11;
     }
 
     if (restriction == ConversionRestrictionKind::DoubleToCGFloat) {
