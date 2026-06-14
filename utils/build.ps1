@@ -128,7 +128,7 @@ param
 (
   # Build Paths
   [System.IO.FileInfo] $SourceCache = "S:\SourceCache",
-  [System.IO.FileInfo] $BinaryCache = "S:\b",
+  [System.IO.FileInfo] $BinaryCache = "S:\BinaryCache",
   [System.IO.FileInfo] $ImageRoot = "S:",
   [System.IO.FileInfo] $Cache = "S:\CAS",
   [string] $Stage = "",
@@ -1546,11 +1546,13 @@ function Get-Dependencies {
       Invoke-WithDotNetRuntime {
         Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn extract -acceptEula $WiX.EulaIdentifier $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
       }
+      subst X: "$BinaryCache\toolchains\$ToolchainName"
       Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
         $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
-        $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
+        $TARGETDIR = if ($_.Name -eq "rtl.msi") { "X:\LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin" } else { "X:\" }
         Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
       }
+      subst /d X:
     }
 
     if ($IncludeSBoM) {
