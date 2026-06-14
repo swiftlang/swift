@@ -269,10 +269,9 @@ public:
   }
 
   static bool deepEquals(const Node *lhs, const Node *rhs) {
+    assert(lhs && rhs && "Nodes being compared may not be null");
     if (lhs == rhs)
       return true;
-    if ((!lhs && rhs) || (lhs && !rhs))
-      return false;
     if (!lhs->isSimilarTo(rhs))
       return false;
     for (auto li = lhs->begin(), ri = rhs->begin(), le = lhs->end(); li != le;
