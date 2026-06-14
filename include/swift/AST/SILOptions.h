@@ -116,7 +116,7 @@ public:
 
   /// Controls whether to always assume that functions rarely throw an Error
   /// within the optimizer. This influences static branch prediction.
-  bool EnableThrowsPrediction = false;
+  bool EnableThrowsPrediction = true;
 
   /// Controls whether to say that blocks ending in an 'unreachable' are cold.
   bool EnableNoReturnCold = false;
