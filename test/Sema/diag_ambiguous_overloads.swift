@@ -152,7 +152,9 @@ do {
   func f1(_ u: String) -> Double {} // expected-note 2 {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
   func f2(_ u: Int) {}
 
-  f2(f1(1 as Double)) // expected-error {{no exact matches in call to local function 'f1'}}
+  f2(f1(1 as Double))
+  // expected-error@-1 {{ambiguous use of 'f1'; cannot convert value of type 'Double' to any of potential types Int, String}}
+  // expected-error@-2 {{cannot convert value of type 'String' to expected argument type 'Int'}}
   f1(1 as Double) as Int // expected-error {{no exact matches in call to local function 'f1'}}
 }
 do {
@@ -184,8 +186,36 @@ do {
   var i16 = MyInt16()
 
   let _ = i16 ++ i16
-  // expected-error@-1 {{ambiguous use of operator '++'}}
+  // expected-error@-1 {{ambiguous use of operator '++'; cannot select between potential result types 'T.D', 'T'}}
 
   let _ = i16 -- i16
-  // expected-error@-1 {{ambiguous use of operator '--'}}
+  // expected-error@-1 {{ambiguous use of operator '--'; cannot select between potential result types 'T.D', 'T'}}
+}
+
+// https://github.com/swiftlang/swift/issues/79999
+do {
+  func foo(_ a: Int) -> [Int] { [] }
+  
+  let _ = foo(-)
+  // expected-error@-1 {{cannot convert value of type '(Duration, Duration) -> Duration' to expected argument type 'Int'}}
+
+  for _ in foo(-) {}
+  // expected-error@-1 {{cannot convert value of type '(Duration, Duration) -> Duration' to expected argument type 'Int'}}
+
+  func test() -> Int {}
+  func test() -> String {}
+  
+  func other(_: Int32) {}
+  
+  other(test())
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Int32'}}
+}
+
+do {
+  func test(_: Int) {} // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
+  func test(_: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
+
+  func compute() -> Double { 0 }
+  
+  test(compute()) // expected-error {{ambiguous use of 'test'; cannot convert value of type 'Double' to any of potential types Int, String}}
 }

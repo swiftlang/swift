@@ -10,7 +10,7 @@ func testGlobalFunctions() {
   if #_hasSymbol(noArgFunc) {}
   if #_hasSymbol(function(with:)) {}
   if #_hasSymbol(throwingFunc) {}
-  if #_hasSymbol(ambiguousFunc) {} // expected-error {{ambiguous use of 'ambiguousFunc()'}}
+  if #_hasSymbol(ambiguousFunc) {} // expected-error {{ambiguous use of 'ambiguousFunc()'; cannot select between potential result types '()', 'Int'}}
   if #_hasSymbol(ambiguousFunc as () -> Int) {}
   if #_hasSymbol(genericFunc(_:) as (S) -> Void) {}
 }
@@ -148,7 +148,7 @@ func testClosure() {
   doIt { if #_hasSymbol(noArgFunc) {} }
   doIt { if #_hasSymbol(ambiguousFunc as () -> Int) {} }
   doIt { if #_hasSymbol(S.self) {} }
-  doIt { if #_hasSymbol(ambiguousFunc) {} } // expected-error {{ambiguous use of 'ambiguousFunc()'}}
+  doIt { if #_hasSymbol(ambiguousFunc) {} } // expected-error {{ambiguous use of 'ambiguousFunc()'; cannot select between potential result types '()', 'Int'}}
   doIt { if #_hasSymbol(localFunc) {} } // expected-warning {{global function 'localFunc()' is not a weakly linked declaration}}
   doIt { if #_hasSymbol(unknownDecl) {} } // expected-error {{cannot find 'unknownDecl' in scope}}
   doIt { if #_hasSymbol(noArgFunc()) {} } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
@@ -178,7 +178,7 @@ struct MyView {
   }
   
   @ViewBuilder var ambiguousFuncView: some View {
-    if #_hasSymbol(ambiguousFunc) { image } // expected-error {{ambiguous use of 'ambiguousFunc()'}}
+    if #_hasSymbol(ambiguousFunc) { image } // expected-error {{ambiguous use of 'ambiguousFunc()'; cannot select between potential result types '()', 'Int'}}
     else { image }
   }
     

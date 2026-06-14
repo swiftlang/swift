@@ -411,7 +411,7 @@ func test_50875() -> String {
   if let s = c.g() { //expected-error{{initializer for conditional binding must have Optional type, not 'String'}}
     return s
   }
-  if let s = c.h() { //expected-error{{ambiguous use of 'h()'}}
+  if let s = c.h() { //expected-error{{ambiguous use of 'h()'; cannot select between potential result types 'Int?', 'Float?'}}
     return s
   }
 }

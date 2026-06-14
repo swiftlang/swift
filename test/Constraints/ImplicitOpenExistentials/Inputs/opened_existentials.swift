@@ -375,7 +375,7 @@ func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
   _ = getSelf(v) // Ok
   // SWIFT-5-AND-6: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   _ = getSelf(v) as any B // Ok
-  _ = getSelf(otherV) as any B & D // expected-error {{ambiguous use of 'getSelf'}}
+  _ = getSelf(otherV) as any B & D // expected-error {{ambiguous use of 'getSelf'; cannot select between potential types '<T where T : D> (T) -> T', '<T where T : B> (T) -> T'}}
 
   func getBDSelf<T: D>(_: T) -> T { fatalError() }
 

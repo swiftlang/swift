@@ -86,7 +86,7 @@ func testTypeIncorrectLogCalls() {
   // expected-error@-2 {{missing argument label 'assertion:' in call}}
 
   _osLogTestHelper("\(x, format: .hex)")
-  //expected-error@-1 {{no exact matches in call to instance method 'appendInterpolation'}}
+  //expected-error@-1 {{ambiguous use of 'appendInterpolation'; cannot convert value of type 'TestClass' to any of potential types Int, Int32, UInt, Float, Double}}
 
   _osLogTestHelper("\(10, format: .myFormat, privacy: .private)")
   //expected-error@-1 {{type 'OSLogIntegerFormatting' has no member 'myFormat'}}

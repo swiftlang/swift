@@ -13,7 +13,7 @@ struct S<T : P> {
   init(_ x: T? = nil) {} // expected-note {{found this candidate}}
   func testInitRanking() {
     _ = S<T>() // Okay
-    _ = S<T>.init() // expected-error {{ambiguous use of 'init(_:)'}}
+    _ = S<T>.init() // expected-error {{ambiguous use of 'init(_:)'; cannot select between potential parameter types '(T)', '(T?)'}}
   }
 }
 struct S1 {
@@ -22,7 +22,7 @@ struct S1 {
 
   func testInitRanking() {
     _ = S1() // Okay
-    _ = S1.init() // expected-error {{ambiguous use of 'init'}}
+    _ = S1.init() // expected-error {{ambiguous use of 'init'; cannot select between potential parameter types '(x: Int, y: Int)', '(Int, Int)'}}
   }
 }
 
@@ -32,7 +32,7 @@ struct S2 {
   init(y: Int...) {} // expected-note {{found this candidate}}
 
   func testInitRanking() {
-    _ = S2() // expected-error {{ambiguous use of 'init'}}
+    _ = S2() // expected-error {{ambiguous use of 'init'; cannot select between potential parameter types '(x: Int...)', '(y: Int...)'}}
   }
 }
 
@@ -43,7 +43,7 @@ struct S3 {
   init(_: String...) {} // expected-note {{found this candidate}}
 
   func testInitRanking() {
-    _ = S3() // expected-error {{ambiguous use of 'init'}}
+    _ = S3() // expected-error {{ambiguous use of 'init'; cannot select between potential parameter types '(x: Int...)', '(String...)'}}
   }
 }
 
@@ -55,7 +55,7 @@ struct S4 {
   init(_: Int = 0) {} // expected-note {{found this candidate}}
 
   func testInitRanking() {
-    _ = S4() // expected-error {{ambiguous use of 'init'}}
+    _ = S4() // expected-error {{ambiguous use of 'init'; cannot select between potential parameter types '(x: Int)', '(Int)'}}
   }
 }
 
@@ -70,6 +70,6 @@ struct S5 {
 
   func testFavoring() {
     let x = 0
-    _ = S5((x, 0) ^^^ 0) // expected-error {{ambiguous use of operator '^^^'}}
+    _ = S5((x, 0) ^^^ 0) // expected-error {{ambiguous use of operator '^^^'; cannot select between potential result types 'String', 'Int'}}
   }
 }

@@ -26,8 +26,8 @@ func accept_integer(_ x: Int16) -> Y { } // expected-note 2{{found this candidat
 func overflow_check() {
   var y : Y = accept_integer(500)
 
-  accept_integer(17) // expected-error{{ambiguous use of 'accept_integer'}}
-  accept_integer(1000000) // expected-error{{ambiguous use of 'accept_integer'}}
+  accept_integer(17) // expected-error{{ambiguous use of 'accept_integer'; cannot select between potential result types 'X', 'Y'}}
+  accept_integer(1000000) // expected-error{{ambiguous use of 'accept_integer'; cannot select between potential result types 'X', 'Y'}}
 }
 
 // Coercion chaining.

@@ -5031,8 +5031,31 @@ WARNING(use_of_void_pointer,none,
 "Unsafe%0Pointer<Void> has been replaced by Unsafe%0RawPointer", (StringRef))
 
 // Ambiguities
+ERROR(incorrect_argument_for_call,none,
+      "cannot convert value of type %1 to expected argument type %2 for %0",
+      (DeclNameRef, Type, Type))
+ERROR(incorrect_argument_for_init,none,
+      "cannot convert value of type %0 to expected argument type %1 for initializer",
+      (Type, Type))
+ERROR(incorrect_operand_for_op,none,
+      "cannot convert value of type %1 to expected %0 operand type %2",
+      (DeclNameRef, Type, Type))
+ERROR(ambiguous_decl_ref_types,none,
+      "ambiguous use of %0; cannot convert value of type %1 to any of potential types %2", (DeclNameRef, Type, StringRef))
+ERROR(ambiguous_operator_ref_types,none,
+      "ambiguous use of operator %0; cannot convert value of type %1 to any of potential types %2", (DeclNameRef, Type, StringRef))
+ERROR(ambiguous_decl_ref_unknown,none,
+      "ambiguous use of %0; cannot select between potential%1 types %2", (DeclNameRef, StringRef, StringRef))
+ERROR(ambiguous_operator_ref_unknown,none,
+      "ambiguous use of operator %0; cannot select between potential%1 types %2", (DeclNameRef, StringRef, StringRef))
+ERROR(ambiguous_initializer_unknown,none,
+      "ambiguous use of initializer; cannot determine which initializer for potential types %0", (StringRef))
 ERROR(ambiguous_decl_ref,none,
       "ambiguous use of %0", (DeclNameRef))
+ERROR(ambiguous_init,none,
+      "ambiguous use of initializer; cannot convert value of type %0 to any of potential types %1", (Type, StringRef))
+NOTE(ambiguous_because_no_candidates_were_found,none,
+     "no candidates found for specified argument %0", (DeclNameRef))
 ERROR(ambiguous_operator_ref,none,
       "ambiguous use of operator %0", (DeclNameRef))
 NOTE(ambiguous_because_of_trailing_closure,none,

@@ -22,7 +22,7 @@ func reasyncOverload(_: () async -> (), _: Int) reasync {} // expected-note {{fo
 func reasyncOverload(_: () -> (), _: String) {} // expected-note {{found this candidate}}
 
 func referencesReasyncOverload() {
-  _ = reasyncOverload // expected-error {{ambiguous use of 'reasyncOverload'}}
+  _ = reasyncOverload // expected-error {{ambiguous use of 'reasyncOverload'; cannot select between potential parameter types '(() -> (), String)', '(() async -> (), Int)'}}
 }
 
 func referencesReasyncOverloadAsync() async {

@@ -2564,7 +2564,8 @@ static bool diagnoseAmbiguityWithContextualType(
 /// same-type requirement mismatches, etc.
 static bool diagnoseAmbiguityWithGenericRequirements(
     ConstraintSystem &cs,
-    ArrayRef<std::pair<const Solution *, const ConstraintFix *>> aggregate) {
+    ArrayRef<std::pair<const Solution *, const ConstraintFix *>> aggregate,
+    const SolutionDiff &diff) {
   // If all of the fixes point to the same overload choice,
   // we can diagnose this an a single error.
   bool hasNonDeclOverloads = false;
@@ -2598,7 +2599,7 @@ static bool diagnoseAmbiguityWithGenericRequirements(
     } else {
       // If there are no overload choices it means that
       // the issue is with types, delegate that to the primary fix.
-      return primaryFix.second->diagnoseForAmbiguity(aggregate);
+      return primaryFix.second->diagnoseForAmbiguity(aggregate, diff);
     }
   }
 
@@ -2621,7 +2622,7 @@ static bool diagnoseAmbiguityWithGenericRequirements(
 static bool diagnoseAmbiguity(
     ConstraintSystem &cs, const SolutionDiff::OverloadDiff &ambiguity,
     ArrayRef<std::pair<const Solution *, const ConstraintFix *>> aggregateFix,
-    ArrayRef<Solution> solutions) {
+    const SolutionDiff &diff, ArrayRef<Solution> solutions) {
   auto *locator = aggregateFix.front().second->getLocator();
   auto anchor = aggregateFix.front().second->getAnchor();
 
@@ -2660,7 +2661,7 @@ static bool diagnoseAmbiguity(
               return fix->getKind() == fixKind && fix->getLocator() == locator;
             })) {
       auto *primaryFix = aggregateFix.front().second;
-      if (primaryFix->diagnoseForAmbiguity(aggregateFix))
+      if (primaryFix->diagnoseForAmbiguity(aggregateFix, diff))
         return true;
     }
   }
@@ -3078,7 +3079,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       continue;
 
     auto aggregate = fixes->second;
-    diagnosed |= ::diagnoseAmbiguity(*this, ambiguity, aggregate, solutions);
+    diagnosed |= ::diagnoseAmbiguity(*this, ambiguity, aggregate, solutionDiff, solutions);
 
     consideredFixes.insert(aggregate.begin(), aggregate.end());
   }
@@ -3138,7 +3139,9 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     }
 
     for (auto &aggregate : viableGroups) {
-      if (diagnoseAmbiguityWithGenericRequirements(*this, aggregate)) {
+      if (diagnoseAmbiguityWithGenericRequirements(*this,
+                                                   aggregate,
+                                                   solutionDiff)) {
         // Remove diagnosed fixes.
         fixes.set_subtract(aggregate);
         diagnosed = true;
@@ -3166,7 +3169,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
               });
         })) {
       auto &aggregate = entry.second;
-      diagnosed |= aggregate.front().second->diagnoseForAmbiguity(aggregate);
+      diagnosed |= aggregate.front().second->diagnoseForAmbiguity(aggregate, solutionDiff);
     }
   }
 
@@ -3372,12 +3375,66 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
       assert(false && "locator could not be simplified to anchor");
     }
 
+    llvm::StringSet<> typeChoicesResults;
+    llvm::StringSet<> typeChoicesParams;
+    llvm::StringSet<> typeChoices;
+
+    for (auto choice : overload.choices) {
+
+      ValueDecl *choiceDecl = choice.getDecl();
+
+      Type choiceType = choiceDecl->removeCurriedSelf();
+      typeChoices.insert(choiceType->getString());
+
+      if (choiceType->is<AnyFunctionType>()) {
+        auto fun = choiceType->getAs<AnyFunctionType>();
+        typeChoicesResults.insert(fun->getResult()->getString());
+        typeChoicesParams.insert(fun->getParamListAsString(fun->getParams()));
+      } else if (choiceType->is<GenericFunctionType>()) {
+        auto gFun = choiceType->getAs<GenericFunctionType>();
+        typeChoicesResults.insert(gFun->getResult()->getString());
+        typeChoicesParams.insert(gFun->getParamListAsString(gFun->getParams()));
+      }
+    }
+
+    auto makeStringList = [&] (llvm::StringSet<> vec) {
+      std::string result;
+      for(auto &entry : vec) {
+        result += "'" + entry.getKey().str() + "', ";
+      }
+      result = result.substr(0, result.size() - 2);
+      return result;
+    };
+
+    std::string typeChoiceString;
+    std::string paramOrResultMsg = "";
+    if (typeChoicesResults.size() > 1) {
+      typeChoiceString = makeStringList(typeChoicesResults);
+      paramOrResultMsg = " result";
+    } else if (typeChoicesParams.size() > 1 && typeChoicesResults.size() > 1) {
+      typeChoiceString = makeStringList(typeChoices);
+    } else if (typeChoicesParams.size() > 1) {
+      typeChoiceString = makeStringList(typeChoicesParams);
+      paramOrResultMsg = " parameter";
+    } else {
+      if (typeChoices.size() == 1)
+          typeChoiceString = "";
+        else
+          typeChoiceString = makeStringList(typeChoices);
+    }
+
     // Emit the ambiguity diagnostic.
     auto &DE = getASTContext().Diags;
-    DE.diagnose(getLoc(anchor),
-                name.isOperator() ? diag::ambiguous_operator_ref
-                                  : diag::ambiguous_decl_ref,
-                name);
+    if (typeChoiceString == "")
+      DE.diagnose(getLoc(anchor),
+                  name.isOperator() ? diag::ambiguous_operator_ref
+                                    : diag::ambiguous_decl_ref,
+                  name);
+    else
+      DE.diagnose(getLoc(anchor),
+                name.isOperator() ? diag::ambiguous_operator_ref_unknown
+                                  : diag::ambiguous_decl_ref_unknown,
+                name, paramOrResultMsg, typeChoiceString);
 
     TrailingClosureAmbiguityFailure failure(solutions, anchor,
                                             overload.choices);
@@ -3394,7 +3451,6 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
       case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional: {
-        // FIXME: show deduced types, etc, etc.
         auto decl = choice.getDecl();
         if (EmittedDecls.insert(decl).second) {
           auto declModule = decl->getDeclContext()->getParentModule();

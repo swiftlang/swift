@@ -362,11 +362,11 @@ takeVoidVoidFn { () -> Void in
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
 func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1 (got 'T')}}
-func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'T')}}
+func f19997471(_ x: Int) {} // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'T')}}
 
 func someGeneric19997471<T>(_ x: T) {
   takeVoidVoidFn {
-    f19997471(x) // expected-error {{no exact matches in call to global function 'f19997471'}}
+    f19997471(x) // expected-error {{ambiguous use of 'f19997471'; cannot convert value of type 'T' to any of potential types String, Int}}
   }
 }
 
@@ -801,7 +801,7 @@ overloaded { } // empty body => inferred as returning ()
 overloaded { print("hi") } // single-expression closure => typechecked with body
 
 overloaded { print("hi"); print("bye") } // multiple expression closure without explicit returns; can default to any return type
-// expected-error@-1 {{ambiguous use of 'overloaded'}}
+// expected-error@-1 {{ambiguous use of 'overloaded'; cannot select between potential parameter types '(() -> Int)', '(() -> Void)'}}
 
 func not_overloaded(_ handler: () -> Int) {}
 
@@ -1049,7 +1049,7 @@ func rdar52204414() {
 func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {} // expected-note{{found this candidate}}
 func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {} // expected-note{{found this candidate}}
 
-overloaded_with_default { 0 } // expected-error{{ambiguous use of 'overloaded_with_default'}}
+overloaded_with_default { 0 } // expected-error{{ambiguous use of 'overloaded_with_default'; cannot select between potential parameter types '(b: Int, c: Int, a: () -> Int)', '(a: () -> Int, b: Int, c: Int)'}}
 
 func overloaded_with_default_and_autoclosure<T>(_ a: @autoclosure () -> T, b: Int = 0) {}
 func overloaded_with_default_and_autoclosure<T>(b: Int = 0, c: @escaping () -> T?) {}
@@ -1256,11 +1256,11 @@ do {
 
 do {
   func test(_: Int, _: Int) {}
-  // expected-note@-1 {{closure passed to parameter of type 'Int' that does not accept a closure}}
+  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #2 (got '_')}}
   func test(_: Int, _: String) {}
-  // expected-note@-1 {{closure passed to parameter of type 'String' that does not accept a closure}}
+  // expected-note@-1 {{candidate expects value of type 'String' for parameter #2 (got '_')}}
 
-  test(42) { // expected-error {{no exact matches in call to local function 'test'}}
+  test(42) { // expected-error {{ambiguous use of 'test'; cannot convert value of type '_' to any of potential types Int, String}}
     print($0)
   }
 }

@@ -25,7 +25,7 @@ do {
   }
 
   func test_ternary_non_default_literal(v: TestFloat) -> Float? {
-    true ? v.test(1.0) : nil // expected-error {{ambiguous use of 'test'}}
+    true ? v.test(1.0) : nil // expected-error {{ambiguous use of 'test'; cannot select between potential result types 'Float', 'Float?}}
   }
 }
 
@@ -368,7 +368,7 @@ do {
   func test(over: Int, other: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found this candidate}}
 
   func performLocal(v: Int, block: @escaping (Int) throws -> Void) async throws {
-    try await test(over: v, block: block) // expected-error {{ambiguous use of 'test'}}
+    try await test(over: v, block: block) // expected-error {{ambiguous use of 'test'; cannot select between potential parameter types '(over: Int, that: String, block: @escaping (Int) throws -> Void)', '(over: Int, other: String, block: @escaping (Int) throws -> Void)'}}
   }
 
   // The hack applied only to `OverloadedDeclRefExpr`s.

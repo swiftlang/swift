@@ -255,7 +255,7 @@ func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubs
 
   value = ovl[(i, j, i)] // expected-error{{cannot convert value of type '(Int, Int, Int)' to expected argument type 'Int'}}
 
-  ret[i] // expected-error{{ambiguous use of 'subscript(_:)'}}
+  ret[i] // expected-error{{ambiguous use of 'subscript(_:)'; cannot select between potential result types 'Float', 'Int'}}
 
   value = ret[i]
   ret[i] = value
@@ -401,20 +401,20 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   // expected-note@-2 {{to match this opening '('}}
 
   let _ = s1["hello"]
-  // expected-error@-1 {{ambiguous use of 'subscript(_:)'}}
+  // expected-error@-1 {{ambiguous use of 'subscript(_:)'; cannot select between potential result types 'Bool', 'String?'}}
   // expected-error@-2 {{expected ')' in expression list}}
 }
 
 struct SubscriptTest2 {
-  subscript(a : String, b : Int) -> Int { return 0 } // expected-note {{candidate expects value of type 'Int' for parameter #2}}
+  subscript(a : String, b : Int) -> Int { return 0 } // expected-note {{candidate expects value of type 'Int' for parameter #2 (got 'Double')}}
   // expected-note@-1 2 {{declared here}}
-  subscript(a : String, b : String) -> Int { return 0 } // expected-note {{candidate expects value of type 'String' for parameter #2}}
+  subscript(a : String, b : String) -> Int { return 0 } // expected-note {{candidate expects value of type 'String' for parameter #2 (got 'Double')}}
 }
 
 func testSubscript1(_ s2 : SubscriptTest2) {
   _ = s2["foo"] // expected-error {{missing argument for parameter #2 in subscript}}
 
-  let a = s2["foo", 1.0] // expected-error {{no exact matches in call to subscript}}
+  let a = s2["foo", 1.0] // expected-error {{ambiguous use of 'subscript'; cannot convert value of type 'Double' to any of potential types Int, String}}
 
   _ = s2.subscript("hello", 6)
   // expected-error@-1 {{value of type 'SubscriptTest2' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{30-31=]}}

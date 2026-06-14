@@ -164,7 +164,7 @@ func testOverloading(name: String) {
 
   let _: A = a1
 
-  _ = overloadedTuplify(true) { b in // expected-error {{ambiguous use of 'overloadedTuplify(_:body:)'}}
+  _ = overloadedTuplify(true) { b in // expected-error {{ambiguous use of 'overloadedTuplify(_:body:)'; cannot select between potential result types 'B', 'A'}}
     b ? "Hello, \(name)" : "Goodbye"
     42
     overloadedTuplify(false) {

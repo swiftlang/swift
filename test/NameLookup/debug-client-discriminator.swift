@@ -7,7 +7,7 @@
 
 import HasPrivateAccess
 
-// CHECK-ERROR: ambiguous use of 'global'
+// CHECK-ERROR: ambiguous use of 'global'; cannot select between potential types 'String', 'Int' 
 // CHECK-INT: let unqualified: Int
 // CHECK-STRING: let unqualified: String
 let unqualified = global

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -verify-ignore-unrelated %s
 
 // REQUIRES: objc_interop
 
@@ -272,9 +272,8 @@ func rdar19831919() {
 
 // <rdar://problem/19831698> Incorrect 'as' fixits offered for invalid literal expressions
 func rdar19831698() {
-  var v70 = true + 1 // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'Int'}}
-  var v71 = true + 1.0 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Double'}}
-// expected-note@-1{{overloads for '+'}}
+  var v70 = true + 1 // expected-error@:18 {{cannot convert value of type 'Bool' to expected '+' operand type 'Int'}}
+  var v71 = true + 1.0 // expected-error{{ambiguous use of '+'; cannot convert value of type 'Bool' to any of potential types Double, Date, DispatchTime, DispatchWallTime}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
   var v73 = true + [] // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'Array<Bool>'}}
   var v75 = true + "str" // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'String'}}

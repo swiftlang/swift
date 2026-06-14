@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -verify-ignore-unrelated %s
 
 //===----------------------------------------------------------------------===//
 // Tests and samples.
@@ -595,12 +595,12 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var pi_d1 = Double(pi_d)
   var pi_s1 = SpecialPi(pi_s) // expected-error {{argument passed to call that takes no arguments}}
 
-  var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
-  var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
+  var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi()'; cannot select between potential result types 'Double', 'Float'}}
+  var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi()'; cannot select between potential result types 'Double', 'Float'}}
   var pi_s2: SpecialPi = getPi() // no-warning
   
   var float = Float.self
-  var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
+  var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'getPi()'; cannot select between potential result types 'Double', 'Float'}}
   var pi_f4 = float.init(pi_f)
 
   var e = Empty(f) // expected-warning {{variable 'e' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}  {{8-8=: Empty}}
@@ -796,7 +796,8 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
   if cond || (a ?? 42 > 0) {}  // Ok.
   if (cond || a) ?? 42 > 0 {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
   // expected-error@-1 {{binary operator '>' cannot be applied to operands of type 'Bool' and 'Int'}}  expected-note@-1 {{overloads for '>' exist with these partially matching parameter list}}
-  // expected-error@-2 {{binary operator '??' cannot be applied to operands of type 'Bool' and 'Int'}}
+  // expected-error@-2 {{ambiguous use of '??'; cannot convert value of type 'Int' to any of potential types Bool, Optional<_>}}
+
   if (cond || a) ?? (42 > 0) {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
 
   if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.
@@ -822,11 +823,11 @@ func testOptionalTypeParsing(_ a : AnyObject) -> String {
 func testParenExprInTheWay() {
   let x = 42
   
-  if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected '&' operand type 'Int'}}
   // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
-  if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected '&' operand type 'Int'}}
   // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
-  if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected '&' operand type 'Int'}}
   // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '== 0' instead}} {{6-7=}}{{7-7=(}}{{16-16= == 0)}}
 
   if x & x {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}

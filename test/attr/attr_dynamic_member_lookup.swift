@@ -318,7 +318,7 @@ struct Ambiguity {
 func testAmbiguity(a: Ambiguity) {
   let _: Int = a.flexibility
   let _: Float = a.dynamism
-  _ = a.dynamism // expected-error {{ambiguous use of 'subscript(dynamicMember:)'}}
+  _ = a.dynamism // expected-error {{ambiguous use of 'subscript(dynamicMember:)'; cannot select between potential result types 'Float', 'Int'}}
 }
 
 // References to overloads are also resolved just like normal subscript and

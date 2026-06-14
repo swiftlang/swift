@@ -256,13 +256,13 @@ func test_pattern_ambiguity_doesnot_crash_compiler() {
 
   let _: (E) -> Void = {
     switch $0 {
-    case .hello(_): break // expected-error {{ambiguous use of 'hello'}}
+    case .hello(_): break // expected-error {{ambiguous use of 'hello'; cannot select between potential parameter types '(result: Int)', '(status: Int)'}}
     }
   }
 
   let _: (E) -> Void = {
     switch $0 {
-    case let E.hello(x): print(x) // expected-error {{ambiguous use of 'hello'}}
+    case let E.hello(x): print(x) // expected-error {{ambiguous use of 'hello'; cannot select between potential parameter types '(result: Int)', '(status: Int)'}}
     default: break
     }
   }
