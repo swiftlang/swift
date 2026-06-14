@@ -9,6 +9,6 @@ typedef struct {
 
 } NUPixelSize;
 
-#if __swift__ >= 50000
-void show_only_for_swift_4(void);
+#if __swift__
+void show_only_for_swift(void);
 #endif
