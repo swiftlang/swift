@@ -56,10 +56,11 @@ func testAmbiguousStringComparisons(s: String) {
 
 func testStringDeprecation(hello: String) {
   let hello2 = hello
-    .addingPercentEscapes(using: .utf8) // expected-error{{'addingPercentEscapes(using:)' is unavailable}}
+    .addingPercentEscapes(using: .utf8) // expected-error{{addingPercentEscapes}}
 
+  // This error check is optional because different Foundation version behave differently
   _ = hello2?
-    .replacingPercentEscapes(using: .utf8) // expected-error{{'replacingPercentEscapes(using:)' is unavailable}}
+    .replacingPercentEscapes(using: .utf8) // expected-error*{{'replacingPercentEscapes(using:)' is unavailable}}
 }
 
 // Positive and negative tests for String collection types. Testing the complete
