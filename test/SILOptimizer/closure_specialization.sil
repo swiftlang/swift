@@ -364,10 +364,10 @@ bb4:
 // CHECK-LABEL: sil shared [noinline] [ossa] @$s4main5inneryys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n : $@convention(thin) (@inout Builtin.Int32, @owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> ()
 // CHECK: bb0
 // CHECK: [[FN:%.*]] = function_ref @closure_with_box_argument
-// CHECK: [[PARTIAL:%.*]] = partial_apply [[FN]](%1)
-// CHECK: [[C:%.*]] = copy_value [[PARTIAL]]
+// CHECK: [[C1:%.*]] = copy_value %1
 // CHECK: [[ARG:%.*]] = load [trivial] %0
-// CHECK: apply [[C]]([[ARG]])
+// CHECK: [[C2:%.*]] = copy_value [[C1]]
+// CHECK: apply [[FN]]([[ARG]], [[C2]])
 
 // CHECK-LABEL: {{.*}} @$s4main5inneryys5Int32Vz_yADctF
 sil hidden [ossa] [noinline] @$s4main5inneryys5Int32Vz_yADctF : $@convention(thin) (@inout Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> ()) -> () {
@@ -567,7 +567,7 @@ bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> ()):
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]]) : $@convention(thin) (Int) -> ()
 // CHECK:   [[E:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK:   [[BB:%.*]] = begin_borrow [[E]]
-// CHECK:   apply [[BB]]() : $@noescape @callee_guaranteed () -> ()
+// CHECK:   apply [[F]]([[ARG]]) : $@convention(thin) (Int) -> ()
 // CHECK:   destroy_value [[E]]
 // CHECK:   destroy_value [[PA]]
 // CHECK:   return
@@ -1019,9 +1019,8 @@ bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: sil shared [ossa] @$s20need_borrow_argument15pointer_and_intSiTf1c_n :
-// CHECK:         [[P:%.*]] = partial_apply
-// CHECK:         [[BB:%.*]] = begin_borrow [[P]]
-// CHECK:         apply [[BB]](undef)
+// CHECK:         [[F:%.*]] = function_ref @pointer_and_int
+// CHECK:         apply [[F]](undef, %0)
 // CHECK-LABEL: } // end sil function '$s20need_borrow_argument15pointer_and_intSiTf1c_n'
 sil [ossa] @need_borrow_argument : $@convention(thin) (@guaranteed @callee_guaranteed (UnsafeRawBufferPointer) -> ()) -> () {
 bb0(%2 : @closureCapture @guaranteed $@callee_guaranteed (UnsafeRawBufferPointer) -> ()):
