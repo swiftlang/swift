@@ -19,7 +19,9 @@
 
 #include <optional>
 
-#include "chrono_utils.h"
+#include <chrono>
+#include <type_traits>
+
 
 namespace swift {
 namespace threading_impl {
