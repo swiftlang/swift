@@ -108,16 +108,18 @@ public func precondition(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
-  // Only check in debug and release mode. In release mode just trap.
-  if _isDebugAssertConfiguration() {
-    if !_fastPath(condition()) {
+  // Only check in debug and release mode.
+  if _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() {
+    if _fastPath(condition()) {
+      return
+    }
+    if _isDebugAssertConfiguration() {
       _assertionFailure("Precondition failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
+    } else { // In release mode just trap.
+      let message = StaticString("precondition failure")
+      Builtin.condfail_message(true._value, message.unsafeRawPointer)
     }
-  } else if _isReleaseAssertConfiguration() {
-    let error = !condition()
-    Builtin.condfail_message(error._value,
-      StaticString("precondition failure").unsafeRawPointer)
   }
 }
 
@@ -316,18 +318,21 @@ public func fatalError(
 /// and abort.
 @usableFromInline @_transparent
 internal func _precondition(
-  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure () -> Bool,
+  _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
-  // Only check in debug and release mode. In release mode just trap.
-  if _isDebugAssertConfiguration() {
-    if !_fastPath(condition()) {
+  // Only check in debug and release mode.
+  if _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() {
+    if _fastPath(condition()) {
+      return
+    }
+    if _isDebugAssertConfiguration() {
       _assertionFailure("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
+    } else { // In release mode just trap.
+      Builtin.condfail_message(true._value, message.unsafeRawPointer)
     }
-  } else if _isReleaseAssertConfiguration() {
-    let error = !condition()
-    Builtin.condfail_message(error._value, message.unsafeRawPointer)
   }
 }
 
