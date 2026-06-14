@@ -198,9 +198,9 @@ getClangScanningFS(SwiftDependencyScanningService &service,
   // We don't need to emit diagnostics, errors would have been emitted earlier
   // when the frontend first created the file system.
   DiagnosticEngine Diags(ctx.SourceMgr);
-  auto FS = llvm::vfs::createPhysicalFileSystem();
-//  auto FS = invocation.createVirtualFileSystemOverlays(
-//      llvm::vfs::createPhysicalFileSystem(), cas, cache, CASIDForPCH, Diags);
+//  auto FS = llvm::vfs::createPhysicalFileSystem();
+  auto FS = invocation.createVirtualFileSystemOverlays(
+      llvm::vfs::createPhysicalFileSystem(), cas, cache, CASIDForPCH, Diags);
   // Dependency scanner needs to create its own file system per worker.
   auto fs = ClangImporter::computeClangImporterFileSystem(
       ctx, importer->getClangFileMapping(), std::move(FS), true,
