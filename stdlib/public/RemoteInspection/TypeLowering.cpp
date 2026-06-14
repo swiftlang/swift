@@ -30,8 +30,6 @@
 #include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Basic/Unreachable.h"
 #include <iostream>
-#include <sstream>
-#include <limits>
 
 #ifdef DEBUG_TYPE_LOWERING
   #define DEBUG_LOG(expr) expr;
