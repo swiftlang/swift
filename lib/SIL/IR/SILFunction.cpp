@@ -1060,6 +1060,11 @@ bool SILFunction::hasValidLinkageForFragileRef(SerializedKind_t callerSerialized
   if (hasForeignBody())
     return true;
 
+  // An external forward declaration is resolved at link time, so any linkage
+  // is valid.
+  if (isExternForwardDeclaration())
+    return true;
+
   // The call site of this function must have checked that
   // caller.isAnySerialized() is true, as indicated by the
   // function name itself (contains 'ForFragileRef').
