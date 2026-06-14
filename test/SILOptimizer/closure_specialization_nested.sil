@@ -1,0 +1,125 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -closure-specialization %s | %FileCheck %s
+
+// The SIL corresponds to the following Swift source:
+//
+// func wrapper0(_ x: Float) -> ((Float) -> Float) {
+//   func closure0(_ t: Float) -> Float {
+//     return t * x
+//   }
+//   return closure0
+// }
+//
+// func wrapper1(_ x: Float) -> ((Float) -> Float) {
+//   let closure0 = wrapper0(x)
+//   func closure1(_ t: Float) -> Float {
+//     return closure0(t)
+//   }
+//   return closure1
+// }
+//
+// func wrapper2(_ x: Float) -> ((Float) -> Float) {
+//   let closure1 = wrapper1(x)
+//   func closure2(_ t: Float) -> Float {
+//     return closure1(t)
+//   }
+//   return closure2
+// }
+//
+// public func caller(_ x: Float, _ y: Float) -> Float {
+//   let closure2 = wrapper2(x)
+//   return callee(y, closure2)
+// }
+//
+// @inline(never)
+// func callee(_ y: Float, _ closure: (Float) -> Float) -> Float {
+//   return closure(y)
+// }
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: {{^}}// caller(_:_:)
+// CHECK:       sil [ossa] @$s7closure6calleryS2f_SftF : $@convention(thin) (Float, Float) -> Float {
+// CHECK:       bb0(%0 : $Float, %1 : $Float):
+// CHECK:         %[[#A8:]] = function_ref @$s7closure6calleeyS2f_S2fXEtF43$s7closure8wrapper2yS2fcSfF8closure2L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper1yde13F8closure1L_yG1FS2fIegyd_Tf1nc_n020$s7closure8wrapper0yde13F8closure0L_yG1FSfTf1nc_n : $@convention(thin) (Float, Float) -> Float
+// CHECK-NEXT:    %[[#A9:]] = apply %[[#A8]](%1, %0) : $@convention(thin) (Float, Float) -> Float
+// CHECK-NEXT:    return %[[#A9]] : $Float
+// CHECK-NEXT:  } // end sil function '$s7closure6calleryS2f_SftF'
+
+// caller(_:_:)
+sil [ossa] @$s7closure6calleryS2f_SftF : $@convention(thin) (Float, Float) -> Float {
+bb0(%0 : $Float, %1 : $Float):
+  // function_ref closure0 #1 (_:) in wrapper0(_:)
+  %7 = function_ref @$s7closure8wrapper0yS2fcSfF8closure0L_yS2fF : $@convention(thin) (Float, Float) -> Float
+  %8 = partial_apply [callee_guaranteed] %7(%0) : $@convention(thin) (Float, Float) -> Float
+  // function_ref closure1 #1 (_:) in wrapper1(_:)
+  %10 = function_ref @$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> Float
+  %11 = partial_apply [callee_guaranteed] %10(%8) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> Float
+  // function_ref closure2 #1 (_:) in wrapper2(_:)
+  %13 = function_ref @$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> Float
+  %14 = partial_apply [callee_guaranteed] %13(%11) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> Float
+  %16 = convert_escape_to_noescape %14 to $@noescape @callee_guaranteed (Float) -> Float
+  // function_ref callee(_:_:)
+  %17 = function_ref @$s7closure6calleeyS2f_S2fXEtF : $@convention(thin) (Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float) -> Float
+  %18 = apply %17(%1, %16) : $@convention(thin) (Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float) -> Float
+  destroy_value %16
+  destroy_value %14
+  return %18
+} // end sil function '$s7closure6calleryS2f_SftF'
+
+// CHECK-LABEL: {{^}}// specialized callee(_:_:)
+// CHECK:       sil private [ossa] @$s7closure6calleeyS2f_S2fXEtF43$s7closure8wrapper2yS2fcSfF8closure2L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper1yde13F8closure1L_yG1FS2fIegyd_Tf1nc_n020$s7closure8wrapper0yde13F8closure0L_yG1FSfTf1nc_n : $@convention(thin) (Float, Float) -> Float {
+// CHECK:       bb0(%0 : $Float, %1 : $Float):
+// CHECK:         %[[#B16:]] = function_ref @$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF43$s7closure8wrapper1yS2fcSfF8closure1L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper0yef13F8closure0L_yH1FSfTf1nc_n : $@convention(thin) (Float, Float) -> Float
+// CHECK-NEXT:    %[[#B17:]] = apply %[[#B16]](%0, %1) : $@convention(thin) (Float, Float) -> Float
+// CHECK:         return %[[#B17]] : $Float
+// CHECK-NEXT:  } // end sil function '$s7closure6calleeyS2f_S2fXEtF43$s7closure8wrapper2yS2fcSfF8closure2L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper1yde13F8closure1L_yG1FS2fIegyd_Tf1nc_n020$s7closure8wrapper0yde13F8closure0L_yG1FSfTf1nc_n'
+
+// callee(_:_:)
+sil private [ossa] @$s7closure6calleeyS2f_S2fXEtF : $@convention(thin) (Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float) -> Float {
+bb0(%0 : $Float, %1 : @guaranteed $@noescape @callee_guaranteed (Float) -> Float):
+  %4 = apply %1(%0) : $@noescape @callee_guaranteed (Float) -> Float
+  return %4
+} // end sil function '$s7closure6calleeyS2f_S2fXEtF'
+
+// CHECK-LABEL: {{^}}// specialized closure2 #1 (_:) in wrapper2(_:)
+// CHECK:       sil private [ossa] @$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF43$s7closure8wrapper1yS2fcSfF8closure1L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper0yef13F8closure0L_yH1FSfTf1nc_n : $@convention(thin) (Float, Float) -> Float {
+// CHECK:       bb0(%0 : $Float, %1 : $Float):
+// CHECK:         %[[#C12:]] = function_ref @$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF43$s7closure8wrapper0yS2fcSfF8closure0L_yS2fFSfTf1nc_n : $@convention(thin) (Float, Float) -> Float
+// CHECK-NEXT:    %[[#C13:]] = apply %[[#C12]](%0, %1) : $@convention(thin) (Float, Float) -> Float
+// CHECK:         return %[[#C13]] : $Float
+// CHECK-NEXT:  } // end sil function '$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF43$s7closure8wrapper1yS2fcSfF8closure1L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper0yef13F8closure0L_yH1FSfTf1nc_n'
+
+// closure2 #1 (_:) in wrapper2(_:)
+sil private [ossa] @$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> Float {
+bb0(%0 : $Float, %1 : @closureCapture @guaranteed $@callee_guaranteed (Float) -> Float):
+  %4 = apply %1(%0) : $@callee_guaranteed (Float) -> Float
+  return %4
+} // end sil function '$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF'
+
+// CHECK-LABEL: {{^}}// specialized closure1 #1 (_:) in wrapper1(_:)
+// CHECK:       sil private [ossa] @$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF43$s7closure8wrapper0yS2fcSfF8closure0L_yS2fFSfTf1nc_n : $@convention(thin) (Float, Float) -> Float {
+// CHECK:       bb0(%0 : $Float, %1 : $Float):
+// CHECK:         %[[#D2:]] = function_ref @$s7closure8wrapper0yS2fcSfF8closure0L_yS2fF : $@convention(thin) (Float, Float) -> Float
+// CHECK:         %[[#D8:]] = apply %[[#D2]](%0, %1) : $@convention(thin) (Float, Float) -> Float
+// CHECK:         return %[[#D8]] : $Float
+// CHECK-NEXT:  } // end sil function '$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF43$s7closure8wrapper0yS2fcSfF8closure0L_yS2fFSfTf1nc_n'
+
+// closure1 #1 (_:) in wrapper1(_:)
+sil private [ossa] @$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> Float {
+bb0(%0 : $Float, %1 : @closureCapture @guaranteed $@callee_guaranteed (Float) -> Float):
+  %4 = apply %1(%0) : $@callee_guaranteed (Float) -> Float
+  return %4
+} // end sil function '$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF'
+
+// closure0 #1 (_:) in wrapper0(_:)
+sil private [ossa] @$s7closure8wrapper0yS2fcSfF8closure0L_yS2fF : $@convention(thin) (Float, Float) -> Float {
+bb0(%0 : $Float, %1 : @closureCapture $Float):
+  %4 = struct_extract %0, #Float._value
+  %5 = struct_extract %1, #Float._value
+  %6 = builtin "fmul_FPIEEE32"(%4, %5) : $Builtin.FPIEEE32
+  %7 = struct $Float (%6)
+  return %7
+} // end sil function '$s7closure8wrapper0yS2fcSfF8closure0L_yS2fF'
