@@ -172,6 +172,13 @@ public func funcWithDefault(_ x: Int, msg: StaticString = "hi") {}
 // `msg`.
 public func callsFuncWithDefault() { funcWithDefault(0) }
 
+// `@_transparent` functions are exempt from the interface-mode contract,
+// because they are always inlined.
+// ROOT-SIL-DAG: sil [transparent] [export_implementation] @$e4Root17transparentHelperSiyF
+// ROOT-SIL-NOT: sil [transparent] [export_interface] @$e4Root17transparentHelperSiyF
+@_transparent
+public func transparentHelper() -> Int { return 42 }
+
 //--- Client.swift
 import Root
 
