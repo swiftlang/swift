@@ -2400,6 +2400,15 @@ std::optional<CodeGenerationModel>
 Decl::getRequiredCodeGenerationModel() const {
   bool isEmbedded = getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
+  // A @_transparent function or storage must be @export(implementation).
+  if (auto func = dyn_cast<AbstractFunctionDecl>(this)) {
+    if (func->isTransparent())
+      return CodeGenerationModel::Implementation;
+  } else if (auto storage = dyn_cast<AbstractStorageDecl>(this)) {
+    if (storage->isTransparent())
+      return CodeGenerationModel::Implementation;
+  }
+
   // A generic declaration must be @export(implementation) in Embedded Swift.
   auto dc = getInnermostDeclContext();
   if (auto sig = dc->getGenericSignatureOfContext()) {

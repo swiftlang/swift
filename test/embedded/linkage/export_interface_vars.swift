@@ -86,7 +86,6 @@ public struct Container {
 
   // LIBRARY-IR-DAG: define {{(protected |dllexport )?}}swiftcc i64 @"$e7Library9ContainerVyS2icig"
   // LIBRARY-IR-DAG: define {{(protected |dllexport )?}}swiftcc void @"$e7Library9ContainerVyS2icis"
-  // LIBRARY-IR-DAG: define {{(protected |dllexport )?}}swiftcc {{.*}}@"$e7Library9ContainerVyS2iciM"
   @export(interface)
   public subscript(idx: Int) -> Int {
     get { return storage + idx }

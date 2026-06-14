@@ -109,7 +109,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
   // an existing function with a wrong linkage, e.g. using `@_cdecl`.
   if(!(callerSerializedKind == IsNotSerialized ||
             F->hasValidLinkageForFragileRef(callerSerializedKind) ||
-            hasSharedVisibility(linkage) || F->isExternForwardDeclaration())) {
+            hasSharedVisibility(linkage))) {
     StringRef name = "a serialized function";
     llvm::SmallVector<char> scratch;
 
