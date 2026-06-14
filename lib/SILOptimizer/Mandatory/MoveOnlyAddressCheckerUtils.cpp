@@ -3201,6 +3201,10 @@ static void insertDestroyBeforeInstruction(UseState &addressUseState,
     return;
   }
 
+  if (isa<UncheckedTakeEnumDataAddrInst>(nextInstruction)) {
+    return;
+  }
+
   // If we need all bits...
   if (bv.all()) {
     // And our next instruction is a destroy_addr on the base address, just
