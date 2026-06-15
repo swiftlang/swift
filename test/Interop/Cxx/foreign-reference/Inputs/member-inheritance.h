@@ -365,3 +365,44 @@ struct DerivedAbstractFRT : AbstractFRT {
 };
 
 struct EmptyDerivedAbstractFRT : AbstractFRT {};
+
+struct IMMORTAL_FRT BaseWithInitMethod {
+  virtual int init() const { return 1; }
+  static BaseWithInitMethod *_Nonnull create() { return new BaseWithInitMethod(); }
+};
+
+struct IMMORTAL_FRT DerivedWithInitMethod : BaseWithInitMethod {
+  virtual int init() const override { return 2; }
+  static DerivedWithInitMethod *_Nonnull create() {
+    return new DerivedWithInitMethod();
+  }
+};
+
+struct IMMORTAL_FRT RenamedBaseWithInitMethod {
+  virtual int method() const __attribute__((swift_name("init()"))) {
+    return 11;
+  }
+  static RenamedBaseWithInitMethod *_Nonnull create() {
+    return new RenamedBaseWithInitMethod();
+  }
+};
+
+struct IMMORTAL_FRT RenamedDerivedWithInitMethod : RenamedBaseWithInitMethod {
+  virtual int method() const override __attribute__((swift_name("init()"))) {
+    return 12;
+  }
+  static RenamedDerivedWithInitMethod *_Nonnull create() {
+    return new RenamedDerivedWithInitMethod();
+  }
+};
+
+struct IMMORTAL_FRT HasCreateMethodImportedAsInitializer {
+  int field;
+
+  int getField() const { return field; }
+
+  static HasCreateMethodImportedAsInitializer *_Nonnull create(int v)
+      __attribute__((swift_name("init(n:)"))) {
+    return new HasCreateMethodImportedAsInitializer{v * 5};
+  }
+};

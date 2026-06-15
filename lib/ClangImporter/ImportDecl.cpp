@@ -63,6 +63,7 @@
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseDeclName.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -4142,6 +4143,22 @@ namespace {
                           diag::note_while_importing, decl->getName());
             return nullptr;
           }
+        }
+      }
+
+      if (auto *attr = decl->getAttr<clang::SwiftNameAttr>();
+          attr && isActiveSwiftVersion()) {
+        ParsedDeclName parsedName = parseDeclName(attr->getName());
+        // If this function has a swift_name attribute 'init' but we can't
+        // import it as an initializer, we ignore the swift_name attribute and
+        // emit a warning.
+        if (parsedName.BaseNameKind == DeclBaseName::Kind::Constructor &&
+            !importedName.getDeclName().getBaseName().isConstructor()) {
+          Impl.diagnose(HeaderLoc(decl->getLocation()),
+                        diag::swift_name_init_on_non_initializer,
+                        attr->getName(), cast<clang::NamedDecl>(decl));
+          Impl.diagnose(HeaderLoc(decl->getLocation()),
+                        diag::swift_name_use_backticks_in_init);
         }
       }
 
