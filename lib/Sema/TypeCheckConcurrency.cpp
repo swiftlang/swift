@@ -7565,8 +7565,11 @@ bool swift::checkSendableConformance(
     }
   }
 
-  // Global-actor-isolated types can be Sendable. We do not check the
-  // instance data because it's all isolated to the global actor.
+  // Global-actor-isolated types can be Sendable. We do not check the instance
+  // data because it's all isolated to the global actor, and such a class need
+  // not be 'final'. Adding global-actor isolation to a non-Sendable superclass,
+  // however, does not make the subclass safely 'Sendable'.
+  bool isGlobalActorIsolated = false;
   switch (getActorIsolation(nominal)) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::ActorInstance:
@@ -7580,7 +7583,8 @@ bool swift::checkSendableConformance(
     llvm_unreachable("type cannot have erased isolation");
 
   case ActorIsolation::GlobalActor:
-    return false;
+    isGlobalActorIsolated = true;
+    break;
   }
 
   // An implied conformance is generated when you state a conformance to
@@ -7614,8 +7618,9 @@ bool swift::checkSendableConformance(
   if (classDecl && classDecl->getParentSourceFile()) {
     bool isInherited = isa<InheritedProtocolConformance>(conformance);
 
-    // A non-final class cannot conform to `Sendable`.
-    if (!classDecl->isSemanticallyFinal()) {
+    // A non-final class cannot conform to `Sendable` unless it is protected by
+    // global actor isolation.
+    if (!classDecl->isSemanticallyFinal() && !isGlobalActorIsolated) {
       classDecl->diagnose(diag::concurrent_value_nonfinal_class,classDecl->getName())
           .fixItInsert(classDecl->getStartLoc(), "final ")
           .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
@@ -7625,22 +7630,71 @@ bool swift::checkSendableConformance(
     }
 
     if (!isInherited) {
-      // A 'Sendable' class cannot inherit from another class, although
-      // we allow `NSObject` for Objective-C interoperability.
+      // A `Sendable` conformance not inherited from a `Sendable` superclass
+      // means the superclass is non-`Sendable`. Subclass cannot safely inherit
+      // unprotected state.
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
+        // `NSObject` is permitted as a superclass for Objective-C interop.
+        // TODO: can `NSObject` be `Sendable` or `~Sendable` instead?
         if (!superclassDecl->isNSObject()) {
-          classDecl
-              ->diagnose(diag::concurrent_value_inherit,
-                         nominal->getASTContext().LangOpts.EnableObjCInterop,
-                         classDecl->getName())
-              .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
+          // Inheritance checking for global-actor-isolated classes was
+          // historically skipped, so we need to downgrade this to a warning to
+          // stage it in.
+          bool isError = false;
+          if (isGlobalActorIsolated) {
+            // TODO: remove this staging once people have had a chance to fix
+            // their code.
+            conformanceDecl
+                ->diagnose(diag::concurrent_value_nonsendable_superclass,
+                           classDecl->getName())
+                .warnUntilLanguageMode(LanguageMode::future);
+          } else {
+            conformanceDecl
+                ->diagnose(diag::concurrent_value_nonsendable_superclass,
+                           classDecl->getName())
+                .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
+            isError = behavior == DiagnosticBehavior::Unspecified;
+          }
 
-          if (behavior == DiagnosticBehavior::Unspecified)
+          conformanceDecl->diagnose(
+              diag::concurrent_value_nonsendable_superclass_note);
+
+          // Point at where the class inherits the non-Sendable superclass. Be
+          // slightly defensive here in the presence of badly-ordered
+          // inheritance clauses: the superclass is not necessarily the first
+          // entry once `superclass must appear first` recovery has run.
+          // TODO: abstract this? The same search exists in TypeCheckAccess.cpp.
+          auto inheritedEntries = classDecl->getInherited().getEntries();
+          auto superclassLocIter = std::find_if(
+              inheritedEntries.begin(), inheritedEntries.end(),
+              [&](TypeLoc inherited) {
+                if (!inherited.wasValidated())
+                  return false;
+                Type ty = inherited.getType();
+                if (ty->is<ProtocolCompositionType>())
+                  if (auto superclass =
+                          ty->getExistentialLayout().explicitSuperclass)
+                    ty = superclass;
+                return ty->getAnyNominal() == superclassDecl;
+              });
+          SourceLoc superclassLoc =
+              superclassLocIter == inheritedEntries.end()
+                  ? classDecl->getLoc()
+                  : superclassLocIter->getSourceRange().Start;
+          classDecl->getASTContext().Diags.diagnose(
+              superclassLoc, diag::concurrent_value_nonsendable_superclass_here,
+              superclassDecl->getName());
+
+          if (isError)
             return true;
         }
       }
     }
   }
+
+  // Global-actor-isolated types do not need their instance storage checked.
+  if (isGlobalActorIsolated)
+    return false;
 
   // In -swift-version 5 mode, a conditional conformance to a protocol can imply
   // a Sendable conformance. The implied conformance is unconditional, so check
