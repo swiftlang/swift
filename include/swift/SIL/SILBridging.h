@@ -747,6 +747,7 @@ struct BridgedInstruction {
   bool maySynchronize() const;
   BRIDGED_INLINE bool shouldBeForwarding() const;
   BRIDGED_INLINE bool isIdenticalTo(BridgedInstruction inst) const;
+  BRIDGED_INLINE SwiftInt getRawIndexInBlock() const;
 
   // =========================================================================//
   //                   Generalized instruction subclasses
@@ -1078,6 +1079,7 @@ struct BridgedBasicBlock {
   BRIDGED_INLINE void moveArgumentsTo(BridgedBasicBlock dest) const;
   BRIDGED_INLINE bool isDebugReconstructionBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedSuccessor getFirstPred() const;
+  BRIDGED_INLINE void recomputeInstructionIndices() const;
 };
 
 struct BridgedSuccessor {
