@@ -678,7 +678,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
 
       // Add dependency only imports.
       auto depOnlyImports = getStringArray(dependencyOnlyImportsID);
-      if (!dependencyOnlyImportsID)
+      if (!depOnlyImports)
         llvm::report_fatal_error("Bad dependency only imports");
       for (const auto &mod : *depOnlyImports)
         moduleDep.addDependencyOnlyImport(mod);
