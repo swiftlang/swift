@@ -26,6 +26,10 @@ class C {
 
 class D : C {}
 
+struct S {
+  var c: C
+}
+
 sil @coro : $@yield_once @convention(thin) () -> @yields @guaranteed C
 
 // The introducer of an introducer is always itself.
@@ -321,3 +325,41 @@ bb3(%7 : @guaranteed $Klass):
   return %t
 }
 
+// CHECK-LABEL: sil [ossa] @forwarding_phi1 :
+// CHECK:       bb1([[PHI:%.*]] : @guaranteed $C):
+// CHECK-NEXT:    = borrowed [[PHI]] : $C from (%1 : $C)
+// CHECK-LABEL: } // end sil function 'forwarding_phi1'
+sil [ossa] @forwarding_phi1 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  specify_test "update_borrowed_from"
+  %1 = begin_borrow %0
+  br bb1(%1)
+
+bb1(%3 : @guaranteed $C):
+  end_borrow %1
+  return %0
+}
+
+// CHECK-LABEL: sil [ossa] @forwarding_phi2 :
+// CHECK:       bb3([[PHI:%.*]] : @guaranteed $C):
+// CHECK-NEXT:    = borrowed [[PHI]] : $C from (%1 : $C)
+// CHECK-LABEL: } // end sil function 'forwarding_phi2'
+sil [ossa] @forwarding_phi2 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  specify_test "update_borrowed_from"
+  %1 = begin_borrow %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%1)
+
+bb2:
+  %10 = struct $S (%1)
+  %11 = struct_extract %10, #S.c
+  br bb3(%11)
+
+bb3(%3 : @guaranteed $C):
+  %4 = borrowed %3 from (%1)
+  end_borrow %1
+  return %0
+}
