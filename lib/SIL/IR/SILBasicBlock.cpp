@@ -17,6 +17,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
@@ -26,6 +27,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/Test.h"
 #include "swift/Strings.h"
 
 using namespace swift;
@@ -79,16 +81,27 @@ SILModule &SILBasicBlock::getModule() const {
   return getParent()->getModule();
 }
 
+void SILBasicBlock::recomputeInstructionIndices() {
+  uint64_t idx = instructionIndexStride;
+  for (SILInstruction &inst : *this) {
+    inst.asSILNode()->setIndexInList(idx);
+    idx += instructionIndexStride;
+  }
+}
+
 void SILBasicBlock::insert(iterator InsertPt, SILInstruction *I) {
   InstList.insert(InsertPt, I);
+  I->assignNewIndexInList();
 }
 
 void SILBasicBlock::push_back(SILInstruction *I) {
   InstList.push_back(I);
+  I->assignNewIndexInList();
 }
 
 void SILBasicBlock::push_front(SILInstruction *I) {
   InstList.push_front(I);
+  I->assignNewIndexInList();
 }
 
 void SILBasicBlock::eraseAllInstructions(SILModule &module) {
@@ -305,7 +318,9 @@ void SILBasicBlock::eraseArgument(int Index) {
 SILBasicBlock *SILBasicBlock::split(iterator I) {
   SILBasicBlock *New = Parent->createBasicBlockAfter(this);
   // Move all of the specified instructions from the original basic block into
-  // the new basic block.
+  // the new basic block. Zero their indices since they move to a new block.
+  for (auto it = I; it != end(); ++it)
+    it->clearIndexInList();
   New->InstList.splice(New->end(), InstList, I, end());
   return New;
 }
@@ -315,6 +330,7 @@ void SILBasicBlock::moveTo(SILBasicBlock::iterator To, SILInstruction *I) {
   InstList.splice(To, I->getParent()->InstList, I);
   ScopeCloner ScopeCloner(*Parent);
   I->setDebugScope(ScopeCloner.getOrCreateClonedScope(I->getDebugScope()));
+  I->assignNewIndexInList();
 }
 
 void
@@ -455,3 +471,77 @@ const SILDebugScope *SILBasicBlock::getScopeOfFirstNonMetaInstruction() {
       return Inst.getDebugScope();
   return begin()->getDebugScope();
 }
+
+//===--------------------------------------------------------------------===//
+//                              Tests
+//===--------------------------------------------------------------------===//
+
+namespace swift::test {
+static FunctionTest BasicBlockBitsTest(
+    "basic_block_bits", [](auto &function, auto &arguments, auto &test) {
+
+  SILBasicBlock &b = *function.getEntryBlock();
+
+  {
+    BasicBlockFlag A(&function);
+    ASSERT(!A.get(&b));
+
+    ASSERT(!A.testAndSet(&b));
+    ASSERT(A.get(&b));
+
+    ASSERT(A.testAndSet(&b));
+    ASSERT(A.get(&b));
+
+    A.reset(&b);
+    ASSERT(!A.get(&b));
+
+    {
+      BasicBlockBitfield B(&function, 5);
+      ASSERT(B.get(&b) == 0u);
+
+      B.set(&b, 27);
+      ASSERT(!A.get(&b));
+      ASSERT(B.get(&b) == 27u);
+
+      A.set(&b);
+      ASSERT(A.get(&b));
+      ASSERT(B.get(&b) == 27u);
+
+      B.set(&b, 2);
+      ASSERT(A.get(&b));
+      ASSERT(B.get(&b) == 2u);
+
+      B.set(&b, 31);
+      ASSERT(A.get(&b));
+      ASSERT(B.get(&b) == 31u);
+    }
+    {
+      BasicBlockBitfield C(&function, 2);
+      ASSERT(C.get(&b) == 0u);
+
+      BasicBlockFlag D(&function);
+      ASSERT(!D.get(&b));
+
+      BasicBlockBitfield E(&function, 3);
+
+      E.set(&b, 5);
+      ASSERT(A.get(&b));
+      ASSERT(C.get(&b) == 0u);
+      ASSERT(!D.get(&b));
+      ASSERT(E.get(&b) == 5u);
+
+      C.set(&b, 1);
+      ASSERT(A.get(&b));
+      ASSERT(C.get(&b) == 1u);
+      ASSERT(!D.get(&b));
+      ASSERT(E.get(&b) == 5u);
+    }
+  }
+  {
+    BasicBlockBitfield F(&function, 32);
+    ASSERT(F.get(&b) == 0u);
+    F.set(&b, 0xdeadbeaf);
+    ASSERT(F.get(&b) == 0xdeadbeaf);
+  }
+});
+} // end namespace swift::test

@@ -253,42 +253,6 @@ bool shouldExpand(SILModule &module, SILType ty);
 bool isIndirectArgumentMutated(SILFunctionArgument *arg, bool ignoreDestroys = false,
                                bool defaultIsMutating = false);
 
-/// Caches instruction indices per basic block.
-///
-/// Instruction indices start at 0 at the first instruction of each basic block.
-///
-/// Note: in case there are more instructions in a block than can be stored in
-///       the index bitfield, the indices are maxed out for the remaining instructions.
-///
-/// Note: as this data structure occupies almost all custom SILNode bits, there
-///       is little room for using other InstructionSet or similar data structures
-///       concurrently.
-class InstructionIndices {
-  NodeBitfield indices;
-  bool indicesOverflowed = false;
-
-  void indexBlock(SILBasicBlock &block);
-
-public:
-  // Leave a few bits for other purposes (e.g. InstructionSet).
-  enum { numIndexBits = SILNode::numCustomBits - 4 };
-
-  static_assert(numIndexBits >= 16,
-                "should at least be able to index 65536 instructions in a block");
-
-  InstructionIndices(SILFunction *f);
-
-  InstructionIndices(SILBasicBlock *block);
-
-  /// Returns true if any block had more instructions than can be uniquely
-  /// indexed, causing some instructions to share the same maximum index.
-  bool hasOverflowedIndices() const { return indicesOverflowed; }
-
-  unsigned get(SILInstruction *inst) {
-    return indices.get(inst->asSILNode());
-  }
-};
-
 } // end namespace swift
 
 #endif

@@ -1200,6 +1200,10 @@ bool BridgedInstruction::isIdenticalTo(BridgedInstruction inst) const {
   return unbridged()->isIdenticalTo(inst.unbridged());
 }
 
+SwiftInt BridgedInstruction::getRawIndexInBlock() const {
+  return (SwiftInt)unbridged()->getRawIndexInList();
+}
+
 SwiftInt BridgedInstruction::MultipleValueInstruction_getNumResults() const {
   return getAs<swift::MultipleValueInstruction>()->getNumResults();
 }
@@ -2157,6 +2161,10 @@ bool BridgedBasicBlock::isDebugReconstructionBlock() const {
 
 OptionalBridgedSuccessor BridgedBasicBlock::getFirstPred() const {
   return {unbridged()->pred_begin().getSuccessorRef()};
+}
+
+void BridgedBasicBlock::recomputeInstructionIndices() const {
+  unbridged()->recomputeInstructionIndices();
 }
 
 swift::SILBasicBlock * _Nullable OptionalBridgedBasicBlock::unbridged() const {

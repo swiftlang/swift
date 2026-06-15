@@ -220,6 +220,50 @@ public class Instruction : CustomStringConvertible, Hashable {
     return bridged.isIdenticalTo(otherInst.bridged)
   }
 
+  /// The raw index of this instruction in its parent block, used for ordering.
+  /// Returns nil if the index has not been computed yet. Use
+  /// `dominatesInBlock` for ordering comparisons instead of comparing raw indices.
+  final var rawIndexInBlock: Int? {
+    let idx = bridged.getRawIndexInBlock()
+    return idx == 0 ? nil : idx
+  }
+
+  /// Returns true if this instruction comes before `other` in the same block.
+  ///
+  /// Complexity: O(1) in the common case.
+  ///
+  /// Each instruction carries a lazily-computed integer index.  Indices are assigned on demand
+  /// by `recomputeInstructionIndices` (spaced by a stride of 8) and persist across optimization
+  /// passes. When instructions are inserted or moved, the implementation tries to slot them into
+  /// the gap between their neighbors, so a single insertion is still O(1). If no gap is available,
+  /// the inserted instruction gets no index assigned; the next call to `dominatesInBlock` that
+  /// encounters such an unassigned index triggers a full re-computation of the block, which is O(n)
+  /// in the number of instructions.
+  ///
+  /// **Pathological case:** repeatedly inserting more than 8 instructions between the same two
+  /// neighbors (exhausting the stride gap) and then calling `dominatesInBlock` on the inserted
+  /// instructions will trigger O(n) re-computations each time.
+  ///
+  public final func strictlyDominatesInBlock(_ other: Instruction) -> Bool {
+    let (idx, otherIdx) = Instruction.getListIndices(lhs: self, rhs: other)
+    return idx < otherIdx
+  }
+
+  /// Like `strictlyDominatesInBlock`, but also returns true if this instruction is the asme as `other`.
+  public final func dominatesInBlock(_ other: Instruction) -> Bool {
+    let (idx, otherIdx) = Instruction.getListIndices(lhs: self, rhs: other)
+    return idx <= otherIdx
+  }
+
+  private static func getListIndices(lhs: Instruction, rhs: Instruction) -> (Int, Int) {
+    precondition(lhs.parentBlock == rhs.parentBlock)
+    if let lhsIdx = lhs.rawIndexInBlock, let rhsIdx = rhs.rawIndexInBlock {
+      return (lhsIdx, rhsIdx)
+    }
+    lhs.parentBlock.recomputeInstructionIndices()
+    return (lhs.rawIndexInBlock!, rhs.rawIndexInBlock!)
+  }
+
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ObjectIdentifier(self))
   }
