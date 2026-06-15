@@ -470,6 +470,14 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   /// instruction as an array of ValueBase objects.
   SILInstructionResultArray getResultsImpl() const;
 
+  /// Tries to assign a valid index to this instruction based on the indices of
+  /// its neighbors, without a full block recomputation.
+  ///
+  /// Called automatically by all insertion and move APIs. Leaves the index as
+  /// zero (uncomputed) if a gap-fill is not possible, e.g. because a neighbor
+  /// has no index yet or the gap between neighbors is exhausted.
+  void assignNewIndexInList();
+
 protected:
   friend class SwiftPassInvocation;
 
@@ -563,6 +571,19 @@ public:
 
   /// This method unlinks 'self' from the containing basic block and deletes it.
   void eraseFromParent();
+
+  /// Returns the raw index of this instruction in its parent block for ordering
+  /// comparisons. A value of 0 means the index has not been computed yet.
+  /// Indices are lazily computed and persist across optimization passes.
+  /// Within a block, non-zero indices are monotonically increasing.
+  uint32_t getRawIndexInList() const { return asSILNode()->getIndexInList(); }
+
+  /// Clears the index of this instruction, marking it as uncomputed.
+  void clearIndexInList() { asSILNode()->setIndexInList(0); }
+
+  /// Returns true if this instruction comes before \p other in the same block.
+  /// Both instructions must be in the same block.
+  bool strictlyDominatesInBlock(const SILInstruction *other) const;
 
   /// Unlink this instruction from its current basic block and insert the
   /// instruction such that it is the first instruction of \p Block.

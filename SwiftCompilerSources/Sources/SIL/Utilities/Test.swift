@@ -143,6 +143,7 @@ public func registerTests() {
   registerTests(
     parseTestSpecificationTest,
     basicBlockTest,
+    instructionIndexTest,
     instructionIterationTest,
     instructionWorklistTest,
     smallProjectionPathTest,

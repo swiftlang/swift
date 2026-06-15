@@ -1058,12 +1058,10 @@ private:
   ///
   /// \param indexValue The index value to clone
   /// \param insertPos The position where cloned instructions should be inserted
-  /// \param instIndices Pre-computed instruction indices
   /// \returns The cloned index value or std::nullopt if cloning was not
   /// possible
   std::optional<SILValue>
-  cloneFixedStorageIndex(SILValue indexValue, SILInstruction *insertPos,
-                         InstructionIndices &instIndices);
+  cloneFixedStorageIndex(SILValue indexValue, SILInstruction *insertPos);
 
 public:
   void run() override {
@@ -1266,15 +1264,6 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
                             << " and index: " << *indexValue);
   }
 
-  InstructionIndices instIndices(&block);
-
-  // If instruction indices have overflowed, the ordering comparisons are
-  // unreliable and can cause unnecessary cloning below in an already large
-  // block, bail out.
-  if (instIndices.hasOverflowedIndices()) {
-    return changed;
-  }
-
   // Second pass: process each self group to place checks with same self next to
   // each other, preserving their original relative order.
   for (auto &entry : checksToMerge) {
@@ -1290,7 +1279,7 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
 
       auto indexValue = check.getIndex();
       auto clonedValue =
-          cloneFixedStorageIndex(indexValue, *checks[0], instIndices);
+          cloneFixedStorageIndex(indexValue, *checks[0]);
       if (!clonedValue) {
         continue;
       }
@@ -1890,8 +1879,7 @@ static void mapResults(SILInstruction *cloned, SILInstruction *original,
 
 std::optional<SILValue>
 BoundsCheckOpts::cloneFixedStorageIndex(SILValue indexValue,
-                                        SILInstruction *insertPos,
-                                        InstructionIndices &instIndices) {
+                                        SILInstruction *insertPos) {
   SmallVector<SILInstruction *, 8> worklist;
   llvm::DenseMap<ValueBase *, SILValue> valueMap;
   ValueSet visited(getFunction());
@@ -1919,7 +1907,7 @@ BoundsCheckOpts::cloneFixedStorageIndex(SILValue indexValue,
     // value dominates insertion point.
     if (isa<SILArgument>(value) ||
         inst->getParent() != insertPos->getParent() ||
-        instIndices.get(inst) < instIndices.get(insertPos)) {
+        inst->strictlyDominatesInBlock(insertPos)) {
       mapValue(value, value, valueMap);
       return true;
     }
