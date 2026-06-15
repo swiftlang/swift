@@ -227,6 +227,18 @@ private func isOptimizableLazyPropertyGetter(_ ai: ApplyInst) -> Bool {
     return false
   }
 
+  // A getter that binds dynamic Self can only be inlined when the caller also
+  // binds dynamic Self and the callee is called on the self value itself.
+  if callee.mayBindDynamicSelf {
+    guard ai.parentFunction.mayBindDynamicSelf,
+      let calleeSelfIdx = ai.calleeArgumentConventions.selfIndex,
+      let callerSelf = ai.parentFunction.selfArgument,
+      ai.arguments[calleeSelfIdx] === callerSelf
+    else {
+      return false
+    }
+  }
+
   // Only handle classes, but not structs.
   // Lazy property getters of structs have an indirect inout self parameter.
   // We don't know if the whole struct is overwritten between two getter calls.
