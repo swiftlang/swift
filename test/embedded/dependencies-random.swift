@@ -45,14 +45,16 @@ posix_memalign
 putchar
 //--- test.swift
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
-// RUN: %target-clang -x c -c %S/Inputs/linux-rng-support.c -o %t/linux-rng-support.o
-// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %t/print.o %t/linux-rng-support.o -o %t/a.out
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/a.o %t/print.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
+// UNSUPPORTED: OS=emscripten
+// arc4random_buf is not provided by emscripten's musl-derived libc
+// (`wasm-ld: error: undefined symbol: arc4random_buf`).
 
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
