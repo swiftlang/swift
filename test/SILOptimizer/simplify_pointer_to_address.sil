@@ -82,6 +82,26 @@ bb0(%0 : @guaranteed $C):
   return %6 : $Int
 }
 
+// CHECK-LABEL: sil [ossa] @borrow_escape_through_index_addr :
+// CHECK:         address_to_pointer
+// CHECK:         [[A:%.*]] = pointer_to_address
+// CHECK:         [[I:%.*]] = index_addr [[A]]
+// CHECK:         [[L:%.*]] = load [trivial] [[I]]
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'borrow_escape_through_index_addr'
+sil [ossa] @borrow_escape_through_index_addr : $@convention(thin) (@guaranteed C) -> Int {
+bb0(%0 : @guaranteed $C):
+  %1 = begin_borrow %0
+  %2 = ref_tail_addr %1, $Int
+  %3 = address_to_pointer %2 to $Builtin.RawPointer
+  %4 = pointer_to_address %3 to [strict] $*Int
+  %5 = integer_literal $Builtin.Word, 1
+  %6 = index_addr %4, %5
+  end_borrow %1 : $C
+  %7 = load [trivial] %6
+  return %7
+}
+
 // CHECK-LABEL: sil [ossa] @borrow_no_escape :
 // CHECK-NOT:     address_to_pointer
 // CHECK-NOT:     pointer_to_address
