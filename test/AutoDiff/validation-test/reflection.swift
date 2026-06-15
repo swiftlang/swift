@@ -1,5 +1,5 @@
 // REQUIRES: no_asan
-// UNSUPPORTED: OS=linux-android, OS=linux-androideabi, OS=wasip1
+// UNSUPPORTED: OS=linux-android, OS=linux-androideabi, OS=wasip1, OS=emscripten
 // RUN: %empty-directory(%t)
 import _Differentiation
 

@@ -34,6 +34,10 @@ func equalThreadIDs(_ a: ThreadID, _ b: ThreadID) -> Bool { a == b }
 typealias ThreadID = UInt32
 func getCurrentThreadID() -> ThreadID { 0 }
 func equalThreadIDs(_ a: ThreadID, _ b: ThreadID) -> Bool { a == b }
+#elseif os(Emscripten)
+typealias ThreadID = UInt32
+func getCurrentThreadID() -> ThreadID { 0 }
+func equalThreadIDs(_ a: ThreadID, _ b: ThreadID) -> Bool { a == b }
 #endif
 
 var mainThread: ThreadID?

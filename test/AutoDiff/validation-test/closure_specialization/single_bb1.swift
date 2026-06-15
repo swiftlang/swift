@@ -25,6 +25,8 @@ import Glibc
 import Android
 #elseif canImport(WASILibc)
 import WASILibc
+#elseif canImport(EmscriptenLibc)
+import EmscriptenLibc
 #elseif canImport(Foundation)
 import Foundation
 #else
