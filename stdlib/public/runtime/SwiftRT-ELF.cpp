@@ -1,4 +1,4 @@
-//===--- SwiftRT-ELF-WASM.cpp ---------------------------------------------===//
+//===--- SwiftRT-ELF.cpp --------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -18,9 +18,7 @@
 #include <cstddef>
 #include <new>
 
-#if defined(__ELF__)
 extern "C" const char __ehdr_start[] __attribute__((__weak__));
-#endif
 
 #if SWIFT_ENABLE_BACKTRACING
 // Drag in a symbol from the backtracer, to force the static linker to include
@@ -32,11 +30,7 @@ static const void *__backtraceRef __attribute__((used, retain))
 // Create empty sections to ensure that the start/stop symbols are synthesized
 // by the linker.  Otherwise, we may end up with undefined symbol references as
 // the linker table section was never constructed.
-#if defined(__ELF__)
 # define DECLARE_EMPTY_METADATA_SECTION(name, attrs) __asm__("\t.section " #name ",\"" attrs "\"\n");
-#elif defined(__wasm__)
-# define DECLARE_EMPTY_METADATA_SECTION(name, attrs) __asm__("\t.section " #name ",\"R\",@\n");
-#endif
 
 #define BOUNDS_VISIBILITY __attribute__((__visibility__("hidden"), \
                                          __aligned__(1)))
@@ -88,15 +82,10 @@ static void swift_image_constructor() {
   { reinterpret_cast<uintptr_t>(&__start_##name),                              \
     static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
 
-    const void *baseAddress = nullptr;
-#if defined(__ELF__)
+  const void *baseAddress = nullptr;
   if (&__ehdr_start != nullptr) {
     baseAddress = __ehdr_start;
   }
-#elif defined(__wasm__)
-  // NOTE: Multi images in a single process is not yet stabilized in WebAssembly
-  // toolchain outside of Emscripten.
-#endif
 
   ::new (&sections) swift::MetadataSections {
       swift::CurrentSectionMetadataVersion,
