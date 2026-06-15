@@ -19,7 +19,9 @@
 #include <new>
 
 #if defined(__ELF__)
-extern "C" const char __ehdr_start[] __attribute__((__weak__));
+extern "C" const char __ehdr_start __attribute__((__weak__));
+extern "C" const char __start_swift5_tests __attribute__((__weak__));
+extern "C" const char __stop_swift5_tests __attribute__((__weak__));
 #endif
 
 #if SWIFT_ENABLE_BACKTRACING
@@ -71,8 +73,6 @@ DECLARE_SWIFT_SECTION(swift5_replace)
 DECLARE_SWIFT_SECTION(swift5_replac2)
 DECLARE_SWIFT_SECTION(swift5_accessible_functions)
 DECLARE_SWIFT_SECTION(swift5_runtime_attributes)
-
-DECLARE_SWIFT_SECTION(swift5_tests)
 }
 
 #undef DECLARE_SWIFT_SECTION
@@ -90,9 +90,7 @@ static void swift_image_constructor() {
 
     const void *baseAddress = nullptr;
 #if defined(__ELF__)
-  if (&__ehdr_start != nullptr) {
-    baseAddress = __ehdr_start;
-  }
+    baseAddress = &__ehdr_start;
 #elif defined(__wasm__)
   // NOTE: Multi images in a single process is not yet stabilized in WebAssembly
   // toolchain outside of Emscripten.
@@ -120,8 +118,24 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(swift5_mpenum),
       SWIFT_SECTION_RANGE(swift5_accessible_functions),
       SWIFT_SECTION_RANGE(swift5_runtime_attributes),
-      SWIFT_SECTION_RANGE(swift5_tests),
+      {},
   };
+
+#if defined(__ELF__)
+  // If this image contains any test content, register that as well. We only do
+  // this for ELF targets because, for all other platforms, the test content
+  // section is independently discoverable at runtime.
+  if (SWIFT_UNLIKELY(&__start_swift5_tests != nullptr)) {
+    sections.swift5_tests = SWIFT_SECTION_RANGE(swift5_tests);
+
+    swift::TestContentSectionBounds sectionBounds {
+      baseAddress,
+      SWIFT_SECTION_RANGE(swift5_tests),
+      0
+    };
+    swift_elf_registerTestContent(&sectionBounds);
+  }
+#endif
 
 #undef SWIFT_SECTION_RANGE
 

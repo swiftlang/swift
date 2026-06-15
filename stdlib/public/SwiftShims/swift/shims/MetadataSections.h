@@ -92,6 +92,24 @@ struct MetadataSections {
   MetadataSectionRange swift5_tests;
 };
 
+#if defined(__ELF__)
+/// A structure describing the bounds of a test content section from a single
+/// loaded ELF image.
+///
+/// This structure is used by Swift Testing during test discovery.
+struct TestContentSectionBounds {
+  /// The base address of the ELF image containing the test content, if known,
+  /// otherwise \c nullptr.
+  const void *baseAddress;
+
+  /// The bounds of the test content section.
+  MetadataSectionRange swift5_tests;
+
+  /// Reserved for future use.
+  __swift_uintptr_t reserved;
+};
+#endif
+
 #ifdef __cplusplus
 } //extern "C"
 } // namespace swift
