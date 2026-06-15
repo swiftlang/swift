@@ -3407,6 +3407,36 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       }
     }
 
+    if ($TestLLDB -or $TestLLDBSwift) {
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets @(
+        "lldb",
+        "lldb-dap",
+        "lldb-server",
+        "repl_swift"
+      )
+
+      foreach ($Tool in @("lldb.exe", "lldb-dap.exe", "lldb-server.exe", "repl_swift.exe")) {
+        $Path = Join-Path $Stage2BinDir $Tool
+        if (-not (Test-Path $Path)) {
+          throw "Test-Compilers: '$Path' missing after explicit Build-CMakeProject; cannot SxS-bind a non-existent EXE"
+        }
+      }
+
+      Invoke-IsolatingEnvVars {
+        Invoke-VsDevShell $BuildPlatform
+        Set-WindowsSxSToolchainRuntime `
+          -BinaryDir              $Stage2BinDir `
+          -RuntimeSourceDir       $RuntimeSource `
+          -ProcessorArchitecture  $BuildPlatform.Architecture.VSName `
+          -Tools                  @(
+                                     "lldb.exe",
+                                     "lldb-dap.exe",
+                                     "lldb-server.exe",
+                                     "repl_swift.exe"
+                                   )
+      }
+    }
+
     # TODO(roman-bcny): Workaround for https://github.com/swiftlang/swift/issues/87970
     # Stdlib DLLs must be fully linked before swift-frontend compilations
     # that load them, otherwise the linker races with memory-mapped DLLs
@@ -5401,6 +5431,21 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
   }
   Write-Host "Stage-WindowsToolchainSxS: built runtime graph with $($RuntimeDependencies.Count) DLL(s)"
 
+  # Some EXEs do not statically import the Swift runtime DLLs they need
+  # at runtime: lldb's expression evaluator JIT-loads the Swift stdlib +
+  # Foundation overlays via LoadLibrary, so the static-import scan below
+  # only discovers swiftCore for them, but the per-DLL SxS manifests on
+  # the dynamically-loaded DLLs require the consumer EXE to declare a
+  # matching activation context.  Without this override, `expr` in any
+  # Swift API test fails with ERROR_MOD_NOT_FOUND.  Extend such EXEs to
+  # the full runtime set so they can satisfy any per-DLL SxS dependency.
+  $DynamicRuntimeImports = @{
+    "lldb.exe"        = $RuntimeBaseNames
+    "lldb-dap.exe"    = $RuntimeBaseNames
+    "lldb-server.exe" = $RuntimeBaseNames
+    "repl_swift.exe"  = $RuntimeBaseNames
+  }
+
   $EXEDependencies = @{}
   $EXEPackageClosures = @{}
   $DLLDependencies = @{}
@@ -5417,6 +5462,15 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
         -BinaryDir  $BinDir `
         -RuntimeSet $RuntimeSet
     )
+    if ($DynamicRuntimeImports.ContainsKey($_.Name)) {
+      $Augmented = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+      )
+      foreach ($D in $StaticRuntimeDeps)              { [void]$Augmented.Add($D) }
+      foreach ($D in $DynamicRuntimeImports[$_.Name]) { [void]$Augmented.Add($D) }
+      $StaticRuntimeDeps = @($Augmented | Sort-Object)
+      Write-Host "Stage-WindowsToolchainSxS: augmenting '$($_.Name)' with dynamic-load runtime imports ($($StaticRuntimeDeps.Count) DLL(s))"
+    }
     $EXEDependencies[$_.FullName] = @(
       Get-RuntimeImportClosure `
         -Roots        $StaticRuntimeDeps `
