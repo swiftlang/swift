@@ -257,6 +257,14 @@ void AsyncTask::completeFuture(AsyncContext *context) {
 
   _swift_tsan_release(static_cast<Job *>(this));
 
+  // If this is task group child, notify the parent group about the completion.
+  if (hasGroupChildFragment()) {
+    // then we must offer into the parent group that we completed,
+    // so it may `next()` poll completed child tasks in completion order.
+    auto group = groupChildFragment()->getGroup();
+    group->offer(this, context);
+  }
+
   // Update the status to signal completion.
   auto newQueueHead = WaitQueueItem::get(
     hadErrorResult ? Status::Error : Status::Success,
@@ -268,13 +276,8 @@ void AsyncTask::completeFuture(AsyncContext *context) {
       newQueueHead, std::memory_order_acq_rel);
   assert(queueHead.getStatus() == Status::Executing);
 
-  // If this is task group child, notify the parent group about the completion.
-  if (hasGroupChildFragment()) {
-    // then we must offer into the parent group that we completed,
-    // so it may `next()` poll completed child tasks in completion order.
-    auto group = groupChildFragment()->getGroup();
-    group->offer(this, context);
-  }
+  // Once we signal completion, an async let task may be destroyed. We must not
+  // access `this` after this point in that case.
 
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
