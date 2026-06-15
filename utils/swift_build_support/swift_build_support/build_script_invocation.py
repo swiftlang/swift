@@ -13,6 +13,7 @@
 import os
 import platform
 import shlex
+import subprocess
 
 from build_swift.build_swift import argparse
 from build_swift.build_swift.constants import BUILD_SCRIPT_IMPL_PATH
@@ -61,6 +62,26 @@ class BuildScriptInvocation(object):
     @property
     def install_all(self):
         return self.args.install_all or self.args.infer_dependencies
+
+    @staticmethod
+    def _env_supports_end_of_options():
+        """Probe whether env(1) recognizes '--' as an end-of-options marker.
+
+        macOS 26's env(1) is stricter about option scanning past the program
+        token, so callers must terminate option parsing with '--' before
+        flag-like program arguments (e.g. cmake's '-G Ninja') to keep env from
+        consuming them. Older env(1)s that don't recognize '--' would try to
+        exec a program literally named '--' and fail; treat a non-zero exit
+        (or a missing env binary) as no support.
+        """
+        try:
+            return subprocess.call(
+                ['env', 'A=1', '--', '/bin/sh', '-c', 'exit 0'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            ) == 0
+        except OSError:
+            return False
 
     def convert_to_impl_arguments(self):
         """convert_to_impl_arguments() -> (env, args)
@@ -135,6 +156,9 @@ class BuildScriptInvocation(object):
             '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
             "--swift-source-dirname", products.Swift.product_source_name(),
         ]
+
+        if self._env_supports_end_of_options():
+            impl_args += ["--env-supports-end-of-options"]
 
         # Compute any product specific cmake arguments.
         #

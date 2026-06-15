@@ -77,6 +77,7 @@ KNOWN_SETTINGS=(
     workspace                                     "${HOME}/src"     "source directory containing llvm, clang, swift"
     dsymutil-jobs                                 "1"               "number of parallel invocations of dsymutil"
     extra-dsymutil-args                           ""                "additional arguments to pass to dsymutil"
+    env-supports-end-of-options                   ""                "set if env(1) recognizes '--' as an end-of-options marker; build-script probes for this and forwards the flag"
 
     ## Build Tools
     host-cc                                       ""                "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
@@ -1039,6 +1040,17 @@ fi
 
 if [[ "${SKIP_RECONFIGURE}" ]]; then
     RECONFIGURE=""
+fi
+
+# `env(1)` end-of-options terminator. macOS 26's env(1) is stricter about
+# option scanning past the program token, so callers must explicitly end
+# option scanning with `--` before the program. build-script probes whether
+# the local env(1) recognizes `--` and forwards
+# --env-supports-end-of-options when it does; otherwise this expands to
+# nothing so we don't break older env(1)s that would try to exec `--`.
+ENV_OPT_TERMINATOR=()
+if [[ "${ENV_SUPPORTS_END_OF_OPTIONS}" ]]; then
+    ENV_OPT_TERMINATOR=(--)
 fi
 
 # WORKSPACE, BUILD_DIR, and INSTALLABLE_PACKAGE must be absolute paths
@@ -2604,7 +2616,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 EXTRA_DISTCC_OPTIONS=("DISTCC_HOSTS=localhost,lzo,cpp")
             fi
             with_pushd "${build_dir}" \
-                call env "${EXTRA_DISTCC_OPTIONS[@]}" "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}"
+                call env "${EXTRA_DISTCC_OPTIONS[@]}" "${ENV_OPT_TERMINATOR[@]}" "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}"
         fi
 
         # Build.
@@ -2797,7 +2809,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                   echo "--- Running tests for ${product} ---"
                   with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                      call env VERBOSE=1 make check
+                      call env VERBOSE=1 "${ENV_OPT_TERMINATOR[@]}" make check
                   echo "--- Finished tests for ${product} ---"
                   continue
                 ;;
@@ -3021,7 +3033,7 @@ for host in "${ALL_HOSTS[@]}"; do
         echo "--- Installing ${product} ---"
         build_dir=$(build_directory ${host} ${product})
 
-        call env DESTDIR="${host_install_destdir}" "${CMAKE_BUILD[@]}" "${build_dir}" -- ${INSTALL_TARGETS}
+        call env DESTDIR="${host_install_destdir}" "${ENV_OPT_TERMINATOR[@]}" "${CMAKE_BUILD[@]}" "${build_dir}" -- ${INSTALL_TARGETS}
     done
 done
 
