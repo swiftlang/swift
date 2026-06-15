@@ -193,3 +193,25 @@
 // CHECK-OFF: }
 // CHECK-ON: class EmptyDerivedAbstractFRT : AbstractFRT {
 // CHECK-ON: }
+
+// CHECK: class BaseWithInitMethod {
+// CHECK:   func `init`() -> Int32
+// CHECK: }
+
+// CHECK-OFF: class DerivedWithInitMethod {
+// CHECK-OFF:   func `init`() -> Int32
+// CHECK-OFF: }
+// CHECK-ON: class DerivedWithInitMethod : BaseWithInitMethod {
+// CHECK-ON:   func `init`() -> Int32
+// CHECK-ON: }
+
+// CHECK: class RenamedBaseWithInitMethod {
+// CHECK:   func method() -> Int32
+// CHECK: }
+
+// CHECK-OFF: class RenamedDerivedWithInitMethod {
+// CHECK-OFF:   func method() -> Int32
+// CHECK-OFF: }
+// CHECK-ON: class RenamedDerivedWithInitMethod : RenamedBaseWithInitMethod {
+// CHECK-ON:   func method() -> Int32
+// CHECK-ON: }

@@ -17,3 +17,42 @@
 
 // CHECK: mutating func nonConstPassThroughAsWrapper(_ a: Int32) -> NonTrivialInWrapper
 // CHECK: func constPassThroughAsWrapper(_ a: Int32) -> NonTrivialInWrapper
+
+// CHECK: struct HasInitMethods {
+// CHECK:   init(field: Int32)
+// CHECK:   init()
+// CHECK:   func `init`() -> Int32
+// CHECK:   mutating func initMutating(_ n: Int32) -> Int32
+// CHECK: }
+
+// CHECK: struct HasInitWithBackticks {
+// CHECK:   init(x: Int32)
+// CHECK:   func `init`() -> Int32
+// CHECK: }
+
+// CHECK: struct HasRenamedInitMethods {
+// CHECK:   func start() -> Int32
+// CHECK:   func startWith(_ a: Int32) -> Int32
+// CHECK: }
+
+// CHECK: struct HasStaticInitFactoryAndInitMethod {
+// CHECK:   func `init`() -> Int32
+// CHECK:   init(value: Int32)
+// CHECK: }
+
+// CHECK: struct HasNonInitializerStaticInitMethod {
+// CHECK:   init()
+// CHECK:   static func nonInitializer(_ value: Int32) -> Int32
+// CHECK: }
+
+// CHECK: struct ConstructorWithRenamedLabel {
+// CHECK:   init(renamed v: Int32)
+// CHECK: }
+
+// CHECK: struct WithFactory {
+// CHECK:   init(x: Int32)
+// CHECK: }
+
+// CHECK: extension WithFactory {
+// CHECK:   init(n: Int32)
+// CHECK: }

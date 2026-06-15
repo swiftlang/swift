@@ -861,6 +861,35 @@ static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
   return static_cast<bool>(determineFactoryInitializerKind(method));
 }
 
+/// Determine whether this C/C++ function or method can be imported as an
+/// initializer of the type named by \p parsedName.
+static bool shouldImportAsInitializer(const clang::FunctionDecl *D,
+                                      const ParsedDeclName &parsedName) {
+  if (isa<clang::CXXConstructorDecl>(D))
+    return true;
+  if (auto *method = dyn_cast<clang::CXXMethodDecl>(D)) {
+    if (!method->isStatic())
+      return false;
+
+    clang::QualType resultType = method->getReturnType();
+    if (resultType->isPointerType() || resultType->isReferenceType())
+      resultType = resultType->getPointeeType();
+
+    const clang::CXXRecordDecl *resultRecord = resultType->getAsCXXRecordDecl();
+    if (!resultRecord)
+      return false;
+    resultRecord = resultRecord->getCanonicalDecl();
+
+    if (parsedName.isMember())
+      return resultRecord->getName() == parsedName.ContextNames.front();
+
+    return resultRecord == method->getParent()->getCanonicalDecl();
+  }
+
+  // Free functions only support the "Type.init(...)" form.
+  return parsedName.isMember();
+}
+
 /// Attempt to omit needless words from the given function name.
 static bool omitNeedlessWordsInFunctionName(
     StringRef &baseName, SmallVectorImpl<StringRef> &argumentNames,
@@ -1713,11 +1742,16 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         skipCustomName = true;
         result.info.hasInvalidCustomName = true;
       }
-    }
+    } else if (auto *func = dyn_cast<clang::FunctionDecl>(D)) {
+      if (auto *cxxMethod = dyn_cast<clang::CXXMethodDecl>(func)) {
+        // `swift_name` attribute is not supported in virtual methods overrides
+        if (cxxMethod->isVirtual() && cxxMethod->size_overridden_methods() > 0)
+          skipCustomName = true;
+      }
 
-    // `swift_name` attribute is not supported in virtual methods overrides
-    if (auto method = dyn_cast<clang::CXXMethodDecl>(D)) {
-      if (method->isVirtual() && method->size_overridden_methods() > 0)
+      if (!skipCustomName &&
+          parsedName.BaseNameKind == DeclBaseName::Kind::Constructor &&
+          !shouldImportAsInitializer(func, parsedName))
         skipCustomName = true;
     }
 
