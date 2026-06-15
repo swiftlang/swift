@@ -167,14 +167,14 @@ addImplicitCodingKeys(NominalTypeDecl *target,
     // TODO: Ensure the class doesn't already have or inherit a variable named
     // "`super`"; otherwise we will generate an invalid enum. In that case,
     // diagnose and bail.
-    auto *super = new (C) EnumElementDecl(SourceLoc(), C.Id_super, nullptr,
+    auto *super = new (C) EnumElementDecl(anchorLoc, C.Id_super, nullptr,
                                           SourceLoc(), nullptr, enumDecl);
     super->setImplicit();
     enumDecl->addMember(super);
   }
 
   for (auto caseIdentifier : caseIdentifiers) {
-    auto *elt = new (C) EnumElementDecl(SourceLoc(), caseIdentifier, nullptr,
+    auto *elt = new (C) EnumElementDecl(anchorLoc, caseIdentifier, nullptr,
                                         SourceLoc(), nullptr, enumDecl);
     elt->setImplicit();
     enumDecl->addMember(elt);
