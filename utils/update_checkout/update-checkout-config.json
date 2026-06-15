@@ -755,10 +755,10 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "stable/20260427"],
+            "aliases": ["rebranch", "stable/20260609"],
             "repos": {
-                "llvm-project": "stable/20260427",
-                "swift-llvm-bindings": "stable/20260427",
+                "llvm-project": "stable/20260609",
+                "swift-llvm-bindings": "stable/20260609",
                 "swift": "rebranch",
                 "cmark": "gfm",
                 "llbuild": "main",
