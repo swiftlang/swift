@@ -204,9 +204,13 @@ bool ModuleDependenciesCacheDeserializer::readSerializationTime(llvm::sys::TimeP
   
   TimeLayout::readRecord(Scratch);
   std::string serializedTimeStamp = BlobData.str();
-  
+
+  TimeLayout::readRecord(Scratch);
+  long long timeStampValue;
+  if (BlobData.getAsInteger(/*Radix=*/10, timeStampValue))
+    return true; // malformed timestamp -> treat as deserialization failure
   SerializationTimeStamp =
-    llvm::sys::TimePoint<>(llvm::sys::TimePoint<>::duration(std::stoll(serializedTimeStamp)));
+      llvm::sys::TimePoint<>(llvm::sys::TimePoint<>::duration(timeStampValue));
   return SerializationTimeStamp == llvm::sys::TimePoint<>();
 }
 
