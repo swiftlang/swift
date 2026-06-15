@@ -6225,10 +6225,12 @@ ERROR(concurrent_value_outside_source_file,none,
       (const ValueDecl *))
 ERROR(concurrent_value_nonfinal_class,none,
       "non-final class %0 cannot conform to the 'Sendable' protocol", (DeclName))
-ERROR(concurrent_value_inherit,none,
-      "'Sendable' class %1 cannot inherit from another class"
-      "%select{| other than 'NSObject'}0",
-      (bool, DeclName))
+GROUPED_ERROR(concurrent_value_nonsendable_superclass,NonSendableSuperclass,none,
+      "class %0 cannot conform to the 'Sendable' protocol", (DeclName))
+NOTE(concurrent_value_nonsendable_superclass_note,none,
+     "a 'Sendable' class cannot inherit from a non-Sendable class", ())
+NOTE(concurrent_value_nonsendable_superclass_here,none,
+     "inherits from non-Sendable class %0", (DeclName))
 ERROR(non_sendable_type,none,
       "type %0 does not conform to the 'Sendable' protocol", (Type))
 GROUPED_ERROR(non_sendable_metatype_type,SendableMetatypes,none,
