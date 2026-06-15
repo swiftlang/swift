@@ -115,11 +115,8 @@ struct SubstitutionMapWithLocalArchetypes {
     // prevents this.
     //
     // TODO: Rework handling of pack type level to make this flag unnecessary.
-    auto optionsPreservingPackExpansionLevel =
-        IFS.getOptions() | SubstFlags::PreservePackExpansionLevel;
-    return IFS.withNewOptions(optionsPreservingPackExpansionLevel, [&]() {
-      return ProtocolConformanceRef::forAbstract(origType.subst(IFS), proto);
-    });
+    InFlightSubstitution::OptionsAdjustmentScope saveOptions(IFS, SubstFlags::PreservePackExpansionLevel);
+    return ProtocolConformanceRef::forAbstract(origType.subst(IFS), proto);
   }
 
   void dump(llvm::raw_ostream &out) const {
