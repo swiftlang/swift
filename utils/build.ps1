@@ -4548,7 +4548,18 @@ roots:
           _SwiftCollections_SourceDIR       = "$SourceCache\swift-collections";
           SwiftFoundation_MACRO             = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin";
         }
-        $FoundationDefines = $SDKInstallDefines + $FoundationDefines
+        $PlatformDefines = if ($Platform.OS -eq [OS]::Windows) {
+          @{};
+        } else {
+          @{
+            OPENSSL_ROOT_DIR        = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake";
+            OPENSSL_CRYPTO_LIBRARY  = "$BinaryCache\$($Platform.Triple)\usr\lib\libcrypto.a"
+            OPENSSL_INCLUDE_DIR     = "$BinaryCache\$($Platform.Triple)\usr\include";
+            OPENSSL_SSL_LIBRARY     = "$BinaryCache\$($Platform.Triple)\usr\lib\libssl.a"
+            OPENSSL_USE_STATIC_LIBS = "YES";
+          };
+        }
+        $FoundationDefines = $SDKInstallDefines + $FoundationDefines + $PlatformDefines
 
         Build-CMakeProject `
           -Src $SourceCache\swift-corelibs-foundation `
