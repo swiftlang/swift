@@ -104,4 +104,8 @@ FunctionsTestSuite.test("mutating base member calls do not require copying") {
   expectEqual(copyCounter, getCopyCounter().pointee)
 }
 
+FunctionsTestSuite.test("non-initializer function renamed to init()") {
+  expectEqual(freeFuncRenamedToInit(), 42)
+}
+
 runAllTests()
