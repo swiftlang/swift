@@ -88,11 +88,18 @@ void swiftscan_dependency_info_details_dispose(
         details_impl->swift_binary_details.swift_overlay_module_dependencies);
       swiftscan_string_dispose(
         details_impl->swift_binary_details.header_dependency);
-    swiftscan_string_dispose(
-        details_impl->swift_binary_details.module_cache_key);
-    swiftscan_string_dispose(
-        details_impl->swift_binary_details.user_module_version);
-    break;
+      swiftscan_string_set_dispose(
+          details_impl->swift_binary_details
+              .header_dependencies_module_dependnecies);
+      swiftscan_string_set_dispose(
+          details_impl->swift_binary_details.header_dependencies_source_files);
+      swiftscan_macro_dependency_dispose(
+          details_impl->swift_binary_details.macro_dependencies);
+      swiftscan_string_dispose(
+          details_impl->swift_binary_details.module_cache_key);
+      swiftscan_string_dispose(
+          details_impl->swift_binary_details.user_module_version);
+      break;
   case SWIFTSCAN_DEPENDENCY_INFO_CLANG:
     swiftscan_string_dispose(details_impl->clang_details.module_map_path);
     swiftscan_string_dispose(details_impl->clang_details.context_hash);
