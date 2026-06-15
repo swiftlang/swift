@@ -1360,6 +1360,15 @@ GenericSignature GenericSignature::withoutMarkerProtocols() const {
 void GenericSignatureImpl::getRequirementsWithInverses(
     SmallVector<Requirement, 2> &reqs,
     SmallVector<InverseRequirement, 2> &inverses) const {
+  // Throwing away the omitted requirements is the normal behavior.
+  SmallVector<Requirement, 2> _throw_away_omitted;
+  getRequirementsWithInversesAndOmitted(reqs, inverses, _throw_away_omitted);
+}
+
+void GenericSignatureImpl::getRequirementsWithInversesAndOmitted(
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses,
+    SmallVector<Requirement, 2> &omitted) const {
   auto &ctx = getASTContext();
 
   llvm::SmallSet<CanType, 12> seenDMTs;
@@ -1470,8 +1479,13 @@ void GenericSignatureImpl::getRequirementsWithInverses(
 
     // If the subject matches a primary associated type we identified earlier,
     // then we will infer a default for them, so drop this requirement.
-    if (seenDMTs.contains(subject->getCanonicalType()))
+    if (seenDMTs.contains(subject->getCanonicalType())) {
+      // To maintain with compatability between SE-503 and the deprecated
+      // SuppressedAssociatedTypes, preserve provide these in the "omitted"
+      // output for the ASTPrinter.
+      omitted.push_back(req);
       continue;
+    }
 
     // Otherwise, for a non-primary associated type, no default is inferred,
     // thus this conformance requirement was explicitly stated. Keep it.
