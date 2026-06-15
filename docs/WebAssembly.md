@@ -66,6 +66,33 @@ LIT_FILTER_OUT='(embedded|KeyPath)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)
   ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasistdlib-macosx-arm64
 ```
 
+## Building and testing the Emscripten stdlib
+
+Prerequisites: Emscripten SDK installed via Homebrew (`brew install emscripten`).
+
+The following `build-script` invocation is macOS-specific. Build LLVM, Swift,
+and the Emscripten stdlib:
+
+```
+./utils/build-script --release-debuginfo \
+  --build-emscripten-stdlib \
+  --emscripten-path /opt/homebrew/Cellar/emscripten/<VERSION>/libexec \
+  --skip-test-emscripten-stdlib \
+  --sccache \
+  --install-swift --install-llvm \
+  --skip-build-benchmarks
+```
+
+Replace `<VERSION>` with your installed Emscripten version (e.g. `5.0.2`).
+
+To run only the Emscripten stdlib tests after building:
+
+```
+cd build/Ninja-RelWithDebInfoAssert
+PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
+  ninja check-swift-emscripten-wasm32-custom check-swift-embedded-emscripten \
+  -C emscriptenstdlib-macosx-arm64
+```
 
 ## Building Swift SDK for WebAssembly
 
