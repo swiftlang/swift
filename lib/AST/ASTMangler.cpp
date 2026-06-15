@@ -953,7 +953,11 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   Node *NewGlobal = Dem.createNode(Node::Kind::Global);
   NewGlobal->addChild(TyMangling, Dem);
   auto mangling = mangleNodeOld(NewGlobal);
-  ASSERT(mangling.isSuccess());
+  if (!mangling.isSuccess()) {
+    // The old mangler doesn't support every kind of type (e.g. opaque types).
+    // Fall back to the new mangling in those cases.
+    return NewName;
+  }
   return mangling.result();
 #endif
 }
