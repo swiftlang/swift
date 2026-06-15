@@ -921,11 +921,6 @@ enum Project {
 }
 
 function Get-ProjectBinaryCache([Hashtable] $Platform, [Project] $Project) {
-  if ($Project -eq [Project]::Compilers) {
-    if ($Platform -eq $HostPlatform) { return "$BinaryCache\5" }
-    if ($Platform -eq $BuildPlatform) { return "$BinaryCache\1" }
-    throw "Building Compilers for $($Platform.Triple) currently unsupported."
-  }
   return "$([IO.Path]::Combine("$BinaryCache\", $Platform.Triple, $Project.ToString()))"
 }
 
@@ -1295,7 +1290,7 @@ function Export-WindowsManifestResource([string] $ImagePath,
 function Test-WindowsManifestHasExecutionLevel([string] $ManifestPath) {
   $Doc = New-Object System.Xml.XmlDocument
   $Doc.Load($ManifestPath)
-  return ($Doc.SelectSingleNode("//*[local-name()='trustInfo' or local-name()='requestedPrivileges' or local-name()='requestedExecutionLevel']") -ne $null)
+  return ([bool]$Doc.SelectSingleNode("//*[local-name()='trustInfo' or local-name()='requestedPrivileges' or local-name()='requestedExecutionLevel']"))
 }
 
 function Assert-WindowsManifestResourcesAreSxSSafe([string] $ImagePath,
@@ -1862,61 +1857,6 @@ $Compilers = @{
     }
   }
 
-  Built = @{
-    C = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang-cl.exe")
-      DriverStyle       = [DriverStyle]::ClangCL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @() }
-      }
-      AssumeFunctional  = $true
-    }
-
-    CXX = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang-cl.exe")
-      DriverStyle       = [DriverStyle]::ClangCL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:__cplusplus")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @() }
-      }
-      AssumeFunctional  = $true
-    }
-
-    GNUC = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang.exe")
-      DriverStyle       = [DriverStyle]::GNU
-      Flags             = @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer", "-finline-functions")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-gdwarf") } else { @("-gcodeview") }
-      }
-      AssumeFunctional  = $true
-    }
-
-    GNUCXX = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang++.exe")
-      DriverStyle       = [DriverStyle]::GNU
-      Flags             = @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer", "-finline-functions")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-gdwarf") } else { @("-gcodeview") }
-      }
-      AssumeFunctional  = $true
-    }
-
-    Swift = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "swiftc.exe")
-      DriverStyle       = [DriverStyle]::Swift
-      Flags             = @()
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") {
-          return @("-g", "-debug-info-format=dwarf", "-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
-        }
-        return @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
-      }
-      AssumeFunctional  = $true
-    }
-  }
-
   Stage0 = @{
     C = @{
       Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage0Compilers), "clang-cl.exe")
@@ -2036,16 +1976,6 @@ $Compilers.Host = @{
 }
 
 $Assemblers = @{
-  Built = @{
-    Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang-cl.exe")
-    DriverStyle       = [DriverStyle]::ClangCL
-    Flags             = @()
-    DebugFlags        = { param([string] $Format)
-      if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
-    }
-    AssumeFunctional  = $true
-  }
-
   Pinned = @{
     Executable        = Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang-cl.exe"
     DriverStyle       = [DriverStyle]::ClangCL
@@ -2803,7 +2733,7 @@ function Build-EarlySwiftDriver([Hashtable] $Platform) {
         SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
         SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform EarlySwiftDriverSQLite)\SQLite3.lib";
 
-        # Prevent re-cloning the soruces
+        # Prevent re-cloning the sources
         FETCHCONTENT_SOURCE_DIR_ARGUMENTPARSER = "$SourceCache\swift-argument-parser";
         FETCHCONTENT_SOURCE_DIR_LLBUILD = "$SourceCache\llbuild";
         FETCHCONTENT_SOURCE_DIR_TOOLSSUPPORTCORE = "$SourceCache\swift-tools-support-core";
@@ -2991,7 +2921,6 @@ function Build-Compilers([Hashtable] $Platform,
                          [string]    $DispatchPackage  = $null,
                          [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake") {
   New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore | Out-Null
-  New-Item -ItemType SymbolicLink -Path "$BinaryCache\$($HostPlatform.Triple)\compilers" -Target "$BinaryCache\5" -ErrorAction Ignore | Out-Null
 
   Invoke-IsolatingEnvVars {
     if ($SwiftCompiler -and $SwiftCompiler.Executable -eq $Compilers.Pinned.Swift.Executable) {
@@ -3924,31 +3853,31 @@ function Test-Dispatch {
 }
 
 function Test-Foundation {
-  $ScratchPath = "$BinaryCache\$($BuildPlatform.Triple)\FoundationTests"
+  $ScratchPath = "$BinaryCache\$($HostPlatform.Triple)\FoundationTests"
 
   # Foundation tests build via swiftpm rather than CMake
   Build-SPMProject `
     -Action Test `
     -Src $SourceCache\swift-foundation `
     -Bin "$ScratchPath" `
-    -Platform $BuildPlatform `
+    -Platform $HostPlatform `
     -Configuration $FoundationTestConfiguration `
     --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
     --test-product swift-foundationPackageTests
 
   Invoke-IsolatingEnvVars {
-    $env:DISPATCH_INCLUDE_PATH="$(Get-SwiftSDK -OS $BuildPlatform.OS)/usr/include"
-    $env:LIBXML_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
-    $env:LIBXML_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include/libxml2"
-    $env:ZLIB_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
-    $env:BROTLI_LIBRARY_PATH="$(Get-ProjectBinaryCache $BuildPlatform brotli)"
-    $env:CURL_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
-    $env:CURL_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include"
+    $env:DISPATCH_INCLUDE_PATH="$(Get-SwiftSDK -OS $HostPlatform.OS)/usr/include"
+    $env:LIBXML_LIBRARY_PATH="$BinaryCache/$($HostPlatform.Triple)/usr/lib"
+    $env:LIBXML_INCLUDE_PATH="$BinaryCache/$($HostPlatform.Triple)/usr/include/libxml2"
+    $env:ZLIB_LIBRARY_PATH="$BinaryCache/$($HostPlatform.Triple)/usr/lib"
+    $env:BROTLI_LIBRARY_PATH="$(Get-ProjectBinaryCache $HostPlatform brotli)"
+    $env:CURL_LIBRARY_PATH="$BinaryCache/$($HostPlatform.Triple)/usr/lib"
+    $env:CURL_INCLUDE_PATH="$BinaryCache/$($HostPlatform.Triple)/usr/include"
     Build-SPMProject `
       -Action Test `
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin "$ScratchPath" `
-      -Platform $BuildPlatform `
+      -Platform $HostPlatform `
       -Configuration $FoundationTestConfiguration `
       --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
       --test-product swift-corelibs-foundationPackageTests
@@ -4000,25 +3929,25 @@ function Build-XCTest([Hashtable] $Platform,
 
 function Test-XCTest {
   Invoke-IsolatingEnvVars {
-    $SwiftRuntime          = [IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", "$ProductVersion")
-    $DispatchBinaryCache   = Get-ProjectBinaryCache $BuildPlatform DynamicDispatch
-    $FoundationBinaryCache = Get-ProjectBinaryCache $BuildPlatform DynamicFoundation
+    $SwiftRuntime          = [IO.Path]::Combine((Get-InstallDir $HostPlatform), "Runtimes", "$ProductVersion")
+    $DispatchBinaryCache   = Get-ProjectBinaryCache $HostPlatform DynamicDispatch
+    $FoundationBinaryCache = Get-ProjectBinaryCache $HostPlatform DynamicFoundation
 
-    $env:Path = "$(Get-ProjectBinaryCache $BuildPlatform XCTest);$(Get-ProjectBinaryCache $BuildPlatform Testing)\bin;${FoundationBinaryCache}\bin;${DispatchBinaryCache};${SwiftRuntime}\usr\bin;${env:Path};$UnixToolsBinDir"
-    $env:SDKROOT = Get-SwiftSDK -OS $Platform.OS
+    $env:Path = "$(Get-ProjectBinaryCache $HostPlatform XCTest);$(Get-ProjectBinaryCache $BuildPlatform Testing)\bin;${FoundationBinaryCache}\bin;${DispatchBinaryCache};${SwiftRuntime}\usr\bin;${env:Path};$UnixToolsBinDir"
+    $env:SDKROOT = Get-SwiftSDK -OS $HostPlatform.OS
 
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-xctest `
-      -Bin (Get-ProjectBinaryCache $BuildPlatform XCTest) `
-      -Platform $BuildPlatform `
+      -Bin (Get-ProjectBinaryCache $HostPlatform XCTest) `
+      -Platform $HostPlatform `
       -CCompiler $Compilers.Stage1.C `
       -CXXCompiler $Compilers.Stage1.CXX `
       -SwiftCompiler $Compilers.Stage1.Swift `
-      -SwiftSDK (Get-SwiftSDK -OS $Platform.OS) `
+      -SwiftSDK (Get-SwiftSDK -OS $HostPlatform.OS) `
       -BuildTargets default,check-xctest `
       -Defines @{
         ENABLE_TESTING = "YES";
-        LLVM_DIR = "$(Get-ProjectBinaryCache $BuildPlatform Stage2Compilers)\lib\cmake\llvm";
+        LLVM_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\llvm";
         XCTEST_PATH_TO_FOUNDATION_BUILD = $FoundationBinaryCache;
         XCTEST_PATH_TO_LIBDISPATCH_BUILD = $DispatchBinaryCache;
         XCTEST_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
@@ -4650,7 +4579,7 @@ function Build-Subprocess([Hashtable] $Platform,
                           [Hashtable] $Compilers,
                           [string]    $SwiftSDK) {
   Build-CMakeProject `
-    -Src $sourceCache\swift-subprocess `
+    -Src $SourceCache\swift-subprocess `
     -Bin (Get-ProjectBinaryCache $Platform Subprocess) `
     -Platform $Platform `
     -CCompiler $Compilers.C `
@@ -5302,16 +5231,16 @@ function Repair-Toolchain([string] $ToolchainInstallRoot) {
     -Path $SwiftDriver `
     -Destination "$ToolchainInstallRoot\usr\bin\swiftc.exe"
 
-  # Merge swift swift-inspect.
-  copy-Item -Force `
+  # Copy swift-inspect tools.
+  Copy-Item -Force `
     -Path "$(Get-PlatformRoot $HostPlatform.OS)\Developer\Library\$(Get-ModuleTriple $HostPlatform)\bin\swift-inspect.exe" `
     -Destination "$ToolchainInstallRoot\usr\bin\swift-inspect.exe"
-  copy-Item -Force `
+  Copy-Item -Force `
     -Path "$(Get-PlatformRoot $HostPlatform.OS)\Developer\Library\$(Get-ModuleTriple $HostPlatform)\bin\SwiftInspectClient.dll" `
     -Destination "$ToolchainInstallRoot\usr\bin\SwiftInspectClient.dll"
 
   # Copy embeddable Python
-  New-Item -Type Directory -Path "$(Get-EmbeddedPythonInstallDir)" -ErrorAction Ignore | Out-Null
+  New-Item -ItemType Directory -Path "$(Get-EmbeddedPythonInstallDir)" -ErrorAction Ignore | Out-Null
   Copy-Item -Force -Recurse `
     -Path "$(Get-EmbeddedPythonPath $HostPlatform)\*" `
     -Destination "$(Get-EmbeddedPythonInstallDir)"
@@ -5361,8 +5290,8 @@ function Test-PackageManager() {
     -Src $SrcDir `
     -Bin "$BinaryCache\$($HostPlatform.Triple)\PackageManagerTests" `
     -Platform $HostPlatform `
-    -Xcc "-I$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+Asserts\usr\include" `
-    -Xlinker "-L$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+Asserts\usr\lib"
+    -Xcc "-I$(Get-InstallDir $HostPlatform)\Toolchains\$ProductVersion+Asserts\usr\include" `
+    -Xlinker "-L$(Get-InstallDir $HostPlatform)\Toolchains\$ProductVersion+Asserts\usr\lib"
 }
 
 # Once the staged toolchain image is laid out, bind each toolchain EXE to
@@ -5634,7 +5563,7 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   }
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" $Stage
   # Extract installer engine to ease code-signing on swift.org CI
-  New-Item -Type Directory -Path "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)" -ErrorAction Ignore | Out-Null
+  New-Item -ItemType Directory -Path "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)" -ErrorAction Ignore | Out-Null
   Invoke-WithDotNetRuntime {
     Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn detach -acceptEula $WiX.EulaIdentifier "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)\"
   }
@@ -5879,13 +5808,13 @@ if ($Toolchain) {
 
     Repair-Toolchain $HostPlatform.NoAssertsToolchainInstallRoot
 
-    # Only compilers have NoAsserts enabled. Copy the rest of the Toolcahin binaries from the Asserts output
+    # Only compilers have NoAsserts enabled. Copy the rest of the Toolchain binaries from the Asserts output
     # Use robocopy for efficient copying
     #   /E : Copies subdirectories, including empty ones.
     #   /XC: Excludes existing files with the same timestamp but different file sizes.
     #   /XN: Excludes existing files that are newer than the copy in the source directory.
     #   /XO: Excludes existing files that are older than the copy in the source directory.
-    #   /NFL: Do not list coppied files in output
+    #   /NFL: Do not list copied files in output
     #   /NDL: Do not list directories in output
     #   /NJH: Do not write a job header
     #   /NC: Do not write file classes
