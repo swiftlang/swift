@@ -987,6 +987,19 @@ public func _swift_intToFloat64(
   return result
 }
 
+// Version information for the Platform Abstraction Layer
+
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+@c @used
+public func swift_getPlatformLayerVersion(
+  _ major: UnsafeMutablePointer<Int>,
+  _ minor: UnsafeMutablePointer<Int>
+) {
+  unsafe major.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR
+  unsafe minor.pointee = 0 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
+}
+#endif
+
 // CXX Exception Personality
 
 public typealias _Unwind_Action = CInt
