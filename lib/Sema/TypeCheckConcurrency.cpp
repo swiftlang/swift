@@ -3184,8 +3184,9 @@ namespace {
     PreWalkAction walkToDeclPre(Decl *decl) override {
       // Don't walk into local types because nothing in them can
       // change the outcome of our analysis, and we don't want to
-      // assume things there have been type checked yet.
-      if (isa<TypeDecl>(decl)) {
+      // assume things there have been type checked yet. Extensions
+      // may also occur here for invalid code, skip them too.
+      if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl)) {
         return Action::SkipChildren();
       }
 
