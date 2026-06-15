@@ -56,22 +56,8 @@ extension DistributedResolvableMacro {
         attr.as(AttributeSyntax.self)?.attributeName.trimmed.description ?? ""
       )
     }
-    let accessModifiers = proto.accessControlModifiers
-
-    let requirementStubs =
-      proto.memberBlock.members // requirements
-        .filter { member in
-          switch member.decl.kind {
-          case .functionDecl: return true
-          case .variableDecl: return true
-          default:
-            return false
-          }
-        }
-        .map { member in
-          stubMethodDecl(access: accessModifiers, member.trimmed)
-        }
-        .joined(separator: "\n    ")
+    let access = proto.accessControlModifiers
+    let requirementStubs = stubsFor(members: proto.memberBlock.members, access: access)
 
     let extensionDecl: DeclSyntax =
       """
@@ -81,6 +67,40 @@ extension DistributedResolvableMacro {
       }
       """
     return [extensionDecl.cast(ExtensionDeclSyntax.self)]
+  }
+
+  /// Returns rendered string with all stub declarations for given members.
+  /// This includes any necessary #if/#endif guards that the original protocol might have.
+  private static func stubsFor(
+    members: MemberBlockItemListSyntax,
+    access: DeclModifierListSyntax
+  ) -> String {
+    var parts: [String] = []
+    for member in members {
+      if let ifConfig = member.decl.as(IfConfigDeclSyntax.self) {
+        // emit the '#if ...' exactly as in the original protocol.
+        var ifConfigBlock = ""
+        for clause in ifConfig.clauses {
+          let kw = clause.poundKeyword.text
+          if let cond = clause.condition {  // #if or #elseif
+            ifConfigBlock += "\(kw) \(cond.trimmed)\n"
+          } else {
+            ifConfigBlock += "\(kw)\n"
+          }
+          if let innerMembers = clause.elements?.as(MemberBlockItemListSyntax.self) {
+            // recurse, there may be more nested #if conditions, or just the actual decls
+            ifConfigBlock += stubsFor(members: innerMembers, access: access)
+            ifConfigBlock += "\n"
+          }
+        }
+        ifConfigBlock += "#endif"
+        parts.append(ifConfigBlock)
+      } else if member.decl.is(FunctionDeclSyntax.self) ||
+                member.decl.is(VariableDeclSyntax.self) {
+        parts.append(stubMethodDecl(access: access, member.trimmed))
+      }
+    }
+    return parts.joined(separator: "\n    ")
   }
 
   static func stubMethodDecl(access: DeclModifierListSyntax, _ requirement: MemberBlockItemListSyntax.Element) -> String {
