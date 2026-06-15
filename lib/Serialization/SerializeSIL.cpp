@@ -1072,11 +1072,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     if (!Options.SerializeDebugInfoSIL)
      return;
     auto DVI = cast<DebugValueInst>(&SI);
-    // Reconstruction blocks (the `transform { ... }` clause) aren't serialized
-    // yet, so drop any debug_value carrying one rather than emit a corrupted
-    // record whose variable type reverts to the operand type on read.
-    if (DVI->getDebugReconstructionBlock())
-      return;
     unsigned attrs = unsigned(DVI->poisonRefs() & 0x1);
     attrs |= unsigned(DVI->usesMoveableValueDebugInfo()) << 1;
     attrs |= unsigned(DVI->hasTrace()) << 2;
