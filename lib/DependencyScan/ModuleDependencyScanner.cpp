@@ -2546,7 +2546,7 @@ ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
                   [this](const auto &cd, auto mok) -> std::string {
                     return clangModuleOutputPathLookup(cd, mok);
                   }, {});
-          if (clangResult)
+          if (clangResult && !clangResult->ModuleGraph.empty())
             return std::make_pair(
                 binaryDepID, clangResult->ModuleGraph[0].ClangModuleMapFile);
           return std::nullopt;
