@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import SwiftMusl // Clang module
+import SwiftOverlayShims
 
 public let MAP_FAILED: UnsafeMutableRawPointer! = UnsafeMutableRawPointer(bitPattern: -1)
 
@@ -69,3 +70,15 @@ public let ${prefix}_TRUE_MIN = ${type}.leastNonzeroMagnitude
 #endif
 % end
 %end
+
+// FILE is an opaque type on Musl (struct _IO_FILE is only forward-declared),
+// so these are OpaquePointers rather than UnsafeMutablePointer<FILE>.
+nonisolated(unsafe) public var stdin: OpaquePointer {
+  OpaquePointer(_swift_stdlib_stdin())
+}
+nonisolated(unsafe) public var stdout: OpaquePointer {
+  OpaquePointer(_swift_stdlib_stdout())
+}
+nonisolated(unsafe) public var stderr: OpaquePointer {
+  OpaquePointer(_swift_stdlib_stderr())
+}
