@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -parse-as-library %s | grep -v debug_value | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -parse-as-library -sil-verify-all %s | grep -v debug_value | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: swift_in_compiler
@@ -56,4 +56,31 @@ public func deadClassInstance() {
 // CHECK-NEXT:  } // end sil function '$s10dead_alloc0A13ManagedBufferyyF'
 public func deadManagedBuffer() -> () {
   _ = ManagedBuffer<Void, Void>.create(minimumCapacity: 1, makingHeaderWith: { _ in () })
+}
+
+// Check that the compiler doesn't crash
+
+struct NC<T: ~Copyable>: ~Copyable {
+  var t: T? = nil
+
+  mutating func take() -> T {
+    let x = consume t
+    self = .init()
+    return x!
+  }
+}
+
+func call<R>(_ c: () -> R) -> R {
+  return c()
+}
+
+public func foo<T>(_ t: consuming T) -> T {
+  var nc = NC(t: t)
+  return call {
+    return nc.take()
+  }
+}
+
+public func test(_ t: ()) -> () {
+  return foo(())
 }
