@@ -300,6 +300,11 @@ namespace {
 
     llvm::SmallVector<const SILGlobalVariable *, 16> globalWorklist;
 
+    /// DebugValueInsts with reconstruction blocks found during serialization.
+    /// After all regular blocks are written, these are used to emit the
+    /// trailing SIL_DEBUG_RECONSTRUCTION_BLOCK records.
+    std::vector<DebugValueInst *> DebugBBWorklist;
+
     /// String storage for temporarily created strings which are referenced from
     /// the tables.
     llvm::BumpPtrAllocator StringTable;
@@ -332,6 +337,8 @@ namespace {
 
     void writeSILFunction(const SILFunction &F, bool DeclOnly = false);
     void writeSILBasicBlock(const SILBasicBlock &BB);
+    void writeBlockArgs(const SILBasicBlock &BB, SmallVectorImpl<DeclID> &Args);
+    void writeDebugReconstructionBlock(const SILBasicBlock &DebugBB);
     void writeSILInstruction(const SILInstruction &SI);
     void writeSILVTable(const SILVTable &vt);
     void writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit);
@@ -738,10 +745,17 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     SerializedBBNum++;
   }
   assert(BasicID == SerializedBBNum && "Wrong number of BBs was serialized");
+
+  // Write debug reconstruction blocks after all regular blocks.
+  for (auto *DVI : DebugBBWorklist) {
+    auto *DebugBB = DVI->getDebugReconstructionBlock();
+    writeDebugReconstructionBlock(*DebugBB);
+  }
+  DebugBBWorklist.clear();
 }
 
-void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
-  SmallVector<DeclID, 4> Args;
+void SILSerializer::writeBlockArgs(const SILBasicBlock &BB,
+                                   SmallVectorImpl<DeclID> &Args) {
   for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I) {
     SILArgument *SA = *I;
     DeclID tId = S.addTypeRef(SA->getType().getRawASTType());
@@ -783,6 +797,11 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
 
     Args.push_back(vId);
   }
+}
+
+void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
+  SmallVector<DeclID, 4> Args;
+  writeBlockArgs(BB, Args);
 
   unsigned abbrCode = SILAbbrCodes[SILBasicBlockLayout::Code];
   SILBasicBlockLayout::emitRecord(Out, ScratchRecord, abbrCode, Args);
@@ -800,6 +819,42 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
       writeSourceLoc(SI.getLoc(), SM);
     }
 
+    writeSILInstruction(SI);
+  }
+}
+
+void SILSerializer::writeDebugReconstructionBlock(const SILBasicBlock &DebugBB) {
+  // Set up fresh ValueIDs for the debug BB's local values.
+  ValueIDs.clear();
+  InstID = 0;
+  unsigned ValueID = 2; // 0 and 1 reserved for SILUndef.
+
+  // Assign IDs to block arguments.
+  for (auto *Arg : DebugBB.getArguments())
+    ValueIDs.insert({static_cast<const ValueBase *>(Arg), ValueID++});
+
+  // Assign IDs to instruction results.
+  for (const SILInstruction &SI : DebugBB)
+    for (auto result : SI.getResults())
+      ValueIDs[result] = ValueID++;
+
+  // Emit the debug reconstruction block header with block args.
+  SmallVector<DeclID, 4> Args;
+  writeBlockArgs(DebugBB, Args);
+
+  unsigned abbrCode = SILAbbrCodes[SILDebugReconstructionBlockLayout::Code];
+  SILDebugReconstructionBlockLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                                Args);
+
+  // Emit each instruction in the debug BB, with source locations.
+  auto &SM = DebugBB.getParent()->getModule().getSourceManager();
+  for (const SILInstruction &SI : DebugBB) {
+    // Although source locations within a debug reconstruction block are not
+    // useful, the deserializer will use the last valid SourceLoc for
+    // instructions. If not serialized, the last valid SourceLoc is usually
+    // the return statement, which has a ReturnKind location incompatible
+    // with regular instructions.
+    writeSourceLoc(SI.getLoc(), SM);
     writeSILInstruction(SI);
   }
 }
@@ -1075,6 +1130,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned attrs = unsigned(DVI->poisonRefs() & 0x1);
     attrs |= unsigned(DVI->usesMoveableValueDebugInfo()) << 1;
     attrs |= unsigned(DVI->hasTrace()) << 2;
+
+    bool hasReconstructionBlock = DVI->getDebugReconstructionBlock() != nullptr;
+    attrs |= unsigned(hasReconstructionBlock) << 11;
+
+    if (hasReconstructionBlock)
+      DebugBBWorklist.push_back(const_cast<DebugValueInst *>(DVI));
 
     auto Operand = DVI->getOperand();
     auto Type = Operand->getType();
@@ -3874,6 +3935,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SourceLocLayout>();
   registerSILAbbr<SourceLocRefLayout>();
   registerSILAbbr<DebugValueDelimiterLayout>();
+  registerSILAbbr<SILDebugReconstructionBlockLayout>();
   registerSILAbbr<SILExtraStringLayout>();
 
   // Write out VTables first because it may require serializations of
