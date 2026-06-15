@@ -90,6 +90,8 @@ The following inspection operations are available currently.
 
 ##### All Platforms
 
+> FreeBSD is currently not supported; all other platforms, such as macOS, Linux, Windows and some Android offer the following functionality.
+
 dump-cache-nodes &lt;name-or-pid&gt;
 : Print the metadata cache nodes.
 
