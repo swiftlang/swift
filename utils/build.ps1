@@ -879,6 +879,7 @@ enum Project {
   brotli
   XML2
   CURL
+  BoringSSL
 
   XCTest
   Testing
@@ -3741,6 +3742,29 @@ function Build-DS2([Hashtable] $Platform) {
     }
 }
 
+function Build-BoringSSL([Hashtable] $Platform,
+                         [Hashtable] $Assembler,
+                         [Hashtable] $CCompiler,
+                         [Hashtable] $CXXCompiler,
+                         [string]    $Phase) {
+  Build-CMakeProject `
+    -Src $SourceCache\boringssl `
+    -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Phase}BoringSSL")) `
+    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
+    -Platform $Platform `
+    -Assembler $Assembler `
+    -CCompiler $CCompiler `
+    -CXXCompiler $CXXCompiler `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      BUILD_TESTING = "NO";
+      CMAKE_POSITION_INDEPENDENT_CODE = "YES";
+      INSTALL_ENABLED = "YES";
+      OPENSSL_NO_ASM = "NO";
+      RUST_BINDINGS = "NO";
+    }
+}
+
 function Build-CURL([Hashtable] $Platform,
                     [Hashtable] $CCompiler,
                     [string]    $Phase) {
@@ -4128,6 +4152,9 @@ function Build-SDKDependencies([Hashtable[]] $ArchitectureSlices,
     Invoke-BuildStep Build-ZLib $Slice -CCompiler $C -Phase $Phase
     Invoke-BuildStep Build-Brotli $Slice -CCompiler $C -Phase $Phase
     Invoke-BuildStep Build-XML2 $Slice -CCompiler $C -CXXCompiler $CXX -Phase $Phase
+    if ($Slice.OS -ne [OS]::Windows) {
+      Invoke-BuildStep Build-BoringSSL $Slice -Assembler $Assemblers.Stage1 -CCompiler $C -CXXCompiler $CXX -Phase ""
+    }
     Invoke-BuildStep Build-CURL $Slice -CCompiler $C -Phase $Phase
   }
 }
