@@ -237,6 +237,7 @@ namespace {
       auto &fieldInfo = getFieldInfo(field);
       switch (fieldInfo.getKind()) {
       case ElementLayout::Kind::Fixed:
+      case ElementLayout::Kind::Hollow:
       case ElementLayout::Kind::Empty:
       case ElementLayout::Kind::EmptyTailAllocatedCType:
         return MemberAccessStrategy::getDirectFixed(
@@ -320,7 +321,8 @@ namespace {
       // Check that constant field offsets we know match
       for (auto &field : asImpl().getFields()) {
         switch (field.getKind()) {
-        case ElementLayout::Kind::Fixed: {
+        case ElementLayout::Kind::Fixed:
+        case ElementLayout::Kind::Hollow: {
           // We know the offset at compile time. See whether there's also an
           // entry for this field in the field offset vector.
           class FindOffsetOfFieldOffsetVector
@@ -1457,9 +1459,7 @@ public:
 
 private:
   /// Collect all the fields of a union.
-  void collectUnionFields() {
-    addOpaqueField(Size(0), TotalStride);
-  }
+  void collectUnionFields() { addOpaqueField(Size(0), TotalStride, false); }
 
   static bool isImportOfClangField(VarDecl *swiftField,
                                    const clang::FieldDecl *clangField) {
@@ -1571,12 +1571,21 @@ private:
       }
     }
 
+    // An empty C++ field (that is, a field whose type is a class or struct
+    // that has no non-static data members) takes a byte of storage in order to
+    // be able to guarantee that the addresses of distinct objects of the same
+    // type are always distinct.
+    // However, it can be skipped in value operations or schema explosions, so
+    // we consider it "hollow".
+    auto *cxxRecord = clangField->getType()->getAsCXXRecordDecl();
+    bool isHollowField = isTransitivelyEmpty(cxxRecord);
+
     // If we have a Swift import of this type, use our lowered information.
     if (swiftField) {
       auto &fieldTI = cast<FixedTypeInfo>(IGM.getTypeInfo(
           SwiftType.getFieldType(swiftField, IGM.getSILModule(),
                                  IGM.getMaximalTypeExpansionContext())));
-      addField(swiftField, offset, fieldTI, isZeroSized);
+      addField(swiftField, offset, fieldTI, isZeroSized, isHollowField);
       auto fieldTy =
           swiftField->getInterfaceType()->lookThroughSingleOptionalType();
       if (fieldTy->isAnyClassReferenceType() &&
@@ -1595,7 +1604,8 @@ private:
     auto fieldTypeSize = ClangContext.getTypeSizeInChars(clangField->getType());
     auto fieldSize = isZeroSized ? clang::CharUnits::Zero()
                                  : dataSize.value_or(fieldTypeSize);
-    return addOpaqueField(offset, Size(fieldSize.getQuantity()));
+
+    return addOpaqueField(offset, Size(fieldSize.getQuantity()), isHollowField);
   }
 
   /// Add opaque storage for bitfields spanning the given range of bits.
@@ -1610,36 +1620,41 @@ private:
     Size offset = Size(bitBegin / 8);
     Size byteLength = Size((bitEnd - bitBegin + 7) / 8);
 
-    addOpaqueField(offset, byteLength);
+    addOpaqueField(offset, byteLength, false);
   }
 
   /// Add opaque storage at the given offset.
-  void addOpaqueField(Size offset, Size fieldSize) {
+  void addOpaqueField(Size offset, Size fieldSize, bool isHollowField) {
     // No need to add storage for zero-size fields (e.g. incomplete array
     // decls).
     if (fieldSize.isZero()) return;
 
     auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(fieldSize, Alignment(1));
-    addField(nullptr, offset, opaqueTI, false);
+    addField(nullptr, offset, opaqueTI, false, isHollowField);
   }
 
   /// Add storage for an (optional) Swift field at the given offset.
   void addField(VarDecl *swiftField, Size offset,
-                const FixedTypeInfo &fieldType, bool isZeroSized) {
+                const FixedTypeInfo &fieldType, bool isZeroSized,
+                bool isHollowField) {
     assert(isZeroSized || offset >= NextOffset && "adding fields out of order");
 
     // Add a padding field if required.
     if (!isZeroSized && offset != NextOffset)
       addPaddingField(offset);
 
-    addFieldInfo(swiftField, fieldType, isZeroSized);
+    addFieldInfo(swiftField, fieldType, isZeroSized, isHollowField);
   }
 
   /// Add information to track a value field at the current offset.
-  void addFieldInfo(VarDecl *swiftField, const FixedTypeInfo &fieldType, bool isZeroSized) {
+  void addFieldInfo(VarDecl *swiftField, const FixedTypeInfo &fieldType,
+                    bool isZeroSized, bool isHollowField) {
     bool isLoadableField = isa<LoadableTypeInfo>(fieldType);
     unsigned explosionSize = 0;
-    if (isLoadableField)
+    // Hollow fields are skipped by `getSchema` and the value-op loops, so
+    // they must not consume explosion slots either; otherwise subsequent
+    // fields' projection ranges run past the end of the loaded explosion.
+    if (isLoadableField && !isHollowField)
       explosionSize = cast<LoadableTypeInfo>(fieldType).getExplosionSize();
     unsigned explosionBegin = NextExplosionIndex;
     NextExplosionIndex += explosionSize;
@@ -1654,6 +1669,10 @@ private:
       else
         layout.completeEmptyTailAllocatedCType(
             fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal), NextOffset);
+    } else if (isHollowField) {
+      layout.completeHollow(
+          fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal),
+          NextOffset, LLVMFields.size());
     } else
       layout.completeFixed(fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());
@@ -1678,6 +1697,42 @@ private:
     LLVMFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, count.getValue()));
     NextOffset = offset;
     SpareBits.appendSetBits(count.getValueInBits());
+  }
+
+  static bool isTransitivelyEmpty(const clang::CXXRecordDecl *cxxRecordDecl) {
+    if (!cxxRecordDecl || !cxxRecordDecl->hasDefinition())
+      return false;
+    cxxRecordDecl = cxxRecordDecl->getDefinition();
+    if (cxxRecordDecl->isEmpty())
+      return true;
+
+    // A union always carries one of its members, even when every member is
+    // itself empty: the union's storage byte is real and must show up in
+    // both the explosion schema and the native ABI schema. Marking it hollow
+    // would collapse the substituted schema to a single element when the
+    // parent has additional non-zero-offset fields, which makes
+    // `mapFromNative`'s simple-coerce path truncate at offset 0 and grab
+    // the wrong bytes.
+    if (cxxRecordDecl->isUnion())
+      return false;
+
+    // A class with a vptr or a virtual base contributes an entry to
+    // `SwiftAggLowering`, so its explosion schema must include it too.
+    if (cxxRecordDecl->isPolymorphic() || cxxRecordDecl->getNumVBases() > 0)
+      return false;
+
+    bool fieldsAllEmpty =
+        llvm::all_of(cxxRecordDecl->fields(), [](const auto *field) {
+          return isTransitivelyEmpty(field->getType()->getAsCXXRecordDecl());
+        });
+    if (!fieldsAllEmpty)
+      return false;
+
+    bool basesAllEmpty =
+        llvm::all_of(cxxRecordDecl->bases(), [](const auto &base) {
+          return isTransitivelyEmpty(base.getType()->getAsCXXRecordDecl());
+        });
+    return basesAllEmpty;
   }
 };
 

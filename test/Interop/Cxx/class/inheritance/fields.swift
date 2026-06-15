@@ -131,4 +131,95 @@ FieldsTestSuite.test("Out-of-order inheritance") {
   expectEqual(d.baseField, 123)
 }
 
+FieldsTestSuite.test("Empty subobjects") {
+  _ = makeBaseEmpty()
+  _ = makeEmptyOnlyDerived()
+}
+
+FieldsTestSuite.test("Contain empty fields") {
+  let o1 = makeIntAndEmpty()
+  expectEqual(o1.x, 42)
+
+  let o2 = makeNoUniqueAddressEmpty()
+  expectEqual(o2.x, 17)
+}
+
+FieldsTestSuite.test("Multiple empty bases") {
+  _ = makeMultiEmptyBases()
+  _ = makeMultiBaseWithEmpty()
+}
+
+FieldsTestSuite.test("Empty as nested or array field") {
+  _ = makeContainsEmptyClass()
+
+  let o = makeOuterWithEmpty()
+  expectEqual(o.x, 7)
+
+  _ = makeEmptyArrayHolder()
+}
+
+FieldsTestSuite.test("Empty as template type parameter") {
+  let o1 = makeEmptyHolderOfEmpty()
+  expectEqual(o1.x, false)
+
+  let o2 = makeEmptyHolderOfInt()
+  expectEqual(o2.x, false)
+  expectEqual(o2.t, 2)
+}
+
+FieldsTestSuite.test("Empty virtual classes") {
+  _ = makeHasFieldWithOnlyVDtor()
+  _ = makeWrapsVirtualBase()
+}
+
+FieldsTestSuite.test("Empty field + 2 chars") {
+  let c1 = makeChildEmptyAndTwoChars()
+  expectEqual(c1.a, CChar(65))  // 'A'
+  expectEqual(c1.b, CChar(66))  // 'B'
+}
+
+FieldsTestSuite.test("Empty field + int + char") {
+  _ = makeChildEmptyIntChar()
+}
+
+FieldsTestSuite.test("Recursively empty field") {
+  let _ = S3()
+}
+
+FieldsTestSuite.test("Empty struct as parameter") {
+  expectEqual(takeBaseEmpty(BaseEmpty(), 17), 17)
+  expectEqual(takeBaseEmpty(makeBaseEmpty(), 71), 71)
+
+  let b1 = roundTripBaseEmpty(makeBaseEmpty())
+  _ = b1
+
+  let d = roundTripEmptyOnlyDerived(makeEmptyOnlyDerived())
+  _ = d
+}
+
+FieldsTestSuite.test("Hollow type stored in Swift containers") {
+  let arr = [makeBaseEmpty(), makeBaseEmpty(), makeBaseEmpty()]
+  expectEqual(arr.count, 3)
+
+  let tup = (makeBaseEmpty(), 42, makeEmptyOnlyDerived())
+  expectEqual(tup.1, 42)
+
+  struct SwiftWrapper {
+    var inner: BaseEmpty
+    var n: Int
+  }
+  let w = SwiftWrapper(inner: makeBaseEmpty(), n: 5)
+  expectEqual(w.n, 5)
+}
+
+FieldsTestSuite.test("Unions") {
+  let s1 = makeHasEmptyUnion()
+  expectEqual(s1.i, 3)
+  let s2 = makeHasUnionEmptyAndInt()
+  expectEqual(s2.i, 5)
+  let s3 = makeHasUnionEmptyAndIntWithValue()
+  expectEqual(s3.i, 5)
+  expectEqual(s3.u.x, 15)
+}
+
 runAllTests()
