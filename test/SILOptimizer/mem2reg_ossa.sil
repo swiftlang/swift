@@ -63,6 +63,8 @@ struct S2 {
   var t: (J, J)
 }
 
+struct NC: ~Copyable {}
+
 ///////////
 // Tests //
 ///////////
@@ -895,4 +897,19 @@ bb0:
   store %7 to [init] %0
   dealloc_stack %0
   unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @empty_non_copyable :
+// Just check that mem2reg doesn't produce illegal SIL
+// CHECK-LABEL: } // end sil function 'empty_non_copyable'
+sil [ossa] @empty_non_copyable: $@convention(thin) (@owned NC, @owned NC) -> () {
+bb0(%0 : @owned $NC, %1 : @owned $NC):
+  %2 = alloc_stack $NC
+  store %0 to [init] %2
+  store %1 to [init] %2
+  %5 = load [take] %2
+  destroy_value %5
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
 }
