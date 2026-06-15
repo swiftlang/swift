@@ -4570,8 +4570,12 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   }
 
   // Check that the decl we're decorating is a member of a type that actually
-  // conforms to the specified protocol.
+  // conforms to the specified protocol. If we have an invalid extension, we
+  // can bail.
   NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
+  if (!NTD)
+    return;
+
   if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
     if (!(OtherPD == PD || OtherPD->inheritsFrom(PD)) &&
         !(OtherPD->isSpecificProtocol(KnownProtocolKind::DistributedActor) ||

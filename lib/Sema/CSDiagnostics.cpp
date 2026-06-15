@@ -2250,52 +2250,52 @@ bool AssignmentFailure::diagnoseAsError() {
       // If there is a masked property of the same type, emit a
       // note to fixit prepend a 'self.' or 'Type.'.
       if (auto typeContext = DC->getInnermostTypeContext()) {
-        SmallVector<ValueDecl *, 2> results;
-        DC->lookupQualified(typeContext->getSelfNominalTypeDecl(),
-                            VD->createNameRef(), Loc,
-                            NL_QualifiedDefault, results);
+        if (auto *nominal = typeContext->getSelfNominalTypeDecl()) {
+          SmallVector<ValueDecl *, 2> results;
+          DC->lookupQualified(nominal, VD->createNameRef(), Loc,
+                              NL_QualifiedDefault, results);
 
-        auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
-          // We're looking for a settable property that is the same type as the
-          // var we found.
-          auto *var = dyn_cast<VarDecl>(decl);
-          if (!var || var == VD)
-            return false;
-
-          if (!var->isSettable(DC) || !var->isSetterAccessibleFrom(DC))
-            return false;
-
-          if (!var->getTypeInContext()->isEqual(VD->getTypeInContext()))
-            return false;
-
-          // Don't suggest a property if we're in one of its accessors.
-          auto *methodDC = DC->getInnermostMethodContext();
-          if (auto *AD = dyn_cast_or_null<AccessorDecl>(methodDC))
-            if (AD->getStorage() == var)
+          auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
+            // We're looking for a settable property that is the same type as
+            // the var we found.
+            auto *var = dyn_cast<VarDecl>(decl);
+            if (!var || var == VD)
               return false;
 
-          return true;
-        });
+            if (!var->isSettable(DC) || !var->isSetterAccessibleFrom(DC))
+              return false;
 
-        if (foundProperty != results.end()) {
-          auto startLoc = immutableExpr->getStartLoc();
-          auto *property = cast<VarDecl>(*foundProperty);
-          auto selfTy = typeContext->getSelfTypeInContext();
+            if (!var->getTypeInContext()->isEqual(VD->getTypeInContext()))
+              return false;
 
-          // If we found an instance property, suggest inserting "self.",
-          // otherwise suggest "Type." for a static property.
-          std::string fixItText;
-          if (property->isInstanceMember()) {
-            fixItText = "self.";
-          } else {
-            fixItText = selfTy->getString() + ".";
+            // Don't suggest a property if we're in one of its accessors.
+            auto *methodDC = DC->getInnermostMethodContext();
+            if (auto *AD = dyn_cast_or_null<AccessorDecl>(methodDC))
+              if (AD->getStorage() == var)
+                return false;
+
+            return true;
+          });
+
+          if (foundProperty != results.end()) {
+            auto startLoc = immutableExpr->getStartLoc();
+            auto *property = cast<VarDecl>(*foundProperty);
+            auto selfTy = typeContext->getSelfTypeInContext();
+
+            // If we found an instance property, suggest inserting "self.",
+            // otherwise suggest "Type." for a static property.
+            std::string fixItText;
+            if (property->isInstanceMember()) {
+              fixItText = "self.";
+            } else {
+              fixItText = selfTy->getString() + ".";
+            }
+            emitDiagnosticAt(startLoc, diag::masked_mutable_property, fixItText,
+                             property, selfTy)
+            .fixItInsert(startLoc, fixItText);
           }
-          emitDiagnosticAt(startLoc, diag::masked_mutable_property, fixItText,
-                           property, selfTy)
-              .fixItInsert(startLoc, fixItText);
         }
       }
-
       // If this is a simple variable marked with a 'let', emit a note to fixit
       // hint it to 'var'.
       VD->emitLetToVarNoteIfSimple(DC);
