@@ -1,4 +1,4 @@
-// {"kind":"complete","signature":"swift::Mangle::Mangler::verify(llvm::StringRef, swift::Mangle::ManglingFlavor)","signatureNext":"Mangle::ASTMangler::mangleDeclWithPrefix"}
+// {"kind":"complete","signature":"swift::Mangle::Mangler::verify(llvm::StringRef, swift::Mangle::ManglingFlavor)","signatureNext":"Mangle::ASTMangler::mangleAnyDecl"}
 // RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 protocol a {
   fileprivate associatedtype b
