@@ -213,9 +213,8 @@ bb3(%9 : @guaranteed $C):
 // CHECK: sil [ossa] @enclosing_def_cycle : $@convention(thin) (@guaranteed C) -> () {
 // CHECK: bb1([[REBORROW:%.*]] : @guaranteed $C,
 // CHECK: } // end sil function 'enclosing_def_cycle'
-// CHECK: Enclosing values for:   %7 = borrowed %6 : $C from (%0 : $C, %1 : $C)
+// CHECK: Enclosing values for:   %7 = borrowed %6 : $C from (%1 : $C)
 // CHECK-NEXT: %1 = begin_borrow %0
-// CHECK-NEXT: %0 = argument of bb0
 // CHECK-NEXT: enclosing_def_cycle: enclosing_values with: %forward
 sil [ossa] @enclosing_def_cycle : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
@@ -225,8 +224,8 @@ bb0(%0 : @guaranteed $C):
   br bb1(%borrow : $C, %first1 : $C)
 
 bb1(%5 : @guaranteed $C, %6 : @guaranteed $C):
-  %forward = borrowed %6 from (%0, %borrow)
-  %reborrow_outer = borrowed %5 from (%0)
+  %forward = borrowed %6 from (%borrow)
+  %reborrow_outer = borrowed %5 from (%borrow)
   specify_test "find_enclosing_defs %forward"
   specify_test "enclosing_values %forward"
   %aggregate2 = struct $PairC(%reborrow_outer : $C, %forward : $C)
