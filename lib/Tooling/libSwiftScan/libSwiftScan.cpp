@@ -104,6 +104,8 @@ void swiftscan_dependency_info_details_dispose(
 }
 
 void swiftscan_link_library_set_dispose(swiftscan_link_library_set_t *set) {
+  if (!set)
+    return;
   for (size_t i = 0; i < set->count; ++i) {
     auto info = set->link_libraries[i];
     swiftscan_string_dispose(info->name);
@@ -113,12 +115,38 @@ void swiftscan_link_library_set_dispose(swiftscan_link_library_set_t *set) {
   delete set;
 }
 
+void swiftscan_source_location_set_dispose(
+    swiftscan_source_location_set_t *set) {
+  if (!set)
+    return;
+  for (size_t i = 0; i < set->count; ++i) {
+    swiftscan_string_dispose(set->source_locations[i]->buffer_identifier);
+    delete set->source_locations[i];
+  }
+  delete[] set->source_locations;
+  delete set;
+}
+
+void swiftscan_import_info_set_dispose(swiftscan_import_info_set_t *set) {
+  if (!set)
+    return;
+  for (size_t i = 0; i < set->count; ++i) {
+    swiftscan_string_dispose(set->imports[i]->import_identifier);
+    swiftscan_source_location_set_dispose(set->imports[i]->source_locations);
+    delete set->imports[i];
+  }
+  delete[] set->imports;
+  delete set;
+}
+
 void swiftscan_dependency_info_dispose(swiftscan_dependency_info_t info) {
   swiftscan_string_dispose(info->module_name);
   swiftscan_string_dispose(info->module_path);
   swiftscan_string_set_dispose(info->source_files);
   swiftscan_string_set_dispose(info->direct_dependencies);
   swiftscan_link_library_set_dispose(info->link_libraries);
+  swiftscan_import_info_set_dispose(info->imports);
+  swiftscan_import_info_set_dispose(info->optional_imports);
   swiftscan_dependency_info_details_dispose(info->details);
   delete info;
 }
