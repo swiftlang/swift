@@ -921,11 +921,6 @@ enum Project {
 }
 
 function Get-ProjectBinaryCache([Hashtable] $Platform, [Project] $Project) {
-  if ($Project -eq [Project]::Compilers) {
-    if ($Platform -eq $HostPlatform) { return "$BinaryCache\5" }
-    if ($Platform -eq $BuildPlatform) { return "$BinaryCache\1" }
-    throw "Building Compilers for $($Platform.Triple) currently unsupported."
-  }
   return "$([IO.Path]::Combine("$BinaryCache\", $Platform.Triple, $Project.ToString()))"
 }
 
@@ -1862,61 +1857,6 @@ $Compilers = @{
     }
   }
 
-  Built = @{
-    C = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang-cl.exe")
-      DriverStyle       = [DriverStyle]::ClangCL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @() }
-      }
-      AssumeFunctional  = $true
-    }
-
-    CXX = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang-cl.exe")
-      DriverStyle       = [DriverStyle]::ClangCL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:__cplusplus")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @() }
-      }
-      AssumeFunctional  = $true
-    }
-
-    GNUC = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang.exe")
-      DriverStyle       = [DriverStyle]::GNU
-      Flags             = @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer", "-finline-functions")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-gdwarf") } else { @("-gcodeview") }
-      }
-      AssumeFunctional  = $true
-    }
-
-    GNUCXX = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang++.exe")
-      DriverStyle       = [DriverStyle]::GNU
-      Flags             = @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer", "-finline-functions")
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") { @("-gdwarf") } else { @("-gcodeview") }
-      }
-      AssumeFunctional  = $true
-    }
-
-    Swift = @{
-      Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "swiftc.exe")
-      DriverStyle       = [DriverStyle]::Swift
-      Flags             = @()
-      DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") {
-          return @("-g", "-debug-info-format=dwarf", "-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
-        }
-        return @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
-      }
-      AssumeFunctional  = $true
-    }
-  }
-
   Stage0 = @{
     C = @{
       Executable        = [IO.Path]::Combine((Get-ProjectToolchainBin $BuildPlatform Stage0Compilers), "clang-cl.exe")
@@ -2036,16 +1976,6 @@ $Compilers.Host = @{
 }
 
 $Assemblers = @{
-  Built = @{
-    Executable        = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang-cl.exe")
-    DriverStyle       = [DriverStyle]::ClangCL
-    Flags             = @()
-    DebugFlags        = { param([string] $Format)
-      if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
-    }
-    AssumeFunctional  = $true
-  }
-
   Pinned = @{
     Executable        = Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath "clang-cl.exe"
     DriverStyle       = [DriverStyle]::ClangCL
@@ -2991,7 +2921,6 @@ function Build-Compilers([Hashtable] $Platform,
                          [string]    $DispatchPackage  = $null,
                          [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake") {
   New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore | Out-Null
-  New-Item -ItemType SymbolicLink -Path "$BinaryCache\$($HostPlatform.Triple)\compilers" -Target "$BinaryCache\5" -ErrorAction Ignore | Out-Null
 
   Invoke-IsolatingEnvVars {
     if ($SwiftCompiler -and $SwiftCompiler.Executable -eq $Compilers.Pinned.Swift.Executable) {
