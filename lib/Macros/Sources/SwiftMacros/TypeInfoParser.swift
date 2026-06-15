@@ -221,48 +221,58 @@ struct ArgParser<T> {
   }
 }
 
-func arityOf<each T>(_ args: repeat each T) -> Int {
-  var n = 0
-  func increment<U>(_: U) { n += 1 }
-  _ = (repeat increment(each args))
-  return n
-}
-
 extension LabeledExprListSyntax {
 
-  /// Given a LabeledExprListSyntax and a variable number of argument infos,
-  /// try to parse the argument list as expected by the infos. Throws if one
-  /// of the arguments fails to parse.
-  func expect<each ArgType>(
-    _ infos: repeat ArgParser<each ArgType>
-  ) throws -> (repeat each ArgType) {
-    // Building the list of arguments syntax
-    var lst = self.map { $0 }
-    let count = arityOf(repeat each infos)
-
-    // Throw if there is a count mismatch, no need to try parsing anything.
-    if count != lst.count {
-      throw TypeInfoParseError.argCountMismatch(expected: count, args: self)
+  /// Parses one labelled argument from the argument list.
+  func expect<A>(_ a: ArgParser<A>) throws -> A {
+    let lst = Array(self)
+    guard lst.count == 1 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 1, args: self)
     }
+    return try a.expect(arg: lst[0])
+  }
 
-    var idx = 0
-
-    /// Helper function to parse a single argument and increment the count to
-    /// be able to parse the next one. This could not be a closure as it is
-    /// generic in the type of the parsed expression `T`.
-    func makeArg<T>(
-      _ info: ArgParser<T>,
-      _ elems: inout [LabeledExprSyntax],
-      _ idx: inout Int
-    ) throws -> T {
-      let val = try info.expect(arg: elems[idx])
-      idx += 1
-      return val
+  /// Parses two labelled arguments from the argument list.
+  func expect<A, B>(_ a: ArgParser<A>, _ b: ArgParser<B>) throws -> (A, B) {
+    let lst = Array(self)
+    guard lst.count == 2 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 2, args: self)
     }
+    return (
+      try a.expect(arg: lst[0]),
+      try b.expect(arg: lst[1]),
+    )
+  }
 
-    // For each argument, try and parse it. If all goes well a tuple containing
-    // all args is returned.
-    return (repeat try makeArg(each infos, &lst, &idx))
+  /// Parses three labelled arguments from the argument list.
+  func expect<A, B, C>(
+    _ a: ArgParser<A>, _ b: ArgParser<B>, _ c: ArgParser<C>
+  ) throws -> (A, B, C) {
+    let lst = Array(self)
+    guard lst.count == 3 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 3, args: self)
+    }
+    return (
+      try a.expect(arg: lst[0]),
+      try b.expect(arg: lst[1]),
+      try c.expect(arg: lst[2]),
+    )
+  }
+
+  /// Parses four labelled arguments from the argument list.
+  func expect<A, B, C, D>(
+    _ a: ArgParser<A>, _ b: ArgParser<B>, _ c: ArgParser<C>, _ d: ArgParser<D>
+  ) throws -> (A, B, C, D) {
+    let lst = Array(self)
+    guard lst.count == 4 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 4, args: self)
+    }
+    return (
+      try a.expect(arg: lst[0]),
+      try b.expect(arg: lst[1]),
+      try c.expect(arg: lst[2]),
+      try d.expect(arg: lst[3]),
+    )
   }
 }
 
