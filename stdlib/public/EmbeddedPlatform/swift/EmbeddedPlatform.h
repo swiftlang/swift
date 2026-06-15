@@ -297,6 +297,44 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_getExclusivityTLS(void);
 void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
 
 /**
+ * Initializes a non-recursive mutex.
+ *
+ * Parameters:
+ *   - `mutex`: opaque caller-owned mutex storage initialized by this function
+ *     and later passed to the other `_swift_mutex_*` functions. The contents
+ *     are private to the platform implementation. The storage is at least six
+ *     pointer-sized words and has pointer alignment.
+ *   - `checked`: nonzero if the platform should diagnose mutex misuse when it
+ *     can do so cheaply.
+ *
+ * This function is required when using Synchronization.Mutex.
+ */
+void _swift_mutex_init(void * EMBEDDED_SWIFT_NONNULL mutex, int checked);
+
+/**
+ * Destroys a mutex initialized by `_swift_mutex_init`.
+ */
+void _swift_mutex_destroy(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Acquires a non-recursive mutex, blocking or spinning until ownership is
+ * obtained.
+ */
+void _swift_mutex_lock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Releases a non-recursive mutex held by the current execution context.
+ */
+void _swift_mutex_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Attempts to acquire a non-recursive mutex without blocking.
+ *
+ * Returns nonzero if the mutex was acquired, or zero if it was not acquired.
+ */
+int _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
  * Exit the program.
  *
  * Parameters:
