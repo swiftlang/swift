@@ -6267,6 +6267,12 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     llvm::Instruction *LastBefore =
         (InsertPt == BB->begin()) ? nullptr : &*std::prev(InsertPt);
 
+    // Visiting debug BB instructions may cache type metadata. Those LLVM
+    // instructions will be erased right after, which could leave dangling
+    // pointers in the cache. Use a ConditionalDominanceScope so that any cache
+    // entries added during the emission are cleaned up.
+    ConditionalDominanceScope condScope(*this);
+
     if (!DebugBB->args_empty()) {
       // Bind the block argument to the operand.
       SILValue operand = i->getOperand();

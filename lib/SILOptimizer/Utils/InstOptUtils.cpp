@@ -2196,6 +2196,10 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 
   if (isa<AddressToPointerInst>(I) || isa<PointerToAddressInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I) ||
+      isa<RefElementAddrInst>(I) || isa<VectorBaseAddrInst>(I))
+    salvageUnaryInst(cast<SingleValueInstruction>(I));
 }
 
 void swift::salvageLoadDebugInfo(LoadOperation load) {
