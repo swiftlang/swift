@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     # Create temp directory and export it for the test suite.
     temp_dir = tempfile.mkdtemp()
-    os.environ["UPDATECHECKOUT_TEST_WORKSPACE_DIR"] = temp_dir
+    os.environ["UPDATE_CHECKOUT_TEST_SUITE_ARENA"] = temp_dir
 
     # Discover all tests for the module.
     module_tests = unittest.defaultTestLoader.discover(MODULE_DIR)
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     suite = unittest.TestSuite()
     suite.addTests(module_tests)
 
-    runner = unittest.TextTestRunner()
+    runner = unittest.TextTestRunner(verbosity=2)
     try:
         result = runner.run(suite)
     finally:
