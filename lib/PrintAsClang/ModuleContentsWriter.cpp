@@ -946,6 +946,9 @@ public:
                          }
 
                          if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+                           // Immediately filter out invalid extensions.
+                           if (ED->isInvalid())
+                             return true;
                            if (outputLangMode == OutputLanguageMode::Cxx)
                              return false;
                            auto baseClass = ED->getSelfClassDecl();

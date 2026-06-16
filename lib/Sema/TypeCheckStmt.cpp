@@ -1521,6 +1521,7 @@ public:
     bool diagnosed = false;
 
     auto *outerDC = climbContextForDiscardStmt(DC);
+    auto *nominalDecl = outerDC->getParent()->getSelfNominalTypeDecl();
     AbstractFunctionDecl *fn = nullptr; // the type member we reside in.
     if (outerDC->getParent()->isTypeContext()) {
       fn = dyn_cast<AbstractFunctionDecl>(outerDC);
@@ -1555,8 +1556,7 @@ public:
     }
 
     // check the kind of type this discard statement appears within.
-    if (!diagnosed) {
-      auto *nominalDecl = fn->getDeclContext()->getSelfNominalTypeDecl();
+    if (!diagnosed && nominalDecl) {
       Type nominalType =
           fn->mapTypeIntoEnvironment(nominalDecl->getDeclaredInterfaceType());
 
