@@ -1000,7 +1000,7 @@ function(_compile_swift_files
       endif()
     endif()
   endif()
-  set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "${custom_env}")
+  set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "${custom_env}" "--")
 
   if (SWIFT_REPORT_STATISTICS)
     list(GET dirs_to_create 0 first_obj_dir)

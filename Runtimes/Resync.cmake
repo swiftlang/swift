@@ -3,7 +3,7 @@
 
 # TODO: Once the migration is completed, we can delete this file
 
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.24)
 
 # Where the standard library lives today
 set(StdlibSources "${CMAKE_CURRENT_LIST_DIR}/../stdlib")
