@@ -559,10 +559,13 @@ public:
       SILLocation loc, SILValue callee, SubstitutionMap subs,
       ArrayRef<SILValue> args, ApplyOptions options,
       const GenericSpecializationInformation *specializationInfo = nullptr,
-      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt) {
-    return insert(ApplyInst::create(getSILDebugLocation(loc), callee, subs,
-                                    args, options, C.silConv, *F,
-                                    specializationInfo, isolationCrossing));
+      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt,
+      std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt) {
+    ASSERT((!argLocs || argLocs->empty() || argLocs->size() == args.size()) &&
+           "createApply argLocs, when supplied, must be parallel to args");
+    return insert(ApplyInst::create(
+        getSILDebugLocation(loc), callee, subs, args, options, C.silConv, *F,
+        specializationInfo, isolationCrossing, argLocs));
   }
 
   TryApplyInst *createTryApply(
@@ -572,11 +575,14 @@ public:
       const GenericSpecializationInformation *specializationInfo = nullptr,
       std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt,
       ProfileCounter normalCount = ProfileCounter(),
-      ProfileCounter errorCount = ProfileCounter()) {
+      ProfileCounter errorCount = ProfileCounter(),
+      std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt) {
+    ASSERT((!argLocs || argLocs->empty() || argLocs->size() == args.size()) &&
+           "createTryApply argLocs, when supplied, must be parallel to args");
     return insertTerminator(TryApplyInst::create(
         getSILDebugLocation(loc), callee, subs, args, normalBB, errorBB,
-        options, *F, specializationInfo, isolationCrossing,
-        normalCount, errorCount));
+        options, *F, specializationInfo, isolationCrossing, normalCount,
+        errorCount, argLocs));
   }
 
   PartialApplyInst *createPartialApply(
@@ -587,7 +593,8 @@ public:
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       StackAllocationIsNested_t IsNested = StackAllocationIsNested,
-      const GenericSpecializationInformation *SpecializationInfo = nullptr) {
+      const GenericSpecializationInformation *SpecializationInfo = nullptr,
+      std::optional<ArrayRef<SILLocation>> ArgLocs = std::nullopt) {
     ASSERT(OnStack == PartialApplyInst::OnStackKind::OnStack ||
            llvm::all_of(Args,
                         [](SILValue value) {
@@ -595,19 +602,25 @@ public:
                               OwnershipKind::Owned);
                         }) &&
                "Must have an owned compatible object");
+    ASSERT((!ArgLocs || ArgLocs->empty() || ArgLocs->size() == Args.size()) &&
+           "createPartialApply ArgLocs, when supplied, must be parallel to "
+           "Args");
     return insert(PartialApplyInst::create(
         getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention,
-        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested));
+        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested, ArgLocs));
   }
 
   BeginApplyInst *createBeginApply(
       SILLocation loc, SILValue callee, SubstitutionMap subs,
       ArrayRef<SILValue> args, ApplyOptions options = ApplyOptions(),
       const GenericSpecializationInformation *specializationInfo = nullptr,
-      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt) {
+      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt,
+      std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt) {
+    ASSERT((!argLocs || argLocs->empty() || argLocs->size() == args.size()) &&
+           "createBeginApply argLocs, when supplied, must be parallel to args");
     return insert(BeginApplyInst::create(
         getSILDebugLocation(loc), callee, subs, args, options, C.silConv, *F,
-        specializationInfo, isolationCrossing));
+        specializationInfo, isolationCrossing, argLocs));
   }
 
   AbortApplyInst *createAbortApply(SILLocation loc, SILValue beginApply) {

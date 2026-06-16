@@ -319,6 +319,17 @@ extension Optional where Wrapped == Instruction {
   }
 }
 
+extension Optional where Wrapped == ApplySite {
+  /// Bridges an optional ApplySite to OptionalBridgedInstruction. Used by
+  /// the Builder.createApply / createTryApply / createBeginApply /
+  /// createPartialApply factories so they can take an optional source-apply
+  /// hint for per-argument SILLocations without forcing every caller to
+  /// materialize the bridged value themselves.
+  public var bridged: OptionalBridgedInstruction {
+    OptionalBridgedInstruction(self?.bridged.obj)
+  }
+}
+
 public class SingleValueInstruction : Instruction, Value {
   final public var definingInstruction: Instruction? { self }
 

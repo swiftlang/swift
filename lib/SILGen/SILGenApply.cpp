@@ -2082,12 +2082,55 @@ static void emitRawApply(SILGenFunction &SGF,
     argValues.push_back(argValue);
   }
 
+  // Build the per-argument SILLocation array, but ONLY for functions that
+  // have opted in to isolation-history emission. The trailing per-argument
+  // location storage on apply instructions is reserved exclusively for that
+  // feature today (see PartitionUtils.h's SequenceBoundary push, which is the
+  // sole consumer). Skipping the array entirely for everyone else keeps the
+  // per-apply storage cost out of the common path and the change cherry-pick
+  // safe.
+  SmallVector<SILLocation, 4> argLocs;
+  bool haveArgLocs = false;
+  if (swift::shouldEmitIsolationHistoryFor(&SGF.F)) {
+    // Default every slot to the apply's anchor; getArgumentLoc()'s anchor
+    // fallback uses the same value, so this is the safe baseline.
+    argLocs.assign(argValues.size(), loc);
+    haveArgLocs = true;
+
+    // Best-effort refinement: when `loc` is an ApplyExpr and the AST
+    // argument count matches the lowered call-argument count exactly, copy
+    // each AST argument's source position into the corresponding slot. The
+    // call-arg portion of `argValues` is the trailing `args.size()` entries
+    // (preceded by indirect-result buffers and possibly an indirect-error
+    // address). On any count mismatch (curried calls, captures, foreign
+    // error/async params, tuple expansion, default args) we leave every
+    // slot at the anchor — the chain walker then sees identical locations
+    // and produces the same notes it does today.
+    if (auto *applyExpr = loc.getAsASTNode<ApplyExpr>()) {
+      auto *argList = applyExpr->getArgs();
+      if (argList && argList->size() == args.size()) {
+        unsigned callArgOffset = argValues.size() - args.size();
+        for (unsigned i = 0, n = args.size(); i != n; ++i) {
+          if (Expr *argExpr = argList->getExpr(i))
+            argLocs[callArgOffset + i] = RegularLocation(argExpr);
+        }
+      }
+    }
+  }
+
+  std::optional<ArrayRef<SILLocation>> argLocsRef =
+      haveArgLocs ? std::optional<ArrayRef<SILLocation>>(argLocs)
+                  : std::nullopt;
+
   auto resultType = substFnConv.getSILResultType(SGF.getTypeExpansionContext());
 
   // If the function is a coroutine, we need to use 'begin_apply'.
   if (substFnType->isCoroutine()) {
     assert(!substFnType->hasErrorResult());
-    auto apply = SGF.B.createBeginApply(loc, fnValue, subs, argValues);
+    auto apply =
+        SGF.B.createBeginApply(loc, fnValue, subs, argValues, ApplyOptions(),
+                               /*specializationInfo=*/nullptr,
+                               /*isolationCrossing=*/std::nullopt, argLocsRef);
     for (auto result : apply->getAllResults())
       rawResults.push_back(result);
     return;
@@ -2102,11 +2145,17 @@ static void emitRawApply(SILGenFunction &SGF,
   if (substFnType->hasErrorResult() &&
       SGF.F.isDistributed() &&
       dyn_cast<ClassDecl>(fnValue->getFunction()->getDeclContext()) ) {
-    auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
+    auto result =
+        SGF.B.createApply(loc, fnValue, subs, argValues, options,
+                          /*specializationInfo=*/nullptr,
+                          /*isolationCrossing=*/std::nullopt, argLocsRef);
     rawResults.push_back(result);
 
   } else if (!substFnType->hasErrorResult()) {
-    auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
+    auto result =
+        SGF.B.createApply(loc, fnValue, subs, argValues, options,
+                          /*specializationInfo=*/nullptr,
+                          /*isolationCrossing=*/std::nullopt, argLocsRef);
     rawResults.push_back(result);
 
   // Otherwise, we need to create a try_apply.
@@ -2138,7 +2187,10 @@ static void emitRawApply(SILGenFunction &SGF,
 
     options -= ApplyFlags::DoesNotThrow;
     SGF.B.createTryApply(loc, fnValue, subs, argValues, normalBB, errorBB,
-                         options);
+                         options, /*specializationInfo=*/nullptr,
+                         /*isolationCrossing=*/std::nullopt,
+                         /*normalCount=*/ProfileCounter(),
+                         /*errorCount=*/ProfileCounter(), argLocsRef);
 
     SGF.B.emitBlock(normalBB);
   }
