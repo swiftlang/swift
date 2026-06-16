@@ -147,7 +147,7 @@ public:
 
   /// Determine what fix (if any) needs to be introduced into a
   /// constraint system as part of resolving type variable as a hole.
-  std::optional<std::pair<ConstraintFix *, unsigned>>
+  std::optional<std::pair<ConstraintFix *, FixImpact>>
   fixForHole(ConstraintSystem &cs) const;
 
   void print(llvm::raw_ostream &Out, SourceManager *, unsigned indent) const {
@@ -410,4 +410,4 @@ public:
 }  // end namespace constraints
 
 }  // end namespace swift
-#endif  // SWIFT_SEMA_BINDING_PRODUCER_H
+#endif // SWIFT_SEMA_BINDING_PRODUCER_H

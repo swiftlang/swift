@@ -1160,7 +1160,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
       if (recordFix(
               SkipUnhandledConstructInResultBuilder::create(
                   *this, unsupported, builder, getConstraintLocator(locator)),
-              /*impact=*/100)) {
+              /*impact=*/FixImpact::InvalidAST * 10)) {
         return getTypeMatchFailure(locator);
       }
 
