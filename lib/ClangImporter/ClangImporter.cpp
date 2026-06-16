@@ -6466,9 +6466,8 @@ static void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl *toDecl) {
 static void handleAmbiguousOverrides(ClangImporter::Implementation &Impl,
                                      FuncDecl *baseFunc,
                                      ValueDecl *clonedDecl) {
-  auto it = Impl.virtualThunkToOriginal.find(baseFunc);
-  if (it != Impl.virtualThunkToOriginal.end())
-    baseFunc = it->second;
+  if (auto *original = Impl.getOriginalForVirtualThunk(baseFunc))
+    baseFunc = original;
 
   const auto *baseCxxMethod =
       dyn_cast_or_null<clang::CXXMethodDecl>(baseFunc->getClangDecl());
