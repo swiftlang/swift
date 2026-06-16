@@ -4179,6 +4179,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           CMAKE_CXX_FLAGS   = if ($Static) { @("-Ddispatch_STATIC") } else { @() };
           CMAKE_Swift_FLAGS = $(if ($Static) { @("-Xcc", "-static-libclosure") } else { @() });
 
+          # FIXME(carlpeto) remove this once the default option is flipped to `ON`.
+          SwiftCore_ENABLE_ENVIRONMENT       = "YES";
           # FIXME(compnerd) remove this once the default option is flipped to `ON`.
           SwiftCore_ENABLE_BACKTRACING       = "YES";
           # FIXME(compnerd) remove this once the default option is flipped to `ON`.

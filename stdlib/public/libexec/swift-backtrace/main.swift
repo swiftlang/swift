@@ -116,6 +116,7 @@ internal struct SwiftBacktrace {
   static var outputStream: CFileStream? = nil
 
   static func write(_ string: String, flush: Bool = false) {
+    precondition(outputStream != nil, "Output stream must be set before calling write")
     var stream = outputStream!
 
     print(string, terminator: "", to: &stream)
@@ -125,6 +126,7 @@ internal struct SwiftBacktrace {
   }
 
   static func writeln(_ string: String, flush: Bool = false) {
+    precondition(outputStream != nil, "Output stream must be set before calling writeln")
     var stream = outputStream!
 
     print(string, to: &stream)
