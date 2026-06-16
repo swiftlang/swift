@@ -2195,6 +2195,9 @@ VarDecl *PreCheckTarget::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
 
   if (auto *typeContext = DC->getInnermostTypeContext()) {
     auto *nominal = typeContext->getSelfNominalTypeDecl();
+    if (!nominal)
+      return nullptr;
+
     auto *classDecl = dyn_cast<ClassDecl>(nominal);
 
     if (!classDecl) {

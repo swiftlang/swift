@@ -1149,10 +1149,15 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
 
   auto *dc = decl->getDeclContext();
 
+  // If we have an invalid extension parent, don't bother checking requirements.
+  auto *nominalParent = dc->getSelfNominalTypeDecl();
+  if (!nominalParent)
+    return true;
+
   const auto genericSig = decl->getGenericSignature();
 
   if (genericSig.getPointer() ==
-      dc->getSelfNominalTypeDecl()->getGenericSignature().getPointer()) {
+      nominalParent->getGenericSignature().getPointer()) {
     return true;
   }
 
@@ -2274,6 +2279,8 @@ static SelfTypeKind getSelfTypeKind(DeclContext *dc,
 void TypeResolver::diagnoseGenericArgumentsOnSelf(
     UnqualifiedIdentTypeRepr *repr, DeclContext *typeDC) {
   auto *selfNominal = typeDC->getSelfNominalTypeDecl();
+  if (!selfNominal)
+    return;
   auto declaredType = selfNominal->getDeclaredType();
 
   diagnose(repr->getNameLoc(), diag::cannot_specialize_self);
