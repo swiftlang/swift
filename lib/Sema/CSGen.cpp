@@ -4388,7 +4388,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 
     recordAnyTypeVarAsPotentialHole(paramType);
 
-    if (recordFix(fix, /*impact=*/1, preparedOverload))
+    if (recordFix(fix, /*impact=*/FixImpact::Mismatch, preparedOverload))
       return getTypeMatchFailure(locator);
 
     return getTypeMatchSuccess();
