@@ -8681,7 +8681,7 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
   if (!storage) {
     storage = new (Context) VarDecl(StaticLoc.isValid(),
                                     VarDecl::Introducer::Var,
-                                    VarLoc, Identifier(),
+                                    pattern->getStartLoc(), Identifier(),
                                     CurDeclContext);
     storage->setInvalid();
 
