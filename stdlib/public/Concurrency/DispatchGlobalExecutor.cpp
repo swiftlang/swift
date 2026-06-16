@@ -61,6 +61,31 @@
 
 using namespace swift;
 
+typedef size_t DispatchQOS;
+enum {
+  DispatchQOSUserInteractive = 0x21, /* UI */
+  DispatchQOSUserInitiated   = 0x19, /* IN */
+  DispatchQOSDefault         = 0x15, /* DEF */
+  DispatchQOSUtility         = 0x11, /* UT */
+  DispatchQOSBackground      = 0x09, /* BG */
+  DispatchQOSUnspecified     = 0x00, /* UN */
+};
+
+enum { DispatchQOSQueueCount = 5 };
+
+static inline int dispatch_qos_getQueueIndex(SwiftJobPriority priority) {
+  if (priority > DispatchQOSUserInitiated)
+    return 0;
+  else if (priority > DispatchQOSDefault)
+    return 1;
+  else if (priority > DispatchQOSUtility)
+    return 2;
+  else if (priority > DispatchQOSBackground)
+    return 3;
+  else
+    return 4;
+}
+
 /// The function passed to dispatch_async_f to execute a job.
 static void __swift_run_job(void *_job) {
   SwiftJob *job = (SwiftJob*) _job;
@@ -133,8 +158,7 @@ static void dispatchEnqueue(dispatch_queue_t queue, SwiftJob *job,
   dispatchEnqueueFunc.load(std::memory_order_relaxed)(queue, job, qos);
 }
 
-static constexpr size_t globalQueueCacheCount =
-    static_cast<size_t>(JobPriority::UserInteractive) + 1;
+static constexpr size_t globalQueueCacheCount = DispatchQOSQueueCount;
 static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
 
 #if defined(__APPLE__) && !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
@@ -144,9 +168,7 @@ extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
 #endif
 
 static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
-  size_t numericPriority = static_cast<size_t>(priority);
-  if (numericPriority >= globalQueueCacheCount)
-    swift_Concurrency_fatalError(0, "invalid job priority %#zx", numericPriority);
+  size_t queueIndex = dispatch_qos_getQueueIndex(priority);
 
 #ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
   std::memory_order loadOrder = std::memory_order_acquire;
@@ -154,7 +176,7 @@ static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
   std::memory_order loadOrder = std::memory_order_relaxed;
 #endif
 
-  auto *ptr = &globalQueueCache[numericPriority];
+  auto *ptr = &globalQueueCache[queueIndex];
   auto queue = ptr->load(loadOrder);
   if (SWIFT_LIKELY(queue))
     return queue;
