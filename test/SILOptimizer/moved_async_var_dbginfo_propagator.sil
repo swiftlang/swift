@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -sil-moved-async-var-dbginfo-propagator -enable-sil-verify-all %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-moved-async-var-dbginfo-propagator -enable-sil-verify-all -verify-debug-value-expr %s 2>&1 | %FileCheck %s
 
 sil_stage canonical
 
@@ -130,6 +130,36 @@ bb1:
 bb2:
   debug_value [moveable_value_debuginfo] undef : $Klass, let, (name "arg", loc "debuginfo_canonicalizer.sil":121:3)
   abort_apply %token
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// When the moved variable is held in an alloc_box, the undef debug_value
+// inserted at a merge point must use the boxed value's type ($Klass), not the
+// box type (${ var Klass }), so the debug_value type-chain verifier holds.
+//
+// CHECK-LABEL: sil @testBoxUndefMerge : $@convention(thin) () -> () {
+// CHECK: bb3:
+// CHECK-NEXT: debug_value [moveable_value_debuginfo] undef : $Klass, var, name "boxVar"
+// CHECK: } // end sil function 'testBoxUndefMerge'
+sil @testBoxUndefMerge : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %box = alloc_box [moveable_value_debuginfo] ${ var Klass }, var, name "boxVar"
+  %f = function_ref @yieldOnceCoroutine : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
+  %k = project_box %box : ${ var Klass }, 0
+  %v = load %k : $*Klass
+  (%3, %token) = begin_apply %f(%v) : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
+  end_apply %token as $()
+  dealloc_box %box : ${ var Klass }
+  br bb3
+
+bb2:
   br bb3
 
 bb3:

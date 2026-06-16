@@ -88,13 +88,24 @@ using namespace swift;
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
+/// Return the SILUndef to use as the operand of an undef debug_value clone of
+/// \p original. For an alloc_box, use the boxed value's type rather than the
+/// box type so the undef matches the variable's type.
+static SILUndef *getUndefForDebugValueClone(DebugVarCarryingInst original) {
+  SILValue operand = original.getOperandForDebugValueClone();
+  if (auto *box = dyn_cast<AllocBoxInst>(operand))
+    return SILUndef::get(box->getFunction(),
+                         box->getAddressType().getObjectType());
+  return SILUndef::get(operand);
+}
+
 /// Clone \p original changing the clone's operand to be undef and insert at the
 /// beginning of \p block.
 static DebugVarCarryingInst
 cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBasicBlock *block) {
   SILBuilderWithScope builder(&block->front());
   builder.setCurrentDebugScope(original->getDebugScope());
-  auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
+  auto *undef = getUndefForDebugValueClone(original);
   return builder.createDebugValue(original->getLoc(), undef,
                                   *original.getVarInfo(), DontPoisonRefs,
                                   UsesMoveableValueDebugInfo);
@@ -105,7 +116,7 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original,
                          SILInstruction *insertPt) {
   SILBuilderWithScope builder(std::next(insertPt->getIterator()));
   builder.setCurrentDebugScope(original->getDebugScope());
-  auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
+  auto *undef = getUndefForDebugValueClone(original);
   return builder.createDebugValue(original->getLoc(), undef,
                                   *original.getVarInfo(), DontPoisonRefs,
                                   UsesMoveableValueDebugInfo);
