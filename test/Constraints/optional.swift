@@ -592,7 +592,7 @@ do {
   func test(_: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
 
   var x: Double = 42
-  test(x!) // expected-error {{no exact matches in call to local function 'test'}}
+  test(x!) // expected-error {{ambiguous use of 'test'; cannot convert argument of type 'Double' to any of potential types 'Int', 'String'}}
   // expected-error@-1 {{cannot force unwrap value of non-optional type 'Double'}}
 }
 
@@ -615,7 +615,7 @@ func testPassingOptionalChainAsWrongArgument() {
   }
 
   func test(test: Test, arr: [Int]?) {
-    test.fn(arr?.first) // expected-error {{cannot convert value of type 'Int?' to expected argument type 'String?'}}
+    test.fn(arr?.first) // expected-error {{cannot convert argument of type 'Int?' to expected argument type 'String?' for 'fn'}}
   }
 }
 

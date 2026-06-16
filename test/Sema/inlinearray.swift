@@ -59,7 +59,7 @@ takeVectorOf2Int(["hello"]) // expected-error {{cannot convert value of type '[S
 takeVectorOf2Int(["hello", "world"]) // expected-error {{cannot convert value of type 'String' to expected element type 'Int'}}
                                      // expected-error@-1 {{cannot convert value of type 'String' to expected element type 'Int'}}
 
-takeVectorOf2Int(["hello", "world", "!"]) // expected-error {{cannot convert value of type '[String]' to expected argument type 'InlineArray<2, Int>'}}
+takeVectorOf2Int(["hello", "world", "!"]) // expected-error {{cannot convert argument of type '[String]' to expected argument type 'InlineArray<2, Int>' for 'takeVectorOf2Int'}}
 
 func takeSugarVectorOf2<T>(_: [2 of T], ty: T.Type = T.self) {}
 takeSugarVectorOf2([1, 2])

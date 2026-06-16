@@ -362,11 +362,11 @@ takeVoidVoidFn { () -> Void in
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
 func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1 (got 'T')}}
-func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'T')}}
+func f19997471(_ x: Int) {} // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'T')}}
 
 func someGeneric19997471<T>(_ x: T) {
   takeVoidVoidFn {
-    f19997471(x) // expected-error {{no exact matches in call to global function 'f19997471'}}
+    f19997471(x) // expected-error {{ambiguous use of 'f19997471'; cannot convert argument of type 'T' to any of potential types 'Int', 'String'}}
   }
 }
 
@@ -788,7 +788,7 @@ takesTwoInOut { _ in } // expected-error {{contextual closure type '(Int, inout 
 func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
-  _ = x.filter { ($0 + y)  > 42 } // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+  _ = x.filter { ($0 + y)  > 42 } // expected-error {{cannot convert value of type 'UInt' to expected '+' operand type 'Int'}}
 }
 
 // rdar://problem/42337247
@@ -1260,7 +1260,7 @@ do {
   func test(_: Int, _: String) {}
   // expected-note@-1 {{closure passed to parameter of type 'String' that does not accept a closure}}
 
-  test(42) { // expected-error {{no exact matches in call to local function 'test'}}
+  test(42) { // expected-error {{closure argument passed to 'test', which expects potential types 'Int', 'String'}}
     print($0)
   }
 }

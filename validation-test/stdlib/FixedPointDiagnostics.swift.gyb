@@ -39,8 +39,8 @@ func testMixedSignArithmetic() {
     _ = ${T}(1) - Stride(0) // expected-error {{}} expected-note {{}}
     var x: ${T} = 0
     x += 1              // OK
-    x += Stride(1) // expected-error {{cannot convert value of type 'Stride' (aka 'Int') to expected argument type '${T}'}} {{10-10=${T}(}} {{19-19=)}}
-    x -= Stride(1) // expected-error {{cannot convert value of type 'Stride' (aka 'Int') to expected argument type '${T}'}} {{10-10=${T}(}} {{19-19=)}}
+    x += Stride(1) // expected-error {{cannot convert value of type 'Stride' (aka 'Int') to expected '+=' operand type '${T}'}}
+    x -= Stride(1) // expected-error {{cannot convert value of type 'Stride' (aka 'Int') to expected '-=' operand type '${T}'}}
 
     _ = (x - x) as Stride // expected-error {{}}
 
@@ -53,8 +53,8 @@ func testMixedSignArithmetic() {
     Stride(1) - ${T}(0) // expected-error {{}} expected-note {{}}
 
     var y: Stride = 0
-    y += ${T}(1)        // expected-error {{cannot convert value of type '${T}' to expected argument type 'Stride' (aka 'Int')}} {{10-10=Stride(}}
-    y -= ${T}(1)        // expected-error {{cannot convert value of type '${T}' to expected argument type 'Stride' (aka 'Int')}} {{10-10=Stride(}}
+    y += ${T}(1)        // expected-error {{ambiguous use of '+='; cannot convert argument of type '${T}' to any of potential types 'Int', 'Stride'}}
+    y -= ${T}(1)        // expected-error {{ambiguous use of '-='; cannot convert argument of type '${T}' to any of potential types 'Int', 'Stride'}}
   }
 % end
 }

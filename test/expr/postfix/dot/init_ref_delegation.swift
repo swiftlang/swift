@@ -549,5 +549,5 @@ do {
     init(_ x: inout [Int]) {}  // expected-note {{candidate expects in-out value of type '[Int]' for parameter #1}}
   }
   var a = 0
-  S.init(&a) // expected-error {{no exact matches in call to initializer}}
+  S.init(&a) // expected-error {{ambiguous use of initializer; cannot convert argument of type 'Int' to any of potential types 'String', '[Int]'}}
 }

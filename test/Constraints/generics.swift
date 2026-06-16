@@ -895,7 +895,7 @@ func rdar78781552() {
     Test(data?.filter)
     // expected-error@-1 {{generic struct 'Test' requires that '(((Int) throws(E) -> Bool) throws(E) -> [Int])?' conform to 'RandomAccessCollection'}}
     // expected-error@-2 {{generic parameter 'Content' could not be inferred}} expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
-    // expected-error@-3 {{cannot convert value of type '(((Int) throws(E) -> Bool) throws(E) -> [Int])?' to expected argument type '[(((Int) throws(E) -> Bool) throws(E) -> [Int])?]'}}
+    // expected-error@-3 {{cannot convert argument of type '(((Int) throws(E) -> Bool) throws(E) -> [Int])?' to expected argument type '[(((Int) throws(E) -> Bool) throws(E) -> [Int])?]' for initializer}}
     // expected-error@-4 {{missing argument label 'data:' in call}}
     // expected-error@-5 {{missing argument for parameter 'filter' in call}}
     // expected-error@-6 {{generic parameter 'E' could not be inferred}}

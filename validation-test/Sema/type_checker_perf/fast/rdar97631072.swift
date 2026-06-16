@@ -13,7 +13,7 @@ struct MaskingView: View {
 	var body: some View {
 		ZStack {
 			ForEach( 0 ..< count, id: \.self ) { index in
-				let y: CGFloat = CGFloat(index * 20.0)  // expected-error {{cannot convert value of type 'Int' to expected argument type 'Double'}}
+				let y: CGFloat = CGFloat(index * 20.0)  // expected-error {{cannot convert value of type 'Int' to expected '*' operand type 'Double'}}
         // there's no * overload for (Int, Double)
 				Circle()
 					.fill((index%3==0) ? Color.white : Color.black)

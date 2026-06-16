@@ -34,18 +34,18 @@ func invalid1() {
 
 func invalid2() {
   func inner(_: Int) {}
-  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1}}
+  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1 (got '[Any]')}}
   // expected-note@-2 {{found this candidate}}
   // expected-note@-3 {{did you mean 'inner'?}}
   func inner(_: String) {}
-  // expected-note@-1 {{candidate expects value of type 'String' for parameter #1}}
+  // expected-note@-1 {{candidate expects value of type 'String' for parameter #1 (got '[Any]')}}
   // expected-note@-2 {{found this candidate}}
 
   func inner(label: Int) {}
   // expected-note@-1 {{found this candidate}}
 
   inner([])
-  // expected-error@-1 {{no exact matches in call to local function 'inner'}}
+  // expected-error@-1 {{ambiguous use of 'inner'; cannot convert argument of type '[Any]' to any of potential types 'Int', 'String'}}
 
   inner(label: "hi")
   // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'Int'}}
