@@ -87,7 +87,7 @@ extension UniqueBox where Value: ~Copyable {
     @_lifetime(borrow self)
     @_transparent
     get {
-      unsafe Span(_unsafeStart: pointer, count: 1)
+      unsafe Span(_unchecked: UnsafePointer(pointer), count: 1)
     }
   }
 
@@ -102,7 +102,7 @@ extension UniqueBox where Value: ~Copyable {
     @_lifetime(&self)
     @_transparent
     mutating get {
-      unsafe MutableSpan(_unsafeStart: pointer, count: 1)
+      unsafe MutableSpan(_unchecked: pointer, count: 1)
     }
   }
 }

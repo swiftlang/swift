@@ -84,6 +84,30 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
     unsafe _pointer = pointer
     _count = count
   }
+
+  /// Unsafely create a `Span` over initialized memory.
+  ///
+  /// `pointer` must point to a region of `count` initialized instances.
+  ///
+  /// The region of memory representing `count` instances starting at `pointer`
+  /// must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `Span`.
+  /// Failure to maintain this invariant results in undefined behaviour.
+  ///
+  /// - Parameters:
+  ///   - pointer: a pointer to the first initialized element.
+  ///   - count: the number of initialized elements in the span.
+  @lifetime(borrow pointer)
+  @unsafe
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal init(
+    _unchecked pointer: UnsafePointer<Element>,
+    count: Int
+  ) {
+    unsafe _pointer = UnsafeRawPointer(pointer)
+    _count = count
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -110,11 +134,16 @@ extension Span where Element: ~Copyable {
   ) {
     //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
     let baseAddress = unsafe UnsafeRawPointer(buffer.baseAddress)
-    _precondition(
-      ((Int(bitPattern: baseAddress) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
-      "baseAddress must be properly aligned to access Element"
-    )
+
+    // 1 byte aligned elements can skip this check.
+    if MemoryLayout<Element>.alignment != 1 {
+      _precondition(
+        ((Int(bitPattern: baseAddress) &
+          (MemoryLayout<Element>.alignment &- 1)) == 0),
+        "baseAddress must be properly aligned to access Element"
+      )
+    }
+
     let span = unsafe Span(_unchecked: baseAddress, count: buffer.count)
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.

@@ -134,7 +134,10 @@ extension _RigidArray where Element: ~Copyable {
   internal var span: Span<Element> {
     @_lifetime(borrow self)
     get {
-      let result = unsafe Span(_unsafeElements: _items)
+      let result = unsafe Span(
+        _unchecked: _storage.baseAddress._unsafelyUnwrappedUnchecked,
+        count: _count
+      )
       return unsafe _overrideLifetime(result, borrowing: self)
     }
   }
@@ -149,7 +152,10 @@ extension _RigidArray where Element: ~Copyable {
   internal var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
     mutating get {
-      let result = unsafe MutableSpan(_unsafeElements: _items)
+      let result = unsafe MutableSpan(
+        _unchecked: _storage.baseAddress._unsafelyUnwrappedUnchecked,
+        count: _count
+      )
       return unsafe _overrideLifetime(result, mutating: &self)
     }
   }
