@@ -15,6 +15,7 @@
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK1
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK2
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK3
+// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK4
 
 import DifferentiationUnittest
 import StdlibUnittest
@@ -120,6 +121,54 @@ AutoDiffClosureSpecSingleBBTests.testWithLeakChecking("Test3") {
         expectEqual((10000 * der3).rounded(), (10000 * (-(tan(Float(z)) * tan(Float(z)) + 1))).rounded())
       }
     }
+  }
+}
+
+public func test4(_ x: Float) -> Float {
+  return sin(x) * cos(x)
+}
+
+@derivative(of: test4)
+public func test4Vjp(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  let vjpSinRes = valueWithPullback(at: x, of: sin)
+  let vjpCosRes = valueWithPullback(at: x, of: cos)
+  let pbSin = vjpSinRes.1
+  let pbCos = vjpCosRes.1
+  func pullback(t: Float) -> Float {
+    return pbSin(t) * cos(x) + sin(x) * pbCos(t)
+  }
+  return (value: test4(x), pullback)
+}
+
+AutoDiffClosureSpecSingleBBTests.testWithLeakChecking("Test4") {
+  // CHECK4-LABEL: {{^}}// test4Vjp(_:)
+  // CHECK4-NEXT:  // Isolation: unspecified
+  // CHECK4-NEXT:  sil @$s3out8test4VjpySf5value_S2fc8pullbacktSfF : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+  // CHECK4:         %[[#D10:]] = function_ref @$s3out8test4VjpySf5value_S2fc8pullbacktSfFADL_1tS2f_tF62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_Sf0f1_g1_h4Cosyj1_klM2U_SfTf1ncnc_n : $@convention(thin) (Float, Float, Float, Float) -> Float
+  // CHECK4:         %[[#D11:]] = partial_apply [callee_guaranteed] %[[#D10]](%0, %0, %0) : $@convention(thin) (Float, Float, Float, Float) -> Float
+  // CHECK4:         %[[#D12:]] = tuple (%[[#]], %[[#D11]])
+  // CHECK4:         return %[[#D12]]
+  // CHECK4:       } // end sil function '$s3out8test4VjpySf5value_S2fc8pullbacktSfF'
+
+  // CHECK4-LABEL: {{^}}// reverse-mode derivative of test4
+  // CHECK4-NEXT:  // Isolation: unspecified
+  // CHECK4-NEXT:  sil [thunk] [heuristic_always_inline] @$s3out5test4yS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+  // CHECK4:         %[[#E10:]] = function_ref @$s3out8test4VjpySf5value_S2fc8pullbacktSfFADL_1tS2f_tF62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_Sf0f1_g1_h4Cosyj1_klM2U_SfTf1ncnc_n : $@convention(thin) (Float, Float, Float, Float) -> Float
+  // CHECK4:         %[[#E11:]] = partial_apply [callee_guaranteed] %[[#E10]](%0, %0, %0) : $@convention(thin) (Float, Float, Float, Float) -> Float
+  // CHECK4:         %[[#E12:]] = tuple (%[[#]], %[[#E11]])
+  // CHECK4:         return %[[#E12]]
+  // CHECK4:       } // end sil function '$s3out5test4yS2fFTJrSpSr'
+
+  // CHECK4-NONE:  {{^}}// pullback #1 (t:) in test4Vjp(_:)
+  // CHECK4:       {{^}}// specialized pullback #1 (t:) in test4Vjp(_:)
+  // CHECK4:       sil private @$s3out8test4VjpySf5value_S2fc8pullbacktSfFADL_1tS2f_tF62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_Sf0f1_g1_h4Cosyj1_klM2U_SfTf1ncnc_n : $@convention(thin) (Float, Float, Float, Float) -> Float {
+
+  func test4Derivative(_ x: Float) -> Float {
+    return cos(x) * cos(x) - sin(x) * sin(x)
+  }
+
+  for x in -100...100 {
+    expectEqual((1000 * gradient(at: Float(x), of: test4)).rounded(), (1000 * test4Derivative(Float(x))).rounded())
   }
 }
 
