@@ -471,8 +471,8 @@ extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED SWIFT_REFCOUNT_CC
 void
 _swift_release_dealloc(HeapObject *object);
 
-SWIFT_ALWAYS_INLINE static HeapObject *_swift_retain_(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
+SWIFT_ALWAYS_INLINE
+static HeapObject *_swift_retain_impl(HeapObject *object, uint32_t *count) {
   if (isValidPointerForNativeRetain(object)) {
     // swift_bridgeObjectRetain might call us with a pointer that has spare bits
     // set, and expects us to return that unmasked value. Mask off those bits
@@ -483,9 +483,14 @@ SWIFT_ALWAYS_INLINE static HeapObject *_swift_retain_(HeapObject *object) {
     // Return the result of increment() to make the eventual call to
     // incrementSlow a tail call, which avoids pushing a stack frame on the fast
     // path on ARM64.
-    return masked->refCounts.increment(object, 1);
+    return masked->refCounts.increment(object, 1, count);
   }
   return object;
+}
+
+SWIFT_ALWAYS_INLINE static HeapObject *_swift_retain_(HeapObject *object) {
+  SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
+  return _swift_retain_impl(object, nullptr);
 }
 
 #ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
@@ -514,6 +519,13 @@ HeapObject *swift::swift_retain(HeapObject *object) {
 
 CUSTOM_RR_ENTRYPOINTS_DEFINE_ENTRYPOINTS(swift_retain)
 
+// Atomically increment the strong reference count and return the new count.
+size_t swift::swift_retainReturningCount(HeapObject *object) {
+  uint32_t count = 0;
+  static_cast<void>(_swift_retain_impl(object, &count));
+  return count;
+}
+
 HeapObject *swift::swift_nonatomic_retain(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain);
   if (isValidPointerForNativeRetain(object))
@@ -525,7 +537,7 @@ SWIFT_ALWAYS_INLINE
 static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain_n);
   if (isValidPointerForNativeRetain(object))
-    return object->refCounts.increment(object, n);
+    return object->refCounts.increment(object, n, nullptr);
   return object;
 }
 
@@ -545,10 +557,15 @@ HeapObject *swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n) {
 }
 
 SWIFT_ALWAYS_INLINE
+static void _swift_release_impl(HeapObject *object, uint32_t *count) {
+  if (isValidPointerForNativeRetain(object))
+    object->refCounts.decrementAndMaybeDeinit(1, count);
+}
+
+SWIFT_ALWAYS_INLINE
 static void _swift_release_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_release);
-  if (isValidPointerForNativeRetain(object))
-    object->refCounts.decrementAndMaybeDeinit(1);
+  _swift_release_impl(object, nullptr);
 }
 
 #ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
@@ -574,11 +591,19 @@ void swift::swift_nonatomic_release(HeapObject *object) {
     object->refCounts.decrementAndMaybeDeinitNonAtomic(1);
 }
 
+// Atomically decrement the strong reference count and return the new count, or
+// zero if this released the last reference.
+size_t swift::swift_releaseReturningCount(HeapObject *object) {
+  uint32_t count = 0;
+  _swift_release_impl(object, &count);
+  return count;
+}
+
 SWIFT_ALWAYS_INLINE
 static void _swift_release_n_(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_release_n);
   if (isValidPointerForNativeRetain(object))
-    object->refCounts.decrementAndMaybeDeinit(n);
+    object->refCounts.decrementAndMaybeDeinit(n, nullptr);
 }
 
 void swift::swift_release_n(HeapObject *object, uint32_t n) {
@@ -946,7 +971,7 @@ void swift::swift_deallocPartialClassInstance(HeapObject *object,
 #endif
 
   // The strong reference count should be +1 -- tear down the object
-  bool shouldDeallocate = object->refCounts.decrementShouldDeinit(1);
+  bool shouldDeallocate = object->refCounts.decrementShouldDeinit(1, nullptr);
   assert(shouldDeallocate);
   (void) shouldDeallocate;
   swift_deallocClassInstance(object, allocatedSize, allocatedAlignMask);
