@@ -269,6 +269,10 @@ private struct AddressUses : AddressDefUseWalker {
   }
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    if let ia = address.instruction as? IndexAddrInst {
+      // The AddressDefUseWalker treats `index_addr` without the `[projection]` flag as leaf use.
+      return walkDownUses(ofAddress: ia, path: path)
+    }
     users.pushIfNotVisited(address.instruction)
     return .continueWalk
   }

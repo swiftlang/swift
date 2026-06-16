@@ -323,6 +323,16 @@ public:
       SmallVector<Requirement, 2> &reqs,
       SmallVector<InverseRequirement, 2> &inverses) const;
 
+  /// A version of `getRequirementsWithInverses` for the ASTPrinter, to help
+  /// with the migration from the legacy SuppressedAssociatedTypes and the new
+  /// SuppressedAssociatedTypesWithDefaults (aka SE-503).
+  ///
+  /// Do not introduce new uses of this function. It should be removed!
+  void getRequirementsWithInversesAndOmitted(
+      SmallVector<Requirement, 2> &reqs,
+      SmallVector<InverseRequirement, 2> &inverses,
+      SmallVector<Requirement, 2> &omitted) const;
+
   /// Iterate over all generic parameters, passing a flag to the callback
   /// indicating if the generic parameter is canonical or not.
   void forEachParam(
