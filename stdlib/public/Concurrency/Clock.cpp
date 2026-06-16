@@ -52,7 +52,7 @@ void swift_get_time(
       clock_gettime(CLOCK_BOOTTIME, &continuous);
 #elif defined(__APPLE__)
       clock_gettime(CLOCK_MONOTONIC_RAW, &continuous);
-#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__))
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__) || defined(__EMSCRIPTEN__))
       clock_gettime(CLOCK_MONOTONIC, &continuous);
 #elif defined(_WIN32)
       // This needs to match what swift-corelibs-libdispatch does
@@ -85,7 +85,7 @@ void swift_get_time(
       clock_gettime(CLOCK_MONOTONIC, &suspending);
 #elif defined(__APPLE__)
       clock_gettime(CLOCK_UPTIME_RAW, &suspending);
-#elif defined(__wasi__)
+#elif defined(__wasi__) || defined(__EMSCRIPTEN__)
       clock_gettime(CLOCK_MONOTONIC, &suspending);
 #elif (defined(__OpenBSD__) || defined(__FreeBSD__))
       clock_gettime(CLOCK_UPTIME, &suspending);
@@ -115,7 +115,7 @@ void swift_get_time(
       return;
     case swift_clock_id_wall:
       struct timespec wall;
-#if defined(__linux__) || defined(__APPLE__) || defined(__wasi__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#if defined(__linux__) || defined(__APPLE__) || defined(__wasi__) || defined(__EMSCRIPTEN__) || defined(__OpenBSD__) || defined(__FreeBSD__)
       clock_gettime(CLOCK_REALTIME, &wall);
 #elif defined(_WIN32)
       // This needs to match what swift-corelibs-libdispatch does
@@ -155,7 +155,7 @@ switch (clock_id) {
       clock_getres(CLOCK_BOOTTIME, &continuous);
 #elif defined(__APPLE__)
       clock_getres(CLOCK_MONOTONIC_RAW, &continuous);
-#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__))
+#elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__) || defined(__EMSCRIPTEN__))
       clock_getres(CLOCK_MONOTONIC, &continuous);
 #elif defined(_WIN32)
       continuous.tv_sec = 0;
@@ -164,7 +164,7 @@ switch (clock_id) {
       auto num = std::chrono::steady_clock::period::num;
       auto den = std::chrono::steady_clock::period::den;
       continuous.tv_sec = num / den;
-      continuous.tv_nsec = (num * 1000000000ll) % den
+      continuous.tv_nsec = (num * 1000000000ll) % den;
 #else
 #error Missing platform continuous time definition
 #endif
@@ -178,7 +178,7 @@ switch (clock_id) {
       clock_getres(CLOCK_MONOTONIC_RAW, &suspending);
 #elif defined(__APPLE__)
       clock_getres(CLOCK_UPTIME_RAW, &suspending);
-#elif defined(__wasi__)
+#elif defined(__wasi__) || defined(__EMSCRIPTEN__)
       clock_getres(CLOCK_MONOTONIC, &suspending);
 #elif (defined(__OpenBSD__) || defined(__FreeBSD__))
       clock_getres(CLOCK_UPTIME, &suspending);
@@ -189,7 +189,7 @@ switch (clock_id) {
       auto num = std::chrono::steady_clock::period::num;
       auto den = std::chrono::steady_clock::period::den;
       suspending.tv_sec = num / den;
-      suspending.tv_nsec = (num * 1'000'000'000ll) % den
+      suspending.tv_nsec = (num * 1'000'000'000ll) % den;
 #else
 #error Missing platform suspending time definition
 #endif
@@ -199,7 +199,7 @@ switch (clock_id) {
     }
     case swift_clock_id_wall: {
       struct timespec wall;
-#if defined(__linux__) || defined(__APPLE__) || defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__)
+#if defined(__linux__) || defined(__APPLE__) || defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__) || defined(__EMSCRIPTEN__)
       clock_getres(CLOCK_REALTIME, &wall);
 #elif defined(_WIN32)
       wall.tv_sec = 0;
@@ -239,7 +239,7 @@ void swift_sleep(
     (void)QueryInterruptTimePrecise(&now);
     delay = deadline - now;
   }
-#elif defined(__linux__) || defined(__APPLE__) || defined(__wasi__) \
+#elif defined(__linux__) || defined(__APPLE__) || defined(__wasi__) || defined(__EMSCRIPTEN__) \
   || defined(__OpenBSD__) || defined(__FreeBSD__)
   struct timespec ts;
   ts.tv_sec = seconds;
