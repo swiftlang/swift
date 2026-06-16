@@ -83,9 +83,6 @@ VARIABLE(SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES, boolean, true,
 
 #ifndef NDEBUG
 
-VARIABLE(SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING, boolean, false,
-         "Enable the an asserts runtime to emit logging as it works.")
-
 VARIABLE(SWIFT_DEBUG_ENABLE_PROTOCOL_CONFORMANCES_LOOKUP_LOG,
          boolean, false,
          "Enable logs for the conformance lookup routine.")
