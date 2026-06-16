@@ -2110,36 +2110,6 @@ private:
           Factory.createNode(Node::Kind::OpaqueReturnTypeIndex, ordinal), Factory);
         return result;
       }
-      if (Mangled.nextIf('o')) {
-        // Special mangling for opaque type.
-        Node::IndexType index;
-        if (!demangleIndex(index, depth))
-          return nullptr;
-        if (!Mangled.nextIf('Q') || !Mangled.nextIf('O'))
-          return nullptr;
-        NodePointer context = demangleContext(depth + 1);
-        if (!context)
-          return nullptr;
-        auto opaqueReturnTypeOf =
-            Factory.createNode(Node::Kind::OpaqueReturnTypeOf);
-        opaqueReturnTypeOf->addChild(context, Factory);
-        // The generic arguments are flattened into a single '_'-terminated
-        // list; wrap them in the list-of-lists shape the printer expects.
-        auto innerArgs = Factory.createNode(Node::Kind::TypeList);
-        while (!Mangled.nextIf('_')) {
-          NodePointer arg = demangleType(depth + 1);
-          if (!arg)
-            return nullptr;
-          innerArgs->addChild(arg, Factory);
-        }
-        auto args = Factory.createNode(Node::Kind::TypeList);
-        args->addChild(innerArgs, Factory);
-        auto opaque = Factory.createNode(Node::Kind::OpaqueType);
-        opaque->addChild(opaqueReturnTypeOf, Factory);
-        opaque->addChild(Factory.createNode(Node::Kind::Index, index), Factory);
-        opaque->addChild(args, Factory);
-        return opaque;
-      }
       return demangleArchetypeType(depth + 1);
     }
     if (c == 'q') {
