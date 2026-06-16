@@ -16,6 +16,7 @@
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CASOptions.h"
 #include "swift/Basic/SourceManager.h"
@@ -99,6 +100,27 @@ void ClangImporter::getBridgingHeaderOptions(
   // Ensure that the resulting PCM build invocation uses Clang frontend
   // directly
   swiftArgs.push_back("-direct-clang-cc1-module-build");
+
+  // `ClangImporter::create` overwrites the
+  // `clang::CodeGenOptions::OptimizationLevel` setting based on
+  // `swift::IRGenOptions::OptMode`. Respect the swift optimisation mode here
+  // so that the bridging header PCH, which is emitted using these options, is
+  // emitted and later consumed using the same clang optimisation level.
+  // Otherwise, the mismatch will be caught and reported as an error when
+  // reading the PCH.
+  switch (ctx.SILOpts.OptMode) {
+  case OptimizationMode::NotSet:
+    break;
+  case OptimizationMode::NoOptimization:
+    swiftArgs.push_back("-Onone");
+    break;
+  case OptimizationMode::ForSpeed:
+    swiftArgs.push_back("-O");
+    break;
+  case OptimizationMode::ForSize:
+    swiftArgs.push_back("-Osize");
+    break;
+  }
 
   // Add args reported by the scanner.
 
