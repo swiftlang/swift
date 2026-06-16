@@ -2189,9 +2189,9 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
     LookupResult memberLookup;
     // Let's try to look any member of the parent type with the given name,
     // even if it is not a type, allowing for a more precise diagnostic.
-    NLOptions memberLookupOptions = (NL_QualifiedDefault |
-                                     NL_IgnoreAccessControl |
-                                     NL_IgnoreMissingImports);
+    NLOptions memberLookupOptions = (NLOptions::QualifiedDefault |
+                                     NLOptions::IgnoreAccessControl |
+                                     NLOptions::IgnoreMissingImports);
     SmallVector<ValueDecl *, 2> results;
     dc->lookupQualified(parentType, repr->getNameRef(), repr->getLoc(),
                         memberLookupOptions, results);

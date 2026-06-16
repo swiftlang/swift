@@ -1182,7 +1182,7 @@ static void collectNonOveriddenSuperclassInits(
     DeclBaseName::createConstructor());
 
   NLOptions subOptions =
-      (NL_QualifiedDefault | NL_IgnoreAccessControl | NL_IgnoreMissingImports);
+      (NLOptions::QualifiedDefault | NLOptions::IgnoreAccessControl | NLOptions::IgnoreMissingImports);
   SmallVector<ValueDecl *, 4> lookupResults;
   subclass->lookupQualified(
       superclassDecl, DeclNameRef::createConstructor(),

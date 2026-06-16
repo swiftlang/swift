@@ -660,7 +660,7 @@ public:
   /// \param member The member to search for.
   ///
   /// \param options Options that control name lookup, based on the
-  /// \c NLOptions* parameter.
+  /// \c NLOptions::* constants in \c NameLookupOptions.
   ///
   /// \param[out] decls Will be populated with the declarations found by name
   /// lookup.

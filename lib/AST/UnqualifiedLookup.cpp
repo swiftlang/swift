@@ -499,15 +499,15 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   if (!moduleToLookIn)
     return;
 
-  auto nlOptions = NL_UnqualifiedDefault;
+  auto nlOptions = NLOptions::UnqualifiedDefault;
   if (options.contains(Flags::IncludeUsableFromInline))
-    nlOptions |= NL_IncludeUsableFromInline;
+    nlOptions |= NLOptions::IncludeUsableFromInline;
   if (options.contains(Flags::ExcludeMacroExpansions))
-    nlOptions |= NL_ExcludeMacroExpansions;
+    nlOptions |= NLOptions::ExcludeMacroExpansions;
   if (options.contains(Flags::ABIProviding))
-    nlOptions |= NL_ABIProviding;
+    nlOptions |= NLOptions::ABIProviding;
   if (options.contains(Flags::IgnoreAccessControl))
-    nlOptions |= NL_IgnoreAccessControl;
+    nlOptions |= NLOptions::IgnoreAccessControl;
 
   lookupInModule(moduleToLookIn, Name.getFullName(), Name.hasModuleSelector(),
                  CurModuleResults, NLKind::UnqualifiedLookup, resolutionKind,
@@ -624,19 +624,19 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     const UnqualifiedLookupOptions options,
     const bool isOriginallyTypeLookup,
     const bool isOriginallyMacroLookup) {
-  NLOptions baseNLOptions = NL_UnqualifiedDefault;
+  NLOptions baseNLOptions = NLOptions::UnqualifiedDefault;
   if (options.contains(Flags::AllowProtocolMembers))
-    baseNLOptions |= NL_ProtocolMembers;
+    baseNLOptions |= NLOptions::ProtocolMembers;
   if (isOriginallyTypeLookup)
-    baseNLOptions |= NL_OnlyTypes;
+    baseNLOptions |= NLOptions::OnlyTypes;
   if (isOriginallyMacroLookup)
-    baseNLOptions |= NL_OnlyMacros;
+    baseNLOptions |= NLOptions::OnlyMacros;
   if (options.contains(Flags::IgnoreAccessControl))
-    baseNLOptions |= NL_IgnoreAccessControl;
+    baseNLOptions |= NLOptions::IgnoreAccessControl;
   if (options.contains(Flags::IgnoreMissingImports))
-    baseNLOptions |= NL_IgnoreMissingImports;
+    baseNLOptions |= NLOptions::IgnoreMissingImports;
   if (options.contains(Flags::ABIProviding))
-    baseNLOptions |= NL_ABIProviding;
+    baseNLOptions |= NLOptions::ABIProviding;
   return baseNLOptions;
 }
 

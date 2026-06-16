@@ -771,7 +771,7 @@ PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
 
     decl->lookupQualified(ArrayRef<NominalTypeDecl *>(decl),
                           DeclNameRef(pair.first), decl->getLoc(),
-                          NL_QualifiedDefault | NL_OnlyTypes,
+                          NLOptions::QualifiedDefault | NLOptions::OnlyTypes,
                           result);
 
     AssociatedTypeDecl *bestAssocType = nullptr;
