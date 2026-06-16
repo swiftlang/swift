@@ -4133,6 +4133,7 @@ function Repair-WindowsSDKAssemblyManifests([Hashtable] $Platform, [string] $Run
   $Targets = New-Object System.Collections.Generic.List[string]
 
   foreach ($DLL in @(
+    "BlocksRuntime",
     "dispatch",
     "swiftDispatch",
     "Foundation",
@@ -5431,15 +5432,9 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
 
   # Build basename -> direct Swift runtime imports.  Keep only edges within
   # the runtime DLL set; system and CRT DLLs are not part of the SxS graph.
-  #
-  # BlocksRuntime stays flat; the Swift runtime DLLs use private SxS.
-  $NonSxSRuntimeDLLs = New-Object System.Collections.Generic.HashSet[string]
-  [void]$NonSxSRuntimeDLLs.Add("BlocksRuntime")
-
   $RuntimeBaseNames = @(
     $RuntimeDLLs |
-      ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_.Name) } |
-      Where-Object { -not $NonSxSRuntimeDLLs.Contains($_) }
+      ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_.Name) }
   )
   $RuntimeSet = New-Object System.Collections.Generic.HashSet[string]
   foreach ($D in $RuntimeBaseNames) { [void]$RuntimeSet.Add($D) }
