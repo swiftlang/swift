@@ -95,6 +95,12 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBasicBlock *block) {
   SILBuilderWithScope builder(&block->front());
   builder.setCurrentDebugScope(original->getDebugScope());
   auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
+  // Non-undef debug_values on alloc_box are allowed and fixed by IRGen to
+  // refer to the project_box. Undef debug_values, however, should always
+  // have the type of the variable.
+  if (auto *abi = dyn_cast<AllocBoxInst>(*original))
+    undef = SILUndef::get(original->getFunction(),
+                          abi->getAddressType().getObjectType());
   return builder.createDebugValue(original->getLoc(), undef,
                                   *original.getVarInfo(), DontPoisonRefs,
                                   UsesMoveableValueDebugInfo);
@@ -106,6 +112,9 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original,
   SILBuilderWithScope builder(std::next(insertPt->getIterator()));
   builder.setCurrentDebugScope(original->getDebugScope());
   auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
+  if (auto *abi = dyn_cast<AllocBoxInst>(*original))
+    undef = SILUndef::get(original->getFunction(),
+                          abi->getAddressType().getObjectType());
   return builder.createDebugValue(original->getLoc(), undef,
                                   *original.getVarInfo(), DontPoisonRefs,
                                   UsesMoveableValueDebugInfo);
