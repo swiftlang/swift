@@ -673,7 +673,8 @@ static bool usesFeatureReparenting(Decl *decl) {
 
   // Check if this decl itself is a reparentable protocol (of extension of).
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    decl = ext->getExtendedNominal();
+    if (auto *nominal = ext->getExtendedNominal())
+      decl = nominal;
   }
 
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {

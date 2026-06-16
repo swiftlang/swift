@@ -3921,49 +3921,65 @@ public:
     }
   }
 
+  void diagnoseInvalidExtension(ExtensionDecl *ED, Type extType) {
+    const bool wasAlreadyInvalid = ED->isInvalid();
+    ED->setInvalid();
+
+    // Diagnose unsupported cases.
+    if (!extType->hasError() && extType->getAnyNominal()) {
+      auto canExtType = extType->getCanonicalType();
+      if (auto existential = canExtType->getAs<ExistentialType>()) {
+        ED->diagnose(diag::unsupported_existential_extension, extType)
+            .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+        ED->diagnose(diag::invalid_extension_rewrite,
+                     existential->getConstraintType())
+            .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                          existential->getConstraintType()->getString());
+        return;
+      }
+
+      // If we've got here, then we have some kind of extension of a prima
+      // facie non-nominal type.  This can come up when we're projecting
+      // typealiases out of bound generic types.
+      //
+      // struct Array<T> { typealias Indices = Range<Int> }
+      // extension Array.Indices.Bound {}
+      //
+      // Offer to rewrite it to the underlying nominal type.
+      if (canExtType.getPointer() != extType.getPointer()) {
+        ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
+            .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+        ED->diagnose(diag::invalid_extension_rewrite, canExtType)
+            .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                          canExtType->getString());
+        return;
+      }
+    }
+
+    if (wasAlreadyInvalid)
+      return;
+
+    // If nothing else applies, fall back to a generic diagnostic.
+    ED->diagnose(diag::non_nominal_extension, extType);
+  }
+
   void visitExtensionDecl(ExtensionDecl *ED) {
     // Produce any diagnostics for the extended type.
     auto extType = ED->getExtendedType();
 
     auto *nominal = ED->getExtendedNominal();
 
+    // If we couldn't resolve the extended decl, diagnose.
+    // FIXME: We shouldn't be diagnosing here, we should be diagnosing directly
+    // in the request such that the extension's "is invalid" bit is accurate.
     if (nominal == nullptr) {
-      const bool wasAlreadyInvalid = ED->isInvalid();
-      ED->setInvalid();
-      if (!extType->hasError() && extType->getAnyNominal()) {
-        auto canExtType = extType->getCanonicalType();
-        if (auto existential = canExtType->getAs<ExistentialType>()) {
-          ED->diagnose(diag::unsupported_existential_extension, extType)
-              .highlight(ED->getExtendedTypeRepr()->getSourceRange());
-          ED->diagnose(diag::invalid_extension_rewrite,
-                       existential->getConstraintType())
-              .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
-                            existential->getConstraintType()->getString());
-          return;
-        }
+      diagnoseInvalidExtension(ED, extType);
 
-        // If we've got here, then we have some kind of extension of a prima
-        // facie non-nominal type.  This can come up when we're projecting
-        // typealiases out of bound generic types.
-        //
-        // struct Array<T> { typealias Indices = Range<Int> }
-        // extension Array.Indices.Bound {}
-        //
-        // Offer to rewrite it to the underlying nominal type.
-        if (canExtType.getPointer() != extType.getPointer()) {
-          ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
-              .highlight(ED->getExtendedTypeRepr()->getSourceRange());
-          ED->diagnose(diag::invalid_extension_rewrite, canExtType)
-              .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
-                            canExtType->getString());
-          return;
-        }
-      }
-
-      if (!wasAlreadyInvalid) {
-        // If nothing else applies, fall back to a generic diagnostic.
-        ED->diagnose(diag::non_nominal_extension, extType);
-      }
+      // Make sure to still recurse into the extension members though, otherwise
+      // they will be left un-type-checked, which violates the assumption that
+      // all AST is type-checked after Sema runs.
+      for (Decl *Member : ED->getMembers())
+        visit(Member);
 
       return;
     }
