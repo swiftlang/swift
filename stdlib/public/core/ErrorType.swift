@@ -167,6 +167,35 @@ func _getErrorEmbeddedNSError<T: Error>(_ x: T)
   return x._getEmbeddedNSError()
 }
 
+internal enum _GNUstepMissingNSError: Error {
+  case missingError
+}
+
+internal struct _GNUstepNSErrorAsError: Error {
+  internal let error: AnyObject
+
+  internal func _getEmbeddedNSError() -> AnyObject? {
+    return error
+  }
+}
+
+extension _GNUstepNSErrorAsError: @unchecked Sendable {}
+
+@_silgen_name("_swift_gnustep_missingNSErrorToError")
+public func _swift_gnustep_missingNSErrorToError() -> Error {
+  return _GNUstepMissingNSError.missingError
+}
+
+@_silgen_name("_swift_gnustep_nserrorToError")
+public func _swift_gnustep_nserrorToError(_ error: AnyObject) -> Error {
+  return _GNUstepNSErrorAsError(error: error)
+}
+
+@_silgen_name("_swift_gnustep_errorHasEmbeddedNSError")
+public func _swift_gnustep_errorHasEmbeddedNSError(_ error: Error) -> Bool {
+  return error._getEmbeddedNSError() != nil
+}
+
 /// Provided by the ErrorObject implementation.
 @_silgen_name("_swift_stdlib_getErrorDefaultUserInfo")
 internal func _getErrorDefaultUserInfo<T: Error>(_ error: T) -> AnyObject?

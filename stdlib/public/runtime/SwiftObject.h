@@ -24,7 +24,11 @@
 #include "swift/Runtime/HeapObject.h"
 #include "../runtime/SwiftHashableSupport.h"
 #if SWIFT_OBJC_INTEROP
+#if __has_include(<objc/NSObject.h>)
 #include <objc/NSObject.h>
+#else
+#include <Foundation/NSObject.h>
+#endif
 #endif
 
 

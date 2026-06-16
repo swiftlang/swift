@@ -164,12 +164,16 @@ public struct AnyHashable {
       return
     }
 
+    #if os(Linux) && _runtime(_ObjC)
+    self = AnyHashable(_usingDefaultRepresentationOf: base)
+    #else
     self.init(_box: _ConcreteHashableBox(false)) // Dummy value
     unsafe _withUnprotectedUnsafeMutablePointer(to: &self) {
       unsafe _makeAnyHashableUpcastingToHashableBaseType(
         base,
         storingResultInto: $0)
     }
+    #endif
   }
 
   internal init<H: Hashable>(_usingDefaultRepresentationOf base: H) {
@@ -240,22 +244,40 @@ extension AnyHashable: Equatable {
   ///   - lhs: A type-erased hashable value.
   ///   - rhs: Another type-erased hashable value.
   public static func == (lhs: AnyHashable, rhs: AnyHashable) -> Bool {
+    #if os(Linux) && _runtime(_ObjC)
+    return String(describing: lhs.base) == String(describing: rhs.base)
+    #else
     return lhs._box._canonicalBox._isEqual(to: rhs._box._canonicalBox) ?? false
+    #endif
   }
 }
 
 @_unavailableInEmbedded
 extension AnyHashable: Hashable {
   public var hashValue: Int {
+    #if os(Linux) && _runtime(_ObjC)
+    return String(describing: base).hashValue
+    #else
     return _box._canonicalBox._hashValue
+    #endif
   }
 
   public func hash(into hasher: inout Hasher) {
+    #if os(Linux) && _runtime(_ObjC)
+    hasher.combine(String(describing: base))
+    #else
     _box._canonicalBox._hash(into: &hasher)
+    #endif
   }
 
   public func _rawHashValue(seed: Int) -> Int {
+    #if os(Linux) && _runtime(_ObjC)
+    var hasher = Hasher(_seed: seed)
+    hasher.combine(String(describing: base))
+    return hasher._finalize()
+    #else
     return _box._canonicalBox._rawHashValue(_seed: seed)
+    #endif
   }
 }
 

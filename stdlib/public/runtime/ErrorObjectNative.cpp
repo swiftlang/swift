@@ -19,7 +19,7 @@
 
 #include "swift/Runtime/Config.h"
 
-#if !SWIFT_OBJC_INTEROP
+#if !SWIFT_OBJC_INTEROP || !SWIFT_OBJC_INTEROP_ERROR_BRIDGING
 
 #include <stdio.h>
 #include "swift/Runtime/Debug.h"

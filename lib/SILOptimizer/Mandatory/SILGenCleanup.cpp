@@ -268,7 +268,6 @@ void SILGenCleanup::run() {
     breakInfiniteLoops(getPassManager(), &function);
     completeAllLifetimes(getPassManager(), &function, /*includeTrivialVars=*/ true);
     function.verifyOwnership(/*deadEndBlocks=*/nullptr);
-
     DeadEndBlocks deadEndBlocks(&function);
     SILGenCanonicalize sgCanonicalize(deadEndBlocks);
 

@@ -18,7 +18,11 @@
 #include "swift/Runtime/Config.h"
 
 #if SWIFT_OBJC_INTEROP
+#if __has_include(<objc/NSObject.h>)
 #include <objc/NSObject.h>
+#else
+#include <Foundation/NSObject.h>
+#endif
 #include <objc/runtime.h>
 #include <objc/message.h>
 #include <objc/objc.h>
@@ -58,16 +62,26 @@
 #include <unordered_map>
 #include <unordered_set>
 #if SWIFT_OBJC_INTEROP
-# import <CoreFoundation/CFBase.h> // for CFTypeID
-# import <Foundation/Foundation.h>
-# include <malloc/malloc.h>
+# if __has_include(<CoreFoundation/CFBase.h>)
+#  import <CoreFoundation/CFBase.h> // for CFTypeID
+# else
+#  import <CoreFoundation.h>
+# endif
+# if __has_include(<Foundation/Foundation.h>)
+#  import <Foundation/Foundation.h>
+# else
+#  import <Foundation.h>
+# endif
+# if __has_include(<malloc/malloc.h>)
+#  include <malloc/malloc.h>
+# endif
 # include <dispatch/dispatch.h>
 #endif
 
 using namespace swift;
 using namespace hashable_support;
 
-#if SWIFT_HAS_ISA_MASKING
+#if SWIFT_HAS_ISA_MASKING && SWIFT_OBJC_INTEROP_HAS_PACKED_ISA_CLASS_MASK
 OBJC_EXPORT __attribute__((__weak_import__))
 const uintptr_t objc_debug_isa_class_mask;
 
@@ -208,7 +222,7 @@ static id _getClassDescription(Class cls) {
 
 @implementation SwiftObject
 + (void)initialize {
-#if SWIFT_HAS_ISA_MASKING && !TARGET_OS_SIMULATOR && !NDEBUG
+#if SWIFT_HAS_ISA_MASKING && SWIFT_OBJC_INTEROP_HAS_PACKED_ISA_CLASS_MASK && !TARGET_OS_SIMULATOR && !NDEBUG
   uintptr_t libObjCMask = (uintptr_t)&objc_absolute_packed_isa_class_mask;
   assert(libObjCMask);
 
@@ -263,8 +277,13 @@ static id _getClassDescription(Class cls) {
 }
 
 - (struct _NSZone *)zone {
+#if __has_include(<malloc/malloc.h>)
   auto zone = malloc_zone_from_ptr(self);
   return (struct _NSZone *)(zone ? zone : malloc_default_zone());
+#else
+  (void)self;
+  return nullptr;
+#endif
 }
 
 - (void)doesNotRecognizeSelector: (SEL) sel {
@@ -352,6 +371,17 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 
 - (BOOL)conformsToProtocol:(Protocol*)proto {
   if (!proto) return NO;
+#if defined(__GNUSTEP_RUNTIME__)
+  const Metadata *currentType = swift_getObjCClassMetadata(
+      reinterpret_cast<const ClassMetadata *>(
+          _swift_getObjCClassOfAllocated(self)));
+
+  while (currentType) {
+    if (class_conformsToProtocol(currentType->getObjCClassObject(), proto))
+      return YES;
+    currentType = _swift_class_getSuperclass(currentType);
+  }
+#else
   auto selfClass = _swift_getObjCClassOfAllocated(self);
 
   // Walk the superclass chain.
@@ -360,6 +390,7 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
       return YES;
     selfClass = class_getSuperclass(selfClass);
   }
+#endif
 
   return NO;
 }
@@ -367,6 +398,16 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 + (BOOL)conformsToProtocol:(Protocol*)proto {
   if (!proto) return NO;
 
+#if defined(__GNUSTEP_RUNTIME__)
+  const Metadata *currentType = swift_getObjCClassMetadata(
+      reinterpret_cast<const ClassMetadata *>(self));
+
+  while (currentType) {
+    if (class_conformsToProtocol(currentType->getObjCClassObject(), proto))
+      return YES;
+    currentType = _swift_class_getSuperclass(currentType);
+  }
+#else
   // Walk the superclass chain.
   Class selfClass = self;
   while (selfClass) {
@@ -374,6 +415,7 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
       return YES;
     selfClass = class_getSuperclass(selfClass);
   }
+#endif
 
   return NO;
 }
@@ -541,6 +583,16 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 /// reference-counting.
 bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 #if SWIFT_OBJC_INTEROP
+#if defined(__GNUSTEP_RUNTIME__)
+  // GNUstep ObjC interop can coexist with pure Swift class metadata that is
+  // not also an ObjC class object. Those records carry the direct metadata
+  // kind word instead of the ObjC-compatible isa/Data layout, so isTypeMetadata()
+  // would otherwise misclassify them as ObjC classes and route releases through
+  // objc_release.
+  auto rawKind = *reinterpret_cast<const uintptr_t *>(theClass);
+  if (rawKind == static_cast<uintptr_t>(MetadataKind::Class))
+    return true;
+#endif
   if (!theClass->isTypeMetadata()) return false;
   return (theClass->getFlags() & ClassFlags::UsesSwiftRefcounting);
 #else
@@ -556,12 +608,15 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 bool
 _swift_objcClassUsesNativeSwiftReferenceCounting(const Metadata *theClass) {
 #if SWIFT_OBJC_INTEROP
-  // If this is ObjC wrapper metadata, the class is definitely not using
-  // Swift ref-counting.
-  if (isa<ObjCClassWrapperMetadata>(theClass)) return false;
+  auto canonical = swift_getObjCClassMetadata(
+      reinterpret_cast<const ClassMetadata *>(theClass));
+  if (!canonical)
+    return false;
 
-  // Otherwise, it's class metadata.
-  return usesNativeSwiftReferenceCounting(cast<ClassMetadata>(theClass));
+  if (isa<ObjCClassWrapperMetadata>(canonical))
+    return false;
+
+  return usesNativeSwiftReferenceCounting(cast<ClassMetadata>(canonical));
 #else
   return true;
 #endif
@@ -1182,14 +1237,30 @@ swift_dynamicCastObjCClassImpl(const void *object,
   if (object == nullptr)
     return nullptr;
 
+#if defined(__GNUSTEP_RUNTIME__)
+  const Metadata *targetMetadata = swift_getObjCClassMetadata(targetType);
+  const Metadata *sourceMetadata = swift_getObjCClassMetadata(
+      reinterpret_cast<const ClassMetadata *>(
+          object_getClass(id_const_cast(object))));
+  for (auto currentType = sourceMetadata;
+       currentType != nullptr;
+       currentType = _swift_class_getSuperclass(currentType)) {
+    if (currentType == targetMetadata) {
+      return object;
+    }
+  }
+#else
   if ([id_const_cast(object) isKindOfClass:class_const_cast(targetType)]) {
     return object;
   }
+#endif
 
   // For casts to NSError or NSObject, we might need to bridge via the Error
   // protocol. Try it now.
-  if (targetType == reinterpret_cast<const ClassMetadata*>(getNSErrorClass()) ||
-      targetType == reinterpret_cast<const ClassMetadata*>([NSObject class])) {
+  Class nsErrorClass = getNSErrorClass();
+  if (nsErrorClass &&
+      (targetType == reinterpret_cast<const ClassMetadata*>(nsErrorClass) ||
+       targetType == reinterpret_cast<const ClassMetadata*>([NSObject class]))) {
     auto srcType = swift_getObjCClassMetadata(
         reinterpret_cast<const ClassMetadata*>(
           object_getClass(id_const_cast(object))));
@@ -1212,14 +1283,30 @@ swift_dynamicCastObjCClassUnconditionalImpl(const void *object,
   if (object == nullptr)
     return nullptr;
 
+#if defined(__GNUSTEP_RUNTIME__)
+  const Metadata *targetMetadata = swift_getObjCClassMetadata(targetType);
+  const Metadata *sourceMetadata = swift_getObjCClassMetadata(
+      reinterpret_cast<const ClassMetadata *>(
+          object_getClass(id_const_cast(object))));
+  for (auto currentType = sourceMetadata;
+       currentType != nullptr;
+       currentType = _swift_class_getSuperclass(currentType)) {
+    if (currentType == targetMetadata) {
+      return object;
+    }
+  }
+#else
   if ([id_const_cast(object) isKindOfClass:class_const_cast(targetType)]) {
     return object;
   }
+#endif
 
   // For casts to NSError or NSObject, we might need to bridge via the Error
   // protocol. Try it now.
-  if (targetType == reinterpret_cast<const ClassMetadata*>(getNSErrorClass()) ||
-      targetType == reinterpret_cast<const ClassMetadata*>([NSObject class])) {
+  Class nsErrorClass = getNSErrorClass();
+  if (nsErrorClass &&
+      (targetType == reinterpret_cast<const ClassMetadata*>(nsErrorClass) ||
+       targetType == reinterpret_cast<const ClassMetadata*>([NSObject class]))) {
     auto srcType = swift_getObjCClassMetadata(
         reinterpret_cast<const ClassMetadata*>(
           object_getClass(id_const_cast(object))));
@@ -1394,24 +1481,44 @@ static bool objcSupportsLazyRealization() {
 }
 
 void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
+#if SWIFT_OBJC_INTEROP_HAS_APPLE_CLASS_IMAGE_API
   static const objc_image_info ImageInfo = {0, 0};
+#endif
 
   Class c = class_const_cast(_c);
 
   if (!objcSupportsLazyRealization()) {
     // Ensure the superclass is realized.
+#if defined(__GNUSTEP_RUNTIME__)
+    // GNUstep/libobjc2 can fault if we eagerly message the superclass while
+    // realizing a Swift-emitted class. Touch the class itself below instead.
+#else
     [class_getSuperclass(c) class];
+#endif
   }
 
   // Register the class.
+#if SWIFT_OBJC_INTEROP_HAS_APPLE_CLASS_IMAGE_API
   Class registered = objc_readClassPair(c, &ImageInfo);
   assert(registered == c
          && "objc_readClassPair failed to instantiate the class in-place");
   (void)registered;
+#else
+  // GNUstep/libobjc2 compiler-emitted classes are registered by the image load
+  // path. Resolving the class through the runtime avoids messaging a partially
+  // realized Swift-emitted class during metadata initialization.
+  (void)class_getSuperclass(c);
+#endif
 }
 
 Class swift::swift_getInitializedObjCClass(Class c) {
   if (!objcSupportsLazyRealization()) {
+#if defined(__GNUSTEP_RUNTIME__)
+    // GNUstep/libobjc2 Swift class metadata is instantiated explicitly through
+    // swift_instantiateObjCClass(). Re-touching metadata-backed class objects
+    // here can fault before libobjc2 has finished realizing them.
+    (void)c;
+#else
     // Used when we have class metadata and we want to ensure a class has been
     // initialized by the Objective-C runtime. We need to do this because the
     // class "c" might be valid metadata, but it hasn't been initialized yet.
@@ -1420,6 +1527,7 @@ Class swift::swift_getInitializedObjCClass(Class c) {
     // return something different. See
     // https://github.com/apple/swift/issues/52863 for an example.
     [c self];
+#endif
   }
   return c;
 }
@@ -1649,10 +1757,16 @@ ClassExtents
 _swift_getSwiftClassInstanceExtents(const Metadata *c) {
   assert(c && c->isClassObject());
   auto metaData = c->getClassObject();
-  return ClassExtents{
-    metaData->getInstanceAddressPoint(),
-    metaData->getInstanceSize() - metaData->getInstanceAddressPoint()
-  };
+#if defined(__GNUSTEP_RUNTIME__)
+  if (!metaData->isTypeMetadata()) {
+    auto negative = size_t(metaData->InstanceAddressPoint);
+    auto positive = size_t(metaData->InstanceSize) - negative;
+    return ClassExtents{negative, positive};
+  }
+#endif
+  auto negative = metaData->getInstanceAddressPoint();
+  auto positive = metaData->getInstanceSize() - metaData->getInstanceAddressPoint();
+  return ClassExtents{negative, positive};
 }
 
 #if SWIFT_OBJC_INTEROP

@@ -35,7 +35,11 @@
 #include "SwiftEquatableSupport.h"
 #include "SwiftHashableSupport.h"
 #include <objc/runtime.h>
+#if __has_include(<Foundation/Foundation.h>)
 #include <Foundation/Foundation.h>
+#else
+#include <Foundation.h>
+#endif
 
 #include <new>
 #include <unordered_set>
@@ -297,8 +301,13 @@ __SwiftValue *swift::bridgeAnythingToSwiftValueObject(OpaqueValue *src,
       getSwiftValuePayloadOffset(alignMask) + srcType->getValueWitnesses()->size;
 
   void *instanceMemory = swift_slowAlloc(totalSize, alignMask);
+#if defined(__GNUSTEP_RUNTIME__)
+  __SwiftValue *instance = reinterpret_cast<__SwiftValue *>(instanceMemory);
+  object_setClass(instance, getSwiftValueClass());
+#else
   __SwiftValue *instance
     = objc_constructInstance(getSwiftValueClass(), instanceMemory);
+#endif
   /* TODO: If we're able to become a SwiftObject subclass in the future,
    * change to this:
   auto instance = swift_allocObject(getSwiftValueClass(), totalSize,
@@ -392,7 +401,12 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
   instanceType->vw_destroy(getSwiftValuePayload(self, alignMask));
 
   // Deallocate ourselves.
+#if defined(__GNUSTEP_RUNTIME__)
+  objc_removeAssociatedObjects(self);
+  (void)objc_delete_weak_refs(self);
+#else
   objc_destructInstance(self);
+#endif
   auto totalSize = getSwiftValuePayloadOffset(alignMask) +
                    instanceType->getValueWitnesses()->size;
   swift_slowDealloc(self, totalSize, alignMask);

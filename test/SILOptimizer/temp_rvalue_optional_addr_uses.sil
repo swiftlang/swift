@@ -1,0 +1,37 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-temp-rvalue-elimination | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @optional_addr_uses
+sil hidden [ossa] @optional_addr_uses : $@convention(thin) (@in_guaranteed FakeOptional<Int>) -> () {
+bb0(%0 : $*FakeOptional<Int>):
+  %1 = alloc_stack $FakeOptional<Int>
+  copy_addr %0 to [init] %1 : $*FakeOptional<Int>
+  switch_enum_addr %1 : $*FakeOptional<Int>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1:
+  %4 = unchecked_take_enum_data_addr %1 : $*FakeOptional<Int>, #FakeOptional.some!enumelt
+  %5 = alloc_stack $Int
+  copy_addr [take] %4 to [init] %5 : $*Int
+  dealloc_stack %5 : $*Int
+  dealloc_stack %1 : $*FakeOptional<Int>
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*FakeOptional<Int>
+  dealloc_stack %1 : $*FakeOptional<Int>
+  br bb3
+
+bb3:
+  %12 = tuple ()
+  return %12 : $()
+}

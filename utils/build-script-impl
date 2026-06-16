@@ -1863,6 +1863,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_STDLIB_ENABLE_OBJC_INTEROP:BOOL=$(true_false "${SWIFT_OBJC_INTEROP}")
+                        -DSwiftCore_ENABLE_OBJC_INTEROP:BOOL=$(true_false "${SWIFT_OBJC_INTEROP}")
                     )
                 fi
 

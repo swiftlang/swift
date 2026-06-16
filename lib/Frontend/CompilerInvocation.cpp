@@ -1677,8 +1677,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     ModuleInterfaceOpts.PublicFlags.IgnorableFlags +=
         " " + printFormalCxxInteropVersion(Opts);
 
+  bool EnableGNUstepObjCInterop = Args.hasArg(OPT_gnustep_objc_interop);
+  if (EnableGNUstepObjCInterop && !Target.isOSLinux()) {
+    Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
+                   "-gnustep-objc-interop", Target.str());
+    return true;
+  }
+
   Opts.UseStaticStandardLibrary = Args.hasArg(OPT_use_static_resource_dir);
+  Opts.EnableGNUstepObjCInterop = EnableGNUstepObjCInterop;
   Opts.EnableObjCInterop =
+      EnableGNUstepObjCInterop ||
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
 

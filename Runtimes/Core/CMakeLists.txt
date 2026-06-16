@@ -98,6 +98,13 @@ check_include_file_cxx("clocale" SwiftCore_HAS_LOCALE)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
+if(NOT APPLE)
+  find_library(SwiftCore_GNUSTEP_BASE_LIBRARY
+    NAMES gnustep-base libgnustep-base)
+  find_library(SwiftCore_OBJC_RUNTIME_LIBRARY
+    NAMES objc libobjc)
+endif()
+
 defaulted_option(SwiftCore_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries")
 
 defaulted_option(SwiftCore_ENABLE_CRASH_REPORTER_CLIENT "Enable Apple CrashReporter integration")
@@ -203,7 +210,9 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -empty-abi-descriptor>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
+  "$<$<AND:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -enable-objc-interop>"
   "$<$<AND:$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -disable-objc-interop>"
+  "$<$<AND:$<NOT:$<PLATFORM_ID:Darwin>>,$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -validate-tbd-against-ir=none>"
   "$<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")

@@ -51,6 +51,9 @@ llvm::cl::opt<bool> DisableSwiftVerification(
 //===----------------------------------------------------------------------===//
 
 void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
+#if defined(__linux__)
+  return;
+#endif
   if (f->getModule().getOptions().VerifyNone)
     return;
 

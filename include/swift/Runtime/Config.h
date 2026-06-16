@@ -155,7 +155,11 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 # elif defined(__APPLE__)
 #  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
 
-// Non-Apple platforms always use 1.
+// GNUstep/libobjc2 class objects also use bit 1 for the Swift marker.
+# elif defined(__GNUSTEP_RUNTIME__)
+#  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
+
+// Other non-Apple platforms use 1.
 # else
 #  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
 

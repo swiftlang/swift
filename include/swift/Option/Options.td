@@ -350,6 +350,10 @@ def Isystem : Separate<["-"], "Isystem">,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Add directory to the system import search path">;
 
+def gnustep_objc_interop : Flag<["-"], "gnustep-objc-interop">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable GNUstep-backed Objective-C interop mode">;
+
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;

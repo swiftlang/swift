@@ -80,6 +80,22 @@ bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
   return triple.isOSBinFormatCOFF() && !triple.isOSCygMing();
 }
 
+static bool useGNUstepObjCSymbolPrefixes(const ASTContext &Ctx) {
+  return Ctx.LangOpts.EnableGNUstepObjCInterop;
+}
+
+static std::string mangleObjCEntityName(const ASTContext &Ctx,
+                                        const ClassDecl *decl,
+                                        StringRef applePrefix,
+                                        StringRef gnustepPrefix) {
+  llvm::SmallString<64> buffer;
+  StringRef name = decl->getObjCRuntimeName(buffer);
+  std::string result(
+      useGNUstepObjCSymbolPrefixes(Ctx) ? gnustepPrefix : applePrefix);
+  result.append(name.data(), name.size());
+  return result;
+}
+
 UniversalLinkageInfo::UniversalLinkageInfo(IRGenModule &IGM)
     : UniversalLinkageInfo(IGM.Triple, IGM.IRGen.hasMultipleIGMs(),
                            IGM.IRGen.Opts.ForcePublicLinkage,
@@ -383,29 +399,20 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
     // An Objective-C class reference reference. The symbol is private, so
     // the mangling is unimportant; it should just be readable in LLVM IR.
   case Kind::ObjCClassRef: {
-    llvm::SmallString<64> tempBuffer;
-    StringRef name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(tempBuffer);
-    std::string Result("OBJC_CLASS_REF_$_");
-    Result.append(name.data(), name.size());
-    return Result;
+    return mangleObjCEntityName(Ctx, cast<ClassDecl>(getDecl()),
+                                "OBJC_CLASS_REF_$_", "._OBJC_REF_CLASS_");
   }
 
     // An Objective-C class reference;  not a swift mangling.
   case Kind::ObjCClass: {
-    llvm::SmallString<64> TempBuffer;
-    StringRef Name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(TempBuffer);
-    std::string Result("OBJC_CLASS_$_");
-    Result.append(Name.data(), Name.size());
-    return Result;
+    return mangleObjCEntityName(Ctx, cast<ClassDecl>(getDecl()),
+                                "OBJC_CLASS_$_", "._OBJC_CLASS_");
   }
 
     // An Objective-C metaclass reference;  not a swift mangling.
   case Kind::ObjCMetaclass: {
-    llvm::SmallString<64> TempBuffer;
-    StringRef Name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(TempBuffer);
-    std::string Result("OBJC_METACLASS_$_");
-    Result.append(Name.data(), Name.size());
-    return Result;
+    return mangleObjCEntityName(Ctx, cast<ClassDecl>(getDecl()),
+                                "OBJC_METACLASS_$_", "._OBJC_METACLASS_");
   }
 
   case Kind::SILFunction: {

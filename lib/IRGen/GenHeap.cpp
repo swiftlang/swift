@@ -1350,10 +1350,13 @@ FunctionPointer IRGenModule::getFixedClassInitializationFn() {
   // initialization.
   FunctionPointer fn;
   if (ObjCInterop) {
+    if (Context.LangOpts.EnableGNUstepObjCInterop) {
+      fn = getGetInitializedObjCClassFunctionPointer();
+    }
     // In new enough ObjC runtimes, objc_opt_self provides a direct fast path
     // to realize a class.
-    if (getAvailabilityRange().isContainedIn(
-            Context.getSwift51Availability())) {
+    else if (getAvailabilityRange().isContainedIn(
+                 Context.getSwift51Availability())) {
       fn = getObjCOptSelfFunctionPointer();
     }
     // Otherwise, the Swift runtime always provides a `get

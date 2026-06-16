@@ -35,6 +35,25 @@ struct HeapObject;
 #include <objc/objc.h>
 #include <objc/runtime.h>
 #include <objc/objc-api.h>
+#if __has_include(<objc/objc-arc.h>)
+#include <objc/objc-arc.h>
+#endif
+
+#ifndef OBJC_EXPORT
+#if defined(OBJC_PUBLIC)
+#define OBJC_EXPORT OBJC_PUBLIC
+#else
+#define OBJC_EXPORT
+#endif
+#endif
+
+#if defined(__GNUSTEP_RUNTIME__)
+#define SWIFT_OBJC_INTEROP_HAS_APPLE_CLASS_IMAGE_API 0
+#define SWIFT_OBJC_INTEROP_HAS_PACKED_ISA_CLASS_MASK 0
+#else
+#define SWIFT_OBJC_INTEROP_HAS_APPLE_CLASS_IMAGE_API 1
+#define SWIFT_OBJC_INTEROP_HAS_PACKED_ISA_CLASS_MASK 1
+#endif
 
 // Redeclare APIs from the Objective-C runtime.
 // These functions are not available through public headers, but are guaranteed
@@ -42,7 +61,13 @@ struct HeapObject;
 
 OBJC_EXPORT id objc_retain(id);
 OBJC_EXPORT void objc_release(id);
+#if defined(__GNUSTEP_RUNTIME__)
+static inline id _objc_rootAutorelease(id object) {
+  return objc_autoreleaseReturnValue(object);
+}
+#else
 OBJC_EXPORT id _objc_rootAutorelease(id);
+#endif
 OBJC_EXPORT void objc_moveWeak(id*, id*);
 OBJC_EXPORT void objc_copyWeak(id*, id*);
 OBJC_EXPORT id objc_initWeak(id*, id);
@@ -64,12 +89,16 @@ typedef struct objc_image_info {
 // Returns nil if the superclass is nil and the class is not marked as a root.
 // Returns nil if the superclass is under construction.
 // Do not call objc_registerClassPair().
+#if SWIFT_OBJC_INTEROP_HAS_APPLE_CLASS_IMAGE_API
 OBJC_EXPORT Class objc_readClassPair(Class cls,
                                      const struct objc_image_info *info)
     __OSX_AVAILABLE_STARTING(__MAC_10_10, __IPHONE_8_0);
+#endif
 
 // Magic symbol whose _address_ is the runtime's isa mask.
+#if SWIFT_OBJC_INTEROP_HAS_PACKED_ISA_CLASS_MASK
 OBJC_EXPORT const struct { char c; } objc_absolute_packed_isa_class_mask;
+#endif
 
 
 namespace swift {

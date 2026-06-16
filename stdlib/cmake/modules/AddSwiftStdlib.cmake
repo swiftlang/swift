@@ -384,8 +384,16 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-D_WASI_EMULATED_MMAN" "-D_WASI_EMULATED_PROCESS_CLOCKS" "-D_WASI_EMULATED_SIGNAL")
   endif()
 
-  if(NOT SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
+  if(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
+    list(APPEND result "-DSWIFT_OBJC_INTEROP=1")
+  else()
     list(APPEND result "-DSWIFT_OBJC_INTEROP=0")
+  endif()
+
+  if(SWIFT_STDLIB_ENABLE_OBJC_INTEROP AND NOT APPLE)
+    list(APPEND result "-D__GNUSTEP_RUNTIME__=1")
+    list(APPEND result "-D__OBJC_GNUSTEP_RUNTIME_ABI__=20")
+    list(APPEND result "-fobjc-runtime=gnustep-2.0")
   endif()
 
   if(SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER)
@@ -1250,6 +1258,10 @@ function(add_swift_target_library_single target name)
     ${SWIFT_SOURCE_DIR}/stdlib/include)
   target_include_directories(${target} BEFORE PRIVATE
     ${SWIFTLIB_SINGLE_PREFIX_INCLUDE_DIRS})
+  if(SWIFT_STDLIB_ENABLE_OBJC_INTEROP AND SWIFT_OBJC_INTEROP_INCLUDE_DIRS)
+    target_include_directories(${target} BEFORE PRIVATE
+      ${SWIFT_OBJC_INTEROP_INCLUDE_DIRS})
+  endif()
   if(("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF"))
     if("${libkind}" STREQUAL "SHARED" AND NOT SWIFTLIB_SINGLE_NOSWIFTRT)

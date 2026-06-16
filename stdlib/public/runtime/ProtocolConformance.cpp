@@ -20,6 +20,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Bincompat.h"
+#if SWIFT_OBJC_INTEROP && __has_include(<protocol.h>)
+#include <protocol.h>
+#endif
+
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/EnvironmentVariables.h"

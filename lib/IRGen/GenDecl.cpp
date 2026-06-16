@@ -94,6 +94,11 @@ llvm::cl::opt<bool> UseBasicDynamicReplacement(
 
 namespace {
 
+static StringRef getObjCClassRefSectionName(IRGenModule &IGM) {
+  return IGM.Context.LangOpts.EnableGNUstepObjCInterop ? "__objc_class_refs"
+                                                       : "__objc_classrefs";
+}
+
 /// Add methods, properties, and protocol conformances from a JITed extension
 /// to an ObjC class using the ObjC runtime.
 ///
@@ -1037,6 +1042,8 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
                : ("__DATA," + Section + "," + MachOAttributes).str();
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
+    if (Context.LangOpts.EnableGNUstepObjCInterop)
+      return Section.str();
     return Section.substr(2).str();
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
@@ -1091,10 +1098,15 @@ void IRGenModule::emitGlobalLists() {
     // Objective-C class references go in a variable with a meaningless
     // name but a magic section.
     emitGlobalList(
-        *this, ObjCClasses, "objc_classes",
-        GetObjCSectionName("__objc_classlist", "regular,no_dead_strip"),
+        *this, ObjCClasses,
+        Context.LangOpts.EnableGNUstepObjCInterop ? "gnustep_objc_classes"
+                                                  : "objc_classes",
+        GetObjCSectionName(
+            Context.LangOpts.EnableGNUstepObjCInterop ? "__objc_classes"
+                                                      : "__objc_classlist",
+            "regular,no_dead_strip"),
         llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
-        /*asContiguousArray*/ false);
+        /*asContiguousArray*/ Context.LangOpts.EnableGNUstepObjCInterop);
 
     // So do resilient class stubs.
     emitGlobalList(
@@ -4943,7 +4955,7 @@ Address IRGenModule::getAddrOfObjCClassRef(ClassDecl *theClass) {
   // Define it lazily.
   if (auto global = dyn_cast<llvm::GlobalVariable>(addr)) {
     if (global->isDeclaration()) {
-      global->setSection(GetObjCSectionName("__objc_classrefs",
+      global->setSection(GetObjCSectionName(getObjCClassRefSectionName(*this),
                                             "regular,no_dead_strip"));
       global->setLinkage(llvm::GlobalVariable::PrivateLinkage);
       global->setExternallyInitialized(true);

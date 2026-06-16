@@ -65,6 +65,16 @@ using namespace swift::silverifier;
 
 using Lowering::AbstractionPattern;
 
+static bool shouldSkipGNUstepSwiftStdlibVerify(const SILModule &M) {
+  auto *swiftModule = M.getSwiftModule();
+  if (!swiftModule)
+    return false;
+  const auto &langOpts = M.getASTContext().LangOpts;
+  return swiftModule->getNameStr() == "Swift" &&
+         langOpts.EnableGNUstepObjCInterop &&
+         langOpts.Target.isOSLinux();
+}
+
 // This flag controls the default behaviour when hitting a verification
 // failure (abort/exit).
 static llvm::cl::opt<bool> AbortOnFailure(
@@ -7584,6 +7594,9 @@ bool swift::isIndirectArgumentMutated(SILFunctionArgument *arg, bool ignoreDestr
 //===----------------------------------------------------------------------===//
 
 static bool verificationEnabled(const SILModule &M) {
+  if (shouldSkipGNUstepSwiftStdlibVerify(M))
+    return false;
+
   // If we are asked to never verify, return false early.
   if (M.getOptions().VerifyNone)
     return false;

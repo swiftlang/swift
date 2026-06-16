@@ -29,14 +29,24 @@
 #include "SwiftHashableSupport.h"
 
 #include <atomic>
+#ifndef __has_include
+#define __has_include(x) 0
+#endif
 #if SWIFT_OBJC_INTEROP
+# include <objc/runtime.h>
+#endif
+#if SWIFT_OBJC_INTEROP && !defined(__GNUSTEP_RUNTIME__) && __has_include(<CoreFoundation/CoreFoundation.h>)
+# define SWIFT_OBJC_INTEROP_ERROR_BRIDGING 1
+#else
+# define SWIFT_OBJC_INTEROP_ERROR_BRIDGING 0
+#endif
+#if SWIFT_OBJC_INTEROP_ERROR_BRIDGING
 # include <CoreFoundation/CoreFoundation.h>
-# include <objc/objc.h>
 #endif
 
 namespace swift {
 
-#if SWIFT_OBJC_INTEROP
+#if SWIFT_OBJC_INTEROP_ERROR_BRIDGING
 
 // Copied from CoreFoundation/CFRuntime.h.
 struct CFRuntimeBase {
@@ -79,7 +89,7 @@ struct SwiftError : SwiftErrorHeader {
   /// This member is only available for native Swift errors.
   const WitnessTable *errorConformance;
 
-#if SWIFT_OBJC_INTEROP
+#if SWIFT_OBJC_INTEROP_ERROR_BRIDGING
   /// The base type that introduces the `Hashable` conformance.
   /// This member is only available for native Swift errors.
   /// This member is lazily-initialized.
@@ -126,7 +136,7 @@ struct SwiftError : SwiftErrorHeader {
              const_cast<const SwiftError *>(this)->getValue());
   }
   
-#if SWIFT_OBJC_INTEROP
+#if SWIFT_OBJC_INTEROP_ERROR_BRIDGING
   // True if the object is really an NSError or CFError instance.
   // The type and errorConformance fields don't exist in an NSError.
   bool isPureNSError() const;
@@ -134,7 +144,7 @@ struct SwiftError : SwiftErrorHeader {
   bool isPureNSError() const { return false; }
 #endif
   
-#if SWIFT_OBJC_INTEROP
+#if SWIFT_OBJC_INTEROP_ERROR_BRIDGING
   /// Get the type of the contained value.
   const Metadata *getType() const;
   /// Get the Error protocol witness table for the contained type.
@@ -146,7 +156,7 @@ struct SwiftError : SwiftErrorHeader {
   const WitnessTable *getErrorConformance() const { return errorConformance; }
 #endif
 
-#if SWIFT_OBJC_INTEROP
+#if SWIFT_OBJC_INTEROP_ERROR_BRIDGING
   /// Get the base type that conforms to `Hashable`.
   /// Returns NULL if the type does not conform.
   const Metadata *getHashableBaseType() const;

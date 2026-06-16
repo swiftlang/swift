@@ -41,12 +41,23 @@
 
 using namespace swift;
 
+static bool shouldSkipGNUstepSwiftStdlibVerify(const SILModule &Module) {
+  auto *swiftModule = Module.getSwiftModule();
+  if (!swiftModule)
+    return false;
+  const auto &langOpts = Module.getASTContext().LangOpts;
+  return swiftModule->getNameStr() == "Swift" &&
+         langOpts.EnableGNUstepObjCInterop &&
+         langOpts.Target.isOSLinux();
+}
+
 bool swift::runSILDiagnosticPasses(SILModule &Module) {
   auto &opts = Module.getOptions();
+  bool skipVerify = shouldSkipGNUstepSwiftStdlibVerify(Module);
 
   // Verify the module, if required.
   // OSSA lifetimes are incomplete until the SILGenCleanup pass runs.
-  if (opts.VerifyAll)
+  if (opts.VerifyAll && !skipVerify)
     Module.verifyIncompleteOSSA();
 
   // If we parsed a .sil file that is already in canonical form, don't rerun
@@ -58,7 +69,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
                           SILPassPipelinePlan::getSILGenPassPipeline(opts),
                           /*isMandatory*/ true);
 
-  if (opts.VerifyAll)
+  if (opts.VerifyAll && !skipVerify)
     Module.verifyOwnership();
 
   executePassPipelinePlan(&Module,
@@ -74,7 +85,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   Module.setStage(SILStage::Canonical);
 
   // Verify the module, if required.
-  if (opts.VerifyAll)
+  if (opts.VerifyAll && !skipVerify)
     Module.verify();
   else {
     LLVM_DEBUG(Module.verify());
@@ -106,9 +117,10 @@ bool swift::runSILOwnershipEliminatorPass(SILModule &Module) {
 
 void swift::runSILOptimizationPasses(SILModule &Module) {
   auto &opts = Module.getOptions();
+  bool skipVerify = shouldSkipGNUstepSwiftStdlibVerify(Module);
 
   // Verify the module, if required.
-  if (opts.VerifyAll)
+  if (opts.VerifyAll && !skipVerify)
     Module.verify();
 
   if (opts.DisableSILPerfOptimizations) {
@@ -135,7 +147,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
     return;
 
   // Verify the module, if required.
-  if (opts.VerifyAll)
+  if (opts.VerifyAll && !skipVerify)
     Module.verify();
   else {
     LLVM_DEBUG(Module.verify());
@@ -143,8 +155,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 }
 
 void swift::runSILPassesForOnone(SILModule &Module) {
+  bool skipVerify = shouldSkipGNUstepSwiftStdlibVerify(Module);
   // Verify the module, if required.
-  if (Module.getOptions().VerifyAll)
+  if (Module.getOptions().VerifyAll && !skipVerify)
     Module.verify();
 
   // We want to run the Onone passes also for function which have an explicit
@@ -154,7 +167,7 @@ void swift::runSILPassesForOnone(SILModule &Module) {
       /*isMandatory*/ true);
 
   // Verify the module, if required.
-  if (Module.getOptions().VerifyAll)
+  if (Module.getOptions().VerifyAll && !skipVerify)
     Module.verify();
   else {
     LLVM_DEBUG(Module.verify());

@@ -5167,8 +5167,11 @@ namespace {
 
     void addMetaclassObject(ConstantStructBuilder &B) {
       // isa
-      ClassDecl *rootClass = getRootClassForMetaclass(IGM, Target);
-      auto isa = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
+      llvm::Constant *isa = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
+      if (!IGM.Context.LangOpts.EnableGNUstepObjCInterop) {
+        ClassDecl *rootClass = getRootClassForMetaclass(IGM, Target);
+        isa = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
+      }
       B.add(isa);
       // super, which is dependent if the superclass is generic
       B.addNullPointer(IGM.ObjCClassPtrTy);
@@ -5463,6 +5466,105 @@ static void emitObjCClassSymbol(IRGenModule &IGM, ClassDecl *classDecl,
                                           metadata, &IGM.Module);
   ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
       .to(alias, link.isForDefinition());
+
+  if (!IGM.Context.LangOpts.EnableGNUstepObjCInterop)
+    return;
+
+  llvm::SmallString<64> nameBuffer;
+  StringRef runtimeName = classDecl->getObjCRuntimeName(nameBuffer);
+  auto refName = (Twine("._OBJC_REF_CLASS_") + runtimeName).str();
+  if (IGM.Module.getNamedValue(refName))
+    return;
+
+  auto *ref = new llvm::GlobalVariable(
+      IGM.Module, IGM.ObjCClassPtrTy, /*isConstant*/ false,
+      llvm::GlobalValue::ExternalLinkage,
+      llvm::ConstantExpr::getBitCast(metadata, IGM.ObjCClassPtrTy), refName);
+  ref->setSection(
+      IGM.GetObjCSectionName("__objc_class_refs", "regular,no_dead_strip"));
+  ref->setExternallyInitialized(true);
+  IGM.addCompilerUsedGlobal(ref);
+}
+
+static llvm::Constant *
+getGNUstepObjCListGlobal(IRGenModule &IGM, StringRef prefix,
+                         StringRef runtimeName) {
+  auto *value = IGM.Module.getNamedValue((Twine(prefix) + runtimeName).str());
+  if (!value)
+    return llvm::ConstantPointerNull::get(IGM.OpaquePtrTy);
+  return llvm::ConstantExpr::getBitCast(value, IGM.OpaquePtrTy);
+}
+
+static llvm::Constant *
+emitGNUstepObjCClassRecord(IRGenModule &IGM, ClassDecl *classDecl,
+                           const ClassLayout &fieldLayout) {
+  llvm::SmallString<64> nameBuffer;
+  StringRef runtimeName = classDecl->getObjCRuntimeName(nameBuffer);
+
+  auto *metaclass = IGM.getAddrOfMetaclassObject(classDecl, NotForDefinition);
+  auto *name = IGM.getAddrOfGlobalString(runtimeName,
+                                         CStringSectionType::ObjCClassName);
+
+  llvm::Constant *superclass = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
+  if (auto superclassType = getSuperclassForMetadata(IGM, classDecl)) {
+    if (auto superclassMetadata =
+            tryEmitConstantHeapMetadataRef(IGM, superclassType,
+                                           /*allowUninit*/ false)) {
+      superclass = llvm::ConstantExpr::getBitCast(superclassMetadata,
+                                                  IGM.ObjCClassPtrTy);
+    }
+  }
+
+  auto nullClass = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
+  auto nullOpaque = llvm::ConstantPointerNull::get(IGM.OpaquePtrTy);
+  auto nullFunction = llvm::ConstantPointerNull::get(IGM.FunctionPtrTy);
+
+  llvm::Constant *fields[] = {
+    llvm::ConstantExpr::getBitCast(metaclass, IGM.ObjCClassPtrTy),
+    superclass,
+    name,
+    llvm::ConstantInt::get(IGM.IntPtrTy, 0),
+    llvm::ConstantInt::get(IGM.IntPtrTy, 0),
+    llvm::ConstantInt::get(IGM.IntPtrTy,
+                           fieldLayout.isFixedSize()
+                               ? fieldLayout.getSize().getValue()
+                               : 0),
+    nullOpaque,
+    getGNUstepObjCListGlobal(IGM, "_INSTANCE_METHODS_", runtimeName),
+    nullOpaque,
+    nullClass,
+    nullFunction,
+    nullFunction,
+    nullClass,
+    getGNUstepObjCListGlobal(IGM, "_PROTOCOLS_", runtimeName),
+    nullOpaque,
+    llvm::ConstantInt::get(IGM.IntPtrTy, 0),
+    getGNUstepObjCListGlobal(IGM, "_PROPERTIES_", runtimeName)
+  };
+
+  auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy, fields);
+  LinkEntity entity = LinkEntity::forObjCClass(classDecl);
+  LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
+  auto *global = new llvm::GlobalVariable(
+      IGM.Module, IGM.ObjCClassStructTy, /*isConstant*/ false,
+      link.getLinkage(), init, link.getName());
+  ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
+      .to(global, link.isForDefinition());
+  global->setExternallyInitialized(true);
+
+  auto refName = (Twine("._OBJC_REF_CLASS_") + runtimeName).str();
+  if (!IGM.Module.getNamedValue(refName)) {
+    auto *ref = new llvm::GlobalVariable(
+        IGM.Module, IGM.ObjCClassPtrTy, /*isConstant*/ false,
+        llvm::GlobalValue::ExternalLinkage,
+        llvm::ConstantExpr::getBitCast(global, IGM.ObjCClassPtrTy), refName);
+    ref->setSection(
+        IGM.GetObjCSectionName("__objc_class_refs", "regular,no_dead_strip"));
+    ref->setExternallyInitialized(true);
+    IGM.addCompilerUsedGlobal(ref);
+  }
+
+  return llvm::ConstantExpr::getBitCast(global, IGM.ObjCClassPtrTy);
 }
 
 /// Check whether the metadata update strategy requires runtime support that is
@@ -5673,6 +5775,14 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     case ClassMetadataStrategy::Update:
     case ClassMetadataStrategy::FixedOrUpdate:
     case ClassMetadataStrategy::Fixed:
+      if (IGM.Context.LangOpts.EnableGNUstepObjCInterop && classDecl->isObjC()) {
+        auto classRecord =
+            emitGNUstepObjCClassRecord(IGM, classDecl, fragileLayout);
+        IGM.addObjCClass(classRecord,
+            classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
+        break;
+      }
+
       if (classDecl->isObjC())
         emitObjCClassSymbol(IGM, classDecl, var, var->getValueType());
 
@@ -7129,6 +7239,12 @@ void irgen::emitSpecializedGenericEnumMetadata(IRGenModule &IGM, CanType type,
 }
 
 llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
+  if (IGM.Context.LangOpts.EnableGNUstepObjCInterop) {
+    auto *selectorName = IGM.getAddrOfObjCMethodName(selector);
+    return Builder.CreateCall(IGM.getObjCSelRegisterNameFunctionPointer(),
+                              selectorName);
+  }
+
   llvm::Constant *loadSelRef = IGM.getAddrOfObjCSelectorRef(selector);
   llvm::Value *loadSel = Builder.CreateLoad(
       Address(loadSelRef, IGM.Int8PtrTy, IGM.getPointerAlignment()));

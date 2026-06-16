@@ -33,10 +33,24 @@ macro(defaulted_set variable type helptext)
   endif()
 endmacro()
 
+if(DEFINED SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
+  set(
+    SwiftCore_ENABLE_OBJC_INTEROP_from_stdlib_default
+    "${SWIFT_STDLIB_ENABLE_OBJC_INTEROP}"
+  )
+endif()
+
 if(APPLE)
   set(SwiftCore_ENABLE_LIBRARY_EVOLUTION_default ON)
   set(SwiftCore_ENABLE_CRASH_REPORTER_CLIENT_default ON)
-  set(SwiftCore_ENABLE_OBJC_INTEROP_default ON)
+  if(DEFINED SwiftCore_ENABLE_OBJC_INTEROP_from_stdlib_default)
+    set(
+      SwiftCore_ENABLE_OBJC_INTEROP_default
+      "${SwiftCore_ENABLE_OBJC_INTEROP_from_stdlib_default}"
+    )
+  else()
+    set(SwiftCore_ENABLE_OBJC_INTEROP_default ON)
+  endif()
   set(SwiftCore_ENABLE_REFLECTION_default ON)
   set(SwiftCore_ENABLE_FATALERROR_BACKTRACE_default ON)
   set(SwiftCore_ENABLE_RUNTIME_OS_VERSIONING_default ON)
@@ -49,6 +63,12 @@ if(APPLE)
 elseif(ANDROID OR BSD OR LINUX OR WASI OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(SwiftCore_OBJECT_FORMAT_default "elf")
 
+  if(DEFINED SwiftCore_ENABLE_OBJC_INTEROP_from_stdlib_default)
+    set(
+      SwiftCore_ENABLE_OBJC_INTEROP_default
+      "${SwiftCore_ENABLE_OBJC_INTEROP_from_stdlib_default}"
+    )
+  endif()
   set(SwiftCore_ENABLE_REFLECTION_default ON)
   if(WASI)
     set(SwiftCore_ENABLE_FATALERROR_BACKTRACE_default OFF)
@@ -80,6 +100,12 @@ elseif(WIN32)
   set(SwiftCore_ENABLE_LIBRARY_EVOLUTION_default ${BUILD_SHARED_LIBS})
   set(SwiftCore_ENABLE_REFLECTION_default ON)
   set(SwiftCore_ENABLE_FATALERROR_BACKTRACE_default ON)
+  if(DEFINED SwiftCore_ENABLE_OBJC_INTEROP_from_stdlib_default)
+    set(
+      SwiftCore_ENABLE_OBJC_INTEROP_default
+      "${SwiftCore_ENABLE_OBJC_INTEROP_from_stdlib_default}"
+    )
+  endif()
   set(SwiftCore_ENABLE_OVERRIDABLE_RETAIN_RELEASE_default ON)
   set(SwiftCore_ENABLE_CONCURRENCY_default NO)
   set(SwiftCore_ENABLE_REMOTE_MIRROR_default NO)

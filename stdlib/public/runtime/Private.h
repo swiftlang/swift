@@ -156,7 +156,16 @@ public:
   /// Is the given value an Objective-C tagged pointer?
   static inline bool isObjCTaggedPointer(const void *object) {
 #if SWIFT_OBJC_INTEROP
+#if defined(__GNUSTEP_RUNTIME__) && defined(__LP64__)
+    auto value = (uintptr_t) object;
+    // GNUstep/libobjc2 small objects use the low three bits as the class
+    // identifier. Payloads such as GSTinyString may occupy high pointer bits,
+    // so they are not necessarily below LeastValidPointerValue.
+    return (value & heap_object_abi::ObjCReservedBitsMask) ||
+           (value & 0x7);
+#else
     return (((uintptr_t) object) & heap_object_abi::ObjCReservedBitsMask);
+#endif
 #else
     assert(!(((uintptr_t) object) & heap_object_abi::ObjCReservedBitsMask));
     return false;

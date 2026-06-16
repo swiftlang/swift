@@ -211,8 +211,12 @@ private struct UseCollector : AddressDefUseWalker {
       if !openExistential.isImmutable {
         return.abortWalk
       }
-    case is UncheckedTakeEnumDataAddrInst:
-      return .abortWalk
+    case let takeEnum as UncheckedTakeEnumDataAddrInst:
+      // In certain cases, `unchecked_take_enum_data_addr` invalidates the underlying memory.
+      if takeEnum.mayBeDestructive {
+        return .abortWalk
+      }
+      return walkDownUses(ofAddress: takeEnum, path: path)
     case let beginAccess as BeginAccessInst:
       if beginAccess.accessKind != .read {
         return .abortWalk
@@ -222,6 +226,10 @@ private struct UseCollector : AddressDefUseWalker {
       // `drop_deinit` is a side-effect instruction can can meaningfully exist without any users.
       // Therefore we have to explicitly add it to `users`.
       users.append(dropDeinit)
+    case is DeallocStackInst:
+      return .continueWalk
+    case is TermInst, is UnconditionalCheckedCastAddrInst:
+      return .abortWalk
     default:
       break
     }

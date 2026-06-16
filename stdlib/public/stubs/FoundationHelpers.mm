@@ -23,6 +23,7 @@
 #include "swift/shims/CoreFoundationShims.h"
 #import <objc/runtime.h>
 #include "swift/Runtime/Once.h"
+#include <cassert>
 #include <dlfcn.h>
 
 typedef enum {
@@ -159,4 +160,3 @@ _swift_stdlib_CreateIndirectTaggedPointerString(const __swift_uint8_t *bytes,
 }
 
 #endif
-

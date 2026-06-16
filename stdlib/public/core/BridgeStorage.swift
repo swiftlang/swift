@@ -42,7 +42,11 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     // Note: Some platforms provide more than one spare bit, but the minimum is
     // a single bit.
 
+    #if _runtime(_ObjC) && canImport(Glibc)
+    _ = NativeClass.self
+    #else
     _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    #endif
 
     rawValue = _makeNativeBridgeObject(
       native,
@@ -52,14 +56,22 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   @inline(__always)
   internal init(objC: ObjC) {
+    #if _runtime(_ObjC) && canImport(Glibc)
+    _ = NativeClass.self
+    #else
     _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    #endif
     rawValue = _makeObjCBridgeObject(objC)
   }
 
   @inlinable
   @inline(__always)
   internal init(native: Native) {
+    #if _runtime(_ObjC) && canImport(Glibc)
+    _ = NativeClass.self
+    #else
     _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    #endif
     rawValue = Builtin.reinterpretCast(native)
   }
 

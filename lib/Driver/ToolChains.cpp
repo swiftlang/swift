@@ -203,12 +203,20 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-aarch64-use-tbi");
   }
 
-  // Enable or disable ObjC interop appropriately for the platform
-  if (Triple.isOSDarwin() &&
+  bool requestedGNUstepObjCInterop =
+      inputArgs.hasArg(options::OPT_gnustep_objc_interop);
+  bool enableGNUstepObjCInterop =
+      requestedGNUstepObjCInterop && Triple.isOSLinux();
+
+  // Enable or disable ObjC interop appropriately for the platform.
+  // GNUstep mode is an explicit opt-in on Linux targets and overrides the
+  // non-Darwin default disablement, but still lowers to the existing frontend
+  // ObjC interop switch for now.
+  if (enableGNUstepObjCInterop || (Triple.isOSDarwin() &&
       !containsValue(
           inputArgs
             .getAllArgValues(options::OPT_enable_experimental_feature),
-          "Embedded")) {
+          "Embedded"))) {
     arguments.push_back("-enable-objc-interop");
   } else {
     arguments.push_back("-disable-objc-interop");
@@ -313,6 +321,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
   inputArgs.AddLastArg(arguments, options::OPT_debug_info_format);
   inputArgs.AddLastArg(arguments, options::OPT_dwarf_version);
+  inputArgs.AddLastArg(arguments, options::OPT_gnustep_objc_interop);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);

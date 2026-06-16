@@ -423,7 +423,7 @@ static bool fixupHandlerInstaller = [] {
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 #endif
 
-#if SWIFT_OBJC_INTEROP
+#if SWIFT_OBJC_INTEROP && !defined(__GNUSTEP_RUNTIME__)
 extern "C" void *_objc_empty_cache;
 #endif
 
@@ -432,8 +432,11 @@ template <> bool Metadata::isStaticallySpecializedGenericMetadata() const {
     return metadata->isStaticallySpecializedGenericMetadata();
   if (auto *metadata = dyn_cast<EnumMetadata>(this))
     return metadata->isStaticallySpecializedGenericMetadata();
-  if (auto *metadata = dyn_cast<ClassMetadata>(this))
+  if (auto *metadata = dyn_cast<ClassMetadata>(this)) {
+    if (!metadata->isTypeMetadata())
+      return false;
     return metadata->isStaticallySpecializedGenericMetadata();
+  }
 
   return false;
 }
@@ -443,8 +446,11 @@ template <> const TypeContextDescriptor *Metadata::getDescription() const {
     return metadata->getDescription();
   if (auto *metadata = dyn_cast<EnumMetadata>(this))
     return metadata->getDescription();
-  if (auto *metadata = dyn_cast<ClassMetadata>(this))
+  if (auto *metadata = dyn_cast<ClassMetadata>(this)) {
+    if (!metadata->isTypeMetadata())
+      return nullptr;
     return metadata->getDescription();
+  }
 
   return nullptr;
 }
@@ -455,8 +461,11 @@ bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
   if (auto *metadata = dyn_cast<EnumMetadata>(this))
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
-  if (auto *metadata = dyn_cast<ClassMetadata>(this))
+  if (auto *metadata = dyn_cast<ClassMetadata>(this)) {
+    if (!metadata->isTypeMetadata())
+      return false;
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+  }
 
   return false;
 }
@@ -544,7 +553,11 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
 #if SWIFT_OBJC_INTEROP
   // Cache data.  Install the same initializer that the compiler is
   // required to use.  We don't need to do this in non-ObjC-interop modes.
+#if defined(__GNUSTEP_RUNTIME__)
+  metadata->CacheData[0] = nullptr;
+#else
   metadata->CacheData[0] = &_objc_empty_cache;
+#endif
   metadata->CacheData[1] = nullptr;
 #endif
 
@@ -731,8 +744,14 @@ _cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description) {
       auto *canonicalMetadataAccessor = canonicalMetadataAccessorPtr.get();
       auto response = canonicalMetadataAccessor(request);
       auto *canonicalMetadata = response.Value;
+      if (!request.isSatisfiedBy(response.State) || canonicalMetadata == nullptr)
+        continue;
+
       const void *const *arguments =
           reinterpret_cast<const void *const *>(canonicalMetadata->getGenericArgs());
+      if (arguments == nullptr)
+        continue;
+
       auto key = MetadataCacheKey(cache.SigLayout, arguments);
       auto result = cache.getOrInsert(key, MetadataRequest(MetadataState::Complete, /*isNonBlocking*/true), canonicalMetadata);
       (void)result;
@@ -742,8 +761,14 @@ _cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description) {
     auto canonicalMetadatas = description->getCanonicalMetadataPrespecializations();
     for (auto &canonicalMetadataPtr : canonicalMetadatas) {
       Metadata *canonicalMetadata = canonicalMetadataPtr.get();
+      if (canonicalMetadata == nullptr)
+        continue;
+
       const void *const *arguments =
           reinterpret_cast<const void *const *>(canonicalMetadata->getGenericArgs());
+      if (arguments == nullptr)
+        continue;
+
       auto key = MetadataCacheKey(cache.SigLayout, arguments);
       auto result = cache.getOrInsert(key, MetadataRequest(MetadataState::Complete, /*isNonBlocking*/true), canonicalMetadata);
       (void)result;
@@ -3684,7 +3709,11 @@ _swift_relocateClassMetadata(const ClassDescriptor *description,
 #if SWIFT_OBJC_INTEROP
   // Cache data.  Install the same initializer that the compiler is
   // required to use.  We don't need to do this in non-ObjC-interop modes.
+#if defined(__GNUSTEP_RUNTIME__)
+  metadata->CacheData[0] = nullptr;
+#else
   metadata->CacheData[0] = &_objc_empty_cache;
+#endif
   metadata->CacheData[1] = nullptr;
 #endif
 
@@ -3844,14 +3873,18 @@ static char *copyGenericClassObjCName(ClassMetadata *theClass) {
 }
 
 static void initGenericClassObjCName(ClassMetadata *theClass) {
-  auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
-
   char *name = copyGenericClassObjCName(theClass);
   getROData(theClass)->Name = name;
+#if !defined(__GNUSTEP_RUNTIME__)
+  auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
   getROData(theMetaclass)->Name = name;
+#endif
 }
 
 static bool installLazyClassNameHook() {
+#if defined(__GNUSTEP_RUNTIME__)
+  return false;
+#else
   static objc_hook_lazyClassNamer oldHook;
   auto myHook = [](Class theClass) -> const char * {
     ClassMetadata *metadata = (ClassMetadata *)theClass;
@@ -3866,6 +3899,7 @@ static bool installLazyClassNameHook() {
   }
 
   return false;
+#endif
 }
 
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
@@ -3878,9 +3912,11 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 static void setUpGenericClassObjCName(ClassMetadata *theClass) {
   if (supportsLazyObjcClassNames()) {
     getROData(theClass)->Name = nullptr;
+#if !defined(__GNUSTEP_RUNTIME__)
     auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
     getROData(theMetaclass)->Name = nullptr;
     getROData(theMetaclass)->NonMetaClass = theClass;
+#endif
   } else {
     initGenericClassObjCName(theClass);
   }
@@ -3957,10 +3993,16 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
        theSuperclass->getDescription()->isGeneric())) {
     // Set up the superclass of the metaclass, which is the metaclass of the
     // superclass.
+#if defined(__GNUSTEP_RUNTIME__)
+    // GNUstep/libobjc2 may not have a stable metaclass object yet while Swift
+    // generic class metadata is still being initialized. Let the runtime
+    // resolve the metaclass chain during class realization instead.
+#else
     auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
     auto theSuperMetaclass
       = (const ClassMetadata *)object_getClass(id_const_cast(theSuperclass));
     theMetaclass->Superclass = theSuperMetaclass;
+#endif
   }
 #endif
 }
@@ -4491,11 +4533,15 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // The compiler enforces that @objc methods in extensions of classes
     // with resilient ancestry have the correct availability, so it should
     // be safe to ignore the stub in this case.
+#if defined(__GNUSTEP_RUNTIME__)
+    swift_instantiateObjCClass(self);
+#else
     if (stub != nullptr && SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift)) {
       SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub)));
     } else {
       swift_instantiateObjCClass(self);
     }
+#endif
   }
 #else
   assert(!self->getDescription()->hasObjCResilientClassStub());
@@ -4534,7 +4580,11 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets,
                                bool allowDependency) {
+#if defined(__GNUSTEP_RUNTIME__)
+  bool requiresUpdate = false;
+#else
   bool requiresUpdate = SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
+#endif
 
   // If we're on a newer runtime, we're going to be initializing the
   // field offset vector. Realize the superclass metadata first, even
@@ -4582,7 +4632,11 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
     initObjCClass(self, numFields, fieldTypes, fieldOffsets);
 
     // See remark above about how this slides field offset globals.
+#if defined(__GNUSTEP_RUNTIME__)
+    swift_getInitializedObjCClass((Class)self);
+#else
     SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift((Class)self, (Class)self));
+#endif
   }
 
   return MetadataDependency();
@@ -4614,6 +4668,11 @@ swift::swift_updatePureObjCClassMetadata(Class cls,
                                          ClassLayoutFlags flags,
                                          size_t numFields,
                                          const TypeLayout * const *fieldTypes) {
+#if defined(__GNUSTEP_RUNTIME__)
+  SWIFT_DEFER {
+    swift_getInitializedObjCClass(cls);
+  };
+#else
   bool hasRealizeClassFromSwift =
     SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
   assert(hasRealizeClassFromSwift);
@@ -4624,6 +4683,7 @@ swift::swift_updatePureObjCClassMetadata(Class cls,
     // stored in the field offset globals.
     SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift(cls, cls));
   };
+#endif
 
   // Update the field offset globals using runtime type information; the layout
   // of resilient types might be different than the statically-emitted layout.
@@ -6755,7 +6815,7 @@ getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
                                          SWIFT_MEMORY_ORDER_CONSUME)) {
     // Someone beat us to the punch. Throw away our table and return the
     // existing one.
-    allocator.Deallocate(buffer);
+    allocator.Deallocate(buffer, tableSize, alignof(void *));
     return orig;
   }
   
@@ -7692,6 +7752,8 @@ static Result performOnMetadataCache(const Metadata *metadata,
   // Handle different kinds of type that can delay their metadata.
   const TypeContextDescriptor *description;
   if (auto classMetadata = dyn_cast<ClassMetadata>(metadata)) {
+    if (!classMetadata->isTypeMetadata())
+      return std::move(callbacks).forOtherMetadata(metadata);
     description = classMetadata->getDescription();
   } else if (auto valueMetadata = dyn_cast<ValueMetadata>(metadata)) {
     description = valueMetadata->getDescription();
@@ -7778,6 +7840,8 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
   // Classes require their superclass to be transitively complete,
   // and they can be generic.
   if (auto classType = dyn_cast<ClassMetadata>(type)) {
+    if (!classType->isTypeMetadata())
+      return false;
     description = classType->getDescription();
     if (auto super = classType->Superclass) {
       if (super->isTypeMetadata() && predicate(super))
@@ -8433,6 +8497,15 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
 
 void MetadataAllocator::Deallocate(const void *allocation, size_t size,
                                    size_t Alignment) {
+#if defined(__GNUSTEP_RUNTIME__)
+  // GNUstep interop bring-up still hits metadata-pool rollback corruption in
+  // speculative / loser allocation paths. Leak pooled metadata allocations for
+  // now rather than rewinding the shared arena over stale bytes.
+  if (size <= PoolRange::MaxPoolAllocationSize) {
+    return;
+  }
+#endif
+
   __asan_poison_memory_region(allocation, size);
 
   if (size > PoolRange::MaxPoolAllocationSize) {

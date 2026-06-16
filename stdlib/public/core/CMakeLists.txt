@@ -341,6 +341,22 @@ elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "FREEBSD")
   find_library(EXECINFO_LIBRARY execinfo)
   list(APPEND swift_core_private_link_libraries ${EXECINFO_LIBRARY})
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "LINUX")
+  if(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
+    set(swift_gnustep_library_search_paths
+      "/usr/GNUstep/System/Library/Libraries"
+      "/usr/GNUstep/Local/Library/Libraries"
+      "${CMAKE_BINARY_DIR}/../install/System/Library/Libraries"
+      "${CMAKE_BINARY_DIR}/../install/Local/Library/Libraries")
+    find_library(SWIFT_GNUSTEP_BASE_LIBRARY
+      NAMES gnustep-base libgnustep-base
+      PATHS ${swift_gnustep_library_search_paths})
+    find_library(SWIFT_GNUSTEP_OBJC_LIBRARY
+      NAMES objc libobjc
+      PATHS ${swift_gnustep_library_search_paths})
+    list(APPEND swift_core_private_link_libraries
+      ${SWIFT_GNUSTEP_OBJC_LIBRARY}
+      ${SWIFT_GNUSTEP_BASE_LIBRARY})
+  endif()
   if(SWIFT_BUILD_STATIC_STDLIB)
     list(APPEND swift_core_private_link_libraries)
   endif()
