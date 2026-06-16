@@ -180,6 +180,117 @@ extension SendableExtSub: @unchecked Sendable {}
 class MultiConformance: @unchecked Sendable {} // expected-note {{'MultiConformance' declares conformance to protocol 'Sendable' here}}
 extension MultiConformance: @unchecked Sendable {} // expected-warning {{redundant conformance of 'MultiConformance' to protocol 'Sendable'}}
 
+// SE-0434: adding global-actor isolation to a non-Sendable superclass does not
+// make a class 'Sendable' and an explicit conformance is diagnosed.
+@available(SwiftStdlib 5.1, *)
+class NonSendableSuperclass {}
+
+// Non-isolated was always rejected, so its an error in the Swift 6 language mode.
+@available(SwiftStdlib 5.1, *)
+final class SendableSubclassOfNonSendable: NonSendableSuperclass, Sendable {}
+// expected-warning@-1:13 {{class 'SendableSubclassOfNonSendable' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
+// expected-note@-2:13 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note@-3:44 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+
+@available(SwiftStdlib 5.1, *)
+@globalActor
+actor SomeActor {
+  static let shared = SomeActor()
+}
+
+// Non-final class rule shouldn't fire.
+@available(SwiftStdlib 5.1, *)
+@MainActor
+class IsolatedSendableSubclass: NonSendableSuperclass, Sendable {
+  // expected-warning@-1:7 {{class 'IsolatedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+  // expected-note@-2:7 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+  // expected-note@-3:33 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+  var state = NonSendableSuperclass() // not flagged: global-actor isolation protects the storage
+}
+
+@available(SwiftStdlib 5.1, *)
+@SomeActor
+class OtherIsolatedSendableSubclass: NonSendableSuperclass, Sendable {}
+// expected-warning@-1:7 {{class 'OtherIsolatedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note@-2:7 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note@-3:38 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+
+@available(SwiftStdlib 5.1, *)
+protocol RefinesSendable: Sendable {}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+class IsolatedImpliedSendableSubclass: NonSendableSuperclass, RefinesSendable {}
+// expected-warning@-1:7 {{class 'IsolatedImpliedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note@-2:7 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note@-3:40 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+final class IsolatedExtensionSendableSubclass: NonSendableSuperclass {}
+// expected-note@-1:48 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+
+@available(SwiftStdlib 5.1, *)
+extension IsolatedExtensionSendableSubclass: Sendable {}
+// expected-warning@-1:1 {{class 'IsolatedExtensionSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note@-2:1 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+class IsolatedUncheckedSendableSubclass: NonSendableSuperclass, @unchecked Sendable {}
+
+// An unavailable conformance is the explicit "not Sendable" opt-out; exempt.
+@available(SwiftStdlib 5.1, *)
+@MainActor
+class IsolatedUnavailableSendableSubclass: NonSendableSuperclass {}
+
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable)
+extension IsolatedUnavailableSendableSubclass: Sendable {}
+
+// Restating Sendable is allowed!
+@available(SwiftStdlib 5.1, *)
+@MainActor
+final class IsolatedSubclassOfIsolated: MainSuper, Sendable {}
+
+// No explicit conformance: the implicit one is withheld, so it isn't 'Sendable'.
+@available(SwiftStdlib 5.1, *)
+@MainActor
+class IsolatedNonSendableSubclass: NonSendableSuperclass {}
+// expected-complete-note@-1:7 {{class 'IsolatedNonSendableSubclass' does not conform to the 'Sendable' protocol}}
+
+@available(SwiftStdlib 5.1, *)
+func needsSendable<T: Sendable>(_: T) {}
+
+@available(SwiftStdlib 5.1, *)
+func passIsolatedNonSendableSubclass(_ instance: IsolatedNonSendableSubclass) {
+  needsSendable(instance)
+  // expected-complete-warning@-1:3 {{type 'IsolatedNonSendableSubclass' does not conform to the 'Sendable' protocol}}
+}
+
+@available(SwiftStdlib 5.1, *)
+class TildeNonSendableSuperclass: ~Sendable {}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+final class IsolatedSubclassOfTildeSuper: TildeNonSendableSuperclass, Sendable {}
+// expected-warning@-1:13 {{class 'IsolatedSubclassOfTildeSuper' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note@-2:13 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note@-3:43 {{inherits from non-Sendable class 'TildeNonSendableSuperclass'}}
+
+// `@MainActor` does not override an explicit `~Sendable` suppression, so an
+// isolated base is still non-Sendable and the subclass is diagnosed.
+@available(SwiftStdlib 5.1, *)
+@MainActor
+class IsolatedTildeSuper: ~Sendable {}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+final class IsolatedSubclassOfIsolatedTilde: IsolatedTildeSuper, Sendable {}
+// expected-warning@-1:13 {{class 'IsolatedSubclassOfIsolatedTilde' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note@-2:13 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note@-3:46 {{inherits from non-Sendable class 'IsolatedTildeSuper'}}
+
 @available(SwiftStdlib 5.1, *)
 actor MyActor {
   // expected-warning@+1 {{non-final class 'Nested' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}} {{3-3=final }}

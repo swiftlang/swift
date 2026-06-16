@@ -121,6 +121,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:strict-language-features>
 - <doc:strict-memory-safety>
 - <doc:temporary-pointers>
+- <doc:non-sendable-superclass>
 - <doc:unavailable-sendable-conformance>
 - <doc:opaque-type-inference>
 - <doc:region-isolation-unknown-pattern>
