@@ -11,7 +11,7 @@ actor TestActor {}
 
 @globalActor
 struct SomeGlobalActor {
-  static var shared: TestActor { TestActor() }
+  static let shared = TestActor()
 }
 
 // expected-note@+1 6 {{calls to global function 'syncGlobActorFn()' from outside of its actor context are implicitly asynchronous}}
