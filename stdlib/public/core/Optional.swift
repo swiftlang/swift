@@ -156,7 +156,7 @@ where Wrapped: ~Copyable & ~Escapable {
   /// initializer behind the scenes.
   @_transparent
   @_preInverseGenerics
-  @lifetime(immortal)
+  @_lifetime(immortal)
   public init(nilLiteral: ()) {
     self = .none
   }
@@ -166,7 +166,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Creates an instance that stores the given value.
   @_transparent
   @_preInverseGenerics
-  @lifetime(copy value)
+  @_lifetime(copy value)
   public init(_ value: consuming Wrapped) {
     self = .some(value)
   }
@@ -354,7 +354,7 @@ extension Optional where Wrapped: ~Escapable {
     // implementation is copying the value, so that generalization will need to
     // be emitted into clients -- `@_preInverseGenerics` will not cut it.
     @inline(__always)
-    @lifetime(copy self)
+    @_lifetime(copy self)
     get {
       if let x = self {
         return x
@@ -367,7 +367,7 @@ extension Optional where Wrapped: ~Escapable {
 extension Optional where Wrapped: ~Copyable & ~Escapable {
   // FIXME(NCG): Do we want this? It seems like we do. Make this public.
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public consuming func _consumingUnsafelyUnwrap() -> Wrapped {
     switch consume self {
     case .some(let x):
@@ -387,7 +387,7 @@ extension Optional where Wrapped: ~Escapable {
   @_preInverseGenerics
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
-    @lifetime(copy self)
+    @_lifetime(copy self)
     get {
       if let x = self {
         return x
@@ -403,7 +403,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   internal consuming func _consumingUncheckedUnwrapped() -> Wrapped {
     if let x = self {
       return x
@@ -417,7 +417,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
 extension Optional where Wrapped: ~Copyable & Escapable {
   @_alwaysEmitIntoClient
   @_addressableSelf
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   public func _span() -> Span<Wrapped> {
     if self == nil {
       return Span()
@@ -446,7 +446,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// - Returns: The wrapped value being stored in this instance. If this
   ///   instance is `nil`, returns `nil`.
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public mutating func take() -> Self {
     let result = consume self
     self = nil
@@ -840,7 +840,7 @@ public func ?? <T: ~Copyable>(
   // To implement that, we need to be able to express that the result's lifetime
   // is limited to the intersection of `optional` and the result of
   // `defaultValue`:
-  //    @lifetime(optional, defaultValue.result)
+  //    @_lifetime(optional, defaultValue.result)
   switch consume optional {
   case .some(let value):
     return value
@@ -916,7 +916,7 @@ public func ?? <T: ~Copyable>(
   // To implement that, we need to be able to express that the result's lifetime
   // is limited to the intersection of `optional` and the result of
   // `defaultValue`:
-  //    @lifetime(optional, defaultValue.result)
+  //    @_lifetime(optional, defaultValue.result)
   switch consume optional {
   case .some(let value):
     return value

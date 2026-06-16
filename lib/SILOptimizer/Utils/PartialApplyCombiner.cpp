@@ -201,6 +201,9 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   }
 
   SILValue callee = pai->getCallee();
+  // Apply might consume pai not directly, but after some conversions. If
+  // destroy_value would be needed, it must consume effective callee of AI.
+  SILValue effectiveCallee = paiAI.getCallee();
   SubstitutionMap subs = pai->getSubstitutionMap();
 
   if (auto *tai = dyn_cast<TryApplyInst>(paiAI)) {
@@ -221,7 +224,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   // consumed by the apply_instruction.
   if (!pai->hasCalleeGuaranteedContext()) {
     paiAI.insertAfterApplication([&](SILBuilder &builder) {
-      builder.emitDestroyValueOperation(destroyloc, pai);
+      builder.emitDestroyValueOperation(destroyloc, effectiveCallee);
     });
   }
   callbacks.deleteInst(paiAI.getInstruction());

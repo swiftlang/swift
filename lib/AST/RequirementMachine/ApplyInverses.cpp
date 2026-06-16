@@ -45,6 +45,7 @@ void swift::rewriting::applyInverses(
     ArrayRef<Type> gps,
     ArrayRef<InverseRequirement> inverseList,
     ArrayRef<StructuralRequirement> explicitRequirements,
+    DefaultRequirementOptions options,
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors) {
 
@@ -102,8 +103,11 @@ void swift::rewriting::applyInverses(
     auto secondTy =
         stripBoundDependentMemberTypes(explicitReqt.req.getSecondType())
             ->getCanonicalType();
-    if (!representativeGPs.count(firstTy)
-        && !representativeGPs.count(secondTy)) {
+
+    const bool foundFirst = representativeGPs.count(firstTy);
+    const bool foundSecond = representativeGPs.count(secondTy);
+
+    if (!foundFirst && !foundSecond) {
       // Same type constraint doesn't involve any in-scope generic parameters.
       continue;
     }
@@ -111,13 +115,11 @@ void swift::rewriting::applyInverses(
     CanType typeInScope;
     CanType typeOutOfScope;
 
-    if (representativeGPs.count(firstTy)
-        && !representativeGPs.count(secondTy)){
+    if (foundFirst && !foundSecond){
       // First type is constrained out of scope.
       typeInScope = firstTy;
       typeOutOfScope = secondTy;
-    } else if (!representativeGPs.count(firstTy)
-               && representativeGPs.count(secondTy)) {
+    } else if (!foundFirst && foundSecond) {
       // Second type is constrained out of scope.
       typeInScope = secondTy;
       typeOutOfScope = firstTy;
@@ -153,7 +155,8 @@ void swift::rewriting::applyInverses(
     // It would probably have been more principled to suppress any defaulting
     // in this case, but this behavior shipped in Swift 6.0 and 6.1, so we
     // need to maintain source compatibility.
-    if (typeOutOfScope->isTypeParameter()) {
+    if (typeOutOfScope->isTypeParameter() &&
+        !options.contains(InferOutOfScopeImpliedInverses)) {
       continue;
     }
     

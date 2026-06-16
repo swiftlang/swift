@@ -20,6 +20,7 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "ResultPlan.h"
+#include "SILGenFunction.h"
 #include "Scope.h"
 #include "SpecializedEmitter.h"
 #include "StorageRefResult.h"
@@ -1435,8 +1436,24 @@ public:
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
       // FIXME(backDeploy): Handle calls to back deployed methods on super?
-      constant = SILDeclRef(declRef->getDecl())
-        .asForeign(requiresForeignEntryPoint(declRef->getDecl()));
+      auto funcDecl = cast<FuncDecl>(declRef->getDecl());
+
+      // A call to a virtual method of a foreign reference type in Swift
+      // resolves to a synthesized thunk that performs dynamic dispatch.
+      // However, a `super` call should statically dispatch to the base class
+      // implementation. Substitute it so the direct call below references that
+      // symbol instead of the thunk.
+      if (auto classDecl = funcDecl->getDeclContext()->getSelfClassDecl()) {
+        if (classDecl->isForeignReferenceType()) {
+          auto clangImporter = SGF.getASTContext().getClangModuleLoader();
+          if (auto original =
+                  clangImporter->getOriginalForVirtualThunk(funcDecl))
+            funcDecl = original;
+        }
+      }
+
+      constant =
+          SILDeclRef(funcDecl).asForeign(requiresForeignEntryPoint(funcDecl));
 
       if (declRef->getDeclRef().isSpecialized())
         substitutions = declRef->getDeclRef().getSubstitutions();
@@ -1750,7 +1767,7 @@ public:
         // See if setting isolation of old type to nonisolated(nonsending)
         // yields the new type.
         auto addedNonIsolatedNonSending = oldFnTy->getExtInfo().withIsolation(
-            FunctionTypeIsolation::forNonIsolatedCaller());
+            FunctionTypeIsolation::forNonisolatedNonsending());
 
         return oldFnTy->withExtInfo(addedNonIsolatedNonSending) == newFnTy;
       }
@@ -2250,8 +2267,9 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
 /// If the given source loc is in a macro expansion buffer, this
 /// method walks up the macro expansion buffer tree to the outermost
 /// source file. Otherwise, the method returns the given loc.
-static SourceLoc
-getLocInOutermostSourceFile(SourceManager &sourceManager, SourceLoc loc) {
+SourceLoc
+SILGenFunction::getLocInOutermostSourceFile(SourceLoc loc) {
+  auto &sourceManager = getSourceManager();
   auto outermostLoc = loc;
   auto bufferID = sourceManager.findBufferContainingLoc(outermostLoc);
 
@@ -2297,7 +2315,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   case MagicIdentifierLiteralExpr::Column: {
     unsigned Value = 0;
     if (auto Loc = magicLiteral->getStartLoc()) {
-      Loc = getLocInOutermostSourceFile(SGF.getSourceManager(), Loc);
+      Loc = SGF.getLocInOutermostSourceFile(Loc);
       if (Loc.isValid()) {
         Value = magicLiteral->getKind() == MagicIdentifierLiteralExpr::Line
                     ? ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first
@@ -5518,9 +5536,6 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
   // Get the callee type information.
   auto calleeTypeInfo = callee.getTypeInfo(SGF);
 
-  std::optional<ManagedValue> self;
-  auto fnValue = callee.getFnValue(SGF, self);
-
   // Evaluate the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
   std::optional<SILLocation> uncurriedLoc;
@@ -5530,6 +5545,12 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
       uncurriedArgs, uncurriedLoc);
 
   auto selfArgMV = uncurriedArgs.back();
+
+  std::optional<ManagedValue> self;
+  if (callee.requiresSelfValueForDispatch()) {
+    self = selfArgMV;
+  }
+  auto fnValue = callee.getFnValue(SGF, self);
 
   // Strip the unnecessary copy_value + mark_unresolved_non_copyable_value +
   // begin_borrow instructions added for move-only self argument.
@@ -6024,8 +6045,30 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
                          call->isNoAsync());
 
     // For an implicitly-async call, record the target of the actor hop.
-    if (auto target = call->isImplicitlyAsync())
+    if (auto target = call->isImplicitlyAsync()) {
       emission.setImplicitlyAsync(target);
+    } else {
+      // If we are emitting a call to an `async` variant of an ObjC completion
+      // handler API, we need to hop at the call site because there is no
+      // `async` function that is going to hop in its body. Such calls are
+      // referencing a sync variant with a special completion handler
+      // synthesized the compiler and the isolation context has to be
+      // established beforehand.
+      //
+      // This is specific to global-actor isolated functions because by default
+      // async variants are `nonisolated(nonsending)` and won't switch
+      // isolation.
+      auto callee = call->getCalledValue(/*skipFunctionConversions=*/true);
+      if (auto *F = dyn_cast_or_null<FuncDecl>(callee)) {
+        if (F->getForeignAsyncConvention()) {
+          if (auto crossing = call->getIsolationCrossing()) {
+            auto calleeIsolation = crossing->getCalleeIsolation();
+            if (calleeIsolation.isGlobalActor())
+              emission.setImplicitlyAsync(calleeIsolation);
+          }
+        }
+      }
+    }
   }
 
   return emission;
@@ -6147,38 +6190,6 @@ RValue SILGenFunction::emitApply(
     }
   }
 
-  // If there's a foreign error or async parameter, fill it in.
-  ManagedValue errorTemp;
-  if (auto foreignAsync = calleeTypeInfo.foreign.async) {
-    unsigned completionIndex = foreignAsync->completionHandlerParamIndex();
-
-    // Ram the emitted completion into the argument list, over the placeholder
-    // we left during the first pass.
-    auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
-
-    // We have already lowered foreign self/moved it into position at this
-    // point, so we know that self will be back.
-    ManagedValue self;
-    if (substFnType->hasSelfParam()) {
-      self = args.back();
-    }
-
-    auto origFormalType = *calleeTypeInfo.origFormalType;
-    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(
-        *this, origFormalType, self, loc);
-  }
-  if (auto foreignError = calleeTypeInfo.foreign.error) {
-    unsigned errorParamIndex =
-        foreignError->getErrorParameterIndex();
-
-    // Ram the emitted error into the argument list, over the placeholder
-    // we left during the first pass.
-    auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
-
-    std::tie(errorTemp, errorArgSlot) =
-        resultPlan->emitForeignErrorArgument(*this, loc).value();
-  }
-
   // Emit the raw application.
   GenericSignature genericSig =
     fn.getType().castTo<SILFunctionType>()->getInvocationGenericSignature();
@@ -6256,6 +6267,38 @@ RValue SILGenFunction::emitApply(
     // own executor afterward, since the callee could have made arbitrary hops
     // out of our isolation domain.
     breadcrumb = ExecutorBreadcrumb(true);
+  }
+
+  // If there's a foreign error or async parameter, fill it in.
+  ManagedValue errorTemp;
+  if (auto foreignAsync = calleeTypeInfo.foreign.async) {
+    unsigned completionIndex = foreignAsync->completionHandlerParamIndex();
+
+    // Ram the emitted completion into the argument list, over the placeholder
+    // we left during the first pass.
+    auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
+
+    // We have already lowered foreign self/moved it into position at this
+    // point, so we know that self will be back.
+    ManagedValue self;
+    if (substFnType->hasSelfParam()) {
+      self = args.back();
+    }
+
+    auto origFormalType = *calleeTypeInfo.origFormalType;
+    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(
+        *this, origFormalType, self, loc);
+  }
+  if (auto foreignError = calleeTypeInfo.foreign.error) {
+    unsigned errorParamIndex =
+        foreignError->getErrorParameterIndex();
+
+    // Ram the emitted error into the argument list, over the placeholder
+    // we left during the first pass.
+    auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
+
+    std::tie(errorTemp, errorArgSlot) =
+        resultPlan->emitForeignErrorArgument(*this, loc).value();
   }
 
   SILValue rawDirectResult;
@@ -6997,8 +7040,7 @@ StringRef SILGenFunction::getMagicFunctionString() {
 
 StringRef SILGenFunction::getMagicFilePathString(SourceLoc loc) {
   assert(loc.isValid());
-  auto &sourceManager = getSourceManager();
-  auto outermostLoc = getLocInOutermostSourceFile(sourceManager, loc);
+  auto outermostLoc = getLocInOutermostSourceFile(loc);
 
   return getSourceManager().getDisplayNameForLoc(outermostLoc);
 }
@@ -7465,6 +7507,17 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
     if (selfParam.isConsumedInCaller() || base.getType().isAddressOnly(SGF.F)) {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
+      
+      // If the base is move only and a +0 value, then the copy we're about to emit is invalid
+      // and will later be diagnosed by the move checker. We'll mark the base as unresolved
+      // to give the move checker a chance to salvage things if it can eliminate the copy.
+      if (selfParam.isConsumedInCaller() && !shouldTake && base.getType().isMoveOnly() &&
+          !isa<MarkUnresolvedNonCopyableValueInst>(base.getValue())) {
+          auto marked = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+              loc, base.getValue(),
+              MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+          base = ManagedValue::forBorrowedAddressRValue(marked);
+      }
 
       auto isGuaranteed = selfParam.isGuaranteedInCaller();
 
@@ -8075,17 +8128,6 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
       getLoweredType(ctx.TheRawPointerType), subs,
       {taskOptions, taskFunction.getValue(), resultBuf});
 
-  return ManagedValue::forObjectRValueWithoutOwnership(apply);
-}
-
-ManagedValue SILGenFunction::emitCancelAsyncTask(
-    SILLocation loc, SILValue task) {
-  ASTContext &ctx = getASTContext();
-  auto apply = B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CancelAsyncTask)),
-      getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
-      { task });
   return ManagedValue::forObjectRValueWithoutOwnership(apply);
 }
 

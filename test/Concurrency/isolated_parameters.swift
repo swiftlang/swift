@@ -88,7 +88,7 @@ func checkConformer(_ s: S, _ p: any P, _ ma: MyActor) async {
   s.m(thing: ma)
   await p.m(thing: ma)
   // expected-warning @-1 {{sending 'p' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'p' to actor-isolated instance method 'm(thing:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'p' to actor-isolated instance method 'm(thing:)' risks causing data races between actor-isolated code and code in the current isolation context}}
 }
 
 // Redeclaration checking
@@ -212,7 +212,7 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
 
   await optionalIsolated(ns, to: myActor)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns' to actor-isolated global function 'optionalIsolated(_:to:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns' to actor-isolated global function 'optionalIsolated(_:to:)' risks causing data races between actor-isolated code and code in the current isolation context}}
 }
 
 @MainActor func callFromMainActor(ns: NotSendable) async {

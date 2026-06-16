@@ -287,6 +287,18 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
                                  const SwiftInt *_Nullable versionComponents,
                                  SwiftInt numVersionComponents);
 
+/// Like `canImport`, but does not emit any diagnostics or update the
+/// `CanImportModuleVersions` cache. Use this from analysis paths that
+/// re-evaluate `#if canImport(...)` after the compiler's primary
+/// `EvaluateIfConditionRequest` has already done so, to avoid duplicate
+/// diagnostics.
+SWIFT_NAME("BridgedASTContext.testCanImport(self:importPath:versionKind:versionComponents:numVersionComponents:)")
+bool BridgedASTContext_testCanImport(BridgedASTContext cContext,
+                                     BridgedStringRef importPath,
+                                     BridgedCanImportVersion versionKind,
+                                     const SwiftInt *_Nullable versionComponents,
+                                     SwiftInt numVersionComponents);
+
 SWIFT_NAME("getter:BridgedASTContext.staticBuildConfigurationPtr(self:)")
 void * _Nonnull BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext);
 
@@ -911,6 +923,12 @@ BridgedAllowFeatureSuppressionAttr_createParsed(BridgedASTContext cContext,
                                                 bool inverted,
                                                 BridgedArrayRef cFeatures);
 
+SWIFT_NAME("BridgedPreInverseGenericsAttr.createParsed(_:atLoc:range:)")
+BridgedPreInverseGenericsAttr
+BridgedPreInverseGenericsAttr_createParsed(BridgedASTContext cContext,
+                                           swift::SourceLoc atLoc,
+                                           swift::SourceRange range);
+
 SWIFT_NAME(
     "BridgedBackDeployedAttr.createParsed(_:atLoc:range:platform:version:)")
 BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
@@ -1171,9 +1189,9 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    swift::SourceRange range,
                                                    swift::Identifier name);
 
-SWIFT_NAME("BridgedWarnAttr.createParsed(_:atLoc:range:diagGroupName:behavior:reason:)")
-BridgedWarnAttr
-BridgedWarnAttr_createParsed(BridgedASTContext cContext,
+SWIFT_NAME("BridgedDiagnoseAttr.createParsed(_:atLoc:range:diagGroupName:behavior:reason:)")
+BridgedDiagnoseAttr
+BridgedDiagnoseAttr_createParsed(BridgedASTContext cContext,
                              swift::SourceLoc atLoc,
                              swift::SourceRange range,
                              swift::Identifier diagGroupName,
@@ -3140,6 +3158,7 @@ struct BridgedASTType {
   BRIDGED_INLINE SwiftInt GenericTypeParam_getIndex() const;
   BRIDGED_INLINE swift::GenericTypeParamKind
   GenericTypeParam_getParamKind() const;
+  BRIDGED_INLINE bool Tuple_containsPackExpansionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;
   BRIDGED_INLINE bool containsSILPackExpansionType() const;
   BRIDGED_INLINE bool isSILPackElementAddress() const;
@@ -3148,9 +3167,8 @@ struct BridgedASTType {
 };
 
 class BridgedCanType {
-  swift::TypeBase * _Nullable type;
-
 public:
+  swift::TypeBase * _Nullable type;
   BRIDGED_INLINE BridgedCanType();
   BRIDGED_INLINE BridgedCanType(swift::CanType ty);
   BRIDGED_INLINE swift::CanType unbridged() const;

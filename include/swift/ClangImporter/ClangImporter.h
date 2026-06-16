@@ -657,6 +657,8 @@ public:
 
   bool isCXXMethodMutating(const clang::CXXMethodDecl *method) override;
 
+  bool isCxxMoveOnlyType(const clang::CXXRecordDecl *decl) override;
+
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
@@ -696,6 +698,7 @@ public:
                                   ClangInheritanceInfo inheritance) override;
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
+  FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
@@ -736,7 +739,7 @@ bool isCompletionHandlerParamName(StringRef paramName);
 namespace importer {
 /// Returns true if the given C/C++ reference type uses "immortal"
 /// retain/release functions.
-bool hasImmortalAttrs(const clang::RecordDecl *decl);
+bool hasAnyImmortalAttr(const clang::RecordDecl *decl);
 
 struct ReturnOwnershipInfo {
   ReturnOwnershipInfo(const clang::NamedDecl *decl);
@@ -776,6 +779,12 @@ bool isCxxConstReferenceType(const clang::Type *type);
 /// Determine whether the given Clang record declaration has an attribute that
 /// makes it import as a reference types. Does not check its bases, if any.
 bool hasImportReferenceAttr(const clang::RecordDecl *decl);
+
+/// Determine whether the given Clang record declaration has the
+/// swift_attr("import_opaque_pointer") attribute, which causes any pointer
+/// to this type to be imported as OpaquePointer regardless of whether the
+/// struct definition is complete.
+bool hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl);
 
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
@@ -824,6 +833,24 @@ bool declIsCxxOnly(const Decl *decl);
 
 /// Is this DeclContext an `enum` that represents a C++ namespace?
 bool isClangNamespace(const DeclContext *dc);
+
+/// Enumerate and import all members of the C++ namespace represented by
+/// \p namespaceEnum, invoking \p emit once for each newly imported member.
+///
+/// This is an expensive operation.
+///
+/// \param namespaceEnum  An imported \c EnumDecl whose Clang decl is
+///                       a \c clang::NamespaceDecl.
+/// \param emit           Callback invoked once per unique imported member.
+/// \param includeSpecializations   If true, also emit imported class template
+///                                 specializations declared in the namespace.
+/// \param includeOtherModules      If true, include namespace redeclarations
+///                                 from Clang modules other than where the
+///                                 underlying namespace is from.
+void forEachCXXNamespaceMember(EnumDecl *namespaceEnum,
+                               llvm::function_ref<void(ValueDecl *)> emit,
+                               bool includeSpecializations,
+                               bool includeOtherModules);
 
 /// For some \a templatedClass that inherits from \a base, whether they are
 /// derived from the same class template.

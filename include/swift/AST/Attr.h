@@ -16,6 +16,7 @@
 
 #ifndef SWIFT_ATTR_H
 #define SWIFT_ATTR_H
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
@@ -3616,6 +3617,56 @@ public:
                     Decl *attachedTo) const;
 };
 
+/// The @_preInverseGenerics attribute
+class PreInverseGenericsAttr : public DeclAttribute {
+  /// The potentially unresolved 'ExceptType'.
+  TypeRepr *ExceptTypeRepr;
+
+  /// A ProtocolCompositionType whose contained inverses are those that should
+  /// be KEPT in the mangling of the decl to which this attribute is attached.
+  ///
+  /// A bare `@_preInverseGenerics` is semantically equivalent to
+  /// @_preInverseGenerics(except: Any) because `Any` contains no inverses, thus
+  /// such an attribute will resolve `ExceptType` to `Any`.
+  Type ExceptType;
+
+  friend class ResolvePreInverseGenericsRequest;
+
+public:
+  PreInverseGenericsAttr(SourceLoc AtLoc, SourceRange Range,
+                         TypeRepr *exceptRepr = nullptr,
+                         Type exceptType = Type());
+
+  /// If the 'except:' argument was present, this may still be null in the case
+  /// of a deserialized attribute. The `hasExcept` query is more reliable.
+  TypeRepr *getExceptTypeRepr() const { return ExceptTypeRepr; }
+
+  /// \returns a ProtocolCompositionType whose inverses represent those that
+  /// must be kept when mangling.
+  Type getResolvedExceptType(const Decl *attachedTo) const;
+
+  /// True if this attribute was written with an `except:` argument.
+  bool hasExcept(const Decl *attachedTo) const {
+    return getExceptTypeRepr() != nullptr ||
+           !getAllowedInverses(attachedTo).empty();
+  }
+
+  /// \returns the set of inverses allowed to be mangled.
+  InvertibleProtocolSet getAllowedInverses(const Decl *attachedTo) const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::PreInverseGenerics;
+  }
+
+  PreInverseGenericsAttr *clone(ASTContext &ctx) const {
+    return new (ctx)
+        PreInverseGenericsAttr(AtLoc, Range, ExceptTypeRepr, ExceptType);
+  }
+
+  bool isEquivalent(const PreInverseGenericsAttr *other,
+                    Decl *attachedTo) const;
+};
+
 /// Defines the @abi attribute.
 class ABIAttr : public DeclAttribute {
   friend class DeclAttribute;
@@ -3680,17 +3731,17 @@ public:
   }
 };
 
-class WarnAttr : public DeclAttribute {
+class DiagnoseAttr : public DeclAttribute {
 public:
-  WarnAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior,
+  DiagnoseAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior,
            std::optional<StringRef> Reason, SourceLoc AtLoc, SourceRange Range,
            bool Implicit)
-      : DeclAttribute(DeclAttrKind::Warn, AtLoc, Range, Implicit),
+      : DeclAttribute(DeclAttrKind::Diagnose, AtLoc, Range, Implicit),
         DiagnosticBehavior(Behavior), DiagnosticGroupID(DiagnosticGroupID),
         Reason(Reason) {}
 
-  WarnAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior, bool Implicit)
-      : WarnAttr(DiagnosticGroupID, Behavior, std::nullopt, SourceLoc(),
+  DiagnoseAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior, bool Implicit)
+      : DiagnoseAttr(DiagnosticGroupID, Behavior, std::nullopt, SourceLoc(),
                  SourceRange(), Implicit) {}
 
   WarningGroupBehavior DiagnosticBehavior;
@@ -3698,15 +3749,15 @@ public:
   const std::optional<StringRef> Reason;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::Warn;
+    return DA->getKind() == DeclAttrKind::Diagnose;
   }
 
-  WarnAttr *clone(ASTContext &ctx) const {
-    return new (ctx) WarnAttr(DiagnosticGroupID, DiagnosticBehavior, Reason,
+  DiagnoseAttr *clone(ASTContext &ctx) const {
+    return new (ctx) DiagnoseAttr(DiagnosticGroupID, DiagnosticBehavior, Reason,
                               AtLoc, Range, isImplicit());
   }
 
-  bool isEquivalent(const WarnAttr *other,
+  bool isEquivalent(const DiagnoseAttr *other,
                     Decl *attachedTo) const {
     return Reason == other->Reason;
   }

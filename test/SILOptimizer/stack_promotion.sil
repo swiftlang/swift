@@ -20,6 +20,12 @@ class YY {
 	init(newx: XX)
 }
 
+class C {}
+
+struct S {
+  let c: C
+}
+
 class DummyArrayStorage<Element> {
   @_hasStorage var count : Int
   @_hasStorage var capacity : Int
@@ -1244,5 +1250,28 @@ bb3:
   dealloc_stack %1 : $*XX
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @escaping_array_element
+// CHECK:         alloc_ref $C
+// CHECK-LABEL: } // end sil function 'escaping_array_element'
+sil [ossa] @escaping_array_element : $@convention(thin) (Builtin.Word) -> @owned C {
+bb0(%0 : $Builtin.Word):
+  %1 = integer_literal $Builtin.Word, 2
+  %2 = alloc_ref [stack] [tail_elems $S * %1] $DummyArrayStorage<S>
+  %3 = begin_borrow %2
+  %4 = ref_tail_addr %3, $S
+  %5 = integer_literal $Builtin.Word, 1
+  %6 = index_addr %4, %5
+  %7 = alloc_ref $C
+  %10 = struct $S (%7)
+  store %10 to [init] %6
+  %30 = index_addr [stack_protection] %4, %0
+  %31 = load [copy] %30
+  %32 = destructure_struct %31
+  end_borrow %3
+  dealloc_ref %2
+  dealloc_stack_ref %2
+  return %32
 }
 

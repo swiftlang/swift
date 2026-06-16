@@ -1,8 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: split-file %s %t
-// RUN: %target-build-swift %t/test.swift -I %t/Inputs -o %t/out -cxx-interoperability-mode=swift-6
-// RUN: %target-codesign %t/out
-// RUN: %target-run %t/out
+// RUN: %target-run-simple-swift-split-file(test.swift -I %t/Inputs -cxx-interoperability-mode=swift-6)
 
 // REQUIRES: executable_test
 

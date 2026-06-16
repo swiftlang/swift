@@ -10,7 +10,6 @@ func canImport() {
 #endif
 
 #if canImport(Foo, _version: 1) // expected-warning {{cannot find user version number for module 'Foo'; version number ignored}}
-  // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for module 'Foo'; version number ignored}}
   // An unversioned 'Foo' causes versioned queries to evaluate to 'true'
   let versionCheck = 1 // expected-warning {{initialization of immutable value 'versionCheck' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
@@ -69,12 +68,15 @@ func canImportVersioned() {
   let buildLarger = 1
 #endif
   
-#if canImport(Bar, _version: 113.330.1.2.0) // expected-warning {{trailing components of version '113.330.1.2' are ignored}}
+#if canImport(Bar, _version: 113.330.1.2.0)
   let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
+#if canImport(Bar, _version: 113.330.1.2.0.0) // expected-warning {{trailing components of version '113.330.1.2.0' are ignored}}
+  let extraExtraComponent = 1 // expected-warning {{initialization of immutable value 'extraExtraComponent' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
 #if canImport(Bar, _underlyingVersion: 113.33) // expected-warning{{cannot find user version number for Clang module 'Bar'; version number ignored}}
-  // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for Clang module 'Bar'; version number ignored}}
   // Bar is an unversioned Swift module with no underlying clang module.
   let underlyingMinorSmaller = 1 // expected-warning {{initialization of immutable value 'underlyingMinorSmaller' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
@@ -137,8 +139,12 @@ func canImportUnderlyingVersion() {
   let buildLarger = 1
 #endif
   
-#if canImport(Baz, _underlyingVersion: 113.330.1.2.0) // expected-warning {{trailing components of version '113.330.1.2' are ignored}}
+#if canImport(Baz, _underlyingVersion: 113.330.1.2.0)
   let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Baz, _underlyingVersion: 113.330.1.2.0.0) // expected-warning {{trailing components of version '113.330.1.2.0' are ignored}}
+  let extraExtraComponent = 1 // expected-warning {{initialization of immutable value 'extraExtraComponent' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
 #if canImport(Baz, _version: 113.33)

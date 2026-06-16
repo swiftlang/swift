@@ -175,8 +175,13 @@ struct S {};
 struct SpanWithoutTypeAlias {
   std::span<const int> bar() [[clang::lifetimebound]];
   void foo(std::span<const int> s [[clang::noescape]]);
+  std::span<S<int>> nestedTemplateInstantiationReturn() [[clang::lifetimebound]];
+  void nestedTemplateInstantiationParam(std::span<S<int>> s [[clang::noescape]]);
+  S<int> * __counted_by(len) nestedTemplateInstantiationReturnCounted(int len) [[clang::lifetimebound]];
+  void nestedTemplateInstantiationParamCounted(S<int> * __counted_by(len) p [[clang::noescape]], int len);
   void otherTemplatedType(ConstSpanOfInt copy [[clang::noescape]], S<int>);
   void otherTemplatedType2(ConstSpanOfInt copy [[clang::noescape]], S<int> *);
+  S<int> *otherTemplatedTypeReturn(ConstSpanOfInt copy [[clang::noescape]]);
 };
 
 inline void func(ConstSpanOfInt copy [[clang::noescape]]) {}

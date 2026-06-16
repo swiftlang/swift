@@ -829,6 +829,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssignCopyArrayFrontToBack)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssignCopyArrayBackToFront)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssignTakeArray)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssumeAlignment)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Dereferenceable)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssumeNonNegative)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssumeTrue)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AtomicLoad)
@@ -1063,7 +1064,6 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
 
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskRunInline)
 
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CancelAsyncTask)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyDefaultActor)
 

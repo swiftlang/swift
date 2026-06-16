@@ -63,8 +63,8 @@ sil @simple_partial_apply_caller_decl : $@convention(thin) (@owned @callee_owned
 // CHECK-LABEL: sil shared [ossa] @$s36simple_multiple_partial_apply_caller19closure_with_stringSSTf1cC0_n : $@convention(thin) (@owned String) -> Builtin.Int1 {
 // %0                                             // user: %2
 // CHECK:         %1 = function_ref @closure_with_string : $@convention(thin) (Builtin.Int1, @guaranteed String) -> Builtin.Int1
-// CHECK:         %2 = partial_apply %1(%0) : $@convention(thin) (Builtin.Int1, @guaranteed String) -> Builtin.Int1
-// CHECK:         %3 = copy_value %2
+// CHECK:         [[P:%.*]] = partial_apply %1(%0) : $@convention(thin) (Builtin.Int1, @guaranteed String) -> Builtin.Int1
+// CHECK:         copy_value [[P]]
 // CHECK:         br bb1
 // CHECK:       } // end sil function '$s36simple_multiple_partial_apply_caller19closure_with_stringSSTf1cC0_n'
 sil [ossa] @simple_multiple_partial_apply_caller : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1, @owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1 {

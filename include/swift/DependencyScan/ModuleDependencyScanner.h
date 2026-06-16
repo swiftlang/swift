@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -119,7 +120,7 @@ public:
       std::shared_ptr<llvm::cas::ObjectStore> CAS,
       std::shared_ptr<llvm::cas::ActionCache> ActionCache,
       DependencyScannerDiagnosticReporter &DiagnosticReporter,
-      llvm::PrefixMapper *mapper);
+      llvm::PrefixMapper *mapper, bool ShareClangCompilerInstance);
 
 private:
   /// Initialize/finalize the clang compiler scanning tool.
@@ -197,6 +198,8 @@ private:
 
   // Worker-specific instance of CompilerInvocation
   std::unique_ptr<CompilerInvocation> workerCompilerInvocation;
+  // Worker-specific SourceManager
+  SourceManager workerSourceMgr;
   // Worker-specific diagnostic engine
   std::unique_ptr<DiagnosticEngine> workerDiagnosticEngine;
   // Worker-specific instance of ASTContext
@@ -224,6 +227,11 @@ private:
   std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
   // Working directory for clang module lookup queries
   std::string clangScanningWorkingDirectoryPath;
+
+  // Flag to use a single clang compiler instance to do all
+  // dependency queries during the life time of this worker.
+  bool ShareClangCompilerInstance = true;
+
   // Restrict access to the parent scanner class.
   friend class ModuleDependencyScanner;
 };
@@ -316,6 +324,7 @@ private:
                           ASTContext &ScanASTContext,
                           DependencyTracker &DependencyTracker,
                           DiagnosticEngine &Diagnostics, bool ParallelScan,
+                          bool ShareClangCompilerInstance,
                           bool EmitScanRemarks);
   llvm::Error initializeWorkerClangScanningTool();
   llvm::Error finalizeWorkerClangScanningTool();
@@ -463,12 +472,17 @@ private:
   std::shared_ptr<llvm::cas::ActionCache> ActionCache;
   /// File prefix mapper.
   std::unique_ptr<llvm::PrefixMapper> PrefixMapper;
+  std::unique_ptr<llvm::PrefixMapper> ReversePrefixMapping;
   /// CAS file system for loading file content.
   llvm::IntrusiveRefCntPtr<llvm::cas::CASBackedFileSystem> CacheFS;
   /// Protect worker access.
   std::mutex WorkersLock;
   /// Count of filesystem queries performed
   std::atomic<unsigned> NumLookups = 0;
+  /// Flag to use a single clang compiler instance to do all
+  /// dependency queries during the life time of each worker this
+  /// scanner owns.
+  bool ShareClangCompilerInstance = true;
 };
 
 /// Check if a module path is under one of the known SDK private framework

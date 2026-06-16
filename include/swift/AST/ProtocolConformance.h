@@ -810,6 +810,29 @@ public:
   /// modules, but in a manner that ensures that all copies are equivalent.
   bool isSynthesizedNonUnique() const;
 
+  /// Compute the code generation model that is required for this conformance.
+  ///
+  /// This function applies the limitations of the compilation model to
+  /// determine if there's a code generation model that *must* be used for the
+  /// given conformances. For example, generic conformances must be
+  /// `@export(implementation)` in Embedded Swift, because it does not support
+  /// unspecialized generics.
+  std::optional<CodeGenerationModel>
+  getRequiredCodeGenerationModel() const;
+
+  /// Retrieve the code generation model explicitly requested for this
+  /// conformance, inherited from the @export attribute on the declaring
+  /// nominal type or extension. Returns nullopt if the declaring context
+  /// does not specify an explicit code generation model.
+  std::optional<CodeGenerationModel>
+  getExplicitCodeGenerationModel() const;
+
+  /// Compute the code generation model for the conformance, combining the
+  /// explicitly-specified information from attributes with defaults
+  /// based on Embedded Swift or feature flags.
+  CodeGenerationModel
+  getEffectiveCodeGenerationModel() const;
+
   /// Whether this conformance represents the conformance of one protocol's
   /// conforming types to another protocol.
   ///

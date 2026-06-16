@@ -14,6 +14,15 @@
 // RUN: %target-swift-frontend -emit-module -o %t %t/InternalUsesOnlyDefaultedImportSPIOnly.swift -I %t
 // RUN: %target-swift-frontend -emit-module -o %t %t/PublicUsesOnlySPIOnly.swift -I %t
 
+// FIXME: This step shouldn't be needed once conformances broken by missing imports are diagnosed properly
+// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 \
+// RUN:   -primary-file %t/main.swift \
+// RUN:   %t/imports.swift \
+// RUN:   -I %t -package-name Package \
+// RUN:   -DCONFORMANCES \
+// RUN:   -verify-additional-prefix conformance- \
+// RUN:   -enable-upcoming-feature MemberImportVisibility:migrate
+
 // RUN: %target-swift-frontend -emit-silgen -verify -swift-version 5 \
 // RUN:   -primary-file %t/main.swift \
 // RUN:   %t/imports.swift \
@@ -106,46 +115,44 @@ extension Int {
 
 extension Int.TypealiasInInternalUsesOnly { } // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
 
+#if CONFORMANCES
 protocol InternalProtocolWithImportedWitnesses {
-  var memberInInternalUsesOnly: Int { get }
-  var memberInInternalUsesOnlyDefaultedImport: Int { get }
-  var memberInMixedUses: Int { get }
-  var memberInInternalUsesOnlyReexported: Int { get }
-  var memberInInternalUsesOnlySPIOnly: Int { get }
-  var memberInInternalUsesOnlyDefaultedImportSPIOnly: Int { get }
-  var memberInInternalUsesOnlyTransitivelyImported: Int { get }
+  var memberInInternalUsesOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnly' with type 'Int'}}
+  var memberInInternalUsesOnlyDefaultedImport: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnlyDefaultedImport' with type 'Int'}}
+  var memberInMixedUses: Int { get } // expected-conformance-note {{protocol requires property 'memberInMixedUses' with type 'Int'}}
+  var memberInInternalUsesOnlyReexported: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnlyReexported' with type 'Int'}}
+  var memberInInternalUsesOnlySPIOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnlySPIOnly' with type 'Int'}}
+  var memberInInternalUsesOnlyDefaultedImportSPIOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnlyDefaultedImportSPIOnly' with type 'Int'}}
+  var memberInInternalUsesOnlyTransitivelyImported: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnlyTransitivelyImported' with type 'Int'}}
 }
 
+// FIXME: Missing import should be diagnosed instead of a failure to conform.
 extension Int: InternalProtocolWithImportedWitnesses { }
-// expected-note@-1 {{property 'memberInInternalUsesOnlyReexported' from 'InternalUsesOnlyReexported' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
-// expected-note@-2 {{property 'memberInInternalUsesOnlyDefaultedImport' from 'InternalUsesOnlyDefaultedImport' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
-// expected-note@-3 {{property 'memberInMixedUses' from 'MixedUses' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
-// expected-note@-4 {{property 'memberInInternalUsesOnlyDefaultedImportSPIOnly' from 'InternalUsesOnlyDefaultedImportSPIOnly' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
-// expected-note@-5 {{property 'memberInInternalUsesOnly' from 'InternalUsesOnly' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
-// expected-note@-6 {{property 'memberInInternalUsesOnlyTransitivelyImported' from 'InternalUsesOnlyTransitivelyImported' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
-// expected-note@-7 {{property 'memberInInternalUsesOnlySPIOnly' from 'InternalUsesOnlySPIOnly' used to satisfy a requirement of protocol 'InternalProtocolWithImportedWitnesses'}}
+// expected-conformance-error@-1 {{type 'Int' does not conform to protocol 'InternalProtocolWithImportedWitnesses'}}
+// expected-conformance-note@-2 {{add stubs for conformance}}
 
 package protocol PackageProtocolWithImportedWitnesses {
-  var memberInPackageUsesOnly: Int { get }
-  var memberInMixedUses: Int { get }
+  var memberInPackageUsesOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInPackageUsesOnly' with type 'Int'}}
+  var memberInMixedUses: Int { get } // expected-conformance-note {{protocol requires property 'memberInMixedUses' with type 'Int'}}
 }
 
+// FIXME: Missing import should be diagnosed instead of a failure to conform.
 extension Int: PackageProtocolWithImportedWitnesses { }
-// expected-note@-1 {{property 'memberInPackageUsesOnly' from 'PackageUsesOnly' used to satisfy a requirement of protocol 'PackageProtocolWithImportedWitnesses'}}
-// expected-note@-2 {{property 'memberInMixedUses' from 'MixedUses' used to satisfy a requirement of protocol 'PackageProtocolWithImportedWitnesses'}}
+// expected-conformance-error@-1 {{type 'Int' does not conform to protocol 'PackageProtocolWithImportedWitnesses'}}
+// expected-conformance-note@-2 {{add stubs for conformance}}
 
 public protocol PublicProtocolWithImportedWitnesses {
-  var memberInPublicUsesOnly: Int { get }
-  var memberInPublicUsesOnlyDefaultedImport: Int { get }
-  var memberInMixedUses: Int { get }
-  var memberInPublicUsesOnlySPIOnly: Int { get }
+  var memberInPublicUsesOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInPublicUsesOnly' with type 'Int'}}
+  var memberInPublicUsesOnlyDefaultedImport: Int { get } // expected-conformance-note {{protocol requires property 'memberInPublicUsesOnlyDefaultedImport' with type 'Int'}}
+  var memberInMixedUses: Int { get } // expected-conformance-note {{protocol requires property 'memberInMixedUses' with type 'Int'}}
+  var memberInPublicUsesOnlySPIOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInPublicUsesOnlySPIOnly' with type 'Int'}}
 }
 
+// FIXME: Missing import should be diagnosed instead of a failure to conform.
 extension Int: PublicProtocolWithImportedWitnesses { }
-// expected-note@-1 {{property 'memberInPublicUsesOnlySPIOnly' from 'PublicUsesOnlySPIOnly' used to satisfy a requirement of protocol 'PublicProtocolWithImportedWitnesses'}}
-// expected-note@-2 {{property 'memberInPublicUsesOnly' from 'PublicUsesOnly' used to satisfy a requirement of protocol 'PublicProtocolWithImportedWitnesses'}}
-// expected-note@-3 {{property 'memberInMixedUses' from 'MixedUses' used to satisfy a requirement of protocol 'PublicProtocolWithImportedWitnesses'}}
-// expected-note@-4 {{property 'memberInPublicUsesOnlyDefaultedImport' from 'PublicUsesOnlyDefaultedImport' used to satisfy a requirement of protocol 'PublicProtocolWithImportedWitnesses'}}
+// expected-conformance-error@-1 {{type 'Int' does not conform to protocol 'PublicProtocolWithImportedWitnesses'}}
+// expected-conformance-note@-2 {{add stubs for conformance}}
+#endif
 
 //--- imports.swift
 

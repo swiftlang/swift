@@ -295,6 +295,8 @@ public var SIG_ERR: _crt_signal_t {
 }
 #elseif os(WASI)
 // No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
+#elseif os(Emscripten)
+// Emscripten has signal.h but limited support in single-threaded mode.
 #else
 internal var _ignore = _UnsupportedPlatformError()
 #endif
@@ -303,7 +305,7 @@ internal var _ignore = _UnsupportedPlatformError()
 // semaphore.h
 //===----------------------------------------------------------------------===//
 
-#if !os(Windows) && !os(WASI)
+#if !os(Windows) && !os(WASI) && !os(Emscripten)
 
 #if os(OpenBSD)
 public typealias Semaphore = UnsafeMutablePointer<sem_t?>

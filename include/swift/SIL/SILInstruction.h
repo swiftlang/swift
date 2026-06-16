@@ -46,6 +46,7 @@
 #include "swift/Strings.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/ilist.h"
@@ -469,6 +470,14 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   /// instruction as an array of ValueBase objects.
   SILInstructionResultArray getResultsImpl() const;
 
+  /// Tries to assign a valid index to this instruction based on the indices of
+  /// its neighbors, without a full block recomputation.
+  ///
+  /// Called automatically by all insertion and move APIs. Leaves the index as
+  /// zero (uncomputed) if a gap-fill is not possible, e.g. because a neighbor
+  /// has no index yet or the gap between neighbors is exhausted.
+  void assignNewIndexInList();
+
 protected:
   friend class SwiftPassInvocation;
 
@@ -562,6 +571,19 @@ public:
 
   /// This method unlinks 'self' from the containing basic block and deletes it.
   void eraseFromParent();
+
+  /// Returns the raw index of this instruction in its parent block for ordering
+  /// comparisons. A value of 0 means the index has not been computed yet.
+  /// Indices are lazily computed and persist across optimization passes.
+  /// Within a block, non-zero indices are monotonically increasing.
+  uint32_t getRawIndexInList() const { return asSILNode()->getIndexInList(); }
+
+  /// Clears the index of this instruction, marking it as uncomputed.
+  void clearIndexInList() { asSILNode()->setIndexInList(0); }
+
+  /// Returns true if this instruction comes before \p other in the same block.
+  /// Both instructions must be in the same block.
+  bool strictlyDominatesInBlock(const SILInstruction *other) const;
 
   /// Unlink this instruction from its current basic block and insert the
   /// instruction such that it is the first instruction of \p Block.
@@ -2052,8 +2074,7 @@ class AllocStackInst final
                              AllocationInst>,
       private SILDebugVariableSupplement,
       private llvm::TrailingObjects<AllocStackInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    Operand, char> {
+                                    const SILDebugScope *, Operand, char> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -2203,11 +2224,16 @@ public:
     else if (complete)
       VarDeclScope = getDebugScope();
 
-    llvm::ArrayRef<SILDIExprElement> DIExprElements(
-        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+    // An alloc_stack always has a single implicit op_deref.
+    // It is not returned with complete = false, so that it isn't printed.
+    static const SILDIExprElement SingleDeref[] = {
+        SILDIExprElement::createOperator(SILDIExprOperator::Dereference)};
+    llvm::ArrayRef<SILDIExprElement> VarDIExpr = {};
+    if (complete)
+      VarDIExpr = SingleDeref;
 
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
-                       VarDeclLoc, VarDeclScope, DIExprElements);
+                       VarDeclLoc, VarDeclScope, VarDIExpr);
   }
 
   /// True if this AllocStack has var info that a pass purposely invalidated.
@@ -5616,18 +5642,18 @@ class DebugValueInst final
   TailAllocatedDebugVariable VarInfo;
   USE_SHARED_UINT8;
 
+  /// Optional debug basic block holding reconstruction instructions.
+  SILBasicBlock *ReconstructionBlock = nullptr;
+
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                  SILDebugVariable Var, PoisonRefs_t poisonRefs,
-                 UsesMoveableValueDebugInfo_t operandWasMoved, bool trace);
+                 UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
+                 bool prependDeref);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
                                 PoisonRefs_t poisonRefs,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
-  static DebugValueInst *createAddr(SILDebugLocation DebugLoc, SILValue Operand,
-                                    SILModule &M, SILDebugVariable Var,
-                                    UsesMoveableValueDebugInfo_t wasMoved,
-                                    bool trace);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -5660,44 +5686,70 @@ public:
     return getLoc().strippedForDebugVariable();
   }
 
+  /// Returns the effective variable type for this debug value.
+  /// If there is a stored type, returns that. If there is a debug
+  /// reconstruction block, returns its return type. Otherwise returns the
+  /// SSA operand type.
+  SILType getVarType() const;
+
   /// Return the debug variable information attached to this instruction.
   ///
-  /// \param complete If true, always retrieve the complete variable with
-  /// location and scope, and the type if possible. If false, only return the
-  /// values if they are stored (if they are different from the instruction's
-  /// location, scope, and type). This should only be set to false in
-  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
-  /// have location and scope and sometimes not.
-  ///
-  /// \note The type is not included because it can change during a pass.
-  /// Passes must make sure to not lose the type information.
-  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
+  /// \param includeLoc If true (by default), always return a variable with
+  ///   location and scope. If false, only return the stored values (if they
+  ///   are different from the instruction's location, scope, and type). This
+  ///   should only be set to false in SILPrinter. Incomplete var info is
+  ///   unpredictable, as it will sometimes have location and scope and
+  ///   sometimes not.
+  /// \param includeType If true, fills in the variable type from the SSA
+  ///   operand when not explicitly stored. Off by default because passes
+  ///   that copy VarInfo into new debug_values may get a stale type.
+  ///   Passes must make sure to not lose the type information.
+  /// \note Use `getCompleteVarInfo()` to include everything.
+  std::optional<SILDebugVariable>
+  getVarInfo(bool includeLoc = true, bool includeType = false) const {
     std::optional<SILType> AuxVarType;
     std::optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
 
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
-    // TODO: passes break if we set the type here, as the type of the operand
-    // can be changed during a pass.
-    // else if (complete)
-    //   AuxVarType = getOperand()->getType().getObjectType();
+    else if (includeType)
+      AuxVarType = getVarType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
-    else if (complete)
+    else if (includeLoc)
       VarDeclLoc = getLoc().strippedForDebugVariable();
 
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
-    else if (complete)
+    else if (includeLoc)
       VarDeclScope = getDebugScope();
 
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
 
+    // Make a temporary copy to prepend a deref. This is safe as
+    // SILDebugVariable contains a copy of the expression.
+    llvm::SmallVector<SILDIExprElement, 4> DIExprCopy;
+    if (hasDeref()) {
+      DIExprCopy.push_back(SILDIExprElement::createOperator(
+          SILDIExprOperator::Dereference));
+      DIExprCopy.append(DIExprElements.begin(), DIExprElements.end());
+      DIExprElements = DIExprCopy;
+    }
+
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
                        VarDeclLoc, VarDeclScope, DIExprElements);
+  }
+
+  /// Like getVarInfo, but always includes the variable type (falling back
+  /// to the SSA operand type), location and scope. Should always be used
+  /// when adding a DIExpr that affects the type.
+  SILDebugVariable getCompleteVarInfo() const {
+    auto info = getVarInfo(/*includeLoc*/ true, /*includeType*/ true);
+    assert(info && "DebugValueInst must always have debug variable info");
+    return *info;
   }
 
   void setDebugVarScope(const SILDebugScope *NewDS) {
@@ -5718,9 +5770,73 @@ public:
     return DVI && DVI->hasAddrVal()? DVI : nullptr;
   }
 
-  /// Whether the attached di-expression (if there is any) starts
-  /// with `op_deref`.
-  bool exprStartsWithDeref() const;
+  /// Whether this debug value has a DIExpr with a deref.
+  /// For address-only types with a debug reconstruction block, the deref
+  /// applies after the BB's result. Otherwise, this is incompatible with
+  /// debug reconstruction blocks.
+  bool hasDeref() const {
+    return sharedUInt8().DebugValueInst.prependDeref;
+  }
+
+  /// Prepends a deref operator to this debug_value in place.
+  /// This must be called when the operand is changed from an object type to
+  /// an address type (when moved to the stack, for example).
+  /// If a reconstruction block exists, a load is added at the beginning.
+  /// Otherwise, it will be prepended to the DIExpr.
+  void prependDeref();
+
+  /// Removes a deref operator to this debug_value in place.
+  /// This must be called when the operand is changed from an address type to
+  /// an object type (when moved from the stack to a register, for example).
+  /// Asserts that the type is loadable (cannot strip deref for address-only).
+  /// If a reconstruction block exists, a load is removed at the beginning. If
+  /// there is no load at the beginning, the operand is killed, marking the
+  /// variable as optimized away.
+  void stripDeref();
+
+  /// Validates the type chain of the DIExpr.
+  /// Starting from VarType, narrows through fragments (outermost first)
+  /// and checks that the result matches the SSA operand type, and that there
+  /// is the right amount of op_deref.
+  /// Returns false if the type chain is invalid, true otherwise.
+  bool isExprTypeValid() const;
+
+  /// Returns the optional debug basic block attached to this instruction.
+  /// The debug BB contains reconstruction instructions for the debug value.
+  /// If this debug value does not have a reconstruction block, this returns
+  /// nullptr. Use getOrCreateDebugReconstructionBlock to create one.
+  SILBasicBlock *getDebugReconstructionBlock() const {
+    return ReconstructionBlock;
+  }
+
+  /// Sets the debug-only basic block for this instruction.
+  /// This should not be called by optimization passes. Optimization passes
+  /// and debug information salvage operations should append to existing
+  /// blocks using getOrCreateDebugReconstructionBlock.
+  void setDebugReconstructionBlock(SILBasicBlock *BB) {
+    ReconstructionBlock = BB;
+  }
+
+  /// Clones the reconstruction block from \p src onto this debug value.
+  void cloneReconstructionBlockFrom(DebugValueInst *src);
+
+  /// Returns a variable reconstruction basic block for this debug value.
+  /// If this debug value has no debug reconstruction block, a new one is
+  /// created and attached to this instruction.
+  /// The newly created basic block will be well-formed, returning the SSA
+  /// value of this debug_value directly.
+  /// If this debug_value has an undef operand, the reconstruction block
+  /// has no arguments and returns undef directly.
+  SILBasicBlock *getOrCreateDebugReconstructionBlock();
+
+  /// Drops the operand from this debug value.
+  /// This function must be called by passes whenever the operand of this debug
+  /// value is no longer valid and cannot be salvaged.
+  /// This will replace the operand with an undef, and clear any DIExpr or debug
+  /// reconstruction block.
+  /// If \p varType is specified, the undef will use that type (in the
+  /// appropriate address/object form) instead of the current operand's type.
+  void killOperand(SILType operandType = SILType());
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds
@@ -10175,14 +10291,23 @@ class IndexAddrInst
   enum { Base, Index };
 
   IndexAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILValue Index,
-                bool needsStackProtection)
+                bool needsStackProtection, bool isProjection)
       : InstructionBase(DebugLoc, Operand->getType(), Operand, Index) {
     sharedUInt8().IndexAddrInst.needsStackProtection = needsStackProtection;
+    sharedUInt8().IndexAddrInst.isProjection = isProjection;
   }
 
 public:
   bool needsStackProtection() const {
     return sharedUInt8().IndexAddrInst.needsStackProtection;
+  }
+  /// True if this instruction projects a single array element address from an
+  /// array base, as opposed to being used for general pointer arithmetic.
+  /// When set, the result cannot be used to reach other array elements (e.g.
+  /// by chaining index_addr instructions); without this flag such chaining is
+  /// permitted.
+  bool isProjection() const {
+    return sharedUInt8().IndexAddrInst.isProjection;
   }
 };
 

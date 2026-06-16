@@ -16,7 +16,7 @@ import SwiftShims
 
 @unsafe
 public struct ClassMetadata {
-  var superclassMetadata: UnsafeMutablePointer<ClassMetadata>?
+  var superclassMetadata: UnsafePointer<ClassMetadata>?
 
   // There is no way to express the actual calling convention on this
   // function (swiftcc with 'self') currently, so let's use UnsafeRawPointer
@@ -134,20 +134,17 @@ public struct HeapObject {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
 // Mirrors the interface defined in swift/EmbeddedPlatform.h
 
-@_extern(c, "_swift_alignedAllocate")
-public func _swift_alignedAllocate(_ pointer: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ alignment: Int, _ size: Int) -> CInt
+@_extern(c, "_swift_allocate")
+public func _swift_allocate(_ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong) -> UnsafeMutableRawPointer?
 
-@_extern(c, "_swift_alignedFree")
-public func _swift_alignedFree(_ p: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int)
+@_extern(c, "_swift_free")
+public func _swift_free(_ p: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong)
 
 @_extern(c, "_swift_generateRandom")
 public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 
 @_extern(c, "_swift_generateRandomHashSeed")
 public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
-
-@_extern(c, "_swift_writeCharToStandardOutput")
-public func _swift_writeCharToStandardOutput(_: CInt) -> CInt
 
 @_extern(c, "_swift_typedAllocate")
 public func _swift_typedAllocate(_ buf: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ size: Int, _ alignMask: Int, _ typeId: UInt64)
@@ -170,13 +167,13 @@ func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
 
 func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
   let alignment = max(alignment, unsafe MemoryLayout<UnsafeRawPointer>.size)
-  var r: UnsafeMutableRawPointer? = nil
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  _ = unsafe _swift_alignedAllocate(&r, alignment, size)
+  return unsafe _swift_allocate(alignment, size, 0)
 #else
+  var r: UnsafeMutableRawPointer? = nil
   _ = unsafe posix_memalign(&r, alignment, size)
-#endif
   return unsafe r
+#endif
 }
 
 @c
@@ -200,7 +197,7 @@ public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPo
 @c
 public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int) {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  unsafe _swift_alignedFree(ptr, size, alignMask)
+  unsafe _swift_free(ptr, size, alignMask, 0)
 #else
   unsafe free(ptr)
 #endif
@@ -269,7 +266,7 @@ public func swift_deallocPartialClassInstance(object: Builtin.RawPointer, metada
   unsafe swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>(object), metadata: UnsafeMutablePointer<ClassMetadata>(metadata), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
 }
 
-func swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>, metadata: UnsafeMutablePointer<ClassMetadata>, allocatedSize: Int, allocatedAlignMask: Int) {
+func swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>, metadata: UnsafePointer<ClassMetadata>, allocatedSize: Int, allocatedAlignMask: Int) {
   var classMetadata = unsafe _swift_embedded_get_heap_object_metadata_pointer(object).assumingMemoryBound(to: ClassMetadata.self)
   while unsafe classMetadata != metadata {
     unsafe _swift_embedded_invoke_heap_object_optional_ivardestroyer(object, classMetadata)
@@ -320,23 +317,36 @@ public func swift_allocEmptyBox() -> Builtin.RawPointer {
 /// Therefore, one cannot not use `swift_release` but rather must use
 /// `swift_releaseBox` to implement the "release" function of a box object.
 
-@_silgen_name("swift_allocBox")
-public func swift_allocBox(_ metadata: Builtin.RawPointer) -> (Builtin.RawPointer, Builtin.RawPointer) {
-  let alignMask = Int(unsafe _swift_embedded_metadata_get_align_mask(UnsafeMutableRawPointer(metadata)))
-  let size = Int(unsafe _swift_embedded_metadata_get_size(UnsafeMutableRawPointer(metadata)))
+/// Computes the footprint of a box whose payload is described by `metadata`:
+/// the offset at which the payload starts within the allocation, the total
+/// allocation size, and the alignment mask to request from the allocator.
+/// `swift_allocBox` and `swift_deallocBox` must agree on these values.
+func _boxAllocationLayout(
+  metadata: UnsafeRawPointer
+) -> (startOfBoxedValue: Int, size: Int, alignMask: Int) {
+  let payloadAlignMask = Int(unsafe _swift_embedded_metadata_get_align_mask(metadata))
+  let payloadSize = Int(unsafe _swift_embedded_metadata_get_size(metadata))
   let headerSize = unsafe MemoryLayout<Int>.size + MemoryLayout<UnsafeRawPointer>.size
   let headerAlignMask = unsafe MemoryLayout<UnsafeRawPointer>.alignment - 1
-  let startOfBoxedValue = ((headerSize + alignMask) & ~alignMask)
-  let requiredSize: Int = startOfBoxedValue + size
-  let requiredAlignmentMask: Int = alignMask | headerAlignMask
+  let startOfBoxedValue = (headerSize + payloadAlignMask) & ~payloadAlignMask
+  return (
+    startOfBoxedValue: startOfBoxedValue,
+    size: startOfBoxedValue + payloadSize,
+    alignMask: payloadAlignMask | headerAlignMask
+  )
+}
 
-  let p = unsafe swift_slowAlloc(requiredSize, requiredAlignmentMask)!
+@_silgen_name("swift_allocBox")
+public func swift_allocBox(_ metadata: Builtin.RawPointer) -> (Builtin.RawPointer, Builtin.RawPointer) {
+  let layout = unsafe _boxAllocationLayout(metadata: UnsafeMutableRawPointer(metadata))
+
+  let p = unsafe swift_slowAlloc(layout.size, layout.alignMask)!
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
 
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutableRawPointer(metadata))
   unsafe object.pointee.refcount = 1
 
-  let boxedValueAddr = unsafe UnsafeMutableRawPointer(p).advanced(by: startOfBoxedValue)
+  let boxedValueAddr = unsafe UnsafeMutableRawPointer(p).advanced(by: layout.startOfBoxedValue)
 
   return (object._rawValue, boxedValueAddr._rawValue)
 }
@@ -345,11 +355,28 @@ public func swift_allocBox(_ metadata: Builtin.RawPointer) -> (Builtin.RawPointe
 public func swift_deallocBox(_ pointer: UnsafeMutableRawPointer) {
   let object = unsafe pointer.bindMemory(to: HeapObject.self, capacity: 1)
   let metadata = unsafe _swift_embedded_get_heap_object_metadata_pointer(object)
+  let layout = unsafe _boxAllocationLayout(metadata: metadata)
   unsafe swift_slowDealloc(
     UnsafeMutableRawPointer(object),
-    _swift_embedded_metadata_get_size(metadata),
-    _swift_embedded_metadata_get_align_mask(metadata)
+    layout.size,
+    layout.alignMask
   )
+}
+
+/// Extracts the type metadata out of a heap object.
+@c
+public func swift_getObjectType(_ pointer: UnsafeMutableRawPointer) -> UnsafeRawPointer {
+  let object = unsafe pointer.bindMemory(to: HeapObject.self, capacity: 1)
+  return unsafe _swift_embedded_get_heap_object_metadata_pointer(object)
+}
+
+/// Determines whether two witness tables are the same.
+///
+/// The only way this can be true in Embedded Swift is if they refer to the same
+/// address in memory.
+@c
+public func swift_compareWitnessTables(_ lhs: UnsafeRawPointer, _ rhs: UnsafeRawPointer) -> Bool {
+  unsafe lhs == rhs
 }
 
 // MARK: - Error boxing (swift_allocError / swift_deallocError / swift_getErrorValue)
@@ -377,15 +404,13 @@ internal func _errorBoxLayout(
 @usableFromInline
 internal func _errorBoxContents(
   _ p: UnsafeRawPointer
-) -> (type: UnsafeRawPointer, conformance: UnsafeRawPointer, value: UnsafeMutableRawPointer) {
-  let type = unsafe (UnsafeMutableRawPointer(mutating: p)
-    + MemoryLayout<HeapObject>.size)
+) -> (type: UnsafeRawPointer, conformance: UnsafeRawPointer, value: UnsafeRawPointer) {
+  let type = unsafe (p + MemoryLayout<HeapObject>.size)
     .assumingMemoryBound(to: UnsafeRawPointer.self).pointee
-  let conformance = unsafe (UnsafeMutableRawPointer(mutating: p)
-    + MemoryLayout<HeapObject>.size + MemoryLayout<UnsafeRawPointer>.size)
+  let conformance = unsafe (p + MemoryLayout<HeapObject>.size + MemoryLayout<UnsafeRawPointer>.size)
     .assumingMemoryBound(to: UnsafeRawPointer.self).pointee
   let layout = unsafe _errorBoxLayout(metadata: type)
-  let value = unsafe UnsafeMutableRawPointer(mutating: p).advanced(by: layout.startOfValue)
+  let value = unsafe p.advanced(by: layout.startOfValue)
   return unsafe (type, conformance, value)
 }
 
@@ -402,7 +427,8 @@ public func _errorBoxDestroyImpl(
   let p = UnsafeMutableRawPointer(object)
   let contents = unsafe _errorBoxContents(UnsafeRawPointer(p))
   unsafe _swift_embedded_metadata_destroy(
-    UnsafeMutableRawPointer(mutating: contents.type), contents.value)
+    UnsafeMutableRawPointer(mutating: contents.type),
+    UnsafeMutableRawPointer(mutating: contents.value))
   let layout = unsafe _errorBoxLayout(metadata: contents.type)
   unsafe swift_slowDealloc(p, layout.totalSize, layout.totalAlignMask)
 }
@@ -501,7 +527,11 @@ public func swift_getErrorValue(
   let outPtr = unsafe UnsafeMutableRawPointer(out)
     .assumingMemoryBound(
       to: (UnsafeMutableRawPointer, UnsafeRawPointer, UnsafeRawPointer).self)
-  unsafe outPtr.pointee = (contents.value, contents.type, contents.conformance)
+  unsafe outPtr.pointee = (
+    UnsafeMutableRawPointer(mutating: contents.value),
+    contents.type,
+    contents.conformance
+  )
 }
 
 /// Error-specific retain (same as swift_retain; no ObjC bridging in embedded).
@@ -535,184 +565,6 @@ public func swifft_makeBoxUnique(buffer: Builtin.RawPointer, metadata: Builtin.R
     return (box, oldObjectAddr._rawValue)
   }
 }
-/// Dynamic cast support
-/// Only supports existential container to concrete casts.
-struct DynamicCastFlags {
-  static let Default           = UInt(bitPattern: 0x0)
-  static let Unconditional     = UInt(bitPattern: 0x1)
-  static let TakeOnSuccess     = UInt(bitPattern: 0x2)
-  static let DestroyOnFailure  = UInt(bitPattern: 0x4)
-}
-
-struct MetadataKind {
-  static let LastEnumerated = UInt(bitPattern: 0x7FF)
-}
-
-func projectExistentialMetadata(
-  _ exist: Builtin.RawPointer
-) -> Builtin.RawPointer {
-
-  let offset = (3 * MemoryLayout<Builtin.RawPointer>.size)
-  let addrOfMetadata = unsafe UnsafeMutableRawPointer(exist) + offset
-  let metadataPtrAddr = unsafe addrOfMetadata.bindMemory(to: Builtin.RawPointer.self, capacity: 1)
-  return unsafe metadataPtrAddr.pointee
-}
-
-func isClassMetadata(_ metadata: Builtin.RawPointer) -> Bool {
-  let addrOfMetadataKind = unsafe UnsafePointer<UInt>(metadata)
-  let kind = unsafe addrOfMetadataKind.pointee
-  return  kind == 0 || kind > MetadataKind.LastEnumerated
-}
-
-func projectHeapObject(_ exist: Builtin.RawPointer) -> UnsafeMutableRawPointer{
-  let addrOfHeapObject = unsafe UnsafePointer<UnsafeMutableRawPointer>(exist)
-  return unsafe addrOfHeapObject.pointee
-}
-
-@c
-public func swift_dynamicCast(
-  _ dest: Builtin.RawPointer, /* points to a concrete type */
-  _ src: Builtin.RawPointer, /* points to an existential */
-  _ srcMetadata: Builtin.RawPointer, /* always nullptr */
-  _ dstMetadata: Builtin.RawPointer,
-  _ flags: UInt
-) -> Bool {
-
-  let isUnconditionalCast : Bool = (flags & DynamicCastFlags.Unconditional) != 0
-  let isTakeOnSuccess : Bool = (flags & DynamicCastFlags.TakeOnSuccess) != 0
-  let isDestroyOnFailure : Bool =
-    (flags & DynamicCastFlags.DestroyOnFailure) != 0
-
-  // Check if src is an `any Error` existential (a single pointer to a heap error
-  // box), as opposed to a regular 4-word existential container.  The error box is
-  // detected by comparing the heap object's metadata pointer to the error-box
-  // metadata storage.  This must be tested before the regular existential path
-  // because `any Error` stack slots are only 1 word wide; projectExistentialMetadata
-  // would read 12 bytes past the slot and return garbage.
-  let boxPtrRaw: Builtin.RawPointer = unsafe UnsafeMutableRawPointer(src)
-    .assumingMemoryBound(to: Builtin.RawPointer.self).pointee
-  let boxPtrBits = UInt(Builtin.ptrtoint_Word(boxPtrRaw))
-  let isAligned = unsafe (boxPtrBits & UInt(MemoryLayout<UnsafeRawPointer>.alignment - 1)) == 0
-  if boxPtrBits != 0 && isAligned,
-     unsafe _swift_embedded_get_heap_object_metadata_pointer(
-       UnsafeMutableRawPointer(boxPtrRaw)) == UnsafeMutableRawPointer(Builtin.addressof(&_errorMetadataStorage)) {
-    // src holds a pointer to an error box. Extract the concrete type.
-    var contents = unsafe _errorBoxContents(UnsafeRawPointer(boxPtrRaw))
-
-    // When Failure == any Error, passing an error through a typed-generic continuation
-    // (e.g. AsyncThrowingStream<E, Error>) can produce a chain of error boxes where
-    // each outer box stores `any Error` (Swift.Error) and its value field holds a raw
-    // pointer to the next inner box.  Unwrap the chain until we find the concrete type
-    // or the value is no longer an error box.
-    for _ in 0..<16 {
-      if unsafe contents.type == UnsafeRawPointer(dstMetadata) { break }
-      // Read the first word of the stored value as a potential inner box pointer.
-      let innerPtr: Builtin.RawPointer = unsafe contents.value
-        .assumingMemoryBound(to: Builtin.RawPointer.self).pointee
-      let innerBits = UInt(Builtin.ptrtoint_Word(innerPtr))
-      guard innerBits != 0 &&
-            (unsafe innerBits & UInt(MemoryLayout<UnsafeRawPointer>.alignment - 1)) == 0 else { break }
-      guard unsafe _swift_embedded_get_heap_object_metadata_pointer(
-              UnsafeMutableRawPointer(innerPtr))
-            == UnsafeMutableRawPointer(Builtin.addressof(&_errorMetadataStorage)) else { break }
-      unsafe contents = unsafe _errorBoxContents(UnsafeRawPointer(innerPtr))
-    }
-
-    // For class types, check the superclass chain; for value types, compare directly.
-    var typeMatches = unsafe contents.type == UnsafeRawPointer(dstMetadata)
-    let srcIsClass = unsafe isClassMetadata(contents.type._rawValue)
-    if !typeMatches && srcIsClass && isClassMetadata(dstMetadata) {
-      // The stored value is a class reference; walk its superclass chain.
-      let classObj = unsafe contents.value.assumingMemoryBound(to: UnsafeMutableRawPointer.self).pointee
-      typeMatches = unsafe swift_dynamicCastClass(
-        object: classObj,
-        targetMetadata: UnsafeRawPointer(dstMetadata)) != nil
-    }
-
-    if typeMatches {
-      // Types match: copy/take the value from the box into dest.
-      if isTakeOnSuccess {
-        unsafe _swift_embedded_metadata_initialize_with_take(
-          UnsafeMutableRawPointer(mutating: contents.type), UnsafeMutableRawPointer(dest), contents.value)
-      } else {
-        unsafe _swift_embedded_metadata_initialize_with_copy(
-          UnsafeMutableRawPointer(mutating: contents.type), UnsafeMutableRawPointer(dest), contents.value)
-      }
-      return true
-    } else {
-      // Type mismatch.
-      if isDestroyOnFailure {
-        swift_release(object: boxPtrRaw)
-      }
-      if isUnconditionalCast {
-        fatalError("failed cast")
-      }
-      return false
-    }
-  }
-
-  let srcMetadata = projectExistentialMetadata(src)
-
-  let isClass = isClassMetadata(dstMetadata)
-
-  if isClass {
-    var success = false
-    let obj = unsafe projectHeapObject(src)
-    if isClassMetadata(srcMetadata) {
-      if srcMetadata != dstMetadata {
-        // check parent chain
-        success = unsafe swift_dynamicCastClass(object: obj, targetMetadata: UnsafeMutableRawPointer(dstMetadata)) != nil
-      } else {
-        success = true
-      }
-    }
-    if !success {
-      if isDestroyOnFailure {
-        unsafe _swift_embedded_existential_destroy(UnsafeMutableRawPointer(src),
-                                                   swift_releaseBox)
-      }
-
-      if isUnconditionalCast {
-        fatalError("failed cast")
-      }
-      return false
-    }
-    if isTakeOnSuccess {
-      let dst = unsafe UnsafeMutablePointer<UnsafeMutableRawPointer>(dest)
-      unsafe dst.pointee = obj
-
-    } else {
-      let dst = unsafe UnsafeMutablePointer<UnsafeMutableRawPointer>(dest)
-      unsafe dst.pointee = obj
-      swift_retain(object: obj._rawValue)
-    }
-    return true;
-  }
-  // destintation type is not a class. Test exact match.
-  let success = srcMetadata == dstMetadata
-  if !success {
-    if isDestroyOnFailure {
-      unsafe _swift_embedded_existential_destroy(UnsafeMutableRawPointer(src),
-                                                 swift_releaseBox)
-    }
-
-    if isUnconditionalCast {
-      fatalError("failed cast")
-    }
-    return false
-  }
-  if isTakeOnSuccess {
-    // take from an existential to a concrete type
-    unsafe _swift_embedded_existential_init_with_take(
-             UnsafeMutableRawPointer(dest), UnsafeMutableRawPointer(src),
-             swift_releaseBox)
-  } else {
-    // copy from an existential to a concrete type
-    unsafe _swift_embedded_existential_init_with_copy(
-             UnsafeMutableRawPointer(dest), UnsafeMutableRawPointer(src))
-  }
-  return true
-}
 
 /// Refcounting
 
@@ -729,29 +581,6 @@ func isValidPointerForNativeRetain(object: Builtin.RawPointer) -> Bool {
 
 @c
 public func swift_setDeallocating(object: Builtin.RawPointer) {
-}
-
-@c
-public func swift_dynamicCastClass(object: UnsafeMutableRawPointer, targetMetadata: UnsafeRawPointer) -> UnsafeMutableRawPointer? {
-  let sourceObj = unsafe object.assumingMemoryBound(to: HeapObject.self)
-  var type = unsafe _swift_embedded_get_heap_object_metadata_pointer(sourceObj).assumingMemoryBound(to: ClassMetadata.self)
-  let targetType = unsafe targetMetadata.assumingMemoryBound(to: ClassMetadata.self)
-  while unsafe type != targetType {
-    guard let superType = unsafe type.pointee.superclassMetadata else {
-      return nil
-    }
-    unsafe type = UnsafeMutablePointer(superType)
-  }
-  return unsafe object
-}
-
-@c
-public func swift_dynamicCastClassUnconditional(object: UnsafeMutableRawPointer, targetMetadata: UnsafeRawPointer,
-    file: UnsafePointer<CChar>, line: CUnsignedInt, column: CUnsignedInt) -> UnsafeMutableRawPointer {
-  guard let result = unsafe swift_dynamicCastClass(object: object, targetMetadata: targetMetadata) else {
-    fatalError("failed cast")
-  }
-  return unsafe result
 }
 
 @c
@@ -838,6 +667,28 @@ public func swift_release_n(object: Builtin.RawPointer, n: UInt32) {
 
   let o = unsafe UnsafeMutablePointer<HeapObject>(object)
   unsafe swift_release_n_(object: o, n: n)
+}
+
+// Non-atomic refcount entry points. For now, just route to the atomic versions.
+// This can be optimized later.
+@c @discardableResult
+public func swift_nonatomic_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
+  return swift_retain(object: object)
+}
+
+@c @discardableResult
+public func swift_nonatomic_retain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
+  return swift_retain_n(object: object, n: n)
+}
+
+@c
+public func swift_nonatomic_release(object: Builtin.RawPointer) {
+  swift_release(object: object)
+}
+
+@c
+public func swift_nonatomic_release_n(object: Builtin.RawPointer, n: UInt32) {
+  swift_release_n(object: object, n: n)
 }
 
 func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBoxRelease: Bool = false) {
@@ -1074,6 +925,80 @@ func _embeddedReportExclusivityViolation(
     true._value, StaticString("dynamic exclusivity violation").unsafeRawPointer)
   Builtin.int_trap()
 }
+
+// IntegerLiteral-to-FloatingPoint conversion
+
+/// Convert a `Builtin.IntegerLiteral` value to a binary floating-point type.
+///
+/// `data` is a pointer to little-endian word-sized chunks; `flags` packs the
+/// minimum bit width needed to store the value (in bits 8 and above) and the
+/// sign (in bit 0). The format mirrors `swift::IntegerLiteral` /
+/// `swift::IntegerLiteralFlags` in `include/swift/Runtime/Numeric.h` and
+/// `include/swift/ABI/MetadataValues.h`. The same algorithm is implemented
+/// in C++ in `stdlib/public/runtime/Numeric.cpp` for non-Embedded builds.
+@_silgen_name("swift_intToFloat32")
+public func _swift_intToFloat32(
+  _ data: UnsafePointer<UInt>, _ flags: Int
+) -> Float {
+  let bitsPerChunk = Int.bitWidth
+  let bitWidth = flags >> 8
+  let numChunks = (bitWidth + bitsPerChunk - 1) / bitsPerChunk
+
+  // Single chunk: the entire value is sign-extended into one chunk.
+  if numChunks == 1 {
+    return Float(Int(bitPattern: unsafe data[0]))
+  }
+
+  // Multi-chunk: lower chunks contribute as unsigned digits in base
+  // 2^bitsPerChunk; only the top chunk carries the sign.
+  let chunkFactor: Float = bitsPerChunk == 64 ? 0x1p64 : 0x1p32
+
+  var result = Float(unsafe data[0])
+  var scale = chunkFactor
+  for i in 1 ..< numChunks - 1 {
+    result += Float(unsafe data[i]) * scale
+    scale *= chunkFactor
+  }
+  result += Float(Int(bitPattern: unsafe data[numChunks - 1])) * scale
+  return result
+}
+
+@_silgen_name("swift_intToFloat64")
+public func _swift_intToFloat64(
+  _ data: UnsafePointer<UInt>, _ flags: Int
+) -> Double {
+  let bitsPerChunk = Int.bitWidth
+  let bitWidth = flags >> 8
+  let numChunks = (bitWidth + bitsPerChunk - 1) / bitsPerChunk
+
+  if numChunks == 1 {
+    return Double(Int(bitPattern: unsafe data[0]))
+  }
+
+  let chunkFactor: Double = bitsPerChunk == 64 ? 0x1p64 : 0x1p32
+
+  var result = Double(unsafe data[0])
+  var scale = chunkFactor
+  for i in 1 ..< numChunks - 1 {
+    result += Double(unsafe data[i]) * scale
+    scale *= chunkFactor
+  }
+  result += Double(Int(bitPattern: unsafe data[numChunks - 1])) * scale
+  return result
+}
+
+// Version information for the Platform Abstraction Layer
+
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+@c @used
+public func swift_getPlatformLayerVersion(
+  _ major: UnsafeMutablePointer<Int>,
+  _ minor: UnsafeMutablePointer<Int>
+) {
+  unsafe major.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR
+  unsafe minor.pointee = 0 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
+}
+#endif
 
 // CXX Exception Personality
 

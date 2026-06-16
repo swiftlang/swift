@@ -28,6 +28,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -43,6 +44,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
 #include "clang/AST/DeclTemplate.h"
@@ -431,6 +433,22 @@ static bool willHaveConfusingConsumption(Type type,
   default:
     return true;
   }
+}
+
+/// Check if this is an attempted downcast between two C++ foreign reference
+/// types, and diagnose if it is. This kind of downcasts is not supported yet.
+static bool diagnoseUnsupportedFRTDowncast(ASTContext &ctx, SourceLoc loc,
+                                           Type fromType, Type toType) {
+  auto fromUnderlying = fromType->lookThroughAllOptionalTypes();
+  auto toUnderlying = toType->lookThroughAllOptionalTypes();
+  if (fromUnderlying->isForeignReferenceType() &&
+      toUnderlying->isForeignReferenceType() &&
+      fromUnderlying->isBindableToSuperclassOf(toUnderlying)) {
+    ctx.Diags.diagnose(loc, diag::downcast_to_foreign_reference_type, fromType,
+                       toType);
+    return true;
+  }
+  return false;
 }
 
 namespace {
@@ -2284,14 +2302,20 @@ namespace {
     /// \param args The argument list of the subscript.
     /// \param locator The locator used to refer to the subscript.
     /// \param isImplicit Whether this is an implicit subscript.
+    /// \param isDynamicMemberLookup Whether this is an implicit
+    /// subscript inserted as a result of dynamic member access. This
+    /// changes how we fish out the call argument match for the call.
     Expr *buildSubscript(Expr *base, ArgumentList *args,
                          ConstraintLocatorBuilder locator,
                          ConstraintLocatorBuilder memberLocator,
-                         bool isImplicit, AccessSemantics semantics,
+                         bool isImplicit, bool isDynamicMemberLookup,
+                         AccessSemantics semantics,
                          const SelectedOverload &selected) {
       // Build the new subscript.
       auto newSubscript = buildSubscriptHelper(base, args, selected,
-                                               locator, isImplicit, semantics);
+                                               locator, isImplicit,
+                                               isDynamicMemberLookup,
+                                               semantics);
       return forceUnwrapIfExpected(newSubscript, memberLocator,
                                    IUOReferenceKind::ReturnValue);
     }
@@ -2299,7 +2323,8 @@ namespace {
     Expr *buildSubscriptHelper(Expr *base, ArgumentList *args,
                                const SelectedOverload &selected,
                                ConstraintLocatorBuilder locator,
-                               bool isImplicit, AccessSemantics semantics) {
+                               bool isImplicit, bool isDynamicMemberLookup,
+                               AccessSemantics semantics) {
       auto choice = selected.choice;
 
       // Apply a key path if we have one.
@@ -2436,9 +2461,17 @@ namespace {
 
       auto appliedWrappers =
           solution.getAppliedPropertyWrappers(memberLoc->getAnchor());
+
+      auto tempLoc = ConstraintLocatorBuilder(memberLoc);
+      auto callArgLoc =
+          (isDynamicMemberLookup
+           ? tempLoc.withPathElement(
+                ConstraintLocator::ImplicitDynamicMemberSubscript)
+           : locator);
+
       args = coerceCallArguments(
           args, fullSubscriptTy, subscriptRef, nullptr,
-          locator.withPathElement(ConstraintLocator::ApplyArgument),
+          callArgLoc.withPathElement(ConstraintLocator::ApplyArgument),
           appliedWrappers);
       if (!args)
         return nullptr;
@@ -2611,7 +2644,7 @@ namespace {
           LocatorPathElt::KeyPathDynamicMember(keyPathTy->getAnyNominal()));
       auto overload = solution.getOverloadChoice(componentLoc);
 
-      // Looks like there is a chain of implicit `subscript(dynamicMember:)`
+      // Looks like there is a chain of implicit `subscript(dynamicMember:...)`
       // calls necessary to resolve a member reference.
       switch (overload.choice.getKind()) {
       case OverloadChoiceKind::DynamicMemberLookup:
@@ -3647,6 +3680,42 @@ namespace {
       llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
     }
 
+    /// Builds an argument list for making a call to the given
+    /// `@dynamicMemberLookup` subscript by inserting any necessary default
+    /// arguments.
+    ArgumentList *buildArgumentListForDynamicMemberLookupSubscript(
+        const SelectedOverload &overload, SourceLoc componentLoc,
+        ConstraintLocator *locator) {
+      ASSERT(overload.choice.isAnyDynamicMemberLookup() &&
+             "Overload must be for dynamic member lookup");
+      ASSERT(isa<SubscriptDecl>(overload.choice.getDecl()));
+
+      auto memberLoc = cs.getCalleeLocator(locator);
+
+      // We specifically don't want the full type here to avoid losing parameter
+      // pack references.
+      auto fnType = overload.adjustedOpenedType->castTo<FunctionType>();
+
+      auto params = fnType->getParams();
+      ASSERT(params.size() >= 1);
+
+      auto param = params[0];
+      auto paramTy = simplifyType(param.getParameterType());
+
+      Expr *argExpr;
+      if (overload.choice.isKeyPathDynamicMemberLookup()) {
+        argExpr = buildKeyPathDynamicMemberArgExpr(paramTy, componentLoc,
+                                                   memberLoc);
+      } else {
+        auto fieldName =
+            overload.choice.getName().getBaseIdentifier().str();
+        argExpr = buildDynamicMemberLookupArgExpr(fieldName, componentLoc,
+                                                  paramTy);
+      }
+
+      return ArgumentList::forImplicitSingle(ctx, ctx.Id_dynamicMember, argExpr);
+    }
+
     /// Form a type checked expression for the argument of a
     /// @dynamicMemberLookup subscript index parameter.
     Expr *buildDynamicMemberLookupArgExpr(StringRef name, SourceLoc loc,
@@ -3663,49 +3732,25 @@ namespace {
                                       const SelectedOverload &overload,
                                       ConstraintLocator *memberLocator) {
       // Application of a DynamicMemberLookup result turns
-      // a member access of `x.foo` into x[dynamicMember: "foo"], or
-      // x[dynamicMember: KeyPath<T, U>]
+      // a member access of `x.foo` into `x[dynamicMember: "foo", ...]`, or
+      // `x[dynamicMember: KeyPath<T, U>, ...]`
+      auto componentLoc =
+          overload.choice.getKind() == OverloadChoiceKind::DynamicMemberLookup
+              ? nameLoc
+              : dotLoc;
+      auto *argList = buildArgumentListForDynamicMemberLookupSubscript(
+          overload, componentLoc, memberLocator);
 
-      // Figure out the expected type of the lookup parameter. We know the
-      // openedFullType will be "xType -> indexType -> resultType".  Dig out
-      // its index type.
-      auto paramTy = getTypeOfDynamicMemberIndex(overload);
-
-      Expr *argExpr = nullptr;
-      if (overload.choice.getKind() ==
-          OverloadChoiceKind::DynamicMemberLookup) {
-        // Build and type check the string literal index value to the specific
-        // string type expected by the subscript.
-        auto fieldName = overload.choice.getName().getBaseIdentifier().str();
-        argExpr = buildDynamicMemberLookupArgExpr(fieldName, nameLoc, paramTy);
-      } else {
-        argExpr =
-            buildKeyPathDynamicMemberArgExpr(paramTy, dotLoc, memberLocator);
+      if (!argList) {
+        return nullptr;
       }
 
-      if (!argExpr)
-        return nullptr;
-
-      solution.recordSingleArgMatchingChoice(cs.getConstraintLocator(expr));
-
-      // Build an argument list.
-      auto *argList =
-          ArgumentList::forImplicitSingle(ctx, ctx.Id_dynamicMember, argExpr);
       // Build and return a subscript that uses this string as the index.
       return buildSubscript(base, argList, cs.getConstraintLocator(expr),
-                            memberLocator, /*isImplicit*/ true,
+                            memberLocator,
+                            /*isImplicit*/ true,
+                            /*isDynamicMemberLookup*/true,
                             AccessSemantics::Ordinary, overload);
-    }
-
-    Type getTypeOfDynamicMemberIndex(const SelectedOverload &overload) {
-      assert(overload.choice.isAnyDynamicMemberLookup());
-
-      auto declTy = solution.simplifyType(overload.adjustedOpenedFullType);
-      auto subscriptTy = declTy->castTo<FunctionType>()->getResult();
-      auto refFnType = subscriptTy->castTo<FunctionType>();
-      assert(refFnType->getParams().size() == 1 &&
-             "subscript always has one arg");
-      return refFnType->getParams()[0].getPlainType();
     }
 
   public:
@@ -3826,7 +3871,8 @@ namespace {
 
       return buildSubscript(expr->getBase(), expr->getArgs(),
                             cs.getConstraintLocator(expr), memberLocator,
-                            expr->isImplicit(), expr->getAccessSemantics(),
+                            expr->isImplicit(), /*isDynamicMemberLookup*/false,
+                            expr->getAccessSemantics(),
                             overload);
     }
 
@@ -3931,7 +3977,8 @@ namespace {
           cs.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
       return buildSubscript(expr->getBase(), expr->getArgs(),
                             cs.getConstraintLocator(expr), memberLocator,
-                            expr->isImplicit(), AccessSemantics::Ordinary,
+                            expr->isImplicit(), /*isDynamicMemberLookup=*/false,
+                            AccessSemantics::Ordinary,
                             solution.getOverloadChoice(memberLocator));
     }
 
@@ -4162,6 +4209,10 @@ namespace {
 
       auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, CheckedCastContextKind::IsExpr, dc);
+
+      if (diagnoseUnsupportedFRTDowncast(ctx, expr->getLoc(),
+                                         fromType, toType))
+        return nullptr;
 
       switch (castKind) {
       case CheckedCastKind::Unresolved:
@@ -4603,6 +4654,11 @@ namespace {
 
       const auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, CheckedCastContextKind::ForcedCast, dc);
+
+      if (diagnoseUnsupportedFRTDowncast(ctx, expr->getLoc(),
+                                         fromType, toType))
+        return nullptr;
+
       switch (castKind) {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -4680,6 +4736,11 @@ namespace {
 
       auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, CheckedCastContextKind::ConditionalCast, dc);
+
+      if (diagnoseUnsupportedFRTDowncast(ctx, expr->getLoc(),
+                                         fromType, toType))
+        return nullptr;
+
       switch (castKind) {
       // Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -5385,26 +5446,13 @@ namespace {
       // Compute substitutions to refer to the member.
       auto ref = resolveConcreteDeclRef(subscript, memberLoc);
 
-      // If this is a @dynamicMemberLookup reference to resolve a property
-      // through the subscript(dynamicMember:) member, restore the
+      // If this is a `@dynamicMemberLookup` reference to resolve a property
+      // through the `subscript(dynamicMember:...)` member, restore the
       // openedType and origComponent to its full reference as if the user
       // wrote out the subscript manually.
       if (overload.choice.isAnyDynamicMemberLookup()) {
-        auto indexType = getTypeOfDynamicMemberIndex(overload);
-        Expr *argExpr = nullptr;
-        if (overload.choice.isKeyPathDynamicMemberLookup()) {
-          argExpr = buildKeyPathDynamicMemberArgExpr(indexType, componentLoc,
-                                                     memberLoc);
-        } else {
-          auto fieldName = overload.choice.getName().getBaseIdentifier().str();
-          argExpr = buildDynamicMemberLookupArgExpr(fieldName, componentLoc,
-                                                    indexType);
-        }
-        args = ArgumentList::forImplicitSingle(ctx, ctx.Id_dynamicMember,
-                                               argExpr);
-        // Record the implicit subscript expr's parameter bindings and matching
-        // direction as `coerceCallArguments` requires them.
-        solution.recordSingleArgMatchingChoice(locator);
+        args = buildArgumentListForDynamicMemberLookupSubscript(
+            overload, componentLoc, locator);
       }
 
       auto subscriptType =
@@ -6180,7 +6228,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   // Determine whether this application has curried self.
   bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
   // Determine the parameter bindings.
-  ParameterListInfo paramInfo(params, callee.getDecl(), skipCurriedSelf);
+  ParameterListInfo paramInfo(params, skipCurriedSelf, callee);
 
   // If this application is an init(wrappedValue:) call that needs an injected
   // wrapped value placeholder, the first non-defaulted argument must be
@@ -7394,7 +7442,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       auto *initType = decl.getDecl()->getInterfaceType()->castTo<FunctionType>();
 
-      auto *ctorRefExpr =  new (ctx) DeclRefExpr(decl, DeclNameLoc(), /*Implicit=*/true);
+      auto *ctorRefExpr = new (ctx)
+          DeclRefExpr(decl, DeclNameLoc(expr->getLoc()), /*Implicit=*/true);
       ctorRefExpr->setType(initType);
       auto *typeExpr = TypeExpr::createImplicit(toType, ctx);
       auto *innerCall = ConstructorRefCallExpr::create(ctx, ctorRefExpr, typeExpr,
@@ -7921,6 +7970,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
     break;
   }
 
@@ -8000,6 +8050,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::PackExpansion:
   case TypeKind::PackElement:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
     break;
 
   case TypeKind::BuiltinTuple:
@@ -8218,8 +8269,16 @@ static Expr *buildCallAsFunctionMethodRef(
     rewriter.ExprStack.pop_back();
   };
 
+  // Anchor the implicit `.callAsFunction` name. Usually `args->getStartLoc()`
+  // is fine — for `foo(x)` that's the `(`, a sensible anchor. But for a bare
+  // trailing closure (`foo { ... }`) it's the `{`, which bleeds into the
+  // member ref's end loc and breaks downstream fix-its
+  // (see fixItEncloseTrailingClosure). Fall back to the end of the base in
+  // that case.
+  auto nameLoc = args->getLParenLoc().isValid() ? args->getStartLoc()
+                                                : fn->getEndLoc();
   auto *declRef = rewriter.buildMemberRef(
-      fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(args->getStartLoc()),
+      fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(nameLoc),
       calleeLoc, calleeLoc, /*implicit*/ true, AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;
@@ -8437,8 +8496,16 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto *calleeLoc = cs.getConstraintLocator(calleeLocator);
   auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc);
   if (overload) {
-    auto *decl = overload->choice.getDeclOrNull();
-    callee = resolveConcreteDeclRef(decl, calleeLoc);
+    // If this is a call through an implicit `dynamicMember:` subscript,
+    // of a `@dynamicMemberLookup` type there is no callee because the
+    // call happens on a value returned by the subscript invocation and
+    // not necessary the member looked up.
+    if (overload->choice.isKeyPathDynamicMemberLookup()) {
+      callee = ConcreteDeclRef();
+    } else {
+      auto *decl = overload->choice.getDeclOrNull();
+      callee = resolveConcreteDeclRef(decl, calleeLoc);
+    }
   }
 
   // Make sure we have a function type that is callable. This helps ensure
@@ -9298,6 +9365,20 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
   if (wrappedVar) {
     if (!finalPatternType->hasError() && !finalPatternType->is<TypeVariableType>())
       finalPatternType = computeWrappedValueType(wrappedVar, finalPatternType);
+  } else if (auto *typedPattern =
+                 dyn_cast<TypedPattern>(target.getInitializationPattern())) {
+    // When the pattern carries an explicit type annotation, prefer the type
+    // the solver assigned to the pattern over the type of the coerced
+    // initializer expression. The two share a canonical type, but if their
+    // sugar differs the initializer's sugar wins through coercion, which can
+    // have surprising results like printing an internal typealias into a
+    // .swiftinterface for a public stored property.
+
+    // FIXME: https://github.com/swiftlang/swift/issues/89690
+    // The final type could be set to the init type unconditionally without any
+    // regressions if constructor types were resugared consistently.
+    if (typedPattern->getTypeRepr())
+      finalPatternType = initType;
   }
 
   finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
@@ -9740,8 +9821,14 @@ ConstraintSystem::applySolution(Solution &solution,
     auto isValidType = [&](Type ty) {
       return !ty->hasError() && !ty->hasTypeVariableOrPlaceholder();
     };
-    for (auto &[_, type] : solution.typeBindings) {
-      ASSERT(isValidType(type) && "type binding has invalid type");
+    for (auto pair : solution.typeBindings) {
+      if (!isValidType(pair.second)) {
+        ABORT([&](llvm::raw_ostream &out) {
+          out << "Type binding has invalid type:\n";
+          pair.first->dump(out);
+          pair.second->dump(out);
+        });
+      }
     }
     for (auto &[_, type] : solution.nodeTypes) {
       ASSERT(isValidType(solution.simplifyType(type)) &&

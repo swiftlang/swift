@@ -20,6 +20,39 @@ function(force_target_link_libraries TARGET)
   force_add_dependencies(${TARGET} ${ARGS_UNPARSED_ARGUMENTS})
 endfunction()
 
+# Add compilation caching options to a Swift target.
+function(_add_swift_caching_compile_options name)
+  if(NOT SWIFT_CACHING_BUILD OR NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    return()
+  endif()
+  target_compile_options(${name} PRIVATE
+    $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
+    $<$<COMPILE_LANGUAGE:Swift>:-cache-compile-job>
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-cas-path ${SWIFT_CACHING_BUILD_CAS_PATH}>")
+  if(SWIFT_CACHING_BUILD_PLUGIN_PATH)
+    target_compile_options(${name} PRIVATE
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-cas-plugin-path ${SWIFT_CACHING_BUILD_PLUGIN_PATH}>")
+  endif()
+  if(SWIFT_CACHING_BUILD_PLUGIN_OPTIONS)
+    string(REPLACE ":" ";" _plugin_opts "${SWIFT_CACHING_BUILD_PLUGIN_OPTIONS}")
+    foreach(_opt IN LISTS _plugin_opts)
+      target_compile_options(${name} PRIVATE
+        "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-cas-plugin-option ${_opt}>")
+    endforeach()
+  endif()
+  if(SWIFT_CACHING_BUILD_PREFIX_MAP)
+    target_compile_options(${name} PRIVATE
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-scanner-prefix-map-sdk /^sdk>"
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-scanner-prefix-map-toolchain /^toolchain>"
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-scanner-prefix-map ${SWIFT_CACHING_BUILD_SOURCE_ROOT}=/^src>")
+  endif()
+  if(SWIFT_CACHING_BUILD_ENABLE_MCCAS)
+    target_compile_options(${name} PRIVATE
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -cas-backend>"
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -cas-friendly-debug-info>")
+  endif()
+endfunction()
+
 # Add compile options shared between libraries and executables.
 function(_add_host_swift_compile_options name)
   # Avoid introducing an implicit dependency on the string-processing library.
@@ -77,6 +110,8 @@ function(_add_host_swift_compile_options name)
   else()
     target_compile_options(${name} PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -DNDEBUG>")
   endif()
+
+  _add_swift_caching_compile_options(${name})
 endfunction()
 
 # Set compile options for C/C++ interop

@@ -378,7 +378,7 @@ synthesizeGenericSignature(SynthesisContext &SC,
                                GenericSignature(),
                                std::move(collector.GenericParamTypes),
                                std::move(collector.AddedRequirements),
-                               /*allowInverses=*/false);
+                               DefaultRequirementOptions());
 }
 
 /// Build a builtin function declaration.
@@ -819,7 +819,7 @@ namespace {
           Context, GenericSignature(),
           std::move(genericParamTypes),
           std::move(addedRequirements),
-          /*allowInverses=*/false);
+          DefaultRequirementOptions());
       return getBuiltinGenericFunction(name, InterfaceParams, InterfaceResult,
                                        TheGenericParamList, GenericSig, Async,
                                        Throws, ThrownError, SendingResult);
@@ -980,6 +980,11 @@ static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getAssumeAlignment(ASTContext &ctx, Identifier id) {
   // This is always "(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer"
+  return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer, _word),
+                            _rawPointer);
+}
+
+static ValueDecl *getDereferenceable(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer, _word),
                             _rawPointer);
 }
@@ -1602,11 +1607,6 @@ static ValueDecl *getGetCurrentExecutor(ASTContext &ctx, Identifier id) {
                             _optional(_executor));
 }
 
-static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(
-      id, { ctx.TheNativeObjectType }, ctx.TheEmptyTupleType);
-}
-
 Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   TupleTypeElt resultTupleElements[2] = {
     ctx.TheNativeObjectType, // task,
@@ -1735,7 +1735,11 @@ static ValueDecl *getDistributedActorInitializeRemote(ASTContext &ctx,
 static ValueDecl *getResumeContinuationReturning(ASTContext &ctx,
                                                  Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted, _conformsToDefaults(0)),
+                            _generics(_unrestricted,
+                                      _conformsTo(
+                                        _typeparam(0), _escapable)
+                                        // we allow ~Copyable, so we do not require Copyable conformance
+                                      ),
                             _parameters(_rawUnsafeContinuation,
                                         _owned(_typeparam(0))),
                             _void);
@@ -2684,13 +2688,13 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Quad:
     return Context.TheIEEE128Type;
   case IITDescriptor::Integer:
-    return BuiltinIntegerType::get(D.Integer_Width, Context);
+    return BuiltinIntegerType::get(D.IntegerWidth, Context);
 
   // A vector of an immediate type.
   case IITDescriptor::Vector: {
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
-    return makeVector(eltType, D.Vector_Width.getKnownMinValue());
+    return makeVector(eltType, D.VectorWidth.getKnownMinValue());
   }
   
   // The element type of a vector type.
@@ -2706,7 +2710,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Pointer: {
     Type pointeeType = decodeImmediate();
     if (!pointeeType) return Type();
-    return makePointer(pointeeType, D.Pointer_AddressSpace);
+    return makePointer(pointeeType, D.PointerAddressSpace);
   }
 
   // A type argument.
@@ -2726,7 +2730,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   // A struct, which we translate as a tuple.
   case IITDescriptor::Struct: {
     SmallVector<TupleTypeElt, 5> Elts;
-    for (unsigned i = 0; i != D.Struct_NumElements; ++i) {
+    for (unsigned i = 0; i != D.StructNumElements; ++i) {
       Type T = decodeImmediate();
       if (!T) return Type();
       
@@ -3091,6 +3095,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (Types.size() != 1) return nullptr;
     return getGepOperation(Context, Id, Types[0]);
 
+  case BuiltinValueKind::GepProjection:
+    if (Types.size() != 1) return nullptr;
+    return getGepOperation(Context, Id, Types[0]);
+
   case BuiltinValueKind::GetTailAddr:
     if (Types.size() != 1) return nullptr;
     return getGetTailAddrOperation(Context, Id, Types[0]);
@@ -3111,6 +3119,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty())
       return nullptr;
     return getAssumeAlignment(Context, Id);
+
+  case BuiltinValueKind::Dereferenceable:
+    if (!Types.empty())
+      return nullptr;
+    return getDereferenceable(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
@@ -3422,9 +3435,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::GetCurrentExecutor:
     return getGetCurrentExecutor(Context, Id);
-
-  case BuiltinValueKind::CancelAsyncTask:
-    return getCancelAsyncTask(Context, Id);
 
   case BuiltinValueKind::CreateTask:
     return getCreateTask(Context, Id);

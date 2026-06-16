@@ -361,7 +361,7 @@ class LLVM(cmake_product.CMakeProduct):
             llvm_cmake_options.define(
                 f'BUILTINS_{builtins_runtimes_target_for_darwin}_'
                 'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:'
-                'STRING', 'armv6 armv6m armv7 armv7m armv7em')
+                'STRING', 'armv6 armv6m armv7 armv7m armv7em armv8m.main armv8.1m.main')
 
         llvm_enable_projects = ['clang']
         llvm_enable_runtimes = []

@@ -89,7 +89,10 @@ const void *const swift::_swift_concurrency_debug_asyncTaskSlabMetadata =
 bool swift::_swift_concurrency_debug_supportsPriorityEscalation =
     SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION;
 
-uint32_t swift::_swift_concurrency_debug_internal_layout_version = 1;
+// ************************* PLEASE UPDATE DEBUG.H DOCS ***************************************
+// * When changing this version number you MUST document the change in `Concurrency/Debug.h`. *
+// ********************************************************************************************
+uint32_t swift::_swift_concurrency_debug_internal_layout_version = 2;
 
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
@@ -254,6 +257,14 @@ void AsyncTask::completeFuture(AsyncContext *context) {
 
   _swift_tsan_release(static_cast<Job *>(this));
 
+  // If this is task group child, notify the parent group about the completion.
+  if (hasGroupChildFragment()) {
+    // then we must offer into the parent group that we completed,
+    // so it may `next()` poll completed child tasks in completion order.
+    auto group = groupChildFragment()->getGroup();
+    group->offer(this, context);
+  }
+
   // Update the status to signal completion.
   auto newQueueHead = WaitQueueItem::get(
     hadErrorResult ? Status::Error : Status::Success,
@@ -265,13 +276,8 @@ void AsyncTask::completeFuture(AsyncContext *context) {
       newQueueHead, std::memory_order_acq_rel);
   assert(queueHead.getStatus() == Status::Executing);
 
-  // If this is task group child, notify the parent group about the completion.
-  if (hasGroupChildFragment()) {
-    // then we must offer into the parent group that we completed,
-    // so it may `next()` poll completed child tasks in completion order.
-    auto group = groupChildFragment()->getGroup();
-    group->offer(this, context);
-  }
+  // Once we signal completion, an async let task may be destroyed. We must not
+  // access `this` after this point in that case.
 
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
@@ -327,11 +333,15 @@ AsyncTask::~AsyncTask() {
     futureFragment()->destroy();
   }
 
-  // The initial task name record is special in that we allow it to stay until
-  // task destruction, since it is possible to read a name off a task handle,
-  // even after it completed; so drop it here:
-  if (hasInitialTaskNameRecord()) {
-    dropInitialTaskNameRecord();
+  // The task name characters live in the task's slab as the FIRST slab
+  // allocation. Free them last (i.e. here) so that the LIFO discipline
+  // holds — `task.name` is allowed to be read off a completed task right
+  // up until destruction.
+  if (hasTaskName()) {
+    if (const char *name = nameFragment()->getName()) {
+      _swift_task_dealloc_specific(this, const_cast<char*>(name));
+      nameFragment()->setName(nullptr, 0);
+    }
 
     #ifndef NDEBUG
     auto oldStatus = _private()._status().load(std::memory_order_relaxed);
@@ -376,7 +386,7 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   // here.
 
   SWIFT_TASK_DEBUG_LOG("Destroyed task %p", task);
-  free(task);
+  swift_slowDealloc(task, 0, alignof(AsyncTask) - 1);
 }
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
@@ -459,6 +469,9 @@ const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
     static_cast<Metadata *>(&taskHeapMetadata);
 
 const size_t swift::_swift_concurrency_debug_asyncTaskSize = sizeof(AsyncTask);
+
+const size_t swift::_swift_concurrency_debug_asyncTaskNameOffset =
+    sizeof(AsyncTask);
 
 const HeapMetadata *swift::jobHeapMetadataPtr =
     static_cast<HeapMetadata *>(&jobHeapMetadata);
@@ -692,9 +705,16 @@ static inline bool taskIsDetached(TaskCreateFlags createFlags, JobFlags jobFlags
 
 static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
     const AsyncTask *parent, const TaskGroup *group,
-    ResultTypeInfo futureResultType, size_t initialContextSize) {
+    ResultTypeInfo futureResultType, size_t initialContextSize,
+    bool hasTaskName) {
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
+  if (hasTaskName) {
+    // The NameFragment must be the FIRST tail-allocated fragment so that
+    // its slot lives at the constant offset `sizeof(AsyncTask)` (exported
+    // as `_swift_concurrency_debug_asyncTaskNameOffset`).
+    headerSize += sizeof(AsyncTask::NameFragment);
+  }
   if (parent) {
     headerSize += sizeof(AsyncTask::ChildFragment);
   }
@@ -923,7 +943,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 
   size_t headerSize, amountToAllocate;
   std::tie(headerSize, amountToAllocate) = amountToAllocateForHeaderAndTask(
-      parent, group, futureResultType, initialContextSize);
+      parent, group, futureResultType, initialContextSize,
+      /*hasTaskName=*/jobFlags.task_hasInitialTaskName());
 
   unsigned initialSlabSize = 512;
 
@@ -963,7 +984,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     allocation = runInlineOption->getAllocation();
     initialSlabSize = runInlineBufferBytes - amountToAllocate;
   } else {
-    allocation = malloc(amountToAllocate);
+    allocation = swift_slowAlloc(amountToAllocate, alignof(AsyncTask) - 1);
   }
   SWIFT_TASK_DEBUG_LOG("allocate task %p, parent = %p, slab %u", allocation,
                        parent, initialSlabSize);
@@ -1114,14 +1135,10 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     task->Private.initialize(basePriority);
   }
 
-  // Task name
-  // This record MUST be the FIRST allocation on the task allocator stack.
-  //
-  // The task name is the only initial record we keep alive after the task completes,
-  // until it is destroyed, because `task.name` can be read off a completed task.
-  // All other records are released early, during task completion.
+  // First, initialize the NameFragment, if any.
   if (jobFlags.task_hasInitialTaskName()) {
-    task->pushInitialTaskName(taskName);
+    ::new (task->nameFragment()) AsyncTask::NameFragment();
+    task->initializeTaskName(taskName);
   }
 
   // Perform additional linking between parent and child task.
@@ -1259,7 +1276,8 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   size_t candidateAllocationBytes = SWIFT_TASK_RUN_INLINE_INITIAL_CONTEXT_BYTES;
   size_t minimumAllocationSize =
       amountToAllocateForHeaderAndTask(/*parent=*/nullptr, /*group=*/nullptr,
-                                       futureResultType, closureContextSize)
+                                       futureResultType, closureContextSize,
+                                       /*hasTaskName=*/false)
           .second;
   void *allocation = nullptr;
   size_t allocationBytes = 0;
@@ -1884,10 +1902,12 @@ swift_task_createNullaryContinuationJobImpl(
   return job;
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 SWIFT_CC(swift)
 void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);
 }
+#endif
 
 // This has moved; the implementation is now in the executor; the declaration
 // needs to be here because unlike other things implemented by the executor,
@@ -1942,8 +1962,10 @@ static void swift_task_startOnMainActorImpl(AsyncTask* task) {
 // Defined in Swift, redeclared here so we can register it with the runtime.
 extern "C" SWIFT_CC(swift)
 bool _swift_task_isCurrentGlobalActor(
-  const swift::Metadata *, const swift::WitnessTable *,
-  SWIFT_CONTEXT const swift::Metadata *);
+  const swift::Metadata *,
+  const swift::WitnessTable *,
+  SWIFT_CONTEXT const swift::Metadata *
+);
 
 // Register our type descriptors with standard manglings when the concurrency
 // runtime is loaded. This allows the runtime to quickly resolve those standard
@@ -1984,7 +2006,7 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
       swift_##name##_hook(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)          \
                               swift_##name##Impl,                              \
                           Override);                                           \
-      abort();                                                                 \
+      swift_unreachable("returned from noreturn hook");                        \
     }                                                                          \
     if (Override != nullptr)                                                   \
       Override(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)                     \
@@ -2000,7 +2022,7 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
   attrs ccAttrs void namespace swift_##name COMPATIBILITY_PAREN(typedArgs) {   \
     if (swift_##name##_hook) {                                                 \
       swift_##name##_hook(swift_##name##Impl, nullptr);                        \
-      abort();                                                                 \
+      swift_unreachable("returned from noreturn hook");                        \
     }                                                                          \
     swift_##name##Impl COMPATIBILITY_PAREN(namedArgs);                         \
   }

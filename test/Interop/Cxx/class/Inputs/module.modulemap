@@ -71,6 +71,11 @@ module MutabilityAnnotations {
   requires cplusplus
 }
 
+module NestedEnums {
+  header "nested-enums.h"
+  requires cplusplus
+}
+
 module NoDiscard {
  header "nodiscard.h"
  requires cplusplus  
@@ -183,4 +188,9 @@ module FriendFunction {
   header "friend-function.h"
   requires cplusplus
   export *
+}
+
+module NoncopyableNonmovableGlobal {
+  header "noncopyable-nonmovable-global.h"
+  requires cplusplus
 }

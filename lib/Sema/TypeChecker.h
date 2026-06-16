@@ -1314,32 +1314,6 @@ diag::RequirementKind getProtocolRequirementKind(ValueDecl *Requirement);
 bool isValidDynamicCallableMethod(FuncDecl *decl,
                                   bool hasKeywordArguments);
 
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)`.
-bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                         bool ignoreLabel = false);
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)` which
-/// takes a single non-variadic parameter that conforms to
-/// `ExpressibleByStringLiteral` protocol.
-bool isValidStringDynamicMemberLookup(SubscriptDecl *decl,
-                                      bool ignoreLabel = false);
-
-/// Returns the KeyPath parameter type for a valid implementation of
-/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
-/// @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)` which
-/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-///
-/// Returns null if the given subscript is not a valid dynamic member lookup
-/// implementation.
-BoundGenericType *
-getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
-                                     bool ignoreLabel = false);
-
 /// Compute the wrapped value type for the given property that has attached
 /// property wrappers, when the backing storage is known to have the given type.
 ///
@@ -1557,16 +1531,6 @@ bool shouldDiagnoseMissingImportForMember(const ValueDecl *decl,
 bool maybeDiagnoseMissingImportForMember(
     const ValueDecl *decl, const DeclContext *dc, SourceLoc loc,
     DiagnosticBehavior limit = DiagnosticBehavior::Unspecified);
-
-/// Emit or delay a diagnostic that suggests adding a missing import that is
-/// necessary to bring \p decl into scope in the containing source file so that
-/// a conformance to \p protocol is valid. If delayed, the diagnostic will
-/// instead be emitted after type checking the entire file and will include an
-/// appropriate fix-it. Returns true if a diagnostic was emitted (and not
-/// delayed).
-bool maybeDiagnoseMissingImportForConformanceWitness(
-    const ValueDecl *decl, const ProtocolDecl *protocol, const DeclContext *dc,
-    SourceLoc loc, DiagnosticBehavior limit = DiagnosticBehavior::Unspecified);
 
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.

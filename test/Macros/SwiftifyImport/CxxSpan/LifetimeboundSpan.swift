@@ -119,9 +119,8 @@ public func myFunc4(_ vec: borrowing VecOfInt, _ span: Span<CInt>) -> Span<CInt>
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(copy span) @_disfavoredOverload
 public func myFunc6(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: CInt) -> Span<CInt> {
-    let _ptrCount = ptr.byteCount
-    if _ptrCount != count * size {
-      fatalError("bounds check failure in myFunc6: expected \(count * size) but got \(_ptrCount)")
+    if ptr.byteCount != count * size {
+      fatalError("bounds check failure in myFunc6: expected \(count * size) but got \(ptr.byteCount)")
     }
     let _ptrPtr = ptr.withUnsafeBytes {
         unsafe $0
@@ -137,9 +136,8 @@ public func myFunc6(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: C
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(copy span) @_disfavoredOverload
 public func myFunc7(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: CInt) -> Span<CInt> {
-    let _ptrCount = ptr.byteCount
-    if _ptrCount != count * size {
-      fatalError("bounds check failure in myFunc7: expected \(count * size) but got \(_ptrCount)")
+    if ptr.byteCount != count * size {
+      fatalError("bounds check failure in myFunc7: expected \(count * size) but got \(ptr.byteCount)")
     }
     let _ptrPtr = ptr.withUnsafeBytes {
         unsafe $0
@@ -155,9 +153,8 @@ public func myFunc7(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: C
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(copy span) @_disfavoredOverload
 public func myFunc8(_ ptr: RawSpan, _ span: Span<CInt>, _ count: CInt, _ size: CInt) -> Span<CInt> {
-    let _ptrCount = ptr.byteCount
-    if _ptrCount != count * size {
-      fatalError("bounds check failure in myFunc8: expected \(count * size) but got \(_ptrCount)")
+    if ptr.byteCount != count * size {
+      fatalError("bounds check failure in myFunc8: expected \(count * size) but got \(ptr.byteCount)")
     }
     let _ptrPtr = ptr.withUnsafeBytes {
         unsafe $0

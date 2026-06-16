@@ -92,10 +92,8 @@ bb0(%i: $Builtin.Word, %tuple : $*(repeat each U)):
 
 // CHECK-LABEL: sil @test_tuple_pack_element_2
 // CHECK:         [[TEMP:%.*]] = alloc_stack $Float
-// CHECK-NEXT:    [[I:%.*]] = integer_literal $Builtin.Word, 0
-// CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[I]] of $Pack{Float}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each Z> at <Pack{Float}>, shape $each Z, uuid [[UUID:".*"]]
-// CHECK-NEXT:    unchecked_addr_cast [[TEMP]] : $*Float to $*@pack_element([[UUID]]) each Z
+// CHECK-NOT:     open_pack_element
+// CHECK:         unchecked_addr_cast [[TEMP]] : $*Float to $*Float
 sil @test_tuple_pack_element_2 : $() -> () {
 bb0:
   %tuple = alloc_stack $Float
@@ -103,6 +101,93 @@ bb0:
   %fn = function_ref @tuple_pack_element : $@convention(thin) <each T> (Builtin.Word, @inout (repeat each T)) -> ()
   apply %fn<Pack{Float}>(%i, %tuple) : $@convention(thin) <each T> (Builtin.Word, @inout (repeat each T)) -> ()
   dealloc_stack %tuple : $*Float
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil [ossa] [heuristic_always_inline] @scalar_open_pack_element : $<each T> () -> () {
+bb0:
+  %index = scalar_pack_index 0 of $Pack{Int, repeat each T}
+  %tok = open_pack_element %index of <each Z> at <Pack{Int, repeat each T}>, shape $Z, uuid "01234567-89AB-CDEF-0123-000000000010"
+  %slot = alloc_stack $@pack_element("01234567-89AB-CDEF-0123-000000000010") Z
+  dealloc_stack %slot : $*@pack_element("01234567-89AB-CDEF-0123-000000000010") Z
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_scalar_open_pack_element
+// CHECK-NOT:     open_pack_element
+// CHECK:         alloc_stack $Int
+sil @test_scalar_open_pack_element : $() -> () {
+bb0:
+  %fn = function_ref @scalar_open_pack_element : $@convention(thin) <each T> () -> ()
+  apply %fn<Pack{Float}>() : $@convention(thin) <each T> () -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil [ossa] [heuristic_always_inline] @pack_pack_open_element : $<each T> () -> () {
+bb0:
+  %zero = integer_literal $Builtin.Word, 0
+  %inner = dynamic_pack_index %zero of $Pack{repeat each T}
+  %index = pack_pack_index 1, %inner of $Pack{Int, repeat each T}
+  %tok = open_pack_element %index of <each Z> at <Pack{Int, repeat each T}>, shape $Z, uuid "01234567-89AB-CDEF-0123-000000000011"
+  %slot = alloc_stack $@pack_element("01234567-89AB-CDEF-0123-000000000011") Z
+  dealloc_stack %slot : $*@pack_element("01234567-89AB-CDEF-0123-000000000011") Z
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_pack_pack_open_element
+// CHECK-NOT:     open_pack_element
+// CHECK:         alloc_stack $String
+sil @test_pack_pack_open_element : $() -> () {
+bb0:
+  %fn = function_ref @pack_pack_open_element : $@convention(thin) <each T> () -> ()
+  apply %fn<Pack{String}>() : $@convention(thin) <each T> () -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_dynamic_open_pack_element_runtime
+// CHECK:         [[INDEX:%.*]] = dynamic_pack_index %0 of $Pack{Int, Float}
+// CHECK:         open_pack_element [[INDEX]] of <each Z> at <Pack{Int, Float}>, shape $each Z, uuid
+sil @test_dynamic_open_pack_element_runtime : $(Builtin.Word) -> () {
+bb0(%i : $Builtin.Word):
+  %tuple = alloc_stack $(Int, Float)
+  %fn = function_ref @tuple_pack_element : $@convention(thin) <each T> (Builtin.Word, @inout (repeat each T)) -> ()
+  apply %fn<Pack{Int, Float}>(%i, %tuple) : $@convention(thin) <each T> (Builtin.Word, @inout (repeat each T)) -> ()
+  dealloc_stack %tuple : $*(Int, Float)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil [ossa] [heuristic_always_inline] @dynamic_literal_open_pack_element : $<each T> () -> () {
+bb0:
+  %two = integer_literal $Builtin.Word, 2
+  %index = dynamic_pack_index %two of $Pack{repeat each T}
+  %tok = open_pack_element %index of <each Z> at <Pack{repeat each T}>, shape $Z, uuid "01234567-89AB-CDEF-0123-000000000012"
+  %slot = alloc_stack $@pack_element("01234567-89AB-CDEF-0123-000000000012") Z
+  dealloc_stack %slot : $*@pack_element("01234567-89AB-CDEF-0123-000000000012") Z
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// `dynamic_pack_index` fed by an integer literal is a flattened (runtime)
+// offset into the pack. When the caller substitutes `repeat each T` with
+// `Pack{Int, repeat each U, Float}`, structural component 2 is `Float`, but
+// runtime offset 2 lands inside the `repeat each U` expansion if it has 2 or
+// more elements, so the flattened and structural indices can disagree. The
+// cloner must detect this and preserve `open_pack_element` rather than
+// substituting `@pack_element(...) Z` with `Float`.
+//
+// CHECK-LABEL: sil @test_dynamic_literal_expansion_before_index
+// CHECK:         open_pack_element {{.*}} of <each Z> at <Pack{Int, repeat each U, Float}>
+// CHECK:         alloc_stack $@pack_element({{.*}}) each Z
+sil @test_dynamic_literal_expansion_before_index : $<each U> () -> () {
+bb0:
+  %fn = function_ref @dynamic_literal_open_pack_element : $@convention(thin) <each T> () -> ()
+  apply %fn<Pack{Int, repeat each U, Float}>() : $@convention(thin) <each T> () -> ()
   %ret = tuple ()
   return %ret : $()
 }

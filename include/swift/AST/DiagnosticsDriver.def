@@ -134,6 +134,10 @@ ERROR(error_wasm_doesnt_support_global_base, none,
       "The --global-base argument is not supported when targeting WebAssembly",
       ())
 
+WARNING(wasi_deprecated_use_wasip1, none,
+        "'wasi' in '-target' is deprecated; use 'wasip1' instead",
+        ())
+
 ERROR(error_hermetic_seal_cannot_have_library_evolution, none,
       "Cannot use -experimental-hermetic-seal-at-link with -enable-library-evolution",
       ())

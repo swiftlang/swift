@@ -242,6 +242,10 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::Solaris:
   case llvm::Triple::Vulkan:
   case llvm::Triple::ZOS:
+  case llvm::Triple::CheriotRTOS:
+  case llvm::Triple::ChipStar:
+  case llvm::Triple::OpenCL:
+  case llvm::Triple::QURT:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
@@ -285,6 +289,13 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "haiku";
   case llvm::Triple::WASI:
     return "wasi";
+  case llvm::Triple::WASIp1:
+    // FIXME: Should be "wasip1", but that breaks the SwiftWASILibC build
+    return "wasi";
+  case llvm::Triple::WASIp2:
+    return "wasip2";
+  case llvm::Triple::WASIp3:
+    return "wasip3";
   case llvm::Triple::Emscripten:
     return "emscripten";
   case llvm::Triple::UnknownOS:
@@ -763,6 +774,11 @@ findSwiftRuntimeVersionHelper(llvm::VersionTuple targetPlatformVersion,
                               ArrayRef<PlatformSwiftRelease> allReleases) {
   #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+  // If the target release is at least the notional future-release version,
+  // return that we aren't deployment-limited.
+  if (targetPlatformVersion >= llvm::VersionTuple(99, 99))
+    return std::nullopt;
+
   // Scan forward in our filtered platform release array for the given
   // platform.
   for (auto &release : allReleases) {
@@ -775,12 +791,6 @@ findSwiftRuntimeVersionHelper(llvm::VersionTuple targetPlatformVersion,
       return std::max(release.swiftVersion, minimumSwiftVersion);
     }
   }
-
-  // If we didn't find anything, but the target release is at least the
-  // notional future-release version, return that we aren't
-  // deployment-limited.
-  if (targetPlatformVersion >= llvm::VersionTuple(99, 99))
-    return std::nullopt;
 
   // Otherwise, return the minimum Swift version.
   return minimumSwiftVersion;

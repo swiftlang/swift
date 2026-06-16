@@ -1,8 +1,4 @@
-// RUN: rm -rf %t
-// RUN: split-file %s %t
-// RUN: %target-build-swift %t/test.swift -I %t/Inputs -o %t/out -Xfrontend -enable-experimental-cxx-interop -O
-// RUN: %target-codesign %t/out
-// RUN: %target-run %t/out
+// RUN: %target-run-simple-swift-split-file(test.swift -I %t/Inputs -Xfrontend -enable-experimental-cxx-interop -O)
 
 // Verify that a non-const ref value parameter can't implicitly receive
 // aborrowed value.

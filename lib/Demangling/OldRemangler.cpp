@@ -860,8 +860,10 @@ ManglingError Remangler::mangleDifferentiableFunctionType(Node *node,
 
 ManglingError Remangler::mangleGlobalActorFunctionType(Node *node,
                                                        unsigned depth) {
-  Buffer << "Y" << (char)node->getIndex(); // differentiability kind
-  return ManglingError::Success;
+  // The old mangling has no representation for global-actor isolation. We
+  // previously attempted to generate one, but it called node->getIndex() on a
+  // node that has no index. Instead, fail gracefully.
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
 ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,

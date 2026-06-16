@@ -103,3 +103,11 @@ public func getModuleKlassMemberTBD() -> Int {
   return ModuleTBD.moduleKlassMember()
 }
 
+// CHECK-LABEL: sil @$s4Main8testLoad1sSi6Module1SV_tF :
+// CHECK-NOT:     function_ref 
+// CHECK-NOT:     apply 
+// CHECK:       } // end sil function '$s4Main8testLoad1sSi6Module1SV_tF'
+public func testLoad(s: Module.S) -> Int {
+  return s.load(t: Int.self, i: 0)
+}
+

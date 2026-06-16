@@ -618,7 +618,7 @@ bb0(%0 : @owned $T):
   %2 = init_existential_metatype %1, $@thick P.Type
   %3 = open_existential_metatype %2 to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self).Type
   %4 = alloc_stack [lexical] $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self
-  debug_value %4, var, name "x"
+  debug_value %4, var, name "x", expr op_deref
   %5 = unchecked_addr_cast %4 to $*T
   store %0 to [init] %5
   destroy_addr %4
@@ -700,7 +700,7 @@ sil_scope 2 { loc "inlined.swift":1:1 parent @$inlined :  $@convention(thin) <τ
 sil [ossa] @replace_existential_with_concrete_type3 : $@convention(thin) (@owned T) -> () {
 bb0(%0 : @owned $T):
   %5 = alloc_stack $any P
-  debug_value %5, let, name "value1", loc "inlined.swift":1:1, scope 2
+  debug_value %5, let, name "value1", expr op_deref, loc "inlined.swift":1:1, scope 2
   %6 = init_existential_addr %5, $T
   store %0 to [init] %6
   %8 = open_existential_addr mutable_access %5 to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122", P) Self

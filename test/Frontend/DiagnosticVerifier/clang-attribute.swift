@@ -45,7 +45,7 @@ module TestClang {
 // CHECK: TEST_H:1:6: note: in expansion from here
 // CHECK: TEST_H:1:6: note: file 'TEST_H' is not parsed for 'expected' statements. Use '-verify-additional-file TEST_H' to enable, or '-verify-ignore-unrelated' to ignore diagnostics in this file 
 
-// CHECK: @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:4:1: error: unexpected remark produced: macro content: |    return unsafe foo(len, p.baseAddress!)|
+// CHECK: @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:4:1: error: unexpected remark produced: macro content: |    return unsafe foo(len, p.baseAddress)|
 // CHECK: TEST_H:1:25: note: in expansion from here
 // CHECK: TEST_H:1:25: note: file 'TEST_H' is not parsed for 'expected' statements. Use '-verify-additional-file TEST_H' to enable, or '-verify-ignore-unrelated' to ignore diagnostics in this file
 // CHECK: <empty-filename>:1:1: error: unexpected note produced: in expansion of macro '_SwiftifyImport' on global function 'foo' here

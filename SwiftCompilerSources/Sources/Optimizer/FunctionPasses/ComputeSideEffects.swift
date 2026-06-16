@@ -197,7 +197,8 @@ private struct CollectedEffects {
       let addr = inst.operands[0].value
       addEffects(.read, to: addr)
 
-    case let apply as FullApplySite:
+    case isFullApplySite:
+      let apply = inst as! FullApplySite
       if apply.callee.type.isCalleeConsumedFunction {
         addEffects(.destroy, to: apply.callee)
         globalEffects = .worstEffects
@@ -249,12 +250,15 @@ private struct CollectedEffects {
       is CondFailInst:
       break
 
+    case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
+      break
+
     case is BeginCOWMutationInst, is IsUniqueInst:
       // Model reference count reading as "destroy" for now. Although we could introduce a "read-refcount"
       // effect, it would not give any significant benefit in any of our current optimizations.
       addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
 
-    case is ReturnInstruction:
+    case isReturnInstruction:
       if inst.parentFunction.convention.hasAddressResult {
         addEffects(.read, to: inst.operands[0].value)
       }
@@ -586,6 +590,9 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
     // Warning: all instruction listed here, must also be handled in `CollectedEffects.addInstructionEffects`
     case is StoreInst, is StoreWeakInst, is StoreUnownedInst, is ApplySite, is DestroyAddrInst,
          is DebugValueInst:
+      return .continueWalk
+
+    case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
       return .continueWalk
 
     default:

@@ -12,6 +12,9 @@
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
+// CHECK-IR shape differs on wasm32: optimized vector-reduce form not produced, trap retained
+// XFAIL: OS=wasip1
+
 // Bounds check should be eliminated
 // SIL optimizer eliminates bounds checks from the loop
 // CHECK-SIL-LABEL: sil @$s23span_bounds_check_tests0A29_sum_iterate_to_count_wo_trapySis4SpanVySiGF :

@@ -70,18 +70,6 @@ set(SWIFT_COMPILER_SOURCES_SDK_FLAGS_default)
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
   set(sdk_path "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
   list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-sdk" "${sdk_path}")
-  if(NOT EXISTS "${sdk_path}/usr/include/c++")
-    # Darwin SDKs in Xcode 12 or older do not include libc++, which prevents clang from finding libc++ when invoked
-    # from ClangImporter. This results in build errors. To workaround this, let's explicitly pass the path to libc++
-    # to clang.
-    message(WARNING "Building with an outdated Darwin SDK: libc++ missing from the ${SWIFT_HOST_VARIANT_SDK} SDK. Will use libc++ from the toolchain.")
-    get_filename_component(absolute_libcxx_path "${CMAKE_C_COMPILER}/../../include/c++/v1" REALPATH)
-    if (EXISTS "${absolute_libcxx_path}")
-      list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-Xcc" "-isystem" "-Xcc" "${absolute_libcxx_path}")
-    else()
-      message(ERROR "libc++ not found in the toolchain.")
-    endif()
-  endif()
 elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
   list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
 endif()
@@ -108,6 +96,10 @@ function(add_swift_compiler_modules_library name)
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+
+  if(SWIFT_CACHING_BUILD AND BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    swift_append_caching_compile_flags(swift_compile_options)
+  endif()
 
   # Pass the declared C++ stdlib for swift's internal clang.
   set(swift_compile_cxx_flags ${CMAKE_CXX_FLAGS})
@@ -161,6 +153,21 @@ function(add_swift_compiler_modules_library name)
   if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
   endif()
+
+  # NOTE: We deliberately do NOT pass -index-store-path here.
+  # add_swift_compiler_modules_library invokes swiftc as
+  #   swiftc -wmo -c -o ${module}.o source1.swift source2.swift ...
+  # i.e. WMO with a single merged object output for many input source files.
+  # The Swift indexer walks every SourceFile in the module and expects an
+  # index-unit-output token per source (IndexRecord.cpp's
+  # error_index_inputs_more_than_outputs), but in WMO+single-output mode
+  # only the last input "produces a main output" so only one token is
+  # available - swiftc emits "index output filenames do not match input
+  # source files" and fails. FrontendTool.cpp:2379 has a FIXME calling out
+  # this exact limitation. Until that FIXME is resolved (or the
+  # SwiftCompilerSources build switches to per-source outputs via an
+  # output-file-map), the libswift compiler modules cannot be added to the
+  # IndexStore from this build path.
 
   get_bootstrapping_path(build_dir ${CMAKE_CURRENT_BINARY_DIR} "${ALS_BOOTSTRAPPING}")
 

@@ -269,7 +269,7 @@ public protocol CaseIterable {
 /// purposes is discouraged.
 public protocol ExpressibleByNilLiteral: ~Copyable, ~Escapable {
   /// Creates an instance initialized with `nil`.
-  @lifetime(immortal)
+  @_lifetime(immortal)
   init(nilLiteral: ())
 }
 

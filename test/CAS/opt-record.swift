@@ -24,8 +24,8 @@
 // RUN: not %FileCheck %s --check-prefix=YAML --input-file=%t/record-1.yaml
 
 // CACHE-MISS: remark: cache miss for input
-// CACHE-HIT: remark: replay output file '<cached-diagnostics>': key 'llvmcas://{{.*}}'
-// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}test.o': key 'llvmcas://{{.*}}'
+// CACHE-HIT: remark: replay output file '<cached-diagnostics>': id 'llvmcas://{{.*}}'
+// CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}test.o': id 'llvmcas://{{.*}}'
 // YAML: ---
 
 var a: Int = 1

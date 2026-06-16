@@ -21,12 +21,14 @@ import Musl
 import Android
 #elseif os(WASI)
 import WASILibc
+#elseif os(Emscripten)
+import EmscriptenLibc
 #elseif os(Windows)
 import CRT
 import WinSDK
 #endif
 
-#if !os(WASI)
+#if !os(WASI) && !os(Emscripten)
 // No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
 internal func _signalToString(_ signal: Int) -> String {
   switch CInt(signal) {
@@ -53,7 +55,7 @@ public enum ProcessTerminationStatus : CustomStringConvertible {
     case .exit(let status):
       return "Exit(\(status))"
     case .signal(let signal):
-#if os(WASI)
+#if os(WASI) || os(Emscripten)
       // No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
       fatalError("Signals are not supported on WebAssembly/WASI")
 #else
@@ -167,7 +169,7 @@ public func waitProcess(_ process: HANDLE) -> ProcessTerminationStatus {
   }
   return .exit(Int(status))
 }
-#elseif os(WASI)
+#elseif os(WASI) || os(Emscripten)
 // WASI doesn't support child processes
 public func spawnChild(_ args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {

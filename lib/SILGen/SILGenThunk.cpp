@@ -647,11 +647,18 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
       ? IsSerialized : IsNotSerialized;
   }
 
+  auto isolation = ActorIsolation::forUnspecified();
+
+  // The isolation of the thunk should match that of its type
+  // otherwise it could lead to incorrect decision optimizations.
+  if (thunkType->hasNonisolatedNonsendingIsolation())
+    isolation = ActorIsolation::forNonisolatedNonsending();
+
   SILGenFunctionBuilder builder(*this);
   return builder.getOrCreateSharedFunction(
-      loc, name, thunkDeclType, ActorIsolation::forUnspecified(), IsBare,
-      IsTransparent, serializable, ProfileCounter(), IsReabstractionThunk,
-      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
+      loc, name, thunkDeclType, isolation, IsBare, IsTransparent, serializable,
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
 }
 
 SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(

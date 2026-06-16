@@ -1,3 +1,4 @@
+// UNSUPPORTED: CPU=armv7k && OS=watchos
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 

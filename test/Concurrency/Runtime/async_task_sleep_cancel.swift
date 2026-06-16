@@ -15,7 +15,16 @@ import Dispatch
 
 @available(SwiftStdlib 5.1, *)
 @main struct Main {
-  static let pause = 500_000_000 // 500ms
+  // Duration for testing a sleep that we intend to run to completion.
+  static let normalPause = 500_000_000 // 500ms
+
+  // Duration for testing a sleep that will be cancelled. This should not run to
+  // completion, so we make it longer in order to minimize the chance of some
+  // delay making the test fail spuriously.
+  //
+  // 15 billion is too big to fit into an Int on 32-bit targets, so we'll make
+  // this a UInt64 and play some games in the time arithmetic.
+  static let cancelledPause = 15_000_000_000 as UInt64 // 15s
 
   static func main() async {
     // CHECK: Starting!
@@ -32,12 +41,12 @@ import Dispatch
     let start = DispatchTime.now()
 
     // try! will fail if the task got cancelled (which shouldn't happen).
-    try! await Task.sleep(nanoseconds: UInt64(pause))
+    try! await Task.sleep(nanoseconds: UInt64(normalPause))
 
     let stop = DispatchTime.now()
 
     // assert that at least the specified time passed since calling `sleep`
-    assert(stop >= (start + .nanoseconds(pause)))
+    assert(stop >= (start + .nanoseconds(normalPause)))
 
     // CHECK-NEXT: Wakey wakey!
     print("Wakey wakey!")
@@ -58,7 +67,7 @@ import Dispatch
     // CHECK-NEXT: Testing sleep that gets cancelled before it starts
     print("Testing sleep that gets cancelled before it starts")
     let sleepyTask = Task {
-      try await Task.sleep(nanoseconds: UInt64(pause))
+      try await Task.sleep(nanoseconds: cancelledPause)
     }
 
     do {
@@ -82,7 +91,7 @@ import Dispatch
     let start = DispatchTime.now()
 
     let sleepyTask = Task {
-      try await Task.sleep(nanoseconds: UInt64(pause))
+      try await Task.sleep(nanoseconds: cancelledPause)
     }
 
     do {
@@ -91,7 +100,7 @@ import Dispatch
       }
 
       let cancellerTask = Task {
-        await Task.sleep(UInt64(pause / 2))
+        await Task.sleep(UInt64(normalPause / 2))
         sleepyTask.cancel()
       }
 
@@ -104,8 +113,10 @@ import Dispatch
 
       let stop = DispatchTime.now()
 
-      // assert that we stopped early.
-      assert(stop < (start + .nanoseconds(pause)))
+      // Assert that we stopped early. cancelledPause is too big to fit into an
+      // Int on 32-bit systems, so we'll check in microseconds instead of
+      // nanoseconds to make that work.
+      assert(stop < (start + .microseconds(Int(cancelledPause / 1000))))
     } catch {
       fatalError("sleep(nanoseconds:) threw some other error: \(error)")
     }

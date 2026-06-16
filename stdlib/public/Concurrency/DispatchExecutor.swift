@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !$Embedded && !os(WASI)
+#if !$Embedded && !os(WASI) && !os(Emscripten)
 
 import Swift
 
@@ -151,7 +151,6 @@ fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
   guard let (clockID, seconds, nanoseconds) = timestamp(for: instant,
                                                         clock: clock) else {
     fatalError("Sorry, cannot schedule on an unknown clock")
-    return
   }
 
   let tolSec: Int64, tolNanosec: Int64
@@ -170,4 +169,4 @@ fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
                                UnownedJob(job))
 }
 
-#endif // !$Embedded && !os(WASI)
+#endif // !$Embedded && !os(WASI) && !os(Emscripten)

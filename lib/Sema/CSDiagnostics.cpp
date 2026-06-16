@@ -48,6 +48,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/TypeVariableType.h"
+#include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
@@ -732,12 +733,18 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
 
   bool emittedSpecializedNote = false;
   if (auto protoType = protocolType->getAs<ProtocolType>()) {
-    if (protoType->getDecl()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    auto *protoDecl = protoType->getDecl();
+    if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable)) {
       if (nonConformingType->is<FunctionType>()) {
         emitDiagnostic(diag::nonsendable_function_type);
         emittedSpecializedNote = true;
       } else if (nonConformingType->is<TupleType>()) {
         emitDiagnostic(diag::nonsendable_tuple_type);
+        emittedSpecializedNote = true;
+      }
+    } else if (protoDecl->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+      if (nonConformingType->is<AnyFunctionType>()) {
+        emitDiagnostic(diag::nonescapable_function_type);
         emittedSpecializedNote = true;
       }
     }
@@ -2243,52 +2250,52 @@ bool AssignmentFailure::diagnoseAsError() {
       // If there is a masked property of the same type, emit a
       // note to fixit prepend a 'self.' or 'Type.'.
       if (auto typeContext = DC->getInnermostTypeContext()) {
-        SmallVector<ValueDecl *, 2> results;
-        DC->lookupQualified(typeContext->getSelfNominalTypeDecl(),
-                            VD->createNameRef(), Loc,
-                            NL_QualifiedDefault, results);
+        if (auto *nominal = typeContext->getSelfNominalTypeDecl()) {
+          SmallVector<ValueDecl *, 2> results;
+          DC->lookupQualified(nominal, VD->createNameRef(), Loc,
+                              NL_QualifiedDefault, results);
 
-        auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
-          // We're looking for a settable property that is the same type as the
-          // var we found.
-          auto *var = dyn_cast<VarDecl>(decl);
-          if (!var || var == VD)
-            return false;
-
-          if (!var->isSettable(DC) || !var->isSetterAccessibleFrom(DC))
-            return false;
-
-          if (!var->getTypeInContext()->isEqual(VD->getTypeInContext()))
-            return false;
-
-          // Don't suggest a property if we're in one of its accessors.
-          auto *methodDC = DC->getInnermostMethodContext();
-          if (auto *AD = dyn_cast_or_null<AccessorDecl>(methodDC))
-            if (AD->getStorage() == var)
+          auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
+            // We're looking for a settable property that is the same type as
+            // the var we found.
+            auto *var = dyn_cast<VarDecl>(decl);
+            if (!var || var == VD)
               return false;
 
-          return true;
-        });
+            if (!var->isSettable(DC) || !var->isSetterAccessibleFrom(DC))
+              return false;
 
-        if (foundProperty != results.end()) {
-          auto startLoc = immutableExpr->getStartLoc();
-          auto *property = cast<VarDecl>(*foundProperty);
-          auto selfTy = typeContext->getSelfTypeInContext();
+            if (!var->getTypeInContext()->isEqual(VD->getTypeInContext()))
+              return false;
 
-          // If we found an instance property, suggest inserting "self.",
-          // otherwise suggest "Type." for a static property.
-          std::string fixItText;
-          if (property->isInstanceMember()) {
-            fixItText = "self.";
-          } else {
-            fixItText = selfTy->getString() + ".";
+            // Don't suggest a property if we're in one of its accessors.
+            auto *methodDC = DC->getInnermostMethodContext();
+            if (auto *AD = dyn_cast_or_null<AccessorDecl>(methodDC))
+              if (AD->getStorage() == var)
+                return false;
+
+            return true;
+          });
+
+          if (foundProperty != results.end()) {
+            auto startLoc = immutableExpr->getStartLoc();
+            auto *property = cast<VarDecl>(*foundProperty);
+            auto selfTy = typeContext->getSelfTypeInContext();
+
+            // If we found an instance property, suggest inserting "self.",
+            // otherwise suggest "Type." for a static property.
+            std::string fixItText;
+            if (property->isInstanceMember()) {
+              fixItText = "self.";
+            } else {
+              fixItText = selfTy->getString() + ".";
+            }
+            emitDiagnosticAt(startLoc, diag::masked_mutable_property, fixItText,
+                             property, selfTy)
+            .fixItInsert(startLoc, fixItText);
           }
-          emitDiagnosticAt(startLoc, diag::masked_mutable_property, fixItText,
-                           property, selfTy)
-              .fixItInsert(startLoc, fixItText);
         }
       }
-
       // If this is a simple variable marked with a 'let', emit a note to fixit
       // hint it to 'var'.
       VD->emitLetToVarNoteIfSimple(DC);
@@ -2531,36 +2538,42 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
   if (!member)
     return std::nullopt;
 
-  if (!member->choice.isDecl())
+  // If the member is a subscript, it might be a dynamic member lookup access,
+  // in which case we need to peer through the keypath parameter to get the
+  // underlying member.
+  auto *SD = member->choice.isDecl()
+                 ? dyn_cast<SubscriptDecl>(member->choice.getDecl())
+                 : nullptr;
+
+  auto kind = SD ? SD->getDynamicMemberLookupKind() : std::nullopt;
+  if (!kind) {
+    // Not a decl, subscript, or dynamic member lookup subscript; stick with the
+    // existing overload choice.
     return member->choice;
-
-  auto *decl = member->choice.getDecl();
-  if (isa<SubscriptDecl>(decl) &&
-      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl))) {
-    auto *subscript = cast<SubscriptDecl>(decl);
-    // If this is a keypath dynamic member lookup, we have to
-    // adjust the locator to find member referred by it.
-    if (isValidKeyPathDynamicMemberLookup(subscript)) {
-      // Type has a following format:
-      // `(Self) -> (dynamicMember: {Writable}KeyPath<T, U>) -> U`
-      auto *fullType = member->adjustedOpenedFullType->castTo<FunctionType>();
-      auto *fnType = fullType->getResult()->castTo<FunctionType>();
-
-      auto paramTy = fnType->getParams()[0].getPlainType();
-      auto keyPath = paramTy->getAnyNominal();
-      auto memberLoc = getConstraintLocator(
-          locator, LocatorPathElt::KeyPathDynamicMember(keyPath));
-
-      auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
-      return memberRef ? std::optional<OverloadChoice>(memberRef->choice)
-                       : std::nullopt;
-    }
-
-    // If this is a string based dynamic lookup, there is no member declaration.
-    return std::nullopt;
   }
 
-  return member->choice;
+  switch (*kind) {
+  case SubscriptDecl::DynamicMemberLookupKind::String:
+    // There is no member declaration for string-based dynamic member lookup
+    // subscripts.
+    return std::nullopt;
+
+  case SubscriptDecl::DynamicMemberLookupKind::KeyPath: {
+    // Access control has already been checked above when fetching `kind`; no
+    // need to repeat here.
+    auto keyPathType = SD->getDynamicMemberLookupKeyPathType();
+    ASSERT(keyPathType && "KeyPath-based dynamic member lookup subscripts must "
+                          "have a valid dynamic member type");
+
+    auto memberLoc = getConstraintLocator(
+        locator,
+        LocatorPathElt::KeyPathDynamicMember(keyPathType->getAnyNominal()));
+
+    auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
+    return memberRef ? std::optional<OverloadChoice>(memberRef->choice)
+                     : std::nullopt;
+  }
+  }
 }
 
 Diag<StringRef> AssignmentFailure::findDeclDiagnostic(ASTContext &ctx,
@@ -2622,6 +2635,9 @@ bool ContextualFailure::diagnoseAsError() {
     return true;
 
   if (diagnoseConversionToNil())
+    return true;
+
+  if (diagnoseConversionFromStdNullopt())
     return true;
 
   if (path.empty()) {
@@ -2711,11 +2727,7 @@ bool ContextualFailure::diagnoseAsError() {
     break;
   }
   case ConstraintLocator::CoercionOperand:
-  case ConstraintLocator::InstanceType: {
-    if (diagnoseCoercionToUnrelatedType())
-      return true;
-    break;
-  }
+    return diagnoseCoercionToUnrelatedType();
 
   case ConstraintLocator::TernaryBranch: {
     auto *ternaryExpr = castToExpr<TernaryExpr>(getRawAnchor());
@@ -3141,6 +3153,56 @@ bool ContextualFailure::diagnoseConversionToNil() const {
       diag.fixItInsertAfter(patternTR->getEndLoc(), ")?");
     }
   }
+
+  return true;
+}
+
+static bool isStdNulloptType(Type type) {
+  auto nominal = type->getAnyNominal();
+  if (!nominal)
+    return false;
+
+  auto clangDecl =
+      dyn_cast_or_null<clang::CXXRecordDecl>(nominal->getClangDecl());
+  if (!clangDecl)
+    return false;
+
+  return clangDecl->isInStdNamespace() && clangDecl->getIdentifier() &&
+         clangDecl->getName() == "nullopt_t";
+}
+
+bool ContextualFailure::diagnoseConversionFromStdNullopt() const {
+  if (!isStdNulloptType(getFromType()))
+    return false;
+  if (!conformsToKnownProtocol(getToType(), KnownProtocolKind::CxxOptional))
+    return false;
+
+  // Pick the appropriate "cannot convert" diagnostic.
+  auto diagnostic = getDiagnosticFor(CTP, getToType());
+  if (!diagnostic)
+    return false;
+
+  emitDiagnostic(*diagnostic, getFromType(), getToType())
+      .highlight(getSourceRange());
+
+  // Locate the source expression that has `nullopt_t` type so we can produce a
+  // fix-it that replaces it with `nil`. Only emit the fix-it when we can
+  // pinpoint the offending expression — otherwise the range could include
+  // unrelated code.
+  SourceRange replaceRange;
+  if (auto anchor = getAsExpr(getAnchor())) {
+    if (auto assignExpr = dyn_cast<AssignExpr>(anchor)) {
+      if (auto src = assignExpr->getSrc())
+        replaceRange = src->getSourceRange();
+    } else if (auto type = getType(anchor);
+               type && type->isEqual(getFromType())) {
+      replaceRange = anchor->getSourceRange();
+    }
+  }
+
+  auto note = emitDiagnostic(diag::note_use_nil_for_cxx_optional);
+  if (replaceRange.isValid())
+    note.fixItReplace(replaceRange, "nil");
 
   return true;
 }
@@ -6556,6 +6618,16 @@ bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
     }
   }
 
+  return true;
+}
+
+bool InvalidProtocolMetatypeStaticMemberRefInKeyPath::diagnoseAsError() {
+  auto baseType = BaseType;
+  if (auto *metatype = baseType->getAs<AnyMetatypeType>())
+    baseType = metatype->getInstanceType();
+
+  emitDiagnostic(diag::expr_keypath_protocol_metatype_static_member,
+                 DeclNameRef(getMember()->getName()), baseType);
   return true;
 }
 

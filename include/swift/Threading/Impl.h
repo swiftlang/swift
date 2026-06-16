@@ -42,7 +42,7 @@ struct stack_bounds {
 #define SWIFT_THREADING_LINUX 1
 #elif defined(_WIN32)
 #define SWIFT_THREADING_WIN32 1
-#elif defined(__wasi__)
+#elif defined(__wasi__) || defined(__EMSCRIPTEN__)
 #define SWIFT_THREADING_NONE 1
 #elif __has_include(<threads.h>)
 #define SWIFT_THREADING_C11 1

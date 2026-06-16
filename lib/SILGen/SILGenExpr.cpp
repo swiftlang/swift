@@ -35,6 +35,7 @@
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/InFlightSubstitution.h"
@@ -3299,6 +3300,21 @@ static bool canEmitSpecializedClosureFunction(const AbstractClosureExpr *closure
                                         const FunctionTypeInfo &contextInfo) {
   auto destType = contextInfo.FormalType;
 
+  // This is a closure that is being converted to `nonisolated(nonsending)`
+  // type and is already behaves as such even though its statically known
+  // isolation is different. Such closures are emitted in a special way where
+  // they gain an implicit isolation parameter that gets ignored to avoid
+  // unnecessary hops.
+  if (contextInfo.ExpectedLoweredType->hasNonisolatedNonsendingIsolation()) {
+    if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+      if (explicitClosure->behavesLikeNonisolatedNonsending())
+        closureType = cast<AnyFunctionType>(
+            closureType
+                ->withIsolation(FunctionTypeIsolation::forNonisolatedNonsending())
+                ->getCanonicalType());
+    }
+  }
+
   // Require the closure's formal type to be closely related to the formal
   // type we're trying to convert it to.
   if (!canEmitClosureFunctionUnderConversion(closureType, destType))
@@ -3339,31 +3355,41 @@ ManagedValue RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
     return emitClosureReference(e, *info);
   }
 
+  // Construct a conversion that just adds requested isolation and doesn't
+  // make any other changes to the closure type.
+  auto adjustClosureIsolation = [&](FunctionTypeIsolation isolation) {
+    // This assertion is why this isn't an infinite recursion.
+    assert(closureType->getIsolation() != isolation &&
+           "closure cannot directly have erased isolation");
+
+    auto newExtInfo = closureType->getExtInfo().withIsolation(isolation);
+    auto newClosureType = closureType.withExtInfo(newExtInfo);
+    auto newInfo = SGF.getFunctionTypeInfo(newClosureType);
+
+    // Emit the closure under that conversion.  This should always succeed.
+    assert(canEmitSpecializedClosureFunction(e, closureType, newInfo));
+    auto result = emitClosureReference(e, newInfo);
+
+    // Narrow the original conversion to start from the updated closure type.
+    auto convAfterIsolationChange = conv.withSourceType(SGF, newClosureType);
+
+    // Apply the narrowed conversion.
+    return convAfterIsolationChange.emit(SGF, e, result, SGFContext());
+  };
+
+  if (info->ExpectedLoweredType->hasNonisolatedNonsendingIsolation()) {
+    if (auto *closure = dyn_cast<ClosureExpr>(e)) {
+      if (closure->behavesLikeNonisolatedNonsending())
+        return adjustClosureIsolation(
+            FunctionTypeIsolation::forNonisolatedNonsending());
+    }
+  }
+
   // If we're converting to an `@isolated(any)` type, at least force the
   // closure to be emitted using the erased-isolation pattern so that
   // we don't lose that information.
-  if (info->ExpectedLoweredType->hasErasedIsolation()) {
-    // This assertion is why this isn't an infinite recursion.
-    assert(!closureType->getIsolation().isErased() &&
-           "closure cannot directly have erased isolation");
-
-    // Construct a conversion that just erases isolation and doesn't make
-    // any other changes to the closure type.
-    auto erasedExtInfo = closureType->getExtInfo()
-      .withIsolation(FunctionTypeIsolation::forErased());
-    auto erasedClosureType = closureType.withExtInfo(erasedExtInfo);
-    auto erasureInfo = SGF.getFunctionTypeInfo(erasedClosureType);
-
-    // Emit the closure under that conversion.  This should always succeed.
-    assert(canEmitSpecializedClosureFunction(e, closureType, erasureInfo));
-    auto erasedResult = emitClosureReference(e, erasureInfo);
-
-    // Narrow the original conversion to start from the erased closure type.
-    auto convAfterErasure = conv.withSourceType(SGF, erasedClosureType);
-
-    // Apply the narrowed conversion.
-    return convAfterErasure.emit(SGF, e, erasedResult, SGFContext());
-  }
+  if (info->ExpectedLoweredType->hasErasedIsolation())
+    return adjustClosureIsolation(FunctionTypeIsolation::forErased());
 
   // Otherwise, give up.
   return ManagedValue();
@@ -3562,7 +3588,7 @@ static ManagedValue emitKeyPathRValueBase(SILGenFunction &subSGF,
 
   // If base is a metatype, it cannot be opened as an existential or upcasted
   // from a class.
-  if (baseType->is<MetatypeType>())
+  if (baseType->is<AnyMetatypeType>())
     return paramSubstValue;
   
   // Pop open an existential container base.
@@ -3843,7 +3869,9 @@ static SILFunction *getOrCreateKeyPathGetter(
   auto name = Mangle::ASTMangler(SGM.getASTContext(), property)
                   .mangleKeyPathGetterThunkHelper(property, genericSig,
                                                   baseType, subs, expansion);
-  auto loc = RegularLocation::getAutoGeneratedLocation();
+  auto getterDecl = property->getAccessor(AccessorKind::Get);
+  auto loc = getterDecl ? RegularLocation::getAutoGeneratedLocation(getterDecl)
+                        : RegularLocation::getAutoGeneratedLocation();
 
   auto thunk =
       getOrCreateKeypathThunk(SGM, name, signature, genericEnv, expansion, loc);
@@ -3940,7 +3968,9 @@ static SILFunction *getOrCreateKeyPathSetter(
   auto name = Mangle::ASTMangler(SGM.getASTContext(), property)
                   .mangleKeyPathSetterThunkHelper(property, genericSig,
                                                   baseType, subs, expansion);
-  auto loc = RegularLocation::getAutoGeneratedLocation();
+  auto setterDecl = property->getAccessor(AccessorKind::Set);
+  auto loc = setterDecl ? RegularLocation::getAutoGeneratedLocation(setterDecl)
+                        : RegularLocation::getAutoGeneratedLocation();
 
   auto thunk =
       getOrCreateKeypathThunk(SGM, name, signature, genericEnv, expansion, loc);
@@ -4866,7 +4896,7 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
       if (!var->getDeclContext()->isTypeContext()) {
         componentTy = var->getInterfaceType()->getCanonicalType();
       } else if (var->getDeclContext()->getSelfProtocolDecl() &&
-                 baseTy->isExistentialType()) {
+                 baseTy->isAnyExistentialType()) {
         componentTy = var->getValueInterfaceType()->getCanonicalType();
         ASSERT(!componentTy->hasTypeParameter());
       } else {
@@ -5218,14 +5248,11 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
   SmallVector<CleanupHandle, 8> cleanups;
 
   for (unsigned index : range(E->getNumElements())) {
-    auto destAddr = addr;
-
-    if (index != 0) {
-      SILValue indexValue = SGF.B.createIntegerLiteral(
-          E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-      destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
-                                   /*needsStackProtection=*/ false);
-    }
+    SILValue indexValue = SGF.B.createIntegerLiteral(
+        E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+    SILValue destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
+                                 /*needsStackProtection=*/ false,
+                                 /*isProjection=*/ true);
 
     // Create a dormant cleanup for the value in case we exit before the
     // full vector has been constructed.
@@ -5299,13 +5326,10 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   SmallVector<CleanupHandle, 8> cleanups;
 
   for (unsigned index : range(E->getNumElements())) {
-    auto destAddr = varargsInfo.getBaseAddress();
-    if (index != 0) {
-      SILValue indexValue = SGF.B.createIntegerLiteral(
-          loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-      destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue,
-              /*needsStackProtection=*/ false);
-    }
+    SILValue indexValue = SGF.B.createIntegerLiteral(
+        loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+    SILValue destAddr = SGF.B.createIndexAddr(loc, varargsInfo.getBaseAddress(), indexValue,
+            /*needsStackProtection=*/ false, /*isProjection=*/ true);
     auto &destTL = varargsInfo.getBaseTypeLowering();
     // Create a dormant cleanup for the value in case we exit before the
     // full array has been constructed.

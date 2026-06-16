@@ -219,10 +219,10 @@ extension Value {
       return true
     case let arg as Argument:
       return arg.parentBlock == instruction.parentBlock
-    case let svi as SingleValueInstruction:
-      return svi.dominatesInSameBlock(instruction)
-    case let mvi as MultipleValueInstructionResult:
-      return mvi.parentInstruction.dominatesInSameBlock(instruction)
+    case let svi as SingleValueInstruction where svi.parentBlock == instruction.parentBlock:
+      return svi.dominatesInBlock(instruction)
+    case let mvi as MultipleValueInstructionResult where mvi.parentBlock == instruction.parentBlock:
+      return mvi.parentInstruction.dominatesInBlock(instruction)
     default:
       return false
     }
@@ -533,32 +533,6 @@ extension Instruction {
     }
   }
 
-  /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction.
-  /// To be used as simple dominance check if both instructions are most likely located in the same block
-  /// and no DominatorTree is available (like in instruction simplification).
-  func dominatesInSameBlock(_ otherInst: Instruction) -> Bool {
-    if parentBlock != otherInst.parentBlock {
-      return false
-    }
-    // Walk in both directions. This is most efficient if both instructions are located nearby but it's not clear
-    // which one comes first in the block's instruction list.
-    var forwardIter = self
-    var backwardIter = self
-    while let f = forwardIter.next {
-      if f == otherInst {
-        return true
-      }
-      forwardIter = f
-      if let b = backwardIter.previous {
-        if b == otherInst {
-          return false
-        }
-        backwardIter = b
-      }
-    }
-    return false
-  }
-  
   /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction or
   /// the parent block of the instruction dominates parent block of `otherInst`.
   func dominates(
@@ -566,7 +540,7 @@ extension Instruction {
     _ domTree: DominatorTree
   ) -> Bool {
     if parentBlock == otherInst.parentBlock {
-      return dominatesInSameBlock(otherInst)
+      return dominatesInBlock(otherInst)
     } else {
       return parentBlock.dominates(
         otherInst.parentBlock,
@@ -669,11 +643,28 @@ extension StoreInst {
     let builder = Builder(after: self, context)
     let type = source.type
     if type.isStruct {
-      if (type.nominal as! StructDecl).hasUnreferenceableStorage {
+      let structDecl = type.nominal as! StructDecl
+      if structDecl.hasUnreferenceableStorage {
         return
       }
       if parentFunction.hasOwnership && source.ownership != .none {
-        let destructure = builder.createDestructureStruct(struct: source)
+        let v: Value
+        if structDecl.valueTypeDestructor != nil {
+          if storeOwnership == .assign {
+            // We must not drop the original (implicit) destroy of the `store [assign]`.
+            // Therefore replace the `store [assign]` with a `destroy_addr` - `store [init]` pair
+            // and then split the `store [init]`.
+            builder.createDestroyAddr(address: destination)
+            let initStore = builder.createStore(source: source, destination: destination, ownership: .initialize)
+            context.erase(instruction: self)
+            initStore.trySplit(context)
+            return
+          }
+          v = builder.createDropDeinit(of: source)
+        } else {
+          v = source
+        }
+        let destructure = builder.createDestructureStruct(struct: v)
         for (fieldIdx, fieldValue) in destructure.results.enumerated() {
           let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: fieldIdx)
           builder.createStore(source: fieldValue, destination: destFieldAddr, ownership: splitOwnership(for: fieldValue))
@@ -930,7 +921,7 @@ private struct EscapesToValueVisitor : EscapeVisitor {
     if operand.value == target.value && path.projectionPath.mayOverlap(with: target.path) {
       return .abort
     }
-    if operand.instruction is ReturnInstruction {
+    if operand.instruction.isReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }

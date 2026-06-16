@@ -846,6 +846,28 @@ bb2(%12 : $Int):
   return %0
 }
 
+// Regression test: when a coroutine scope is ended via end_borrow on the token
+// (rather than end_apply/abort_apply) on a dead-end path, the inliner must
+// insert end_borrow for any owned value yielded @guaranteed before destroying
+// it. The bug was that destroy_value [dead_end] was inserted before end_borrow,
+// producing an ownership violation.
+//
+// CHECK-LABEL: sil [ossa] @test_yield_owned_end_borrow_unreachable :
+// CHECK:       bb0:
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[BORROWED:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         end_borrow [[BORROWED]]
+// CHECK:         destroy_value [dead_end] [[INSTANCE]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'test_yield_owned_end_borrow_unreachable'
+sil [ossa] @test_yield_owned_end_borrow_unreachable : $@convention(thin) () -> () {
+bb0:
+  %callee = function_ref @yield_owned_as_guaranteed : $@yield_once @convention(thin) () -> @yields @guaranteed SomeClass
+  (%value, %token) = begin_apply %callee() : $@yield_once @convention(thin) () -> @yields @guaranteed SomeClass
+  end_borrow %token : $Builtin.SILToken
+  unreachable
+}
+
 sil @co_routine : $@yield_once @convention(thin) (@guaranteed String) -> @yields @inout Optional<Int>
 
 sil [ossa] [transparent] @call_co_routine : $@yield_once @convention(thin) (@guaranteed String, @guaranteed String) -> @yields @inout Optional<Int> {

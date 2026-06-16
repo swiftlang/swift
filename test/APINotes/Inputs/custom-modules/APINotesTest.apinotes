@@ -2,9 +2,19 @@ Name: APINotesTest
 Functions:
   - Name: moveToPoint
     SwiftName: 'moveTo(x:y:z:)'
+  - Name: jumpToPoint
+    SwiftName: '`jump to`(x:)'
 Globals:
   - Name: ANTGlobalValue
     SwiftName: global
+  - Name: ANTGlobalValue2
+    SwiftName: '`test raw`'
+  - Name: ANTGlobalValue3
+    SwiftName: '`Complex.Name`'
+  - Name: ANTGlobalValue4
+    SwiftName: '`class`'
+  - Name: ANTGlobalValue5
+    SwiftName: '`3test raw`'
   - Name: will_be_private
     SwiftPrivate: true
 Tags:

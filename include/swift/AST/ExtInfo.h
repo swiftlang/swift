@@ -102,10 +102,11 @@ public:
   static FunctionTypeIsolation forErased() {
     return { Kind::Erased };
   }
-  static FunctionTypeIsolation forNonIsolatedCaller() {
+  static FunctionTypeIsolation forNonisolatedNonsending() {
     return { Kind::NonIsolatedNonsending };
   }
 
+  
   Kind getKind() const { return value.getInt(); }
   bool isNonIsolated() const {
     return getKind() == Kind::NonIsolated;

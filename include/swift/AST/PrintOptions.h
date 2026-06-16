@@ -341,6 +341,10 @@ public:
   /// Whether to print implicit parts of the AST.
   bool SkipImplicit = false;
 
+  /// Whether to print implicit but synthesized (user-facing) declarations, even
+  /// if SkipImplicit.
+  bool AlwaysPrintSynthesized = false;
+
   /// Whether to print unavailable parts of the AST.
   bool SkipUnavailable = false;
 
@@ -821,8 +825,6 @@ public:
   void initForSynthesizedExtension(TypeOrExtensionDecl D);
   void initForSynthesizedExtensionInScope(TypeOrExtensionDecl D,
                                           OverrideScope &scope) const;
-
-  void clearSynthesizedExtension();
 
   bool shouldPrint(const Decl* D) const {
     return CurrentPrintabilityChecker->shouldPrint(D, *this);

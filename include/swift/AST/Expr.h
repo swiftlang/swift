@@ -268,7 +268,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -303,7 +303,15 @@ protected:
     /// Whether this closure was type-checked as an argument to a macro. This
     /// is only populated after type-checking, and only exists for diagnostic
     /// logic. Do not add more uses of this.
-    IsMacroArgument : 1
+    IsMacroArgument : 1,
+
+    /// True if this closure, even though it has a different static isolation,
+    /// should behave like `nonisolated(nonsending)` when lowered. This is important
+    /// for cases where a closure is passed to a non-sending `nonisolated(nonsending)`
+    /// parameter of a `nonisolated(nonsending)` call and doesn't leave isolation of
+    /// the parent context. It's easier to work with statically known isolation than
+    /// make closure dynamically isolated via assuming `nonisolated(nonsending)`.
+    BehavesLikeNonisolatedNonsending: 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -4317,6 +4325,7 @@ public:
     Bits.ClosureExpr.NoGlobalActorAttribute = false;
     Bits.ClosureExpr.RequiresDynamicIsolationChecking = false;
     Bits.ClosureExpr.IsMacroArgument = false;
+    Bits.ClosureExpr.BehavesLikeNonisolatedNonsending = false;
   }
 
   SourceRange getSourceRange() const;
@@ -4425,6 +4434,21 @@ public:
 
   void setIsMacroArgument(bool value = true) {
     Bits.ClosureExpr.IsMacroArgument = value;
+  }
+
+  /// Determines whether this closure, even though it has a different static
+  /// isolation, should behave like `nonisolated(nonsending)` when lowered. This
+  /// is important for cases where a closure is passed to a non-sending
+  /// `nonisolated(nonsending)` parameter of a `nonisolated(nonsending)` call
+  /// and doesn't leave isolation of the parent context. It's easier to work with
+  /// statically known isolation than make closure dynamically isolated via
+  /// assuming `nonisolated(nonsending)`.
+  bool behavesLikeNonisolatedNonsending() const {
+    return Bits.ClosureExpr.BehavesLikeNonisolatedNonsending;
+  }
+
+  void setBehavesLikeNonisolatedNonsending(bool value = true) {
+    Bits.ClosureExpr.BehavesLikeNonisolatedNonsending = value;
   }
 
   /// Determine whether this closure expression has an

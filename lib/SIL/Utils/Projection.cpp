@@ -286,7 +286,7 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
         B.createIntegerLiteral(Loc, IntLiteralTy, getIndex());
     return B.createIndexAddr(Loc, Base, IntLiteralIndex,
         // TODO: do we need to be conservative here?
-        /*needsStackProtection=*/ true);
+        /*needsStackProtection=*/ true, /*isProjection=*/ true);
   }
   case ProjectionKind::Enum: {
     if (UncheckedEnumDataAddrInstBase::isDestructive(

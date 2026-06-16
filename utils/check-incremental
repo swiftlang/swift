@@ -37,7 +37,7 @@ def compile_and_stat(compile_args, output_file):
 
     logFile = open(output_file + ".log", "w")
 
-    subprocess.check_call(compile_args, stderr=logFile)
+    subprocess.check_call(compile_args, stdout=logFile)
 
     logFile.close()
 
@@ -104,10 +104,8 @@ def main():
 
     new_args += [
       '-Xllvm', '-print-no-uuids',
-      '-Xllvm', '-sil-print-pass-md5']
-
-    new_args += [
-      '-Xllvm', '-print-cse-internals']
+      '-Xllvm', '-sil-print-pass-md5',
+      '-Xfrontend', '-disable-safe-interop-wrappers']
 
     if EMIT_IR:
       new_args += [

@@ -696,6 +696,16 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_wasistdlib)
         builder.add_product(products.WASISwiftSDK,
                             is_enabled=self.args.build_wasistdlib)
+
+        builder.add_product(products.EmscriptenSysroot,
+                            is_enabled=self.args.build_emscriptenstdlib)
+        builder.add_product(products.EmscriptenLLVMRuntimeLibs,
+                            is_enabled=self.args.build_emscriptenstdlib)
+        builder.add_product(products.EmscriptenStdlib,
+                            is_enabled=self.args.build_emscriptenstdlib)
+        builder.add_product(products.EmscriptenSwiftSDK,
+                            is_enabled=self.args.build_emscriptenstdlib)
+
         builder.add_product(products.SwiftFoundationTests,
                             is_enabled=self.args.build_foundation)
         builder.add_product(products.FoundationTests,
@@ -844,6 +854,10 @@ class BuildScriptInvocation(object):
                     " ".join(config.swift_benchmark_run_targets)))
 
             for product_class in pipeline:
+                if self.args.enable_caching:
+                    build_dir = self.workspace.build_dir(
+                        host_target.name, product_class.product_name())
+                    self._write_caching_config_files(build_dir)
                 self._execute_build_action(host_target, product_class)
 
         # Test...
@@ -944,6 +958,8 @@ class BuildScriptInvocation(object):
             toolchain=self.toolchain,
             source_dir=self.workspace.source_dir(product_source),
             build_dir=build_dir)
+        if self.args.enable_caching:
+            self._write_caching_config_files(build_dir)
         if product.should_clean(host_target):
             log_message = "Cleaning %s" % product_name
             print("--- {} ---".format(log_message), flush=True)
@@ -979,3 +995,40 @@ class BuildScriptInvocation(object):
             print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.install(host_target)
+
+    def _write_caching_config_files(self, build_dir):
+        import json
+        os.makedirs(build_dir, exist_ok=True)
+
+        cas_config = {"CASPath": self.args.caching_cas_path}
+        if self.args.caching_plugin_path:
+            cas_config["PluginPath"] = self.args.caching_plugin_path
+        with open(os.path.join(build_dir, '.cas-config'), 'w') as f:
+            json.dump(cas_config, f, indent=2)
+            f.write('\n')
+
+        if self.args.caching_prefix_map:
+            sdk_path = None
+            try:
+                from build_swift.build_swift.wrappers import xcrun
+                sdk_path = xcrun.sdk_path(sdk='macosx')
+            except Exception:
+                pass
+
+            toolchain_path = None
+            cc_dir = os.path.dirname(self.toolchain.cc)
+            candidate = os.path.dirname(os.path.dirname(cc_dir))
+            if candidate and candidate != '/':
+                toolchain_path = candidate
+
+            prefix_map = {}
+            if sdk_path:
+                prefix_map["/^sdk"] = sdk_path
+            if toolchain_path:
+                prefix_map["/^toolchain"] = toolchain_path
+            prefix_map["/^src"] = SWIFT_SOURCE_ROOT
+
+            with open(os.path.join(build_dir,
+                                   'compilation-prefix-map.json'), 'w') as f:
+                json.dump(prefix_map, f, indent=2)
+                f.write('\n')

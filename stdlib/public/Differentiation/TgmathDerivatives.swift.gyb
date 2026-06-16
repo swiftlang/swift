@@ -26,6 +26,8 @@ import Swift
   import Glibc
 #elseif os(WASI)
   import WASILibc
+#elseif os(Emscripten)
+  import EmscriptenLibc
 #elseif os(Windows)
   import CRT
 #elseif canImport(Android)

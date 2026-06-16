@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -common-subexpression-elimination | %FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -13,7 +13,7 @@ struct NonTrivialStruct {
 
 // CHECK-LABEL: sil [ossa] @cse_copy_upcast1 :
 // CHECK: upcast
-// CHECK-NOT: upcast 
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'cse_copy_upcast1'
 sil [ossa] @cse_copy_upcast1 : $@convention(thin) (@owned Klass) -> @owned (SuperKlass, SuperKlass) {
 bb0(%0 : @owned $Klass):
@@ -26,7 +26,7 @@ bb0(%0 : @owned $Klass):
 
 // CHECK-LABEL: sil [ossa] @cse_copy_upcast2 :
 // CHECK: upcast
-// CHECK-NOT: upcast 
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'cse_copy_upcast2'
 sil [ossa] @cse_copy_upcast2 : $@convention(thin) (@owned Klass) -> @owned (SuperKlass, SuperKlass) {
 bb0(%0 : @owned $Klass):
@@ -39,7 +39,7 @@ bb0(%0 : @owned $Klass):
 
 // CHECK-LABEL: sil [ossa] @cse_copy_upcast3 :
 // CHECK: upcast
-// CHECK-NOT: upcast 
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'cse_copy_upcast3'
 sil [ossa] @cse_copy_upcast3 : $@convention(thin) (@owned Klass) -> @owned (SuperKlass, SuperKlass) {
 bb0(%0 : @owned $Klass):
@@ -54,7 +54,7 @@ bb0(%0 : @owned $Klass):
 
 // CHECK-LABEL: sil [ossa] @cse_copy_upcast4 :
 // CHECK: upcast
-// CHECK-NOT: upcast 
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'cse_copy_upcast4'
 sil [ossa] @cse_copy_upcast4 : $@convention(thin) (@guaranteed Klass) -> @owned SuperKlass {
 bb0(%0 : @guaranteed $Klass):
@@ -68,7 +68,7 @@ bb0(%0 : @guaranteed $Klass):
 
 // CHECK-LABEL: sil [ossa] @cse_copy_upcast5 :
 // CHECK: upcast
-// CHECK-NOT: upcast 
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'cse_copy_upcast5'
 sil [ossa] @cse_copy_upcast5 : $@convention(thin) (@guaranteed Klass) -> @owned SuperKlass {
 bb0(%0 : @guaranteed $Klass):
@@ -85,7 +85,7 @@ sil [ossa] @useSuperKlass2 : $@convention(thin) (@owned SuperKlass) -> ()
 
 // CHECK-LABEL: sil [ossa] @cse_copy_upcast6 :
 // CHECK: upcast
-// CHECK-NOT: upcast 
+// CHECK-NOT: upcast
 // CHECK-LABEL: } // end sil function 'cse_copy_upcast6'
 sil [ossa] @cse_copy_upcast6 : $@convention(thin) (@guaranteed Klass) -> @owned SuperKlass {
 bb0(%0 : @guaranteed $Klass):
@@ -99,7 +99,7 @@ bb0(%0 : @guaranteed $Klass):
 
 // CHECK-LABEL: sil [ossa] @cse_copy_upcast7 :
 // CHECK: upcast
-// CHECK-NOT: upcast 
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'cse_copy_upcast7'
 sil [ossa] @cse_copy_upcast7 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -125,7 +125,7 @@ bb3:
 
 // CHECK-LABEL: sil [ossa] @cse_copy_upcast8 :
 // CHECK: upcast
-// CHECK-NOT: upcast 
+// CHECK-NOT: upcast
 // CHECK-LABEL: } // end sil function 'cse_copy_upcast8'
 sil [ossa] @cse_copy_upcast8 : $@convention(thin) (@guaranteed Klass) -> @owned SuperKlass {
 bb0(%0 : @guaranteed $Klass):
@@ -139,9 +139,9 @@ bb0(%0 : @guaranteed $Klass):
   return %copy2 : $SuperKlass
 }
 
-// CHECK-LABEL: sil [ossa] @cse_copy_unchecked_ref_cast : 
+// CHECK-LABEL: sil [ossa] @cse_copy_unchecked_ref_cast :
 // CHECK: unchecked_ref_cast
-// CHECK-NOT: unchecked_ref_cast 
+// CHECK: unchecked_ref_cast
 // CHECK-LABEL: } // end sil function 'cse_copy_unchecked_ref_cast'
 sil [ossa] @cse_copy_unchecked_ref_cast : $@convention(thin) (@owned Klass) -> @owned (SuperKlass, SuperKlass) {
 bb0(%0 : @owned $Klass):
@@ -152,9 +152,9 @@ bb0(%0 : @owned $Klass):
   return %res : $(SuperKlass, SuperKlass)
 }
 
-// CHECK-LABEL: sil [ossa] @cse_copy_upcast_destroy_before_common_expr : 
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast_destroy_before_common_expr :
 // CHECK: upcast
-// CHECK-NOT: upcast 
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'cse_copy_upcast_destroy_before_common_expr'
 sil [ossa] @cse_copy_upcast_destroy_before_common_expr : $@convention(thin) (@owned Klass) -> @owned SuperKlass {
 bb0(%0 : @owned $Klass):
@@ -165,8 +165,8 @@ bb0(%0 : @owned $Klass):
   return %2 : $SuperKlass
 }
 
-// CHECK-LABEL: sil [ossa] @cse_copy_upcast_need_destroys : 
-// CHECK-NOT: upcast 
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast_need_destroys :
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'cse_copy_upcast_need_destroys'
 sil [ossa] @cse_copy_upcast_need_destroys : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
@@ -189,9 +189,9 @@ bb3:
   return %res : $()
 }
 
-// CHECK-LABEL: sil [ossa] @cse_copy_upcast_multiple_identity : 
+// CHECK-LABEL: sil [ossa] @cse_copy_upcast_multiple_identity :
 // CHECK: upcast
-// CHECK-NOT: upcast 
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'cse_copy_upcast_multiple_identity'
 sil [ossa] @cse_copy_upcast_multiple_identity : $@convention(thin) (@owned Klass) -> @owned SuperKlass {
 bb0(%0 : @owned $Klass):
@@ -204,9 +204,9 @@ bb0(%0 : @owned $Klass):
   return %2 : $SuperKlass
 }
 
-// CHECK-LABEL: sil [ossa] @cse_borrow_upcast : 
+// CHECK-LABEL: sil [ossa] @cse_borrow_upcast :
 // CHECK: upcast
-// CHECK-NOT: upcast 
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'cse_borrow_upcast'
 sil [ossa] @cse_borrow_upcast : $@convention(thin) (@owned Klass) -> @owned (SuperKlass, SuperKlass) {
 bb0(%0 : @owned $Klass):

@@ -1058,12 +1058,10 @@ private:
   ///
   /// \param indexValue The index value to clone
   /// \param insertPos The position where cloned instructions should be inserted
-  /// \param instIndices Pre-computed instruction indices
   /// \returns The cloned index value or std::nullopt if cloning was not
   /// possible
   std::optional<SILValue>
-  cloneFixedStorageIndex(SILValue indexValue, SILInstruction *insertPos,
-                         InstructionIndices &instIndices);
+  cloneFixedStorageIndex(SILValue indexValue, SILInstruction *insertPos);
 
 public:
   void run() override {
@@ -1214,6 +1212,23 @@ bool BoundsCheckOpts::removeRedundantArrayChecksInBlock(SILBasicBlock &BB) {
   return Changed;
 }
 
+static bool canOptimize(FixedStorageSemanticsCall call) {
+  if (!call.hasSelf()) {
+    return false;
+  }
+  auto selfValue = call.getSelf();
+  if (!selfValue->getType().isAddress()) {
+    return true;
+  }
+  auto rootAddr = lookThroughAddressAndValueProjections(selfValue);
+  auto *funcArg = dyn_cast<SILFunctionArgument>(rootAddr);
+  if (!funcArg || funcArg->getArgumentConvention() !=
+                      SILArgumentConvention::Indirect_In_Guaranteed) {
+    return false;
+  }
+  return true;
+}
+
 bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block) {
   bool changed = false;
 
@@ -1234,6 +1249,10 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
       continue;
     }
 
+    if (!canOptimize(fixedStorageCall)) {
+      continue;
+    }
+
     auto selfValue = fixedStorageCall.getSelf();
     auto indexValue = fixedStorageCall.getIndex();
 
@@ -1243,15 +1262,6 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
     LLVM_DEBUG(llvm::dbgs() << "  Found fixed storage check: " << inst
                             << " with self: " << *selfValue
                             << " and index: " << *indexValue);
-  }
-
-  InstructionIndices instIndices(&block);
-
-  // If instruction indices have overflowed, the ordering comparisons are
-  // unreliable and can cause unnecessary cloning below in an already large
-  // block, bail out.
-  if (instIndices.hasOverflowedIndices()) {
-    return changed;
   }
 
   // Second pass: process each self group to place checks with same self next to
@@ -1269,7 +1279,7 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
 
       auto indexValue = check.getIndex();
       auto clonedValue =
-          cloneFixedStorageIndex(indexValue, *checks[0], instIndices);
+          cloneFixedStorageIndex(indexValue, *checks[0]);
       if (!clonedValue) {
         continue;
       }
@@ -1700,13 +1710,11 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInLoop(
             FixedStorageSemanticsCallKind::CheckIndex) {
       continue;
     }
-
-    if (!fixedStorageSemantics->hasSelfArgument()) {
+    if (!canOptimize(fixedStorageSemantics)) {
       continue;
     }
 
-    auto selfValue = fixedStorageSemantics->getSelfArgument();
-
+    auto selfValue = fixedStorageSemantics.getSelf();
     if (!DT->dominates(selfValue->getParentBlock(), preheader)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "  " << *selfValue << " does not dominate preheader\n");
@@ -1798,7 +1806,7 @@ bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
       continue;
     }
 
-    if (!fixedStorageSemantics->hasSelfArgument()) {
+    if (!canOptimize(fixedStorageSemantics)) {
       continue;
     }
 
@@ -1871,8 +1879,7 @@ static void mapResults(SILInstruction *cloned, SILInstruction *original,
 
 std::optional<SILValue>
 BoundsCheckOpts::cloneFixedStorageIndex(SILValue indexValue,
-                                        SILInstruction *insertPos,
-                                        InstructionIndices &instIndices) {
+                                        SILInstruction *insertPos) {
   SmallVector<SILInstruction *, 8> worklist;
   llvm::DenseMap<ValueBase *, SILValue> valueMap;
   ValueSet visited(getFunction());
@@ -1900,7 +1907,7 @@ BoundsCheckOpts::cloneFixedStorageIndex(SILValue indexValue,
     // value dominates insertion point.
     if (isa<SILArgument>(value) ||
         inst->getParent() != insertPos->getParent() ||
-        instIndices.get(inst) < instIndices.get(insertPos)) {
+        inst->strictlyDominatesInBlock(insertPos)) {
       mapValue(value, value, valueMap);
       return true;
     }

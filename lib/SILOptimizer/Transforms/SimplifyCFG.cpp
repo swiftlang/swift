@@ -509,16 +509,27 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
         auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
         if (!LiveBlock->args_empty()) {
           auto *LiveBlockArg = LiveBlock->getArgument(0);
-          auto NewValue = EI->hasOperand() ? EI->getOperand() : EI;
+
+          auto builder = SILBuilderWithScope(SEI);
+
+          // The default block receives the whole enum value, not the extracted
+          // payload. Only use the payload for explicitly matched case blocks.
+          //
+          // Use unchecked_enum_data to extract the payload instead of using the
+          // enum instruction's operand, to avoid over-consuming the operand if
+          // the enum has other users.
+          bool isDefaultBlock = SEI->hasDefault() && LiveBlock == SEI->getDefaultBB();
+          SILValue NewValue = (!isDefaultBlock && EI->hasOperand())
+                                  ? builder.createUncheckedEnumData(
+                                        SEI->getLoc(), EI, EI->getElement())
+                                  : SILValue(EI);
           LiveBlockArg->replaceAllUsesWith(NewValue);
           LiveBlock->eraseArgument(0);
-          SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);
+          builder.createBranch(SEI->getLoc(), LiveBlock);
         } else {
           SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);
         }
         SEI->eraseFromParent();
-        if (EI->use_empty())
-          EI->eraseFromParent();
         HaveChangedCFG = true;
       }
       continue;

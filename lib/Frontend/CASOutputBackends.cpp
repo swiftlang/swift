@@ -344,7 +344,7 @@ Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
     for (auto &Outs : OutputsForInput)
       Builder.addOutput(Outs.first, Outs.second);
 
-    if (auto Err = Builder.build(CAS).moveInto(Result))
+    if (auto Err = Builder.build(CAS, InputIndex).moveInto(Result))
       return Err;
   }
 
@@ -357,7 +357,8 @@ Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
                           << CAS.getID(*CacheKey).toString() << "\' => \'"
                           << CAS.getID(*Result).toString() << "\'\n";);
 
-  if (auto E = Cache.put(CAS.getID(*CacheKey), CAS.getID(*Result))) {
+  if (auto E = Cache.put(CAS.getID(*CacheKey), CAS.getID(*Result),
+                         /*CanBeDistributed=*/true)) {
     // If `SWIFT_STRICT_CAS_ERRORS` environment is set, do not attempt to
     // recover from error.
     if (::getenv("SWIFT_STRICT_CAS_ERRORS"))

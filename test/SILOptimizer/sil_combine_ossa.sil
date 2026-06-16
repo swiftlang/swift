@@ -5,6 +5,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -enable-copy-propagation -enable-lexical-lifetimes=false | %FileCheck %s --check-prefix=CHECK_COPYPROP
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: objc_codegen
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -1542,7 +1543,7 @@ sil [ossa] @unchecked_addr_cast_forwarding : $@convention(thin) (@inout Builtin.
 bb0(%0 : $*Builtin.NativeObject):
   %1 = unchecked_addr_cast %0 : $*Builtin.NativeObject to $*Builtin.RawPointer
   %2 = unchecked_addr_cast %1 : $*Builtin.RawPointer to $*Builtin.Word
-  debug_value %2 : $*Builtin.Word // should not prevent the optimization
+  debug_value %2 : $*Builtin.Word, expr op_deref // should not prevent the optimization
   %3 = load [trivial] %2 : $*Builtin.Word
   return %3 : $Builtin.Word
 }
@@ -1647,7 +1648,7 @@ bb0(%0 : $*FakeOptional<B>):
 
 bb1:
   %2 = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt
-  debug_value %2 : $*B  // should not prevent the optimization
+  debug_value %2 : $*B, expr op_deref  // should not prevent the optimization
   %3 = load [copy] %2 : $*B
   return %3 : $B
 
@@ -2083,7 +2084,7 @@ bb0:
 // CHECK: } // end sil function 'sub_pointers'
 sil [ossa] @sub_pointers : $@convention(thin) (Builtin.RawPointer) -> Builtin.Word {
 bb0(%0 : $Builtin.RawPointer):
-  %1 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
   %23 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
   %26 = builtin "ptrtoint_Word"(%23 : $Builtin.RawPointer) : $Builtin.Word
   %27 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word

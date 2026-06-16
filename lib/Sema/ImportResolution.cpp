@@ -1360,6 +1360,11 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
                  import->getDeclContext()->getModuleScopeContext(),
                  import->getLoc(), NL_QualifiedDefault);
 
+  // `import macro` has not been implementd. Filter them out for now.
+  llvm::erase_if(decls, [](ValueDecl *VD) {
+    return isa<MacroDecl>(VD);
+  });
+
   auto importLoc = import->getLoc();
   if (decls.empty()) {
     ctx.Diags.diagnose(importLoc, diag::decl_does_not_exist_in_module,

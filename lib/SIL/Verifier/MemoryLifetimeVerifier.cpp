@@ -117,7 +117,7 @@ class MemoryLifetimeVerifier {
   /// Helper function to set bits for function arguments and returns.
   void setFuncOperandBits(BlockState &state, Operand &op,
                           SILArgumentConvention convention,
-                          bool isTryApply);
+                          SILInstruction *applyInst);
 
   /// Perform all checks in the function after the data flow has been computed.
   void checkFunction(BitDataflow &dataFlow);
@@ -145,9 +145,7 @@ public:
   MemoryLifetimeVerifier(SILFunction *function, CalleeCache *calleeCache,
                          DeadEndBlocks *deadEndBlocks)
       : function(function), calleeCache(calleeCache),
-        deadEndBlocks(deadEndBlocks),
-        locations(/*handleNonTrivialProjections*/ true,
-                  /*handleTrivialLocations*/ true) {}
+        deadEndBlocks(deadEndBlocks) {}
 
   /// The main entry point to verify the lifetime of all memory locations in
   /// the function.
@@ -482,8 +480,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         ApplySite AS(&I);
         for (Operand &op : I.getAllOperands()) {
           if (AS.isArgumentOperand(op)) {
-            setFuncOperandBits(state, op, AS.getCaptureConvention(op),
-                              isa<TryApplyInst>(&I));
+            setFuncOperandBits(state, op, AS.getCaptureConvention(op), &I);
           }
         }
         break;
@@ -524,8 +521,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
       case SILInstructionKind::YieldInst: {
         auto *YI = cast<YieldInst>(&I);
         for (Operand &op : YI->getAllOperands()) {
-          setFuncOperandBits(state, op, YI->getArgumentConventionForOperand(op),
-                             /*isTryApply=*/ false);
+          setFuncOperandBits(state, op, YI->getArgumentConventionForOperand(op), &I);
         }
         break;
       }
@@ -582,19 +578,30 @@ void MemoryLifetimeVerifier::setBitsOfPredecessor(Bits &getSet, Bits &killSet,
   }
 }
 
+static bool isNoThrowApply(SILInstruction *applyInst) {
+  if (auto *apply = dyn_cast<ApplyInst>(applyInst)) {
+    return apply->isNonThrowing();
+  }
+  return false;
+}
+
 void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
                                         SILArgumentConvention convention,
-                                        bool isTryApply) {
+                                        SILInstruction *applyInst) {
   switch (convention) {
     case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
       killBits(state, op.get());
       break;
     case SILArgumentConvention::Indirect_Out:
+      // An `apply [nothrow]` does not initialize the indirect error result.
+      if (ApplySite(applyInst).isIndirectErrorResultOperand(op) && isNoThrowApply(applyInst))
+        break;
+
       // try_apply is special, because an @out result is only initialized
       // in the normal-block, but not in the throw-block.
       // We handle the @out result of try_apply in setBitsOfPredecessor.
-      if (!isTryApply)
+      if (!isa<TryApplyInst>(applyInst))
         genBits(state, op.get());
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
@@ -942,6 +949,8 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
     case SILArgumentConvention::Indirect_Out:
       requireBitsClear(bits & locations.getNonTrivialLocations(),
                        argumentOp.get(), applyInst);
+      if (ApplySite(applyInst).isIndirectErrorResultOperand(argumentOp) && isNoThrowApply(applyInst))
+        break;
       locations.setBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:

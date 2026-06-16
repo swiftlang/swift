@@ -186,8 +186,7 @@ bool SILValueOwnershipChecker::check() {
   llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
   llvm::copy(extendLifetimeUses, std::back_inserter(allRegularUsers));
 
-  LinearLifetimeChecker checker(deadEndBlocks,
-                                guaranteedPhiVerifier.instIndices);
+  LinearLifetimeChecker checker(deadEndBlocks);
   auto linearLifetimeResult = checker.checkValue(value, allLifetimeEndingUsers,
                                                  allRegularUsers, errorBuilder);
   result = !linearLifetimeResult.getFoundError();
@@ -620,8 +619,7 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
     coroutineEndUses.push_back(use);
   }
 
-  LinearLifetimeChecker checker(deadEndBlocks,
-                                guaranteedPhiVerifier.instIndices);
+  LinearLifetimeChecker checker(deadEndBlocks);
   auto linearLifetimeResult =
       checker.checkValue(yield, coroutineEndUses, regularUses, errorBuilder);
   if (linearLifetimeResult.getFoundError()) {
@@ -964,8 +962,7 @@ verifySILValueHelper(const SILFunction *f, SILValue value,
       .check();
 }
 
-void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks,
-                               InstructionIndices *instIndices) const {
+void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   // Do not validate SILUndef values.
   if (isa<SILUndef>(*this))
     return;
@@ -996,7 +993,7 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks,
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
   LinearLifetimeChecker::ErrorBuilder errorBuilder(
       *f, BehaviorKind::PrintMessageAndAssert);
-  GuaranteedPhiVerifier guaranteedPhiVerifier(f, deadEndBlocks, instIndices,
+  GuaranteedPhiVerifier guaranteedPhiVerifier(f, deadEndBlocks,
                                               errorBuilder);
   verifySILValueHelper(f, *this, errorBuilder, deadEndBlocks,
                        guaranteedPhiVerifier);
@@ -1052,10 +1049,8 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
     errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndAssert);
   }
 
-  InstructionIndices instIndices(const_cast<SILFunction *>(this));
-
   GuaranteedPhiVerifier guaranteedPhiVerifier(this, deadEndBlocks,
-                                              &instIndices, *errorBuilder);
+                                              *errorBuilder);
   for (auto &block : *this) {
     for (auto *arg : block.getArguments()) {
       LinearLifetimeChecker::ErrorBuilder newBuilder = *errorBuilder;

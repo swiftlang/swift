@@ -59,7 +59,6 @@ class Swift(product.Product):
 
         # Add experimental cxx interop flags.
         self.cmake_options.extend(self._enable_experimental_cxx_interop)
-        self.cmake_options.extend(self._enable_cxx_interop_swift_bridging_header)
 
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
@@ -95,6 +94,9 @@ class Swift(product.Product):
 
         self.cmake_options.extend(self._enable_stdlib_symbol_graphs)
 
+        # Add pedantic diagnostics flag.
+        self.cmake_options.extend(self._swift_pedantic_diagnostics)
+
         self.cmake_options.extend(
             self._swift_tools_ld64_lto_codegen_only_for_supporting_targets)
 
@@ -108,6 +110,8 @@ class Swift(product.Product):
 
         self.cmake_options.extend(
             self._darwin_test_deployment_versions)
+
+        self.cmake_options.extend(self._caching_flags)
 
         self.cmake_options.extend_raw(self.args.extra_swift_cmake_options)
 
@@ -226,11 +230,6 @@ updated without updating swift.py?")
                  self.args.enable_experimental_cxx_interop)]
 
     @property
-    def _enable_cxx_interop_swift_bridging_header(self):
-        return [('SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL',
-                 self.args.enable_cxx_interop_swift_bridging_header)]
-
-    @property
     def _enable_experimental_distributed(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL',
                  self.args.enable_experimental_distributed)]
@@ -311,6 +310,11 @@ updated without updating swift.py?")
                  self.args.enable_new_runtime_build)]
 
     @property
+    def _swift_pedantic_diagnostics(self):
+        return [('SWIFT_PEDANTIC_DIAGNOSTICS:BOOL',
+                  self.args.swift_pedantic_diagnostics)]
+
+    @property
     def _darwin_test_deployment_versions(self):
         return [('SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_OSX:STRING',
                  self.args.darwin_test_deployment_version_osx),
@@ -334,6 +338,37 @@ updated without updating swift.py?")
             self.cmake_options.extend(
                 [('SWIFT_DEBUGINFO_NON_LTO_ARGS:STRING',
                  ";".join(self.args.swift_debuginfo_non_lto_args))])
+
+    @property
+    def _caching_flags(self):
+        if not self.args.enable_caching:
+            return []
+        if self.args.bootstrapping_mode != 'hosttools':
+            return []
+        cas_path = self.args.caching_cas_path
+        if cas_path is None:
+            return []
+        result = [
+            ('SWIFT_CACHING_BUILD:BOOL', True),
+            ('SWIFT_CACHING_BUILD_CAS_PATH:PATH', cas_path),
+        ]
+        if self.args.caching_plugin_path:
+            result.append(
+                ('SWIFT_CACHING_BUILD_PLUGIN_PATH:PATH',
+                 self.args.caching_plugin_path))
+        if self.args.caching_plugin_option:
+            result.append(
+                ('SWIFT_CACHING_BUILD_PLUGIN_OPTIONS:STRING',
+                 ':'.join(self.args.caching_plugin_option)))
+        if self.args.caching_prefix_map:
+            from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
+            result.append(('SWIFT_CACHING_BUILD_PREFIX_MAP:BOOL', True))
+            result.append(
+                ('SWIFT_CACHING_BUILD_SOURCE_ROOT:PATH',
+                 SWIFT_SOURCE_ROOT))
+        if getattr(self.args, 'caching_enable_mccas', False):
+            result.append(('SWIFT_CACHING_BUILD_ENABLE_MCCAS:BOOL', True))
+        return result
 
     @classmethod
     def get_dependencies(cls):

@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -c -wmo -emit-module -o %t/C.o %t/C.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -num-threads 1 -c -I %t -emit-module -o %t/D.o -o %t/D2.o %t/D.swift %t/D2.swift -wmo -enable-experimental-feature Embedded -parse-as-library
 
-// RUN: %target-clang %target-clang-resource-dir-opt %t/C.o %t/D.o %t/D2.o  %target-embedded-posix-shim -o %t/Application
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/C.o %t/D.o %t/D2.o  %target-embedded-posix-shim -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 

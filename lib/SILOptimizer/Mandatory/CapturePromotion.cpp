@@ -592,6 +592,13 @@ void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
       auto varInfo = *inst->getVarInfo();
       if (varInfo.Scope)
         varInfo.Scope = getOpScope(inst->getDebugScope());
+      // The operand is promoted from a project_box (address), to an object
+      // type: strip the leading op_deref.
+      ASSERT(!inst->getDebugReconstructionBlock() &&
+             "Unexpected debug reconstruction block in Diagnostic Pass");
+      ASSERT(varInfo.DIExpr.startsWithDeref() &&
+             "Address value debug_value must start with op_deref");
+      varInfo.DIExpr.eraseElement(varInfo.DIExpr.element_begin());
       getBuilder().createDebugValue(inst->getLoc(), value, varInfo);
       return;
     }

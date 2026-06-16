@@ -12,6 +12,8 @@
   import Glibc
 #elseif canImport(Android)
   import Android
+#elseif canImport(WASILibc)
+  import WASILibc
 #elseif os(Windows)
   import CRT
 #else

@@ -977,15 +977,80 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
   }
 
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {
+    if (opaqueLoc.isInvalid() && anyLoc.isInvalid()) {
+      return type;
+    }
+
+    // Unwrap any layers of optionality, keeping track of what we peeled off.
+    SmallVector<TypeRepr *, 2> optionals;
+    TypeRepr *base = type;
+    InverseTypeRepr *inverseToReapply = nullptr;
+
+    if (auto *inv = dyn_cast<InverseTypeRepr>(base)) {
+      inverseToReapply = inv;
+      base = inv->getConstraint();
+    }
+
+    while (true) {
+      if (auto *opt = dyn_cast<OptionalTypeRepr>(base)) {
+        optionals.push_back(base);
+        base = opt->getBase();
+      } else if (auto *iuo =
+                     dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(base)) {
+        optionals.push_back(base);
+        base = iuo->getBase();
+      } else {
+        break;
+      }
+    }
+
+    if (inverseToReapply) {
+      base = new (Context) InverseTypeRepr(inverseToReapply->getTildeLoc(), base);
+    }
+
+    // If this was a composition with `some` or `any`, the optional sugar is
+    // parsed as bound to the elements, not to the whole composition. Check the
+    // last element so that if we have something like `some P & Q?`, we can
+    // diagnose it specifically with a fix-it.
+    if (auto *comp = dyn_cast<CompositionTypeRepr>(base)) {
+      if (!comp->getTypes().empty()) {
+        auto *last = comp->getTypes().back();
+        auto *lastForDiag = last;
+        if (auto *inv = dyn_cast<InverseTypeRepr>(lastForDiag)) {
+          lastForDiag = inv->getConstraint();
+        }
+        if (isa<OptionalTypeRepr>(lastForDiag) ||
+            isa<ImplicitlyUnwrappedOptionalTypeRepr>(lastForDiag)) {
+          diagnose(last->getEndLoc(),
+                   diag::confusing_some_any_optional_composition)
+              .fixItInsert(comp->getStartLoc(), "(")
+              .fixItInsert(last->getEndLoc(), ")");
+        }
+      }
+    }
+
+    // Apply the opaque or existential typing.
+    TypeRepr *result = base;
     if (opaqueLoc.isValid() &&
         (anyLoc.isInvalid() || SourceMgr.isBeforeInBuffer(opaqueLoc, anyLoc))) {
-      type = new (Context) OpaqueReturnTypeRepr(opaqueLoc, type);
+      result = new (Context) OpaqueReturnTypeRepr(opaqueLoc, result);
     } else if (anyLoc.isValid()) {
-      type = new (Context) ExistentialTypeRepr(anyLoc, type);
+      result = new (Context) ExistentialTypeRepr(anyLoc, result);
     }
-    return type;
+
+    // Re-wrap the optionals.
+    for (auto *optRepr : llvm::reverse(optionals)) {
+      if (auto *opt = dyn_cast<OptionalTypeRepr>(optRepr)) {
+        result = new (Context) OptionalTypeRepr(result, opt->getQuestionLoc());
+      } else if (auto *iuo =
+                     dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(optRepr)) {
+        result = new (Context) ImplicitlyUnwrappedOptionalTypeRepr(
+            result, iuo->getExclamationLoc());
+      }
+    }
+    return result;
   };
-  
+
   // Parse the first type
   ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID, reason);
   if (FirstType.isNull())

@@ -570,10 +570,12 @@ SILLocation.
 ### debug_value
 
 ```
-sil-instruction ::= debug_value sil-debug-value-option* sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
+sil-instruction ::= debug_value sil-debug-value-option* sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)? (',' 'transform' debug-transform-block)?
 sil-debug-value-option ::= [poison]
 sil-debug-value-option ::= [moveable_value_debuginfo]
 sil-debug-value-option ::= [trace]
+
+debug-transform-block ::= '{' sil-basic-block '}'
 
 debug_value %1 : $Int
 ```
@@ -645,28 +647,12 @@ It means: "You can get the value of source variable 'x' by
 *dereferencing* SSA value `%a`". The `op_deref` is a SIL DIExpression
 operator that represents "dereference". If there are multiple SIL
 DIExpression operators (or arguments), they are evaluated from left to
-right:
-
-```
-debug_value %b : $**Int, name "y", expr op_deref:op_deref
-```
-
-In the snippet above, two `op_deref` operators will be applied on SSA
-value `%b` sequentially.
+right.
 
 Note that normally when the SSA value has an address type, there will be
-a `op_deref` in the SIL DIExpression. Because there is no pointer in
-Swift so you always need to dereference an address-type SSA value to get
-the value of a source variable. However, if the SSA value is a
-`alloc_stack`, the `debug_value` is used to indicate the *declaration*
-of a source variable. Or, you can say, used to specify the location
-(memory address) of the source variable. Therefore, we don't need to
-add a `op_deref` in this case:
-
-```
-%a = alloc_stack $Int, ...
-debug_value %a : $*Int, name "my_var"
-```
+a `op_deref` in the SIL DIExpression, as there is no address types in
+Swift source code. There can only be one `op_deref`, as double address types
+don't exist in SIL.
 
 The `op_fragment` operator is used to specify the SSA value of a
 specific field in an aggregate-type source variable. This SIL
@@ -705,6 +691,18 @@ It is worth noting that a SIL DIExpression is similar to
 LLVM debug info metadata. While LLVM represents `!DIExpression` are a
 list of 64-bit integers, SIL DIExpression can have elements with various
 types, like AST nodes or strings.
+
+A `debug_value` can have an attached **transform block**: a standalone `SILBasicBlock` containing SIL instructions that describe how to reconstruct the variable's value. See [DebugBasicBlocks.md](DebugBasicBlocks.md) for the full design.
+
+```
+debug_value undef : $Builtin.Int64, let, name "x", type $Int, expr op_fragment:#Int._value, transform {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 42
+  return %0 : $Builtin.Int64
+}
+```
+
+When both a transform block and a DIExpression are present, the transform block is evaluated first.
 
 The `[trace]` flag is available for compiler unit testing. It is not
 produced during normal compilation. It is used combination with internal
@@ -1404,7 +1402,7 @@ arg.1 = a
 ### index_addr
 
 ```
-sil-instruction ::= 'index_addr' ('[' 'stack_protection' ']')? sil-operand ',' sil-operand
+sil-instruction ::= 'index_addr' ('[' 'stack_protection' ']')? ('[' 'projection' ']')? sil-operand ',' sil-operand
 
 %2 = index_addr %0 : $*T, %1 : $Builtin.Int<n>
 // %0 must be of an address type $*T
@@ -1424,6 +1422,16 @@ array.
 
 The `stack_protection` flag indicates that stack protection is done for
 the pointer origin.
+
+The `projection` flag indicates that this instruction projects an element
+address from an array base address, as opposed to being used for general
+pointer arithmetic. When this flag is set, the result address can only
+reach the single element at the given index — it is not possible to chain
+multiple `index_addr` instructions to reach other array elements from the
+result. Without this flag, the result may be used as the base of another
+`index_addr`, allowing arithmetic across element boundaries (e.g. an
+`index_addr` with index 1 followed by an `index_addr` with index 2 reaches
+the element at offset 3).
 
 ### tail_addr
 

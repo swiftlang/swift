@@ -91,7 +91,7 @@ GenericSignature SILSpecializeAttr::buildTypeErasedSignature(
         C, GenericSignature(),
         SmallVector<GenericTypeParamType *>(sig.getGenericParams()),
         requirementsErased,
-        /*allowInverses=*/false);
+        DefaultRequirementOptions());
   }
 
   return sig;
@@ -745,6 +745,13 @@ SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
   return newBlock;
 }
 
+SILBasicBlock *SILFunction::createEmptyDebugReconstructionBlock() {
+  SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  newBlock->index = -2;
+  // Do NOT insert into BlockList - this is a standalone debug block.
+  return newBlock;
+}
+
 void SILFunction::moveAllBlocksFromOtherFunction(SILFunction *F) {
   BlockList.splice(begin(), F->BlockList);
   
@@ -1051,6 +1058,11 @@ bool SILFunction::hasValidLinkageForFragileRef(SerializedKind_t callerSerialized
   // Fragile functions can reference 'static inline' functions imported
   // from C.
   if (hasForeignBody())
+    return true;
+
+  // An external forward declaration is resolved at link time, so any linkage
+  // is valid.
+  if (isExternForwardDeclaration())
     return true;
 
   // The call site of this function must have checked that

@@ -1745,9 +1745,18 @@ extension Array {
     return try _buffer.withUnsafeBufferPointer(body)
   }
 
+  /// A span over the elements of this array.
+  ///
+  /// - Note: On Apple platforms, this property copies bridged `NSArray`
+  ///   instances into contiguous storage on first access and caches
+  ///   the result. Subsequent calls can reuse the cached copy.
+  ///
+  /// - Returns: A `Span` over the elements of this array.
+  ///
+  /// - Complexity: O(1) for native arrays, amortized O(1) for bridged arrays.
   @available(SwiftStdlib 6.2, *)
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_alwaysEmitIntoClient
     borrowing get {
 #if _runtime(_ObjC)
@@ -1865,10 +1874,16 @@ extension Array {
     return try unsafe body(&inoutBufferPointer)
   }
 
+  /// A mutable span over the elements of this array.
+  ///
+  /// - Returns: A `MutableSpan` over the elements of this array.
+  ///
+  /// - Complexity: O(1) when the array's storage is uniquely referenced,
+  ///   O(*n*) otherwise.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     mutating get {
       // _makeMutableAndUnique*() inserts begin_cow_mutation.
       // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.

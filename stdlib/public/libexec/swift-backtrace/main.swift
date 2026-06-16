@@ -116,6 +116,7 @@ internal struct SwiftBacktrace {
   static var outputStream: CFileStream? = nil
 
   static func write(_ string: String, flush: Bool = false) {
+    precondition(outputStream != nil, "Output stream must be set before calling write")
     var stream = outputStream!
 
     print(string, terminator: "", to: &stream)
@@ -125,6 +126,7 @@ internal struct SwiftBacktrace {
   }
 
   static func writeln(_ string: String, flush: Bool = false) {
+    precondition(outputStream != nil, "Output stream must be set before calling writeln")
     var stream = outputStream!
 
     print(string, to: &stream)
@@ -779,7 +781,6 @@ Generate a backtrace for the parent process.
         }
       }
     }
-
   }
 
   // Parse the command line arguments; we can't use swift-argument-parser
@@ -981,7 +982,14 @@ Generate a backtrace for the parent process.
       return
     }
 
-    let crashingThread = target.threads[target.crashingThreadNdx]
+    let crashingThread: TargetThread
+    if target.crashingThreadNdx == -1 {
+      print("swift-backtrace: unable to find crashing thread",
+            to: &standardError)
+      crashingThread = target.threads[0]
+    } else {
+      crashingThread = target.threads[target.crashingThreadNdx]
+    }
 
     let description: String
 
@@ -1056,7 +1064,9 @@ Generate a backtrace for the parent process.
       }
     }
 
-    dump(ndx: target.crashingThreadNdx, thread: crashingThread)
+    if target.crashingThreadNdx != -1 {
+      dump(ndx: target.crashingThreadNdx, thread: crashingThread)
+    }
     if args.threads! {
       for (ndx, thread) in target.threads.enumerated() where ndx != target.crashingThreadNdx {
         dump(ndx: ndx, thread: thread)
@@ -1066,7 +1076,7 @@ Generate a backtrace for the parent process.
     if args.registers! == .crashedOnly {
       writeln("\n\nRegisters:\n")
 
-      if let context = target.threads[target.crashingThreadNdx].context {
+      if let context = crashingThread.context {
         showRegisters(context)
       } else {
         writeln(theme.info("no context for thread \(target.crashingThreadNdx)"))

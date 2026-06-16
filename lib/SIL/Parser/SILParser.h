@@ -335,6 +335,7 @@ public:
                       StringRef &OpcodeName);
   bool parseSILDebugVar(SILDebugVariable &Var);
 
+  bool parseSILDebugTransformBlock(SILBasicBlock *&DebugBB, SILBuilder &B);
   bool parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr);
 
   /// Parses the basic block arguments as part of branch instruction.
@@ -354,6 +355,7 @@ public:
   bool parseSILFunctionRef(SILLocation InstLoc, SILFunction *&ResultFn);
 
   bool parseSILBasicBlock(SILBuilder &B);
+  bool parseSILBasicBlockArgList(SILBasicBlock *BB, bool isEntry);
   bool parseKeyPathPatternComponent(KeyPathPatternComponent &component,
                                     SmallVectorImpl<SILType> &operandTypes,
                                     SourceLoc componentLoc,

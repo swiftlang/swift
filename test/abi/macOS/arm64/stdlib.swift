@@ -772,6 +772,7 @@ Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_3_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_4_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_5_0ABvpZMV
 Added: _$sSBsE5radixSivpZMV
 Added: _$sSFsE8ulpOfOnexvpZMV
 Added: _$sSUsE8isSignedSbvpZMV
@@ -957,6 +958,8 @@ Added: _$ss13_SwiftifyInfoO11nonescapingyABs01_A4ExprO_tcABmFWC
 Added: _$ss13_SwiftifyInfoO7endedByyABs01_A4ExprO_SitcABmFWC
 Added: _$ss13_SwiftifyInfoO7sizedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO13sizedByOrNullyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO15countedByOrNullyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO18lifetimeDependenceyABs01_A4ExprO_AEs01_D4TypeOtcABmFWC
 Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
@@ -1259,15 +1262,15 @@ Added: _$sSlss17BorrowingSequenceRzrlE31_customContainsEquatableElementySbSg0F0S
 // Necessary for Distributed to compute distributed remote reference object size
 Added: __ZN5swift26getResilientMetadataBoundsEPKNS_21TargetClassDescriptorINS_9InProcessEEE
 
-// Borrow
-Added: _$ss6BorrowVMa
-Added: _$ss6BorrowVMn
-Added: _$ss6BorrowVsRi_zrlE7builtinxBWvg
+// Ref
+Added: _$ss3RefVMa
+Added: _$ss3RefVMn
+Added: _$ss3RefVsRi_zrlE7builtinxBWvg
 
-// Inout
-Added: _$ss5InoutVMa
-Added: _$ss5InoutVMn
-Added: _$ss5InoutVsRi_zrlE7pointerSpyxGvg
+// MutableRef
+Added: _$ss10MutableRefVMa
+Added: _$ss10MutableRefVMn
+Added: _$ss10MutableRefVsRi_zrlE7pointerSpyxGvg
 
 // SE-0514 Hashable Conformance for Dictionary.Keys, CollectionOfOne and EmptyCollection
 Added: _$sSD4KeysV9hashValueSivpMV
@@ -1280,6 +1283,21 @@ Added: _$ss15EmptyCollectionV9hashValueSivpMV
 Added: _$ss15EmptyCollectionVyxGSHsMc
 Added: _$ss15EmptyCollectionVyxGSHsWP
 
+// SE-0525 RawSpan and safe-loading API
+Added: _$ss9ByteOrderO2eeoiySbAB_ABtFZ
+Added: _$ss9ByteOrderO4hash4intoys6HasherVz_tF
+Added: _$ss9ByteOrderO6nativeABvgZ
+Added: _$ss9ByteOrderO6nativeABvpZMV
+Added: _$ss9ByteOrderO9hashValueSivg
+Added: _$ss9ByteOrderO9hashValueSivpMV
+Added: _$ss9ByteOrderOMa
+Added: _$ss9ByteOrderOMn
+Added: _$ss9ByteOrderON
+Added: _$ss9ByteOrderOSHsMc
+Added: _$ss9ByteOrderOSHsWP
+Added: _$ss9ByteOrderOSQsMc
+Added: _$ss9ByteOrderOSQsWP
+
 // Wrapper for SWIFT_CONCURRENCY_TRACING_SUBSYSTEM environment variable
 Added: _concurrencyTracingSubsystem
 
@@ -1290,3 +1308,33 @@ Added: _$ss9UniqueBoxVMn
 // UniqueBox.pointer getter
 Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
 
+// Cross-encoding strcmp for Foundation
+Added: __swift_unicodeBuffersEqual_nonNormalizing
+
+// Debug variable for metadata allocator back pointer
+Added: __swift_debug_allocationPoolBackPointerOffset
+
+// _RigidArray
+Added: _$ss11_RigidArrayVMa
+Added: _$ss11_RigidArrayVMn
+Added: _$ss11_RigidArrayVsRi_zrlE6_countSivM
+Added: _$ss11_RigidArrayVsRi_zrlE6_countSivg
+Added: _$ss11_RigidArrayVsRi_zrlE6_countSivs
+Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvM
+Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvg
+Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvs
+Added: _$ss11_RigidArrayVsSHRzRi_zrlE9hashValueSivg
+Added: _$ss11_RigidArrayVyxGSHsSHRzRi_zrlMc
+Added: _$ss11_RigidArrayVyxGSQsSQRzRi_zrlMc
+
+// UniqueArray
+Added: _$ss11UniqueArrayVMa
+Added: _$ss11UniqueArrayVMn
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages06_RigidB0VyxGvM
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages06_RigidB0VyxGvr
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages06_RigidB0VyxGvs
+Added: _$ss11UniqueArrayVsSHRzRi_zrlE9hashValueSivg
+Added: _$ss11UniqueArrayVyxGSHsSHRzRi_zrlMc
+Added: _$ss11UniqueArrayVyxGSQsSQRzRi_zrlMc
+Added: _$ss11UniqueArrayVsRi_zrlE11descriptionSSvg
+Added: _$ss11UniqueArrayVsRi_zrlE16debugDescriptionSSvg

@@ -20,6 +20,7 @@
 #include "ImportEnumInfo.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
@@ -324,7 +325,10 @@ static void printFullContextPrefix(ImportedName name, ImportNameVersion version,
   assert(newDeclContextNamed && "should of been set");
   auto parentName = Impl.importFullName(newDeclContextNamed, version);
   printFullContextPrefix(parentName, version, os, Impl);
-  os << parentName.getDeclName() << ".";
+  auto baseNameStr = parentName.getDeclName().getBaseName().userFacingName();
+  printIdentifierEscapingIfNeeded(baseNameStr, os,
+                                  PrintNameContext::TypeMember);
+  os << ".";
 }
 
 void ClangImporter::Implementation::printSwiftName(ImportedName name,
@@ -357,7 +361,13 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
     printFullContextPrefix(name, version, os, *this);
 
   // Base name.
-  os << name.getDeclName().getBaseName();
+  auto baseName = name.getDeclName().getBaseName();
+  if (baseName.isSpecial()) {
+    os << baseName.userFacingName();
+  } else {
+    printIdentifierEscapingIfNeeded(baseName.userFacingName(), os,
+                                    PrintNameContext::Normal);
+  }
 
   // Determine the number of argument labels we'll be producing.
   auto argumentNames = name.getDeclName().getArgumentNames();
@@ -380,10 +390,13 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
     }
 
     if (currentArgName < argumentNames.size()) {
-      if (argumentNames[currentArgName].empty())
+      if (argumentNames[currentArgName].empty()) {
         os << "_";
-      else
-        os << argumentNames[currentArgName].str();
+      } else {
+        auto labelStr = argumentNames[currentArgName].str();
+        printIdentifierEscapingIfNeeded(
+            labelStr, os, PrintNameContext::FunctionParameterExternal);
+      }
       os << ":";
       ++currentArgName;
       continue;
@@ -848,6 +861,35 @@ static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
   return static_cast<bool>(determineFactoryInitializerKind(method));
 }
 
+/// Determine whether this C/C++ function or method can be imported as an
+/// initializer of the type named by \p parsedName.
+static bool shouldImportAsInitializer(const clang::FunctionDecl *D,
+                                      const ParsedDeclName &parsedName) {
+  if (isa<clang::CXXConstructorDecl>(D))
+    return true;
+  if (auto *method = dyn_cast<clang::CXXMethodDecl>(D)) {
+    if (!method->isStatic())
+      return false;
+
+    clang::QualType resultType = method->getReturnType();
+    if (resultType->isPointerType() || resultType->isReferenceType())
+      resultType = resultType->getPointeeType();
+
+    const clang::CXXRecordDecl *resultRecord = resultType->getAsCXXRecordDecl();
+    if (!resultRecord)
+      return false;
+    resultRecord = resultRecord->getCanonicalDecl();
+
+    if (parsedName.isMember())
+      return resultRecord->getName() == parsedName.ContextNames.front();
+
+    return resultRecord == method->getParent()->getCanonicalDecl();
+  }
+
+  // Free functions only support the "Type.init(...)" form.
+  return parsedName.isMember();
+}
+
 /// Attempt to omit needless words from the given function name.
 static bool omitNeedlessWordsInFunctionName(
     StringRef &baseName, SmallVectorImpl<StringRef> &argumentNames,
@@ -959,9 +1001,11 @@ NameImporter::determineEffectiveContext(const clang::NamedDecl *decl,
       LLVM_FALLTHROUGH;
     case EnumKind::Constants:
     case EnumKind::Unknown:
-      // The enum constant goes into the redeclaration context of the
-      // enum.
-      res = enumDecl->getRedeclContext();
+      // The enum constant goes into the parent context of the enum,
+      // skipping past the (transparent) unscoped enum itself but stopping at
+      // any enclosing record. This makes record-nested enumerators behave as
+      // members in both C and C++ rather than getting promoted to file scope.
+      res = enumDecl->getNonTransparentDeclContext();
       break;
     }
     // Import onto a swift_newtype if present
@@ -1672,7 +1716,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     auto method = dyn_cast<clang::ObjCMethodDecl>(D);
     if (method) {
       unsigned initPrefixLength;
-      if (parsedName.BaseName == "init" && parsedName.IsFunctionName) {
+      if (parsedName.BaseNameKind == DeclBaseName::Kind::Constructor &&
+          parsedName.IsFunctionName) {
         if (!shouldImportAsInitializer(method, version, initPrefixLength)) {
           // We cannot import this as an initializer anyway.
           return ImportedName();
@@ -1697,31 +1742,51 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         skipCustomName = true;
         result.info.hasInvalidCustomName = true;
       }
-    }
+    } else if (auto *func = dyn_cast<clang::FunctionDecl>(D)) {
+      if (auto *cxxMethod = dyn_cast<clang::CXXMethodDecl>(func)) {
+        // `swift_name` attribute is not supported in virtual methods overrides
+        if (cxxMethod->isVirtual() && cxxMethod->size_overridden_methods() > 0)
+          skipCustomName = true;
+      }
 
-    // `swift_name` attribute is not supported in virtual methods overrides
-    if (auto method = dyn_cast<clang::CXXMethodDecl>(D)) {
-      if (method->isVirtual() && method->size_overridden_methods() > 0)
+      if (!skipCustomName &&
+          parsedName.BaseNameKind == DeclBaseName::Kind::Constructor &&
+          !shouldImportAsInitializer(func, parsedName))
         skipCustomName = true;
     }
 
     if (!skipCustomName) {
       result.info.hasCustomName = true;
       result.declName = parsedName.formDeclName(
-          swiftCtx, /*isSubscript=*/false,
-          isa<clang::ClassTemplateSpecializationDecl>(D));
+          swiftCtx, isa<clang::ClassTemplateSpecializationDecl>(D));
+
+      if (result.declName && result.declName.isSimpleName()) {
+        const clang::FunctionDecl *fnDecl = dyn_cast<clang::FunctionDecl>(D);
+        if (!fnDecl) {
+          if (auto *fnTemplate = dyn_cast<clang::FunctionTemplateDecl>(D))
+            fnDecl = fnTemplate->getAsFunction();
+        }
+        if (fnDecl) {
+          // Function-typed clang decls require a compound (non-simple) name.
+          SmallVector<Identifier, 4> emptyArgs(fnDecl->getNumParams(),
+                                               Identifier());
+          result.declName = DeclName(
+              swiftCtx, result.declName.getBaseName(), emptyArgs);
+        }
+      }
 
       // Handle globals treated as members.
       if (parsedName.isMember()) {
         // FIXME: Make sure this thing is global.
-        result.effectiveContext = parsedName.ContextName;
+        result.effectiveContext =
+            swiftCtx.AllocateCopy(parsedName.fullContextName());
         if (parsedName.SelfIndex) {
           result.info.hasSelfIndex = true;
           result.info.selfIndex = *parsedName.SelfIndex;
         }
         result.info.importAsMember = true;
 
-        if (parsedName.BaseName == "init")
+        if (parsedName.BaseNameKind == DeclBaseName::Kind::Constructor)
           result.info.initKind = CtorInitializerKind::Factory;
       }
 
@@ -1764,7 +1829,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
             // Update the name to reflect the new parameter labels.
             result.declName = formDeclName(
                 swiftCtx, parsedName.BaseName, parsedName.ArgumentLabels,
-                /*isFunction=*/true, isInitializer, /*isSubscript=*/false,
+                /*isFunction=*/true,
+                isInitializer ? DeclBaseName::Kind::Constructor
+                              : DeclBaseName::Kind::Normal,
                 isa<clang::ClassTemplateSpecializationDecl>(D));
           } else if (nameAttr->isAsync) {
             // The custom name was for an async import, but we didn't in fact
@@ -1910,25 +1977,13 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     break;
   }
 
-  case clang::DeclarationName::CXXConversionFunctionName: {
-    auto conversionDecl = dyn_cast<clang::CXXConversionDecl>(D);
-    if (!conversionDecl)
-      return ImportedName();
-    auto toType = conversionDecl->getConversionType();
-    // Only import `operator bool()` for now.
-    if (toType->isBooleanType()) {
-      isFunction = true;
-      baseName = "__convertToBool";
-      addDefaultArgNamesForClangFunction(conversionDecl, argumentNames);
-      break;
-    }
-    return ImportedName();
-  }
+  case clang::DeclarationName::CXXConversionFunctionName:
   case clang::DeclarationName::CXXDestructorName:
   case clang::DeclarationName::CXXLiteralOperatorName:
   case clang::DeclarationName::CXXUsingDirective:
   case clang::DeclarationName::CXXDeductionGuideName:
     // TODO: Handling these is part of C++ interoperability.
+    // Note that operator bool() is handled in lookupAndImportOperatorBool()
     return ImportedName();
 
   case clang::DeclarationName::CXXOperatorName: {
@@ -2474,9 +2529,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   baseName = renameUnsafeMethod(swiftCtx, D, baseName);
 
-  result.declName = formDeclName(swiftCtx, baseName, argumentNames, isFunction,
-                                 isInitializer, /*isSubscript=*/false,
-                                 isa<clang::ClassTemplateSpecializationDecl>(D));
+  result.declName =
+      formDeclName(swiftCtx, baseName, argumentNames, isFunction,
+                   isInitializer ? DeclBaseName::Kind::Constructor
+                                 : DeclBaseName::Kind::Normal,
+                   isa<clang::ClassTemplateSpecializationDecl>(D));
   return result;
 }
 

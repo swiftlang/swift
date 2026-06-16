@@ -170,7 +170,8 @@ func rdar20142523() {
 // <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, ExpressibleByIntegerLiteral)' is not convertible to 'ExpressibleByIntegerLiteral
 func rdar21080030() {
   var s = "Hello"
-  if s.count() == 0 {} // expected-error {{cannot call value of non-function type 'Int'}}
+  if s.count() == 0 {} // expected-error {{missing argument for parameter 'where' in call}}
+  // expected-error@-1 {{generic parameter 'E' could not be inferred}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -1133,7 +1134,6 @@ func rdar17170728() {
   // `reduce(into:)`, and the actual problem is that Int cannot be used as a boolean
   // condition.
   let _ = [i, j, k].reduce(0 as Int?) { // expected-error {{missing argument label 'into:' in call}}
-  // expected-error@-1 {{generic parameter 'E' could not be inferred}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
     // expected-error@-1 {{binary operator '+' cannot be applied to operands of type 'Bool.Stride' and 'Bool'}}
   }
@@ -1537,7 +1537,8 @@ func issue63746() {
 }
 
 func rdar86611718(list: [Int]) {
-  String(list.count()) // expected-error {{cannot call value of non-function type 'Int'}}
+  String(list.count()) // expected-error {{missing argument for parameter 'where' in call}}
+  // expected-error@-1 {{generic parameter 'E' could not be inferred}}
 }
 
 // rdar://108977234 - failed to produce diagnostic when argument to AnyHashable parameter doesn't conform to Hashable protocol
@@ -1570,6 +1571,9 @@ func testNilCoalescingOperatorRemoveFix() {
   if ("" // This is a comment
       ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-1:9-+0:12=}}
 }
+
+// FIXME: https://github.com/swiftlang/swift/issues/89918
+let _ = type(of: Int.foo) // expected-error {{failed to produce diagnostic}}
 
 // https://github.com/apple/swift/issues/74617
 struct Foo_74617 {

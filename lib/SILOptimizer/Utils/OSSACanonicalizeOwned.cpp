@@ -1414,12 +1414,14 @@ bool OSSACanonicalizeOwned::computeLiveness() {
     clear();
     return false;
   }
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
   if (respectsDeadEnds() && hasAnyDeadEnds()) {
     if (respectsDeinitBarriers()) {
       extendLexicalLivenessToDeadEnds();
     }
     extendLivenessToDeadEnds();
   }
+#endif
   if (respectsDeinitBarriers()) {
     extendLivenessToDeinitBarriers();
   }

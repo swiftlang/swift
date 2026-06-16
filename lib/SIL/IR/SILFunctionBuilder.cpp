@@ -252,8 +252,8 @@ void SILFunctionBuilder::addFunctionAttributes(
     return;
   auto *decl = constant.getDecl();
 
-  // Don't add section for addressor functions (where decl is a global)
-  if (isa<FuncDecl>(decl)) {
+  // Add section for anything that was originally a function.
+  if (isa<AbstractFunctionDecl>(decl)) {
     if (auto *SA = Attrs.getAttribute<SectionAttr>())
       F->setSection(SA->Name);
   }
@@ -391,7 +391,18 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       F->setAvailabilityForLinkage(*availability);
 
     F->setIsAlwaysWeakImported(decl->isAlwaysWeakImported());
-    if (auto cgModel = decl->getExplicitCodeGenerationModel()) {
+
+    auto cgModel = decl->getExplicitCodeGenerationModel();
+    if (!cgModel && mod.getOptions().EmbeddedSwift)
+      cgModel = decl->getEffectiveCodeGenerationModel();
+
+    // Default-argument generators are always @export(implementation).
+    // FIXME: Should we sink all of this logic into SILDeclRef itself?
+    if (cgModel == CodeGenerationModel::Interface &&
+        constant.isDefaultArgGenerator())
+      cgModel = CodeGenerationModel::Implementation;
+
+    if (cgModel) {
       switch (*cgModel) {
       case CodeGenerationModel::Interface:
       case CodeGenerationModel::Implementation:

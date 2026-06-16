@@ -52,7 +52,7 @@
 #if _compiler_version("5.7.100") // expected-warning {{the second version component is not used for comparison in legacy compiler versions}}
 #endif
 
-#if _compiler_version("700.*.1.1.1.1") // expected-error {{version must not have more than five components}}
+#if _compiler_version("700.*.1.1.1.1") // expected-warning {{trailing components of version '700.0.1.1.1' are ignored}}
 #endif
 
 #if _compiler_version("9223372.*.1.1.1") // expected-error {{compiler version component '9223372' is not in the allowed range 0...9223371}}

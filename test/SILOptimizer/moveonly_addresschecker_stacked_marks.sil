@@ -1,0 +1,63 @@
+// RUN: %target-sil-opt -sil-print-types -module-name moveonly -sil-move-only-address-checker -enable-sil-verify-all %s | %FileCheck %s
+
+// Regression test for an assertion in
+// `MoveOnlyAddressCheckerPImpl::performSingleCheck` → ... →
+// `finishedInitializationOfDefs`, triggered by stacked
+// `mark_unresolved_non_copyable_value` instructions on the same
+// `alloc_stack`: an outer mark (`[consumable_and_assignable]` or
+// `[initable_but_not_consumable]`) gates the init store, and an inner
+// `[no_consume_or_assign]` mark layered on top gates the binding's
+// reads. `addressBeginsInitialized` didn't recognize the inner mark's
+// operand as something that could be already-initialized, so the
+// use-walk found no `initializeDef` to record, and
+// `finishedInitializationOfDefs` asserted `(isInitialized())`.
+//
+// The checker now treats the inner mark as beginning-initialized when
+// its operand is an outer mark whose check kind permits init.
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+public class Klass {}
+
+public struct NC : ~Copyable {
+  var k: Klass
+}
+
+sil @readNC : $@convention(thin) (@guaranteed NC) -> ()
+
+// CHECK-LABEL: sil [ossa] @stackedMarksConsumableAndAssignable
+sil [ossa] @stackedMarksConsumableAndAssignable : $@convention(thin) (@owned NC) -> () {
+bb0(%0 : @owned $NC):
+  %1 = alloc_stack $NC
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NC
+  store %0 to [init] %2 : $*NC
+  %5 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2 : $*NC
+  %6 = load_borrow %5 : $*NC
+  %7 = function_ref @readNC : $@convention(thin) (@guaranteed NC) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed NC) -> ()
+  end_borrow %6 : $NC
+  destroy_addr %5 : $*NC
+  dealloc_stack %1 : $*NC
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @stackedMarksInitableButNotConsumable
+sil [ossa] @stackedMarksInitableButNotConsumable : $@convention(thin) (@owned NC) -> () {
+bb0(%0 : @owned $NC):
+  %1 = alloc_stack $NC
+  %2 = mark_unresolved_non_copyable_value [initable_but_not_consumable] %1 : $*NC
+  store %0 to [init] %2 : $*NC
+  %5 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2 : $*NC
+  %6 = load_borrow %5 : $*NC
+  %7 = function_ref @readNC : $@convention(thin) (@guaranteed NC) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed NC) -> ()
+  end_borrow %6 : $NC
+  destroy_addr %5 : $*NC
+  dealloc_stack %1 : $*NC
+  %r = tuple ()
+  return %r : $()
+}

@@ -288,8 +288,8 @@ struct AliasAnalysis {
       }
       return effects
 
-    case let apply as FullApplySite:
-      return getApplyEffect(of: apply, on: memLoc)
+    case isFullApplySite:
+      return getApplyEffect(of: inst as! FullApplySite, on: memLoc)
 
     case let partialApply as PartialApplyInst:
       return getPartialApplyEffect(of: partialApply, on: memLoc)
@@ -410,6 +410,7 @@ struct AliasAnalysis {
     // First try to figure out to which argument(s) the address "escapes" to.
     if let result = memLoc.addressWithPath.visit(using: visitor,
                                                  initialWalkingDirection: memLoc.walkingDirection,
+                                                 complexityBudget: getComplexityBudget(for: apply.parentFunction),
                                                  context)
     {
       // The resulting effects are the argument effects to which `address` escapes to.
@@ -451,7 +452,15 @@ struct AliasAnalysis {
         return .init(write: true)
       }
       return .noEffects
+    case .TSanInoutAccess:
+      if memLoc.mayAlias(with: builtin.arguments[0], self) {
+        return .init(read: true)
+      }
+      return .noEffects
     default:
+      if builtin.memoryEffects == .noEffects {
+        return .noEffects
+      }
       return defaultEffects(of: builtin, on: memLoc)
     }
   }
@@ -488,9 +497,7 @@ struct AliasAnalysis {
   // the EscapeUtils do several hundred up/down walks which is much more than needed in most cases.
   private func getComplexityBudget(for function: Function) -> Int {
     if cache.estimatedFunctionSize == nil {
-      var numInsts = 0
-      for _ in function.instructions { numInsts += 1 }
-      cache.estimatedFunctionSize = numInsts
+      cache.estimatedFunctionSize = function.getInstructionCount()
     }
     return 1_000_000 / cache.estimatedFunctionSize!
   }
@@ -858,7 +865,7 @@ private struct EscapesToInstructionVisitor : EscapeVisitor {
     if user == target {
       return .abort
     }
-    if user is ReturnInstruction {
+    if user.isReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }

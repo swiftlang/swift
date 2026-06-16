@@ -16,7 +16,7 @@
 // Without @available(SwiftStdlib 6.4, *) on the enclosing function, the
 // availability context does not cover SwiftStdlib 6.4.
 func testForLoopOverSpanWithoutAvailability(_ seq: Span<Int>) {
-  for x in seq { // expected-error {{for-in loop requires 'Span<Int>' to conform to 'BorrowingSequence', which is only available in macOS 9999 or newer}}
+  for x in seq { // expected-error {{for-in loop requires 'Span<Int>' to conform to 'BorrowingSequence', which is only available in macOS 27.0 or newer}}
   // expected-note@-2 {{add '@available' attribute to enclosing global function}}
   // expected-note@-2 {{add 'if #available' version check}}
     _ = x
@@ -79,7 +79,7 @@ extension BorrowingFallbackNoSequence: BorrowingSequence {
 }
 
 func testInvalidBorrowingNoSequence(seq: BorrowingFallbackNoSequence) {
-  for x in seq { // expected-error {{for-in loop requires 'BorrowingFallbackNoSequence' to conform to 'BorrowingSequence', which is only available in macOS 9999 or newer}}
+  for x in seq { // expected-error {{for-in loop requires 'BorrowingFallbackNoSequence' to conform to 'BorrowingSequence', which is only available in macOS 27.0 or newer}}
   // expected-note@-2 {{add '@available' attribute to enclosing global function}}
   // expected-note@-2 {{add 'if #available' version check}}
     _ = x

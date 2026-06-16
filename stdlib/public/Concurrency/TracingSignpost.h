@@ -67,6 +67,7 @@
   "job_enqueue_global_with_delay"
 #define SWIFT_LOG_JOB_ENQUEUE_EXECUTOR_NAME "job_enqueue_executor"
 #define SWIFT_LOG_JOB_RUN_NAME "job_run"
+#define SWIFT_LOG_TASK_SWITCH_EXECUTOR_NAME "task_switch_executor"
 
 namespace swift {
 namespace concurrency {
@@ -402,6 +403,26 @@ inline void job_run_end(job_run_info info) {
     os_signpost_interval_end(TaskLog, info.handle, SWIFT_LOG_JOB_RUN_NAME,
                              "task=%" PRId64, info.taskId);
   }
+}
+
+inline void task_switch_executor(AsyncTask *task,
+                                 SerialExecutorRef serialExecutor,
+                                 TaskExecutorRef taskExecutor) {
+  ENSURE_LOGS();
+  HeapObject *executorIdentity =
+      serialExecutor.isGeneric() ? nullptr : serialExecutor.getIdentity();
+  auto metadata =
+      executorIdentity ? swift_getObjectType(executorIdentity) : nullptr;
+  auto descriptor =
+      metadata ? (const void *)metadata->getTypeContextDescriptor() : nullptr;
+  auto executorKind = classifyExecutor(serialExecutor, taskExecutor);
+  auto id = os_signpost_id_make_with_pointer(TaskLog, task);
+  os_signpost_event_emit(TaskLog, id, SWIFT_LOG_TASK_SWITCH_EXECUTOR_NAME,
+                         "task=%" PRId64 " taskPointer=%p"
+                         " executor=%p metadata=%p descriptor=%p"
+                         " executorKind=%u",
+                         task->getTaskId(), task, executorIdentity, metadata,
+                         descriptor, (unsigned)executorKind);
 }
 
 #pragma clang diagnostic pop

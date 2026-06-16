@@ -85,3 +85,19 @@
 // CHECK:   case y
 // CHECK:   case z
 // CHECK: }
+
+// CHECK: enum ScopedEnumChar32 : UInt32 {
+// CHECK:   init?(rawValue: UInt32)
+// CHECK:   var rawValue: UInt32 { get }
+// CHECK:   typealias RawValue = UInt32
+// CHECK:   case x
+// CHECK:   case y
+// CHECK: }
+
+// CHECK: enum ScopedEnumChar16 : UInt16 {
+// CHECK:   init?(rawValue: UInt16)
+// CHECK:   var rawValue: UInt16 { get }
+// CHECK:   typealias RawValue = UInt16
+// CHECK:   case a
+// CHECK:   case b
+// CHECK: }

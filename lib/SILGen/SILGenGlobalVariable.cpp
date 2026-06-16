@@ -52,8 +52,10 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
 
   auto cExternAttr = ExternAttr::find(gDecl->getAttrs(), ExternKind::C);
   if (gDecl->getAttrs().hasAttribute<SILGenNameAttr>() || cExternAttr) {
-    silLinkage = SILLinkage::DefaultForDeclaration;
-    if (! gDecl->hasInitialValue()) {
+    // `@_extern(c)` and body-less `@_silgen_name` declarations name a symbol
+    // defined elsewhere; the SIL global is just a forward declaration.
+    if (!gDecl->hasInitialValue()) {
+      silLinkage = SILLinkage::DefaultForDeclaration;
       forDef = NotForDefinition;
     }
   }

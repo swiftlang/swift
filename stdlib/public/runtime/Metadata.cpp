@@ -82,19 +82,13 @@ using namespace swift;
 using namespace metadataimpl;
 
 #if defined(__APPLE__)
-// Binaries using noncopyable types check the address of the symbol
-// `swift_runtimeSupportsNoncopyableTypes` before exposing any noncopyable
-// type metadata through in-process reflection, to prevent existing code
-// that expects all types to be copyable from crashing or causing bad behavior
-// by copying noncopyable types. The runtime does not yet support noncopyable
-// types, so we explicitly define this symbol to be zero for now. Binaries
-// weak-import this symbol so they will resolve it to a zero address on older
-// runtimes as well.
-//
-// Note: If this symbol's value ever gets updated, the corresponding condition
-// handled by IRGen MUST be updated in tandem.
+// Binaries compiled with older deployment targets check the address of the
+// symbol `swift_runtimeSupportsNoncopyableTypes` before exposing any
+// noncopyable type metadata through in-process reflection. If the address is
+// zero, then the metadata is not exposed to the runtime. Binaries weak-import
+// this symbol so they will resolve it to a zero address on older runtimes too.
 __asm__("  .globl _swift_runtimeSupportsNoncopyableTypes\n");
-__asm__(".set _swift_runtimeSupportsNoncopyableTypes, 0\n");
+__asm__(".set _swift_runtimeSupportsNoncopyableTypes, 1\n");
 #endif
 
 // GenericParamDescriptor is a single byte, so while it's difficult to
@@ -770,6 +764,11 @@ cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description,
       (void *)description);
 }
 
+SWIFT_CC(swift)
+static MetadataResponse
+_swift_getGenericMetadata(MetadataRequest request, const void *const *arguments,
+                          const TypeContextDescriptor *description);
+
 MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
     MetadataRequest request, const Metadata *candidate,
     const Metadata **cacheMetadataPtr) {
@@ -787,6 +786,23 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
                             MetadataState::Complete};
   }
 
+  const void *const *arguments =
+      reinterpret_cast<const void *const *>(candidate->getGenericArgs());
+
+  if (SWIFT_UNLIKELY(
+          runtime::environment::
+              SWIFT_DEBUG_DISABLE_NONCANONICAL_STATIC_SPECIALIZATIONS())) {
+    // Pretend the noncanonical static specialization isn't there. Route
+    // through the normal generic metadata instantiation path instead.
+    auto response = _swift_getGenericMetadata(request, arguments, description);
+
+    // Don't cache incomplete metadata, since code above assumes cached metadata
+    // is complete.
+    if (response.State == MetadataState::Complete)
+      cachedMetadataAddr->store(response.Value, std::memory_order_release);
+    return response;
+  }
+
   if (auto *token =
           description
               ->getCanonicalMetadataPrespecializationCachingOnceToken()) {
@@ -794,8 +810,6 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
     // NOTE: If there is no token, then there are no canonical prespecialized
     //       metadata records, either.
   }
-  const void *const *arguments =
-      reinterpret_cast<const void *const *>(candidate->getGenericArgs());
   auto &cache = getCache(*description);
   auto key = MetadataCacheKey(cache.SigLayout, arguments);
   auto result = cache.getOrInsert(key, request, candidate);
@@ -2608,6 +2622,7 @@ static void performBasicLayout(TypeLayout &layout,
   size_t size = layout.size;
   size_t alignMask = layout.flags.getAlignmentMask();
   bool isPOD = layout.flags.isPOD();
+  bool isCopyable = layout.flags.isCopyable();
   bool isBitwiseTakable = layout.flags.isBitwiseTakable();
   bool isBitwiseBorrowable = layout.flags.isBitwiseBorrowable();
   bool isAddressableForDependencies = layout.flags.isAddressableForDependencies();
@@ -2625,6 +2640,7 @@ static void performBasicLayout(TypeLayout &layout,
     size += eltLayout->size;
     alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
     if (!eltLayout->flags.isPOD()) isPOD = false;
+    if (!eltLayout->flags.isCopyable()) isCopyable = false;
     if (!eltLayout->flags.isBitwiseTakable()) isBitwiseTakable = false;
     if (!eltLayout->flags.isBitwiseBorrowable()) isBitwiseBorrowable = false;
     if (eltLayout->flags.isAddressableForDependencies())
@@ -2637,6 +2653,7 @@ static void performBasicLayout(TypeLayout &layout,
   layout.flags = ValueWitnessFlags()
                      .withAlignmentMask(alignMask)
                      .withPOD(isPOD)
+                     .withCopyable(isCopyable)
                      .withBitwiseTakable(isBitwiseTakable)
                      .withBitwiseBorrowable(isBitwiseBorrowable)
                      .withAddressableForDependencies(isAddressableForDependencies)
@@ -3220,6 +3237,16 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
         assignUnlessEqual(fieldOffsets[i], offset);
       });
 
+  // If the struct is always noncopyable, we must honor that.
+  if (structType->getDescription()->isUnconditionallySuppressing(
+          InvertibleProtocolKind::Copyable)) {
+    layout.flags = layout.flags.withCopyable(false);
+    // Unconditionally ~Copyable types may have a user-defined deinit.
+    // Mark as non-POD to avoid optimizations which may skip calling that
+    // deinit.
+    layout.flags = layout.flags.withPOD(false);
+  }
+
   // We have extra inhabitants if any element does. Use the field with the most.
   unsigned extraInhabitantCount = 0;
   for (unsigned i = 0; i < numFields; ++i) {
@@ -3258,6 +3285,12 @@ static void swift_cvw_initStructMetadataWithLayoutStringImpl(
       [&](size_t i, const uint8_t *fieldType, uint32_t offset) {
         assignUnlessEqual(fieldOffsets[i], offset);
       });
+
+  // If the struct is always noncopyable, we must honor that.
+  if (layout.flags.isCopyable() &&
+        structType->getDescription()->isUnconditionallySuppressing(
+            InvertibleProtocolKind::Copyable))
+    layout.flags = layout.flags.withCopyable(false);
 
   // We have extra inhabitants if any element does. Use the field with the most.
   unsigned extraInhabitantCount = 0;
@@ -8192,6 +8225,7 @@ const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
 const size_t swift::_swift_debug_allocationPoolSize = InitialPoolSize;
 const size_t swift::_swift_debug_metadataAllocatorPageSize = PoolRange::PageSize;
 std::atomic<const void *> swift::_swift_debug_metadataAllocationBacktraceList;
+size_t swift::_swift_debug_allocationPoolBackPointerOffset = ~0;
 
 static void recordBacktrace(void *allocation) {
   withCurrentBacktrace([&](void **addrs, int count) {
@@ -8211,43 +8245,43 @@ static void recordBacktrace(void *allocation) {
   });
 }
 
-static inline bool scribbleEnabled() {
-#ifndef NDEBUG
-  // When DEBUG is defined, always scribble.
-  return true;
-#else
-  // When DEBUG is not defined, only scribble when the
-  // SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE environment variable is set.
-  return SWIFT_UNLIKELY(
-          runtime::environment::SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE());
-#endif
-}
-
-static constexpr char scribbleByte = 0xAA;
+static std::optional<uint8_t> ScribbleByte;
 
 template <typename Pointee>
 static inline void memsetScribble(Pointee *bytes, size_t totalSize) {
-  if (scribbleEnabled())
-    memset(bytes, scribbleByte, totalSize);
+  if (SWIFT_LIKELY(!ScribbleByte))
+    return;
+
+  memset(bytes, ScribbleByte.value(), totalSize);
 }
 
 /// When scribbling is enabled, check the specified region for the scribble
 /// values to detect overflows. When scribbling is disabled, this is a no-op.
 static inline void checkScribble(char *bytes, size_t totalSize) {
-  if (scribbleEnabled())
-    for (size_t i = 0; i < totalSize; i++)
-      if (bytes[i] != scribbleByte) {
-        const size_t maxToPrint = 16;
-        size_t remaining = totalSize - i;
-        size_t toPrint = std::min(remaining, maxToPrint);
-        std::string hex = toHex(llvm::StringRef{&bytes[i], toPrint});
-        swift::fatalError(
-            0, "corrupt metadata allocation arena detected at %p: %s%s",
-            &bytes[i], hex.c_str(), toPrint < remaining ? "..." : "");
-      }
+  if (SWIFT_LIKELY(!ScribbleByte))
+    return;
+
+  // scribbleByte is unsigned, so do an unsigned comparison here.
+  auto ptr = reinterpret_cast<uint8_t *>(bytes);
+  for (size_t i = 0; i < totalSize; i++)
+    if (ptr[i] != ScribbleByte.value()) {
+      const size_t maxToPrint = 16;
+      size_t remaining = totalSize - i;
+      size_t toPrint = std::min(remaining, maxToPrint);
+      std::string hex = toHex(llvm::StringRef{&bytes[i], toPrint});
+      swift::fatalError(
+          0, "corrupt metadata allocation arena detected at %p: %s%s",
+          &bytes[i], hex.c_str(), toPrint < remaining ? "..." : "");
+    }
 }
 
 static void checkAllocatorDebugEnvironmentVariables(void *context) {
+  // Set our ScribbleByte from the environment variable. If it's not set but
+  // SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE is set, then set the byte to 0xaa.
+  ScribbleByte = runtime::environment::SWIFT_DEBUG_RUNTIME_ALLOC_SCRIBBLE_BYTE();
+  if (!ScribbleByte && runtime::environment::SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE())
+    ScribbleByte = 0xaa;
+
   memsetScribble(InitialAllocationPool.Pool, InitialPoolSize);
 
   _swift_debug_metadataAllocationIterationEnabled =
@@ -8258,6 +8292,7 @@ static void checkAllocatorDebugEnvironmentVariables(void *context) {
                      "Warning: SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING "
                      "without SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION "
                      "has no effect.\n");
+    _swift_debug_allocationPoolBackPointerOffset = PoolRange::PageSize - sizeof(void **);
     return;
   }
 
@@ -8270,6 +8305,7 @@ static void checkAllocatorDebugEnvironmentVariables(void *context) {
   memcpy(InitialAllocationPool.Pool + newPoolSize, &trailer, sizeof(trailer));
   poolCopy.Remaining = newPoolSize;
   AllocationPool.store(poolCopy, std::memory_order_relaxed);
+  _swift_debug_allocationPoolBackPointerOffset = PoolRange::PageSize - sizeof(PoolTrailer);
 }
 
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
@@ -8304,19 +8340,24 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
       newState = PoolRange{curState.Begin + sizeWithHeader,
                            curState.Remaining - sizeWithHeader};
     } else {
-      auto poolSize = PoolRange::PageSize;
-      if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled))
-        poolSize -= sizeof(PoolTrailer);
       allocatedNewPage = true;
       allocation = reinterpret_cast<char *>(swift_slowAlloc(PoolRange::PageSize,
                                                             alignof(char) - 1));
       memsetScribble(allocation, PoolRange::PageSize);
 
+      auto poolSize = PoolRange::PageSize;
       if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled)) {
+        poolSize -= sizeof(PoolTrailer);
         PoolTrailer *newTrailer = (PoolTrailer *)(allocation + poolSize);
         char *prevTrailer = curState.Begin + curState.Remaining;
         newTrailer->PrevTrailer = prevTrailer;
         newTrailer->PoolSize = poolSize;
+      } else {
+        // Write a single back pointer to the end of the pool for the benefit of
+        // memory analysis tools.
+        poolSize -= sizeof(void *);
+        void **ptr = (void **)(allocation + poolSize);
+        *ptr = curState.Begin + curState.Remaining;
       }
       newState = PoolRange{allocation + sizeWithHeader,
                            poolSize - sizeWithHeader};

@@ -47,7 +47,14 @@ struct CerebralValley<T> {
 // --- now some tests ---
 // ----------------------
 
-func basic_vararg(_ va: MO...) {} // expected-error {{noncopyable type 'MO' cannot be used within a variadic type yet}}
+func basic_vararg1(_ va: MO...) {} // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+// expected-note@-1 {{required because variadic parameter type must be stored inside an 'Array'}}
+
+// Make sure we perform this check for all inverse requirements, not just Copyable!
+struct MOO: ~Escapable {}  // expected-error {{an implicit initializer cannot return a ~Escapable result}}
+
+func basic_vararg2(_ va: MOO...) {} // expected-error {{type 'MOO' does not conform to protocol 'Escapable'}}
+// expected-note@-1 {{required because variadic parameter type must be stored inside an 'Array'}}
 
 func illegalTypes<T>(_ t: T) {
   let _: Array<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}

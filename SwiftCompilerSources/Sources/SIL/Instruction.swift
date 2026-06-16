@@ -181,7 +181,7 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   public final var isDeinitBarrier: Bool {
     switch self {
-    case is FullApplySite, is EndApplyInst, is AbortApplyInst:
+    case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst:
       return true
     default:
       return mayAccessPointerOrGlobal || mayLoadWeakOrUnowned || maySynchronize
@@ -218,6 +218,50 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   public func isIdenticalTo(_ otherInst: Instruction) -> Bool {
     return bridged.isIdenticalTo(otherInst.bridged)
+  }
+
+  /// The raw index of this instruction in its parent block, used for ordering.
+  /// Returns nil if the index has not been computed yet. Use
+  /// `dominatesInBlock` for ordering comparisons instead of comparing raw indices.
+  final var rawIndexInBlock: Int? {
+    let idx = bridged.getRawIndexInBlock()
+    return idx == 0 ? nil : idx
+  }
+
+  /// Returns true if this instruction comes before `other` in the same block.
+  ///
+  /// Complexity: O(1) in the common case.
+  ///
+  /// Each instruction carries a lazily-computed integer index.  Indices are assigned on demand
+  /// by `recomputeInstructionIndices` (spaced by a stride of 8) and persist across optimization
+  /// passes. When instructions are inserted or moved, the implementation tries to slot them into
+  /// the gap between their neighbors, so a single insertion is still O(1). If no gap is available,
+  /// the inserted instruction gets no index assigned; the next call to `dominatesInBlock` that
+  /// encounters such an unassigned index triggers a full re-computation of the block, which is O(n)
+  /// in the number of instructions.
+  ///
+  /// **Pathological case:** repeatedly inserting more than 8 instructions between the same two
+  /// neighbors (exhausting the stride gap) and then calling `dominatesInBlock` on the inserted
+  /// instructions will trigger O(n) re-computations each time.
+  ///
+  public final func strictlyDominatesInBlock(_ other: Instruction) -> Bool {
+    let (idx, otherIdx) = Instruction.getListIndices(lhs: self, rhs: other)
+    return idx < otherIdx
+  }
+
+  /// Like `strictlyDominatesInBlock`, but also returns true if this instruction is the asme as `other`.
+  public final func dominatesInBlock(_ other: Instruction) -> Bool {
+    let (idx, otherIdx) = Instruction.getListIndices(lhs: self, rhs: other)
+    return idx <= otherIdx
+  }
+
+  private static func getListIndices(lhs: Instruction, rhs: Instruction) -> (Int, Int) {
+    precondition(lhs.parentBlock == rhs.parentBlock)
+    if let lhsIdx = lhs.rawIndexInBlock, let rhsIdx = rhs.rawIndexInBlock {
+      return (lhsIdx, rhsIdx)
+    }
+    lhs.parentBlock.recomputeInstructionIndices()
+    return (lhs.rawIndexInBlock!, rhs.rawIndexInBlock!)
   }
 
   public func hash(into hasher: inout Hasher) {
@@ -650,6 +694,20 @@ final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariable
   public var debugVariable: DebugVariable? {
     return bridged.DebugValue_hasVarInfo() ? bridged.DebugValue_getVarInfo() : nil
   }
+
+  public var debugReconstructionBlock: BasicBlock? {
+    bridged.DebugValue_getDebugReconstructionBlock().block
+  }
+
+  public func getOrCreateDebugReconstructionBlock() -> BasicBlock {
+    bridged.DebugValue_getOrCreateDebugReconstructionBlock().block
+  }
+
+  public func stripDeref() { bridged.DebugValue_stripDeref() }
+  public func prependDeref() { bridged.DebugValue_prependDeref() }
+  public func killOperand(withType type: Type? = nil) {
+    bridged.DebugValue_killOperand(type?.bridged ?? BridgedType())
+  }
 }
 
 final public class DebugStepInst : Instruction {}
@@ -936,12 +994,29 @@ public protocol IndexingInstruction: SingleValueInstruction {
 extension IndexingInstruction {
   public var base: Value { operands[0].value }
   public var index: Value { operands[1].value }
+
+  public var constantIndex: Int? {
+    if let literal = index as? IntegerLiteralInst,
+       let indexValue = literal.value
+    {
+      return indexValue
+    }
+    return nil
+  }
 }
 
 final public
 class IndexAddrInst : SingleValueInstruction, IndexingInstruction {
   public var needsStackProtection: Bool {
     bridged.IndexAddrInst_needsStackProtection()
+  }
+  /// True if this instruction projects a single array element address from an
+  /// array base, as opposed to being used for general pointer arithmetic.
+  /// When set, the result cannot be used to reach other array elements (e.g.
+  /// by chaining `index_addr` instructions); without this flag such chaining
+  /// is permitted.
+  public var isProjection: Bool {
+    bridged.IndexAddrInst_isProjection()
   }
 }
 
@@ -1032,7 +1107,11 @@ class ValueMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 final public
 class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class ObjCProtocolInst : SingleValueInstruction {}
+final public class ObjCProtocolInst : SingleValueInstruction {
+  public var protocolDecl: ProtocolDecl {
+    bridged.ObjCProtocolInst_getProtocol().getAs(ProtocolDecl.self)
+  }
+}
 
 final public class TypeValueInst: SingleValueInstruction, UnaryInstruction {
   public var paramType: CanonicalType {
@@ -1118,10 +1197,16 @@ final public class IntegerLiteralInst : SingleValueInstruction {
 }
 
 final public class FloatLiteralInst : SingleValueInstruction {
+  /// The bit pattern of the literal as an integer.
+  /// Returns nil if the bit pattern does not fit in an Int (e.g. Float80).
+  public var bits: Int? {
+    let b = bridged.FloatLiteralInst_getBits()
+    return b.hasValue ? b.value : nil
+  }
 }
 
 final public class StringLiteralInst : SingleValueInstruction {
-  public enum Encoding {
+  public enum Encoding: Hashable {
     case Bytes
     case UTF8
     /// UTF-8 encoding of an Objective-C selector.
@@ -1432,7 +1517,7 @@ final public class ExplicitCopyValueInst : SingleValueInstruction, CopyingInstru
 final public class UnownedCopyValueInst : SingleValueInstruction, CopyingInstruction {}
 final public class WeakCopyValueInst : SingleValueInstruction, CopyingInstruction {}
 
-final public class UncheckedOwnershipConversionInst : SingleValueInstruction {}
+final public class UncheckedOwnershipConversionInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {
   public var fromValue: Value { operand.value }
@@ -1995,7 +2080,11 @@ final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruc
 //                           parameter pack instructions
 //===----------------------------------------------------------------------===//
 
-final public class AllocPackInst : SingleValueInstruction, Allocation {}
+final public class AllocPackInst : SingleValueInstruction, Allocation {
+  public var packType: CanonicalType {
+    CanonicalType(bridged: bridged.AllocPackInst_getPackType())
+  }
+}
 final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
 
 final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
@@ -2037,9 +2126,16 @@ final public class TuplePackElementAddrInst: SingleValueInstruction {
   public var tupleOperand: Operand { operands[1] }
 }
 
-final public class PackElementGetInst: SingleValueInstruction {}
+final public class PackElementGetInst: SingleValueInstruction {
+  public var indexOperand: Operand { operands[0] }
+  public var packOperand: Operand { operands[1] }
+}
 
-final public class PackElementSetInst: Instruction {}
+final public class PackElementSetInst: Instruction {
+  public var valueOperand: Operand { operands[0] }
+  public var indexOperand: Operand { operands[1] }
+  public var packOperand: Operand { operands[2] }
+}
 
 //===----------------------------------------------------------------------===//
 //                            terminator instructions
@@ -2067,6 +2163,25 @@ final public class UnreachableInst : TermInst {
 @_semantics("fast_cast")
 public protocol ReturnInstruction: Instruction {
   var returnedValue: Value { get }
+}
+
+public extension Instruction {
+  /// To be used for fast type casting to `isReturnInstruction` in time critical code.
+  /// This is a workaround for the slow runtime type casts. After toolchain builders are
+  /// upgraded to a compiler version which includes the fix for this problem
+  /// (https://github.com/swiftlang/swift/pull/88270), we don't need this anymore and
+  /// the regular `as isReturnInstruction` casts can be used instead.
+  var isReturnInstruction: Bool {
+    self is ReturnInst || self is ReturnBorrowInst
+  }
+}
+
+/// For pattern matching in switch statements.
+public struct IsReturnInstruction {}
+public let isReturnInstruction = IsReturnInstruction()
+
+public func ~= (pattern: IsReturnInstruction, value: Instruction) -> Bool {
+  return value.isReturnInstruction
 }
 
 final public class ReturnInst : TermInst, UnaryInstruction, ReturnInstruction {
@@ -2165,9 +2280,9 @@ final public class CondBranchInst : TermInst {
 final public class SwitchValueInst : TermInst {
 }
 
-final public class SwitchEnumInst : TermInst {
+final public class SwitchEnumInst : TermInst, UnaryInstruction {
 
-  public var enumOp: Value { operands[0].value }
+  public var enumOp: Value { operand.value }
 
   public struct CaseIndexArray : RandomAccessCollection {
     fileprivate let switchEnum: SwitchEnumInst

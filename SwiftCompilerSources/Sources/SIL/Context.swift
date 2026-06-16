@@ -48,6 +48,8 @@ extension Context {
 
   public func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
 
+  public func getBuiltinWordType() -> Type { _bridged.getBuiltinWordType().type }
+
   public func getTupleType(elements: [Type]) -> AST.`Type` {
     return getTupleType(elements: elements.map{ $0.rawType })
   }
@@ -130,6 +132,10 @@ extension MutatingContext {
 
   public func notifyEffectsChanged() {
     _bridged.notifyChanges(.Effects)
+  }
+
+  public func hasChanged(_ kind: BridgedContext.NotificationKind) -> Bool {
+    _bridged.hasChangeNotification(kind)
   }
 
   public func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool, markedAsUsed: Bool) -> GlobalVariable {

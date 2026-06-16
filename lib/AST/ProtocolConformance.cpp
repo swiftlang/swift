@@ -32,6 +32,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/Statistic.h"
@@ -418,6 +419,55 @@ bool NormalProtocolConformance::isSynthesizedNonUnique() const {
     return file->getKind() == FileUnitKind::ClangModule;
 
   return false;
+}
+
+std::optional<CodeGenerationModel>
+NormalProtocolConformance::getExplicitCodeGenerationModel() const {
+  // Inherit the code generation model from the declaring nominal type or
+  // extension. @export(interface) on either one implies the conformances
+  // defined directly on that declaration are also @export(interface).
+  if (auto *ext = dyn_cast<ExtensionDecl>(getDeclContext()))
+    return ext->getExplicitCodeGenerationModel();
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(getDeclContext()))
+    return nominal->getExplicitCodeGenerationModel();
+  return std::nullopt;
+}
+
+std::optional<CodeGenerationModel>
+NormalProtocolConformance::getRequiredCodeGenerationModel() const {
+  auto dc = getDeclContext();
+  bool isEmbedded = dc->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+
+  // A conformance in a generic context must be @export(implementation) in
+  // Embedded Swift.
+  if (auto sig = dc->getGenericSignatureOfContext()) {
+    if (!sig->areAllParamsConcrete() && isEmbedded)
+      return CodeGenerationModel::Implementation;
+  }
+
+  // Synthesized conformances are always @export(implementation).
+  if (isSynthesized())
+    return CodeGenerationModel::Implementation;
+
+  // Other conformances must be @export(interface) in non-Embedded Swift,
+  // because the witness table symbols must be unique.
+  if (!isEmbedded) {
+    return CodeGenerationModel::Interface;
+  }
+
+  return std::nullopt;
+}
+
+CodeGenerationModel
+NormalProtocolConformance::getEffectiveCodeGenerationModel() const {
+  if (auto required = getRequiredCodeGenerationModel())
+    return *required;
+
+  if (auto explicitModel = getExplicitCodeGenerationModel())
+    return *explicitModel;
+
+  // Otherwise, apply the module-level default.
+  return getDeclContext()->getParentModule()->codeGenerationModel();
 }
 
 bool NormalProtocolConformance::isConformanceOfProtocol() const {
@@ -1505,7 +1555,6 @@ createProtocolToProtocolConformances(ProtocolDecl *protocol) {
 
   for (auto &[newBase, ext, index] : protocol->getReparentingProtocols()) {
     // We say that 'Self' is what conforms to the @reparented entry.
-    auto conformingType = protocol->getDeclaredInterfaceType();
     auto const &entry = ext->getInherited().getEntry(index);
     assert(entry.isReparented());
 
@@ -1514,7 +1563,7 @@ createProtocolToProtocolConformances(ProtocolDecl *protocol) {
       loc = ext->getLoc();
 
     conformances.push_back(ctx.getNormalConformance(
-        conformingType, newBase, loc, entry.getTypeRepr(), /*dc=*/ext,
+        ctx.TheSelfType, newBase, loc, entry.getTypeRepr(), /*dc=*/ext,
         ProtocolConformanceState::Incomplete,
         ProtocolConformanceFlags::Reparented));
   }

@@ -37,59 +37,6 @@ class DeclName;
 class EnumDecl;
 enum class ExplicitSafety;
 
-/// The input type for a clang direct lookup request.
-struct ClangDirectLookupDescriptor final {
-  Decl *decl;
-  const clang::Decl *clangDecl;
-  DeclName name;
-
-  ClangDirectLookupDescriptor(Decl *decl, const clang::Decl *clangDecl,
-                              DeclName name)
-      : decl(decl), clangDecl(clangDecl), name(name) {}
-
-  friend llvm::hash_code hash_value(const ClangDirectLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.name, desc.decl, desc.clangDecl);
-  }
-
-  friend bool operator==(const ClangDirectLookupDescriptor &lhs,
-                         const ClangDirectLookupDescriptor &rhs) {
-    return lhs.name == rhs.name && lhs.decl == rhs.decl &&
-           lhs.clangDecl == rhs.clangDecl;
-  }
-
-  friend bool operator!=(const ClangDirectLookupDescriptor &lhs,
-                         const ClangDirectLookupDescriptor &rhs) {
-    return !(lhs == rhs);
-  }
-};
-
-void simple_display(llvm::raw_ostream &out,
-                    const ClangDirectLookupDescriptor &desc);
-SourceLoc extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc);
-
-/// This matches SwiftLookupTable::SingleEntry
-using ClangDirectLookupEntry =
-    llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
-                       clang::ModuleMacro *>;
-
-/// Uses the appropriate SwiftLookupTable to find a set of clang decls given
-/// their name.
-class ClangDirectLookupRequest
-    : public SimpleRequest<ClangDirectLookupRequest,
-                           SmallVector<ClangDirectLookupEntry, 4>(
-                               ClangDirectLookupDescriptor),
-                           RequestFlags::Uncached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  SmallVector<ClangDirectLookupEntry, 4>
-  evaluate(Evaluator &evaluator, ClangDirectLookupDescriptor desc) const;
-};
-
 /// The input type for a namespace member lookup request.
 struct CXXNamespaceMemberLookupDescriptor final {
   EnumDecl *namespaceDecl;
@@ -97,7 +44,7 @@ struct CXXNamespaceMemberLookupDescriptor final {
 
   CXXNamespaceMemberLookupDescriptor(EnumDecl *namespaceDecl, DeclName name)
       : namespaceDecl(namespaceDecl), name(name) {
-    assert(isa<clang::NamespaceDecl>(namespaceDecl->getClangDecl()));
+    ASSERT(isa<clang::NamespaceDecl>(namespaceDecl->getClangDecl()));
   }
 
   friend llvm::hash_code
@@ -121,7 +68,7 @@ void simple_display(llvm::raw_ostream &out,
 SourceLoc
 extractNearestSourceLoc(const CXXNamespaceMemberLookupDescriptor &desc);
 
-/// Uses ClangDirectLookup to find a named member inside of the given namespace.
+/// Find a named member inside of the given Clang namespace.
 class CXXNamespaceMemberLookup
     : public SimpleRequest<CXXNamespaceMemberLookup,
                            TinyPtrVector<ValueDecl *>(
@@ -197,7 +144,7 @@ void simple_display(llvm::raw_ostream &out,
 SourceLoc
 extractNearestSourceLoc(const ClangRecordMemberLookupDescriptor &desc);
 
-/// Uses ClangDirectLookup to find a named member inside of the given record.
+/// Find a named member inside of the given Clang record.
 class ClangRecordMemberLookup
     : public SimpleRequest<ClangRecordMemberLookup,
                            TinyPtrVector<ValueDecl *>(
@@ -366,9 +313,12 @@ class ForeignReferenceTypeInfo {
 
   llvm::PointerIntPair<const clang::RecordDecl *, 2> BaseAndFlags;
 
-  ForeignReferenceTypeInfo(const clang::RecordDecl *decl, bool isValid,
-                           bool isRef)
-      : BaseAndFlags{decl} {
+  const clang::CXXRecordDecl *primarySuperclass = nullptr;
+
+  ForeignReferenceTypeInfo(const clang::RecordDecl *decl,
+                           const clang::CXXRecordDecl *primarySuperclass,
+                           bool isValid, bool isRef)
+      : BaseAndFlags{decl}, primarySuperclass(primarySuperclass) {
     unsigned int flags = 0;
     flags |= isValid ? FlagIsValid : 0;
     flags |= isRef ? FlagIsRef : 0;
@@ -381,14 +331,15 @@ public:
 
   /// Not a reference type
   static ForeignReferenceTypeInfo Value(bool isValid = true) {
-    return {nullptr, isValid, /*isRef=*/false};
+    return {nullptr, nullptr, isValid, /*isRef=*/false};
   }
 
   /// A shared reference type using the retain/release functions from \a decl.
-  static ForeignReferenceTypeInfo Shared(const clang::RecordDecl *decl,
-                                         bool isValid = true) {
+  static ForeignReferenceTypeInfo
+  Shared(const clang::RecordDecl *decl,
+         const clang::CXXRecordDecl *primarySuperclass, bool isValid = true) {
     ASSERT(decl && "shared reference must have a non-null base decl");
-    return {decl, isValid, /*isRef=*/true};
+    return {decl, primarySuperclass, isValid, /*isRef=*/true};
   }
 
   /// The base decl that is annotated with the retain/release functions that
@@ -413,6 +364,14 @@ public:
   ///
   /// This is independent of whether those attributes are actually valid.
   bool isReference() const { return BaseAndFlags.getInt() & FlagIsRef; }
+
+  /// The single FRT base that is the primary (first) direct base of this
+  /// type, suitable for use as the Swift superclass. Returns nullptr if there
+  /// is no single primary FRT base (e.g., multiple FRT bases, or the FRT
+  /// base is not the first direct base).
+  const clang::CXXRecordDecl *getPrimarySuperclass() const {
+    return primarySuperclass;
+  }
 };
 
 struct ForeignReferenceTypeInfoDescriptor {
@@ -446,12 +405,11 @@ class ForeignReferenceTypeInfoRequest
     : public SimpleRequest<ForeignReferenceTypeInfoRequest,
                            ForeignReferenceTypeInfo(
                                ForeignReferenceTypeInfoDescriptor),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
   SourceLoc getNearestLoc() const { return SourceLoc(); };
-  bool isCached() const { return true; }
 
 private:
   friend SimpleRequest;
@@ -858,7 +816,6 @@ void simple_display(llvm::raw_ostream &out,
 SourceLoc
 extractNearestSourceLoc(const CxxRecordDeclDescriptor &desc);
 
-/// Uses ClangDirectLookup to find a named member inside of the given namespace.
 class CxxIteratorInfoRequest
     : public SimpleRequest<CxxIteratorInfoRequest,
                            std::optional<importer::CxxIteratorCategory>(

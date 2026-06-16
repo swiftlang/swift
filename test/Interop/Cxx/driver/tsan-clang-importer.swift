@@ -1,5 +1,6 @@
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
+// REQUIRES: no_asan
 // REQUIRES: OS=macosx
 
 // RUN: %target-swiftc_driver %s -sanitize=thread -import-objc-header %S/sanitizer-detect.h -o %t_tsan -cxx-interoperability-mode=default

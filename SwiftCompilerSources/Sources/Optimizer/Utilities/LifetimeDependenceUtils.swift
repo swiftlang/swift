@@ -527,6 +527,8 @@ extension LifetimeDependence.Scope {
         break
       }
     }
+    // Insert dead-end paths with no destroy_addr.
+    extendToDeadEnds(range: &range, context)
     return range
   }
 
@@ -567,28 +569,61 @@ extension LifetimeDependence.Scope {
       }
       var range = InstructionRange(begin: initializingStore, context)
       range.insert(contentsOf: deallocInsts)
-
-      // Insert unreachable paths with no dealloc_stack.
-      var forwardUnreachableWalk = BasicBlockWorklist(context)
-      defer { forwardUnreachableWalk.deinitialize() }
-
-      // TODO: ensure complete dealloc_stack on all paths in SIL verification, then assert exitBlock.isEmpty.
-      for exitBlock in range.exitBlocks {
-        forwardUnreachableWalk.pushIfNotVisited(exitBlock)
-      }
-      while let b = forwardUnreachableWalk.pop() {
-        if let unreachableInst = b.terminator as? UnreachableInst {
-          // Note: 'unreachableInst' is not necessarilly dominated by 'initializingStore'. This marks the range invalid,
-          // but leaves it in a usable state that includes all blocks covered by the temporary allocation. The extra
-          // blocks (backward up to the function entry) are irrelevant becase we already know that 'initializingStore'
-          // dominates dependent uses.
-          range.insert(unreachableInst)
-        }
-        for succBlock in b.successors {
-          forwardUnreachableWalk.pushIfNotVisited(succBlock)
-        }
-      }
+      // Insert dead-end paths with no dealloc_stack.
+      extendToDeadEnds(range: &range, context)
       return range
+    }
+  }
+
+  // Extend a range from its exit blocks forward to all blocks dominated by the range's exits. This is needed for ranges
+  // that represent a scope that must include dead-end paths. It assumes that exit blocks are on dead-end paths.
+  //
+  // TODO: This is a messy, costly computation of dominance frontiers. It can be avoided by fixing OSSA lifetime
+  // completion so that all paths from an alloc_stack to a function exit include destroy_addr and dealloc_stack. Then
+  // this utility can simply be deleted.
+  private static func extendToDeadEnds(range: inout InstructionRange, _ context: Context) {
+    // First find all blocks forward reachable from an exit block.
+    var forwardReachableExitBlocks = Stack<BasicBlock>(context)
+    var forwardReachableExitBlockSet = BasicBlockSet(context)
+    defer {
+      forwardReachableExitBlocks.deinitialize()
+      forwardReachableExitBlockSet.deinitialize()
+    }
+    let pushExitBlock = { (block: BasicBlock) in
+      if forwardReachableExitBlockSet.insert(block) {
+        forwardReachableExitBlocks.append(block)
+      }
+    }
+    var marker = forwardReachableExitBlocks.top
+    for exitBlock in range.exitBlocks {
+      pushExitBlock(exitBlock)
+    }
+    while marker != forwardReachableExitBlocks.top {
+      let prevMarker = marker
+      marker = forwardReachableExitBlocks.top
+      for forwardExitBlock in forwardReachableExitBlocks.segment(low: prevMarker, high: marker) {
+        for succBlock in forwardExitBlock.successors {
+          pushExitBlock(succBlock)
+        }
+      }
+    }
+    // Now find and forward-propagate all reachable-from-exit blocks that have a predecessor that is not
+    // reachable-from-exit. This includes blocks that are not dominated by exits or that are reachable via a destroy.
+    var forwardUnreachableWalk = BasicBlockWorklist(context)
+    defer { forwardUnreachableWalk.deinitialize() }
+    for forwardReachableExitBlock in forwardReachableExitBlocks {
+      if forwardReachableExitBlock.predecessors.contains(
+           where: { !range.blockRange.contains($0) && !forwardReachableExitBlockSet.contains($0) }) {
+        forwardUnreachableWalk.transitivelyAddBlockWithSuccessors(startingAt: forwardReachableExitBlock)
+      }
+    }
+    // Finally, add the blocks dominated by exit blocks to 'range'.
+    for forwardReachableExitBlock in forwardReachableExitBlocks {
+      if (forwardUnreachableWalk.hasBeenPushed(forwardReachableExitBlock)) {
+        // The reachable-from-exit block is not dominate by exits, so ignore it.
+        continue
+      }
+      range.insert(forwardReachableExitBlock.terminator)
     }
   }
 }
@@ -1180,7 +1215,7 @@ extension LifetimeDependenceDefUseWalker {
 
 let lifetimeDependenceScopeTest = FunctionTest("lifetime_dependence_scope") {
     function, arguments, context in
-  let markDep = arguments.takeValue() as! MarkDependenceInst
+  let markDep = arguments.takeInstruction() as! MarkDependenceInstruction
   guard let dependence = LifetimeDependence(markDep, context) else {
     print("Invalid Dependence")
     return
@@ -1192,6 +1227,7 @@ let lifetimeDependenceScopeTest = FunctionTest("lifetime_dependence_scope") {
   }
   defer { range.deinitialize() }
   print(range)
+  print(range.blockRange)
 }
 
 private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
@@ -1520,6 +1556,24 @@ struct LifetimeDependenceRootWalker : LifetimeDependenceUseDefValueWalker, Lifet
     }
     let newOwner = newLifetime.ownership == .owned ? newLifetime : nil
     return walkUp(value: newLifetime, newOwner)
+  }
+}
+
+private extension PointerToAddressInst {
+  // If this address is the result of a call to unsafe[Mutable]Address, return the 'self' operand of the apply. This
+  // represents the base value into which this address projects.
+  func isResultOfUnsafeAddressor() -> Operand? {
+    if isStrict,
+       let extract = pointer as? StructExtractInst,
+       extract.`struct`.type.isAnyUnsafePointer,
+       let addressorApply = extract.`struct` as? ApplyInst,
+       let addressorFunc = addressorApply.referencedFunction,
+       addressorFunc.isAddressor
+    {
+      let selfArgIdx = addressorFunc.selfArgumentIndex!
+      return addressorApply.argumentOperands[selfArgIdx]
+    }
+    return nil
   }
 }
 

@@ -507,12 +507,17 @@ func expandFreestandingMacroImpl(
 
   // Send the message.
   do {
+    let pluginProtocolVersion = macro.plugin.capability?.protocolVersion ?? 0
     let message = HostToPluginMessage.expandFreestandingMacro(
       macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
       macroRole: pluginMacroRole,
       discriminator: discriminator,
-      syntax: PluginMessage.Syntax(syntax: Syntax(expansionSyntax), in: sourceFilePtr)!,
-      lexicalContext: pluginLexicalContext(of: expansionSyntax),
+      syntax: PluginMessage.Syntax(
+        syntax: Syntax(expansionSyntax),
+        in: sourceFilePtr,
+        pluginProtocolVersion: pluginProtocolVersion
+      )!,
+      lexicalContext: pluginLexicalContext(of: expansionSyntax, pluginProtocolVersion: pluginProtocolVersion),
       staticBuildConfiguration: try cContext.staticBuildConfiguration.asJSON
     )
     let result = try macro.plugin.sendMessageAndWait(message)
@@ -642,8 +647,10 @@ private func lexicalContext(of node: some SyntaxProtocol) -> [Syntax] {
 
 /// Produce the full lexical context of the given node to pass along to
 /// macro expansion.
-private func pluginLexicalContext(of node: some SyntaxProtocol) -> [PluginMessage.Syntax] {
-  lexicalContext(of: node).compactMap { .init(syntax: $0) }
+private func pluginLexicalContext(of node: some SyntaxProtocol, pluginProtocolVersion: Int) -> [PluginMessage.Syntax] {
+  lexicalContext(of: node).compactMap {
+    .init(syntax: $0, pluginProtocolVersion: pluginProtocolVersion)
+  }
 }
 
 func expandAttachedMacroImpl(
@@ -682,6 +689,8 @@ func expandAttachedMacroImpl(
   }
 
   // Prepare syntax nodes to transfer.
+  let pluginProtocolVersion = macro.plugin.capability?.protocolVersion ?? 0
+
   let customAttributeSyntax = PluginMessage.Syntax(
     syntax: Syntax(customAttrNode),
     in: customAttrSourceFilePtr
@@ -689,12 +698,17 @@ func expandAttachedMacroImpl(
 
   let declSyntax = PluginMessage.Syntax(
     syntax: declarationNode,
-    in: declarationSourceFilePtr
+    in: declarationSourceFilePtr,
+    pluginProtocolVersion: pluginProtocolVersion
   )!
 
   let parentDeclSyntax: PluginMessage.Syntax?
   if parentDeclNode != nil {
-    parentDeclSyntax = .init(syntax: Syntax(parentDeclNode!), in: parentDeclSourceFilePtr!)!
+    parentDeclSyntax = .init(
+      syntax: Syntax(parentDeclNode!),
+      in: parentDeclSourceFilePtr!,
+      pluginProtocolVersion: pluginProtocolVersion
+    )!
   } else {
     parentDeclSyntax = nil
   }
@@ -730,7 +744,10 @@ func expandAttachedMacroImpl(
       parentDeclSyntax: parentDeclSyntax,
       extendedTypeSyntax: extendedTypeSyntax,
       conformanceListSyntax: conformanceListSyntax,
-      lexicalContext: pluginLexicalContext(of: declarationNode),
+      lexicalContext: pluginLexicalContext(
+        of: declarationNode,
+        pluginProtocolVersion: pluginProtocolVersion
+      ),
       staticBuildConfiguration: try cContext.staticBuildConfiguration.asJSON
     )
     let expandedSource: String?

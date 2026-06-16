@@ -49,19 +49,17 @@ func unavailableInAnyAppleOS() { // expected-apple-note {{'unavailableInAnyApple
   unavailableInEveryAppleOS()
 }
 
-// FIXME: [availability] Ensure the fix-it suggests @available(anyAppleOS ...) rdar://163819878
 func availableAtDeploymentTarget() {
-  // expected-apple-note@-1 {{add '@available' attribute to enclosing global function}}
-  // expected-macos-note@-2 2 {{add '@available' attribute to enclosing global function}}
+  // expected-apple-note@-1 {{add '@available' attribute to enclosing global function}}{{1-1=@available(anyAppleOS 26.1, *)\n}}
+  // expected-macos-note@-2 2 {{add '@available' attribute to enclosing global function}}{{1-1=@available(macOS 26.1, *)\n}}
 
-  // FIXME: [availability] Ensure the fix-it suggests if #available(anyAppleOS ...) rdar://163819878
   availableInAnyAppleOS26_1()
   // expected-macos-error@-1 {{'availableInAnyAppleOS26_1()' is only available in macOS 26.1 or newer}}
   // expected-ios-error@-2 {{'availableInAnyAppleOS26_1()' is only available in iOS 26.1 or newer}}
   // expected-watchos-error@-3 {{'availableInAnyAppleOS26_1()' is only available in watchOS 26.1 or newer}}
   // expected-tvos-error@-4 {{'availableInAnyAppleOS26_1()' is only available in tvOS 26.1 or newer}}
   // expected-visionos-error@-5 {{'availableInAnyAppleOS26_1()' is only available in visionOS 26.1 or newer}}
-  // expected-apple-note@-6 {{add 'if #available' version check}}
+  // expected-apple-note@-6 {{add 'if #available' version check}}{{3-30=if #available(anyAppleOS 26.1, *) {\n      availableInAnyAppleOS26_1()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
 
   // FIXME: [availability] Remap domain/version in deprecation diagnostics
   deprecatedInAnyAppleOS26()

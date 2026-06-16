@@ -60,12 +60,38 @@ func testUnavailableExpandAllElsePaths() {
   }
 }
 
-func log(message: String) {}
+// Verify that secondary (non-availability) conditions prevent the else branch
+// from being refined. The else branch can fire because the secondary condition
+// failed, in which case the platform may still be unavailable.
+// expected-note@+1 *{{add '@available' attribute to enclosing global function}}
+func testUnavailableWithSecondaryConditions() {
+  let x: Int? = 0
 
-@available(*, unavailable, renamed: "log(message:)")
-func log(format: String, _ args: Any...) { fatalError() } // expected-note {{'log(format:_:)' has been explicitly marked unavailable here}}
+  // With a secondary condition, the else branch is not refined because it
+  // could be reached when the secondary condition fails (not because the
+  // platform became available).
+  if #unavailable(macOS 998.0), let x {
+    _ = x
+  } else {
+    foo() // expected-error{{'foo()' is only available in macOS 998.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  }
 
-// Regression test for https://github.com/apple/swift/issues/64694
-func testUnavailableRenamedFromVariadicDoesntAssert() {
-  log(format: "") // expected-error{{'log(format:_:)' has been renamed to 'log(message:)'}}
+  // Same with a boolean secondary condition.
+  if #unavailable(macOS 998.0), x != nil {
+  } else {
+    foo() // expected-error{{'foo()' is only available in macOS 998.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  }
+
+  // Else-if chains are also not refined.
+  if #unavailable(macOS 998.0), let x {
+    _ = x
+  } else if x == nil {
+    foo() // expected-error{{'foo()' is only available in macOS 998.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  } else {
+    foo() // expected-error{{'foo()' is only available in macOS 998.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  }
 }

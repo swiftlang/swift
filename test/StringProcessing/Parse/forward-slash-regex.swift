@@ -97,7 +97,6 @@ do {
   // expected-error@+1 {{'/' is not a prefix unary operator}}
   _ = /x /?
     .blah
-  // expected-error@-1 {{cannot infer contextual base in reference to member 'blah'}}
 }
 _ = /x/? // expected-error {{cannot use optional chaining on non-optional value of type 'Regex<Substring>'}}
   .blah // expected-error {{value of type 'Regex<Substring>' has no member 'blah'}}

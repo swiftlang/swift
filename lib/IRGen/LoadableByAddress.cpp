@@ -16,6 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Types.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "loadable-address"
 #include "Explosion.h"
@@ -36,9 +38,11 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CompileTimeInterpolationUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -1895,11 +1899,9 @@ static void rewriteUsesOfScalar(StructLoweringState &pass, SILValue address,
       createOutlinedCopyCall(copyBuilder, address, dest, pass);
       storeUser->eraseFromParent();
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
-      SILBuilder dbgBuilder(dbgInst, dbgInst->getDebugScope());
-      // Rewrite the debug_value to point to the variable in the alloca.
-      dbgBuilder.createDebugValueAddr(dbgInst->getLoc(), address,
-                                      *dbgInst->getVarInfo());
-      dbgInst->eraseFromParent();
+      // Update the debug_value to point to the variable in the alloca.
+      dbgInst->setOperand(address);
+      dbgInst->prependDeref();
     }
   }
 }
@@ -2131,6 +2133,83 @@ static void createStructElementAddrInstrAndLoad(LoadableStorageAllocation &alloc
   }
 }
 
+static SILValue getMakeAddrBorrowOperand(SILBuilder &builder,
+                                         MakeBorrowInst *orig) {
+  // This doesn't support OSSA yet. That isn't typically a problem since this
+  // pass currently only runs during IRGen preparation.
+  auto &fn = builder.getFunction();
+  assert(!fn.hasOwnership());
+
+  auto loc = orig->getLoc();
+  auto operand = orig->getOperand();
+  
+  // If the operand was already spilled to an address by the pass, then use
+  // it as is.
+  if (operand->getType().isAddress()) {
+    return operand;
+  }
+
+  // If the operand is a load or load_borrow of a memory location, borrow that
+  // original address.
+  if (auto load = dyn_cast<LoadInst>(operand)) {
+    return load->getOperand();
+  }
+  if (auto lb = dyn_cast<LoadBorrowInst>(operand)) {
+    return lb->getOperand();
+  }
+
+  // Otherwise, this value is local, and can be spilled to a local stack
+  // allocation.
+  AllocStackInst *stack;
+  {
+    SavedInsertionPointRAII save(builder);
+
+    SmallVector<SILValue, 4> typeDependentOperands;
+    if (operand->getType().hasLocalArchetype()) {
+      operand->getType().getASTType().visit([&](CanType t) {
+          if (auto localArchetype = dyn_cast<LocalArchetypeType>(t)) {
+            typeDependentOperands.push_back(
+                  fn.getModule().getRootLocalArchetypeDef(localArchetype, &fn));
+          }
+        });
+    }
+
+    // If the operand is not type-dependent at all, then we can insert the stack
+    // allocation in the entry block.
+    if (typeDependentOperands.empty()) {
+      builder.setInsertionPoint(&*fn.begin()->begin());
+    }
+    // Otherwise, find the earliest block dominated by all of the dependent
+    // operands.
+    else {
+      auto insertPoint = typeDependentOperands.front()->getNextInstruction();
+
+      // TODO: If there are multiple type dependencies, find the point at
+      // which all of the type dependent operands join together.
+      builder.setInsertionPoint(insertPoint);
+    }
+    stack = builder.createAllocStack(loc, operand->getType());
+  }
+  
+  builder.createStore(loc, operand, stack, StoreOwnershipQualifier::Unqualified);
+
+  // Insert balancing dealloc_stacks.
+  DominanceInfo domTree(&fn);
+  SmallVector<SILBasicBlock *, 4> domBoundary;
+  computeDominatedBoundaryBlocks(stack->getParentBlock(), &domTree, domBoundary);
+
+  for (auto *boundBlock : domBoundary) {
+    SavedInsertionPointRAII save(builder);
+
+    builder.setInsertionPoint(boundBlock->getTerminator());
+    builder.createDeallocStack(loc, stack);
+  }
+
+  StackNesting::fixNesting(&fn);
+  
+  return stack;
+}
+
 static void createMakeAddrBorrow(LoadableStorageAllocation &allocator,
                                  MakeBorrowInst *instr,
                                  StructLoweringState &pass) {
@@ -2140,8 +2219,9 @@ static void createMakeAddrBorrow(LoadableStorageAllocation &allocator,
   }
 
   SILBuilderWithScope builder(instr);
+  auto operand = getMakeAddrBorrowOperand(builder, instr);
   SingleValueInstruction *newInstr = builder.createMakeAddrBorrow(
-      instr->getLoc(), instr->getOperand());
+      instr->getLoc(), operand);
 
   // `make_addr_borrow` produces a `Borrow<T>` by-value, like `make_borrow`,
   // so it is a drop-in replacement.
@@ -2343,11 +2423,7 @@ static void rewriteFunction(StructLoweringState &pass,
       } else {
         assert(currOperand->getType().isAddress() &&
                "Expected an address type");
-        // SILBuilderWithScope skips over metainstructions.
-        SILBuilder debugBuilder(instr, instr->getDebugScope());
-        debugBuilder.createDebugValueAddr(instr->getLoc(), currOperand,
-                                          *instr->getVarInfo());
-        instr->getParent()->erase(instr);
+        instr->prependDeref();
       }
     }
   }
@@ -4696,16 +4772,20 @@ protected:
   }
 
   void visitDebugValueInst(DebugValueInst *dbg) {
+    // Undef debug values have a special meaning. Don't allocate stack space
+    // for those.
+    // Rewriting them would also break nullary debug reconstruction blocks.
+    if (isa<SILUndef>(dbg->getOperand()))
+      return;
     if (!dbg->hasAddrVal() &&
         (assignment.isPotentiallyCArray(dbg->getOperand()->getType()) ||
          overlapsWithOnStackDebugLoc(dbg->getOperand()))) {
       assignment.markForDeletion(dbg);
       return;
     }
-    auto builder = assignment.getBuilder(dbg->getIterator());
     SILValue addr = assignment.getAddressForValue(dbg->getOperand());
-    builder.createDebugValueAddr(dbg->getLoc(), addr, *dbg->getVarInfo());
-    assignment.markForDeletion(dbg);
+    dbg->setOperand(addr);
+    dbg->prependDeref();
   }
 
   void visitRetainValueInst(RetainValueInst *r) {

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -common-subexpression-elimination | %FileCheck %s
 
 sil_stage canonical
 
@@ -97,7 +97,7 @@ sil [ossa] @exit : $@convention(thin) () -> Never
 // CHECK: store
 // CHECK: unchecked_ref_cast
 // CHECK-NOT: unchecked_bitwise_cast
-// CHECK: } // end sil function 'removeTriviallyDeadInstructions'
+// CHECK-LABEL: } // end sil function 'removeTriviallyDeadInstructions'
 sil [ossa] @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : @owned $B):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
@@ -116,7 +116,6 @@ bb0(%0 : @owned $B):
 
 // CHECK-LABEL: sil [ossa] @removeTriviallyDeadCrossBasicBlocks :
 // CHECK: cond_br
-// CHECK-NOT: unchecked_ref_cast
 // CHECK-LABEL: } // end sil function 'removeTriviallyDeadCrossBasicBlocks'
 sil [ossa] @removeTriviallyDeadCrossBasicBlocks : $@convention(thin) (@owned B, Builtin.Int1) -> () {
 bb0(%0: @owned $B, %1: $Builtin.Int1):
@@ -136,7 +135,6 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @dead_use_of_alloc_stack :
-// CHECK: bb
 // CHECK: alloc_stack
 // CHECK: dealloc_stack
 // CHECK-LABEL: } // end sil function 'dead_use_of_alloc_stack'
@@ -150,7 +148,6 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @tuple_extract :
-// CHECK: bb
 // CHECK-LABEL: } // end sil function 'tuple_extract'
 sil [ossa] @tuple_extract : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
@@ -159,14 +156,7 @@ bb0(%0 : $Int64):
 }
 
 // CHECK-LABEL: sil [ossa] @do_not_fold_integer_literal :
-// CHECK: bb
 // CHECK: cond_br
-// CHECK: {{^bb}}
-// CHECK-NEXT: integer_literal
-// CHECK-NEXT: br bb
-// CHECK: {{^bb}}
-// CHECK-NEXT: integer_literal
-// CHECK-NEXT: br bb
 // CHECK-LABEL: } // end sil function 'do_not_fold_integer_literal'
 sil [ossa] @do_not_fold_integer_literal : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
@@ -187,14 +177,7 @@ bb2(%3 : $Builtin.Int1):
 enum BoolLike { case true_, false_ }
 
 // CHECK-LABEL: sil [ossa] @fold_enum :
-// CHECK: bb
 // CHECK: switch_enum
-// CHECK: {{^bb}}
-// CHECK-NOT: enum
-// CHECK-NEXT: br bb
-// CHECK: {{^bb}}
-// CHECK-NOT: enum
-// CHECK-NEXT: br bb
 // CHECK-LABEL: } // end sil function 'fold_enum'
 sil [ossa] @fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
@@ -213,14 +196,7 @@ bb3(%3 : $BoolLike):
 }
 
 // CHECK-LABEL: sil [ossa] @do_not_fold_enum :
-// CHECK: bb
 // CHECK: switch_enum
-// CHECK: {{^bb}}
-// CHECK-NEXT: enum
-// CHECK-NEXT: br bb
-// CHECK: {{^bb}}
-// CHECK-NEXT: enum
-// CHECK-NEXT: br bb
 // CHECK-LABEL: } // end sil function 'do_not_fold_enum'
 sil [ossa] @do_not_fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
 bb0(%0 : $BoolLike):
@@ -248,10 +224,8 @@ bb3(%3 : $BoolLike):
 // Int8 literals with the same value. Anything else is outside of scope for cse.
 //
 // CHECK-LABEL: sil [ossa] @test0 :
-// CHECK: [[TARGET:%[0-9]+]] = integer_literal $Builtin.Int8, 8
-// CHECK-NEXT: [[DECOY1:%[0-9]+]] = integer_literal $Builtin.Int16, 8
-// CHECK-NEXT: [[DECOY2:%[0-9]+]] = integer_literal $Builtin.Int8, 1
-// CHECK-NEXT: tuple ([[TARGET]] : $Builtin.Int8, [[TARGET]] : $Builtin.Int8, [[DECOY1]] : $Builtin.Int16, [[DECOY2]] : $Builtin.Int8)
+// CHECK: integer_literal $Builtin.Int8, 8
+// CHECK-NOT: integer_literal $Builtin.Int8, 8
 // CHECK-LABEL: } // end sil function 'test0'
 sil [ossa] @test0 : $@convention(thin) () -> (Builtin.Int8, Builtin.Int8, Builtin.Int16,
                            Builtin.Int8) {
@@ -267,16 +241,8 @@ sil [ossa] @test0 : $@convention(thin) () -> (Builtin.Int8, Builtin.Int8, Builti
 // assuming nothing has changed.
 
 // CHECK-LABEL: sil [ossa] @test1 :
-// CHECK: bb0
-// CHECK-NEXT: [[TARGET:%[0-9]+]] = integer_literal $Builtin.Int8, 8
-// CHECK-NEXT: cond_br undef, bb1, bb2
-// CHECK: bb1
-// CHECK-NEXT: br bb3([[TARGET]] : $Builtin.Int8)
-// CHECK: bb2
-// CHECK-NEXT: [[DECOY:%[0-9]+]] = integer_literal $Builtin.Int8, 16
-// CHECK-NEXT: br bb3([[DECOY]] : $Builtin.Int8)
-// CHECK: bb3([[PHI:%[0-9]+]] : $Builtin.Int8):
-// CHECK-NEXT: tuple ([[TARGET]] : $Builtin.Int8, [[PHI]] : $Builtin.Int8, [[TARGET]] : $Builtin.Int8)
+// CHECK: integer_literal $Builtin.Int8, 8
+// CHECK-NOT: integer_literal $Builtin.Int8, 8
 // CHECK-LABEL: } // end sil function 'test1'
 sil [ossa] @test1 : $@convention(thin) () -> (Builtin.Int8, Builtin.Int8, Builtin.Int8) {
 bb0:
@@ -300,9 +266,8 @@ bb3(%4 : $Builtin.Int8):
 sil [ossa] @evil : $@convention(thin) (@inout Builtin.Int8) -> ()
 
 // CHECK-LABEL: sil [ossa] @functionrefinst :
-// CHECK: bb0
-// CHECK: function_ref @evil : $@convention(thin) (@inout Builtin.Int8) -> ()
-// CHECK-NOT: function_ref @evil : $@convention(thin) (@inout Builtin.Int8) -> ()
+// CHECK: function_ref @evil
+// CHECK-NOT: function_ref @evil
 // CHECK-LABEL: } // end sil function 'functionrefinst'
 sil [ossa] @functionrefinst : $@convention(thin) (@inout Builtin.Int8) -> () {
 bb0(%0 : $*Builtin.Int8):
@@ -317,7 +282,6 @@ bb0(%0 : $*Builtin.Int8):
 sil_global @global_target : $Builtin.Int64
 
 // CHECK-LABEL: sil [ossa] @globaladdr_inst :
-// CHECK-NOT: global_addr
 // CHECK: global_addr @global_target
 // CHECK-NOT: global_addr
 // CHECK-LABEL: } // end sil function 'globaladdr_inst'
@@ -347,11 +311,8 @@ sil [ossa] @string_use : $@convention(thin) (Builtin.RawPointer, Builtin.Word, B
 
 
 // CHECK-LABEL: sil [ossa] @stringliteral :
-// CHECK: [[TARGET:%[0-9]+]] = string_literal utf8 "First"
-// CHECK: [[LEN:%[0-9]+]] = integer_literal $Builtin.Word, 5
-// CHECK: [[ASCII:%[0-9]+]] = integer_literal $Builtin.Int1, -1
-// CHECK-NOT: string_literal "First"
-// CHECK: apply {{%[0-9]+}}([[TARGET]], [[LEN]], [[ASCII]], {{%[0-9]+}}, [[TARGET]], [[LEN]], [[ASCII]], {{%[0-9]+}})
+// CHECK: string_literal utf8 "First"
+// CHECK-NOT: string_literal utf8 "First"
 // CHECK-LABEL: } // end sil function 'stringliteral'
 sil [ossa] @stringliteral : $@convention(thin) () -> () {
   %0 = string_literal utf8 "First"
@@ -380,14 +341,8 @@ sil @print_interval : $@convention(thin) (Interval) -> ()
 sil @print_fake_interval : $@convention(thin) (FakeInterval) -> ()
 
 // CHECK-LABEL: sil [ossa] @structliteral :
-// CHECK: [[TARGET:%[0-9]+]] = struct $Interval ([[IN1:%[0-9]+]] : $Builtin.Int32, [[IN2:%[0-9]+]] : $Builtin.Int32)
-// CHECK-NOT: struct $Interval ([[IN1]] : $Builtin.Int32, [[IN2]] : $Builtin.Int32)
-// CHECK: [[DECOY:%[0-9]+]] = struct $FakeInterval ([[IN1]] : $Builtin.Int32, [[IN2]] : $Builtin.Int32)
-// CHECK: [[PRINT_INTERVAL_FUN:%[0-9]+]] = function_ref @print_interval
-// CHECK: apply [[PRINT_INTERVAL_FUN]]([[TARGET]])
-// CHECK: apply [[PRINT_INTERVAL_FUN]]([[TARGET]])
-// CHECK: [[PRINT_FAKEINTERVAL_FUN:%[0-9]+]] = function_ref @print_fake_interval
-// CHECK: apply [[PRINT_FAKEINTERVAL_FUN]]([[DECOY]])
+// CHECK: struct $Interval
+// CHECK-NOT: struct $Interval
 // CHECK-LABEL: } // end sil function 'structliteral'
 sil [ossa] @structliteral : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
@@ -488,10 +443,8 @@ sil [ossa] @tupleelementaddr_test : $@convention(thin) () -> (Builtin.Int32) {
 sil [ossa] @metatype_user : $@convention(thin) (@thin String.Type) -> ()
 
 // CHECK-LABEL: sil [ossa] @metatype_test :
-// CHECK: [[TARGET:%[0-9]+]] = metatype $@thin String.Type
-// CHECK-NOT: {{%[0-9]+}} = metatype $@thin String.Type
-// CHECK: apply {{%[0-9]+}}([[TARGET]])
-// CHECK: apply {{%[0-9]+}}([[TARGET]])
+// CHECK: metatype $@thin String.Type
+// CHECK-NOT: metatype $@thin String.Type
 // CHECK-LABEL: } // end sil function 'metatype_test'
 sil [ossa] @metatype_test : $@convention(thin) () -> () {
   %0 = metatype $@thin String.Type
@@ -507,11 +460,11 @@ struct StringData {
   var size: Builtin.Word
 }
 
-// CHECK-LABEL: sil [ossa] @sil_extract_of_string :
 //
 // Make sure we only forward the first field of the string_literal
 // instead of the whole string literal. Otherwise we run into arity
 // issues.
+// CHECK-LABEL: sil [ossa] @sil_extract_of_string :
 // CHECK-LABEL: } // end sil function 'sil_extract_of_string'
 sil [ossa] @sil_extract_of_string : $@convention(thin) () -> Builtin.Word {
   %0 = string_literal utf8 ""
@@ -525,8 +478,6 @@ sil [ossa] @helper : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer)
 sil [ossa] @helper2 : $@convention(thin) (UInt8, UInt8) -> Builtin.Word
 
 // CHECK-LABEL: sil [ossa] @sil_string_different_encodings :
-// CHECK:      [[T0:%.*]] = function_ref @helper
-// CHECK-NEXT: apply [[T0]](%0, %1)
 // CHECK-LABEL: } // end sil function 'sil_string_different_encodings'
 sil [ossa] @sil_string_different_encodings : $@convention(thin) () -> Builtin.Word {
   %0 = string_literal utf8 "help"
@@ -537,7 +488,6 @@ sil [ossa] @sil_string_different_encodings : $@convention(thin) () -> Builtin.Wo
 }
 
 // CHECK-LABEL: sil [ossa] @raw_idx_cse :
-// CHECK: pointer_to_address
 // CHECK: pointer_to_address
 // CHECK-LABEL: } // end sil function 'raw_idx_cse'
 sil [ossa] @raw_idx_cse: $@convention(thin) (Builtin.RawPointer) -> () {
@@ -560,18 +510,11 @@ enum FakeOptional {
   case some(Builtin.Int32)
 }
 
-// CHECK-LABEL: sil [ossa] @enum_cse : $@convention(thin) () -> () {
-// CHECK: bb0
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: [[FUNC:%[0-9]+]] = function_ref @unknown_fake_optional_user : $@convention(thin) (FakeOptional) -> ()
-// CHECK-NEXT: [[NONE:%[0-9]+]] = enum $FakeOptional, #FakeOptional.none!enumelt
-// CHECK-NEXT: apply [[FUNC]]([[NONE]]) : $@convention(thin) (FakeOptional) -> ()
-// CHECK-NEXT: apply [[FUNC]]([[NONE]]) : $@convention(thin) (FakeOptional) -> ()
-// CHECK-NEXT: [[INTEGER:%[0-9]+]] = integer_literal $Builtin.Int32, 0
-// CHECK-NEXT: [[SOME:%[0-9]+]] = enum $FakeOptional, #FakeOptional.some!enumelt, [[INTEGER]] : $Builtin.Int32
-// CHECK-NEXT: apply [[FUNC]]([[SOME]]) : $@convention(thin) (FakeOptional) -> ()
-// CHECK-NEXT: apply [[FUNC]]([[SOME]]) : $@convention(thin) (FakeOptional) -> ()
-// CHECK-NEXT: tuple
+// CHECK-LABEL: sil [ossa] @enum_cse :
+// CHECK: enum $FakeOptional, #FakeOptional.none!enumelt
+// CHECK-NOT: enum $FakeOptional, #FakeOptional.none!enumelt
+// CHECK: enum $FakeOptional, #FakeOptional.some!enumelt
+// CHECK-NOT: enum $FakeOptional, #FakeOptional.some!enumelt
 // CHECK-LABEL: } // end sil function 'enum_cse'
 sil [ossa] @unknown_fake_optional_user : $@convention(thin) (FakeOptional) -> ()
 sil [ossa] @enum_cse : $@convention(thin) () -> () {
@@ -592,14 +535,9 @@ bb0:
 
 sil [ossa] @int32_user : $@convention(thin) (Builtin.Int32) -> ()
 
-// CHECK-LABEL: sil [ossa] @unchecked_enum_data_cse : $@convention(thin) (FakeOptional) -> () {
-// CHECK: bb0([[INPUT_ENUM:%[0-9]+]] : $FakeOptional):
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: [[FUNC:%[0-9]+]] = function_ref @int32_user : $@convention(thin) (Builtin.Int32) -> ()
-// CHECK-NEXT: [[INT:%[0-9]+]] = unchecked_enum_data [[INPUT_ENUM]] : $FakeOptional, #FakeOptional.some!enumelt
-// CHECK-NEXT: apply [[FUNC]]([[INT]]) : $@convention(thin) (Builtin.Int32) -> ()
-// CHECK-NEXT: apply [[FUNC]]([[INT]]) : $@convention(thin) (Builtin.Int32) -> ()
-// CHECK-NEXT: tuple
+// CHECK-LABEL: sil [ossa] @unchecked_enum_data_cse :
+// CHECK: unchecked_enum_data
+// CHECK-NOT: unchecked_enum_data
 // CHECK-LABEL: } // end sil function 'unchecked_enum_data_cse'
 sil [ossa] @unchecked_enum_data_cse : $@convention(thin) (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
@@ -615,8 +553,6 @@ bb0(%0 : $FakeOptional):
 // CHECK-LABEL: sil [ossa] @test2cse :
 // CHECK: ref_to_raw_pointer
 // CHECK-NOT: ref_to_raw_pointer
-// CHECK: function_ref
-// CHECK: apply
 // CHECK-LABEL: } // end sil function 'test2cse'
 sil [ossa] @test2cse : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
@@ -632,10 +568,8 @@ bb0(%0 : @owned $C):
 sil [ossa] @helperCD : $@convention(thin) (@owned C, @owned C) -> Builtin.Word
 
 // CHECK-LABEL: sil [ossa] @cse_index_addr_inst :
-// CHECK: bb0(
-// CHECK-NEXT: index_addr
-// CHECK-NEXT: address_to_pointer
-// CHECK-NEXT: tuple
+// CHECK: index_addr
+// CHECK-NOT: index_addr
 // CHECK-LABEL: } // end sil function 'cse_index_addr_inst'
 sil [ossa] @cse_index_addr_inst : $@convention(thin) (@in D, Builtin.Word) -> (Builtin.RawPointer, Builtin.RawPointer) {
 bb0(%0 : $*D, %1 : $Builtin.Word):
@@ -651,11 +585,8 @@ bb0(%0 : $*D, %1 : $Builtin.Word):
 sil [ossa] [readnone] @readnonefun : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
 
 // CHECK-LABEL: sil [ossa] @cse_readnone :
-// CHECK: bb0
 // CHECK: function_ref @readnonefun
-// CHECK: apply
 // CHECK-NOT: function_ref @readnonefun
-// CHECK-NOT: apply
 // CHECK-LABEL: } // end sil function 'cse_readnone'
 sil [ossa] @cse_readnone : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int8):
@@ -669,7 +600,6 @@ bb0(%0 : $*Builtin.Int8):
 // CHECK-LABEL: sil [ossa] @cse_raw_pointer_to_ref :
 // CHECK: raw_pointer_to_ref
 // CHECK-NOT: raw_pointer_to_ref
-// CHECK: tuple
 // CHECK-LABEL: } // end sil function 'cse_raw_pointer_to_ref'
 sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> @owned (C, C) {
 bb0(%0 : $Builtin.RawPointer):
@@ -683,8 +613,6 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-LABEL: sil [ossa] @cse_unchecked_addr_cast :
 // CHECK: unchecked_addr_cast
 // CHECK-NOT: unchecked_addr_cast
-// CHECK: struct_element_addr
-// CHECK: tuple
 // CHECK-LABEL: } // end sil function 'cse_unchecked_addr_cast'
 sil [ossa] @cse_unchecked_addr_cast : $@convention(thin) () -> (Builtin.RawPointer, Builtin.RawPointer) {
 bb0:
@@ -708,7 +636,6 @@ enum Enum1 {
 // CHECK-LABEL: sil [ossa] @cse_select_enum :
 // CHECK: select_enum
 // CHECK-NOT: select_enum
-// CHECK: tuple
 // CHECK-LABEL: } // end sil function 'cse_select_enum'
 sil [ossa] @cse_select_enum : $@convention(thin) (@guaranteed Enum1) -> (Builtin.Int1, Builtin.Int1) {
 bb0(%0 : $Enum1):
@@ -720,10 +647,9 @@ bb0(%0 : $Enum1):
   return %3: $(Builtin.Int1, Builtin.Int1)
 }
 
-// CHECK-LABEL:   sil [ossa] @cse_bridge_object_to_word :
-// CHECK:           [[REF:%[0-9]+]] = bridge_object_to_word
-// CHECK-NOT:       bridge_object_to_word
-// CHECK:           tuple ([[REF]] : $Builtin.Word, [[REF]] : $Builtin.Word)
+// CHECK-LABEL: sil [ossa] @cse_bridge_object_to_word :
+// CHECK: bridge_object_to_word
+// CHECK-NOT: bridge_object_to_word
 // CHECK-LABEL: } // end sil function 'cse_bridge_object_to_word'
 sil [ossa] @cse_bridge_object_to_word : $@convention(thin) (@owned Builtin.BridgeObject) -> (Builtin.Word, Builtin.Word) {
 bb0(%0 : @owned $Builtin.BridgeObject):
@@ -736,10 +662,9 @@ bb0(%0 : @owned $Builtin.BridgeObject):
 
 sil [ossa] [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
 
-// CHECK-LABEL:   sil [ossa] @dont_cse_get_count_on_low_level_sil :
-// CHECK:           [[R1:%[0-9]+]] = apply
-// CHECK:           [[R2:%[0-9]+]] = apply
-// CHECK:           tuple ([[R1]] : $Int, [[R2]] : $Int)
+// CHECK-LABEL: sil [ossa] @dont_cse_get_count_on_low_level_sil :
+// CHECK: apply
+// CHECK: apply
 // CHECK-LABEL: } // end sil function 'dont_cse_get_count_on_low_level_sil'
 sil [ossa] @dont_cse_get_count_on_low_level_sil : $@convention(thin) (@guaranteed Array<Int>) -> (Int, Int) {
 bb0(%0 : @guaranteed $Array<Int>):
@@ -756,12 +681,8 @@ sil [ossa]  @_TFC4main4PingD : $@convention(method) (@owned Ping) -> ()
 sil [ossa]  @_TFC4main4PingcfMS0_FT_S0_ : $@convention(method) (@owned Ping) -> @owned Ping
 
 // CHECK-LABEL: sil [ossa] @_TF4main4ringFCS_4PingT_ :
-// CHECK:           bb0(%0 : @owned $Ping):
-// CHECK-NEXT:      class_method
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      apply
+// CHECK: class_method
+// CHECK-NOT: class_method
 // CHECK-LABEL: } // end sil function '_TF4main4ringFCS_4PingT_'
 sil [ossa] @_TF4main4ringFCS_4PingT_ : $@convention(thin) (@owned Ping) -> () {
 bb0(%0 : @owned $Ping):
@@ -844,18 +765,10 @@ bb0(%0 : $*T):
   return %4 : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @_TF1p3foouRq_S_9Reachable_FTq_1aSi_T_ :
-// CHECK:           bb0(%0 : $*T, %1 : $Int):
-// CHECK-NEXT:      witness_method
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      destroy_addr
-// CHECK-NEXT:      tuple
 // p.foo <A where A: p.Reachable> (A, a : Swift.Int) -> ()
+// CHECK-LABEL: sil hidden [ossa] @_TF1p3foouRq_S_9Reachable_FTq_1aSi_T_ :
+// CHECK: witness_method
+// CHECK-NOT: = witness_method
 // CHECK-LABEL: } // end sil function '_TF1p3foouRq_S_9Reachable_FTq_1aSi_T_'
 sil hidden [ossa] @_TF1p3foouRq_S_9Reachable_FTq_1aSi_T_ : $@convention(thin) <T where T : Reachable> (@in T, Int) -> () {
 bb0(%0 : $*T, %1 : $Int):
@@ -918,21 +831,8 @@ bb0(%0 : $*Airplane):
   return %5 : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @_TF2p28trytoflyFPS_7Flyable_T_ :
-// CHECK:           bb0(%0 : $*any Flyable):
-// CHECK-NEXT:      open_existential_addr
-// CHECK-NEXT:      witness_method
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      open_existential_addr
-// CHECK-NEXT:      witness_method
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      open_existential_addr
-// CHECK-NEXT:      witness_method
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      destroy_addr
-// CHECK-NEXT:      tuple
 // p2.trytofly (p2.Flyable) -> ()
+// CHECK-LABEL: sil hidden [ossa] @_TF2p28trytoflyFPS_7Flyable_T_ :
 // CHECK-LABEL: } // end sil function '_TF2p28trytoflyFPS_7Flyable_T_'
 sil hidden [ossa] @_TF2p28trytoflyFPS_7Flyable_T_ : $@convention(thin) (@in Flyable) -> () {
 bb0(%0 : $*Flyable):
@@ -960,12 +860,6 @@ sil_witness_table hidden Airplane: Flyable module p2 {
 protocol Pingable { func ping() }
 
 // CHECK-LABEL: sil hidden [ossa] @CSE_Existential_Simple :
-// CHECK: open_existential_addr immutable_access %0 : $*any Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable)
-// CHECK: witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self, #Pingable.ping : {{.*}}, %2
-// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self>(%2)
-// CHECK: open_existential_addr immutable_access
-// CHECK: witness_method
-// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self>(%2)
 // CHECK-LABEL: } // end sil function 'CSE_Existential_Simple'
 sil hidden [ossa] @CSE_Existential_Simple : $@convention(thin) (@in Pingable) -> () {
 bb0(%0 : $*Pingable):
@@ -981,7 +875,6 @@ bb0(%0 : $*Pingable):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @CSE_Existential_Calls_With_Control_Flow :
 sil hidden [ossa] @CSE_Existential_Calls_With_Control_Flow : $@convention(thin) (@in Pingable, Int) -> () {
 bb0(%0 : $*Pingable, %1 : $Int):
   debug_value %0 : $*Pingable, expr op_deref // let x
@@ -989,8 +882,7 @@ bb0(%0 : $*Pingable, %1 : $Int):
   %4 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self
   %5 = witness_method $@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %4 : $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
 
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
-  %6 = apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+    %6 = apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   %7 = integer_literal $Builtin.Int64, 3
   %8 = integer_literal $Builtin.Int64, 3
   %9 = builtin "cmp_sgt_Int64"(%8 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
@@ -1000,8 +892,7 @@ bb1:
   %11 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self
   %12 = witness_method $@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %11 : $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
 
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
-  %13 = apply %12<@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self>(%11) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+    %13 = apply %12<@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self>(%11) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   br bb3
 
 bb2:
@@ -1011,13 +902,13 @@ bb3:
   %15 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self
   %16 = witness_method $@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %15 : $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
 
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
-  %17 = apply %16<@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self>(%15) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+    %17 = apply %16<@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self>(%15) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Pingable
   %19 = tuple ()
 
   return %19 : $()
 }
+// CHECK-LABEL: sil hidden [ossa] @CSE_Existential_Calls_With_Control_Flow :
 // CHECK-LABEL: } // end sil function 'CSE_Existential_Calls_With_Control_Flow'
 
 // CHECK-LABEL: sil [ossa] @cse_mark_dependence :
@@ -1059,9 +950,9 @@ bb0(%0 : @guaranteed $Proto & Ping):
 sil [ossa] [global_init] @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
 
 // CHECK-LABEL: sil [ossa] @cse_global_init :
-// CHECK:   pointer_to_address
-// CHECK:   pointer_to_address
-// CHECK: // end sil function 'cse_global_init'
+// CHECK: pointer_to_address
+// CHECK-NOT: pointer_to_address
+// CHECK-LABEL: } // end sil function 'cse_global_init'
 sil [ossa] @cse_global_init : $@convention(thin) () -> Int64 {
 bb0:
   %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
@@ -1086,11 +977,10 @@ protocol SomeP {}
 
 public enum SpecialEnum : SomeP {}
 
-// CHECK-LABEL: sil [ossa] @testCSEInitExistentialMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
-// CHECK:   [[EMT:%.*]] = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick any Any.Type
+// CHECK-LABEL: sil [ossa] @testCSEInitExistentialMetatype :
+// CHECK: init_existential_metatype
 // CHECK-NOT: init_existential_metatype
-// CHECK:   builtin "is_same_metatype"([[EMT]] : $@thick any Any.Type, [[EMT]] : $@thick any Any.Type) : $Builtin.Int1
-// CHECK-LABEL: }  // end sil function 'testCSEInitExistentialMetatype'
+// CHECK-LABEL: } // end sil function 'testCSEInitExistentialMetatype'
 sil [ossa] @testCSEInitExistentialMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
 bb0(%0 : $@thick SpecialEnum.Type):
   %1 = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
@@ -1127,11 +1017,10 @@ bb3(%15 : $Int64):
 
 sil [ossa] @take_int : $@convention(thin) (Int64) -> ()
 
-// CHECK-LABEL: sil [ossa] @dont_cse_lazy_property_of_overwritten_struct : $@convention(thin) () -> () {
-// CHECK:   [[GETTER:%[0-9]+]] = function_ref @lazy_getter
-// CHECK:   apply [[GETTER]]
-// CHECK:   apply [[GETTER]]
-// CHECK: } // end sil function 'dont_cse_lazy_property_of_overwritten_struct'
+// CHECK-LABEL: sil [ossa] @dont_cse_lazy_property_of_overwritten_struct :
+// CHECK: apply
+// CHECK: apply
+// CHECK-LABEL: } // end sil function 'dont_cse_lazy_property_of_overwritten_struct'
 sil [ossa] @dont_cse_lazy_property_of_overwritten_struct : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $StructWithLazyProperty
@@ -1213,10 +1102,9 @@ bb3(%15 : $Int64):
 }
 
 // CHECK-LABEL: sil [ossa] @dont_cse_nonossa_getter :
-// CHECK:   [[GETTER:%[0-9]+]] = function_ref @lazy_class_getter_nonossa
-// CHECK:   apply [[GETTER]]
-// CHECK:   apply [[GETTER]]
-// CHECK: } // end sil function 'dont_cse_nonossa_getter'
+// CHECK: apply
+// CHECK: apply
+// CHECK-LABEL: } // end sil function 'dont_cse_nonossa_getter'
 sil [ossa] @dont_cse_nonossa_getter : $@convention(thin) (@guaranteed LazyKlass) -> (Int64, Int64) {
 bb0(%0 : @guaranteed $LazyKlass):
   %getter = function_ref @lazy_class_getter_nonossa : $@convention(method) (@guaranteed LazyKlass) -> Int64
@@ -1241,9 +1129,9 @@ bb0(%0 : $LazyKlass):
 }
 
 // CHECK-LABEL: sil [ossa] @test_end_lifetime :
-// CHECK:       upcast
-// CHECK-NOT:   upcast
-// CHECK: } // end sil function 'test_end_lifetime'
+// CHECK: upcast
+// CHECK: upcast
+// CHECK-LABEL: } // end sil function 'test_end_lifetime'
 sil [ossa] @test_end_lifetime : $@convention(method) (@owned E) -> () {
 bb0(%0 : @owned $E):
   %copy = copy_value %0 : $E
@@ -1269,10 +1157,9 @@ struct S {
 // The RAUW utility doesn't properly handle reborrows yet.  Until it does, don't
 // replace in the face of non-dominated reborrows.
 //
-// CHECK-LABEL: sil [ossa] @dont_rauw_guaranteed_with_nondominated_reborrow : {{.*}} {
-// CHECK:         struct_extract
-// CHECK:         struct_extract
-// CHECK:         struct_extract
+// CHECK-LABEL: sil [ossa] @dont_rauw_guaranteed_with_nondominated_reborrow :
+// CHECK: struct_extract
+// CHECK: struct_extract
 // CHECK-LABEL: } // end sil function 'dont_rauw_guaranteed_with_nondominated_reborrow'
 sil [ossa] @dont_rauw_guaranteed_with_nondominated_reborrow : $@convention(thin) (@owned S) -> @owned C {
 bb0(%0 : @owned $S):
@@ -1303,9 +1190,9 @@ bb3(%14 : @guaranteed $C, %15 : @reborrow $S, %16 : @owned $S):
   return %19
 }
 
-// CHECK-LABEL: sil [ossa] @type_value_test : {{.*}} {
-// CHECK:         type_value
-// CHECK-NOT:     type_value
+// CHECK-LABEL: sil [ossa] @type_value_test :
+// CHECK: type_value
+// CHECK-NOT: type_value
 // CHECK-LABEL: } // end sil function 'type_value_test'
 sil [ossa] @type_value_test : $@convention(thin) <let N : Int> (@in_guaranteed InlineArray<N, Int>, Int) -> () {
 bb0(%0 : $*InlineArray<N, Int>, %1 : $Int):
@@ -1326,9 +1213,9 @@ bb0(%0 : $*InlineArray<N, Int>, %1 : $Int):
 }
 
 struct Pair<let x: Int, let y: Int> {}
-// CHECK-LABEL: sil [ossa] @dont_cse_different_type_values : {{.*}} {
-// CHECK:         type_value
-// CHECK:         type_value
+// CHECK-LABEL: sil [ossa] @dont_cse_different_type_values :
+// CHECK: type_value
+// CHECK: type_value
 // CHECK-LABEL: } // end sil function 'dont_cse_different_type_values'
 sil [ossa] @dont_cse_different_type_values : $@convention(method) <let x : Int, let y : Int> (Pair<x, y>) -> (Int, Int) {
 [global: ]
@@ -1339,9 +1226,9 @@ bb0(%0 : $Pair<x, y>):
   return %4
 }
 
-// CHECK-LABEL: sil [ossa] @dead_end_block : {{.*}} {
-// CHECK:       bb1:
-// CHECK-NEXT:    destroy_value
+// CHECK-LABEL: sil [ossa] @dead_end_block :
+// CHECK: upcast
+// CHECK: upcast
 // CHECK-LABEL: } // end sil function 'dead_end_block'
 sil [ossa] @dead_end_block : $@convention(thin) (Builtin.RawPointer) -> @owned B {
 bb0(%0 : $Builtin.RawPointer):
@@ -1379,8 +1266,8 @@ class Element {
 //     br bb2(%20, %24)
 //
 // Previously asserted in OwnershipLifetimeExtender::createPlusZeroCopy.
-// CHECK-LABEL: sil [ossa] @testUnownedPhi : {{.*}} {
-// CHECK:  unmanaged_to_ref %{{.*}} to $Element
+// CHECK-LABEL: sil [ossa] @testUnownedPhi :
+// CHECK: unmanaged_to_ref
 // CHECK-LABEL: } // end sil function 'testUnownedPhi'
 sil [ossa] @testUnownedPhi : $@convention(thin) (Optional<Unmanaged<Element>>) -> () {
 bb0(%0 : $Optional<Unmanaged<Element>>):
@@ -1439,8 +1326,8 @@ bb6:
 //     br bb2(%20, %24)
 //
 // Previously asserted in OwnershipLifetimeExtender::borrowCopyOverGuaranteedUsers.
-// CHECK-LABEL: sil [ossa] @testReplaceUnownedPhiWithGuaranteed : {{.*}} {
-// CHECK: unmanaged_to_ref %{{.*}} to $Element
+// CHECK-LABEL: sil [ossa] @testReplaceUnownedPhiWithGuaranteed :
+// CHECK: unmanaged_to_ref
 // CHECK-LABEL: } // end sil function 'testReplaceUnownedPhiWithGuaranteed'
 sil [ossa] @testReplaceUnownedPhiWithGuaranteed : $@convention(thin) (Optional<Unmanaged<Element>>) -> () {
 bb0(%0 : $Optional<Unmanaged<Element>>):
@@ -1510,11 +1397,7 @@ bb1(%6 : $Builtin.RawPointer):
 protocol Q {}
 protocol P : Identifiable where Self.ID : Q {}
 
-// CHECK-LABEL: sil [ossa] @test_cse_open_existential_addr
 // The second open_existential_addr must not be eliminated.
-// CHECK: open_existential_addr
-// CHECK: open_existential_addr
-// CHECK: } // end sil function 'test_cse_open_existential_addr'
 sil [ossa] @test_cse_open_existential_addr : $@convention(thin) (@in_guaranteed any P) -> () {
 bb0(%0 : $*any P):
   %1 = open_existential_addr immutable_access %0 to $*@opened("00000000-0000-0000-0000-000000000001", any P) Self

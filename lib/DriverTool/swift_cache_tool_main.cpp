@@ -135,8 +135,15 @@ public:
     }
 
     // Fallback to default path if not set.
-    if (CASOpts.CASPath.empty() && CASOpts.PluginPath.empty())
-      CASOpts.CASPath = getDefaultOnDiskCASPath();
+    if (CASOpts.CASPath.empty() && CASOpts.PluginPath.empty()) {
+      auto Path = getDefaultOnDiskCASPath();
+      if (!Path) {
+        llvm::errs() << llvm::toString(Path.takeError()) << "\n";
+        return 1;
+      }
+
+      CASOpts.CASPath = *Path;
+    }
 
     Inputs = ParsedArgs.getAllArgValues(OPT_INPUT);
     FrontendArgs = ParsedArgs.getAllArgValues(OPT__DASH_DASH);

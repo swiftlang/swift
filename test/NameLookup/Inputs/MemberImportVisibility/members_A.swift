@@ -71,14 +71,38 @@ open class BaseClassInA {
   open func overriddenInBMethod() {}
 }
 
-public protocol ProtocolInA {
-  func defaultedRequirementInA()
-  func defaultedRequirementInB()
-  func defaultedRequirementInC()
+public protocol EmptyProtocolInA { }
+
+public protocol ProtocolInA1 {
+  func defaultedRequirementInA() // has an inherited default
 }
 
-extension ProtocolInA {
+extension ProtocolInA1 {
   public func defaultedRequirementInA() { }
+}
+
+public protocol ProtocolInA2 {
+  func defaultedRequirementInA() // has an inherited default
+  func defaultedRequirementInB() // has a retroactive default (in B)
+  func defaultedRequirementInC() // has a retroactive default (in C)
+}
+
+extension ProtocolInA2 {
+  public func defaultedRequirementInA() { }
+}
+
+public protocol ProtocolInA3 {
+  func defaultedRequirementInBAndC() // has retroactive defaults (in both B and C)
+}
+
+public protocol BaseProtocolInA4 {
+  func defaultedRequirementInRefinementInA() // has a retroactive default (in an extension on a refined protocol)
+}
+
+public protocol ProtocolInA4: BaseProtocolInA4 { }
+
+extension ProtocolInA4 {
+  public func defaultedRequirementInRefinementInA() { }
 }
 
 public protocol ProtocolWithAssociatedTypesInA {
@@ -87,9 +111,11 @@ public protocol ProtocolWithAssociatedTypesInA {
   associatedtype WitnessedInC
 }
 
-public struct StructWithWitnessesForProtocolWithAssociatedTypesInA {
+public struct StructInA1 {
   public struct WitnessedInA { }
 }
+
+public struct StructInA2: Equatable { }
 
 public struct EquatableInA: Equatable {
   public static func ==(_: Self, _: Self) -> Bool {

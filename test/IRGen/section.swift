@@ -12,9 +12,25 @@
 @section("__DATA,__mysection") var g5: UnsafeMutablePointer<Int>? = UnsafeMutablePointer(bitPattern: 0x42424242)
 @section("__TEXT,__mysection") @used func foo() {}
 
+var g6: Int {
+  @section("__TEXT,__mysection") @used get { 0 }
+  @section("__TEXT,__mymutsection") @used set { }
+}
+
 struct MyStruct {
-	@section("__DATA,__mysection") static var static0: Int = 1
-	@section("__TEXT,__mysection") @used func foo() {}
+  @section("__DATA,__mysection") static var static0: Int = 1
+  @section("__TEXT,__mysection") @used func foo() {}
+  @section("__TEXT,__mysection") @used init(initialValue: Int) {}
+
+  subscript(i: Int) -> Int {
+    @section("__TEXT,__mysection") get { i }
+    @section("__TEXT,__mymutsection") set { }
+  }
+}
+
+class MyClass {
+  @used @section("__TEXT,__mysection") init() { }
+  @used @section("__TEXT,__mysection") deinit { }
 }
 
 @section("__TEXT,__mysection")
@@ -28,9 +44,18 @@ func testit(_ e: consuming Any) -> Any { e }
 // SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g4: UnsafeMutablePointer<Int>? { get set }
 // SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g5: UnsafeMutablePointer<Int>? { get set }
 // SIL: @section("__TEXT,__mysection") @used func foo()
+// SIL: var g6: Int {
+// SIL:   @section("__TEXT,__mysection") @used get
+// SIL:   @section("__TEXT,__mymutsection") @used set
+// SIL: }
 // SIL: struct MyStruct {
 // SIL:   @section("__DATA,__mysection") @_hasStorage @_hasInitialValue static var static0: Int { get set }
 // SIL:   @section("__TEXT,__mysection") @used func foo()
+// SIL: @section("__TEXT,__mysection") @used init(initialValue:
+// SIL:  subscript(i: Int) -> Int {
+// SIL:    @section("__TEXT,__mysection") get
+// SIL:    @section("__TEXT,__mymutsection") set
+// SIL:  }
 
 // SIL: sil private [global_init_once_fn] @$s7section2g0_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section2g0Sivau : $@convention(thin)
@@ -45,9 +70,19 @@ func testit(_ e: consuming Any) -> Any { e }
 // SIL: sil private [global_init_once_fn] @$s7section2g5_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section2g5SpySiGSgvau : $@convention(thin)
 // SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section3fooyyF : $@convention(thin)
+// SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section2g6Sivg : $@convention(thin)
+// SIL: sil hidden [used] [section "__TEXT,__mymutsection"] @$s7section2g6Sivs : $@convention(thin)
 // SIL: sil private [global_init_once_fn] @$s7section8MyStructV7static0_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section8MyStructV7static0Sivau : $@convention(thin)
 // SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section8MyStructV3fooyyF : $@convention(method)
+// SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section8MyStructV12initialValueACSi_tcfC : $@convention(method)
+// SIL: sil hidden [section "__TEXT,__mysection"] @$s7section8MyStructVyS2icig : $@convention(method)
+// SIL: sil hidden [section "__TEXT,__mymutsection"] @$s7section8MyStructVyS2icis : $@convention(method)
+// SIL: sil hidden [transparent] [section "__TEXT,__mymutsection"] @$s7section8MyStructVyS2iciM : $@yield_once @convention(method)
+// SIL: sil hidden [exact_self_class] [used] [section "__TEXT,__mysection"] @$s7section7MyClassCACycfC : $@convention(method)
+// SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section7MyClassCACycfc : $@convention(method)
+// SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section7MyClassCfd : $@convention(method)
+// SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section7MyClassCfD : $@convention(method)
 // SIL: sil hidden @$s7section6testityypypnF : $@convention(thin) (@in Any) -> @out Any {
 
 // IR:  @"$s7section2g0Sivp" = hidden global %TSi <{ {{(i64|i32)}} 1 }>, section "__DATA,__mysection"
@@ -59,3 +94,4 @@ func testit(_ e: consuming Any) -> Any { e }
 // IR:  @"$s7section8MyStructV7static0SivpZ" = hidden global %TSi <{ {{(i64|i32)}} 1 }>, section "__DATA,__mysection"
 // IR:  define {{.*}}@"$s7section3fooyyF"(){{.*}} section "__TEXT,__mysection"
 // IR:  define {{.*}}@"$s7section8MyStructV3fooyyF"() #0 section "__TEXT,__mysection"
+// IR:  define {{.*}}@"$s7section8MyStructV12initialValueACSi_tcfC"({{.*}}) #0 section "__TEXT,__mysection"

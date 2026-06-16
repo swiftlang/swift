@@ -330,6 +330,10 @@ extension TypeProperties {
       bridged: rawType.canonical.bridged.SILFunctionType_getSubstGenericSignature())
   }
 
+  public var tupleContainsPackExpansionType: Bool {
+    return rawType.bridged.Tuple_containsPackExpansionType()
+  }
+
   public var containsSILPackExpansionType: Bool {
     return rawType.bridged.containsSILPackExpansionType()
   }
@@ -445,6 +449,12 @@ extension Type: Equatable {
 extension CanonicalType: Equatable {
   public static func ==(lhs: CanonicalType, rhs: CanonicalType) -> Bool { 
     lhs.rawType == rhs.rawType
+  }
+}
+
+extension CanonicalType: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(bridged.type)
   }
 }
 

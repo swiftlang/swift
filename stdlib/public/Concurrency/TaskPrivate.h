@@ -39,6 +39,14 @@
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
 
+// In embedded builds, pure virtual methods are replaced with
+// __builtin_unreachable() stubs to avoid pulling in __cxa_pure_virtual.
+#if SWIFT_CONCURRENCY_EMBEDDED
+#define SWIFT_CONCURRENCY_ABSTRACT(decl) decl { __builtin_unreachable(); }
+#else
+#define SWIFT_CONCURRENCY_ABSTRACT(decl) decl = 0
+#endif
+
 namespace swift {
 
 // Set to 1 to enable helpful debug spew to stderr
@@ -780,6 +788,26 @@ public:
 static_assert(sizeof(ActiveTaskStatus) == ACTIVE_TASK_STATUS_SIZE,
   "ActiveTaskStatus is of incorrect size");
 
+/// Global allocator that goes through swift_slowAlloc/swift_slowDealloc.
+struct SwiftGlobalAllocator {
+  void *allocateGlobal(size_t size, size_t alignMask) {
+    return swift_slowAlloc(size, alignMask);
+  }
+
+  void deallocateGlobal(void* ptr, size_t size, size_t alignMask) {
+    swift_slowDealloc(ptr, size, alignMask);
+  }
+};
+
+/// Select the global allocator differently for Embedded Swift (where we always
+/// want to go through swift_slow(Alloc|Dealloc)) or non-embedded (where we
+/// continue using malloc/free).
+#if SWIFT_CONCURRENCY_EMBEDDED
+typedef SwiftGlobalAllocator TaskGlobalAllocator;
+#else
+typedef MallocFreeAllocator TaskGlobalAllocator;
+#endif
+
 struct TaskAllocatorConfiguration {
 #if SWIFT_CONCURRENCY_EMBEDDED
 
@@ -817,11 +845,13 @@ struct TaskAllocatorConfiguration {
 /// malloc stack logging.
 static constexpr size_t SlabCapacity =
     1024 - 8 -
-    StackAllocator<0, nullptr, TaskAllocatorConfiguration>::slabHeaderSize();
+  StackAllocator<0, nullptr, TaskAllocatorConfiguration, TaskGlobalAllocator>
+    ::slabHeaderSize();
 extern Metadata TaskAllocatorSlabMetadata;
 
 using TaskAllocator = StackAllocator<SlabCapacity, &TaskAllocatorSlabMetadata,
-                                     TaskAllocatorConfiguration>;
+                                     TaskAllocatorConfiguration,
+                                     TaskGlobalAllocator>;
 
 /// Private storage in an AsyncTask object.
 struct AsyncTask::PrivateStorage {
@@ -891,8 +921,8 @@ struct AsyncTask::PrivateStorage {
       if (task->hasInitialTaskExecutorPreferenceRecord()) {
         task->dropInitialTaskExecutorPreferenceRecord();
       }
-      // We specifically DO NOT drop the task name record here, even if present,
-      // as it is possible to read it off a task handle (`task.name`).
+      // The task name lives in the tail-allocated NameFragment slot now,
+      // not on the status-record chain — there is no record to drop here.
     }
 
     // Drain unlock the task and remove any overrides on thread as a
@@ -900,16 +930,8 @@ struct AsyncTask::PrivateStorage {
     auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
     while (true) {
       #ifndef NDEBUG
-      if (task->hasInitialTaskNameRecord()) {
-        // While we generally drop all task records during complete, the task name record is allowed to
-        // stay until destruction, because we allow reading the name from a task handle: `task.name`.
-        assert((oldStatus.getInnermostRecord() &&
-               (oldStatus.getInnermostRecord()->getKind() == TaskStatusRecordKind::TaskName)) &&
-          "The only remaining task record allowed after complete() is a task name, but was different!");
-      } else {
-        assert(oldStatus.getInnermostRecord() == NULL &&
+      assert(oldStatus.getInnermostRecord() == NULL &&
              "Status records should have been removed by this time!");
-      }
       #endif
       assert(oldStatus.isRunning());
 

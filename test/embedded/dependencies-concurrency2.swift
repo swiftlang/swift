@@ -1,13 +1,16 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -disable-availability-checking -parse-as-library -enable-experimental-feature Embedded %t/test.swift -c -o %t/a.o
-// RUN: %target-clang -nostdlib -lSystem %t/a.o %target-embedded-posix-shim -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos -lswift_Concurrency -dead_strip -Wl,-undefined,dynamic_lookup
+// RUN: %target-embedded-link -nostdlib -lSystem %t/a.o %target-embedded-posix-shim -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos -lswift_Concurrency -dead_strip -Wl,-undefined,dynamic_lookup
 
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.out | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
 // RUN: comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt > %t/extra.txt
 // RUN: test ! -s %t/extra.txt
+
+// Expects the POSIX-based dependencies, not the Embedded Swift platform ones.
+// XFAIL: swift_embedded_platform
 
 //--- allowed-dependencies.txt
 ___assert_rtn

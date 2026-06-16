@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default %t/test.swift -emit-module \
-// RUN:   -verify -Rmacro-expansions -verify-additional-file %t%{fs-sep}test.h -suppress-notes
+// RUN:   -verify -Rmacro-expansions -verify-additional-file %t%{fs-sep}test.h -suppress-notes -eager-macro-checking
 
 //--- test.h
 #define __counted_by(x) __attribute__((__counted_by__(x)))
@@ -11,7 +11,7 @@
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func control_group_function(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe control_group_function(p.baseAddress!, len)|}}
+//   expected-remark@4{{macro content: |    return unsafe control_group_function(p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void control_group_function(int * __counted_by(len) p, int len);
@@ -24,7 +24,7 @@ struct Bar {
   //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public mutating func control_group_method(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
   //   expected-remark@4{{macro content: |    let len = Int32(exactly: p.count)!|}}
-  //   expected-remark@5{{macro content: |    return unsafe control_group_method(p.baseAddress!, len)|}}
+  //   expected-remark@5{{macro content: |    return unsafe control_group_method(p.baseAddress, len)|}}
   //   expected-remark@6{{macro content: |}|}}
   // }}
   void control_group_method(int * __counted_by(len) p, int len);

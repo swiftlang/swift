@@ -11,6 +11,11 @@
 // REQUIRES: embedded_stdlib_cross_compiling
 // REQUIRES: swift_feature_Embedded
 
+// This test pins the freestanding wasm32-unknown-none-wasm target (-nostdlib,
+// its own rt.c and _start). The Emscripten triple has no freestanding
+// configuration; it is always hosted and launched through emcc's JS glue.
+// UNSUPPORTED: OS=emscripten
+
 //--- rt.c
 
 #include <stddef.h>

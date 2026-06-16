@@ -108,7 +108,7 @@ macro(configure_sdks_darwin)
   set(macosx_arch "x86_64" "arm64")
   set(iphoneos_arch "arm64" "arm64e")
   set(appletvos_arch "arm64")
-  set(watchos_arch "armv7k" "arm64_32")
+  set(watchos_arch "arm64_32" "arm64")
 
   set(macosx_ver "13.0")
   set(iphoneos_ver "16.0")
@@ -377,7 +377,8 @@ function (swift_benchmark_compile_archopts)
 
     # If we are not compiling at -Onone and are performing WMO, always emit
     # optimization-records.
-    if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
+    if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*" AND
+       NOT SWIFT_CACHING_BUILD)
       list(APPEND common_options "-save-optimization-record=bitstream")
     endif()
   endif()

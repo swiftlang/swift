@@ -207,6 +207,9 @@ public:
   SILFunction *maybeGetFunction() const { return F; }
 
   bool isInsertingIntoGlobal() const { return F == nullptr; }
+  bool isInsertingIntoDebugReconstructionBlock() const {
+    return BB && BB->isDebugReconstructionBlock();
+  }
 
   TypeExpansionContext getTypeExpansionContext() const {
     if (!F)
@@ -251,8 +254,11 @@ public:
     // FIXME: Audit all uses and enable this assertion.
     // assert(getCurrentDebugScope() && "no debug scope");
     auto Scope = getCurrentDebugScope();
-    if (!Scope && F)
-        Scope = F->getDebugScope();
+    // The content of debug reconstruction block is always scopeless.
+    if (BB && BB->isDebugReconstructionBlock())
+      Scope = nullptr;
+    else if (!Scope && F)
+      Scope = F->getDebugScope();
     auto overriddenLoc = CurDebugLocOverride ? *CurDebugLocOverride : Loc;
     return SILDebugLocation(overriddenLoc, Scope);
   }
@@ -275,6 +281,8 @@ public:
   /// If we have a SILFunction, return SILFunction::hasOwnership(). If we have a
   /// SILGlobalVariable, just return false.
   bool hasOwnership() const {
+    if (BB && BB->isDebugReconstructionBlock())
+      return false;
     if (F)
       return F->hasOwnership();
     return false;
@@ -794,7 +802,8 @@ public:
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
     ASSERT((Qualifier != LoadOwnershipQualifier::Unqualified) ||
-           !hasOwnership() && "Unqualified inst in qualified function");
+           !hasOwnership() &&
+           "Unqualified inst in qualified function");
     ASSERT((Qualifier == LoadOwnershipQualifier::Unqualified) ||
            hasOwnership() && "Qualified inst in unqualified function");
     ASSERT(isLoadableOrOpaque(LV->getType()));
@@ -1073,10 +1082,6 @@ public:
       PoisonRefs_t poisonRefs = DontPoisonRefs,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
-  DebugValueInst *createDebugValueAddr(
-      SILLocation Loc, SILValue src, SILDebugVariable Var,
-      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
-      bool trace = false);
 
   DebugStepInst *createDebugStep(SILLocation Loc) {
     return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));
@@ -1085,8 +1090,10 @@ public:
   /// Create a debug_value according to the type of \p src
   DebugValueInst *emitDebugDescription(SILLocation Loc, SILValue src,
                                        SILDebugVariable Var) {
-    if (src->getType().isAddress())
-      return createDebugValueAddr(Loc, src, Var);
+    if (src->getType().isAddress()) {
+      Var.DIExpr.prependElements(
+        {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+    }
     return createDebugValue(Loc, src, Var);
   }
 
@@ -2652,9 +2659,11 @@ public:
   //===--------------------------------------------------------------------===//
 
   IndexAddrInst *createIndexAddr(SILLocation Loc, SILValue Operand,
-                                 SILValue Index, bool needsStackProtection) {
+                                 SILValue Index, bool needsStackProtection,
+                                 bool isProjection) {
     return insert(new (getModule()) IndexAddrInst(getSILDebugLocation(Loc),
-                                    Operand, Index, needsStackProtection));
+                                    Operand, Index, needsStackProtection,
+                                    isProjection));
   }
 
   TailAddrInst *createTailAddr(SILLocation Loc, SILValue Operand,
@@ -3341,7 +3350,7 @@ private:
 #ifndef NDEBUG
     // A vector instruction can only be in a global initializer. Therefore there
     // is no point in verifying debug info or ownership.
-    if (!isa<VectorInst>(TheInst)) {
+    if (!isa<VectorInst>(TheInst) && !BB->isDebugReconstructionBlock()) {
       // If we are inserting into a specific function (rather than a block for a
       // global_addr), verify that our instruction/the associated location are in
       // sync. We don't care if an instruction is used in global_addr.

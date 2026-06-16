@@ -3,7 +3,9 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -target %target-swift-5.1-abi-triple
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -target %target-swift-5.1-abi-triple -parse-as-library
 
-// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -verify-ignore-unrelated -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
+// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-experimental-feature FlowIsolationGlobalActor -parse-as-library -emit-sil -o /dev/null -verify -verify-ignore-unrelated -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
+
+// REQUIRES: swift_feature_FlowIsolationGlobalActor
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
@@ -1896,3 +1898,27 @@ class GlobalDefaultIsolationTest {
   // expected-error@-1 {{actor-isolated default value in a global actor 'SomeGlobalActor'-isolated context}}
 }
 
+// Regression test for https://github.com/swiftlang/swift/issues/89855
+
+enum GH_89855 {
+  actor A {
+      var state = 0
+      // expected-note@-1 {{mutation of this property is only permitted within the actor}}
+
+      func f(_ b: isolated B) {
+          let bIso = {
+              _ = b
+              let bug = { [self] in
+                  // Previously this was 'self-isolated'
+                  self.state += 1 // So this was allowed
+                  // expected-error@-1 {{actor-isolated property 'state' can not be mutated from a nonisolated context}}
+                  self.preconditionIsolated() // 💥 But this crashed
+              }
+              bug()
+          }
+          bIso()
+      }
+  }
+
+  actor B {}
+}
