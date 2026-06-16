@@ -1192,8 +1192,14 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   }
   cacheEntry.set(fn, isFullyDeserialized);
 
+  // A function from a static module should not be deserialized into a dynamic
+  // module. Doing so can lead to linker errors on Windows: symbols are not
+  // exported for static modules linked into dynamic modules (#88199).
+  const bool importingFromStaticToDynamicLibrary =
+      MF->isStaticLibrary() && !SILMod.getSwiftModule()->isStaticLibrary();
+
   // Stop here if we have nothing else to do.
-  if (isEmptyFunction || declarationOnly) {
+  if (isEmptyFunction || declarationOnly || importingFromStaticToDynamicLibrary) {
     if (genericEnv)
       fn->setGenericEnvironment(genericEnv);
     return fn;
