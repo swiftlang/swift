@@ -10399,9 +10399,12 @@ const ParamDecl *swift::getParameterAt(ConcreteDeclRef declRef,
                                        unsigned index) {
   auto *source = declRef.getDecl();
   if (auto *params = source->getParameterList()) {
-    unsigned origIndex = params->getOrigParamIndex(declRef.getSubstitutions(),
-                                                   index);
-    return params->get(origIndex);
+    // `index` can be out of range, e.g. applying the closure returned by a
+    // @dynamicMemberLookup subscript with more parameters than the subscript.
+    // Those have no ParamDecl; return nullptr like the sibling overloads.
+    if (auto origIndex = params->getOrigParamIndexIfPresent(
+            declRef.getSubstitutions(), index))
+      return params->get(*origIndex);
   }
   return nullptr;
 }

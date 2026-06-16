@@ -138,6 +138,11 @@ public:
 
   unsigned getOrigParamIndex(SubstitutionMap subMap, unsigned substIndex) const;
 
+  /// Like \c getOrigParamIndex, but returns \c std::nullopt instead of aborting
+  /// when \p substIndex is out of range for this parameter list.
+  std::optional<unsigned>
+  getOrigParamIndexIfPresent(SubstitutionMap subMap, unsigned substIndex) const;
+
   /// Return the full source range of this parameter.
   SourceRange getSourceRange() const;
   SourceLoc getStartLoc() const { return getSourceRange().Start; }

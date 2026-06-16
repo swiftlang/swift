@@ -1595,9 +1595,10 @@ ParameterListInfo::ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
 
   auto subs = declRef.getSubstitutions();
   for (auto i : indices(params)) {
-    if (auto *param = subs ? getParameterAt(declRef, i) : paramList->get(i)) {
+    auto *param = subs ? getParameterAt(declRef, i)
+                       : (i < paramList->size() ? paramList->get(i) : nullptr);
+    if (param)
       setFlagsFor(param, i);
-    }
   }
 }
 

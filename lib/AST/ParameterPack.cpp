@@ -358,7 +358,8 @@ CanType TypeBase::getReducedShape() {
   return getASTContext().TheEmptyTupleType;
 }
 
-unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,
+std::optional<unsigned>
+ParameterList::getOrigParamIndexIfPresent(SubstitutionMap subMap,
                                           unsigned substIndex) const {
   unsigned remappedIndex = substIndex;
 
@@ -379,6 +380,14 @@ unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,
 
     remappedIndex -= substCount;
   }
+
+  return std::nullopt;
+}
+
+unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,
+                                          unsigned substIndex) const {
+  if (auto origIndex = getOrigParamIndexIfPresent(subMap, substIndex))
+    return *origIndex;
 
   ABORT([&](auto &out) {
     out << "Invalid substituted argument index: " << substIndex << "\n";
