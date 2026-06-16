@@ -681,7 +681,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         target.markInvalid();
         return true;
       }
-      ABORT("Cannot type-check PatternBindingDecl without closure context");
+      // Disabled for 6.4, we'll fall through and attempt to type-check.
+      // ABORT("Cannot type-check PatternBindingDecl without closure context");
     }
   }
 
