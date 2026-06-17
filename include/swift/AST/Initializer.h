@@ -109,27 +109,9 @@ public:
   /// If this initializes a single @lazy variable, return it.
   VarDecl *getInitializedLazyVar() const;
   
-  /// Check if an accessor macro potentially converts the given
-  /// `var` into a lazily computed property
-  ///
-  /// Accessor macros subsume a var initializer.
-  /// It's the macro's responsibility to re-contextualize
-  /// the initializer. However, this initializer is type-checked
-  /// in its old context _before_ the macro expands. At this point
-  /// we don't know what the macro will do.
-  /// By looking at the introduced accessor names, we make an
-  /// educated guess whether the macro will use the initializer in
-  /// a non-observing accessor where `self` is available.
-  /// If this is not the case, no problem: Type-checking would
-  /// fail in the new context with an appropriate error after the
-  /// macro is expanded.
-  ///
-  /// - returns: `true` if...
-  ///                • accessor macro attached
-  ///                • macro introduces non-observing accessor
-  ///                • macro does not introduce `init` accessor
-  ///            `false` otherwise
-  bool maybeLazilySubsumed(VarDecl *var) const;
+//  /// Check if an accessor macro converts the given
+//  /// `var` into a lazily computed property
+//  bool macroSubsumesInitializerLazily(VarDecl *var) const;
 
   /// If this initializes a single @lazy variable, lazily create a self
   /// declaration for it to refer to.

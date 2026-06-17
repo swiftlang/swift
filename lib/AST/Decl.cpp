@@ -2638,31 +2638,19 @@ VarDecl *PatternBindingInitializer::getInitializedLazyVar() const {
       if (var->getAttrs().hasAttribute<LazyAttr>())
         return var;
       
-      // Check macro if we can still pretend the var is lazy
-      if (maybeLazilySubsumed(var))
+      // Check if a macro subsumes an initializer lazily
+      bool macroSubsumesInitializerLazily = false;
+      namelookup::forEachPotentialAttachedMacro(var, MacroRole::Accessor,
+        [&](MacroDecl *macro, const MacroRoleAttr *attr) {
+        if (attr->isInitializerContextLazy()) {
+          macroSubsumesInitializerLazily = true;
+        }
+      });
+      if (macroSubsumesInitializerLazily)
         return var;
     }
   }
   return nullptr;
-}
-
-bool PatternBindingInitializer::maybeLazilySubsumed(VarDecl *var) const {
-  assert(var && "Cannot check macros of a null VarDecl");
-  bool introducesNonObservingAccessors = false;
-  bool introducesInitAccessor = false;
-  
-  namelookup::forEachPotentialAttachedMacro(var, MacroRole::Accessor,
-    [&](MacroDecl *macro, const MacroRoleAttr *attr) {
-      if (!swift::accessorMacroOnlyIntroducesObservers(macro, attr))
-        introducesNonObservingAccessors = true;
-      
-      if (swift::accessorMacroIntroducesInitAccessor(macro, attr))
-        introducesInitAccessor = true;
-  });
-  
-  // We assume the initializer will be used in the body of an
-  // init accessor if introduced by the macro.
-  return introducesNonObservingAccessors && !introducesInitAccessor;
 }
 
 unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) const {

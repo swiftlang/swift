@@ -2240,6 +2240,15 @@ getMacroIntroducedDeclNameKind(Identifier name) {
       .Default(std::nullopt);
 }
 
+static std::optional<MacroInitializerContextKind>
+getMacroInitializerContextKind(Identifier context) {
+  return llvm::StringSwitch<std::optional<MacroInitializerContextKind>>(
+             context.str())
+      .Case("lazy", MacroInitializerContextKind::Lazy)
+      .Case("eager", MacroInitializerContextKind::Eager)
+      .Default(std::nullopt);
+}
+
 /// Determine the macro role based on its name.
 std::optional<MacroRole> getMacroRole(StringRef roleName) {
   // Match the role string to the known set of roles.
@@ -2262,6 +2271,8 @@ ParserResult<MacroRoleAttr>
 Parser::parseMacroRoleAttribute(
     MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc)
 {
+  auto &e = llvm::errs();
+  e << "Parsing macro role attribute...\n";
   StringRef attrName;
   bool isAttached;
   switch (syntax) {
@@ -2288,8 +2299,10 @@ Parser::parseMacroRoleAttribute(
   bool sawRole = false;
   bool sawConformances = false;
   bool sawNames = false;
+  bool sawInitializer = false;
   SmallVector<MacroIntroducedDeclName, 2> names;
   SmallVector<Expr *, 2> conformances;
+  std::optional<MacroInitializerContextKind> initializerContext = std::nullopt;
   auto argumentsStatus = parseList(
       tok::r_paren, lParenLoc, rParenLoc,
       /*AllowSepAfterLast=*/false, diag::expected_rparen_expr_list, [&] {
@@ -2318,18 +2331,24 @@ Parser::parseMacroRoleAttribute(
         SourceLoc fieldNameLoc;
         parseOptionalArgumentLabel(fieldName, fieldNameLoc);
 
-        // If there is a field name, it better be 'names'.
-        if (!(fieldName.empty() || fieldName.is("names") ||
-              fieldName.is("conformances"))) {
-          diagnose(fieldNameLoc, diag::macro_attribute_unknown_label,
-                   isAttached, fieldName);
+        // If there is a field name, it better be one of 'names', 'conformances', or 'initializer'.
+        if (!(fieldName.empty() || fieldName.is("names")
+                                || fieldName.is("conformances")
+                                || (fieldName.is("initializer") && role == MacroRole::Accessor))) {
+          if (isAttached && role && fieldName.is("initializer")) {
+            diagnose(fieldNameLoc, diag::macro_attribute_unsupported_label,
+                     fieldName, "accessor", swift::getMacroRoleString(*role));
+          } else {
+            diagnose(fieldNameLoc, diag::macro_attribute_unknown_label,
+                     isAttached, fieldName);
+          }
           status.setIsParseError();
           return status;
         }
 
         // If there is no field name and we haven't seen either names or the
         // role, this is the role.
-        if (fieldName.empty() && !sawConformances && !sawNames && !sawRole) {
+        if (fieldName.empty() && !sawConformances && !sawNames && !sawRole && !sawInitializer) {
           // Whether we saw anything we tried to treat as a role.
           sawRole = true;
 
@@ -2349,6 +2368,8 @@ Parser::parseMacroRoleAttribute(
 
           if (!role)
             role = getMacroRole(roleName.str());
+          
+          e << "  • Role '" << roleName << "'\n";
 
           if (!role) {
             diagnose(roleNameLoc, diag::macro_role_attr_expected_kind,
@@ -2382,6 +2403,7 @@ Parser::parseMacroRoleAttribute(
                      "conformances");
           }
 
+          e << "  • Field 'conformances:'\n";
           sawConformances = true;
 
           // Parse the introduced conformances
@@ -2389,6 +2411,51 @@ Parser::parseMacroRoleAttribute(
           if (expr.isNonNull())
             conformances.push_back(expr.get());
 
+          return status;
+        }
+        
+        // Accessor macros have an optional `initializer` argument
+        // that may be either `.lazy` or `.eager`, e.g:
+        //
+        //     @attached(accessor, initializer: .lazy, names: ...)
+        if (fieldName.is("initializer")) {
+          e << "  • Field 'initializer:'\n";
+          if (fieldName.is("initializer") && sawInitializer) {
+            diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),
+                     diag::macro_attribute_duplicate_label, isAttached,
+                     "initializer");
+          }
+          
+          sawInitializer = true;
+          
+          Identifier initializerContextIdentifier;
+          SourceLoc initializerContextLoc;
+          if (consumeIf(tok::code_complete)) {
+            status.setHasCodeCompletionAndIsError();
+            if (this->CodeCompletionCallbacks) {
+              // TODO: check this and find out what it does.
+              /// I copied this from the code that parses introduced
+              /// names further down from here. Not sure if it's
+              /// correct here and if the `index`value  is still correct here
+              /// and in the original code...
+              this->CodeCompletionCallbacks->completeDeclAttrParam(
+                  getParameterizedDeclAttributeKind(isAttached), /*index*/1, /*HasLabel=*/true);
+            }
+          } else if (parseIdentifier(initializerContextIdentifier, initializerContextLoc,
+                                     diag::macro_attribute_initializer_unknown_argument, /*diagnoseDollarPrefix=*/true)) {
+            status.setIsParseError();
+            return status;
+          }
+          
+          auto initializerContextKind = getMacroInitializerContextKind(initializerContextIdentifier);
+          if (!initializerContextKind) {
+            diagnose(initializerContextLoc, diag::macro_attribute_initializer_unknown_argument);
+            status.setIsParseError();
+            return status;
+          }
+          
+          initializerContext = initializerContextKind;
+          e << "    value = '" << initializerContextIdentifier << "'\n";
           return status;
         }
 
@@ -2400,6 +2467,7 @@ Parser::parseMacroRoleAttribute(
                             : diag::macro_attribute_missing_label,
                    isAttached, "names");
         }
+        e << "  • Field 'names:'\n";
         sawNames = true;
 
         // Parse the introduced name kind.
@@ -2473,6 +2541,9 @@ Parser::parseMacroRoleAttribute(
         names.push_back(
             MacroIntroducedDeclName(*introducedKind, name.getFullName()));
 
+        e << "    names = [";
+        llvm::interleaveComma(names, e, [&](auto ty) { e << ty.getName(); });
+        e << "]\n";
         return status;
       });
 
@@ -2488,11 +2559,18 @@ Parser::parseMacroRoleAttribute(
 
     return makeParserError();
   }
+  
+  // Initializer context of accessor macros should be `eager` by default:
+  // Existing macros will behave the same as before.
+  if (role == MacroRole::Accessor && !initializerContext.has_value()) {
+    initializerContext = MacroInitializerContextKind::Eager;
+  }
 
   SourceRange range(Loc, rParenLoc);
   return makeParserResult(MacroRoleAttr::create(
-      Context, AtLoc, range, syntax, lParenLoc, *role, names,
-      conformances, rParenLoc, /*isImplicit*/ false));
+      Context, AtLoc, range, syntax, lParenLoc, *role,
+      initializerContext, names, conformances,
+      rParenLoc, /*isImplicit*/ false));
 }
 
 /// Guts of \c parseSingleAttrOption and \c parseSingleAttrOptionIdentifier.
