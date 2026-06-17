@@ -85,6 +85,11 @@ enum class MacroIntroducedDeclNameKind {
   // `getAllMacroIntroducedDeclNameKinds`.
 };
 
+enum class MacroInitializerContextKind {
+  Lazy,
+  Eager,
+};
+
 /// Returns an enumeratable list of all macro introduced decl name kinds.
 std::vector<MacroIntroducedDeclNameKind> getAllMacroIntroducedDeclNameKinds();
 
