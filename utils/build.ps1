@@ -879,6 +879,7 @@ enum Project {
   brotli
   XML2
   CURL
+  BoringSSL
 
   XCTest
   Testing
@@ -3676,6 +3677,29 @@ function Build-DS2([Hashtable] $Platform) {
     }
 }
 
+function Build-BoringSSL([Hashtable] $Platform,
+                         [Hashtable] $Assembler,
+                         [Hashtable] $CCompiler,
+                         [Hashtable] $CXXCompiler,
+                         [string]    $Phase) {
+  Build-CMakeProject `
+    -Src $SourceCache\boringssl `
+    -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Phase}BoringSSL")) `
+    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
+    -Platform $Platform `
+    -Assembler $Assembler `
+    -CCompiler $CCompiler `
+    -CXXCompiler $CXXCompiler `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      BUILD_TESTING = "NO";
+      CMAKE_POSITION_INDEPENDENT_CODE = "YES";
+      INSTALL_ENABLED = "YES";
+      OPENSSL_NO_ASM = "NO";
+      RUST_BINDINGS = "NO";
+    }
+}
+
 function Build-CURL([Hashtable] $Platform,
                     [Hashtable] $CCompiler,
                     [string]    $Phase) {
@@ -3708,17 +3732,27 @@ function Build-CURL([Hashtable] $Platform,
         "$(Get-ProjectBinaryCache $Platform ([Project]"${Phase}Brotli"))\libbrotlidec.a"
       }
       BUILD_CURL_EXE = "NO";
+      BUILD_EXAMPLES = "NO";
       BUILD_LIBCURL_DOCS = "NO";
       BUILD_MISC_DOCS = "NO";
+      BUILD_STATIC_LIBS = "YES";
+      CURL_BROTLI = "YES";
+      CURL_BUILD_EVERYTHING = "NO";
       CURL_CA_BUNDLE = "none";
+      CURL_CA_EMBED = "";
       CURL_CA_FALLBACK = "NO";
       CURL_CA_PATH = "none";
-      CURL_BROTLI = "YES";
+      CURL_CA_SEARCH_SAFE = "NO";
+      CURL_CLANG_TIDY = "NO";
+      CURL_CODE_COVERAGE = "NO";
+      CURL_DEBUG_GLOBAL_MEM = "NO";
+      CURL_DEFAULT_SSL_BACKEND = if ($Platform.OS -eq [OS]::Windows) { "schannel" } else { "openssl" };
       CURL_DISABLE_ALTSVC = "NO";
       CURL_DISABLE_AWS = "YES";
       CURL_DISABLE_BASIC_AUTH = "NO";
       CURL_DISABLE_BEARER_AUTH = "NO";
       CURL_DISABLE_BINDLOCAL = "NO";
+      CURL_DISABLE_CA_SEARCH = "YES";
       CURL_DISABLE_COOKIES = "NO";
       CURL_DISABLE_DICT = "YES";
       CURL_DISABLE_DIGEST_AUTH = "NO";
@@ -3733,6 +3767,8 @@ function Build-CURL([Hashtable] $Platform,
       CURL_DISABLE_HTTP = "NO";
       CURL_DISABLE_HTTP_AUTH = "NO";
       CURL_DISABLE_IMAP = "YES";
+      CURL_DISABLE_INSTALL = "NO";
+      CURL_DISABLE_IPFS = "YES";
       CURL_DISABLE_KERBEROS_AUTH = "NO";
       CURL_DISABLE_LDAP = "YES";
       CURL_DISABLE_LDAPS = "YES";
@@ -3740,55 +3776,76 @@ function Build-CURL([Hashtable] $Platform,
       CURL_DISABLE_MQTT = "YES";
       CURL_DISABLE_NEGOTIATE_AUTH = "NO";
       CURL_DISABLE_NETRC = "NO";
-      CURL_DISABLE_NTLM = "NO";
+      CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG = "YES";
       CURL_DISABLE_PARSEDATE = "NO";
       CURL_DISABLE_POP3 = "YES";
       CURL_DISABLE_PROGRESS_METER = "YES";
       CURL_DISABLE_PROXY = "NO";
       CURL_DISABLE_RTSP = "YES";
+      CURL_DISABLE_SHA512_256 = "NO";
       CURL_DISABLE_SHUFFLE_DNS = "YES";
-      CURL_DISABLE_SMB = "YES";
       CURL_DISABLE_SMTP = "YES";
       CURL_DISABLE_SOCKETPAIR = "YES";
       CURL_DISABLE_SRP = "NO";
       CURL_DISABLE_TELNET = "YES";
       CURL_DISABLE_TFTP = "YES";
+      CURL_DISABLE_TYPECHECK = "YES";
       CURL_DISABLE_VERBOSE_STRINGS = "NO";
+      CURL_DISABLE_WEBSOCKETS = "NO";
+      CURL_DROP_UNUSED = "YES";
+      CURL_ENABLE_EXPORT_TARGET = "YES";
+      CURL_ENABLE_NTLM = "NO";
+      CURL_ENABLE_SMB = "NO";
+      CURL_ENABLE_SSL = "YES";
+      CURL_GCC_ANALYZER = "NO";
       CURL_LTO = "NO";
-      CURL_USE_BEARSSL = "NO";
+      CURL_NATIVE_CA = "YES";
+      CURL_STATIC_CRT = "NO";
+      CURL_USE_CMAKECONFIG = "YES";
       CURL_USE_GNUTLS = "NO";
+      CURL_USE_GSASL = "NO";
       CURL_USE_GSSAPI = "NO";
+      CURL_USE_LIBBACKTRACE = "NO";
       CURL_USE_LIBPSL = "NO";
       CURL_USE_LIBSSH = "NO";
       CURL_USE_LIBSSH2 = "NO";
+      CURL_USE_LIBUV = "NO";
       CURL_USE_MBEDTLS = "NO";
-      CURL_USE_OPENSSL = "NO";
+      CURL_USE_OPENSSL = if ($Platform.OS -eq [OS]::Windows) { "NO" } else { "YES" };
+      CURL_USE_PKGCONFIG = "NO";
+      CURL_USE_RUSTLS = "NO";
       CURL_USE_SCHANNEL = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
-      CURL_USE_WOLFSSL = "NO";
       CURL_WINDOWS_SSPI = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       CURL_ZLIB = "YES";
       CURL_ZSTD = "NO";
       ENABLE_ARES = "NO";
-      ENABLE_CURLDEBUG = "NO";
       ENABLE_CURL_MANUAL = "NO";
       ENABLE_DEBUG = "NO";
       ENABLE_IPV6 = "YES";
       ENABLE_THREADED_RESOLVER = "NO";
       ENABLE_UNICODE = "YES";
       ENABLE_UNIX_SOCKETS = "NO";
-      ENABLE_WEBSOCKETS = "YES";
       HAVE_POLL_FINE = "NO";
+      OPENSSL_ROOT_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake";
+      OPENSSL_CRYPTO_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\libcrypto.a"
+      OPENSSL_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      OPENSSL_SSL_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\libssl.a"
+      OPENSSL_USE_STATIC_LIBS = "YES";
+      USE_APPLE_IDN = "NO";
+      USE_APPLE_SECTRUST = "NO";
       USE_ECH = "NO";
       USE_HTTPSRR = "NO";
       USE_IDN2 = "NO";
-      USE_MSH3 = "NO";
+      USE_IPV6 = "YES";
       USE_NGHTTP2 = "NO";
       USE_NGTCP2 = "NO";
       USE_QUICHE = "NO";
-      USE_OPENSSL_QUIC = "NO";
+      USE_OPENSSL = if ($Platform.OS -eq [OS]::Windows) { "NO" } else { "YES" };
+      USE_SSLS_EXPORT = "NO";
       USE_WIN32_IDN = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       USE_WIN32_LARGE_FILES = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       USE_WIN32_LDAP = "NO";
+      USE_WINDOWS_SSPI = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       ZLIB_ROOT = "$BinaryCache\$($Platform.Triple)\usr";
       ZLIB_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib";
     })
@@ -4063,6 +4120,9 @@ function Build-SDKDependencies([Hashtable[]] $ArchitectureSlices,
     Invoke-BuildStep Build-ZLib $Slice -CCompiler $C -Phase $Phase
     Invoke-BuildStep Build-Brotli $Slice -CCompiler $C -Phase $Phase
     Invoke-BuildStep Build-XML2 $Slice -CCompiler $C -CXXCompiler $CXX -Phase $Phase
+    if ($Slice.OS -ne [OS]::Windows) {
+      Invoke-BuildStep Build-BoringSSL $Slice -Assembler $Assemblers.Stage1 -CCompiler $C -CXXCompiler $CXX -Phase ""
+    }
     Invoke-BuildStep Build-CURL $Slice -CCompiler $C -Phase $Phase
   }
 }
