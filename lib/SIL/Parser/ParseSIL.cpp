@@ -756,6 +756,8 @@ static bool parseDeclSILOptional(
       *isThunk = IsBackDeployedThunk;
     else if (isThunk && SP.P.Tok.getText() == "distributed_thunk")
       *isThunk = IsDistributedThunk;
+    else if (isThunk && SP.P.Tok.getText() == "distributed_proxy_adapter_thunk")
+      *isThunk = IsDistributedProxyAdapterThunk;
     else if (isWithoutActuallyEscapingThunk
              && SP.P.Tok.getText() == "without_actually_escaping")
       *isWithoutActuallyEscapingThunk = true;

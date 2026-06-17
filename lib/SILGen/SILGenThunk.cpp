@@ -136,7 +136,10 @@ void SILGenModule::emitDistributedResolvableProxyAdapterThunkForDecl(
   // is a plain `nonisolated(nonsending)` function, so it is referenced by
   // an ordinary SILDeclRef (not `.asDistributed()`).
   auto ref = SILDeclRef(thunkDecl);
-  emitFunctionDefinition(ref, getFunction(ref, ForDefinition));
+  SILFunction *fn = getFunction(ref, ForDefinition);
+  // Mark the SIL function so DFE keeps it alive.
+  fn->setThunk(IsDistributedProxyAdapterThunk);
+  emitFunctionDefinition(ref, fn);
 }
 
 void SILGenModule::emitBackDeploymentThunk(SILDeclRef thunk) {

@@ -169,7 +169,7 @@ findOriginalDistributedFuncDecl(AbstractFunctionDecl *thunkOrFunc) {
 }
 
 /// Recover the user-declared distributed target's 'resolvable proxy
-/// adapter' thunk (`$__resolvableProxyAdapter_$_*`) given the regular
+/// adapter' thunk (`$distributedProxyAdapter$*`) given the regular
 /// distributed thunk decl the accessor was generated for. Returns null
 /// when the target needs no such thunk (i.e. it has no `@Resolvable`
 /// parameter or result).
@@ -436,7 +436,7 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
 
   // Pick the SIL function to dispatch through. Default = the linked thunk;
   // if the target has a `@Resolvable` 'resolvable proxy adapter' thunk
-  // (`$__resolvableProxyAdapter_$_<base>`), dispatch there instead so the
+  // (`$distributedProxyAdapter$<base>`), dispatch there instead so the
   // accessor speaks `$P` end-to-end and no IR-level existential boxing /
   // result-buffer juggling is needed. The linking identity (the symbol
   // emitted into the accessor record) stays the regular thunk's name.

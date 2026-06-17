@@ -98,7 +98,7 @@ The term "distributed thunk" generally refers specifically to the `...TE` thunk 
 | **distributed thunk** | `...TE` | Caller side; invoke `remoteCall()` when the actor referenced is remote | always (for every distributed target) | "if remote, encode and `system.remoteCall(...)`; else `try await self.<orig>(...)`". This is what user code, witness tables, and protocol dispatch resolve to when calling a `distributed` member. |
 | **distributed-target accessor** | `...TETF` | Recipient side; one per `distributed func`/`var`; IR-only (built by `IRGenModule::emitDistributedTargetAccessor`, no SIL) | always paired with a regular distributed thunk | Exposed to the runtime via `forDistributedTargetAccessor` / accessible-function record. Decodes wire arguments via the system's `decodeNextArgument`, then calls a SIL function (the regular thunk by default, or the resolvable-proxy-adapter thunk when one exists). |
 | **distributed-thunk witness** | `...TWTE` | Caller side; per protocol-conformance witness for a `distributed func` requirement | always (one per witness) | Forwards from the protocol-witness signature to the implementation's distributed thunk. |
-| **resolvable proxy adapter thunk** | `$__resolvableProxyAdapter_$_<base>` (plain old function) | Recipient side; synthesized in AST | only when the target has at least one `any P` / `some P` parameter or result for a `@Resolvable protocol` `P` | Bridges between the wire-level proxy stub `$P` and the user-declared `any P` / `some P`. Body forwards to the user func; for `any P` results, re-wraps via `$P.resolve(id: __result.id, using: self.actorSystem)`. |
+| **resolvable proxy adapter thunk** | `$distributedProxyAdapter$<base>` (plain old function) | Recipient side; synthesized in AST | only when the target has at least one `any P` / `some P` parameter or result for a `@Resolvable protocol` `P` | Bridges between the wire-level proxy stub `$P` and the user-declared `any P` / `some P`. Body forwards to the user func; for `any P` results, re-wraps via `$P.resolve(id: __result.id, using: self.actorSystem)`. |
 
 Wire identity vs. dispatch: the accessor's *symbol* (the one a remote peer's `remoteCall` looks up by mangled name) is always the regular distributed thunk's identity. Whether the accessor body internally calls the regular thunk or the resolvable-proxy-adapter thunk is decided in `IRGenModule::emitDistributedTargetAccessor` and passed through as `dispatchTo`; it is invisible to peers and does not affect the accessor record.
 
@@ -184,7 +184,7 @@ In pseudo-Swift, it would look something like this:
 
 #### Resolvable proxy adapter thunk
 
-**Mangling:** No special mangling, but a special name prefix: `$__resolvableProxyAdapter_$_<base>` as the method is synthesized in Sema/AST.
+**Mangling:** No special mangling, but a special name prefix: `$distributedProxyAdapter$<base>` as the method is synthesized in Sema/AST.
 
 **Synthesis:** AST, `lib/Sema/CodeSynthesisDistributedActor.cpp`. `createDistributedResolvableProxyAdapterThunkDecl()` builds the `FuncDecl`, `deriveBodyDistributed_resolvableProxyAdapterThunk()` synthesizes its body. Triggered lazily through `GetDistributedRecipientResolvableProxyAdapterThunkRequest`, which only returns a non-null thunk when the target has at least one `@Resolvable` `any P` / `some P` parameter or result. SILGen emits it via `SILGenModule::emitDistributedResolvableProxyAdapterThunkForDecl`.
 
@@ -199,7 +199,7 @@ distributed func echoActor(
 The synthesized thunk would be:
 
 ```swift
-func $__resolvableProxyAdapter_$_echoActor(
+func $distributedProxyAdapter$echoActor(
     _ g: $Greeter
 ) async throws -> $Greeter {
   // === Parameter case
@@ -414,7 +414,7 @@ And the recipient side, after the process boundary, decodes the call:
                        ▼
            ┌─────────────────────────────────────────────────┐
            │ resolvable proxy adapter thunk                  │
-           │ ($__resolvableProxyAdapter_$_sendAnyGreeter)   │
+           │ ($distributedProxyAdapter$sendAnyGreeter)       │
            │ // signature: ($Greeter) async throws -> S      │ ! Signature has any/some Greeter 
            │                                                 │   swapped for wire layer '$Greeter'
            │                                                 │ 

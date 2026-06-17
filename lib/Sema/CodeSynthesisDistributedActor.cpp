@@ -898,9 +898,9 @@ createDistributedResolvableProxyAdapterThunkDecl(DeclContext *DC,
 
   // Synthesize a distinct, stable name so this helper neither collides with
   // the regular distributed thunk nor goes through the distributed-thunk
-  // mangling path. Follow the compiler-synthesized-name convention used by
-  // e.g. `$__lazy_storage_$_<name>`: `$__resolvableProxyAdapter_$_<base>`.
-  // For a computed property the base is the storage (var) name.
+  // mangling path. The `$` prefix and infix make it unspellable from
+  // user code: `$distributedProxyAdapter$<base>`. For a computed property
+  // the base is the storage (var) name.
   Identifier baseIdent;
   if (auto *accessor = dyn_cast<AccessorDecl>(func))
     baseIdent = accessor->getStorage()->getBaseIdentifier();
@@ -908,7 +908,7 @@ createDistributedResolvableProxyAdapterThunkDecl(DeclContext *DC,
     baseIdent = func->getBaseIdentifier();
 
   SmallString<64> nameBuf;
-  nameBuf += "$__resolvableProxyAdapter_$_";
+  nameBuf += "$distributedProxyAdapter$";
   nameBuf += baseIdent.str();
   DeclName thunkName(C, C.getIdentifier(nameBuf),
                      func->getName().getArgumentNames());
