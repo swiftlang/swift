@@ -3319,6 +3319,14 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
         # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
         LLDB_TEST_USER_ARGS = "--skip-category=watchpoint;--sysroot=$SwiftSDK";
         LLDB_TEST_SWIFT_DRIVER_EXTRA_FLAGS = "-sdk '$SwiftSDK'"
+        # On Windows-staged, the Swift runtime DLLs (swiftCore, Foundation,
+        # FoundationEssentials, ...) live at <InstallDir>\Runtimes\<Version>\
+        # usr\bin, not under the SDK's usr\bin. Without this, lldb's
+        # lit.cfg.py falls back to deriving <sysroot>\usr\bin from the
+        # --sysroot above, which is empty post-bootstrap; the test
+        # inferior then can't find the Swift runtime at launch and dies
+        # with STATUS_DLL_NOT_FOUND. Point lit at the actual location.
+        LLDB_TEST_INFERIOR_RUNTIME_BIN = "$SwiftRuntime";
         # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
         LLVM_LIT_ARGS = "-v --no-gtest-sharding --time-tests";
         # LLDB Unit tests link against this library
