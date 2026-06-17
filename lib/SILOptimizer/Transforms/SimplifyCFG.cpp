@@ -3189,10 +3189,12 @@ bool ArgumentSplitter::createNewArguments() {
   // and have them point directly at the argument.
   simplifyUsers(Agg);
 
-  // If we only had such users of Agg and Agg is dead now (ignoring debug
-  // instructions), remove it.
-  if (onlyHaveDebugUses(Agg))
+  // If we only had such users of Agg and Agg is dead now, rewrite debug values
+  // and remove it.
+  if (onlyHaveDebugUses(Agg)) {
+    salvageDebugInfo(Agg);
     eraseFromParentWithDebugInsts(Agg);
+  }
 
   return true;
 }
