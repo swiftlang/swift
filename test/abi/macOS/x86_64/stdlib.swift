@@ -1303,3 +1303,27 @@ Added: _$ss9UniqueBoxVMn
 // UniqueBox.pointer getter
 Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
 
+// _RigidArray
+Added: _$ss11_RigidArrayVMa
+Added: _$ss11_RigidArrayVMn
+Added: _$ss11_RigidArrayVsRi_zrlE6_countSivM
+Added: _$ss11_RigidArrayVsRi_zrlE6_countSivg
+Added: _$ss11_RigidArrayVsRi_zrlE6_countSivs
+Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvM
+Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvg
+Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvs
+Added: _$ss11_RigidArrayVsSHRzRi_zrlE9hashValueSivg
+Added: _$ss11_RigidArrayVyxGSHsSHRzRi_zrlMc
+Added: _$ss11_RigidArrayVyxGSQsSQRzRi_zrlMc
+
+// UniqueArray
+Added: _$ss11UniqueArrayVMa
+Added: _$ss11UniqueArrayVMn
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages06_RigidB0VyxGvM
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages06_RigidB0VyxGvr
+Added: _$ss11UniqueArrayVsRi_zrlE8_storages06_RigidB0VyxGvs
+Added: _$ss11UniqueArrayVsSHRzRi_zrlE9hashValueSivg
+Added: _$ss11UniqueArrayVyxGSHsSHRzRi_zrlMc
+Added: _$ss11UniqueArrayVyxGSQsSQRzRi_zrlMc
+Added: _$ss11UniqueArrayVsRi_zrlE11descriptionSSvg
+Added: _$ss11UniqueArrayVsRi_zrlE16debugDescriptionSSvg
