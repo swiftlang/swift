@@ -27,6 +27,26 @@ struct StrongsInAStructArc {
 void takeStrongArcStruct(struct StrongsInAStructArc s);
 struct StrongsInAStructArc returnStrongArcStruct(void);
 
+struct WeaksInAStructArc {
+  __weak MYObject *_Nullable myobj;
+};
+
+struct WeakAndNonnull {
+  __weak MYObject *_Nonnull myobj;
+};
+
+struct ConstWeakInAStruct {
+  __weak MYObject *_Nullable const myobj;
+};
+
+struct MixedStrongWeakArc {
+  __strong MYObject *_Nonnull strong;
+  __weak MYObject *_Nullable weak;
+  int tag;
+};
+
+void takeMixedArcStruct(struct MixedStrongWeakArc s);
+
 struct UnavailableArcStruct {
   __strong MYObject *_Nonnull myobj;
 } NS_SWIFT_UNAVAILABLE("Use MySwiftType instead");
@@ -44,12 +64,12 @@ struct OuterArcStruct {
   int tag;
 };
 
-// Struct with __weak fields should not be imported.
+// Struct with __weak fields should be imported with the feature enabled.
 struct WeakInAStructArc {
   __weak MYObject *_Nullable weakobj;
 };
 
-// Struct nesting a __weak field should not be imported.
+// Struct nesting a __weak field should also be imported.
 struct OuterWithWeakInner {
   struct WeakInAStructArc nested;
 };

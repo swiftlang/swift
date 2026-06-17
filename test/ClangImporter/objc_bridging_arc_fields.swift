@@ -15,11 +15,57 @@ import objc_structs
 // CHECK-IDE-TEST: func takeStrongArcStruct(_ s: StrongsInAStructArc)
 // CHECK-IDE-TEST: func returnStrongArcStruct() -> StrongsInAStructArc
 
+// CHECK-IDE-TEST: struct WeaksInAStructArc {
+// CHECK-IDE-TEST:   init()
+// CHECK-IDE-TEST:   init(myobj: MYObject?)
+// CHECK-IDE-TEST:   weak var myobj: @sil_weak MYObject?
+// CHECK-IDE-TEST: }
+
+// WeakAndNonnull should not be imported at all because its only field is
+// __weak + _Nonnull, which can't be represented in Swift, and partial import
+// would produce an incorrect layout.
+// CHECK-IDE-TEST-NOT: struct WeakAndNonnull
+
+// A const __weak field imports as weak var with a private setter.
+// CHECK-IDE-TEST: struct ConstWeakInAStruct {
+// CHECK-IDE-TEST:   init()
+// CHECK-IDE-TEST:   init(myobj: MYObject?)
+// CHECK-IDE-TEST:   weak var myobj: @sil_weak MYObject? { get }
+// CHECK-IDE-TEST: }
+
 // Structs with non-trivial copy/destroy should be imported when the flag is on.
-func testStrongStructImport() -> StrongsInAStructArc {
-  let anObject = MYObject()
-  let aStrongInAStruct = StrongsInAStructArc(myobj: anObject)
-  return aStrongInAStruct
+func objcStructsWithArcPointers(
+  withWeaks weaks: WeaksInAStructArc,
+  strongs: StrongsInAStructArc
+) -> StrongsInAStructArc {
+  let anObject: MYObject = weaks.myobj ?? MYObject()
+  _ = WeaksInAStructArc(myobj: anObject)
+  return StrongsInAStructArc(myobj: anObject)
+}
+
+func objcStructWithWeakNonnullIsNotImported() {
+  _ = WeakAndNonnull() // expected-error {{cannot find 'WeakAndNonnull' in scope}}
+}
+
+func constWeakIsReadOnly(_ s: ConstWeakInAStruct) {
+  let _: MYObject? = s.myobj
+}
+
+// Mixed strong + weak + trivial fields in one struct.
+// CHECK-IDE-TEST: struct MixedStrongWeakArc {
+// CHECK-IDE-TEST:   init(strong: MYObject, weak: MYObject?, tag: CInt)
+// CHECK-IDE-TEST:   var strong: MYObject
+// CHECK-IDE-TEST:   weak var weak: @sil_weak MYObject?
+// CHECK-IDE-TEST:   var tag: CInt
+// CHECK-IDE-TEST: }
+// CHECK-IDE-TEST: func takeMixedArcStruct(_ s: MixedStrongWeakArc)
+
+func mixedStructFieldAccess(_ s: MixedStrongWeakArc) -> (MYObject, MYObject?, Int32) {
+  return (s.strong, s.weak, s.tag)
+}
+
+func mixedStructConstruction() -> MixedStrongWeakArc {
+  return MixedStrongWeakArc(strong: MYObject(), weak: MYObject(), tag: 42)
 }
 
 // An ARC struct marked NS_SWIFT_UNAVAILABLE is still imported but cannot be used.
@@ -52,6 +98,11 @@ func receiveStrongStructFromCFunction() {
   let _: MYObject = s.myobj
 }
 
+func passMixedStructToCFunction() {
+  let s = MixedStrongWeakArc(strong: MYObject(), weak: MYObject(), tag: 7)
+  takeMixedArcStruct(s)
+}
+
 // Nested structs with strong ARC fields should be imported.
 // CHECK-IDE-TEST: struct OuterArcStruct {
 // CHECK-IDE-TEST:   init()
@@ -65,14 +116,20 @@ func testNestedArcStructImport() {
   let _: MYObject = outer.nested.inner
 }
 
-// Structs with __weak fields should not be imported even with the flag.
-func weakArcStructIsRejected() {
-  _ = WeakInAStructArc() // expected-error {{cannot find 'WeakInAStructArc' in scope}}
-}
-
-// Structs nesting a __weak field should not be imported.
-func outerWithWeakInnerIsRejected() {
-  _ = OuterWithWeakInner() // expected-error {{cannot find 'OuterWithWeakInner' in scope}}
+// Nested structs with weak ARC fields should also be imported.
+// CHECK-IDE-TEST: struct WeakInAStructArc {
+// CHECK-IDE-TEST:   init()
+// CHECK-IDE-TEST:   init(weakobj: MYObject?)
+// CHECK-IDE-TEST:   weak var weakobj: @sil_weak MYObject?
+// CHECK-IDE-TEST: }
+// CHECK-IDE-TEST: struct OuterWithWeakInner {
+// CHECK-IDE-TEST:   init()
+// CHECK-IDE-TEST:   init(nested: WeakInAStructArc)
+// CHECK-IDE-TEST:   var nested: WeakInAStructArc
+// CHECK-IDE-TEST: }
+func testNestedWeakArcStructImport() {
+  let inner = WeakInAStructArc(weakobj: MYObject())
+  _ = OuterWithWeakInner(nested: inner)
 }
 
 // Union with strong ARC fields should not be imported.
