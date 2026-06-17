@@ -19,7 +19,7 @@ func mutexWord(
 @_cdecl("_swift_mutex_init")
 public func test_swift_mutex_init(
   _ mutex: UnsafeMutableRawPointer,
-  _ checked: CInt
+  _ checked: Int
 ) {
   print("mutex.init")
   if checked != 0 {
@@ -62,7 +62,7 @@ public func test_swift_mutex_unlock(
 @_cdecl("_swift_mutex_tryLock")
 public func test_swift_mutex_tryLock(
   _ mutex: UnsafeMutableRawPointer
-) -> CInt {
+) -> Int {
   print("mutex.tryLock")
   if mutexWord(mutex).pointee != 0x51 {
     print("unexpected tryLock handle")

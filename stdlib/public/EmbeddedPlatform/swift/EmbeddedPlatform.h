@@ -309,7 +309,8 @@ void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
  *
  * This function is required when using Synchronization.Mutex.
  */
-void _swift_mutex_init(void * EMBEDDED_SWIFT_NONNULL mutex, int checked);
+void _swift_mutex_init(void * EMBEDDED_SWIFT_NONNULL mutex,
+                       __swift_ptrdiff_t checked);
 
 /**
  * Destroys a mutex initialized by `_swift_mutex_init`.
@@ -332,7 +333,7 @@ void _swift_mutex_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
  *
  * Returns nonzero if the mutex was acquired, or zero if it was not acquired.
  */
-int _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
+__swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
 
 /**
  * Exit the program.
