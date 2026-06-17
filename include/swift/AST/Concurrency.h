@@ -19,8 +19,11 @@
 
 namespace swift {
 
-/// Find the imported module that treats the given nominal type as "preconcurrency", or return `nullptr`
-/// if there is no such module.
+/// Find the imported module that treats the given nominal type as
+/// "preconcurrency", or return `nullptr` if there is no such module.
+///
+/// Does not reflect whether the nominal is from Clang or has `@preconcurrency`;
+/// use `Decl::preconcurrency()` for that.
 ModuleDecl *moduleImportForPreconcurrency(NominalTypeDecl *nominal,
                                           const DeclContext *fromDC);
 
