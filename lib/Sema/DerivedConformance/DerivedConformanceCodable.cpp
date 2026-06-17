@@ -170,6 +170,11 @@ addImplicitCodingKeys(NominalTypeDecl *target,
     auto *super = new (C) EnumElementDecl(anchorLoc, C.Id_super, nullptr,
                                           SourceLoc(), nullptr, enumDecl);
     super->setImplicit();
+
+    auto *caseDecl = EnumCaseDecl::create(anchorLoc, {super}, enumDecl);
+    caseDecl->setImplicit();
+
+    enumDecl->addMember(caseDecl);
     enumDecl->addMember(super);
   }
 
