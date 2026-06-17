@@ -969,6 +969,20 @@ bb0(%0 : $*MyBufferView<T>):
   return %t : $()
 }
 
+// The inner mark of of two stacked `[no_consume_or_assign]` marks must be 
+// recognized as initialized when the outer mark is.
+//
+// CHECK-LABEL: sil hidden [ossa] @test_stacked_no_consume_or_assign_inherits_parent_init :
+// CHECK:       bb0({{%[^,]+}} : $*NonTrivialStruct):
+// CHECK-LABEL: } // end sil function 'test_stacked_no_consume_or_assign_inherits_parent_init'
+sil hidden [ossa] @test_stacked_no_consume_or_assign_inherits_parent_init : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %outer = mark_unresolved_non_copyable_value [no_consume_or_assign] %0 : $*NonTrivialStruct
+  %inner = mark_unresolved_non_copyable_value [no_consume_or_assign] %outer : $*NonTrivialStruct
+  %t = tuple ()
+  return %t : $()
+}
+
 public struct ContainerC {
   var a: CopyableKlass
   var b: CopyableKlass

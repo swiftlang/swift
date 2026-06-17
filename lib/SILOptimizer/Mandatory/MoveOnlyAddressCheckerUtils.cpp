@@ -1222,8 +1222,13 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
                  << "Adding stacked mark over init-permitting parent as "
                     "init!\n");
       return true;
-    case MarkUnresolvedNonCopyableValueInst::CheckKind::Invalid:
     case MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign:
+      // A read-only parent doesn't itself perform init, so the inner mark is
+      // initialized iff the parent is. This shape arises under opaque values
+      // when address lowering elides a `store_borrow` between two stacked
+      // `[no_consume_or_assign]` marks.
+      return addressBeginsInitialized(parentMark);
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::Invalid:
     case MarkUnresolvedNonCopyableValueInst::CheckKind::
         AssignableButNotConsumable:
       break;
