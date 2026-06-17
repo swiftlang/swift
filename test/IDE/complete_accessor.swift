@@ -124,3 +124,14 @@ extension UNKNOWN_TYPE {
     #^UNKNOWN_EXT_SUBSCRIPT_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
 }
+
+var incompleteAccessor1: Int {
+  @#^INCOMPLETE_ACCESSOR_ATTR1^#
+  // INCOMPLETE_ACCESSOR_ATTR1: Keyword/None: storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
+}
+
+var incompleteAccessor2: Int {
+  set {}
+  @#^INCOMPLETE_ACCESSOR_ATTR2^#
+  // INCOMPLETE_ACCESSOR_ATTR2: Keyword/None: storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
+}
