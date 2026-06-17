@@ -50,6 +50,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:module-self-import>
 - <doc:oslog>
 - <doc:option-obsoleted-by-module-selectors>
+- <doc:unstable-global-actor-shared>
 - <doc:public-import-of-project-internal-module>
 - <doc:result-builder-methods>
 - <doc:spi-import-ignored>
@@ -108,6 +109,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:option-obsoleted-by-module-selectors>
 - <doc:exclusivity-violation>
 - <doc:performance-hints>
+- <doc:unstable-global-actor-shared>
 - <doc:property-wrapper-requirements>
 - <doc:conformance-isolation>
 - <doc:protocol-type-non-conformance>
