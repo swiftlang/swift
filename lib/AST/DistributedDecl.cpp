@@ -1573,14 +1573,15 @@ AbstractFunctionDecl::getDistributedThunk() const {
       nullptr);
 }
 
-FuncDecl *AbstractStorageDecl::getDistributedResolvableProxyAdapterThunk() const {
+FuncDecl *
+AbstractStorageDecl::getDistributedResolvableProxyAdapterThunk() const {
   if (!isDistributed())
     return nullptr;
 
   auto mutableThis = const_cast<AbstractStorageDecl *>(this);
   return evaluateOrDefault(
       getASTContext().evaluator,
-      GetDistributedResolvableProxyAdapterThunkRequest{mutableThis}, nullptr);
+      GetDistributedRecipientResolvableProxyAdapterThunkRequest{mutableThis}, nullptr);
 }
 
 FuncDecl *
@@ -1598,7 +1599,7 @@ AbstractFunctionDecl::getDistributedResolvableProxyAdapterThunk() const {
 
   return evaluateOrDefault(
       getASTContext().evaluator,
-      GetDistributedResolvableProxyAdapterThunkRequest{mutableThis},
+      GetDistributedRecipientResolvableProxyAdapterThunkRequest{mutableThis},
       nullptr);
 }
 

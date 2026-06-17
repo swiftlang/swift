@@ -1549,6 +1549,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 
   emitDistributedThunkForDecl(AFD);
+
   // If \p AFD has an `any P` / `some P` `@Resolvable protocol` parameter
   // or result, also emit the recipient-side thunk that adapts between the
   // wire-level proxy stub `$P` and the user-facing `any P` / `some P`

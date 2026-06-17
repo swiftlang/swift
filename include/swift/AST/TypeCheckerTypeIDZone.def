@@ -151,7 +151,7 @@ SWIFT_REQUEST(TypeChecker, GetDistributedTargetInvocationResultHandlerOnReturnFu
 SWIFT_REQUEST(TypeChecker, GetDistributedThunkRequest,
               FuncDecl *(llvm::PointerUnion<AbstractStorageDecl *, AbstractFunctionDecl *>),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, GetDistributedResolvableProxyAdapterThunkRequest,
+SWIFT_REQUEST(TypeChecker, GetDistributedRecipientResolvableProxyAdapterThunkRequest,
               FuncDecl *(llvm::PointerUnion<AbstractStorageDecl *, AbstractFunctionDecl *>),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorIDPropertyRequest,

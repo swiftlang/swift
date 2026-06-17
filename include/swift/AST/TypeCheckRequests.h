@@ -1574,8 +1574,8 @@ public:
 /// types the distributed function expects (an implicit existential
 /// erasure), invokes the function, and re-resolves the result back into
 /// the proxy type so it can be returned over the wire.
-class GetDistributedResolvableProxyAdapterThunkRequest
-    : public SimpleRequest<GetDistributedResolvableProxyAdapterThunkRequest,
+class GetDistributedRecipientResolvableProxyAdapterThunkRequest
+    : public SimpleRequest<GetDistributedRecipientResolvableProxyAdapterThunkRequest,
                            FuncDecl *(
                                llvm::PointerUnion<AbstractStorageDecl *,
                                                   AbstractFunctionDecl *>),

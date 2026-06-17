@@ -67,10 +67,10 @@ static Type getDistributedResolvableProtocolStubType(Type ty) {
 
 /// Build `try $P.resolve(id: <idExpr>, using: <systemExpr>)`.
 static Expr *createDistributedResolveCall(ASTContext &C,
-                                          Type stubInterfaceTy,
+                                          Type actorTy,
                                           Expr *idExpr,
                                           Expr *systemExpr) {
-  auto *stubTypeExpr = TypeExpr::createImplicit(stubInterfaceTy, C);
+  auto *stubTypeExpr = TypeExpr::createImplicit(actorTy, C);
   DeclName resolveName(C, C.getIdentifier("resolve"),
                        {C.Id_id, C.getIdentifier("using")});
   auto *resolveExpr =
@@ -1162,7 +1162,7 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
 }
 
 FuncDecl *
-GetDistributedResolvableProxyAdapterThunkRequest::evaluate(
+GetDistributedRecipientResolvableProxyAdapterThunkRequest::evaluate(
     Evaluator &evaluator, Originator originator) const {
   AbstractFunctionDecl *distributedTarget = nullptr;
   if (auto *storage = originator.dyn_cast<AbstractStorageDecl *>()) {
@@ -1210,8 +1210,7 @@ GetDistributedResolvableProxyAdapterThunkRequest::evaluate(
 
     // The resolvable proxy adapter thunk is only needed when a parameter or
     // the result is `@Resolvable` `any P` / `some P` and so must be adapted
-    // to / from the proxy stub `$P`. Otherwise the regular distributed
-    // thunk and accessor handle the call directly.
+    // to / from the proxy stub `$P`. Otherwise, the call is made directly.
     if (!distributedTargetNeedsResolvableProxyAdapterThunk(func))
       return nullptr;
 

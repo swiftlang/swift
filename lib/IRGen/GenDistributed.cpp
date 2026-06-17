@@ -20,7 +20,6 @@
 #include "CallEmission.h"
 #include "Callee.h"
 #include "ClassTypeInfo.h"
-#include "ExtraInhabitants.h"
 #include "GenCall.h"
 #include "GenClass.h"
 #include "GenDecl.h"
@@ -41,8 +40,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/ProtocolConformanceRef.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunction.h"
 #include "llvm/IR/DataLayout.h"
@@ -140,20 +137,14 @@ struct ArgumentDecoderInfo {
 
 /// Get the user-declared `distributed func` (or computed-property accessor)
 /// given an arbitrary `AbstractFunctionDecl`. The caller may already hold
-/// the original decl, the synthesized regular distributed thunk, or an
-/// `AccessorDecl` of a distributed property; this helper normalizes all
-/// three to the original distributed declaration.
+/// the original decl, a synthesized 'distributed thunk', or an
+/// `AccessorDecl` of a distributed property; this helper handles returns the
+/// original distributed declaration any of these are attached to.
 ///
 /// Cases:
-///   1. Accessor of a distributed property -- return the accessor itself
-///      (the original "distributed func" view of the property's getter);
-///      `nullptr` if the storage is not distributed.
-///   2. Already the original `distributed func` (not a thunk) -- return it
-///      as-is; `nullptr` if the decl isn't actually distributed.
-///   3. The synthesized regular distributed thunk -- walk back to the
-///      original via name+identity match in the enclosing nominal:
-///      `original->getDistributedThunk() == thunkOrFunc`. `nullptr` if
-///      no matching original is found (shouldn't happen for valid input).
+///   1. Accessor of a `distributed var` computed property - return it,
+///   2. Already the original `distributed func` (not a thunk) - return it,
+///   3. The synthesized 'distributed thunk' - find the original `distributed func`.
 static AbstractFunctionDecl *
 findOriginalDistributedFuncDecl(AbstractFunctionDecl *thunkOrFunc) {
   // Case 1: distributed-property accessor.
@@ -536,14 +527,15 @@ void DistributedAccessor::decodeArguments(const ArgumentDecoderInfo &decoder,
     // === @Resolvable protocol param: override runtime-loaded metadata
     // The wire decoder is invoked with `argumentTy` taken from the runtime's
     // argument-types buffer, which `__getParameterTypeInfo` populates by
-    // demangling the regular distributed thunk's mangled name. That mangling
-    // still names `any P` / `some P`, neither of which conforms to Codable.
+    // demangling the regular distributed thunk's mangled name.
     //
-    // The caller-side thunk records the argument as the proxy stub `$P`
-    // (see `deriveBodyDistributed_thunk` in CodeSynthesisDistributedActor.cpp),
-    // so the value on the wire really is a `$P`. Substitute the wire-supplied
-    // metadata with a compile-time reference to `$P` so `decodeNextArgument<$P>`
-    // sees a Codable-conforming type.
+    // That mangling still names `any P` / `some P`, neither of which can conform
+    // to the SerializationRequirement protocol (e.g. Codable).
+    //
+    // We know the caller erased the encoded value to an `$P` for wire transmission.
+    // Therefore, we need to substitute the type with the proxy type `$P`,
+    // so that the user implemented `decodeNextArgument<$P>` receives
+    // a SerializationRequirement-conforming type (and e.g. can `Decodable::init(from:)` decode it).
     if (auto *thunk = Target.getThunk()) {
       if (auto *funcDecl = findOriginalDistributedFuncDecl(
               thunk->getDeclRef().getAbstractFunctionDecl())) {
