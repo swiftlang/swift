@@ -570,6 +570,9 @@ extension PrefixSequence.Iterator: IteratorProtocol {
 
 extension PrefixSequence: Sequence {
   @inlinable
+  public var underestimatedCount: Int { Swift.min(_maxLength, _base.underestimatedCount) }
+
+  @inlinable
   public __consuming func makeIterator() -> Iterator {
     return Iterator(_base.makeIterator(), maxLength: _maxLength)
   }
