@@ -1777,11 +1777,10 @@ static ImportedType adjustTypeForConcreteImport(
           importedType = getUnmanagedType(impl, importedType);
         }
         break;
-      // FIXME: Eventually we might get C++-like support for strong pointers in
-      // structs, at which point we should really be checking the lifetime
-      // qualifiers.
       case clang::Qualifiers::OCL_Strong:
-        if (!impl.SwiftContext.LangOpts.EnableCXXInterop) {
+        if (!impl.SwiftContext.LangOpts.EnableCXXInterop &&
+            !impl.SwiftContext.LangOpts.hasFeature(
+                Feature::ImportCStructsWithArcFields)) {
           return {Type(), false};
         }
         break;
