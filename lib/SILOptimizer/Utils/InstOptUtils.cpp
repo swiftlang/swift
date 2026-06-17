@@ -2023,6 +2023,16 @@ static void salvageBinaryInst(SingleValueInstruction *SVI) {
   }
 }
 
+/// Salvage debug info for identity-like instructions (copy_value, move_value).
+/// Just repoints debug uses to the operand.
+static void salvageIdentityInst(SingleValueInstruction *SVI) {
+  SmallVector<Operand *, 4> debugUses(getDebugUses(SVI));
+  for (Operand *U : debugUses) {
+    auto *DbgInst = cast<DebugValueInst>(U->getUser());
+    DbgInst->setOperand(SVI->getOperand(0));
+  }
+}
+
 /// Salvage debug info for destructure_struct / destructure_tuple instructions.
 ///
 /// These are multi-value instructions. For each result that has debug uses,
@@ -2311,6 +2321,9 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 
   if (isa<IndexAddrInst>(I) || isa<IndexRawPointerInst>(I))
     salvageBinaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<CopyValueInst>(I) || isa<MoveValueInst>(I))
+    salvageIdentityInst(cast<SingleValueInstruction>(I));
 }
 
 void swift::salvageLoadDebugInfo(LoadOperation load) {
