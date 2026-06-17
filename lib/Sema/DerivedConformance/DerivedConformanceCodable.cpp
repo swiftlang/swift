@@ -177,9 +177,13 @@ addImplicitCodingKeys(NominalTypeDecl *target,
     auto *elt = new (C) EnumElementDecl(anchorLoc, caseIdentifier, nullptr,
                                         SourceLoc(), nullptr, enumDecl);
     elt->setImplicit();
+
+    auto *caseDecl = EnumCaseDecl::create(anchorLoc, {elt}, enumDecl);
+    caseDecl->setImplicit();
+
+    enumDecl->addMember(caseDecl);
     enumDecl->addMember(elt);
   }
-
   // Forcibly derive conformance to CodingKey.
   TypeChecker::checkConformancesInContext(enumDecl);
 
