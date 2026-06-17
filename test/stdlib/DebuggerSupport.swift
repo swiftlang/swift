@@ -25,6 +25,10 @@ class ClassWithMembers {
   var b = "Hello World"
 }
 
+class ClassWithDescription: CustomStringConvertible {
+  var description: String { "custom description" }
+}
+
 class ClassWithMirror: CustomReflectable {
   var customMirror: Mirror {
     return Mirror(self, children: ["a" : 1, "b" : "Hello World"])
@@ -176,6 +180,16 @@ if #available(SwiftStdlib 6.3, *) {
         }
       } else {
         expectTrue(false)
+      }
+    }
+
+    do {
+      let obj = ClassWithDescription()
+      withExtendedLifetime(obj) { obj in
+        let pointer = unsafeBitCast(obj, to: UnsafeRawPointer.self)
+        let (success, printed) = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: "s9AnyObjectaD")
+        expectTrue(success)
+        expectEqual(printed, "custom description\n")
       }
     }
   }
