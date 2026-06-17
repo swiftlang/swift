@@ -288,6 +288,24 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_protocol_conformance_descriptor \
   __ptrauth(ptrauth_key_process_independent_data, 1, \
             SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor)
+#define __ptrauth_swift_value_witness_table_pointer \
+  __ptrauth(ptrauth_key_process_independent_data, 1, \
+            SpecialPointerAuthDiscriminators::ValueWitnessTable)
+#define __ptrauth_swift_protocol_witness_table_pointer \
+  __ptrauth(ptrauth_key_process_independent_data, 1, \
+            SpecialPointerAuthDiscriminators::ProtocolWitnessTable)
+// The individual pointer fields of a conformance cache entry's extended
+// storage. These live in process-local heap, so they use the process-dependent
+// data key, address-discriminated against their own slot.
+#define __ptrauth_swift_conformance_cache_storage_protocol \
+  __ptrauth(ptrauth_key_process_dependent_data, 1, \
+            SpecialPointerAuthDiscriminators::ConformanceCacheStorageProtocol)
+#define __ptrauth_swift_conformance_cache_storage_global_actor_type \
+  __ptrauth(ptrauth_key_process_dependent_data, 1, \
+            SpecialPointerAuthDiscriminators::ConformanceCacheStorageGlobalActorType)
+#define __ptrauth_swift_conformance_cache_storage_next \
+  __ptrauth(ptrauth_key_process_dependent_data, 1, \
+            SpecialPointerAuthDiscriminators::ConformanceCacheStorageNext)
 #define __ptrauth_swift_dynamic_replacement_key                                \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::DynamicReplacementKey)
@@ -373,6 +391,11 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_class_method_pointer(__declkey)
 #define __ptrauth_swift_protocol_witness_function_pointer(__declkey)
 #define __ptrauth_swift_value_witness_function_pointer(__key)
+#define __ptrauth_swift_value_witness_table_pointer
+#define __ptrauth_swift_protocol_witness_table_pointer
+#define __ptrauth_swift_conformance_cache_storage_protocol
+#define __ptrauth_swift_conformance_cache_storage_global_actor_type
+#define __ptrauth_swift_conformance_cache_storage_next
 #define __ptrauth_swift_type_metadata_instantiation_function
 #define __ptrauth_swift_job_invoke_function
 #define __ptrauth_swift_task_resume_function

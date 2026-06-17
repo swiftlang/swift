@@ -25,6 +25,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/SignedPointerUnion.h"
 #include "swift/Basic/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -573,31 +574,39 @@ namespace {
     /// Storage used when we have global actor isolation on the conformance.
     struct ExtendedStorage {
       /// The protocol to which the type conforms.
-      const ProtocolDescriptor *Proto;
+      const ProtocolDescriptor * __ptrauth_swift_conformance_cache_storage_protocol
+          Proto;
 
       /// The global actor to which this conformance is isolated, or NULL for
       /// a nonisolated conformances.
-      const Metadata *globalActorIsolationType = nullptr;
+      const Metadata * __ptrauth_swift_conformance_cache_storage_global_actor_type
+          globalActorIsolationType = nullptr;
 
       /// When the conformance is global-actor-isolated, this is the conformance
       /// of globalActorIsolationType to GlobalActor.
-      const WitnessTable *globalActorIsolationWitnessTable = nullptr;
+      const WitnessTable * __ptrauth_swift_protocol_witness_table_pointer
+          globalActorIsolationWitnessTable = nullptr;
 
       /// The next pointer in the list of extended storage allocations.
-      ExtendedStorage *next = nullptr;
+      ExtendedStorage * __ptrauth_swift_conformance_cache_storage_next
+          next = nullptr;
     };
 
-    llvm::PointerUnion<const Metadata *, const TypeContextDescriptor *>
+    SignedPointerUnion<const Metadata *, const TypeContextDescriptor *,
+                       SpecialPointerAuthDiscriminators::
+                           ConformanceCacheTypeOrDescriptor>
         TypeOrDescriptor;
-    llvm::PointerUnion<const ProtocolDescriptor *, ExtendedStorage *>
+    SignedPointerUnion<const ProtocolDescriptor *, ExtendedStorage *,
+                       SpecialPointerAuthDiscriminators::
+                           ConformanceCacheProtoOrStorage>
         ProtoOrStorage;
 
     union {
       /// The witness table. Used for type cache records.
-      const WitnessTable *Witness;
+      const WitnessTable * __ptrauth_swift_protocol_witness_table_pointer Witness;
 
       /// The conformance. Used for type descriptor cache records.
-      const ProtocolConformanceDescriptor *Conformance;
+      const ProtocolConformanceDescriptor * __ptrauth_swift_protocol_conformance_descriptor Conformance;
     };
 
   public:
@@ -640,12 +649,28 @@ namespace {
       assert(ProtoOrStorage);
     }
 
+    ConformanceCacheEntry(const ConformanceCacheEntry &other)
+        : TypeOrDescriptor(other.TypeOrDescriptor), ProtoOrStorage(other.ProtoOrStorage) {
+      if (TypeOrDescriptor.is<const Metadata *>())
+        Witness = other.Witness;
+      else
+        Conformance = other.Conformance;
+    }
+
     bool matchesKey(const ConformanceCacheKey &key) const {
-      return TypeOrDescriptor == key.TypeOrDescriptor && getProtocol() == key.Proto;
+      return getTypeOrDescriptorUnion() == key.TypeOrDescriptor &&
+             getProtocol() == key.Proto;
     }
 
     friend llvm::hash_code hash_value(const ConformanceCacheEntry &entry) {
       return hash_value(entry.getKey());
+    }
+
+    llvm::PointerUnion<const Metadata *, const TypeContextDescriptor *>
+    getTypeOrDescriptorUnion() const {
+      if (TypeOrDescriptor.is<const Metadata *>())
+        return TypeOrDescriptor.get<const Metadata *>();
+      return TypeOrDescriptor.get<const TypeContextDescriptor *>();
     }
 
     /// Get the protocol.
@@ -661,7 +686,7 @@ namespace {
 
     /// Get the conformance cache key.
     ConformanceCacheKey getKey() const {
-      return ConformanceCacheKey(TypeOrDescriptor, getProtocol());
+      return ConformanceCacheKey(getTypeOrDescriptorUnion(), getProtocol());
     }
 
     /// Get the cached witness table, or null if we cached failure.
