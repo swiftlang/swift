@@ -687,7 +687,14 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
         new (context) ParamDecl(SourceLoc(), SourceLoc(), argName, SourceLoc(),
                                 var->getName(), structDecl);
     param->setSpecifier(ParamSpecifier::Default);
-    param->setInterfaceType(var->getInterfaceType());
+
+    // For weak fields, the constructor parameter should take a strong
+    // reference (the unwrapped referent type), not the WeakStorageType.
+    auto paramType = var->getInterfaceType();
+    if (auto RST = dyn_cast<ReferenceStorageType>(paramType.getPointer()))
+      paramType = RST->getReferentType();
+    param->setInterfaceType(paramType);
+
     ClangImporter::Implementation::recordImplicitUnwrapForDecl(
         param, var->isImplicitlyUnwrappedOptional());
 

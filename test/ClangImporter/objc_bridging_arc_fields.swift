@@ -25,10 +25,39 @@ import objc_structs
 // CHECK-IDE-TEST: func takeStrongArcStruct(_ s: StrongsInAStructArc)
 // CHECK-IDE-TEST: func returnStrongArcStruct() -> StrongsInAStructArc
 
+// CHECK-IDE-TEST: struct WeaksInAStructArc {
+// CHECK-IDE-TEST:   init()
+// CHECK-IDE-TEST:   init(myobj: MYObject?)
+// CHECK-IDE-TEST:   weak var myobj: @sil_weak MYObject?
+// CHECK-IDE-TEST: }
+
+// WeakAndNonnull should not be imported at all because its only field is
+// __weak + _Nonnull, which can't be represented in Swift, and partial import
+// would produce an incorrect layout.
+// CHECK-IDE-TEST-NOT: struct WeakAndNonnull
+
+// A const __weak field imports as weak var with a private setter.
+// CHECK-IDE-TEST: struct ConstWeakInAStruct {
+// CHECK-IDE-TEST:   init()
+// CHECK-IDE-TEST:   init(myobj: MYObject?)
+// CHECK-IDE-TEST:   weak var myobj: @sil_weak MYObject? { get }
+// CHECK-IDE-TEST: }
+
 // Structs with non-trivial copy/destroy should be imported when the flag is on.
-func testStrongStructImport() -> StrongsInAStructArc {
-  let anObject = MYObject()
+func objcStructsWithArcPointers(
+  withWeaks weaks: WeaksInAStructArc,
+  strongs: StrongsInAStructArc
+) -> StrongsInAStructArc {
+
+  // Weak references should be bridged as Optional
+  let anObject: MYObject = weaks.myobj ?? MYObject()
+
+  // Should be able to construct these as well
+  _ = WeaksInAStructArc(myobj: anObject)
+
+  // Strong references should be retained by the struct's ctor
   let aStrongInAStruct = StrongsInAStructArc(myobj: anObject)
+
   return aStrongInAStruct
 }
 
@@ -37,6 +66,34 @@ func testExistingStrongStructImport() {
   var s = StrongsInAStruct()
   s.nsstr = "hello"
   _ = s
+}
+
+func objcStructWithWeakNonnullIsNotImported() {
+  // WeakAndNonnull should not be imported at all.
+  _ = WeakAndNonnull() // expected-error {{cannot find 'WeakAndNonnull' in scope}}
+}
+
+func constWeakIsReadOnly(_ s: ConstWeakInAStruct) {
+  // const __weak imports as a read-only weak property
+  let _: MYObject? = s.myobj  // okay, can read
+  // s.myobj = nil  // would fail: setter is inaccessible
+}
+
+// Mixed strong + weak + trivial fields in one struct.
+// CHECK-IDE-TEST: struct MixedStrongWeakArc {
+// CHECK-IDE-TEST:   init(strong: MYObject, weak: MYObject?, tag: Int32)
+// CHECK-IDE-TEST:   var strong: MYObject
+// CHECK-IDE-TEST:   weak var weak: @sil_weak MYObject?
+// CHECK-IDE-TEST:   var tag: Int32
+// CHECK-IDE-TEST: }
+// CHECK-IDE-TEST: func takeMixedArcStruct(_ s: MixedStrongWeakArc)
+
+func mixedStructFieldAccess(_ s: MixedStrongWeakArc) -> (MYObject, MYObject?, Int32) {
+  return (s.strong, s.weak, s.tag)
+}
+
+func mixedStructConstruction() -> MixedStrongWeakArc {
+  return MixedStrongWeakArc(strong: MYObject(), weak: MYObject(), tag: 42)
 }
 
 // Strong fields with a Swift-bridged ObjC type (NSString -> String) should
@@ -90,4 +147,9 @@ func passStrongStructToCFunction() {
 func receiveStrongStructFromCFunction() {
   let s = returnStrongArcStruct()
   let _: MYObject = s.myobj
+}
+
+func passMixedStructToCFunction() {
+  let s = MixedStrongWeakArc(strong: MYObject(), weak: MYObject(), tag: 7)
+  takeMixedArcStruct(s)
 }

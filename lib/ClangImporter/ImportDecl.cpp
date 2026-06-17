@@ -852,6 +852,16 @@ classImplementsProtocol(const clang::ObjCInterfaceDecl *constInterface,
   return interface->ClassImplementsProtocol(proto, checkCategories);
 }
 
+/// Set weak storage interface on a VarDecl, wrapping its type in
+/// WeakStorageType and adding the ReferenceOwnershipAttr.
+static void setWeakStorageInterface(VarDecl *var, Type type) {
+  ASTContext &ctx = var->getASTContext();
+  var->getAttrs().add(new (ctx)
+                          ReferenceOwnershipAttr(ReferenceOwnership::Weak));
+  var->setInterfaceType(WeakStorageType::get(
+      type->isOptional() ? type : type->wrapInOptionalType(), ctx));
+}
+
 static void
 applyPropertyOwnership(VarDecl *prop,
                        clang::ObjCPropertyAttribute::Kind attrs) {
@@ -865,10 +875,7 @@ applyPropertyOwnership(VarDecl *prop,
     return;
   }
   if (attrs & clang::ObjCPropertyAttribute::kind_weak) {
-    prop->addAttribute(new (ctx)
-                           ReferenceOwnershipAttr(ReferenceOwnership::Weak));
-    prop->setInterfaceType(WeakStorageType::get(
-        prop->getInterfaceType(), ctx));
+    setWeakStorageInterface(prop, prop->getInterfaceType());
     return;
   }
   if ((attrs & clang::ObjCPropertyAttribute::kind_assign) ||
@@ -5029,12 +5036,19 @@ namespace {
         importedType = ImportedType(closureType, false);
       }
 
-      if (!importedType)
-        importedType =
-            Impl.importType(decl->getType(), ImportTypeKind::RecordField,
-                            ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                            isInSystemModule(dc), Bridgeability::None,
-                            getImportTypeAttrs(decl));
+      auto objcLifetime = decl->getType().getObjCLifetime();
+
+      if (!importedType) {
+        auto importTypeKind = ImportTypeKind::RecordField;
+        if (objcLifetime == clang::Qualifiers::OCL_Weak)
+          importTypeKind = ImportTypeKind::RecordFieldWithReferenceSemantics;
+
+        importedType = Impl.importType(
+            decl->getType(), importTypeKind,
+            ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
+            isInSystemModule(dc), Bridgeability::None,
+            getImportTypeAttrs(decl));
+      }
       if (!importedType) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::record_field_not_imported, decl),
@@ -5042,23 +5056,39 @@ namespace {
         return nullptr;
       }
 
-      auto type = importedType.getType();
-
       auto result = Impl.createDeclWithClangNode<VarDecl>(
           decl, importer::convertClangAccess(decl->getAccess()),
           /*IsStatic*/ false, VarDecl::Introducer::Var,
           Impl.importSourceLoc(decl->getLocation()), name, dc);
+
+      result->setInterfaceType(importedType.getType());
+      ClangImporter::Implementation::recordImplicitUnwrapForDecl(
+          result, importedType.isImplicitlyUnwrapped());
+
       if (decl->getType().isConstQualified()) {
         // Note that in C++ there are ways to change the values of const
         // members, so we don't use WriteImplKind::Immutable storage.
         assert(result->supportsMutation());
         result->overwriteSetterAccess(AccessLevel::Private);
       }
+
       result->setIsObjC(false);
       result->setIsDynamic(false);
-      result->setInterfaceType(type);
-      ClangImporter::Implementation::recordImplicitUnwrapForDecl(
-          result, importedType.isImplicitlyUnwrapped());
+
+      // Handle ARC ownership for struct fields.
+      if (objcLifetime == clang::Qualifiers::OCL_Weak) {
+        if (auto nullability = decl->getType()->getNullability()) {
+          // A weak + nonnull field can't be represented in Swift — refuse it
+          // and let VisitRecordDecl fail the whole struct.
+          if (*nullability == clang::NullabilityKind::NonNull) {
+            Impl.addImportDiagnostic(
+                decl, Diagnostic(diag::record_field_weak_nonnull, decl),
+                decl->getSourceRange().getBegin());
+            return nullptr;
+          }
+        }
+        setWeakStorageInterface(result, importedType.getType());
+      }
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())

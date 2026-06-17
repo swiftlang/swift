@@ -1576,8 +1576,10 @@ private:
           SwiftType.getFieldType(swiftField, IGM.getSILModule(),
                                  IGM.getMaximalTypeExpansionContext())));
       addField(swiftField, offset, fieldTI, isZeroSized);
-      auto fieldTy =
-          swiftField->getInterfaceType()->lookThroughSingleOptionalType();
+      auto fieldInterfaceTy = swiftField->getInterfaceType();
+      if (isa<WeakStorageType>(fieldInterfaceTy.getPointer()))
+        hasReferenceField = true;
+      auto fieldTy = fieldInterfaceTy->lookThroughSingleOptionalType();
       if (fieldTy->isAnyClassReferenceType() &&
           fieldTy->getReferenceCounting() != ReferenceCounting::None)
         hasReferenceField = true;

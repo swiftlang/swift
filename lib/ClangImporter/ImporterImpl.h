@@ -122,7 +122,7 @@ enum class ImportTypeKind {
 
   /// Import the declared type of a variable.
   Variable,
-  
+
   /// Import the declared type of an audited variable.
   ///
   /// This is exactly like ImportTypeKind::Variable, except it
@@ -131,7 +131,12 @@ enum class ImportTypeKind {
 
   /// Import the declared type of a struct or union field.
   RecordField,
-  
+
+  /// Import the declared type of a struct or union field that has reference
+  /// ownership semantics (__weak or __unsafe_unretained). These fields should
+  /// not be bridged.
+  RecordFieldWithReferenceSemantics,
+
   /// Import the result type of a function.
   ///
   /// This provides special treatment for 'void', among other things, and
