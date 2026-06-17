@@ -78,12 +78,6 @@ static llvm::cl::opt<bool> ForceTypedErrors(
                    "it easier to test typed errors"),
     llvm::cl::Hidden);
 
-static llvm::cl::opt<bool> EmitIsolationHistory(
-    "sil-regionbasedisolation-emit-isolation-history",
-    llvm::cl::desc("Emit notes explaining why a disconnected value ended up "
-                   "in an isolated region"),
-    llvm::cl::Hidden);
-
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
@@ -473,25 +467,7 @@ static InFlightDiagnostic diagnoseNote(const PartitionOp &op, Diag<T...> diag,
 //===----------------------------------------------------------------------===//
 
 static bool shouldEmitIsolationHistory(SILFunction *fn) {
-  if (EmitIsolationHistory)
-    return true;
-
-  // Isolation history emission is opt-in. We accept either the LLVM testing
-  // flag or a `@diagnose(RegionIsolationIsolationHistory, as: <not ignored>)`
-  // attribute on the SIL function's own decl.
-  if (auto *dc = fn->getDeclContext()) {
-    if (auto *decl = dc->getAsDecl()) {
-      for (auto *attr : decl->getAttrs().getAttributes<DiagnoseAttr>()) {
-        if (attr->DiagnosticGroupID ==
-                DiagGroupID::RegionIsolationIsolationHistory &&
-            attr->DiagnosticBehavior != WarningGroupBehavior::Ignored) {
-          return true;
-        }
-      }
-    }
-  }
-
-  return false;
+  return swift::shouldEmitIsolationHistoryFor(fn);
 }
 
 namespace {
@@ -2704,7 +2680,8 @@ private:
     return {};
   }
 
-  /// If \p EmitIsolationHistory is set and \p sentElement is disconnected
+  /// If isolation-history emission is enabled for this function (see
+  /// \c shouldEmitIsolationHistoryFor) and \p sentElement is disconnected
   /// (i.e., not itself actor-isolated), walk the isolation history DAG to find
   /// the most recent instruction where the element was merged into an isolated
   /// region and emit a note there.

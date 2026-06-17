@@ -1842,6 +1842,21 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   return OS;
 }
 
+/// Returns true when isolation-history note emission should run for \p fn.
+///
+/// Isolation-history is opt-in. It is enabled when:
+///   - The frontend flag \c -sil-region-isolation-emit-isolation-history was
+///     passed (\c SILOptions::EmitIsolationHistory), or
+///   - The function carries a
+///     \c \@diagnose(RegionIsolationIsolationHistory, as: <not ignored>)
+///     attribute.
+///
+/// Both producers (SILGen, when deciding whether to record per-argument
+/// SILLocations on apply instructions) and consumers (SendNonSendable's
+/// IsolationHistoryNoteEmitter) consult this single predicate so the two
+/// sides stay in lock-step.
+bool shouldEmitIsolationHistoryFor(const SILFunction *fn);
+
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
