@@ -557,6 +557,32 @@ bb0:
   return %7 : $()
 }
 
+struct LexicalKeyPathWrapper<Root, Value> {
+  @_hasStorage var object: Kl { get set }
+  @_hasStorage var keyPath: KeyPath<Root, Value> { get set }
+}
+
+// A removed keypath user that consumes a lexical owned value defined outside
+// the dead object graph must make DeadObjectElimination bail out. This keeps
+// the function unchanged rather than shortening the lexical value's lifetime.
+//
+// CHECK-LABEL: sil [ossa] @dead_keypath_user_with_lexical_operand
+// CHECK: move_value [lexical]
+// CHECK: keypath
+// CHECK: struct $LexicalKeyPathWrapper
+// CHECK: } // end sil function 'dead_keypath_user_with_lexical_operand'
+sil [ossa] @dead_keypath_user_with_lexical_operand : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @createit : $@convention(thin) () -> @owned Kl
+  %1 = apply %0() : $@convention(thin) () -> @owned Kl
+  %2 = move_value [lexical] %1 : $Kl
+  %3 = keypath $KeyPath<KeyPathRoot, Int>, (root $KeyPathRoot; stored_property #KeyPathRoot.int : $Int)
+  %4 = struct $LexicalKeyPathWrapper<KeyPathRoot, Int> (%2, %3)
+  destroy_value %4 : $LexicalKeyPathWrapper<KeyPathRoot, Int>
+  %5 = tuple ()
+  return %5 : $()
+}
+
 // Check that we don't crash here.
 sil [ossa] @not_dominating_stores : $@convention(thin) () -> () {
 bb0:
