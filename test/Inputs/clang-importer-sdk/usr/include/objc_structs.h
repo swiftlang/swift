@@ -27,6 +27,26 @@ struct StrongsInAStructArc {
 void takeStrongArcStruct(struct StrongsInAStructArc s);
 struct StrongsInAStructArc returnStrongArcStruct(void);
 
+struct WeaksInAStructArc {
+  __weak MYObject *_Nullable myobj;
+};
+
+struct WeakAndNonnull {
+  __weak MYObject *_Nonnull myobj;
+};
+
+struct ConstWeakInAStruct {
+  __weak MYObject *_Nullable const myobj;
+};
+
+struct MixedStrongWeakArc {
+  __strong MYObject *_Nonnull strong;
+  __weak MYObject *_Nullable weak;
+  int tag;
+};
+
+void takeMixedArcStruct(struct MixedStrongWeakArc s);
+
 struct StrongNSStringArc {
   __strong NSString *_Nonnull name;
   int tag;
