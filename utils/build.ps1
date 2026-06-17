@@ -3304,6 +3304,39 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       Copy-Item `
         -Path "$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" `
         -Destination "$CompilerCache\$SwiftRTSubdir"
+
+      # Stage2 builds its own stdlib (SWIFT_BUILD_DYNAMIC_STDLIB=YES) with
+      # different cmake configuration than the DynamicRuntime build that
+      # gets installed to <InstallDir>\Runtimes\<Version>\usr\bin and that
+      # Foundation in the SDK is linked against.  The two produce ABI-
+      # divergent swiftCore.dlls (different export tables).  Test inferiors
+      # compiled by Stage2's swiftc resolve their swiftCore symbols from
+      # Stage2's resource directory, so a.out's import table references
+      # Stage2's exports; at runtime the inferior's swiftCore.dll comes from
+      # PATH (Runtimes' install copy goes first), and Foundation in that
+      # install was linked against the install's swiftCore -- two
+      # incompatible ABIs in one process.  The inferior dies during
+      # process init with STATUS_ENTRYPOINT_NOT_FOUND (0xc0000139) and
+      # lldbinline reports "no breakpoint hit" because the process never
+      # reaches main.
+      #
+      # Replace Stage2's stdlib resource directory with the install image's
+      # so the test inferior is link-time-bound to the same swiftCore the
+      # install Foundation expects at runtime.  Only the .lib import
+      # libraries actually have to match, but copying the whole windows\
+      # subtree is simpler and keeps .swiftmodule/.swiftinterface
+      # consistent.  Do NOT touch $CompilerCache\bin\*.dll: Stage2's own
+      # swiftc.exe is linked against Stage2's swiftCore.lib and needs
+      # Stage2's swiftCore.dll at its own runtime.
+      $InstallSwiftLibArch = "$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)"
+      $Stage2SwiftLibArch  = "$CompilerCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)"
+      if (Test-Path $InstallSwiftLibArch) {
+        Write-Host "Test-Compilers: aligning Stage2 stdlib resource dir with install image ('$InstallSwiftLibArch' -> '$Stage2SwiftLibArch')"
+        Copy-Item -Recurse -Force -Path "$InstallSwiftLibArch\*" -Destination $Stage2SwiftLibArch
+      } else {
+        Write-Warning "Test-Compilers: install stdlib '$InstallSwiftLibArch' not found; skipping resource-dir alignment (test inferiors that import Foundation will likely fail to load with 0xc0000139)"
+      }
+
       $TestingDefines += @{
         LLDB_INCLUDE_TESTS = "YES";
         # Check for required Python modules in CMake
