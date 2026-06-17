@@ -240,7 +240,7 @@ extension LabeledExprListSyntax {
     }
     return (
       try a.expect(arg: lst[0]),
-      try b.expect(arg: lst[1]),
+      try b.expect(arg: lst[1])
     )
   }
 
@@ -255,7 +255,7 @@ extension LabeledExprListSyntax {
     return (
       try a.expect(arg: lst[0]),
       try b.expect(arg: lst[1]),
-      try c.expect(arg: lst[2]),
+      try c.expect(arg: lst[2])
     )
   }
 
@@ -271,7 +271,7 @@ extension LabeledExprListSyntax {
       try a.expect(arg: lst[0]),
       try b.expect(arg: lst[1]),
       try c.expect(arg: lst[2]),
-      try d.expect(arg: lst[3]),
+      try d.expect(arg: lst[3])
     )
   }
 }
