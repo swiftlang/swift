@@ -8434,7 +8434,13 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     ParserStatus AccessorStatus = parseAccessorIntroducer(
         *this, Attributes, Kind, Loc, IsFirstAccessor, &featureUnavailable);
     Status |= AccessorStatus;
-    if (AccessorStatus.isError() && !AccessorStatus.hasCodeCompletion()) {
+    if (AccessorStatus.isError()) {
+      // If we have a code completion token in an attribute but no accessor
+      // introducer, bail.
+      if (AccessorStatus.hasCodeCompletion()) {
+        accessorHasCodeCompletion = true;
+        break;
+      }
       if (Tok.is(tok::code_complete)) {
         // Handle code completion here only if it's not the first accessor.
         // If it's the first accessor, it's handled in function body parsing
