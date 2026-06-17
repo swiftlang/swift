@@ -196,6 +196,28 @@ public:
   makeUnionFieldAccessors(NominalTypeDecl *importedUnionDecl,
                           VarDecl *importedFieldDecl);
 
+  /// Build computed accessors for a struct field whose imported type bridges
+  /// to a native Swift type (e.g., NSString → String).
+  ///
+  /// The getter loads from the stored field and bridges to the Swift type,
+  /// and the setter bridges from the Swift type and stores to the stored field.
+  void makeBridgedFieldAccessors(StructDecl *importedDecl,
+                                 VarDecl *computedField, VarDecl *storedField);
+
+  /// Create a memberwise constructor whose parameters use bridged Swift types.
+  ///
+  /// For each member in \p storedMembers, \p bridgedParams contains the
+  /// parameter name, type, and IUO flag for the corresponding init parameter.
+  /// The body bridges each parameter before assigning it directly to storage.
+  struct BridgedInitParam {
+    Identifier name;
+    Type type;
+    bool isIUO;
+  };
+  ConstructorDecl *createBridgedValueConstructor(
+      NominalTypeDecl *structDecl, ArrayRef<VarDecl *> storedMembers,
+      ArrayRef<BridgedInitParam> bridgedParams, bool wantBody);
+
   /// Build the bitfield getter and setter using Clang.
   ///
   /// \code
