@@ -5,7 +5,7 @@
 
 // RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -verify-ignore-unrelated  -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
 // RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=targeted -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
-// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=complete  -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete- -verify-ignore-unrelated -strict-concurrency=complete  -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalConcurrency
@@ -16,7 +16,7 @@
 // expected-warning@-1{{'@preconcurrency' on module 'OtherActors' has no effect}}{{1-17=}}
 
 @preconcurrency
-class MyPredatesConcurrencyClass { }
+class MyPredatesConcurrencyClass { } // expected-complete-note {{class 'MyPredatesConcurrencyClass' does not conform to the 'Sendable' protocol}}
 
 enum EnumWithPredatesConcurrencyValue {
   case stored(MyPredatesConcurrencyClass)
@@ -37,7 +37,10 @@ func test(
   acceptSendable(nsOpt) // silence issue entirely
   acceptSendable(oma) // okay
   acceptSendable(ssc) // okay
-  acceptSendable(mpcc)
+  // FIXME: The "; this is an error in the Swift 6 language mode" framing
+  // is wrong. See the FIXME at the limitBehaviorWithPreconcurrency call in
+  // lib/Sema/TypeCheckConcurrency.h.
+  acceptSendable(mpcc) // expected-complete-warning {{type 'MyPredatesConcurrencyClass' does not conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
 }
 
 let nonStrictGlobal = NonStrictClass() // no warning

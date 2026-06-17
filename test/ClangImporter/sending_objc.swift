@@ -25,7 +25,7 @@ func methodTestSendingResult() async {
 func methodTestSendingArg() async {
   let x = MyType()
   let s = NSObject()
-  let _ = x.getResultWithSendingArgument(s)  // expected-error {{sending 's' risks causing data races}}
+  let _ = x.getResultWithSendingArgument(s)  // expected-warning {{sending 's' risks causing data races}}
   // expected-note @-1 {{'s' used after being passed as a 'sending' parameter; Later uses could race}}
   useValue(s) // expected-note {{access can happen concurrently}}
 }
@@ -45,14 +45,14 @@ func funcTestSendingResult() async {
   // Just to show that without the sendring param, we generate diagnostics.
   let x2 = NSObject()
   let y2 = returnNSObjectFromGlobalFunction(x2)
-  await sendToMain(x2) // expected-error {{sending 'x2' risks causing data races}}
+  await sendToMain(x2) // expected-warning {{sending 'x2' risks causing data races}}
   // expected-note @-1 {{sending 'x2' to main actor-isolated global function 'sendToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(y2) // expected-note {{access can happen concurrently}}
 }
 
 func funcTestSendingArg() async {
   let x = NSObject()
-  sendNSObjectToGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
+  sendNSObjectToGlobalFunction(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{'x' used after being passed as a 'sending' parameter; Later uses could race}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
