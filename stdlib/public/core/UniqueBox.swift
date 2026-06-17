@@ -87,7 +87,8 @@ extension UniqueBox where Value: ~Copyable {
     @_lifetime(borrow self)
     @_transparent
     get {
-      unsafe Span(_unchecked: UnsafePointer(pointer), count: 1)
+      let s = unsafe Span(_unchecked: UnsafePointer(pointer), count: 1)
+      return unsafe _overrideLifetime(s, borrowing: self)
     }
   }
 

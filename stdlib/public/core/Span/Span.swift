@@ -77,6 +77,7 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   @_alwaysEmitIntoClient
   @inline(__always)
   @lifetime(borrow pointer)
+  @_disfavoredOverload
   internal init(
     _unchecked pointer: UnsafeRawPointer?,
     count: Int
