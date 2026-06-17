@@ -80,9 +80,17 @@ swift_task_isIsolatingCurrentContextImpl(
 
 extern "C" SWIFT_CC(swift) bool swift_task_isMainExecutorImpl(
     SerialExecutorRef executor) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  // In the embedded cooperative executor model the main executor is the generic
+  // executor (mirrors CooperativeGlobalExecutor.cpp's swift_task_isMainExecutorImpl).
+  // Custom SerialExecutor witness tables and the _swift_task_isMainExecutorSwift
+  // bridge are unavailable in embedded mode.
+  return executor.isGeneric();
+#else
   HeapObject *identity = executor.getIdentity();
   return executor.hasSerialExecutorWitnessTable() &&
          _swift_task_isMainExecutorSwift(
              identity, swift_getObjectType(identity),
              executor.getSerialExecutorWitnessTable());
+#endif
 }
