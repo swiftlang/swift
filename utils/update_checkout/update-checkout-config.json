@@ -192,13 +192,13 @@
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-31",
                 "wasmkit": "0.2.1",
-                "curl": "curl-8_9_1",
+                "curl": "curl-8_20_0",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.0.3",
                 "swift-subprocess": "0.4",
-                "boringssl": "817ab07ebb53da35afea409ab9328f578492832d"
+                "boringssl": "0226f30467f540a3f62ef48d453f93927da199b6"
             }
         },
         "release/6.4.x": {
@@ -805,13 +805,13 @@
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-31",
                 "wasmkit": "0.2.1",
-                "curl": "curl-8_9_1",
+                "curl": "curl-8_20_0",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.0.3",
                 "swift-subprocess": "0.4",
-                "boringssl": "817ab07ebb53da35afea409ab9328f578492832d"
+                "boringssl": "0226f30467f540a3f62ef48d453f93927da199b6"
             }
         },
         "next" : {
@@ -867,12 +867,13 @@
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-31",
                 "wasmkit": "0.2.1",
-                "curl": "curl-8_9_1",
+                "curl": "curl-8_20_0",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.4"
+                "swift-subprocess": "0.4",
+                "boringssl": "0226f30467f540a3f62ef48d453f93927da199b6"
             }
         }
     }
