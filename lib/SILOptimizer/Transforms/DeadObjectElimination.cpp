@@ -1076,22 +1076,47 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
   }
 
   if (KPI->getFunction()->hasOwnership()) {
+    // Deleting the keypath and its (ownership-forwarding) users shortens the
+    // lifetimes of the owned values they consume: the keypath's own pattern
+    // operands, and -- when a user is an aggregate such as `struct`, `tuple` or
+    // `enum` -- owned values *other* than the keypath itself. Each such consumed
+    // value whose definition survives the removal needs a compensating
+    // destroy_value. First make sure that is safe for every one of them (no
+    // mutation yet, so that bailing out leaves the function unchanged); bail if
+    // it would shorten the lifetime of a lexical or pointer-escaping value.
+    auto needsCompensatingDestroy = [&](const Operand &op) -> SILValue {
+      if (op.getUser() == KPI || !op.isConsuming())
+        return SILValue();
+      SILValue value = op.get();
+      if (value->getType().isTrivial(*KPI->getFunction()))
+        return SILValue();
+      if (auto *def = value->getDefiningInstruction())
+        if (UsersToRemove.count(def))
+          return SILValue();
+      return value;
+    };
     for (const Operand &Op : KPI->getPatternOperands()) {
       if (Op.get()->getType().isTrivial(*KPI->getFunction()))
         continue;
-      // In ossa, we are going to delete the dead keypath which was consuming
-      // the pattern operand and insert a destroy_value of the pattern operand
-      // value. This is shortening the pattern operand value's lifetime. Check
-      // if there was a pointer escape, if so bail out.
-      if (findPointerEscape(Op.get())) {
+      if (findPointerEscape(Op.get()))
         return false;
-      }
     }
+    for (auto *user : UsersToRemove)
+      for (const Operand &op : user->getAllOperands())
+        if (SILValue value = needsCompensatingDestroy(op))
+          if (value->isLexical() || findPointerEscape(value))
+            return false;
+
+    // All checks passed: now insert the compensating destroys.
     for (const Operand &Op : KPI->getPatternOperands()) {
       if (Op.get()->getType().isTrivial(*KPI->getFunction()))
         continue;
       SILBuilderWithScope(KPI).createDestroyValue(KPI->getLoc(), Op.get());
     }
+    for (auto *user : UsersToRemove)
+      for (const Operand &op : user->getAllOperands())
+        if (SILValue value = needsCompensatingDestroy(op))
+          SILBuilderWithScope(user).createDestroyValue(user->getLoc(), value);
   }
 
   // Remove the keypath and all of its users.

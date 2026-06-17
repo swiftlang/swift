@@ -1,0 +1,137 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -deadobject-elim %s | %FileCheck %s
+
+// Regression test for https://github.com/swiftlang/swift/issues/89910.
+//
+// DeadObjectElimination's keypath handling removes a dead keypath together with
+// its transitive (ownership-forwarding) users. When one of those users is an
+// aggregate -- e.g. a `struct` -- that consumes an owned value *other* than the
+// keypath, the eliminated aggregate's other owned operands must get compensating
+// destroys, otherwise they leak (the ownership verifier reports a "leaked owned
+// value that was never consumed").
+
+import Swift
+import Builtin
+
+class Klass {}
+
+struct S { var x: Int }
+
+struct Pair {
+  var k: Klass
+  var kp: KeyPath<S, Int>
+}
+
+struct II { }
+struct I { @_hasStorage let x: II { get } }
+struct S2 { }
+
+struct Holder {
+  var k: Klass
+  var kp: KeyPath<S2, II>
+}
+
+// Mirrors StructuredQueriesCore.TableColumn from the original reproducer: an
+// owned column-name `String` stored alongside a `KeyPath`.
+struct TableColumn {
+  var name: String
+  var keyPath: KeyPath<S, Int>
+}
+
+sil @makeKlass : $@convention(thin) () -> @owned Klass
+sil @stringInit : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil @getter : $@convention(method) (@guaranteed KeyPath<I, II>, S2) -> @out II
+sil @kpgetter : $@convention(keypath_accessor_getter) (@in_guaranteed S2, @in_guaranteed KeyPath<I, II>) -> @out II
+sil @equ : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<I, II>, @in_guaranteed KeyPath<I, II>) -> Bool
+sil @hsh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<I, II>) -> Int
+
+// The keypath flows into a `struct` that also owns a `Klass`; the struct is only
+// destroyed. Eliminating the keypath + struct must leave the `Klass` destroyed.
+//
+// CHECK-LABEL: sil [ossa] @dead_keypath_in_struct :
+// CHECK-NOT:     keypath
+// CHECK-NOT:     = struct $Pair
+// CHECK:         [[K:%.*]] = apply
+// CHECK:         destroy_value [[K]]
+// CHECK-LABEL: } // end sil function 'dead_keypath_in_struct'
+sil [ossa] @dead_keypath_in_struct : $@convention(thin) () -> () {
+bb0:
+  %mk = function_ref @makeKlass : $@convention(thin) () -> @owned Klass
+  %k = apply %mk() : $@convention(thin) () -> @owned Klass
+  %kp = keypath $KeyPath<S, Int>, (root $S; stored_property #S.x : $Int)
+  %p = struct $Pair (%k, %kp)
+  destroy_value %p
+  %t = tuple ()
+  return %t
+}
+
+// Same, but the keypath is aggregated into a `tuple` rather than a `struct`.
+//
+// CHECK-LABEL: sil [ossa] @dead_keypath_in_tuple :
+// CHECK-NOT:     keypath
+// CHECK:         [[K2:%.*]] = apply
+// CHECK:         destroy_value [[K2]]
+// CHECK-LABEL: } // end sil function 'dead_keypath_in_tuple'
+sil [ossa] @dead_keypath_in_tuple : $@convention(thin) () -> () {
+bb0:
+  %mk = function_ref @makeKlass : $@convention(thin) () -> @owned Klass
+  %k = apply %mk() : $@convention(thin) () -> @owned Klass
+  %kp = keypath $KeyPath<S, Int>, (root $S; stored_property #S.x : $Int)
+  %t0 = tuple (%k : $Klass, %kp : $KeyPath<S, Int>)
+  destroy_value %t0
+  %t = tuple ()
+  return %t
+}
+
+// A close mirror of the original reproducer (issue #89910): the owned value the
+// verifier reported leaking was a string-literal `String` aggregated into a
+// `TableColumn` struct alongside the key path. Eliminating the keypath + struct
+// must leave that `@owned String` (`%21 = apply ... -> @owned String` in the bug
+// report) destroyed rather than leaked.
+//
+// CHECK-LABEL: sil [ossa] @dead_keypath_in_table_column :
+// CHECK-NOT:     keypath
+// CHECK-NOT:     = struct $TableColumn
+// CHECK:         [[STR:%.*]] = apply
+// CHECK:         destroy_value [[STR]]
+// CHECK-LABEL: } // end sil function 'dead_keypath_in_table_column'
+sil [ossa] @dead_keypath_in_table_column : $@convention(thin) () -> () {
+bb0:
+  %lit = string_literal utf8 "scope"
+  %len = integer_literal $Builtin.Word, 5
+  %ascii = integer_literal $Builtin.Int1, -1
+  %meta = metatype $@thin String.Type
+  %si = function_ref @stringInit : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %str = apply %si(%lit, %len, %ascii, %meta) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %kp = keypath $KeyPath<S, Int>, (root $S; stored_property #S.x : $Int)
+  %col = struct $TableColumn (%str, %kp)
+  destroy_value %col
+  %t = tuple ()
+  return %t
+}
+
+// Bail-out path: a removable user (the `struct`) consumes a *lexical* owned value
+// other than the keypath, so eliminating the keypath would shorten that value's
+// lifetime. The pass must bail and leave the function untouched.
+//
+// This also guards a subtler invariant: the bail-out check has to run *before*
+// any compensating destroys are inserted. The keypath here has a non-trivial
+// pattern operand (the captured index `%inner`); if the pass inserted a
+// destroy_value for it before deciding to bail, the still-present keypath would
+// double-consume `%inner` (caught by -enable-sil-verify-all as "over consume").
+//
+// CHECK-LABEL: sil [ossa] @dead_keypath_lexical_operand_bails :
+// CHECK:         keypath $KeyPath<S2, II>
+// CHECK:         struct $Holder
+// CHECK-LABEL: } // end sil function 'dead_keypath_lexical_operand_bails'
+sil [ossa] @dead_keypath_lexical_operand_bails : $@convention(thin) () -> () {
+bb0:
+  %mk = function_ref @makeKlass : $@convention(thin) () -> @owned Klass
+  %k = apply %mk() : $@convention(thin) () -> @owned Klass
+  %kl = move_value [lexical] %k : $Klass
+  %inner = keypath $KeyPath<I, II>, (root $I; stored_property #I.x : $II)
+  %kp = keypath $KeyPath<S2, II>, (root $S2; gettable_property $II, id @getter : $@convention(method) (@guaranteed KeyPath<I, II>, S2) -> @out II, getter @kpgetter: $@convention(keypath_accessor_getter) (@in_guaranteed S2, @in_guaranteed KeyPath<I, II>) -> @out II, indices [%$0 : $KeyPath<I, II> : $KeyPath<I, II>], indices_equals @equ : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<I, II>, @in_guaranteed KeyPath<I, II>) -> Bool, indices_hash @hsh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<I, II>) -> Int) (%inner)
+  %h = struct $Holder (%kl, %kp)
+  destroy_value %h
+  %t = tuple ()
+  return %t
+}
