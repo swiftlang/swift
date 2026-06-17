@@ -940,6 +940,247 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   ImporterImpl.RawTypes[structDecl] = underlyingType;
 }
 
+// MARK: Bridged ARC struct field accessors
+
+/// Synthesizer for the body of a bridged struct field getter.
+/// Loads from the stored field and bridges to the Swift type.
+static std::pair<BraceStmt *, bool>
+synthesizeBridgedFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto *getterDecl = cast<AccessorDecl>(afd);
+  VarDecl *storedVar = static_cast<VarDecl *>(context);
+
+  ASTContext &ctx = getterDecl->getASTContext();
+  auto *selfDecl = getterDecl->getImplicitSelfDecl();
+  auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit=*/true);
+  selfRef->setType(selfDecl->getTypeInContext());
+
+  auto storedType = storedVar->getInterfaceType();
+  auto *storedRef = new (ctx)
+      MemberRefExpr(selfRef, SourceLoc(), storedVar, DeclNameLoc(),
+                    /*Implicit=*/true, AccessSemantics::DirectToStorage);
+  storedRef->setType(storedType);
+
+  Expr *result = storedRef;
+
+  Type computedType = getterDecl->getResultInterfaceType();
+  if (!computedType->isEqual(storedType)) {
+    auto bridge = new (ctx) BridgeFromObjCExpr(storedRef, computedType);
+    bridge->setType(computedType);
+    result = CoerceExpr::createImplicit(ctx, bridge, computedType);
+  }
+
+  return createSingleReturnBody(ctx, result);
+}
+
+/// Synthesizer for the body of a bridged struct field setter.
+/// Bridges the new value from its Swift type to the ObjC stored type.
+static std::pair<BraceStmt *, bool>
+synthesizeBridgedFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto *setterDecl = cast<AccessorDecl>(afd);
+  VarDecl *storedVar = static_cast<VarDecl *>(context);
+  ASTContext &ctx = setterDecl->getASTContext();
+
+  auto *selfDecl = setterDecl->getImplicitSelfDecl();
+
+  Expr *selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                        /*implicit=*/true);
+  selfRef->setType(LValueType::get(selfDecl->getTypeInContext()));
+
+  auto storedType = storedVar->getInterfaceType();
+  auto *lhs = new (ctx)
+      MemberRefExpr(selfRef, SourceLoc(), storedVar, DeclNameLoc(),
+                    /*Implicit=*/true, AccessSemantics::DirectToStorage);
+  lhs->setType(LValueType::get(storedType));
+
+  auto *newValueDecl = setterDecl->getParameters()->get(0);
+  auto *newValueRef = new (ctx) DeclRefExpr(newValueDecl, DeclNameLoc(),
+                                            /*implicit=*/true);
+  newValueRef->setType(newValueDecl->getTypeInContext());
+
+  Expr *rhs = newValueRef;
+  if (!storedType->isEqual(newValueDecl->getInterfaceType())) {
+    auto bridge = new (ctx) BridgeToObjCExpr(newValueRef, storedType);
+    bridge->setType(storedType);
+    rhs = CoerceExpr::createImplicit(ctx, bridge, storedType);
+  }
+
+  auto *assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
+                                      /*Implicit=*/true);
+  assign->setType(TupleType::getEmpty(ctx));
+
+  auto *ret = ReturnStmt::createImplicit(ctx, /*expr=*/nullptr);
+  auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
+  return {body, /*isTypeChecked=*/true};
+}
+
+void SwiftDeclSynthesizer::makeBridgedFieldAccessors(StructDecl *importedDecl,
+                                                     VarDecl *computedField,
+                                                     VarDecl *storedField) {
+
+  auto &C = ImporterImpl.SwiftContext;
+  auto *params = ParameterList::createEmpty(C);
+  auto getterType = computedField->getInterfaceType();
+  auto *getter = AccessorDecl::create(
+      C,
+      /*declLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, computedField,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/false,
+      /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(), params, getterType,
+      importedDecl);
+  getter->setImplicit();
+  getter->setIsObjC(false);
+  getter->setIsDynamic(false);
+  getter->setIsTransparent(false);
+  getter->copyFormalAccessFrom(importedDecl);
+  getter->setBodySynthesizer(synthesizeBridgedFieldGetterBody, storedField);
+
+  AccessorDecl *setter = nullptr;
+  if (computedField->getSetterFormalAccess() > AccessLevel::Private) {
+    auto newValueDecl =
+        new (C) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                          C.Id_value, importedDecl);
+    newValueDecl->setSpecifier(ParamSpecifier::Default);
+    newValueDecl->setInterfaceType(computedField->getInterfaceType());
+
+    auto *setterParams = ParameterList::createWithoutLoc(newValueDecl);
+    auto voidTy = TupleType::getEmpty(C);
+
+    setter = AccessorDecl::create(
+        C,
+        /*declLoc=*/SourceLoc(),
+        /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Set, computedField,
+        /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+        /*Throws=*/false,
+        /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(), setterParams,
+        voidTy, importedDecl);
+    setter->setImplicit();
+    setter->setIsObjC(false);
+    setter->setIsDynamic(false);
+    setter->setSelfAccessKind(SelfAccessKind::Mutating);
+    setter->setAccess(computedField->getSetterFormalAccess());
+    setter->setBodySynthesizer(synthesizeBridgedFieldSetterBody, storedField);
+  }
+
+  ClangImporter::Implementation::makeComputed(computedField, getter, setter);
+}
+
+// MARK: Bridged ARC struct value constructor
+
+/// Synthesizer for a memberwise constructor that bridges parameters to their
+/// stored ObjC types before assignment.
+static std::pair<BraceStmt *, bool>
+synthesizeBridgedValueConstructorBody(AbstractFunctionDecl *afd,
+                                      void *context) {
+  auto *ctor = cast<ConstructorDecl>(afd);
+  ArrayRef<VarDecl *> storedMembers(static_cast<VarDecl **>(context) + 1,
+                                    static_cast<uintptr_t *>(context)[0]);
+
+  ASTContext &ctx = ctor->getASTContext();
+  auto *selfDecl = ctor->getImplicitSelfDecl();
+
+  SmallVector<ASTNode, 4> stmts;
+
+  unsigned paramIdx = 0;
+  for (auto *storedVar : storedMembers) {
+    if (isa_and_nonnull<clang::IndirectFieldDecl>(storedVar->getClangDecl()))
+      continue;
+
+    Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                      /*implicit=*/true);
+    lhs->setType(LValueType::get(selfDecl->getTypeInContext()));
+
+    lhs = new (ctx)
+        MemberRefExpr(lhs, SourceLoc(), storedVar, DeclNameLoc(),
+                      /*Implicit=*/true, AccessSemantics::DirectToStorage);
+    lhs->setType(LValueType::get(storedVar->getTypeInContext()));
+
+    auto *paramRef = createParamRefExpr(ctor, paramIdx);
+    Expr *rhs = paramRef;
+
+    auto storedType = storedVar->getInterfaceType();
+    if (auto RST = dyn_cast<ReferenceStorageType>(storedType.getPointer()))
+      storedType = RST->getReferentType();
+
+    auto paramType = ctor->getParameters()->get(paramIdx)->getInterfaceType();
+    if (!storedType->isEqual(paramType)) {
+      auto bridge = new (ctx) BridgeToObjCExpr(paramRef, storedType);
+      bridge->setType(storedType);
+      rhs = CoerceExpr::createImplicit(ctx, bridge, storedType);
+    }
+
+    auto *assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
+                                        /*Implicit=*/true);
+    assign->setType(TupleType::getEmpty(ctx));
+    stmts.push_back(assign);
+    ++paramIdx;
+  }
+
+  stmts.push_back(ReturnStmt::createImplicit(ctx, /*expr=*/nullptr));
+  auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc());
+  return {body, /*isTypeChecked=*/true};
+}
+
+ConstructorDecl *SwiftDeclSynthesizer::createBridgedValueConstructor(
+    NominalTypeDecl *structDecl, ArrayRef<VarDecl *> storedMembers,
+    ArrayRef<BridgedInitParam> bridgedParams, bool wantBody) {
+
+  auto &context = ImporterImpl.SwiftContext;
+
+  SmallVector<ParamDecl *, 8> valueParameters;
+  unsigned idx = 0;
+  for (auto *var : storedMembers) {
+    if (var->isStatic())
+      continue;
+
+    if (var->hasClangNode())
+      if (isa<clang::IndirectFieldDecl>(var->getClangDecl()))
+        continue;
+
+    Identifier argName = bridgedParams[idx].name;
+    Type paramType = bridgedParams[idx].type;
+    bool isIUO = bridgedParams[idx].isIUO;
+
+    if (auto RST = dyn_cast<ReferenceStorageType>(paramType.getPointer()))
+      paramType = RST->getReferentType();
+
+    auto *param = new (context) ParamDecl(SourceLoc(), SourceLoc(), argName,
+                                          SourceLoc(), argName, structDecl);
+    param->setSpecifier(ParamSpecifier::Default);
+    param->setInterfaceType(paramType);
+    ClangImporter::Implementation::recordImplicitUnwrapForDecl(param, isIUO);
+    param->setNonEphemeralIfPossible();
+    valueParameters.push_back(param);
+    ++idx;
+  }
+
+  auto *paramList = ParameterList::create(context, valueParameters);
+  DeclName name(context, DeclBaseName::createConstructor(), paramList);
+  auto *ctor = new (context)
+      ConstructorDecl(name, structDecl->getLoc(),
+                      /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+                      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                      /*ThrownType=*/TypeLoc(), paramList,
+                      /*GenericParams=*/nullptr, structDecl);
+
+  ctor->copyFormalAccessFrom(structDecl);
+  ctor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
+
+  if (wantBody) {
+    auto memberMemory =
+        context.AllocateUninitialized<uintptr_t>(storedMembers.size() + 1);
+    memberMemory[0] = storedMembers.size();
+    for (unsigned i : indices(storedMembers))
+      memberMemory[i + 1] = reinterpret_cast<uintptr_t>(storedMembers[i]);
+    ctor->setBodySynthesizer(synthesizeBridgedValueConstructorBody,
+                             memberMemory.data());
+  }
+
+  return ctor;
+}
+
 // MARK: Unions
 
 /// Synthesizer for the body of a union field getter.

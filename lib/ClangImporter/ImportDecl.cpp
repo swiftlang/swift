@@ -2790,6 +2790,81 @@ namespace {
           result->addMemberToLookupTable(member);
       }
 
+      // For ARC structs, detect fields whose ObjC type has a Swift bridge
+      // (e.g., NSString → String). For each such field, make the stored
+      // property private (with a _ prefix) and add a computed property
+      // with the original name and the bridged Swift type.
+      bool hasBridgedFields = false;
+      SmallVector<SwiftDeclSynthesizer::BridgedInitParam, 4> bridgedInitParams;
+      if (hasArcFields && isa<StructDecl>(result)) {
+        for (unsigned i = 0; i < members.size(); i++) {
+          auto *member = members[i];
+          auto *clangField =
+              dyn_cast_or_null<clang::FieldDecl>(member->getClangDecl());
+          if (!clangField) {
+            bridgedInitParams.push_back(
+                {member->getName(), member->getInterfaceType(),
+                 member->isImplicitlyUnwrappedOptional()});
+            continue;
+          }
+
+          auto objcLifetime = clangField->getType().getObjCLifetime();
+          if (objcLifetime != clang::Qualifiers::OCL_Strong) {
+            bridgedInitParams.push_back(
+                {member->getName(), member->getInterfaceType(),
+                 member->isImplicitlyUnwrappedOptional()});
+            continue;
+          }
+
+          // Try importing the field type with bridging enabled.
+          auto bridgedImport =
+              Impl.importType(clangField->getType(), ImportTypeKind::Property,
+                              ImportDiagnosticAdder(Impl, clangField,
+                                                    clangField->getLocation()),
+                              isInSystemModule(dc), Bridgeability::Full,
+                              getImportTypeAttrs(clangField));
+
+          if (!bridgedImport ||
+              bridgedImport.getType()->isEqual(member->getInterfaceType())) {
+            bridgedInitParams.push_back(
+                {member->getName(), member->getInterfaceType(),
+                 member->isImplicitlyUnwrappedOptional()});
+            continue;
+          }
+
+          // This field bridges. Rename the stored field and make it private.
+          auto originalName = member->getName();
+          auto bridgedType = bridgedImport.getType();
+
+          auto storedName =
+              Impl.SwiftContext.getIdentifier(("_" + originalName.str()).str());
+          member->setName(storedName);
+          member->overwriteAccess(AccessLevel::Private);
+          member->overwriteSetterAccess(AccessLevel::Private);
+
+          // Create a computed property with the original name.
+          auto *computedVar = new (Impl.SwiftContext) VarDecl(
+              /*IsStatic*/ false, VarDecl::Introducer::Var, SourceLoc(),
+              originalName, result);
+          computedVar->setInterfaceType(bridgedType);
+          computedVar->setImplicit();
+          computedVar->copyFormalAccessFrom(result);
+          ClangImporter::Implementation::recordImplicitUnwrapForDecl(
+              computedVar, bridgedImport.isImplicitlyUnwrapped());
+          if (clangField->getType().isConstQualified())
+            computedVar->overwriteSetterAccess(AccessLevel::Private);
+
+          synthesizer.makeBridgedFieldAccessors(cast<StructDecl>(result),
+                                                computedVar, member);
+
+          result->addMember(computedVar);
+
+          bridgedInitParams.push_back({originalName, bridgedType,
+                                       bridgedImport.isImplicitlyUnwrapped()});
+          hasBridgedFields = true;
+        }
+      }
+
       const clang::CXXRecordDecl *cxxRecordDecl =
           dyn_cast<clang::CXXRecordDecl>(decl);
       bool hasBaseClasses = cxxRecordDecl &&
@@ -2871,12 +2946,18 @@ namespace {
         //
         // If we can completely represent the struct in SIL, leave the body
         // implicit, otherwise synthesize one to call property setters.
-        auto valueCtor = synthesizer.createValueConstructor(
-            result, members,
-            /*want param names*/ true,
-            /*want body*/ hasUnreferenceableStorage);
-        if (!hasUnreferenceableStorage)
-          valueCtor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
+        ConstructorDecl *valueCtor;
+        if (hasBridgedFields) {
+          valueCtor = synthesizer.createBridgedValueConstructor(
+              result, members, bridgedInitParams, /*wantBody=*/true);
+        } else {
+          valueCtor = synthesizer.createValueConstructor(
+              result, members,
+              /*want param names*/ true,
+              /*want body*/ hasUnreferenceableStorage);
+          if (!hasUnreferenceableStorage)
+            valueCtor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
+        }
 
         if (isNonEscapable)
           markReturnsUnsafeNonescapable(valueCtor);

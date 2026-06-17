@@ -8,6 +8,16 @@
 import Foundation
 import objc_structs
 
+// The existing StrongsInAStruct (which has no nullability annotation) is also
+// importable with the flag. Its __strong NSString * field gets bridged to
+// String! with the stored property renamed to _nsstr.
+// CHECK-IDE-TEST: struct StrongsInAStruct {
+// CHECK-IDE-TEST:   init()
+// CHECK-IDE-TEST:   init(nsstr: String!)
+// CHECK-IDE-TEST:   var _nsstr: NSString!
+// CHECK-IDE-TEST:   var nsstr: String!
+// CHECK-IDE-TEST: }
+
 // CHECK-IDE-TEST: struct StrongsInAStructArc {
 // CHECK-IDE-TEST:   init(myobj: MYObject)
 // CHECK-IDE-TEST:   var myobj: MYObject
@@ -20,6 +30,36 @@ func testStrongStructImport() -> StrongsInAStructArc {
   let anObject = MYObject()
   let aStrongInAStruct = StrongsInAStructArc(myobj: anObject)
   return aStrongInAStruct
+}
+
+// The existing StrongsInAStruct becomes available with the feature flag.
+func testExistingStrongStructImport() {
+  var s = StrongsInAStruct()
+  s.nsstr = "hello"
+  _ = s
+}
+
+// Strong fields with a Swift-bridged ObjC type (NSString -> String) should
+// import as computed properties backed by private stored properties.
+// CHECK-IDE-TEST: struct StrongNSStringArc {
+// CHECK-IDE-TEST:   init(name: String, tag: Int32)
+// CHECK-IDE-TEST:   var _name: NSString
+// CHECK-IDE-TEST:   var tag: Int32
+// CHECK-IDE-TEST:   var name: String
+// CHECK-IDE-TEST: }
+
+func bridgedFieldAccess(_ s: StrongNSStringArc) -> String {
+  return s.name
+}
+
+func bridgedFieldConstruction() -> StrongNSStringArc {
+  return StrongNSStringArc(name: "hello", tag: 42)
+}
+
+func bridgedFieldMutation() {
+  var s = StrongNSStringArc(name: "hello", tag: 1)
+  s.name = "world"
+  _ = s
 }
 
 // An ARC struct marked NS_SWIFT_UNAVAILABLE is still imported but cannot be used.

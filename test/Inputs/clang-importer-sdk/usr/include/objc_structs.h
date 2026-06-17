@@ -27,6 +27,11 @@ struct StrongsInAStructArc {
 void takeStrongArcStruct(struct StrongsInAStructArc s);
 struct StrongsInAStructArc returnStrongArcStruct(void);
 
+struct StrongNSStringArc {
+  __strong NSString *_Nonnull name;
+  int tag;
+};
+
 struct UnavailableArcStruct {
   __strong MYObject *_Nonnull myobj;
 } NS_SWIFT_UNAVAILABLE("Use MySwiftType instead");
