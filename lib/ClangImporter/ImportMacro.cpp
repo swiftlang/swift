@@ -20,6 +20,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericParamList.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
@@ -28,6 +30,7 @@
 #include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/AST/Expr.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
@@ -497,6 +500,49 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
 
   return V;
 }
+
+ValueDecl *importTypeDeclAlias(ClangImporter::Implementation &clang,
+                               swift::DeclContext *DC, const clang::NamedDecl *D,
+                               Identifier alias) {
+  if (!DC->getASTContext().LangOpts.hasFeature(Feature::ImportMacroAliases))
+    return nullptr;
+
+  // Ignore self-referential macros.
+  if (D->getName() == alias.str())
+    return nullptr;
+
+  swift::Decl *imported = clang.importDecl(D, clang.CurrentVersion);
+  if (imported == nullptr)
+    return nullptr;
+
+  swift::TypeDecl *TD = dyn_cast<TypeDecl>(imported);
+  if (TD == nullptr)
+    return nullptr;
+
+  // If the imported type is named identically, avoid the aliasing.
+  if (TD->getName().str() == alias.str())
+    return nullptr;
+
+  auto *aliasDecl = clang.createDeclWithClangNode<TypeAliasDecl>(
+      D, swift::AccessLevel::Public,
+      /*StartLoc=*/SourceLoc(), /*EqualLoc=*/SourceLoc(),
+      alias, /*NameLoc=*/SourceLoc(), /*genericparams*/ nullptr, DC);
+
+  auto *GTD = dyn_cast<GenericTypeDecl>(TD);
+  if (GTD && !isa<ProtocolDecl>(GTD)) {
+    aliasDecl->setGenericSignature(GTD->getGenericSignature());
+    if (GTD->hasGenericParamList()) {
+      aliasDecl->getASTContext().evaluator.cacheOutput(
+            GenericParamListRequest{aliasDecl},
+            std::move(GTD->getGenericParams()->clone(aliasDecl)));
+    }
+  }
+
+  aliasDecl->setUnderlyingType(TD->getDeclaredInterfaceType());
+  aliasDecl->markAsCompatibilityAlias();
+
+  return aliasDecl;
+}
 } // namespace
 
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
@@ -642,9 +688,15 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       clang::LookupResult R(S, {{tok.getIdentifierInfo()}, {}},
                             clang::Sema::LookupAnyName);
       if (S.LookupName(R, S.TUScope))
-        if (R.getResultKind() == clang::LookupResultKind::Found)
-          if (const auto *VD = dyn_cast<clang::ValueDecl>(R.getFoundDecl()))
+        if (R.getResultKind() == clang::LookupResultKind::Found) {
+          if (const auto *VD = dyn_cast<clang::ValueDecl>(R.getFoundDecl())) {
             return importDeclAlias(impl, DC, VD, name);
+          } else if (isa<clang::TypeDecl>(R.getFoundDecl()) ||
+                     isa<clang::ObjCInterfaceDecl>(R.getFoundDecl()) ||
+                     isa<clang::ObjCProtocolDecl>(R.getFoundDecl())) {
+            return importTypeDeclAlias(impl, DC, R.getFoundDecl(), name);
+          }
+        }
     }
 
     // TODO(https://github.com/apple/swift/issues/57735): Seems rare to have a single token that is neither a literal nor an identifier, but add diagnosis.
