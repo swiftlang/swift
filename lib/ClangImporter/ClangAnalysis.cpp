@@ -92,40 +92,13 @@ class ForeignReferenceTypeChecker {
   }
 
   /// Whether \p base is non-null and has an offset of zero from \c checkedDecl.
-  bool atOffsetZero(const clang::CXXRecordDecl *base) const {
+  bool isPresentAndAtOffsetZero(const clang::CXXRecordDecl *base) const {
     ASSERT(checkedDecl);
     if (base == nullptr)
       return false;
     auto &clangCtx = checkedDecl->getASTContext();
     auto &layout = clangCtx.getASTRecordLayout(checkedDecl);
     return layout.getBaseClassOffset(base).isZero();
-  }
-
-  /// Extract the retain and release operation annotations from \p decl.
-  static std::pair<StringRef, StringRef>
-  getRetainReleaseOps(const clang::RecordDecl *decl) {
-    if (!decl->hasAttrs())
-      return {StringRef(), StringRef()};
-
-    StringRef retain{}, release{};
-    for (auto attr : decl->getAttrs()) {
-      auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
-      if (!swiftAttr)
-        continue;
-
-      auto attrStr = swiftAttr->getAttribute();
-
-      if (attrStr.consume_front("retain:"))
-        retain = attrStr;
-      else if (attrStr.consume_front("release:"))
-        release = attrStr;
-    }
-    return {retain, release};
-  }
-
-  /// Whether \p x is non-nullopt and matches \p y.
-  static bool opsMatch(StringRef x, StringRef y) {
-    return !x.empty() && x == y;
   }
 
 public:
@@ -142,10 +115,16 @@ public:
     ASSERT(checkedDecl && "ForeignReferenceTypeInfo should only be used once");
     SWIFT_DEFER { checkedDecl = nullptr; };
 
-    bool explicitlyAnnotated = importer::hasImportReferenceAttr(checkedDecl);
-    const clang::CXXRecordDecl *uniqueDirectFRTBase = visitBases(checkedDecl);
+    if (importer::hasImportReferenceAttr(checkedDecl)) {
+      // checkedDecl is explicitly annotated as a foreign reference type.
+      // Do not let it have a primarySuperclass, to prevent upcasting past the
+      // annotation boundary in the class hierarchy.
+      return ForeignReferenceTypeInfo::Shared(checkedDecl,
+                                              /*primarySuperclass=*/nullptr);
+    }
 
-    if (!explicitlyAnnotated && FRTBases.empty()) {
+    const clang::CXXRecordDecl *uniqueDirectFRTBase = visitBases(checkedDecl);
+    if (FRTBases.empty()) {
       // Neither checkedDecl nor any of its base classes are annotated as
       // a reference type, so checkedDecl is a value type.
       ASSERT(uniqueDirectFRTBase == nullptr &&
@@ -155,59 +134,48 @@ public:
 
     // The primary FRT superclass is the unique direct FRT base of checkedDecl,
     // but only if it is at offset 0 (so a pointer bitcast suffices for upcast).
-    auto *primarySuperclass =
-        atOffsetZero(uniqueDirectFRTBase) ? uniqueDirectFRTBase : nullptr;
+    auto *primarySuperclass = isPresentAndAtOffsetZero(uniqueDirectFRTBase)
+                                  ? uniqueDirectFRTBase
+                                  : nullptr;
 
-    if (explicitlyAnnotated && primarySuperclass) {
-      auto [retain, release] = getRetainReleaseOps(checkedDecl);
-      auto [superRetain, superRelease] = getRetainReleaseOps(primarySuperclass);
-      if (!opsMatch(retain, superRetain) || !opsMatch(release, superRelease))
-        primarySuperclass = nullptr;
-    }
+    const clang::CXXRecordDecl *FRTBase = nullptr;
+    bool seenShared = false, seenMultipleShared = false, seenImmortal = false;
 
-    const clang::CXXRecordDecl *FRTBase;
-    if (explicitlyAnnotated) {
-      FRTBase = checkedDecl;
-    } else {
-      ASSERT(!FRTBases.empty() && "if checkedDecl wasn't explicitly annotated,"
-                                  "at least one of its bases should be an FRT");
-      FRTBase = nullptr;
-      bool seenShared = false, seenMultipleShared = false, seenImmortal = false;
-      for (auto *base : FRTBases) {
-        if (importer::hasAnyImmortalAttr(base)) {
-          seenImmortal = true;
-        } else if (!FRTBase) {
-          FRTBase = base;
-          seenShared = true;
-        } else {
-          seenMultipleShared = true;
-        }
-      }
-
-      // If there are no shared references, FRTBase is the first immortal base
-      FRTBase = FRTBase ? FRTBase : FRTBases.front();
-
-      if (seenMultipleShared || (seenShared && seenImmortal)) {
-        // checkedDecl is an invalid FRT, either because it has multiple shared
-        // FRT bases (ambiguous retain/release ops), or because it has mixed
-        // ancestry between shared and immortal bases.
-        if (Impl)
-          Impl->diagnose(HeaderLoc{checkedDecl->getLocation()},
-                         diag::cant_infer_frt_in_cxx_inheritance, checkedDecl);
-
-        // decl inherits from FRT base, so we should treat it as a reference
-        // type, albeit an invalid one (due to ambiguity).
-        //
-        // return ForeignReferenceTypeInfo::Shared(FRTBase, nullptr,
-        //                                         /*isValid=*/false);
-        //
-        // However, to honor the existing behavior, (for now) we will report
-        // that this is an (invalid) value type.
-        return ForeignReferenceTypeInfo::Value(/*isValid=*/false);
+    for (auto *base : FRTBases) {
+      if (importer::hasAnyImmortalAttr(base)) {
+        seenImmortal = true;
+      } else if (!FRTBase) {
+        FRTBase = base;
+        seenShared = true;
+      } else {
+        seenMultipleShared = true;
       }
     }
 
-    ASSERT(FRTBase && "should have encountered FRTBase");
+    // If there are no shared references, FRTBase is the first immortal base.
+    if (!FRTBase) {
+      ASSERT(seenImmortal && "should have encountered immortal FRTBase");
+      FRTBase = FRTBases.front();
+    }
+
+    if (seenMultipleShared || (seenShared && seenImmortal)) {
+      // checkedDecl is an invalid FRT, either because it has multiple shared
+      // FRT bases (ambiguous retain/release ops), or because it has mixed
+      // ancestry between shared and immortal bases.
+      if (Impl)
+        Impl->diagnose(HeaderLoc{checkedDecl->getLocation()},
+                       diag::cant_infer_frt_in_cxx_inheritance, checkedDecl);
+
+      // decl inherits from FRT base, so we should treat it as a reference
+      // type, albeit an invalid one (due to ambiguity).
+      //
+      // return ForeignReferenceTypeInfo::Shared(FRTBase, nullptr,
+      //                                         /*isValid=*/false);
+      //
+      // However, to honor the existing behavior, (for now) we will report
+      // that this is an (invalid) value type.
+      return ForeignReferenceTypeInfo::Value(/*isValid=*/false);
+    }
     return ForeignReferenceTypeInfo::Shared(FRTBase, primarySuperclass);
   }
 };
