@@ -3,6 +3,8 @@
 // Simple structs where Codable conformance is added in extensions should derive
 // conformance.
 struct SimpleStruct {
+  // expected-note@-1 {{did you mean 'x'?}}
+  // expected-note@-2 {{did you mean 'y'?}}
   var x: Int
   var y: Double
   static var z: String = "foo"

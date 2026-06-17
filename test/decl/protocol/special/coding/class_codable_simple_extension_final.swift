@@ -3,6 +3,8 @@
 // Simple final classes where Codable conformance is added in extensions should
 // be able to derive conformance for both Codable protocols.
 final class SimpleClass {
+  // expected-note@-1 {{did you mean 'x'?}}
+  // expected-note@-2 {{did you mean 'y'?}}
   var x: Int = 1
   var y: Double = .pi
   static var z: String = "foo"

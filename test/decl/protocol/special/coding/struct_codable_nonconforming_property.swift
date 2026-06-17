@@ -22,6 +22,9 @@ struct NonConformingStruct : Codable { // expected-error {{type 'NonConformingSt
   // expected-error@-2 {{type 'NonConformingStruct' does not conform to protocol 'Encodable'}}
   // expected-error@-3 {{type 'NonConformingStruct' does not conform to protocol 'Encodable'}}
   // expected-note@-4 {{did you mean 'init'?}}
+  // expected-note@-5 {{did you mean 'w'?}}
+  // expected-note@-6 {{did you mean 'x'?}}
+  // expected-note@-7 {{did you mean 'y'?}}
   var w: NonCodable // expected-note {{cannot automatically synthesize 'Decodable' because 'NonCodable' does not conform to 'Decodable'}}
   // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'NonCodable' does not conform to 'Decodable'}}
   // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'NonCodable' does not conform to 'Encodable'}}

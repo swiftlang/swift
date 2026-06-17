@@ -3,6 +3,8 @@
 // Simple structs with all Codable properties should get derived conformance to
 // Codable.
 struct SimpleStruct : Codable {
+  // expected-note@-1 {{did you mean 'x'?}}
+  // expected-note@-2 {{did you mean 'y'?}}
   var x: Int
   var y: Double
   static var z: String = "foo"
@@ -29,4 +31,3 @@ struct A: Codable {
   var property: String
   static let propertyName = CodingKeys.property.stringValue
 }
-

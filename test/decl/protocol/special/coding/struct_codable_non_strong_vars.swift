@@ -3,6 +3,8 @@
 // Structs with Codable properties (with non-strong ownership) should get
 // derived conformance to Codable.
 struct NonStrongStruct : Codable {
+  // expected-note@-1 {{did you mean 'x'?}}
+  // expected-note@-2 {{did you mean 'y'?}}
   class NestedClass : Codable {
     init() {}
   }

@@ -4,6 +4,8 @@
 // but their lazy and computed members should be skipped as part of the
 // synthesis.
 struct StructWithComputedMembers : Codable {
+    // expected-note@-1 {{'x' declared here}}
+    // expected-note@-2 {{'x' declared here}}
     var x: Int
     lazy var y: Double = Double.pi
     var z: String {

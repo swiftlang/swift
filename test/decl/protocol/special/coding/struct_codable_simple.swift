@@ -3,6 +3,9 @@
 // Simple structs with all Codable properties should get derived conformance to
 // Codable.
 struct SimpleStruct : Codable {
+    // expected-note@-1 {{did you mean 'x'?}}
+    // expected-note@-2 {{did you mean 'y'?}}
+    
     var x: Int
     var y: Double
     static var z: String = "foo"
@@ -34,6 +37,8 @@ let _ = SimpleStruct.CodingKeys.self // expected-error {{'CodingKeys' is inacces
 // https://github.com/apple/swift/issues/54675
 
 struct S1_54675: Codable { // expected-error {{type 'S1_54675' does not conform to protocol 'Encodable'}} expected-error {{type 'S1_54675' does not conform to protocol 'Decodable'}}
+  // expected-note@-1 {{CodingKey case 'x' does not match any stored properties}}
+  
   var x: Int // expected-note {{'x' previously declared here}}
   var x: Int // expected-error {{invalid redeclaration of 'x'}}
   // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'Int' does not conform to 'Encodable'}}
@@ -41,11 +46,13 @@ struct S1_54675: Codable { // expected-error {{type 'S1_54675' does not conform 
 }
 
 struct S2_54675: Decodable { // expected-error {{type 'S2_54675' does not conform to protocol 'Decodable'}}
+  // expected-note@-1 {{CodingKey case 'x' does not match any stored properties}}
   var x: Int // expected-note {{'x' previously declared here}}
   var x: Int // expected-error {{invalid redeclaration of 'x'}}
 }
 
 struct S3_54675: Encodable { // expected-error {{type 'S3_54675' does not conform to protocol 'Encodable'}}
+  // expected-note@-1 {{CodingKey case 'x' does not match any stored properties}}
   var x: Int // expected-note {{'x' previously declared here}}
   var x: Int // expected-error {{invalid redeclaration of 'x'}}
 }

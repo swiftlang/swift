@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -swift-version 4
 
 final class Conditional<T> {
+  // expected-note@-1 {{did you mean 'x'?}}
+  // expected-note@-2 {{did you mean 'y'?}}
   var x: T
   var y: T?
 

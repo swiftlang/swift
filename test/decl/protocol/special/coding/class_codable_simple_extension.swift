@@ -3,6 +3,8 @@
 // Non-final classes where Codable conformance is added in extensions should
 // only be able to derive conformance for Encodable.
 class SimpleClass { // expected-note {{did you mean 'init'?}}
+  // expected-note@-1 {{did you mean 'x'?}}
+  // expected-note@-2 {{did you mean 'y'?}}
   var x: Int = 1
   var y: Double = .pi
   static var z: String = "foo"

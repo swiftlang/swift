@@ -1,6 +1,8 @@
 // Simple classes with all Codable properties should get derived conformance to
 // Codable.
 class SimpleClass : Codable {
+  // expected-note@-1 {{did you mean 'x'?}}
+  // expected-note@-2 {{did you mean 'y'?}}
   var x: Int = 1
   var y: Double = .pi
   static var z: String = "foo"

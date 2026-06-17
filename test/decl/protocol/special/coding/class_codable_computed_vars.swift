@@ -4,6 +4,7 @@
 // but their lazy and computed members should be skipped as part of the
 // synthesis.
 class ClassWithComputedMembers : Codable {
+  // expected-note@-1 2 {{'x' declared here}}
   var x: Int = 1
   lazy var y: Double = .pi
   var z: String {
@@ -20,10 +21,9 @@ class ClassWithComputedMembers : Codable {
     let _ = ClassWithComputedMembers.CodingKeys.x
 
     // Lazy vars should not be part of the CodingKeys enum.
-    let _ = ClassWithComputedMembers.CodingKeys.y // expected-error {{type 'ClassWithComputedMembers.CodingKeys' has no member 'y'}}
-
+    let _ = ClassWithComputedMembers.CodingKeys.y // expected-error {{type 'ClassWithComputedMembers.CodingKeys' has no member 'y'; did you mean 'x'?}}
     // Computed vars should not be part of the CodingKeys enum.
-    let _ = ClassWithComputedMembers.CodingKeys.z // expected-error {{type 'ClassWithComputedMembers.CodingKeys' has no member 'z'}}
+    let _ = ClassWithComputedMembers.CodingKeys.z // expected-error {{type 'ClassWithComputedMembers.CodingKeys' has no member 'z'; did you mean 'x'?}}
   }
 }
 
