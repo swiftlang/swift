@@ -1818,8 +1818,9 @@ static bool isEnumObjC(EnumDecl *enumDecl, DeclAttribute *attr) {
     SourceRange errorRange;
     if (!enumDecl->getInherited().empty())
       errorRange = enumDecl->getInherited().getEntry(0).getSourceRange();
-    enumDecl->diagnose(diag::objc_enum_raw_type_not_integer, attr, rawType)
-      .highlight(errorRange);
+    auto languageName = dyn_cast<ObjCAttr>(attr) ? "Objective-C" : "C";
+    enumDecl->diagnose(diag::objc_enum_raw_type_not_integer, attr, rawType,
+      languageName).highlight(errorRange);
     return false;
   }
 
