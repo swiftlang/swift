@@ -1955,6 +1955,20 @@ public:
     return createNominalType(typeAliasDecl, parent);
   }
 
+  /// Determine whether the generic parameter at the given index is a value
+  /// parameter. Returns std::nullopt if the type isn't generic or the index is
+  /// out of range.
+  std::optional<bool> isValueGenericParameter(BuiltTypeDecl anyTypeDecl,
+                                              unsigned index) const {
+    auto typeDecl = dyn_cast<TypeContextDescriptor>(anyTypeDecl);
+    if (!typeDecl)
+      return std::nullopt;
+    auto localParams = getLocalGenericParams(typeDecl);
+    if (index >= localParams.size())
+      return std::nullopt;
+    return localParams[index].getKind() == GenericParamKind::Value;
+  }
+
   TypeLookupErrorOr<BuiltType>
   createBoundGenericType(BuiltTypeDecl anyTypeDecl,
                          llvm::ArrayRef<BuiltType> genericArgs,
@@ -2517,7 +2531,9 @@ swift_getTypeByMangledNodeImpl(MetadataRequest request, Demangler &demangler,
   // swift_checkMetadataState after the fact.
   DecodedMetadataBuilder builder(demangler, substGenericParam,
                                  substWitnessTable);
-  auto type = Demangle::decodeMangledType(builder, node);
+  auto type =
+      Demangle::decodeMangledType(builder, node, /*forRequirement=*/false,
+                                  /*allowValue=*/false);
   if (type.isError()) {
     return *type.getError();
   }
@@ -2809,7 +2825,9 @@ swift::getTypePackByMangledName(StringRef typeName,
 
   DecodedMetadataBuilder builder(demangler, substGenericParam,
                                  substWitnessTable);
-  auto type = Demangle::decodeMangledType(builder, node);
+  auto type =
+      Demangle::decodeMangledType(builder, node, /*forRequirement=*/false,
+                                  /*allowValue=*/false);
   if (type.isError()) {
     return *type.getError();
   }

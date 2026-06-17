@@ -954,6 +954,14 @@ public:
     return IntegerTypeRef::create(*this, value);
   }
 
+  // TypeRefs model generic values as distinct IntegerTypeRefs, so a value
+  // argument is never misinterpreted as a type; the demangler's value/type
+  // consistency check is unnecessary here.
+  std::optional<bool> isValueGenericParameter(const BuiltTypeDecl &,
+                                              unsigned index) {
+    return std::nullopt;
+  }
+
   const TypeRef *createNegativeIntegerType(intptr_t value) {
     return IntegerTypeRef::create(*this, value);
   }

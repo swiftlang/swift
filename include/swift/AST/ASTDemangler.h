@@ -167,6 +167,14 @@ public:
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args,
                               Type parent);
 
+  // This is used by the runtime's type lookup to catch the case where a mangled
+  // name specifies a value argument where a type argument is supposed to go.
+  // The AST builder doesn't have that problem so we skip that check entirely.
+  std::optional<bool> isValueGenericParameter(GenericTypeDecl *decl,
+                                              unsigned index) {
+    return std::nullopt;
+  }
+
   Type createTupleType(ArrayRef<Type> eltTypes, ArrayRef<StringRef> labels);
 
   Type createPackType(ArrayRef<Type> eltTypes);
