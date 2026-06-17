@@ -1,5 +1,6 @@
 
 if(WIN32)
+  option(SWIFT_ASSEMBLY_VERSION "Assembly Version" "${PROJECT_VERSION}")
   option(SWIFT_PUBLIC_KEY_TOKEN "Code Signing Identity" "0000000000000000")
 endif()
 
@@ -67,7 +68,7 @@ function(embed_version_info target)
   get_target_property(_EVI_NAME ${target} NAME)
 
   # Pad the project version to a four-part `MAJOR.MINOR.PATCH.TWEAK`
-  string(REGEX MATCHALL "[0-9]+" version_parts "${PROJECT_VERSION}")
+  string(REGEX MATCHALL "[0-9]+" version_parts "${SWIFT_ASSEMBLY_VERSION}")
   list(LENGTH version_parts version_part_count)
   while(version_part_count LESS 4)
     list(APPEND version_parts "0")
@@ -150,7 +151,7 @@ function(embed_manifest target)
   get_target_property(_EM_NAME ${target} NAME)
 
   # Pad the project version to a four-part `MAJOR.MINOR.PATCH.TWEAK`
-  string(REGEX MATCHALL "[0-9]+" version_parts "${PROJECT_VERSION}")
+  string(REGEX MATCHALL "[0-9]+" version_parts "${SWIFT_ASSEMBLY_VERSION}")
   list(LENGTH version_parts version_part_count)
   while(version_part_count LESS 4)
     list(APPEND version_parts "0")

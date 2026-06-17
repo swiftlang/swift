@@ -4263,6 +4263,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
           CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+          SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
           SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
           dispatch_DIR = (Get-ProjectCMakeModules $Platform ([Project]"${Variant}CDispatch"));
@@ -4299,6 +4300,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
         -Defines ($SDKInstallDefines + @{
           BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+          SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
           SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
           SwiftCore_DIR = "$RuntimeBinaryCache\cmake\SwiftCore";
@@ -4325,6 +4327,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
             SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR = "$RuntimeBinaryCache\cmake\SwiftCore";
@@ -4350,6 +4353,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
             SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
@@ -4378,6 +4382,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
             CMAKE_CXX_FLAGS = @("-I$RuntimeBinaryCache\include");
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
             SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
@@ -4405,6 +4410,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
             CMAKE_CXX_FLAGS = @("-I$RuntimeBinaryCache\include");
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
             SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
@@ -4431,6 +4437,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
             SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
@@ -4457,6 +4464,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
             SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
@@ -4484,6 +4492,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
             SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR       = "$RuntimeBinaryCache\cmake\SwiftCore";
