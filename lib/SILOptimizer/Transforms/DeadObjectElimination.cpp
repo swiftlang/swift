@@ -1101,6 +1101,9 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
     // owned value). Inserting the destroy at the deletion point shortens those
     // values' lifetimes, so bail out if any of them is lexical or has a pointer
     // escape.
+    InstructionSet usersToRemoveSet(KPI->getFunction());
+    for (auto *user : UsersToRemove)
+      usersToRemoveSet.insert(user);
     for (auto *user : UsersToRemove) {
       for (const Operand &op : user->getAllOperands()) {
         if (!op.isConsuming())
@@ -1109,7 +1112,7 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
         // Values defined within the dead graph are replaced with undef before
         // deletion, so they are never compensated.
         if (auto *def = value->getDefiningInstruction())
-          if (UsersToRemove.count(def))
+          if (usersToRemoveSet.contains(def))
             continue;
         if (value->isLexical() || findPointerEscape(value))
           return false;
