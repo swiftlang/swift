@@ -328,10 +328,11 @@ public:
   /// SuppressedAssociatedTypesWithDefaults (aka SE-503).
   ///
   /// Do not introduce new uses of this function. It should be removed!
-  void getRequirementsWithInversesAndOmitted(
+  ///
+  /// \param reqs will include extra requirements for the ASTPrinter.
+  void getRequirementsWithInversesForPrinting(
       SmallVector<Requirement, 2> &reqs,
-      SmallVector<InverseRequirement, 2> &inverses,
-      SmallVector<Requirement, 2> &omitted) const;
+      SmallVector<InverseRequirement, 2> &inverses) const;
 
   /// Iterate over all generic parameters, passing a flag to the callback
   /// indicating if the generic parameter is canonical or not.
@@ -561,6 +562,17 @@ private:
   /// Return the reduced version of the given type under this generic
   /// signature.
   CanType getReducedType(Type type) const;
+
+  /// Transform the requirements into a form where implicit Copyable and
+  /// Escapable conformances are omitted, and their absence is explicitly
+  /// noted.
+  ///
+  /// \param ForPrinting controls whether some Requirements are not omitted,
+  /// for the ASTPrinter's needs.
+  void getRequirementsWithInversesImpl(
+      SmallVector<Requirement, 2> &reqs,
+      SmallVector<InverseRequirement, 2> &inverses,
+      bool ForPrinting) const;
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);

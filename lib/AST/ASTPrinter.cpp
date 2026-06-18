@@ -2054,8 +2054,7 @@ void PrintAST::printGenericSignature(
     requirements.append(genericSig.getRequirements().begin(),
                         genericSig.getRequirements().end());
   } else if (flags & PrintInverseRequirements) {
-    genericSig->getRequirementsWithInversesAndOmitted(requirements, inverses,
-                                                      /*omitted=*/requirements);
+    genericSig->getRequirementsWithInversesForPrinting(requirements, inverses);
     llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
       return !inverseFilter(inverse);
     });
@@ -3455,8 +3454,7 @@ void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
     SmallVector<Requirement, 2> requirements;
     SmallVector<InverseRequirement, 2> inverses;
     auto Sig = ED->getGenericSignature();
-    Sig->getRequirementsWithInversesAndOmitted(requirements, inverses,
-                                               /*omitted=*/requirements);
+    Sig->getRequirementsWithInversesForPrinting(requirements, inverses);
     printSingleDepthOfGenericSignature(
         Sig.getGenericParams(),
         requirements,

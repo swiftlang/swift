@@ -1360,15 +1360,19 @@ GenericSignature GenericSignature::withoutMarkerProtocols() const {
 void GenericSignatureImpl::getRequirementsWithInverses(
     SmallVector<Requirement, 2> &reqs,
     SmallVector<InverseRequirement, 2> &inverses) const {
-  // Throwing away the omitted requirements is the normal behavior.
-  SmallVector<Requirement, 2> _throw_away_omitted;
-  getRequirementsWithInversesAndOmitted(reqs, inverses, _throw_away_omitted);
+  getRequirementsWithInversesImpl(reqs, inverses, /*ForPrinting*/ false);
 }
 
-void GenericSignatureImpl::getRequirementsWithInversesAndOmitted(
+void GenericSignatureImpl::getRequirementsWithInversesForPrinting(
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses) const {
+  getRequirementsWithInversesImpl(reqs, inverses, /*ForPrinting*/ true);
+}
+
+void GenericSignatureImpl::getRequirementsWithInversesImpl(
     SmallVector<Requirement, 2> &reqs,
     SmallVector<InverseRequirement, 2> &inverses,
-    SmallVector<Requirement, 2> &omitted) const {
+    bool ForPrinting) const {
   auto &ctx = getASTContext();
 
   llvm::SmallSet<CanType, 12> seenDMTs;
@@ -1479,13 +1483,12 @@ void GenericSignatureImpl::getRequirementsWithInversesAndOmitted(
 
     // If the subject matches a primary associated type we identified earlier,
     // then we will infer a default for them, so drop this requirement.
-    if (seenDMTs.contains(subject->getCanonicalType())) {
-      // To maintain with compatability between SE-503 and the deprecated
-      // SuppressedAssociatedTypes, preserve provide these in the "omitted"
-      // output for the ASTPrinter.
-      omitted.push_back(req);
+    //
+    // To maintain with compatability between SE-503 and the deprecated
+    // SuppressedAssociatedTypes, we preserve these requirements when the
+    // purpose is for the ASTPrinter.
+    if (!ForPrinting && seenDMTs.contains(subject->getCanonicalType()))
       continue;
-    }
 
     // Otherwise, for a non-primary associated type, no default is inferred,
     // thus this conformance requirement was explicitly stated. Keep it.
