@@ -311,7 +311,8 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str,
                                                        MangledTypeRefRole role){
-  return getAddrOfStringForTypeRef(SymbolicMangling{str.str(), {}}, role);
+  return getAddrOfStringForTypeRef(SymbolicMangling{str.str(), {}, nullptr},
+                                   role);
 }
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
@@ -436,7 +437,16 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
   
   // And a null terminator!
   S.addInt(Int8Ty, 0);
-  
+
+  // Append a pointer to the external Obj-C class, if present, after the null
+  // terminator. This ensures that the linker doesn't strip those classes if
+  // the user is intentionally linking without `-ObjC` or `-force_load`.
+  if (mangling.ObjCClassRef) {
+    S.addRelativeAddress(getAddrOfLLVMVariableOrGOTEquivalent(
+                             LinkEntity::forObjCClassRef(mangling.ObjCClassRef))
+                             .getValue());
+  }
+
   auto finished = S.finishAndCreateFuture();
   auto var = new llvm::GlobalVariable(Module, finished.getType(),
                                       /*constant*/ true,
