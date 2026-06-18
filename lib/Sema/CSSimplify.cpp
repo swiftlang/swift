@@ -9406,7 +9406,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           auto *fix = AllowInvalidStaticMemberRefOnProtocolMetatype::create(
               *this, memberLoc);
 
-          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+          return recordFix(fix, FixImpact::InvalidReference)
+                     ? SolutionKind::Error
+                     : SolutionKind::Solved;
         }
       }
 
@@ -11909,7 +11911,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           solveWithNewBaseOrName(baseTy, DeclNameRef::createSubscript());
       // Looks like it was indeed meant to be a subscript operator.
       if (result == SolutionKind::Solved)
-        return recordFix(UseSubscriptOperator::create(*this, locator))
+        return recordFix(UseSubscriptOperator::create(*this, locator),
+                         FixImpact::InvalidReference)
                    ? SolutionKind::Error
                    : SolutionKind::Solved;
     }
@@ -12634,7 +12637,8 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
     recordAnyTypeVarAsPotentialHole(type2);
 
     recordFix(IgnoreNonMetatypeDynamicType::create(
-        *this, type2, type1, getConstraintLocator(locator)));
+                  *this, type2, type1, getConstraintLocator(locator)),
+              FixImpact::TypeMismatch);
     return SolutionKind::Solved;
   }
 
@@ -13935,7 +13939,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
         *this, desugar2, memberName, /*alreadyDiagnosed=*/false,
         getConstraintLocator(loc, ConstraintLocator::DynamicCallable));
 
-    if (recordFix(fix))
+    if (recordFix(fix, FixImpact::InvalidReference))
       return SolutionKind::Error;
 
     recordPotentialHole(tv);
