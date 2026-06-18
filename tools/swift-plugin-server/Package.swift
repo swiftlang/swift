@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
   name: "swift-plugin-server",
   platforms: [
-    .macOS(.v13)
+    .macOS(.v14)
   ],
   products: [
     .executable(name: "swift-plugin-server", targets: ["swift-plugin-server"]),
@@ -14,6 +14,7 @@ let package = Package(
   dependencies: [
     .package(path: "../../../swift-syntax"),
     .package(path: "../../../wasmkit"),
+    .package(path: "../../../swift-system"),
   ],
   targets: [
     .executableTarget(

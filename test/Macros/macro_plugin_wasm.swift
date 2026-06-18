@@ -20,10 +20,10 @@
 // RUN: %FileCheck %s < %t/macro-loading.txt
 
 // CHECK: ->(plugin:[[#PID:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION:]]}}}
-// CHECK: <-(plugin:[[#PID]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library"],"protocolVersion":7}}}
+// CHECK: <-(plugin:[[#PID]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
 // CHECK: ->(plugin:[[#PID]]) {"loadPluginLibrary":{"libraryPath":"{{.*[\\/]}}Plugin.wasm","moduleName":"MacroDefinition"}}
 // CHECK: <-(plugin:[[#PID]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
-// CHECK: ->(plugin:[[#PID]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"constInt","typeName":"ConstMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":16,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":4,"offset":143},"source":"#constInt"}}}
+// CHECK: ->(plugin:[[#PID]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"constInt","typeName":"ConstMacro"},"macroRole":"expression","staticBuildConfiguration":{{.*}},"syntax":{"kind":"expression","location":{"column":16,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":4,"offset":143},"source":"#constInt"}}}
 // CHECK: <-(plugin:[[#PID]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"1"}}
 
 //--- test.swift
@@ -43,8 +43,30 @@ static void write_json(const char *json) {
   swift_write(1, json, len);
 }
 
+// Read exactly 'len' bytes (the host frames each message as length + body).
+static void read_fully(int fd, void *buf, wasi_size_t len) {
+  uint8_t *p = (uint8_t *)buf;
+  wasi_size_t total = 0;
+  while (total < len) {
+    wasi_size_t n = swift_read(fd, p + total, len - total);
+    if (n == 0) break; // EOF
+    total += n;
+  }
+}
+
+// Returns 1 if 'needle' occurs within the first 'len' bytes of 'buf'.
+static int contains(const char *buf, wasi_size_t len, const char *needle) {
+  wasi_size_t nlen = swift_strlen(needle);
+  if (nlen == 0 || nlen > len) return 0;
+  for (wasi_size_t i = 0; i + nlen <= len; i++) {
+    wasi_size_t j = 0;
+    while (j < nlen && buf[i + j] == needle[j]) j++;
+    if (j == nlen) return 1;
+  }
+  return 0;
+}
+
 int was_start_called = 0;
-int pump_calls = 0;
 
 __attribute__((export_name("_start")))
 void _start(void) {
@@ -55,6 +77,21 @@ void _start(void) {
 __attribute__((export_name("swift_wasm_macro_v1_pump")))
 void pump(void) {
   if (!was_start_called) swift_abort("_start not called!");
-  if (pump_calls++ != 0) swift_abort("expected pump to be called once");
-  write_json("{\"expandMacroResult\": {\"expandedSource\": \"1\", \"diagnostics\": []}}");
+
+  // Each pump handles one framed request: 8-byte little-endian length, then body.
+  uint64_t len64 = 0;
+  read_fully(0, &len64, sizeof(len64));
+  wasi_size_t len = (wasi_size_t)len64;
+  static char request[4096];
+  if (len > sizeof(request)) len = sizeof(request);
+  read_fully(0, request, len);
+
+  // The server forwards 'getCapability' before any expansion; answer it, else produce
+  // the canned expansion result. Substring routing suffices for this fixed test input
+  // (the expand request never contains the bytes "getCapability").
+  if (contains(request, len, "getCapability")) {
+    write_json("{\"getCapabilityResult\": {\"capability\": {\"protocolVersion\": 8, \"features\": [\"load-plugin-library\"]}}}");
+  } else {
+    write_json("{\"expandMacroResult\": {\"expandedSource\": \"1\", \"diagnostics\": []}}");
+  }
 }
