@@ -64,6 +64,23 @@ struct Region {
 namespace llvm {
 
 template <>
+struct DenseMapInfo<swift::PartitionPrimitives::Element> {
+  using Element = swift::PartitionPrimitives::Element;
+
+  static Element getEmptyKey() {
+    return Element(DenseMapInfo<unsigned>::getEmptyKey());
+  }
+  static Element getTombstoneKey() {
+    return Element(DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(Element element) {
+    return DenseMapInfo<unsigned>::getHashValue(element);
+  }
+  static bool isEqual(Element LHS, Element RHS) { return LHS == RHS; }
+};
+
+template <>
 struct DenseMapInfo<swift::PartitionPrimitives::Region> {
   using Region = swift::PartitionPrimitives::Region;
 

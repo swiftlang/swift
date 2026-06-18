@@ -15,6 +15,7 @@
 // We only use this so we can implement print on our type erased errors.
 #include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
 
 #define DEBUG_TYPE "region-isolation"
@@ -256,9 +257,19 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
                                   IsolationHistory inputHistory) {
   Partition p(inputHistory);
   if (!indices.empty()) {
+    // De-duplicate indices: pushing AddNewRegionForElement / merge nodes
+    // for the same element more than once is unrecoverable in popHistory
+    // (the second pop's removeElement asserts because the first pop
+    // already extracted the element). Callers may pass duplicates without
+    // realizing it; absorb that here rather than crashing on rewind.
+    SmallVector<Element, 8> uniqueIndices;
+    for (Element idx : indices)
+      uniqueIndices.push_back(idx);
+    sortUnique(uniqueIndices);
+
     // Lowest element is our region representative and the value that our
     // region takes.
-    Element repElement = *std::min_element(indices.begin(), indices.end());
+    Element repElement = uniqueIndices[0];
     Region repElementRegion = Region(repElement);
     p.nextAvailableRegionNum = Region(repElementRegion + 1);
 
@@ -266,17 +277,25 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
     // sequence.
     p.pushHistorySequenceBoundary(loc);
 
-    // First create a region for repElement. We are going to merge all other
-    // regions into its region.
+    // First create a region for repElement. We are going to merge each other
+    // element into its region one at a time.
     p.pushNewElementRegion(repElement);
-    llvm::SmallVector<Element, 32> nonRepElts;
-    for (Element index : indices) {
+    for (Element index : uniqueIndices) {
       p.elementToRegionMap.insert_or_assign(index, repElementRegion);
       if (index != repElement) {
+        // Each non-rep element is recorded as "born into its own region, then
+        // absorbed into repElement's region". This mirrors how
+        // Partition::assignElement records adding a new element to an
+        // existing region (pushNewElementRegion + pushMergeElementRegions
+        // with a single peer) — and crucially, it is the *only* shape that
+        // popHistoryOnce can rewind correctly. A single MergeElementRegions
+        // node carrying every peer at once would pop by re-merging the peers
+        // into a single shared region, leaving the subsequent
+        // AddNewRegionForElement undos asserting on the "should have been
+        // last element" invariant.
         p.pushNewElementRegion(index);
-        nonRepElts.push_back(index);
+        p.pushMergeElementRegions(repElement, index);
       }
-      p.pushMergeElementRegions(repElement, nonRepElts);
     }
   }
 
@@ -290,11 +309,18 @@ Partition Partition::separateRegions(SILLocation loc, ArrayRef<Element> indices,
   if (indices.empty())
     return p;
 
+  // De-duplicate indices: see comment in singleRegion for why duplicates
+  // are unrecoverable in popHistory.
+  SmallVector<Element, 8> uniqueIndices;
+  for (Element idx : indices)
+    uniqueIndices.push_back(idx);
+  sortUnique(uniqueIndices);
+
   // Place all operations in one history sequence.
   p.pushHistorySequenceBoundary(loc);
 
   auto maxIndex = Element(0);
-  for (Element index : indices) {
+  for (Element index : uniqueIndices) {
     p.elementToRegionMap.insert_or_assign(index, Region(index));
     p.pushNewElementRegion(index);
     maxIndex = Element(std::max(maxIndex, index));
@@ -547,7 +573,17 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
       auto iter = result.elementToRegionMap.find(Element(sndRegionNumber));
       if (iter != result.elementToRegionMap.end()) {
         result.elementToRegionMap.insert({sndEltNumber, iter->second});
-        result.pushMergeElementRegions(sndEltNumber, Element(sndRegionNumber));
+        // Record sndEltNumber as a brand-new element first, then merge it
+        // into its rep's region. This mirrors how Partition::assignElement
+        // records "new element added to existing region" —
+        // pushNewElementRegion(newElt) followed by
+        // pushMergeElementRegions(existingRep, [newElt]). Crucially, the
+        // merge primary is the *existing* rep, not the new element: pop
+        // then extracts the new element back into a fresh region (on its
+        // own, satisfying the AddNew undo's "should have been last" assert)
+        // while leaving the existing region's other members untouched.
+        result.pushNewElementRegion(sndEltNumber);
+        result.pushMergeElementRegions(Element(sndRegionNumber), sndEltNumber);
         // We want fresh_label to always be one element larger than our
         // maximum element.
         if (result.nextAvailableRegionNum <= Region(sndEltNumber))
@@ -938,9 +974,11 @@ bool Partition::popHistoryOnce(
     return true;
   case IsolationHistory::Node::RemoveElementFromRegion:
     // We removed an element from a specific region. So, we need to add it
-    // back.
+    // back. pushRemoveElementFromRegion stores the surviving sibling at
+    // additionalElementArgs[0] (the only additional arg), so reverse the
+    // remove by re-assigning the popped element to that sibling's region.
     assignElement(head->getFirstArgAsElement(),
-                  head->getAdditionalElementArgs()[1],
+                  head->getAdditionalElementArgs()[0],
                   false /*update history*/);
     return true;
 
