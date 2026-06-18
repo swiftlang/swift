@@ -30,9 +30,7 @@ actor Custom {
 
 @globalActor
 struct CustomActor {
-    static var shared: Custom {
-        return Custom()
-    }
+    static let shared = Custom()
 }
 
 @MainActor func transferToMainIndirect<T>(_ t: T) async {}

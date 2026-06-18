@@ -420,7 +420,7 @@ class SlowServerlet: SlowServer {
 }
 
 @globalActor actor FooActor {
-    static var shared = FooActor()
+    static let shared = FooActor()
 }
 
 @FooActor
