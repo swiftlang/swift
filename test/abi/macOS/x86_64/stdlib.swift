@@ -1333,3 +1333,8 @@ Added: _$ss11UniqueArrayVyxGSHsSHRzRi_zrlMc
 Added: _$ss11UniqueArrayVyxGSQsSQRzRi_zrlMc
 Added: _$ss11UniqueArrayVsRi_zrlE11descriptionSSvg
 Added: _$ss11UniqueArrayVsRi_zrlE16debugDescriptionSSvg
+
+// Reference counting
+Added: _swift_releaseReturningCount
+Added: _swift_retainReturningCount
+
