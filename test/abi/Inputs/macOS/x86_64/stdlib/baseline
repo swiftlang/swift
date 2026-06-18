@@ -13660,13 +13660,11 @@ _swift_registerProtocolConformances
 _swift_registerProtocols
 _swift_registerTypeMetadataRecords
 _swift_release
-_swift_releaseReturningCount
 _swift_release_n
 _swift_relocateClassMetadata
 _swift_reportError
 _swift_reportWarning
 _swift_retain
-_swift_retainReturningCount
 _swift_retainCount
 _swift_retain_n
 _swift_rootObjCDealloc
