@@ -118,9 +118,9 @@ static const constexpr StoredDiagnosticInfo storedDiagnosticInfos[] = {
 #define GROUPED_WARNING(ID, Group, Options, Text, Signature)                   \
   StoredDiagnosticInfo(DiagnosticKind::Warning, DiagnosticOptions::Options,    \
                        DiagGroupID::Group),
-#define NOTE(ID, Options, Text, Signature)                                     \
+#define GROUPED_NOTE(ID, Group, Options, Text, Signature)                      \
   StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticOptions::Options,       \
-                       DiagGroupID::no_group),
+                       DiagGroupID::Group),
 #define REMARK(ID, Options, Text, Signature)                                   \
   StoredDiagnosticInfo(DiagnosticKind::Remark, DiagnosticOptions::Options,     \
                        DiagGroupID::no_group),

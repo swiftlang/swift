@@ -15,6 +15,7 @@
 #include "DiagnosticHelpers.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Concurrency.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -44,6 +45,7 @@
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "swift/Sema/Concurrency.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -74,6 +76,12 @@ static llvm::cl::opt<bool> ForceTypedErrors(
     "sil-regionbasedisolation-force-use-of-typed-errors",
     llvm::cl::desc("Force the usage of typed instead of named errors to make "
                    "it easier to test typed errors"),
+    llvm::cl::Hidden);
+
+static llvm::cl::opt<bool> EmitIsolationHistory(
+    "sil-regionbasedisolation-emit-isolation-history",
+    llvm::cl::desc("Emit notes explaining why a disconnected value ended up "
+                   "in an isolated region"),
     llvm::cl::Hidden);
 
 //===----------------------------------------------------------------------===//
@@ -458,6 +466,395 @@ static InFlightDiagnostic diagnoseNote(const PartitionOp &op, Diag<T...> diag,
   return siloptimizer::diagnoseNote(
       op.getSourceInst()->getFunction()->getASTContext(),
       op.getSourceLoc().getSourceLoc(), diag, std::forward<U>(args)...);
+}
+
+//===----------------------------------------------------------------------===//
+//                           MARK: IsolationHistory
+//===----------------------------------------------------------------------===//
+
+static bool shouldEmitIsolationHistory(SILFunction *fn) {
+  if (EmitIsolationHistory)
+    return true;
+
+  // Isolation history emission is opt-in. We accept either the LLVM testing
+  // flag or a `@diagnose(RegionIsolationIsolationHistory, as: <not ignored>)`
+  // attribute on the SIL function's own decl.
+  if (auto *dc = fn->getDeclContext()) {
+    if (auto *decl = dc->getAsDecl()) {
+      for (auto *attr : decl->getAttrs().getAttributes<DiagnoseAttr>()) {
+        if (attr->DiagnosticGroupID ==
+                DiagGroupID::RegionIsolationIsolationHistory &&
+            attr->DiagnosticBehavior != WarningGroupBehavior::Ignored) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+namespace {
+
+/// Helper that emits the optional notes attached to a SentNeverSendable error
+/// when isolation-history emission is enabled: a chain of "X is connected
+/// to Y" notes anchored at each named intermediate's declaration, ending
+/// with an "originating" note at the merge that brought the sent element
+/// into an isolated region.
+///
+/// Construct with the full context needed to walk the isolation history,
+/// then call \c emit(). \c emit() is a no-op when isolation-history emission
+/// is disabled, when the sent element is itself isolated, or when no useful
+/// chain was found.
+class IsolationHistoryNoteEmitter {
+public:
+  /// Single-use entry point. Constructs an internal emitter from the inputs
+  /// and emits any isolation-history notes that apply.
+  static void emit(SILFunction *fn, RegionAnalysisValueMap &valueMap,
+                   Element sentElement, IsolationHistory isolationHistory,
+                   SILDynamicMergedIsolationInfo regionInfo) {
+    IsolationHistoryNoteEmitter emitter(fn, valueMap, sentElement,
+                                        isolationHistory, regionInfo);
+    emitter.emitHelper();
+  }
+
+private:
+  /// One named link in the chain of merges that brought a sent element into an
+  /// isolated region. The chain is ordered from the sent element back to the
+  /// isolated source: the first entry is the named local closest to the send,
+  /// the last is the named local merged directly with the isolated source.
+  struct ChainStep {
+    /// Source location of the declaration of \c name (the line of `let foo =
+    /// …`).
+    SourceLoc declLoc;
+    /// User-visible identifier of this chain link.
+    Identifier name;
+    /// The Element this name corresponds to.
+    Element element;
+  };
+
+  /// The SIL function whose AST context is used for diagnostic emission and
+  /// whose decl-attribute / cl-flag state gates emission via
+  /// \c shouldEmitIsolationHistory.
+  SILFunction *inputFn;
+
+  /// The region analysis value map; used to look up element isolation state
+  /// and to recover representative SILValues for name inference.
+  RegionAnalysisValueMap &inputValueMap;
+
+  /// The element whose path into the isolated region we are explaining.
+  Element inputSentElement;
+
+  /// The isolation history DAG to walk.
+  IsolationHistory inputIsolationHistory;
+
+  /// Merged isolation info for the receiving region. Supplies the
+  /// task-isolated flag and the descriptive-kind string used in the
+  /// diagnostic format strings.
+  SILDynamicMergedIsolationInfo inputRegionInfo;
+
+  /// Source location of the originating merge — i.e., the merge that brought
+  /// a disconnected value into the actor-isolated region. Empty when no useful
+  /// note should be emitted (chain has no intermediate disconnected steps, or
+  /// no merge involving the element was found). Populated by
+  /// \c collectIsolationHistoryNotes.
+  std::optional<SILLocation> originatingLoc;
+
+  /// Named locals along the chain, ordered from sent end → isolated end.
+  /// `chainSteps[0]` is closest to the send; `chainSteps.back()` is closest
+  /// to the isolated source. Populated by \c collectIsolationHistoryNotes.
+  SmallVector<ChainStep, 4> chainSteps;
+
+  /// User-visible name of the isolated value that ended the chain, if one
+  /// could be inferred. Empty when the isolated source has no recoverable
+  /// name (e.g. a synthesised actor-introducing value). Populated by
+  /// \c collectIsolationHistoryNotes.
+  Identifier isolatedName;
+
+  IsolationHistoryNoteEmitter(SILFunction *fn, RegionAnalysisValueMap &valueMap,
+                              Element sentElement,
+                              IsolationHistory isolationHistory,
+                              SILDynamicMergedIsolationInfo regionInfo)
+      : inputFn(fn), inputValueMap(valueMap), inputSentElement(sentElement),
+        inputIsolationHistory(isolationHistory), inputRegionInfo(regionInfo) {}
+
+  void emitHelper() {
+    if (!shouldEmit())
+      return;
+
+    collectIsolationHistoryNotes();
+    if (!originatingLoc)
+      return;
+
+    auto descriptiveKindStr = inputRegionInfo.printForDiagnostics(inputFn);
+
+    if (chainSteps.empty()) {
+      // No named locals along the chain — emit the generic location-only note
+      // at the originating merge.
+      emitGenericOriginatingNote(originatingLoc->getSourceLoc(),
+                                 descriptiveKindStr);
+      return;
+    }
+
+    // If we have a named chain, emit one note per chain link describing the
+    // connection between named locals, ending at the originating note that
+    // names the isolated source.
+    //
+    // chainSteps is ordered newest→oldest: chainSteps[0] is closest to the
+    // send, chainSteps.back() is closest to the isolated source. For each
+    // step, the "predecessor" (the value it is connected to) is the
+    // next-older entry, or the isolated source for the last entry.
+    for (auto p : llvm::enumerate(ArrayRef(chainSteps).drop_back())) {
+      const auto &step = p.value();
+      // Intermediate link: this step is connected to the next-older step.
+      const auto &predecessor = chainSteps[p.index() + 1];
+
+      // Skip degenerate "X is connected to X" — happens when name
+      // inference resolves both ends of the link to the same identifier
+      // (e.g. a `let f: () -> () = { ... }` where the closure literal and
+      // the binding share the var-decl name).
+      if (step.name == predecessor.name)
+        continue;
+      emitChainLinkNote(step, predecessor);
+    }
+
+    // Emit an originating link note on back.
+    emitOriginatingLinkNote(chainSteps.back(), descriptiveKindStr);
+  }
+
+  void collectIsolationHistoryNotes();
+
+  /// Returns true when isolation-history emission is on for this function and
+  /// the sent element is "disconnected" (i.e., it became isolated by being
+  /// merged with an isolated value rather than being intrinsically isolated).
+  bool shouldEmit() const {
+    if (!shouldEmitIsolationHistory(inputFn))
+      return false;
+    return inputValueMap.getIsolationRegion(inputSentElement).isDisconnected();
+  }
+
+  void emitGenericOriginatingNote(SourceLoc loc, StringRef descriptiveKind) {
+    inputFn->getASTContext().Diags.diagnose(
+        loc, diag::regionbasedisolation_value_became_part_of_isolated_region,
+        descriptiveKind, inputRegionInfo->isTaskIsolated());
+  }
+
+  void emitChainLinkNote(const ChainStep &step, const ChainStep &predecessor) {
+    inputFn->getASTContext().Diags.diagnose(
+        step.declLoc, diag::regionbasedisolation_chain_value_exposed, step.name,
+        predecessor.name);
+  }
+
+  void emitOriginatingLinkNote(const ChainStep &step,
+                               StringRef descriptiveKind) {
+    if (!isolatedName.empty() && step.name != isolatedName) {
+      // Originating link: this step is connected to the named isolated
+      // source. Anchor at the originating merge's location, since that's
+      // where the sent value joined the isolated region.
+      inputFn->getASTContext().Diags.diagnose(
+          originatingLoc->getSourceLoc(),
+          diag::regionbasedisolation_chain_value_exposed_to_isolated_named,
+          step.name, isolatedName, descriptiveKind,
+          inputRegionInfo->isTaskIsolated());
+      return;
+    }
+
+    // Originating link without a useful named isolated source: fall back to
+    // the generic location-only note.
+    emitGenericOriginatingNote(originatingLoc->getSourceLoc(), descriptiveKind);
+  }
+};
+
+} // namespace
+
+/// Walk the isolation history DAG looking for the merge that brought
+/// \c inputSentElement's region into the isolated region. We follow the chain
+/// of merges transitively: starting with a tracking set containing only
+/// \c inputSentElement, each time we see a MergeElementRegions involving any
+/// tracked element, we examine the other elements involved. If any of them is
+/// itself isolated (per \c inputValueMap), that merge is the answer. Otherwise
+/// the others are also disconnected values that became isolated transitively,
+/// so we add them to the tracking set and keep walking.
+///
+/// On exit, populates the output members:
+///   - \c originatingLoc: source location of the originating merge, or empty
+///     when no useful note should be emitted (chain has no intermediate
+///     disconnected steps, or no merge involving the element was found).
+///   - \c chainSteps: each named intermediate's declaration, ordered
+///     newest→oldest.
+///   - \c isolatedName: the user-visible name of the isolated source, if one
+///     could be recovered.
+///
+/// If the chain has no intermediate disconnected steps — i.e.,
+/// \c inputSentElement is merged directly with an already-isolated element —
+/// \c originatingLoc is left empty. In that case the user is conceptually
+/// sending an already-isolated value (e.g. `transferToMain(x)` where `x` is
+/// task-isolated), so a "value was merged … here" note pointing at the same
+/// call site adds no information.
+///
+/// CFGHistoryJoin nodes introduce branches in the DAG. We push the joined
+/// branch onto a worklist and continue along the parent path; if neither path
+/// finds an answer \c originatingLoc remains empty.
+void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
+  using Node = IsolationHistory::Node;
+
+  llvm::SmallSet<Element, 8> tracked;
+  tracked.insert(inputSentElement);
+
+  // Work list of nodes to try if the current path finds nothing. Each entry
+  // is the head of an alternative path to explore.
+  SmallVector<const Node *, 4> worklist;
+  worklist.push_back(inputIsolationHistory.getHead());
+
+  // Set to true when the most recently seen MergeElementRegions involved an
+  // already-tracked element being merged with something that is itself
+  // isolated. The next SequenceBoundary we encounter holds the source location
+  // for that merge.
+  bool pendingTargetMerge = false;
+
+  // True once we've followed at least one chain link through a disconnected
+  // intermediate. If we find the target merge before this is true the chain
+  // is trivial and we suppress the originating note.
+  bool intermediateSeen = false;
+
+  // The first isolated element we encounter. Used to attribute a name to the
+  // originating note ("y is connected to x …").
+  Element isolatedElement = inputSentElement;
+  bool isolatedFound = false;
+
+  while (!worklist.empty() && !originatingLoc) {
+    const auto *node = worklist.pop_back_val();
+
+    for (; node; node = node->getParent()) {
+      switch (node->getKind()) {
+      case Node::MergeElementRegions: {
+        Element rep = node->getFirstArgAsElement();
+        ArrayRef<Element> others = node->getAdditionalElementArgs();
+
+        // Is any tracked element involved in this merge?
+        bool repIsTracked = tracked.count(rep);
+        bool anyOtherTracked =
+            llvm::any_of(others, [&](Element e) { return tracked.count(e); });
+        if (!repIsTracked && !anyOtherTracked)
+          break;
+
+        // Helper: classify a non-tracked element as either the merge target
+        // (isolated) or another disconnected sibling to track. If the element
+        // has no value-map entry (which can legitimately happen when an
+        // element was tracked transiently in history but no longer in the
+        // map), ignore it.
+        auto consider = [&](Element e) {
+          if (tracked.count(e))
+            return;
+          auto info = inputValueMap.getIsolationRegion(e);
+          if (!info)
+            return;
+          if (!info.isDisconnected()) {
+            pendingTargetMerge = true;
+            if (!isolatedFound) {
+              isolatedFound = true;
+              isolatedElement = e;
+            }
+          } else {
+            tracked.insert(e);
+            intermediateSeen = true;
+          }
+        };
+
+        consider(rep);
+        for (Element e : others)
+          consider(e);
+        break;
+      }
+
+      case Node::SequenceBoundary:
+        if (pendingTargetMerge) {
+          if (auto loc = node->getHistoryBoundaryLoc()) {
+            if (intermediateSeen)
+              originatingLoc = loc;
+            // Either way (suppressed or not), we've found the chain end.
+            worklist.clear();
+            node = nullptr;
+            break;
+          }
+        }
+        pendingTargetMerge = false;
+        break;
+
+      case Node::CFGHistoryJoin:
+        // Save the joined branch for later and continue on the parent path.
+        if (auto *joinedNode = node->getFirstArgAsNode())
+          worklist.push_back(joinedNode);
+        break;
+
+      case Node::AddNewRegionForElement:
+      case Node::RemoveLastElementFromRegion:
+      case Node::RemoveElementFromRegion:
+        break;
+      }
+
+      if (!node)
+        break;
+    }
+  }
+
+  if (!originatingLoc)
+    return;
+
+  // Build the named-step list. For each tracked element other than the sent
+  // element, infer a user name + the source location of its declaration.
+  // Sort by source location so chainSteps[0] is closest to the send (newest)
+  // and chainSteps.back() is closest to the isolated source (oldest).
+  llvm::SmallDenseSet<const void *, 4> seenLocs;
+
+  auto inferStepFor = [&](Element elt) -> std::optional<ChainStep> {
+    SILValue rep = inputValueMap.maybeGetRepresentative(elt);
+    if (!rep)
+      return {};
+    auto namePair = VariableNameInferrer::inferNameAndFirstPathComponent(rep);
+    if (!namePair)
+      return {};
+    if (!namePair->second.isValid())
+      return {};
+    // VariableNameInferrer falls back to the literal identifier "unknown" when
+    // it can't recover a name. That's never useful in a diagnostic; treat it
+    // as no-name.
+    if (namePair->first.str() == "unknown")
+      return {};
+    return ChainStep{namePair->second, namePair->first, elt};
+  };
+
+  // Look up the isolated source's user-visible name, if any. We do this first
+  // so we can skip chain steps whose name coincides with it (those are aliases
+  // of the isolated source rather than independent links in the chain).
+  if (isolatedFound) {
+    if (auto step = inferStepFor(isolatedElement))
+      isolatedName = step->name;
+  }
+
+  for (Element elt : tracked) {
+    if (elt == inputSentElement)
+      continue;
+    auto step = inferStepFor(elt);
+    if (!step)
+      continue;
+    // Skip elements whose inferred name matches the isolated source — these
+    // are aliases produced by copies along the chain that the name inferrer
+    // collapses back to the original.
+    if (!isolatedName.empty() && step->name == isolatedName)
+      continue;
+    if (!seenLocs.insert(step->declLoc.getOpaquePointerValue()).second)
+      continue;
+    chainSteps.push_back(*step);
+  }
+
+  // Sort newest-first (highest source position first) so that chainSteps[0]
+  // is closest to the send and chainSteps.back() is closest to the isolated
+  // source. SourceLocs from the same buffer compare by raw pointer position.
+  llvm::sort(chainSteps, [](const ChainStep &lhs, const ChainStep &rhs) {
+    return rhs.declLoc.getOpaquePointerValue() <
+           lhs.declLoc.getOpaquePointerValue();
+  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -2259,6 +2656,14 @@ class SentNeverSendableDiagnosticEmitter {
   RegionAnalysisValueMap &valueMap;
   SendNeverSentDiagnosticEmitterHelper diagnosticEmitter;
 
+  /// The element that was sent. Used to check if it is itself disconnected
+  /// (and thus needs isolation history to explain why it is in an isolated
+  /// region).
+  Element sentElement;
+
+  /// The isolation history of the partition at the point of the error.
+  IsolationHistory isolationHistory;
+
   using SentNeverSendableError = PartitionOpError::SentNeverSendableError;
 
 public:
@@ -2267,7 +2672,9 @@ public:
       : valueMap(info->getValueMap()),
         diagnosticEmitter(error.op->getSourceOp(),
                           valueMap.getRepresentative(error.sentElement),
-                          error.isolationRegionInfo) {}
+                          error.isolationRegionInfo),
+        sentElement(error.sentElement),
+        isolationHistory(error.isolationHistory) {}
 
   /// Gathers diagnostics. Returns false if we emitted a "I don't understand
   /// error". If we emit such an error, we should bail without emitting any
@@ -2296,9 +2703,21 @@ private:
 
     return {};
   }
+
+  /// If \p EmitIsolationHistory is set and \p sentElement is disconnected
+  /// (i.e., not itself actor-isolated), walk the isolation history DAG to find
+  /// the most recent instruction where the element was merged into an isolated
+  /// region and emit a note there.
+  void emitIsolationHistoryNoteIfNeeded();
 };
 
 } // namespace
+
+void SentNeverSendableDiagnosticEmitter::emitIsolationHistoryNoteIfNeeded() {
+  IsolationHistoryNoteEmitter::emit(
+      diagnosticEmitter.getOperand()->getFunction(), valueMap, sentElement,
+      isolationHistory, diagnosticEmitter.getIsolationRegionInfo());
+}
 
 bool SentNeverSendableDiagnosticEmitter::initForSendingPartialApply(
     FullApplySite fas, Operand *callsiteOp) {
@@ -2508,6 +2927,9 @@ struct SentNeverSendableDiagnosticEmitter::AutoClosureWalker : ASTWalker {
 };
 
 bool SentNeverSendableDiagnosticEmitter::emit() {
+  // Emit isolation history notes after the primary diagnostic returns.
+  SWIFT_DEFER { emitIsolationHistoryNoteIfNeeded(); };
+
   // We need to find the isolation info.
   auto *op = diagnosticEmitter.getOperand();
   auto loc = op->getUser()->getLoc();
