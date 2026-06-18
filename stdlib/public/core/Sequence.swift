@@ -496,6 +496,9 @@ extension DropFirstSequence: Sequence {
   public typealias SubSequence = AnySequence<Element>
   
   @inlinable
+  public var underestimatedCount: Int { _base.underestimatedCount > _limit ? _base.underestimatedCount &- _limit : 0 }
+
+  @inlinable
   @inline(__always)
   public __consuming func makeIterator() -> Iterator {
     var it = _base.makeIterator()
