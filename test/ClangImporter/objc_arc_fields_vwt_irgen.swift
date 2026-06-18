@@ -7,13 +7,15 @@ import Foundation
 import objc_structs
 
 // Verify that imported ARC structs get non-trivial value witness tables with
-// member-wise retain/release, and that these witnesses are correctly invoked
+// appropriate retain/release, and that these witnesses are correctly invoked
 // through a generic context.
+//
+// Strong-only structs remain loadable with member-wise VWT.
+// Weak-containing structs are address-only with Clang-synthesized VWT.
 
-// --- VWT tables use non-trivial witnesses for copy/destroy, memcpy for take ---
+// --- VWT tables use non-trivial witnesses ---
+// Strong-only: still uses member-wise VWT and __swift_memcpy for take.
 // CHECK-DAG: @"$sSo19StrongsInAStructArcVWV" = {{.*}} %swift.vwtable { ptr @"$sSo19StrongsInAStructArcVwCP", ptr @"$sSo19StrongsInAStructArcVwxx", ptr @"$sSo19StrongsInAStructArcVwcp", ptr @"$sSo19StrongsInAStructArcVwca", ptr @__swift_memcpy
-// CHECK-DAG: @"$sSo17WeaksInAStructArcVWV" = {{.*}} %swift.vwtable { ptr @"$sSo17WeaksInAStructArcVwCP", ptr @"$sSo17WeaksInAStructArcVwxx", ptr @"$sSo17WeaksInAStructArcVwcp", ptr @"$sSo17WeaksInAStructArcVwca", ptr @__swift_memcpy
-// CHECK-DAG: @"$sSo18MixedStrongWeakArcVWV" = {{.*}} %swift.vwtable { ptr @"$sSo18MixedStrongWeakArcVwCP", ptr @"$sSo18MixedStrongWeakArcVwxx", ptr @"$sSo18MixedStrongWeakArcVwcp", ptr @"$sSo18MixedStrongWeakArcVwca", ptr @__swift_memcpy
 
 // --- Generic context calls through the VWT ---
 
@@ -37,7 +39,7 @@ func exerciseStrongGeneric() {
   _ = copy
 }
 
-// Same for weak — VWT's initializeWithCopy calls weakCopyInit.
+// Same for weak — VWT's initializeWithCopy calls the Clang copy constructor.
 // CHECK-LABEL: define hidden swiftcc void @"$s{{.*}}19exerciseWeakGenericyyF"
 // CHECK: call swiftcc void @"$s{{.*}}11genericCopyyxxlF"
 func exerciseWeakGeneric() {
@@ -56,36 +58,30 @@ func exerciseMixedGeneric() {
 }
 
 // --- Value witness function bodies ---
-// VWT functions are emitted per-type in VWT field order (destroy, initWithCopy,
-// assignWithCopy). Types emit in order: Mixed, Weak, Strong.
 
-// Mixed destroy: releases strong field, destroys weak field.
+// Mixed destroy: calls Clang-synthesized destructor.
 // CHECK-LABEL: define linkonce_odr hidden void @"$sSo18MixedStrongWeakArcVwxx"
-// CHECK: call void @llvm.objc.release
-// CHECK: call void @swift_unknownObjectWeakDestroy
+// CHECK: call void @__destructor_8_s0_w8
 // CHECK: ret void
 
-// Mixed initializeWithCopy: retains strong field, copies weak field.
+// Mixed initializeWithCopy: calls Clang-synthesized copy constructor (may be
+// inlined by Clang codegen into direct objc_retain + objc_copyWeak calls).
 // CHECK-LABEL: define linkonce_odr hidden ptr @"$sSo18MixedStrongWeakArcVwcp"
-// CHECK: call ptr @llvm.objc.retain
-// CHECK: call ptr @swift_unknownObjectWeakCopyInit
-// CHECK: ret ptr
+// CHECK: @llvm.objc.retain
 
-// Mixed assignWithCopy: retains new strong, releases old strong, copies weak.
+// Mixed assignWithCopy: calls Clang-synthesized copy assignment operator.
 // CHECK-LABEL: define linkonce_odr hidden ptr @"$sSo18MixedStrongWeakArcVwca"
-// CHECK: call ptr @llvm.objc.retain
-// CHECK: call void @llvm.objc.release
-// CHECK: call ptr @swift_unknownObjectWeakCopyAssign
+// CHECK: call void @__copy_assignment_8_8_s0_w8
 // CHECK: ret ptr
 
-// Weak destroy uses swift_unknownObjectWeakDestroy.
+// Weak destroy uses Clang-synthesized destructor.
 // CHECK-LABEL: define linkonce_odr hidden void @"$sSo17WeaksInAStructArcVwxx"
-// CHECK: call void @swift_unknownObjectWeakDestroy
+// CHECK: call void @__destructor_8_w0
 // CHECK: ret void
 
-// Weak initializeWithCopy uses swift_unknownObjectWeakCopyInit.
+// Weak initializeWithCopy: Clang copy constructor.
 // CHECK-LABEL: define linkonce_odr hidden ptr @"$sSo17WeaksInAStructArcVwcp"
-// CHECK: call ptr @swift_unknownObjectWeakCopyInit
+// CHECK: call void @__copy_constructor_8_8_w0
 // CHECK: ret ptr
 
 // Strong destroy releases via objc_release.
