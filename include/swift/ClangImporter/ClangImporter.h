@@ -236,19 +236,12 @@ public:
   std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
 
-  std::optional<std::vector<std::string>>
-  getClangCC1Arguments(ASTContext &ctx,
-                       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                       bool ignoreClangTarget = false);
-
   std::vector<std::string>
   getClangDepScanningInvocationArguments(ASTContext &ctx);
 
-  static std::unique_ptr<clang::CompilerInvocation>
-  createClangInvocation(ClangImporter *importer,
-                        const ClangImporterOptions &importerOpts,
-                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                        const std::vector<std::string> &CC1Args);
+  std::unique_ptr<clang::CompilerInvocation> createClangInvocation(
+      ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs,
+      bool forCodeGen = false);
 
   /// Creates a Clang Driver based on the Swift compiler options.
   ///
