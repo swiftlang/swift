@@ -65,20 +65,20 @@ func makerParamAutoclosure(@Maker // expected-error {{result builder attribute '
                            fn: @autoclosure () -> ()) {}
 
 @resultBuilder
-struct GenericMaker<T> {} // expected-note {{generic struct 'GenericMaker' declared here}} expected-error {{result builder must provide at least one static 'buildBlock' method}}
+struct GenericMaker<T> {} // expected-error {{result builder must provide at least one static 'buildBlock' method}}
 
-struct GenericContainer<T> {  // expected-note {{generic struct 'GenericContainer' declared here}}
+struct GenericContainer<T> {
   @resultBuilder
   struct Maker {} // expected-error {{result builder must provide at least one static 'buildBlock' method}}
 }
 
-func makeParamUnbound(@GenericMaker // expected-error {{reference to generic type 'GenericMaker' requires arguments}}
+func makeParamUnbound(@GenericMaker // expected-error {{unable to infer generic arguments for result builder @GenericMaker}}
                       fn: () -> ()) {}
 
 func makeParamBound(@GenericMaker<Int>
                     fn: () -> ()) {}
 
-func makeParamNestedUnbound(@GenericContainer.Maker // expected-error {{reference to generic type 'GenericContainer' requires arguments}}
+func makeParamNestedUnbound(@GenericContainer.Maker // expected-error {{unable to infer generic arguments for result builder @GenericContainer.Maker}}
                             fn: () -> ()) {}
 
 func makeParamNestedBound(@GenericContainer<Int>.Maker

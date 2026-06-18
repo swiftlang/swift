@@ -619,6 +619,9 @@ enum class ConstraintSystemFlags {
 
   /// Disable macro expansions.
   DisableMacroExpansions = 0x40,
+
+  /// Don't record a failed constraint after adding an unsolvable constraint.
+  DisableRecordFailedConstraint = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2303,6 +2306,9 @@ public:
 
   /// Whether we should record the failure of a constraint.
   bool shouldRecordFailedConstraint() const {
+    if (Options.contains(ConstraintSystemFlags::DisableRecordFailedConstraint))
+      return false;
+
     // If we're debugging, always note a failure so we can print it out.
     if (isDebugMode())
       return true;

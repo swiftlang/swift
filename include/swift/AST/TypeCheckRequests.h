@@ -4184,6 +4184,10 @@ enum class CustomAttrTypeKind {
   /// Global actors are represented as custom type attributes. They don't
   /// have any particularly interesting semantics.
   GlobalActor,
+  
+  /// Result builder types can have their generics arguments
+  /// inferred from the attached declaration.
+  ResultBuilder,
 };
 
 void simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value);
