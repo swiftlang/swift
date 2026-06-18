@@ -187,7 +187,7 @@ if #available(SwiftStdlib 6.3, *) {
       let obj = ClassWithDescription()
       withExtendedLifetime(obj) { obj in
         let pointer = unsafeBitCast(obj, to: UnsafeRawPointer.self)
-        let (success, printed) = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: "s9AnyObjectaD")
+        let (success, printed) = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: "yXlD")
         expectTrue(success)
         expectEqual(printed, "custom description\n")
       }

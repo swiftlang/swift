@@ -355,14 +355,6 @@ public enum _DebuggerSupport {
       return (false, "invalid pointer")
     }
 
-    // AnyObject (s9AnyObjectaD) is a type alias (Builtin.AnyObject) which is
-    // not resolved by _getTypeByMangledNameInContext. Instead, bitcast the
-    // pointer directly to AnyObject.
-    if mangledTypeName == "s9AnyObjectaD" {
-      let object = unsafe unsafeBitCast(pointer, to: AnyObject.self)
-      return (true, stringForPrintObject(object))
-    }
-
     guard let type =
       unsafe _getTypeByMangledNameInContext(
         mangledTypeName,
@@ -374,7 +366,7 @@ public enum _DebuggerSupport {
       }
 
     func loadPointer<T>(type: T.Type) -> Any {
-      if type is AnyObject.Type {
+      if type is AnyObject.Type || type is AnyObject.Protocol {
         unsafe unsafeBitCast(pointer, to: T.self)
       } else {
         unsafe pointer.load(as: T.self)
