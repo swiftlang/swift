@@ -6421,7 +6421,7 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
 }
 
 // Clone attributes that have been imported from Clang.
-void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl* toDecl) {
+static void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl *toDecl) {
   ASTContext &context = fromDecl->getASTContext();
   for (auto attr : fromDecl->getAttrs()) {
     switch (attr->getKind()) {
@@ -6463,7 +6463,30 @@ void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl* toDecl) {
   }
 }
 
-static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
+static void handleAmbiguousOverrides(ClangImporter::Implementation &Impl,
+                                     FuncDecl *baseFunc,
+                                     ValueDecl *clonedDecl) {
+  if (auto *original = Impl.getOriginalForVirtualThunk(baseFunc))
+    baseFunc = original;
+
+  const auto *baseCxxMethod =
+      dyn_cast_or_null<clang::CXXMethodDecl>(baseFunc->getClangDecl());
+  if (!baseCxxMethod)
+    return;
+
+  const auto *derivedCxxRecord = dyn_cast<clang::CXXRecordDecl>(
+      clonedDecl->getDeclContext()->getAsDecl()->getClangDecl());
+  if (!derivedCxxRecord)
+    return;
+
+  if (Impl.isAmbiguouslyOverridden(derivedCxxRecord, baseCxxMethod))
+    Impl.markUnavailable(
+        clonedDecl,
+        "overrides multiple C++ methods with different Swift names");
+}
+
+static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
+                                      ValueDecl *decl, DeclContext *newContext,
                                       ClangInheritanceInfo inheritance) {
   AccessLevel access = inheritance.accessForBaseDecl(decl);
   ASTContext &context = decl->getASTContext();
@@ -6491,7 +6514,9 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
         fn->getResultInterfaceType(), newContext, /*isSynthesized=*/true);
     cloneImportedAttributes(decl, out);
     out->setAccess(access);
-    inheritance.setUnavailableIfNecessary(decl, out);
+    auto markedUnavailable = inheritance.setUnavailableIfNecessary(decl, out);
+    if (!markedUnavailable)
+      handleAmbiguousOverrides(Impl, fn, out);
     out->setBodySynthesizer(synthesizeBaseClassMethodBody, fn);
     out->setSelfAccessKind(fn->getSelfAccessKind());
     return out;
@@ -7991,16 +8016,14 @@ Decl *ClangImporter::lookupImportedDecl(const clang::NamedDecl *decl) {
 }
 
 ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
-    ValueDecl *decl, DeclContext *newContext,
-    ClangInheritanceInfo inheritance) {
+    ValueDecl *decl, DeclContext *newContext, ClangInheritanceInfo inherit) {
 
   // Make sure we don't clone the decl again for this class, as that would
   // result in multiple definitions of the same symbol.
   std::pair<ValueDecl *, DeclContext *> key = {decl, newContext};
   auto known = clonedBaseMembers.find(key);
   if (known == clonedBaseMembers.end()) {
-    ValueDecl *cloned = cloneBaseMemberDecl(decl, newContext, inheritance);
-    handleAmbiguousSwiftName(cloned);
+    ValueDecl *cloned = cloneBaseMemberDecl(*this, decl, newContext, inherit);
     known = clonedBaseMembers.try_emplace(key, cloned).first;
     clonedMembers.try_emplace(cloned, decl);
   }
@@ -9198,15 +9221,15 @@ ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) const {
   return std::min(baseDecl->getFormalAccess(), inherited);
 }
 
-void ClangInheritanceInfo::setUnavailableIfNecessary(
+bool ClangInheritanceInfo::setUnavailableIfNecessary(
     const ValueDecl *baseDecl, ValueDecl *clonedDecl) const {
   if (!isInheriting())
-    return;
+    return false;
 
   auto *clangDecl =
       dyn_cast_or_null<clang::NamedDecl>(baseDecl->getClangDecl());
   if (!clangDecl)
-    return;
+    return false;
 
   const char *msg = nullptr;
 
@@ -9218,6 +9241,7 @@ void ClangInheritanceInfo::setUnavailableIfNecessary(
   if (msg)
     clonedDecl->addAttribute(AvailableAttr::createUniversallyUnavailable(
         clonedDecl->getASTContext(), msg));
+  return static_cast<bool>(msg);
 }
 
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>

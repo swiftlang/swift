@@ -1010,7 +1010,9 @@ public:
   /// was inherited with private inheritance.
   ///
   /// Does nothing if this ClangInheritanceInfo::isInheriting() is \c false.
-  void setUnavailableIfNecessary(const ValueDecl *baseDecl,
+  ///
+  /// Returns true if \param clonedDecl was marked unavailable.
+  bool setUnavailableIfNecessary(const ValueDecl *baseDecl,
                                  ValueDecl *clonedDecl) const;
 
   friend llvm::hash_code hash_value(const ClangInheritanceInfo &info) {

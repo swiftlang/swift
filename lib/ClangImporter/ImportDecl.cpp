@@ -10761,22 +10761,6 @@ ValueDecl *ClangImporter::Implementation::createUnavailableDecl(
   return var;
 }
 
-void ClangImporter::Implementation::handleAmbiguousSwiftName(ValueDecl *decl) {
-  if (!decl || decl->isUnavailable())
-    return;
-
-  auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(
-      decl->getDeclContext()->getAsDecl()->getClangDecl());
-
-  if (!cxxRecordDecl)
-    return;
-
-  if (findUnavailableMethod(cxxRecordDecl, decl->getName())) {
-    markUnavailable(decl,
-                    "overrides multiple C++ methods with different Swift names");
-  }
-}
-
 // Force the members of the entire inheritance hierarchy to be loaded and
 // deserialized before loading the members of this class. This allows the
 // decl members table to be warmed up and enables the correct identification of
