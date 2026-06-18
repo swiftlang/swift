@@ -9972,7 +9972,7 @@ ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
     // If the type witness is invalid we'll have emitted an error, record a
     // fix to ensure the solution is marked invalid.
     auto *loc = getConstraintLocator(locator);
-    recordFix(IgnoreInvalidASTNode::create(*this, loc));
+    recordFix(IgnoreInvalidASTNode::create(*this, loc), FixImpact::InvalidAST);
     return Type();
   }
 
