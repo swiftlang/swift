@@ -24,4 +24,4 @@ struct S2 {
   func callAsFunction(_ block: () -> Void) { block() }
 }
 
-S2 {}  // expected-error {{ambiguous use of 'init'}}
+S2 {}  // expected-error {{ambiguous use of 'init', cannot select between potential parameter types '(() -> Void)', '()'}}

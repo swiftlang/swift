@@ -23,5 +23,5 @@ struct VariableDecl2 {
   }
 }
 
-let buildable = VariableDecl2(paramInt: 1) { // expected-error {{ambiguous use of 'init'}}
+let buildable = VariableDecl2(paramInt: 1) { // expected-error {{ambiguous use of 'init', cannot select between potential parameter types '(paramClosure: () -> Int?, paramInt: Int, paramResultBuilder: () -> Int?)', '(paramInt: Int, paramClosure: () -> Int?, paramResultBuilder: () -> Int?)'}}
 }

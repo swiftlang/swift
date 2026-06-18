@@ -196,6 +196,6 @@ func test_nested_pointers() {
 
 func exit(_: Float) {} // expected-note {{found this candidate}}
 func test_ambiguous() {
-  exit(5) // expected-error {{ambiguous use of 'exit'}}
+  exit(5) // expected-error {{ambiguous use of 'exit', cannot select between potential result types '()', 'Never'}}
 }
 

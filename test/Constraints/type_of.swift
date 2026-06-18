@@ -77,7 +77,7 @@ func bar() -> UInt {}   // expected-note {{found this candidate}}
 
 foo(type(of: G.T.self)) // Ok
 let _: Any = type(of: G.T.self) // Ok
-foo(type(of: bar())) // expected-error {{ambiguous use of 'bar()'}}
+foo(type(of: bar())) // expected-error {{ambiguous use of 'bar()', cannot select between potential result types 'Float', 'Int', 'String', 'UInt'}}
 
 // https://github.com/apple/swift/issues/53093
 do {

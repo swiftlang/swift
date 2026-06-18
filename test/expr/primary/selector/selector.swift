@@ -91,8 +91,8 @@ func testSelector(_ c1: C1, p1: P1, obj: AnyObject) {
 }
 
 func testAmbiguity() {
-  _ = #selector(C1.method3) // expected-error{{ambiguous use of 'method3'}}
-  _ = #selector(C1.ambiguous) // expected-error{{ambiguous use of 'ambiguous(a:b:)'}}
+  _ = #selector(C1.method3) // expected-error{{ambiguous use of 'method3', cannot select between potential parameter types '(A, b: B)', '(a: A, b: B)'}}
+  _ = #selector(C1.ambiguous) // expected-error{{ambiguous use of 'ambiguous(a:b:)', cannot select between potential parameter types '(a: A, b: A)', '(a: A, b: B)'}}
 }
 
 func testUnusedSelector() {

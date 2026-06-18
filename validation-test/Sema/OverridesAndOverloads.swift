@@ -177,7 +177,7 @@ Overrides.test("contravariant return type override, protocol to protocol") {
 
 #if ERRORS
   // FIXME: https://github.com/apple/swift/issues/43348
-  Derived().foo() as P1 // expected-error {{ambiguous use of 'foo()'}}
+  Derived().foo() as P1 // expected-error {{ambiguous use of 'foo()', cannot select between potential result types 'any P1', 'any P1x'}}
   expectEqual("Derived.foo() -> P1x", which)
 #endif
 
@@ -201,7 +201,7 @@ Overrides.test("contravariant return type override, protocol to struct") {
 
 #if ERRORS
   // FIXME: https://github.com/apple/swift/issues/43348
-  Derived().foo() as P1 // expected-error {{ambiguous use of 'foo()'}}
+  Derived().foo() as P1 // expected-error {{ambiguous use of 'foo()', cannot select between potential result types 'P1ImplS1', 'any P1'}}
   expectEqual("Derived.foo() -> P1ImplS1", which)
 #endif
 
@@ -316,7 +316,7 @@ Overloads.test("implicit conversion to a superclass is ambiguous with conversion
 
 #if ERRORS
   Base().foo(P1ImplC1x())
-  // expected-error @-1 {{ambiguous use of 'foo'}}
+  // expected-error @-1 {{ambiguous use of 'foo', cannot select between potential parameter types '(C1)', '(any P1)'}}
 #endif
 }
 

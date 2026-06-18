@@ -19,7 +19,7 @@ func ovlLitB(_: Int64) -> Int64 {} // expected-note{{}}
 func testLiteralOverloadingovlLitB() {
   var y32 : Int32 = ovlLitA(ovlLitB(0))
   var y64 : Int64 = ovlLitA(ovlLitB(0))
-  var y /*: Int*/ = ovlLitA(ovlLitB(0))  // expected-error{{ambiguous use of 'ovlLitB'}}
+  var y /*: Int*/ = ovlLitA(ovlLitB(0))  // expected-error{{ambiguous use of 'ovlLitB', cannot select between potential result types 'Int32', 'Int64'}}
 }
 
 func literalOverloadSameReturn(_ i: Int) -> Int {}

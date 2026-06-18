@@ -299,7 +299,7 @@ func test_init_refs_with_single_pack_expansion_param() {
     init(x: repeat each V) {} // expected-note {{found this candidate}}
   }
 
-  _ = EmptyAmbiguous() // expected-error {{ambiguous use of 'init'}}
+  _ = EmptyAmbiguous() // expected-error {{ambiguous use of 'init', cannot select between potential parameter types '(repeat each V)', '(x: repeat each V)'}}
   _ = EmptyAmbiguous(x: 42)
   _ = EmptyAmbiguous(x: (42, "")) // Ok
 }
@@ -675,7 +675,7 @@ do {
   func test1<each T>(_: repeat each T) {}
   // expected-note@-1 {{found this candidate}}
 
-  test1(1, 2, 3) // expected-error {{ambiguous use of 'test1'}}
+  test1(1, 2, 3) // expected-error {{ambiguous use of 'test1', cannot select between potential parameter types '(T...)', '(repeat each T)'}}
   test1(1, "a") // Ok
 
   func test2<each T>(_: repeat each T) {}

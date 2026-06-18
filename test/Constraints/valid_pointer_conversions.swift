@@ -114,7 +114,7 @@ func testGenericPointerConversions(
   takesCharPtrs(id(mutablePtr), optID(mutablePtr))
 
   // Make sure this is ambiguous.
-  ptr.foo(chars) // expected-error {{ambiguous use of 'foo'}}
+  ptr.foo(chars) // expected-error {{ambiguous use of 'foo', cannot select between potential parameter types '(Self)', '(UnsafePointer<CChar>)'}}
 }
 
 // Make sure we prefer non-pack overloads when pointer conversions are involved.

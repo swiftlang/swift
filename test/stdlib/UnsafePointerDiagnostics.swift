@@ -370,5 +370,5 @@ func unsafePointerInitNonEphemeralConversions() {
   _ = UnsafeMutableRawBufferPointer(start: &global, count: 0)
 
   // FIXME: This is currently ambiguous.
-  _ = OpaquePointer(&global) // expected-error {{ambiguous use of 'init(_:)'}}
+  _ = OpaquePointer(&global) // expected-error {{ambiguous use of 'init(_:)', cannot select between potential parameter types '(UnsafeMutablePointer<T>)', '(UnsafeMutableRawPointer)', '(UnsafePointer<T>)', '(UnsafeRawPointer)'}}
 }

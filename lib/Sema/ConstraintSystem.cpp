@@ -2108,12 +2108,6 @@ SolutionResult ConstraintSystem::salvage() {
     // FIXME: If we were able to actually fix things along the way,
     // we may have to hunt for the best solution. For now, we don't care.
 
-    // Remove solutions that require fixes; the fixes in those systems should
-    // be diagnosed rather than any ambiguity.
-    auto hasFixes = [](const Solution &sol) { return !sol.Fixes.empty(); };
-    auto newEnd = std::remove_if(viable.begin(), viable.end(), hasFixes);
-    viable.erase(newEnd, viable.end());
-
     // If there are multiple solutions, try to diagnose an ambiguity.
     if (viable.size() > 1) {
       if (isDebugMode()) {
@@ -2128,11 +2122,21 @@ SolutionResult ConstraintSystem::salvage() {
         }
       }
 
-      if (diagnoseAmbiguity(viable)) {
+      
+
+      // Remove solutions that require fixes when there are a mixture of solutions with and
+      // without fixes. If all solutions still have fixes, try again to fall through to
+      // diagnoseAmbiguity
+      auto hasFixes = [](const Solution &sol) { return !sol.Fixes.empty(); };
+      if (!llvm::all_of(viable, hasFixes)) {
+        auto newEnd = std::remove_if(viable.begin(), viable.end(), hasFixes);
+        viable.erase(newEnd, viable.end());
+      }
+
+      if (diagnoseAmbiguityInSolutions(viable)) {
         return SolutionResult::forAmbiguous(viable);
       }
     }
-
     // Fall through to produce diagnostics.
   }
 
@@ -2465,7 +2469,7 @@ diagnoseAmbiguityWithEphemeralPointers(ConstraintSystem &cs,
   // If only some of the solutions have ephemeral pointer fixes
   // let's let `diagnoseAmbiguity` diagnose the problem either
   // with affected argument or related declaration e.g. function ref.
-  return cs.diagnoseAmbiguity(solutions);
+  return cs.diagnoseAmbiguityInSolutions(solutions);
 }
 
 static bool diagnoseAmbiguityWithContextualType(
@@ -3022,7 +3026,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
           return !fix->isFatal();
         });
       })) {
-    return diagnoseAmbiguity(solutions);
+    return diagnoseAmbiguityInSolutions(solutions);
   }
 
   // Algorithm is as follows:
@@ -3078,9 +3082,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       continue;
 
     auto aggregate = fixes->second;
-    diagnosed |= ::diagnoseAmbiguity(*this, ambiguity, aggregate, solutions);
-
-    consideredFixes.insert(aggregate.begin(), aggregate.end());
+    if (::diagnoseAmbiguity(*this, ambiguity, aggregate, solutions)) {
+      diagnosed |= true;
+      
+      consideredFixes.insert(aggregate.begin(), aggregate.end());
+    }
   }
 
   if (diagnoseAmbiguityWithContextualType(*this, solutionDiff, contextualFixes,
@@ -3246,7 +3252,7 @@ static void extendPreorderIndexMap(
   expr->walk(traversal);
 }
 
-bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
+bool ConstraintSystem::diagnoseAmbiguityInSolutions(ArrayRef<Solution> solutions) {
   // Produce a diff of the solutions.
   SolutionDiff diff(solutions);
 
@@ -3372,18 +3378,101 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
       assert(false && "locator could not be simplified to anchor");
     }
 
-    // Emit the ambiguity diagnostic.
+    // Find all unique decls for these overloads
+    SmallPtrSet<ValueDecl *, 8> uniqueDecls;
+    for(auto choice : overload.choices) {
+      auto decl = choice.getDecl();
+      if (decl) {
+        uniqueDecls.insert(decl);
+      }
+    }
+
+    // Find all relevantDecls, based on conformance
+    // If there are too many decls for the check, just keep them all
+    SmallPtrSet<ValueDecl *, 8> relevantDecls;
+    if (uniqueDecls.size() > 10)
+      relevantDecls = uniqueDecls;
+    else {
+      for (auto decl : uniqueDecls) {
+        bool addDecl = true;
+        for(auto seenDecl : relevantDecls) {
+          if (TypeChecker::compareDeclarations(this->DC, decl, seenDecl) ==
+              Comparison::Worse) {
+            addDecl = false;
+            break;
+          }
+        }
+        if (addDecl)
+          relevantDecls.insert(decl);
+      }
+    }
+    // There must be more than one relevantDecl for there to be ambiguity
+    if (relevantDecls.size() == 1)
+      return false;
+
+    llvm::StringSet<> typeChoicesResults;
+    llvm::StringSet<> typeChoicesParams;
+    llvm::StringSet<> typeChoices;
+
+    for (auto decl : relevantDecls) {
+      Type choiceType = decl->removeCurriedSelf();
+      typeChoices.insert(choiceType->getString());
+
+      if (choiceType->is<AnyFunctionType>()) {
+        auto fun = choiceType->getAs<AnyFunctionType>();
+        typeChoicesResults.insert(fun->getResult()->getString());
+        typeChoicesParams.insert(fun->getParamListAsString(fun->getParams()));
+      } else if (choiceType->is<GenericFunctionType>()) {
+        auto gFun = choiceType->getAs<GenericFunctionType>();
+        typeChoicesResults.insert(gFun->getResult()->getString());
+        typeChoicesParams.insert(gFun->getParamListAsString(gFun->getParams()));
+      }
+    }
+
+    auto makeDiagList = [&](llvm::StringSet<> vec) {
+      llvm::SmallVector<std::string, 2> result;
+      for (auto &entry : vec) {
+        result.emplace_back("'" + entry.getKey().str() + "'");
+      }
+      llvm::sort(result);
+      return llvm::join(result, ", ");
+    };
+
+    std::string typeChoiceString;
+    std::string paramOrResultMsg = "";
+    if (typeChoicesResults.size() > 1) {
+      typeChoiceString = makeDiagList(typeChoicesResults);
+      paramOrResultMsg = " result";
+    } else if (typeChoicesParams.size() > 1 && typeChoicesResults.size() > 1) {
+      typeChoiceString = makeDiagList(typeChoices);
+    } else if (typeChoicesParams.size() > 1) {
+      typeChoiceString = makeDiagList(typeChoicesParams);
+      paramOrResultMsg = " parameter";
+    } else {
+      if (typeChoices.size() == 1)
+        typeChoiceString = "";
+      else
+        typeChoiceString = makeDiagList(typeChoices);
+    }
+
+    // Emit the ambiguity diagnostic
     auto &DE = getASTContext().Diags;
-    DE.diagnose(getLoc(anchor),
-                name.isOperator() ? diag::ambiguous_operator_ref
-                                  : diag::ambiguous_decl_ref,
-                name);
+    if (typeChoiceString == "")
+      DE.diagnose(getLoc(anchor), name.isOperator() ?
+                  diag::ambiguous_operator_ref
+                  : diag::ambiguous_decl_ref, name);
+    else
+      DE.diagnose(getLoc(anchor),
+                  name.isOperator() ? diag::ambiguous_operator_ref_unknown
+                                    : diag::ambiguous_decl_ref_unknown,
+                  name, paramOrResultMsg, typeChoiceString);
 
     TrailingClosureAmbiguityFailure failure(solutions, anchor,
                                             overload.choices);
     if (failure.diagnoseAsNote())
       return true;
 
+    //TODO: use relevantDecl here
     // Emit candidates.  Use a SmallPtrSet to make sure only emit a particular
     // candidate once.  FIXME: Why is one candidate getting into the overload
     // set multiple times? (See also tryDiagnoseTrailingClosureAmbiguity.)
@@ -3394,7 +3483,6 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
       case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional: {
-        // FIXME: show deduced types, etc, etc.
         auto decl = choice.getDecl();
         if (EmittedDecls.insert(decl).second) {
           auto declModule = decl->getDeclContext()->getParentModule();

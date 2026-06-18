@@ -35,6 +35,6 @@ do {
   // The solutions are incomparable because rethrows version cannot be called through typed throws one.
   test {
     await unrelated()
-    $0.compute {} // expected-error {{ambiguous use of 'compute'}}
+    $0.compute {} // expected-error {{ambiguous use of 'compute', cannot select between potential parameter types '(() async throws -> Void)', '(() throws(E) -> Void)'}}
   }
 }

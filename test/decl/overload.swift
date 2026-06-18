@@ -4,11 +4,9 @@ var var_redecl1: Int // expected-note {{previously declared here}}
 var_redecl1 = 0
 var var_redecl1: UInt // expected-error {{invalid redeclaration of 'var_redecl1'}}
 
-var var_redecl2: Int // expected-note {{previously declared here}}
-// expected-note@-1 {{found this candidate}}
+var var_redecl2: Int // expected-note {{previously declared here}} // expected-note {{found this candidate}}
 var_redecl2 = 0 // expected-error {{ambiguous use of 'var_redecl2'}}
-var var_redecl2: Int // expected-error {{invalid redeclaration of 'var_redecl2'}}
-// expected-note@-1 {{found this candidate}}
+var var_redecl2: Int // expected-error {{invalid redeclaration of 'var_redecl2'}} // expected-note {{found this candidate}}
 
 var var_redecl3: (Int) -> () { get {} } // expected-note {{previously declared here}}
 var var_redecl3: () -> () { get {} } // expected-error {{invalid redeclaration of 'var_redecl3'}}
@@ -590,25 +588,25 @@ enum E8_52486 {
 
 enum E9_52486 {
   case A // expected-note {{'A' previously declared here}} expected-note {{found this candidate}}
-  static let A: E9_52486 = .A // expected-error {{invalid redeclaration of 'A'}}
-  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found this candidate}}
+  static let A: E9_52486 = .A // expected-error {{invalid redeclaration of 'A'}} expected-note {{found this candidate}}
+  // expected-error@-1 {{ambiguous use of 'A'}}
 }
 
 enum E10_52486 {
-  static let A: E10_52486 = .A // expected-note {{'A' previously declared here}}
-  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found this candidate}}
+  static let A: E10_52486 = .A // expected-note {{'A' previously declared here}} expected-note {{found this candidate}}
+  // expected-error@-1 {{ambiguous use of 'A'}}
   case A // expected-error {{invalid redeclaration of 'A'}} expected-note {{found this candidate}}
 }
 
 enum E11_52486 {
   case A // expected-note {{'A' previously declared here}} expected-note {{found this candidate}}
-  static var A: E11_52486 = .A // expected-error {{invalid redeclaration of 'A'}}
-  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found this candidate}}
+  static var A: E11_52486 = .A // expected-error {{invalid redeclaration of 'A'}} expected-note {{found this candidate}}
+  // expected-error@-1 {{ambiguous use of 'A'}}
 }
 
 enum E12_52486 {
-  static var A: E12_52486 = .A // expected-note {{'A' previously declared here}}
-  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found this candidate}}
+  static var A: E12_52486 = .A // expected-note {{'A' previously declared here}} expected-note {{found this candidate}}
+  // expected-error@-1 {{ambiguous use of 'A'}}
   case A // expected-error {{invalid redeclaration of 'A'}} expected-note {{found this candidate}}
 }
 

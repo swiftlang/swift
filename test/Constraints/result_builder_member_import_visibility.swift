@@ -93,6 +93,6 @@ Int.transitiveTakesTransitiveBuilder { 1 } // expected-member-import-error {{sta
 // expected-member-import-error@-1 {{static method 'buildBlock' is not available due to missing import of defining module 'Transitive'}}
 Int.directTakesDirectBuilder { 1 }
 Int.directTakesTransitiveBuilder { 1 } // expected-member-import-error {{static method 'buildBlock' is not available due to missing import of defining module 'Transitive'}}
-Int.ambiguous { 1 } // expected-no-member-import-error {{ambiguous use of 'ambiguous'}}
+Int.ambiguous { 1 } // expected-no-member-import-error {{ambiguous use of 'ambiguous', cannot select between potential parameter types '(directBuilder: () -> Int)', '(transitiveBuilder: () -> Int)'}}
 // expected-no-member-import-note@-1 {{use an explicit argument label instead of a trailing closure to call 'ambiguous(transitiveBuilder:)'}}
 // expected-no-member-import-note@-2 {{use an explicit argument label instead of a trailing closure to call 'ambiguous(directBuilder:)'}}

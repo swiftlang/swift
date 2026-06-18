@@ -282,15 +282,15 @@ func test_invalid_argument_to_keypath_subscript() {
     // expected-error@-1 {{cannot use value of type 'Int' as a key path subscript index; argument must be a key path}}
   }
 
-  func ambiguous(_: (String) -> Void) {}
-  func ambiguous(_: (Int) -> Void) {}
+  func ambiguous(_: (String) -> Void) {} // expected-note {{found this candidate}}
+  func ambiguous(_: (Int) -> Void) {} // expected-note {{found this candidate}}
 
   // FIXME(diagnostic): This is not properly diagnosed in a general case and key path application is even more
   // complicated because overloads anchored on 'SubscriptExpr -> subscript member' do not point to declarations.
   // The diagnostic should point out that `ambiguous` is indeed ambiguous and that `5` is not a valid argument
   // for a key path subscript.
   ambiguous {
-    // expected-error@-1 {{failed to produce diagnostic for expression}}
+    // expected-error@-1 {{ambiguous use of 'ambiguous', cannot select between potential parameter types '((Int) -> Void)', '((String) -> Void)'}}
     $0[keyPath: 5]
   }
 

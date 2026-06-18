@@ -68,11 +68,11 @@ do {
   func perform4<S: Sequence>(_: S) where S.Element == Any.Type? {}
   perform4([Undo.self, Cut.self, Copy.self])
 
-  // expected-error@+1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  // expected-error@+1 {{failed to produce diagnostic}}
   let _: [Int: any Command] = Dictionary(
     uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
 
-  // expected-error@+1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  // expected-error@+1 {{failed to produce diagnostic}}
   let _: [Int: (any Command)?] = Dictionary(
     uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
 
