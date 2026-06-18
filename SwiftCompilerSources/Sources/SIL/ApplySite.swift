@@ -280,6 +280,10 @@ extension ApplySite {
     functionConvention.resultDependencies != nil
   }
 
+  public var captureDependence: LifetimeDependenceConvention? {
+    (functionConvention.resultDependencies?.hasCaptures ?? false) ? .inherit : nil
+  }
+
   public func isAddressable(operand: Operand) -> Bool {
     for targetOperand in argumentOperands {
       guard !targetOperand.value.isEscapable else {
