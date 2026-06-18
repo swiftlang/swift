@@ -2701,10 +2701,17 @@ public:
     for (auto &op : applySite.getArgumentOperands()) {
       // See if we tracked it.
       if (auto lookupResult = tryToTrackValue(op.get())) {
-        // If we are tracking it, sent it and if it is actor derived, mark
+        // If we are tracking it, send it and if it is actor derived, mark
         // our partial apply as actor derived.
         builder.addRequire(*lookupResult);
-        builder.addSend(lookupResult->value, &op);
+        //        builder.addSend(lookupResult->value, &op);
+
+        if (applySite.isSending(op))
+          builder.addSend(lookupResult->value, &op);
+        else
+          builder.addActorIntroducingInst(lookupResult->value,
+                                          &op, actorIsolation);
+
       }
     }
 
