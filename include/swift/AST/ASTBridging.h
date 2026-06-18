@@ -936,6 +936,14 @@ BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
     swift::SourceRange range, swift::PlatformKind platform,
     BridgedVersionTuple cVersion);
 
+SWIFT_NAME("BridgedCOMAttr.createParsed(_:atLoc:range:interface:implementation:threading:)")
+BridgedCOMAttr BridgedCOMAttr_createParsed(BridgedASTContext context,
+                                           swift::SourceLoc location,
+                                           swift::SourceRange range,
+                                           BridgedStringRef interface,
+                                           BridgedStringRef implementation,
+                                           swift::COMThreadingModel threading);
+
 SWIFT_NAME("BridgedCDeclAttr.createParsed(_:atLoc:range:name:underscored:)")
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                swift::SourceLoc atLoc,
