@@ -2478,7 +2478,8 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
       }();
       if (lookupDepth > ctx.TypeCheckerOpts.DynamicMemberLookupDepthLimit) {
         (void)recordFix(TooManyDynamicMemberLookups::create(
-            *this, DeclNameRef(choice.getName()), locator));
+                            *this, DeclNameRef(choice.getName()), locator),
+                        FixImpact::InvalidReference);
         recordTypeVariablesAsHoles(memberTy);
       } else {
         addValueMemberConstraint(
