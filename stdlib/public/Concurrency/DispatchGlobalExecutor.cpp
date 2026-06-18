@@ -61,29 +61,50 @@
 
 using namespace swift;
 
-typedef size_t DispatchQOS;
-enum {
-  DispatchQOSUserInteractive = 0x21, /* UI */
-  DispatchQOSUserInitiated   = 0x19, /* IN */
-  DispatchQOSDefault         = 0x15, /* DEF */
-  DispatchQOSUtility         = 0x11, /* UT */
-  DispatchQOSBackground      = 0x09, /* BG */
-  DispatchQOSUnspecified     = 0x00, /* UN */
-};
+static constexpr dispatch_qos_class_t DispatchQOSClassUserInteractive
+  = (dispatch_qos_class_t)0x21;
+static constexpr dispatch_qos_class_t DispatchQOSClassUserInitiated
+  = (dispatch_qos_class_t)0x19;
+static constexpr dispatch_qos_class_t DispatchQOSClassDefault
+  = (dispatch_qos_class_t)0x15;
+static constexpr dispatch_qos_class_t DispatchQOSClassUtility
+  = (dispatch_qos_class_t)0x11;
+static constexpr dispatch_qos_class_t DispatchQOSClassBackground
+  = (dispatch_qos_class_t)0x09;
+/* static constexpr dispatch_qos_class_t DispatchQOSClassUnspecified
+  = (dispatch_qos_class_t)0x00;
+*/
 
-enum { DispatchQOSQueueCount = 5 };
+static constexpr size_t DispatchQOSClassCount = 5;
 
-static inline int dispatch_qos_getQueueIndex(SwiftJobPriority priority) {
-  if (priority > DispatchQOSUserInitiated)
+static inline int cacheIndexForQos(dispatch_qos_class_t priority) {
+  switch (priority) {
+  case DispatchQOSClassUserInteractive:
     return 0;
-  else if (priority > DispatchQOSDefault)
+  case DispatchQOSClassUserInitiated:
     return 1;
-  else if (priority > DispatchQOSUtility)
+  case DispatchQOSClassDefault:
     return 2;
-  else if (priority > DispatchQOSBackground)
+  case DispatchQOSClassUtility:
     return 3;
-  else
+  case DispatchQOSClassBackground:
     return 4;
+  default:
+    return 2; /* Return DispatchQOSClassDefault index */
+  }
+}
+
+static inline dispatch_qos_class_t qosClassFromPriority(size_t priority) {
+  if (priority > DispatchQOSClassUserInitiated)
+    return DispatchQOSClassUserInteractive;
+  else if (priority > DispatchQOSClassDefault)
+    return DispatchQOSClassUserInitiated;
+  else if (priority > DispatchQOSClassUtility)
+    return DispatchQOSClassDefault;
+  else if (priority > DispatchQOSClassBackground)
+    return DispatchQOSClassUtility;
+  else
+    return DispatchQOSClassBackground;
 }
 
 /// The function passed to dispatch_async_f to execute a job.
@@ -158,7 +179,7 @@ static void dispatchEnqueue(dispatch_queue_t queue, SwiftJob *job,
   dispatchEnqueueFunc.load(std::memory_order_relaxed)(queue, job, qos);
 }
 
-static constexpr size_t globalQueueCacheCount = DispatchQOSQueueCount;
+static constexpr size_t globalQueueCacheCount = DispatchQOSClassCount;
 static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
 
 #if defined(__APPLE__) && !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
@@ -168,7 +189,12 @@ extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
 #endif
 
 static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
-  size_t queueIndex = dispatch_qos_getQueueIndex(priority);
+  // Map an arbitrary priority value to a predefined
+  // `dispatch_qos_class_t` value.
+  auto qos = qosClassFromPriority(priority);
+
+  // Map `dispatch_qos_class_t` value to a cache index.
+  auto qosIndex = cacheIndexForQos(qos);
 
 #ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
   std::memory_order loadOrder = std::memory_order_acquire;
@@ -176,7 +202,7 @@ static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
   std::memory_order loadOrder = std::memory_order_relaxed;
 #endif
 
-  auto *ptr = &globalQueueCache[queueIndex];
+  auto *ptr = &globalQueueCache[qosIndex];
   auto queue = ptr->load(loadOrder);
   if (SWIFT_LIKELY(queue))
     return queue;
@@ -184,12 +210,14 @@ static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
 #if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || !defined(__APPLE__)
   const int DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS = -3;
 
-  // Create a new cooperative concurrent queue and swap it in.
+  // Create a new cooperative concurrent queue with a maximum width
+  // equal to the number of logical CPU cores, and swap it in.
   dispatch_queue_attr_t newQueueAttr = dispatch_queue_attr_make_with_qos_class(
-      DISPATCH_QUEUE_CONCURRENT, (dispatch_qos_class_t)priority, 0);
+    DISPATCH_QUEUE_CONCURRENT, qos, 0);
   dispatch_queue_t newQueue = dispatch_queue_create(
-      "Swift global concurrent queue", newQueueAttr);
-  dispatch_queue_set_width(newQueue, DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS);
+    "Swift global concurrent queue", newQueueAttr);
+  dispatch_queue_set_width(
+    newQueue, DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS);
 
   if (!ptr->compare_exchange_strong(queue, newQueue,
                                     /*success*/ std::memory_order_release,
@@ -204,13 +232,13 @@ static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
   // race with other threads doing this at the same time for this priority, but
   // that's OK, they'll all end up writing the same value.
   if (runtime::environment::concurrencyEnableCooperativeQueues())
-    queue = dispatch_get_global_queue((dispatch_qos_class_t)priority,
-                                      dispatchQueueCooperativeFlag);
+    queue = dispatch_get_global_queue(
+      qos, /*flags*/ dispatchQueueCooperativeFlag);
+
   // If dispatch doesn't support dispatchQueueCooperativeFlag, it will return
   // NULL. Fall back to a standard global queue.
   if (!queue)
-    queue = dispatch_get_global_queue((dispatch_qos_class_t)priority,
-                                      /*flags*/ 0);
+    queue = dispatch_get_global_queue(qos, /*flags*/ 0);
 
   // Unconditionally store it back in the cache. If we raced with another
   // thread, we'll just overwrite the entry with the same value.
@@ -229,7 +257,7 @@ static dispatch_queue_t getTimerQueue(SwiftJobPriority priority) {
     return getGlobalQueue(priority);
 
   // On older OSes, use a standard global queue.
-  return dispatch_get_global_queue((dispatch_qos_class_t)priority, /*flags*/ 0);
+  return dispatch_get_global_queue(qosClassFromPriority(priority), /*flags*/ 0);
 }
 
 extern "C" SWIFT_CC(swift)
