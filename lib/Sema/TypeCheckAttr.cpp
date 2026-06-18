@@ -8383,6 +8383,33 @@ void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
   }
 
   (void)nominal->isGlobalActor();
+
+  // GlobalActor requires 'shared' to always return the same actor instance.
+  // Only a stored 'let' guarantees this; any other shape
+  // can silently violate the contract.
+  if (auto *var = nominal->getGlobalActorInstance(); var && !var->isLet()) {
+    var->diagnose(diag::global_actor_shared_non_let_witness, var);
+
+    {
+      auto useLet =
+          var->diagnose(diag::global_actor_shared_non_let_witness_use_let);
+      SourceLoc fixItLoc = getFixItLocForVarToLet(var);
+      if (fixItLoc.isValid())
+        useLet.fixItReplace(fixItLoc, "let");
+    }
+
+    {
+      auto silence =
+          var->diagnose(diag::global_actor_shared_non_let_witness_silence);
+      if (auto *pbd = var->getParentPatternBinding()) {
+        SourceLoc insertLoc = pbd->getStartLoc();
+        if (insertLoc.isValid())
+          silence.fixItInsert(
+              insertLoc,
+              "@diagnose(UnstableGlobalActorShared, as: ignored) ");
+      }
+    }
+  }
 }
 
 void AttributeChecker::visitAsyncAttr(AsyncAttr *attr) {

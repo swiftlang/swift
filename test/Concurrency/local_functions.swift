@@ -34,6 +34,9 @@ actor TestActor {
     // not a valid implementation
     return TestActor()
   }
+  // expected-warning@-4{{GlobalActor witness static property 'shared' may return different actor instances, which would lead to global actor isolation violations}}
+  // expected-note@-5{{declare it as 'static let' to guarantee a stable instance}}
+  // expected-note@-6{{if this property always returns the same instance, silence the warning with '@diagnose(UnstableGlobalActorShared, as: ignored)'}}
 }
 
 struct Generic<T> {
