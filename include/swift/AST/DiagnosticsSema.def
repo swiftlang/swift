@@ -6392,6 +6392,20 @@ ERROR(global_actor_arg,none,
       (Type))
 ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
+
+GROUPED_WARNING(global_actor_shared_non_let_witness,
+                UnstableGlobalActorShared,none,
+                "GlobalActor witness %kind0 may return different actor "
+                "instances, which would lead to global actor isolation "
+                "violations",
+                (const ValueDecl *))
+NOTE(global_actor_shared_non_let_witness_use_let,none,
+     "declare it as 'static let' to guarantee a stable instance",
+     ())
+NOTE(global_actor_shared_non_let_witness_silence,none,
+     "if this property always returns the same instance, silence the warning "
+     "with '@diagnose(UnstableGlobalActorShared, as: ignored)'",
+     ())
 ERROR(global_actor_top_level_var,none,
       "top-level code variables cannot have a global actor", ())
 ERROR(global_actor_access,none,
