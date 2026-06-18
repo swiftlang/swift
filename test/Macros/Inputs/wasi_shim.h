@@ -17,6 +17,11 @@ typedef struct wasi_ciovec_t {
   wasi_size_t buf_len;
 } wasi_ciovec_t;
 
+typedef struct wasi_iovec_t {
+  uint8_t *buf;
+  wasi_size_t buf_len;
+} wasi_iovec_t;
+
 wasi_errno_t wasi_fd_write(
   wasi_fd_t fd,
   const wasi_ciovec_t *iovs,
@@ -25,6 +30,17 @@ wasi_errno_t wasi_fd_write(
 ) __attribute__((
   __import_module__("wasi_snapshot_preview1"),
   __import_name__("fd_write"),
+  __warn_unused_result__
+));
+
+wasi_errno_t wasi_fd_read(
+  wasi_fd_t fd,
+  const wasi_iovec_t *iovs,
+  wasi_size_t iovs_len,
+  wasi_size_t *nread
+) __attribute__((
+  __import_module__("wasi_snapshot_preview1"),
+  __import_name__("fd_read"),
   __warn_unused_result__
 ));
 
@@ -52,4 +68,12 @@ static inline wasi_errno_t swift_write(int fd, const void *buf, wasi_size_t len)
 _Noreturn static inline void swift_abort(const char *message) {
   swift_write(2, message, swift_strlen(message));
   wasi_proc_exit(1);
+}
+
+static inline wasi_size_t swift_read(int fd, void *buf, wasi_size_t len) {
+  struct wasi_iovec_t vec = { .buf = (uint8_t *)buf, .buf_len = len };
+  wasi_size_t nread = 0;
+  // Abort on a read error rather than returning 0, which the caller would read as EOF.
+  if (wasi_fd_read(fd, &vec, 1, &nread) != 0) swift_abort("fd_read failed!\n");
+  return nread;
 }

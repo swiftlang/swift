@@ -21,10 +21,14 @@
 // CHECK: guest error!
 
 //--- test.swift
+// The forwarded getCapability is the guest's first pump, so its abort now surfaces at
+// plugin-load time (warning at the decl + error at the use) rather than during expansion.
+// expected-warning @+2 {{failed to load library plugin}}
+// expected-note @+1 {{declared here}}
 @freestanding(expression) macro constInt() -> Int = #externalMacro(module: "MacroDefinition", type: "ConstMacro")
 
 func foo() {
-  // expected-error @+1 {{failed to communicate with external macro}}
+  // expected-error @+1 {{failed to load library plugin}}
   let _: Int = #constInt
 }
 
