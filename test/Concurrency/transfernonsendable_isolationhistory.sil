@@ -1,0 +1,417 @@
+// RUN: %target-sil-opt -send-non-sendable -sil-regionbasedisolation-emit-isolation-history -strict-concurrency=complete %s -o /dev/null -verify
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// SIL coverage test for the
+// `-sil-regionbasedisolation-emit-isolation-history` flag. Each test below
+// exercises a specific class of merge translated by RegionAnalysis: apply
+// arguments/results, store_borrow, store, alloc_stack-as-var_decl, plus
+// chain and CFG-join cases.
+//
+// We use function-application merges (rather than tuples/structs) because
+// inferred names from var_decl move_values land more reliably on apply
+// results. `debug_value` attaches user-visible names to elements; the chain
+// notes ("'y' is connected to 'x' which is accessible to <iso>", "'z' is
+// connected to 'y'") are the focus of the verification.
+//
+// The warning / non-history note matchers below use empty bodies so the
+// test stays robust against unrelated diagnostic-text refactors. The chain
+// notes have their full text matched.
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+class NonSendableKlass {}
+
+struct PairStruct {
+  var first: NonSendableKlass
+  var second: NonSendableKlass
+}
+
+enum PayloadEnum {
+  case some(NonSendableKlass)
+  case none
+}
+
+class ContainerKlass {
+  var slot: NonSendableKlass
+}
+
+sil @mergeOne   : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+sil @mergeTwo   : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+sil @makeFresh  : $@convention(thin) () -> @owned NonSendableKlass
+sil @makeContainer : $@convention(thin) () -> @owned ContainerKlass
+sil @takeInout : $@convention(thin) (@inout NonSendableKlass, @guaranteed NonSendableKlass) -> ()
+sil @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+// MARK: Suppression — direct send of the actively task-isolated parameter.
+// No chain to describe, so no extra reachability note is emitted.
+sil [ossa] @suppress_direct_send : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+  %addr = alloc_stack $NonSendableKlass
+  %sb = store_borrow %x to %addr : $*NonSendableKlass
+  %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%sb) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  end_borrow %sb : $*NonSendableKlass
+  dealloc_stack %addr : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: Single-step — apply taking one task-isolated arg returns a value
+// merged into the arg's region. Originating note ties 'y' to 'x'.
+sil [ossa] @single_step_apply_one_arg : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+
+  %f1 = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass
+  debug_value %y : $NonSendableKlass, let, name "y"
+
+  %addr = alloc_stack $NonSendableKlass
+  %sb = store_borrow %y to %addr : $*NonSendableKlass
+  %g = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %g<NonSendableKlass>(%sb) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  end_borrow %sb : $*NonSendableKlass
+  dealloc_stack %addr : $*NonSendableKlass
+  destroy_value %y : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: Single-step — apply taking two args (task-isolated 'x' + fresh
+// disconnected) returns a value merged into both regions.
+sil [ossa] @single_step_apply_two_args : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+
+  %mk = function_ref @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
+  %fresh = apply %mk() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %f2 = function_ref @mergeTwo : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %r1 = apply %f2(%x, %fresh) : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  destroy_value %fresh : $NonSendableKlass
+  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass
+  debug_value %y : $NonSendableKlass, let, name "y"
+
+  %addr = alloc_stack $NonSendableKlass
+  %sb = store_borrow %y to %addr : $*NonSendableKlass
+  %g = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %g<NonSendableKlass>(%sb) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  end_borrow %sb : $*NonSendableKlass
+  dealloc_stack %addr : $*NonSendableKlass
+  destroy_value %y : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: Two-step chain — y = mergeOne(x), z = mergeOne(y), send z.
+// Originating note at the y merge; intermediate note at the z merge.
+sil [ossa] @chain_two_step : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+  %f1 = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+
+  // y = mergeOne(x)
+  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass
+  debug_value %y : $NonSendableKlass, let, name "y"
+
+  // z = mergeOne(y)
+  %yb = begin_borrow %y : $NonSendableKlass
+  %r2 = apply %f1(%yb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'z' is connected to 'y'}}
+  end_borrow %yb : $NonSendableKlass
+  %z = move_value [lexical] [var_decl] %r2 : $NonSendableKlass
+  debug_value %z : $NonSendableKlass, let, name "z"
+
+  // send z
+  %addr = alloc_stack $NonSendableKlass
+  %sb = store_borrow %z to %addr : $*NonSendableKlass
+  %g = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %g<NonSendableKlass>(%sb) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  end_borrow %sb : $*NonSendableKlass
+  dealloc_stack %addr : $*NonSendableKlass
+  destroy_value %z : $NonSendableKlass
+  destroy_value %y : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: Three-step chain — w = mergeOne(z), z = mergeOne(y), y = mergeOne(x),
+// send w. Originating + two intermediates.
+sil [ossa] @chain_three_step : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+  %f1 = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+
+  // y = mergeOne(x)
+  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass
+  debug_value %y : $NonSendableKlass, let, name "y"
+
+  // z = mergeOne(y)
+  %yb = begin_borrow %y : $NonSendableKlass
+  %r2 = apply %f1(%yb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'z' is connected to 'y'}}
+  end_borrow %yb : $NonSendableKlass
+  %z = move_value [lexical] [var_decl] %r2 : $NonSendableKlass
+  debug_value %z : $NonSendableKlass, let, name "z"
+
+  // w = mergeOne(z)
+  %zb = begin_borrow %z : $NonSendableKlass
+  %r3 = apply %f1(%zb) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'w' is connected to 'z'}}
+  end_borrow %zb : $NonSendableKlass
+  %w = move_value [lexical] [var_decl] %r3 : $NonSendableKlass
+  debug_value %w : $NonSendableKlass, let, name "w"
+
+  // send w
+  %addr = alloc_stack $NonSendableKlass
+  %sb = store_borrow %w to %addr : $*NonSendableKlass
+  %g = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %g<NonSendableKlass>(%sb) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  end_borrow %sb : $*NonSendableKlass
+  dealloc_stack %addr : $*NonSendableKlass
+  destroy_value %w : $NonSendableKlass
+  destroy_value %z : $NonSendableKlass
+  destroy_value %y : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: CFG join (both branches keep y in same region) — y created in entry
+// block via merge with x, branches diverge then rejoin, send in join block.
+sil [ossa] @cfg_join_uniform : $@convention(thin) @async (@guaranteed NonSendableKlass, Builtin.Int1) -> () {
+bb0(%x : @guaranteed $NonSendableKlass, %cond : $Builtin.Int1):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+  %f1 = function_ref @mergeOne : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %r1 = apply %f1(%x) : $@convention(thin) (@guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %y = move_value [lexical] [var_decl] %r1 : $NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  debug_value %y : $NonSendableKlass, let, name "y"
+  cond_br %cond, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %addr = alloc_stack $NonSendableKlass
+  %sb = store_borrow %y to %addr : $*NonSendableKlass
+  %g = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %g<NonSendableKlass>(%sb) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  end_borrow %sb : $*NonSendableKlass
+  dealloc_stack %addr : $*NonSendableKlass
+  destroy_value %y : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: CFG join (one branch merges) — y is fresh in entry, only the true
+// branch joins it with x via mergeTwo, then we send y in the join block.
+// Exercises CFGHistoryJoin recovery in the chain walk.
+sil [ossa] @cfg_join_one_branch_merges : $@convention(thin) @async (@guaranteed NonSendableKlass, Builtin.Int1) -> () {
+bb0(%x : @guaranteed $NonSendableKlass, %cond : $Builtin.Int1):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+
+  %mk = function_ref @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
+  %r0 = apply %mk() : $@convention(thin) () -> @owned NonSendableKlass
+  %y = move_value [lexical] [var_decl] %r0 : $NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  debug_value %y : $NonSendableKlass, let, name "y"
+  cond_br %cond, bb_merge, bb_no_merge
+
+bb_merge:
+  %yb = begin_borrow %y : $NonSendableKlass
+  %f2 = function_ref @mergeTwo : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %rm = apply %f2(%x, %yb) : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  end_borrow %yb : $NonSendableKlass
+  destroy_value %rm : $NonSendableKlass
+  br bb_join
+
+bb_no_merge:
+  br bb_join
+
+bb_join:
+  %addr = alloc_stack $NonSendableKlass
+  %sb = store_borrow %y to %addr : $*NonSendableKlass
+  %g = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %g<NonSendableKlass>(%sb) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  end_borrow %sb : $*NonSendableKlass
+  dealloc_stack %addr : $*NonSendableKlass
+  destroy_value %y : $NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: Store-based merge — store of an owned value into an alloc_stack
+// var_decl named 'y' merges y's region with the stored value's region.
+sil [ossa] @merge_via_store : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+  %xc = copy_value %x : $NonSendableKlass
+  %y_addr = alloc_stack [lexical] [var_decl] $NonSendableKlass, var, name "y"
+  store %xc to [init] %y_addr : $*NonSendableKlass // expected-note {{value was merged into code in the current isolation context region here}}
+
+  %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%y_addr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  destroy_addr %y_addr : $*NonSendableKlass
+  dealloc_stack %y_addr : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: TupleInst — `tuple` aggregate merges all element regions. We send
+// the whole tuple as a `(NS, NS)` value via store_borrow.
+sil [ossa] @merge_via_tuple_inst : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+
+  %xc = copy_value %x : $NonSendableKlass
+  %mk = function_ref @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
+  %fresh = apply %mk() : $@convention(thin) () -> @owned NonSendableKlass
+
+  // tuple aggregates xc and fresh into a single value whose region merges
+  // both operands' regions.
+  %tup = tuple (%xc : $NonSendableKlass, %fresh : $NonSendableKlass) // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  %y = move_value [lexical] [var_decl] %tup : $(NonSendableKlass, NonSendableKlass)
+  debug_value %y : $(NonSendableKlass, NonSendableKlass), let, name "y"
+
+  %addr = alloc_stack $(NonSendableKlass, NonSendableKlass)
+  %sb = store_borrow %y to %addr : $*(NonSendableKlass, NonSendableKlass)
+  %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type '(NonSendableKlass, NonSendableKlass)' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<(NonSendableKlass, NonSendableKlass)>(%sb) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  end_borrow %sb : $*(NonSendableKlass, NonSendableKlass)
+  dealloc_stack %addr : $*(NonSendableKlass, NonSendableKlass)
+  destroy_value %y : $(NonSendableKlass, NonSendableKlass)
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: StructInst — `struct` aggregate merges all field regions.
+sil [ossa] @merge_via_struct_inst : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+
+  %xc = copy_value %x : $NonSendableKlass
+  %mk = function_ref @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
+  %fresh = apply %mk() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %s = struct $PairStruct (%xc : $NonSendableKlass, %fresh : $NonSendableKlass) // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  %y = move_value [lexical] [var_decl] %s : $PairStruct
+  debug_value %y : $PairStruct, let, name "y"
+
+  %addr = alloc_stack $PairStruct
+  %sb = store_borrow %y to %addr : $*PairStruct
+  %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'PairStruct' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<PairStruct>(%sb) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  end_borrow %sb : $*PairStruct
+  dealloc_stack %addr : $*PairStruct
+  destroy_value %y : $PairStruct
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: EnumInst — enum case with non-Sendable payload merges payload and
+// enum value's regions.
+sil [ossa] @merge_via_enum_inst : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+
+  %xc = copy_value %x : $NonSendableKlass
+  %e = enum $PayloadEnum, #PayloadEnum.some!enumelt, %xc : $NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  %y = move_value [lexical] [var_decl] %e : $PayloadEnum
+  debug_value %y : $PayloadEnum, let, name "y"
+
+  %addr = alloc_stack $PayloadEnum
+  %sb = store_borrow %y to %addr : $*PayloadEnum
+  %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'PayloadEnum' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<PayloadEnum>(%sb) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  end_borrow %sb : $*PayloadEnum
+  dealloc_stack %addr : $*PayloadEnum
+  destroy_value %y : $PayloadEnum
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: ref_element_addr write — assigning into a class instance field via
+// `ref_element_addr` + `store` merges the class instance into the stored
+// value's region.
+sil [ossa] @merge_via_ref_element_addr_write : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+
+  %mk = function_ref @makeContainer : $@convention(thin) () -> @owned ContainerKlass
+  %c = apply %mk() : $@convention(thin) () -> @owned ContainerKlass
+  %y = move_value [lexical] [var_decl] %c : $ContainerKlass
+  debug_value %y : $ContainerKlass, let, name "y"
+
+  // y.slot = x merges y's region with x's. Need a borrow for ref_element_addr.
+  %xc = copy_value %x : $NonSendableKlass
+  %yb = begin_borrow %y : $ContainerKlass
+  %slot_addr = ref_element_addr %yb : $ContainerKlass, #ContainerKlass.slot // expected-note {{'y.slot' is connected to 'y'}}
+  %access = begin_access [modify] [dynamic] %slot_addr : $*NonSendableKlass
+  store %xc to [assign] %access : $*NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  end_access %access : $*NonSendableKlass
+  end_borrow %yb : $ContainerKlass
+
+  %addr = alloc_stack $ContainerKlass
+  %sb = store_borrow %y to %addr : $*ContainerKlass
+  %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'ContainerKlass' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<ContainerKlass>(%sb) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  end_borrow %sb : $*ContainerKlass
+  dealloc_stack %addr : $*ContainerKlass
+  destroy_value %y : $ContainerKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// MARK: inout argument merge — passing an `inout NS` along with a
+// `@guaranteed NS` merges the inout addr's region with the guaranteed
+// argument's region.
+sil [ossa] @merge_via_inout_arg : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%x : @guaranteed $NonSendableKlass):
+  debug_value %x : $NonSendableKlass, let, name "x", argno 1
+
+  %mk = function_ref @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
+  %fresh = apply %mk() : $@convention(thin) () -> @owned NonSendableKlass
+  %y_addr = alloc_stack [lexical] [var_decl] $NonSendableKlass, var, name "y"
+  store %fresh to [init] %y_addr : $*NonSendableKlass
+
+  %access = begin_access [modify] [static] %y_addr : $*NonSendableKlass
+  %takeInout = function_ref @takeInout : $@convention(thin) (@inout NonSendableKlass, @guaranteed NonSendableKlass) -> ()
+  apply %takeInout(%access, %x) : $@convention(thin) (@inout NonSendableKlass, @guaranteed NonSendableKlass) -> () // expected-note {{'makeFresh' is connected to 'x' which is accessible to code in the current isolation context}}
+  end_access %access : $*NonSendableKlass
+
+  %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note@+1 {{sending value of non-Sendable type 'NonSendableKlass' to global actor '<null>'-isolated callee risks causing races in between code in the current isolation context and global actor '<null>'-isolated uses}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%y_addr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  destroy_addr %y_addr : $*NonSendableKlass
+  dealloc_stack %y_addr : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}

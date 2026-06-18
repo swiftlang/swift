@@ -114,6 +114,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:conformance-isolation>
 - <doc:protocol-type-non-conformance>
 - <doc:public-import-of-project-internal-module>
+- <doc:region-isolation-isolation-history>
 - <doc:result-builder-methods>
 - <doc:spi-import-ignored>
 - <doc:semantic-copies>

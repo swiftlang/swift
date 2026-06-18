@@ -1286,6 +1286,23 @@ NOTE(rbi_merge_failure_value_note_bare, none,
      "value is exposed to %select{%0 code|code in the current isolation context}1",
      (StringRef, bool))
 
+GROUPED_NOTE(regionbasedisolation_value_became_part_of_isolated_region,
+     RegionIsolationIsolationHistory, none,
+     "value was merged into %select{%0 code|code in the current isolation "
+     "context}1 region here",
+     (StringRef, bool))
+
+GROUPED_NOTE(regionbasedisolation_chain_value_exposed,
+     RegionIsolationIsolationHistory, none,
+     "%0 is connected to %1",
+     (Identifier, Identifier))
+
+GROUPED_NOTE(regionbasedisolation_chain_value_exposed_to_isolated_named,
+     RegionIsolationIsolationHistory, none,
+     "%0 is connected to %1 which is accessible to "
+     "%select{%2 code|code in the current isolation context}3",
+     (Identifier, Identifier, StringRef, bool))
+
 // Concurrency related diagnostics
 ERROR(executor_factory_must_conform, none,
       "the DefaultExecutorFactory does not conform to 'ExecutorFactory'", ())
