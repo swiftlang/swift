@@ -12,7 +12,6 @@ set_target_properties(swiftCRT PROPERTIES
 target_compile_definitions(swiftCRT PRIVATE
   $<$<BOOL:${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
 target_compile_options(swiftCRT PRIVATE
-  "SHELL:-Xfrontend -disable-force-load-symbols"
   "SHELL:-Xcc -D_USE_MATH_DEFINES")
 target_link_libraries(swiftCRT PUBLIC
   ClangModules)

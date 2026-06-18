@@ -5,8 +5,6 @@ set_target_properties(swiftWinSDK PROPERTIES
   Swift_MODULE_NAME WinSDK)
 target_compile_definitions(swiftWinSDK PRIVATE
   $<$<BOOL:${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
-target_compile_options(swiftWinSDK PRIVATE
-  "SHELL:-Xfrontend -disable-force-load-symbols")
 target_link_libraries(swiftWinSDK PUBLIC
   ClangModules)
 target_link_libraries(swiftWinSDK PRIVATE
