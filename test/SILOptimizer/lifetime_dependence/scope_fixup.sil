@@ -970,3 +970,57 @@ bb3:
   %18 = tuple ()
   return %18
 }
+
+// Test handling of disjoint scopes that should not be extended.
+
+sil [ossa] @getDependentHolder : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @guaranteed Holder
+
+// The path from the loadborrow to the end_borrow in b5 never reaches the inner
+// store_borrow scope, so scope extension should simply ignore it.
+// 
+// CHECK-LABEL: sil hidden [noinline] [ossa] @testDisjointParentScopes : $@convention(thin) (@in_guaranteed Holder) -> () {
+// CHECK:       bb0(%0 : $*Holder):
+// CHECK:         %1 = load_borrow %0
+// CHECK-NEXT:    cond_br undef, bb1, bb2
+// CHECK:       bb1:
+// CHECK:         cond_br undef, bb4, bb5
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    %5 = alloc_stack $Holder
+// CHECK:       bb4:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb5:
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'testDisjointParentScopes'
+sil hidden [noinline] [ossa] @testDisjointParentScopes : $@convention(thin) (@in_guaranteed Holder) -> () {
+bb0(%0 : $*Holder):
+  %1 = load_borrow %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb4, bb5
+
+bb2:
+  br bb3
+
+bb3:
+  %5 = alloc_stack $Holder
+  %6 = store_borrow %1 to %5
+  %7 = function_ref @getDependentHolder : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @guaranteed Holder
+  %8 = apply %7(%6) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @guaranteed Holder
+  %9 = mark_dependence [unresolved] %8 on %6
+  end_borrow %6
+  dealloc_stack %5
+  end_borrow %1
+  %13 = tuple ()
+  return %13
+
+bb4:
+  br bb3
+
+bb5:
+  end_borrow %1
+  unreachable
+}
