@@ -2976,7 +2976,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
                                SF, attr->getLocation(),
-                               NL_QualifiedDefault);
+                               {NLFlag::QualifiedDefault});
     if (decls.size() == 1)
       ApplicationDelegateProto = dyn_cast<ProtocolDecl>(decls[0]);
   }
@@ -3902,9 +3902,9 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
   if (!typeCtx)
     typeCtx = cast<ExtensionDecl>(declCtxt->getAsDecl())->getExtendedNominal();
 
-  auto options = NL_QualifiedDefault;
+  NLOptions options = {NLFlag::QualifiedDefault};
   if (declCtxt->isInSpecializeExtensionContext())
-    options |= NL_IncludeUsableFromInline;
+    options |= NLFlag::IncludeUsableFromInline;
 
   if (typeCtx)
     moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
@@ -5002,11 +5002,11 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
 
       auto builderType = nominal->getDeclaredType();
       nominal->lookupQualified(builderType, DeclNameRef(buildPartialBlockFirst),
-                               attr->getLocation(), NL_QualifiedDefault,
+                               attr->getLocation(), {NLFlag::QualifiedDefault},
                                buildPartialBlockFirstMatches);
       nominal->lookupQualified(
           builderType, DeclNameRef(buildPartialBlockAccumulated),
-          attr->getLocation(), NL_QualifiedDefault,
+          attr->getLocation(), {NLFlag::QualifiedDefault},
           buildPartialBlockAccumulatedMatches);
 
       hasAccessibleBuildPartialBlockFirst = llvm::any_of(
@@ -9139,7 +9139,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
     SmallVector<ValueDecl *, 1> lookupResults;
     attachedContext->lookupQualified(attachedContext->getParentModule(),
                                      nameRef.withoutArgumentLabels(ctx),
-                                     attr->getLocation(), NL_OnlyTypes,
+                                     attr->getLocation(), {NLFlag::OnlyTypes},
                                      lookupResults);
     if (lookupResults.size() == 1)
       return lookupResults[0];

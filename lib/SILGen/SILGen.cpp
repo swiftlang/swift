@@ -529,11 +529,11 @@ Type SILGenModule::getConfiguredExecutorFactory() {
     mainType->lookupQualified(mainType,
                               DeclNameRef(identifier),
                               SourceLoc(),
-                              NL_RemoveNonVisible |
-                              NL_RemoveOverridden |
-                              NL_OnlyTypes |
-                              NL_RemoveAssociatedTypes |
-                              NL_ProtocolMembers,
+                              {NLFlag::RemoveNonVisible,
+                               NLFlag::RemoveOverridden,
+                               NLFlag::OnlyTypes,
+                               NLFlag::RemoveAssociatedTypes,
+                               NLFlag::ProtocolMembers},
                               decls);
     for (auto decl : decls) {
       auto *genericDecl = cast<GenericTypeDecl>(decl);

@@ -599,12 +599,12 @@ static DirectLookupDescriptor contextualizeOptions(
 static NLOptions
 contextualizeOptions(const DeclContext *dc, SourceLoc loc,
                      NLOptions options) {
-  if (!(options & NL_ExcludeMacroExpansions)
+  if (!options.contains(NLFlag::ExcludeMacroExpansions)
       && namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
-    options |= NL_ExcludeMacroExpansions;
-  if (!(options & NL_ABIProviding)
+    options |= NLFlag::ExcludeMacroExpansions;
+  if (!options.contains(NLFlag::ABIProviding)
       && namelookup::isInABIAttr(dc->getParentSourceFile(), loc))
-    options |= NL_ABIProviding;
+    options |= NLFlag::ABIProviding;
 
   return options;
 }
