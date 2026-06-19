@@ -429,6 +429,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
   def public_autolink_library :
     Separate<["-"], "public-autolink-library">,
     HelpText<"Add public dependent library">;
+
+  def enable_com_interop
+    : Flag<["-"], "enable-experimental-com-interop">,
+      HelpText<"Enable COM interop code generation and configuration directives">;
 }
 
 // HIDDEN FLAGS
@@ -615,6 +619,10 @@ def disable_implicit_concurrency_module_import : Flag<["-"],
 def disable_implicit_string_processing_module_import : Flag<["-"],
   "disable-implicit-string-processing-module-import">,
   HelpText<"Disable the implicit import of the _StringProcessing module.">;
+
+def disable_implicit_com_module_import
+  : Flag<["-"], "disable-implicit-com-module-import">,
+    HelpText<"Disable the implicit import of the COM module.">;
 
 def disable_implicit_cxx_module_import : Flag<["-"],
   "disable-implicit-cxx-module-import">,
