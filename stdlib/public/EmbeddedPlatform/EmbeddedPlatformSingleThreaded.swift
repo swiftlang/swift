@@ -18,62 +18,62 @@ func _swift_single_threaded_trap() -> Never {
   while true {}
 }
 
+fileprivate struct SingleThreadedMutex {
+  var checked: Bool
+  var locked: Bool
+}
+
 @implementation @c
 public func _swift_mutex_init(
   _ mutex: UnsafeMutableRawPointer,
   _ checked: Int
 ) {
-  let storage = mutex.assumingMemoryBound(to: UInt.self)
-  storage.pointee = checked == 0 ? 0 : 1
-  (storage + 1).pointee = 0
+  let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
+  storage.pointee = SingleThreadedMutex(
+    checked: checked != 0,
+    locked: false)
 }
 
 @implementation @c
 public func _swift_mutex_destroy(_ mutex: UnsafeMutableRawPointer) {
-  let storage = mutex.assumingMemoryBound(to: UInt.self)
-  let checked = storage.pointee != 0
-  let state = storage + 1
-  if checked && state.pointee != 0 {
+  let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
+  if storage.pointee.checked && storage.pointee.locked {
     _swift_single_threaded_trap()
   }
 
-  storage.pointee = 0
-  state.pointee = 0
+  storage.pointee = SingleThreadedMutex(checked: false, locked: false)
 }
 
 @implementation @c
 public func _swift_mutex_lock(_ mutex: UnsafeMutableRawPointer) {
-  let storage = mutex.assumingMemoryBound(to: UInt.self)
-  if storage.pointee != 0 {
-    let state = storage + 1
-    if state.pointee != 0 {
+  let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
+  if storage.pointee.checked {
+    if storage.pointee.locked {
       _swift_single_threaded_trap()
     }
-    state.pointee = 1
+    storage.pointee.locked = true
   }
 }
 
 @implementation @c
 public func _swift_mutex_unlock(_ mutex: UnsafeMutableRawPointer) {
-  let storage = mutex.assumingMemoryBound(to: UInt.self)
-  if storage.pointee != 0 {
-    let state = storage + 1
-    if state.pointee == 0 {
+  let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
+  if storage.pointee.checked {
+    if !storage.pointee.locked {
       _swift_single_threaded_trap()
     }
-    state.pointee = 0
+    storage.pointee.locked = false
   }
 }
 
 @implementation @c
 public func _swift_mutex_tryLock(_ mutex: UnsafeMutableRawPointer) -> Int {
-  let storage = mutex.assumingMemoryBound(to: UInt.self)
-  if storage.pointee != 0 {
-    let state = storage + 1
-    if state.pointee != 0 {
+  let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
+  if storage.pointee.checked {
+    if storage.pointee.locked {
       return 0
     }
-    state.pointee = 1
+    storage.pointee.locked = true
   }
   return 1
 }
