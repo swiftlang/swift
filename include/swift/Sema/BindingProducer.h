@@ -188,7 +188,10 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
   using Binding = inference::PotentialBinding;
 
   TypeVariableType *TypeVar;
-  llvm::SmallVector<Binding, 4> Bindings;
+
+  llvm::SmallVector<Binding, 2> Bindings;
+  llvm::SmallPtrSet<CanType, 2> ExploredTypes;
+
   /// The set of defaults to attempt once producer
   /// runs out of direct & transitive bindings.
   llvm::SmallVector<Binding, 1> DelayedDefaults;
@@ -197,9 +200,6 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
   // generator is currently at, `numTries` represents
   // the number of times bindings have been recomputed.
   unsigned Index = 0, NumTries = 0;
-
-  llvm::SmallPtrSet<CanType, 4> ExploredTypes;
-  llvm::SmallPtrSet<TypeBase *, 4> BoundTypes;
 
   /// Determines whether this type variable has a
   /// `ExpressibleByNilLiteral` requirement which
@@ -241,7 +241,6 @@ public:
     {
       auto type = binding.BindingType;
 
-      BoundTypes.insert(type.getPointer());
       ExploredTypes.insert(type->getCanonicalType());
     }
 

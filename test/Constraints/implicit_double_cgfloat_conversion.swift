@@ -353,14 +353,36 @@ func test_implicit_conversion_clash_with_partial_application_check() {
 }
 
 func test_ternary_and_nil_coalescing() {
-  func test(_: Double?) {}
+  func test1(_: Double?) {}
+  func test2(_: CGFloat?) {}
 
-  func ternary(v: CGFloat) {
-    test(true ? v : nil) // Ok
+  func ternary1(v: CGFloat, w: Double) {
+    test1(true ? v : nil)
+    test2(true ? v : nil)
+    test1(true ? w : nil)
+    test2(true ? w : nil)
   }
 
-  func test_nil_coalescing(v: CGFloat?) {
-    test(v ?? 0.0) // Ok
+  func ternary1a(v: CGFloat) -> Double? {
+    return true ? v : nil
+  }
+
+  func ternary1b(w: Double) -> CGFloat? {
+    return true ? w : nil
+  }
+
+  func ternary2(v: CGFloat?, w: Double?) {
+    test1(true ? v : nil)
+    test2(true ? v : nil)
+    test1(true ? w : nil)
+    test2(true ? w : nil)
+  }
+
+  func test_nil_coalescing(v: CGFloat?, w: Double?) {
+    test1(v ?? 0.0)
+    test2(v ?? 0.0)
+    test1(w ?? 0.0)
+    test2(w ?? 0.0)
   }
 }
 
@@ -422,4 +444,22 @@ func test_init_validation() {
       // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
     }
   }
+}
+
+// Optional-to-optional conversion
+func optional_to_optional(x: CGFloat?) -> Double? {
+  return x
+}
+
+func test_joins_requiring_optional_to_optional_conversion(_ x1: Double, _ x2: CGFloat,
+                                                          _ y1: Double?, _ y2: CGFloat?) {
+  if x1 != y1 {}
+  if x1 != y2 {}
+  if x2 != y1 {}
+  if x2 != y2 {}
+
+  if y1 != x1 {}
+  if y1 != x2 {}
+  if y2 != x1 {}
+  if y2 != x2 {}
 }

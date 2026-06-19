@@ -50,19 +50,19 @@ func testNestedTypes() {
 
   // CHECK-OUTPUT: [Test.Container.(unknown context at{{[^)]*}}).Base]
   // CHECK-OUTPUT: 27
-  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV9testclassyxxlFSi_Tg5
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV9testclassyxxSzRzlFSi_Tg5
   print(c.testclass(27))
   // CHECK-OUTPUT: [Test.Container.(unknown context at{{[^)]*}}).Base]
   // CHECK-OUTPUT: 27
-  // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test9ContainerV13testclass_genyxxlF
+  // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test9ContainerV13testclass_genyxxSzRzlF
   print(c.testclass_gen(27))
   // CHECK-OUTPUT: [Test.(unknown context at{{[^)]*}}).PE<Swift.Int>.B(27)]
   // CHECK-OUTPUT: 27
-  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV8testenumyxxlFSi_Tg5
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV8testenumyxxSzRzlFSi_Tg5
   print(c.testenum(27))
   // CHECK-OUTPUT: [Test.(unknown context at{{[^)]*}}).PE<Swift.Int>.B(27)]
   // CHECK-OUTPUT: 27
-  // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test9ContainerV12testenum_genyxxlF
+  // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test9ContainerV12testenum_genyxxSzRzlF
   print(c.testenum_gen(27))
 }
 
@@ -127,10 +127,10 @@ func testSubModule() {
 
 func testClosures() {
   // CHECK-OUTPUT: 23
-  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test14genericClosureyxxlFSi_Tg5
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test14genericClosureyxxSzRzlFSi_Tg5
   print(genericClosure(23))
   // CHECK-OUTPUT: 24
-  // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test18genericClosure_genyxxlF
+  // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test18genericClosure_genyxxSzRzlF
   print(genericClosure_gen(24))
 }
 
@@ -144,7 +144,7 @@ func testKeypath() {
 func testMisc() {
   // CHECK-OUTPUT: 43
   // CHECK-OUTPUT: 42
-  // CHECK-SIL-DAG: sil shared {{.*}} @$s4Test13callUnrelatedyxxlFSi_Tg5
+  // CHECK-SIL-DAG: sil shared {{.*}} @$s4Test13callUnrelatedyxxSzRzlFSi_Tg5
   print(callUnrelated(42))
 
   // CHECK-OUTPUT: 27
@@ -169,13 +169,13 @@ func testGlobal() {
 @inline(never)
 func testImplementationOnly() {
   // CHECK-OUTPUT: 27
-  // CHECK-SIL2: function_ref @$s4Test26callImplementationOnlyTypeyxxlF
+  // CHECK-SIL2: function_ref @$s4Test26callImplementationOnlyTypeyxxSzRzlF
   print(callImplementationOnlyType(27))
   // CHECK-OUTPUT: 40
-  // CHECK-SIL2: function_ref @$s4Test26callImplementationOnlyFuncySixlF
+  // CHECK-SIL2: function_ref @$s4Test26callImplementationOnlyFuncySixSzRzlF
   print(callImplementationOnlyFunc(0))
   // CHECK-OUTPUT: 123
-  // CHECK-SIL2: function_ref @$s4Test23callCImplementationOnlyySixlF
+  // CHECK-SIL2: function_ref @$s4Test23callCImplementationOnlyySixSzRzlF
   print(callCImplementationOnly(0))
   // CHECK-SIL2: } // end sil function '$s4Main22testImplementationOnlyyyF'
 }
