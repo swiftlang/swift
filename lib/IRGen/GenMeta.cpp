@@ -7687,6 +7687,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::SendableMetatype:
   case KnownProtocolKind::ConvertibleToBytes:
   case KnownProtocolKind::ConvertibleFromBytes:
+  case KnownProtocolKind::IUnknown:
+  case KnownProtocolKind::ISwiftObject:
     return SpecialProtocol::None;
   }
 
