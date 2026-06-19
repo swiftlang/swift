@@ -298,7 +298,7 @@ using KeyPathCapability = std::pair<KeyPathMutability, /*isSendable=*/bool>;
 namespace constraints {
 
 template <typename T = Expr> T *castToExpr(ASTNode node) {
-  return cast<T>(cast<Expr *>(node));
+  return cast<T>(cast_or_null<Expr *>(node));
 }
 
 template <typename T = Expr> T *getAsExpr(ASTNode node) {
