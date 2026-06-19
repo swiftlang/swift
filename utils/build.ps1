@@ -49,6 +49,11 @@ tracking.
 The product version to be used when building the installer. Supports semantic
 version strings (e.g., "1.0.0"). Default: "0.0.0"
 
+.PARAMETER WindowsSxSAssemblyPublicKeyToken
+The public key token to embed in Windows side-by-side assembly manifests.
+This is identity metadata only; it does not sign binaries or catalogs.
+Default: "0000000000000000"
+
 .PARAMETER ToolchainIdentifier
 The toolchain version identifier for the toolchain being built.
 Default: Uses TOOLCHAIN_VERSION environment variable or "$USERNAME.development"
@@ -152,6 +157,8 @@ param
 
   # Toolchain Version Info
   [string] $ProductVersion = "0.0.0",
+  [ValidatePattern("^[A-Fa-f0-9]{16}$")]
+  [string] $WindowsSxSAssemblyPublicKeyToken = "0000000000000000",
   [string] $ToolchainIdentifier = $(if ($env:TOOLCHAIN_VERSION) { $env:TOOLCHAIN_VERSION } else { "$env:USERNAME.development" }),
 
   # Toolchain Cross-compilation
@@ -204,6 +211,7 @@ param
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version 3.0
+$WindowsSxSAssemblyPublicKeyToken = $WindowsSxSAssemblyPublicKeyToken.ToLowerInvariant()
 
 # Avoid being run in a "Developer" shell since this script launches its own sub-shells targeting
 # different architectures, and these variables cause confusion.
@@ -887,10 +895,6 @@ enum Project {
   ClangRuntime
   SwiftInspect
   DynamicCDispatch
-  DynamicZLib
-  DynamicBrotli
-  DynamicXML2
-  DynamicCURL
   DynamicRuntime
   DynamicOverlay
   DynamicRuntimeModule
@@ -903,10 +907,6 @@ enum Project {
   DynamicVolatile
   DynamicFoundation
   StaticCDispatch
-  StaticZLib
-  StaticBrotli
-  StaticXML2
-  StaticCURL
   StaticRuntime
   StaticOverlay
   StaticRuntimeModule
@@ -1015,6 +1015,7 @@ function ConvertTo-FourPartVersion([string] $Version) {
 function Set-WindowsAssemblyManifest([string] $ImagePath,
                                      [string] $AssemblyVersion,
                                      [string] $ProcessorArchitecture,
+                                     [string] $PublicKeyToken,
                                      [string] $LogPrefix) {
   if (-not (Test-Path $ImagePath)) {
     throw "${LogPrefix}: '$ImagePath' does not exist"
@@ -1032,8 +1033,12 @@ function Set-WindowsAssemblyManifest([string] $ImagePath,
     $ManifestXml = @"
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity type="win32" name="$AssemblyName" version="$AssemblyVersion"
-      processorArchitecture="$ProcessorArchitecture"/>
+  <assemblyIdentity
+      name="$AssemblyName"
+      processorArchitecture="$ProcessorArchitecture"
+      publicKeyToken="$PublicKeyToken"
+      type="win32"
+      version="$AssemblyVersion" />
   <file name="$FileName"/>
 </assembly>
 "@
@@ -1054,7 +1059,8 @@ function Set-WindowsAssemblyManifest([string] $ImagePath,
 function Test-WindowsAssemblyManifestMatchesImage([string] $ManifestPath,
                                                   [string] $ImagePath,
                                                   [string] $AssemblyVersion,
-                                                  [string] $ProcessorArchitecture) {
+                                                  [string] $ProcessorArchitecture,
+                                                  [string] $PublicKeyToken) {
   $Doc = New-Object System.Xml.XmlDocument
   $Doc.Load($ManifestPath)
 
@@ -1076,6 +1082,7 @@ function Test-WindowsAssemblyManifestMatchesImage([string] $ManifestPath,
     ($AssemblyIdentity.GetAttribute("name") -eq $AssemblyName) -and
     ($AssemblyIdentity.GetAttribute("version") -eq $AssemblyVersion) -and
     ($AssemblyIdentity.GetAttribute("processorArchitecture") -ieq $ProcessorArchitecture) -and
+    ($AssemblyIdentity.GetAttribute("publicKeyToken") -ieq $PublicKeyToken) -and
     ($File.GetAttribute("name") -eq $FileName)
   )
 }
@@ -1083,6 +1090,7 @@ function Test-WindowsAssemblyManifestMatchesImage([string] $ManifestPath,
 function Ensure-WindowsAssemblyManifest([string] $ImagePath,
                                         [string] $AssemblyVersion,
                                         [string] $ProcessorArchitecture,
+                                        [string] $PublicKeyToken,
                                         [string] $LogPrefix) {
   if (-not (Test-Path $ImagePath)) {
     throw "${LogPrefix}: '$ImagePath' does not exist"
@@ -1100,7 +1108,8 @@ function Ensure-WindowsAssemblyManifest([string] $ImagePath,
           -ManifestPath           $ExistingManifestPath `
           -ImagePath              $ImagePath `
           -AssemblyVersion        $AssemblyVersion `
-          -ProcessorArchitecture  $ProcessorArchitecture
+          -ProcessorArchitecture  $ProcessorArchitecture `
+          -PublicKeyToken         $PublicKeyToken
       } catch {
         $KeepExistingManifest = $true
         throw "${LogPrefix}: '$ImagePath' has an unparsable RT_MANIFEST #1 (extracted to '$ExistingManifestPath')"
@@ -1123,6 +1132,7 @@ function Ensure-WindowsAssemblyManifest([string] $ImagePath,
       -ImagePath              $ImagePath `
       -AssemblyVersion        $AssemblyVersion `
       -ProcessorArchitecture  $ProcessorArchitecture `
+      -PublicKeyToken         $PublicKeyToken `
       -LogPrefix              $LogPrefix
   } finally {
     if (-not $KeepExistingManifest) {
@@ -1133,11 +1143,13 @@ function Ensure-WindowsAssemblyManifest([string] $ImagePath,
 
 function New-WindowsManifestDependency([string] $Name,
                                        [string] $AssemblyVersion,
-                                       [string] $ProcessorArchitecture) {
+                                       [string] $ProcessorArchitecture,
+                                       [string] $PublicKeyToken) {
   return [pscustomobject]@{
     Name                  = $Name
     Version               = $AssemblyVersion
     ProcessorArchitecture = $ProcessorArchitecture
+    PublicKeyToken        = $PublicKeyToken
   }
 }
 
@@ -1197,6 +1209,7 @@ function Set-WindowsExecutableManifestDependencies([string] $ToolPath,
       $AsmId.SetAttribute("name", $Dependency.Name)
       $AsmId.SetAttribute("version", $Dependency.Version)
       $AsmId.SetAttribute("processorArchitecture", $Dependency.ProcessorArchitecture)
+      $AsmId.SetAttribute("publicKeyToken", $Dependency.PublicKeyToken)
       $AsmId.SetAttribute("language", "*")
       [void]$DepAsm.AppendChild($AsmId)
       [void]$Dep.AppendChild($DepAsm)
@@ -2997,7 +3010,8 @@ function Set-WindowsSxSToolchainRuntime {
     [string]                          $AssemblyName          = "swiftToolchainRuntime",
     # Windows SxS requires the canonical four-part `a.b.c.d` form.
     [string]                          $AssemblyVersion       = "1.0.0.0",
-    [Parameter(Mandatory)] [string]   $ProcessorArchitecture
+    [Parameter(Mandatory)] [string]   $ProcessorArchitecture,
+    [string]                          $PublicKeyToken        = $WindowsSxSAssemblyPublicKeyToken
   )
 
   if (-not (Test-Path $BinaryDir)) {
@@ -3046,8 +3060,12 @@ function Set-WindowsSxSToolchainRuntime {
   $BundleManifest = @"
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity type="win32" name="$AssemblyName" version="$AssemblyVersion"
-      processorArchitecture="$ProcessorArchitecture"/>
+  <assemblyIdentity
+      name="$AssemblyName"
+      processorArchitecture="$ProcessorArchitecture"
+      publicKeyToken="$PublicKeyToken"
+      type="win32"
+      version="$AssemblyVersion" />
 $FilesXml
 </assembly>
 "@
@@ -3059,6 +3077,7 @@ $FilesXml
     Name                  = $AssemblyName
     Version               = $AssemblyVersion
     ProcessorArchitecture = $ProcessorArchitecture
+    PublicKeyToken        = $PublicKeyToken
   }
   foreach ($Tool in $Tools) {
     $ToolPath = if ([System.IO.Path]::IsPathRooted($Tool)) {
@@ -3177,7 +3196,8 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
     [Parameter(Mandatory)] [Hashtable] $EXEDependencies,
     [Parameter(Mandatory)] [string[]]  $DLLsToInject,
     [Parameter(Mandatory)] [string]    $AssemblyVersion,
-    [Parameter(Mandatory)] [string]    $ProcessorArchitecture
+    [Parameter(Mandatory)] [string]    $ProcessorArchitecture,
+    [string]                           $PublicKeyToken = $WindowsSxSAssemblyPublicKeyToken
   )
 
   if (-not (Test-Path $BinaryDir)) {
@@ -3211,6 +3231,7 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
       -ImagePath              $StagedDLL `
       -AssemblyVersion        $AssemblyVersion `
       -ProcessorArchitecture  $ProcessorArchitecture `
+      -PublicKeyToken         $PublicKeyToken `
       -LogPrefix              "Set-WindowsSxSToolchainRuntimePerDLL"
     Assert-WindowsManifestResourcesAreSxSSafe $StagedDLL "Set-WindowsSxSToolchainRuntimePerDLL"
     $Length = (Get-Item $StagedDLL).Length
@@ -3244,7 +3265,7 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
 
     $Dependencies = @(
       foreach ($DLLName in ($DirectRuntimeDeps | Sort-Object)) {
-        New-WindowsManifestDependency $DLLName $AssemblyVersion $ProcessorArchitecture
+        New-WindowsManifestDependency $DLLName $AssemblyVersion $ProcessorArchitecture $PublicKeyToken
       }
     )
     Set-WindowsExecutableManifestDependencies $ToolPath $Dependencies "Set-WindowsSxSToolchainRuntimePerDLL"
@@ -3564,11 +3585,10 @@ function Build-CompilerRuntime([Hashtable] $Platform,
 }
 
 function Build-Brotli([Hashtable] $Platform,
-                      [Hashtable] $CCompiler,
-                      [string]    $Phase) {
+                      [Hashtable] $CCompiler) {
   Build-CMakeProject `
     -Src $SourceCache\brotli `
-    -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Phase}Brotli")) `
+    -Bin (Get-ProjectBinaryCache $Platform Brotli) `
     -Platform $Platform `
     -CCompiler $CCompiler `
     -BuildTargets default `
@@ -3581,11 +3601,10 @@ function Build-Brotli([Hashtable] $Platform,
 
 
 function Build-ZLib([Hashtable] $Platform,
-                    [Hashtable] $CCompiler,
-                    [string]    $Phase) {
+                    [Hashtable] $CCompiler) {
   Build-CMakeProject `
     -Src $SourceCache\zlib `
-    -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Phase}ZLib")) `
+    -Bin (Get-ProjectBinaryCache $Platform ZLib) `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -CCompiler $CCompiler `
@@ -3680,11 +3699,10 @@ function Build-DS2([Hashtable] $Platform) {
 function Build-BoringSSL([Hashtable] $Platform,
                          [Hashtable] $Assembler,
                          [Hashtable] $CCompiler,
-                         [Hashtable] $CXXCompiler,
-                         [string]    $Phase) {
+                         [Hashtable] $CXXCompiler) {
   Build-CMakeProject `
     -Src $SourceCache\boringssl `
-    -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Phase}BoringSSL")) `
+    -Bin (Get-ProjectBinaryCache $Platform BoringSSL) `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -Assembler $Assembler `
@@ -3701,8 +3719,7 @@ function Build-BoringSSL([Hashtable] $Platform,
 }
 
 function Build-CURL([Hashtable] $Platform,
-                    [Hashtable] $CCompiler,
-                    [string]    $Phase) {
+                    [Hashtable] $CCompiler) {
   $PlatformDefines = @{}
   if ($Platform.OS -eq [OS]::Android) {
     $PlatformDefines += @{
@@ -3712,7 +3729,7 @@ function Build-CURL([Hashtable] $Platform,
 
   Build-CMakeProject `
     -Src $SourceCache\curl `
-    -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Phase}CURL")) `
+    -Bin (Get-ProjectBinaryCache $Platform CURL) `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -CCompiler $CCompiler `
@@ -3722,14 +3739,14 @@ function Build-CURL([Hashtable] $Platform,
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       BROTLI_INCLUDE_DIR = "$SourceCache\brotli\c\include";
       BROTLICOMMON_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$(Get-ProjectBinaryCache $Platform ([Project]"${Phase}Brotli"))\brotlicommon.lib"
+        "$(Get-ProjectBinaryCache $Platform Brotli)\brotlicommon.lib"
       } else {
-        "$(Get-ProjectBinaryCache $Platform ([Project]"${Phase}Brotli"))\libbrotlicommon.a"
+        "$(Get-ProjectBinaryCache $Platform Brotli)\libbrotlicommon.a"
       };
       BROTLIDEC_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$(Get-ProjectBinaryCache $Platform ([Project]"${Phase}Brotli"))\brotlidec.lib"
+        "$(Get-ProjectBinaryCache $Platform Brotli)\brotlidec.lib"
       } else {
-        "$(Get-ProjectBinaryCache $Platform ([Project]"${Phase}Brotli"))\libbrotlidec.a"
+        "$(Get-ProjectBinaryCache $Platform Brotli)\libbrotlidec.a"
       }
       BUILD_CURL_EXE = "NO";
       BUILD_EXAMPLES = "NO";
@@ -4108,8 +4125,7 @@ function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [str
 }
 
 function Build-SDKDependencies([Hashtable[]] $ArchitectureSlices,
-                               [Hashtable]   $Compilers,
-                               [string]      $Phase) {
+                               [Hashtable]   $Compilers) {
   foreach ($Slice in $ArchitectureSlices) {
     # `$Compilers.C/.CXX` are clang-cl drivers configured with MSVC-style
     # flags (`/GS-`, `/Gw`, ...).  For non-Windows targets the NDK clang
@@ -4117,13 +4133,13 @@ function Build-SDKDependencies([Hashtable[]] $ArchitectureSlices,
     $C   = if ($Slice.OS -eq [OS]::Windows) { $Compilers.C   } else { $Compilers.GNUC   }
     $CXX = if ($Slice.OS -eq [OS]::Windows) { $Compilers.CXX } else { $Compilers.GNUCXX }
     if ($IncludeDS2) { Invoke-BuildStep Build-DS2 $Slice }
-    Invoke-BuildStep Build-ZLib $Slice -CCompiler $C -Phase $Phase
-    Invoke-BuildStep Build-Brotli $Slice -CCompiler $C -Phase $Phase
-    Invoke-BuildStep Build-XML2 $Slice -CCompiler $C -CXXCompiler $CXX -Phase $Phase
+    Invoke-BuildStep Build-ZLib $Slice -CCompiler $C
+    Invoke-BuildStep Build-Brotli $Slice -CCompiler $C
+    Invoke-BuildStep Build-XML2 $Slice -CCompiler $C -CXXCompiler $CXX -Phase ""
     if ($Slice.OS -ne [OS]::Windows) {
-      Invoke-BuildStep Build-BoringSSL $Slice -Assembler $Assemblers.Stage1 -CCompiler $C -CXXCompiler $CXX -Phase ""
+      Invoke-BuildStep Build-BoringSSL $Slice -Assembler $Assemblers.Stage1 -CCompiler $C -CXXCompiler $CXX
     }
-    Invoke-BuildStep Build-CURL $Slice -CCompiler $C -Phase $Phase
+    Invoke-BuildStep Build-CURL $Slice -CCompiler $C
   }
 }
 
@@ -4133,6 +4149,7 @@ function Repair-WindowsSDKAssemblyManifests([Hashtable] $Platform, [string] $Run
   $Targets = New-Object System.Collections.Generic.List[string]
 
   foreach ($DLL in @(
+    "BlocksRuntime",
     "dispatch",
     "swiftDispatch",
     "Foundation",
@@ -4157,6 +4174,7 @@ function Repair-WindowsSDKAssemblyManifests([Hashtable] $Platform, [string] $Run
         -ImagePath              $Path `
         -AssemblyVersion        (ConvertTo-FourPartVersion $ProductVersion) `
         -ProcessorArchitecture  $Platform.Architecture.VSName `
+        -PublicKeyToken         $WindowsSxSAssemblyPublicKeyToken `
         -LogPrefix              "Repair-WindowsSDKAssemblyManifests"
       Assert-WindowsManifestResourcesAreSxSSafe $Path "Repair-WindowsSDKAssemblyManifests"
     }
@@ -4214,7 +4232,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
     $CDispatchCXX = if ($Platform.OS -eq [OS]::Windows) { $Compilers.CXX } else { $Compilers.GNUCXX }
     Build-CDispatch $Platform -CCompiler $CDispatchC -CXXCompiler $CDispatchCXX -Phase $Variant
     if ($BuildFoundation) {
-      Build-SDKDependencies @($Platform) -Compilers $Compilers -Phase $Variant
+      Build-SDKDependencies @($Platform) -Compilers $Compilers
     }
 
     # ── Core ──────────────────────────────────────────────────────────────────
@@ -4232,6 +4250,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
           CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+          SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+          SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
           dispatch_DIR = (Get-ProjectCMakeModules $Platform ([Project]"${Variant}CDispatch"));
 
@@ -4267,6 +4287,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
         -Defines ($SDKInstallDefines + @{
           BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+          SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+          SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
           SwiftCore_DIR = "$RuntimeBinaryCache\cmake\SwiftCore";
 
@@ -4292,6 +4314,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+            SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR = "$RuntimeBinaryCache\cmake\SwiftCore";
 
@@ -4316,6 +4340,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+            SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
             SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
@@ -4343,6 +4369,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
             CMAKE_CXX_FLAGS = @("-I$RuntimeBinaryCache\include");
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+            SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
             SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
@@ -4369,6 +4397,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
             CMAKE_CXX_FLAGS = @("-I$RuntimeBinaryCache\include");
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+            SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
             SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
@@ -4394,6 +4424,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           -Defines ($SDKInstallDefines + @{
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+            SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
             SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
@@ -4419,6 +4451,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+            SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
             SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
@@ -4445,6 +4479,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
             CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
             CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+            SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
 
             SwiftCore_DIR       = "$RuntimeBinaryCache\cmake\SwiftCore";
             SwiftOverlay_DIR    = "$OverlayBinaryCache\cmake\SwiftOverlay";
@@ -4531,8 +4567,16 @@ roots:
                                               };
           ENABLE_TESTING                    = "NO";
           BROTLI_INCLUDE_DIR                = "$SourceCache\brotli\c\include";
-          BROTLICOMMON_LIBRARY              = "$(Get-ProjectBinaryCache $Platform ([Project]"${Variant}Brotli"))\brotlicommon.lib";
-          BROTLIDEC_LIBRARY                 = "$(Get-ProjectBinaryCache $Platform ([Project]"${Variant}Brotli"))\brotlidec.lib";
+          BROTLICOMMON_LIBRARY              = if ($Platform.OS -eq [OS]::Windows) {
+                                                "$(Get-ProjectBinaryCache $Platform Brotli)\brotlicommon.lib";
+                                              } else {
+                                                "$(Get-ProjectBinaryCache $Platform Brotli)\libbrotlicommon.a";
+                                              };
+          BROTLIDEC_LIBRARY                 = if ($Platform.OS -eq [OS]::Windows) {
+                                                "$(Get-ProjectBinaryCache $Platform Brotli)\brotlidec.lib";
+                                              } else {
+                                                "$(Get-ProjectBinaryCache $Platform Brotli)\libbrotlidec.a";
+                                              };
           FOUNDATION_BUILD_TOOLS            = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
           CURL_DIR                          = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
           LibXml2_DIR                       = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
@@ -5442,15 +5486,9 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
 
   # Build basename -> direct Swift runtime imports.  Keep only edges within
   # the runtime DLL set; system and CRT DLLs are not part of the SxS graph.
-  #
-  # BlocksRuntime stays flat; the Swift runtime DLLs use private SxS.
-  $NonSxSRuntimeDLLs = New-Object System.Collections.Generic.HashSet[string]
-  [void]$NonSxSRuntimeDLLs.Add("BlocksRuntime")
-
   $RuntimeBaseNames = @(
     $RuntimeDLLs |
-      ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_.Name) } |
-      Where-Object { -not $NonSxSRuntimeDLLs.Contains($_) }
+      ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_.Name) }
   )
   $RuntimeSet = New-Object System.Collections.Generic.HashSet[string]
   foreach ($D in $RuntimeBaseNames) { [void]$RuntimeSet.Add($D) }
@@ -5918,7 +5956,7 @@ if ($IncludeDS2) {
 }
 
 if ($Windows) {
-  Build-SDKDependencies $WindowsSDKBuilds -Compilers $Compilers.Stage1 -Phase ""
+  Build-SDKDependencies $WindowsSDKBuilds -Compilers $Compilers.Stage1
 
   $SDKROOT = Get-SwiftSDK -OS Windows
   foreach ($Build in $WindowsSDKBuilds) {
@@ -5995,7 +6033,7 @@ if ($Windows) {
 }
 
 if ($Android) {
-  Build-SDKDependencies $AndroidSDKBuilds -Compilers $Compilers.Stage1 -Phase ""
+  Build-SDKDependencies $AndroidSDKBuilds -Compilers $Compilers.Stage1
 
   $SDKROOT = Get-SwiftSDK -OS Android
   foreach ($Build in $AndroidSDKBuilds) {
