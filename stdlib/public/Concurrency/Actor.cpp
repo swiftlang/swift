@@ -514,6 +514,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
       return true;
     }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
     // We cannot use 'complexEquality' as it requires two executor instances,
     // and we do not have a 'current' executor here.
 
@@ -553,6 +554,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
     }
 
     assert(!options.contains(swift_task_is_current_executor_flag::Assert));
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
     return false;
   }
 
@@ -605,6 +607,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
     }
   }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   // Complex equality means that if two executors of the same type have some
   // special logic to check if they are "actually the same".
   //
@@ -701,6 +704,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
   // In the end, since 'checkIsolated' could not be used, so we must assume
   // that the executors are not the same context.
   assert(!options.contains(swift_task_is_current_executor_flag::Assert));
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
   return false;
 }
 
@@ -823,6 +827,7 @@ void swift::swift_task_reportUnexpectedExecutor(
       isFatalError ? "error" : "warning", functionIsolation,
       (int)fileLength, file, (int)line, whereExpected);
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   if (_swift_shouldReportFatalErrorsToDebugger()) {
     RuntimeErrorDetails details = {
         .version = RuntimeErrorDetails::currentVersion,
@@ -841,6 +846,7 @@ void swift::swift_task_reportUnexpectedExecutor(
         isFatalError ? RuntimeErrorFlagFatal : RuntimeErrorFlagNone, message,
         &details);
   }
+#endif
 
 #if defined(_WIN32) && !SWIFT_CONCURRENCY_EMBEDDED
 #define STDERR_FILENO 2
