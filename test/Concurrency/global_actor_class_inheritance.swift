@@ -3,8 +3,9 @@
 
 // REQUIRES: concurrency
 
-// Test that global actor annotations are rejected on class base types but
-// allowed on protocol conformances (SE-0466 isolated conformances).
+// Test that global actor annotations are rejected on class base types in
+// inheritance clauses but allowed on protocol conformances (SE-0466 isolated
+// conformances).
 
 actor SomeActorInstance {}
 
