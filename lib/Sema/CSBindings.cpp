@@ -89,6 +89,8 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
       addDefault(constraint);
   }
 
+  computeJoinsAndMeets();
+
   for (auto &entry : info.AdjacentVars)
     AdjacentVars.insert(entry.first);
 
@@ -176,6 +178,118 @@ void BindingSet::computeLValueState() {
   }
 }
 
+void BindingSet::computeJoinsAndMeets() {
+  // We don't allow a join of type 'Any' or 'Any?', unless we're looking at
+  // an array element, dictionary value, or dictionary key. We detect this
+  // by checking for a default constraint with type 'Any' (or 'AnyHashable'
+  // in the dictionary key case). In this situation, we promote the default
+  // constraint to a supertype binding.
+  auto isAcceptableJoin = [](Type type) {
+    return !type->isAny() && (!type->getOptionalObjectType() ||
+                              !type->getOptionalObjectType()->isAny());
+  };
+
+  SmallVector<Type, 3> typesToJoin;
+  bool allowUpperBound = false;
+  bool allTransitive = true;
+  PointerUnion<Constraint *, ConstraintLocator *> bindingSource;
+  TypeVariableType *originator;
+
+  for (const auto &binding : Bindings) {
+    if (binding.isViableForJoin()) {
+      if (!isAcceptableJoin(binding.BindingType))
+        allowUpperBound = true;
+
+      if (!binding.isTransitive())
+        allTransitive = false;
+
+      bindingSource = binding.BindingSource;
+      originator = binding.Originator;
+
+      typesToJoin.push_back(binding.BindingType);
+    }
+  }
+
+  if (typesToJoin.size() <= 1)
+    return;
+
+  if (!allTransitive)
+    originator = nullptr;
+
+  // Put the existentials first, to work around the fact that our join
+  // operation is not actually associative.
+  //
+  // FIXME: Perhaps subtypeJoin() should just take a list of types.
+  std::stable_partition(typesToJoin.begin(), typesToJoin.end(),
+                        [](Type ty) -> bool {
+                          return ty->lookThroughAllOptionalTypes()->isAnyExistentialType();
+                        });
+
+  Type commonSupertype;
+  for (auto ty : typesToJoin) {
+    if (!commonSupertype) {
+      commonSupertype = ty;
+      continue;
+    }
+
+    // FIXME: Remove isAcceptableJoin() and check existentialUpperBound
+    // instead.
+    bool existentialUpperBound = false;
+    commonSupertype = subtypeJoin(commonSupertype, ty, &existentialUpperBound);
+  }
+
+  // If the result was 'Any' or 'Any?' but none of the inputs were, don't
+  // accept the join unless we have a default of 'Any'.
+  if (!allowUpperBound && !isAcceptableJoin(commonSupertype)) {
+    auto found = llvm::find_if(Defaults, [](Constraint *constraint) {
+          return (constraint->getKind() == ConstraintKind::Defaultable &&
+                  (constraint->getSecondType()->isAny() ||
+                   constraint->getSecondType()->isAnyHashable()));
+        });
+
+    if (found == Defaults.end())
+      return;
+
+    // Use the default type instead of the common supertype binding.
+    commonSupertype = (*found)->getSecondType();
+    bindingSource = *found;
+  }
+
+  PotentialBinding supertypeBinding(commonSupertype,
+                                    AllowedBindingKind::Supertypes,
+                                    bindingSource, originator);
+
+  LLVM_DEBUG(llvm::dbgs() << "Computed join of supertype bindings: ";
+             dump(llvm::dbgs(), 0);
+             llvm::dbgs() << "\n");
+
+  // Record the new binding and remove bindings that participated in the join.
+  SmallVector<PotentialBinding, 4> newBindings;
+  newBindings.push_back(supertypeBinding);
+
+  for (const auto &binding : Bindings) {
+    // Filter out supertype bindings that participated in the join.
+    if (binding.isViableForJoin())
+      continue;
+
+    // If the joined binding is in conflict with an existing subtype binding,
+    // we have a situation where we picked a more general supertype than what
+    // was expected. Bail out.
+    //
+    // FIXME: Eventually, we should drop the supertype bindings.
+    if (binding.Kind == AllowedBindingKind::Subtypes &&
+        subsumeBinding(binding, supertypeBinding) == SubsumeBindingResult::Conflict) {
+      return;
+    }
+
+    // Keep all other bindings.
+    newBindings.push_back(binding);
+  }
+
+  // All good.
+  std::swap(Bindings, newBindings);
+}
+
 bool BindingSet::forClosureResult() const {
   return TypeVar->getImpl().isClosureResultType();
 }
@@ -212,8 +326,12 @@ bool PotentialBinding::isViableForJoin() const {
          !BindingType->hasTypeVariable() &&
          !BindingType->hasPlaceholder() &&
          !BindingType->hasUnboundGenericType() &&
-         !hasDefaultedLiteralProtocol() &&
-         !isDefaultableBinding();
+         /// FIXME: The old join code didn't understand existentials, so it
+         /// did not join 'Any' with 'any Sendable'. The compatibility hack
+         /// where 'any Sendable' can bind to 'Any' relies on this behavior.
+         /// Continue to simulate it for now by skipping joins involving
+         /// 'any Sendable' specifically.
+         !BindingType->isSendableExistential();
 }
 
 namespace {
@@ -268,6 +386,9 @@ public:
     }
     if (BindingType)
       BindingType.print(out, PO);
+    else
+      out << "nil";
+
     if (!Viable)
       out << " [literal not viable]";
   }
@@ -991,7 +1112,7 @@ bool BindingSet::finalizeKeyPathBindings() {
       bool isContextualTypeReadOnly = false;
       // If the key path is sufficiently resolved we can add inferred binding
       // to the set.
-      SmallSetVector<PotentialBinding, 4> updatedBindings;
+      SmallVector<PotentialBinding, 4> updatedBindings;
       for (const auto &binding : Bindings) {
         auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
 
@@ -1008,7 +1129,7 @@ bool BindingSet::finalizeKeyPathBindings() {
                                        extInfo.withSendable(false));
           }
 
-          updatedBindings.insert(binding.withType(fnType));
+          updatedBindings.push_back(binding.withType(fnType));
           isContextualTypeReadOnly = true;
         } else if (!(bindingTy->isWritableKeyPath() ||
                      bindingTy->isReferenceWritableKeyPath())) {
@@ -1042,8 +1163,8 @@ bool BindingSet::finalizeKeyPathBindings() {
           // better diagnostics.
           auto keyPathTy = getKeyPathType(ctx, *capability, rootTy,
                                           CS.getKeyPathValueType(keyPath));
-          updatedBindings.insert({keyPathTy, AllowedBindingKind::Fallback, locator,
-                                  /*originator=*/nullptr});
+          updatedBindings.push_back({keyPathTy, AllowedBindingKind::Fallback, locator,
+                                    /*originator=*/nullptr});
         } else if (CS.shouldAttemptFixes()) {
           auto fixedRootTy = CS.getFixedType(rootTy);
           // If key path is structurally correct and has a resolved root
@@ -1058,12 +1179,12 @@ bool BindingSet::finalizeKeyPathBindings() {
               return entry->getKind() == ConstraintKind::FallbackType;
             });
             assert(fallback != Defaults.end());
-            updatedBindings.insert(
+            updatedBindings.push_back(
                 {(*fallback)->getSecondType(),
                  AllowedBindingKind::Fallback,
                  *fallback});
           } else {
-            updatedBindings.insert(PotentialBinding::forHole(
+            updatedBindings.push_back(PotentialBinding::forHole(
                 TypeVar, CS.getConstraintLocator(
                              keyPath, ConstraintLocator::FallbackType)));
           }
@@ -1071,7 +1192,8 @@ bool BindingSet::finalizeKeyPathBindings() {
       }
 
       Bindings.clear();
-      Bindings.append(updatedBindings.begin(), updatedBindings.end());
+      for (const auto &binding : updatedBindings)
+        addBinding(binding);
       Defaults.clear();
 
       // Note the fact that we modified the binding set.
@@ -1115,37 +1237,68 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
 }
 
 /// Decide if the new binding subsumes the existing binding, or vice versa.
-///
-/// Return value:
-/// - std::nullopt: new binding is unrelated to old binding; both bindings
-///   remain valid.
-/// - true: the possibly modified new binding subsumes old binding.
-/// - false: discard new binding
-std::optional<bool>
-BindingSet::subsumeBinding(PotentialBinding &binding,
+SubsumeBindingResult
+BindingSet::subsumeBinding(const PotentialBinding &binding,
                            const PotentialBinding &existing) {
+  // FIXME: Hack to avoid finding duplicate solutions that only differ
+  // in CGFloat vs Double.
+  //
+  // This will be going away shortly. Once we're always promoting
+  // supertype bindings when they're ready, the subtype binding is not
+  // attempted unless its the only one, so we will not end up with
+  // duplicate solutions.
+  auto dedupCGFloatDoubleHack = [&]() -> std::optional<SubsumeBindingResult> {
+    if (!TypeVar->getImpl().isClosureParameterType()) {
+      auto lhs = existing.BindingType;
+      auto rhs = binding.BindingType;
+
+      auto lhsUnwrap = lhs;
+      auto rhsUnwrap = rhs;
+      if (lhs->isOptional() && rhs->isOptional()) {
+        lhsUnwrap = lhs->getOptionalObjectType();
+        rhsUnwrap = rhs->getOptionalObjectType();
+      }
+
+      if (lhsUnwrap->isDouble() && rhsUnwrap->isCGFloat())
+        return SubsumeBindingResult::ExistingIsBetter;
+      else if (lhsUnwrap->isCGFloat() && rhsUnwrap->isDouble())
+        return SubsumeBindingResult::NewIsBetter;
+    }
+
+    return std::nullopt;
+  };
+
+#define SUBSUME_DEBUG(str)                                                     \
+  LLVM_DEBUG(llvm::dbgs() << str << ": "                                       \
+                              << existing.BindingType.getString() << " vs "    \
+                              << binding.BindingType.getString() << "\n");
+
   // (Exact, Exact)
   if (existing.Kind == AllowedBindingKind::Exact &&
       binding.Kind == AllowedBindingKind::Exact) {
-    // If we have two incompatible Exact bindings, our partial solution so far
-    // is unsatisfiable. Mark this binding set as conflicting, so that we
-    // attempt it next and fail as soon as possible.
     auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
-    if (result.has_value() && !*result) {
-      markConflicting();
+
+    // FIXME: Do this in diagnostic mode also
+    if (!CS.shouldAttemptFixes()) {
+      // If we have two incompatible Exact bindings, our partial solution so far
+      // is unsatisfiable. Mark this binding set as conflicting, so that we
+      // attempt it next and fail as soon as possible.
+      if (result.has_value() && !*result) {
+        SUBSUME_DEBUG("Exact vs exact conflict");
+        return SubsumeBindingResult::Conflict;
+      }
+
+      // In any case, drop all Exact bindings but the first one, because it
+      // doesn't matter which one we attempt.
+      return SubsumeBindingResult::ExistingIsBetter;
     }
 
-    // In any case, drop all Exact bindings but the first one, because it
-    // doesn't matter which one we attempt.
-    if (!CS.shouldAttemptFixes())
-      return false;
-
-    // FIXME: Drop exact bindings in diagnostic mode also
+    // FIXME: Remove this.
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return false;
+        return SubsumeBindingResult::ExistingIsBetter;
 
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
     }
   }
 
@@ -1155,17 +1308,19 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Existing exact binding must be a supertype of the new lower bound.
-      if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
-                               GenericSignature())) {
-        markConflicting();
+      if (!canConvertTo(CS, binding.BindingType, existing.BindingType,
+                        GenericSignature())) {
+        SUBSUME_DEBUG("Exact vs supertype conflict");
+        return SubsumeBindingResult::Conflict;
       }
 
       // Once we have an Exact binding, we don't need anything else.
-      return false;
+      return SubsumeBindingResult::ExistingIsBetter;
     }
 
+    // FIXME: Remove this.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return false;
+      return SubsumeBindingResult::ExistingIsBetter;
   }
 
   // (Exact, Subtypes)
@@ -1174,24 +1329,26 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Existing exact binding must be a subtype of the new upper bound.
-      if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
-                               GenericSignature())) {
-        markConflicting();
+      if (!canConvertTo(CS, existing.BindingType, binding.BindingType,
+                        GenericSignature())) {
+        SUBSUME_DEBUG("Exact vs subtype conflict");
+        return SubsumeBindingResult::Conflict;
       }
 
       // Once we have an Exact binding, we don't need anything else.
-      return false;
+      return SubsumeBindingResult::ExistingIsBetter;
     }
 
+    // FIXME: Remove this.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return false;
+      return SubsumeBindingResult::ExistingIsBetter;
   }
 
   // (Exact, Fallback)
   if (existing.Kind == AllowedBindingKind::Exact &&
       binding.Kind == AllowedBindingKind::Fallback) {
     if (binding.BindingType->isEqual(existing.BindingType))
-      return false;
+      return SubsumeBindingResult::ExistingIsBetter;
   }
 
   // (Supertypes, Exact)
@@ -1200,24 +1357,26 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Exact binding must be a supertype of the existing lower bound.
-      if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
-                               GenericSignature())) {
-        markConflicting();
+      if (!canConvertTo(CS, existing.BindingType, binding.BindingType,
+                        GenericSignature())) {
+        SUBSUME_DEBUG("Supertype vs exact conflict");
+        return SubsumeBindingResult::Conflict;
       }
 
       // Exact bindings replace Supertype bindings.
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
     }
 
+    // FIXME: Remove the rest.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
 
     auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return false;
+        return SubsumeBindingResult::ExistingIsBetter;
 
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
     }
   }
 
@@ -1226,51 +1385,18 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Supertypes) {
     // Drop duplicate supertype bindings.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return false;
+      return SubsumeBindingResult::ExistingIsBetter;
 
-    // FIXME: This is unsound. We need Type::join() to handle type variables
-    // instead.
+    // Joins are handled in computeJoinsAndMeets().
+
+    // FIXME: Remove this.
     auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return false;
+        return SubsumeBindingResult::ExistingIsBetter;
 
       ASSERT(existing.BindingType->hasTypeVariable());
-      return true;
-    }
-
-    // If this is a non-defaulted supertype binding,
-    // check whether we can combine it with another
-    // supertype binding by computing the 'join' of the types.
-    if (binding.isViableForJoin()) {
-      if (existing.isViableForJoin()) {
-        auto isAcceptableJoin = [](Type type) {
-          return !type->isAny() && (!type->getOptionalObjectType() ||
-                                    !type->getOptionalObjectType()->isAny());
-        };
-
-        auto joinType =
-            Type::join(existing.BindingType, binding.BindingType);
-
-        if (joinType && isAcceptableJoin(*joinType)) {
-          // Result of the join has to use new binding because it refers
-          // to the constraint that triggered the join that replaced the
-          // existing binding.
-          //
-          // For "join" to be transitive, both bindings have to be as
-          // well, otherwise we consider it a refinement of a direct
-          // binding.
-          auto *originator =
-              binding.isTransitive() && existing.isTransitive()
-                  ? binding.Originator
-                  : nullptr;
-
-          binding = PotentialBinding(*joinType, binding.Kind,
-                                     binding.BindingSource,
-                                     originator);
-          return true;
-        }
-      }
+      return SubsumeBindingResult::NewIsBetter;
     }
   }
 
@@ -1280,26 +1406,28 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The existing lower bound should be a subtype of the new upper bound.
-      if (canPossiblyConvertTo(CS, existing.BindingType, binding.BindingType,
-                               GenericSignature())) {
-        binding.Kind = AllowedBindingKind::Exact;
-        markConflicting();
-        return true;
+      if (!canConvertTo(CS, existing.BindingType, binding.BindingType,
+                        GenericSignature())) {
+        SUBSUME_DEBUG("Supertype vs subtype conflict");
+        return SubsumeBindingResult::Conflict;
       }
     }
 
-    // FIXME: Dubious.
+    // FIXME: Remove the rest.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
 
     auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return false;
+        return SubsumeBindingResult::ExistingIsBetter;
 
       ASSERT(existing.BindingType->hasTypeVariable());
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
     }
+
+    if (auto result = dedupCGFloatDoubleHack())
+      return *result;
   }
 
   // (Supertypes, Fallback)
@@ -1307,15 +1435,15 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Fallback) {
     // If both have the same type, prefer the supertype binding.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return false;
+      return SubsumeBindingResult::ExistingIsBetter;
 
     auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return false;
+        return SubsumeBindingResult::ExistingIsBetter;
 
       ASSERT(existing.BindingType->hasTypeVariable());
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
     }
   }
 
@@ -1325,23 +1453,25 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The new exact binding should be a subtype of the existing upper bound.
-      if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
-                               GenericSignature())) {
-        markConflicting();
+      if (!canConvertTo(CS, binding.BindingType, existing.BindingType,
+                        GenericSignature())) {
+        SUBSUME_DEBUG("Subtype vs exact conflict");
+        return SubsumeBindingResult::Conflict;
       }
 
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
     }
 
+    // FIXME: Remove the rest.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
 
     auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return false;
+        return SubsumeBindingResult::ExistingIsBetter;
 
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
     }
   }
 
@@ -1351,19 +1481,19 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The new lower bound should be a subtype of the existing upper bound.
-      if (canPossiblyConvertTo(CS, binding.BindingType, existing.BindingType,
-                               GenericSignature())) {
-        binding.Kind = AllowedBindingKind::Exact;
-        markConflicting();
-        return true;
+      if (!canConvertTo(CS, binding.BindingType, existing.BindingType,
+                        GenericSignature())) {
+        SUBSUME_DEBUG("Subtype vs supertype conflict");
+        return SubsumeBindingResult::Conflict;
       }
     }
 
-    // FIXME: Dubious.
-    if (binding.BindingType->isEqual(existing.BindingType)) {
-      binding.Kind = AllowedBindingKind::Subtypes;
-      return true;
-    }
+    // FIXME: Remove the rest.
+    if (binding.BindingType->isEqual(existing.BindingType))
+      return SubsumeBindingResult::ExistingIsBetter;
+
+    if (auto result = dedupCGFloatDoubleHack())
+      return *result;
   }
 
   // (Subtypes, Subtypes)
@@ -1371,9 +1501,7 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Subtypes) {
     // Drop duplicate subtype bindings.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return false;
-
-    // FIXME: Implement meet of two types
+      return SubsumeBindingResult::ExistingIsBetter;
   }
 
   // (Subtypes, Fallback)
@@ -1381,7 +1509,7 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Fallback) {
     // If both have the same type, prefer the subtype binding.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return false;
+      return SubsumeBindingResult::ExistingIsBetter;
   }
 
   // (Fallback, Exact)
@@ -1389,14 +1517,14 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Exact) {
     // If both have the same type, prefer the exact binding.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
 
     auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return false;
+        return SubsumeBindingResult::ExistingIsBetter;
 
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
     }
   }
 
@@ -1405,7 +1533,7 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Supertypes) {
     // If both have the same type, prefer the supertype binding.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
   }
 
   // (Fallback, Subtypes)
@@ -1413,7 +1541,7 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Subtypes) {
     // If both have the same type, prefer the subtype binding.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
   }
 
   // (Fallback, Fallback)
@@ -1421,28 +1549,18 @@ BindingSet::subsumeBinding(PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Fallback) {
     // Drop duplicate Fallback bindings.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return true;
+      return SubsumeBindingResult::NewIsBetter;
   }
 
-  // FIXME: Refactor or remove this
-  if (!TypeVar->getImpl().isClosureParameterType()) {
-    // Since Double and CGFloat are effectively the same type due to an
-    // implicit conversion between them, always prefer Double over CGFloat
-    // when possible.
-    //
-    // Note: This optimization can't be performed for closure parameters
-    //       because their type could be converted only at the point of
-    //       use in the closure body.
-    if (binding.BindingType->isCGFloat() && existing.BindingType->isDouble())
-      return false;
+  return SubsumeBindingResult::KeepBoth;
 
-    if (binding.BindingType->isDouble() && existing.BindingType->isCGFloat())
-      return true;
-  }
-
-  return std::nullopt;
+#undef SUBSUME_DEBUG
 }
 
+/// If a single binding in isolation, together with any conformance
+/// constraints imposed upon this type variable, is sufficient to
+/// reduce the domain of the type variable to a single type, upgrade
+/// the binding to an exact binding before it enters the binding set.
 void BindingSet::reduceBinding(PotentialBinding &binding) {
   bool checkConformanceConstraints =
       !CS.shouldAttemptFixes() &&
@@ -1463,6 +1581,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
     if (!conforms) {
       // Our partial solution so far is contradictory. Promote this
       // binding to attempt immediately.
+      LLVM_DEBUG(llvm::dbgs() << "Exact binding doesn't conform: "
+                              << type.getString() << "\n");
       markConflicting();
 
       // Preserve the binding kind, which is Exact.
@@ -1480,6 +1600,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
       if (!isPossibleSupertypeOfFunctionType(binding.BindingType)) {
         // Our partial solution so far is contradictory. Promote this
         // binding to attempt immediately.
+        LLVM_DEBUG(llvm::dbgs() << "Conflict from bad closure subtype: "
+                                << binding.BindingType.getString() << "\n");
         markConflicting();
         binding.Kind = AllowedBindingKind::Exact;
         break;
@@ -1521,6 +1643,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
         LLVM_FALLTHROUGH;
 
       case KnownLValueKind::RValue:
+        LLVM_DEBUG(llvm::dbgs() << "Reduce subtype to exact: "
+                                << binding.BindingType.getString() << "\n");
         binding.Kind = AllowedBindingKind::Exact;
         break;
       }
@@ -1541,6 +1665,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
       if (!conforms) {
         // Our partial solution so far is contradictory. Promote this
         // binding to attempt immediately.
+        LLVM_DEBUG(llvm::dbgs() << "Subtype binding doesn't conform: "
+                                << binding.BindingType.getString() << "\n");
         markConflicting();
         binding.Kind = AllowedBindingKind::Exact;
         break;
@@ -1550,6 +1676,40 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
     break;
   }
   case AllowedBindingKind::Supertypes: {
+    // If we have 'any C & P conv $T0' and '$T0 conforms Q', and C conforms to Q,
+    // we can relax our binding type from `any C & P` to `C`.
+    SmallVector<Type, 2> optionals;
+    auto unwrappedType = binding.BindingType
+        ->lookThroughAllOptionalTypes(optionals);
+    if (unwrappedType->is<ExistentialType>()) {
+      auto layout = unwrappedType->getExistentialLayout();
+      if (layout.containsNonMarkerProtocols()) {
+        if (auto superclassTy = layout.getExplicitSuperclassOrProtocolSuperclass()) {
+          // Presence of a type parameter means we have something like this,
+          // which we cannot support here:
+          //
+          //   protocol P: G<Self.A> { ... }
+          //
+          if (!superclassTy->hasTypeParameter()) {
+            bool condition = llvm::any_of(Protocols,
+                [&](ProtocolDecl *proto) {
+              return (!proto->existentialConformsToSelf() &&
+                      CS.lookupConformance(superclassTy, proto));
+            });
+
+            if (condition) {
+              for (unsigned i = 0; i < optionals.size(); ++i)
+                superclassTy = OptionalType::get(superclassTy);
+              binding.BindingType = superclassTy;
+
+              LLVM_DEBUG(llvm::dbgs() << "Reduce supertype of existential to superclass: "
+                                      << binding.BindingType.getString() << "\n");
+            }
+          }
+        }
+      }
+    }
+
     // If we have X conv $T0, $T0 conforms P, we can check if X itself
     // or any of its proper supertypes conform to P, by performing the
     // supertype transitive conformance check. If the answer is negative,
@@ -1565,6 +1725,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
       if (!conforms) {
         // Our partial solution so far is contradictory. Promote this
         // binding to attempt immediately.
+        LLVM_DEBUG(llvm::dbgs() << "Supertype doesn't conform: "
+                                << binding.BindingType.getString() << "\n");
         markConflicting();
         binding.Kind = AllowedBindingKind::Exact;
         break;
@@ -1583,6 +1745,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
       });
 
       if (condition) {
+        LLVM_DEBUG(llvm::dbgs() << "Reduce superclass to exact: "
+                                << binding.BindingType.getString() << "\n");
         binding.Kind = AllowedBindingKind::Exact;
         break;
       }
@@ -1596,6 +1760,8 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
 }
 
 void BindingSet::addBinding(PotentialBinding binding) {
+  // Perform the occurs check. For non-transitive bindings, this happens in
+  // inferFromRelational().
   if (binding.isTransitive() &&
       !checkTypeOfBinding(TypeVar, binding.BindingType))
     return;
@@ -1620,21 +1786,23 @@ void BindingSet::addBinding(PotentialBinding binding) {
 
   reduceBinding(binding);
 
-  llvm::SmallSetVector<PotentialBinding, 1> joined;
-
-  // Prevent against checking against the same opened nominal type
-  // over and over again. Doing so means redundant work in the best
-  // case. In the worst case, we'll produce lots of duplicate solutions
-  // for this constraint system, which is problematic for overload
-  // resolution.
   auto existing = Bindings.begin();
   while (existing != Bindings.end()) {
     auto result = subsumeBinding(binding, *existing);
-    if (result == std::nullopt) {
-      // Record a new binding, unless it subsumed by something else.
-       ++existing;
-      continue;
-    } else if (*result) {
+    switch (result) {
+    case SubsumeBindingResult::Conflict:
+      markConflicting();
+
+      // Promote the new binding to exact and drop everything else.
+      binding.Kind = AllowedBindingKind::Exact;
+
+      Bindings.clear();
+      existing = Bindings.end();  // Exit the loop.
+      break;
+    case SubsumeBindingResult::ExistingIsBetter:
+      // Drop the new binding.
+      return;
+    case SubsumeBindingResult::NewIsBetter:
       // First, remove all of the adjacent type variables associated
       // with the existing binding.
       //
@@ -1650,30 +1818,16 @@ void BindingSet::addBinding(PotentialBinding binding) {
 
       // Remove the existing binding.
       existing = Bindings.erase(existing);
-
-      // Insert the possibly updated binding.
-      for (auto *adjacentVar : referencedTypeVars)
-        AdjacentVars.insert(adjacentVar);
-
-      joined.insert(binding);
-      continue;
-    } else {
-      // Drop the new binding.
-      return;
+      break;
+    case SubsumeBindingResult::KeepBoth:
+      // Nothing to do so far, keep the existing binding and move on.
+      ++existing;
+      break;
     }
   }
 
-  for (const auto &binding : joined) {
-    DEBUG_ASSERT(std::find(Bindings.begin(), Bindings.end(), binding)
-                 == Bindings.end());
-    Bindings.push_back(binding);
-  }
-
-  // If new binding has been joined with at least one of existing
-  // bindings, there is no reason to include it into the set.
-  if (!joined.empty())
-    return;
-
+  // The new binding was not in conflict with or subsumed by anything else, so
+  // record it.
   for (auto *adjacentVar : referencedTypeVars)
     AdjacentVars.insert(adjacentVar);
 
@@ -1742,6 +1896,35 @@ void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
       floatLiteral != Literals.end()) {
     Literals.erase(intLiteral);
   }
+}
+
+void BindingSet::possiblyDropDefaults() {
+  if (Defaults.empty())
+    return;
+
+  if (!Literals.empty())
+    return;
+
+  bool anySupertypeBindings = false;
+  bool anyNonJoinableSupertypeBindings = false;
+  for (const auto &binding : Bindings) {
+    if (binding.Kind == AllowedBindingKind::Supertypes) {
+      anySupertypeBindings = true;
+      if (!binding.isViableForJoin())
+        anyNonJoinableSupertypeBindings = true;
+    }
+  }
+  
+  if (!anySupertypeBindings || anyNonJoinableSupertypeBindings)
+    return;
+
+  auto found = llvm::find_if(Defaults, [](Constraint *constraint) {
+        return (constraint->getKind() == ConstraintKind::Defaultable &&
+                (constraint->getSecondType()->isAny() ||
+                 constraint->getSecondType()->isAnyHashable()));
+      });
+  if (found != Defaults.end())
+    Defaults.erase(found);
 }
 
 void PotentialBindings::inferFromLiteral(Constraint *constraint,
@@ -2051,8 +2234,10 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
     }
   }
 
-  if (bestBindings)
+  if (bestBindings) {
     bestBindings->coalesceIntegerAndFloatLiteralRequirements();
+    bestBindings->possiblyDropDefaults();
+  }
 
   return bestBindings;
 }
@@ -2099,27 +2284,39 @@ void BindingSet::addDefault(Constraint *constraint) {
   Defaults.push_back(constraint);
 }
 
-bool LiteralRequirement::isCoveredBy(Type type, ConstraintSystem &CS) const {
-  auto coversDefaultType = [](Type type, Type defaultType) -> bool {
-    if (!defaultType->hasUnboundGenericType())
-      return type->isEqual(defaultType);
+bool LiteralRequirement::isCoveredBy(AllowedBindingKind kind, Type type,
+                                     ConstraintSystem &CS) const {
+  if (CS.lookupConformance(type, getProtocol()))
+    return true;
 
+  if (!hasDefaultType())
+    return false;
+
+  auto defaultType = getDefaultType();
+  if (defaultType->hasUnboundGenericType()) {
     // For generic literal types, check whether we already have a
     // specialization of this generic within our list.
     // FIXME: This assumes that, e.g., the default literal
     // int/float/char/string types are never generic.
     auto nominal = defaultType->getAnyNominal();
-    if (!nominal)
-      return false;
+    return nominal && nominal == type->getAnyNominal();
+  } else {
+    switch (kind) {
+    case AllowedBindingKind::Exact:
+    case AllowedBindingKind::Fallback:
+      return type->isEqual(defaultType);
 
-    // FIXME: Check parents?
-    return nominal == type->getAnyNominal();
-  };
+    case AllowedBindingKind::Supertypes:
+      if (!type->getAnyNominal() && !type->isExistentialType())
+        return false;
+      return canConvertTo(CS, defaultType, type, GenericSignature());
 
-  if (hasDefaultType() && coversDefaultType(type, getDefaultType()))
-    return true;
-
-  return bool(CS.lookupConformance(type, getProtocol()));
+    case AllowedBindingKind::Subtypes:
+      if (!type->getAnyNominal() && !type->isExistentialType())
+        return false;
+      return canConvertTo(CS, type, defaultType, GenericSignature());
+    }
+  }
 }
 
 std::pair<bool, Type>
@@ -2147,7 +2344,7 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
     if (type->isTypeVariableOrMember() || type->isPlaceholder())
       return std::make_pair(false, Type());
 
-    if (isCoveredBy(type, CS)) {
+    if (isCoveredBy(binding.Kind, type, CS)) {
       return std::make_pair(true, requiresUnwrap ? type : Type());
     }
 
