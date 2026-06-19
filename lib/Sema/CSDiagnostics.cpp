@@ -58,10 +58,15 @@
 using namespace swift;
 using namespace constraints;
 
-static bool hasFixFor(const Solution &solution, ConstraintLocator *locator) {
-  return llvm::any_of(solution.Fixes, [&locator](const ConstraintFix *fix) {
-    return fix->getLocator() == locator;
-  });
+static bool hasFixFor(const Solution &solution, ConstraintLocator *locator,
+                      std::optional<FixKind> expectedKind = std::nullopt) {
+  return llvm::any_of(
+      solution.Fixes, [&locator, &expectedKind](const ConstraintFix *fix) {
+        if (fix->getLocator() == locator) {
+          return !expectedKind || fix->getKind() == *expectedKind;
+        }
+        return false;
+      });
 }
 
 FailureDiagnostic::~FailureDiagnostic() {}
@@ -3990,8 +3995,8 @@ bool MissingCallFailure::diagnoseAsError() {
       auto fnType = type->castTo<FunctionType>();
 
       if (MissingArgumentsFailure::isMisplacedMissingArgument(getSolution(), locator)) {
-        ArgumentMismatchFailure failure(
-            getSolution(), fnType, fnType->getResult(), locator);
+        ArgumentMismatchFailure failure(getSolution(), fnType,
+                                        fnType->getResult(), locator);
         return failure.diagnoseMisplacedMissingArgument();
       }
 
@@ -5396,13 +5401,15 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // foo(bar) // `() -> Void` vs. `(Int) -> Void`
   // ```
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    auto info = *(getFunctionArgApplyInfo(locator));
+    if (auto info = getFunctionArgApplyInfo(locator)) {
 
-    auto *argExpr = info.getArgExpr();
-    emitDiagnosticAt(argExpr->getLoc(), diag::cannot_convert_argument_value,
-                     info.getArgType(), info.getParamType());
-    // TODO: It would be great so somehow point out which arguments are missing.
-    return true;
+      auto *argExpr = info->getArgExpr();
+      emitDiagnosticAt(argExpr->getLoc(), diag::cannot_convert_argument_value,
+                       info->getArgType(), info->getParamType());
+      // TODO: It would be great so somehow point out which arguments are
+      // missing.
+      return true;
+    }
   }
 
   // Function type has fewer arguments than expected by context:
@@ -7643,6 +7650,25 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
     return false;
   }
 
+  // FIXME: After Argument Synthesis, we're still generating Argument Mismatch
+  // fixes and errors
+  //  But the locator for the ApplyArgument is not a suitable match for a
+  //  FunctionApplyArgInfo This causes crashes when attempting to build one.
+  //  Blocking here is a stop gap while we devise a means of either not having
+  //  argument mismatches or of having usable locators.
+  if (!Info) {
+    auto locator = getLocator();
+    auto path = locator->getPath();
+    auto iter = path.rbegin();
+    if (locator->findLast<LocatorPathElt::ApplyArgument>(iter)) {
+      auto *newLoc = getSolution().getConstraintLocator(
+          locator->getAnchor(), path.drop_back(iter - path.rbegin()));
+      if (hasFixFor(getSolution(), newLoc, FixKind::AddMissingArguments))
+        return false;
+    }
+    ABORT("expected function arg apply info for argument mismatch");
+  }
+
   if (diagnoseKeyPathLiteralMutabilityMismatch())
     return true;
 
@@ -7983,7 +8009,7 @@ bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
   auto &ctx = getASTContext();
 
   // Should be a lone trailing closure argument.
-  if (!Info.isTrailingClosure() || !Info.getArgList()->isUnary())
+  if (!Info->isTrailingClosure() || !Info->getArgList()->isUnary())
     return false;
 
   // Check if this an application of a Regex initializer, and the user has not
@@ -8021,8 +8047,7 @@ bool ArgumentMismatchFailure::diagnoseClosureMismatch() const {
   if (paramType->lookThroughAllOptionalTypes()->is<AnyFunctionType>())
     return false;
 
-  emitDiagnostic(diag::closure_bad_param, paramType,
-                 Info.isTrailingClosure())
+  emitDiagnostic(diag::closure_bad_param, paramType, Info->isTrailingClosure())
       .highlight(getSourceRange());
 
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
@@ -8921,15 +8946,15 @@ SourceLoc MissingOptionalUnwrapKeyPathFailure::getLoc() const {
 }
 
 bool TrailingClosureRequiresExplicitLabel::diagnoseAsError() {
-  auto argInfo = *getFunctionArgApplyInfo(getLocator());
+  auto argInfo = getFunctionArgApplyInfo(getLocator());
 
   {
     auto diagnostic = emitDiagnostic(
-        diag::unlabeled_trailing_closure_deprecated, argInfo.getParamLabel());
-    fixIt(diagnostic, argInfo);
+        diag::unlabeled_trailing_closure_deprecated, argInfo->getParamLabel());
+    fixIt(diagnostic, *argInfo);
   }
 
-  if (auto *callee = argInfo.getCallee()) {
+  if (auto *callee = argInfo->getCallee()) {
     emitDiagnosticAt(callee, diag::decl_declared_here, callee);
   }
 
