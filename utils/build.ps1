@@ -887,10 +887,6 @@ enum Project {
   ClangRuntime
   SwiftInspect
   DynamicCDispatch
-  DynamicZLib
-  DynamicBrotli
-  DynamicXML2
-  DynamicCURL
   DynamicRuntime
   DynamicOverlay
   DynamicRuntimeModule
@@ -903,10 +899,6 @@ enum Project {
   DynamicVolatile
   DynamicFoundation
   StaticCDispatch
-  StaticZLib
-  StaticBrotli
-  StaticXML2
-  StaticCURL
   StaticRuntime
   StaticOverlay
   StaticRuntimeModule
@@ -3564,11 +3556,10 @@ function Build-CompilerRuntime([Hashtable] $Platform,
 }
 
 function Build-Brotli([Hashtable] $Platform,
-                      [Hashtable] $CCompiler,
-                      [string]    $Phase) {
+                      [Hashtable] $CCompiler) {
   Build-CMakeProject `
     -Src $SourceCache\brotli `
-    -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Phase}Brotli")) `
+    -Bin (Get-ProjectBinaryCache $Platform Brotli) `
     -Platform $Platform `
     -CCompiler $CCompiler `
     -BuildTargets default `
@@ -3581,11 +3572,10 @@ function Build-Brotli([Hashtable] $Platform,
 
 
 function Build-ZLib([Hashtable] $Platform,
-                    [Hashtable] $CCompiler,
-                    [string]    $Phase) {
+                    [Hashtable] $CCompiler) {
   Build-CMakeProject `
     -Src $SourceCache\zlib `
-    -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Phase}ZLib")) `
+    -Bin (Get-ProjectBinaryCache $Platform ZLib) `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -CCompiler $CCompiler `
@@ -3680,11 +3670,10 @@ function Build-DS2([Hashtable] $Platform) {
 function Build-BoringSSL([Hashtable] $Platform,
                          [Hashtable] $Assembler,
                          [Hashtable] $CCompiler,
-                         [Hashtable] $CXXCompiler,
-                         [string]    $Phase) {
+                         [Hashtable] $CXXCompiler) {
   Build-CMakeProject `
     -Src $SourceCache\boringssl `
-    -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Phase}BoringSSL")) `
+    -Bin (Get-ProjectBinaryCache $Platform BoringSSL) `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -Assembler $Assembler `
@@ -3701,8 +3690,7 @@ function Build-BoringSSL([Hashtable] $Platform,
 }
 
 function Build-CURL([Hashtable] $Platform,
-                    [Hashtable] $CCompiler,
-                    [string]    $Phase) {
+                    [Hashtable] $CCompiler) {
   $PlatformDefines = @{}
   if ($Platform.OS -eq [OS]::Android) {
     $PlatformDefines += @{
@@ -3712,7 +3700,7 @@ function Build-CURL([Hashtable] $Platform,
 
   Build-CMakeProject `
     -Src $SourceCache\curl `
-    -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Phase}CURL")) `
+    -Bin (Get-ProjectBinaryCache $Platform CURL) `
     -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -CCompiler $CCompiler `
@@ -3722,14 +3710,14 @@ function Build-CURL([Hashtable] $Platform,
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       BROTLI_INCLUDE_DIR = "$SourceCache\brotli\c\include";
       BROTLICOMMON_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$(Get-ProjectBinaryCache $Platform ([Project]"${Phase}Brotli"))\brotlicommon.lib"
+        "$(Get-ProjectBinaryCache $Platform Brotli)\brotlicommon.lib"
       } else {
-        "$(Get-ProjectBinaryCache $Platform ([Project]"${Phase}Brotli"))\libbrotlicommon.a"
+        "$(Get-ProjectBinaryCache $Platform Brotli)\libbrotlicommon.a"
       };
       BROTLIDEC_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$(Get-ProjectBinaryCache $Platform ([Project]"${Phase}Brotli"))\brotlidec.lib"
+        "$(Get-ProjectBinaryCache $Platform Brotli)\brotlidec.lib"
       } else {
-        "$(Get-ProjectBinaryCache $Platform ([Project]"${Phase}Brotli"))\libbrotlidec.a"
+        "$(Get-ProjectBinaryCache $Platform Brotli)\libbrotlidec.a"
       }
       BUILD_CURL_EXE = "NO";
       BUILD_EXAMPLES = "NO";
@@ -4108,8 +4096,7 @@ function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [str
 }
 
 function Build-SDKDependencies([Hashtable[]] $ArchitectureSlices,
-                               [Hashtable]   $Compilers,
-                               [string]      $Phase) {
+                               [Hashtable]   $Compilers) {
   foreach ($Slice in $ArchitectureSlices) {
     # `$Compilers.C/.CXX` are clang-cl drivers configured with MSVC-style
     # flags (`/GS-`, `/Gw`, ...).  For non-Windows targets the NDK clang
@@ -4117,13 +4104,13 @@ function Build-SDKDependencies([Hashtable[]] $ArchitectureSlices,
     $C   = if ($Slice.OS -eq [OS]::Windows) { $Compilers.C   } else { $Compilers.GNUC   }
     $CXX = if ($Slice.OS -eq [OS]::Windows) { $Compilers.CXX } else { $Compilers.GNUCXX }
     if ($IncludeDS2) { Invoke-BuildStep Build-DS2 $Slice }
-    Invoke-BuildStep Build-ZLib $Slice -CCompiler $C -Phase $Phase
-    Invoke-BuildStep Build-Brotli $Slice -CCompiler $C -Phase $Phase
-    Invoke-BuildStep Build-XML2 $Slice -CCompiler $C -CXXCompiler $CXX -Phase $Phase
+    Invoke-BuildStep Build-ZLib $Slice -CCompiler $C
+    Invoke-BuildStep Build-Brotli $Slice -CCompiler $C
+    Invoke-BuildStep Build-XML2 $Slice -CCompiler $C -CXXCompiler $CXX -Phase ""
     if ($Slice.OS -ne [OS]::Windows) {
-      Invoke-BuildStep Build-BoringSSL $Slice -Assembler $Assemblers.Stage1 -CCompiler $C -CXXCompiler $CXX -Phase ""
+      Invoke-BuildStep Build-BoringSSL $Slice -Assembler $Assemblers.Stage1 -CCompiler $C -CXXCompiler $CXX
     }
-    Invoke-BuildStep Build-CURL $Slice -CCompiler $C -Phase $Phase
+    Invoke-BuildStep Build-CURL $Slice -CCompiler $C
   }
 }
 
@@ -4214,7 +4201,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
     $CDispatchCXX = if ($Platform.OS -eq [OS]::Windows) { $Compilers.CXX } else { $Compilers.GNUCXX }
     Build-CDispatch $Platform -CCompiler $CDispatchC -CXXCompiler $CDispatchCXX -Phase $Variant
     if ($BuildFoundation) {
-      Build-SDKDependencies @($Platform) -Compilers $Compilers -Phase $Variant
+      Build-SDKDependencies @($Platform) -Compilers $Compilers
     }
 
     # ── Core ──────────────────────────────────────────────────────────────────
@@ -4531,8 +4518,16 @@ roots:
                                               };
           ENABLE_TESTING                    = "NO";
           BROTLI_INCLUDE_DIR                = "$SourceCache\brotli\c\include";
-          BROTLICOMMON_LIBRARY              = "$(Get-ProjectBinaryCache $Platform ([Project]"${Variant}Brotli"))\brotlicommon.lib";
-          BROTLIDEC_LIBRARY                 = "$(Get-ProjectBinaryCache $Platform ([Project]"${Variant}Brotli"))\brotlidec.lib";
+          BROTLICOMMON_LIBRARY              = if ($Platform.OS -eq [OS]::Windows) {
+                                                "$(Get-ProjectBinaryCache $Platform Brotli)\brotlicommon.lib";
+                                              } else {
+                                                "$(Get-ProjectBinaryCache $Platform Brotli)\libbrotlicommon.a";
+                                              };
+          BROTLIDEC_LIBRARY                 = if ($Platform.OS -eq [OS]::Windows) {
+                                                "$(Get-ProjectBinaryCache $Platform Brotli)\brotlidec.lib";
+                                              } else {
+                                                "$(Get-ProjectBinaryCache $Platform Brotli)\libbrotlidec.a";
+                                              };
           FOUNDATION_BUILD_TOOLS            = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
           CURL_DIR                          = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
           LibXml2_DIR                       = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
@@ -5918,7 +5913,7 @@ if ($IncludeDS2) {
 }
 
 if ($Windows) {
-  Build-SDKDependencies $WindowsSDKBuilds -Compilers $Compilers.Stage1 -Phase ""
+  Build-SDKDependencies $WindowsSDKBuilds -Compilers $Compilers.Stage1
 
   $SDKROOT = Get-SwiftSDK -OS Windows
   foreach ($Build in $WindowsSDKBuilds) {
@@ -5995,7 +5990,7 @@ if ($Windows) {
 }
 
 if ($Android) {
-  Build-SDKDependencies $AndroidSDKBuilds -Compilers $Compilers.Stage1 -Phase ""
+  Build-SDKDependencies $AndroidSDKBuilds -Compilers $Compilers.Stage1
 
   $SDKROOT = Get-SwiftSDK -OS Android
   foreach ($Build in $AndroidSDKBuilds) {
