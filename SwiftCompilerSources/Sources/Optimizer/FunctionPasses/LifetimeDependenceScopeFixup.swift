@@ -772,9 +772,8 @@ extension ScopeExtension {
       // because the stack allocation effectively covers the entire unreachable path.
       for scopeEndInst in extScope.endInstructions {
         switch extendedUseRange.overlaps(pathBegin: extScope.firstInstruction, pathEnd: scopeEndInst, context) {
-        case .containsPath, .containsEnd, .disjoint:
+        case .containsPath, .containsEnd:
           // containsPath can occur when the extendable scope has the same begin as the use range.
-          // disjoint is unexpected, but if it occurs then `extScope` must be before the useRange.
           mustExtend = true
           break
         case .containsBegin, .overlappedByPath:
@@ -784,6 +783,19 @@ extension ScopeExtension {
           // to cover this scope's end instructions. The extended scope must at least cover the original scopes because
           // the original scopes may protect other operations.
           extendedUseRange.insert(scopeEndInst)
+          break
+        case .disjoint:
+          // disjoint is unexpected, but if it occurs then `extScope` must be before the useRange.
+          assert({
+                   // If the start of extendedUseRange is between the end of the
+                   // disjoint range and the end of extendedUseRange, then we
+                   // know the disjoint range precedes extendedUseRange.
+                   var endsRange = InstructionRange(begin: scopeEndInst, ends: extendedUseRange.ends, context)
+                   let precedes = endsRange.contains(extendedUseRange.begin!)
+                   endsRange.deinitialize()
+                   return precedes
+                 }(),
+                 "Any scopes disjoint with the useRange must precede it.")
           break
         }
       }
