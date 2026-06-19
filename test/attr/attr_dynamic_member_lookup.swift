@@ -1337,7 +1337,7 @@ struct WithSendable {
 
 // Make sure we enforce a limit on the number of chained dynamic member lookups.
 @dynamicMemberLookup
-struct SelfRecursiveLookup<T> {
+struct SelfRecursiveLookup<T> { // expected-note {{'T' declared as parameter to type 'SelfRecursiveLookup'}}
   init(_: () -> T) {}
   init(_: () -> KeyPath<Self, T>) {}
   subscript<U>(dynamicMember kp: KeyPath<T, U>) -> SelfRecursiveLookup<U> {}
@@ -1346,13 +1346,14 @@ let selfRecurse1 = SelfRecursiveLookup { selfRecurse1.e }
 // expected-error@-1 {{could not find member 'e'; exceeded the maximum number of nested dynamic member lookups}}
 
 let selfRecurse2 = SelfRecursiveLookup { selfRecurse2[a: 0] }
-// expected-error@-1 {{could not find member 'subscript'; exceeded the maximum number of nested dynamic member lookups}}
+// expected-error@-1 {{generic parameter 'T' could not be inferred}}
+// expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
 
 let selfRecurse3 = SelfRecursiveLookup { \.e }
 // expected-error@-1 {{could not find member 'e'; exceeded the maximum number of nested dynamic member lookups}}
 
 let selfRecurse4 = SelfRecursiveLookup { \.[a: 0] }
-// expected-error@-1 {{could not find member 'subscript'; exceeded the maximum number of nested dynamic member lookups}}
+// expected-error@-1 {{cannot infer key path type from context; consider explicitly specifying a root type}}
 
 extension SelfRecursiveLookup where T == SelfRecursiveLookup<SelfRecursiveLookup<SelfRecursiveLookup<Int>>> {
   var terminator: T { fatalError() }
