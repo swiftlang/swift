@@ -18,6 +18,9 @@
 
 // UNSUPPORTED: CPU=armv7k, CPU=arm64_32, CPU=armv7
 
+// CHECK-IR labels for throws-prediction differ on wasm32 (inlining/layout)
+// XFAIL: OS=wasip1
+
 // CHECK-DISABLED-NOT: normal_count
 
 enum MyError: Error { case err }

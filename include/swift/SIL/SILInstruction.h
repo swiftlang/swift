@@ -470,6 +470,14 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   /// instruction as an array of ValueBase objects.
   SILInstructionResultArray getResultsImpl() const;
 
+  /// Tries to assign a valid index to this instruction based on the indices of
+  /// its neighbors, without a full block recomputation.
+  ///
+  /// Called automatically by all insertion and move APIs. Leaves the index as
+  /// zero (uncomputed) if a gap-fill is not possible, e.g. because a neighbor
+  /// has no index yet or the gap between neighbors is exhausted.
+  void assignNewIndexInList();
+
 protected:
   friend class SwiftPassInvocation;
 
@@ -563,6 +571,19 @@ public:
 
   /// This method unlinks 'self' from the containing basic block and deletes it.
   void eraseFromParent();
+
+  /// Returns the raw index of this instruction in its parent block for ordering
+  /// comparisons. A value of 0 means the index has not been computed yet.
+  /// Indices are lazily computed and persist across optimization passes.
+  /// Within a block, non-zero indices are monotonically increasing.
+  uint32_t getRawIndexInList() const { return asSILNode()->getIndexInList(); }
+
+  /// Clears the index of this instruction, marking it as uncomputed.
+  void clearIndexInList() { asSILNode()->setIndexInList(0); }
+
+  /// Returns true if this instruction comes before \p other in the same block.
+  /// Both instructions must be in the same block.
+  bool strictlyDominatesInBlock(const SILInstruction *other) const;
 
   /// Unlink this instruction from its current basic block and insert the
   /// instruction such that it is the first instruction of \p Block.
@@ -5749,8 +5770,10 @@ public:
     return DVI && DVI->hasAddrVal()? DVI : nullptr;
   }
 
-  /// Whether this debug value has a DIExpr with a deref. If this instruction
-  /// has a debug reconstruction block, this returns false.
+  /// Whether this debug value has a DIExpr with a deref.
+  /// For address-only types with a debug reconstruction block, the deref
+  /// applies after the BB's result. Otherwise, this is incompatible with
+  /// debug reconstruction blocks.
   bool hasDeref() const {
     return sharedUInt8().DebugValueInst.prependDeref;
   }
@@ -5765,6 +5788,7 @@ public:
   /// Removes a deref operator to this debug_value in place.
   /// This must be called when the operand is changed from an address type to
   /// an object type (when moved from the stack to a register, for example).
+  /// Asserts that the type is loadable (cannot strip deref for address-only).
   /// If a reconstruction block exists, a load is removed at the beginning. If
   /// there is no load at the beginning, the operand is killed, marking the
   /// variable as optimized away.
@@ -5810,7 +5834,9 @@ public:
   /// value is no longer valid and cannot be salvaged.
   /// This will replace the operand with an undef, and clear any DIExpr or debug
   /// reconstruction block.
-  void killOperand();
+  /// If \p varType is specified, the undef will use that type (in the
+  /// appropriate address/object form) instead of the current operand's type.
+  void killOperand(SILType operandType = SILType());
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds
@@ -10265,14 +10291,23 @@ class IndexAddrInst
   enum { Base, Index };
 
   IndexAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILValue Index,
-                bool needsStackProtection)
+                bool needsStackProtection, bool isProjection)
       : InstructionBase(DebugLoc, Operand->getType(), Operand, Index) {
     sharedUInt8().IndexAddrInst.needsStackProtection = needsStackProtection;
+    sharedUInt8().IndexAddrInst.isProjection = isProjection;
   }
 
 public:
   bool needsStackProtection() const {
     return sharedUInt8().IndexAddrInst.needsStackProtection;
+  }
+  /// True if this instruction projects a single array element address from an
+  /// array base, as opposed to being used for general pointer arithmetic.
+  /// When set, the result cannot be used to reach other array elements (e.g.
+  /// by chaining index_addr instructions); without this flag such chaining is
+  /// permitted.
+  bool isProjection() const {
+    return sharedUInt8().IndexAddrInst.isProjection;
   }
 };
 

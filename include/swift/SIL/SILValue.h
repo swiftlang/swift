@@ -38,7 +38,6 @@ class DominanceInfo;
 class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
-class InstructionIndices;
 class SILInstruction;
 class SILArgument;
 class SILLocation;
@@ -729,7 +728,7 @@ public:
   /// Verify that this SILValue and its uses respects ownership invariants.
   ///
   /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
-  void verifyOwnership(DeadEndBlocks *DEBlocks, InstructionIndices *instIndices) const;
+  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
 
   SWIFT_DEBUG_DUMP;
 };
@@ -1087,6 +1086,13 @@ private:
 
   // For details see SILNode::lastInitializedBitfieldID
   uint64_t lastInitializedBitfieldID : (64 - numCustomBits);
+
+  uint64_t getLastInitializedBitfieldID() const {
+    return lastInitializedBitfieldID;
+  }
+  void setLastInitializedBitfieldID(uint64_t bitfieldID) {
+    lastInitializedBitfieldID = bitfieldID;
+  }
 
 public:
   Operand(SILInstruction *owner)

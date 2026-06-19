@@ -30,9 +30,6 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     _set_pure_swift_link_flags(SwiftInProcPluginServer "../../")
   endif()
 
-  set_property(TARGET ${name}
-    PROPERTY BUILD_WITH_INSTALL_RPATH YES)
-
   add_dependencies(compiler SwiftInProcPluginServer)
   swift_install_in_component(TARGETS SwiftInProcPluginServer
     ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host" COMPONENT compiler

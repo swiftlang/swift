@@ -39,6 +39,19 @@ namespace swift {
   /// Determine whether the given string can be the name of a member.
   bool canBeMemberName(StringRef identifier);
 
+  /// Split a string at the first occurrence of a separator character, but do
+  /// not split within backticks (e.g. `A.B`).
+  std::pair<StringRef, StringRef> backtickAwareSplit(StringRef text,
+                                                     char separator);
+
+  /// Split a string at the last occurrence of a separator character, but do not
+  /// split within backticks.
+  std::pair<StringRef, StringRef> backtickAwareRSplit(StringRef text,
+                                                      char separator);
+
+  /// Strip surrounding backticks from a string if present.
+  StringRef stripBackticks(StringRef name);
+
   /// Returns true if the given word is one of Swift's known prepositions.
   ///
   /// This can be faster than getPartOfSpeech(StringRef).

@@ -619,18 +619,20 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:            struct_extract [[BB]]
 // CHECK:         [[ELT0:%.*]] = ref_tail_addr
 //   Element 0.
+// CHECK:         [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK:         [[ELT0_PTR:%.*]] = index_addr [projection] [[ELT0]] : $*Cat, [[IDX0]] : $Builtin.Word
 // CHECK:         [[T0:%.*]] = function_ref @$s6errors10make_a_catAA3CatCyKF : $@convention(thin) () -> (@owned Cat, @error any Error)
 // CHECK:         try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error any Error), normal [[NORM_0:bb[0-9]+]], error [[ERR_0:bb[0-9]+]]
 // CHECK:       [[NORM_0]]([[CAT0:%.*]] : @owned $Cat):
-// CHECK-NEXT:    store [[CAT0]] to [init] [[ELT0]]
+// CHECK-NEXT:    store [[CAT0]] to [init] [[ELT0_PTR]]
 //   Element 1.
 // CHECK-NEXT:    [[T0:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK-NEXT:    [[ELT1:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:    [[ELT1:%.*]] = index_addr [projection] [[ELT0]] : $*Cat, [[T0]]
 // CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT:    store [[ARG_COPY]] to [init] [[ELT1]]
 //   Element 2.
 // CHECK-NEXT:    [[T0:%.*]] = integer_literal $Builtin.Word, 2
-// CHECK-NEXT:    [[ELT2:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:    [[ELT2:%.*]] = index_addr [projection] [[ELT0]] : $*Cat, [[T0]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @$s6errors10make_a_catAA3CatCyKF : $@convention(thin) () -> (@owned Cat, @error any Error)
 // CHECK-NEXT:    try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error any Error), normal [[NORM_2:bb[0-9]+]], error [[ERR_2:bb[0-9]+]]
@@ -638,7 +640,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:    store [[CAT2]] to [init] [[ELT2]]
 //   Element 3.
 // CHECK-NEXT:    [[T0:%.*]] = integer_literal $Builtin.Word, 3
-// CHECK-NEXT:    [[ELT3:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:    [[ELT3:%.*]] = index_addr [projection] [[ELT0]] : $*Cat, [[T0]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @$s6errors10make_a_catAA3CatCyKF : $@convention(thin) () -> (@owned Cat, @error any Error)
 // CHECK-NEXT:    try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error any Error), normal [[NORM_3:bb[0-9]+]], error [[ERR_3:bb[0-9]+]]
@@ -663,7 +665,7 @@ func test_variadic(_ cat: Cat) throws {
 //   Failure from element 2.
 // CHECK:       [[ERR_2]]([[ERROR:%.*]] : @owned $any Error):
 // CHECK-NEXT:    destroy_addr [[ELT1]]
-// CHECK-NEXT:    destroy_addr [[ELT0]]
+// CHECK-NEXT:    destroy_addr [[ELT0_PTR]]
 // CHECK:         end_borrow [[BB]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @$ss29_deallocateUninitializedArray{{.*}}F
@@ -673,7 +675,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:       [[ERR_3]]([[ERROR:%.*]] : @owned $any Error):
 // CHECK-NEXT:    destroy_addr [[ELT2]]
 // CHECK-NEXT:    destroy_addr [[ELT1]]
-// CHECK-NEXT:    destroy_addr [[ELT0]]
+// CHECK-NEXT:    destroy_addr [[ELT0_PTR]]
 // CHECK-NEXT:    end_borrow [[BB]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @$ss29_deallocateUninitializedArray{{.*}}F

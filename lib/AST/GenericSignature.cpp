@@ -1360,6 +1360,19 @@ GenericSignature GenericSignature::withoutMarkerProtocols() const {
 void GenericSignatureImpl::getRequirementsWithInverses(
     SmallVector<Requirement, 2> &reqs,
     SmallVector<InverseRequirement, 2> &inverses) const {
+  getRequirementsWithInversesImpl(reqs, inverses, /*ForPrinting*/ false);
+}
+
+void GenericSignatureImpl::getRequirementsWithInversesForPrinting(
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses) const {
+  getRequirementsWithInversesImpl(reqs, inverses, /*ForPrinting*/ true);
+}
+
+void GenericSignatureImpl::getRequirementsWithInversesImpl(
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses,
+    bool ForPrinting) const {
   auto &ctx = getASTContext();
 
   llvm::SmallSet<CanType, 12> seenDMTs;
@@ -1470,7 +1483,11 @@ void GenericSignatureImpl::getRequirementsWithInverses(
 
     // If the subject matches a primary associated type we identified earlier,
     // then we will infer a default for them, so drop this requirement.
-    if (seenDMTs.contains(subject->getCanonicalType()))
+    //
+    // To maintain with compatability between SE-503 and the deprecated
+    // SuppressedAssociatedTypes, we preserve these requirements when the
+    // purpose is for the ASTPrinter.
+    if (!ForPrinting && seenDMTs.contains(subject->getCanonicalType()))
       continue;
 
     // Otherwise, for a non-primary associated type, no default is inferred,

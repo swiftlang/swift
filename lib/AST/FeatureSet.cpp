@@ -477,6 +477,7 @@ UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(ImportCxxMembersLazily)
+UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -502,6 +503,7 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 UNINTERESTING_FEATURE(CustomAvailability)
 UNINTERESTING_FEATURE(BuiltinMarkDependence)
+UNINTERESTING_FEATURE(BuiltinGepProjection)
 
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.
@@ -671,7 +673,8 @@ static bool usesFeatureReparenting(Decl *decl) {
 
   // Check if this decl itself is a reparentable protocol (of extension of).
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    decl = ext->getExtendedNominal();
+    if (auto *nominal = ext->getExtendedNominal())
+      decl = nominal;
   }
 
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
@@ -687,6 +690,8 @@ UNINTERESTING_FEATURE(BorrowingSequence)
 UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
 UNINTERESTING_FEATURE(FlowIsolationGlobalActor)
 
+UNINTERESTING_FEATURE(DeriveConformancesViaMacros)
+
 static bool usesFeatureBorrowInout(Decl *decl) {
   auto &ctx = decl->getASTContext();
 
@@ -696,6 +701,8 @@ static bool usesFeatureBorrowInout(Decl *decl) {
 
   return decl == ctx.getRefDecl() || decl == ctx.getMutableRefDecl();
 }
+
+UNINTERESTING_FEATURE(BuiltinDereferenceable)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

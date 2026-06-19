@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -enable-experimental-cxx-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S%{fs-sep}Inputs -cxx-interoperability-mode=default -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}functions.h
 
 import Functions
 
@@ -16,3 +16,10 @@ Derived().sameMethodDifferentSignature()
 
 // FIXME: we should import this (https://github.com/apple/swift/issues/69745):
 Derived().rvalueThisInBase() // expected-error {{value of type 'Derived' has no member 'rvalueThisInBase'}}
+
+func callfreeFuncRenamedToInit() -> Int32 {
+  var result: Int32 = 0
+  result += freeFuncRenamedToInit()
+  result += `init`() // expected-error {{cannot find 'init' in scope}}
+  return result
+}

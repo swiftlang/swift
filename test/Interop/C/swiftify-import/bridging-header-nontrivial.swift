@@ -41,7 +41,7 @@ imports for @__swiftmacro_So3bar15_SwiftifyImportfMp_.swift:
     defer {
         _fixLifetime(p)
     }
-    return unsafe foo(len, _pPtr.baseAddress!)
+    return unsafe foo(len, _pPtr.baseAddress)
 }
 ------------------------------
 @__swiftmacro_So3bar15_SwiftifyImportfMp_.swift
@@ -55,7 +55,7 @@ imports for @__swiftmacro_So3bar15_SwiftifyImportfMp_.swift:
     defer {
         _fixLifetime(p)
     }
-    return unsafe bar(len, _pPtr.baseAddress!)
+    return unsafe bar(len, _pPtr.baseAddress)
 }
 ------------------------------
 

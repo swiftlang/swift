@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,6 +29,8 @@ internal import Musl
 internal import Android
 #elseif os(WASI)
 internal import WASILibc
+#elseif os(Emscripten)
+internal import EmscriptenLibc
 #elseif os(Windows)
 internal import CRT
 internal import WinSDK
@@ -42,7 +44,7 @@ internal import ObjectiveC
 import _Concurrency
 #endif
 
-#if os(WASI)
+#if os(WASI) || os(Emscripten)
 let platformSupportsChildProcesses = false
 #else
 let platformSupportsChildProcesses = true
@@ -2156,8 +2158,13 @@ public final class TestSuite {
       return self
     }
 
-    public func crashOutputMatches(_ string: String) -> _TestBuilder {
-      _data._crashOutputMatches.append(string)
+    public func crashOutputMatches(
+      _ string: String,
+      when predicate: Bool = true
+    ) -> _TestBuilder {
+      if predicate {
+        _data._crashOutputMatches.append(string)
+      }
       return self
     }
 
@@ -2289,7 +2296,7 @@ public enum TestRequirement: CustomStringConvertible {
       !version.isAvailable
     case .crashTesting:
       switch _getRunningOSVersion() {
-      case .wasi:
+      case .wasi, .emscripten:
         true
       default:
         false
@@ -2324,6 +2331,7 @@ public enum OSVersion : CustomStringConvertible {
   case windows
   case haiku
   case wasi
+  case emscripten
 
   public var description: String {
     switch self {
@@ -2363,6 +2371,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Haiku"
     case .wasi:
       return "WASI"
+    case .emscripten:
+      return "Emscripten"
     }
   }
 }
@@ -2413,6 +2423,8 @@ func _getOSVersion() -> OSVersion {
   return .haiku
 #elseif os(WASI)
   return .wasi
+#elseif os(Emscripten)
+  return .emscripten
 #else
   let productVersion = _getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
@@ -2513,6 +2525,8 @@ public enum TestRunPredicate : CustomStringConvertible {
   case haikuAny(reason: String)
 
   case wasiAny(reason: String)
+
+  case emscriptenAny(reason: String)
 
   case objCRuntime(/*reason:*/ String)
   case nativeRuntime(/*reason:*/ String)
@@ -2639,6 +2653,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case .wasiAny(reason: let reason):
       return "wasiAny(*, reason: \(reason))"
+
+    case .emscriptenAny(reason: let reason):
+      return "emscriptenAny(*, reason: \(reason))"
 
     case .objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
@@ -3028,6 +3045,14 @@ public enum TestRunPredicate : CustomStringConvertible {
     case .wasiAny:
       switch _getRunningOSVersion() {
       case .wasi:
+        return true
+      default:
+        return false
+      }
+
+    case .emscriptenAny:
+      switch _getRunningOSVersion() {
+      case .emscripten:
         return true
       default:
         return false

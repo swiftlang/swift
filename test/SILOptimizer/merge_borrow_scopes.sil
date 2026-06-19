@@ -1,0 +1,149 @@
+// RUN: %target-sil-opt %s -merge-borrow-scopes | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @use_obj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+// Two adjacent borrow scopes of the same owned value are merged into one.
+//
+// CHECK-LABEL: sil [ossa] @merge_two_adjacent_scopes :
+// CHECK:         %2 = begin_borrow %0
+// CHECK:          = apply %1(%2)
+// CHECK-NOT:     begin_borrow
+// CHECK:          = apply %1(%2)
+// CHECK:       } // end sil function 'merge_two_adjacent_scopes'
+sil [ossa] @merge_two_adjacent_scopes : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @use_obj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %2 = begin_borrow %0 : $Builtin.NativeObject
+  %3 = apply %1(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $Builtin.NativeObject
+  %5 = begin_borrow %0 : $Builtin.NativeObject
+  %6 = apply %1(%5) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %5 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// Three adjacent borrow scopes of the same value are merged into one.
+//
+// CHECK-LABEL: sil [ossa] @merge_three_adjacent_scopes :
+// CHECK:         %2 = begin_borrow %0
+// CHECK:          = apply %1(%2)
+// CHECK-NOT:     begin_borrow
+// CHECK:          = apply %1(%2)
+// CHECK-NOT:     begin_borrow
+// CHECK:          = apply %1(%2)
+// CHECK:       } // end sil function 'merge_three_adjacent_scopes'
+sil [ossa] @merge_three_adjacent_scopes : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @use_obj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %2 = begin_borrow %0 : $Builtin.NativeObject
+  %3 = apply %1(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $Builtin.NativeObject
+  %5 = begin_borrow %0 : $Builtin.NativeObject
+  %6 = apply %1(%5) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %5 : $Builtin.NativeObject
+  %8 = begin_borrow %0 : $Builtin.NativeObject
+  %9 = apply %1(%8) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %8 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+// Non-borrow instructions between the two scopes do not prevent merging.
+//
+// CHECK-LABEL: sil [ossa] @merge_with_instructions_between :
+// CHECK:         %2 = begin_borrow %0
+// CHECK:          = apply %1(%2)
+// CHECK-NOT:     begin_borrow
+// CHECK:          = apply %1(%2)
+// CHECK:       } // end sil function 'merge_with_instructions_between'
+sil [ossa] @merge_with_instructions_between : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @use_obj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %2 = begin_borrow %0 : $Builtin.NativeObject
+  %3 = apply %1(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $Builtin.NativeObject
+  debug_value %0 : $Builtin.NativeObject, let, name "x"
+  %6 = begin_borrow %0 : $Builtin.NativeObject
+  %7 = apply %1(%6) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %6 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+// Borrow scopes of a guaranteed function argument are also merged.
+//
+// CHECK-LABEL: sil [ossa] @merge_guaranteed_arg_borrows :
+// CHECK:         %2 = begin_borrow %0
+// CHECK:          = apply %1(%2)
+// CHECK-NOT:     begin_borrow
+// CHECK:          = apply %1(%2)
+// CHECK:       } // end sil function 'merge_guaranteed_arg_borrows'
+sil [ossa] @merge_guaranteed_arg_borrows : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = function_ref @use_obj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %2 = begin_borrow %0 : $Builtin.NativeObject
+  %3 = apply %1(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $Builtin.NativeObject
+  %5 = begin_borrow %0 : $Builtin.NativeObject
+  %6 = apply %1(%5) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %5 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+// Borrow scopes of two independent values are not merged with each other.
+//
+// CHECK-LABEL: sil [ossa] @dont_merge_different_values :
+// CHECK:         begin_borrow %0
+// CHECK:         begin_borrow %1
+// CHECK:       } // end sil function 'dont_merge_different_values'
+sil [ossa] @dont_merge_different_values : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %use = function_ref @use_obj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %2 = begin_borrow %0 : $Builtin.NativeObject
+  %3 = apply %use(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $Builtin.NativeObject
+  %5 = begin_borrow %1 : $Builtin.NativeObject
+  %6 = apply %use(%5) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %5 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+// Borrow scopes in different basic blocks are not merged: the pass operates
+// per-block and does not propagate the scope dictionary across branches.
+//
+// CHECK-LABEL: sil [ossa] @dont_merge_across_blocks :
+// CHECK:       bb0
+// CHECK:         begin_borrow
+// CHECK:       bb1
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_merge_across_blocks'
+sil [ossa] @dont_merge_across_blocks : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %use = function_ref @use_obj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %2 = apply %use(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %1 : $Builtin.NativeObject
+  br bb1
+bb1:
+  %5 = begin_borrow %0 : $Builtin.NativeObject
+  %6 = apply %use(%5) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %5 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}

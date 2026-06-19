@@ -1402,7 +1402,7 @@ arg.1 = a
 ### index_addr
 
 ```
-sil-instruction ::= 'index_addr' ('[' 'stack_protection' ']')? sil-operand ',' sil-operand
+sil-instruction ::= 'index_addr' ('[' 'stack_protection' ']')? ('[' 'projection' ']')? sil-operand ',' sil-operand
 
 %2 = index_addr %0 : $*T, %1 : $Builtin.Int<n>
 // %0 must be of an address type $*T
@@ -1422,6 +1422,16 @@ array.
 
 The `stack_protection` flag indicates that stack protection is done for
 the pointer origin.
+
+The `projection` flag indicates that this instruction projects an element
+address from an array base address, as opposed to being used for general
+pointer arithmetic. When this flag is set, the result address can only
+reach the single element at the given index — it is not possible to chain
+multiple `index_addr` instructions to reach other array elements from the
+result. Without this flag, the result may be used as the base of another
+`index_addr`, allowing arithmetic across element boundaries (e.g. an
+`index_addr` with index 1 followed by an `index_addr` with index 2 reaches
+the element at offset 3).
 
 ### tail_addr
 

@@ -493,45 +493,6 @@ SILInstruction *SILCombiner::legacyVisitAllocStackInst(AllocStackInst *AS) {
   return eraseInstFromFunction(*AS);
 }
 
-/// Returns the base address if \p val is an index_addr with constant index.
-static SILValue isConstIndexAddr(SILValue val, unsigned &index) {
-  auto *IA = dyn_cast<IndexAddrInst>(val);
-  if (!IA)
-    return nullptr;
-  auto *Index = dyn_cast<IntegerLiteralInst>(IA->getIndex());
-
-  // Limiting to 32 bits is more than enough. The reason why not limiting to 64
-  // bits is to leave room for overflow when we add two indices.
-  if (!Index || Index->getValue().getActiveBits() > 32)
-    return nullptr;
-
-  index = Index->getValue().getZExtValue();
-  return IA->getBase();
-}
-
-/// Optimize nested index_addr instructions:
-/// Example in SIL pseudo code:
-///    %1 = index_addr %ptr, x
-///    %2 = index_addr %1, y
-/// ->
-///    %2 = index_addr %ptr, x+y
-SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
-  unsigned index = 0;
-  SILValue base = isConstIndexAddr(IA, index);
-  if (!base)
-    return nullptr;
-
-  unsigned index2 = 0;
-  SILValue base2 = isConstIndexAddr(base, index2);
-  if (!base2)
-    return nullptr;
-
-  auto *newIndex = Builder.createIntegerLiteral(IA->getLoc(),
-                                    IA->getIndex()->getType(), index + index2);
-  return Builder.createIndexAddr(IA->getLoc(), base2, newIndex,
-    IA->needsStackProtection() || cast<IndexAddrInst>(base)->needsStackProtection());
-}
-
 /// Whether there exists a unique value to which \p addr is always initialized
 /// at \p forInst.
 ///

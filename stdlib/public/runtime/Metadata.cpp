@@ -764,6 +764,11 @@ cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description,
       (void *)description);
 }
 
+SWIFT_CC(swift)
+static MetadataResponse
+_swift_getGenericMetadata(MetadataRequest request, const void *const *arguments,
+                          const TypeContextDescriptor *description);
+
 MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
     MetadataRequest request, const Metadata *candidate,
     const Metadata **cacheMetadataPtr) {
@@ -781,6 +786,23 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
                             MetadataState::Complete};
   }
 
+  const void *const *arguments =
+      reinterpret_cast<const void *const *>(candidate->getGenericArgs());
+
+  if (SWIFT_UNLIKELY(
+          runtime::environment::
+              SWIFT_DEBUG_DISABLE_NONCANONICAL_STATIC_SPECIALIZATIONS())) {
+    // Pretend the noncanonical static specialization isn't there. Route
+    // through the normal generic metadata instantiation path instead.
+    auto response = _swift_getGenericMetadata(request, arguments, description);
+
+    // Don't cache incomplete metadata, since code above assumes cached metadata
+    // is complete.
+    if (response.State == MetadataState::Complete)
+      cachedMetadataAddr->store(response.Value, std::memory_order_release);
+    return response;
+  }
+
   if (auto *token =
           description
               ->getCanonicalMetadataPrespecializationCachingOnceToken()) {
@@ -788,8 +810,6 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
     // NOTE: If there is no token, then there are no canonical prespecialized
     //       metadata records, either.
   }
-  const void *const *arguments =
-      reinterpret_cast<const void *const *>(candidate->getGenericArgs());
   auto &cache = getCache(*description);
   auto key = MetadataCacheKey(cache.SigLayout, arguments);
   auto result = cache.getOrInsert(key, request, candidate);
@@ -3218,10 +3238,14 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
       });
 
   // If the struct is always noncopyable, we must honor that.
-  if (layout.flags.isCopyable() &&
-      structType->getDescription()->isUnconditionallySuppressing(
-          InvertibleProtocolKind::Copyable))
+  if (structType->getDescription()->isUnconditionallySuppressing(
+          InvertibleProtocolKind::Copyable)) {
     layout.flags = layout.flags.withCopyable(false);
+    // Unconditionally ~Copyable types may have a user-defined deinit.
+    // Mark as non-POD to avoid optimizations which may skip calling that
+    // deinit.
+    layout.flags = layout.flags.withPOD(false);
+  }
 
   // We have extra inhabitants if any element does. Use the field with the most.
   unsigned extraInhabitantCount = 0;
@@ -8201,6 +8225,7 @@ const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
 const size_t swift::_swift_debug_allocationPoolSize = InitialPoolSize;
 const size_t swift::_swift_debug_metadataAllocatorPageSize = PoolRange::PageSize;
 std::atomic<const void *> swift::_swift_debug_metadataAllocationBacktraceList;
+size_t swift::_swift_debug_allocationPoolBackPointerOffset = ~0;
 
 static void recordBacktrace(void *allocation) {
   withCurrentBacktrace([&](void **addrs, int count) {
@@ -8267,6 +8292,7 @@ static void checkAllocatorDebugEnvironmentVariables(void *context) {
                      "Warning: SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING "
                      "without SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION "
                      "has no effect.\n");
+    _swift_debug_allocationPoolBackPointerOffset = PoolRange::PageSize - sizeof(void **);
     return;
   }
 
@@ -8279,6 +8305,7 @@ static void checkAllocatorDebugEnvironmentVariables(void *context) {
   memcpy(InitialAllocationPool.Pool + newPoolSize, &trailer, sizeof(trailer));
   poolCopy.Remaining = newPoolSize;
   AllocationPool.store(poolCopy, std::memory_order_relaxed);
+  _swift_debug_allocationPoolBackPointerOffset = PoolRange::PageSize - sizeof(PoolTrailer);
 }
 
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
@@ -8313,19 +8340,24 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
       newState = PoolRange{curState.Begin + sizeWithHeader,
                            curState.Remaining - sizeWithHeader};
     } else {
-      auto poolSize = PoolRange::PageSize;
-      if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled))
-        poolSize -= sizeof(PoolTrailer);
       allocatedNewPage = true;
       allocation = reinterpret_cast<char *>(swift_slowAlloc(PoolRange::PageSize,
                                                             alignof(char) - 1));
       memsetScribble(allocation, PoolRange::PageSize);
 
+      auto poolSize = PoolRange::PageSize;
       if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled)) {
+        poolSize -= sizeof(PoolTrailer);
         PoolTrailer *newTrailer = (PoolTrailer *)(allocation + poolSize);
         char *prevTrailer = curState.Begin + curState.Remaining;
         newTrailer->PrevTrailer = prevTrailer;
         newTrailer->PoolSize = poolSize;
+      } else {
+        // Write a single back pointer to the end of the pool for the benefit of
+        // memory analysis tools.
+        poolSize -= sizeof(void *);
+        void **ptr = (void **)(allocation + poolSize);
+        *ptr = curState.Begin + curState.Remaining;
       }
       newState = PoolRange{allocation + sizeWithHeader,
                            poolSize - sizeWithHeader};

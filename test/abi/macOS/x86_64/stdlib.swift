@@ -959,6 +959,8 @@ Added: _$ss13_SwiftifyInfoO11nonescapingyABs01_A4ExprO_tcABmFWC
 Added: _$ss13_SwiftifyInfoO7endedByyABs01_A4ExprO_SitcABmFWC
 Added: _$ss13_SwiftifyInfoO7sizedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO13sizedByOrNullyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO15countedByOrNullyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO18lifetimeDependenceyABs01_A4ExprO_AEs01_D4TypeOtcABmFWC
 Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
@@ -1305,6 +1307,8 @@ Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
 // Cross-encoding strcmp for Foundation
 Added: __swift_unicodeBuffersEqual_nonNormalizing
 
+// Debug variable for metadata allocator back pointer
+Added: __swift_debug_allocationPoolBackPointerOffset
 // _RigidArray
 Added: _$ss11_RigidArrayVMa
 Added: _$ss11_RigidArrayVMn
@@ -1329,3 +1333,8 @@ Added: _$ss11UniqueArrayVyxGSHsSHRzRi_zrlMc
 Added: _$ss11UniqueArrayVyxGSQsSQRzRi_zrlMc
 Added: _$ss11UniqueArrayVsRi_zrlE11descriptionSSvg
 Added: _$ss11UniqueArrayVsRi_zrlE16debugDescriptionSSvg
+
+// Reference counting
+Added: _swift_releaseReturningCount
+Added: _swift_retainReturningCount
+

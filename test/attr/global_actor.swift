@@ -15,6 +15,9 @@ struct GA1 {
 
 @globalActor
 struct GenericGlobalActor<T> {
+  // 'let' is not possible on a generic type; silence the warning since
+  // this witness shape is only used here for global-actor attribute tests.
+  @diagnose(UnstableGlobalActorShared, as: ignored)
   static var shared: SomeActor { SomeActor() }
 }
 
@@ -62,7 +65,7 @@ struct OtherGlobalActor {
 }
 
 @GA1 func f() {
-  @GA1 let x = 17 // expected-error{{local variable 'x' cannot have a global actor}}
+  @GA1 let x = 17 // expected-error@:3{{local variable 'x' cannot have a global actor}} {{3-8=}}
   _ = x
 }
 
@@ -83,9 +86,9 @@ class SomeClass {
   @GA1 deinit { }
 }
 
-@GA1 typealias Integer = Int // expected-error{{type alias cannot have a global actor}}
+@GA1 typealias Integer = Int // expected-error@:1{{type alias cannot have a global actor}} {{1-6=}}
 
-@GA1 actor ActorInTooManyPlaces { } // expected-error{{actor 'ActorInTooManyPlaces' cannot have a global actor}}
+@GA1 actor ActorInTooManyPlaces { } // expected-error@:1{{actor 'ActorInTooManyPlaces' cannot have a global actor}} {{1-6=}}
 
 @GA1 @OtherGlobalActor func twoGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('OtherGlobalActor' and 'GA1')}}
 // expected-note@-1{{'GA1' attribute previously declared here}}

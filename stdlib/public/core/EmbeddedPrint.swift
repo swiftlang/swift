@@ -28,7 +28,7 @@ func putchar(_: CInt) -> CInt
 #endif
 
 
-private func writeChars(_ chars: UnsafeBufferPointer<UInt8>) {
+internal func writeChars(_ chars: UnsafeBufferPointer<UInt8>) {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
   _ = unsafe _swift_writeToStandardOutput(chars.baseAddress, chars.count)
 #else

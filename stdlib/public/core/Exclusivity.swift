@@ -238,6 +238,7 @@ internal func _swift_exclusivityAccessSetNext(
 @c(swift_dumpTrackedAccesses)
 @usableFromInline
 @unsafe
+@_unavailableInEmbedded
 internal func swift_dumpTrackedAccesses() {
   if let head = unsafe accessHead {
     unsafe Access.forEach(head) {

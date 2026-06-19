@@ -822,7 +822,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   using namespace options;
   Opts.EnableCaching |= Args.hasFlag(
       OPT_cache_compile_job, OPT_no_cache_compile_job, /*Default=*/false);
-  Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks);
+  Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks) ||
+                               ::getenv("SWIFT_ENABLE_COMPILE_CACHE_REMARK");
   Opts.CacheSkipReplay |= Args.hasArg(OPT_cache_disable_replay);
   Opts.WriteOutputHashXAttr |= Args.hasArg(OPT_write_output_hash_xattr);
   if (const Arg *A = Args.getLastArg(OPT_cas_path))
@@ -1166,6 +1167,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableImplicitStringProcessingModuleImport |=
     Args.hasArg(OPT_disable_implicit_string_processing_module_import);
+
+  Opts.DisableImplicitCOMModuleImport |=
+      Args.hasArg(OPT_disable_implicit_com_module_import);
 
   Opts.DisableImplicitCxxModuleImport |=
     Args.hasArg(OPT_disable_implicit_cxx_module_import);
@@ -1677,6 +1681,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         " " + printFormalCxxInteropVersion(Opts);
 
   Opts.UseStaticStandardLibrary = Args.hasArg(OPT_use_static_resource_dir);
+  Opts.EnableCOMInterop = Args.hasArg(OPT_enable_com_interop);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));

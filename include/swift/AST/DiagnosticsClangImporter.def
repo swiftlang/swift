@@ -82,6 +82,14 @@ WARNING(swift_name_attr_ignored, none,
         "effect on method overrides",
         (StringRef))
 
+WARNING(swift_name_init_on_non_initializer, none,
+        "ignoring swift_name attribute '%0'; %1 cannot be imported as an "
+        "initializer",
+        (StringRef, const clang::NamedDecl *))
+
+NOTE(swift_name_use_backticks_in_init, none,
+     "use backticks (e.g. 'swift_name(\"`init`(...)\")')", ())
+
 GROUPED_WARNING(swift_name_circular_context_import, ClangDeclarationImport, none,
         "cycle detected while resolving '%0' in swift_name attribute for '%1'",
         (StringRef, StringRef))

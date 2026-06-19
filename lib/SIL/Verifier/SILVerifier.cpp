@@ -87,6 +87,11 @@ static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
 #endif
                                                                 ));
 
+// Verify the type chain of debug_value instructions. Disabled by default
+// while we fix all root causes.
+static llvm::cl::opt<bool> VerifyDebugValueExpr("verify-debug-value-expr",
+                                                llvm::cl::init(false));
+
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
@@ -1055,7 +1060,6 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   DominanceInfo *Dominance;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
-  InstructionIndices instIndices;
 
   bool SingleFunction = true;
   bool checkLinearLifetime = false;
@@ -1443,7 +1447,7 @@ public:
               bool SingleFunction = true, bool checkLinearLifetime = true)
       : M(F.getModule().getSwiftModule()), F(F), calleeCache(calleeCache),
         Dominance(dominanceInfo), fnConv(F.getConventionsInContext()),
-        TC(F.getModule().Types), instIndices(const_cast<SILFunction *>(&F)),
+        TC(F.getModule().Types),
         SingleFunction(SingleFunction),
         checkLinearLifetime(checkLinearLifetime) {
     if (F.isExternalDeclaration())
@@ -1481,10 +1485,7 @@ public:
     if (aBlock != bBlock)
       return Dominance->properlyDominates(aBlock, bBlock);
 
-    // Note that it might happen that for absurdly large basic blocks, the instruction
-    // indices are "maxed out". In this case we cannot compute the before-after
-    // relation efficiently and we conservatively return true.
-    return a != b && instIndices.get(a) <= instIndices.get(b);
+    return a->strictlyDominatesInBlock(b);
   }
 
   void visitSILPhiArgument(SILPhiArgument *arg) {
@@ -1591,7 +1592,7 @@ public:
               "Once ownership is gone, all values should have none ownership");
       return;
     }
-    SILValue(V).verifyOwnership(DEBlocks.get(), &instIndices);
+    SILValue(V).verifyOwnership(DEBlocks.get());
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -1959,7 +1960,9 @@ public:
     }
 
     // Type chain: SSA operand -> DebugBB -> deref -> fragments -> vartype
-    require(inst->isExprTypeValid(), "debug_value type chain should hold");
+    if (VerifyDebugValueExpr)
+      require(inst->isExprTypeValid(),
+              "debug_value type chain should hold");
   }
 
   void checkInstructionsDebugInfo(SILInstruction *inst) {

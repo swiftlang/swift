@@ -203,6 +203,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
+    case SourceFileKind::SyntheticMacro:
       braceItemListKind = BraceItemListKind::MacroExpansion;
       break;
     }
@@ -8433,7 +8434,13 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     ParserStatus AccessorStatus = parseAccessorIntroducer(
         *this, Attributes, Kind, Loc, IsFirstAccessor, &featureUnavailable);
     Status |= AccessorStatus;
-    if (AccessorStatus.isError() && !AccessorStatus.hasCodeCompletion()) {
+    if (AccessorStatus.isError()) {
+      // If we have a code completion token in an attribute but no accessor
+      // introducer, bail.
+      if (AccessorStatus.hasCodeCompletion()) {
+        accessorHasCodeCompletion = true;
+        break;
+      }
       if (Tok.is(tok::code_complete)) {
         // Handle code completion here only if it's not the first accessor.
         // If it's the first accessor, it's handled in function body parsing
@@ -8546,9 +8553,9 @@ void Parser::parseTopLevelAccessors(
     if (accessorStatus.isError())
       break;
 
-    (void)parseAccessorAfterIntroducer(loc, kind, accessors, hasEffectfulGet,
-                                       parsingLimitedSyntax, attributes,
-                                       PD_Default, storage, status);
+    (void)parseAccessorAfterIntroducer(
+        loc, kind, accessors, hasEffectfulGet, parsingLimitedSyntax, attributes,
+        getParseDeclOptions(storage->getDeclContext()), storage, status);
     if (IsFirstAccessor) {
       IsFirstAccessor = false;
     }
@@ -8680,7 +8687,7 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
   if (!storage) {
     storage = new (Context) VarDecl(StaticLoc.isValid(),
                                     VarDecl::Introducer::Var,
-                                    VarLoc, Identifier(),
+                                    pattern->getStartLoc(), Identifier(),
                                     CurDeclContext);
     storage->setInvalid();
 
@@ -10472,6 +10479,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
+    case SourceFileKind::SyntheticMacro:
       if (Tok.is(tok::identifier)) {
         diagnose(Tok, diag::destructor_has_name).fixItRemove(Tok.getLoc());
         consumeToken();

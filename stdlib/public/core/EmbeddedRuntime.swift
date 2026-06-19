@@ -134,11 +134,11 @@ public struct HeapObject {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
 // Mirrors the interface defined in swift/EmbeddedPlatform.h
 
-@_extern(c, "_swift_alignedAllocate")
-public func _swift_alignedAllocate(_ pointer: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ alignment: Int, _ size: Int) -> CInt
+@_extern(c, "_swift_allocate")
+public func _swift_allocate(_ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong) -> UnsafeMutableRawPointer?
 
-@_extern(c, "_swift_alignedFree")
-public func _swift_alignedFree(_ p: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int)
+@_extern(c, "_swift_free")
+public func _swift_free(_ p: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong)
 
 @_extern(c, "_swift_generateRandom")
 public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
@@ -167,13 +167,13 @@ func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
 
 func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
   let alignment = max(alignment, unsafe MemoryLayout<UnsafeRawPointer>.size)
-  var r: UnsafeMutableRawPointer? = nil
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  _ = unsafe _swift_alignedAllocate(&r, alignment, size)
+  return unsafe _swift_allocate(alignment, size, 0)
 #else
+  var r: UnsafeMutableRawPointer? = nil
   _ = unsafe posix_memalign(&r, alignment, size)
-#endif
   return unsafe r
+#endif
 }
 
 @c
@@ -197,7 +197,7 @@ public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPo
 @c
 public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int) {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  unsafe _swift_alignedFree(ptr, size, alignMask)
+  unsafe _swift_free(ptr, size, alignMask, 0)
 #else
   unsafe free(ptr)
 #endif
@@ -669,6 +669,28 @@ public func swift_release_n(object: Builtin.RawPointer, n: UInt32) {
   unsafe swift_release_n_(object: o, n: n)
 }
 
+// Non-atomic refcount entry points. For now, just route to the atomic versions.
+// This can be optimized later.
+@c @discardableResult
+public func swift_nonatomic_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
+  return swift_retain(object: object)
+}
+
+@c @discardableResult
+public func swift_nonatomic_retain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
+  return swift_retain_n(object: object, n: n)
+}
+
+@c
+public func swift_nonatomic_release(object: Builtin.RawPointer) {
+  swift_release(object: object)
+}
+
+@c
+public func swift_nonatomic_release_n(object: Builtin.RawPointer, n: UInt32) {
+  swift_release_n(object: object, n: n)
+}
+
 func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBoxRelease: Bool = false) {
   guard let object = unsafe object else {
     return
@@ -903,6 +925,80 @@ func _embeddedReportExclusivityViolation(
     true._value, StaticString("dynamic exclusivity violation").unsafeRawPointer)
   Builtin.int_trap()
 }
+
+// IntegerLiteral-to-FloatingPoint conversion
+
+/// Convert a `Builtin.IntegerLiteral` value to a binary floating-point type.
+///
+/// `data` is a pointer to little-endian word-sized chunks; `flags` packs the
+/// minimum bit width needed to store the value (in bits 8 and above) and the
+/// sign (in bit 0). The format mirrors `swift::IntegerLiteral` /
+/// `swift::IntegerLiteralFlags` in `include/swift/Runtime/Numeric.h` and
+/// `include/swift/ABI/MetadataValues.h`. The same algorithm is implemented
+/// in C++ in `stdlib/public/runtime/Numeric.cpp` for non-Embedded builds.
+@_silgen_name("swift_intToFloat32")
+public func _swift_intToFloat32(
+  _ data: UnsafePointer<UInt>, _ flags: Int
+) -> Float {
+  let bitsPerChunk = Int.bitWidth
+  let bitWidth = flags >> 8
+  let numChunks = (bitWidth + bitsPerChunk - 1) / bitsPerChunk
+
+  // Single chunk: the entire value is sign-extended into one chunk.
+  if numChunks == 1 {
+    return Float(Int(bitPattern: unsafe data[0]))
+  }
+
+  // Multi-chunk: lower chunks contribute as unsigned digits in base
+  // 2^bitsPerChunk; only the top chunk carries the sign.
+  let chunkFactor: Float = bitsPerChunk == 64 ? 0x1p64 : 0x1p32
+
+  var result = Float(unsafe data[0])
+  var scale = chunkFactor
+  for i in 1 ..< numChunks - 1 {
+    result += Float(unsafe data[i]) * scale
+    scale *= chunkFactor
+  }
+  result += Float(Int(bitPattern: unsafe data[numChunks - 1])) * scale
+  return result
+}
+
+@_silgen_name("swift_intToFloat64")
+public func _swift_intToFloat64(
+  _ data: UnsafePointer<UInt>, _ flags: Int
+) -> Double {
+  let bitsPerChunk = Int.bitWidth
+  let bitWidth = flags >> 8
+  let numChunks = (bitWidth + bitsPerChunk - 1) / bitsPerChunk
+
+  if numChunks == 1 {
+    return Double(Int(bitPattern: unsafe data[0]))
+  }
+
+  let chunkFactor: Double = bitsPerChunk == 64 ? 0x1p64 : 0x1p32
+
+  var result = Double(unsafe data[0])
+  var scale = chunkFactor
+  for i in 1 ..< numChunks - 1 {
+    result += Double(unsafe data[i]) * scale
+    scale *= chunkFactor
+  }
+  result += Double(Int(bitPattern: unsafe data[numChunks - 1])) * scale
+  return result
+}
+
+// Version information for the Platform Abstraction Layer
+
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+@c @used
+public func swift_getPlatformLayerVersion(
+  _ major: UnsafeMutablePointer<Int>,
+  _ minor: UnsafeMutablePointer<Int>
+) {
+  unsafe major.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR
+  unsafe minor.pointee = 0 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
+}
+#endif
 
 // CXX Exception Personality
 

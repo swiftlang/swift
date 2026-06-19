@@ -118,9 +118,9 @@ static const constexpr StoredDiagnosticInfo storedDiagnosticInfos[] = {
 #define GROUPED_WARNING(ID, Group, Options, Text, Signature)                   \
   StoredDiagnosticInfo(DiagnosticKind::Warning, DiagnosticOptions::Options,    \
                        DiagGroupID::Group),
-#define NOTE(ID, Options, Text, Signature)                                     \
+#define GROUPED_NOTE(ID, Group, Options, Text, Signature)                      \
   StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticOptions::Options,       \
-                       DiagGroupID::no_group),
+                       DiagGroupID::Group),
 #define REMARK(ID, Options, Text, Signature)                                   \
   StoredDiagnosticInfo(DiagnosticKind::Remark, DiagnosticOptions::Options,     \
                        DiagGroupID::no_group),
@@ -606,7 +606,7 @@ bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID grou
       sf->getExportedSourceFile()) {
     auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
     return swift_ASTGen_isWarningGroupEnabledInFile(
-        sf->getExportedSourceFile(),
+        sf->getExportedSourceFile(), sf->getASTContext(),
         BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
         StringRef(getDiagGroupInfoByID(groupID).name));
   }
@@ -1372,7 +1372,7 @@ DiagnosticState::determineUserControlledWarningBehavior(
         auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
         WarningGroupBehavior behavior =
             swift_ASTGen_warningGroupBehaviorAtPosition(
-                SF->getExportedSourceFile(),
+                SF->getExportedSourceFile(), SF->getASTContext(),
                 BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
                 StringRef(getDiagGroupInfoByID(diag.getGroupID()).name), loc);
         switch (behavior) {
@@ -1583,6 +1583,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
       case GeneratedSourceInfo::PrettyPrinted:
       case GeneratedSourceInfo::DefaultArgument:
       case GeneratedSourceInfo::AttributeFromClang:
+      case GeneratedSourceInfo::SyntheticMacro:
         fixIts = {};
         break;
       case GeneratedSourceInfo::ReplacedFunctionBody:
@@ -1631,6 +1632,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return DeclName();
   }
 }
@@ -1693,6 +1695,7 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
     case GeneratedSourceInfo::DefaultArgument:
     case GeneratedSourceInfo::ReplacedFunctionBody:
     case GeneratedSourceInfo::AttributeFromClang:
+    case GeneratedSourceInfo::SyntheticMacro:
       return childNotes;
     }
 

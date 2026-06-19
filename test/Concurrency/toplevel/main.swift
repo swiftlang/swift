@@ -15,7 +15,7 @@ func foo() -> Int {
 var a = 10 // expected-swift6-note 2{{var declared here}}
 
 @MainActor
-var b = 14 // expected-error {{top-level code variables cannot have a global actor}}
+var b = 14 // expected-error@-1:1 {{top-level code variables cannot have a global actor}} {{1-+1:1=}}
 
 func nonIsolatedSynchronous() {
   // expected-swift6-note@-1 {{add '@MainActor' to make global function 'nonIsolatedSynchronous()' part of global actor 'MainActor'}}

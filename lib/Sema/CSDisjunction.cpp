@@ -875,13 +875,13 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
         if (paramFlags.isAutoClosure())
           paramType = paramType->castTo<FunctionType>()->getResult();
 
-        reason |= canPossiblyConvertTo(cs, argType, paramType, genericSig);
+        reason |= checkConversion(cs, argType, paramType, genericSig);
       }
 
       auto overloadResultType = overloadType->getResult();
       auto applyResultType = argFuncType->getResult();
-      reason |= canPossiblyConvertTo(cs, overloadResultType,
-                                     applyResultType, genericSig);
+      reason |= checkConversion(cs, overloadResultType,
+                                applyResultType, genericSig);
 
       if (reason) {
         if (cs.isDebugMode()) {

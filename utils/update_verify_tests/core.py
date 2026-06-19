@@ -81,6 +81,10 @@ class Diag:
         nested_lines,
         diag_content_raw=None,
         original_count_str=None,
+        fixits_raw_str="",
+        had_none_fixit_marker=False,
+        preserved_markers=None,
+        had_absolute_line_in_source=False,
     ):
         self.prefix = prefix
         self.diag_content = diag_content
@@ -105,6 +109,24 @@ class Diag:
         self.nested_lines = nested_lines
         self.parent = None
         self.closer = None
+        self.fixits_raw_str = fixits_raw_str
+        self.had_none_fixit_marker = had_none_fixit_marker
+        # Non-fix-it markers (group-name=, documentation-file=) seen inside
+        # the trailing fix-it run on the source line, in source order. They
+        # need to be re-emitted verbatim if actual_fixits replaces the
+        # source's fix-its.
+        self.preserved_markers = (
+            list(preserved_markers) if preserved_markers else []
+        )
+        # Whether any fix-it marker on the source side carried an absolute
+        # `<line>:<col>` position. When False, actual fix-its with absolute
+        # lines coming from the verifier are rewritten as relative offsets
+        # at render time so the test stays stable across line shifts.
+        self.had_absolute_line_in_source = had_absolute_line_in_source
+        # None means: no fix-it error reported for this diag, render
+        # fixits_raw_str as is. A list (possibly empty) means: replace the
+        # source fix-its with these exact marker strings.
+        self.actual_fixits = None
 
     def decrement_count(self):
         self.count -= 1
@@ -156,7 +178,50 @@ class Diag:
         # vs the new count to decide whether to keep self's original digit.
         self.count = other_diag.count
         self.category = other_diag.category
+        self.fixits_raw_str = other_diag.fixits_raw_str
+        self.had_none_fixit_marker = other_diag.had_none_fixit_marker
+        self.actual_fixits = other_diag.actual_fixits
+        self.preserved_markers = other_diag.preserved_markers
+        self.had_absolute_line_in_source = (
+            other_diag.had_absolute_line_in_source
+        )
         other_diag.count = 0
+
+    def _render_fixits(self):
+        if self.actual_fixits is None:
+            return self.fixits_raw_str
+        # Re-emit any non-fix-it markers seen inside the source fix-it run
+        # (e.g. {{group-name=...}}) in their original order, then the actual
+        # fix-its from the verifier, then preserve {{none}} if present.
+        parts = list(self.preserved_markers)
+        actuals = self.actual_fixits
+        if not self.had_absolute_line_in_source:
+            # The verifier always emits absolute `<line>:<col>` positions in
+            # actual fix-its; convert them to relative offsets so the test
+            # source is stable across line shifts. Source already using
+            # absolute lines is left alone. Relative offsets in fix-it
+            # bodies are interpreted by the verifier as offsets from the
+            # diagnostic line, not the comment line.
+            diag_line_n = self.absolute_target()
+            actuals = [
+                relativize_fixit_marker(a, diag_line_n) for a in actuals
+            ]
+        parts.extend(actuals)
+        if self.had_none_fixit_marker:
+            parts.append(
+                "{{none}}"
+            )  # keep {{none}}, it still means "no documentation-file" etc.
+        if not parts:
+            return ""
+        # Match the source's separator pattern: if the original fix-it run
+        # was packed directly against `}}` of the message (no whitespace),
+        # stay packed; otherwise emit a leading space.
+        leading = (
+            ""
+            if self.fixits_raw_str and self.fixits_raw_str[0] not in " \t"
+            else " "
+        )
+        return leading + " ".join(parts)
 
     def render(self):
         assert self.count >= 0
@@ -210,7 +275,7 @@ class Diag:
                 # the C++ lexer reads them back literally.
                 # python trivia: raw strings can't end with a backslash
                 content_s = self.diag_content.replace("\\", "\\\\")
-            return base_s + "{{" + content_s + "}}"
+            return base_s + "{{" + content_s + "}}" + self._render_fixits()
 
 
 class ExpansionDiagClose:
@@ -232,15 +297,157 @@ expected_expansion_diag_re = re.compile(
 )
 expected_expansion_close_re = re.compile(r"//(\s*)\}\}")
 
+fixit_marker_re = re.compile(r"\{\{(?P<content>(?:[^}]|\}(?!\}))*)\}\}+")
+
+# Matches the `<line>:<col>` form of a fix-it position, optionally with a
+# leading `+`/`-` sign that makes the line offset relative to the comment
+# line. Without a sign, the line is absolute.
+_fixit_pos_with_line_re = re.compile(r"^(?P<sign>[+-])?(?P<line>\d+):(?P<col>\d+)$")
+# Matches a full fix-it range `<start>-<end>` where each side is either a
+# line:col pair (with optional sign) or a bare column.
+_fixit_range_re = re.compile(
+    r"^(?P<start>[+-]?\d+(?::\d+)?)-(?P<end>[+-]?\d+(?::\d+)?)(?P<rest>=.*)\Z",
+    re.DOTALL,
+)
+
+
+def _fixit_content_has_absolute_line(content):
+    """Whether a fix-it marker's *content* (no `{{`/`}}`) carries an absolute
+    line number on either the start or the end of its range.
+    """
+    rm = _fixit_range_re.match(content)
+    if not rm:
+        return False
+    for pos in (rm.group("start"), rm.group("end")):
+        if (
+            ":" in pos
+            and not pos.startswith("+")
+            and not pos.startswith("-")
+        ):
+            return True
+    return False
+
+
+def _relativize_fixit_pos(pos_str, comment_line_n):
+    """If *pos_str* is an absolute `<line>:<col>` position, rewrite it as a
+    sign-prefixed offset relative to *comment_line_n*. Already-relative or
+    column-only positions are returned unchanged.
+    """
+    m = _fixit_pos_with_line_re.match(pos_str)
+    if not m or m.group("sign"):
+        return pos_str
+    line_n = int(m.group("line"))
+    col = m.group("col")
+    offset = line_n - comment_line_n
+    if offset == 0:
+        # Same line as the comment: drop the line prefix entirely.
+        return col
+    sign = "+" if offset > 0 else "-"
+    return f"{sign}{abs(offset)}:{col}"
+
+
+def relativize_fixit_marker(marker_text, comment_line_n):
+    """Rewrite any absolute line numbers inside a `{{...}}` fix-it marker as
+    relative offsets from *comment_line_n*. Markers that already use
+    relative offsets, or that do not carry line information, are returned
+    unchanged.
+    """
+    m = fixit_marker_re.match(marker_text)
+    if not m:
+        return marker_text
+    content = m.group("content")
+    rm = _fixit_range_re.match(content)
+    if not rm:
+        return marker_text
+    new_start = _relativize_fixit_pos(rm.group("start"), comment_line_n)
+    new_end = _relativize_fixit_pos(rm.group("end"), comment_line_n)
+    if new_start == rm.group("start") and new_end == rm.group("end"):
+        return marker_text
+    return "{{" + new_start + "-" + new_end + rm.group("rest") + "}}"
+
+
+def consume_trailing_fixits(s):
+    """Pull fix-it and related ``{{...}}`` markers off the head of *s*.
+
+    Returns ``(raw_text, has_none_marker, preserved_markers)`` where:
+
+    * ``raw_text`` is the substring of *s* covering everything consumed.
+      Non-fix-it markers (``{{documentation-file=...}}``,
+      ``{{group-name=...}}``) are only included when they appear *between*
+      fix-its in the run; trailing ones stay in *s* so the line content
+      around the fix-it expectation continues to round-trip verbatim.
+    * ``has_none_marker`` is True if a ``{{none}}`` marker was seen.
+    * ``preserved_markers`` is the list of non-fix-it markers consumed
+      inside the run, in source order; these must be re-emitted verbatim
+      when the fix-it run is rewritten.
+
+    Stops at ``{{children:...}}`` (which is parsed elsewhere).
+    """
+    pos = 0
+    last_consumed_end = 0
+    has_none = False
+    saw_any = False
+    preserved = []
+    # Non-fix-it markers seen since the last fix-it (or start). These
+    # become "preserved" only if a subsequent fix-it/{{none}} extends the
+    # consumed run past them; otherwise they are left for line.content.
+    pending_preserved = []
+    while True:
+        ws_match = re.match(r"[ \t]*", s[pos:])
+        next_pos = pos + ws_match.end()
+        # `||` separates fix-it alternatives; only meaningful between markers.
+        if saw_any and s[next_pos : next_pos + 2] == "||":
+            next_pos += 2
+            ws_match2 = re.match(r"[ \t]*", s[next_pos:])
+            next_pos += ws_match2.end()
+        m = fixit_marker_re.match(s, next_pos)
+        if not m:
+            break
+        content = m.group("content")
+        if content.startswith("children:"):
+            break
+        if content.startswith("documentation-file=") or content.startswith(
+            "group-name="
+        ):
+            pending_preserved.append(m.group(0))
+            pos = m.end()
+            continue
+        # Real fix-it (or {{none}}). Commit any pending preserved markers
+        # and extend the consumed range to cover this fix-it.
+        preserved.extend(pending_preserved)
+        pending_preserved = []
+        if content == "none":
+            has_none = True
+        pos = m.end()
+        last_consumed_end = m.end()
+        saw_any = True
+    return (s[:last_consumed_end], has_none, preserved)
+
+
+def split_fixit_markers(s):
+    pos = 0
+    results = []
+    while pos < len(s):
+        ws_match = re.match(r"[ \t]*", s[pos:])
+        pos += ws_match.end()
+        if pos >= len(s):
+            break
+        m = fixit_marker_re.match(s, pos)
+        if not m:
+            break
+        results.append(m.group(0))
+        pos = m.end()
+    return results
+
 
 def parse_diag(line, filename, prefix, all_prefixes=False):
     s = line.content
-    ms = expected_diag_re.findall(s)
+    matches = list(expected_diag_re.finditer(s))
     matched_re = expected_diag_re
-    if not ms:
-        ms = expected_expansion_diag_re.findall(s)
+    if not matches:
+        matches = list(expected_expansion_diag_re.finditer(s))
         matched_re = expected_expansion_diag_re
-    if not ms:
+    if not matches:
         ms = expected_expansion_close_re.findall(s)
         if not ms:
             return None
@@ -250,10 +457,11 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
             )
         line.content = expected_expansion_close_re.sub("{{DIAG}}", s)
         return ExpansionDiagClose(ms[0], line)
-    if len(ms) > 1:
+    if len(matches) > 1:
         raise KnownException(
             f"multiple diags on line {filename}:{line.line_n}. Aborting due to missing implementation."
         )
+    m = matches[0]
     [
         ws_slash,
         check_prefix,
@@ -266,7 +474,7 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
         count_s,
         ws_braces,
         diag_s,
-    ] = ms[0]
+    ] = m.groups()
     if check_prefix != prefix and check_prefix != "" and not all_prefixes:
         return None
     if not target_line_s or target_line_s == "@":
@@ -283,7 +491,34 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
         is_absolute = True
     col = int(target_col_s[1:]) if target_col_s else None
     count = int(count_s) if count_s else 1
-    line.content = matched_re.sub("{{DIAG}}", s)
+    if matched_re is expected_diag_re:
+        fixits_raw_str, has_none_marker, preserved_markers = (
+            consume_trailing_fixits(s[m.end() :])
+        )
+        # Detect whether any source-side fix-it marker carries an absolute
+        # `<line>:<col>` position; if so, future updates preserve absolute
+        # form, otherwise actual fix-its are rewritten as relative offsets.
+        had_absolute_line = False
+        for marker in split_fixit_markers(fixits_raw_str):
+            fm = fixit_marker_re.match(marker)
+            if not fm:
+                continue
+            content = fm.group("content")
+            if (
+                content == "none"
+                or content.startswith("documentation-file=")
+                or content.startswith("group-name=")
+            ):
+                continue
+            if _fixit_content_has_absolute_line(content):
+                had_absolute_line = True
+                break
+    else:
+        fixits_raw_str, has_none_marker, preserved_markers = "", False, []
+        had_absolute_line = False
+    line.content = (
+        s[: m.start()] + "{{DIAG}}" + s[m.end() + len(fixits_raw_str) :]
+    )
 
     unescaped_diag_s = decode(
         encode(diag_s, "utf-8", "backslashreplace"), "unicode-escape"
@@ -303,6 +538,10 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
         [],
         diag_content_raw=diag_s,
         original_count_str=count_s if count_s else None,
+        fixits_raw_str=fixits_raw_str,
+        had_none_fixit_marker=has_none_marker,
+        preserved_markers=preserved_markers,
+        had_absolute_line_in_source=had_absolute_line,
     )
 
 
@@ -469,6 +708,33 @@ def remove_dead_diags(lines, prefix):
                 break
         if took:
             continue
+        # Even if take() didn't merge (e.g. because the synthesized sibling
+        # has a different category, as in the wrong-category-with-fix-it
+        # case), transfer the dead diag's fix-it state to a live sibling on
+        # the same target. The fix-it was reported by the verifier against
+        # this source location, so it logically belongs to whichever diag
+        # ends up rendering at this location.
+        if (
+            line.diag.actual_fixits is not None
+            and line.diag.target is not None
+        ):
+            for other_diag in line.diag.target.targeting_diags:
+                if (
+                    other_diag is line.diag
+                    or other_diag.is_from_source_file
+                    or other_diag.count == 0
+                    or other_diag.actual_fixits is not None
+                ):
+                    continue
+                other_diag.actual_fixits = line.diag.actual_fixits
+                other_diag.had_none_fixit_marker = (
+                    line.diag.had_none_fixit_marker
+                )
+                other_diag.preserved_markers = line.diag.preserved_markers
+                other_diag.had_absolute_line_in_source = (
+                    line.diag.had_absolute_line_in_source
+                )
+                break
         if line.render() == "":
             remove_line(line, lines)
 
@@ -552,6 +818,61 @@ def update_lines(
                 f"{filename}:{line_n} - found {line.diag.category} diag but expected {diag_error.category}"
             )
         line.diag.decrement_count()
+
+    # Group FixitErrors by their target diag. When count > 1 and the verifier
+    # produces distinct actual fix-it sets per occurrence (e.g.
+    # `expected-warning 2 {{msg}} {{wrong}}` against two diagnostics that
+    # emit different fix-its), split the source's count expectation into
+    # one per occurrence so each set of actual fix-its lands on its own
+    # directive.
+    fixit_errors_by_diag = {}
+    for diag_error in diag_errors:
+        if not isinstance(diag_error, FixitError):
+            continue
+        line_n = diag_error.line
+        line = orig_lines[line_n - 1]
+        if not line.diag:
+            raise KnownException(
+                f"{filename}:{line_n} - fix-it mismatch reported, but no expected-* directive parsed on that line"
+            )
+        bucket = fixit_errors_by_diag.setdefault(id(line.diag), (line.diag, []))
+        bucket[1].append(diag_error.actual_fixits)
+
+    for diag, actuals_list in fixit_errors_by_diag.values():
+        unique = []
+        for actual in actuals_list:
+            if actual not in unique:
+                unique.append(actual)
+        if len(unique) <= 1 or diag.count <= 1 or nested_context is not None:
+            diag.actual_fixits = unique[0]
+            continue
+        # Split: peel off siblings for each earlier distinct actual_fixits
+        # set. The original diag keeps the last set so the synthesized
+        # siblings (inserted ahead of it via add_diag) line up with the
+        # earlier actual diagnostics in source order.
+        diag.actual_fixits = unique[-1]
+        diag.count -= len(unique) - 1
+        if diag.count < 1:
+            # Shouldn't happen if the verifier reports at most `count` fix-it
+            # errors per directive, but guard against pathological inputs.
+            diag.count = 1
+        for extra_actual in unique[:-1]:
+            new_diag = add_diag(
+                diag.absolute_target(),
+                diag.col(),
+                diag.diag_content,
+                diag.category,
+                lines,
+                orig_lines,
+                diag.prefix,
+                nested_context,
+            )
+            new_diag.actual_fixits = extra_actual
+            new_diag.had_none_fixit_marker = diag.had_none_fixit_marker
+            new_diag.preserved_markers = list(diag.preserved_markers)
+            new_diag.had_absolute_line_in_source = (
+                diag.had_absolute_line_in_source
+            )
 
     diag_errors.sort(reverse=True, key=lambda diag_error: diag_error.line)
     for diag_error in diag_errors:
@@ -743,6 +1064,20 @@ diag_produced_elsewhere_re = re.compile(
 )
 
 
+"""
+ex:
+test.swift:2:89: error: expected fix-it not seen; actual fix-it seen: {{3-8=_}}
+test.swift:2:89: error: expected fix-it not seen
+test.swift:2:89: error: expected no fix-its; actual fix-it seen: {{3-8=_}}
+test.swift:2:89: error: unexpected fix-it seen; actual fix-its seen: {{3-8=_}} {{9-10=x}}
+"""
+fixit_error_re = re.compile(
+    r"(\S+):(\d+):(\d+): error: "
+    r"(expected fix-it not seen|expected no fix-its|unexpected fix-it seen)"
+    r"(?:; actual fix-its? seen: (.*))?$"
+)
+
+
 class NotFoundDiag:
     def __init__(self, file, line, col, category, content, prefix):
         self.file = file
@@ -787,6 +1122,25 @@ class NestedDiag:
 """
 
 
+class FixitError:
+    def __init__(self, file, line, col, actual_fixits):
+        self.file = file
+        self.line = line
+        self.col = col
+        self.actual_fixits = actual_fixits
+        # Sit alongside NotFoundDiag/ExtraDiag/NestedDiag; the per-file
+        # bucket sort needs these attrs even though they're unused here.
+        self.category = None
+        self.content = None
+        self.prefix = ""
+
+    def __str__(self):
+        return (
+            f"{self.file}:{self.line}:{self.col}: fix-it mismatch "
+            f"(actual: {' '.join(self.actual_fixits) or '<none>'})"
+        )
+
+
 def check_expectations(tool_output, prefix):
     """
     The entry point function.
@@ -810,9 +1164,7 @@ def check_expectations(tool_output, prefix):
                 if i + n_extra_lines < len(tool_output):
                     next_line = tool_output[i + n_extra_lines]
                     if diag_expansion_note_re.match(next_line.strip()):
-                        dprint(
-                            f"expansion note (ignored): {next_line.strip()}"
-                        )
+                        dprint(f"expansion note (ignored): {next_line.strip()}")
                         n_extra_lines += 1
                 extra_lines = tool_output[i + 1 : i + n_extra_lines]
             elif not "error:" in line:
@@ -917,6 +1269,20 @@ def check_expectations(tool_output, prefix):
                         m.group(5),
                         diag.diag_content,
                         diag.prefix,
+                    )
+                )
+            elif m := fixit_error_re.match(line):
+                dprint(f"fix-it mismatch: {line.strip()}")
+                actual_fixits_str = m.group(5) or ""
+                n_extra = 4 if actual_fixits_str else 3
+                extra_lines = tool_output[i + 1 : i + n_extra]
+                dprint(f"extra lines: {extra_lines}")
+                curr.append(
+                    FixitError(
+                        m.group(1),
+                        int(m.group(2)),
+                        int(m.group(3)),
+                        split_fixit_markers(actual_fixits_str),
                     )
                 )
             else:

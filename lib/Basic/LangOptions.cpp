@@ -486,8 +486,7 @@ void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
 }
 
 static bool isMultiThreadedRuntime(llvm::Triple triple) {
-  if (triple.getOS() == llvm::Triple::WASI ||
-      triple.getOS() == llvm::Triple::Emscripten) {
+  if (triple.isOSWASI() || triple.getOS() == llvm::Triple::Emscripten) {
     return triple.getEnvironmentName() == "threads";
   }
   if (triple.getOSName() == "none") {
@@ -578,6 +577,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::OS, "Haiku");
     break;
   case llvm::Triple::WASI:
+  case llvm::Triple::WASIp1:
+  case llvm::Triple::WASIp2:
+  case llvm::Triple::WASIp3:
     addPlatformConditionValue(PlatformConditionKind::OS, "WASI");
     break;
   case llvm::Triple::Emscripten:

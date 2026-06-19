@@ -747,6 +747,7 @@ struct BridgedInstruction {
   bool maySynchronize() const;
   BRIDGED_INLINE bool shouldBeForwarding() const;
   BRIDGED_INLINE bool isIdenticalTo(BridgedInstruction inst) const;
+  BRIDGED_INLINE SwiftInt getRawIndexInBlock() const;
 
   // =========================================================================//
   //                   Generalized instruction subclasses
@@ -815,6 +816,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE void PointerToAddressInst_setAlignment(uint64_t alignment) const;
   BRIDGED_INLINE bool AddressToPointerInst_needsStackProtection() const;
   BRIDGED_INLINE bool IndexAddrInst_needsStackProtection() const;
+  BRIDGED_INLINE bool IndexAddrInst_isProjection() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialRefInst_getConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType InitExistentialRefInst_getFormalConcreteType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialAddrInst_getConformances() const;
@@ -997,6 +999,14 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool DebugValue_hasVarInfo() const;
   BRIDGED_INLINE BridgedSILDebugVariable DebugValue_getVarInfo() const;
 
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock
+  DebugValue_getDebugReconstructionBlock() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock
+  DebugValue_getOrCreateDebugReconstructionBlock() const;
+  BRIDGED_INLINE void DebugValue_stripDeref() const;
+  BRIDGED_INLINE void DebugValue_prependDeref() const;
+  BRIDGED_INLINE void DebugValue_killOperand(BridgedType operandType) const;
+
   BRIDGED_INLINE bool AllocStack_hasVarInfo() const;
   BRIDGED_INLINE BridgedSILDebugVariable AllocStack_getVarInfo() const;
 
@@ -1067,7 +1077,9 @@ struct BridgedBasicBlock {
   BRIDGED_INLINE void moveAllInstructionsToBegin(BridgedBasicBlock dest) const;
   BRIDGED_INLINE void moveAllInstructionsToEnd(BridgedBasicBlock dest) const;
   BRIDGED_INLINE void moveArgumentsTo(BridgedBasicBlock dest) const;
+  BRIDGED_INLINE bool isDebugReconstructionBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedSuccessor getFirstPred() const;
+  BRIDGED_INLINE void recomputeInstructionIndices() const;
 };
 
 struct BridgedSuccessor {
@@ -1306,7 +1318,10 @@ struct BridgedBuilder{
                                                                                uint64_t alignment) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createIndexAddr(BridgedValue base,
                                                                         BridgedValue index,
-                                                                        bool needsStackProtection) const;
+                                                                        bool needsStackProtection,
+                                                                        bool isProjection) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createIndexRawPointer(BridgedValue base,
+                                                                              BridgedValue index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedRefCast(BridgedValue op,
                                                                                BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedAddrCast(BridgedValue op,

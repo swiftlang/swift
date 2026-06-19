@@ -20,6 +20,8 @@ import Glibc
 import Musl
 #elseif canImport(Android)
 import Android
+#elseif os(Emscripten)
+import EmscriptenLibc
 #elseif os(Windows)
 import WinSDK
 #endif

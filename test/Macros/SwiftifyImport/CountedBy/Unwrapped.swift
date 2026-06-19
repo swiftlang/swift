@@ -19,6 +19,6 @@ public func myFunc(_ ptr: UnsafePointer<CInt>!, _ len: CInt) {
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func myFunc(_ ptr: UnsafeBufferPointer<CInt>) {
     let len = CInt(exactly: ptr.count)!
-    return unsafe myFunc(ptr.baseAddress!, len)
+    return unsafe myFunc(ptr.baseAddress, len)
 }
 ------------------------------

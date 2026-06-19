@@ -101,11 +101,13 @@ public func testIfAvailableDynamicDomain() {
 }
 // CHECK: end sil function '$s4Test28testIfAvailableDynamicDomainyyF'
 
-// CHECK-LABEL: sil private [ossa] @$sSC33__swift_DynamicDomain_isAvailableBi1_yF : $@convention(thin) () -> Builtin.Int1
+// CHECK-LABEL: sil non_abi [serialized] [export_implementation] [ossa] @$sSC33__swift_DynamicDomain_isAvailableBi1_yF : $@convention(thin) () -> Builtin.Int1
 // CHECK: bb0:
-// CHECK:   [[QUERY_FUNC:%.*]] = function_ref @$sSo27__DynamicDomain_isAvailableSbyFTo : $@convention(c) () -> Bool
-// CHECK:   [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]() : $@convention(c) () -> Bool
-// CHECK:   [[RESULT:%.*]] = struct_extract [[QUERY_RESULT]], #Bool._value
+// CHECK:   [[PRED_FUNC:%.*]] = function_ref @$sSo19dynamic_domain_preds5Int32VyFTo : $@convention(c) () -> Int32
+// CHECK:   [[PRED_RESULT:%.*]] = apply [[PRED_FUNC]]() : $@convention(c) () -> Int32
+// CHECK:   [[NEQ_FUNC:%.*]] = function_ref @$ss5Int32V2neoiySbAB_ABtFZ
+// CHECK:   [[NEQ_RESULT:%.*]] = apply [[NEQ_FUNC]]([[PRED_RESULT]], {{.*}}, {{.*}})
+// CHECK:   [[RESULT:%.*]] = struct_extract [[NEQ_RESULT]], #Bool._value
 // CHECK:   return [[RESULT]]
 // CHECK: end sil function '$sSC33__swift_DynamicDomain_isAvailableBi1_yF'
 

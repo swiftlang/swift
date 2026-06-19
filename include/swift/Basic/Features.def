@@ -282,6 +282,8 @@ LANGUAGE_FEATURE(BuiltinTaskCancellationShield, 0, "Task Cancellation Shield Bui
 LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
 BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude private initialized properties from memberwise init")
 LANGUAGE_FEATURE(BuiltinMarkDependence, 0, "markDependence Builtin")
+LANGUAGE_FEATURE(BuiltinGepProjection, 0, "gepProjection Builtin")
+LANGUAGE_FEATURE(BuiltinDereferenceable, 0, "Builtin.dereferenceable")
 LANGUAGE_FEATURE(BuiltinAddTaskLocalValue, 0, "addTaskLocalValue and removeTaskLocalValue builtins")
 LANGUAGE_FEATURE(BuiltinContinuationNonCopyableSuccess, 0, "Builtin.{resume,withUnsafe}*Continuation* relaxed to allow Success: ~Copyable")
 SUPPRESSIBLE_LANGUAGE_FEATURE(TildeSendable, 518, "~Sendable for explicitly marking non-Sendable types")
@@ -514,6 +516,10 @@ EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 /// Do not import non-field C++ record members until requested from Swift.
 EXPERIMENTAL_FEATURE(ImportCxxMembersLazily, true)
 
+/// Import a C++ foreign reference type's primary FRT base as a Swift
+/// superclass.
+EXPERIMENTAL_FEATURE(ForeignReferenceTypeInheritance, true)
+
 /// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
 // TODO: When this is turned on by default, take care of:
 // * "TODO" around line 8100 of lib/Parse/ParseDecl.cpp
@@ -617,6 +623,9 @@ EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 /// non-resilient modules. Layout will be encoded in the .swiftmodule.
 EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 
+/// Allow use of macros to derive various conformances
+EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
+  
 /// Defer checking of global-actor-isolated initializers (and the
 /// global-actor-isolated stored properties they access) from Sema to the
 /// SIL-level flow-isolation pass, allowing more programs to be accepted.

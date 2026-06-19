@@ -28,6 +28,16 @@ func testSwiftName() {
 
   _ = global
   _ = ANTGlobalValue // expected-error{{'ANTGlobalValue' has been renamed to 'global'}}
+  _ = `test raw`
+  _ = ANTGlobalValue2 // expected-error{{'ANTGlobalValue2' has been renamed to '`test raw`'}}
+  _ = `Complex.Name`
+  _ = ANTGlobalValue3 // expected-error{{'ANTGlobalValue3' has been renamed to '`Complex.Name`'}}
+  _ = `class`
+  _ = ANTGlobalValue4 // expected-error{{'ANTGlobalValue4' has been renamed to '`class`'}}
+  `jump to`(x: 0.0)
+  jumpToPoint(0.0) // expected-error{{'jumpToPoint' has been renamed to '`jump to`(x:)'}}
+  _ = `3test raw`
+  _ = ANTGlobalValue5 // expected-error{{'ANTGlobalValue5' has been renamed to '`3test raw`'}}
 
   let ps = Point(x: 0.0, y: 0.0)
   let ps2 = PointStruct(x: 0.0, y: 0.0) // expected-error{{'PointStruct' has been renamed to 'Point'}}

@@ -49,7 +49,7 @@ private extension AllocStackInst {
       return false
     }
 
-    let builder = Builder(before: self, context)
+    let builder = Builder(replacing: self, context)
     let newAlloc = builder.createAllocStack(payloadType,
                                             hasDynamicLifetime: hasDynamicLifetime,
                                             isLexical: isLexical,
@@ -57,13 +57,19 @@ private extension AllocStackInst {
                                             usesMoveableValueDebugInfo: usesMoveableValueDebugInfo)
     let oldAllocType = type
     if let varInfo = debugVariable {
-      builder.createDebugValue(value: Undef.get(type: oldAllocType, context), debugVariable: varInfo)
+      // Move the debug variable to a debug_value, so that it gets salvaged by
+      // the logic below.
+      builder.createDebugValue(value: newAlloc, debugVariable: varInfo)
     }
     self.replace(with: newAlloc, context)
 
     context.erase(instructions: nonPayloadDestroys)
 
     newAlloc.rewriteStore(context)
+
+    // Find the unique enum case index before the loop erases these instructions.
+    // If multiple different case indices exist, we can't reconstruct the enum in debug info.
+    let caseIndex: Int? = newAlloc.getUniqueCaseIndex()
 
     for use in newAlloc.uses {
       switch use.instruction {
@@ -74,8 +80,12 @@ private extension AllocStackInst {
       case let uteda as UncheckedEnumDataAddrInstBase where uteda.enum == use.value:
         uteda.replace(with: newAlloc, context)
       case let dv as DebugValueInst:
-        // TODO: Add support for op_enum_fragment
-        dv.operand.set(to: Undef.get(type: oldAllocType, context), context)
+        if let caseIndex {
+          dv.salvageEnumPayload(caseIndex: caseIndex, enumType: oldAllocType.objectType, context)
+        } else {
+          // Kill the operand, and fix the type to be the enum type rather than the payload type.
+          dv.killOperand(withType: oldAllocType)
+        }
       case is DestroyAddrInst, is DeallocStackInst, is StoreInst:
         break
       default:
@@ -83,6 +93,29 @@ private extension AllocStackInst {
       }
     }
     return true
+  }
+
+  /// Returns the unique enum case index among all `init_enum_data_addr` and
+  /// `unchecked_take_enum_data_addr` users, or nil if there are multiple
+  /// different case indices.
+  private func getUniqueCaseIndex() -> Int? {
+    var caseIndex: Int? = nil
+    for use in uses {
+      let idx: Int
+      switch use.instruction {
+      case let ieda as InitEnumDataAddrInst:
+        idx = ieda.caseIndex
+      case let uteda as UncheckedEnumDataAddrInstBase where uteda.enum == use.value:
+        idx = uteda.caseIndex
+      default:
+        continue
+      }
+      if let existing = caseIndex, existing != idx {
+        return nil // Found different case indices.
+      }
+      caseIndex = idx
+    }
+    return caseIndex
   }
 
   /// Replace
@@ -519,5 +552,47 @@ private struct EnumCaseUseBlocks : AddressDefUseWalker {
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     blocks.insert(address.instruction.parentBlock)
     return .continueWalk
+  }
+}
+
+private extension DebugValueInst {
+  /// Salvages debug info when an enum `alloc_stack` is replaced with a payload
+  /// `alloc_stack`.
+  func salvageEnumPayload(caseIndex: Int, enumType: Type, _ context: SimplifyContext) {
+    let operandType = self.operand.value.type
+
+    // Address-only types can't be represented in DWARF expressions.
+    guard operandType.objectType.isLoadable(in: self.parentFunction),
+          enumType.isLoadable(in: self.parentFunction) else {
+      // Kill the operand, and fix the type to be the enum type rather than the payload type.
+      self.killOperand(withType: enumType)
+      return
+    }
+
+    // Strip deref: removes the enum load it becomes an object type.
+    self.stripDeref()
+
+    let debugBB = self.getOrCreateDebugReconstructionBlock()
+    guard debugBB.arguments.count > 0 else {
+      // The debug_value was killed if it relied on the address itself.
+      // No salvaging possible.
+      return
+    }
+
+    let oldArg = debugBB.arguments[0]
+
+    // Load from the new alloc_stack (undef placeholder) and wrap it in an enum.
+    let bbBuilder = Builder(atBeginOf: debugBB, location: self.location, context)
+    let loadVal = bbBuilder.createLoad(fromAddress: Undef.get(type: operandType, context),
+                                       ownership: .unqualified)
+    let enumVal = bbBuilder.createEnum(caseIndex: caseIndex, payload: loadVal, enumType: enumType)
+
+    oldArg.uses.replaceAll(with: enumVal, context)
+
+    // Replace the phi arg with correct type, and wire the load's operand.
+    debugBB.eraseArgument(at: 0, context)
+    let newArg = debugBB.insertPhiArgument(
+      atPosition: 0, type: operandType, ownership: .none, context)
+    loadVal.operand.set(to: newArg, context)
   }
 }

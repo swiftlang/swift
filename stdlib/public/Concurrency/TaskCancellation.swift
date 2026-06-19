@@ -99,7 +99,7 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
 ///   - handler: A closure to execute on cancellation.
 ///     If the task is canceled, this closure is called at most once;
 ///     otherwise, it isn't called.
-///   - isolation: The actor that the operation and cancellation handler are isolated to.
+///   - isolation: The actor that the operation is isolated to.
 ///
 /// This differs from the operation cooperatively checking for cancellation
 /// and reacting to it in that the cancellation handler is _always_ and
@@ -223,7 +223,7 @@ extension Task {
   @_transparent
   public var isCancelled: Bool {
     // This is @available(SwiftStdlib 6.4, *) but can't use SwiftStdlib in transparent function
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) {
+    if #available(anyAppleOS 27, *) {
       let ignoreTaskCancellationShield: UInt64 = 0x1
       return unsafe _taskIsCancelledWithFlags(_AsyncTask(_task), flags: ignoreTaskCancellationShield)
     } else {

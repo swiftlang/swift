@@ -5248,14 +5248,11 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
   SmallVector<CleanupHandle, 8> cleanups;
 
   for (unsigned index : range(E->getNumElements())) {
-    auto destAddr = addr;
-
-    if (index != 0) {
-      SILValue indexValue = SGF.B.createIntegerLiteral(
-          E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-      destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
-                                   /*needsStackProtection=*/ false);
-    }
+    SILValue indexValue = SGF.B.createIntegerLiteral(
+        E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+    SILValue destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
+                                 /*needsStackProtection=*/ false,
+                                 /*isProjection=*/ true);
 
     // Create a dormant cleanup for the value in case we exit before the
     // full vector has been constructed.
@@ -5329,13 +5326,10 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   SmallVector<CleanupHandle, 8> cleanups;
 
   for (unsigned index : range(E->getNumElements())) {
-    auto destAddr = varargsInfo.getBaseAddress();
-    if (index != 0) {
-      SILValue indexValue = SGF.B.createIntegerLiteral(
-          loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-      destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue,
-              /*needsStackProtection=*/ false);
-    }
+    SILValue indexValue = SGF.B.createIntegerLiteral(
+        loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+    SILValue destAddr = SGF.B.createIndexAddr(loc, varargsInfo.getBaseAddress(), indexValue,
+            /*needsStackProtection=*/ false, /*isProjection=*/ true);
     auto &destTL = varargsInfo.getBaseTypeLowering();
     // Create a dormant cleanup for the value in case we exit before the
     // full array has been constructed.

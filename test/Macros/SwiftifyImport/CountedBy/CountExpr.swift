@@ -18,9 +18,8 @@ public func myFunc(_ ptr: UnsafePointer<CInt>, _ size: CInt, _ count: CInt) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ size: CInt, _ count: CInt) {
-    let _ptrCount = ptr.count
-    if _ptrCount != size * count {
-      fatalError("bounds check failure in myFunc: expected \(size * count) but got \(_ptrCount)")
+    if ptr.count != size * count {
+      fatalError("bounds check failure in myFunc: expected \(size * count) but got \(ptr.count)")
     }
     return unsafe myFunc(ptr.baseAddress!, size, count)
 }

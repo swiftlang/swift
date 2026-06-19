@@ -1149,10 +1149,15 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
 
   auto *dc = decl->getDeclContext();
 
+  // If we have an invalid extension parent, don't bother checking requirements.
+  auto *nominalParent = dc->getSelfNominalTypeDecl();
+  if (!nominalParent)
+    return true;
+
   const auto genericSig = decl->getGenericSignature();
 
   if (genericSig.getPointer() ==
-      dc->getSelfNominalTypeDecl()->getGenericSignature().getPointer()) {
+      nominalParent->getGenericSignature().getPointer()) {
     return true;
   }
 
@@ -2274,6 +2279,8 @@ static SelfTypeKind getSelfTypeKind(DeclContext *dc,
 void TypeResolver::diagnoseGenericArgumentsOnSelf(
     UnqualifiedIdentTypeRepr *repr, DeclContext *typeDC) {
   auto *selfNominal = typeDC->getSelfNominalTypeDecl();
+  if (!selfNominal)
+    return;
   auto declaredType = selfNominal->getDeclaredType();
 
   diagnose(repr->getNameLoc(), diag::cannot_specialize_self);
@@ -2549,11 +2556,15 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
 
   // Short-circuiting.
   if (repr->isInvalid()) return ErrorType::get(ctx);
-  // Reject member type access only when the base is explicitly written as an
-  // opaque type, e.g. `(some P).T`.
+  // Reject member type access only when the base is both explicitly written as
+  // an opaque type and resolves to an opaque archetype, e.g. `(some P).T` in
+  // result/binding position. Accessing a member on an opaque parameter,
+  // e.g. `func foo(_: (some P).S)`, is sugar for a generic parameter and is
+  // well-formed.
   auto *baseRepr = repr->getBase()->getWithoutParens();
-  if (isa<OpaqueReturnTypeRepr>(baseRepr) ||
-      isa<NamedOpaqueReturnTypeRepr>(baseRepr)) {
+  if ((isa<OpaqueReturnTypeRepr>(baseRepr) ||
+       isa<NamedOpaqueReturnTypeRepr>(baseRepr)) &&
+      parentTy->is<OpaqueTypeArchetypeType>()) {
     if (!options.contains(TypeResolutionFlags::SilenceDiagnostics)) {
       diagnose(repr->getNameLoc(), diag::opaque_type_member_type,
                repr->getNameRef(), parentTy)
@@ -7013,10 +7024,10 @@ private:
   /// a type representation with the given parent requires paretheses.
   static bool anySyntaxNeedsParens(TypeRepr *parent) {
     switch (parent->getKind()) {
-    case TypeReprKind::Optional:
-    case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Protocol:
       return true;
+    case TypeReprKind::Optional:
+    case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Metatype:
     case TypeReprKind::Attributed:
     case TypeReprKind::Error:
@@ -7125,7 +7136,9 @@ private:
 
       // Look through parens, inverses, `.Type` metatypes, and compositions.
       if ((*it)->isParenType() || isa<InverseTypeRepr>(*it) ||
-          isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it)) {
+          isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it) ||
+          isa<OptionalTypeRepr>(*it) ||
+          isa<ImplicitlyUnwrappedOptionalTypeRepr>(*it)) {
         continue;
       }
 

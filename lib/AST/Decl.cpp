@@ -1222,6 +1222,11 @@ bool Decl::hasExplicitIsolationAttribute() const {
     }
   }
 
+  if (auto concurrentAttr = getAttrs().getAttribute<ConcurrentAttr>()) {
+    if (!concurrentAttr->isImplicit())
+      return true;
+  }
+
   if (auto globalActorAttr = getGlobalActorAttr()) {
     if (!globalActorAttr->first->isImplicit())
       return true;
@@ -2394,6 +2399,15 @@ Decl::getExplicitCodeGenerationModel() const {
 std::optional<CodeGenerationModel>
 Decl::getRequiredCodeGenerationModel() const {
   bool isEmbedded = getASTContext().LangOpts.hasFeature(Feature::Embedded);
+
+  // A @_transparent function or storage must be @export(implementation).
+  if (auto func = dyn_cast<AbstractFunctionDecl>(this)) {
+    if (func->isTransparent())
+      return CodeGenerationModel::Implementation;
+  } else if (auto storage = dyn_cast<AbstractStorageDecl>(this)) {
+    if (storage->isTransparent())
+      return CodeGenerationModel::Implementation;
+  }
 
   // A generic declaration must be @export(implementation) in Embedded Swift.
   auto dc = getInnermostDeclContext();
@@ -6785,7 +6799,10 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 
   if (member.isSimpleName() && !baseName.isSpecial()) {
     if (baseName.getIdentifier() == Context.Id_CodingKeys) {
-      action.emplace(ImplicitMemberAction::ResolveCodingKeys);
+      // Only request CodingKeys synthesis if no explicit CodingKeys exists.
+      // lookupDirect does not trigger synthesis, so this is safe from cycles.
+      if (lookupDirect(DeclName(Context.Id_CodingKeys)).empty())
+        action.emplace(ImplicitMemberAction::ResolveCodingKeys);
     }
   } else {
     auto argumentNames = member.getArgumentNames();
@@ -12574,7 +12591,7 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       case ActorIsolation::ActorInstance:
         auto isolatedVar = isolation.getActorInstance();
         return isolatedVar->isSelfParameter() ||
-            isolatedVar-isSelfParamCapture();
+               isolatedVar->isSelfParamCapture();
       }
     }
 
@@ -13540,6 +13557,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return origDC;
   }
 }

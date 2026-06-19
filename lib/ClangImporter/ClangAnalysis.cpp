@@ -1,13 +1,14 @@
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/RecordLayout.h"
 #include "clang/AST/Type.h"
-#include "llvm/ADT/SetVector.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -25,225 +26,160 @@ bool importer::hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl) {
          });
 }
 
-static ForeignReferenceTypeInfo
-checkForeignReferenceType(const clang::CXXRecordDecl *decl,
-                          ClangImporter::Implementation *Impl);
+namespace {
+class ForeignReferenceTypeChecker {
+  /// We are checking this to determine whether it is a foreign reference type.
+  const clang::CXXRecordDecl *checkedDecl;
 
-static std::pair<std::optional<StringRef>, std::optional<StringRef>>
-getRetainReleaseOperations(const clang::RecordDecl *decl) {
-  if (!decl->hasAttrs())
-    return {std::nullopt, std::nullopt};
+  /// Used for emitting diagnostics.
+  ClangImporter::Implementation *Impl = nullptr;
 
-  std::optional<StringRef> retain, release;
-  for (auto attr : decl->getAttrs()) {
-    auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
-    if (!swiftAttr)
-      continue;
-    auto attrStr = swiftAttr->getAttribute();
+  /// Whether we encountered a non-record base during the base traversal.
+  bool hasNonRecordBase = false;
 
-    if (attrStr.consume_front("retain:"))
-      retain = attrStr;
-    else if (attrStr.consume_front("release:"))
-      release = attrStr;
-  }
-  return {retain, release};
-}
+  /// Base classes that are marked as FRTs. Populated by \c visitBases().
+  llvm::SmallVector<const clang::CXXRecordDecl *, 1> FRTBases;
 
-/// If \p decl has exactly one direct FRT base and it is at offset 0 in the
-/// C++ layout, return it. Being at offset 0 means a pointer bitcast suffices
-/// for upcasting in IRGen. This is the case when the FRT base is the first
-/// base, or when all bases before it are empty (empty base optimization).
-static const clang::CXXRecordDecl *
-findPrimarySuperclassBase(const clang::CXXRecordDecl *decl,
-                          const clang::CXXRecordDecl *baseWithLifetimeOps) {
-  if (!decl->hasDefinition())
-    return nullptr;
-
-  const clang::CXXRecordDecl *singleFRTBase = nullptr;
-  ForeignReferenceTypeInfo singleFRTBaseInfo;
-
-  for (auto base : decl->bases()) {
-    if (auto baseRecordDecl = base.getType()->getAsCXXRecordDecl()) {
-      auto baseFRTInfo =
-          checkForeignReferenceType(baseRecordDecl, /*Impl=*/nullptr);
-      if (!baseFRTInfo.isReference() || base.isVirtual() ||
-          base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
-        continue;
-
-      if (singleFRTBase)
-        // Bail if we found multiple FRT bases.
-        return nullptr;
-
-      singleFRTBase = baseRecordDecl;
-      singleFRTBaseInfo = baseFRTInfo;
-    }
-  }
-
-  if (!singleFRTBase)
-    return nullptr;
-
-  auto &clangCtx = decl->getASTContext();
-  auto &layout = clangCtx.getASTRecordLayout(decl);
-  if (!layout.getBaseClassOffset(singleFRTBase).isZero())
-    return nullptr;
-
-  // If decl has attributes with lifetime operations, check that they match.
-  auto [overriddenRetain, overriddenRelease] =
-      getRetainReleaseOperations(baseWithLifetimeOps);
-  auto [baseRetain, baseRelease] =
-      getRetainReleaseOperations(singleFRTBaseInfo.getDecl());
-  if ((overriddenRelease && overriddenRelease != baseRelease) ||
-      (overriddenRetain && overriddenRetain != baseRetain))
-    return nullptr;
-
-  return singleFRTBase;
-}
-
-/// This routine determines whether \a decl is a foreign reference type, and
-/// whether its foreign reference type attributes are valid. This determinition
-/// considers attributes annotated on both \a decl itself as well as its
-/// transitive bases.
-///
-/// When \a Impl is non-null, this function will use it to emit diagnostics for
-/// invalid attributes; when \a Impl is null, those diagnostics are not emitted
-/// (but the returned ForeignReferenceTypeInfo will still indicate \a decl has
-/// invalid attributes). This function is designed this way to keep the site
-/// where diagnostics are emitted close to the logic that leads to them.
-static ForeignReferenceTypeInfo
-checkForeignReferenceType(const clang::CXXRecordDecl *decl,
-                          ClangImporter::Implementation *Impl) {
-  // This was explicitly annotated. Just trust the annotation.
-  if (importer::hasImportReferenceAttr(decl))
-    return ForeignReferenceTypeInfo::Shared(decl,
-                                            findPrimarySuperclassBase(decl, decl));
-
-  if (!decl->hasDefinition())
-    // If this doesn't have a definition, there's no inheritance info to check.
-    return ForeignReferenceTypeInfo::Value();
-
-  // Keep track of base classes that are marked as FRTs, with set semantics
-  // because we cannot have multiple copies of the same base FRT.
-  llvm::SmallSetVector<const clang::CXXRecordDecl *, 1> FRTBases;
-
-  // Keep track of virtual bases, which we only need to visit once.
+  /// Virtual bases, which we only need to visit once.
   llvm::SmallPtrSet<const clang::CXXRecordDecl *, 1> virtualBases;
 
-  // Bases we have yet to visit. Each base class instance should appear
-  // in this container exactly once.
-  llvm::SmallVector<const clang::CXXRecordDecl *, 4> unvisitedBases;
+  /// Recursively visits the bases of \p decl to accumulate FRT information.
+  ///
+  /// If exactly one base of \p decl leads to an annotated FRT base class, then
+  /// this function returns a pointer to that direct base. Returns \c nullptr
+  /// otherwise.
+  const clang::CXXRecordDecl *visitBases(const clang::CXXRecordDecl *decl) {
+    if (!decl->hasDefinition())
+      // Without a definition, there's no inheritance info to check.
+      return nullptr;
 
-  // N.B. our definition of "base" also includes the origin class itself,
-  //      i.e., decl
-  unvisitedBases.push_back(decl);
-
-  bool multipleFRTs = false;
-
-  while (!unvisitedBases.empty()) {
-    auto *rec = unvisitedBases.pop_back_val();
-
-    if (importer::hasImportReferenceAttr(rec)) {
-      if (!FRTBases.insert(rec)) {
-        // The same base FRT appears multiple times in the class hierarchy
-        // (i.e., due to diamond inheritance), which is not valid. Bail.
-        multipleFRTs = true;
-        break;
+    const clang::CXXRecordDecl *singleFRTSuperclass = nullptr;
+    bool multipleFRTSuperclasses = false;
+    for (auto declBase : decl->bases()) {
+      auto *base = declBase.getType()->getAsCXXRecordDecl();
+      if (!base) {
+        // It is possible to encounter `clang::TemplateSpecializationType`s.
+        // In such cases, report this as invalid and continue past it.
+        hasNonRecordBase = true;
+        continue;
       }
-    }
-
-    for (auto recBase : rec->bases()) {
-      auto *base = recBase.getType()->getAsCXXRecordDecl();
-      if (!base)
-        // It is possible to encounter clang::TemplateSpecializationType.
-        // In such cases, just bail and report this as an invalid value type
-        return ForeignReferenceTypeInfo::Value(/*isValid=*/false);
 
       ASSERT(base->hasDefinition() && "base record should be complete");
       base = base->getDefinition();
-
       ASSERT(!base->isDependentContext() && "base should not be dependent");
 
-      if (recBase.isVirtual()) {
-        if (virtualBases.insert(base).second)
-          // First time seeing this virtual base. Visit it later.
-          unvisitedBases.push_back(base);
+      if (!declBase.isVirtual() || virtualBases.insert(base).second) {
+        bool baseIsFRT;
+        if (importer::hasImportReferenceAttr(base)) {
+          FRTBases.push_back(base);
+          baseIsFRT = true;
+        } else {
+          baseIsFRT = static_cast<bool>(visitBases(base));
+        }
+
+        if (baseIsFRT && !declBase.isVirtual() &&
+            declBase.getAccessSpecifier() ==
+                clang::AccessSpecifier::AS_public) {
+          if (singleFRTSuperclass)
+            multipleFRTSuperclasses = true;
+          else
+            singleFRTSuperclass = base;
+        }
+      }
+    }
+
+    return multipleFRTSuperclasses ? nullptr : singleFRTSuperclass;
+  }
+
+  /// Whether \p base is non-null and has an offset of zero from \c checkedDecl.
+  bool isPresentAndAtOffsetZero(const clang::CXXRecordDecl *base) const {
+    ASSERT(checkedDecl);
+    if (base == nullptr)
+      return false;
+    auto &clangCtx = checkedDecl->getASTContext();
+    auto &layout = clangCtx.getASTRecordLayout(checkedDecl);
+    return layout.getBaseClassOffset(base).isZero();
+  }
+
+public:
+  ForeignReferenceTypeChecker(const clang::CXXRecordDecl *checkedDecl)
+      : checkedDecl{checkedDecl} {}
+
+  ForeignReferenceTypeChecker &&
+  withDiagnostics(ClangImporter::Implementation &ImplRef) && {
+    Impl = &ImplRef;
+    return std::move(*this);
+  }
+
+  ForeignReferenceTypeInfo check() && {
+    ASSERT(checkedDecl && "ForeignReferenceTypeInfo should only be used once");
+    SWIFT_DEFER { checkedDecl = nullptr; };
+
+    if (importer::hasImportReferenceAttr(checkedDecl)) {
+      // checkedDecl is explicitly annotated as a foreign reference type.
+      // Do not let it have a primarySuperclass, to prevent upcasting past the
+      // annotation boundary in the class hierarchy.
+      return ForeignReferenceTypeInfo::Shared(checkedDecl,
+                                              /*primarySuperclass=*/nullptr);
+    }
+
+    const clang::CXXRecordDecl *uniqueDirectFRTBase = visitBases(checkedDecl);
+    if (FRTBases.empty()) {
+      // Neither checkedDecl nor any of its base classes are annotated as
+      // a reference type, so checkedDecl is a value type.
+      ASSERT(uniqueDirectFRTBase == nullptr &&
+             "there should be no superclass if there are no FRT bases");
+      return ForeignReferenceTypeInfo::Value();
+    }
+
+    // The primary FRT superclass is the unique direct FRT base of checkedDecl,
+    // but only if it is at offset 0 (so a pointer bitcast suffices for upcast).
+    auto *primarySuperclass = isPresentAndAtOffsetZero(uniqueDirectFRTBase)
+                                  ? uniqueDirectFRTBase
+                                  : nullptr;
+
+    const clang::CXXRecordDecl *FRTBase = nullptr;
+    bool seenShared = false, seenMultipleShared = false, seenImmortal = false;
+
+    for (auto *base : FRTBases) {
+      if (importer::hasAnyImmortalAttr(base)) {
+        seenImmortal = true;
+      } else if (!FRTBase) {
+        FRTBase = base;
+        seenShared = true;
       } else {
-        // Visit this non-virtual base class later.
-        unvisitedBases.push_back(base);
-      }
-    }
-  }
-
-  if (FRTBases.empty())
-    // Did not encounter any FRTs in the class hierarchy
-    return ForeignReferenceTypeInfo::Value();
-
-  // This is the first FRT we encountered during our base traversal,
-  // so we shall use it as our "canonical" FRT base.
-  auto *baseFRT = FRTBases.front();
-
-  if (multipleFRTs) {
-    // The same FRT base appears multiple times in the class hierarchy
-    if (Impl)
-      Impl->diagnose(HeaderLoc{decl->getLocation()},
-                     diag::cant_infer_frt_in_cxx_inheritance, decl);
-
-    // decl inherits from FRT base, so we should treat it as a reference
-    // type, albeit an invalid one (due to ambiguity).
-    //
-    // return ForeignReferenceTypeInfo::Shared(baseFRT, /*isValid=*/false);
-    //
-    // However, in honor the existing behavior, (for now) we will report that
-    // this is an (invalid) value type.
-    return ForeignReferenceTypeInfo::Value(/*isValid=*/false);
-  }
-
-  constexpr StringRef retainPrefix = "retain:", releasePrefix = "release:";
-  std::optional<StringRef> retain = std::nullopt, release = std::nullopt;
-  bool multipleOps = false;
-
-  for (auto *base : FRTBases) {
-    for (auto *attr : base->getAttrs()) {
-      auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr);
-      if (!swiftAttr)
-        continue;
-      auto attrStr = swiftAttr->getAttribute();
-      if (attrStr.consume_front(retainPrefix)) {
-        if (retain.has_value() && retain.value() != attrStr) {
-          multipleOps = true;
-          break;
-        }
-        retain = attrStr;
-      } else if (attrStr.consume_front(releasePrefix)) {
-        if (release.has_value() && release.value() != attrStr) {
-          multipleOps = true;
-          break;
-        }
-        release = attrStr;
+        seenMultipleShared = true;
       }
     }
 
-    if (multipleOps)
-      break;
+    // If there are no shared references, FRTBase is the first immortal base.
+    if (!FRTBase) {
+      ASSERT(seenImmortal && "should have encountered immortal FRTBase");
+      FRTBase = FRTBases.front();
+    }
+
+    if (seenMultipleShared || (seenShared && seenImmortal)) {
+      // checkedDecl is an invalid FRT, either because it has multiple shared
+      // FRT bases (ambiguous retain/release ops), or because it has mixed
+      // ancestry between shared and immortal bases.
+      if (Impl)
+        Impl->diagnose(HeaderLoc{checkedDecl->getLocation()},
+                       diag::cant_infer_frt_in_cxx_inheritance, checkedDecl);
+
+      // decl inherits from FRT base, so we should treat it as a reference
+      // type, albeit an invalid one (due to ambiguity).
+      //
+      // return ForeignReferenceTypeInfo::Shared(FRTBase, nullptr,
+      //                                         /*isValid=*/false);
+      //
+      // However, to honor the existing behavior, (for now) we will report
+      // that this is an (invalid) value type.
+      return ForeignReferenceTypeInfo::Value(/*isValid=*/false);
+    }
+    return ForeignReferenceTypeInfo::Shared(FRTBase, primarySuperclass);
   }
-
-  if (multipleOps) {
-    if (Impl)
-      Impl->diagnose(HeaderLoc{decl->getLocation()},
-                     diag::cant_infer_frt_in_cxx_inheritance, decl);
-
-    // decl inherits from FRT base, so we should treat it as a reference
-    // type, albeit an invalid one (due to ambiguity).
-    //
-    // return ForeignReferenceTypeInfo::Shared(baseFRT, /*isValid=*/false);
-    //
-    // However, in honor the existing behavior, (for now) we will report that
-    // this is an (invalid) value type.
-    return ForeignReferenceTypeInfo::Value(/*isValid=*/false);
-  }
-
-  return ForeignReferenceTypeInfo::Shared(
-      baseFRT, findPrimarySuperclassBase(decl, baseFRT));
-}
+};
+} // namespace
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const ForeignReferenceTypeInfoDescriptor &desc) {
@@ -267,13 +203,14 @@ ForeignReferenceTypeInfo ForeignReferenceTypeInfoRequest::evaluate(
   auto *decl = desc.decl;
 
   if (auto *cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl))
-    return checkForeignReferenceType(cxxDecl, nullptr);
+    return ForeignReferenceTypeChecker(cxxDecl).check();
 
   // If this isn't a C++ record, then there's no inheritance (nor any of the
   // associated complications) to worry about. Just look for ref attributes.
 
   if (importer::hasImportReferenceAttr(decl))
-    return ForeignReferenceTypeInfo::Shared(decl);
+    return ForeignReferenceTypeInfo::Shared(decl,
+                                            /*primarySuperclass=*/nullptr);
 
   return ForeignReferenceTypeInfo::Value();
 }
@@ -292,9 +229,10 @@ bool importer::diagnoseForeignReferenceType(
   // If the result was invalid, we need to run the underlying check again, but
   // this time with ClangImporter::Implemention in order to emit diagnostics.
   // This slow path does redundant work but only for invalid decls.
-  auto infoAgain = checkForeignReferenceType(decl, &Impl);
+  auto infoAgain =
+      ForeignReferenceTypeChecker(decl).withDiagnostics(Impl).check();
   // FIXME: this appears to be non-deterministic in some configurations
-  // ASSERT(!infoAgain.isValid() && "FRT check validity should be deterministic");
+  // ASSERT(!infoAgain.isValid() && "FRT check should be deterministic");
   (void)infoAgain;
   return false;
 }
@@ -362,25 +300,8 @@ static void diagnoseMissingReturnsRetained(ClangImporter::Implementation &Impl,
     return; // recordDecl is not a shared reference type
 
   if (importer::matchSwiftAttr<bool>(
-          recordDecl, {{"returned_as_unretained_by_default", true}}))
+          info.getDecl(), {{"returned_as_unretained_by_default", true}}))
     return;
-
-  // FIXME: this is only here to preserve legacy behavior; we really shouldn't
-  //        consider returned_as_unretained_by_default annotations on anything
-  //        other than the "canonical" FRT base (the one whose retain/release
-  //        methods we use)
-  if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
-      cxxRecordDecl && cxxRecordDecl->hasDefinition()) {
-    auto inheritsDefaultAttr = false;
-    cxxRecordDecl->forallBases([&inheritsDefaultAttr](auto *base) {
-      inheritsDefaultAttr =
-          inheritsDefaultAttr || importer::matchSwiftAttr<bool>(
-                         base, {{"returned_as_unretained_by_default", true}});
-      return true;
-    });
-    if (inheritsDefaultAttr)
-      return;
-  }
 
   // If we reached here, then we have a call to an unannotated, Clang-imported
   // function that returns a pointer to a shared reference type that doesn't

@@ -248,11 +248,11 @@ private:
 class IsolationHistory {
 public:
   class Factory;
+  class Node;
 
 private:
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
-  class Node;
 
   // TODO: This shouldn't need to be a friend.
   friend class Partition;
@@ -1302,10 +1302,17 @@ public:
     Element sentElement;
     SILDynamicMergedIsolationInfo isolationRegionInfo;
 
+    /// The isolation history of the partition at the point the send was
+    /// detected. Used to emit notes explaining why a disconnected element ended
+    /// up in an isolated region.
+    IsolationHistory isolationHistory;
+
     SentNeverSendableError(const PartitionOp &op, Element sentElement,
-                           SILDynamicMergedIsolationInfo isolationRegionInfo)
+                           SILDynamicMergedIsolationInfo isolationRegionInfo,
+                           IsolationHistory isolationHistory)
         : op(&op), sentElement(sentElement),
-          isolationRegionInfo(isolationRegionInfo) {}
+          isolationRegionInfo(isolationRegionInfo),
+          isolationHistory(isolationHistory) {}
 
     SentNeverSendableError(SentNeverSendableError &&other) = default;
     SentNeverSendableError &operator=(SentNeverSendableError &&other) = default;
@@ -2427,8 +2434,8 @@ private:
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleError(
-        SentNeverSendableError(op, elt, dynamicMergedIsolationInfo));
+    return handleError(SentNeverSendableError(
+        op, elt, dynamicMergedIsolationInfo, p.getIsolationHistory()));
   }
 };
 

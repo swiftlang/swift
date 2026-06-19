@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -disable-availability-checking -I %S/Inputs
+// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeInheritance -disable-availability-checking -I %S/Inputs
+
+// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
 import Upcast
 
@@ -24,7 +26,10 @@ func implicitConversionLeaf(_ l: LeafDerived) -> Int32 {
   return takesBase(l)
 }
 
-// MARK: - Overridden lifetime operations:
+// MARK: - Explicit SWIFT_SHARED_REFERENCE annotations block upcasting:
+
+// An explicit shared reference annotation on a derived FRT acts as an upcast
+// barrier, regardless of whether its retain/release ops match the base's.
 
 func upcastOverridesToDerived(_ c: OverridesLifetimeOps) -> RefCountedDerived {
   return c as RefCountedDerived // expected-error {{cannot convert value of type 'OverridesLifetimeOps' to type 'RefCountedDerived' in coercion}}
@@ -35,11 +40,20 @@ func upcastOverridesToBase(_ c: OverridesLifetimeOps) -> RefCountedBase {
 }
 
 func upcastDerivedToOverrides(_ d: OverridesLifetimeOpsDerived) -> OverridesLifetimeOps {
-  return d as OverridesLifetimeOps
+  return d as OverridesLifetimeOps // expected-error {{cannot convert value of type 'OverridesLifetimeOpsDerived' to type 'OverridesLifetimeOps' in coercion}}
 }
 
 func upcastDerivedToRefCountedDerived(_ d: OverridesLifetimeOpsDerived) -> RefCountedDerived {
   return d as RefCountedDerived // expected-error {{cannot convert value of type 'OverridesLifetimeOpsDerived' to type 'RefCountedDerived' in coercion}}
+}
+
+func upcastReannotatedToBase(_ d: ReannotatedRefCountedDerived) -> RefCountedBase {
+  return d as RefCountedBase // expected-error {{cannot convert value of type 'ReannotatedRefCountedDerived' to type 'RefCountedBase' in coercion}}
+}
+
+func implicitConversionReannotated(_ d: ReannotatedRefCountedDerived) -> Int32 {
+  func takesRefBase(_ b: RefCountedBase) -> Int32 { b.getBaseValue() }
+  return takesRefBase(d) // expected-error {{cannot convert value of type 'ReannotatedRefCountedDerived' to expected argument type 'RefCountedBase'}}
 }
 
 func unrelatedCast(_ u: Unrelated) -> Base {

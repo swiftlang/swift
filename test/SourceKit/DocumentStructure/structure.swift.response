@@ -546,8 +546,8 @@
       key.accessibility: source.lang.swift.accessibility.internal,
       key.setter_accessibility: source.lang.swift.accessibility.internal,
       key.offset: 1079,
-      key.length: 3,
-      key.nameoffset: 1079,
+      key.length: 5,
+      key.nameoffset: 1083,
       key.namelength: 0
     },
     {

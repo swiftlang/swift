@@ -329,6 +329,9 @@ namespace swift {
     /// configuration options.
     bool EnableObjCInterop = true;
 
+    /// Enable COM interop code generation and build configuration options.
+    bool EnableCOMInterop = false;
+
     /// Enable C++ interop code generation and build configuration
     /// options. Disabled by default because there is no way to control the
     /// language mode of clang on a per-header or even per-module basis. Also
@@ -426,6 +429,9 @@ namespace swift {
 
     /// Disable the implicit import of the _StringProcessing module.
     bool DisableImplicitStringProcessingModuleImport = false;
+
+    /// Disable the implicit import of the COM module.
+    bool DisableImplicitCOMModuleImport = false;
 
     /// Disable the implicit import of the Cxx module.
     bool DisableImplicitCxxModuleImport = false;

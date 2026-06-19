@@ -1502,6 +1502,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  case BuiltinValueKind::Dereferenceable: {
+    auto pointer = args.claimNext();
+    auto sizeValue = args.claimNext();
+    IGF.Builder.CreateDereferenceableAssumption(pointer, sizeValue);
+    out.add(pointer);
+    return;
+  }
+
   case BuiltinValueKind::AllocVector: {
     // Obsolete: only there to be able to read old Swift.interface files which still
     // contain the builtin.

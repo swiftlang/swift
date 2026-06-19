@@ -233,10 +233,6 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   if (!type->isTypeVariableOrMember()) {
     // If this type variable represents a literal, check whether we picked the
     // default literal type. First, find the corresponding protocol.
-    //
-    // If we have the constraint graph, we can check all type variables in
-    // the equivalence class. This is the More Correct path.
-    // FIXME: Eliminate the less-correct path.
     auto typeVarRep = getRepresentative(typeVar);
     for (auto *tv : CG[typeVarRep].getEquivalenceClass()) {
       auto locator = tv->getImpl().getLocator();

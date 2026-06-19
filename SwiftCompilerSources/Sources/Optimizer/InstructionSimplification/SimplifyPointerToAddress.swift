@@ -83,7 +83,8 @@ private func simplifyIndexRawPointer(of ptr2Addr: PointerToAddressInst, _ contex
   let newPtr2Addr = builder.createPointerToAddress(pointer: indexRawPtr.base, addressType: ptr2Addr.type,
                                                    isStrict: ptr2Addr.isStrict, isInvariant: ptr2Addr.isInvariant)
   let newIndex = builder.createCastIfNeeded(of: index, toIndexTypeOf: indexRawPtr)
-  let indexAddr = builder.createIndexAddr(base: newPtr2Addr, index: newIndex, needStackProtection: false)
+  let indexAddr = builder.createIndexAddr(base: newPtr2Addr, index: newIndex,
+                                          needStackProtection: false, isProjection: false)
   ptr2Addr.replace(with: indexAddr, context)
   return true
 }
@@ -268,6 +269,10 @@ private struct AddressUses : AddressDefUseWalker {
   }
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    if let ia = address.instruction as? IndexAddrInst {
+      // The AddressDefUseWalker treats `index_addr` without the `[projection]` flag as leaf use.
+      return walkDownUses(ofAddress: ia, path: path)
+    }
     users.pushIfNotVisited(address.instruction)
     return .continueWalk
   }

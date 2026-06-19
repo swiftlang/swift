@@ -133,6 +133,13 @@ private:
   /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
   uint64_t lastInitializedBitfieldID = 0;
 
+  uint64_t getLastInitializedBitfieldID() const {
+    return lastInitializedBitfieldID;
+  }
+  void setLastInitializedBitfieldID(uint64_t bitfieldID) {
+    lastInitializedBitfieldID = bitfieldID;
+  }
+
   // Used by `BasicBlockBitfield`.
   unsigned getCustomBits() const { return customBits; }
   // Used by `BasicBlockBitfield`.
@@ -192,6 +199,11 @@ public:
   using reverse_iterator = InstListType::reverse_iterator;
   using const_reverse_iterator = InstListType::const_reverse_iterator;
 
+  /// The stride used when (re-)computing instruction indices.
+  /// Indices are assigned as multiples of this value, leaving room to assign
+  /// numbers in-between when instructions are inserted later.
+  enum { instructionIndexStride = 8 };
+
   void insert(iterator InsertPt, SILInstruction *I);
   void insert(SILInstruction *InsertPt, SILInstruction *I) {
     insert(InsertPt->getIterator(), I);
@@ -203,6 +215,10 @@ public:
   void erase(SILInstruction *I, SILModule &module);
   static void moveInstruction(SILInstruction *inst, SILInstruction *beforeInst);
   void moveInstructionToFront(SILInstruction *inst);
+
+  /// Recomputes instruction indices for all instructions in this block,
+  /// assigning each a unique index spaced by `instructionIndexStride`.
+  void recomputeInstructionIndices();
 
   void eraseAllInstructions(SILModule &module);
 
@@ -218,10 +234,14 @@ public:
 
   /// Transfer the instructions from Other to the end of this block.
   void spliceAtEnd(SILBasicBlock *Other) {
+    for (SILInstruction &I : *Other)
+      I.clearIndexInList();
     InstList.splice(end(), Other->InstList);
   }
 
   void spliceAtBegin(SILBasicBlock *Other) {
+    for (SILInstruction &I : *Other)
+      I.clearIndexInList();
     InstList.splice(begin(), Other->InstList);
   }
 

@@ -34,5 +34,5 @@ if CommandLine.arguments.dropFirst().first == "interop" {
 #include <ptrcheck.h>
 
 static inline void invokeMacroInClangModule(
-    const int* __counted_by(count) __attribute__((__noescape__)) arr,
+    const int* _Nonnull __counted_by(count) __attribute__((__noescape__)) arr,
     int count) {}

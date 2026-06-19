@@ -435,7 +435,7 @@ func test_force_unwrap_not_being_too_eager() {
 // rdar://problem/57097401
 func invalidOptionalChaining(a: Any) {
   a == "="? // expected-error {{cannot use optional chaining on non-optional value of type 'String'}}
-  // expected-error@-1 {{cannot convert value of type 'Any' to expected argument type 'String'}}
+  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
 }
 
 /// https://github.com/apple/swift/issues/54739

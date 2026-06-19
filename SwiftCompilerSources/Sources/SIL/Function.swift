@@ -125,6 +125,16 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     blocks.lazy.flatMap { $0.instructions }
   }
 
+  /// Warning: This is O(n).
+  public func getInstructionCount() -> Int {
+    // TODO: once CI upgrades the host compiler to swift >= 6.0, we can use `Sequence.count`
+    var numInsts = 0
+    for _ in instructions {
+      numInsts += 1
+    }
+    return numInsts
+  }
+
   public var reversedInstructions: LazySequence<FlattenSequence<LazyMapSequence<ReverseBasicBlockList, ReverseInstructionList>>>  {
     blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
   }

@@ -4570,8 +4570,12 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   }
 
   // Check that the decl we're decorating is a member of a type that actually
-  // conforms to the specified protocol.
+  // conforms to the specified protocol. If we have an invalid extension, we
+  // can bail.
   NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
+  if (!NTD)
+    return;
+
   if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
     if (!(OtherPD == PD || OtherPD->inheritsFrom(PD)) &&
         !(OtherPD->isSpecificProtocol(KnownProtocolKind::DistributedActor) ||
@@ -8379,6 +8383,33 @@ void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
   }
 
   (void)nominal->isGlobalActor();
+
+  // GlobalActor requires 'shared' to always return the same actor instance.
+  // Only a stored 'let' guarantees this; any other shape
+  // can silently violate the contract.
+  if (auto *var = nominal->getGlobalActorInstance(); var && !var->isLet()) {
+    var->diagnose(diag::global_actor_shared_non_let_witness, var);
+
+    {
+      auto useLet =
+          var->diagnose(diag::global_actor_shared_non_let_witness_use_let);
+      SourceLoc fixItLoc = getFixItLocForVarToLet(var);
+      if (fixItLoc.isValid())
+        useLet.fixItReplace(fixItLoc, "let");
+    }
+
+    {
+      auto silence =
+          var->diagnose(diag::global_actor_shared_non_let_witness_silence);
+      if (auto *pbd = var->getParentPatternBinding()) {
+        SourceLoc insertLoc = pbd->getStartLoc();
+        if (insertLoc.isValid())
+          silence.fixItInsert(
+              insertLoc,
+              "@diagnose(UnstableGlobalActorShared, as: ignored) ");
+      }
+    }
+  }
 }
 
 void AttributeChecker::visitAsyncAttr(AsyncAttr *attr) {
@@ -9102,7 +9133,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
 
   // Handle types separately
   if (isa<NominalTypeDecl>(attached)) {
-    if (!parsedName.ContextName.empty())
+    if (parsedName.isMember())
       return nullptr;
 
     SmallVector<ValueDecl *, 1> lookupResults;

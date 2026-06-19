@@ -31,11 +31,13 @@
 
 namespace swift {
 class BraceStmt;
+class CaseStmt;
 class Decl;
 class IfStmt;
 class GuardStmt;
 class SourceFile;
 class Stmt;
+class SwitchStmt;
 class Expr;
 class StmtConditionElement;
 
@@ -89,7 +91,15 @@ public:
     GuardStmtElseBranch,
 
     // The context was introduced for the body of a while statement.
-    WhileStmtBody
+    WhileStmtBody,
+
+    /// A placeholder context introduced for the entirety of a switch
+    /// statement. The contents are expanded lazily because the case label
+    /// items must be type-checked before per-case refinement can be computed.
+    SwitchStmt,
+
+    /// The context was introduced for the body of a switch statement case.
+    SwitchStmtCaseBody
   };
 
 private:
@@ -106,6 +116,8 @@ private:
       PoundAvailableInfo *PAI;
       GuardStmt *GS;
       WhileStmt *WS;
+      SwitchStmt *SS;
+      CaseStmt *CS;
     };
 
   public:
@@ -124,6 +136,10 @@ private:
           DC(DC), GS(GS) {}
     IntroNode(WhileStmt *WS, const DeclContext *DC)
         : IntroReason(Reason::WhileStmtBody), DC(DC), WS(WS) {}
+    IntroNode(SwitchStmt *SS, const DeclContext *DC)
+        : IntroReason(Reason::SwitchStmt), DC(DC), SS(SS) {}
+    IntroNode(CaseStmt *CS, const DeclContext *DC)
+        : IntroReason(Reason::SwitchStmtCaseBody), DC(DC), CS(CS) {}
 
     Reason getReason() const { return IntroReason; }
 
@@ -160,6 +176,16 @@ private:
     WhileStmt *getAsWhileStmt() const {
       assert(IntroReason == Reason::WhileStmtBody);
       return WS;
+    }
+
+    SwitchStmt *getAsSwitchStmt() const {
+      assert(IntroReason == Reason::SwitchStmt);
+      return SS;
+    }
+
+    CaseStmt *getAsCaseStmt() const {
+      assert(IntroReason == Reason::SwitchStmtCaseBody);
+      return CS;
     }
   };
 
@@ -241,6 +267,20 @@ public:
   createForWhileStmtBody(ASTContext &Ctx, WhileStmt *WS, const DeclContext *DC,
                          AvailabilityScope *Parent,
                          const AvailabilityContext Info);
+
+  /// Create a placeholder availability scope for a switch statement that
+  /// will be lazily expanded into per-case scopes once the case label items
+  /// have been type-checked.
+  static AvailabilityScope *createForSwitchStmt(ASTContext &Ctx, SwitchStmt *SS,
+                                                const DeclContext *DC,
+                                                AvailabilityScope *Parent,
+                                                const AvailabilityContext Info);
+
+  /// Create an availability scope for the body of a switch statement case.
+  static AvailabilityScope *
+  createForSwitchStmtCaseBody(ASTContext &Ctx, CaseStmt *CS,
+                              const DeclContext *DC, AvailabilityScope *Parent,
+                              const AvailabilityContext Info);
 
   Decl *getDeclOrNull() const {
     auto IntroReason = getReason();

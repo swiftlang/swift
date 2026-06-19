@@ -6,6 +6,8 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module/OtherModule.swift
 // RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 5 %s > /dev/null -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
 
+// REQUIRES: objc_codegen
+
 import OtherModule
 
 extension Point {

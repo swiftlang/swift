@@ -22,15 +22,6 @@ import os
 
 from . import scheme_mock
 
-def _add_branch_to_remotes(remote_path, repo_names, branch_name):
-    """Create *branch_name* on every bare remote repo."""
-    for repo_name in repo_names:
-        remote_repo = os.path.join(remote_path, repo_name)
-        scheme_mock.call_quietly(
-            ["git", "branch", branch_name, "main"],
-            cwd=remote_repo,
-        )
-
 
 def _add_commit_to_repos(local_path, repo_names, filename, content):
     """Commit a new file to each local clone and push it to origin."""
@@ -49,11 +40,19 @@ def _add_commit_to_repos(local_path, repo_names, filename, content):
 class ShallowCloneTestCase(scheme_mock.SchemeMockTestCase):
     """--skip-history should produce depth-1, single-branch clones."""
 
+    def _add_branch_to_remotes(self, branch_name):
+        """Create *branch_name* on every bare remote repo."""
+        for repo_name in self.repo_names:
+            scheme_mock.call_quietly(
+                ["git", "branch", branch_name, "main"],
+                cwd=self.remote_path(repo_name=repo_name),
+            )
+
     def setUp(self):
         super().setUp()
         # Add a second branch to every bare remote so single-branch tests are
         # meaningful.
-        _add_branch_to_remotes(self.remote_path, self.get_all_repos(), "other-branch")
+        self._add_branch_to_remotes("other-branch")
 
     def test_skip_history_produces_shallow_clone(self):
         """Repos cloned with --skip-history must be depth-1 shallow clones."""
@@ -71,7 +70,7 @@ class ShallowCloneTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             is_shallow = self.call(
                 ["git", "rev-parse", "--is-shallow-repository"], cwd=repo_path
@@ -98,7 +97,7 @@ class ShallowCloneTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             remote_branches = self.call(["git", "branch", "-r"], cwd=repo_path).strip()
             self.assertIn("origin/main", remote_branches)
@@ -123,7 +122,7 @@ class ShallowCloneTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             remote_branches = self.call(["git", "branch", "-r"], cwd=repo_path).strip()
             self.assertIn("origin/main", remote_branches)
@@ -148,7 +147,7 @@ class ShallowCloneTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             is_shallow = self.call(
                 ["git", "rev-parse", "--is-shallow-repository"], cwd=repo_path
@@ -169,7 +168,7 @@ class PartialCloneTestCase(scheme_mock.SchemeMockTestCase):
                 ["git", "config", "remote.origin.partialclonefilter"],
                 cwd=repo_path,
             ).strip()
-        except scheme_mock.CallQuietlyException:
+        except scheme_mock.PrintableSubprocessError:
             return None
 
     def test_partial_clone_sets_filter(self):
@@ -188,7 +187,7 @@ class PartialCloneTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             filter_value = self._get_partial_clone_filter(repo_path)
             self.assertEqual(
@@ -212,7 +211,7 @@ class PartialCloneTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             filter_value = self._get_partial_clone_filter(repo_path)
             self.assertIsNone(
@@ -237,7 +236,7 @@ class PartialCloneTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
 
             is_shallow = self.call(
@@ -265,7 +264,7 @@ class ShallowUpdateTestCase(scheme_mock.SchemeMockTestCase):
     def _push_new_commits(self):
         _add_commit_to_repos(
             self.local_path,
-            self.get_all_repos(),
+            self.repo_names,
             self._NEW_FILE,
             "added by CI update test",
         )
@@ -288,7 +287,7 @@ class ShallowUpdateTestCase(scheme_mock.SchemeMockTestCase):
         self._push_new_commits()
         self.call(base_cmd)
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             is_shallow = self.call(
                 ["git", "rev-parse", "--is-shallow-repository"], cwd=repo_path
@@ -317,7 +316,7 @@ class ShallowUpdateTestCase(scheme_mock.SchemeMockTestCase):
         self._push_new_commits()
         self.call(base_cmd)
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             local_head = self.call(["git", "rev-parse", "HEAD"], cwd=repo_path).strip()
             remote_tip = self.call(

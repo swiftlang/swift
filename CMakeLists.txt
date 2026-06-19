@@ -466,9 +466,8 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows" AND BOOTSTRAPPING_MODE STREQUAL "HO
 endif()
 
 if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
     # In debug builds, to workaround a problem with LLDB's `po` command (rdar://115770255).
-    # If the host Swift version is less than 5.8, use pure mode to workaround a C++ interop compiler crash.
     set(BRIDGING_MODE "PURE")
   else()
     set(BRIDGING_MODE "INLINE")
@@ -767,10 +766,6 @@ option(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP
   "Enable experimental C++ interop modules"
   TRUE)
 
-option(SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER
-  "Install the <swift/bridging> C++ interoperability header alongside compiler"
-  TRUE)
-
 option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
   "Enable experimental distributed actors and functions"
   FALSE)
@@ -983,6 +978,24 @@ if(SWIFT_BUILT_STANDALONE)
   swift_common_standalone_build_config(SWIFT)
 else()
   swift_common_unified_build_config(SWIFT)
+endif()
+
+# Mirror HandleLLVMOptions.cmake's LLVM_ENABLE_INDEX_STORE behavior for the
+# Swift compile language. HandleLLVMOptions only appends -index-store-path to
+# CMAKE_C_FLAGS / CMAKE_CXX_FLAGS, so swiftc invocations would otherwise miss
+# the flag. Forwarding it here lets sourcekit-lsp's IndexStoreDB resolve
+# Swift-side symbols (stdlib, swift-syntax, libswift compiler modules) and
+# answer cross-language queries between Swift and the C++ toolchain. Probe
+# CMAKE_Swift_COMPILER for the flag so we no-op against a swiftc that does
+# not understand it, matching the check_{c,cxx}_compiler_flag gating used on
+# the C/C++ side.
+if(LLVM_ENABLE_INDEX_STORE AND CMAKE_Swift_COMPILER AND NOT XCODE AND NOT MSVC_IDE)
+  swift_supports_compiler_arguments(SWIFT_SUPPORTS_INDEX_STORE
+    -index-store-path "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/IndexStore")
+  if(SWIFT_SUPPORTS_INDEX_STORE)
+    add_compile_options(
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-index-store-path ${INDEX_DATA_STORE_PATH}>")
+  endif()
 endif()
 
 include(SwiftComponents)

@@ -298,7 +298,7 @@ using KeyPathCapability = std::pair<KeyPathMutability, /*isSendable=*/bool>;
 namespace constraints {
 
 template <typename T = Expr> T *castToExpr(ASTNode node) {
-  return cast<T>(cast<Expr *>(node));
+  return cast<T>(cast_or_null<Expr *>(node));
 }
 
 template <typename T = Expr> T *getAsExpr(ASTNode node) {
@@ -2065,7 +2065,7 @@ public:
 
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
-  bool recordFix(ConstraintFix *fix, unsigned impact = 1,
+  bool recordFix(ConstraintFix *fix, FixImpact impact = FixImpact::Mismatch,
                  PreparedOverloadBuilder *preparedOverload = nullptr);
 
   void recordPotentialHole(TypeVariableType *typeVar);

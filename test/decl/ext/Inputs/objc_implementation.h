@@ -244,6 +244,8 @@ void CImplFuncRenamed_C(int param) __attribute__((swift_name("CImplFuncRenamed_S
 void CImplFuncMismatch1(int param);
 void CImplFuncMismatch2(int param);
 
+void CImplDuplicate(int param);
+
 #if __OBJC__
 void CImplFuncMismatch3(_Nullable id param);
 void CImplFuncMismatch4(_Nullable id param);

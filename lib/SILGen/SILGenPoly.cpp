@@ -3292,6 +3292,7 @@ class ResultPlanner : public ExpanderBase<ResultPlanner, IndirectSlot> {
   SmallVector<Operation, 8> Operations;
   ArrayRef<SILResultInfo> AllOuterResults;
   ArrayRef<SILResultInfo> AllInnerResults;
+  CanSILFunctionType UnsubstInnerFnType;
   SmallVectorImpl<SILValue> &InnerArgs;
   InnerPackResultGenerator InnerPacks;
 
@@ -3316,7 +3317,8 @@ public:
             .getNumIndirectSILResults());
 
     AllOuterResults = outerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults();
-    AllInnerResults = innerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults();
+    UnsubstInnerFnType = innerFnType->getUnsubstitutedType(SGF.SGM.M);
+    AllInnerResults = UnsubstInnerFnType->getResults();
 
     // Recursively walk the result types.
     expand(innerOrigType, innerSubstType, outerOrigType, outerSubstType);
@@ -4576,7 +4578,10 @@ ResultPlanner::expandInnerTupleOuterIndirect(AbstractionPattern innerOrigType,
   // treats the slot as a single fixed-layout value and would crash on the
   // dynamic-layout pack-expansion tuple.
   if (outerSubstTupleType && !outerOrigType.isTuple()
-      && AllInnerResults.size() == 1
+      && AllInnerResults.size() == 1 &&
+      AllInnerResults.front().getReturnValueType(
+          SGF.SGM.M, UnsubstInnerFnType, TypeExpansionContext::minimal()) ==
+          innerSubstType
       && !outerSubstTupleType.containsPackExpansionType()) {
     SILResultInfo innerResult = claimNextInnerResult();
     planSingleIntoIndirect(innerOrigType, innerSubstType,

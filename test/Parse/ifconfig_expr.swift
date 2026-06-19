@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -D CONDITION_1
+// RUN: %target-swift-frontend -emit-module -o %t/A.swiftmodule %S/../Inputs/empty.swift -user-module-version 1.0
+// RUN: %target-typecheck-verify-swift -I %t/ -D CONDITION_1
 
 postfix operator ++
 postfix func ++ (_: Int) -> Int { 0 }
@@ -151,19 +152,19 @@ func canImportVersioned() {
   let a = 1
 #endif
 
-#if canImport(A, _underlyingVersion: 4)
+#if canImport(B, _underlyingVersion: 4) // TODO(ParserValidation): expected-warning *{{cannot find module 'B' for canImport check; the directive will evaluate to false}}
   let a = 1
 #endif
 
-#if canImport(A, _underlyingVersion: 2.200)
+#if canImport(B, _underlyingVersion: 2.200) // TODO(ParserValidation): expected-warning *{{cannot find module 'B' for canImport check; the directive will evaluate to false}}
   let a = 1
 #endif
   
-#if canImport(A, _underlyingVersion: 2.200.1)
+#if canImport(B, _underlyingVersion: 2.200.1) // TODO(ParserValidation): expected-warning *{{cannot find module 'B' for canImport check; the directive will evaluate to false}}
   let a = 1
 #endif
   
-#if canImport(A, _underlyingVersion: 2.200.1.3)
+#if canImport(B, _underlyingVersion: 2.200.1.3) // TODO(ParserValidation): expected-warning *{{cannot find module 'B' for canImport check; the directive will evaluate to false}}
   let a = 1
 #endif
 

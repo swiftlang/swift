@@ -118,10 +118,6 @@ void PrintOptions::initForSynthesizedExtensionInScope(TypeOrExtensionDecl D,
                                       TypeTransformContext(D));
 }
 
-void PrintOptions::clearSynthesizedExtension() {
-  TransformContext.reset();
-}
-
 static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
   AccessScope scope =
       VD->getFormalAccessScope(/*useDC*/nullptr,
@@ -781,15 +777,16 @@ ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   return printer;
 }
 
+namespace swift {
+
 /// Determine whether to escape the given keyword in the given context.
-bool swift::escapeIdentifierInContext(Identifier name, PrintNameContext context,
+static bool escapeIdentifierInContext(StringRef name, PrintNameContext context,
                                       bool isSpecializedCxxTemplate) {
-  StringRef keyword = name.str();
-  bool isKeyword = llvm::StringSwitch<bool>(keyword)
+  bool isKeyword = llvm::StringSwitch<bool>(name)
 #define KEYWORD(KW) \
       .Case(#KW, true)
 #include "swift/AST/TokenKinds.def"
-      .Default(false);
+                       .Default(false);
 
   // NB: ClangImporter synthesizes C++ template specializations with Identifiers
   // that contain the full type signature; e.g., a type named literally
@@ -799,29 +796,61 @@ bool swift::escapeIdentifierInContext(Identifier name, PrintNameContext context,
   switch (context) {
   case PrintNameContext::Normal:
   case PrintNameContext::Attribute:
-    return isKeyword ||
-           (!isSpecializedCxxTemplate && name.mustAlwaysBeEscaped());
+    return isKeyword || (!isSpecializedCxxTemplate &&
+                         Lexer::identifierMustAlwaysBeEscaped(name));
   case PrintNameContext::Keyword:
   case PrintNameContext::IntroducerKeyword:
     return false;
 
   case PrintNameContext::ClassDynamicSelf:
   case PrintNameContext::GenericParameter:
-    return isKeyword && keyword != "Self";
+    return isKeyword && name != "Self";
 
   case PrintNameContext::TypeMember:
-    return isKeyword || !canBeMemberName(keyword) ||
-           (!isSpecializedCxxTemplate && name.mustAlwaysBeEscaped());
+    return isKeyword || !canBeMemberName(name) ||
+           (!isSpecializedCxxTemplate &&
+            Lexer::identifierMustAlwaysBeEscaped(name));
 
   case PrintNameContext::FunctionParameterExternal:
   case PrintNameContext::FunctionParameterLocal:
   case PrintNameContext::TupleElement:
-    return !canBeArgumentLabel(keyword) ||
-           (!isSpecializedCxxTemplate && name.mustAlwaysBeEscaped());
+    return !canBeArgumentLabel(name) ||
+           (!isSpecializedCxxTemplate &&
+            Lexer::identifierMustAlwaysBeEscaped(name));
   }
 
   llvm_unreachable("Unhandled PrintNameContext in switch.");
 }
+
+bool escapeIdentifierInContext(Identifier name, PrintNameContext context,
+                               bool isSpecializedCxxTemplate) {
+  return escapeIdentifierInContext(name.str(), context,
+                                   isSpecializedCxxTemplate);
+}
+
+void printIdentifierEscapingIfNeeded(StringRef identifier,
+                                     llvm::raw_ostream &os,
+                                     PrintNameContext context) {
+  bool mustEscape = escapeIdentifierInContext(
+      identifier, context, /*isSpecializedCxxTemplate=*/false);
+  if (mustEscape) {
+    os << '`';
+  }
+  os << identifier;
+  if (mustEscape) {
+    os << '`';
+  }
+}
+
+std::string identifierEscapingIfNeeded(StringRef identifier,
+                                       PrintNameContext context) {
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  printIdentifierEscapingIfNeeded(identifier, os, context);
+  return result;
+}
+
+} // namespace swift
 
 void ASTPrinter::printName(Identifier Name, PrintNameContext Context,
                            bool IsSpecializedCxxTemplate) {
@@ -1574,7 +1603,19 @@ void PrintAST::printAttributes(const Decl *D) {
         Printer.printAttrName("@_inheritsConvenienceInitializers");
         Printer << " ";
       }
-      if (CD->hasMissingDesignatedInitializers()) {
+      bool hasMissing = CD->hasMissingDesignatedInitializers();
+      // When emitting a public-only interface, SPI designated initializers
+      // are filtered out, so the class effectively has missing designated
+      // initializers from the perspective of public clients.
+      if (!hasMissing && Options.printPublicInterface()) {
+        auto ctors = const_cast<ClassDecl *>(CD)->lookupDirect(
+            DeclBaseName::createConstructor());
+        hasMissing = llvm::any_of(ctors, [](ValueDecl *member) {
+          auto init = cast<ConstructorDecl>(member);
+          return init->isDesignatedInit() && init->isSPI();
+        });
+      }
+      if (hasMissing) {
         Printer.printAttrName("@_hasMissingDesignatedInitializers");
         Printer << " ";
       }
@@ -2013,7 +2054,7 @@ void PrintAST::printGenericSignature(
     requirements.append(genericSig.getRequirements().begin(),
                         genericSig.getRequirements().end());
   } else if (flags & PrintInverseRequirements) {
-    genericSig->getRequirementsWithInverses(requirements, inverses);
+    genericSig->getRequirementsWithInversesForPrinting(requirements, inverses);
     llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
       return !inverseFilter(inverse);
     });
@@ -3013,105 +3054,6 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   indent();
 }
 
-// This provides logic for looking up all members of a namespace. This is
-// intentionally implemented only in the printer and should *only* be used for
-// debugging, testing, generating module dumps, etc. (In other words, if you're
-// trying to get all the members of a namespace in another part of the compiler,
-// you're probably doing something wrong. This is a very expensive operation,
-// so we want to do it only when absolutely necessary.)
-static void addNamespaceMembers(Decl *decl,
-                                llvm::SmallVector<Decl *, 16> &members) {
-  auto &ctx = decl->getASTContext();
-  auto namespaceDecl = cast<clang::NamespaceDecl>(decl->getClangDecl());
-
-  // This is only to keep track of the members we've already seen.
-  llvm::SmallPtrSet<Decl *, 16> addedMembers;
-  const auto *declOwner = namespaceDecl->getOwningModule();
-  if (declOwner)
-    declOwner = declOwner->getTopLevelModule();
-  auto Redecls = llvm::SmallVector<clang::NamespaceDecl *, 2>(namespaceDecl->redecls());
-  std::stable_sort(Redecls.begin(), Redecls.end(), [&](clang::NamespaceDecl *LHS, clang::NamespaceDecl *RHS) {
-    // A namespace redeclaration will not have an owning Clang module if it is
-    // declared in a bridging header.
-    if (!LHS->getOwningModule() || !RHS->getOwningModule())
-      return (bool)LHS->getOwningModule() < (bool)RHS->getOwningModule();
-    return LHS->getOwningModule()->Name < RHS->getOwningModule()->Name;
-  });
-  for (auto redecl : Redecls) {
-    // Skip namespace declarations that come from other top-level modules.
-    if (const auto *redeclOwner = redecl->getOwningModule()) {
-      if (declOwner && declOwner != redeclOwner->getTopLevelModule())
-        continue;
-    }
-    for (auto member : redecl->decls()) {
-      if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
-        // Add all specializations to a worklist so we don't accidentally mutate
-        // the list of decls we're iterating over.
-        llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *, 16> specWorklist;
-        for (auto spec : classTemplate->specializations())
-          specWorklist.insert(spec);
-        for (auto spec : specWorklist) {
-          if (auto import =
-                  ctx.getClangModuleLoader()->importDeclDirectly(spec))
-            if (addedMembers.insert(import).second)
-              members.push_back(import);
-        }
-      }
-
-      auto lookupAndAddMembers = [&](DeclName name) {
-        auto allResults = evaluateOrDefault(
-            ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
-
-        for (auto found : allResults) {
-          auto clangMember = cast<clang::NamedDecl *>(found);
-          if (auto importedDecl =
-                  ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
-            if (addedMembers.insert(importedDecl).second) {
-              members.push_back(importedDecl);
-
-              // Handle macro-expanded declarations.
-              importedDecl->visitAuxiliaryDecls([&](Decl *decl) {
-                auto valueDecl = dyn_cast<ValueDecl>(decl);
-                if (!valueDecl)
-                  return;
-
-                // Bail out if the auxiliary decl was not produced by a macro.
-                auto module = decl->getDeclContext()->getParentModule();
-                auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
-                if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
-                  return;
-
-                members.push_back(valueDecl);
-              });
-            }
-          }
-        }
-      };
-
-      auto namedDecl = dyn_cast<clang::NamedDecl>(member);
-      if (!namedDecl)
-        continue;
-      auto name = ctx.getClangModuleLoader()->importName(namedDecl);
-      if (!name)
-        continue;
-      lookupAndAddMembers(name);
-
-      // Unscoped enums could have their enumerators present
-      // in the parent namespace.
-      if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
-        if (!ed->isScoped()) {
-          for (const auto *ecd : ed->enumerators()) {
-            auto name = ctx.getClangModuleLoader()->importName(ecd);
-            if (!name)
-              continue;
-            lookupAndAddMembers(name);
-          }
-        }
-      }
-    }
-  }
-}
-
 /// Sort and print Clang record members in the following order:
 ///
 ///   struct PrintMe {
@@ -3250,7 +3192,11 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma, bool openBracket,
       }
     }
     if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
-      addNamespaceMembers(D, Members);
+      swift::importer::forEachCXXNamespaceMember(
+          cast<EnumDecl>(D),
+          [&](ValueDecl *member) { Members.push_back(member); },
+          /*includeSpecializations=*/true,
+          /*includeOtherModules=*/false);
     } else if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
       // For Clang records, sort their members, because we may import them
       // in an unstable order.
@@ -3508,7 +3454,7 @@ void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
     SmallVector<Requirement, 2> requirements;
     SmallVector<InverseRequirement, 2> inverses;
     auto Sig = ED->getGenericSignature();
-    Sig->getRequirementsWithInverses(requirements, inverses);
+    Sig->getRequirementsWithInversesForPrinting(requirements, inverses);
     printSingleDepthOfGenericSignature(
         Sig.getGenericParams(),
         requirements,
@@ -8034,9 +7980,11 @@ public:
         Printer.printName(Assoc->getProtocol()->getName());
         Printer << "]";
       }
-      Printer.printTypeRef(T, Assoc, T->getName());
+      Printer.printTypeRef(T, Assoc, T->getName(),
+                           PrintNameContext::TypeMember);
     } else {
-      Printer.printName(T->getName());
+      Printer.printName(T->getName(),
+                        PrintNameContext::TypeMember);
     }
   }
 

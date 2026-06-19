@@ -954,7 +954,9 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   NewGlobal->addChild(TyMangling, Dem);
   auto mangling = mangleNodeOld(NewGlobal);
   if (!mangling.isSuccess()) {
-    llvm_unreachable("unexpected mangling failure");
+    // The old mangler doesn't support every kind of type (e.g. opaque types).
+    // Fall back to the new mangling in those cases.
+    return NewName;
   }
   return mangling.result();
 #endif
@@ -3196,7 +3198,6 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
         return false;
     }
 
-    auto *nominal = dyn_cast<NominalTypeDecl>(decl);
     auto namedDecl = getClangDeclForMangling(decl);
     if (!namedDecl) {
       if (auto typedefType = getTypeDefForCXXCFOptionsDefinition(decl)) {
@@ -3233,7 +3234,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       // `ClassTemplateSpecializationDecl`'s name does not include information about
       // template arguments, and in order to prevent name clashes we use the
       // name of the Swift decl which does include template arguments.
-      appendIdentifier(nominal->getName().str(),
+      appendIdentifier(decl->getName().str(),
                        /*allowRawIdentifiers=*/false);
     } else {
       appendIdentifier(namedDecl->getName());
@@ -3252,14 +3253,15 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       // imported as a Swift enum.
       appendOperator("V");
     } else if (isa<clang::TypedefNameDecl>(namedDecl) ||
-               isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
+               isa<clang::ObjCCompatibleAliasDecl>(namedDecl) ||
+               isa<clang::NamespaceAliasDecl>(namedDecl)) {
       appendOperator("a");
     } else if (isa<clang::NamespaceDecl>(namedDecl)) {
       // Note: Namespaces are not really enums, but since namespaces are
       // imported as enums, be consistent.
       appendOperator("O");
     } else if (isa<clang::ClassTemplateDecl>(namedDecl)) {
-      appendIdentifier(nominal->getName().str(),
+      appendIdentifier(decl->getName().str(),
                        /*allowRawIdentifiers=*/false);
     } else {
       llvm_unreachable("unknown imported Clang type");
@@ -4478,7 +4480,17 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
       conformance->getDeclContext()->getModuleScopeContext();
   Mod = topLevelSubcontext->getParentModule();
 
-  auto conformingType = conformance->getType();
+  Type conformingType;
+  if (isa<NormalProtocolConformance>(conformance) &&
+      conformance->isReparented()) {
+    // Note: The conforming type of a reparented conformance used to be the
+    // protocol, but that interacted badly with type substitution. Instead
+    // we set the conforming type to be the Self type parameter, but that
+    // requires a special case here to maintain the previous mangling.
+    conformingType = conformance->getDeclContext()->getDeclaredInterfaceType();
+  } else {
+    conformingType = conformance->getType();
+  }
   appendType(conformingType->getCanonicalType(), nullptr);
 
   appendProtocolName(conformance->getProtocol());
@@ -4991,6 +5003,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return appendMacroExpansionLoc();
   }
   
@@ -5043,6 +5056,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     llvm_unreachable("Exited above");
   }
 

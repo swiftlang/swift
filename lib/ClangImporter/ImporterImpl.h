@@ -62,6 +62,7 @@
 
 namespace clang {
 class APValue;
+class BuiltinType;
 class DeclarationName;
 class MangleContext;
 class ObjCInterfaceDecl;
@@ -688,6 +689,10 @@ public:
 
   llvm::SmallPtrSet<const clang::Decl *, 1> synthesizedAndAlwaysVisibleDecls;
 
+  /// For virtual methods of foreign reference types, whenever a virtual thunk
+  /// is generated, keep track of the original C++ method.
+  llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
+
 private:
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
@@ -696,14 +701,6 @@ private:
   // Map all cloned methods back to the original member
   llvm::DenseMap<ValueDecl *, ValueDecl *> clonedMembers;
   llvm::DenseSet<const ValueDecl *> membersSynthesizedPerType;
-
-  // Keep track of methods that are unavailale in each class.
-  // We need this set because these methods will be imported lazily. We don't
-  // have the corresponding Swift method when the availability check is
-  // performed, so instead we store the information in this set and then, when
-  // the method is finally generated, we check if it's present here
-  llvm::DenseSet<std::pair<const clang::CXXRecordDecl *, DeclName>>
-      unavailableMethods;
 
 public:
   /// Attempt to lookup and import the synthesized .pointee computed property.
@@ -782,9 +779,11 @@ public:
   static bool isSwiftFunctionWrapper(const clang::RecordDecl *decl);
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
-                                  ClangInheritanceInfo inheritance);
+                                  ClangInheritanceInfo inherit);
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
+  FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
+
   bool isMemberSynthesizedPerType(const ValueDecl *decl);
   void markMemberSynthesizedPerType(const ValueDecl *decl);
 
@@ -810,17 +809,14 @@ public:
     return getNameImporter().getEnumKind(decl);
   }
 
-  bool findUnavailableMethod(const clang::CXXRecordDecl *classDecl,
-                             DeclName name) {
-    return unavailableMethods.contains({classDecl, name});
-  }
+private:
+  llvm::DenseMap<const clang::CXXRecordDecl *,
+                 llvm::SmallDenseSet<const clang::CXXMethodDecl *>>
+      ambiguousVirtualOverrides;
 
-  void insertUnavailableMethod(const clang::CXXRecordDecl *classDecl,
-                               DeclName name) {
-    unavailableMethods.insert({classDecl, name});
-  }
-
-  void handleAmbiguousSwiftName(ValueDecl *decl);
+public:
+  bool isAmbiguouslyOverridden(const clang::CXXRecordDecl *Record,
+                               const clang::CXXMethodDecl *Method);
 
 private:
   /// A mapping from imported declarations to their "alternate" declarations,
@@ -2070,6 +2066,20 @@ bool isSpecialAppKitFunctionKeyProperty(const clang::NamedDecl *decl);
 /// nested types other than pointers or references.
 bool hasSameUnderlyingType(const clang::Type *a,
                            const clang::TemplateTypeParmDecl *b);
+
+/// Map a `clang::BuiltinType` to its Swift stdlib counterpart as listed in
+/// `BuiltinMappedTypes.def`, if there is one.
+[[nodiscard]] std::optional<StringRef>
+getBuiltinTypeSwiftName(const clang::BuiltinType *bt);
+
+/// Return the Swift type name if `ty` is a `clang::BuiltinType` with a Swift
+/// counterpart.
+[[nodiscard]] std::optional<StringRef> static inline getBuiltinTypeSwiftName(
+    clang::QualType ty) {
+  if (const auto *bt = ty->getAs<clang::BuiltinType>())
+    return getBuiltinTypeSwiftName(bt);
+  return std::nullopt;
+}
 
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,

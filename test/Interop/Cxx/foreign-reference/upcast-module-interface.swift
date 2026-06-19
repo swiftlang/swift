@@ -1,4 +1,6 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=Upcast -I %S/Inputs -I %swift_src_root/lib/ClangImporter/SwiftBridging -source-filename=x -cxx-interoperability-mode=upcoming-swift -print-implicit-attrs | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=Upcast -I %S/Inputs -I %swift_src_root/lib/ClangImporter/SwiftBridging -source-filename=x -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature ForeignReferenceTypeInheritance -print-implicit-attrs | %FileCheck %s
+
+// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
 // CHECK: class Base {
 // CHECK:   var baseValue: Int32
@@ -41,7 +43,9 @@
 
 // CHECK: class OverridesLifetimeOps {
 
-// CHECK: class OverridesLifetimeOpsDerived : OverridesLifetimeOps {
+// CHECK: class OverridesLifetimeOpsDerived {
+
+// CHECK: class ReannotatedRefCountedDerived {
 
 // CHECK: class DerivedFromEmptyAndBase : Base {
 // CHECK:   var extraValue: Int32

@@ -3105,3 +3105,17 @@ public struct CustomConditionCheckMacro: ExpressionMacro {
     return "\(literal: isSet)"
   }
 }
+
+public enum BorrowMutateMacro: AccessorMacro {
+    public static func expansion(
+        of node: AttributeSyntax,
+        providingAccessorsOf declaration: some DeclSyntaxProtocol,
+        in context: some MacroExpansionContext
+    ) throws -> [AccessorDeclSyntax] {
+        [
+            "borrow { _x }",
+            "mutate { return &_x }",
+        ]
+    }
+}
+

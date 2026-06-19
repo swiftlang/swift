@@ -38,7 +38,7 @@ extension _RigidArray where Element: ~Copyable {
       let source = unsafe _storage.extracting(index ..< count)
       let target = unsafe _storage.extracting(index + 1 ..< count + 1)
       let last = unsafe target.moveInitialize(fromContentsOf: source)
-      assert(last == target.endIndex)
+      _internalInvariant(last == target.endIndex)
     }
     unsafe _storage.initializeElement(at: index, to: item)
     _count += 1
@@ -165,7 +165,7 @@ extension _RigidArray where Element: ~Copyable {
     at index: Int
   ) {
     unsafe items.withUnsafeMutableBufferPointer { buffer, count in
-      let source = unsafe buffer._extracting(first: count)
+      let source = buffer.extracting(first: count)
       unsafe self.insert(moving: source, at: index)
       count = 0
     }
