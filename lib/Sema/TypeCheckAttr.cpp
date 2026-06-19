@@ -2447,6 +2447,177 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   }
 }
 
+namespace {
+namespace com {
+
+/// Look up a type by name from the \c COM module.  Emits a diagnostic on
+/// failure.
+TypeDecl *lookup(ASTContext &C, StringRef name, SourceLoc loc) {
+  auto *COM = C.getLoadedModule(C.Id_COM);
+  if (!COM) {
+    // When building the COM module itself, look up types locally.
+    if (C.MainModule && C.MainModule->getName() == C.Id_COM)
+      COM = C.MainModule;
+  }
+  if (!COM) {
+    C.Diags.diagnose(loc, diag::attr_com_missing_module);
+    return nullptr;
+  }
+
+  SmallVector<ValueDecl *, 1> results;
+  C.lookupInModule(COM, name, results);
+  if (results.empty() || !isa<TypeDecl>(results.front())) {
+    C.Diags.diagnose(loc, diag::com_module_missing_type, name);
+    return nullptr;
+  }
+
+  return cast<TypeDecl>(results.front());
+}
+
+/// Body synthesizer for a GUID getter.  Produces:
+/// \code
+///   return GUID(data1: 0x…, data2: 0x…, data3: 0x…,
+///               data4: (0x…, 0x…, 0x…, 0x…, 0x…, 0x…, 0x…, 0x…))
+/// \endcode
+std::pair<BraceStmt *, bool>
+materializeGUID(AbstractFunctionDecl *AFD, void *context) {
+  auto &C = AFD->getASTContext();
+
+  TypeDecl *Ty = lookup(C, "GUID", AFD->getLoc());
+  if (!Ty)
+    return {BraceStmt::create(C, SourceLoc(), {}, SourceLoc()),
+            /*isTypeChecked=*/true};
+
+  std::optional<UUID> uuid =
+      UUID::fromString(static_cast<const char *>(context));
+  assert(uuid && "GUID string should have been validated by Sema");
+  const unsigned char *V = uuid->Value;
+
+  auto hex = [&](uint64_t value) -> IntegerLiteralExpr * {
+    return new (C) IntegerLiteralExpr(
+        C.AllocateCopy("0x" + llvm::utohexstr(value)), {}, /*implicit=*/true);
+  };
+
+  // RFC 4122 network byte order -> COM GUID fields.
+  Expr *data1 = hex((uint32_t(V[0]) << 24) | (V[1] << 16) | (V[2] << 8) | V[3]);
+  Expr *data2 = hex((uint16_t(V[4]) << 8) | V[5]);
+  Expr *data3 = hex((uint16_t(V[6]) << 8) | V[7]);
+
+  SmallVector<Expr *, 8> elements;
+  for (unsigned i = 0; i < 8; ++i)
+    elements.push_back(hex(V[8 + i]));
+  Expr *data4 = TupleExpr::createImplicit(C, elements, {});
+
+  Argument args[] = {
+      {SourceLoc(), C.getIdentifier("data1"), data1},
+      {SourceLoc(), C.getIdentifier("data2"), data2},
+      {SourceLoc(), C.getIdentifier("data3"), data3},
+      {SourceLoc(), C.getIdentifier("data4"), data4},
+  };
+  CallExpr *call = CallExpr::createImplicit(
+      C, TypeExpr::createImplicit(Ty->getDeclaredInterfaceType(), C),
+      ArgumentList::createImplicit(C, args));
+
+  return {BraceStmt::create(C, SourceLoc(),
+                            ASTNode(ReturnStmt::createImplicit(C, call)),
+                            SourceLoc()),
+          /*isTypeChecked=*/false};
+}
+
+/// Synthesize a computed \c GUID property with the given name in the given
+/// context, wiring up the body synthesizer to produce the GUID literal.
+///
+/// \param isStatic Whether the property should be \c static.
+/// \param AEIC Whether to add \c @_alwaysEmitIntoClient to the getter.
+/// \param accessSource The declaration to copy access from.
+/// \param isParent Forwarded to \c copyFormalAccessFrom.
+VarDecl *generateIDAccessor(ASTContext &C, DeclContext *DC, Identifier name,
+                            StringRef value, bool isStatic, bool AEIC,
+                            ValueDecl *accessSource, bool isParent) {
+  TypeDecl *Ty = lookup(C, "GUID", accessSource->getLoc());
+  if (!Ty)
+    return nullptr;
+  Type GUIDTy = Ty->getDeclaredInterfaceType();
+
+  VarDecl *VD =
+      new (C) VarDecl(isStatic, VarDecl::Introducer::Var, SourceLoc(), name, DC);
+  VD->setImplicit();
+  VD->setSynthesized();
+  VD->setInterfaceType(GUIDTy);
+  VD->copyFormalAccessFrom(accessSource, isParent);
+
+  AccessorDecl *getter =
+      AccessorDecl::create(C, /*FuncLoc=*/{}, /*AccessorKeywordLoc=*/{},
+                           AccessorKind::Get, VD, /*Async=*/false,
+                           /*AsyncLoc=*/{}, /*Throws=*/false,
+                           /*ThrowsLoc=*/{}, /*ThrownType=*/{},
+                           ParameterList::createEmpty(C), GUIDTy, DC);
+  getter->setImplicit();
+  getter->setIsTransparent(false);
+  getter->copyFormalAccessFrom(VD);
+  if (AEIC)
+    getter->addAttribute(new (C) AlwaysEmitIntoClientAttr(/*implicit=*/true));
+  // AllocateCopy a null-terminated copy — UUID::fromString expects a C string.
+  std::string str = value.str();
+  StringRef stored = C.AllocateCopy(StringRef(str.c_str(), str.size() + 1));
+  getter->setBodySynthesizer(materializeGUID,
+                             const_cast<char *>(stored.data()));
+
+  VD->setImplInfo(StorageImplInfo::getImmutableComputed());
+  VD->setAccessors(SourceLoc(), {getter}, SourceLoc());
+
+  Type resolved = DC->mapTypeIntoEnvironment(GUIDTy);
+  Pattern *pattern =
+      TypedPattern::createImplicit(C,
+                                   NamedPattern::createImplicit(C, VD, resolved),
+                                   resolved);
+  PatternBindingDecl::createImplicit(C, StaticSpellingKind::None, pattern,
+                                     /*InitExpr=*/nullptr, DC);
+
+  return VD;
+}
+
+/// Synthesize \c static \c var \c IID: \c GUID in an \c extension \c P.Protocol
+/// for a \c @com protocol.  The getter is \c @_alwaysEmitIntoClient.
+void synthesizeIIDProperty(ProtocolDecl *PD, ASTContext &C, StringRef value) {
+  // Create an implicit `extension P.Protocol`.
+  ExtensionDecl *ext =
+      ExtensionDecl::create(C, SourceLoc(), nullptr, {},
+                            PD->getModuleScopeContext(), nullptr);
+  ext->setImplicit();
+  // ext->setIsMetatypeExtension();
+  C.evaluator.cacheOutput(ExtendedTypeRequest{ext}, PD->getDeclaredType());
+  ext->setExtendedNominal(PD);
+  PD->addExtension(ext);
+
+  if (SourceFile *SF = PD->getDeclContext()->getParentSourceFile())
+    SF->addTopLevelDecl(ext);
+
+  VarDecl *property =
+      generateIDAccessor(C, ext, C.Id_IID, value, /*isStatic=*/true,
+                         /*AEIC=*/true, PD, /*isParent=*/false);
+  if (!property)
+    return;
+
+  ext->addMember(property);
+  ext->addMember(property->getParentPatternBinding());
+}
+
+/// Synthesize \c static \c var \c CLSID: \c GUID on a \c @com class.
+void synthesizeCLSIDProperty(ClassDecl *CD, ASTContext &C, StringRef value) {
+  VarDecl *property =
+      generateIDAccessor(C, CD, C.Id_CLSID, value, /*isStatic=*/true,
+                         /*AEIC=*/false, CD, /*isParent=*/true);
+  if (!property)
+    return;
+
+  CD->addMember(property);
+  CD->addMember(property->getParentPatternBinding());
+}
+
+}
+}
+
 void AttributeChecker::visitCOMAttr(COMAttr *attr) {
   if (!Ctx.LangOpts.EnableCOMInterop) {
     diagnoseAndRemoveAttr(attr, diag::attr_com_requires_flag);
@@ -2504,6 +2675,13 @@ void AttributeChecker::visitCOMAttr(COMAttr *attr) {
       return;
     }
   }
+
+  // Synthesize GUID constants.
+  if (auto *PD = dyn_cast<ProtocolDecl>(D))
+    com::synthesizeIIDProperty(PD, Ctx, attr->IID);
+  else if (auto *CD = dyn_cast<ClassDecl>(D))
+    if (attr->CLSID)
+      com::synthesizeCLSIDProperty(CD, Ctx, *attr->CLSID);
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {

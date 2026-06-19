@@ -2218,6 +2218,8 @@ ERROR(attr_com_explicit_iswiftobject, none,
       "'ISwiftObject' conformance is compiler-managed and cannot be declared explicitly", ())
 NOTE(attr_com_iswiftobject_implied, none,
      "'@com' automatically provides 'ISwiftObject' conformance", ())
+ERROR(attr_com_missing_module, none,
+      "'COM' module not imported, required for '@com'", ())
 ERROR(com_module_missing_type, none,
       "type '%0' not found in the 'COM' module", (StringRef))
 
