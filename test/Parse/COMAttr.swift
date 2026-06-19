@@ -1,8 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/COM.swiftmodule -module-name COM -enable-experimental-com-interop %S/Inputs/COM.swift
+// RUN: %target-swift-frontend -emit-module-path %t/COM.swiftmodule -module-name COM -enable-experimental-com-interop %S/../Inputs/COM.swift
 // RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -dump-ast %s 2>&1 | %FileCheck %s
-
-import COM
 
 @com(interface: "00000000-0000-0000-0000-000000000000")
 protocol IInterface: IUnknown {
