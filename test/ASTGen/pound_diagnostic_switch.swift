@@ -36,3 +36,30 @@ func testPoundDiagnosticInSwitchIfConfig(_ x: Int) {
     break
   }
 }
+
+func testPoundDiagnosticInSwitchElse(_ x: Int) {
+  switch x {
+  #if false
+  case 1:
+    break
+  #else
+  #warning("warning in #else") // expected-warning {{warning in #else}}
+  #endif
+  default:
+    break
+  }
+}
+
+func testPoundDiagnosticInSwitchNestedIfConfig(_ x: Int) {
+  switch x {
+  #if true
+  #if true
+  #warning("warning in nested #if") // expected-warning {{warning in nested #if}}
+  #endif
+  #endif
+  case 1:
+    break
+  default:
+    break
+  }
+}
