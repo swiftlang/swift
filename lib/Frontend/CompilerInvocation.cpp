@@ -1168,6 +1168,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableImplicitStringProcessingModuleImport |=
     Args.hasArg(OPT_disable_implicit_string_processing_module_import);
 
+  Opts.DisableImplicitCOMModuleImport |=
+      Args.hasArg(OPT_disable_implicit_com_module_import);
+
   Opts.DisableImplicitCxxModuleImport |=
     Args.hasArg(OPT_disable_implicit_cxx_module_import);
 
@@ -1678,6 +1681,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         " " + printFormalCxxInteropVersion(Opts);
 
   Opts.UseStaticStandardLibrary = Args.hasArg(OPT_use_static_resource_dir);
+  Opts.EnableCOMInterop = Args.hasArg(OPT_enable_com_interop);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
