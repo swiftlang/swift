@@ -1079,3 +1079,33 @@ func testNoDuplicateStmtDiags() {
     }
   }
 }
+
+func testInvalidTransforDoesntHideConversionFailure() {
+  @resultBuilder
+  struct BuilderA {
+    static func buildBlock<T>(_ v1: T) -> T { v1 }
+    static func buildBlock<T, U>(_ v1: T, _ v2: U) -> (T, U) { (v1, v2) }
+  }
+
+  func fn(@BuilderA a: () -> Void) {}
+  func fn(@BuilderA b: () -> Void) {}
+  func fn(_: () -> Void) {}
+
+  func test(_: Int) {}
+
+  fn {
+    if true {
+      return
+    }
+
+    test("") // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  }
+
+  fn {
+    if true {
+      0
+    }
+
+    test("") // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  }
+}
