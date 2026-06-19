@@ -2230,6 +2230,12 @@ ERROR(attr_com_protocol_unexpected_arg, none,
       "'@com' on a protocol must only have 'interface:'; '%0' is not allowed", (StringRef))
 ERROR(attr_com_class_unexpected_iid, none,
       "'@com' on a class must not have 'interface:'; use 'implementation:' instead", ())
+ERROR(attr_com_explicit_iswiftobject, none,
+      "'ISwiftObject' conformance is compiler-managed and cannot be declared explicitly", ())
+NOTE(attr_com_iswiftobject_implied, none,
+     "'@com' automatically provides 'ISwiftObject' conformance", ())
+ERROR(com_module_missing_type, none,
+      "type '%0' not found in the 'COM' module", (StringRef))
 
 // @_staticExclusiveOnly
 ERROR(attr_static_exclusive_only_disabled,none,
