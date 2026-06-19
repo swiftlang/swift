@@ -525,9 +525,17 @@ public class CaptureTwoValuesTest {
   }
 }
 
-
+// https://github.com/swiftlang/swift/issues/73860
 final class Final {
   static func useSelf(_ body: (Self) -> ()) {}
+
+  func callUseSelf1() {
+    Final.useSelf { _ in }
+  }
+
+  func callUseSelf2() {
+    Self.useSelf { _ in }
+  }
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self13testNoErasureyyyAA5FinalCXEF :

@@ -305,10 +305,10 @@ do {
   class C {}
   struct S {
     func genericallyNonOptional<T: AnyObject>(_ a: T, _ b: T, _ c: T) { }
-    // expected-note@-1 {{where 'T' = 'Optional<C>'}}
+    // expected-note@-1 {{where 'T' = 'C?'}}
 
     func f(_ a: C?, _ b: C?, _ c: C) {
-      genericallyNonOptional(a, b, c) // expected-error {{instance method 'genericallyNonOptional' requires that 'Optional<C>' be a class type}}
+      genericallyNonOptional(a, b, c) // expected-error {{instance method 'genericallyNonOptional' requires that 'C?' be a class type}}
       // expected-note @-1 {{wrapped type 'C' satisfies this requirement}}
     }
   }

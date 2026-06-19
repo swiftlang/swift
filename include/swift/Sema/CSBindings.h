@@ -139,12 +139,10 @@ struct PotentialBinding {
   }
 
   PotentialBinding withSameSource(Type type, AllowedBindingKind kind) const {
-    ASSERT(kind != AllowedBindingKind::Fallback);
     return {type, kind, BindingSource, Originator};
   }
 
   PotentialBinding asTransitiveFrom(TypeVariableType *originator) const {
-    ASSERT(Kind != AllowedBindingKind::Fallback);
     ASSERT(originator);
     return {BindingType, Kind, BindingSource, originator};
   }
@@ -246,7 +244,7 @@ struct LiteralRequirement {
   bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
 
 private:
-  bool isCoveredBy(Type type, ConstraintSystem &CS) const;
+  bool isCoveredBy(AllowedBindingKind kind, Type type, ConstraintSystem &CS) const;
 };
 
 struct PotentialBindings {
@@ -416,6 +414,25 @@ enum class KnownLValueKind: uint8_t {
   RValue,
   /// Definitely an lvalue.
   LValue
+};
+
+/// Encodes the result of evaluating a new binding against an existing binding
+/// with BindingSet::subsumeBinding().
+enum class SubsumeBindingResult: uint8_t {
+  /// The new binding conflicts with some existing binding.
+  Conflict,
+
+  /// The new binding should not be added because it is strictly less precise
+  /// than the existing binding; recording it would give us no new information.
+  ExistingIsBetter,
+
+  /// The new binding is strictly more precise than the existing binding, so
+  /// the new binding should replace the existing binding.
+  NewIsBetter,
+
+  /// The new binding is independent of the existing binding. Keep the existing
+  /// binding and record the new one.
+  KeepBoth
 };
 
 class BindingSet {
@@ -689,6 +706,9 @@ public:
   /// could satisfy both requirements is `Double`.
   void coalesceIntegerAndFloatLiteralRequirements();
 
+  /// Drop default requirements if we had supertype bindings and no literals.
+  void possiblyDropDefaults();
+
   /// Check whether the given binding set covers any of the literal protocols
   /// associated with this type variable. The idea is that if a type variable
   /// has a binding like Int and also it has a conformance requirement to
@@ -726,6 +746,8 @@ public:
 private:
   void computeLValueState();
 
+  void computeJoinsAndMeets();
+
   void markDirty() {
     IsDirty = true;
   }
@@ -743,8 +765,8 @@ private:
   /// adjacent conformance constraints.
   void reduceBinding(PotentialBinding &binding);
 
-  std::optional<bool> subsumeBinding(PotentialBinding &binding,
-                                     const PotentialBinding &existing);
+  SubsumeBindingResult subsumeBinding(const PotentialBinding &binding,
+                                      const PotentialBinding &existing);
 
   void addDefault(Constraint *constraint);
 

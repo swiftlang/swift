@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeChecker.h"
 #include "swift/Sema/Subtyping.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -30,7 +31,54 @@
 
 using namespace swift;
 using namespace constraints;
-using namespace inference;
+
+/// Determine whether the candidate type is a subclass of the superclass type.
+bool swift::constraints::isSubclassOf(Type candidateType, Type superclassType) {
+  if (!superclassType->getClassOrBoundGenericClass())
+    return false;
+
+  if (!candidateType->getClassOrBoundGenericClass()) {
+    candidateType = candidateType->getSuperclass();
+    if (!candidateType)
+      return false;
+  }
+
+  do {
+    auto result = isLikelyExactMatch(candidateType, superclassType);
+    ASSERT(result);
+    if (*result)
+      return true;
+
+    candidateType = candidateType->getSuperclass();
+  } while (candidateType);
+
+  return false;
+}
+
+/// Determine whether the candidate type can be erased to the given
+/// existential type. This check is approximate, because it disregards
+/// conditional conformance and parameterized protocol types.
+bool swift::constraints::isSubtypeOfExistentialType(Type candidateType,
+                                                    Type existentialType) {
+  auto layout = existentialType->getExistentialLayout();
+
+  if (auto layoutConstraint = layout.getLayoutConstraint()) {
+    if (layoutConstraint->isClass() &&
+        !(candidateType->isClassExistentialType() ||
+          candidateType->mayHaveSuperclass()))
+      return false;
+  }
+
+  if (layout.explicitSuperclass &&
+      !isSubclassOf(candidateType, layout.explicitSuperclass))
+    return false;
+
+  return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
+    auto result = TypeChecker::containsProtocol(candidateType, P,
+                                                /*allowMissing=*/false);
+    return result.first || result.second;
+  });
+}
 
 /// T conv $T0
 /// $T0 conforms P
@@ -110,7 +158,9 @@ bool ConstraintSystem::isConformanceTransitiveForSupertype(
       declsToCheck.push_back(cgFloatDecl);
     break;
 
-  case ConversionBehavior::Structural:
+  case ConversionBehavior::Function:
+  case ConversionBehavior::Metatype:
+  case ConversionBehavior::ExistentialMetatype:
     // FIXME: Metatypes and functions.
     result = false;
     break;
@@ -122,6 +172,11 @@ bool ConstraintSystem::isConformanceTransitiveForSupertype(
   case ConversionBehavior::InOut:
     // InOut types convert to mutable pointers.
     addMutablePointers();
+    break;
+
+  case ConversionBehavior::Existential:
+    // FIXME: Implement this.
+    result = false;
     break;
 
   case ConversionBehavior::Unknown:
@@ -247,11 +302,15 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
     // FIXME: Check pointer types.
     return false;
 
-  case ConversionBehavior::Structural:
+  case ConversionBehavior::Function:
+  case ConversionBehavior::Metatype:
+  case ConversionBehavior::ExistentialMetatype:
     // FIXME: Metatypes and functions.
     return false;
 
+  case ConversionBehavior::Existential:
   case ConversionBehavior::Unknown:
+    // Can't say anything in this case.
     return false;
   }
 }
@@ -276,7 +335,7 @@ swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
 
   // FIXME: Make this more precise.
   if (auto *lhsDecl = lhs->getAnyNominal()) {
-    if (!rhs->is<TypeVariableType>() && !rhs->isTypeParameter()) {
+    if (!rhs->isTypeVariableOrMember() && !rhs->isTypeParameter()) {
       auto *rhsDecl = rhs->getAnyNominal();
       return lhsDecl == rhsDecl;
     }
@@ -288,75 +347,162 @@ swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
 
 ConversionBehavior
 swift::constraints::getConversionBehavior(Type type) {
-  if (type->is<StructType>()) {
-    if (type->isAnyHashable())
-      return ConversionBehavior::AnyHashable;
-    else if (type->isString())
-      return ConversionBehavior::String;
-    else if (type->isDouble() || type->isCGFloat())
-      return ConversionBehavior::Double;
-    else if (type->getAnyPointerElementType())
-      return ConversionBehavior::Pointer;
+  auto canType = type->getCanonicalType();
+  auto &ctx = canType->getASTContext();
 
-    return ConversionBehavior::None;
-  }
+  auto containsParameterPacks = [&]() -> bool {
+    if (canType->hasParameterPack())
+      return true;
 
-  if (auto *structTy = type->getAs<BoundGenericStructType>()) {
-    if (auto eltTy = structTy->getArrayElementType()) {
-      return ConversionBehavior::Array;
-    } else if (ConstraintSystem::isDictionaryType(structTy)) {
-      return ConversionBehavior::Dictionary;
-    } else if (ConstraintSystem::isSetType(structTy)) {
-      return ConversionBehavior::Set;
-    } else if (type->getAnyPointerElementType()) {
-      return ConversionBehavior::Pointer;
+    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+    canType->getTypeVariables(referencedTypeVars);
+    for (auto *typeVar : referencedTypeVars) {
+      if (typeVar->getImpl().isPackExpansion())
+        return true;
     }
 
+    return false;
+  };
+
+  switch (canType->getKind()) {
+  #define TYPE(id, parent)
+  #define BUILTIN_TYPE(id, parent) case TypeKind::id: return ConversionBehavior::None;
+  #define SUGARED_TYPE(id, parent) case TypeKind::id: llvm_unreachable("");
+
+  #include "swift/AST/TypeNodes.def"
+  #undef BUILTIN_TYPE
+  #undef SUGARED_TYPE
+  #undef TYPE
+
+  case TypeKind::Struct: {
+    auto structTy = cast<StructType>(canType);
+    auto *decl = structTy->getDecl();
+
+    if (decl == ctx.getAnyHashableDecl())
+      return ConversionBehavior::AnyHashable;
+    else if (decl == ctx.getStringDecl())
+      return ConversionBehavior::String;
+    else if (decl == ctx.getDoubleDecl() ||
+             decl == ctx.getCGFloatDecl())
+      return ConversionBehavior::Double;
+    else if (decl == ctx.getUnsafeRawPointerDecl() ||
+             decl == ctx.getUnsafeMutableRawPointerDecl())
+      return ConversionBehavior::Pointer;
+
     return ConversionBehavior::None;
   }
 
-  if (auto *enumTy = type->getAs<BoundGenericEnumType>()) {
-    if (enumTy->getOptionalObjectType())
+  case TypeKind::BoundGenericStruct: {
+    auto structTy = cast<BoundGenericStructType>(canType);
+    auto *decl = structTy->getDecl();
+
+    if (decl == ctx.getArrayDecl())
+      return ConversionBehavior::Array;
+    else if (decl == ctx.getDictionaryDecl())
+      return ConversionBehavior::Dictionary;
+    else if (decl == ctx.getSetDecl())
+      return ConversionBehavior::Set;
+    else if (decl == ctx.getUnsafePointerDecl() ||
+             decl == ctx.getUnsafeMutablePointerDecl() ||
+             decl == ctx.getAutoreleasingUnsafeMutablePointerDecl())
+      return ConversionBehavior::Pointer;
+
+    return ConversionBehavior::None;
+  }
+
+  case TypeKind::Class:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::DynamicSelf:
+    return ConversionBehavior::Class;
+
+  case TypeKind::Enum:
+    return ConversionBehavior::None;
+
+  case TypeKind::BoundGenericEnum: {
+    auto enumTy = cast<BoundGenericEnumType>(canType);
+    if (enumTy->getDecl() == ctx.getOptionalDecl())
       return ConversionBehavior::Optional;
 
     return ConversionBehavior::None;
   }
 
-  if (type->is<ClassType>() || type->is<BoundGenericClassType>())
-    return ConversionBehavior::Class;
-
-  if (type->is<EnumType>() ||
-      type->is<BuiltinType>() || type->is<ArchetypeType>())
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::PackArchetype:
+  case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::ExistentialArchetype:
+  case TypeKind::ElementArchetype:
     return ConversionBehavior::None;
 
-  if (type->is<FunctionType>() || type->is<MetatypeType>())
-    return ConversionBehavior::Structural;
+  case TypeKind::Metatype:
+    return ConversionBehavior::Metatype;
 
-  if (type->is<InOutType>())
+  case TypeKind::ExistentialMetatype:
+    return ConversionBehavior::ExistentialMetatype;
+
+  case TypeKind::InOut:
     return ConversionBehavior::InOut;
 
-  if (type->is<LValueType>())
+  case TypeKind::LValue:
     return ConversionBehavior::LValue;
 
-  if (type->isVoid())
-    return ConversionBehavior::None;
-
-  // Only tuples with a known length are supported for now.
-  if (type->is<TupleType>()) {
-    if (type->hasParameterPack())
+  case TypeKind::Tuple: {
+    auto tupleTy = cast<TupleType>(canType);
+    if (tupleTy->getNumElements() == 0)
+      return ConversionBehavior::None;
+    if (containsParameterPacks())
       return ConversionBehavior::Unknown;
-
-    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
-    type->getTypeVariables(referencedTypeVars);
-    for (auto *typeVar : referencedTypeVars) {
-      if (typeVar->getImpl().isPackExpansion())
-        return ConversionBehavior::Unknown;
-    }
-
     return ConversionBehavior::Tuple;
   }
 
-  return ConversionBehavior::Unknown;
+  case TypeKind::Function: {
+    if (containsParameterPacks())
+      return ConversionBehavior::Unknown;
+    return ConversionBehavior::Function;
+  }
+
+  case TypeKind::Existential:
+    return ConversionBehavior::Existential;
+
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::ParameterizedProtocol:
+    // FIXME: Arrange it so that these are always wrapped in an
+    // ExistentialType.
+    return ConversionBehavior::Existential;
+
+  case TypeKind::Error:
+  case TypeKind::Placeholder:
+  case TypeKind::UnboundGeneric:
+  case TypeKind::Pack:
+  case TypeKind::PackExpansion:
+  case TypeKind::PackElement:
+  case TypeKind::TypeVariable:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+  case TypeKind::Module:
+  case TypeKind::Join:
+  case TypeKind::Meet:
+    return ConversionBehavior::Unknown;
+
+  case TypeKind::WeakStorage:
+  case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
+  case TypeKind::BuiltinTuple:
+  case TypeKind::GenericFunction:
+  case TypeKind::SILFunction:
+  case TypeKind::SILBlockStorage:
+  case TypeKind::SILBox:
+  case TypeKind::SILMoveOnlyWrapped:
+  case TypeKind::SILPack:
+  case TypeKind::SILToken:
+  case TypeKind::ErrorUnion:
+  case TypeKind::Integer:
+  case TypeKind::Hidden:
+    ABORT([&](llvm::raw_ostream &out) {
+      out << "Unusual type spotted in constraint system:\n";
+      canType->dump(out);
+    });
+  }
 }
 
 bool swift::constraints::hasProperSubtypes(Type type) {
@@ -381,8 +527,11 @@ bool swift::constraints::hasProperSubtypes(Type type) {
   case ConversionBehavior::Double:
   case ConversionBehavior::Pointer:
   case ConversionBehavior::Optional:
-  case ConversionBehavior::Structural:
+  case ConversionBehavior::Function:
+  case ConversionBehavior::Metatype:
   case ConversionBehavior::Tuple:
+  case ConversionBehavior::Existential:
+  case ConversionBehavior::ExistentialMetatype:
   case ConversionBehavior::Unknown:
     return true;
   }
@@ -402,6 +551,9 @@ bool swift::constraints::hasProperSupertypes(Type type) {
     // Strings convert to pointers.
     return true;
   case ConversionBehavior::Class: {
+    if (type->is<DynamicSelfType>())
+      return true;
+
     auto *classDecl = type->getClassOrBoundGenericClass();
     return classDecl->getSuperclassDecl();
   }
@@ -419,8 +571,11 @@ bool swift::constraints::hasProperSupertypes(Type type) {
   case ConversionBehavior::Double:
   case ConversionBehavior::Pointer:
   case ConversionBehavior::Optional:
-  case ConversionBehavior::Structural:
+  case ConversionBehavior::Function:
+  case ConversionBehavior::Metatype:
   case ConversionBehavior::Tuple:
+  case ConversionBehavior::Existential:
+  case ConversionBehavior::ExistentialMetatype:
   case ConversionBehavior::Unknown:
     return true;
   }
@@ -432,10 +587,24 @@ static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
   return nullptr;
 }
 
-ConflictReason swift::constraints::canPossiblyConvertTo(
-    ConstraintSystem &cs,
-    Type lhs, Type rhs,
-    GenericSignature sig) {
+static bool isCovariantInstanceType(Type t) {
+  return t->getClassOrBoundGenericClass() ||
+         t->is<ArchetypeType>();
+}
+
+/// More meaningful overload for when you want a boolean result.
+bool swift::constraints::canConvertTo(ConstraintSystem &cs,
+                                      Type lhs, Type rhs,
+                                      GenericSignature sig) {
+  return !checkConversion(cs, lhs, rhs, sig);
+}
+
+ConflictReason swift::constraints::checkConversion(ConstraintSystem &cs,
+                                                   Type lhs, Type rhs,
+                                                   GenericSignature sig) {
+  if (lhs->isEqual(rhs))
+    return std::nullopt;
+
   auto lhsKind = getConversionBehavior(lhs);
   auto rhsKind = getConversionBehavior(rhs);
 
@@ -451,24 +620,52 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     }
 
     case ConversionBehavior::Class: {
+      // Unwrap DynamicSelfType.
+      bool lhsWasSelf = false;
+      if (auto *lhsSelf = lhs->getAs<DynamicSelfType>()) {
+        lhsWasSelf = true;
+        lhs = lhsSelf->getSelfType();
+      }
+
+      bool rhsWasSelf = false;
+      if (auto *rhsSelf = rhs->getAs<DynamicSelfType>()) {
+        rhsWasSelf = true;
+        rhs = rhsSelf->getSelfType();
+      }
+
+      // DynamicSelfType-to-DynamicSelfType conversions are exact.
+      if (lhsWasSelf && rhsWasSelf) {
+        auto result = isLikelyExactMatch(lhs, rhs);
+        if (result.has_value() && !*result)
+          return ConflictFlag::Class;
+      }
+
+      // No conversions to DynamicSelfType.
+      if (rhsWasSelf)
+        return ConflictFlag::Class;
+
       auto *lhsDecl = lhs->getClassOrBoundGenericClass();
       auto *rhsDecl = rhs->getClassOrBoundGenericClass();
 
       // Toll-free bridging CF -> ObjC.
       if (lhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
           rhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
-        if (auto *lhsBridged = getBridgedObjCClass(lhsDecl))
-          lhsDecl = lhsBridged;
+        if (auto *lhsBridged = getBridgedObjCClass(lhsDecl)) {
+          lhs = lhsBridged->getDeclaredInterfaceType();
+          ASSERT(!lhs->hasTypeParameter());
+        }
 
       // Toll-free bridging ObjC -> CF.
       } else if (lhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
                  rhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-        if (auto *rhsBridged = getBridgedObjCClass(rhsDecl))
-          rhsDecl = rhsBridged;
+        if (auto *rhsBridged = getBridgedObjCClass(rhsDecl)) {
+          rhs = rhsBridged->getDeclaredInterfaceType();
+          ASSERT(!rhs->hasTypeParameter());
+        }
       }
 
       // Check for a subclassing relationship.
-      if (!rhsDecl->isSuperclassOf(lhsDecl))
+      if (!isSubclassOf(lhs, rhs))
         return ConflictFlag::Class;
 
       break;
@@ -496,12 +693,11 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
 
     case ConversionBehavior::Array: {
       // Array-to-Array conversions.
-      auto subResult = canPossiblyConvertTo(
-          cs,
-          lhs->getArrayElementType(),
-          rhs->getArrayElementType(), sig);
-      if (subResult)
-        return subResult | ConflictFlag::Array;
+      auto result = checkConversion(cs,
+                                    lhs->getArrayElementType(),
+                                    rhs->getArrayElementType(), sig);
+      if (result)
+        return result | ConflictFlag::Array;
 
       break;
     }
@@ -509,16 +705,14 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       // Dictionary-to-Dictionary conversions.
       auto lhsPair = *ConstraintSystem::isDictionaryType(lhs);
       auto rhsPair = *ConstraintSystem::isDictionaryType(rhs);
-      auto keyResult = canPossiblyConvertTo(
-          cs,
-          lhsPair.first,
-          rhsPair.first, sig);
+      auto keyResult = checkConversion(cs,
+                                       lhsPair.first,
+                                       rhsPair.first, sig);
       if (keyResult)
         return keyResult | ConflictFlag::DictionaryKey;
-      auto valueResult = canPossiblyConvertTo(
-          cs,
-          lhsPair.second,
-          rhsPair.second, sig);
+      auto valueResult = checkConversion(cs,
+                                         lhsPair.second,
+                                         rhsPair.second, sig);
       if (valueResult)
         return valueResult | ConflictFlag::DictionaryKey;
       break;
@@ -528,29 +722,40 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       auto lhsElt = *ConstraintSystem::isSetType(lhs);
       auto rhsElt = *ConstraintSystem::isSetType(rhs);
 
-      auto subResult = canPossiblyConvertTo(
-          cs,
-          lhsElt,
-          rhsElt, sig);
-      if (subResult)
-        return subResult | ConflictFlag::Set;
+      auto result = checkConversion(cs, lhsElt, rhsElt, sig);
+      if (result)
+        return result | ConflictFlag::Set;
       break;
     }
     case ConversionBehavior::Optional: {
       // Optional-to-optional conversion.
       auto argObjectType = lhs->getOptionalObjectType();
       auto objectType = rhs->getOptionalObjectType();
-      auto optionalToOptional = canPossiblyConvertTo(
-          cs, argObjectType, objectType, sig);
 
-      if (optionalToOptional)
-        return optionalToOptional | ConflictFlag::Optional;
+      auto result = checkConversion(cs, argObjectType, objectType, sig);
+      if (result)
+        return result | ConflictFlag::Optional;
       break;
     }
-    case ConversionBehavior::Structural:
-      if (lhs->getCanonicalType()->getKind()
-          != rhs->getCanonicalType()->getKind())
-        return ConflictFlag::Structural;
+    case ConversionBehavior::Metatype: {
+      auto argInstanceType = lhs->getMetatypeInstanceType();
+      auto instanceType = rhs->getMetatypeInstanceType();
+
+      if (!isCovariantInstanceType(argInstanceType) ||
+          !isCovariantInstanceType(instanceType)) {
+        auto result = isLikelyExactMatch(argInstanceType, instanceType);
+        if (result.has_value() && !*result)
+          return ConflictReason(ConflictFlag::Metatype) | ConflictFlag::Exact;
+        break;
+      }
+
+      auto result = checkConversion(cs, argInstanceType, instanceType, sig);
+      if (result)
+        return result | ConflictFlag::Metatype;
+      break;
+    }
+    case ConversionBehavior::Function:
+      // FIXME: Implement.
       break;
     case ConversionBehavior::InOut:
     case ConversionBehavior::LValue: {
@@ -573,13 +778,27 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       for (unsigned i : indices(lhsTuple->getElements())) {
         auto lhsElt = lhsTuple->getElementType(i);
         auto rhsElt = rhsTuple->getElementType(i);
-        auto result = canPossiblyConvertTo(cs, lhsElt, rhsElt, sig);
+        auto result = checkConversion(cs, lhsElt, rhsElt, sig);
         if (result)
           return result | ConflictFlag::TupleElement;
       }
 
       break;
     }
+    case ConversionBehavior::Existential:
+      // Existential-to-existential conversions.
+      if (!isSubtypeOfExistentialType(lhs, rhs))
+        return ConflictFlag::Existential;
+
+      break;
+    case ConversionBehavior::ExistentialMetatype:
+      // Existential metatype-to-existential metatype conversions.
+      if (!isSubtypeOfExistentialType(lhs->getMetatypeInstanceType(),
+                                      rhs->getMetatypeInstanceType())) {
+        return ConflictFlag::Existential;
+      }
+
+      break;
     case ConversionBehavior::Unknown:
       break;
     }
@@ -596,8 +815,7 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
 
     } else {
       // Attempt LValue-to-RValue conversion.
-      return canPossiblyConvertTo(cs, lhs->getWithoutSpecifierType(),
-                                  rhs, sig);
+      return checkConversion(cs, lhs->getWithoutSpecifierType(), rhs, sig);
     }
 
   // Handle case where the kinds don't match, and we're not converting
@@ -606,22 +824,22 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
              lhsKind != ConversionBehavior::InOut) {
     switch (rhsKind) {
     case ConversionBehavior::Class: {
-      // Archetypes can convert to classes.
-      if (lhs->is<ArchetypeType>()) {
-        auto superclassType = lhs->getSuperclass();
-        if (!superclassType)
-          return ConflictFlag::Class;
-
-        return canPossiblyConvertTo(cs, superclassType, rhs, sig);
-      }
-
       // Protocol metatypes can convert to instances of the Protocol class
       // on Objective-C interop platforms.
-      if (lhs->is<MetatypeType>())
+      //
+      // FIXME: Make this less conservative.
+      if (lhsKind == ConversionBehavior::Metatype)
         break;
 
-      // Nothing else converts to a class except for existentials
-      // (which are 'ConversionBehavior::Unknown').
+      // No conversions to DynamicSelfType.
+      if (rhs->is<DynamicSelfType>())
+        return ConflictFlag::Category;
+
+      // Archetypes, existentials, and dynamic Self can convert to classes.
+      if (isSubclassOf(lhs, rhs))
+        break;
+
+      // Nothing else converts to a class.
       return ConflictFlag::Category;
     }
 
@@ -642,10 +860,9 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     case ConversionBehavior::Optional: {
       // We have a non-optional on the left. Try value-to-optional.
       auto objectType = rhs->getOptionalObjectType();
-      auto valueToOptional = canPossiblyConvertTo(
-          cs, lhs, objectType, sig);
-      if (valueToOptional)
-        return valueToOptional | ConflictFlag::Optional;
+      auto result = checkConversion(cs, lhs, objectType, sig);
+      if (result)
+        return result | ConflictFlag::Optional;
 
       break;
     }
@@ -658,9 +875,30 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     case ConversionBehavior::Array:
     case ConversionBehavior::Dictionary:
     case ConversionBehavior::Set:
-    case ConversionBehavior::Structural:
+    case ConversionBehavior::Function:
+    case ConversionBehavior::Metatype:
     case ConversionBehavior::Tuple:
       return ConflictFlag::Category;
+
+    case ConversionBehavior::Existential:
+      // Concrete-to-existential conversions.
+      if (!isSubtypeOfExistentialType(lhs, rhs))
+        return ConflictFlag::Existential;
+
+      break;
+
+    case ConversionBehavior::ExistentialMetatype:
+      if (lhsKind != ConversionBehavior::Metatype) {
+        return ConflictFlag::Category;
+      }
+
+      // Concrete metatype-to-existential metatype conversions.
+      if (!isSubtypeOfExistentialType(lhs->getMetatypeInstanceType(),
+                                      rhs->getMetatypeInstanceType())) {
+        return ConflictFlag::Existential;
+      }
+
+      break;
 
     case ConversionBehavior::Unknown:
       break;
@@ -717,6 +955,777 @@ bool swift::constraints::isPossibleSupertypeOfFunctionType(Type type) {
   return false;
 }
 
+namespace {
+enum class Operation { Join, Meet };
+}
+
+static void decomposeConstraintType(Type t,
+                                    llvm::SmallSetVector<ProtocolDecl *, 4> &protos,
+                                    Type &superclass, bool &anyObject,
+                                    InvertibleProtocolSet &invertible) {
+  if (auto *protoTy = t->getAs<ProtocolType>()) {
+    protos.insert(protoTy->getDecl());
+  } else if (auto *paramTy = t->getAs<ParameterizedProtocolType>()) {
+    // FIXME: Do something smart with the generic arguments here.
+    protos.insert(paramTy->getBaseType()->getDecl());
+  } else if (auto *compositionTy = t->getAs<ProtocolCompositionType>()) {
+    for (auto memberTy : compositionTy->getMembers()) {
+      decomposeConstraintType(memberTy, protos, superclass,
+                              anyObject, invertible);
+    }
+
+    anyObject |= compositionTy->hasExplicitAnyObject();
+    invertible |= compositionTy->getInverses();
+  } else if (t->getClassOrBoundGenericClass()) {
+    superclass = t;
+  } else {
+    ABORT([&](auto &out) {
+      out << "Unknown constraint type:\n";
+      t->dump(out);
+    });
+  }
+}
+
+static Type existentialConstraintJoinMeetImpl(
+    Operation op, Type lhs, Type rhs) {
+  auto &ctx = lhs->getASTContext();
+
+  llvm::SmallSetVector<ProtocolDecl *, 4> lhsProtos;
+  Type lhsSuperclass;
+  bool lhsAnyObject = false;
+  InvertibleProtocolSet lhsInverses;
+  decomposeConstraintType(lhs, lhsProtos, lhsSuperclass, lhsAnyObject, lhsInverses);
+
+  llvm::SmallSetVector<ProtocolDecl *, 4> rhsProtos;
+  Type rhsSuperclass;
+  bool rhsAnyObject = false;
+  InvertibleProtocolSet rhsInverses;
+  decomposeConstraintType(rhs, rhsProtos, rhsSuperclass, rhsAnyObject, rhsInverses);
+
+  SmallVector<Type, 4> members;
+  Type superclass;
+  bool anyObject = false;
+  InvertibleProtocolSet inverses = lhsInverses;
+  if (op == Operation::Join) {
+    // Intersect all inherited protocols.
+    for (unsigned i = 0, e = lhsProtos.size(); i < e; ++i) {
+      for (auto *inherited : lhsProtos[i]->getAllInheritedProtocols()) {
+        lhsProtos.insert(inherited);
+      }
+    }
+
+    for (unsigned i = 0, e = rhsProtos.size(); i < e; ++i) {
+      for (auto *inherited : rhsProtos[i]->getAllInheritedProtocols()) {
+        rhsProtos.insert(inherited);
+      }
+    }
+
+    for (auto *proto : lhsProtos) {
+      if (proto->getInvertibleProtocolKind())
+        continue;
+      if (rhsProtos.count(proto))
+        members.push_back(proto->getDeclaredInterfaceType());
+    }
+
+    // Join the superclass bound.
+    if (lhsSuperclass && rhsSuperclass) {
+      bool existentialUpperBound = false;
+      superclass = subtypeJoin(lhsSuperclass, rhsSuperclass,
+                               &existentialUpperBound);
+
+      if (existentialUpperBound)
+        superclass = Type();
+    } else {
+      // Drop the superclass bound.
+    }
+
+    anyObject = lhsAnyObject && rhsAnyObject;
+    inverses.insertAll(rhsInverses);
+  } else {
+    // Take the union of all protocols.
+    for (auto *proto : lhsProtos) {
+      if (proto->getInvertibleProtocolKind())
+        continue;
+      members.push_back(proto->getDeclaredInterfaceType());
+    }
+    for (auto *proto : rhsProtos) {
+      if (proto->getInvertibleProtocolKind())
+        continue;
+      if (lhsProtos.count(proto) == 0)
+        members.push_back(proto->getDeclaredInterfaceType());
+    }
+
+    // Compute the meet of the superclass bound.
+    if (lhsSuperclass && rhsSuperclass) {
+      bool uninhabited = false;
+      superclass = subtypeMeet(lhsSuperclass, rhsSuperclass,
+                               &uninhabited);
+      if (uninhabited)
+        return Type();
+    } else if (lhsSuperclass) {
+      superclass = lhsSuperclass;
+    } else {
+      superclass = rhsSuperclass;
+    }
+
+    anyObject = lhsAnyObject || rhsAnyObject;
+    inverses.intersect(rhsInverses);
+
+    // FIXME: Check for conflicts
+  }
+
+  if (superclass)
+    members.push_back(superclass);
+
+  if (members.empty() && inverses.empty() && !anyObject)
+    return Type();
+
+  return ProtocolCompositionType::get(ctx, members, inverses, anyObject);
+}
+
+static Type superclassJoinMeetImpl(Operation op, Type lhs, Type rhs) {
+  if (op == Operation::Join) {
+    // Try to find a common superclass.
+    SmallVector<Type, 2> lhsSuper;
+
+    auto lhsClass = lhs;
+    while (lhsClass) {
+      lhsSuper.push_back(lhsClass);
+      lhsClass = lhsClass->getSuperclass();
+    }
+
+    SmallVector<Type, 2> rhsSuper;
+    auto rhsClass = rhs;
+    while (rhsClass) {
+      rhsSuper.push_back(rhsClass);
+      rhsClass = rhsClass->getSuperclass();
+    }
+
+    std::reverse(lhsSuper.begin(), lhsSuper.end());
+    std::reverse(rhsSuper.begin(), rhsSuper.end());
+
+    unsigned i = std::min(lhsSuper.size(), rhsSuper.size());
+    while (i > 0) {
+      --i;
+      if (lhsSuper[i]->isEqual(rhsSuper[i]))
+        return lhsSuper[i];
+    }
+  } else {
+    // Check if one is a subclass of the other.
+    if (isSubclassOf(lhs, rhs))
+      return lhs;
+    else if (isSubclassOf(rhs, lhs))
+      return rhs;
+  }
+
+  return Type();
+}
+
+static std::optional<AnyFunctionType::ExtInfo>
+extInfoJoinMeetImpl(Operation op,
+                    AnyFunctionType::ExtInfo lhsInfo,
+                    AnyFunctionType::ExtInfo rhsInfo) {
+  bool noEscape, sendable, throwing;
+  Type sendableDep;
+  Type thrownError;
+
+  // Concurrency is too hard to reason about here.
+  if (lhsInfo.getIsolation() != rhsInfo.getIsolation())
+    return std::nullopt;
+
+  auto lhsSendableDep = lhsInfo.getSendableDependentType();
+  auto rhsSendableDep = rhsInfo.getSendableDependentType();
+
+  if (op == Operation::Join) {
+    noEscape = lhsInfo.isNoEscape() || rhsInfo.isNoEscape();
+
+    if (lhsSendableDep && rhsSendableDep) {
+      // Form a tuple; its Sendable iff both components are Sendable.
+      SmallVector<TupleTypeElt, 2> elts;
+      elts.push_back(lhsSendableDep);
+      elts.push_back(rhsSendableDep);
+      sendableDep = TupleType::get(elts, lhsSendableDep->getASTContext());
+      sendable = false;
+    } else if (lhsSendableDep && !rhsSendableDep) {
+      if (rhsInfo.isSendable())
+        sendableDep = lhsSendableDep;
+      sendable = false;
+    } else if (!lhsSendableDep && rhsSendableDep) {
+      if (lhsInfo.isSendable())
+        sendableDep = rhsSendableDep;
+      sendable = false;
+    } else {
+      sendable = lhsInfo.isSendable() && rhsInfo.isSendable();
+    }
+
+    throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
+    Type thrownError;
+    if (throwing) {
+      // Join is only typed-throws if both functions are typed throws.
+      auto lhsThrownError = lhsInfo.getThrownError();
+      auto rhsThrownError = rhsInfo.getThrownError();
+      if (lhsThrownError && rhsThrownError) {
+        auto result = isLikelyExactMatch(thrownError, rhsThrownError);
+        if (result && *result)
+          thrownError = lhsThrownError;
+      }
+    }
+  } else {
+    noEscape = lhsInfo.isNoEscape() && rhsInfo.isNoEscape();
+
+    if (lhsSendableDep && rhsSendableDep) {
+      // We cannot represent the meet of two sendable-dependent types.
+      return std::nullopt;
+    } else if (lhsSendableDep && !rhsSendableDep) {
+      if (rhsInfo.isSendable()) {
+        sendable = true;
+      } else {
+        sendable = false;
+        sendableDep = lhsSendableDep;
+      }
+    } else if (!lhsSendableDep && rhsSendableDep) {
+      if (lhsInfo.isSendable()) {
+        sendable = true;
+      } else {
+        sendable = false;
+        sendableDep = rhsSendableDep;
+      }
+    } else {
+      sendable = lhsInfo.isSendable() || rhsInfo.isSendable();
+    }
+
+    throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();
+    Type thrownError;
+    if (throwing) {
+      auto lhsThrownError = lhsInfo.getThrownError();
+      auto rhsThrownError = rhsInfo.getThrownError();
+
+      // Meet is typed-throws if at least one is typed throws.
+      if (!lhsThrownError) {
+        thrownError = rhsThrownError;
+      } else {
+        auto result = isLikelyExactMatch(thrownError, rhsThrownError);
+        if (result && !*result)
+          thrownError = Type();
+      }
+    }
+  }
+
+  // FIXME: Implement everything else!
+  return lhsInfo.intoBuilder()
+      .withNoEscape(noEscape)
+      .withThrows(throwing, thrownError)
+      .withSendable(sendable)
+      .withSendableDependentType(sendableDep)
+      .build();
+}
+
+static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
+                                bool *failed) {
+  if (lhs->isEqual(rhs))
+    return lhs;
+
+  auto fail = [&]() -> Type {
+    *failed = true;
+    auto &ctx = lhs->getASTContext();
+    if (op == Operation::Join)
+      return ctx.getAnyExistentialType();
+    return ctx.getNeverType();
+  };
+
+  auto unknown = [&]() -> Type {
+    auto &ctx = lhs->getASTContext();
+    if (op == Operation::Join)
+      return ctx.TheJoinType;
+    return ctx.TheMeetType;
+  };
+
+  auto rec = [&](Type lhs, Type rhs) -> Type {
+    return subtypeJoinMeetImpl(op, lhs, rhs, failed);
+  };
+
+  auto lhsKind = getConversionBehavior(lhs);
+  auto rhsKind = getConversionBehavior(rhs);
+
+  if (lhsKind == ConversionBehavior::Unknown ||
+      rhsKind == ConversionBehavior::Unknown)
+    return unknown();
+
+  if (lhsKind == rhsKind) {
+    switch (lhsKind) {
+    case ConversionBehavior::String:
+    case ConversionBehavior::AnyHashable:
+      ASSERT(false && "Already handled above");
+      break;
+
+    case ConversionBehavior::None: {
+      // These are either singleton types, or they're invariant.
+      auto result = isLikelyExactMatch(lhs, rhs);
+      if (result && !*result)
+        return fail();
+      if (!lhs->hasTypeVariable())
+        return lhs;
+      return rhs;
+    }
+
+    case ConversionBehavior::LValue:
+    case ConversionBehavior::InOut: {
+      // These are invariant.
+      auto result = isLikelyExactMatch(lhs->getWithoutSpecifierType(),
+                                       rhs->getWithoutSpecifierType());
+      if (result && !*result)
+        return fail();
+      if (!lhs->hasTypeVariable())
+        return lhs;
+      return rhs;
+    }
+
+    case ConversionBehavior::Class: {
+      // FIXME: CF toll-free bridging
+
+      auto result = superclassJoinMeetImpl(op, lhs, rhs);
+      if (result)
+        return result;
+
+      return fail();
+    }
+
+    case ConversionBehavior::Array: {
+      auto result = rec(lhs->getArrayElementType(),
+                        rhs->getArrayElementType());
+      return ArraySliceType::get(result);
+    }
+
+    case ConversionBehavior::Dictionary: {
+      auto lhsPair = ConstraintSystem::isDictionaryType(lhs);
+      auto rhsPair = ConstraintSystem::isDictionaryType(rhs);
+
+      auto keyResult = rec(lhsPair->first, rhsPair->first);
+      auto valueResult = rec(lhsPair->second, rhsPair->second);
+
+      return DictionaryType::get(keyResult, valueResult);
+    }
+
+    case ConversionBehavior::Set: {
+      auto lhsElt = *ConstraintSystem::isSetType(lhs);
+      auto rhsElt = *ConstraintSystem::isSetType(rhs);
+
+      auto result = rec(lhsElt, rhsElt);
+
+      auto &ctx = lhs->getASTContext();
+      return BoundGenericType::get(ctx.getSetDecl(), Type(), result);
+    }
+
+    case ConversionBehavior::Double:
+      // Double join CGFloat = Double
+      // Double meet CGFloat = Double
+      if (lhs->isDouble())
+        return lhs;
+      ASSERT(lhs->isCGFloat() && rhs->isDouble());
+      return rhs;
+
+    case ConversionBehavior::Pointer:
+      // FIXME
+      return fail();
+
+    case ConversionBehavior::Optional: {
+      auto result = rec(lhs->getOptionalObjectType(),
+                        rhs->getOptionalObjectType());
+      return OptionalType::get(result);
+    }
+
+    case ConversionBehavior::Function: {
+      auto *lhsFunc = lhs->castTo<FunctionType>();
+      auto *rhsFunc = rhs->castTo<FunctionType>();
+
+      auto result = rec(lhsFunc->getResult(), rhsFunc->getResult());
+
+      SmallVector<AnyFunctionType::Param, 4> params;
+
+      // Note: getConversionBehavior() guarantees the function types don't
+      // contain any parameter packs, so we may assume their lengths are
+      // known.
+      if (lhsFunc->getNumParams() != rhsFunc->getNumParams())
+        return fail();
+
+      for (unsigned i : indices(lhsFunc->getParams())) {
+        auto lhsParam = lhsFunc->getParams()[i];
+        auto rhsParam = rhsFunc->getParams()[i];
+
+        if (lhsParam.getParameterFlags() != rhsParam.getParameterFlags())
+          return fail();
+
+        Type paramType;
+        if (lhsParam.isInOut() || lhsParam.isVariadic()) {
+          ASSERT(rhsParam.isInOut());
+          auto result = isLikelyExactMatch(lhsParam.getPlainType(),
+                                           rhsParam.getPlainType());
+          if (!result)
+            return fail();
+          if (!*result)
+            return fail();
+
+          paramType = lhsParam.getPlainType();
+        } else if (op == Operation::Join) {
+          bool uninhabited = false;
+          paramType = subtypeMeet(lhsParam.getPlainType(),
+                                  rhsParam.getPlainType(),
+                                  &uninhabited);
+          if (uninhabited)
+            return fail();
+        } else {
+          bool existentialUpperBound = false;
+          paramType = subtypeJoin(lhsParam.getPlainType(),
+                                  rhsParam.getPlainType(),
+                                  &existentialUpperBound);
+          if (existentialUpperBound)
+            return fail();
+        }
+
+        params.push_back(lhsParam.withType(paramType));
+      }
+
+      auto extInfo = extInfoJoinMeetImpl(op,
+                                         lhsFunc->getExtInfo(),
+                                         rhsFunc->getExtInfo());
+      if(!extInfo.has_value())
+        return fail();
+
+      return FunctionType::get(params, result, *extInfo);
+    }
+
+    case ConversionBehavior::Metatype: {
+      auto lhsInstance = lhs->getMetatypeInstanceType();
+      auto rhsInstance = rhs->getMetatypeInstanceType();
+
+      Type result;
+      if (!isCovariantInstanceType(lhsInstance) ||
+          !isCovariantInstanceType(rhsInstance)) {
+        result = fail();
+      } else {
+        result = rec(lhsInstance, rhsInstance);
+      }
+
+      if (auto *existentialTy = result->getAs<ExistentialType>())
+        return ExistentialMetatypeType::get(existentialTy->getConstraintType());
+      return MetatypeType::get(result);
+    }
+
+    case ConversionBehavior::Tuple: {
+      auto *lhsTuple = lhs->castTo<TupleType>();
+      auto *rhsTuple = rhs->castTo<TupleType>();
+
+      // Note: getConversionBehavior() guarantees the tuples don't contain
+      // any parameter packs, so we may assume their lengths are known.
+      if (lhsTuple->getNumElements() != rhsTuple->getNumElements())
+        return fail();
+
+      bool lhsLabels = llvm::any_of(lhsTuple->getElements(),
+                                    [&](TupleTypeElt elt) -> bool {
+                                      return elt.hasName();
+                                    });
+      bool rhsLabels = llvm::any_of(rhsTuple->getElements(),
+                                    [&](TupleTypeElt elt) -> bool {
+                                      return elt.hasName();
+                                    });
+
+      SmallVector<TupleTypeElt, 2> elts;
+      for (unsigned i : indices(lhsTuple->getElements())) {
+        auto &lhsElt = lhsTuple->getElement(i);
+        auto &rhsElt = rhsTuple->getElement(i);
+        auto result = rec(lhsElt.getType(), rhsElt.getType());
+        if (lhsLabels && rhsLabels)
+          elts.emplace_back(result, lhsElt.getName());
+        else
+          elts.emplace_back(result);
+      }
+
+      return TupleType::get(elts, lhs->getASTContext());
+    }
+
+    case ConversionBehavior::Existential: {
+      // FIXME: Arrange it so that we don't see bare constraint types here.
+      if (auto *lhsExistential = lhs->getAs<ExistentialType>())
+        lhs = lhsExistential->getConstraintType();
+      if (auto *rhsExistential = rhs->getAs<ExistentialType>())
+        rhs = rhsExistential->getConstraintType();
+
+      auto result = existentialConstraintJoinMeetImpl(op, lhs, rhs);
+      if (!result)
+        return fail();
+      if (result->getClassOrBoundGenericClass())
+        return result;
+      ASSERT(!result->is<ExistentialType>());
+      return ExistentialType::get(result);
+    }
+
+    case ConversionBehavior::ExistentialMetatype: {
+      Type lhsConstraint = lhs->castTo<ExistentialMetatypeType>()->getInstanceType();
+      Type rhsConstraint = rhs->castTo<ExistentialMetatypeType>()->getInstanceType();
+      auto result = existentialConstraintJoinMeetImpl(
+          op, lhsConstraint, rhsConstraint);
+      if (!result)
+        return fail();
+      if (result->getClassOrBoundGenericClass())
+        return MetatypeType::get(result);
+      ASSERT(!result->is<ExistentialType>());
+      return ExistentialMetatypeType::get(result);
+    }
+
+    case ConversionBehavior::Unknown:
+      ASSERT(false && "Handled above");
+    }
+  }
+
+  // The join and meet operations are symmetric.
+  auto either = [&](ConversionBehavior kind) {
+    if (lhsKind == kind) {
+      return true;
+    } else if (rhsKind == kind) {
+      std::swap(lhs, rhs);
+      std::swap(lhsKind, rhsKind);
+      return true;
+    } else {
+      return false;
+    }
+  };
+
+  if (either(ConversionBehavior::LValue)) {
+    // @lvalue X join Y = X join Y
+    // @lvalue X meet Y = @lvalue X if X is a subtype of Y, otherwise uninhabited
+    if (op == Operation::Join) {
+      return rec(lhs->getWithoutSpecifierType(), rhs);
+    } else {
+      auto rvalueTy = rec(lhs->getWithoutSpecifierType(), rhs);
+      auto result = isLikelyExactMatch(lhs->getWithoutSpecifierType(), rvalueTy);
+      if (result && !*result)
+        return fail();
+      return lhs;
+    }
+  }
+
+  if (either(ConversionBehavior::Class)) {
+    if (rhsKind == ConversionBehavior::None &&
+        rhs->is<ArchetypeType>()) {
+      // If T has a superclass bound D:
+      //
+      // C join T = C join D
+      // C meet T = T if C is a superclass of D, otherwise uninhabited
+      if (op == Operation::Join) {
+        auto superclassTy = rhs->getSuperclass();
+        if (!superclassTy)
+          return fail();
+        return rec(lhs, superclassTy);
+      } else {
+        if (!isSubclassOf(rhs, lhs))
+          return fail();
+        return rhs;
+      }
+    }
+  }
+
+  if (either(ConversionBehavior::AnyHashable)) {
+    if (rhsKind == ConversionBehavior::Optional &&
+        rhs->getOptionalObjectType()->isAnyHashable()) {
+      // Special case.
+      //
+      // AnyHashable join AnyHashable? = AnyHashable?
+      // AnyHashable meet AnyHashable? = AnyHashable
+      if (op == Operation::Join)
+        return rhs;
+      return lhs;
+    }
+
+    // If T conforms to Hashable:
+    //
+    // AnyHashable join T = AnyHashable
+    // AnyHashable meet T = T
+    auto &ctx = rhs->getASTContext();
+    auto *hashableProto = ctx.getProtocol(KnownProtocolKind::Hashable);
+    if (!hashableProto)
+      return fail();
+    if (!lookupConformance(rhs, hashableProto))
+      return fail();
+    if (op == Operation::Join)
+      return lhs;
+    else
+      return rhs;
+  }
+
+  if (either(ConversionBehavior::Existential)) {
+    if (op == Operation::Join) {
+      // Incomplete implementation.
+      //
+      // FIXME: Delete requirements concrete type doesn't satisfy, and form new
+      // existential.
+      if (isSubtypeOfExistentialType(rhs, lhs))
+        return lhs;
+
+      if (auto superclassTy = lhs->getSuperclass())
+        return rec(superclassTy, rhs);
+    } else {
+      if (isSubtypeOfExistentialType(rhs, lhs))
+        return rhs;
+    }
+  }
+
+  if (either(ConversionBehavior::ExistentialMetatype)) {
+    if (rhs->is<MetatypeType>()) {
+      auto lhsInstance = lhs->getMetatypeInstanceType();
+      auto rhsInstance = rhs->getMetatypeInstanceType();
+
+      if (op == Operation::Join) {
+        // Incomplete implementation.
+        //
+        // FIXME: Delete requirements concrete type doesn't satisfy, and form new
+        // existential.
+        if (isSubtypeOfExistentialType(rhsInstance, lhsInstance))
+          return lhs;
+
+        if (auto superclassTy = lhsInstance->getSuperclass()) {
+          return rec(MetatypeType::get(superclassTy), rhs);
+        }
+      } else {
+        if (isSubtypeOfExistentialType(rhsInstance, lhsInstance))
+          return rhs;
+      }
+    }
+  }
+
+  if (either(ConversionBehavior::Optional)) {
+    // U join Optional<T> = Optional<T join U>
+    // U meet Optional<T> = T meet U
+    auto joined = rec(lhs->getOptionalObjectType(), rhs);
+    if (op == Operation::Join)
+      return OptionalType::get(joined);
+    else
+      return joined;
+  }
+
+  return fail();
+}
+
+Type swift::constraints::subtypeJoin(Type lhs, Type rhs,
+                                     bool *existentialUpperBound) {
+  return subtypeJoinMeetImpl(Operation::Join, lhs, rhs,
+                             existentialUpperBound);
+}
+
+Type swift::constraints::subtypeMeet(Type lhs, Type rhs,
+                                     bool *uninhabited) {
+  return subtypeJoinMeetImpl(Operation::Meet, lhs, rhs,
+                             uninhabited);
+}
+
+/// This could almost use Type::transformWithPosition(), however that would give
+/// us no way to construct the correct locator.
+static Type openTypeJoinsAndMeetsRec(ConstraintSystem &cs, Type type,
+                                     ConstraintLocatorBuilder locator) {
+  auto rec = [&](Type type, LocatorPathElt elt,
+                 std::optional<LocatorPathElt> secondElt=std::nullopt) -> Type {
+    if (!type->hasJoinOrMeet())
+      return type;
+
+    auto subLocator = locator.withPathElement(elt);
+    return openTypeJoinsAndMeetsRec(cs, type,
+                                    (secondElt.has_value()
+                                     ? subLocator.withPathElement(*secondElt)
+                                     : subLocator));
+  };
+
+  if (type->is<MeetType>() || type->is<JoinType>()) {
+    unsigned options = TVO_PrefersSubtypeBinding | TVO_CanBindToHole;
+    return cs.createTypeVariable(cs.getConstraintLocator(locator), options);
+  }
+
+  switch (getConversionBehavior(type)) {
+  case ConversionBehavior::Optional: {
+    auto result = rec(type->getOptionalObjectType(),
+                      LocatorPathElt::GenericArgument(0));
+    return OptionalType::get(result);
+  }
+
+  case ConversionBehavior::Array: {
+    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto result = rec(boundTy->getGenericArgs()[0],
+                      LocatorPathElt::GenericArgument(0));
+    return ArraySliceType::get(result);
+  }
+
+  case ConversionBehavior::Dictionary: {
+    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto keyTy = rec(boundTy->getGenericArgs()[0],
+                      LocatorPathElt::GenericArgument(0));
+    auto valueTy = rec(boundTy->getGenericArgs()[1],
+                       LocatorPathElt::GenericArgument(1));
+    return DictionaryType::get(keyTy, valueTy);
+  }
+
+  case ConversionBehavior::Set: {
+    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto eltTy = rec(boundTy->getGenericArgs()[0],
+                     LocatorPathElt::GenericArgument(0));
+
+    auto &ctx = cs.getASTContext();
+    return BoundGenericType::get(ctx.getSetDecl(), Type(), eltTy);
+  }
+
+  case ConversionBehavior::Function: {
+    auto *funcTy = type->castTo<FunctionType>();
+
+    auto result = rec(funcTy->getResult(),
+                      ConstraintLocator::FunctionResult);
+
+    SmallVector<AnyFunctionType::Param, 4> params;
+    for (unsigned i : indices(funcTy->getParams())) {
+      const auto &param = funcTy->getParams()[i];
+      auto paramType = rec(param.getPlainType(),
+                           LocatorPathElt::FunctionArgument(),
+                           LocatorPathElt::TupleElement(i));
+      params.push_back(param.withType(paramType));
+    }
+
+    return FunctionType::get(params, result, funcTy->getExtInfo());
+  }
+
+  case ConversionBehavior::Metatype: {
+    auto instanceTy = rec(type->getMetatypeInstanceType(),
+                          ConstraintLocator::InstanceType);
+    return MetatypeType::get(instanceTy);
+  }
+
+  case ConversionBehavior::Tuple: {
+    auto *tupleTy = type->castTo<TupleType>();
+
+    SmallVector<TupleTypeElt, 2> elts;
+    for (unsigned i : indices(tupleTy->getElements())) {
+      const auto &elt = tupleTy->getElement(i);
+      auto eltTy = rec(elt.getType(),
+                       LocatorPathElt::TupleElement(i));
+      elts.emplace_back(eltTy, elt.getName());
+    }
+
+    return TupleType::get(elts, cs.getASTContext());
+  }
+
+  default:
+    ASSERT(!type->hasJoinOrMeet() && "Don't expect to see variance here");
+    return type;
+  }
+}
+
+/// Replace JoinType and MeetType with fresh type variables.
+Type swift::constraints::openTypeJoinsAndMeets(ConstraintSystem &cs, Type type,
+                                               ConstraintLocator *locator) {
+  if (!type->hasJoinOrMeet())
+    return type;
+
+  // These should never appear at the top level, or we'll enter an infinite loop.
+  ASSERT(!type->is<JoinType>() && !type->is<MeetType>());
+
+  return openTypeJoinsAndMeetsRec(cs, type, locator);
+}
+
 void swift::constraints::simple_display(llvm::raw_ostream &out,
                                         ConflictReason reason) {
   if (!reason)
@@ -730,8 +1739,8 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " exact";
   if (reason.contains(ConflictFlag::Class))
     out << " class";
-  if (reason.contains(ConflictFlag::Structural))
-    out << " structural";
+  if (reason.contains(ConflictFlag::Metatype))
+    out << " metatype";
   if (reason.contains(ConflictFlag::Array))
     out << " array";
   if (reason.contains(ConflictFlag::DictionaryKey))
@@ -742,12 +1751,12 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " set";
   if (reason.contains(ConflictFlag::Optional))
     out << " optional";
-  if (reason.contains(ConflictFlag::Structural))
-    out << " structural";
   if (reason.contains(ConflictFlag::Conformance))
     out << " conformance";
   if (reason.contains(ConflictFlag::TupleArity))
     out << " tuple_arity";
   if (reason.contains(ConflictFlag::TupleElement))
     out << " tuple_element";
+  if (reason.contains(ConflictFlag::Existential))
+    out << " existential";
 }

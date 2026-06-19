@@ -126,9 +126,6 @@ TypeVarBindingProducer::TypeVarBindingProducer(
     return;
   }
 
-  // A binding to `Any` which should always be considered as a last resort.
-  std::optional<Binding> Any;
-
   // FIXME: Move this into BindingSet.
   auto adjustBinding = [&](const Binding &binding) -> Binding {
     // Adjust optionality of existing bindings based on presence of
@@ -143,11 +140,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(
     // Adjust optionality of existing bindings based on presence of
     // `ExpressibleByNilLiteral` requirement.
     auto adjustedBinding = adjustBinding(binding);
-    if (adjustedBinding.BindingType->isAny()) {
-      Any.emplace(adjustedBinding);
-    } else {
-      Bindings.push_back(adjustedBinding);
-    }
+    Bindings.push_back(adjustedBinding);
   };
 
   if (TypeVar->getImpl().isPackExpansion()) {
@@ -202,13 +195,6 @@ TypeVarBindingProducer::TypeVarBindingProducer(
                 literal.isDirectRequirement() ? BindingKind::Subtypes
                                               : BindingKind::Supertypes,
                 literal.getSource()});
-  }
-
-  // Let's always consider `Any` to be a last resort binding because
-  // it's always better to infer concrete type and erase it if required
-  // by the context.
-  if (Any) {
-    Bindings.push_back(*Any);
   }
 
   for (auto *constraint : bindings.Defaults) {
@@ -273,9 +259,6 @@ bool TypeVarBindingProducer::computeNext() {
     auto type = binding.BindingType;
 
     // If we've already tried this binding, move on.
-    if (!BoundTypes.insert(type.getPointer()).second)
-      return;
-
     if (!ExploredTypes.insert(type->getCanonicalType()).second)
       return;
 
