@@ -501,13 +501,13 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
 
   NLOptions nlOptions = {NLFlag::UnqualifiedDefault};
   if (options.contains(Flags::IncludeUsableFromInline))
-    nlOptions |= NLFlag::IncludeUsableFromInline;
+    nlOptions |= NLOptions(NLFlag::IncludeUsableFromInline);
   if (options.contains(Flags::ExcludeMacroExpansions))
-    nlOptions |= NLFlag::ExcludeMacroExpansions;
+    nlOptions |= NLOptions(NLFlag::ExcludeMacroExpansions);
   if (options.contains(Flags::ABIProviding))
-    nlOptions |= NLFlag::ABIProviding;
+    nlOptions |= NLOptions(NLFlag::ABIProviding);
   if (options.contains(Flags::IgnoreAccessControl))
-    nlOptions |= NLFlag::IgnoreAccessControl;
+    nlOptions |= NLOptions(NLFlag::IgnoreAccessControl);
 
   lookupInModule(moduleToLookIn, Name.getFullName(), Name.hasModuleSelector(),
                  CurModuleResults, NLKind::UnqualifiedLookup, resolutionKind,
@@ -626,17 +626,17 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     const bool isOriginallyMacroLookup) {
   NLOptions baseNLOptions = {NLFlag::UnqualifiedDefault};
   if (options.contains(Flags::AllowProtocolMembers))
-    baseNLOptions |= NLFlag::ProtocolMembers;
+    baseNLOptions |= NLOptions(NLFlag::ProtocolMembers);
   if (isOriginallyTypeLookup)
-    baseNLOptions |= NLFlag::OnlyTypes;
+    baseNLOptions |= NLOptions(NLFlag::OnlyTypes);
   if (isOriginallyMacroLookup)
-    baseNLOptions |= NLFlag::OnlyMacros;
+    baseNLOptions |= NLOptions(NLFlag::OnlyMacros);
   if (options.contains(Flags::IgnoreAccessControl))
-    baseNLOptions |= NLFlag::IgnoreAccessControl;
+    baseNLOptions |= NLOptions(NLFlag::IgnoreAccessControl);
   if (options.contains(Flags::IgnoreMissingImports))
-    baseNLOptions |= NLFlag::IgnoreMissingImports;
+    baseNLOptions |= NLOptions(NLFlag::IgnoreMissingImports);
   if (options.contains(Flags::ABIProviding))
-    baseNLOptions |= NLFlag::ABIProviding;
+    baseNLOptions |= NLOptions(NLFlag::ABIProviding);
   return baseNLOptions;
 }
 

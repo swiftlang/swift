@@ -3226,15 +3226,15 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::AllowUsableFromInline))
-      options |= NLFlag::IncludeUsableFromInline;
+      options |= NLOptions(NLFlag::IncludeUsableFromInline);
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
-      options |= NLFlag::IgnoreMissingImports;
+      options |= NLOptions(NLFlag::IgnoreMissingImports);
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
-      options |= NLFlag::ExcludeMacroExpansions;
+      options |= NLOptions(NLFlag::ExcludeMacroExpansions);
 
     // Look through the type declarations we were given, resolving them down
     // to nominal type declarations, module declarations, and

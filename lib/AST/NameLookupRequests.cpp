@@ -601,10 +601,10 @@ contextualizeOptions(const DeclContext *dc, SourceLoc loc,
                      NLOptions options) {
   if (!options.contains(NLFlag::ExcludeMacroExpansions)
       && namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
-    options |= NLFlag::ExcludeMacroExpansions;
+    options |= NLOptions(NLFlag::ExcludeMacroExpansions);
   if (!options.contains(NLFlag::ABIProviding)
       && namelookup::isInABIAttr(dc->getParentSourceFile(), loc))
-    options |= NLFlag::ABIProviding;
+    options |= NLOptions(NLFlag::ABIProviding);
 
   return options;
 }

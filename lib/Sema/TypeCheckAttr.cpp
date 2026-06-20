@@ -3904,7 +3904,7 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
 
   NLOptions options = {NLFlag::QualifiedDefault};
   if (declCtxt->isInSpecializeExtensionContext())
-    options |= NLFlag::IncludeUsableFromInline;
+    options |= NLOptions(NLFlag::IncludeUsableFromInline);
 
   if (typeCtx)
     moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,

@@ -101,7 +101,6 @@ namespace swift {
   class MacroDefinition;
   class ModuleDecl;
   class NamedPattern;
-  // enum NLOptions : unsigned;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;

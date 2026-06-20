@@ -25,6 +25,7 @@
 #include "swift/AST/GenericTypeParamKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LayoutConstraintKind.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/WarningGroupBehavior.h"

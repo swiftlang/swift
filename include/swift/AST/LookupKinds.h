@@ -17,6 +17,14 @@
 #ifndef SWIFT_LOOKUPKINDS_H
 #define SWIFT_LOOKUPKINDS_H
 
+/// `LookupKinds.h` is imported into Swift. Be *very* careful with what you
+/// include here and keep these includes minimal!
+/// If you don't need to import a header into Swift, include it in a
+/// `#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE`
+/// block below instead.
+///
+/// See include guidelines and caveats in `BasicBridging.h`.
+
 #include "swift/Basic/OptionSet.h"
 
 namespace swift {
@@ -91,28 +99,15 @@ inline bool operator==(NLOptions lhs, NLOptions rhs) {
   return lhs.containsOnly(rhs);
 }
 
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
 inline llvm::hash_code hash_value(NLOptions options) {
   return llvm::hash_value(options.toRaw());
 }
 
-// static inline NLOptions operator|(NLOptions lhs, NLOptions rhs) {
-//   return NLOptions(unsigned(lhs) | unsigned(rhs));
-// }
-// static inline NLOptions &operator|=(NLOptions &lhs, NLOptions rhs) {
-//   return (lhs = lhs | rhs);
-// }
-// static inline NLOptions operator&(NLOptions lhs, NLOptions rhs) {
-//   return NLOptions(unsigned(lhs) & unsigned(rhs));
-// }
-// static inline NLOptions &operator&=(NLOptions &lhs, NLOptions rhs) {
-//   return (lhs = lhs & rhs);
-// }
-// static inline NLOptions operator~(NLOptions value) {
-//   return NLOptions(~(unsigned)value);
-// }
-
 void simple_display(llvm::raw_ostream &out, NLOptions options);
 
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
 /// Flags affecting module-level lookup.
 enum class ModuleLookupFlags : unsigned {

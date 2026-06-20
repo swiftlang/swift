@@ -377,11 +377,11 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   LookupResult result;
   NLOptions subOptions = {NLFlag::QualifiedDefault, NLFlag::ProtocolMembers};
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
-    subOptions |= NLFlag::IgnoreAccessControl;
+    subOptions |= NLOptions(NLFlag::IgnoreAccessControl);
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
-    subOptions |= NLFlag::IgnoreMissingImports;
+    subOptions |= NLOptions(NLFlag::IgnoreMissingImports);
   if (options.contains(NameLookupFlags::ABIProviding))
-    subOptions |= NLFlag::ABIProviding;
+    subOptions |= NLOptions(NLFlag::ABIProviding);
 
   // We handle our own overriding/shadowing filtering.
   subOptions -= NLOptions(NLFlag::RemoveOverridden);
@@ -479,13 +479,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
                           NLFlag::ProtocolMembers};
 
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
-    subOptions |= NLFlag::IgnoreAccessControl;
+    subOptions |= NLOptions(NLFlag::IgnoreAccessControl);
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
-    subOptions |= NLFlag::IgnoreMissingImports;
+    subOptions |= NLOptions(NLFlag::IgnoreMissingImports);
   if (options.contains(NameLookupFlags::IncludeUsableFromInline))
-    subOptions |= NLFlag::IncludeUsableFromInline;
+    subOptions |= NLOptions(NLFlag::IncludeUsableFromInline);
   if (options.contains(NameLookupFlags::ABIProviding))
-    subOptions |= NLFlag::ABIProviding;
+    subOptions |= NLOptions(NLFlag::ABIProviding);
 
   // Make sure we've resolved implicit members, if we need them.
   namelookup::installSemanticMembersIfNeeded(type, name);
