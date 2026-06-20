@@ -175,9 +175,10 @@ internal func _expectEnd<C: Collection>(of s: C, is i: C.Index) {
     "invalid Collection: count differed in successive traversals")
 }
 
-@inlinable
+/// Returns a grown capacity for a buffer of `capacity` elements.
+@inlinable @inline(__always)
 internal func _growArrayCapacity(_ capacity: Int) -> Int {
-  return capacity * 2
+  return capacity &+ (capacity &>> 2)
 }
 
 @_alwaysEmitIntoClient
