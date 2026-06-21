@@ -466,7 +466,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows" AND BOOTSTRAPPING_MODE STREQUAL "HO
 endif()
 
 if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     # In debug builds, to workaround a problem with LLDB's `po` command (rdar://115770255).
     set(BRIDGING_MODE "PURE")
   else()
