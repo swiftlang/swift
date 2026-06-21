@@ -44,16 +44,41 @@ public final class NinjaBuildDir: Sendable {
   // We can infer the project root from the location of swift-xcodegen itself.
   //                      1     2         3          4           5         6      7
   // #filePath = <root>/swift/utils/swift-dev-utils/Sources/SwiftXcodeGen/Ninja/NinjaBuildDir.swift
-  private static let inferredProjectRootPath = AbsolutePath(#filePath).dropLast(7)
+  internal static let fallbackProjectRootPath = AbsolutePath(#filePath).dropLast(7)
 
-  private static func detectProjectRoot() throws -> AbsolutePath {
-    let inferredSwiftPath = inferredProjectRootPath.appending(Repo.swift.relativePath)
+  private static func detectProjectRoot(
+    buildDir: AbsolutePath
+  ) throws -> AbsolutePath {
+    // First try to infer the project root relative to the build directory,
+    // according to where build-script normally puts it:
+    // '<root>/build/<build-dir>'. This lets swift-xcodegen produce a
+    // correct project when run against a build directory belonging to a
+    // different checkout than the one containing this file.
+    //
+    // TODO: Explore the possibility of inferring source directories on demand
+    //       from CMake cache files instead of inferring a project root early.
+    //       This will cover both the case described above and worktrees.
+    if let parent = buildDir.parentDir, parent.fileName == "build",
+      let projectRoot = parent.parentDir,
+      projectRoot.appending(Repo.swift.relativePath).exists
+    {
+      return projectRoot
+    }
+
+    log.warning(
+      """
+      Failed to infer project root directory from build directory \
+      '\(buildDir)'; falling back to '\(Self.fallbackProjectRootPath)'
+      """
+    )
+
+    let inferredSwiftPath = fallbackProjectRootPath.appending(Repo.swift.relativePath)
     guard inferredSwiftPath.exists else {
       throw XcodeGenError.couldNotInferProjectRoot(
         reason: "expected swift repo at '\(inferredSwiftPath)'"
       )
     }
-    return inferredProjectRootPath
+    return fallbackProjectRootPath
   }
   
   public init(at path: AbsolutePath, projectRootDir: AbsolutePath?) throws {
@@ -62,7 +87,13 @@ public final class NinjaBuildDir: Sendable {
     }
     self.path = path
     self._tripleSuffix = Self.detectTripleSuffix(buildDir: path)
-    self.projectRootDir = try projectRootDir ?? Self.detectProjectRoot()
+
+    if let projectRootDir {
+      self.projectRootDir = projectRootDir
+    } else {
+      self.projectRootDir = try Self.detectProjectRoot(buildDir: path)
+      log.debug("Inferred project root directory as '\(self.projectRootDir)'")
+    }
   }
   
   public func buildDir(for repo: Repo) throws -> RepoBuildDir {
