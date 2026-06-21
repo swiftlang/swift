@@ -406,11 +406,10 @@ public:
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
 
-  Mangle::ManglingFlavor getManglingFlavor() {
-    return Mangle::ManglingFlavor::Default;
-  }
+  Mangle::ManglingFlavor getManglingFlavor() const { return Flavor; }
 
 private:
+  Mangle::ManglingFlavor Flavor;
   Demangle::Demangler Dem;
 
   /// Makes sure dynamically allocated TypeRefs stick around for the life of
@@ -868,7 +867,7 @@ public:
 
   const BuiltinTypeRef *createBuiltinType(const std::string &builtinName,
                                           const std::string &mangledName) {
-    return BuiltinTypeRef::create(*this, mangledName);
+    return BuiltinTypeRef::create(*this, mangledName, getManglingFlavor());
   }
 
   BuiltTypeDecl createTypeDecl(Node *node, std::vector<size_t> paramsPerLevel) {
@@ -909,12 +908,14 @@ public:
   }
 
   const NominalTypeRef *createNominalType(const BuiltTypeDecl &typeRefDecl) {
-    return NominalTypeRef::create(*this, typeRefDecl->mangledName, nullptr);
+    return NominalTypeRef::create(*this, typeRefDecl->mangledName,
+                                  getManglingFlavor());
   }
 
   const NominalTypeRef *createNominalType(const BuiltTypeDecl &typeRefDecl,
                                           const TypeRef *parent) {
-    return NominalTypeRef::create(*this, typeRefDecl->mangledName, parent);
+    return NominalTypeRef::create(*this, typeRefDecl->mangledName,
+                                  getManglingFlavor(), parent);
   }
 
   const TypeRef *createTypeAliasType(const BuiltTypeDecl &typeRefDecl,
@@ -951,7 +952,7 @@ public:
   }
 
   const TypeRef *createIntegerType(intptr_t value) {
-    return IntegerTypeRef::create(*this, value);
+    return IntegerTypeRef::create(*this, value, getManglingFlavor());
   }
 
   // TypeRefs model generic values as distinct IntegerTypeRefs, so a value
@@ -963,16 +964,17 @@ public:
   }
 
   const TypeRef *createNegativeIntegerType(intptr_t value) {
-    return IntegerTypeRef::create(*this, value);
+    return IntegerTypeRef::create(*this, value, getManglingFlavor());
   }
 
   const TypeRef *createBuiltinFixedArrayType(const TypeRef *size,
                                              const TypeRef *element) {
-    return BuiltinFixedArrayTypeRef::create(*this, size, element);
+    return BuiltinFixedArrayTypeRef::create(*this, size, element,
+                                            getManglingFlavor());
   }
 
   const TypeRef *createBuiltinBorrowType(const TypeRef *referent) {
-    return BuiltinBorrowTypeRef::create(*this, referent);
+    return BuiltinBorrowTypeRef::create(*this, referent, getManglingFlavor());
   }
 
   // Construct a bound generic type ref along with the parent type info
@@ -1032,7 +1034,7 @@ public:
 
       // Extend the typeref list towards the innermost type
       typeref = BoundGenericTypeRef::create(*this, mangling.result(), params,
-                                            typeref);
+                                            getManglingFlavor(), typeref);
     }
     return typeref;
   }
@@ -1048,7 +1050,7 @@ public:
     auto maybeGenericParamsPerLevel = builtTypeDecl->genericParamsPerLevel;
     if (!maybeGenericParamsPerLevel) {
       return BoundGenericTypeRef::create(*this, builtTypeDecl->mangledName,
-                                         args, nullptr);
+                                         args, getManglingFlavor());
     }
 
     // Otherwise, work from a full demangle tree to produce a
@@ -1098,7 +1100,7 @@ public:
 
     // Build and return the top typeref
     return BoundGenericTypeRef::create(*this, mangling.result(), params,
-                                       parents);
+                                       getManglingFlavor(), parents);
   }
 
   const BoundGenericTypeRef *
@@ -1110,7 +1112,7 @@ public:
 
     if (!builtTypeDecl->genericParamsPerLevel)
       return BoundGenericTypeRef::create(*this, builtTypeDecl->mangledName,
-                                         args, parent);
+                                         args, getManglingFlavor(), parent);
     assert(parent == nullptr &&
            "Parent is not null but we're reconstructing the parent!");
     return createBoundGenericType(builtTypeDecl, args);
@@ -1169,19 +1171,20 @@ public:
     }
 
     // Otherwise, build a type ref that represents the opaque type.
-    return OpaqueArchetypeTypeRef::create(*this, mangling.result(),
-                                          nodeToString(opaqueDescriptor),
-                                          ordinal, genericArgs);
+    return OpaqueArchetypeTypeRef::create(
+        *this, mangling.result(), nodeToString(opaqueDescriptor), ordinal,
+        genericArgs, getManglingFlavor());
   }
 
   const TupleTypeRef *createTupleType(llvm::ArrayRef<const TypeRef *> elements,
                                       llvm::ArrayRef<StringRef> labels) {
     std::vector<std::string> labelsVec(labels.begin(), labels.end());
-    return TupleTypeRef::create(*this, elements, labelsVec);
+    return TupleTypeRef::create(*this, elements, labelsVec,
+                                getManglingFlavor());
   }
 
   const TypeRef *createPackType(llvm::ArrayRef<const TypeRef *> elements) {
-    return PackTypeRef::create(*this, elements);
+    return PackTypeRef::create(*this, elements, getManglingFlavor());
   }
 
   const TypeRef *createSILPackType(llvm::ArrayRef<const TypeRef *> elements,
@@ -1202,7 +1205,8 @@ public:
   const TypeRef *createExpandedPackElement(const TypeRef *patternType) {
     assert(!ActivePackExpansions.empty());
     auto countType = ActivePackExpansions.back();
-    return PackExpansionTypeRef::create(*this, patternType, countType);
+    return PackExpansionTypeRef::create(*this, patternType, countType,
+                                        getManglingFlavor());
   }
 
   void endPackExpansion() {
@@ -1216,7 +1220,8 @@ public:
       FunctionMetadataDifferentiabilityKind diffKind,
       const TypeRef *globalActor, const TypeRef *thrownError) {
     return FunctionTypeRef::create(*this, params, result, flags, extFlags,
-                                   diffKind, globalActor, thrownError);
+                                   diffKind, globalActor, thrownError,
+                                   getManglingFlavor());
   }
 
   const FunctionTypeRef *createImplFunctionType(
@@ -1278,7 +1283,8 @@ public:
 
     auto result = createTupleType({}, llvm::ArrayRef<llvm::StringRef>());
     return FunctionTypeRef::create(*this, {}, result, funcFlags, extFuncFlags,
-                                   diffKind, nullptr, nullptr);
+                                   diffKind, nullptr, nullptr,
+                                   getManglingFlavor());
   }
 
   BuiltType createProtocolTypeFromDecl(BuiltProtocolDecl protocol) {
@@ -1305,8 +1311,8 @@ public:
       protocolRefs.push_back(protocolType);
     }
 
-    return ProtocolCompositionTypeRef::create(*this, protocolRefs, superclass,
-                                              isClassBound);
+    return ProtocolCompositionTypeRef::create(
+        *this, protocolRefs, superclass, isClassBound, getManglingFlavor());
   }
 
   const ConstrainedExistentialTypeRef *createConstrainedExistentialType(
@@ -1316,7 +1322,8 @@ public:
     auto *baseProto = llvm::dyn_cast<ProtocolCompositionTypeRef>(base);
     if (!baseProto)
       return nullptr;
-    return ConstrainedExistentialTypeRef::create(*this, baseProto, constraints);
+    return ConstrainedExistentialTypeRef::create(*this, baseProto, constraints,
+                                                 getManglingFlavor());
   }
 
   const TypeRef *
@@ -1349,14 +1356,16 @@ public:
   const ExistentialMetatypeTypeRef *createExistentialMetatypeType(
       const TypeRef *instance,
       std::optional<Demangle::ImplMetatypeRepresentation> repr = std::nullopt) {
-    return ExistentialMetatypeTypeRef::create(*this, instance);
+    return ExistentialMetatypeTypeRef::create(*this, instance,
+                                              getManglingFlavor());
   }
 
   const MetatypeTypeRef *createMetatypeType(
       const TypeRef *instance,
       std::optional<Demangle::ImplMetatypeRepresentation> repr = std::nullopt) {
     bool WasAbstract = (repr && *repr != ImplMetatypeRepresentation::Thin);
-    return MetatypeTypeRef::create(*this, instance, WasAbstract);
+    return MetatypeTypeRef::create(*this, instance, WasAbstract,
+                                   getManglingFlavor());
   }
 
   void pushGenericParams(
@@ -1366,12 +1375,14 @@ public:
   const GenericTypeParameterTypeRef *
   createGenericTypeParameterType(unsigned depth, unsigned index) {
     // FIXME: variadic generics
-    return GenericTypeParameterTypeRef::create(*this, depth, index);
+    return GenericTypeParameterTypeRef::create(*this, depth, index,
+                                               getManglingFlavor());
   }
 
   const DependentMemberTypeRef *
   createDependentMemberType(const std::string &member, const TypeRef *base) {
-    return DependentMemberTypeRef::create(*this, member, base, "");
+    return DependentMemberTypeRef::create(*this, member, base, "",
+                                          getManglingFlavor());
   }
 
   const DependentMemberTypeRef *
@@ -1380,17 +1391,18 @@ public:
     // Objective-C protocols don't have dependent types.
     if (protocol->second)
       return nullptr;
-    return DependentMemberTypeRef::create(*this, member, base, protocol->first);
+    return DependentMemberTypeRef::create(*this, member, base, protocol->first,
+                                          getManglingFlavor());
   }
 
 #define REF_STORAGE(Name, ...)                                                 \
   const Name##StorageTypeRef *create##Name##StorageType(const TypeRef *base) { \
-    return Name##StorageTypeRef::create(*this, base);                          \
+    return Name##StorageTypeRef::create(*this, base, getManglingFlavor());     \
   }
 #include "swift/AST/ReferenceStorage.def"
 
   const SILBoxTypeRef *createSILBoxType(const TypeRef *base) {
-    return SILBoxTypeRef::create(*this, base);
+    return SILBoxTypeRef::create(*this, base, getManglingFlavor());
   }
 
   using BuiltSILBoxField = typename SILBoxTypeWithLayoutTypeRef::Field;
@@ -1416,8 +1428,8 @@ public:
       const llvm::SmallVectorImpl<BuiltRequirement> &Requirements,
       llvm::ArrayRef<BuiltInverseRequirement> InverseRequirements) {
     // FIXME: Handle inverse requirements.
-    return SILBoxTypeWithLayoutTypeRef::create(*this, Fields, Substitutions,
-                                               Requirements);
+    return SILBoxTypeWithLayoutTypeRef::create(
+        *this, Fields, Substitutions, Requirements, getManglingFlavor());
   }
 
   bool isExistential(const TypeRef *) {
@@ -1435,7 +1447,7 @@ public:
   }
 
   const ObjCClassTypeRef *createObjCClassType(const std::string &name) {
-    return ObjCClassTypeRef::create(*this, name);
+    return ObjCClassTypeRef::create(*this, name, getManglingFlavor());
   }
 
   const ObjCClassTypeRef *
@@ -1447,12 +1459,12 @@ public:
   }
 
   const ObjCProtocolTypeRef *createObjCProtocolType(const std::string &name) {
-    return ObjCProtocolTypeRef::create(*this, name);
+    return ObjCProtocolTypeRef::create(*this, name, getManglingFlavor());
   }
 
   const ForeignClassTypeRef *
   createForeignClassType(const std::string &mangledName) {
-    return ForeignClassTypeRef::create(*this, mangledName);
+    return ForeignClassTypeRef::create(*this, mangledName, getManglingFlavor());
   }
 
   const ForeignClassTypeRef *getUnnamedForeignClassType() {
@@ -1508,7 +1520,9 @@ public:
 
   // Only for testing. A TypeRefBuilder built this way will not be able to
   // decode records in remote memory.
-  explicit TypeRefBuilder(ForTesting_t) : TC(*this), RDF(*this, nullptr) {}
+  explicit TypeRefBuilder(ForTesting_t)
+      : Flavor(Mangle::ManglingFlavor::Default), TC(*this),
+        RDF(*this, nullptr) {}
 
 private:
   /// Indexes of Reflection Infos we've already processed.
@@ -1586,10 +1600,13 @@ private:
 
 public:
   template <typename Runtime>
-  TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader,
-                 remote::ExternalTypeRefCache *externalCache = nullptr,
-                 DescriptorFinder *externalDescriptorFinder = nullptr)
-      : TC(*this), EDF(externalDescriptorFinder), RDF(*this, externalCache),
+  TypeRefBuilder(
+      remote::MetadataReader<Runtime, TypeRefBuilder> &reader,
+      remote::ExternalTypeRefCache *externalCache = nullptr,
+      DescriptorFinder *externalDescriptorFinder = nullptr,
+      Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default)
+      : Flavor(Flavor), TC(*this), EDF(externalDescriptorFinder),
+        RDF(*this, externalCache),
         PointerSize(sizeof(typename Runtime::StoredPointer)),
         TypeRefDemangler([this, &reader](RemoteRef<char> string,
                                          bool useOpaqueTypeSymbolicReferences)

@@ -1736,7 +1736,8 @@ const TypeRef *TypeConverter::getRawPointerTypeRef() {
   if (RawPointerTR != nullptr)
     return RawPointerTR;
 
-  RawPointerTR = BuiltinTypeRef::create(Builder, "Bp");
+  RawPointerTR =
+      BuiltinTypeRef::create(Builder, "Bp", Builder.getManglingFlavor());
   return RawPointerTR;
 }
 
@@ -1744,7 +1745,8 @@ const TypeRef *TypeConverter::getNativeObjectTypeRef() {
   if (NativeObjectTR != nullptr)
     return NativeObjectTR;
 
-  NativeObjectTR = BuiltinTypeRef::create(Builder, "Bo");
+  NativeObjectTR =
+      BuiltinTypeRef::create(Builder, "Bo", Builder.getManglingFlavor());
   return NativeObjectTR;
 }
 
@@ -1752,7 +1754,8 @@ const TypeRef *TypeConverter::getUnknownObjectTypeRef() {
   if (UnknownObjectTR != nullptr)
     return UnknownObjectTR;
 
-  UnknownObjectTR = BuiltinTypeRef::create(Builder, "BO");
+  UnknownObjectTR =
+      BuiltinTypeRef::create(Builder, "BO", Builder.getManglingFlavor());
   return UnknownObjectTR;
 }
 
@@ -1760,7 +1763,8 @@ const TypeRef *TypeConverter::getThinFunctionTypeRef() {
   if (ThinFunctionTR != nullptr)
     return ThinFunctionTR;
 
-  ThinFunctionTR = BuiltinTypeRef::create(Builder, "yyXf");
+  ThinFunctionTR =
+      BuiltinTypeRef::create(Builder, "yyXf", Builder.getManglingFlavor());
   return ThinFunctionTR;
 }
 
@@ -1768,7 +1772,8 @@ const TypeRef *TypeConverter::getAnyMetatypeTypeRef() {
   if (AnyMetatypeTR != nullptr)
     return AnyMetatypeTR;
 
-  AnyMetatypeTR = BuiltinTypeRef::create(Builder, "ypXp");
+  AnyMetatypeTR =
+      BuiltinTypeRef::create(Builder, "ypXp", Builder.getManglingFlavor());
   return AnyMetatypeTR;
 }
 
