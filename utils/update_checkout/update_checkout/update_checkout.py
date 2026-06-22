@@ -96,6 +96,67 @@ def output_prefix(repo_name: str):
     return f"[{repo_name}] ".ljust(40)
 
 
+def get_pr_branch(
+    *,
+    repo_path: Path,
+    repo_name: str,
+    pr_id: str,
+    base_branch: str,
+):
+    prefix = output_prefix(repo_name)
+
+    pr_merge_ref_name = f"pull/{pr_id}/merge"
+    local_pr_merge_ref = f"refs/remotes/origin/{pr_merge_ref_name}"
+
+    # Fetch the PR merge ref, and also fetch the scheme branch, which ought to
+    # match the PR base branch.
+    Git.run(
+        repo_path,
+        [
+            "fetch",
+            "origin",
+            "--tags",
+            # Overwrite the ref if it exists.
+            "--force",
+            f"refs/{pr_merge_ref_name}:{local_pr_merge_ref}",
+            base_branch,
+        ],
+        echo=True,
+        prefix=prefix,
+    )
+
+    # Check out a branch at the ref, resetting the branch if it exists.
+    pr_branch = "ci_pr_{0}".format(pr_id)
+    Git.run(
+        repo_path,
+        ["checkout", "-B", pr_branch, local_pr_merge_ref],
+        echo=True,
+        prefix=prefix,
+    )
+
+    # Merge the base branch into it. GitHub cannot be trusted to keep PR merge
+    # refs up-to-date.
+    try:
+        Git.run(
+            repo_path,
+            ["merge", f"origin/{base_branch}", "--no-edit"],
+            echo=True,
+            prefix=prefix,
+        )
+    except Exception:
+        # If the merge fails, odds are there's a conflict. Either way
+        # we do not want to proceed. Abort the merge to leave a clean
+        # working directory behind, ignoring errors, and fail with the
+        # merge error.
+        try:
+            Git.run(repo_path, ["merge", "--abort"], echo=True, prefix=prefix)
+        except Exception:
+            pass
+        raise
+
+    return pr_branch
+
+
 def get_branch_for_repo(
     repo_path: Path,
     config: Dict[str, Any],
@@ -126,50 +187,14 @@ def get_branch_for_repo(
         scheme_branch = scheme_map[repo_name]
         remote_repo_id = config["repos"][repo_name]["remote"]["id"]
         if remote_repo_id in cross_repos_pr:
-            prefix = output_prefix(repo_name)
             cross_repo = True
             pr_id = cross_repos_pr[remote_repo_id]
-            repo_branch = "ci_pr_{0}".format(pr_id)
-
-            # Fetch the PR merge branch into repo_branch, and also fetch the
-            # scheme branch, which ought to match the PR base branch.
-            Git.run(
-                repo_path,
-                [
-                    "fetch",
-                    "origin",
-                    # If repo_branch exists, overwrite it.
-                    "--force",
-                    # If repo_branch exists and is checked out, this will
-                    # prevent Git from refusing the fetch.
-                    "--update-head-ok",
-                    "--tags",
-                    f"pull/{pr_id}/merge:{repo_branch}",
-                    scheme_branch,
-                ],
-                echo=True,
-                prefix=prefix,
+            repo_branch = get_pr_branch(
+                repo_path=repo_path,
+                repo_name=repo_name,
+                pr_id=pr_id,
+                base_branch=scheme_branch,
             )
-            # Check out repo_branch and merge the base branch into it.
-            # GitHub cannot be trusted to keep PR merge branches up-to-date.
-            Git.run(repo_path, ["checkout", repo_branch], echo=True, prefix=prefix)
-            try:
-                Git.run(
-                    repo_path,
-                    ["merge", f"origin/{scheme_branch}", "--no-edit"],
-                    echo=True,
-                    prefix=prefix,
-                )
-            except Exception as e:
-                # If the merge fails, odds are there's a conflict. Either way
-                # we do not want to proceed. Abort the merge to leave a clean
-                # working directory behind, ignoring errors, and fail with the
-                # merge error.
-                try:
-                    Git.run(repo_path, ["merge", "--abort"], echo=True, prefix=prefix)
-                except:
-                    pass
-                raise e
         else:
             repo_branch = scheme_branch
 

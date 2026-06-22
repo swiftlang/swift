@@ -119,12 +119,11 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         if stale:
             self.call(["git", "checkout", pr_base_branch], cwd=repo_path)
 
-            # Arrange for an eventual conflict between commits E and D if
-            # asked to.
-            if conflicts_with_base:
-                with open(change_file_path, "w") as f:
-                    f.write("base-version\n")
-                self.call(["git", "add", "."], cwd=repo_path)
+            # Always add an actual change to this commit so that soft-resetting
+            # it has an effect on the working directory.
+            with open(change_file_path, "w") as f:
+                f.write("base-version\n")
+            self.call(["git", "add", "."], cwd=repo_path)
 
             # Create commit E.
             self.call(
@@ -273,3 +272,20 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
         self.verify_head_for_up_to_date_pr_merge_ref(repo_name=repo_name, pr_id=pr_id)
+
+    def test_checkout_stale_pr_merge_ref_idempotency(self):
+        repo_name = "repo1"
+        pr_id = 1
+        self.set_up_pr_merge_ref(repo_name=repo_name, pr_id=pr_id, stale=True)
+
+        update_checkout_args = self.update_checkout_base_args + [
+            "--github-comment",
+            f"""
+            https://github.com/apple/{repo_name}/pull/{pr_id}
+            @swift-ci please test
+            """,
+        ]
+        # Calling repeatedly should not affect the result.
+        self.call(update_checkout_args)
+        self.call(update_checkout_args)
+        self.verify_head_for_stale_pr_merge_ref(repo_name=repo_name, pr_id=pr_id)
