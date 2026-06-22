@@ -8433,6 +8433,9 @@ public:
   /// instance method.
   bool isObjCInstanceMethod() const;
 
+  /// Whether this is a top-level (module-scope) function with @objc (SE-0495).
+  bool isObjCGlobalFunction() const;
+
   /// Get the foreign language targeted by a @c-style attribute, if any.
   /// Used to abstract away the change in meaning of @c vs @_cdecl while
   /// formalizing the attribute.

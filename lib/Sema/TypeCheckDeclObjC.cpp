@@ -1907,6 +1907,11 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
   } else {
     // Cannot be @objc.
+    //
+    // Note: a top-level @objc function (SE-0495) is *not* marked @objc here.
+    // Like @c/@_cdecl, it is a plain C-callable entry point with no selector
+    // or message-send dispatch; its representability is validated by
+    // TypeCheckCDeclFunctionRequest and it is identified via getCDeclKind().
   }
 
   // If this declaration should not be exposed to Objective-C, we're done.
@@ -4248,15 +4253,22 @@ evaluate(Evaluator &evaluator, Decl *D) const {
 evaluator::SideEffect
 TypeCheckCDeclFunctionRequest::evaluate(Evaluator &evaluator,
                                         FuncDecl *FD,
-                                        CDeclAttr *attr) const {
+                                        DeclAttribute *attr) const {
   auto &ctx = FD->getASTContext();
 
   auto lang = FD->getCDeclKind();
-  assert(lang && "missing @c?");
-  auto kind = lang == ForeignLanguage::ObjectiveC
-                      ? ObjCReason::ExplicitlyUnderscoreCDecl
-                      : ObjCReason::ExplicitlyCDecl;
-  ObjCReason reason(kind, attr);
+  assert(lang && "missing @c/@objc?");
+  // Pick the reason that matches the spelling that requested the C export, so
+  // diagnostics refer to the right attribute. @objc on a top-level function
+  // (SE-0495) checks Objective-C representability just like @_cdecl.
+  ObjCReason reason = [&] {
+    if (auto objcAttr = dyn_cast<ObjCAttr>(attr))
+      return objCReasonForObjCAttr(objcAttr);
+    auto kind = lang == ForeignLanguage::ObjectiveC
+                        ? ObjCReason::ExplicitlyUnderscoreCDecl
+                        : ObjCReason::ExplicitlyCDecl;
+    return ObjCReason(kind, attr);
+  }();
 
   std::optional<ForeignAsyncConvention> asyncConvention;
   std::optional<ForeignErrorConvention> errorConvention;
