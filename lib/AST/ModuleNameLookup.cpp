@@ -422,7 +422,7 @@ void namelookup::lookupVisibleDeclsInModule(
   LookupVisibleDecls lookup(ctx, resolutionKind, lookupKind);
   lookup.lookupInModule(decls, moduleOrFile, accessPath, moduleScopeContext,
                         /*hasModuleSelector=*/false,
-                        {NLFlag::QualifiedDefault});
+                        NLFlag::QualifiedDefault);
 }
 
 void namelookup::simple_display(llvm::raw_ostream &out, ResolutionKind kind) {

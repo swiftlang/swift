@@ -6847,7 +6847,7 @@ NominalTypeDecl::getExecutorOwnedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), {NLFlag::ProtocolMembers},
+                  getLoc(), NLFlag::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -6886,7 +6886,7 @@ NominalTypeDecl::getExecutorLegacyOwnedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), {NLFlag::ProtocolMembers},
+                  getLoc(), NLFlag::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -6925,7 +6925,7 @@ NominalTypeDecl::getExecutorLegacyUnownedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), {NLFlag::ProtocolMembers},
+                  getLoc(), NLFlag::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -12470,7 +12470,7 @@ const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   this->lookupQualified(getSelfNominalTypeDecl(),
                         DeclNameRef(C.Id_unownedExecutor),
-                        getLoc(), {NLFlag::ProtocolMembers},
+                        getLoc(), NLFlag::ProtocolMembers,
                         results);
 
   for (auto candidate: results) {

@@ -3226,15 +3226,15 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::AllowUsableFromInline))
-      options |= NLOptions(NLFlag::IncludeUsableFromInline);
+      options |= NLFlag::IncludeUsableFromInline;
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
-      options |= NLOptions(NLFlag::IgnoreMissingImports);
+      options |= NLFlag::IgnoreMissingImports;
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
-      options |= NLOptions(NLFlag::ExcludeMacroExpansions);
+      options |= NLFlag::ExcludeMacroExpansions;
 
     // Look through the type declarations we were given, resolving them down
     // to nominal type declarations, module declarations, and
@@ -3250,8 +3250,8 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
     // Search all of the modules.
     for (auto module : moduleDecls) {
       auto innerOptions = options;
-      innerOptions -= NLOptions(NLFlag::RemoveOverridden);
-      innerOptions -= NLOptions(NLFlag::RemoveNonVisible);
+      innerOptions -= NLFlag::RemoveOverridden;
+      innerOptions -= NLFlag::RemoveNonVisible;
       SmallVector<ValueDecl *, 4> moduleMembers;
       dc->lookupQualified(module, name, loc, innerOptions, moduleMembers);
       members.append(moduleMembers.begin(), moduleMembers.end());

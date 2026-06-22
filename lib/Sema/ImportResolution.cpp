@@ -1358,7 +1358,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
                  /*hasModuleSelector=*/true, decls,
                  NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                  import->getDeclContext()->getModuleScopeContext(),
-                 import->getLoc(), {NLFlag::QualifiedDefault});
+                 import->getLoc(), NLFlag::QualifiedDefault);
 
   // `import macro` has not been implementd. Filter them out for now.
   llvm::erase_if(decls, [](ValueDecl *VD) {

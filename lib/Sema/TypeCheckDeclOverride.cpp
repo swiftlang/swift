@@ -966,9 +966,9 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     for (auto *ctx : superContexts) {
       ctx->synthesizeSemanticMembersIfNeeded(membersName);
     }
-    NLOptions lookupOptions = {NLFlag::QualifiedDefault};
+    NLOptions lookupOptions = NLFlag::QualifiedDefault;
     if (ignoreMissingImports)
-      lookupOptions |= NLOptions(NLFlag::IgnoreMissingImports);
+      lookupOptions |= NLFlag::IgnoreMissingImports;
 
     dc->lookupQualified(superContexts, DeclNameRef(membersName), decl->getLoc(),
                         lookupOptions, members);

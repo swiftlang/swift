@@ -1665,8 +1665,8 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
     // to restate them in the resulting list, or else an otherwise valid
     // conformance will become ambiguous.
     const NLOptions options =
-        (doUnqualifiedLookup ? NLOptions() : NLOptions(NLFlag::ProtocolMembers)) |
-        NLOptions(NLFlag::IgnoreMissingImports);
+        (doUnqualifiedLookup ? NLOptions() : NLFlag::ProtocolMembers) |
+        NLFlag::IgnoreMissingImports;
 
     auto getWitness = [req, DC](ValueDecl *witness) -> ValueDecl * {
       // Protocol members can't be witnesses.
@@ -6768,8 +6768,8 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
 
     static bool hasValidMethod(NominalTypeDecl *typeDecl,
                                SmallVectorImpl<InvalidMethod> &invalid) {
-      NLOptions subOptions = {NLFlag::QualifiedDefault};
-      subOptions |= NLOptions(NLFlag::ProtocolMembers);
+      NLOptions subOptions = NLFlag::QualifiedDefault;
+      subOptions |= NLFlag::ProtocolMembers;
 
       DeclNameRef baseName(typeDecl->getASTContext().Id_appendInterpolation);
 

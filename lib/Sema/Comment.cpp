@@ -67,7 +67,7 @@ private:
 
     SmallVector<ValueDecl *, 2> members;
     nominalType->lookupQualified(nominalType, DeclNameRef(VD->getName()),
-                                 VD->getLoc(), {NLFlag::ProtocolMembers},
+                                 VD->getLoc(), NLFlag::ProtocolMembers,
                                  members);
 
     std::optional<ResultWithDecl> result;

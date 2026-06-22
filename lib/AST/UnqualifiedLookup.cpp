@@ -499,15 +499,15 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   if (!moduleToLookIn)
     return;
 
-  NLOptions nlOptions = {NLFlag::UnqualifiedDefault};
+  NLOptions nlOptions = NLFlag::UnqualifiedDefault;
   if (options.contains(Flags::IncludeUsableFromInline))
-    nlOptions |= NLOptions(NLFlag::IncludeUsableFromInline);
+    nlOptions |= NLFlag::IncludeUsableFromInline;
   if (options.contains(Flags::ExcludeMacroExpansions))
-    nlOptions |= NLOptions(NLFlag::ExcludeMacroExpansions);
+    nlOptions |= NLFlag::ExcludeMacroExpansions;
   if (options.contains(Flags::ABIProviding))
-    nlOptions |= NLOptions(NLFlag::ABIProviding);
+    nlOptions |= NLFlag::ABIProviding;
   if (options.contains(Flags::IgnoreAccessControl))
-    nlOptions |= NLOptions(NLFlag::IgnoreAccessControl);
+    nlOptions |= NLFlag::IgnoreAccessControl;
 
   lookupInModule(moduleToLookIn, Name.getFullName(), Name.hasModuleSelector(),
                  CurModuleResults, NLKind::UnqualifiedLookup, resolutionKind,
@@ -624,19 +624,19 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     const UnqualifiedLookupOptions options,
     const bool isOriginallyTypeLookup,
     const bool isOriginallyMacroLookup) {
-  NLOptions baseNLOptions = {NLFlag::UnqualifiedDefault};
+  NLOptions baseNLOptions = NLFlag::UnqualifiedDefault;
   if (options.contains(Flags::AllowProtocolMembers))
-    baseNLOptions |= NLOptions(NLFlag::ProtocolMembers);
+    baseNLOptions |= NLFlag::ProtocolMembers;
   if (isOriginallyTypeLookup)
-    baseNLOptions |= NLOptions(NLFlag::OnlyTypes);
+    baseNLOptions |= NLFlag::OnlyTypes;
   if (isOriginallyMacroLookup)
-    baseNLOptions |= NLOptions(NLFlag::OnlyMacros);
+    baseNLOptions |= NLFlag::OnlyMacros;
   if (options.contains(Flags::IgnoreAccessControl))
-    baseNLOptions |= NLOptions(NLFlag::IgnoreAccessControl);
+    baseNLOptions |= NLFlag::IgnoreAccessControl;
   if (options.contains(Flags::IgnoreMissingImports))
-    baseNLOptions |= NLOptions(NLFlag::IgnoreMissingImports);
+    baseNLOptions |= NLFlag::IgnoreMissingImports;
   if (options.contains(Flags::ABIProviding))
-    baseNLOptions |= NLOptions(NLFlag::ABIProviding);
+    baseNLOptions |= NLFlag::ABIProviding;
   return baseNLOptions;
 }
 
