@@ -147,6 +147,28 @@ def get_path_from_url(url: str) -> str:
     return urllib.parse.urlsplit(url).path
 
 
+def configure_git_identity(repo_path):
+    """Configure a deterministic local git identity and disable commit signing
+    for the clone at `repo_path`.
+
+    update-checkout's own clones (under `source_root`) do not set these up, so a
+    test that commits into such a clone must call this first; otherwise the
+    commit depends on an ambient global identity, which is absent on a pristine
+    CI worker, and aborts. The harness's `local_path` clones go through this too,
+    via `setup_mock_remote`.
+    """
+    call_quietly(
+        ["git", "config", "--local", "user.name", "swift_test"], cwd=repo_path
+    )
+    call_quietly(
+        ["git", "config", "--local", "user.email", "no-reply@swift.org"],
+        cwd=repo_path,
+    )
+    call_quietly(
+        ["git", "config", "--local", "commit.gpgsign", "false"], cwd=repo_path
+    )
+
+
 # TODO: Move this to SchemeMockTestCase.
 def setup_mock_remote(test_case, base_dir, base_config, remotes_path, local_path):
     for local_repo_name in base_config["repos"].keys():
@@ -160,16 +182,7 @@ def setup_mock_remote(test_case, base_dir, base_config, remotes_path, local_path
             ["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=remote_repo_path
         )
         call_quietly(["git", "clone", "-l", remote_repo_path, local_repo_path])
-        call_quietly(
-            ["git", "config", "--local", "user.name", "swift_test"], cwd=local_repo_path
-        )
-        call_quietly(
-            ["git", "config", "--local", "user.email", "no-reply@swift.org"],
-            cwd=local_repo_path,
-        )
-        call_quietly(
-            ["git", "config", "--local", "commit.gpgsign", "false"], cwd=local_repo_path
-        )
+        configure_git_identity(local_repo_path)
         call_quietly(
             ["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=local_repo_path
         )
@@ -250,6 +263,14 @@ class SchemeMockTestCase(unittest.TestCase):
         self._remotes_path = os.path.join(self.workspace, "remote")
         # We use local as a workspace for creating commits.
         self.local_path = os.path.join(self.workspace, "local")
+
+        self.base_args = [
+            self.update_checkout_path,
+            "--config",
+            self.config_path,
+            "--source-root",
+            self.source_root,
+        ]
 
     def setUp(self):
         create_dir(self.source_root)
