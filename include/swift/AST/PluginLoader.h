@@ -32,7 +32,6 @@ public:
   struct PluginEntry {
     StringRef libraryPath;
     StringRef executablePath;
-    bool forceDisableSandbox;
   };
 
 private:
