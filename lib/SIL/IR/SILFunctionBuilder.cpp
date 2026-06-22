@@ -172,9 +172,12 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setOptimizationMode(OA->getMode());
   }
 
-  // @_silgen_name and @_cdecl functions may be called from C code somewhere.
-  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
+  // @_silgen_name and C-exported functions may be called from C code.
+  if (Attrs.hasAttribute<SILGenNameAttr>())
     F->setHasCReferences(true);
+  if (auto *AFD = constant.getAbstractFunctionDecl())
+    if (AFD->getCDeclKind())
+      F->setHasCReferences(true);
 
   for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
     bool shouldExportDecl = true;

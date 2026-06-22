@@ -4935,7 +4935,7 @@ StringRef ValueDecl::getCDeclName() const {
   // Handle @objc on a top-level function (SE-0495). The C symbol name is the
   // optional @objc(name) argument, or the base identifier when omitted.
   if (auto *FD = dyn_cast<FuncDecl>(this)) {
-    if (FD->getDeclContext()->isModuleScopeContext()) {
+    if (FD->isObjCGlobalFunction()) {
       if (auto objcAttr = getAttrs().getAttribute<ObjCAttr>()) {
         if (auto name = objcAttr->getName())
           return name->getSelectorPieces().front().str();
