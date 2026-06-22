@@ -285,7 +285,8 @@
     "Exclusivity.swift",
     "Ref.swift",
     "MutableRef.swift",
-    "UniqueBox.swift"
+    "UniqueBox.swift",
+    "DerivedConformances.swift"
   ],
   "Result": [
     "Result.swift"
