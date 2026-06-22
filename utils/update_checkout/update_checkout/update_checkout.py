@@ -229,10 +229,10 @@ def update_single_repository(pool_args: UpdateArguments):
                     prefix=prefix,
                 )
 
-            if pool_args.clean:
+            if pool_args.stash:
                 # Stash tracked and untracked changes.
                 run_for_repo_and_each_submodule_rec(["stash", "-u"])
-            elif pool_args.stash:
+            elif pool_args.clean:
                 # Delete tracked changes.
                 run_for_repo_and_each_submodule_rec(["reset", "--hard", "HEAD"])
 
