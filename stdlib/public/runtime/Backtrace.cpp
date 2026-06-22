@@ -1344,11 +1344,10 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 #endif
 {
   #if defined(_WIN32)
-  HANDLE hOutput;
-  if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
-    hOutput = GetStdHandle(STD_ERROR_HANDLE);
-  else
-    hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+  HANDLE hOutput =
+    GetStdHandle(_swift_backtraceSettings.outputTo == OutputTo::Stderr
+                    ? STD_ERROR_HANDLE
+                    : STD_OUTPUT_HANDLE);
   #endif
 
 #if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
@@ -1577,14 +1576,13 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   if (!bRet) {
     #if DEBUG_BACKTRACING
       char message[256];
-      int len = snprintf(message, sizeof(message),
+      int len = snprintf_s(message, sizeof(message),
                           "swift runtime: %lu return code for CreateProcessW (%ls) ",
                           (unsigned long)bRet,
                           swiftBacktracePath);
       if (len > 0) {
         DWORD written;
-        HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
-        WriteFile(hErr, message, (DWORD)len, &written, NULL);
+        WriteFile(hOutput, message, (DWORD)len, &written, NULL);
       } else {
         const char *message = "snprintf failed... ";
         WriteFile(hOutput, message, strlen(message), NULL, NULL);
@@ -1633,8 +1631,7 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
                         (unsigned long)dwExitCode);
     if (len > 0) {
       DWORD written;
-      HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
-      WriteFile(hErr, message, (DWORD)len, &written, NULL);
+      WriteFile(hOutput, message, (DWORD)len, &written, NULL);
     } else {
       const char *message = "snprintf failed... ";
       WriteFile(hOutput, message, strlen(message), NULL, NULL);
