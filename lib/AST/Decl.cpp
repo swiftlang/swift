@@ -4932,6 +4932,18 @@ StringRef ValueDecl::getCDeclName() const {
       return getBaseIdentifier().str();
   }
 
+  // Handle @objc on a top-level function (SE-0495). The C symbol name is the
+  // optional @objc(name) argument, or the base identifier when omitted.
+  if (auto *FD = dyn_cast<FuncDecl>(this)) {
+    if (FD->getDeclContext()->isModuleScopeContext()) {
+      if (auto objcAttr = getAttrs().getAttribute<ObjCAttr>()) {
+        if (auto name = objcAttr->getName())
+          return name->getSelectorPieces().front().str();
+        return getBaseIdentifier().str();
+      }
+    }
+  }
+
   return "";
 }
 
@@ -11149,13 +11161,24 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
   return isInstanceMember() || isa<ConstructorDecl>(this);
 }
 
-std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
-  auto attr = getAttrs().getAttribute<CDeclAttr>();
-  if (!attr)
-    return std::nullopt;
+bool AbstractFunctionDecl::isObjCGlobalFunction() const {
+  return getDeclContext()->isModuleScopeContext() &&
+         !isa<AccessorDecl>(this) && getAttrs().hasAttribute<ObjCAttr>();
+}
 
-  return attr->Underscored ? ForeignLanguage::ObjectiveC
-                           : ForeignLanguage::C;
+std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
+  if (auto attr = getAttrs().getAttribute<CDeclAttr>())
+    return attr->Underscored ? ForeignLanguage::ObjectiveC
+                             : ForeignLanguage::C;
+
+  // @objc on a top-level function (SE-0495) is a C export that accepts
+  // Objective-C types, behaving like @_cdecl for type checking, header
+  // emission, and thunk generation (Swift body + C-convention thunk that
+  // bridges types like String <-> NSString).
+  if (isObjCGlobalFunction())
+    return ForeignLanguage::ObjectiveC;
+
+  return std::nullopt;
 }
 
 bool AbstractFunctionDecl::needsNewVTableEntry() const {

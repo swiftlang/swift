@@ -3792,10 +3792,19 @@ public:
     }
 
     // If the function is exported to C, it must be representable in (Obj-)C.
-    if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
+    // This covers @c and @_cdecl, as well as @objc on a top-level function
+    // (SE-0495), which is a C export accepting Objective-C types.
+    if (auto cdeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
       evaluateOrDefault(Ctx.evaluator,
-                        TypeCheckCDeclFunctionRequest{FD, CDeclAttr},
+                        TypeCheckCDeclFunctionRequest{FD, cdeclAttr},
                         {});
+    } else if (FD->getDeclContext()->isModuleScopeContext() &&
+               !isa<AccessorDecl>(FD)) {
+      if (auto objcAttr = FD->getAttrs().getAttribute<ObjCAttr>()) {
+        evaluateOrDefault(Ctx.evaluator,
+                          TypeCheckCDeclFunctionRequest{FD, objcAttr},
+                          {});
+      }
     }
 
     TypeChecker::checkObjCImplementation(FD);
