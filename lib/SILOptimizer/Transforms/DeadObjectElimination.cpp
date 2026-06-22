@@ -787,7 +787,8 @@ class DeadObjectElimination : public SILFunctionTransform {
   DominanceInfo *domInfo = nullptr;
 
   void removeInstructions(ArrayRef<SILInstruction*> toRemove);
-  
+  void removeKeyPathAndUsers(ArrayRef<SILInstruction*> toRemove);
+
   /// Try to salvage the debug info for a dead instruction removed by
   /// DeadObjectElimination.
   ///
@@ -858,6 +859,31 @@ DeadObjectElimination::removeInstructions(ArrayRef<SILInstruction*> toRemove) {
     // Now we know that I should not have any uses... erase it from its parent.
     deleter.forceDelete(I);
   }
+}
+
+void
+DeadObjectElimination::removeKeyPathAndUsers(
+    ArrayRef<SILInstruction*> toRemove) {
+  // Drop all result uses up front so each instruction satisfies
+  // InstructionDeleter's incidental-use precondition. This also keeps the
+  // lifetime fixup below from compensating uses within the dead graph itself:
+  // undef operands have None ownership and are never consuming.
+  for (auto *I : toRemove)
+    I->replaceAllUsesOfAllResultsWithUndef();
+
+  if (!getFunction()->hasOwnership()) {
+    for (auto *I : toRemove)
+      deleter.forceDelete(I);
+    return;
+  }
+
+  // In ossa, fix lifetimes so that consuming operands defined outside the dead
+  // graph get a compensating destroy_value. This covers the keypath's own
+  // pattern operands as well as owned values consumed by a removed user (e.g. a
+  // struct that packages the dead keypath together with an unrelated owned
+  // value, as in https://github.com/swiftlang/swift/issues/89791).
+  for (auto *I : toRemove)
+    deleter.forceDeleteAndFixLifetimes(I);
 }
 
 void DeadObjectElimination::salvageDebugInfo(SILInstruction *toBeRemoved) {
@@ -1060,42 +1086,42 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
     return false;
   }
 
-  bool hasOwnership = KPI->getFunction()->hasOwnership();
-  for (const Operand &Op : KPI->getPatternOperands()) {
+  if (!KPI->getFunction()->hasOwnership()) {
     // In non-ossa, bail out if we have non-trivial pattern operands.
-    if (!hasOwnership) {
-      if (Op.get()->getType().isTrivial(*KPI->getFunction()))
-        return false;
-      continue;
-    }
-    // In ossa, bail out if we have non-trivial pattern operand values that are
-    // lexical.
-    if (Op.get()->isLexical()) {
-      return false;
-    }
-  }
-
-  if (KPI->getFunction()->hasOwnership()) {
     for (const Operand &Op : KPI->getPatternOperands()) {
       if (Op.get()->getType().isTrivial(*KPI->getFunction()))
-        continue;
-      // In ossa, we are going to delete the dead keypath which was consuming
-      // the pattern operand and insert a destroy_value of the pattern operand
-      // value. This is shortening the pattern operand value's lifetime. Check
-      // if there was a pointer escape, if so bail out.
-      if (findPointerEscape(Op.get())) {
         return false;
+    }
+  } else {
+    // In ossa, removeKeyPathAndUsers compensates every consuming operand of a
+    // removed instruction whose value is defined outside the dead graph with a
+    // destroy_value inserted at the deletion point. This covers the keypath's
+    // own pattern operands as well as owned values consumed by a removed user
+    // (e.g. a struct that packages the dead keypath together with an unrelated
+    // owned value). Inserting the destroy at the deletion point shortens those
+    // values' lifetimes, so bail out if any of them is lexical or has a pointer
+    // escape.
+    InstructionSet usersToRemoveSet(KPI->getFunction());
+    for (auto *user : UsersToRemove)
+      usersToRemoveSet.insert(user);
+    for (auto *user : UsersToRemove) {
+      for (const Operand &op : user->getAllOperands()) {
+        if (!op.isConsuming())
+          continue;
+        SILValue value = op.get();
+        // Values defined within the dead graph are replaced with undef before
+        // deletion, so they are never compensated.
+        if (auto *def = value->getDefiningInstruction())
+          if (usersToRemoveSet.contains(def))
+            continue;
+        if (value->isLexical() || findPointerEscape(value))
+          return false;
       }
-    }
-    for (const Operand &Op : KPI->getPatternOperands()) {
-      if (Op.get()->getType().isTrivial(*KPI->getFunction()))
-        continue;
-      SILBuilderWithScope(KPI).createDestroyValue(KPI->getLoc(), Op.get());
     }
   }
 
   // Remove the keypath and all of its users.
-  removeInstructions(
+  removeKeyPathAndUsers(
     ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating keypath.\n");
 
