@@ -25,6 +25,6 @@ enum SwiftPluginServer {
         )
       )
     )
-    listener.main()
+    try listener.main()
   }
 }
