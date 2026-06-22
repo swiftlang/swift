@@ -21,14 +21,7 @@ class StashAndCleanTestCase(scheme_mock.SchemeMockTestCase):
 
     --stash MUST preserve uncommitted tracked + untracked work (recoverable
     from `git stash`); --clean MUST discard it. Both modes additionally delete
-    ignored files via the shared trailing `git clean -fdx`. These options were
-    silently inverted by a refactor, so these tests assert the recoverability /
-    discard behaviour directly.
-
-    The submodule-recursion arm of the fix is not exercised here (the mock
-    harness builds submodule-free repos); it issues the same swapped commands
-    via `git submodule foreach --recursive`. Full submodule coverage is tracked
-    as a known gap.
+    ignored files via the shared trailing `git clean -fdx`.
     """
 
     def __init__(self, *args, **kwargs):
