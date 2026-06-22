@@ -426,6 +426,9 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     Flag<["-"], "enable-experimental-async-top-level">,
     HelpText<"Enable experimental concurrency in top-level code">;
 
+  def disable_force_load_symbols : Flag<["-"],"disable-force-load-symbols">,
+      HelpText<"Disable generation of all Swift _FORCE_LOAD symbols">;
+
   def public_autolink_library :
     Separate<["-"], "public-autolink-library">,
     HelpText<"Add public dependent library">;
@@ -673,10 +676,6 @@ def disable_autolink_frameworks : Flag<["-"],"disable-autolink-frameworks">,
 
 def disable_all_autolinking : Flag<["-"],"disable-all-autolinking">,
   HelpText<"Disable all Swift autolink directives">;
-
-def disable_force_load_symbols : Flag<["-"],"disable-force-load-symbols">,
-  Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Disable generation of all Swift _FORCE_LOAD symbols">;
 
 def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
   HelpText<"Don't run diagnostic passes">;

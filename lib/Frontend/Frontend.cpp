@@ -235,7 +235,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.ABIDescriptorPath = outs.ABIDescriptorOutputPath.c_str();
   serializationOpts.emptyABIDescriptor = opts.emptyABIDescriptor;
 
-  if (!getIRGenOptions().ForceLoadSymbolName.empty())
+  if (!getIRGenOptions().ForceLoadSymbolName.empty() &&
+      !getIRGenOptions().DisableForceLoadSymbols)
     serializationOpts.AutolinkForceLoad = true;
 
   // Options contain information about the developer's computer,
