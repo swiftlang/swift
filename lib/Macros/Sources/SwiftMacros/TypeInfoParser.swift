@@ -459,7 +459,7 @@ extension EnumCaseInfo: TypeInfoProtocol {
 
     let (name, associatedValueLabels) = try getNamedFuncallArgs(
       node: node,
-      name: "StoredProperty"
+      name: "EnumCaseInfo"
     ).expect(
       .stringArg("name"),
       .stringArg("associatedValueLabels").toOptional().toArray()
