@@ -319,14 +319,6 @@ class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.base_args = [
-            self.update_checkout_path,
-            "--config",
-            self.config_path,
-            "--source-root",
-            self.source_root,
-        ]
-
         repos = self.repo_names
         repos.pop()
 

@@ -24,16 +24,6 @@ class StashAndCleanTestCase(scheme_mock.SchemeMockTestCase):
     ignored files via the shared trailing `git clean -fdx`.
     """
 
-    def __init__(self, *args, **kwargs):
-        super(StashAndCleanTestCase, self).__init__(*args, **kwargs)
-        self.base_args = [
-            self.update_checkout_path,
-            "--config",
-            self.config_path,
-            "--source-root",
-            self.source_root,
-        ]
-
     def _repo1_path(self):
         return os.path.join(self.source_root, "repo1")
 
@@ -53,15 +43,10 @@ class StashAndCleanTestCase(scheme_mock.SchemeMockTestCase):
         update that follows the stash/clean step is a no-op; only the working
         tree is later made dirty. Requires `_clone()` to have run first."""
         repo = self._repo1_path()
-        # Configure a local identity + disable commit signing on the
-        # update-checkout-managed clone. Unlike the harness's `local_path`
-        # clones, update-checkout does not set these up, so without this the
-        # seed commit would depend on an ambient global git identity and abort
-        # with a missing-identity error on a pristine CI worker. Mirrors
-        # scheme_mock.setup_mock_remote.
-        self._git(["config", "--local", "user.name", "swift_test"])
-        self._git(["config", "--local", "user.email", "no-reply@swift.org"])
-        self._git(["config", "--local", "commit.gpgsign", "false"])
+        # update-checkout's own clone of source_root has no git identity (only
+        # the harness's local_path clones get one), so configure it before the
+        # seed commit. See scheme_mock.configure_git_identity.
+        scheme_mock.configure_git_identity(repo)
         with open(os.path.join(repo, "tracked.txt"), "w") as f:
             f.write("committed content\n")
         with open(os.path.join(repo, ".gitignore"), "w") as f:
