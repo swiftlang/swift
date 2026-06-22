@@ -745,10 +745,65 @@ def main_preset():
 # -----------------------------------------------------------------------------
 # Main (normal)
 
+
+def _dump_options(parser):
+    """Emit a JSON description of every option this build-script invocation
+    recognizes — both the Python-layer flags defined in driver_arguments and
+    the bash-layer KNOWN_SETTINGS in build-script-impl.
+    """
+
+    def action_to_dict(action):
+        # Custom build_swift actions track multiple destinations on `dests`;
+        # stock argparse actions only have `dest` (which may be SUPPRESS for
+        # --help and our multi-dest wrappers).
+        dests = getattr(action, 'dests', None)
+        if dests is None:
+            dests = [] if action.dest == argparse.SUPPRESS else [action.dest]
+        return {
+            'option_strings': list(action.option_strings),
+            'dests': list(dests),
+            'help': action.help,
+            'default': action.default,
+            'choices': list(action.choices) if action.choices else None,
+            'nargs': action.nargs,
+            'metavar': action.metavar,
+        }
+
+    build_script_options = [
+        action_to_dict(a) for a in parser._actions if a.option_strings
+    ]
+
+    impl_options = []
+    impl_error = None
+    try:
+        result = subprocess.run(
+            [BUILD_SCRIPT_IMPL_PATH, '--dump-options'],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True)
+        impl_options = json.loads(result.stdout)
+    except (OSError, subprocess.CalledProcessError, ValueError) as e:
+        impl_error = str(e)
+
+    output = {
+        'build_script': build_script_options,
+        'build_script_impl': impl_options,
+    }
+    if impl_error is not None:
+        output['build_script_impl_error'] = impl_error
+
+    print(json.dumps(output, indent=2, default=str))
+    return 0
+
+
 def main_normal():
     parser = driver_arguments.create_argument_parser()
 
     args = migration.parse_args(parser, sys.argv[1:])
+
+    if args.dump_options:
+        return _dump_options(parser)
 
     if args.build_script_impl_args:
         # If we received any impl args, check if `build-script-impl` would

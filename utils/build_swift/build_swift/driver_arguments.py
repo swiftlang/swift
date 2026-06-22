@@ -342,6 +342,10 @@ def create_argument_parser():
     option('--dump-config', toggle_true,
            help='instead of building, write JSON to stdout containing '
                 'various values used to build in this configuration')
+    option('--dump-options', store_true,
+           help='instead of building, write a JSON description of every '
+                'recognized option (both build-script and build-script-impl) '
+                'to stdout and exit')
 
     option(['--reconfigure'], store_true,
            help="Reconfigure all projects as we build")
