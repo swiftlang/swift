@@ -708,7 +708,8 @@ namespace {
     /// Records a fix for an invalid AST node, and returns a hole for it.
     Type recordInvalidNode(ASTNode node) {
       CS.recordFix(
-          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(node)));
+          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(node)),
+          /*impact=*/10);
 
       // Ideally we wouldn't need a type variable here, but we don't have a
       // suitable placeholder originator for all the cases here.
