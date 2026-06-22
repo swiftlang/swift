@@ -6,7 +6,7 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1 || OS=emscripten
 // REQUIRES: swift_feature_Embedded
 
 import _Concurrency
