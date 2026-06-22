@@ -111,7 +111,7 @@ extension ASTGenVisitor {
   func handlePoundDiagnostic(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax, kind: PoundDiagnosticKind) {
 
     switch node.parent?.kind {
-    case .codeBlockItem, .memberBlockItem, nil:
+    case .codeBlockItem, .memberBlockItem, .switchCaseList, nil:
       break
     default:
       // TODO: Diagnose.
