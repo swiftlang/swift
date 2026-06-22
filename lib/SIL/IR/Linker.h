@@ -129,6 +129,8 @@ public:
   }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *IEI);
   void visitInitExistentialRefInst(InitExistentialRefInst *IERI);
+  void visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI);
+  void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *IEMI);
   void visitBuiltinInst(BuiltinInst *bi);
   void visitAllocRefInst(AllocRefInst *ARI);
   void visitAllocRefDynamicInst(AllocRefDynamicInst *ARI);
@@ -156,6 +158,11 @@ private:
   }
 
   void linkInVTable(ClassDecl *D);
+
+  /// Force-deserialize the witness tables for an existential's conformances.
+  /// See the definition for why this is needed in embedded mode.
+  void linkInExistentialConformances(
+      ArrayRef<ProtocolConformanceRef> conformances);
 
   // Main loop of the visitor. Called by one of the other *visit* methods.
   void process();
