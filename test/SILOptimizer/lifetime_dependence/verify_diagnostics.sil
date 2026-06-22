@@ -4,7 +4,7 @@
 // RUN:   -sil-verify-all \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableTypes \
-// RUN:   -o /dev/null
+// RUN:   | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
@@ -451,29 +451,65 @@ bb0(%0 : $*BorrowWrapper<T>, %1 : $*T, %2 : $@thin BorrowWrapper<T>.Type):
   return %15
 }
 
+sil [reabstraction_thunk] [without_actually_escaping] @noescape_to_escape_thunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+
 // rdar://177381648: error: lifetime-dependent variable escapes its scope
 //
-// Test that lifetime diagnostics are disabled for @noescape function arguments.
-// The diagnostics would fail here because the mark_dependence is on the conditionally unwrapped value.
-sil @noescape_to_escape_thunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
-
-sil shared [serialized] [thunk] [ossa] @testNoEscapeBlockEscape : $@convention(thin) (@owned Optional<@noescape @callee_guaranteed () -> ()>) -> () {
+// Test that a noescape closure can be captured by an escaping closure. Normally, the DiagnoseInvalidEscapes diagnostics
+// catches cases like this, but it ignores thunks. This is required for withoutActuallyEscaping to work. Lifetime
+// diagnostics simply needs to ignore escapable values. In this example that means ignoring the result of both:
+// 1. the partial_apply which captures a noescape closure and returns an escaping closure
+// 2. the mark_dependence which forwards an escaping closure
+sil shared [serialized] [thunk] [ossa] @testNoEscapeThunkEscape : $@convention(thin) (@owned Optional<@noescape @callee_guaranteed () -> ()>) -> () {
 bb0(%0 : @owned $Optional<@noescape @callee_guaranteed () -> ()>):
   switch_enum %0, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
-bb1(%3 : @owned $@noescape @callee_guaranteed () -> ()):
-  %4 = copy_value %3
-  %5 = function_ref @noescape_to_escape_thunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
-  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
-  %7 = mark_dependence [unresolved] %6 on %3
-  destroy_value %7
-  destroy_value %3
-  br bb3
+bb1(%2 : @owned $@noescape @callee_guaranteed () -> ()):
+  %3 = copy_value %2
+
+  %4 = function_ref @noescape_to_escape_thunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %5 = partial_apply [callee_guaranteed] %4(%3) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = mark_dependence %5 on %2
+  %7 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %6
+  destroy_value %2
+  br bb3(%7)
 
 bb2:
-  br bb3
+  %10 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  br bb3(%10)
 
-bb3:
-  %tup = tuple ()
-  return %tup
+bb3(%12 : @owned $Optional<@callee_guaranteed () -> ()>):
+  destroy_value %12
+  %14 = tuple ()
+  return %14
+}
+
+// This is the same as the above case except that mark_dependence is still [unresolved]. The diagnostic pass should
+// settle it as an escaping mark_dependence since it doesn't actually verify the escapable dependency uses.
+//
+// CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @testNoEscapeThunkEscapeUnresolved : $@convention(thin) (@owned Optional<@noescape @callee_guaranteed () -> ()>) -> () {
+// CHECK: mark_dependence %{{.*}}
+// CHECK-LABEL: } // end sil function 'testNoEscapeThunkEscapeUnresolved'
+sil shared [serialized] [thunk] [ossa] @testNoEscapeThunkEscapeUnresolved : $@convention(thin) (@owned Optional<@noescape @callee_guaranteed () -> ()>) -> () {
+bb0(%0 : @owned $Optional<@noescape @callee_guaranteed () -> ()>):
+  switch_enum %0, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%2 : @owned $@noescape @callee_guaranteed () -> ()):
+  %3 = copy_value %2
+
+  %4 = function_ref @noescape_to_escape_thunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %5 = partial_apply [callee_guaranteed] %4(%3) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = mark_dependence [unresolved] %5 on %2
+  %7 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %6
+  destroy_value %2
+  br bb3(%7)
+
+bb2:
+  %10 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  br bb3(%10)
+
+bb3(%12 : @owned $Optional<@callee_guaranteed () -> ()>):
+  destroy_value %12
+  %14 = tuple ()
+  return %14
 }
