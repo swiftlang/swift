@@ -446,6 +446,24 @@ void TypeVariableStep::setup() {
   ++CS.solverState->NumTypeVariablesBound;
 }
 
+bool TypeVariableStep::shouldSkip(const TypeVariableBinding &choice) const {
+  // Let's always attempt types inferred from "defaultable" constraints
+  // in diagnostic mode. This allows the solver to attempt i.e. `Any`
+  // for collection literals and produce better diagnostics for for-in
+  // statements like `for (x, y, z) in [] { ... }` when pattern type
+  // could not be inferred.
+  //
+  // A notable exception are closure result types, there is no reason
+  // to attempt `Void` if there is a contextual type, it would always
+  // produce a worse solution.
+  if (CS.shouldAttemptFixes() && !TypeVar->getImpl().isClosureResultType())
+    return false;
+
+  // If this is a defaultable binding and we have found solutions,
+  // don't explore the default binding.
+  return AnySolved && choice.isDefaultable();
+}
+
 bool TypeVariableStep::attempt(const TypeVariableBinding &choice) {
   ++CS.solverState->NumTypeVariableBindings;
 
