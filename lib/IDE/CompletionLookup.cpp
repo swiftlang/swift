@@ -794,6 +794,12 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
     VarType = getTypeOfMember(VD, dynamicLookupInfo);
   }
 
+  // Make sure to look through the storage reference type if present. These
+  // shouldn't be presented to the user, and cannot be used in the constraint
+  // system when e.g computing type relations.
+  if (VarType)
+    VarType = VarType->getReferenceStorageReferent();
+
   std::optional<ContextualNotRecommendedReason> NotRecommended;
   // "not recommended" in its own getter.
   if (Kind == LookupKind::ValueInDeclContext) {
