@@ -2147,11 +2147,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_prune_disjunctions,
                    Opts.SolverPruneDisjunctions);
 
-  Opts.SolverOptimizeOperatorDefaults =
-      Args.hasFlag(OPT_solver_enable_optimize_operator_defaults,
-                   OPT_solver_disable_optimize_operator_defaults,
-                   Opts.SolverOptimizeOperatorDefaults);
-
   Opts.SolverEnablePerformanceHacks =
       Args.hasFlag(OPT_solver_enable_performance_hacks,
                    OPT_solver_disable_performance_hacks,

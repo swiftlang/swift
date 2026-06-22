@@ -4005,14 +4005,15 @@ void ConstraintSystem::generateOverloadConstraints(
         getFix) {
   SmallVector<ValueDecl *, 1> requirements;
 
-  if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
-    for (auto choice : choices) {
-      if (auto *decl = choice.getDeclOrNull()) {
-        if (decl->isOperator() &&
-            isa<ProtocolDecl>(decl->getDeclContext()) &&
-            !isDeclUnavailable(decl, locator)) {
-          requirements.push_back(decl);
-        }
+  // Skip protocol extension operators that are refinements of a protocol
+  // requirement operator, because they never participate in a valid
+  // solution.
+  for (auto choice : choices) {
+    if (auto *decl = choice.getDeclOrNull()) {
+      if (decl->isOperator() &&
+          isa<ProtocolDecl>(decl->getDeclContext()) &&
+          !isDeclUnavailable(decl, locator)) {
+        requirements.push_back(decl);
       }
     }
   }
@@ -4029,14 +4030,12 @@ void ConstraintSystem::generateOverloadConstraints(
     // Skip protocol extension operators that are refinements of a protocol
     // requirement operator, because they never participate in a valid
     // solution.
-    if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
-      if (auto *decl = choice.getDeclOrNull()) {
-        if (decl->getDeclContext()->getExtendedProtocolDecl()) {
-          if (llvm::any_of(requirements, [&](ValueDecl *req) {
-            return TypeChecker::isDeclRefinementOf(decl, req);
-          })) {
-            continue;
-          }
+    if (auto *decl = choice.getDeclOrNull()) {
+      if (decl->getDeclContext()->getExtendedProtocolDecl()) {
+        if (llvm::any_of(requirements, [&](ValueDecl *req) {
+          return TypeChecker::isDeclRefinementOf(decl, req);
+        })) {
+          continue;
         }
       }
     }
