@@ -4752,6 +4752,7 @@ function Build-Build([Hashtable] $Platform,
       LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
       SwiftDriver_DIR = (Get-ProjectCMakeModules $Platform Driver);
       SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
+      SwiftSubprocess_DIR = (Get-ProjectCMakeModules $Platform Subprocess);
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
       SwiftToolsProtocols_DIR = (Get-ProjectCMakeModules $Platform ToolsProtocols);
       SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
@@ -4987,6 +4988,7 @@ function Build-PackageManager([Hashtable] $Platform,
       CMAKE_Swift_FLAGS = @("-DCRYPTO_v2");
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
+      SwiftSubprocess_DIR = (Get-ProjectCMakeModules $Platform Subprocess);
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
       LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
