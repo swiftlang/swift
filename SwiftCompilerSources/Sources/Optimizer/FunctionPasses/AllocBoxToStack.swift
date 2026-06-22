@@ -237,6 +237,8 @@ private struct FunctionSpecializations {
         // First, replace the instruction with the original `box`, which adds more uses to `box`.
         // In a later iteration those additional uses will be handled.
         (user as! SingleValueInstruction).replace(with: box, context)
+      case let debugValue as DebugValueInst:
+        debugValue.operand.set(to: stack, context)
       case let apply as ApplySite:
         specialize(apply: apply, context)
       default:
