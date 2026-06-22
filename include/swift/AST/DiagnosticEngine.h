@@ -771,9 +771,12 @@ namespace swift {
     DiagnosticState(DiagnosticState &&) = default;
     DiagnosticState &operator=(DiagnosticState &&) = default;
 
-    /// If this diagnostic is a warning belonging to a diagnostic group,
-    /// figure out if there is a source-level (`@warn`) control for this group
-    /// for this diagnostic's source location.
+    /// Determine any user-configured behavior for this diagnostic's group,
+    /// combining the command-line warning controls (`-Werror`, `-Wwarning`,
+    /// `-warnings-as-errors`) with any source-level (`@diagnose`) control at
+    /// the diagnostic's source location.
+    ///
+    /// Caller must ensure \p diag's effective behavior is a warning.
     std::optional<DiagnosticBehavior>
     determineUserControlledWarningBehavior(const Diagnostic &diag,
                                            SourceManager &sourceMgr) const;
