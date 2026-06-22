@@ -472,14 +472,14 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
 
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(d)) {
     // Native-to-foreign thunks for top-level decls are created on-demand,
-    // unless they are marked @_cdecl, in which case they expose a dedicated
-    // entry-point with the visibility of the function.
+    // unless they use the thunk model (@_cdecl or @objc top-level), in which
+    // case they expose a dedicated entry-point with the visibility of the
+    // function.
     //
     // Native-to-foreign thunks for methods are always just private, since
     // they're anchored by Objective-C metadata.
-    auto &attrs = fn->getAttrs();
     if (constant.isNativeToForeignThunk() &&
-        !(attrs.hasAttribute<CDeclAttr>() && !fn->hasOnlyCEntryPoint())) {
+        fn->getCDeclKind() != ForeignLanguage::ObjectiveC) {
       auto isTopLevel = fn->getDeclContext()->isModuleScopeContext();
       return isTopLevel ? Limit::OnDemand : Limit::Private;
     }
@@ -1537,9 +1537,11 @@ std::optional<std::string> SILDeclRef::getAsmName() const {
       if (auto VD = dyn_cast<ValueDecl>(decl))
         return std::string(EA->getCName(VD));
 
-    // @c/@_cdecl
-    if (decl->getAttrs().hasAttribute<CDeclAttr>())
-      return std::string(decl->getCDeclName());
+    // @c, @_cdecl, and @objc on a top-level function (SE-0495). In all of
+    // these the C symbol name comes from getCDeclName().
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl))
+      if (AFD->getCDeclKind())
+        return std::string(decl->getCDeclName());
   }
 
   return std::nullopt;
