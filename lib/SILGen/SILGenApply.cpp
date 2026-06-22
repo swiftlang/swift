@@ -5664,6 +5664,13 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
       calleeTypeInfo.origResultType->getFunctionResultType();
     calleeTypeInfo.substResultType =
       cast<FunctionType>(calleeTypeInfo.substResultType).getResult();
+
+    // Static methods have their lifetime dependencies placed on the inner
+    // function type, since the outer function parameter is always an independent
+    // metatype.
+    if (lifetimeDependencies.empty()) {
+      lifetimeDependencies = calleeTypeInfo.origFormalType->getLifetimeDependencies();
+    }
   }
 
   ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
