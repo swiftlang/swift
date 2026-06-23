@@ -1110,8 +1110,10 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   assert(!builderType->hasTypeParameter());
 
   if (InvalidResultBuilderBodies.count(fn)) {
-    (void)recordFix(IgnoreInvalidResultBuilderBody::create(
-        *this, getConstraintLocator(fn.getAbstractClosureExpr())));
+    (void)recordFix(
+        IgnoreInvalidResultBuilderBody::create(
+            *this, getConstraintLocator(fn.getAbstractClosureExpr())),
+        /*impact=*/10);
     return getTypeMatchSuccess();
   }
 
@@ -1128,7 +1130,8 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     if (shouldAttemptFixes() && !isForCodeCompletion()) {
       if (recordFix(IgnoreResultBuilderWithReturnStmts::create(
               *this, builderType,
-              getConstraintLocator(fn.getAbstractClosureExpr()))))
+              getConstraintLocator(fn.getAbstractClosureExpr()))),
+          /*impact=*/10)
         return getTypeMatchFailure(locator);
 
       return getTypeMatchSuccess();

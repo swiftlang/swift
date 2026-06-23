@@ -9349,7 +9349,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           auto *fix = AllowInvalidStaticMemberRefOnProtocolMetatype::create(
               *this, memberLoc);
 
-          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+          return recordFix(fix, /*impact=*/5) ? SolutionKind::Error
+                                              : SolutionKind::Solved;
         }
       }
 
@@ -9915,7 +9916,7 @@ ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
     // If the type witness is invalid we'll have emitted an error, record a
     // fix to ensure the solution is marked invalid.
     auto *loc = getConstraintLocator(locator);
-    recordFix(IgnoreInvalidASTNode::create(*this, loc));
+    recordFix(IgnoreInvalidASTNode::create(*this, loc), /*impact=*/10);
     return Type();
   }
 
@@ -11842,7 +11843,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           solveWithNewBaseOrName(baseTy, DeclNameRef::createSubscript());
       // Looks like it was indeed meant to be a subscript operator.
       if (result == SolutionKind::Solved)
-        return recordFix(UseSubscriptOperator::create(*this, locator))
+        return recordFix(UseSubscriptOperator::create(*this, locator),
+                         /*impact=*/5)
                    ? SolutionKind::Error
                    : SolutionKind::Solved;
     }
@@ -12567,7 +12569,8 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
     recordAnyTypeVarAsPotentialHole(type2);
 
     recordFix(IgnoreNonMetatypeDynamicType::create(
-        *this, type2, type1, getConstraintLocator(locator)));
+                  *this, type2, type1, getConstraintLocator(locator)),
+              /*impact=*/2);
     return SolutionKind::Solved;
   }
 
@@ -13868,7 +13871,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
         *this, desugar2, memberName, /*alreadyDiagnosed=*/false,
         getConstraintLocator(loc, ConstraintLocator::DynamicCallable));
 
-    if (recordFix(fix))
+    if (recordFix(fix, /*impact=*/5))
       return SolutionKind::Error;
 
     recordPotentialHole(tv);
