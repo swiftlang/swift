@@ -93,6 +93,7 @@ add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVE
       ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
       -Xcc -D_USE_MATH_DEFINES
+      -Xfrontend -disable-force-load-symbols
       ${swift_platform_compile_flags}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS WINDOWS

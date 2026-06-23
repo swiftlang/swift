@@ -3328,6 +3328,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
         # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
         LLDB_TEST_USER_ARGS = "--skip-category=watchpoint;--sysroot=$SwiftSDK";
         LLDB_TEST_SWIFT_DRIVER_EXTRA_FLAGS = "-sdk '$SwiftSDK'"
+        LLDB_TEST_INFERIOR_RUNTIME_BIN = "$SwiftRuntime";
         # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
         LLVM_LIT_ARGS = "-v --no-gtest-sharding --time-tests";
         # LLDB Unit tests link against this library
@@ -3413,6 +3414,36 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
           -Tools                  @("swift-backtrace.exe")
       } else {
         Write-Warning "SxS bind: '$Stage2LibexecSwiftDir\swift-backtrace.exe' not present; skipping backtracer bind (Build-TestBacktrace did not run or failed)"
+      }
+    }
+
+    if ($TestLLDB -or $TestLLDBSwift) {
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets @(
+        "lldb",
+        "lldb-dap",
+        "lldb-server",
+        "repl_swift"
+      )
+
+      foreach ($Tool in @("lldb.exe", "lldb-dap.exe", "lldb-server.exe", "repl_swift.exe")) {
+        $Path = Join-Path $Stage2BinDir $Tool
+        if (-not (Test-Path $Path)) {
+          throw "Test-Compilers: '$Path' missing after explicit Build-CMakeProject; cannot SxS-bind a non-existent EXE"
+        }
+      }
+
+      Invoke-IsolatingEnvVars {
+        Invoke-VsDevShell $BuildPlatform
+        Set-WindowsSxSToolchainRuntime `
+          -BinaryDir              $Stage2BinDir `
+          -RuntimeSourceDir       $RuntimeSource `
+          -ProcessorArchitecture  $BuildPlatform.Architecture.VSName `
+          -Tools                  @(
+                                     "lldb.exe",
+                                     "lldb-dap.exe",
+                                     "lldb-server.exe",
+                                     "repl_swift.exe"
+                                   )
       }
     }
 
@@ -5502,6 +5533,21 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
   }
   Write-Host "Stage-WindowsToolchainSxS: built runtime graph with $($RuntimeDependencies.Count) DLL(s)"
 
+  # Some EXEs do not statically import the Swift runtime DLLs they need
+  # at runtime: lldb's expression evaluator JIT-loads the Swift stdlib +
+  # Foundation overlays via LoadLibrary, so the static-import scan below
+  # only discovers swiftCore for them, but the per-DLL SxS manifests on
+  # the dynamically-loaded DLLs require the consumer EXE to declare a
+  # matching activation context.  Without this override, `expr` in any
+  # Swift API test fails with ERROR_MOD_NOT_FOUND.  Extend such EXEs to
+  # the full runtime set so they can satisfy any per-DLL SxS dependency.
+  $DynamicRuntimeImports = @{
+    "lldb.exe"        = $RuntimeBaseNames
+    "lldb-dap.exe"    = $RuntimeBaseNames
+    "lldb-server.exe" = $RuntimeBaseNames
+    "repl_swift.exe"  = $RuntimeBaseNames
+  }
+
   $EXEDependencies = @{}
   $EXEPackageClosures = @{}
   $DLLDependencies = @{}
@@ -5518,6 +5564,15 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
         -BinaryDir  $BinDir `
         -RuntimeSet $RuntimeSet
     )
+    if ($DynamicRuntimeImports.ContainsKey($_.Name)) {
+      $Augmented = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+      )
+      foreach ($D in $StaticRuntimeDeps)              { [void]$Augmented.Add($D) }
+      foreach ($D in $DynamicRuntimeImports[$_.Name]) { [void]$Augmented.Add($D) }
+      $StaticRuntimeDeps = @($Augmented | Sort-Object)
+      Write-Host "Stage-WindowsToolchainSxS: augmenting '$($_.Name)' with dynamic-load runtime imports ($($StaticRuntimeDeps.Count) DLL(s))"
+    }
     $EXEDependencies[$_.FullName] = @(
       Get-RuntimeImportClosure `
         -Roots        $StaticRuntimeDeps `
