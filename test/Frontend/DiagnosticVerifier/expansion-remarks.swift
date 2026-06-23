@@ -1,10 +1,14 @@
 // REQUIRES: swift_swift_parser, executable_test
 
 // RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(UnstringifyMacroDefinition) -module-name=UnstringifyMacroDefinition %S/Inputs/macro/unstringify-macro.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -Rmacro-expansions
+// RUN: %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -Rmacro-expansions -typecheck %t/main.swift
+// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -Rmacro-expansions -typecheck %t/empty-no-expansion.swift 2>&1 | %FileCheck --check-prefix=CHECK-MISSING %t/empty-no-expansion.swift
 
+//--- main.swift
 @attached(peer, names: overloaded)
 macro unstringifyPeer(_ s: String) =
     #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
@@ -35,3 +39,12 @@ func bar() {
     }}
     */
 }
+
+//--- empty-no-expansion.swift
+// CHECK-MISSING:     error: expected expansion not produced
+// CHECK-MISSING-NOT: didn't find '}}'
+// CHECK-MISSING-NOT: no expansion with diagnostics starting at
+
+// expected-expansion@+2:14{{
+// }}
+func qux() {}
