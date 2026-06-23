@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=100 -solver-enable-optimize-operator-defaults
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=100
 
 // https://github.com/swiftlang/swift/issues/53006
 

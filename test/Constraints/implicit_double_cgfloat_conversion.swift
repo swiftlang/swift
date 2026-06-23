@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
-// RUN: %target-swift-emit-silgen -swift-version 5 -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 5 %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -420,9 +420,6 @@ func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
 // FIXME: This regressed with the real CGFloat.init overload set from the
 // SDK, but this test file previously used the mock SDK which masked the
 // regression.
-//
-// See implicit_double_cgfloat_conversion_hacks.swift -- the test case passes
-// with -enable-solver-performance-hacks.
 func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
   func test(_: CGFloat) -> CGFloat { 0 }
   func test(_: Double) -> Double { 0 }

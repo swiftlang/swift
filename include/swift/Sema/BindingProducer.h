@@ -25,14 +25,12 @@ class DisjunctionChoice {
   ConstraintSystem &CS;
   unsigned Index;
   Constraint *Choice;
-  bool ExplicitConversion;
   bool IsBeginningOfPartition;
 
 public:
   DisjunctionChoice(ConstraintSystem &cs, unsigned index, Constraint *choice,
-                    bool explicitConversion, bool isBeginningOfPartition)
+                    bool isBeginningOfPartition)
       : CS(cs), Index(index), Choice(choice),
-        ExplicitConversion(explicitConversion),
         IsBeginningOfPartition(isBeginningOfPartition) {}
 
   unsigned getIndex() const { return Index; }
@@ -89,10 +87,6 @@ public:
   operator Constraint *() const { return Choice; }
 
 private:
-  /// If associated disjunction is an explicit conversion,
-  /// let's try to propagate its type early to prune search space.
-  void propagateConversionInfo(ConstraintSystem &cs) const;
-
   static ValueDecl *getOperatorDecl(Constraint *choice) {
     auto *decl = getOverloadChoiceDecl(choice);
     if (!decl)
@@ -294,13 +288,9 @@ class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
   // are iterating over.
   unsigned PartitionIndex = 0;
 
-  bool IsExplicitConversion;
-
   Constraint *Disjunction;
 
   unsigned Index = 0;
-
-  bool needsGenericOperatorOrdering = true;
 
 public:
   using Element = DisjunctionChoice;
@@ -311,7 +301,6 @@ public:
                                 ? disjunction->getLocator()
                                 : nullptr),
         Choices(disjunction->getNestedConstraints()),
-        IsExplicitConversion(disjunction->isExplicitConversion()),
         Disjunction(disjunction) {
     assert(disjunction->getKind() == ConstraintKind::Disjunction);
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
@@ -323,10 +312,6 @@ public:
 
     // Order and partition the disjunction choices.
     partitionDisjunction(Ordering, PartitionBeginning);
-  }
-
-  void setNeedsGenericOperatorOrdering(bool flag) {
-    needsGenericOperatorOrdering = flag;
   }
 
   std::optional<Element> operator()() override {
@@ -342,19 +327,10 @@ public:
     ++Index;
 
     auto choice = DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
-                                    IsExplicitConversion, isBeginningOfPartition);
-    // Partition the generic operators before producing the first generic
-    // operator disjunction choice.
-    if (needsGenericOperatorOrdering && choice.isGenericOperator()) {
-      unsigned nextPartitionIndex = (PartitionIndex < PartitionBeginning.size() ?
-                                     PartitionBeginning[PartitionIndex] : Ordering.size());
-      partitionGenericOperators(Ordering.begin() + currIndex,
-                                Ordering.begin() + nextPartitionIndex);
-      needsGenericOperatorOrdering = false;
-    }
+                                    isBeginningOfPartition);
 
     return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
-                             IsExplicitConversion, isBeginningOfPartition);
+                             isBeginningOfPartition);
   }
 
   bool needsToComputeNext() const override { return false; }
@@ -368,12 +344,6 @@ private:
   void
   partitionDisjunction(SmallVectorImpl<unsigned> &Ordering,
                        SmallVectorImpl<unsigned> &PartitionBeginning);
-
-  /// Partition the choices in the range \c first to \c last into groups and
-  /// order the groups in the best order to attempt based on the argument
-  /// function type that the operator is applied to.
-  void partitionGenericOperators(SmallVectorImpl<unsigned>::iterator first,
-                                 SmallVectorImpl<unsigned>::iterator last);
 };
 
 class ConjunctionElementProducer : public BindingProducer<ConjunctionElement> {

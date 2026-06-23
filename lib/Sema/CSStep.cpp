@@ -513,12 +513,6 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
     if (!choice.isGenericOperator() && choice.isSymmetricOperator()) {
       if (!BestNonGenericScore || score < BestNonGenericScore) {
         BestNonGenericScore = score;
-        if (shouldSkipGenericOperators()) {
-          // The disjunction choice producer shouldn't do the work
-          // to partition the generic operator choices if generic
-          // operators are going to be skipped.
-          Producer.setNeedsGenericOperatorOrdering(false);
-        }
       }
     }
 
@@ -701,27 +695,6 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   return !hasUnavailableOverloads && !hasFixes && !hasAsyncMismatch &&
          (isBeginningOfPartition ||
           shortCircuitDisjunctionAt(choice, lastChoice));
-}
-
-bool swift::isSIMDOperator(ValueDecl *value) {
-  if (!value)
-    return false;
-
-  auto func = dyn_cast<FuncDecl>(value);
-  if (!func)
-    return false;
-
-  if (!func->isOperator())
-    return false;
-
-  auto nominal = func->getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominal)
-    return false;
-
-  if (nominal->getName().empty())
-    return false;
-
-  return nominal->getName().str().starts_with_insensitive("simd");
 }
 
 bool DisjunctionStep::shortCircuitDisjunctionAt(

@@ -2132,11 +2132,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_transitive_conformance,
                    Opts.SolverEnableTransitiveConformance);
 
-  Opts.SolverEnableBindingOptimizations =
-      Args.hasFlag(OPT_solver_enable_binding_optimizations,
-                   OPT_solver_disable_binding_optimizations,
-                   Opts.SolverEnableBindingOptimizations);
-
   Opts.SolverEnablePreparedOverloads =
       Args.hasFlag(OPT_solver_enable_prepared_overloads,
                    OPT_solver_disable_prepared_overloads,
@@ -2146,11 +2141,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_solver_enable_prune_disjunctions,
                    OPT_solver_disable_prune_disjunctions,
                    Opts.SolverPruneDisjunctions);
-
-  Opts.SolverOptimizeOperatorDefaults =
-      Args.hasFlag(OPT_solver_enable_optimize_operator_defaults,
-                   OPT_solver_disable_optimize_operator_defaults,
-                   Opts.SolverOptimizeOperatorDefaults);
 
   Opts.SolverEnablePerformanceHacks =
       Args.hasFlag(OPT_solver_enable_performance_hacks,

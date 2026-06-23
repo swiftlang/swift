@@ -475,12 +475,6 @@ def solver_enable_transitive_conformance : Flag<["-"], "solver-enable-transitive
 def solver_disable_transitive_conformance : Flag<["-"], "solver-disable-transitive-conformance">,
   HelpText<"Disable transitive conformance constraint optimization">;
 
-def solver_enable_binding_optimizations : Flag<["-"], "solver-enable-binding-optimizations">,
-  HelpText<"Enable experimental optimizations to speed up type variable binding">;
-
-def solver_disable_binding_optimizations : Flag<["-"], "solver-disable-binding-optimizations">,
-  HelpText<"Disable experimental optimizations to speed up type variable binding">;
-
 def disable_named_lazy_import_as_member_loading :
   Flag<["-"], "disable-named-lazy-import-as-member-loading">,
   HelpText<"Import all of a type's import-as-member globals together, as Swift "
@@ -990,12 +984,6 @@ def solver_disable_prune_disjunctions : Flag<["-"], "solver-disable-prune-disjun
 
 def solver_enable_prune_disjunctions : Flag<["-"], "solver-enable-prune-disjunctions">,
   HelpText<"Enable experimental disjunction pruning algorithm for lookahead in the solver">;
-
-def solver_disable_optimize_operator_defaults : Flag<["-"], "solver-disable-optimize-operator-defaults">,
-  HelpText<"Disable experimental optimization to sometimes skip operators in protocol extensions">;
-
-def solver_enable_optimize_operator_defaults : Flag<["-"], "solver-enable-optimize-operator-defaults">,
-  HelpText<"Enable experimental optimization to sometimes skip operators in protocol extensions">;
 
 def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-hacks">,
   HelpText<"Disable various constraint solver performance optimizations that have been "

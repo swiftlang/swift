@@ -1564,7 +1564,6 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
 void BindingSet::reduceBinding(PotentialBinding &binding) {
   bool checkConformanceConstraints =
       !CS.shouldAttemptFixes() &&
-      CS.getASTContext().TypeCheckerOpts.SolverEnableBindingOptimizations &&
       !Protocols.empty() &&
       !canBeNil();
 
@@ -2018,8 +2017,7 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
 }
 
 bool BindingSet::operator<(const BindingSet &other) {
-  if (CS.getASTContext().TypeCheckerOpts.SolverEnableBindingOptimizations &&
-      !CS.shouldAttemptFixes()) {
+  if (!CS.shouldAttemptFixes()) {
     if (isConflicting() != other.isConflicting())
       return isConflicting();
 

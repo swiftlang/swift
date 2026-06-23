@@ -1,12 +1,9 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
-// RUN: %target-swift-frontend -swift-version 5 -typecheck %s -solver-enable-performance-hacks
-// RUN: %target-swift-emit-silgen -swift-version 5 -solver-enable-performance-hacks %s
 
 // REQUIRES: objc_interop
 import Foundation
 
 // Move this back to implicit_double_cgfloat_conversion.swift when fixed.
-
 func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
   func test(_: CGFloat) -> CGFloat { 0 } // expected-note {{found this candidate}}
   func test(_: Double) -> Double { 0 } // expected-note {{found this candidate}}
