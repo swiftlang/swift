@@ -927,7 +927,6 @@ extension String.UTF16View {
     return _guts.withFastUTF8 { utf8 in
       var readIdx = crumb._encodedOffset
       let readEnd = utf8.count
-      _internalInvariant(readIdx < readEnd)
 
       var utf16I = 0
       let utf16End: Int = remaining
@@ -938,6 +937,36 @@ extension String.UTF16View {
       if crumb.transcodedOffset != 0 {
         utf16I = -1
       }
+
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+      // Guess-and-check fast path.
+      //
+      // The smallest possible UTF8 distance for N UTF16 code units is N bytes.
+      // Start there, and use the vectorized length function to quickly find how
+      // far over that minimum we actually are. If this run happens to be all
+      // ASCII, it will be correct. If not, it gets us vectorized counting of
+      // the initial prefix, and then we continue on from there.
+      //
+      // `guessThreshold` has to be at least 16, otherwise we don't hit get the
+      // vector path in _utf16Distance. It also amortizes setup/call overhead.
+      let guessThreshold = 32
+      if remaining >= guessThreshold {
+        let guessOffset = unsafe _scalarAlign(
+          utf8, crumb._encodedOffset &+ remaining)
+        let guessIndex = String.Index(
+          encodedOffset: guessOffset, transcodedOffset: 0
+        )._knownUTF8
+        let guessDistance = _utf16Distance(from: crumb, to: guessIndex)
+        _internalInvariant(guessDistance <= remaining)
+        if guessDistance == remaining {
+          return guessIndex
+        }
+        readIdx = guessIndex._encodedOffset
+        utf16I = guessDistance
+      }
+#endif
+
+      _internalInvariant(readIdx < readEnd)
 
       while true {
         _precondition(readIdx < readEnd, "String index is out of bounds")
