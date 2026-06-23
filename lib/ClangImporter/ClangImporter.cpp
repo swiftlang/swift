@@ -2433,9 +2433,12 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
                                     SourceLoc loc,
                                     ModuleVersionInfo *versionInfo,
                                     bool isTestableDependencyLookup) {
-  // Look up the top-level module to see if it exists.
+  // Look up the top-level module to see if it exists, mapping any -module-alias
+  // to the real module name so canImport(<alias>) matches import <alias>.
   auto topModule = modulePath.front();
-  clang::Module *clangModule = Impl.lookupModule(topModule.Item.str());
+  auto realModuleName =
+      Impl.SwiftContext.getRealModuleName(topModule.Item).str();
+  clang::Module *clangModule = Impl.lookupModule(realModuleName);
   if (!clangModule) {
     return false;
   }
@@ -2461,7 +2464,7 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
       if (!clangModule && component.Item.str() == "Private" &&
           (&component) == (&modulePath.getRaw()[1])) {
         clangModule =
-            Impl.lookupModule((topModule.Item.str() + "_Private").str());
+            Impl.lookupModule((realModuleName + "_Private").str());
       }
       if (!clangModule || !clangModule->isAvailable(lo, ti, r, mh, m)) {
         return false;
@@ -2479,7 +2482,7 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
   // Look for the .tbd file inside .framework dir to get the project version
   // number.
   llvm::VersionTuple currentVersion = getCurrentVersionFromTBD(
-      Impl.Instance->getVirtualFileSystem(), path, topModule.Item.str());
+      Impl.Instance->getVirtualFileSystem(), path, realModuleName);
   versionInfo->setVersion(currentVersion,
                           ModuleVersionSourceKind::ClangModuleTBD);
   return true;
