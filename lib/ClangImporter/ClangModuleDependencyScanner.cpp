@@ -16,16 +16,17 @@
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CASOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/CAS/CASOptions.h"
+#include "clang/DependencyScanning/DependencyScanningService.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendOptions.h"
-#include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
-#include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
+#include "clang/Tooling/DependencyScanningTool.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/FileSystem.h"
@@ -36,7 +37,7 @@
 using namespace swift;
 
 using namespace clang::tooling;
-using namespace clang::tooling::dependencies;
+using namespace clang::dependencies;
 
 static void addScannerPrefixMapperInvocationArguments(
     std::vector<std::string> &invocationArgStrs, ASTContext &ctx) {
@@ -83,7 +84,7 @@ std::vector<std::string> ClangImporter::getClangDepScanningInvocationArguments(
 
 void ClangImporter::getBridgingHeaderOptions(
     const ASTContext &ctx,
-    const clang::tooling::dependencies::TranslationUnitDeps &deps,
+    const clang::dependencies::TranslationUnitDeps &deps,
     std::vector<std::string> &swiftArgs) {
   auto addClangArg = [&](Twine arg) {
     swiftArgs.push_back("-Xcc");
@@ -99,6 +100,27 @@ void ClangImporter::getBridgingHeaderOptions(
   // Ensure that the resulting PCM build invocation uses Clang frontend
   // directly
   swiftArgs.push_back("-direct-clang-cc1-module-build");
+
+  // `ClangImporter::create` overwrites the
+  // `clang::CodeGenOptions::OptimizationLevel` setting based on
+  // `swift::IRGenOptions::OptMode`. Respect the swift optimisation mode here
+  // so that the bridging header PCH, which is emitted using these options, is
+  // emitted and later consumed using the same clang optimisation level.
+  // Otherwise, the mismatch will be caught and reported as an error when
+  // reading the PCH.
+  switch (ctx.SILOpts.OptMode) {
+  case OptimizationMode::NotSet:
+    break;
+  case OptimizationMode::NoOptimization:
+    swiftArgs.push_back("-Onone");
+    break;
+  case OptimizationMode::ForSpeed:
+    swiftArgs.push_back("-O");
+    break;
+  case OptimizationMode::ForSize:
+    swiftArgs.push_back("-Osize");
+    break;
+  }
 
   // Add args reported by the scanner.
 

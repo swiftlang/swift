@@ -73,7 +73,10 @@
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/CodeGen/ObjectFilePCHContainerWriter.h"
+#include "clang/DependencyScanning/ModuleDepCollector.h"
+#include "clang/DependencyScanning/ScanAndUpdateArgs.h"
 #include "clang/Driver/Compilation.h"
+#include "clang/Driver/CreateInvocationFromArgs.h"
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/ToolChain.h"
 #include "clang/Frontend/CompilerInvocation.h"
@@ -93,8 +96,6 @@
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "clang/Serialization/ObjectFilePCHContainerReader.h"
-#include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
-#include "clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -1101,7 +1102,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   clang::DiagnosticOptions diagOpts;
   clang::CompilerInstance CI(std::move(invocation),
                              Impl.Instance->getPCHContainerOperations(),
-                             &Impl.Instance->getModuleCache());
+                             Impl.Instance->getModuleCachePtr());
   CI.setTarget(&Impl.Instance->getTarget());
   CI.setDiagnostics(&*clang::CompilerInstance::createDiagnostics(
       Impl.Instance->getVirtualFileSystem(), diagOpts));
@@ -1189,7 +1190,7 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   PCHBasename.append("-swift_");
   PCHBasename.append(SwiftPCHHash);
   PCHBasename.append("-clang_");
-  PCHBasename.append(getClangModuleHash());
+  PCHBasename.append(computeClangContextHash());
   PCHBasename.append(".pch");
   SmallString<256> PCHFilename { PCHOutputDir };
   llvm::sys::path::append(PCHFilename, PCHBasename);
@@ -2123,7 +2124,7 @@ std::string ClangImporter::getBridgingHeaderContents(
 
   clang::CompilerInstance rewriteInstance(
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
-      &Impl.Instance->getModuleCache());
+      Impl.Instance->getModuleCachePtr());
 
   if (Impl.CAS)
     rewriteInstance.setCASDatabases(Impl.CAS, Impl.ResultCache);
@@ -2231,7 +2232,7 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
 
   auto clonedInstance = std::make_unique<clang::CompilerInstance>(
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
-      &Impl.Instance->getModuleCache());
+      Impl.Instance->getModuleCachePtr());
 
   if (Impl.CAS)
     clonedInstance->setCASDatabases(Impl.CAS, Impl.ResultCache);
@@ -4500,8 +4501,8 @@ clang::CodeGenOptions &ClangImporter::getCodeGenOpts() const {
   return Impl.getCodeGenOptions();
 }
 
-std::string ClangImporter::getClangModuleHash() const {
-  return Impl.Invocation->getModuleHash(Impl.Instance->getDiagnostics());
+std::string ClangImporter::computeClangContextHash() const {
+  return Impl.Invocation->computeContextHash(Impl.Instance->getDiagnostics());
 }
 
 std::vector<std::string>
@@ -4559,7 +4560,7 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   PPOpts.Includes.clear();
 
   // Clear benign CodeGenOptions.
-  clang::tooling::dependencies::resetBenignCodeGenOptions(
+  clang::dependencies::resetBenignCodeGenOptions(
       clang::frontend::ActionKind::GenerateModule, instance.getLangOpts(),
       instance.getCodeGenOpts());
 
@@ -4570,9 +4571,9 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   if (!Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper.empty()) {
     // Remap all the paths if requested.
     llvm::PrefixMapper Mapper;
-    clang::tooling::dependencies::DepscanPrefixMapping::configurePrefixMapper(
+    clang::dependencies::DepscanPrefixMapping::configurePrefixMapper(
         Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper, Mapper);
-    clang::tooling::dependencies::DepscanPrefixMapping::remapInvocationPaths(
+    clang::dependencies::DepscanPrefixMapping::remapInvocationPaths(
         instance, Mapper);
     instance.getFrontendOpts().PathPrefixMappings.clear();
   }
@@ -7262,8 +7263,10 @@ std::string
 swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
   if (!Clang.hasPreprocessor())
     return "";
-  std::string SpecificModuleCachePath =
-      Clang.getPreprocessor().getHeaderSearchInfo().getModuleCachePath().str();
+  std::string SpecificModuleCachePath = Clang.getPreprocessor()
+                                            .getHeaderSearchInfo()
+                                            .getSpecificModuleCachePath()
+                                            .str();
 
   // The returned-from-clang module cache path includes a suffix directory
   // that is specific to the clang version and invocation; we want the
