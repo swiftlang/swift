@@ -122,9 +122,7 @@ internal func inspect(options: UniversalOptions,
 
 @main
 internal struct SwiftInspect: ParsableCommand {
-  // DumpArrays and DumpConcurrency cannot be reliably be ported outside of
-  // Darwin due to the need to iterate the heap.
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS) || os(Windows)
   static let subcommands: [ParsableCommand.Type] = [
     DumpConformanceCache.self,
     DumpRawMetadata.self,
@@ -133,13 +131,21 @@ internal struct SwiftInspect: ParsableCommand {
     DumpArrays.self,
     DumpConcurrency.self,
   ]
-#elseif os(Windows) || os(Android)
+#elseif os(Android)
   static let subcommands: [ParsableCommand.Type] = [
     DumpConformanceCache.self,
     DumpRawMetadata.self,
     DumpGenericMetadata.self,
     DumpCacheNodes.self,
     DumpArrays.self,
+  ]
+#elseif os(Linux)
+  static let subcommands: [ParsableCommand.Type] = [
+    DumpConformanceCache.self,
+    DumpRawMetadata.self,
+    DumpGenericMetadata.self,
+    DumpCacheNodes.self,
+    DumpConcurrency.self,
   ]
 #else
   static let subcommands: [ParsableCommand.Type] = [
