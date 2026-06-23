@@ -10,14 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_extern(c, "_swift_exit")
-func _swift_exit(_: Int)
-
-func _swift_single_threaded_trap() -> Never {
-  _swift_exit(1)
-  while true {}
-}
-
 fileprivate struct SingleThreadedMutex {
   var checked: Bool
   var locked: Bool
@@ -38,7 +30,7 @@ public func _swift_mutex_init(
 public func _swift_mutex_destroy(_ mutex: UnsafeMutableRawPointer) {
   let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
   if storage.pointee.checked && storage.pointee.locked {
-    _swift_single_threaded_trap()
+    fatalError("destroying a locked mutex")
   }
 
   storage.pointee = SingleThreadedMutex(checked: false, locked: false)
@@ -49,7 +41,7 @@ public func _swift_mutex_lock(_ mutex: UnsafeMutableRawPointer) {
   let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
   if storage.pointee.checked {
     if storage.pointee.locked {
-      _swift_single_threaded_trap()
+      fatalError("locking an already locked mutex")
     }
     storage.pointee.locked = true
   }
@@ -60,7 +52,7 @@ public func _swift_mutex_unlock(_ mutex: UnsafeMutableRawPointer) {
   let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
   if storage.pointee.checked {
     if !storage.pointee.locked {
-      _swift_single_threaded_trap()
+      fatalError("unlocking an unlocked mutex")
     }
     storage.pointee.locked = false
   }
