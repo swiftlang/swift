@@ -1651,7 +1651,7 @@ enum class RawLayoutFlags : uintptr_t {
 
   /// Whether the given raw layout type is considered "plain old data". This can
   /// occur when the like type is concretely something like an 'Int'.
-  IsPOD = 0x8
+  IsNonPOD = 0x8
 };
 static inline RawLayoutFlags operator|(RawLayoutFlags lhs,
                                        RawLayoutFlags rhs) {
@@ -1671,7 +1671,7 @@ static inline bool isRawLayoutBitwiseBorrowable(RawLayoutFlags flags) {
   return uintptr_t(flags) & uintptr_t(RawLayoutFlags::BitwiseBorrowable);
 }
 static inline bool isRawLayoutPOD(RawLayoutFlags flags) {
-  return uintptr_t(flags) & uintptr_t(RawLayoutFlags::IsPOD);
+  return (uintptr_t(flags) & uintptr_t(RawLayoutFlags::IsNonPOD)) == 0;
 }
 
 namespace SpecialPointerAuthDiscriminators {

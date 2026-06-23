@@ -3640,16 +3640,19 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
 
     // PODness comes directly from the like type if we 'movesAsLike'. A custom
     // deinit on the raw layout type however automatically forces non-pod.
-    if (!T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
+    if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
+      rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
+                          IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
+    } else {
       auto &likeTypeInfo = IGM.getTypeInfo(likeType);
       auto isPOD = likeTypeInfo.getIsTriviallyDestroyable(IGF, likeType);
-      auto isPODFlags = IGF.Builder.CreateOr(rawLayoutFlags,
-                            IGM.getSize(Size((uint8_t) RawLayoutFlags::IsPOD)));
-      rawLayoutFlags = IGF.Builder.CreateSelect(isPOD, isPODFlags, rawLayoutFlags);
+      auto isNonPODFlags = IGF.Builder.CreateOr(rawLayoutFlags,
+                            IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
+      rawLayoutFlags = IGF.Builder.CreateSelect(isPOD, rawLayoutFlags, isNonPODFlags);
     }
-  } else if (!T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
+  } else if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
     rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
-                            IGM.getSize(Size((uint8_t) RawLayoutFlags::IsPOD)));
+                            IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
   }
 
   // If we don't have a count, then we're the 'like:' variant so just pass some
