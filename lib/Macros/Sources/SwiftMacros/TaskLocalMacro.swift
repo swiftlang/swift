@@ -18,7 +18,15 @@ import SwiftDiagnostics
 ///
 /// It introduces a peer `static let $name: TaskLocal<Type>` as well as a getter
 /// that accesses the task local storage.
-public enum TaskLocalMacro {}
+public enum TaskLocalMacro {
+  /// Attributes to copy onto the synthesized `$name` peer.
+  static let attributesToCopy: [String] = [
+    "usableFromInline",
+    "available",
+    "_spi",
+    "_spi_available",
+  ]
+}
 
 extension TaskLocalMacro: PeerMacro {
   public static func expansion(
@@ -78,6 +86,17 @@ extension TaskLocalMacro: PeerMacro {
     // Copy access modifiers
     let access = varDecl.accessControlModifiers
 
+    // Keep the projected property visible anywhere the original is.
+    let attributes = varDecl.attributes.filter { element in
+      guard let attribute = element.as(AttributeSyntax.self) else {
+        return false
+      }
+      if let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) {
+        return Self.attributesToCopy.contains(identifier.name.text)
+      }
+      return Self.attributesToCopy.contains(attribute.attributeName.trimmed.description)
+    }
+
     // If the property is global, do not prefix the synthesised decl with 'static'
     let isGlobal = context.lexicalContext.isEmpty
     let staticKeyword: TokenSyntax?
@@ -89,7 +108,7 @@ extension TaskLocalMacro: PeerMacro {
 
     return [
       """
-      \(access)\(staticKeyword)let $\(name)\(explicitTypeAnnotation) = TaskLocal(wrappedValue: \(initialValue))
+      \(attributes)\(access)\(staticKeyword)let $\(name)\(explicitTypeAnnotation) = TaskLocal(wrappedValue: \(initialValue))
       """
     ]
   }
