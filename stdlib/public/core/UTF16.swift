@@ -464,6 +464,24 @@ typealias ByteBlock = SIMD16<UInt8>
 typealias ByteHalfBlock = SIMD8<UInt8>
 #endif
 
+/*
+ SIMD<...> isn't generating the right code for the transcoding loop, so we use
+ intrinsics to manually specify what we want for now. If you want to remove this
+ in the future as our SIMD codegen improves, double check these benchmarks:
+  * UTF16Decode.length
+  * UTF16ToIdx.longCyrillic
+  * UTF16ToIdx.longCJK
+ */
+@_transparent
+func _wrappedSum(_ v: SIMD8<Int8>) -> Int8 {
+  Int8(Builtin.int_vector_reduce_add_Vec8xInt8(v._storage._value))
+}
+
+@_transparent
+func _wrappedSum(_ v: SIMD8<UInt16>) -> UInt16 {
+  UInt16(Builtin.int_vector_reduce_add_Vec8xInt16(v._storage._value))
+}
+
 @_transparent
 func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> ByteHalfBlock? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: CodeUnitBlock.self)
@@ -484,10 +502,10 @@ func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16? {
     return nil
   }
   // Everything is 1, 2, or 3-byte BMP
-  return CodeUnitBlock.one
+  let lengths = CodeUnitBlock.one
       .replacing(with: 2, where: block .> utf8OneByteMax)
       .replacing(with: 3, where: block .> utf8TwoByteMax)
-      .wrappedSum()
+  return _wrappedSum(lengths)
 }
 
 @_transparent

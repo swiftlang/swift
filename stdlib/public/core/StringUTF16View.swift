@@ -732,34 +732,30 @@ extension String.UTF16View {
   
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
   @inline(__always)
-  internal func _utf16Length<U: SIMD, S: SIMD>(
+  internal func _utf16Length(
     readPtr: inout UnsafeRawPointer,
-    endPtr: UnsafeRawPointer,
-    unsignedSIMDType: U.Type,
-    signedSIMDType: S.Type
-  ) -> Int where U.Scalar == UInt8, S.Scalar == Int8 {
+    endPtr: UnsafeRawPointer
+  ) -> Int {
     var utf16Count = 0
-    
-    while unsafe readPtr + MemoryLayout<U>.stride < endPtr {
+
+    while unsafe readPtr + MemoryLayout<SIMD8<UInt8>>.stride < endPtr {
       //Find the number of continuations (0b10xxxxxx)
-      let sValue = unsafe readPtr.loadUnaligned(as: S.self)
-      let continuations = S.zero.replacing(with: S.one, where: sValue .< -65 + 1)
-            
+      let sValue = unsafe readPtr.loadUnaligned(as: SIMD8<Int8>.self)
+      let continuations = SIMD8<Int8>.zero.replacing(
+        with: SIMD8<Int8>.one, where: sValue .< -65 + 1)
+
       //Find the number of 4 byte code points (0b11110xxx)
-      let uValue = unsafe readPtr.loadUnaligned(as: U.self)
-      let fourBytes = unsafe S.zero.replacing(
-        with: S.one,
-        where: unsafeBitCast(
-          uValue .>= 0b11110000,
-          to: SIMDMask<S.MaskStorage>.self
-        )
+      let uValue = unsafe readPtr.loadUnaligned(as: SIMD8<UInt8>.self)
+      let fourBytes = unsafe SIMD8<Int8>.zero.replacing(
+        with: SIMD8<Int8>.one,
+        where: uValue .>= 0b11110000
       )
-      
-      utf16Count &+= U.scalarCount + Int((fourBytes &- continuations).wrappedSum())
-            
-      unsafe readPtr += MemoryLayout<U>.stride
+
+      utf16Count &+= 8 + Int(_wrappedSum(fourBytes &- continuations))
+
+      unsafe readPtr += MemoryLayout<SIMD8<UInt8>>.stride
     }
-    
+
     return utf16Count
   }
 #endif
@@ -793,9 +789,7 @@ extension String.UTF16View {
       
       unsafe utf16Count &+= _utf16Length(
         readPtr: &readPtr,
-        endPtr: endPtr,
-        unsignedSIMDType: SIMD8<UInt8>.self,
-        signedSIMDType: SIMD8<Int8>.self
+        endPtr: endPtr
       )
    
       //TO CONSIDER: SIMD widths <8 here
