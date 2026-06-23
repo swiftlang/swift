@@ -77,7 +77,7 @@ static constexpr dispatch_qos_class_t DispatchQOSClassBackground
 
 static constexpr size_t DispatchQOSClassCount = 5;
 
-static inline int cacheIndexForQos(dispatch_qos_class_t priority) {
+static inline int cacheIndexForQOS(dispatch_qos_class_t priority) {
   switch (priority) {
   case DispatchQOSClassUserInteractive:
     return 0;
@@ -194,7 +194,7 @@ static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
   auto qos = qosClassFromPriority(priority);
 
   // Map `dispatch_qos_class_t` value to a cache index.
-  auto qosIndex = cacheIndexForQos(qos);
+  auto qosIndex = cacheIndexForQOS(qos);
 
 #ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
   std::memory_order loadOrder = std::memory_order_acquire;
