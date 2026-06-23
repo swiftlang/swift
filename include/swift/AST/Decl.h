@@ -2762,6 +2762,11 @@ public:
     return getPatternList()[i].getOriginalInitRange();
   }
 
+  /// Retrieve the SourceRange for the pattern binding entry at a given index.
+  SourceRange getEntrySourceRange(unsigned i) const {
+    return getPatternList()[i].getSourceRange();
+  }
+
   void setInit(unsigned i, Expr *E) {
     getMutablePatternList()[i].setInit(E);
   }

@@ -91,6 +91,11 @@ func funcScopeC() {
 @_extern(c, "c_value")
 var nonFunc: Int = 0 // expected-error{{'@_extern' variable cannot have an initializer}}
 
+// Forward references of extern vars is fine
+_ = forwardRef
+@_extern(c, "c_value2")
+var forwardRef: Int
+
 @_extern(c, "with_body")
 func withInvalidBody() {} // expected-error {{unexpected body of function declaration}}
 

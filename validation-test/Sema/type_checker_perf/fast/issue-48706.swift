@@ -30,6 +30,19 @@ class AnyRelationship<Base> {
     }
 }
 
+var issue = IssueModel(uid: "1", title: "ABC", assignees: [], followers: [])
+let assignees = [
+    IssueAssignee(issueUid: "1", assigneeUid: "Assigned to Issue 1"),
+    IssueAssignee(issueUid: "2", assigneeUid: "Assigned to Issue 2"),
+    IssueAssignee(issueUid: "1", assigneeUid: "Also assigned to issue 1!!!!")
+]
+
+let followers = [
+    IssueFollower(issueUid: "1", followerUid: "Following Issue 1"),
+    IssueFollower(issueUid: "2", followerUid: "Following Issue 2"),
+    IssueFollower(issueUid: "1", followerUid: "Also following issue 1!!!!")
+]
+
 final class OneToMany<One, Many, SharedKey: Equatable>: AnyRelationship<One> {
     let oneKeyPath: WritableKeyPath<One, [Many]>
     let manyKeyPath: KeyPath<Many, SharedKey>
@@ -54,19 +67,6 @@ final class OneToMany<One, Many, SharedKey: Equatable>: AnyRelationship<One> {
         }
     }
 }
-
-var issue = IssueModel(uid: "1", title: "ABC", assignees: [], followers: [])
-let assignees = [
-    IssueAssignee(issueUid: "1", assigneeUid: "Assigned to Issue 1"),
-    IssueAssignee(issueUid: "2", assigneeUid: "Assigned to Issue 2"),
-    IssueAssignee(issueUid: "1", assigneeUid: "Also assigned to issue 1!!!!")
-]
-
-let followers = [
-    IssueFollower(issueUid: "1", followerUid: "Following Issue 1"),
-    IssueFollower(issueUid: "2", followerUid: "Following Issue 2"),
-    IssueFollower(issueUid: "1", followerUid: "Also following issue 1!!!!")
-]
 
 for join in IssueModel.joins {
     join.query(withModel: &issue)

@@ -119,13 +119,15 @@ func f0(_ a: Any) -> Int { return 1 }
 assert(f0(1) == 1)
 
 // TODO(diagnostics): Bad diagnostic - should be `circular reference`
-var selfRef = { selfRef() }
+var selfRef = { selfRef() } // expected-note {{'selfRef' declared here}}
 // expected-error@-1 {{unable to infer closure type without a type annotation}}
+// expected-warning@-2 {{use of global variable 'selfRef' before its declaration; this will be an error in a future Swift language mode}}
 
 // TODO: should be an error `circular reference` but it's diagnosed via overlapped requests
-var nestedSelfRef = {
+var nestedSelfRef = { // expected-note {{'nestedSelfRef' declared here}}
   var recursive = { nestedSelfRef() }
   // expected-warning@-1 {{variable 'recursive' was never mutated; consider changing to 'let' constant}}
+  // expected-warning@-2 {{use of global variable 'nestedSelfRef' before its declaration; this will be an error in a future Swift language mode}}
   recursive()
 }
 

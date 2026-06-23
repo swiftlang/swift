@@ -14,13 +14,13 @@ using @Test // expected-error {{default isolation can only be set to '@MainActor
 using test // expected-error {{default isolation can only be set to '@MainActor' or 'nonisolated'}}
 
 do {
-  using // expected-warning {{expression of type 'Int' is unused}}
+  using // expected-error {{use of global variable 'using' before its declaration}}
   @MainActor
 // expected-error@+1 {{expected declaration}}
 }
 
 do {
-  using // expected-warning {{expression of type 'Int' is unused}}
+  using // expected-error {{use of global variable 'using' before its declaration}}
   nonisolated // expected-error {{cannot find 'nonisolated' in scope}}
 }
 
@@ -40,7 +40,7 @@ do {
 }
 
 let
-  using = 42
+  using = 42 // expected-note 2{{'using' declared here}}
 
 let (x: Int, using: String) = (x: 42, using: "")
 
