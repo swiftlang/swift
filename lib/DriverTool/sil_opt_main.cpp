@@ -413,6 +413,12 @@ struct SILOptOptions {
                      llvm::cl::init(true),
                      llvm::cl::desc("Run sil verifications after every pass."));
 
+  llvm::cl::opt<bool> EmitIsolationHistory = llvm::cl::opt<bool>(
+      "sil-region-isolation-emit-isolation-history",
+      llvm::cl::desc("Emit notes explaining why a disconnected value ended up "
+                     "in an isolated region. Mirrors the frontend flag of the "
+                     "same name; controls SILOptions::EmitIsolationHistory."));
+
   llvm::cl::opt<bool>
   SILVerifyAll = llvm::cl::opt<bool>("sil-verify-all",
                llvm::cl::Hidden,
@@ -856,6 +862,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.OptRecordPasses = options.RemarksPasses;
   SILOpts.EnableStackProtection = true;
   SILOpts.EnableMoveInoutStackProtection = options.EnableMoveInoutStackProtection;
+  SILOpts.EmitIsolationHistory = options.EmitIsolationHistory;
 
   SILOpts.VerifyExclusivity = options.VerifyExclusivity;
   if (options.EnforceExclusivity.getNumOccurrences() != 0) {

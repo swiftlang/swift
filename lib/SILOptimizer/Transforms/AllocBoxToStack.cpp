@@ -1195,6 +1195,14 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
   auto ApplyInst = Apply.getInstruction();
   SILBuilderWithScope Builder(ApplyInst);
 
+  // AllocBoxToStack rewrites the argument list with a 1:1 mapping — each
+  // operand becomes either itself or a project_box on a stack-promoted box
+  // (see the loop above). The original apply's per-argument SILLocations
+  // remain positionally valid, so just forward the optional storage hint
+  // through to the SILBuilder factory; the factory will assert in debug
+  // builds if the sizes ever diverge from this 1:1 invariant.
+  std::optional<ArrayRef<SILLocation>> ArgLocs = Apply.getArgumentLocs();
+
   // Build the function_ref and ApplySite.
   SILValue FunctionRef = Builder.createFunctionRef(Apply.getLoc(), ClonedFn);
   switch (Apply.getKind()) {
@@ -1204,25 +1212,29 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
         PAI->getCalleeConvention(), PAI->getResultIsolation(), PAI->isOnStack(),
         PAI->isStackAllocationNested(),
-        GenericSpecializationInformation::create(ApplyInst, Builder));
+        GenericSpecializationInformation::create(ApplyInst, Builder), ArgLocs);
   }
   case ApplySiteKind::ApplyInst:
     return Builder.createApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
         Apply.getApplyOptions(),
-        GenericSpecializationInformation::create(ApplyInst, Builder));
+        GenericSpecializationInformation::create(ApplyInst, Builder),
+        /*isolationCrossing=*/std::nullopt, ArgLocs);
   case ApplySiteKind::BeginApplyInst:
     return Builder.createBeginApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
         Apply.getApplyOptions(),
-        GenericSpecializationInformation::create(ApplyInst, Builder));
+        GenericSpecializationInformation::create(ApplyInst, Builder),
+        /*isolationCrossing=*/std::nullopt, ArgLocs);
   case ApplySiteKind::TryApplyInst: {
     auto TAI = cast<TryApplyInst>(Apply);
     return Builder.createTryApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
-        TAI->getNormalBB(), TAI->getErrorBB(),
-        TAI->getApplyOptions(),
-        GenericSpecializationInformation::create(ApplyInst, Builder));
+        TAI->getNormalBB(), TAI->getErrorBB(), TAI->getApplyOptions(),
+        GenericSpecializationInformation::create(ApplyInst, Builder),
+        /*isolationCrossing=*/std::nullopt,
+        /*normalCount=*/ProfileCounter(),
+        /*errorCount=*/ProfileCounter(), ArgLocs);
   }
   }
   llvm_unreachable("unhandled apply inst kind!");

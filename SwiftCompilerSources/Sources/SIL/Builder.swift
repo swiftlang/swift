@@ -503,15 +503,17 @@ public struct Builder {
     arguments: [Value],
     isNonThrowing: Bool = false,
     isNonAsync: Bool = false,
-    specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo()
+    specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo(),
+    argumentLocationsFrom: ApplySite? = nil
   ) -> ApplyInst {
     let apply = arguments.withBridgedValues { valuesRef in
       bridged.createApply(function.bridged, substitutionMap.bridged, valuesRef,
-                          isNonThrowing, isNonAsync, specializationInfo)
+                          isNonThrowing, isNonAsync, specializationInfo,
+                          argumentLocationsFrom.bridged)
     }
     return notifyNew(apply.getAs(ApplyInst.self))
   }
-  
+
   @discardableResult
   public func createTryApply(
     function: Value,
@@ -520,26 +522,30 @@ public struct Builder {
     normalBlock: BasicBlock,
     errorBlock: BasicBlock,
     isNonAsync: Bool = false,
-    specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo()
+    specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo(),
+    argumentLocationsFrom: ApplySite? = nil
   ) -> TryApplyInst {
     let apply = arguments.withBridgedValues { valuesRef in
       bridged.createTryApply(function.bridged, substitutionMap.bridged, valuesRef,
                              normalBlock.bridged, errorBlock.bridged,
-                             isNonAsync, specializationInfo)
+                             isNonAsync, specializationInfo,
+                             argumentLocationsFrom.bridged)
     }
     return notifyNew(apply.getAs(TryApplyInst.self))
   }
-  
+
   public func createBeginApply(function: Value,
                                _ substitutionMap: SubstitutionMap,
                                arguments: [Value],
                                isNonThrowing: Bool = false,
                                isNonAsync: Bool = false,
-                               specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo()
+                               specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo(),
+                               argumentLocationsFrom: ApplySite? = nil
   ) -> BeginApplyInst {
     let apply = arguments.withBridgedValues { valuesRef in
       bridged.createBeginApply(function.bridged, substitutionMap.bridged, valuesRef,
-                               isNonThrowing, isNonAsync, specializationInfo)
+                               isNonThrowing, isNonAsync, specializationInfo,
+                               argumentLocationsFrom.bridged)
     }
     return notifyNew(apply.getAs(BeginApplyInst.self))
   }
@@ -616,17 +622,19 @@ public struct Builder {
 
   public func createPartialApply(
     function: Value,
-    substitutionMap: SubstitutionMap, 
-    capturedArguments: [Value], 
-    calleeConvention: ArgumentConvention, 
-    hasUnknownResultIsolation: Bool, 
+    substitutionMap: SubstitutionMap,
+    capturedArguments: [Value],
+    calleeConvention: ArgumentConvention,
+    hasUnknownResultIsolation: Bool,
     isOnStack: Bool,
     /// If true this `partial_apply [on_stack]` must follow proper stack allocation nesting rules.
-    isNested: Bool
+    isNested: Bool,
+    argumentLocationsFrom: ApplySite? = nil
   ) -> PartialApplyInst {
     return capturedArguments.withBridgedValues { capturedArgsRef in
       let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged,
-                                           substitutionMap.bridged, hasUnknownResultIsolation, isOnStack, isNested)
+                                           substitutionMap.bridged, hasUnknownResultIsolation, isOnStack, isNested,
+                                           argumentLocationsFrom.bridged)
       return notifyNew(pai.getAs(PartialApplyInst.self))
     }
   }
