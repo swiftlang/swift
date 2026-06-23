@@ -1898,3 +1898,27 @@ class GlobalDefaultIsolationTest {
   // expected-error@-1 {{actor-isolated default value in a global actor 'SomeGlobalActor'-isolated context}}
 }
 
+// Regression test for https://github.com/swiftlang/swift/issues/89855
+
+enum GH_89855 {
+  actor A {
+      var state = 0
+      // expected-note@-1 {{mutation of this property is only permitted within the actor}}
+
+      func f(_ b: isolated B) {
+          let bIso = {
+              _ = b
+              let bug = { [self] in
+                  // Previously this was 'self-isolated'
+                  self.state += 1 // So this was allowed
+                  // expected-error@-1 {{actor-isolated property 'state' can not be mutated from a nonisolated context}}
+                  self.preconditionIsolated() // 💥 But this crashed
+              }
+              bug()
+          }
+          bIso()
+      }
+  }
+
+  actor B {}
+}
