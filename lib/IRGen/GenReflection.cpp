@@ -547,6 +547,32 @@ getTypeRefImpl(IRGenModule &IGM,
     // in-process.
     IGM.IRGen.noteUseOfTypeMetadata(type);
 
+    // Ensure ObjC classes referenced by mangled type metadata strings are
+    // visible to the linker. The runtime resolves these classes by name via
+    // objc_getClass() at runtime, but without a linker-visible reference the
+    // linker may not pull in the archive member defining the class when
+    // linking static archives without -ObjC. Emitting a classref entry
+    // creates an undefined reference to _OBJC_CLASS_$_<name> that forces
+    // the linker to include the class definition.
+    if (IGM.ObjCInterop) {
+      type.visit([&](Type t) {
+        // Use getAnyNominal to catch ObjC generic classes whose erased
+        // type is a NominalType (ClassType) rather than a
+        // BoundGenericClassType.
+        auto *nominal = t->getAnyNominal();
+        if (!nominal)
+          return;
+        auto *classDecl = dyn_cast<ClassDecl>(nominal);
+        if (!classDecl)
+          return;
+        if (classDecl->hasKnownSwiftImplementation())
+          return;
+        if (classDecl->isForeign())
+          return;
+        (void)IGM.getAddrOfObjCClassRef(classDecl);
+      });
+    }
+
     // If the minimum deployment target's runtime demangler wouldn't understand
     // this mangled name, then fall back to generating a "mangled name" with a
     // symbolic reference with a callback function.
