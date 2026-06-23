@@ -1616,6 +1616,7 @@ public:
         PrevArgIdx(prevArgIdx), Bindings(bindings.begin(), bindings.end()) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 /// Diagnose an attempt to destructure a single tuple closure parameter

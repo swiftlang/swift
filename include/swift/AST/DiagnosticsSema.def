@@ -1667,6 +1667,18 @@ ERROR(argument_out_of_order_unnamed_unnamed,none,
 ERROR(argument_out_of_order_binary_op,none,
       "operator argument #%0 must precede operator argument #%1",
       (unsigned, unsigned))
+NOTE(argument_out_of_order_note_named, none,
+     "candidate expects argument %0 must precede argument %1",
+     (Identifier, Identifier))
+NOTE(argument_out_of_order_note_unnamed, none,
+     "candidate expects argument #%0 must precede argument #%1",
+     (unsigned, unsigned))
+NOTE(argument_out_of_order_note_named_unnamed, none,
+     "candidate expects argument %0 must precede argument #%1",
+     (Identifier, unsigned))
+NOTE(argument_out_of_order_note_unnamed_named, none,
+     "candidate expects argument #%0 must precede argument #%1",
+     (unsigned, Identifier))
 NOTE(candidate_expected_different_labels,none,
      "incorrect labels for candidate (have: '%0', expected: '%1')",
      (StringRef, StringRef))
