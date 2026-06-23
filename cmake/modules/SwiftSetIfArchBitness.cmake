@@ -13,6 +13,7 @@ function(set_if_arch_bitness var_name)
      "${SIA_ARCH}" STREQUAL "x86" OR
      "${SIA_ARCH}" STREQUAL "armv4t" OR
      "${SIA_ARCH}" STREQUAL "armv5" OR
+     "${SIA_ARCH}" STREQUAL "armv5te" OR
      "${SIA_ARCH}" STREQUAL "armv6" OR
      "${SIA_ARCH}" STREQUAL "armv6m" OR
      "${SIA_ARCH}" STREQUAL "armv7" OR
