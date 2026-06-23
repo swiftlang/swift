@@ -142,6 +142,9 @@ FieldsTestSuite.test("Contain empty fields") {
 
   let o2 = makeNoUniqueAddressEmpty()
   expectEqual(o2.x, 17)
+
+  let o3 = makeBaseEmptyAndInt(72)
+  expectEqual(o3.x, 72)
 }
 
 FieldsTestSuite.test("Multiple empty bases") {

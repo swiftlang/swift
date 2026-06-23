@@ -175,6 +175,12 @@ struct EmptyOnlyDerived : BaseEmpty {};
 
 inline EmptyOnlyDerived makeEmptyOnlyDerived() { return {}; }
 
+struct BaseEmptyAndInt : BaseEmpty {
+  int x;
+};
+
+inline BaseEmptyAndInt makeBaseEmptyAndInt(int n) { return {{}, n}; }
+
 struct IntAndEmpty {
   int x;
   Empty e;
@@ -222,8 +228,8 @@ inline ContainsEmptyClass makeContainsEmptyClass() { return {}; }
 
 struct OuterWithEmpty {
   struct Inner {};
-  int x;
   Inner i;
+  int x;
 };
 
 inline OuterWithEmpty makeOuterWithEmpty() {
@@ -240,8 +246,8 @@ inline EmptyArrayHolder makeEmptyArrayHolder() { return {}; }
 
 template <class T>
 struct EmptyHolder {
-  bool x;
   T t;
+  bool x;
 };
 
 inline EmptyHolder<Empty> makeEmptyHolderOfEmpty() {
@@ -343,8 +349,8 @@ inline HasEmptyUnion makeHasEmptyUnion() {
 }
 
 union UnionEmptyAndInt {
-  int x;
   Empty e;
+  int x;
 };
 
 struct HasUnionEmptyAndInt {
