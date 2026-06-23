@@ -45,6 +45,7 @@ SupersetVJPTests.testWithLeakChecking("CrossModuleClosure") {
   // solution is correct because Tracked conforms to
   // AdditiveArithmetic, but AutoDiff doesn't like the
   // resulting AST and complains that + is not differentiable.
+  // Will be solved by https://github.com/swiftlang/swift/pull/87692
   expectEqual(1, gradient(at: Tracked<Float>(1)) { x in x + 2 })
 }
 #endif
