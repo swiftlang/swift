@@ -112,18 +112,25 @@ static bool isSwiftDependencyKind(ModuleDependencyKind Kind) {
 static std::string
 computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
                              const ASTContext &ctx) {
+  auto currentWorkingDirectory = [&ctx]() -> std::string {
+    if (auto cwd =
+            ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory())
+      return *cwd;
+    ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
+                       "Could not determine current working directory");
+    return std::string();
+  };
+
   std::string workingDir;
   auto clangWorkingDirPos = std::find(
       commandLineArgs.rbegin(), commandLineArgs.rend(), "-working-directory");
   if (clangWorkingDirPos == commandLineArgs.rend())
-    workingDir =
-        ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+    workingDir = currentWorkingDirectory();
   else {
     if (clangWorkingDirPos - 1 == commandLineArgs.rend()) {
       ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                          "Missing '-working-directory' argument");
-      workingDir =
-          ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+      workingDir = currentWorkingDirectory();
     } else
       workingDir = *(clangWorkingDirPos - 1);
   }
@@ -2546,7 +2553,7 @@ ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
                   [this](const auto &cd, auto mok) -> std::string {
                     return clangModuleOutputPathLookup(cd, mok);
                   }, {});
-          if (clangResult)
+          if (clangResult && !clangResult->ModuleGraph.empty())
             return std::make_pair(
                 binaryDepID, clangResult->ModuleGraph[0].ClangModuleMapFile);
           return std::nullopt;

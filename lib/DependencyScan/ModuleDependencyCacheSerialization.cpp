@@ -204,9 +204,13 @@ bool ModuleDependenciesCacheDeserializer::readSerializationTime(llvm::sys::TimeP
   
   TimeLayout::readRecord(Scratch);
   std::string serializedTimeStamp = BlobData.str();
-  
+
+  TimeLayout::readRecord(Scratch);
+  long long timeStampValue;
+  if (BlobData.getAsInteger(/*Radix=*/10, timeStampValue))
+    return true; // malformed timestamp -> treat as deserialization failure
   SerializationTimeStamp =
-    llvm::sys::TimePoint<>(llvm::sys::TimePoint<>::duration(std::stoll(serializedTimeStamp)));
+      llvm::sys::TimePoint<>(llvm::sys::TimePoint<>::duration(timeStampValue));
   return SerializationTimeStamp == llvm::sys::TimePoint<>();
 }
 
@@ -674,7 +678,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
 
       // Add dependency only imports.
       auto depOnlyImports = getStringArray(dependencyOnlyImportsID);
-      if (!dependencyOnlyImportsID)
+      if (!depOnlyImports)
         llvm::report_fatal_error("Bad dependency only imports");
       for (const auto &mod : *depOnlyImports)
         moduleDep.addDependencyOnlyImport(mod);
@@ -1013,22 +1017,22 @@ ModuleDependenciesCacheDeserializer::getModuleDependencyIDArray(unsigned n) {
     static const std::string clangPrefix("clang");
     std::vector<ModuleDependencyID> result;
     for (const auto &encodedIdentifierString : *encodedIdentifierStringArray) {
+      StringRef encoded(encodedIdentifierString);
       ModuleDependencyID id;
-      if (!encodedIdentifierString.compare(0, textualPrefix.size(),
-                                           textualPrefix)) {
-        auto moduleName =
-            encodedIdentifierString.substr(textualPrefix.size() + 1);
-        id = {moduleName, ModuleDependencyKind::SwiftInterface};
-      } else if (!encodedIdentifierString.compare(0, binaryPrefix.size(),
-                                                  binaryPrefix)) {
-        auto moduleName =
-            encodedIdentifierString.substr(binaryPrefix.size() + 1);
-        id = {moduleName, ModuleDependencyKind::SwiftBinary};
-      } else {
-        auto moduleName =
-            encodedIdentifierString.substr(clangPrefix.size() + 1);
-        id = {moduleName, ModuleDependencyKind::Clang};
-      }
+      if (encoded.starts_with(textualPrefix) &&
+          encoded.size() > textualPrefix.size())
+        id = {encoded.substr(textualPrefix.size() + 1).str(),
+              ModuleDependencyKind::SwiftInterface};
+      else if (encoded.starts_with(binaryPrefix) &&
+               encoded.size() > binaryPrefix.size())
+        id = {encoded.substr(binaryPrefix.size() + 1).str(),
+              ModuleDependencyKind::SwiftBinary};
+      else if (encoded.starts_with(clangPrefix) &&
+               encoded.size() > clangPrefix.size())
+        id = {encoded.substr(clangPrefix.size() + 1).str(),
+              ModuleDependencyKind::Clang};
+      else
+        return std::nullopt;
       result.push_back(id);
     }
     return result;
