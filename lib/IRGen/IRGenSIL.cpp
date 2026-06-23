@@ -7780,9 +7780,21 @@ void IRGenSILFunction::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *i){
   (void)from.claimAll();
   CanType instanceType(i->getType().castTo<AnyMetatypeType>().getInstanceType());
   Explosion to;
-  llvm::Value *classPtr =
-    emitClassHeapMetadataRefForMetatype(*this, swiftMeta, instanceType);
-  to.add(Builder.CreateBitCast(classPtr, IGM.ObjCClassPtrTy));
+  auto deploymentAvailability =
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
+  auto getObjCMetatypeFromMetadataAvail =
+      IGM.Context.getGetObjCMetatypeFromMetadataAvailability();
+  // Use getObjCMetatypeFromMetadata if available. Otherwise, use old
+  // getObjCClassFromMetadata.
+  if (deploymentAvailability.isContainedIn(getObjCMetatypeFromMetadataAvail)) {
+    llvm::Value *objcMetatypePtr =
+        emitObjCMetatypeForMetatype(*this, swiftMeta, instanceType);
+    to.add(Builder.CreateBitCast(objcMetatypePtr, IGM.ObjCPtrTy));
+  } else {
+    llvm::Value *classPtr =
+        emitClassHeapMetadataRefForMetatype(*this, swiftMeta, instanceType);
+    to.add(Builder.CreateBitCast(classPtr, IGM.ObjCClassPtrTy));
+  }
   setLoweredExplosion(i, to);
 }
 
