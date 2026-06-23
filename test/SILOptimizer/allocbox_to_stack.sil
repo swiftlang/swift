@@ -20,13 +20,15 @@ class C {}
 sil @simple_promotion : $(Int) -> Int {
 bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
+  debug_value %1, var, name "x"
   %1a = project_box %1 : ${ var Int }, 0
   store %0 to %1a : $*Int
   %3 = load %1a : $*Int
   strong_release %1 : ${ var Int }
   return %3 : $Int
 
-// CHECK: alloc_stack
+// CHECK: [[S:%.*]] = alloc_stack
+// CHECK-NEXT: debug_value [[S]]
 // CHECK-NOT: alloc_box
 // CHECK-NOT: strong_release
 // CHECK: return
