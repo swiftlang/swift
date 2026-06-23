@@ -7589,6 +7589,12 @@ bool swift::checkSendableConformance(
   bool wasImplied = (conformance->getSourceKind() ==
                      ConformanceEntryKind::Implied);
 
+  // If Sendable came from a `@preconcurrency` protocol the error
+  // should be downgraded even with strict concurrency checking to
+  // allow clients time to address the new requirement.
+  bool impliedByPreconcurrencyProtocol =
+      check == SendableCheck::ImpliedByPreconcurrencyProtocol;
+
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
   SendableCheckContext checkContext(conformanceDC, check);
@@ -7605,7 +7611,8 @@ bool swift::checkSendableConformance(
     if (!(nominal->hasClangNode() && wasImplied)) {
       conformanceDecl
           ->diagnose(diag::concurrent_value_outside_source_file, nominal)
-          .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
+          .limitBehaviorWithPreconcurrency(
+              behavior, impliedByPreconcurrencyProtocol, LanguageMode::v6);
 
       if (behavior == DiagnosticBehavior::Unspecified)
         return true;
@@ -7618,9 +7625,12 @@ bool swift::checkSendableConformance(
     // A non-final class cannot conform to `Sendable` unless it is protected by
     // global actor isolation.
     if (!classDecl->isSemanticallyFinal() && !isGlobalActorIsolated) {
-      classDecl->diagnose(diag::concurrent_value_nonfinal_class,classDecl->getName())
+      classDecl
+          ->diagnose(diag::concurrent_value_nonfinal_class,
+                     classDecl->getName())
           .fixItInsert(classDecl->getStartLoc(), "final ")
-          .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
+          .limitBehaviorWithPreconcurrency(
+              behavior, impliedByPreconcurrencyProtocol, LanguageMode::v6);
 
       if (behavior == DiagnosticBehavior::Unspecified)
         return true;
@@ -7644,12 +7654,16 @@ bool swift::checkSendableConformance(
             conformanceDecl
                 ->diagnose(diag::concurrent_value_nonsendable_superclass,
                            classDecl->getName())
-                .warnUntilLanguageMode(LanguageMode::future);
+                .limitBehaviorWithPreconcurrency(
+                    DiagnosticBehavior::Warning,
+                    impliedByPreconcurrencyProtocol, LanguageMode::future);
           } else {
             conformanceDecl
                 ->diagnose(diag::concurrent_value_nonsendable_superclass,
                            classDecl->getName())
-                .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
+                .limitBehaviorWithPreconcurrency(
+                    behavior, impliedByPreconcurrencyProtocol,
+                    LanguageMode::v6);
             isError = behavior == DiagnosticBehavior::Unspecified;
           }
 
