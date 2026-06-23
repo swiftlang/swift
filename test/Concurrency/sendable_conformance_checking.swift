@@ -219,11 +219,22 @@ class OtherIsolatedSendableSubclass: NonSendableSuperclass, Sendable {}
 protocol RefinesSendable: Sendable {}
 
 @available(SwiftStdlib 5.1, *)
+@preconcurrency protocol PreconcurrencyRefinesSendable: Sendable {}
+
+@available(SwiftStdlib 5.1, *)
 @MainActor
 class IsolatedImpliedSendableSubclass: NonSendableSuperclass, RefinesSendable {}
 // expected-warning@-1:7 {{class 'IsolatedImpliedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
 // expected-note@-2:7 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
 // expected-note@-3:40 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+
+// Warning even in future language version due to preconcurrency implied conformance.
+@available(SwiftStdlib 5.1, *)
+@MainActor
+class IsolatedPreconcurrencySendableSubclass: NonSendableSuperclass, PreconcurrencyRefinesSendable {}
+// expected-warning@-1:7 {{class 'IsolatedPreconcurrencySendableSubclass' cannot conform to the 'Sendable' protocol}}
+// expected-note@-2:7 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note@-3:47 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
 
 @available(SwiftStdlib 5.1, *)
 @MainActor
