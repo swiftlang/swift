@@ -1076,12 +1076,6 @@ extension String.UTF16View {
       if isASCII {
         _internalInvariant(range.lowerBound.transcodedOffset == 0)
         _internalInvariant(range.upperBound.transcodedOffset == 0)
-        #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
-        let transcodedCount = unsafe Self.transcodeASCIIChunk(
-          utf8, from: readIdx, to: readEnd, into: buffer, at: writeIdx)
-        readIdx &+= transcodedCount
-        writeIdx &+= transcodedCount
-        #endif
         while readIdx < readEnd {
           unsafe _internalInvariant(utf8[readIdx] < 0x80)
           unsafe buffer[_unchecked: writeIdx] = unsafe UInt16(
