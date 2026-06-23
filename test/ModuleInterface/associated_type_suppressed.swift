@@ -77,10 +77,9 @@ public func ncIter3<T: P>(_ t: T) where T.Element: Copyable {}
 // SIL: @$s5assoc6ncBothyyxAA1PRz7ElementRj_zlF :
 public func ncBoth<T: P>(_ t: T) where T.Iterator: ~Copyable, T.Element: ~Copyable {}
 
-// INTERFACE: public func bothCopyable<T>(_ t: T) where T : assoc::P, T.Iterator : Swift::Copyable
-// SIL-NEW:    @$s5assoc12bothCopyableyyxAA1PRzs0C08IteratorRpzlF :
-// SIL-LEGACY: @$s5assoc12bothCopyableyyxAA1PRzs0C08IteratorRpz7ElementRj_zlF :
-public func bothCopyable<T: P>(_ t: T) where T.Iterator: Copyable {}
+// INTERFACE: public func bothCopyable<T>(_ t: T) where T : assoc::P, T.Element : Swift::Copyable, T.Iterator : Swift::Copyable
+// SIL:    @$s5assoc12bothCopyableyyxAA1PRzs0C08IteratorRpzlF :
+public func bothCopyable<T: P>(_ t: T) where T.Element: Copyable, T.Iterator: Copyable {}
 
 // INTERFACE-LABEL: public struct Holder<S> where S : assoc::P, S : ~Copyable, S.Element : ~Copyable {
 public struct Holder<S> where S.Element: ~Copyable, S: P & ~Copyable {
@@ -94,13 +93,14 @@ public struct Holder<S> where S.Element: ~Copyable, S: P & ~Copyable {
 // SIL: @$s5assoc6HolderVAARi_z7ElementRj_zrlE02ncC0yyqd__AA1PRd__ADRj_d__lF :
   public func ncElement<T>(_ t: T) where T: P, T.Element: ~Copyable {}
 
-// INTERFACE: public func copyableIter<T>(_ t: T) where T : assoc::P, T.Iterator : Swift::Copyable
+// INTERFACE-NEW: public func copyableIter<T>(_ t: T) where T : assoc::P, T.Element : Swift::Copyable, T.Iterator : Swift::Copyable
+// INTERFACE-OLD: public func copyableIter<T>(_ t: T) where T : assoc::P, T.Iterator : Swift::Copyable, T.Element : ~Copyable
 // SIL-NEW:    @$s5assoc6HolderVAARi_z7ElementRj_zrlE12copyableIteryyqd__AA1PRd__s8Copyable8IteratorRpd__lF :
 // SIL-LEGACY: @$s5assoc6HolderVAARi_z7ElementRj_zrlE12copyableIteryyqd__AA1PRd__s8Copyable8IteratorRpd__ADRj_d__lF :
 public func copyableIter<T: P>(_ t: T) where T.Iterator: Copyable {}
 }
 
-// INTERFACE-NEW: extension assoc::Holder {
+// INTERFACE-NEW: extension assoc::Holder where S.Element : Swift::Copyable {
 // INTERFACE-LEGACY: extension assoc::Holder where S.Element : ~Copyable {
 extension Holder {
   // SIL-NEW:    @$s5assoc6HolderV19forceIntoInterface1yyF :
@@ -111,7 +111,7 @@ extension Holder {
   public func forceIntoInterface1c() where S.Element: Copyable {}
 }
 
-// INTERFACE-NEW: extension assoc::Holder where S.Iterator : Swift::Copyable {
+// INTERFACE-NEW: extension assoc::Holder where S.Element : Swift::Copyable, S.Iterator : Swift::Copyable {
 // INTERFACE-LEGACY: extension assoc::Holder where S.Iterator : Swift::Copyable, S.Element : ~Copyable {
 extension Holder where S.Iterator: Copyable {
   // SIL-NEW:    @$s5assoc6HolderVAAs8Copyable8IteratorRpzrlE19forceIntoInterface2yyF :
@@ -128,7 +128,7 @@ extension Holder where S.Element: ~Copyable {
   public func forceIntoInterface5() {}
 }
 
-// INTERFACE-NEW: extension assoc::P {
+// INTERFACE-NEW: extension assoc::P where Self.Element : Swift::Copyable {
 // INTERFACE-LEGACY: extension assoc::P where Self.Element : ~Copyable {
 extension P {
   // SIL-NEW:    @$s5assoc1PPAAE19forceIntoInterface3yyF :
@@ -138,7 +138,7 @@ extension P {
   public func forceIntoInterface3c() where Element: Copyable {}
 }
 
-// INTERFACE-NEW: extension assoc::P where Self.Iterator : Swift::Copyable {
+// INTERFACE-NEW: extension assoc::P where Self.Element : Swift::Copyable, Self.Iterator : Swift::Copyable {
 // INTERFACE-LEGACY: extension assoc::P where Self.Iterator : Swift::Copyable, Self.Element : ~Copyable {
 extension P where Iterator: Copyable {
   // SIL-NEW:    @$s5assoc1PPAAs8Copyable8IteratorRpzrlE19forceIntoInterface4yyF :
@@ -147,4 +147,10 @@ extension P where Iterator: Copyable {
 
   // SIL:        @$s5assoc1PPAAs8Copyable8IteratorRpzrlE20forceIntoInterface4cyyF :
   public func forceIntoInterface4c() where Element: Copyable {}
+}
+
+// INTERFACE: extension assoc::P where Self.Element : Swift::Copyable {
+extension P where Element: Copyable {
+  // SIL:    @$s5assoc1PPAAE19forceIntoInterface5yyF :
+  public func forceIntoInterface5() {}
 }
