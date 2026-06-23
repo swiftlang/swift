@@ -29,15 +29,13 @@ func annotatedFunc( // expected-note 3 {{enclosing scope here}}
   }
   localFunc()
 
-  // FIXME: [availability] Incorrect scope noted
-  switch e { // expected-note 3 {{enclosing scope here}}
+  switch e {
   case .macOS_10:
-    if #available(macOS 10, *) { _ = 1 } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
+    if #available(macOS 10, *) { _ = 1 } // FIXME: [availability] Should be diagnosed
   case .macOS_11:
-    if #available(macOS 11, *) { _ = 1 } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
+    if #available(macOS 11, *) { _ = 1 } // FIXME: [availability] Should be diagnosed
   case .macOS_12:
-    // FIXME: [availability] Spurious warning
-    if #available(macOS 12, *) { _ = 1 } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
+    if #available(macOS 12, *) { _ = 1 }
   case .macOS_13:
     if #available(macOS 13, *) { _ = 1 }
   }
@@ -115,14 +113,13 @@ func testWhileStmt() {
 func testSwitchStmt(
   _ e: MacOSVersions,
 ) {
-  // FIXME: [availability] Spurious warnings
-  switch e { // expected-note 3 {{enclosing scope here}}
+  switch e {
   case .macOS_10:
-    if #available(macOS 10, *) { _ = 1 } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
+    if #available(macOS 10, *) { _ = 1 }
   case .macOS_11:
-    if #available(macOS 11, *) { _ = 1 } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
+    if #available(macOS 11, *) { _ = 1 }
   case .macOS_12:
-    if #available(macOS 12, *) { _ = 1 } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
+    if #available(macOS 12, *) { _ = 1 }
   case .macOS_13:
     if #available(macOS 13, *) { _ = 1 }
   }
