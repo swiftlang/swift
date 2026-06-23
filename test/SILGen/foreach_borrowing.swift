@@ -4,7 +4,6 @@
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
 // RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
-// RUN:     -enable-experimental-feature BorrowingForLoop \
 // RUN:     -enable-experimental-feature BorrowingSequence \
 // RUN:     %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ADDR
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
@@ -14,7 +13,6 @@
 // RUN:     -enable-sil-opaque-values \
 // RUN:     %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPAQUE
 
-// REQUIRES: swift_feature_BorrowingForLoop
 // REQUIRES: swift_feature_BorrowingSequence
 
 struct NoncopyableInt: ~Copyable {
