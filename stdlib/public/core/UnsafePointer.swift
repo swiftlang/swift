@@ -473,7 +473,8 @@ extension UnsafePointer where Pointee: ~Copyable {
   @safe
   @_alwaysEmitIntoClient
   public func _isWellAligned() -> Bool {
-    (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
+    MemoryLayout<Pointee>.alignment == 1 ||
+      (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
   }
 }
 
@@ -1398,7 +1399,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   @safe
   @_alwaysEmitIntoClient
   public func _isWellAligned() -> Bool {
-    (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
+    MemoryLayout<Pointee>.alignment == 1 ||
+      (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
   }
 }
 

@@ -133,19 +133,15 @@ extension Span where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) {
-    //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
+    _precondition(
+      buffer._isWellAligned(),
+      "baseAddress must be properly aligned to access Element"
+    )
+
+    // FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
     let baseAddress = unsafe UnsafeRawPointer(buffer.baseAddress)
-
-    // 1 byte aligned elements can skip this check.
-    if MemoryLayout<Element>.alignment != 1 {
-      _precondition(
-        ((Int(bitPattern: baseAddress) &
-          (MemoryLayout<Element>.alignment &- 1)) == 0),
-        "baseAddress must be properly aligned to access Element"
-      )
-    }
-
     let span = unsafe Span(_unchecked: baseAddress, count: buffer.count)
+
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
     self = unsafe _overrideLifetime(span, borrowing: buffer)

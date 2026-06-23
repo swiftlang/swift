@@ -92,14 +92,10 @@ extension MutableSpan where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
-    // 1 byte aligned elements can skip this check.
-    if MemoryLayout<Element>.alignment != 1 {
-      _precondition(
-        ((Int(bitPattern: buffer.baseAddress) &
-          (MemoryLayout<Element>.alignment &- 1)) == 0),
-        "baseAddress must be properly aligned to access Element"
-      )
-    }
+    _precondition(
+      buffer._isWellAligned(),
+      "baseAddress must be properly aligned to access Element"
+    )
 
     let ms = unsafe MutableSpan<Element>(_unchecked: buffer)
     self = unsafe _overrideLifetime(ms, borrowing: buffer)
