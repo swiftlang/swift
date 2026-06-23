@@ -1922,8 +1922,21 @@ public:
 
     // Set the boundary so that as we push, this shows when to stop processing
     // for this PartitionOp.
-    SILLocation loc = op.hasSourceInst() ? getLoc(op.getSourceInst())
-                                         : getLoc(op.getSourceOp());
+    //
+    // For PartitionOps sourced from a specific apply argument operand, prefer
+    // the apply's per-argument SILLocation when one is stored. This is the
+    // ONLY consumer of those per-argument locations today: the location ends
+    // up on a SequenceBoundary node and is read back by the
+    // IsolationHistoryNoteEmitter chain walker. When the producer (SILGen)
+    // hasn't filled in per-argument locations, getArgumentLoc() falls back to
+    // the apply's anchor location, so behavior is unchanged for functions
+    // that haven't opted in to isolation-history.
+    SILLocation loc = SILLocation::invalid();
+    if (op.hasSourceInst()) {
+      loc = getLoc(op.getSourceInst());
+    } else if (Operand *srcOp = op.getSourceOp()) {
+      loc = getLoc(srcOp);
+    }
     p.pushHistorySequenceBoundary(loc);
 
     switch (op.getKind()) {
@@ -2514,7 +2527,20 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   bool shouldTryToSquelchErrors() const { return true; }
 
   static SILLocation getLoc(SILInstruction *inst) { return inst->getLoc(); }
-  static SILLocation getLoc(Operand *op) { return op->getUser()->getLoc(); }
+  static SILLocation getLoc(Operand *op) {
+    // For PartitionOps sourced from a specific apply argument operand, prefer
+    // the apply's per-argument SILLocation when one is stored. This is the
+    // ONLY consumer of those per-argument locations today: the location ends
+    // up on a SequenceBoundary node and is read back by the
+    // IsolationHistoryNoteEmitter chain walker. When the producer (SILGen)
+    // hasn't filled in per-argument locations, getArgumentLoc() falls back to
+    // the apply's anchor location, so behavior is unchanged for functions
+    // that haven't opted in to isolation-history.
+    if (auto as = ApplySite::isa(op->getUser());
+        as && as.isArgumentOperand(*op))
+      return as.getArgumentLoc(op);
+    return op->getUser()->getLoc();
+  }
   static SILInstruction *getSourceInst(const PartitionOp &partitionOp) {
     return partitionOp.getSourceInst();
   }

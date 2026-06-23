@@ -5,7 +5,7 @@
 // Verifies that the `@diagnose(RegionIsolationIsolationHistory, as: warning)`
 // attribute on a function opts that function in to isolation-history note
 // emission for SentNeverSendable diagnostics, even when the
-// `-sil-regionbasedisolation-emit-isolation-history` LLVM flag is not passed.
+// `-sil-region-isolation-emit-isolation-history` frontend flag is not passed.
 //
 // Conversely, a function with no attribute should NOT emit isolation-history
 // notes. The `no_attr` function below validates this by omitting the

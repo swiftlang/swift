@@ -1125,6 +1125,14 @@ def sil_region_isolation_assert_on_unknown_pattern :
   HelpText<"Abort if SIL region isolation detects an unknown pattern. "
            "For compiler developers only.">;
 
+def sil_region_isolation_emit_isolation_history
+    : Flag<["-"], "sil-region-isolation-emit-isolation-history">,
+      HelpText<
+          "Emit notes explaining why a disconnected value ended up in an "
+          "isolated region. Enables isolation-history for every function in "
+          "the module; otherwise, isolation-history is opt-in per function "
+          "via @diagnose(RegionIsolationIsolationHistory, ...).">;
+
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;
 

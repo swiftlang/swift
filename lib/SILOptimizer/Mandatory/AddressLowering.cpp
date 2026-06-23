@@ -2686,9 +2686,21 @@ SILValue ApplyRewriter::materializeIndirectOutputAddress(ApplyOutput kind,
 void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   auto *oldCall = cast<ApplyInst>(apply.getInstruction());
 
+  // Address lowering may change the rewritten apply's argument count
+  // when opaque-value lowering inserts or merges operands. Forward the
+  // original per-argument SILLocations only when the count is preserved;
+  // otherwise pass nullopt and the new apply has no per-argument storage.
+  // (The SILBuilder factory asserts on size mismatch by design — that's
+  // why this guard is at the call site rather than inside the factory.)
+  std::optional<ArrayRef<SILLocation>> argLocs =
+      ApplySite(oldCall).getArgumentLocs();
+  if (argLocs && argLocs->size() != newCallArgs.size())
+    argLocs = std::nullopt;
+
   auto *newCall = argBuilder.createApply(
       callLoc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
-      oldCall->getApplyOptions(), oldCall->getSpecializationInfo());
+      oldCall->getApplyOptions(), oldCall->getSpecializationInfo(),
+      /*isolationCrossing=*/std::nullopt, argLocs);
 
   this->apply = FullApplySite(newCall);
 
@@ -2721,11 +2733,18 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
     opValues.push_back(oper.get());
   }
 
+  // begin_apply yield-rewrite is a strict argument-preserving rewrite: we
+  // copy every operand through unchanged and only the result conventions
+  // change. The original per-argument SILLocations remain positionally
+  // valid 1:1 with `opValues`; just pass them through.
+
   // Recreate the begin_apply so that the instruction results have the right
   // ownership kind as per the lowered addresses convention.
   auto *newCall = argBuilder.createBeginApply(
       callLoc, apply.getCallee(), apply.getSubstitutionMap(), opValues,
-      origCall->getApplyOptions(), origCall->getSpecializationInfo());
+      origCall->getApplyOptions(), origCall->getSpecializationInfo(),
+      /*isolationCrossing=*/std::nullopt,
+      ApplySite(origCall).getArgumentLocs());
   this->apply = FullApplySite(newCall);
 
   // Replace uses of orig begin_apply with the new begin_apply
@@ -2907,10 +2926,23 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
 
   auto *tryApply = cast<TryApplyInst>(apply.getInstruction());
 
+  // Same shape as rewriteApply above: forward per-argument SILLocations
+  // only when the rewritten try_apply has the same argument count as the
+  // original; otherwise pass nullopt and the new try_apply has no
+  // per-argument storage. The SILBuilder factory asserts on size mismatch
+  // by design, so the guard has to live here.
+  std::optional<ArrayRef<SILLocation>> argLocs =
+      ApplySite(tryApply).getArgumentLocs();
+  if (argLocs && argLocs->size() != newCallArgs.size())
+    argLocs = std::nullopt;
+
   auto *newCallInst = argBuilder.createTryApply(
       callLoc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
       tryApply->getNormalBB(), tryApply->getErrorBB(),
-      tryApply->getApplyOptions(), tryApply->getSpecializationInfo());
+      tryApply->getApplyOptions(), tryApply->getSpecializationInfo(),
+      /*isolationCrossing=*/std::nullopt,
+      /*normalCount=*/ProfileCounter(),
+      /*errorCount=*/ProfileCounter(), argLocs);
 
   // Immediately delete the old try_apply (old applies hang around until
   // dead code removal because they directly define values).

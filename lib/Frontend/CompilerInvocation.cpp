@@ -3330,6 +3330,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.VerifyOwnershipAll |= Args.hasArg(OPT_sil_ownership_verify_all);
   Opts.AbortOnUnknownRegionIsolationPatternError |=
       Args.hasArg(OPT_sil_region_isolation_assert_on_unknown_pattern);
+  Opts.EmitIsolationHistory |=
+      Args.hasArg(OPT_sil_region_isolation_emit_isolation_history);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);

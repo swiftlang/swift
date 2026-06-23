@@ -562,6 +562,7 @@ namespace sil_block {
     SIL_INST_APPLY,
     BCFixed<3>,           // ApplyKind
     BCFixed<2>,           // ApplyOptions
+    BCFixed<1>,           // HasArgumentLocs (1 = NumCallArguments source-loc records follow)
     SubstitutionMapIDField,  // substitution map
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type
