@@ -1063,7 +1063,7 @@ handleASTNodeForDerivation(ASTContext &C, DerivedConformance &derived,
     // FIXME: This call is needed when building the stdlib, otherwise causing
     // some linking errors on the witnesses. Will eventually get rid of it so
     // that the body is synthesized only if needed.
-    (void)fDecl->getMacroExpandedBody();
+    (void)fDecl->getTypecheckedBody();
   } else if (auto *varDecl = dyn_cast<VarDecl>(vDecl)) {
     // In all derivation cases for the moment, the getter of a
     // derived var decl should be immutable computed, so the default
@@ -1121,6 +1121,7 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
   }
   ASSERT(expansion);
 
+  derived.addMemberToConformanceContext(expansion, nullptr);
   // Find the expanded `ValueDecl *` and return it. There should only ever be a
   // single one.
   ValueDecl *witness = nullptr;
@@ -1136,6 +1137,11 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
   });
   ASSERT(witness && "Expected a witness but got NULL");
 
+  AccessLevel access = derived.Nominal->getFormalAccess();
+  if (access == AccessLevel::Private)
+    access = AccessLevel::FilePrivate;
+  witness->overwriteAccess(access);
+  
   return witness;
 }
 
