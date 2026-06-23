@@ -177,10 +177,11 @@ def get_branch_for_repo(
 
 
 def update_single_repository(pool_args: UpdateArguments):
-    verbose = pool_args.verbose
+    args = pool_args.args
+    verbose = args.verbose
     repo_name = pool_args.repo_name
 
-    repo_path = pool_args.source_root.joinpath(repo_name)
+    repo_path = args.source_root.joinpath(repo_name)
     if not repo_path.is_dir() or repo_path.is_symlink():
         return
 
@@ -190,15 +191,15 @@ def update_single_repository(pool_args: UpdateArguments):
             print(f"{prefix}Updating '{repo_path}'")
 
         fetch_extra_args = []
-        if pool_args.skip_history:
+        if args.skip_history:
             fetch_extra_args.extend(["--depth", "1"])
-        if pool_args.partial_clone:
+        if args.partial_clone:
             fetch_extra_args.extend(["--filter", "blob:none"])
 
         cross_repo = False
         checkout_target = None
-        if pool_args.tag:
-            checkout_target = confirm_tag_in_repo(repo_path, pool_args.tag, repo_name)
+        if args.tag:
+            checkout_target = confirm_tag_in_repo(repo_path, args.tag, repo_name)
         elif pool_args.scheme_name:
             checkout_target, cross_repo = get_branch_for_repo(
                 repo_path,
@@ -218,21 +219,21 @@ def update_single_repository(pool_args: UpdateArguments):
         #   changes rather than discarding them)
         # 2. delete ignored files
         # 3. abort an ongoing rebase
-        if pool_args.clean or pool_args.stash:
+        if args.clean or args.stash:
 
-            def run_for_repo_and_each_submodule_rec(args: List[str]):
-                Git.run(repo_path, args, echo=verbose, prefix=prefix)
+            def run_for_repo_and_each_submodule_rec(cmd: List[str]):
+                Git.run(repo_path, cmd, echo=verbose, prefix=prefix)
                 Git.run(
                     repo_path,
-                    ["submodule", "foreach", "--recursive", "git"] + args,
+                    ["submodule", "foreach", "--recursive", "git"] + cmd,
                     echo=verbose,
                     prefix=prefix,
                 )
 
-            if pool_args.stash:
+            if args.stash:
                 # Stash tracked and untracked changes.
                 run_for_repo_and_each_submodule_rec(["stash", "-u"])
-            elif pool_args.clean:
+            elif args.clean:
                 # Delete tracked changes.
                 run_for_repo_and_each_submodule_rec(["reset", "--hard", "HEAD"])
 
@@ -351,7 +352,7 @@ def update_single_repository(pool_args: UpdateArguments):
 
         # If we were asked to reset to the specified branch, do the hard
         # reset and return.
-        if checkout_target and pool_args.reset_to_remote and not cross_repo:
+        if checkout_target and args.reset_to_remote and not cross_repo:
             full_target = full_target_name(repo_path, "origin", checkout_target)
             Git.run(
                 repo_path, ["reset", "--hard", full_target], echo=verbose, prefix=prefix
@@ -577,21 +578,14 @@ def update_all_repositories(
             continue
 
         my_args = UpdateArguments(
-            source_root=args.source_root,
+            args=args,
             config=config,
             repo_name=repo_name,
             scheme_name=scheme_name,
             scheme_map=scheme_map,
-            tag=args.tag,
             timestamp=timestamp,
-            reset_to_remote=args.reset_to_remote,
-            clean=args.clean,
-            stash=args.stash,
             cross_repos_pr=cross_repos_pr,
-            skip_history=args.skip_history,
-            partial_clone=args.partial_clone,
             output_prefix="Updating",
-            verbose=args.verbose,
         )
         pool_args.append(my_args)
 
@@ -612,7 +606,7 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
     args = pool_args.args
     repo_name = pool_args.repo_name
     repo_branch = pool_args.repo_branch
-    verbose = pool_args.verbose
+    verbose = args.verbose
     skip_tags = args.skip_tags
     remote = pool_args.remote
 
@@ -788,7 +782,6 @@ def obtain_all_additional_swift_sources(
 
         new_args = AdditionalSwiftSourcesArguments(
             args=args,
-            source_root=args.source_root,
             repo_name=repo_name,
             repo_info=repo_info,
             repo_branch=repo_branch,
@@ -796,7 +789,6 @@ def obtain_all_additional_swift_sources(
             scheme_name=scheme_name,
             skip_repository_list=skip_repository_list,
             output_prefix="Cloning",
-            verbose=args.verbose,
         )
 
         if args.use_submodules:
