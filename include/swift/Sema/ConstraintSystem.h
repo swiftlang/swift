@@ -4118,13 +4118,7 @@ public:
 
   // If the given constraint is an applied disjunction, get the argument function
   // that the disjunction is applied to.
-  FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction) {
-    assert(disjunction->getKind() == ConstraintKind::Disjunction);
-    auto found = AppliedDisjunctions.find(disjunction->getLocator());
-    if (found == AppliedDisjunctions.end())
-      return nullptr;
-    return found->second;
-  }
+  FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction);
 
   /// The overload sets that have already been resolved along the current path.
   const llvm::DenseMap<ConstraintLocator *, SelectedOverload> &
@@ -4616,9 +4610,6 @@ bool exprNeedsParensInsideFollowingOperator(DeclContext *DC,
 bool exprNeedsParensOutsideFollowingOperator(
     DeclContext *DC, Expr *expr, PrecedenceGroupDecl *followingPG,
     llvm::function_ref<Expr *(const Expr *)> getParent);
-
-/// Determine whether this is a SIMD operator.
-bool isSIMDOperator(ValueDecl *value);
 
 std::string describeGenericType(ValueDecl *GP, bool includeName = false);
 
