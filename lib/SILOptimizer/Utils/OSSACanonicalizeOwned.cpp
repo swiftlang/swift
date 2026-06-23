@@ -1371,8 +1371,8 @@ void OSSACanonicalizeOwned::rewriteCopies(
               deadEndBlocksAnalysis->get(getCurrentDef()->getFunction()))) {
         continue;
       }
-      LLVM_DEBUG(llvm::dbgs() << "  Removing debug_value: " << *dvi);
-      deleter.forceDelete(dvi);
+      LLVM_DEBUG(llvm::dbgs() << "  Killing debug_value: " << *dvi);
+      dvi->killOperand();
     }
   }
 
