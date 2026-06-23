@@ -138,8 +138,8 @@ computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
 }
 
 std::string ModuleDependencyScanner::clangModuleOutputPathLookup(
-    const clang::tooling::dependencies::ModuleDeps &clangDeps,
-    clang::tooling::dependencies::ModuleOutputKind moduleOutputKind) const {
+    const clang::dependencies::ModuleDeps &clangDeps,
+    clang::dependencies::ModuleOutputKind moduleOutputKind) const {
   llvm::SmallString<128> outputPath(ModuleOutputPath);
   if (clangDeps.IsInStableDirectories)
     outputPath = SDKModuleOutputPath;
@@ -159,17 +159,17 @@ std::string ModuleDependencyScanner::clangModuleOutputPathLookup(
   llvm::sys::path::append(outputPath, clangDeps.ID.ModuleName + "-" +
                                           clangDeps.ID.ContextHash);
   switch (moduleOutputKind) {
-  case clang::tooling::dependencies::ModuleOutputKind::ModuleFile:
+  case clang::dependencies::ModuleOutputKind::ModuleFile:
     llvm::sys::path::replace_extension(
         outputPath, getExtension(swift::file_types::TY_ClangModuleFile));
     break;
-  case clang::tooling::dependencies::ModuleOutputKind::DependencyFile:
+  case clang::dependencies::ModuleOutputKind::DependencyFile:
     llvm::sys::path::replace_extension(
         outputPath, getExtension(swift::file_types::TY_Dependencies));
     break;
-  case clang::tooling::dependencies::ModuleOutputKind::DependencyTargets:
+  case clang::dependencies::ModuleOutputKind::DependencyTargets:
     return clangDeps.ID.ModuleName + "-" + clangDeps.ID.ContextHash;
-  case clang::tooling::dependencies::ModuleOutputKind::
+  case clang::dependencies::ModuleOutputKind::
       DiagnosticSerializationFile:
     llvm::sys::path::replace_extension(
         outputPath, getExtension(swift::file_types::TY_SerializedDiagnostics));
@@ -328,10 +328,10 @@ ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
                                                      isTestableImport);
 }
 
-std::optional<clang::tooling::dependencies::TranslationUnitDeps>
+std::optional<clang::dependencies::TranslationUnitDeps>
 ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     Identifier moduleName, LookupModuleOutputCallback lookupModuleOutput,
-    const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
+    const llvm::DenseSet<clang::dependencies::ModuleID>
         &alreadySeenModules) {
   diagnosticReporter.registerNamedClangModuleQuery();
   auto clangModuleDependencies =
@@ -361,17 +361,17 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
   return clangModuleDependencies.get();
 }
 
-std::optional<clang::tooling::dependencies::TranslationUnitDeps>
+std::optional<clang::dependencies::TranslationUnitDeps>
 ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
     ModuleDependencyID moduleID,
     std::optional<StringRef> headerPath,
     std::optional<llvm::MemoryBufferRef> sourceBuffer,
     LookupModuleOutputCallback lookupModuleOutput,
-    const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
+    const llvm::DenseSet<clang::dependencies::ModuleID>
        &alreadySeenModules) {
   // Scan the specified textual header file and collect its dependencies
   auto scanHeaderDependencies = [&]()
-      -> llvm::Expected<clang::tooling::dependencies::TranslationUnitDeps> {
+      -> llvm::Expected<clang::dependencies::TranslationUnitDeps> {
     auto dependencies = clangScanningTool.getTranslationUnitDependencies(
         inputSpecificClangScannerCommand(clangScanningBaseCommandLineArgs,
                                          headerPath),
@@ -2179,7 +2179,7 @@ LibraryLevel swift::libraryLevelFromPath(StringRef modulePath,
 }
 
 ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
-    const clang::tooling::dependencies::ModuleDeps &clangModuleDep) {
+    const clang::dependencies::ModuleDeps &clangModuleDep) {
   // File dependencies for this module.
   std::vector<std::string> fileDeps;
   clangModuleDep.forEachFileDep(
@@ -2201,7 +2201,7 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
 
   auto pcmPath = clangModuleOutputPathLookup(
       clangModuleDep,
-      clang::tooling::dependencies::ModuleOutputKind::ModuleFile);
+      clang::dependencies::ModuleOutputKind::ModuleFile);
   swiftArgs.push_back("-o");
   swiftArgs.push_back(pcmPath);
 

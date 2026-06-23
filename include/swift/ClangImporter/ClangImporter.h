@@ -63,15 +63,13 @@ namespace clang {
   namespace driver {
     class Driver;
   }
-namespace tooling {
 namespace dependencies {
   struct ModuleDeps;
   struct TranslationUnitDeps;
   enum class ModuleOutputKind;
   using ModuleDepsGraph = std::vector<ModuleDeps>;
 }
-}
-}
+} // namespace clang
 
 namespace swift {
 enum class ResultConvention : uint8_t;
@@ -527,7 +525,7 @@ public:
 
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
-      const clang::tooling::dependencies::TranslationUnitDeps &deps,
+      const clang::dependencies::TranslationUnitDeps &deps,
       std::vector<std::string> &swiftArgs);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
@@ -558,7 +556,7 @@ public:
   clang::TargetInfo &getTargetInfo() const;
   clang::CodeGenOptions &getCodeGenOpts() const;
 
-  std::string getClangModuleHash() const;
+  std::string computeClangContextHash() const;
 
   /// Get clang file mapping.
   const ClangInvocationFileMapping &getClangFileMapping() const {
