@@ -1,10 +1,10 @@
-// RUN: %target-sil-opt -send-non-sendable -sil-regionbasedisolation-emit-isolation-history -strict-concurrency=complete %s -o /dev/null -verify
+// RUN: %target-sil-opt -send-non-sendable -sil-region-isolation-emit-isolation-history -strict-concurrency=complete %s -o /dev/null -verify
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
 // SIL coverage test for the
-// `-sil-regionbasedisolation-emit-isolation-history` flag. Each test below
+// `-sil-region-isolation-emit-isolation-history` flag. Each test below
 // exercises a specific class of merge translated by RegionAnalysis: apply
 // arguments/results, store_borrow, store, alloc_stack-as-var_decl, plus
 // chain and CFG-join cases.

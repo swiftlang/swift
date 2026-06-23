@@ -1568,11 +1568,17 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
     ++NumCapturesPromoted;
   }
 
-  // Create a new partial apply with the new arguments.
+  // Create a new partial apply with the new arguments. Capture promotion
+  // replaces each box-typed capture with the loaded value while keeping the
+  // surrounding argument order, so the original apply's per-argument
+  // SILLocations remain positionally valid 1:1 with `args`. Forward the
+  // optional storage straight through; the SILBuilder factory will assert
+  // in debug builds if the sizes ever diverge from this 1:1 invariant.
   auto *newPAI = builder.createPartialApply(
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
-      pai->getCalleeConvention(), pai->getResultIsolation(),
-      pai->isOnStack(), pai->isStackAllocationNested());
+      pai->getCalleeConvention(), pai->getResultIsolation(), pai->isOnStack(),
+      pai->isStackAllocationNested(),
+      /*SpecializationInfo=*/nullptr, ApplySite(pai).getArgumentLocs());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();
   if (fri->use_empty()) {

@@ -13,7 +13,9 @@
 #define DEBUG_TYPE "sil-function"
 
 #include "swift/SIL/SILFunction.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
@@ -1425,4 +1427,27 @@ SourceFile *SILFunction::getSourceFile() const {
     return nullptr;
 
   return declRef.getInnermostDeclContext()->getParentSourceFile();
+}
+
+bool swift::shouldEmitIsolationHistoryFor(const SILFunction *fn) {
+  if (fn->getModule().getOptions().EmitIsolationHistory)
+    return true;
+
+  // Per-function opt-in: a `@diagnose(RegionIsolationIsolationHistory,
+  // as: <not ignored>)` on the function's own decl turns it on for that
+  // function only.
+  auto *dc = fn->getDeclContext();
+  if (!dc)
+    return false;
+  auto *decl = dc->getAsDecl();
+  if (!decl)
+    return false;
+
+  for (auto *attr : decl->getAttrs().getAttributes<DiagnoseAttr>()) {
+    if (attr->DiagnosticGroupID ==
+            DiagGroupID::RegionIsolationIsolationHistory &&
+        attr->DiagnosticBehavior != WarningGroupBehavior::Ignored)
+      return true;
+  }
+  return false;
 }

@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -parse-as-library -Xllvm -sil-regionbasedisolation-emit-isolation-history -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -parse-as-library -sil-region-isolation-emit-isolation-history -verify %s -o /dev/null
 
 // REQUIRES: concurrency
 
 // Swift-source coverage test for the
-// `-sil-regionbasedisolation-emit-isolation-history` flag, which makes the
+// `-sil-region-isolation-emit-isolation-history` flag, which makes the
 // SendNonSendable pass emit additional notes describing the chain of merges
 // that brought a sent value into an actor-isolated region. The originating
 // note names the isolated source ("'y' is connected to 'x' which is
@@ -874,4 +874,77 @@ func continuation_chain(_ x: NS) async {
   //                                   note: 'z' is reachable from 'y'
   //                                   note: 'y' is reachable from 'mid'
   //                                   note: 'mid' is reachable from 'x' which is accessible to ...
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Per-argument SILLocation: verifies that when SILGen attaches per-argument
+// locations to an apply (gated by isolation-history), the originating-merge
+// note anchors at the AST argument's source position rather than at the
+// apply's anchor (the call expression's start). Each variant exercises a
+// different apply opcode so the per-arg loc array survives ApplyInst,
+// TryApplyInst, and BeginApplyInst construction.
+////////////////////////////////////////////////////////////////////////////////
+
+// First-argument case: the offending value is in slot 0. Confirms that the
+// per-arg loc array is not silently shifted by the indirect-result / error
+// prefix when the apply has neither.
+func per_arg_loc(_ x: NS) async {
+  let y = combine(
+    x, // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    NS())
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+  // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+// Second-argument case: the offending value is in slot 1. Confirms the
+// per-arg loc array is indexed by argument position, not just the first
+// slot. A bug that always wrote the first slot would anchor the note at
+// the `NS()` line above instead of the `x,` line below.
+func per_arg_loc_second(_ x: NS) async {
+  let y = combine(
+    NS(),
+    x) // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+  // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+// Throwing call (try_apply) case: confirms that createTryApply forwards
+// the argLocs array to the constructed TryApplyInst. The PartitionOp
+// derived from this call site reads the per-argument loc; a regression in
+// TryApply argLoc threading would surface here as the note anchoring at
+// the call line instead of the argument line.
+func combineThrows(_ a: NS, _ b: NS) throws -> NS { a }
+
+func per_arg_loc_throws(_ x: NS) async throws {
+  let y = try combineThrows(
+    x, // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    NS())
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+  // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+// Coroutine (begin_apply) case: a read accessor lowers to begin_apply.
+// Reading `bag.slot` through the coroutine accessor and then folding the
+// borrowed value into a region exercises createBeginApply's argLoc path.
+final class BagWithRead {
+  private var stored: NS = NS()
+  var slot: NS {
+    _read { yield stored }
+  }
+}
+
+func per_arg_loc_coroutine(_ x: NS) async {
+  let bag = BagWithRead()
+  // Use combine() with a multi-line arg list so the per-arg loc for `x` is
+  // on a different line than the call. The merge of `x` into `bag`'s
+  // region happens inside combine; the SIL apply receives `x` at slot 0
+  // and `bag.slot` (read coroutine) at slot 1.
+  // expected-note@+1{{'y' is connected to 'bag'}}
+  let y = combine(
+    // expected-note@+1{{'bag.slot' is connected to 'y'}}
+    bag.slot,
+    x, // expected-note {{'bag' is connected to 'x' which is accessible to code in the current isolation context}}
+  )
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+  // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
