@@ -2047,7 +2047,7 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
           tupleType, SPII->getComponentIndex());
       VarInfo.DIExpr.append(FragDIExpr);
     }
-    SILBuilder(PESI, API->getDebugScope())
+    SILBuilder(PESI, DbgInst->getDebugScope())
         .createDebugValue(DbgInst->getLoc(), PESI->getValue(), VarInfo);
   }
 }
