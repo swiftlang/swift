@@ -5,7 +5,8 @@
 
 _ = "HI!
 // expected-error@-1{{unterminated string literal}}
-var self1 = self1
+
+struct Circular { let x = x }
 // expected-note@-1 {{through reference here}}
 // expected-error@-2 {{circular reference}}
 

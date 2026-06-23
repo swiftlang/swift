@@ -209,11 +209,12 @@ class ForwardReference {
 }
 
 func questionablyValidForwardReference() { print(qvfrVar, terminator: ""); }; var qvfrVar: Int = 0
+// expected-warning@-1 {{use of global variable 'qvfrVar' before its declaration; this will be an error in a future Swift language mode}}
+// expected-note@-2 {{'qvfrVar' declared here}}
 
-// FIXME: This should warn too.
 print(forwardReferenceVar, terminator: ""); var forwardReferenceVar: Int = 0
-
-
+// expected-error@-1:7 {{use of global variable 'forwardReferenceVar' before its declaration}}
+// expected-note@-2:49 {{'forwardReferenceVar' declared here}}
 
 // <rdar://problem/23248290> Name lookup: "Cannot convert type 'Int' to expected argument type 'Int'" while trying to initialize ivar of generic type in class scope
 // https://gist.github.com/erynofwales/61768899502b7ac83c6e

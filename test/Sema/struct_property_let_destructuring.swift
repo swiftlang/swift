@@ -4,6 +4,8 @@
 // Destructuring initializations for `let` properties in structs isn't
 // implemented correctly in SILGen, so diagnose it as unsupported for now.
 
+let foo = Foo(/*value: 1*/)
+
 struct Foo {
     var value: Int = 42
 
@@ -23,13 +25,5 @@ struct Foo {
 
 }
 
-
-let foo = Foo(/*value: 1*/)
-
-
 foo.tellMe()
-
-
-
-
 print("Hello")

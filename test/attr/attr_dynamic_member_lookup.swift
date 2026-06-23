@@ -1342,12 +1342,14 @@ struct SelfRecursiveLookup<T> { // expected-note {{'T' declared as parameter to 
   init(_: () -> KeyPath<Self, T>) {}
   subscript<U>(dynamicMember kp: KeyPath<T, U>) -> SelfRecursiveLookup<U> {}
 }
-let selfRecurse1 = SelfRecursiveLookup { selfRecurse1.e }
+let selfRecurse1 = SelfRecursiveLookup { selfRecurse1.e } // expected-note {{'selfRecurse1' declared here}}
 // expected-error@-1 {{could not find member 'e'; exceeded the maximum number of nested dynamic member lookups}}
+// expected-warning@-2 {{use of global variable 'selfRecurse1' before its declaration; this will be an error in a future Swift language mode}}
 
-let selfRecurse2 = SelfRecursiveLookup { selfRecurse2[a: 0] }
+ let selfRecurse2 = SelfRecursiveLookup { selfRecurse2[a: 0] } // expected-note {{'selfRecurse2' declared here}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
+// expected-warning@-3 {{use of global variable 'selfRecurse2' before its declaration; this will be an error in a future Swift language mode}}
 
 let selfRecurse3 = SelfRecursiveLookup { \.e }
 // expected-error@-1 {{could not find member 'e'; exceeded the maximum number of nested dynamic member lookups}}
@@ -1360,8 +1362,11 @@ extension SelfRecursiveLookup where T == SelfRecursiveLookup<SelfRecursiveLookup
   subscript(terminator terminator: Int) -> T { fatalError() }
 }
 
-let selfRecurse5 = SelfRecursiveLookup { selfRecurse5.terminator }
-let selfRecurse6 = SelfRecursiveLookup { selfRecurse6[terminator: 0] }
+let selfRecurse5 = SelfRecursiveLookup { selfRecurse5.terminator } // expected-note {{'selfRecurse5' declared here}}
+// expected-warning@-1 {{use of global variable 'selfRecurse5' before its declaration; this will be an error in a future Swift language mode}}
+
+let selfRecurse6 = SelfRecursiveLookup { selfRecurse6[terminator: 0] } // expected-note {{'selfRecurse6' declared here}}
+// expected-warning@-1 {{use of global variable 'selfRecurse6' before its declaration; this will be an error in a future Swift language mode}}
 
 let selfRecurse7 = SelfRecursiveLookup { \.terminator }
 let selfRecurse8 = SelfRecursiveLookup { \.[terminator: 0] }

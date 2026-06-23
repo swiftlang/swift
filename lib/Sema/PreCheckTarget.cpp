@@ -308,8 +308,13 @@ static bool findNonMembers(ArrayRef<LookupResultEntry> lookupResults,
     }
 
     ValueDecl *D = Result.getValueDecl();
-    if (!isValid(D))
+    if (!isValid(D)) {
+      // If this is a non-local variable, continue looking for a viable
+      // candidate.
+      if (!D->getDeclContext()->isLocalContext())
+        continue;
       return false;
+    }
 
     if (matchesDeclRefKind(D, refKind))
       ResultValues.push_back(D);
@@ -392,16 +397,55 @@ static bool isMemberChainTail(Expr *expr, Expr *parent, MemberChainKind kind) {
   return !parent || getMemberChainSubExpr(parent, kind) != expr;
 }
 
+/// If `VD` is a script mode global var, checks whether a reference to it should
+/// be considered a use-before-declaration.
+static bool isGlobalScriptVarForwardRef(VarDecl *VD, DeclContext *useDC,
+                                        SourceLoc useLoc) {
+  if (!useLoc || !VD->isTopLevelGlobal() || !VD->hasStorage())
+    return false;
+
+  SourceLoc varLoc = VD->getLoc(/*serialized*/ false);
+  if (!varLoc)
+    return false;
+
+  // The reference must be in the same SourceFile.
+  if (useDC->getOutermostParentSourceFile() !=
+      VD->getDeclContext()->getOutermostParentSourceFile()) {
+    return false;
+  }
+
+  // A valid reference must appear after the variable's location. If we have
+  // a PatternBindingDecl, then move the location to the end of the entry to
+  // catch e.g `let x: Int = x`.
+  if (auto *PBD = VD->getParentPatternBinding()) {
+    auto idx = PBD->getPatternEntryIndexForVarDecl(VD);
+    if (auto range = PBD->getEntrySourceRange(idx))
+      varLoc = range.End;
+  }
+  auto &SM = VD->getASTContext().SourceMgr;
+  return SM.isAtOrBefore(useLoc, varLoc);
+}
+
 static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
-                                    ValueDecl *&localDeclAfterUse) {
-  // Only VarDecls require declaration before use.
+                                    SourceLoc useLoc,
+                                    bool scriptVarForwardRefIsError,
+                                    VarDecl *&localDeclAfterUse) {
+  // Only non-debugger VarDecls require declaration before use.
   auto *VD = dyn_cast<VarDecl>(D);
-  if (!VD)
+  if (!VD || VD->isDebuggerVar())
     return true;
 
-  // Non-local and variables injected by lldb are always valid.
+  // Check to see if we have a forward reference to a global script-mode var.
+  if (isGlobalScriptVarForwardRef(VD, DC, useLoc)) {
+    // Prefer the VarDecl that is an actual error.
+    if (!localDeclAfterUse || scriptVarForwardRefIsError)
+      localDeclAfterUse = VD;
+    return !scriptVarForwardRefIsError;
+  }
+
+  // Non-local are otherwise always valid.
   auto *varDC = VD->getDeclContext();
-  if (!varDC->isLocalContext() || VD->isDebuggerVar())
+  if (!varDC->isLocalContext())
     return true;
 
   while (true) {
@@ -585,12 +629,39 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
 
     Lookup = TypeChecker::lookupUnqualified(DC, LookupName, Loc, lookupOptions);
 
-    ValueDecl *localDeclAfterUse = nullptr;
+    // If a script-mode forward reference is not in a TopLevelCodeDecl (e.g in a
+    // closure or function), downgrade to a warning since it has a non-trivial
+    // source compatibility impact. We ought to make these errors eventually
+    // though.
+    auto scriptVarForwardRefIsError =
+        isa<TopLevelCodeDecl>(DC) ||
+        Context.isLanguageModeAtLeast(LanguageMode::future);
+
+    VarDecl *localDeclAfterUse = nullptr;
     AllDeclRefs = findNonMembers(
         Lookup.innerResults(), UDRE->getRefKind(),
         /*breakOnMember=*/true, ResultValues, [&](ValueDecl *D) {
-          return isValidForwardReference(D, DC, localDeclAfterUse);
+          return isValidForwardReference(D, DC, Loc, scriptVarForwardRefIsError,
+                                         localDeclAfterUse);
         });
+
+    // Diagnose a use-before-decl script-mode var if we either have no other
+    // results or are warning (since we don't know whether the var will be
+    // chosen it's better to over-diagnose in that case).
+    if (localDeclAfterUse && localDeclAfterUse->isTopLevelGlobal() &&
+        (ResultValues.empty() || !scriptVarForwardRefIsError)) {
+      Context.Diags.diagnose(Loc, diag::use_global_before_declaration, Name)
+          .warnUntilLanguageModeIf(!scriptVarForwardRefIsError,
+                                   LanguageMode::future);
+      Context.Diags.diagnose(localDeclAfterUse, diag::decl_declared_here,
+                             localDeclAfterUse);
+      if (scriptVarForwardRefIsError)
+        return errorResult();
+
+      // If we warned on the use, carry on and pretend we didn't see a
+      // use-before-decl.
+      localDeclAfterUse = nullptr;
+    }
 
     // If local declaration after use is found, check outer results for
     // better matching candidates.
@@ -610,7 +681,8 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
         AllDeclRefs = findNonMembers(
             Lookup.innerResults(), UDRE->getRefKind(),
             /*breakOnMember=*/true, ResultValues, [&](ValueDecl *D) {
-              return isValidForwardReference(D, DC, localDeclAfterUse);
+              return isValidForwardReference(
+                  D, DC, Loc, scriptVarForwardRefIsError, localDeclAfterUse);
             });
       }
     }
