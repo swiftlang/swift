@@ -259,6 +259,13 @@ extension Unsafe${Mutable}RawBufferPointer: @unsafe ${Mutable}Collection {
     return unsafe Indices(uncheckedBounds: (startIndex, endIndex))
   }
 
+  @_alwaysEmitIntoClient
+  @inline(always)
+  @safe
+  public func _checkBounds(_ bounds: Range<Index>) -> Bool {
+    0 <= bounds.lowerBound && bounds.upperBound <= count
+  }
+
   /// Accesses the byte at the given offset in the memory region as a `UInt8`
   /// value.
   ///
@@ -287,14 +294,12 @@ extension Unsafe${Mutable}RawBufferPointer: @unsafe ${Mutable}Collection {
   @inlinable
   public subscript(bounds: Range<Int>) -> SubSequence {
     get {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
+      _debugPrecondition(_checkBounds(bounds), "Index out of range")
       return unsafe Slice(base: self, bounds: bounds)
     }
 %  if mutable:
     nonmutating set {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
+      _debugPrecondition(_checkBounds(bounds), "Index out of range")
       _debugPrecondition(unsafe bounds.count == newValue.count)
 
       if unsafe !newValue.isEmpty {
@@ -707,8 +712,8 @@ extension Unsafe${Mutable}RawBufferPointer {
     // degradation wrt passing around pointers not wrapped in a BufferPointer
     // construct.
     _debugPrecondition(
-      unsafe slice.startIndex >= 0 && slice.endIndex <= slice.base.count,
-      "Invalid slice")
+      unsafe slice.base._checkBounds(slice._bounds), "Invalid slice"
+    )
     let base = unsafe slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = unsafe slice.endIndex &- slice.startIndex
     unsafe self.init(start: base, count: count)
@@ -737,6 +742,17 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter slice: The raw buffer slice to rebase.
   @inlinable @_transparent
   public init(rebasing slice: Slice<UnsafeMutableRawBufferPointer>) {
+    // NOTE: `Slice` does not guarantee that its start/end indices are valid
+    // in `base` -- it merely ensures that `startIndex <= endIndex`.
+    // We need manually check that we aren't given an invalid slice,
+    // or the resulting collection would allow access that was
+    // out-of-bounds with respect to the original base buffer.
+    // We only do this in debug builds to prevent a measurable performance
+    // degradation wrt passing around pointers not wrapped in a BufferPointer
+    // construct.
+    _debugPrecondition(
+      unsafe slice.base._checkBounds(slice._bounds), "Invalid slice"
+    )
     let base = unsafe slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = unsafe slice.endIndex &- slice.startIndex
     unsafe self.init(start: base, count: count)

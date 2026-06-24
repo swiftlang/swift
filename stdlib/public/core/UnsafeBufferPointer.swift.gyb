@@ -263,6 +263,13 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     unsafe Range(uncheckedBounds: (0, count))
   }
 
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  @safe
+  public func _checkBounds(_ bounds: Range<Index>) -> Bool {
+    0 <= bounds.lowerBound && bounds.upperBound <= count
+  }
+
   @_transparent
   @_preInverseGenerics
   public func index(after i: Int) -> Int {
@@ -511,8 +518,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @safe
   public func extracting(_ bounds: Range<Int>) -> Self {
-    _precondition(bounds.lowerBound >= 0 && bounds.upperBound <= count,
-      "Index out of range")
+    _precondition(_checkBounds(bounds), "Index out of range")
     guard let start = self.baseAddress else {
       return unsafe Self(start: nil, count: 0)
     }
@@ -872,15 +878,13 @@ extension Unsafe${Mutable}BufferPointer:
     bounds: Range<Int>
   ) -> Slice<Unsafe${Mutable}BufferPointer<Element>> {
     get {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
+      _debugPrecondition(_checkBounds(bounds), "Index out of range")
       return unsafe Slice(
         base: self, bounds: bounds)
     }
 %  if Mutable:
     nonmutating set {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
+      _debugPrecondition(_checkBounds(bounds), "Index out of range")
       unsafe _debugPrecondition(bounds.count == newValue.count)
 
       // FIXME: swift-3-indexing-model: tests.
@@ -959,8 +963,8 @@ extension Unsafe${Mutable}BufferPointer {
     // degradation wrt passing around pointers not wrapped in a BufferPointer
     // construct.
     _debugPrecondition(
-      unsafe slice.startIndex >= 0 && slice.endIndex <= slice.base.count,
-      "Invalid slice")
+      unsafe slice.base._checkBounds(slice._bounds), "Invalid slice"
+    )
     let base = unsafe slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = unsafe slice.endIndex &- slice.startIndex
     unsafe self.init(start: base, count: count)
@@ -989,6 +993,17 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameter slice: The buffer slice to rebase.
   @inlinable @_transparent // unsafe-performance
   public init(rebasing slice: Slice<UnsafeMutableBufferPointer<Element>>) {
+    // NOTE: `Slice` does not guarantee that its start/end indices are valid
+    // in `base` -- it merely ensures that `startIndex <= endIndex`.
+    // We need manually check that we aren't given an invalid slice,
+    // or the resulting collection would allow access that was
+    // out-of-bounds with respect to the original base buffer.
+    // We only do this in debug builds to prevent a measurable performance
+    // degradation wrt passing around pointers not wrapped in a BufferPointer
+    // construct.
+    _debugPrecondition(
+      unsafe slice.base._checkBounds(slice._bounds), "Invalid slice"
+    )
     let base = unsafe slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = unsafe slice.endIndex &- slice.startIndex
     unsafe self.init(start: base, count: count)
