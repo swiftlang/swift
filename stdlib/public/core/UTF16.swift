@@ -466,9 +466,11 @@ typealias ByteHalfBlock = SIMD8<UInt8>
 
 /*
  SIMD<...> isn't generating the right code for the transcoding loop, so we use
- intrinsics to manually specify what we want for now. If you want to remove this
- in the future as our SIMD codegen improves, double check these benchmarks:
+ intrinsics to manually specify what we want for now. If you want to remove
+ these in the future as our SIMD codegen improves, double check these benchmarks
   * UTF16Decode.length
+  * UTF16Decode.initDecoding
+  * UTF16Decode.initFromCustom.cont
   * UTF16ToIdx.longCyrillic
   * UTF16ToIdx.longCJK
  */
@@ -480,6 +482,17 @@ func _wrappedSum(_ v: SIMD8<Int8>) -> Int8 {
 @_transparent
 func _wrappedSum(_ v: SIMD8<UInt16>) -> UInt16 {
   UInt16(Builtin.int_vector_reduce_add_Vec8xInt16(v._storage._value))
+}
+
+@_transparent
+func _anySurrogate(_ block: CodeUnitBlock) -> Bool {
+  /* A UTF-16 code unit is a surrogate iff it's in [0xD800, 0xDFFF],
+   i.e. (cu &- 0xD800) <= 0x7FF as an unsigned value */
+  let shifted = Builtin.sub_Vec8xInt16(
+    block._storage._value,
+    CodeUnitBlock(repeating: utf16LeadSurrogateMin)._storage._value)
+  let minLane = UInt16(Builtin.int_vector_reduce_umin_Vec8xInt16(shifted))
+  return minLane <= utf16SurrogateMax &- utf16LeadSurrogateMin
 }
 
 @_transparent
@@ -497,8 +510,7 @@ func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16? {
   if block.max() <= utf8OneByteMax {
     return UInt16(truncatingIfNeeded: blockSize)
   }
-  let surrogates = (block .>= utf16LeadSurrogateMin) .& (block .<= utf16SurrogateMax)
-  if any(surrogates) {
+  if _anySurrogate(block) {
     return nil
   }
   // Everything is 1, 2, or 3-byte BMP
@@ -511,8 +523,7 @@ func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16? {
 @_transparent
 func nonSurrogateBlock(at pointer: UnsafePointer<UInt16>) -> CodeUnitBlock? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: CodeUnitBlock.self)
-  let surrogates = (block .>= utf16LeadSurrogateMin) .& (block .<= utf16SurrogateMax)
-  return any(surrogates) ? nil : block
+  return _anySurrogate(block) ? nil : block
 }
 
 #else
