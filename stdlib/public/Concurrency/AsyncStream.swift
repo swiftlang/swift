@@ -181,7 +181,7 @@ public struct AsyncStream<Element> {
       case bufferingNewest(Int)
     }
 
-    let storage: _Storage
+    let storage: _AsyncStreamStorage<Element, Never>
 
     /// Resume the task awaiting the next iteration point by having it return
     /// normally from its suspension point with a given element.
@@ -197,7 +197,7 @@ public struct AsyncStream<Element> {
     /// without blocking for any awaiting consumption from the iteration.
     @discardableResult
     public func yield(_ value: sending Element) -> YieldResult {
-      storage.yield(value)
+      storage.yield(value).asStreamYieldResult()
     }
 
     /// Resume the task awaiting the next iteration point by having it return
@@ -207,7 +207,7 @@ public struct AsyncStream<Element> {
     /// finish, the stream enters a terminal state and doesn't produce any
     /// additional elements.
     public func finish() {
-      storage.finish()
+      storage.terminate(.finished(nil))
     }
 
     /// A callback to invoke when canceling iteration of an asynchronous
@@ -229,25 +229,28 @@ public struct AsyncStream<Element> {
     /// ``withTaskCancellationHandler(operation:onCancel:)``.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
-        return storage.getOnTermination()
+        return adaptToStreamTerminationHandler(storage.getOnTermination())
       }
       nonmutating set {
-        storage.setOnTermination(newValue)
+        storage.setOnTermination(adaptToStorageTerminationHandler(newValue))
       }
     }
   }
 
   final class _Context {
-    let storage: _Storage?
+    let storage: _AsyncStreamStorage<Element, Never>?
     let produce: () async -> Element?
 
-    init(storage: _Storage? = nil, produce: @escaping () async -> Element?) {
+    init(
+      storage: _AsyncStreamStorage<Element, Never>? = nil,
+      produce: @escaping () async -> Element?
+    ) {
       self.storage = storage
       self.produce = produce
     }
 
     deinit {
-      storage?.cancel()
+      storage?.terminate(.cancelled)
     }
   }
 
@@ -301,7 +304,9 @@ public struct AsyncStream<Element> {
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
   ) {
-    let storage: _Storage = .create(limit: limit)
+    let storage: _AsyncStreamStorage<Element, Never> = .init(
+      bufferingPolicy: limit.asStorageBufferingPolicy()
+    )
     context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }
@@ -438,7 +443,7 @@ extension AsyncStream.Continuation {
   ) -> YieldResult {
     switch result {
     case .success(let val):
-      return storage.yield(val)
+      return storage.yield(val).asStreamYieldResult()
     }
   }
 
@@ -456,7 +461,7 @@ extension AsyncStream.Continuation {
   /// blocking for any awaiting consumption from the iteration.
   @discardableResult
   public func yield() -> YieldResult where Element == Void {
-    return storage.yield(())
+    return storage.yield(()).asStreamYieldResult()
   }
 }
 
