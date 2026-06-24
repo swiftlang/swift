@@ -1343,9 +1343,25 @@ _swift_spawnBacktracer(CrashInfo *crashInfo, int memserver_fd)
 _swift_spawnBacktracer(CrashInfo *crashInfo)
 #endif
 {
+  #if defined(_WIN32)
+  HANDLE hOutput =
+    GetStdHandle(_swift_backtraceSettings.outputTo == OutputTo::Stderr
+                    ? STD_ERROR_HANDLE
+                    : STD_OUTPUT_HANDLE);
+  #endif
+
 #if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
+  #if DEBUG_BACKTRACING
+    const char *message = "**backtracer disabled** ";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
+  #endif
   return false;
 #else
+  #if DEBUG_BACKTRACING
+    const char *message = "preparing to launch backtracer... ";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
+  #endif
+
   // Set-up the backtracer's command line arguments
   switch (_swift_backtraceSettings.algorithm) {
   case UnwindAlgorithm::Fast:
@@ -1518,11 +1534,6 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   return false;
 
   #elif defined(_WIN32)
-  HANDLE hOutput;
-  if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
-    hOutput = GetStdHandle(STD_ERROR_HANDLE);
-  else
-    hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 
   // Windows actually uses a flat command line string with some rather
   // odd parsing rules.
@@ -1563,6 +1574,21 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
                              &startupInfo,
                              &processInfo);
   if (!bRet) {
+    #if DEBUG_BACKTRACING
+      char message[256];
+      int len = snprintf_s(message, sizeof(message),
+                          "swift runtime: %lu return code for CreateProcessW (%ls) ",
+                          (unsigned long)bRet,
+                          swiftBacktracePath);
+      if (len > 0) {
+        DWORD written;
+        WriteFile(hOutput, message, (DWORD)len, &written, NULL);
+      } else {
+        const char *message = "snprintf failed... ";
+        WriteFile(hOutput, message, strlen(message), NULL, NULL);
+      }
+    #endif
+
     return false;
   }
 
@@ -1573,6 +1599,12 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   if (dwRet != WAIT_OBJECT_0) {
     CloseHandle(processInfo.hProcess);
+
+    #if DEBUG_BACKTRACING
+      const char *message = "WaitForSingleObject failed... ";
+      WriteFile(hOutput, message, strlen(message), NULL, NULL);
+    #endif 
+
     return false;
   }
 
@@ -1580,20 +1612,29 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   DWORD dwExitCode;
   if (!GetExitCodeProcess(processInfo.hProcess, &dwExitCode)) {
     CloseHandle(processInfo.hProcess);
+
+    #if DEBUG_BACKTRACING
+      const char *message = "GetExitCodeProcess failed... ";
+      WriteFile(hOutput, message, strlen(message), NULL, NULL);
+    #endif
+
     return false;
   }
 
 #if DEBUG_BACKTRACING
   if (dwExitCode != 0) {
-    char message[128];
+    char message[256];
     int len = snprintf(message, sizeof(message),
-                        "swift runtime: swift-backtrace.exe exited with status 0x%08lX (%lu)\n",
+                        "swift runtime: %ls exited with status 0x%08lX (%lu)\n",
+                        swiftBacktracePath,
                         (unsigned long)dwExitCode,
                         (unsigned long)dwExitCode);
     if (len > 0) {
       DWORD written;
-      HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
-      WriteFile(hErr, message, (DWORD)len, &written, NULL);
+      WriteFile(hOutput, message, (DWORD)len, &written, NULL);
+    } else {
+      const char *message = "snprintf failed... ";
+      WriteFile(hOutput, message, strlen(message), NULL, NULL);
     }
   }
 #endif  
