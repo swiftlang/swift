@@ -63,3 +63,20 @@ struct NonClass {
 // @objc and @c cannot be combined on the same global function.
 @c @objc func both() {}
 // expected-error @-1 {{cannot apply both '@c' and '@objc' to global function}}
+
+// When @c rejects a type that @objc would accept, suggest @objc.
+@c(bridgedFunc) func bridged(name: String) -> String { name }
+// expected-error @-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{Swift structs cannot be represented in C}}
+// expected-note @-3 {{use '@objc' to expose this function to Objective-C}} {{1-16=@objc(bridgedFunc)}}
+
+@c func bridgedNoName(name: String) {}
+// expected-error @-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{Swift structs cannot be represented in C}}
+// expected-note @-3 {{use '@objc' to expose this function to Objective-C}} {{1-3=@objc}}
+
+// No @objc suggestion when the type is not valid in Objective-C either.
+struct PureSwiftStruct {}
+@c(pureSwift) func pureSwift(s: PureSwiftStruct) {}
+// expected-error @-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{Swift structs cannot be represented in C}}

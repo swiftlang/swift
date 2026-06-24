@@ -4999,6 +4999,37 @@ TypeCheckForeignFunctionRequest::evaluate(Evaluator &evaluator,
     }
   } else {
     reason.setAttrInvalid();
+
+    // If this is a top-level @c function whose types would be valid under
+    // @objc, suggest using @objc instead. Only when ObjC interop is enabled
+    // (the suggestion is meaningless without it), and never for
+    // @implementation functions, where @c is required to match the imported
+    // declaration and replacing it with @objc would break the match.
+    if (auto *cdeclAttr = dyn_cast<CDeclAttr>(attr);
+        cdeclAttr && !cdeclAttr->Underscored &&
+        FD->getDeclContext()->isModuleScopeContext() &&
+        ctx.LangOpts.EnableObjCInterop &&
+        !FD->getAttrs().hasAttribute<ObjCImplementationAttr>()) {
+      // Probe ObjC representability without emitting diagnostics.
+      DiagnosticTransaction transaction(ctx.Diags);
+      auto objcReason = ObjCReason(ObjCReason::ExplicitlyUnderscoreCDecl, attr);
+      std::optional<ForeignAsyncConvention> asyncConv;
+      std::optional<ForeignErrorConvention> errorConv;
+      bool validInObjC =
+          isRepresentableInLanguage(FD, objcReason, asyncConv, errorConv);
+      transaction.abort();
+
+      if (validInObjC) {
+        // Build the replacement text: @objc or @objc(name).
+        std::string replacement;
+        if (cdeclAttr->Name.empty())
+          replacement = "@objc";
+        else
+          replacement = ("@objc(" + cdeclAttr->Name + ")").str();
+        ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_suggest_objc)
+            .fixItReplace(attr->getRangeWithAt(), replacement);
+      }
+    }
   }
   return {};
 }

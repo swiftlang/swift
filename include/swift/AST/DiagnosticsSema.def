@@ -2305,6 +2305,9 @@ ERROR(cxx_references_unsupported,none,
       "%kind0 cannot implement C++ function '%1' because reference "
       "parameters and return types are not yet supported",
       (ValueDecl *, StringRef))
+NOTE(cdecl_suggest_objc,none,
+     "use '@objc' to expose this function to Objective-C",
+     ())
 
 // @used and @section
 ERROR(section_empty_name,none,

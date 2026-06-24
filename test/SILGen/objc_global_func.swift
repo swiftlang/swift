@@ -16,7 +16,8 @@ import Foundation
 // CHECK-LABEL: sil hidden [asmname "customName"] [ossa] @$s16objc_global_func5namedSiyFTo : $@convention(c) () -> Int {
 @objc(customName) func named() -> Int { 0 }
 
-// C-compatible: NSObject is trivially representable in ObjC.
+// Trivially representable in ObjC (no bridging needed), single symbol.
+// Note: @c would reject NSObject since ObjC classes are not representable in C.
 // CHECK-LABEL: sil hidden [asmname "takesObject"] [ossa] @$s16objc_global_func11takesObjectyySo8NSObjectCFTo : $@convention(c) (NSObject) -> () {
 @objc(takesObject) func takesObject(_ x: NSObject) {}
 
