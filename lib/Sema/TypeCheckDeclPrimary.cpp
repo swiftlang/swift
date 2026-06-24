@@ -2420,7 +2420,10 @@ public:
   }
 
   void visitUsingDecl(UsingDecl *UD) {
-    // Nothing to validate yet.
+    if (!UD->getDeclContext()->isModuleScopeContext()) {
+      // 'using' is only valid at file scope.
+      UD->diagnose(diag::decl_inner_scope);
+    }
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {

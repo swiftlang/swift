@@ -177,7 +177,8 @@ SWIFT_REQUEST(TypeChecker, GlobalActorAttributeRequest,
                   llvm::PointerUnion<Decl *, ClosureExpr *>),
               SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ActorIsolationRequest,
-              ActorIsolationState(ValueDecl *),
+              ActorIsolationState(
+                  llvm::PointerUnion<ValueDecl *, ExtensionDecl *>),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasIsolatedSelfRequest,
               bool(ValueDecl *),
@@ -657,8 +658,12 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailabilitySpecRequest,
               (const AvailabilitySpec *, const DeclContext *),
               SeparatelyCached, NoLocationInfo)
 
-SWIFT_REQUEST(TypeChecker, DefaultIsolationInSourceFileRequest,
-              std::optional<DefaultIsolation>(const SourceFile *),
+SWIFT_REQUEST(TypeChecker, FileDefaultsRequest,
+              FileDefaults(const SourceFile *),
+              Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, ApplyFileDefaultsRequest,
+              evaluator::SideEffect(Decl *),
               Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, BindExtensionsRequest,

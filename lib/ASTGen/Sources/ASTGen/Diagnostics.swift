@@ -147,10 +147,10 @@ extension ASTGenDiagnostic {
     )
   }
 
-  static func invalidDefaultIsolationSpecifier(_ specifier: some SyntaxProtocol) -> Self {
+  static func invalidDefaultSpecifier(_ specifier: some SyntaxProtocol) -> Self {
     Self(
       node: specifier,
-      message: "default isolation can only be set to '@MainActor' or 'nonisolated'"
+      message: "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'using'"
     )
   }
 }
