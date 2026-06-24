@@ -346,6 +346,8 @@ struct LibPrespecializedState {
     LOG("  disabledProcessTable=%p", data->getDisabledProcessesTable());
     LOG("  pointerKeyedMetadataMap=%p", data->getPointerKeyedMetadataMap());
     LOG("  descriptorMap=%p", data->getDescriptorMap());
+    LOG("  pointerKeyedWitnessTableMap=%p",
+        data->getPointerKeyedWitnessTableMap());
 
     return data;
   }
@@ -583,6 +585,39 @@ swift::getLibPrespecializedMetadata(const TypeContextDescriptor *description,
     return getMetadataFromPointerKeyedMapDebugMode(state, description,
                                                    arguments);
   }
+}
+
+const WitnessTable *
+swift::getLibPrespecializedWitnessTable(
+    const ProtocolConformanceDescriptor *conformance, const Metadata *type) {
+#if DYLD_FIND_POINTER_HASH_TABLE_ENTRY_DEFINED
+  auto &state = LibPrespecialized.get();
+
+  auto *data = state.data;
+  if (!data)
+    return nullptr;
+
+  if (state.mapConfiguration ==
+      LibPrespecializedState::MapConfiguration::Disabled)
+    return nullptr;
+
+  auto *map = data->getPointerKeyedWitnessTableMap();
+  if (!map)
+    return nullptr;
+
+  if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_find_pointer_hash_table_entry)) {
+    // The dyld call takes the key as the first pointer in the key, then
+    // separately an array of the rest. Our keys are conformance, type.
+    const void *arguments[1] = {type};
+    auto result = SWIFT_RUNTIME_WEAK_USE(_dyld_find_pointer_hash_table_entry(
+        map, conformance, /*argumentCount=*/1, arguments));
+    LOG("WT lookup (conformance=%p, type=%p) -> %p (dyld hash table).",
+        (const void *)conformance, (const void *)type, result);
+    return reinterpret_cast<const WitnessTable *>(
+        const_cast<void *>(result));
+  }
+#endif
+  return nullptr;
 }
 
 std::pair<LibPrespecializedLookupResult, const TypeContextDescriptor *>
