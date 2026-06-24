@@ -73,7 +73,8 @@ private:
 
   bool canImportModule(ImportPath::Module named, SourceLoc loc,
                        ModuleVersionInfo *versionInfo,
-                       bool isTestableImport) override;
+                       bool isTestableImport,
+                       bool isSourceCanImport) override;
 
   bool handlePossibleTargetMismatch(
       SourceLoc sourceLocation,
