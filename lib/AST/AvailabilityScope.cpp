@@ -20,6 +20,7 @@
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
@@ -72,9 +73,42 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
     if (auto parentScope = enclosingSF->getAvailabilityScope()) {
       auto charRange = Ctx.SourceMgr.getRangeForBuffer(SF->getBufferID());
       range = SourceRange(charRange.getStart(), charRange.getEnd());
-      auto originalNode = SF->getNodeInEnclosingSourceFile();
-      parentContext = parentScope->findMostRefinedSubContext(
-          originalNode.getStartLoc(), Ctx);
+
+      // For peer, conformance, and extension macros, the expansion is a
+      // sibling of the attached declaration rather than nested inside it.
+      // The expansion should therefore inherit availability from the
+      // enclosing context, not from the attached declaration. Locate the
+      // parent scope using the buffer's logical declaration context instead
+      // of the attached node's source location.
+      SourceLoc lookupLoc;
+      if (auto role = SF->getFulfilledMacroRole()) {
+        switch (*role) {
+        case MacroRole::Peer:
+        case MacroRole::Conformance:
+        case MacroRole::Extension:
+          if (auto *dcDecl =
+                  SF->getGeneratedSourceFileInfo()->declContext->getAsDecl())
+            lookupLoc = dcDecl->getStartLoc();
+          break;
+        case MacroRole::Expression:
+        case MacroRole::Declaration:
+        case MacroRole::CodeItem:
+        case MacroRole::Accessor:
+        case MacroRole::MemberAttribute:
+        case MacroRole::Member:
+        case MacroRole::Body:
+        case MacroRole::Preamble:
+          lookupLoc = SF->getNodeInEnclosingSourceFile().getStartLoc();
+          break;
+        }
+      } else {
+        lookupLoc = SF->getNodeInEnclosingSourceFile().getStartLoc();
+      }
+
+      parentContext =
+          lookupLoc.isValid()
+              ? parentScope->findMostRefinedSubContext(lookupLoc, Ctx)
+              : parentScope;
     }
     break;
   }
