@@ -6,7 +6,7 @@ import Builtin
 import Swift
 import _Concurrency
 
-// CHECK-LABEL: sil shared [noinline] [ossa] @$s7specgen12take_closureyyySi_SitcF023$s7specgen6calleryySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s7specgen12take_closureyyySi_SitcF023$s7specgen6calleryySiFyE8_SitcfU_SiTf1E_n : $@convention(thin) (Int) -> () {
 
 // CHECK: bb0(%0 : $Int)
 // CHECK: function_ref @$s7specgen6calleryySiFySi_SitcfU_
@@ -26,7 +26,7 @@ bb0(%0 : @owned $@callee_owned (Int, Int) -> ()):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil shared [noinline] [ossa] @$s7specgen13take_closure2yyySi_SitcF023$s7specgen6calleryySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s7specgen13take_closure2yyySi_SitcF023$s7specgen6calleryySiFyE8_SitcfU_SiTf1E_n : $@convention(thin) (Int) -> () {
 // CHECK: bb0(%0 : $Int)
 // CHECK: [[FUN:%.*]] = function_ref @$s7specgen6calleryySiFySi_SitcfU_
 // CHECK: partial_apply [[FUN]](
@@ -54,9 +54,9 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int):
 }
 
 // CHECK-LABEL: sil [ossa] @$s7specgen6calleryySiF : $@convention(thin) (Int) -> () {
-// CHECK: [[ID2:%[0-9]+]] = function_ref @$s7specgen12take_closureyyySi_SitcF023$s7specgen6calleryySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> ()
+// CHECK: [[ID2:%[0-9]+]] = function_ref @$s7specgen12take_closureyyySi_SitcF023$s7specgen6calleryySiFyE8_SitcfU_SiTf1E_n : $@convention(thin) (Int) -> ()
 // CHECK: apply [[ID2]](%0) : $@convention(thin) (Int) -> ()
-// CHECK: [[ID1:%[0-9]+]] = function_ref @$s7specgen13take_closure2yyySi_SitcF023$s7specgen6calleryySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> ()
+// CHECK: [[ID1:%[0-9]+]] = function_ref @$s7specgen13take_closure2yyySi_SitcF023$s7specgen6calleryySiFyE8_SitcfU_SiTf1E_n : $@convention(thin) (Int) -> ()
 // CHECK: apply [[ID1]](%0) : $@convention(thin) (Int) -> ()
 sil [ossa] @$s7specgen6calleryySiF : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
@@ -361,7 +361,7 @@ bb4:
 
 // Ensure that we can specialize and properly mangle functions that take closures with <τ_0_0> { var τ_0_0 } <arguments>.
 
-// CHECK-LABEL: sil shared [noinline] [ossa] @$s4main5inneryys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n : $@convention(thin) (@inout Builtin.Int32, @owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> ()
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s4main5inneryys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nE_n : $@convention(thin) (@inout Builtin.Int32, @owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> ()
 // CHECK: bb0
 // CHECK: [[FN:%.*]] = function_ref @closure_with_box_argument
 // CHECK: [[C1:%.*]] = copy_value %1
@@ -464,7 +464,7 @@ public struct S : P {
   init()
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s4test1SVAA1PA2aDP3fooyS2iycFZTW8closure2SiTf1cn_n : $@convention(thin) (@thick S.Type, Int) -> Int
+// CHECK-LABEL: sil shared [ossa] @$s4test1SVAA1PA2aDP3fooyS2iycFZTW8closure2SiTf1En_n : $@convention(thin) (@thick S.Type, Int) -> Int
 sil [ossa] @$s4test1SVAA1PA2aDP3fooyS2iycFZTW : $@convention(witness_method: P) (@guaranteed @noescape @callee_guaranteed () -> Int, @thick S.Type) -> Int {
 bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> Int, %1 : $@thick S.Type):
   %3 = apply %0() : $@noescape @callee_guaranteed () -> Int
@@ -498,7 +498,7 @@ sil [ossa] @testClosureConvertHelper : $(Int) -> ()
 
 // specialized testClosureConvertThunk
 // FIXME: Need to handle closures with multiple exceptional exits.
-// CHECK-LABEL: sil shared [ossa] @$s23testClosureConvertThunk0abC6HelperSiTf1nc_n : $@convention(thin) (Int) -> (@out (), @error any Error) {
+// CHECK-LABEL: sil shared [ossa] @$s23testClosureConvertThunk0abC6HelperSiTf1nE_n : $@convention(thin) (Int) -> (@out (), @error any Error) {
 // CHECK:       bb0(%0 : $*(), %1 : $Int):
 // CHECK:         [[F:%.*]] = function_ref @testClosureConvertHelper : $@convention(thin) (Int) -> ()
 // CHECK:         [[PA:%.*]] = partial_apply [[F]](%1) : $@convention(thin) (Int) -> ()
@@ -515,7 +515,7 @@ sil [ossa] @testClosureConvertHelper : $(Int) -> ()
 // CHECK:         destroy_value [[CVT2]]
 // CHECK:         destroy_value [[PA]]
 // CHECK:         throw
-// CHECK-LABEL: } // end sil function '$s23testClosureConvertThunk0abC6HelperSiTf1nc_n'
+// CHECK-LABEL: } // end sil function '$s23testClosureConvertThunk0abC6HelperSiTf1nE_n'
 sil [ossa] @testClosureConvertThunk : $@convention(thin) (@guaranteed @noescape @callee_owned () -> @error Error) -> (@out (), @error Error) {
 bb0(%0 : $*(), %1 : @guaranteed $@noescape @callee_owned () -> @error Error):
   %2 = copy_value %1
@@ -561,7 +561,7 @@ bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> ()):
   return %8 : $()
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s24testClosureThunkNoEscape0aB13ConvertHelperSiTf1c_n : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil shared [ossa] @$s24testClosureThunkNoEscape0aB13ConvertHelperSiTf1E_n : $@convention(thin) (Int) -> () {
 // CHECK: bb0([[ARG:%.*]] : $Int):
 // CHECK:   [[F:%.*]] = function_ref @testClosureConvertHelper : $@convention(thin) (Int) -> ()
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]]) : $@convention(thin) (Int) -> ()
@@ -574,7 +574,7 @@ bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> ()):
 // CHECK: }
 // CHECK-LABEL: sil [ossa] @testClosureNoEscape : $@convention(thin) (Int) -> () {
 // CHECK-NOT: partial_apply
-// CHECK:   [[FN:%.*]] = function_ref @$s24testClosureThunkNoEscape0aB13ConvertHelperSiTf1c_n : $@convention(thin) (Int) -> ()
+// CHECK:   [[FN:%.*]] = function_ref @$s24testClosureThunkNoEscape0aB13ConvertHelperSiTf1E_n : $@convention(thin) (Int) -> ()
 // CHECK-NOT: partial_apply
 // CHECK:   %5 = apply [[FN]](%0) : $@convention(thin) (Int) -> ()
 // CHECK-NOT: release
@@ -608,7 +608,7 @@ bb0(%0 : $*Int, %1 : @guaranteed $@noescape @callee_guaranteed () -> @out Int):
 
 sil [reabstraction_thunk] @reabstractionThunk : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
 
-// CHECK-LABEL: sil shared [ossa] @$s25testClosureThunkNoEscape20aB14ConvertHelper2SiTf1nc_n : $@convention(thin) (Int) -> @out Int
+// CHECK-LABEL: sil shared [ossa] @$s25testClosureThunkNoEscape20aB14ConvertHelper2SiTf1nE_n : $@convention(thin) (Int) -> @out Int
 // CHECK: [[PA1:%.*]] = partial_apply
 // CHECK: convert_escape_to_noescape
 // CHECK: [[PA2:%.*]] = partial_apply
@@ -620,7 +620,7 @@ sil [reabstraction_thunk] @reabstractionThunk : $@convention(thin) (@noescape @c
 // CHECK: return
 
 // CHECK-LABEL: sil [ossa] @reabstractionTest : $@convention(thin) (Int) -> ()
-// CHECK: [[F:%.*]] = function_ref @$s25testClosureThunkNoEscape20aB14ConvertHelper2SiTf1nc_n
+// CHECK: [[F:%.*]] = function_ref @$s25testClosureThunkNoEscape20aB14ConvertHelper2SiTf1nE_n
 // CHECK: apply [[F]]
 // CHECK: return
 sil [ossa] @reabstractionTest : $(Int) -> () {
@@ -660,7 +660,7 @@ entry(%empty : $*(), %closure : @owned $@noescape @callee_guaranteed @substitute
 // CHECK:         [[HELPER:%[^,]+]] = function_ref @testClosureConvertHelper3
 // CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [[HELPER]]
 // CHECK:         [[NOESCAPE_CLOSURE:%[^,]+]] = convert_escape_to_noescape [[CLOSURE]]
-// CHECK:         [[SPECIALIZATION:%[^,]+]] = function_ref @$s25testClosureThunkNoEscape30aB14ConvertHelper3SiTf1nc_n
+// CHECK:         [[SPECIALIZATION:%[^,]+]] = function_ref @$s25testClosureThunkNoEscape30aB14ConvertHelper3SiTf1nE_n
 // CHECK:         apply [[SPECIALIZATION]]{{.*}}
 // CHECK:         destroy_value [[CLOSURE]]
 // CHECK:         destroy_value [[NOESCAPE_CLOSURE]]
@@ -710,7 +710,7 @@ bb2(%error : $any Error):
 // CHECK:         [[HELPER:%[^,]+]] = function_ref @testThrowingClosureConvertHelper
 // CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [[HELPER]]
 // CHECK:         [[NOESCAPE_CLOSURE:%[^,]+]] = convert_escape_to_noescape [[CLOSURE]]
-// CHECK:         [[SPECIALIZATION:%[^,]+]] = function_ref @$s32testClosureThunkNoEscapeThrowing0afB13ConvertHelperSiTf1nc_n
+// CHECK:         [[SPECIALIZATION:%[^,]+]] = function_ref @$s32testClosureThunkNoEscapeThrowing0afB13ConvertHelperSiTf1nE_n
 // CHECK:         try_apply [[SPECIALIZATION]]{{.*}}normal [[NORMAL_BLOCK:bb[0-9]+]], error [[ERROR_BLOCK:bb[0-9]+]]
 // CHECK:       [[NORMAL_BLOCK]]
 // CHECK:         destroy_value [[NOESCAPE_CLOSURE]]
@@ -764,7 +764,7 @@ bb0(%0 : $*Int, %1 : @owned $@callee_guaranteed () -> @out Int):
 // CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA]]
 // CHECK: [[F2:%.*]] = function_ref @reabstractionThunk
 // CHECK: [[PA2:%.*]] = partial_apply [callee_guaranteed] [[F2]]([[CVT]])
-// CHECK: [[F3:%.*]] = function_ref @$s17testClosureThunk40aB14ConvertHelper2SiTf1nc_n : $@convention(thin) (Int) -> @out Int
+// CHECK: [[F3:%.*]] = function_ref @$s17testClosureThunk40aB14ConvertHelper2SiTf1nE_n : $@convention(thin) (Int) -> @out Int
 // CHECK:  apply [[F3]]([[STK]], %0)
 // CHECK:  destroy_value [[PA]]
 // CHECK:  dealloc_stack [[STK]]
@@ -792,7 +792,7 @@ sil [reabstraction_thunk] @reabstractionThunk2 : $@convention(thin) (@guaranteed
 // CHECK-LABEL: sil [ossa] @reabstractionTest3 : $@convention(thin) (Int) -> () {
 // CHECK: bb0(%0 : $Int):
 // CHECK:  [[STK:%.*]] = alloc_stack $Int
-// CHECK:  [[SPEC:%.*]] = function_ref @$s25testClosureThunkNoEscape20aB14ConvertHelper2SiTf1nc_n : $@convention(thin) (Int) -> @out Int // user: %9
+// CHECK:  [[SPEC:%.*]] = function_ref @$s25testClosureThunkNoEscape20aB14ConvertHelper2SiTf1nE_n : $@convention(thin) (Int) -> @out Int // user: %9
 // CHECK:    = apply [[SPEC]]([[STK]], %0) : $@convention(thin) (Int) -> @out Int
 // CHECK:  dealloc_stack [[STK]] : $*Int
 // CHECK:  return
@@ -824,10 +824,10 @@ bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> Int):
   unreachable
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s14coroutine_user25testClosureConvertHelper2SiTf1c_n : $@yield_once @convention(thin) (Int) -> @yields Int {
+// CHECK-LABEL: sil shared [ossa] @$s14coroutine_user25testClosureConvertHelper2SiTf1E_n : $@yield_once @convention(thin) (Int) -> @yields Int {
 
 // CHECK-LABEL: sil [ossa] @test_coroutine_user : $@convention(thin) (Int) -> Int {
-// CHECK:         [[C:%.*]] = function_ref @$s14coroutine_user25testClosureConvertHelper2SiTf1c_n : $@yield_once @convention(thin) (Int) -> @yields Int
+// CHECK:         [[C:%.*]] = function_ref @$s14coroutine_user25testClosureConvertHelper2SiTf1E_n : $@yield_once @convention(thin) (Int) -> @yields Int
 // CHECK:           = begin_apply [[C]](%0)
 // CHECK: } // end sil function 'test_coroutine_user'
 sil [ossa] @test_coroutine_user : $@convention(thin) (Int) -> Int {
@@ -1018,10 +1018,10 @@ bb0(%0 : $Int):
   return %r
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s20need_borrow_argument15pointer_and_intSiTf1c_n :
+// CHECK-LABEL: sil shared [ossa] @$s20need_borrow_argument15pointer_and_intSiTf1E_n :
 // CHECK:         [[F:%.*]] = function_ref @pointer_and_int
 // CHECK:         apply [[F]](undef, %0)
-// CHECK-LABEL: } // end sil function '$s20need_borrow_argument15pointer_and_intSiTf1c_n'
+// CHECK-LABEL: } // end sil function '$s20need_borrow_argument15pointer_and_intSiTf1E_n'
 sil [ossa] @need_borrow_argument : $@convention(thin) (@guaranteed @callee_guaranteed (UnsafeRawBufferPointer) -> ()) -> () {
 bb0(%2 : @closureCapture @guaranteed $@callee_guaranteed (UnsafeRawBufferPointer) -> ()):
   %70 = apply %2(undef): $@callee_guaranteed (UnsafeRawBufferPointer) -> ()
@@ -1064,3 +1064,70 @@ bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> (), %1 : @guaranteed $A
   %r = tuple()
   return %r
 }
+
+// Check that specializing the same function for the same closure, one time non-escaping and the other time escaping,
+// does not violate ownership rules for parameter passing.
+sil [ossa] @guaranteed_capture_inner_fn : $@convention(thin) (@guaranteed AnyObject) -> ()
+
+sil [ossa] @guaranteed_capture_callee : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> ()):
+  %r1 = apply %0() : $@noescape @callee_guaranteed () -> ()
+  %r2 = tuple ()
+  return %r2 : $()
+}
+
+sil [ossa] @guaranteed_capture_caller_escaping : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %f = function_ref @guaranteed_capture_inner_fn : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %noescape = convert_escape_to_noescape %pa : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %use = function_ref @guaranteed_capture_callee : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  apply %use(%noescape) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %noescape
+  destroy_value %pa
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @guaranteed_capture_caller_onstack : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %f = function_ref @guaranteed_capture_inner_fn : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %use = function_ref @guaranteed_capture_callee : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  apply %use(%pa) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %pa
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @guaranteed_capture_callee2 : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> ()):
+  %r1 = apply %0() : $@noescape @callee_guaranteed () -> ()
+  %r2 = tuple ()
+  return %r2 : $()
+}
+
+sil [ossa] @guaranteed_capture_caller_onstack2 : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %f = function_ref @guaranteed_capture_inner_fn : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %use = function_ref @guaranteed_capture_callee2 : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  apply %use(%pa) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %pa
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @guaranteed_capture_caller_escaping2 : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %f = function_ref @guaranteed_capture_inner_fn : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %noescape = convert_escape_to_noescape %pa : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %use = function_ref @guaranteed_capture_callee2 : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  apply %use(%noescape) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %noescape
+  destroy_value %pa
+  %r = tuple ()
+  return %r
+}
+
