@@ -8441,6 +8441,11 @@ public:
   /// formalizing the attribute.
   std::optional<ForeignLanguage> getCDeclKind() const;
 
+  /// Whether this function's signature includes types that require Objective-C
+  /// bridging (e.g. String <-> NSString). Used by @objc global functions to
+  /// decide between the @c single-symbol model and the @_cdecl thunk model.
+  bool signatureRequiresObjCBridging() const;
+
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.
   bool argumentNameIsAPIByDefault() const;
