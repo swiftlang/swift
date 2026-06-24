@@ -788,6 +788,10 @@ void DiagnosticVerifier::parseNestedExpectedDiagInfoBlock(
     unsigned &PrevExpectedContinuationLine,
     std::vector<ExpectedDiagnosticInfo> &NestedDiagsOut, size_t &End) {
   size_t NestedMatch = MatchStartIn.find("expected-");
+  if (NestedMatch == StringRef::npos) {
+    End = MatchStartIn.find("}}");
+    return;
+  }
   // Scan the memory buffer looking for expected-note/warning/error.
   while (NestedMatch != StringRef::npos) {
     StringRef NestedMatchStartIn = MatchStartIn.substr(NestedMatch);
@@ -994,10 +998,6 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
       addError(DiagnosticLoc,
                "didn't find '}}' to match '{{' in expected-expansion");
       return 0;
-    }
-    if (Expected.NestedDiags.size() == 0) {
-      addError(DiagnosticLoc, "expected-expansion block is empty");
-      // Keep going
     }
   } else {
     End = MatchStart.find("}}");
@@ -1248,9 +1248,7 @@ void DiagnosticVerifier::verifyDiagnostics(
     if (expected.Classification == DiagnosticKindExpansion) {
       SourceLoc Loc = SM.getLocForLineCol(BufferID, expected.LineNo, *expected.ColumnNo);
       if (Expansions.count(Loc) == 0) {
-        addError(expected.ExpectedStart,
-                 "no expansion with diagnostics starting at " +
-                     std::to_string(expected.LineNo) + ":" + std::to_string(*expected.ColumnNo));
+        addError(expected.ExpectedStart, "expected expansion not produced");
         continue;
       }
       unsigned ExpansionBufferID = Expansions[Loc];
