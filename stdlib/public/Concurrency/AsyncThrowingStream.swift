@@ -134,14 +134,14 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     ///
     /// The `onTermination` closure receives an instance of this type.
     public enum Termination: Sendable {
-      
+
       /// The stream finished as a result of calling the continuation's
       ///  `finish` method.
       ///
       ///  The associated `Failure` value provides the error that terminated
       ///  the stream. If no error occurred, this value is `nil`.
       case finished(Failure?)
-      
+
       /// The stream finished as a result of cancellation.
       case cancelled
     }
@@ -153,7 +153,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// this type to indicate the success or failure of yielding an element to
     /// the continuation.
     public enum YieldResult {
-      
+
       /// The stream successfully enqueued the element.
       ///
       /// This value represents the successful enqueueing of an element, whether
@@ -167,13 +167,13 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       /// that uses the `remaining` value could race on the consumption of
       /// values from the stream.
       case enqueued(remaining: Int)
-      
+
       /// The stream didn't enqueue the element because the buffer was full.
       ///
       /// The associated element for this case is the element that the stream
       /// dropped.
       case dropped(Element)
-      
+
       /// The stream didn't enqueue the element because the stream was in a
       /// terminal state.
       ///
@@ -182,12 +182,12 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       /// it threw an error.
       case terminated
     }
-    
+
     /// A strategy that handles exhaustion of a buffer’s capacity.
     public enum BufferingPolicy: Sendable {
       /// Continue to add to the buffer, without imposing a limit on the number of buffered elements.
       case unbounded
-      
+
       /// When the buffer is full, discard the newly received element.
       ///
       /// This strategy enforces keeping at most the specified number of oldest values.
@@ -195,7 +195,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       /// - Note: If the specified number is zero or negative, no elements are buffered.
       /// In that case, an iterator receives an element only if it is already awaiting a value when the continuation yields.
       case bufferingOldest(Int)
-      
+
       /// When the buffer is full, discard the oldest element in the buffer.
       ///
       /// This strategy enforces keeping at most the specified number of newest values.
@@ -205,7 +205,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       case bufferingNewest(Int)
     }
 
-    let storage: _Storage
+    let storage: _AsyncStreamStorage<Element, Failure>
 
     /// Resume the task awaiting the next iteration point by having it return
     /// normally from its suspension point with a given element.
@@ -221,7 +221,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// without blocking for any awaiting consumption from the iteration.
     @discardableResult
     public func yield(_ value: sending Element) -> YieldResult {
-      storage.yield(value)
+      storage.yield(value).asStreamYieldResult()
     }
 
     /// Resume the task awaiting the next iteration point by having it return
@@ -233,7 +233,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// finish, the stream enters a terminal state and doesn't produce any additional
     /// elements.
     public func finish(throwing error: __owned Failure? = nil) {
-      storage.finish(throwing: error)
+      storage.terminate(.finished(error))
     }
 
     /// A callback to invoke when canceling iteration of an asynchronous
@@ -255,25 +255,28 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// ``withTaskCancellationHandler(operation:onCancel:)``.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
-        return storage.getOnTermination()
+        return adaptToStreamTerminationHandler(storage.getOnTermination())
       }
       nonmutating set {
-        storage.setOnTermination(newValue)
+        storage.setOnTermination(adaptToStorageTerminationHandler(newValue))
       }
     }
   }
 
   final class _Context {
-    let storage: _Storage?
+    let storage: _AsyncStreamStorage<Element, Failure>?
     let produce: () async throws(Failure) -> Element?
 
-    init(storage: _Storage? = nil, produce: @escaping () async throws(Failure) -> Element?) {
+    init(
+      storage: _AsyncStreamStorage<Element, Failure>? = nil,
+      produce: @escaping () async throws(Failure) -> Element?
+    ) {
       self.storage = storage
       self.produce = produce
     }
 
     deinit {
-      storage?.cancel()
+      storage?.terminate(.cancelled)
     }
   }
 
@@ -338,11 +341,13 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
   ) where Failure == Error {
-    let storage: _Storage = .create(limit: limit)
+    let storage: _AsyncStreamStorage<Element, Failure> = .init(
+      bufferingPolicy: limit.asStorageBufferingPolicy()
+    )
     context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }
-  
+
   /// Constructs an asynchronous throwing stream from a given element-producing
   /// closure.
   ///
@@ -478,9 +483,9 @@ extension AsyncThrowingStream.Continuation {
   ) -> YieldResult where Failure == Error {
     switch result {
     case .success(let val):
-      return storage.yield(val)
+      return storage.yield(val).asStreamYieldResult()
     case .failure(let err):
-      storage.finish(throwing: err)
+      storage.terminate(.finished(err))
       return .terminated
     }
   }
@@ -499,7 +504,7 @@ extension AsyncThrowingStream.Continuation {
   /// without blocking for any awaiting consumption from the iteration.
   @discardableResult
   public func yield() -> YieldResult where Element == Void {
-    storage.yield(())
+    storage.yield(()).asStreamYieldResult()
   }
 }
 
