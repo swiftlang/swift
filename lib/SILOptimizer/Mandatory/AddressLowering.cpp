@@ -3598,6 +3598,15 @@ protected:
     yield->setOperand(use->getOperandNumber(), addr);
   }
 
+  // Captured index value of a keypath. The keypath runtime ABI passes each
+  // index via address. Rewrite the operand to its storage address now; the
+  // pattern's recorded LoweredType is patched up after the main rewrite loop
+  // by rebuildKeyPathInstsForAddressOnlyIndices.
+  void visitKeyPathInst(KeyPathInst *kpi) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    kpi->setOperand(use->getOperandNumber(), addr);
+  }
+
   void visitIgnoredUseInst(IgnoredUseInst *ignored) {
     SILValue addr = addrMat.materializeAddress(use->get());
     ignored->setOperand(addr);

@@ -658,7 +658,17 @@ void verifyKeyPathComponent(SILModule &M,
         auto opIndex = index.Operand;
         auto contextType =
           index.LoweredType.subst(M, patternSubs);
-        require(contextType == operands[opIndex].get()->getType(),
+        auto operandType = operands[opIndex].get()->getType();
+        // The operand normally matches the pattern's lowered type exactly.
+        // In opaque-values mode, SILGen records address-only indices'
+        // LoweredType in the pattern as the address form (since the keypath
+        // runtime ABI passes them by address), but the operand is still at
+        // object type until AddressLowering rewrites it. Accept that
+        // intermediate shape.
+        require(contextType == operandType ||
+                    (!M.useLoweredAddresses() &&
+                     (contextType.isAddress() && operandType.isObject() &&
+                      contextType.getObjectType() == operandType)),
                 "operand must match type required by pattern");
         SILType loweredType = index.LoweredType;
         require(
