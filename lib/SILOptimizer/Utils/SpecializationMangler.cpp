@@ -242,18 +242,21 @@ FunctionSignatureSpecializationMangler::appendStringAsIdentifier(StringRef str) 
 
 void
 FunctionSignatureSpecializationMangler::mangleClosureProp(SILInstruction *Inst) {
-  ArgOpBuffer << 'c';
-
   // Add in the partial applies function name if we can find one. Assert
   // otherwise. The reason why this is ok to do is currently we only perform
   // closure specialization if we know the function_ref in question. When this
   // restriction is removed, the assert here will fire.
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(Inst)) {
+    ArgOpBuffer << 'c';
     auto *FRI = cast<FunctionRefInst>(TTTFI->getCallee());
     appendIdentifier(FRI->getReferencedFunction()->getName());
     return;
   }
   auto *PAI = cast<PartialApplyInst>(Inst);
+  // Use 'c' for on-stack (non-escaping) and 'E' for escaping partial_applys.
+  // This prevents name collisions when both kinds specialize the same callee
+  // with the same captured-argument types but different ownership conventions.
+  ArgOpBuffer << (PAI->isOnStack() ? 'c' : 'E');
   auto *FRI = cast<FunctionRefInst>(PAI->getCallee());
   appendIdentifier(FRI->getReferencedFunction()->getName());
 

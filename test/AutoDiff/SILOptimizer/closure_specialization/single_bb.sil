@@ -31,7 +31,7 @@ bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (Float) -> (Float, Float)):
 // reverse-mode derivative of f(_:)
 sil hidden [ossa] @$s4test1fyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 bb0(%0 : $Float):
-  // CHECK:         sil private [ossa] @$s11$pullback_f12$vjpMultiplyS2fTf1nc_n : $@convention(thin) (Float, Float, Float) -> Float {
+  // CHECK:         sil private [ossa] @$s11$pullback_f12$vjpMultiplyS2fTf1nE_n : $@convention(thin) (Float, Float, Float) -> Float {
   // CHECK:         bb0(%0 : $Float, %1 : $Float, %2 : $Float):
   // CHECK:           %[[#A2:]] = function_ref @$vjpMultiply : $@convention(thin) (Float, Float, Float) -> (Float, Float)
   // COMBINE:         %[[#]] = apply %[[#A2]](%0, %1, %2) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
@@ -42,7 +42,7 @@ bb0(%0 : $Float):
   // CHECK:           %[[#A5:]] = builtin "fmul_FPIEEE32"(%[[#A4]] : $Builtin.FPIEEE32, %[[#A4]] : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
   // CHECK:           %[[#A6:]] = struct $Float (%[[#A5]] : $Builtin.FPIEEE32)
   // COMBINE-NOT:     function_ref @$vjpMultiply
-  // CHECK:           %[[#A7:]] = function_ref @$s11$pullback_f12$vjpMultiplyS2fTf1nc_n : $@convention(thin) (Float, Float, Float) -> Float
+  // CHECK:           %[[#A7:]] = function_ref @$s11$pullback_f12$vjpMultiplyS2fTf1nE_n : $@convention(thin) (Float, Float, Float) -> Float
   // CHECK:           %[[#A8:]] = partial_apply [callee_guaranteed] %[[#A7]](%0, %0) : $@convention(thin) (Float, Float, Float) -> Float
   // CHECK:           %[[#A9:]] = tuple (%[[#A6]] : $Float, %[[#A8]] : $@callee_guaranteed (Float) -> Float)
   // CHECK:           return %[[#A9]]
@@ -78,7 +78,7 @@ bb0(%0 : $Float, %1 : @guaranteed $@callee_guaranteed (Float) -> (Float, Float))
 // reverse-mode derivative of k(_:)
 sil hidden [ossa] @$s4test1kyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 bb0(%0 : $Float):
-  // CHECK:         sil private [ossa] @$s11$pullback_k12$vjpMultiplyS2fTf1nc_n : $@convention(thin) (Float, Float, Float) -> Float {
+  // CHECK:         sil private [ossa] @$s11$pullback_k12$vjpMultiplyS2fTf1nE_n : $@convention(thin) (Float, Float, Float) -> Float {
   // CHECK:         bb0(%0 : $Float, %1 : $Float, %2 : $Float):
   // CHECK:           %[[#B2:]] = function_ref @$vjpMultiply : $@convention(thin) (Float, Float, Float) -> (Float, Float)
   // COMBINE:         %[[#]] = apply %[[#B2]](%0, %1, %2) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
@@ -89,7 +89,7 @@ bb0(%0 : $Float):
   // CHECK:           %[[#B5:]] = builtin "fmul_FPIEEE32"(%[[#B4]] : $Builtin.FPIEEE32, %[[#B4]] : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
   // CHECK:           %[[#B6:]] = struct $Float (%[[#B5]] : $Builtin.FPIEEE32)
   // COMBINE-NOT:     function_ref @$vjpMultiply
-  // CHECK:           %[[#B7:]] = function_ref @$s11$pullback_k12$vjpMultiplyS2fTf1nc_n : $@convention(thin) (Float, Float, Float) -> Float
+  // CHECK:           %[[#B7:]] = function_ref @$s11$pullback_k12$vjpMultiplyS2fTf1nE_n : $@convention(thin) (Float, Float, Float) -> Float
   // CHECK:           %[[#B8:]] = partial_apply [callee_guaranteed] %[[#B7]](%0, %0) : $@convention(thin) (Float, Float, Float) -> Float
   // CHECK:           %[[#B9:]] = tuple (%[[#B6]] : $Float, %[[#B8]] : $@callee_guaranteed (Float) -> Float)
   // CHECK:           return %[[#B9]]
@@ -134,7 +134,7 @@ bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (Float) -> Float, %2 : @owned $
 // reverse-mode derivative of g(_:)
 sil hidden [ossa] @$s4test1gyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 bb0(%0 : $Float):
-  // CHECK:         sil private [ossa] @$s11$pullback_g7$vjpSinSf0B3CosSf0B8MultiplyS2fTf1nccc_n : $@convention(thin) (Float, Float, Float, Float, Float) -> Float {
+  // CHECK:         sil private [ossa] @$s11$pullback_g7$vjpSinSf0B3CosSf0B8MultiplyS2fTf1nEEE_n : $@convention(thin) (Float, Float, Float, Float, Float) -> Float {
   // CHECK:         bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $Float, %4 : $Float):
   // CHECK:           %[[#C4:]] = function_ref @$vjpSin : $@convention(thin) (Float, Float) -> Float
   // CHECK:           %[[#C6:]] = function_ref @$vjpCos : $@convention(thin) (Float, Float) -> Float
@@ -153,7 +153,7 @@ bb0(%0 : $Float):
   // COMBINE-NOT:     function_ref @$vjpCos
   // COMBINE-NOT:     function_ref @$vjpMultiply
   // CHECK:           %[[#C14:]] = struct $Float (%[[#C13]] : $Builtin.FPIEEE32)
-  // CHECK:           %[[#C15:]] = function_ref @$s11$pullback_g7$vjpSinSf0B3CosSf0B8MultiplyS2fTf1nccc_n : $@convention(thin) (Float, Float, Float, Float, Float) -> Float
+  // CHECK:           %[[#C15:]] = function_ref @$s11$pullback_g7$vjpSinSf0B3CosSf0B8MultiplyS2fTf1nEEE_n : $@convention(thin) (Float, Float, Float, Float, Float) -> Float
   // CHECK:           %[[#C16:]] = partial_apply [callee_guaranteed] %[[#C15]](%0, %0, %[[#C14]], %[[#C12]]) : $@convention(thin) (Float, Float, Float, Float, Float) -> Float
   // CHECK:           %[[#C17:]] = tuple (%[[#]] : $Float, %[[#C16]] : $@callee_guaranteed (Float) -> Float)
   // CHECK:           return %[[#C17]]
@@ -272,7 +272,7 @@ bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (Float) -> Float):
 // reverse-mode derivative of h(x:)
 sil hidden [ossa] @$s5test21h1xS2f_tFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 bb0(%0 : $Float):
-  // CHECK:         sil private [signature_optimized_thunk] [heuristic_always_inline] [ossa] @$s10pullback_h073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbackti1_j5FZSf_J6SfcfU_S2fTf1nc_n : $@convention(thin) (Float, Float, Float) -> Float {
+  // CHECK:         sil private [signature_optimized_thunk] [heuristic_always_inline] [ossa] @$s10pullback_h073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbackti1_j5FZSf_J6SfcfU_S2fTf1nE_n : $@convention(thin) (Float, Float, Float) -> Float {
   // CHECK:         bb0(%0 : $Float, %1 : $Float, %2 : $Float):
   // CHECK:           %[[#E8:]] = function_ref @$sS2fIegnr_S2fIegyd_TR : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float
   // CHECK:           %[[#E6:]] = function_ref @pullback_f_specialized : $@convention(thin) (@in_guaranteed Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) -> @out Float
@@ -295,7 +295,7 @@ bb0(%0 : $Float):
   // COMBINE-NOT:     function_ref @pullback_f_specialized
   // COMBINE-NOT:     function_ref @$sS2fIegnr_S2fIegyd_TR
   // CHECK:           %[[#E13:]] = struct $Float (%[[#E12]] : $Builtin.FPIEEE32)
-  // CHECK:           %[[#E14:]] = function_ref @$s10pullback_h073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbackti1_j5FZSf_J6SfcfU_S2fTf1nc_n : $@convention(thin) (Float, Float, Float) -> Float
+  // CHECK:           %[[#E14:]] = function_ref @$s10pullback_h073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbackti1_j5FZSf_J6SfcfU_S2fTf1nE_n : $@convention(thin) (Float, Float, Float) -> Float
   // CHECK:           %[[#E15:]] = partial_apply [callee_guaranteed] %[[#E14]](%0, %0) : $@convention(thin) (Float, Float, Float) -> Float
   // CHECK:           %[[#E16:]] = tuple (%[[#E13]] : $Float, %[[#E15]] : $@callee_guaranteed (Float) -> Float)
   // CHECK:           return %[[#E16]]
