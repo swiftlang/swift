@@ -507,6 +507,17 @@ EXPERIMENTAL_FEATURE(TrailingComma, false)
 // stabilized.
 EXPERIMENTAL_FEATURE(SafeInteropWrappers, true)
 
+// Opts into the stabilized behavior where `__counted_by`/`__sized_by` on a
+// `_Nullable` C pointer produces a non-Optional Span/UnsafeBufferPointer
+// wrapper (with a runtime check that null only occurs when the count is 0).
+// When this feature is disabled the wrapper instead propagates the Optional,
+// matching the original SafeInteropWrappers source contract that some
+// projects have already adopted. `__counted_by_or_null` /
+// `__sized_by_or_null` always propagate Optional regardless of this flag.
+// This has no effect without SafeInteropWrappers enabled, as the enabled
+// behavior is already standard in the stabilized version.
+EXPERIMENTAL_FEATURE(SafeInteropWrappersNullAsEmptySpan, true)
+
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 

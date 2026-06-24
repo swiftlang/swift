@@ -7,23 +7,32 @@
 // RUN: %FileCheck --dry-run --ignore-runtime-warnings > %t/expansions.txt < %t/tmp.txt
 // RUN: diff --strip-trailing-cr %t/expansions.txt %t/expansions.txt.expected
 
+// Mirrors OpaqueReturn.swift but exercises the legacy opt-in
+// behavior: without `nullableAsEmptySpan: true`, normal Optional
+// pointer parameters / return values propagate as Optional in the wrapper.
+// IUO parameters and returns are stripped and follow the modern wrapper
+// convention (no force-unwrap; precondition+EmptySpan for Span returns) —
+// the flag only affects _Nullable normal-Optional pointers. The invocations
+// deliberately omit `nullableAsEmptySpan` so this also mirrors what a
+// pre-`nullableAsEmptySpan` compiler would emit.
+
 //--- test.swift
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"))
 public func nonnullUnsafeRawBufferPointer(_ size: CInt) -> OpaquePointer {}
 
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"))
 public func nullableUnsafeRawBufferPointer(_ size: CInt) -> OpaquePointer? {}
 
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"))
 public func impNullableUnsafeRawBufferPointer(_ size: CInt) -> OpaquePointer! {}
 
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
 public func nonnullSpan(p: OpaquePointer, size: CInt) -> OpaquePointer {}
 
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
 public func nullableSpan(p: OpaquePointer?, _ size: CInt) -> OpaquePointer? {}
 
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
 public func impNullableSpan(p: OpaquePointer!, _ size: CInt) -> OpaquePointer! {}
 
 //--- expansions.txt.expected
@@ -39,8 +48,12 @@ public func nonnullUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPointe
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public func nullableUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPointer {
-    return unsafe UnsafeRawBufferPointer(start: unsafe UnsafeRawPointer(unsafe nullableUnsafeRawBufferPointer(size)), count: Int(size))
+public func nullableUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPointer? {
+    let _resultValue = unsafe nullableUnsafeRawBufferPointer(size)
+    if unsafe _resultValue == nil {
+      return nil
+    }
+    return unsafe UnsafeRawBufferPointer(start: unsafe UnsafeRawPointer(_resultValue!), count: Int(size))
 }
 ------------------------------
 @__swiftmacro_4test33impNullableUnsafeRawBufferPointer15_SwiftifyImportfMp_.swift
@@ -70,18 +83,17 @@ public func nonnullSpan(p: RawSpan) -> RawSpan {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
-public func nullableSpan(p: RawSpan) -> RawSpan {
-    let size = CInt(exactly: p.byteCount)!
-    let _pPtr = p.withUnsafeBytes {
+public func nullableSpan(p: RawSpan?) -> RawSpan? {
+    let size = CInt(exactly: p?.byteCount ?? 0)!
+    let _pPtr = p?.withUnsafeBytes {
         unsafe $0
     }
     defer {
         _fixLifetime(p)
     }
-    let _resultValue = unsafe nullableSpan(p: OpaquePointer(_pPtr.baseAddress), size)
+    let _resultValue = unsafe nullableSpan(p: OpaquePointer(_pPtr?.baseAddress), size)
     if unsafe _resultValue == nil {
-      precondition(size == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")
-      return RawSpan()
+      return nil
     }
     return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe UnsafeRawPointer(_resultValue!), byteCount: Int(size)), copying: ())
 }
