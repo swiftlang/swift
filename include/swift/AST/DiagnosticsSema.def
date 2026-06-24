@@ -6050,6 +6050,38 @@ ERROR(distributed_actor_func_param_not_codable,none,
       "parameter %0 of type %1 in %kindonly2 does not conform to "
       "serialization requirement '%3'",
       (Identifier, Type, const AbstractFunctionDecl *, StringRef))
+ERROR(distributed_actor_func_param_resolvable_actor_system_mismatch,none,
+      "parameter %0 of type %1 in %kindonly2 must match the enclosing actor's "
+      "ActorSystem (%5)",
+      (Identifier, Type, const AbstractFunctionDecl *, DeclName, Type, Type))
+NOTE(distributed_actor_func_param_resolvable_actor_system_mismatch_note,none,
+     "'@Resolvable protocol' %0 uses actor system %1",
+     (DeclName, Type))
+ERROR(distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system,none,
+      "parameter %0 of type %1 in %kindonly2 uses '@Resolvable protocol' %3 "
+      "without a concrete 'ActorSystem' constraint",
+      (Identifier, Type, const AbstractFunctionDecl *, DeclName))
+NOTE(distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system_fixit,none,
+     "add 'where Self.ActorSystem == ...' to %0", (DeclName))
+ERROR(distributed_actor_func_param_resolvable_protocol_composition_ambiguous,none,
+      "parameter %0 of type %1 in %kindonly2 contains more than one '@Resolvable protocol'",
+      (Identifier, Type, const AbstractFunctionDecl *))
+ERROR(distributed_actor_func_result_resolvable_protocol_composition_ambiguous,none,
+      "result type %0 of %kindonly1 contains more than one '@Resolvable protocol'",
+      (Type, const ValueDecl *))
+NOTE(distributed_actor_func_resolvable_protocol_composition_ambiguous_note,none,
+     "declare a new '@Resolvable protocol' that refines those protocols and use it instead",
+     ())
+ERROR(distributed_actor_func_result_resolvable_actor_system_mismatch,none,
+      "result type %0 of %kindonly1 must match the enclosing actor's actor system %3",
+      (Type, const ValueDecl *, DeclName, Type))
+NOTE(distributed_actor_func_result_resolvable_actor_system_mismatch_note,none,
+     "'@Resolvable protocol' %0 uses actor system %1",
+     (DeclName, Type))
+ERROR(distributed_actor_func_result_resolvable_protocol_no_concrete_actor_system,none,
+      "result type %0 of %kindonly1 uses '@Resolvable protocol' %2 "
+      "without a concrete 'ActorSystem' constraint",
+      (Type, const ValueDecl *, DeclName))
 ERROR(distributed_actor_target_result_not_codable,none,
       "result type %0 of %kindbase1 does not conform to serialization requirement '%2'",
       (Type, const ValueDecl *, StringRef))

@@ -437,29 +437,79 @@ static bool checkDistributedTargetResultType(
       checkDistributedSerializationRequirementIsExactlyCodable(
           C, serializationRequirement);
 
-  for (auto serializationReq: serializationRequirements) {
-    auto conformance = checkConformance(resultType, serializationReq);
-    if (conformance.isInvalid()) {
+  // --- Special case: `-> some/any P` where P is a `@Resolvable protocol`
+  // Wire format encodes the actor's `id` as a Codable ActorID,
+  // so the existential/opaque does not need to conform to the serialization requirement.
+  bool skipCodableCheck = false;
+  auto resolvableMatch = findDistributedResolvableExistentialOrOpaqueProtocol(resultType);
+  if (resolvableMatch.isAmbiguous) {
+    if (diagnose) {
+      valueDecl->diagnose(
+          diag::distributed_actor_func_result_resolvable_protocol_composition_ambiguous,
+          resultType, valueDecl);
+      valueDecl->diagnose(
+          diag::distributed_actor_func_resolvable_protocol_composition_ambiguous_note);
+    }
+    return true;
+  }
+
+  if (auto *resolvableProto = resolvableMatch.proto) {
+    auto protocolSystemTy =
+        getResolvableProtocolConcreteActorSystemType(resolvableProto);
+    if (!protocolSystemTy) {
       if (diagnose) {
-        llvm::StringRef conformanceToSuggest = isCodableRequirement ?
-                                               "Codable" : // Codable is a typealias, easier to diagnose like that
-                                               serializationReq->getNameStr();
+        valueDecl->diagnose(
+            diag::distributed_actor_func_result_resolvable_protocol_no_concrete_actor_system,
+            resultType, valueDecl, resolvableProto->getName());
+      }
+      return true;
+    }
 
-        auto diag = valueDecl->diagnose(
-            diag::distributed_actor_target_result_not_codable,
-            resultType,
-            valueDecl,
-            conformanceToSuggest
-        );
+    auto enclosingSystemTy =
+        getConcreteReplacementForProtocolActorSystemType(valueDecl);
 
-        if (isCodableRequirement) {
-          if (auto resultNominalType = resultType->getAnyNominal()) {
-            addCodableFixIt(resultNominalType, diag);
+    if (enclosingSystemTy && !enclosingSystemTy->isEqual(protocolSystemTy)) {
+      if (diagnose) {
+        valueDecl->diagnose(
+            diag::distributed_actor_func_result_resolvable_actor_system_mismatch,
+            resultType, valueDecl,
+            resolvableProto->getName(), protocolSystemTy);
+        resolvableProto->diagnose(
+            diag::distributed_actor_func_result_resolvable_actor_system_mismatch_note,
+            resolvableProto->getName(), protocolSystemTy);
+      }
+      return true;
+    }
+
+    // `@Resolvable protocol` result — skip Codable check, wire uses actor ID
+    skipCodableCheck = true;
+  }
+
+  if (!skipCodableCheck) {
+    for (auto serializationReq: serializationRequirements) {
+      auto conformance = checkConformance(resultType, serializationReq);
+      if (conformance.isInvalid()) {
+        if (diagnose) {
+          llvm::StringRef conformanceToSuggest = isCodableRequirement ?
+                                                 "Codable" : // Codable is a typealias, easier to diagnose like that
+                                                 serializationReq->getNameStr();
+
+          auto diag = valueDecl->diagnose(
+              diag::distributed_actor_target_result_not_codable,
+              resultType,
+              valueDecl,
+              conformanceToSuggest
+          );
+
+          if (isCodableRequirement) {
+            if (auto resultNominalType = resultType->getAnyNominal()) {
+              addCodableFixIt(resultNominalType, diag);
+            }
           }
         }
-      } // end if: diagnose
 
-      return true;
+        return true;
+      }
     }
   }
 
@@ -521,6 +571,32 @@ bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
                            false); // no error if cycle
 }
 
+/// Emit a fix-it suggesting to constrain the `@Resolvable` \p resolvableProto's
+/// `Self.ActorSystem` to the enclosing actor's system type (or a placeholder
+/// when no concrete enclosing system is known).
+static void emitResolvableProtocolMissingActorSystemFixit(
+    ProtocolDecl *resolvableProto, Type enclosingSystemTy) {
+  auto fixItLoc = resolvableProto->getBraces().Start;
+  if (!fixItLoc.isValid())
+    return;
+
+  llvm::SmallString<64> fixIt;
+  fixIt += " where Self.ActorSystem == ";
+  if (enclosingSystemTy && !enclosingSystemTy->hasError() &&
+      !enclosingSystemTy->is<GenericTypeParamType>() &&
+      !enclosingSystemTy->is<ArchetypeType>()) {
+    fixIt += enclosingSystemTy->getString();
+  } else {
+    fixIt += "<#ActorSystem#>";
+  }
+  fixIt += " ";
+  resolvableProto
+      ->diagnose(
+          diag::distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system_fixit,
+          resolvableProto->getName())
+      .fixItInsert(fixItLoc, fixIt);
+}
+
 bool CheckDistributedFunctionRequest::evaluate(
     Evaluator &evaluator, AbstractFunctionDecl *func) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
@@ -553,20 +629,71 @@ bool CheckDistributedFunctionRequest::evaluate(
       // --- Check parameters for 'SerializationRequirement' conformance
       auto paramTy = func->mapTypeIntoEnvironment(param->getInterfaceType());
 
-      auto srl = serializationReqType->getExistentialLayout();
-      for (auto req: srl.getProtocols()) {
-        if (checkConformance(paramTy, req).isInvalid()) {
-          auto diag = func->diagnose(
-              diag::distributed_actor_func_param_not_codable,
+      // --- Special case: `param: some/any P` where P is a `@Resolvable protocol`.
+      bool skipSerializationRequirementCheck = false;
+      auto resolvableMatch = findDistributedResolvableExistentialOrOpaqueProtocol(paramTy);
+      if (resolvableMatch.isAmbiguous) {
+        func->diagnose(
+            diag::distributed_actor_func_param_resolvable_protocol_composition_ambiguous,
+            param->getArgumentName(), param->getInterfaceType(), func);
+        func->diagnose(
+            diag::distributed_actor_func_resolvable_protocol_composition_ambiguous_note);
+        return true;
+      }
+
+      if (auto *resolvableProto = resolvableMatch.proto) {
+        auto enclosingSystemTy =
+            getConcreteReplacementForProtocolActorSystemType(func);
+        auto protocolSystemTy =
+            getResolvableProtocolConcreteActorSystemType(resolvableProto);
+        if (!protocolSystemTy) {
+          func->diagnose(
+              diag::distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system,
               param->getArgumentName(), param->getInterfaceType(), func,
-              serializationRequirementIsCodable ? "Codable"
-                                                : req->getNameStr());
-
-          if (auto paramNominalTy = paramTy->getAnyNominal()) {
-            addCodableFixIt(paramNominalTy, diag);
-          } // else, no nominal type to suggest the fixit for, e.g. a closure
-
+              resolvableProto->getName());
+          emitResolvableProtocolMissingActorSystemFixit(resolvableProto,
+                                                       enclosingSystemTy);
           return true;
+        }
+
+        if (enclosingSystemTy && !enclosingSystemTy->isEqual(protocolSystemTy)) {
+          // The actor system of the `any P` and actor we're making the call on
+          // must match, because we need to form a `$P.resolve(param.id, using: self.system)`
+          // call.
+          func->diagnose(
+              diag::distributed_actor_func_param_resolvable_actor_system_mismatch,
+              param->getArgumentName(), param->getInterfaceType(), func,
+              resolvableProto->getName(), protocolSystemTy,
+              enclosingSystemTy);
+          resolvableProto->diagnose(
+              diag::distributed_actor_func_param_resolvable_actor_system_mismatch_note,
+              resolvableProto->getName(), protocolSystemTy);
+          return true;
+        }
+
+        // Skip the serialization-requirement check for this parameter;
+        // We know it is a distributed actor protocol on the same actor system.
+        // We also know that it is a `@Resolvable protocol` and `any/some P`,
+        // which does itself not conform to e.g. `Codable`
+        skipSerializationRequirementCheck = true;
+      }
+
+      if (!skipSerializationRequirementCheck) {
+        auto srl = serializationReqType->getExistentialLayout();
+        for (auto req: srl.getProtocols()) {
+          if (!checkConformance(paramTy, req)) {
+            auto diag = func->diagnose(
+                diag::distributed_actor_func_param_not_codable,
+                param->getArgumentName(), param->getInterfaceType(), func,
+                serializationRequirementIsCodable ? "Codable"
+                                                  : req->getNameStr());
+
+            if (auto paramNominalTy = paramTy->getAnyNominal()) {
+              addCodableFixIt(paramNominalTy, diag);
+            } // else, no nominal type to suggest the fixit for, e.g. a closure
+
+            return true;
+          }
         }
       }
     }

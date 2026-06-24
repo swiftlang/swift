@@ -1116,6 +1116,7 @@ class MandatoryInlining : public SILModuleTransform {
 
       case IsThunk_t::IsNotThunk:
       case IsThunk_t::IsBackDeployedThunk:
+      case IsThunk_t::IsDistributedProxyAdapterThunk:
         // For correctness, inlining _stdlib_isOSVersionAtLeast() when it is
         // declared transparent is mandatory in the thunks of @backDeployed
         // functions. These thunks will not contain calls to other transparent
