@@ -9257,9 +9257,23 @@ ERROR(nonexhaustive_attr_on_internal_type,none,
 // MARK: `using` declaration
 //===----------------------------------------------------------------------===//
 ERROR(invalid_redecl_of_file_isolation,none,
-      "invalid redeclaration of file-level default actor isolation", ())
+      "invalid redeclaration of file-level default isolation", ())
 NOTE(invalid_redecl_of_file_isolation_prev,none,
-     "default isolation was previously declared here", ())
+     "file-level default isolation previously declared here", ())
+ERROR(invalid_actor_for_file_isolation,none,
+     "global actor %0 is not valid in a 'using' declaration",
+     (Type))
+NOTE(invalid_actor_for_file_isolation_note,none,
+     "file-level default isolation must be '@MainActor' or 'nonisolated'", ())
+ERROR(using_decl_invalid_attribute,none,
+     "'%0' is not valid in a 'using' declaration",
+     (DeclAttribute))
+NOTE(using_decl_invalid_attribute_note,none,
+     "'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'", ())
+ERROR(using_decl_must_precede_other_decls,none,
+     "'using' must appear before any non-import declaration", ())
+NOTE(using_decl_must_precede_other_decls_previous,none,
+     "first non-import declaration here", ())
 
 //===----------------------------------------------------------------------===//
 // MARK: `@inline(always)` attribute

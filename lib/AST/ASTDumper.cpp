@@ -2217,7 +2217,13 @@ namespace {
 
     void visitUsingDecl(UsingDecl *UD, Label label) {
       printCommon(UD, "using_decl", label);
-      printFieldQuoted(UD->getSpecifierName(), Label::always("specifier"));
+
+      ASTContext *Ctx = &UD->getASTContext();
+      DeclContext *DC = UD->getDeclContext();
+      printList(
+          UD->getSpecifiedAttributes(),
+          [&](auto *attr, Label label) { printRec(attr, Ctx, DC, label); },
+          Label::optional("specified_attrs"));
     }
 
     void visitExtensionDecl(ExtensionDecl *ED, Label label) {

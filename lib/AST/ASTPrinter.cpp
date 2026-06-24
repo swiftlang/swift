@@ -3422,7 +3422,9 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 
 void PrintAST::visitUsingDecl(UsingDecl *decl) {
   Printer.printIntroducerKeyword("using", Options, " ");
-  Printer << decl->getSpecifierName();
+  for (auto attr : decl->getSpecifiedAttributes()) {
+    attr->print(Printer, Options, decl);
+  }
 }
 
 void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {

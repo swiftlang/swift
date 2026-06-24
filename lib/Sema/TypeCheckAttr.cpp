@@ -9295,3 +9295,160 @@ ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
 
   return ctx.AllocateCopy(results);
 }
+
+FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
+                                           const SourceFile *file) const {
+  auto &ctx = file->getASTContext();
+  FileDefaults result;
+
+  std::optional<Decl *> firstNonImportDecl;
+
+  for (auto *D : file->getTopLevelDecls()) {
+    auto *UD = dyn_cast<UsingDecl>(D);
+    if (!UD) {
+      if (!firstNonImportDecl && !isa<ImportDecl>(D)) {
+        firstNonImportDecl = D;
+      }
+      continue;
+    }
+
+    if (firstNonImportDecl) {
+      UD->diagnose(diag::using_decl_must_precede_other_decls);
+      firstNonImportDecl.value()->diagnose(
+          diag::using_decl_must_precede_other_decls_previous);
+      // TODO: emit a fix-it
+    }
+
+    std::optional<DeclAttrKind> seen;
+    for (auto *attr : UD->getSpecifiedAttributes()) {
+      // It shouldn't be possible to get here with multiple attributes (it
+      // shouldn't parse), but make sure. @available can end up being multiple
+      // attributes though.
+      ASSERT((!seen || (seen == DeclAttrKind::Available &&
+                        attr->getKind() == DeclAttrKind::Available)) &&
+             "'using' should only have one specified attribute");
+      seen = attr->getKind();
+
+      if (isa<DiagnoseAttr>(attr)) {
+        // `@diagnose` is handled via the swift-syntax region tree.
+        continue;
+      }
+
+      // TODO: call validation when it exists! For example, validate the
+      // the structure of `@available`, if we do it for normal attrs.
+
+      if (auto *availAttr = dyn_cast<AvailableAttr>(attr)) {
+        result.availability.push_back(availAttr);
+        continue;
+      }
+
+      auto setDefaultIsolation = [&](DefaultIsolation isolation) {
+        if (result.isolation) {
+          UD->diagnose(diag::invalid_redecl_of_file_isolation);
+          result.isolation.value().source->diagnose(
+              diag::invalid_redecl_of_file_isolation_prev);
+        } else {
+          result.isolation = {isolation, UD};
+        }
+      };
+
+      if (isa<NonisolatedAttr>(attr)) {
+        setDefaultIsolation(DefaultIsolation::Nonisolated);
+        continue;
+      }
+
+      if (auto *custom = dyn_cast<CustomAttr>(attr)) {
+        auto type = evaluateOrDefault(
+            ctx.evaluator,
+            CustomAttrTypeRequest{custom, UD->getDeclContext(),
+                                  CustomAttrTypeKind::GlobalActor},
+            Type());
+        if (type) {
+          if (type->hasError()) {
+            // CustomAttrTypeRequest already produced an error. Instead of
+            // piling on, we can attach a note.
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::using_decl_invalid_attribute_note);
+            continue;
+          }
+
+          if (type->isEqual(ctx.getMainActorType())) {
+            setDefaultIsolation(DefaultIsolation::MainActor);
+            continue;
+          }
+
+          auto *nominal = type->getAnyNominal();
+          if (nominal && nominal->isGlobalActor()) {
+            // Some non MainActor global actor, diagnose.
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::invalid_actor_for_file_isolation, type);
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::invalid_actor_for_file_isolation_note);
+            continue;
+          }
+        }
+        // Not a global actor (some other illegal attribute) so fall through to
+        // the generic diagnostic.
+      }
+
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::using_decl_invalid_attribute, attr);
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::using_decl_invalid_attribute_note);
+    }
+  }
+
+  return result;
+}
+
+bool ApplyFileDefaultsRequest::appliesTo(const Decl *decl) {
+  auto *dc = decl->getDeclContext();
+  return dc->isModuleScopeContext() &&
+         (isa<ValueDecl>(decl) || isa<ExtensionDecl>(decl)) &&
+         dc->getParentSourceFile();
+}
+
+evaluator::SideEffect ApplyFileDefaultsRequest::evaluate(Evaluator &evaluator,
+                                                         Decl *decl) const {
+  // Decl::applyFileDefaults() gates on appliesTo() before requesting, but
+  // nobody should call without checking to not waste time and cache.
+  //
+  // TODO: Would this be better served by a new `precondition` API for requests?
+  if (!appliesTo(decl)) {
+    DEBUG_ASSERT(false && "ApplyFileDefaultsRequest on a decl that can't have "
+                          "file defaults; caller should have checked");
+    return {};
+  }
+
+  // Known to exist thanks to appliesTo.
+  auto *file = decl->getDeclContext()->getParentSourceFile();
+  auto defaults = file->getFileDefaults();
+  if (defaults.availability.empty())
+    return {};
+
+  auto &ctx = decl->getASTContext();
+  auto &attrs = decl->getAttrs();
+
+  // Put defaults on the tail of the linked list, so explicit attrs take
+  // priority. With no attrs, use \c add to set the head.
+
+  DeclAttribute *tail = nullptr;
+  for (auto *existing : attrs)
+    tail = existing;
+
+  auto append = [&](DeclAttribute *attr) {
+    if (tail)
+      *tail->getMutableNext() = attr;
+    else
+      attrs.add(attr);
+    tail = attr;
+  };
+
+  // We append in reverse, since printing will reverse again, to get the printed
+  // order and priority order to correctly reflect the top to bottom order of
+  // the file-level defaults.
+  for (auto *attr : llvm::reverse(defaults.availability))
+    append(attr->clone(ctx, /*implicit=*/true));
+
+  return {};
+}
