@@ -50,7 +50,6 @@ cake: Var C1.CIIns2 changes from strong to weak
 cake: EnumElement FrozenKind.AddedCase has been added as a new enum case
 
 /* Conformance changes */
-cake: Enum IceKind has removed conformance to BitwiseCopyable
 cake: Enum IceKind has removed conformance to Sendable
 cake: Enum IceKind has removed conformance to SendableMetatype
 cake: Func ObjCProtocol.removeOptional() is no longer an optional requirement
