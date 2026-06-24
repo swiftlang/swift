@@ -1330,8 +1330,7 @@ extractBuilderValueIfExists(const swift::NominalTypeDecl *TypeDecl,
     return createBuilderCompileTimeValue(attr, VarDecl);
   }
 
-  for (ProtocolDecl *Decl :
-       TypeDecl->getLocalProtocols(ConformanceLookupKind::All)) {
+  for (ProtocolDecl *Decl : TypeDecl->getAllProtocols()) {
     // FIXME(noncopyable_generics): Should these be included?
     if (Decl->getInvertibleProtocolKind())
       continue;
