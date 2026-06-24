@@ -160,6 +160,7 @@ extension ContinuousObservation.State {
     while await track(state, options: options, apply: apply) {}
   }
 
+  @diagnose(DeprecatedDeclaration, as: ignored)
   fileprivate static func track(
     _ state: _ManagedCriticalState<ContinuousObservation.State>,
     options: ObservationTracking.Options,
