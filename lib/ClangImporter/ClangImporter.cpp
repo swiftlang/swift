@@ -2433,7 +2433,8 @@ static llvm::VersionTuple getCurrentVersionFromTBD(llvm::vfs::FileSystem &FS,
 bool ClangImporter::canImportModule(ImportPath::Module modulePath,
                                     SourceLoc loc,
                                     ModuleVersionInfo *versionInfo,
-                                    bool isTestableDependencyLookup) {
+                                    bool isTestableDependencyLookup,
+                                    bool isSourceCanImport) {
   // Look up the top-level module to see if it exists, mapping any -module-alias
   // to the real module name so canImport(<alias>) matches import <alias>.
   auto topModule = modulePath.front();
