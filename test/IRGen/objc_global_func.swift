@@ -12,7 +12,9 @@ import Foundation
 // CHECK-DAG: define hidden i64 @customName()
 @objc(customName) func named() -> Int { 0 }
 
-// C-compatible: ObjC object types are trivially representable.
+// ObjC object types are trivially representable in ObjC (no bridging needed),
+// so they use the single-symbol model. Note: @c would reject NSObject since
+// ObjC classes are not representable in C.
 // CHECK-DAG: define hidden void @takesObject(ptr %0)
 @objc(takesObject) func takesObject(_ x: NSObject) {}
 
