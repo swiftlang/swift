@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -parse-stdlib -target x86_64-apple-macosx10.14 -typecheck -verify %s
 // RUN: %target-swift-frontend -parse-stdlib -target x86_64-apple-macosx11 -typecheck %s
 // RUN: %target-swift-frontend -parse-stdlib -target x86_64-apple-macosx12 -typecheck %s -DTARGET_MACOS_12
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx, SWIFT_STDLIB_ARCH=x86_64
 
 import _Concurrency
 

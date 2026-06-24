@@ -1,9 +1,9 @@
 // Checks that in Embedded Swift, we allow using stdlib types even when they
 // have declared availability to be higher than our macOS deployment target.
 
-// RUN: %target-typecheck-verify-swift -target arm64-apple-macos14 -enable-experimental-feature Embedded
-// RUN: %target-typecheck-verify-swift -target arm64-apple-macos15 -enable-experimental-feature Embedded
-// RUN: %target-typecheck-verify-swift -target x86_64-apple-macos14 -enable-experimental-feature Embedded -target-min-inlining-version min
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macos15 -enable-experimental-feature Embedded
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -target-min-inlining-version min
 
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: OS=macosx
