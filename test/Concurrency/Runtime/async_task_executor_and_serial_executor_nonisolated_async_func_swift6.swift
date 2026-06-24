@@ -103,8 +103,16 @@ actor DefaultActor {
 
     let actor = DefaultActor()
 
+    print("Task(executorPreference:) { actorFunc { ... } }") // OK
     await Task(executorPreference: executor) {
       await actor.testWithTaskExecutorPreferenceTask(executor)
+    }.value
+
+    print("Task() { withTaskExecutorPreference { actorFunc { ... } } }") // OK
+    await Task {
+      await withTaskExecutorPreference(executor) {
+        await actor.testWithTaskExecutorPreferenceTask(executor)
+      }
     }.value
   }
 }

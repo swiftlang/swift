@@ -2828,6 +2828,7 @@ public:
     Task_IsAsyncLetTask                   = 28,
     Task_HasInitialTaskExecutorPreference = 29,
     Task_HasInitialTaskName               = 30,
+    Task_IsImmediateTask                  = 31,
   };
   // clang-format on
 
@@ -2867,6 +2868,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskName,
                                 task_hasInitialTaskName,
                                 task_setHasInitialTaskName)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsImmediateTask,
+                                task_isImmediateTask,
+                                task_setIsImmediateTask)
 };
 
 /// Kinds of task status record.

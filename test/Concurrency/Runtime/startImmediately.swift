@@ -77,7 +77,9 @@ final class NaiveQueueExecutor: SerialExecutor, TaskExecutor {
     let unowned = UnownedJob(job)
     print("NaiveQueueExecutor(\(self.queue.label)) enqueue [thread:\(getCurrentThreadID())]")
     queue.async {
+      print("NaiveQueueExecutor(\(self.queue.label)) enqueue, inside async [thread:\(getCurrentThreadID())]")
       unowned.runSynchronously(on: self.asUnownedSerialExecutor())
+      print("NaiveQueueExecutor(\(self.queue.label)) enqueue, after runSynchronously [thread:\(getCurrentThreadID())]")
     }
   }
 }
@@ -456,7 +458,9 @@ print("call_taskImmediate_taskExecutor()")
 @TaskLocal
 nonisolated(unsafe) var niceTaskLocalValueYouGotThere: String = ""
 
-// FIXME: rdar://155596073 Task executors execution may not always hop as expected
+// FIXME: rdar://155596073 Task.immediate(executorPreference:) called from
+// within an already-running default actor needs the drain to hop to the
+// task executor's queue, which is not yet supported.
 func call_taskImmediate_taskExecutor(taskExecutor: NaiveQueueExecutor) async {
   await Task.immediate(executorPreference: taskExecutor) {
     print("Task.immediate(executorPreference:)")
@@ -554,9 +558,5 @@ func call_taskImmediate_taskExecutor(taskExecutor: NaiveQueueExecutor) async {
     }
   }
 }
-
-// FIXME: rdar://155596073 task executors can be somewhat racy it seems and not always hop as we'd want them to
-// await call_taskImmediate_taskExecutor(
-//  taskExecutor: NaiveQueueExecutor(queue: DispatchQueue(label: "my-queue")))
 
 print("DONE!") // CHECK: DONE!

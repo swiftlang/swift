@@ -290,6 +290,9 @@ extension Task where Failure == ${FAILURE_TYPE} {
 % end # IS_DEPRECATED
   ${"\n  ".join(adjust_availability(ALL_AVAILABILITY))}
   @discardableResult
+  % if HAS_TASK_EXECUTOR:
+  @_unavailableInEmbedded
+  % end # HAS_TASK_EXECUTOR
   public ${METHOD_VARIANT}(
     ${",\n    ".join(adjust_params_for_kind(PARAMS))}
   ) ${ARROW_RETURN_TYPE}{
@@ -396,7 +399,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
       % if HAS_ISOLATED_ANY:
       initialSerialExecutor: builtinSerialExecutor,
       % end
-      operation: operation).0 // Task ${METHOD_VARIANT}
+      operation: operation).0
     }
 
 % if IS_INIT:
