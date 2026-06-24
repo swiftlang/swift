@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-sil-opaque-values -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-sil-opaque-values -Xllvm -sil-full-demangle -primary-file %s > %t/output.silgen
+// RUN: %FileCheck < %t/output.silgen %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // Test SILGen -enable-sil-opaque-values with tests that depend on the stdlib.
 
@@ -969,3 +971,32 @@ func load_borrow_in_guaranteed_borrowMe<T: ~Copyable>(_ n: borrowing T) {}
 func load_borrow_in_guaranteed_caller(_ h: LoadBorrowHolder) {
   load_borrow_in_guaranteed_borrowMe(h.inner)
 }
+
+
+func existentialErrorPassThrough(_ body: () throws(Error) -> Void) throws(Error) {
+  try body()
+}
+@_silgen_name("forceIndirectErrorThunk")
+func forceIndirectErrorThunk<T: Error>(_ x: () throws(T) -> Void) throws {
+  try existentialErrorPassThrough(x)
+}
+
+// CHECK-LABEL: sil{{.*}} [ossa] @forceIndirectErrorThunk : {{.*}} {
+// CHECK:       [[CONVERTED:%[^,]+]] = convert_function {{%[^,]+}} : {{.*}} to $@noescape @callee_guaranteed () -> @error_indirect T
+// CHECK:       [[THUNK_FN:%[^,]+]] = function_ref @$sxIgzr_s5Error_pIegzo_sAARzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@guaranteed @noescape @callee_guaranteed () -> @error_indirect τ_0_0) -> @error any Error
+// CHECK:       [[PARTIAL:%[^,]+]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<T>([[CONVERTED]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@guaranteed @noescape @callee_guaranteed () -> @error_indirect τ_0_0) -> @error any Error
+// CHECK:       [[NOESCAPE:%[^,]+]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL]] : $@callee_guaranteed () -> @error any Error to $@noescape @callee_guaranteed () -> @error any Error
+// CHECK:       [[PASSTHROUGH_FN:%[^,]+]] = function_ref @$s20opaque_values_silgen27existentialErrorPassThroughyyyyKXEKF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @error any Error) -> @error any Error
+// CHECK:       try_apply [[PASSTHROUGH_FN]]([[NOESCAPE]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @error any Error) -> @error any Error, normal {{bb[0-9]+}}, error [[ERROR_BB:bb[0-9]+]]
+
+// CHECK:       [[ERROR_BB]]({{%[^,]+}} : @owned $any Error):
+// CHECK: } // end sil function 'forceIndirectErrorThunk'
+
+
+// CHECK-LABEL: sil{{.*}} [reabstraction_thunk] [ossa] @$sxIgzr_s5Error_pIegzo_sAARzlTR : $@convention(thin) <T where T : Error> (@guaranteed @noescape @callee_guaranteed () -> @error_indirect T) -> @error any Error {
+// CHECK:       bb0([[CLOSURE:%[^,]+]] : @guaranteed $@noescape @callee_guaranteed () -> @error_indirect T):
+// CHECK-NEXT:    try_apply [[CLOSURE]]() : {{.*}}, normal {{bb[0-9]+}}, error [[ERROR_BB:bb[0-9]+]]
+
+// CHECK:       [[ERROR_BB]]({{%[^,]+}} : @owned $T):
+// CHECK:         throw {{%[^,]+}} : $any Error
+// CHECK-LABEL: } // end sil function '$sxIgzr_s5Error_pIegzo_sAARzlTR'
