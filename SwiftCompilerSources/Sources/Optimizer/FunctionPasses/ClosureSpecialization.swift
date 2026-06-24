@@ -316,7 +316,39 @@ private func analyzeArguments(of apply: ApplySite, _ context: FunctionPassContex
   if argumentsToSpecialize.isEmpty {
     return nil
   }
+  for (argOp, _) in argumentsToSpecialize
+  where hasMultiplyCapturedDependenceBase(of: argOp.value, in: rootClosures) {
+    return nil
+  }
   return SpecializationInfo(apply: apply, closureArguments: argumentsToSpecialize, rootClosures: rootClosures)
+}
+
+private func hasMultiplyCapturedDependenceBase(of value: Value, in rootClosures: [PartialApplyInst]) -> Bool {
+  switch value {
+  case is ConvertFunctionInst,
+       is ConvertEscapeToNoEscapeInst,
+       is MoveValueInst,
+       is CopyValueInst:
+    return hasMultiplyCapturedDependenceBase(of: (value as! UnaryInstruction).operand.value, in: rootClosures)
+  case let mdi as MarkDependenceInst:
+    return isCapturedMoreThanOnce(mdi.base, in: rootClosures) ||
+      hasMultiplyCapturedDependenceBase(of: mdi.value, in: rootClosures)
+  case let partialApply as PartialApplyInst where partialApply.isPartialApplyOfThunk:
+    return hasMultiplyCapturedDependenceBase(of: partialApply.arguments[0], in: rootClosures)
+  default:
+    return false
+  }
+}
+
+private func isCapturedMoreThanOnce(_ value: Value, in rootClosures: [PartialApplyInst]) -> Bool {
+  var count = 0
+  for closure in rootClosures {
+    for capture in closure.arguments where capture == value {
+      count += 1
+      if count > 1 { return true }
+    }
+  }
+  return false
 }
 
 // Walks down the use-def chain of a function argument, recursively, to find a rootClosure.
@@ -339,8 +371,12 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
     guard let operandClosure = findSpecializableClosure(of: mdi.value, &visited) else {
       return nil
     }
-    // Make sure that the mark_dependence's base is part of the use-def chain and will therefore be cloned as well.
-    if !visited.contains(mdi.base) {
+    // The cloned mark_dependence must reference its base in the specialized function: the base is
+    // either in the closure's use-def chain (cloned) or a root-closure capture (passed as an argument).
+    var baseIsRootClosureCapture: Bool {
+      (operandClosure as? PartialApplyInst)?.arguments.contains(where: { $0 == mdi.base }) ?? false
+    }
+    if !visited.contains(mdi.base), !baseIsRootClosureCapture {
       return nil
     }
     return operandClosure
@@ -675,6 +711,10 @@ private struct SpecializationInfo {
         cloner.context)
       if !cloner.isCloned(value: originalClosureArg) {
         cloner.recordFoldedValue(originalClosureArg, mappedTo: capturedArg)
+        if let cast = originalClosureArg as? UncheckedValueCastInst,
+           !cloner.isCloned(value: cast.fromValue) {
+          cloner.recordFoldedValue(cast.fromValue, mappedTo: capturedArg)
+        }
       }
     }
   }

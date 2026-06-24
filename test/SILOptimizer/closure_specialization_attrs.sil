@@ -50,13 +50,18 @@ bb0(%0 : @owned $C):
 
 // =============================================================================
 // rdar://105887096: do not insert a retain inside a read-only function.
-// For now, the specialization is disabled.
 //
-// TODO: A @noescape closure should never be converted to an @owned argument
-// regardless of the function attribute.
+// A non-escaping (on-stack) closure passed to a [readonly] function can be specialized:
+// the closure's captures are passed as @guaranteed arguments, so no retain/copy is
+// introduced and the [readonly] effect is preserved. (This is reached by looking through
+// the closure's `mark_dependence` on its capture.)
 
-// This should not be specialized until we support guaranteed arguments.
-// CHECK-NOT: @$s20takesReadOnlyClosure
+// The specialized function takes the capture @guaranteed (never @owned) and contains no
+// retain, so it remains [readonly]-safe.
+// CHECK-LABEL: sil private [readonly] [ossa] @$s20takesReadOnlyClosure{{.*}}Tf1c_n : $@convention(thin) (@guaranteed Storage) -> Val {
+// CHECK-NOT: @owned
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function '$s20takesReadOnlyClosure{{.*}}Tf1c_n'
 sil private [readonly] [ossa] @takesReadOnlyClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Val) -> Val) -> Val {
 bb0(%2 : @guaranteed $@noescape @callee_guaranteed (Val) -> Val):
   %46 = struct $Val ()
@@ -70,9 +75,11 @@ bb0(%0 : $Val, %1 : @closureCapture @guaranteed $Storage):
   return %46 : $Val
 }
 
+// The closure is replaced by a direct call to the specialized function, passing the
+// capture @guaranteed (no @owned Storage, so no retain at the call site either).
 // CHECK-LABEL: sil [ossa] @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
 // CHECK-NOT: @owned Storage
-// CHECK: apply %{{.*}} : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Val) -> Val) -> Val
+// CHECK: apply %{{.*}} : $@convention(thin) (@guaranteed Storage) -> Val
 // CHECK-LABEL: } // end sil function 'testPassReadOnlyClosure'
 sil [ossa] @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
 bb0(%0 : @guaranteed $Storage):
