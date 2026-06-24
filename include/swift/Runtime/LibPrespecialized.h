@@ -39,17 +39,22 @@ struct LibPrespecializedData {
 
   TargetPointer<Runtime, const void> descriptorMap;
 
+  /// Witness table map. Keys are (ProtocolConformanceDescriptor *,
+  /// conforming-type Metadata *). Values are the corresponding witness table.
+  TargetPointer<Runtime, const void> pointerKeyedWitnessTableMap;
+
   // Existing fields are above, add new fields below this point.
 
   // The major/minor version numbers for this version of the struct.
   static constexpr uint32_t currentMajorVersion = 1;
-  static constexpr uint32_t currentMinorVersion = 4;
+  static constexpr uint32_t currentMinorVersion = 5;
 
   // Version numbers where various fields were introduced.
   static constexpr uint32_t minorVersionWithDisabledProcessesTable = 2;
   static constexpr uint32_t minorVersionWithPointerKeyedMetadataMap = 3;
   static constexpr uint32_t minorVersionWithOptionFlags = 3;
   static constexpr uint32_t minorVersionWithDescriptorMap = 4;
+  static constexpr uint32_t minorVersionWithPointerKeyedWitnessTableMap = 5;
 
   // Option flags values.
   enum : typename Runtime::StoredSize {
@@ -104,6 +109,12 @@ struct LibPrespecializedData {
       return nullptr;
     return reinterpret_cast<const DescriptorMap *>(descriptorMap);
   }
+
+  const void *getPointerKeyedWitnessTableMap() const {
+    if (minorVersion < minorVersionWithPointerKeyedWitnessTableMap)
+      return nullptr;
+    return pointerKeyedWitnessTableMap;
+  }
 };
 
 enum class LibPrespecializedLookupResult {
@@ -123,6 +134,11 @@ const LibPrespecializedData<InProcess> *getLibPrespecializedData();
 Metadata *getLibPrespecializedMetadata(const TypeContextDescriptor *description,
                                        const void *const *arguments);
 void libPrespecializedImageLoaded();
+
+/// Look up a prebuilt witness table for the given conformance and type. Returns
+/// nullptr on failure. Failure is never definitive.
+const WitnessTable *getLibPrespecializedWitnessTable(
+    const ProtocolConformanceDescriptor *conformance, const Metadata *type);
 
 std::pair<LibPrespecializedLookupResult, const TypeContextDescriptor *>
 getLibPrespecializedTypeDescriptor(Demangle::NodePointer node);
