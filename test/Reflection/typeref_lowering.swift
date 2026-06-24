@@ -1453,3 +1453,13 @@ SpySiGXu
 // CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))
 // CHECK-32-NEXT: (field name=wtable offset=4
 // CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)))
+
+// Constrained existential whose only requirement is an inverse Copyable
+// conformance.
+12TypeLowering11TheProtocol_pRi_s_XP
+// CHECK: (constrained_existential_type
+// CHECK-NEXT: (protocol_composition
+// CHECK-NEXT: (protocol TypeLowering.TheProtocol))
+// CHECK: (inverse_requirement
+// CHECK-NEXT: (generic_type_parameter depth=0 index=0) : ~Copyable
+

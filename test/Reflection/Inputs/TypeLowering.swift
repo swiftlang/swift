@@ -324,3 +324,5 @@ public struct AlmostBig {
 public struct Big {
   var a, b, c, d, e: Int
 }
+
+public protocol TheProtocol: ~Copyable {}
