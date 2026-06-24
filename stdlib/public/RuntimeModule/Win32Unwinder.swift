@@ -18,7 +18,7 @@
 
 import Swift
 internal import WinSDK
-internal import BacktracingImpl.OS.Windows
+@_implementationOnly import BacktracingImpl.OS.Windows
 
 extension WIN32_IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY {
   var Flag: UInt32 { UnwindData & 0x3 }
