@@ -55,7 +55,7 @@ public func syncRunTest(_ fn: @escaping () -> Void) {
   sem.wait()
 }
 
-//--- crash1.swift
+//--- Crash1.swift
 import Interface
 
 @globalActor
@@ -79,7 +79,7 @@ print("OK")
 // Crash without good message, since via 'dispatch_assert_queue'
 // SWIFT6_CHECK-NOT: OK
 
-//--- crash2.swift
+//--- Crash2.swift
 import Interface
 
 @globalActor
@@ -101,7 +101,7 @@ print("OK")
 // Crash without good message, since via 'dispatch_assert_queue'
 // SWIFT6_CHECK-NOT: OK
 
-//--- crash3.swift
+//--- Crash3.swift
 import Interface
 
 actor MyActor {
