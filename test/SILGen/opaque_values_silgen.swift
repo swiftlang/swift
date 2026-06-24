@@ -947,3 +947,25 @@ func copy_expr_generic<T>(_ t: T)  {
   eat_generic(copy t)
 }
 func eat_generic<T>(_ t: consuming T) {}
+
+struct LoadBorrowNC: ~Copyable {
+  var x: Int = 0
+}
+final class LoadBorrowHolder {
+  var inner: LoadBorrowNC
+  init(inner: consuming LoadBorrowNC) { self.inner = inner }
+}
+func load_borrow_in_guaranteed_borrowMe<T: ~Copyable>(_ n: borrowing T) {}
+
+// CHECK-LABEL: sil{{.*}} [ossa] @load_borrow_in_guaranteed_caller :
+// CHECK:         ref_element_addr {{%[^,]+}}, #LoadBorrowHolder.inner
+// CHECK:         mark_unresolved_non_copyable_value [no_consume_or_assign]
+// CHECK:         [[BORROWED:%[^,]+]] = load_borrow
+// CHECK-NOT:     load [copy]
+// CHECK:         apply {{.*}}<LoadBorrowNC>([[BORROWED]])
+// CHECK:         end_borrow [[BORROWED]]
+// CHECK-LABEL: } // end sil function 'load_borrow_in_guaranteed_caller'
+@_silgen_name("load_borrow_in_guaranteed_caller")
+func load_borrow_in_guaranteed_caller(_ h: LoadBorrowHolder) {
+  load_borrow_in_guaranteed_borrowMe(h.inner)
+}

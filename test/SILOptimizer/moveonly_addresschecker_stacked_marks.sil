@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -module-name moveonly -sil-move-only-address-checker -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -module-name moveonly -address-lowering -sil-move-only-address-checker -enable-sil-verify-all -enable-sil-opaque-values %s | %FileCheck %s
 
 // Regression test for an assertion in
 // `MoveOnlyAddressCheckerPImpl::performSingleCheck` → ... →
