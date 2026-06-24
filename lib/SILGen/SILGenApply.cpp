@@ -4928,7 +4928,7 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
   // Load if necessary.
   if (value.getType().isAddress()) {
     if (!param.isIndirectInGuaranteed() || !SGF.silConv.useLoweredAddresses()) {
-      if (value.getType().isMoveOnly()) {
+      if (value.getType().isMoveOnly() && !param.isIndirectInGuaranteed()) {
         // We use a formal access load [copy] instead of a load_borrow here
         // since in the case where we have a second parameter that is consuming,
         // we want to avoid emitting invalid SIL and instead allow for the
@@ -4940,6 +4940,12 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
         // guaranteed to be within the access scope meaning that it is easy for
         // SIL passes like the move only checker to convert this to a
         // load_borrow.
+        //
+        // For @in_guaranteed destinations the callee borrows, so emit a real
+        // load_borrow — emitting load [copy] there would be a copy of a
+        // ~Copyable value that the move-only checker can't always remove
+        // (in particular under opaque values, AddressLowering reifies it as
+        // alloc_stack + copy_addr [init] before the checker runs).
         value = SGF.B.createFormalAccessLoadCopy(loc, value);
         // Strip off the cleanup from the load [copy] since we do not want the
         // cleanup to be forwarded.

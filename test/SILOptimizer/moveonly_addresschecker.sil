@@ -900,3 +900,115 @@ bb4(%reborrow : @reborrow $Optional<@callee_guaranteed () -> ()>, %maybe : @owne
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: sil hidden [ossa] @test_init_by_adjacent_copy_addr :
+// CHECK:       bb0(%0 : $*MyBufferView<T>):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $MyBufferView<T>
+// CHECK:         copy_addr [take] %0 to [init] [[STK]]
+// CHECK:         destroy_addr [[STK]]
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_init_by_adjacent_copy_addr'
+sil hidden [ossa] @test_init_by_adjacent_copy_addr : $@convention(thin) <T> (@in MyBufferView<T>) -> () {
+bb0(%0 : $*MyBufferView<T>):
+  %1 = alloc_stack $MyBufferView<T>
+  copy_addr [take] %0 to [init] %1 : $*MyBufferView<T>
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*MyBufferView<T>
+  destroy_addr %2 : $*MyBufferView<T>
+  dealloc_stack %1 : $*MyBufferView<T>
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// Allow specific instructions  (read-only or no memory effect — `debug_value`
+// here) to intervene between `alloc_stack`, the `copy_addr [init]` filling it,
+// and the mark. Anything that may write to memory between them would bail the
+// walk.
+// CHECK-LABEL: sil hidden [ossa] @test_init_by_copy_addr_with_benign_interveners :
+// CHECK:       bb0(%0 : $*MyBufferView<T>):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $MyBufferView<T>
+// CHECK:         copy_addr [take] %0 to [init] [[STK]]
+// CHECK:         destroy_addr [[STK]]
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_init_by_copy_addr_with_benign_interveners'
+sil hidden [ossa] @test_init_by_copy_addr_with_benign_interveners : $@convention(thin) <T> (@in MyBufferView<T>) -> () {
+bb0(%0 : $*MyBufferView<T>):
+  %1 = alloc_stack $MyBufferView<T>
+  debug_value %0 : $*MyBufferView<T>, var, name "x", argno 1, expr op_deref
+  copy_addr [take] %0 to [init] %1 : $*MyBufferView<T>
+  debug_value %1 : $*MyBufferView<T>, var, name "y", argno 2, expr op_deref
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*MyBufferView<T>
+  destroy_addr %2 : $*MyBufferView<T>
+  dealloc_stack %1 : $*MyBufferView<T>
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_consume_let_via_take :
+// CHECK:       bb0(%0 : $*MyBufferView<T>):
+// CHECK:         [[OUTER:%[^,]+]] = alloc_stack [lexical] [var_decl] $MyBufferView<T>
+// CHECK:         copy_addr [take] %0 to [init] [[OUTER]]
+// CHECK:         [[INNER:%[^,]+]] = alloc_stack $MyBufferView<T>
+// CHECK:         copy_addr [take] [[OUTER]] to [init] [[INNER]]
+// CHECK:         destroy_addr [[INNER]]
+// CHECK:         dealloc_stack [[INNER]]
+// CHECK:         dealloc_stack [[OUTER]]
+// CHECK-LABEL: } // end sil function 'test_consume_let_via_take'
+sil hidden [ossa] @test_consume_let_via_take : $@convention(thin) <T> (@in MyBufferView<T>) -> () {
+bb0(%0 : $*MyBufferView<T>):
+  %1 = alloc_stack [lexical] [var_decl] $MyBufferView<T>, let, name "q"
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*MyBufferView<T>
+  copy_addr [take] %0 to [init] %2 : $*MyBufferView<T>
+  %3 = alloc_stack $MyBufferView<T>
+  copy_addr %2 to [init] %3 : $*MyBufferView<T>
+  %4 = mark_unresolved_non_copyable_value [consumable_and_assignable] %3 : $*MyBufferView<T>
+  destroy_addr %4 : $*MyBufferView<T>
+  dealloc_stack %3 : $*MyBufferView<T>
+  destroy_addr %2 : $*MyBufferView<T>
+  dealloc_stack %1 : $*MyBufferView<T>
+  %t = tuple ()
+  return %t : $()
+}
+
+// The inner mark of of two stacked `[no_consume_or_assign]` marks must be 
+// recognized as initialized when the outer mark is.
+//
+// CHECK-LABEL: sil hidden [ossa] @test_stacked_no_consume_or_assign_inherits_parent_init :
+// CHECK:       bb0({{%[^,]+}} : $*NonTrivialStruct):
+// CHECK-LABEL: } // end sil function 'test_stacked_no_consume_or_assign_inherits_parent_init'
+sil hidden [ossa] @test_stacked_no_consume_or_assign_inherits_parent_init : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %outer = mark_unresolved_non_copyable_value [no_consume_or_assign] %0 : $*NonTrivialStruct
+  %inner = mark_unresolved_non_copyable_value [no_consume_or_assign] %outer : $*NonTrivialStruct
+  %t = tuple ()
+  return %t : $()
+}
+
+public struct ContainerC {
+  var a: CopyableKlass
+  var b: CopyableKlass
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_copy_addr_through_wrapper_projection :
+// CHECK:         [[FIELD_A:%[^,]+]] = struct_element_addr {{%[^,]+}}, #ContainerC.a
+// CHECK:         [[UNWRAP:%[^,]+]] = moveonlywrapper_to_copyable_addr [[FIELD_A]]
+// CHECK:         copy_addr [[UNWRAP]] to [init]
+// CHECK-NOT:     copy_addr [take] [[UNWRAP]]
+// CHECK:         destroy_addr {{%[^,]+}} : $*@moveOnly ContainerC
+// CHECK-LABEL: } // end sil function 'test_copy_addr_through_wrapper_projection'
+sil hidden [ossa] @test_copy_addr_through_wrapper_projection : $@convention(thin) (@in ContainerC) -> @owned CopyableKlass {
+bb0(%0 : $*ContainerC):
+  %v = load [take] %0 : $*ContainerC
+  %wv = copyable_to_moveonlywrapper [owned] %v : $ContainerC
+  %1 = alloc_stack $@moveOnly ContainerC
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*@moveOnly ContainerC
+  store %wv to [init] %mark : $*@moveOnly ContainerC
+  %field_a = struct_element_addr %mark : $*@moveOnly ContainerC, #ContainerC.a
+  %field_a_unwrap = moveonlywrapper_to_copyable_addr %field_a : $*@moveOnly CopyableKlass
+  %result_slot = alloc_stack $CopyableKlass
+  copy_addr %field_a_unwrap to [init] %result_slot : $*CopyableKlass
+  %result = load [take] %result_slot : $*CopyableKlass
+  dealloc_stack %result_slot : $*CopyableKlass
+  destroy_addr %mark : $*@moveOnly ContainerC
+  dealloc_stack %1 : $*@moveOnly ContainerC
+  return %result : $CopyableKlass
+}

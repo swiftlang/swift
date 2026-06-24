@@ -245,6 +245,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILArgumentConvention.h"
@@ -496,8 +497,14 @@ static bool visitScopeEndsRequiringInit(
 static bool isCopyableValue(SILValue value) {
   if (value->getType().isMoveOnly())
     return false;
-  if (isa<MoveOnlyWrapperToCopyableAddrInst>(value))
+  if (auto *unwrap = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(value)) {
+    // If the operand is an address projection (e.g. struct_element_addr),
+    // the copy reads only a subfield rather than the entire @noImplicitCopy
+    // storage — treat as a regular copyable read.
+    if (Projection::isAddressProjection(unwrap->getOperand()))
+      return true;
     return false;
+  }
   return true;
 }
 
@@ -1152,11 +1159,46 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
 
   // Assume a strict check of a temporary or formal access is initialized
   // before the check.
-  if (auto *asi = dyn_cast<AllocStackInst>(stripAccessMarkers(operand));
-      asi && address->isStrict()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Adding strict-marked alloc_stack as init!\n");
-    return true;
+  if (auto *asi = dyn_cast<AllocStackInst>(stripAccessMarkers(operand))) {
+    if (address->isStrict()) {
+      LLVM_DEBUG(llvm::dbgs() << "Adding strict-marked alloc_stack as init!\n");
+      return true;
+    }
+    // An alloc_stack initialized by a nearby `copy_addr [init]` writing
+    // into it:
+    //   %asi = alloc_stack $T
+    //   ...      (only read-only / no-effect instructions)
+    //   copy_addr _ to [init] $asi
+    //   ...      (only read-only / no-effect instructions)
+    //   %mark = mark_unresolved_noncopyable_value_inst %asi
+    // The initialization cannot be reached transitively via the use-chain
+    // since it is not applied to the mark itself. We allow benign
+    // intervening instructions but reject anything that may write to
+    // memory other than the recognized init.
+    if (asi->getParent() == address->getParent()) {
+      bool seenInit = false;
+      for (auto it = std::next(asi->getIterator()); &*it != address; ++it) {
+        SILInstruction *inst = &*it;
+        if (auto *cai = dyn_cast<CopyAddrInst>(inst);
+            cai && cai->getDest() == asi && cai->isInitializationOfDest()) {
+          seenInit = true;
+          continue;
+        }
+        // Conservative approach here given that we do not check whether this
+        // instruction applies to the address we are interested in. This would
+        // require alias analysis.
+        if (inst->mayWriteToMemory()) {
+          seenInit = false;
+          break;
+        }
+      }
+      if (seenInit) {
+        LLVM_DEBUG(llvm::dbgs() << "Adding alloc_stack initialized by "
+                                   "copy_addr [init] (no intervening "
+                                   "writes) as init!\n");
+        return true;
+      }
+    }
   }
 
   // SILGen sometimes emits two stacked `mark_unresolved_non_copyable_value`s
@@ -1180,8 +1222,13 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
                  << "Adding stacked mark over init-permitting parent as "
                     "init!\n");
       return true;
-    case MarkUnresolvedNonCopyableValueInst::CheckKind::Invalid:
     case MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign:
+      // A read-only parent doesn't itself perform init, so the inner mark is
+      // initialized iff the parent is. This shape arises under opaque values
+      // when address lowering elides a `store_borrow` between two stacked
+      // `[no_consume_or_assign]` marks.
+      return addressBeginsInitialized(parentMark);
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::Invalid:
     case MarkUnresolvedNonCopyableValueInst::CheckKind::
         AssignableButNotConsumable:
       break;
