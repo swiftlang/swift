@@ -1572,6 +1572,36 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Obtain the 'resolvable proxy adapter' thunk for the passed-in function.
+///
+/// This thunk is invoked on the recipient side of a remote call: it
+/// receives the wire-level proxy types ('$P') decoded from the
+/// invocation, forwards them into the user-facing 'any P' / 'some P'
+/// types the distributed function expects (an implicit existential
+/// erasure), invokes the function, and re-resolves the result back into
+/// the proxy type so it can be returned over the wire.
+class GetDistributedRecipientResolvableProxyAdapterThunkRequest
+    : public SimpleRequest<GetDistributedRecipientResolvableProxyAdapterThunkRequest,
+                           FuncDecl *(
+                               llvm::PointerUnion<AbstractStorageDecl *,
+                                                  AbstractFunctionDecl *>),
+                           RequestFlags::Cached> {
+  using Originator =
+      llvm::PointerUnion<AbstractStorageDecl *, AbstractFunctionDecl *>;
+
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, Originator originator) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Obtain the 'id' property of a 'distributed actor'.
 class GetDistributedActorIDPropertyRequest :
     public SimpleRequest<GetDistributedActorIDPropertyRequest,
