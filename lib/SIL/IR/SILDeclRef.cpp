@@ -530,14 +530,16 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
 
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(d)) {
     // Native-to-foreign thunks for top-level decls are created on-demand,
-    // unless they use the thunk model (@_cdecl or @objc top-level), in which
-    // case they expose a dedicated entry-point with the visibility of the
-    // function.
+    // unless they use the thunk model (@_cdecl or @objc top-level with
+    // bridged types), in which case they expose a dedicated entry-point
+    // with the visibility of the function. C-compatible @objc globals use
+    // the single-symbol model and don't produce thunks.
     //
     // Native-to-foreign thunks for methods are always just private, since
     // they're anchored by Objective-C metadata.
     if (constant.isNativeToForeignThunk() &&
-        fn->getCDeclKind() != ForeignLanguage::ObjectiveC) {
+        (fn->getCDeclKind() != ForeignLanguage::ObjectiveC ||
+         fn->hasOnlyCEntryPoint())) {
       auto isTopLevel = fn->getDeclContext()->isModuleScopeContext();
       return isTopLevel ? Limit::OnDemand : Limit::Private;
     }

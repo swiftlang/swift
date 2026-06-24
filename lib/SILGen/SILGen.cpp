@@ -1560,9 +1560,12 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
             && "emitAbstractFuncDecl() on ABI-only decl?");
 
   // If the declaration is exported to C with the thunk model (@_cdecl or @objc
-  // on a top-level function), emit its native-to-foreign thunk. The thunk
-  // carries the C symbol name and bridges types like String <-> NSString.
-  if (AFD->getCDeclKind() == ForeignLanguage::ObjectiveC) {
+  // on a top-level function with bridged types), emit its native-to-foreign
+  // thunk. The thunk carries the C symbol name and bridges types like
+  // String <-> NSString. C-compatible @objc globals use the @c single-symbol
+  // model and don't need a thunk.
+  if (AFD->getCDeclKind() == ForeignLanguage::ObjectiveC &&
+      !AFD->hasOnlyCEntryPoint()) {
     auto thunk = SILDeclRef(AFD).asForeign();
     if (!hasFunction(thunk))
       emitNativeToForeignThunk(thunk);
