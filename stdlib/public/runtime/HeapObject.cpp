@@ -492,7 +492,7 @@ SWIFT_ALWAYS_INLINE static HeapObject *_swift_retain_(HeapObject *object) {
 SWIFT_REFCOUNT_CC
 static HeapObject *_swift_retain_adapterImpl(HeapObject *object) {
   HeapObject *masked =
-      (HeapObject *)((uintptr_t)object & ~heap_object_abi::SwiftSpareBitsMask);
+      (HeapObject *)((uintptr_t)object & ~heap_object_abi::UntaggedNonNativeBridgeObjectBits);
   _swift_retain(masked);
   return object;
 }
