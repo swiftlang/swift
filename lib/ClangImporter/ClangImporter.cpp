@@ -1409,6 +1409,10 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
     CI = clang::createInvocation(invocationArgs, std::move(CIOpts));
     if (!CI)
       return nullptr;
+
+    // CodeGenOpts.Argv0 is a raw const char* into driverArgs[0]; re-anchor it
+    // to clangPath, which outlives the invocation.
+    CI->getCodeGenOpts().Argv0 = ctx.ClangImporterOpts.clangPath.c_str();
   }
 
   // FIXME: clang fails to generate a module if there is a `-fmodule-map-file`
