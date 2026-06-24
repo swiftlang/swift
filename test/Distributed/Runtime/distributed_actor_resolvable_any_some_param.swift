@@ -11,6 +11,7 @@
 //
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: OS=windows-msvc
 
 // This test exercises the **remote-branch** wire round-trip for a
 // `distributed func` that takes a `some/any P` parameter where `P` is a
