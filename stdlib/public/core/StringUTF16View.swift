@@ -939,24 +939,35 @@ extension String.UTF16View {
       // Start there, and use the vectorized length function to quickly find how
       // far over that minimum we actually are. If this run happens to be all
       // ASCII, it will be correct. If not, it gets us vectorized counting of
-      // the initial prefix, and then we continue on from there.
+      // the initial prefix, and we then repeat from where we landed: each round
+      // turns another chunk of the remaining distance into a vectorized count
+      // instead of a scalar walk. The range shrinks every round (dense UTF-8
+      // means a larger undershoot, so more rounds), so we stop once it drops
+      // below `guessThreshold` and let the scalar loop below finish the tail.
       //
-      // `guessThreshold` has to be at least 16, otherwise we don't hit get the
-      // vector path in _utf16Distance. It also amortizes setup/call overhead.
+      // `guessThreshold` has to be at least 16, otherwise we don't hit the
+      // vector path in _utf16Distance. It also amortizes setup/call overhead,
+      // and gates each round so we never guess a range too small to vectorize.
       let guessThreshold = 32
       if remaining >= guessThreshold {
-        let guessOffset = unsafe _scalarAlign(
-          utf8, crumb._encodedOffset &+ remaining)
-        let guessIndex = String.Index(
-          encodedOffset: guessOffset, transcodedOffset: 0
-        )._knownUTF8
-        let guessDistance = _utf16Distance(from: crumb, to: guessIndex)
-        _internalInvariant(guessDistance <= remaining)
-        if guessDistance == remaining {
-          return guessIndex
-        }
-        readIdx = guessIndex._encodedOffset
-        utf16I = guessDistance
+        var current = crumb
+        var unitsRemaining = remaining
+        repeat {
+          let guessOffset = unsafe _scalarAlign(
+            utf8, current._encodedOffset &+ unitsRemaining)
+          let guessIndex = String.Index(
+            encodedOffset: guessOffset, transcodedOffset: 0
+          )._knownUTF8
+          let guessDistance = _utf16Distance(from: current, to: guessIndex)
+          _internalInvariant(guessDistance <= unitsRemaining)
+          if guessDistance == unitsRemaining {
+            return guessIndex
+          }
+          unitsRemaining &-= guessDistance
+          current = guessIndex
+        } while unitsRemaining >= guessThreshold
+        readIdx = current._encodedOffset
+        utf16I = remaining &- unitsRemaining
       }
 #endif
 
