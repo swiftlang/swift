@@ -26,8 +26,8 @@ internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
 #endif
-internal import BacktracingImpl.ImageFormats.PeCoff
-internal import BacktracingImpl.ImageFormats.CodeView
+@_implementationOnly import BacktracingImpl.ImageFormats.PeCoff
+@_implementationOnly import BacktracingImpl.ImageFormats.CodeView
 
 // .. Typealiases ..............................................................
 
