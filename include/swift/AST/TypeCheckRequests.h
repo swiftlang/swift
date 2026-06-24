@@ -21,6 +21,7 @@
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/CatchNode.h"
 #include "swift/AST/Effects.h"
@@ -71,6 +72,7 @@ class PreInverseGenericsAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
 class TypeLoc;
+class UsingDecl;
 class Witness;
 class TypeResolution;
 struct TypeWitnessAndDecl;
@@ -82,6 +84,10 @@ class StorageImplInfo;
 void simple_display(
     llvm::raw_ostream &out,
     const llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> &value);
+
+void simple_display(
+    llvm::raw_ostream &out,
+    const llvm::PointerUnion<ValueDecl *, ExtensionDecl *> &value);
 
 void simple_display(llvm::raw_ostream &out, ASTContext *ctx);
 
@@ -1676,18 +1682,21 @@ public:
 };
 
 /// Determine the actor isolation for the given declaration.
-class ActorIsolationRequest :
-    public SimpleRequest<ActorIsolationRequest,
-                         InferredActorIsolation(ValueDecl *),
-                         RequestFlags::Cached> {
+class ActorIsolationRequest
+    : public SimpleRequest<
+          ActorIsolationRequest,
+          InferredActorIsolation(
+              llvm::PointerUnion<ValueDecl *, ExtensionDecl *>),
+          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  InferredActorIsolation evaluate(Evaluator &evaluator,
-                                  ValueDecl *value) const;
+  InferredActorIsolation evaluate(
+      Evaluator &evaluator,
+      llvm::PointerUnion<ValueDecl *, ExtensionDecl *> declOrExtension) const;
 
 public:
   // Caching
@@ -5559,9 +5568,12 @@ public:
   void cacheResult(std::optional<SemanticAvailabilitySpec> value) const;
 };
 
-class DefaultIsolationInSourceFileRequest
-    : public SimpleRequest<DefaultIsolationInSourceFileRequest,
-                           std::optional<DefaultIsolation>(const SourceFile *),
+/// Gathers the file-level defaults declared by `using ...` at the top of a
+/// source file, and diagnoses any issues that would affect results. Other
+/// validation in `visitUsingDecl` instead.
+class FileDefaultsRequest
+    : public SimpleRequest<FileDefaultsRequest,
+                           FileDefaults(const SourceFile *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5569,11 +5581,35 @@ public:
 private:
   friend SimpleRequest;
 
-  std::optional<DefaultIsolation> evaluate(Evaluator &evaluator,
-                                           const SourceFile *file) const;
+  FileDefaults evaluate(Evaluator &evaluator, const SourceFile *file) const;
 
 public:
   bool isCached() const { return true; }
+};
+
+/// Materializes file-level `using @available(...)` defaults onto \p decl's
+/// attribute list by tail-appending implicit clones of each applicable
+/// availability attr. Must only be called on top-level value decls and
+/// extensions.
+class ApplyFileDefaultsRequest
+    : public SimpleRequest<ApplyFileDefaultsRequest,
+                           evaluator::SideEffect(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+
+  /// Whether file-level defaults can apply to `decl`: it must be a top-level
+  /// value or extension with a source file. Checking this is cheaper than
+  /// needlessly requesting.
+  static bool appliesTo(const Decl *decl);
 };
 
 /// Performs extension binding for all of the extensions in a module.
