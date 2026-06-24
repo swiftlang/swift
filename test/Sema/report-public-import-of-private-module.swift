@@ -108,7 +108,7 @@ import LocalClang // expected-error{{private module 'LocalClang' is imported pub
 @_implementationOnly import LocalClang
 
 /// Expect no errors with spi-only imports.
-// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/SpiOnlyImports.swift \
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/SPIOnlyImports.swift \
 // RUN:   -experimental-spi-only-imports -module-cache-path %t \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
 // RUN:   -library-level api
