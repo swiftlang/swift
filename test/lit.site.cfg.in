@@ -114,6 +114,14 @@ else:
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
 
+# If tools have debug info, set the tools-debuginfo flag.
+if "@CMAKE_BUILD_TYPE@" in ["Debug", "RelWithDebInfo"]:
+    config.available_features.add('tools-debuginfo')
+
+# If tools are release-mode, set the tools-release flag.
+if "@CMAKE_BUILD_TYPE@" in ["Release", "RelWithDebInfo"]:
+    config.available_features.add('tools-release')
+
 if "@SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY@" == "TRUE":
     config.available_features.add("single_threaded_concurrency")
 
