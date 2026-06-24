@@ -461,7 +461,7 @@ bool BindingSet::isDelayed() const {
     return true;
 
   if (isHole()) {
-    auto *locator = TypeVar->getImpl().getLocator();
+    auto *locator = CS.getHoleLocator(TypeVar);
     assert(locator && "a hole without locator?");
 
     // Delay resolution of the code completion expression until

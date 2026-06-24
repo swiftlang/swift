@@ -111,7 +111,9 @@ TypeVarBindingProducer::TypeVarBindingProducer(
     : BindingProducer(cs, typeVar->getImpl().getLocator()),
       TypeVar(typeVar), CanBeNil(bindings.canBeNil()) {
   if (bindings.isDirectHole()) {
-    auto *locator = getLocator();
+    auto *holeTV = CS.getHoleTypeVar(TypeVar);
+    auto *locator = holeTV->getImpl().getLocator();
+
     // If this type variable is associated with a code completion token
     // and it failed to infer any bindings let's adjust holes's locator
     // to point to a code completion token to avoid attempting to "fix"
@@ -122,7 +124,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(
           CS.getConstraintLocator(bindings.getAssociatedCodeCompletionToken());
     }
 
-    Bindings.push_back(Binding::forHole(TypeVar, locator));
+    Bindings.push_back(Binding::forHole(holeTV, locator));
     return;
   }
 
@@ -439,7 +441,7 @@ bool TypeVarBindingProducer::computeNext() {
 
 std::optional<std::pair<ConstraintFix *, FixImpact>>
 TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
-  auto *dstLocator = TypeVar->getImpl().getLocator();
+  auto *dstLocator = cs.getHoleLocator(TypeVar);
   auto *srcLocator = Binding.getLocator();
 
   // FIXME: This check could be turned into an assert once
@@ -460,7 +462,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
 
   auto defaultImpact = FixImpact::Mismatch;
 
-  if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
+  if (auto *GP = dstLocator->getGenericParameter()) {
     // If it is representative for a key path root, let's emit a more
     // specific diagnostic.
     auto *keyPathRoot =
@@ -490,12 +492,12 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     }
   }
 
-  if (TypeVar->getImpl().isClosureParameterType()) {
+  if (dstLocator->isClosureParameterType()) {
     ConstraintFix *fix = SpecifyClosureParameterType::create(cs, dstLocator);
     return std::make_pair(fix, defaultImpact);
   }
 
-  if (TypeVar->getImpl().isClosureResultType()) {
+  if (dstLocator->isClosureResultType()) {
     auto *closure = castToExpr<ClosureExpr>(dstLocator->getAnchor());
     // If the whole body is being ignored due to a pre-check failure,
     // let's not record a fix about result type since there is
@@ -614,15 +616,17 @@ static bool shouldIgnoreHoleForCodeCompletion(ConstraintSystem &cs,
                                               ConstraintLocator *srcLocator) {
   if (!cs.isForCodeCompletion())
     return false;
-  
+
+  auto *holeLoc = cs.getHoleLocator(typeVar);
+
   // Don't penalize solutions with unresolved generics.
-  if (typeVar->getImpl().getGenericParameter())
+  if (holeLoc->getGenericParameter())
     return true;
 
   // Don't penalize solutions if we couldn't determine the type of the code
   // completion token. We still want to examine the surrounding types in
   // that case.
-  if (typeVar->getImpl().isCodeCompletionToken())
+  if (holeLoc->directlyAt<CodeCompletionExpr>())
     return true;
 
   // When doing completion in a result builder, we avoid solving unrelated
@@ -650,7 +654,7 @@ static bool shouldIgnoreHoleForCodeCompletion(ConstraintSystem &cs,
   if (cs.hasArgumentsIgnoredForCodeCompletion()) {
     // Avoid simplifying the locator if the constraint system didn't ignore
     // any arguments.
-    auto argExpr = simplifyLocatorToAnchor(typeVar->getImpl().getLocator());
+    auto argExpr = simplifyLocatorToAnchor(holeLoc);
     if (cs.isArgumentIgnoredForCodeCompletion(argExpr.dyn_cast<Expr *>())) {
       return true;
     }
