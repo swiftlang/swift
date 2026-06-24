@@ -267,6 +267,20 @@ public struct OpaqueWitness: AssocType {
   }
 }
 
+public struct Pair<First, Second> {
+  public var first: First
+  public var second: Second
+}
+
+
+public struct Outer<T> {
+  public struct Inner {
+    public func makeSequence<U>(_ t: T, _ u: U) -> some Sequence {
+      return [Pair(first: t, second: u)]
+    }
+  }
+}
+
 public struct GenericOnAssocType<T: AssocType> {
   var x: T.A
   var y: T.A

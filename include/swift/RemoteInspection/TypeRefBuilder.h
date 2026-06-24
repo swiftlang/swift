@@ -1124,11 +1124,15 @@ public:
       return nullptr;
 
     GenericArgumentMap subs;
+    unsigned subDepth = 0;
     for (unsigned d = 0, de = genericArgs.size(); d < de; ++d) {
       auto argsForDepth = genericArgs[d];
+      if (argsForDepth.empty())
+        continue;
       for (unsigned i = 0, ie = argsForDepth.size(); i < ie; ++i) {
-        subs.insert({{d, i}, argsForDepth[i]});
+        subs.insert({{subDepth, i}, argsForDepth[i]});
       }
+      ++subDepth;
     }
 
     return underlyingTy->subst(*this, subs);

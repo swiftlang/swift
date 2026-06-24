@@ -118,11 +118,9 @@ public:
 
   reflection::RemoteAddress getImageStartAddress(unsigned i) const;
 
-  // TODO: We could consult the dynamic symbol tables of the images to
-  // implement this.
-  reflection::RemoteAddress getSymbolAddress(const std::string &name) override {
-    return reflection::RemoteAddress();
-  }
+  // Look up the address of a symbol by name in the symbol tables of the
+  // loaded images.
+  reflection::RemoteAddress getSymbolAddress(const std::string &name) override;
 
   ReadBytesResult readBytes(reflection::RemoteAddress Addr,
                             uint64_t Size) override;

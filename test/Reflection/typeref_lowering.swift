@@ -1453,3 +1453,20 @@ SpySiGXu
 // CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))
 // CHECK-32-NEXT: (field name=wtable offset=4
 // CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)))
+
+// Opaque return type capturing generic parameters across a non-generic context level (the mangled bound generics have an empty middle level).
+12TypeLowering5OuterV5InnerV12makeSequenceyQrx_qd__tlFQOySi__SSQo_
+// CHECK:      (bound_generic_struct Swift.Array
+// CHECK-NEXT:   (bound_generic_struct TypeLowering.Pair
+// CHECK-NEXT:     (struct Swift.Int)
+// CHECK-NEXT:     (struct Swift.String)))
+// CHECK-64-NEXT: (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1
+// CHECK-64-NEXT:   (field name=_buffer offset=0
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1
+// CHECK-64-NEXT:       (field name=_storage offset=0
+// CHECK-32-NEXT: (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT:   (field name=_buffer offset=0
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT:       (field name=_storage offset=0
+
+

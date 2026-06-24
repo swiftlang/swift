@@ -526,6 +526,62 @@ ObjectMemoryReader::getImageStartAddress(unsigned i) const {
                             reflection::RemoteAddress::DefaultAddressSpace)));
 }
 
+reflection::RemoteAddress
+ObjectMemoryReader::getSymbolAddress(const std::string &name) {
+  if (name.empty())
+    return reflection::RemoteAddress();
+
+  // Object file symbol tables store some names with a leading underscore (e.g.
+  // Mach-O), while the demangler hands us names without one. Accept either.
+  auto matches = [&name](StringRef symbolName) {
+    return symbolName == name ||
+           (symbolName.starts_with("_") && symbolName.drop_front() == name);
+  };
+
+  for (auto &Entry : Images) {
+    const llvm::object::ObjectFile *O = Entry.TheImage.getObjectFile();
+    for (const auto &Symbol : O->symbols()) {
+      llvm::Expected<uint32_t> Flags = Symbol.getFlags();
+      if (!Flags) {
+        llvm::consumeError(Flags.takeError());
+        continue;
+      }
+      if (*Flags & llvm::object::SymbolRef::SF_Undefined)
+        continue;
+
+      llvm::Expected<llvm::object::section_iterator> Section =
+          Symbol.getSection();
+      if (!Section) {
+        llvm::consumeError(Section.takeError());
+        continue;
+      }
+      if (*Section == O->section_end())
+        continue;
+
+      auto SymbolName = Symbol.getName();
+      if (!SymbolName) {
+        llvm::consumeError(SymbolName.takeError());
+        continue;
+      }
+      if (!matches(*SymbolName))
+        continue;
+
+      auto Address = Symbol.getAddress();
+      if (!Address) {
+        llvm::consumeError(Address.takeError());
+        continue;
+      }
+
+      return encodeImageIndexAndAddress(
+          &Entry.TheImage,
+          remote::RemoteAddress(
+              *Address, reflection::RemoteAddress::DefaultAddressSpace));
+    }
+  }
+
+  return reflection::RemoteAddress();
+}
+
 ReadBytesResult ObjectMemoryReader::readBytes(reflection::RemoteAddress Addr,
                                               uint64_t Size) {
   auto addrValue = Addr.getRawAddress();
