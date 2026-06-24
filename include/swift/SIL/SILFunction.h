@@ -63,6 +63,7 @@ enum IsThunk_t {
   IsSignatureOptimizedThunk,
   IsBackDeployedThunk,
   IsDistributedThunk,
+  IsDistributedProxyAdapterThunk,
 };
 enum IsDynamicallyReplaceable_t {
   IsNotDynamic,
@@ -508,6 +509,7 @@ private:
     case IsReabstractionThunk:
     case IsBackDeployedThunk:
     case IsDistributedThunk:
+    case IsDistributedProxyAdapterThunk:
       thunkCanHaveSubclassScope = false;
       break;
     }

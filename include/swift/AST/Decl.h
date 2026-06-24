@@ -6497,6 +6497,14 @@ public:
   /// 'distributed' and and nullptr otherwise.
   FuncDecl *getDistributedThunk() const;
 
+  /// Return the 'resolvable proxy adapter' thunk for this computed
+  /// property, if a distributed thunk includes an `any P` / `some P`
+  /// where the P is a distributed `@Resolvable protocol`, and must
+  /// therefore be mapped to the proxy type `$P` that we use as wire
+  /// format to erase the actual implementation type (underlying the
+  /// `any P`), which may not be available on the remote peer.
+  FuncDecl *getDistributedResolvableProxyAdapterThunk() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -8133,6 +8141,11 @@ public:
   /// \return the synthesized thunk, or null if the base of the call has
   ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
+
+  /// Get the 'resolvable proxy adapter' thunk used on the recipient side
+  /// of a remote call to bridge between the wire-level `@Resolvable`
+  /// proxy types (`$P`) and the user-facing `any P` / `some P` types.
+  FuncDecl *getDistributedResolvableProxyAdapterThunk() const;
 
   /// Detect whether this function declaration is an unstructured task
   /// factory: a `Task` initializer or one of the `detached`,

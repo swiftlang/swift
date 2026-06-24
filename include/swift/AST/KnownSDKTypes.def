@@ -36,8 +36,6 @@ KNOWN_SDK_TYPE_DECL(ObjectiveC, NSObject, ClassDecl, 0)
 KNOWN_SDK_TYPE_DECL(ObjectiveC, Selector, StructDecl, 0)
 KNOWN_SDK_TYPE_DECL(ObjectiveC, ObjCBool, StructDecl, 0)
 
-// TODO(async): These might move to the stdlib module when concurrency is
-// standardized
 KNOWN_SDK_TYPE_DECL(Concurrency, CheckedContinuation, NominalTypeDecl, 2)
 KNOWN_SDK_TYPE_DECL(Concurrency, UnsafeContinuation, NominalTypeDecl, 2)
 KNOWN_SDK_TYPE_DECL(Concurrency, MainActor, NominalTypeDecl, 0)
@@ -53,6 +51,7 @@ KNOWN_SDK_TYPE_DECL(Concurrency, TaskLocal, ClassDecl, 1)
 
 // Distributed actors
 KNOWN_SDK_TYPE_DECL(Distributed, DistributedActor, ProtocolDecl, 0)
+KNOWN_SDK_TYPE_DECL(Distributed, _DistributedActorStub, ProtocolDecl, 0)
 KNOWN_SDK_TYPE_DECL(Distributed, DistributedActorSystem, ProtocolDecl, 0)
 KNOWN_SDK_TYPE_DECL(Distributed, DistributedTargetInvocationEncoder, ProtocolDecl, 0)
 KNOWN_SDK_TYPE_DECL(Distributed, DistributedTargetInvocationDecoder, ProtocolDecl, 0)
