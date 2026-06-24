@@ -1,0 +1,152 @@
+// RUN: %target-sil-opt -sil-print-types %s -sil-combine -sil-print-debuginfo | %FileCheck %s
+
+// Test salvaging of builtin instructions into debug reconstruction blocks.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 1 { loc "test.swift":1:1 parent @test_binary_builtin : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () }
+sil_scope 2 { loc "test.swift":10:1 parent @test_unary_builtin : $@convention(thin) (Builtin.Int32) -> () }
+sil_scope 3 { loc "test.swift":20:1 parent @test_nullary_builtin : $@convention(thin) () -> () }
+sil_scope 4 { loc "test.swift":30:1 parent @test_assume_nonnegative : $@convention(thin) (Builtin.Int64) -> () }
+sil_scope 5 { loc "test.swift":40:1 parent @test_binary_builtin_one_literal : $@convention(thin) (Builtin.Int64) -> () }
+sil_scope 6 { loc "test.swift":50:1 parent @test_checked_trunc_intliteral : $@convention(thin) () -> () }
+sil_scope 7 { loc "test.swift":60:1 parent @test_binary_builtin_literal_lhs : $@convention(thin) (Builtin.Int64) -> () }
+
+// Binary builtin with both operands live: salvage with phi arg for one operand
+// and literal cloned into the debug BB.
+
+// CHECK-LABEL: sil @test_binary_builtin_one_literal
+// CHECK:       bb0([[VAL:%[0-9]+]] : $Builtin.Int64):
+// CHECK:         debug_value [[VAL]] : $Builtin.Int64, let, name "result", {{.*}}transform {
+// CHECK:           bb0(%0 : $Builtin.Int64):
+// CHECK:             %1 = integer_literal $Builtin.Int64, 1
+// CHECK:             %2 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+// CHECK:             return %2 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_binary_builtin_one_literal'
+sil @test_binary_builtin_one_literal : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  debug_value %2 : $Builtin.Int64, let, name "result", loc "test.swift":40:1, scope 5
+  %t = tuple ()
+  return %t : $()
+}
+
+// Binary builtin where the literal is the first operand (lhs) and the live
+// value is the second operand (rhs). The phi arg should wire to the rhs.
+
+// CHECK-LABEL: sil @test_binary_builtin_literal_lhs
+// CHECK:       bb0([[VAL:%[0-9]+]] : $Builtin.Int64):
+// CHECK:         debug_value [[VAL]] : $Builtin.Int64, let, name "result", {{.*}}transform {
+// CHECK:           bb0(%0 : $Builtin.Int64):
+// CHECK:             %1 = integer_literal $Builtin.Int64, 10
+// CHECK:             %2 = builtin "sub_Int64"(%1 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64
+// CHECK:             return %2 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_binary_builtin_literal_lhs'
+sil @test_binary_builtin_literal_lhs : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 10
+  %2 = builtin "sub_Int64"(%1 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64
+  debug_value %2 : $Builtin.Int64, let, name "result", loc "test.swift":60:1, scope 7
+  %t = tuple ()
+  return %t : $()
+}
+
+// Binary builtin with two live operands: both need phi args but debug BBs
+// only support one, so the debug value is killed.
+
+// CHECK-LABEL: sil @test_binary_builtin
+// CHECK:       bb0([[A:%[0-9]+]] : $Builtin.Int64, [[B:%[0-9]+]] : $Builtin.Int64):
+// CHECK:         debug_value undef : $Builtin.Int64, let, name "result"
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_binary_builtin'
+sil @test_binary_builtin : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  debug_value %2 : $Builtin.Int64, let, name "result", loc "test.swift":1:1, scope 1
+  %t = tuple ()
+  return %t : $()
+}
+
+// Unary builtin (zextOrBitCast): salvaged as unary with phi arg rewired.
+
+// CHECK-LABEL: sil @test_unary_builtin
+// CHECK:       bb0([[VAL:%[0-9]+]] : $Builtin.Int32):
+// CHECK:         debug_value [[VAL]] : $Builtin.Int32, let, name "ext", {{.*}}transform {
+// CHECK:           bb0(%0 : $Builtin.Int32):
+// CHECK:             %1 = builtin "zextOrBitCast_Int32_Int64"(%0 : $Builtin.Int32) : $Builtin.Int64
+// CHECK:             return %1 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_unary_builtin'
+sil @test_unary_builtin : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = builtin "zextOrBitCast_Int32_Int64"(%0 : $Builtin.Int32) : $Builtin.Int64
+  debug_value %1 : $Builtin.Int64, let, name "ext", loc "test.swift":10:1, scope 2
+  %t = tuple ()
+  return %t : $()
+}
+
+// Nullary builtin (zeroInitializer): salvaged by cloning into debug BB.
+
+// CHECK-LABEL: sil @test_nullary_builtin
+// CHECK:         debug_value undef : $Builtin.Int64, let, name "zero", {{.*}}transform {
+// CHECK:           %0 = builtin "zeroInitializer"() : $Builtin.Int64
+// CHECK:           return %0 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_nullary_builtin'
+sil @test_nullary_builtin : $@convention(thin) () -> () {
+bb0:
+  %0 = builtin "zeroInitializer"() : $Builtin.Int64
+  debug_value %0 : $Builtin.Int64, let, name "zero", loc "test.swift":20:1, scope 3
+  %t = tuple ()
+  return %t : $()
+}
+
+// assumeNonNegative: salvaged as identity (operand repointed).
+
+// CHECK-LABEL: sil @test_assume_nonnegative
+// CHECK:       bb0([[VAL:%[0-9]+]] : $Builtin.Int64):
+// CHECK:         debug_value [[VAL]] : $Builtin.Int64, let, name "nn"
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_assume_nonnegative'
+sil @test_assume_nonnegative : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin "assumeNonNegative_Int64"(%0 : $Builtin.Int64) : $Builtin.Int64
+  debug_value %1 : $Builtin.Int64, let, name "nn", loc "test.swift":30:1, scope 4
+  %t = tuple ()
+  return %t : $()
+}
+
+// Checked truncation from IntLiteral: the builtin creates branches at IRGen,
+// so it is constant-folded and the result is cloned into the debug BB.
+// The debug_value tracks a tuple_extract of the builtin result (the common
+// pattern after prior cascading salvage of the tuple_extract).
+
+// CHECK-LABEL: sil @test_checked_trunc_intliteral
+// CHECK:         debug_value undef : {{.*}}, let, name "truncated", {{.*}}transform {
+// CHECK:           %0 = integer_literal $Builtin.Int1, 0
+// CHECK:           %1 = integer_literal $Builtin.Int64, 42
+// CHECK:           %2 = tuple (%1 : $Builtin.Int64, %0 : $Builtin.Int1)
+// CHECK:           %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int1), 0
+// CHECK:           return %3 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_checked_trunc_intliteral'
+sil @test_checked_trunc_intliteral : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.IntLiteral, 42
+  %1 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
+  %2 = tuple_extract %1 : $(Builtin.Int64, Builtin.Int1), 0
+  debug_value %2 : $Builtin.Int64, let, name "truncated", loc "test.swift":50:1, scope 6
+  %t = tuple ()
+  return %t : $()
+}
