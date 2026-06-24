@@ -499,9 +499,11 @@ public:
       Visitor.addDynamicFunction(AFD, *dynKind);
     }
 
-    // @_cdecl and @objc-on-a-top-level-function both emit a foreign thunk with
-    // an extra C symbol. Export it.
-    if (AFD->getCDeclKind() == ForeignLanguage::ObjectiveC)
+    // @_cdecl and @objc-on-a-top-level-function with bridged types emit a
+    // foreign thunk with an extra C symbol. Export it. C-compatible @objc
+    // globals use the single-symbol model and are already handled above.
+    if (AFD->getCDeclKind() == ForeignLanguage::ObjectiveC &&
+        !AFD->hasOnlyCEntryPoint())
       addFunction(SILDeclRef(AFD).asForeign());
 
     {
