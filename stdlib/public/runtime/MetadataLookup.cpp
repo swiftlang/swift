@@ -3083,7 +3083,12 @@ swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
   if (witnessTables.empty())
     return {/*ptr=*/nullptr, 0};
 
-  void **tables = (void **)malloc(witnessTables.size() * sizeof(void *));
+  // Note: this MUST be swift_slowAlloc because it will be deallocated with
+  // Unsafe*Pointer which uses swift_slowDealloc which will use aligned deallocation.
+  // On Windows, aligned deallocations must match aligned allocations, even if
+  // other platforms are more flexible here.
+  void **tables = (void **)swift_slowAlloc(
+      witnessTables.size() * sizeof(void *), ~size_t(0));
   for (unsigned i = 0, n = witnessTables.size(); i != n; ++i)
     tables[i] = const_cast<void *>(witnessTables[i]);
 
