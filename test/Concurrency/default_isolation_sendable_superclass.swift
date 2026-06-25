@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -strict-concurrency=targeted -swift-version 5
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -swift-version 6
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix swift6- -swift-version 6
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
@@ -13,9 +13,8 @@ import Foundation
 
 // When a class inherits global-actor isolation from its superclass (rather
 // than declaring it explicitly), the implicit Sendable conformance is
-// maintained for source compatibility with no diagnostic. The user never
-// asked for Sendable, so diagnosing the non-Sendable superclass would be
-// confusing.
+// maintained for source compatibility. Starting in Swift 6, a warning
+// explains where the conformance came from and offers fix-its.
 
 public class NonSendableSuperclass {}
 
@@ -23,9 +22,13 @@ public class NonSendableSuperclass {}
 public class IsolatedNonSendable: NonSendableSuperclass {}
 
 // Inherits @MainActor from the superclass. The implicit Sendable conformance
-// is kept silently -- no diagnostic expected.
+// is kept but diagnosed starting in Swift 6.
 public final class InheritedIsolationSubclass: IsolatedNonSendable {}
+// expected-swift6-warning @-1 {{class 'InheritedIsolationSubclass' is implicitly 'Sendable' due to inherited 'MainActor' isolation but has a non-Sendable superclass; this will be an error in a future Swift language mode}}
+// expected-swift6-note @-2 {{make 'InheritedIsolationSubclass' explicitly 'MainActor' to retain implicit 'Sendable' conformance}} {{1-1=@MainActor }}
+// expected-swift6-note @-3 {{mark 'InheritedIsolationSubclass' as '~Sendable' to suppress the implicit conformance}} {{67-67=, ~Sendable}}
 
+// The subclass is still Sendable (source compatibility), so this compiles.
 func requiresSendable<T: Sendable>(_: T.Type) {}
 func testInheritedIsolationIsSendable() {
   requiresSendable(InheritedIsolationSubclass.self)
