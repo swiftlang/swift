@@ -1064,8 +1064,9 @@ emitThunkIndirectErrorArgument(SILGenFunction &SGF, SILLocation loc,
                                CanSILFunctionType fnType) {
   // If the function we're calling has an indirect error result, create an
   // argument for it.
-  auto innerError = fnType->getOptionalErrorResult();
-  if (!innerError || innerError->getConvention() != ResultConvention::Indirect)
+  auto convention = SGF.silConv.getFunctionConventions(fnType);
+  auto innerError = convention.getIndirectErrorResult();
+  if (!innerError)
     return std::nullopt;
 
   // If the type of the indirect error is the same for both the inner
