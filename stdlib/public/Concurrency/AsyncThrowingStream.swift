@@ -389,16 +389,16 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   public init(
     unfolding produce: @escaping @Sendable () async throws -> Element?
   ) where Failure == Error {
-    let _unfoldingStorage = _UnfoldingStorage(
+    let unfoldingStorage = _AsyncStreamUnfoldingStorage(
       produce: produce,
       onCancel: nil
     )
 
     self.context = _Context {
       return try await withTaskCancellationHandler {
-        return try await _unfoldingStorage.next()
+        return try await unfoldingStorage.next()
       } onCancel: {
-        _unfoldingStorage.terminate()
+        unfoldingStorage.terminate()
       }
     }
   }

@@ -114,7 +114,7 @@ fileprivate struct Disconnected<Value: ~Copyable>: ~Copyable, @unchecked Sendabl
 /// The state machine is single-consumer–based. However, instead of crashing on concurrent iteration,
 /// the consumer that “loses” the race to `next()` is enqueued in a **FIFO queue** and **eventually resumed**.
 ///
-/// Furthermore, when the stream reaches its terminal state and an onTermination closure is set,
+/// Furthermore, when the stream reaches its terminal state and an `onTermination` closure is set,
 /// the closure is invoked **exactly once, after which it is cleared**.
 ///
 /// Once the stream has reached its terminal state, all subsequent consumers will **immediately return nil**,
@@ -637,7 +637,7 @@ extension _AsyncStreamStorage {
 ///
 /// States:
 ///
-///   - `producing`: The stream is active and invokes the `produce` closure, producing the next element on consumer demand.
+///   - `producing`: The stream is active and invokes the `produce` closure to produce the next element on consumer demand.
 ///   - `terminated`: The stream is in a terminal state and **immediately returns `nil`** on consumer demand.
 ///
 /// Transitions:
@@ -651,15 +651,15 @@ extension _AsyncStreamStorage {
 ///
 /// Behavior:
 /// The state machine is single-consumer–based and invokes the `produce` closure in response to demand.
-/// On concurrent iteration, `produce` is invoked concurrently.
+/// However, on concurrent iteration, `produce` is invoked concurrently.
 ///
 /// The stream reaches its terminal state either when **`produce` returns nil** or
 /// when the **task of an active consumer is cancelled**.
 ///
-/// The `onCancel` closure is invoked **at most once** and is **cleared afterward**.
-/// However, it is only invoked if the stream is **terminated due to task cancellation**.
+/// Furthermore, when the stream reaches its terminal state **due to task cancellation** and an `onCancel` closure was set,
+/// the closure is invoked **exactly once, after which it is cleared**.
 @safe
-final class _UnfoldingStorage<Element, Failure: Error>: @unchecked Sendable {
+final class _AsyncStreamUnfoldingStorage<Element, Failure: Error>: @unchecked Sendable {
   typealias Produce = @Sendable () async throws(Failure) -> Element? // TODO: This needs to have `nonisolated(nonsending)` in order to execute on the caller's actor
   typealias OnCancel = (@Sendable () -> Void)?
 
@@ -696,7 +696,7 @@ final class _UnfoldingStorage<Element, Failure: Error>: @unchecked Sendable {
   }
 }
 
-extension _UnfoldingStorage {
+extension _AsyncStreamUnfoldingStorage {
   nonisolated(nonsending) func next() async throws(Failure) -> Element? {
     let state = withLock { state in
       return state
@@ -741,7 +741,7 @@ extension _UnfoldingStorage {
   }
 }
 
-extension _UnfoldingStorage {
+extension _AsyncStreamUnfoldingStorage {
   @safe
   private func withLock<Value>(
     _ body: (inout State) -> Value
