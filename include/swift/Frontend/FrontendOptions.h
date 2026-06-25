@@ -477,8 +477,8 @@ public:
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {
     None, ///< Don't automatically crash.
-    AssertAfterParse, ///< Automatically assert after parsing.
-    CrashAfterParse, ///< Automatically crash after parsing.
+    AssertAfterTypeChecking, ///< Automatically assert after type checking.
+    CrashAfterTypeChecking, ///< Automatically crash after type checking.
   };
 
   /// Indicates a debug crash mode for the frontend.
