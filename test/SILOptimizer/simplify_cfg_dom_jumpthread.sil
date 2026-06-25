@@ -597,3 +597,25 @@ bb6(%12 : @guaranteed $C):
   return %15
 }
 
+// CHECK-LABEL: sil [ossa] @test_switch_enum_default_with_payload :
+// CHECK-NOT:     switch_enum
+// CHECK:         copy_value {{%.*}} : $E2
+// CHECK:       } // end sil function 'test_switch_enum_default_with_payload'
+sil [ossa] @test_switch_enum_default_with_payload : $@convention(thin) (@guaranteed E2) -> @owned E2 {
+bb0(%0 : @guaranteed $E2):
+  %1 = unchecked_enum_data %0, #E2.b!enumelt
+  %2 = enum $E2, #E2.b!enumelt, %1
+  switch_enum %2, case #E2.a!enumelt: bb1, default bb2
+
+bb1:
+  %4 = copy_value %0
+  br bb3(%4)
+
+bb2(%6 : @guaranteed $E2):
+  %7 = copy_value %6
+  br bb3(%7)
+
+bb3(%9 : @owned $E2):
+  return %9
+}
+

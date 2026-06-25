@@ -387,6 +387,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ImplDifferentiabilityKind:
   case Node::Kind::ImplEscaping:
   case Node::Kind::ImplErasedIsolation:
+  case Node::Kind::ImplNonisolatedNonsendingIsolation:
   case Node::Kind::ImplSendingResult:
   case Node::Kind::ImplConvention:
   case Node::Kind::ImplParameterResultDifferentiability:
@@ -1228,6 +1229,7 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << "]";
       break;
     case FunctionSigSpecializationParamKind::ClosureProp:
+    case FunctionSigSpecializationParamKind::EscapingClosureProp:
       if (Idx + 2 > End)
         return;
       Printer << "[";
@@ -1993,6 +1995,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       return nullptr;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";
+      return nullptr;
+    case FunctionSigSpecializationParamKind::EscapingClosureProp:
+      Printer << "Escaping Closure Propagated";
       return nullptr;
     case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
       Printer << "Same As Argument";
@@ -2891,6 +2896,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::ImplEscaping:
     Printer << "@escaping";
+    return nullptr;
+  case Node::Kind::ImplNonisolatedNonsendingIsolation:
+    Printer << "@caller_isolated";
     return nullptr;
   case Node::Kind::ImplErasedIsolation:
     Printer << "@isolated(any)";

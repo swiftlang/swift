@@ -194,7 +194,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   auto ignoredDowngradeToWarning = DowngradeToWarning::No;
   auto originKind =
       getDisallowedOriginKind(D, where, ignoredDowngradeToWarning);
-  auto commonBehavior = where.behaviorForReferenceToOrigin(originKind);
+  auto commonBehavior = where.behaviorForReferenceToOrigin(D, originKind);
   if (commonBehavior == DiagnosticBehavior::Ignore)
     return false;
 
@@ -336,7 +336,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
         }
       });
 
-  auto commonBehavior = where.behaviorForReferenceToOrigin(originKind);
+  auto commonBehavior = where.behaviorForReferenceToOrigin(D, originKind);
   if (commonBehavior == DiagnosticBehavior::Ignore)
     return false;
 
@@ -508,7 +508,8 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
       });
 
   auto originKind = getDisallowedOriginKind(ext, where);
-  auto commonBehavior = where.behaviorForReferenceToOrigin(originKind);
+  auto commonBehavior =
+      where.behaviorForReferenceToOrigin(/*D=*/nullptr, originKind);
   if (commonBehavior == DiagnosticBehavior::Ignore)
     return false;
 

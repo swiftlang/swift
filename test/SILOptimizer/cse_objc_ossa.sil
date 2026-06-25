@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -common-subexpression-elimination | %FileCheck %s
 // REQUIRES: objc_interop
 sil_stage canonical
 
@@ -91,16 +91,8 @@ bb0(%0 : @owned $Bar):
   return %5 : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @_TF4test9trytowalkFPS_8Walkable_T_ :
-// CHECK:           bb0(%0 : @owned $any Walkable):
-// CHECK-NEXT:      {{%.*}} = open_existential_ref
-// CHECK-NEXT:      {{%.*}} = objc_method
-// CHECK-NEXT:      {{%.*}} = apply
-// CHECK-NEXT:      {{%.*}} = objc_method
-// CHECK-NEXT:      {{%.*}} = apply
-// CHECK-NEXT:      destroy_value 
-// CHECK-NEXT:      {{%.*}} = tuple
 // test.trytowalk (test.Walkable) -> ()
+// CHECK-LABEL: sil hidden [ossa] @_TF4test9trytowalkFPS_8Walkable_T_ :
 // CHECK-LABEL: } // end sil function '_TF4test9trytowalkFPS_8Walkable_T_'
 sil hidden [ossa] @_TF4test9trytowalkFPS_8Walkable_T_ : $@convention(thin) (@owned Walkable) -> () {
 bb0(%0 : @owned $Walkable):
@@ -129,12 +121,12 @@ bb0(%0 : @owned $Walkable):
 // of BB arguments. The type of BB2 argument should use the same opened existential as the
 // one opened in the entry block.
 
-// CHECK-LABEL: sil [ossa] @cse_open_existential_in_bbarg1 : $@convention(thin) (@owned AnyObject) -> ()
 // TODOCHECK: open_existential_ref %0 : $AnyObject to $[[OPENED:@opened\(.*\) AnyObject]]
 // TODOCHECK: bb1(%{{[0-9]*}} : $@convention(objc_method) ([[OPENED]]) -> @autoreleased Optional<NSString>):
 // TODOCHECK-NOT: open_existential_ref
 // TODOCHECK: bb3(%{{[0-9]*}} : $@convention(objc_method) ([[OPENED]]) -> @autoreleased Optional<NSString>):
 // TODOCHECK-NOT: open_existential_ref
+// CHECK-LABEL: sil [ossa] @cse_open_existential_in_bbarg1 :
 // CHECK-LABEL: } // end sil function 'cse_open_existential_in_bbarg1'
 sil [ossa] @cse_open_existential_in_bbarg1 : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
@@ -172,9 +164,9 @@ bb5:
   return %13 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @cse_open_existential_in_bbarg2 : $@convention(thin) (@owned AnyObject) -> ()
 // TODOCHECK: open_existential_ref %0 :
 // TODOCHECK-NOT: open_existential_ref
+// CHECK-LABEL: sil [ossa] @cse_open_existential_in_bbarg2 :
 // CHECK-LABEL: } // end sil function 'cse_open_existential_in_bbarg2'
 sil [ossa] @cse_open_existential_in_bbarg2 : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
@@ -209,7 +201,8 @@ bb4:
 // CHECK: value_metatype $@objc_metatype
 // CHECK: objc_metatype_to_object
 // CHECK-NOT: value_metatype $@objc_metatype
-// CHECK: destroy_value 
+// CHECK: objc_metatype_to_object
+// CHECK: destroy_value
 // CHECK-LABEL: } // end sil function 'cse_value_metatype'
 sil [ossa] @cse_value_metatype : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
 bb0(%0 : @owned $T):
@@ -226,7 +219,8 @@ bb0(%0 : @owned $T):
 // CHECK: existential_metatype $@objc_metatype
 // CHECK: objc_existential_metatype_to_object
 // CHECK-NOT: existential_metatype $@objc_metatype
-// CHECK: destroy_value 
+// CHECK: objc_existential_metatype_to_object
+// CHECK: destroy_value
 // CHECK-LABEL: } // end sil function 'cse_existential_metatype'
 sil [ossa] @cse_existential_metatype : $@convention(thin) (@owned XX) -> @owned (AnyObject, AnyObject) {
 bb0(%0 : @owned $XX):
@@ -266,8 +260,8 @@ bb0(%0 : @owned $B, %1 : @owned $B):
 // CHECK: value_metatype $@objc_metatype
 // CHECK: objc_metatype_to_object
 // CHECK-NOT: value_metatype $@objc_metatype
-// CHECK-NOT: objc_metatype_to_object
-// CHECK: destroy_value 
+// CHECK: objc_metatype_to_object
+// CHECK: destroy_value
 // CHECK-LABEL: } // end sil function 'cse_objc_metatype_to_object'
 sil [ossa] @cse_objc_metatype_to_object : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
 bb0(%0 : @owned $T):
@@ -285,8 +279,8 @@ bb0(%0 : @owned $T):
 // CHECK: existential_metatype $@objc_metatype
 // CHECK: objc_existential_metatype_to_object
 // CHECK-NOT: existential_metatype $@objc_metatype
-// CHECK-NOT: objc_existential_metatype_to_object
-// CHECK: destroy_value 
+// CHECK: objc_existential_metatype_to_object
+// CHECK: destroy_value
 // CHECK-LABEL: } // end sil function 'cse_objc_existential_metatype_to_object'
 sil [ossa] @cse_objc_existential_metatype_to_object : $@convention(thin) (@owned XX) -> @owned (AnyObject, AnyObject) {
 bb0(%0 : @owned $XX):
@@ -325,8 +319,9 @@ sil_vtable Bar {
 // CHECK-LABEL: sil [ossa] @cse_value_metatype2 :
 // CHECK: value_metatype $@objc_metatype
 // CHECK: objc_metatype_to_object
-// CHECK-NOT: value_metatype $@objc_metatype
-// CHECK: destroy_value 
+// CHECK: value_metatype $@objc_metatype
+// CHECK: objc_metatype_to_object
+// CHECK: destroy_value
 // CHECK-LABEL: } // end sil function 'cse_value_metatype2'
 sil [ossa] @cse_value_metatype2 : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
 bb0(%0 : @owned $T):
@@ -344,8 +339,9 @@ bb0(%0 : @owned $T):
 // CHECK-LABEL: sil [ossa] @cse_existential_metatype2 :
 // CHECK: existential_metatype $@objc_metatype
 // CHECK: objc_existential_metatype_to_object
-// CHECK-NOT: existential_metatype $@objc_metatype
-// CHECK: destroy_value 
+// CHECK: existential_metatype $@objc_metatype
+// CHECK: objc_existential_metatype_to_object
+// CHECK: destroy_value
 // CHECK-LABEL: } // end sil function 'cse_existential_metatype2'
 sil [ossa] @cse_existential_metatype2 : $@convention(thin) (@owned XX) -> @owned (AnyObject, AnyObject) {
 bb0(%0 : @owned $XX):

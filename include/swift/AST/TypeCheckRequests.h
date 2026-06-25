@@ -16,10 +16,12 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/CatchNode.h"
 #include "swift/AST/Effects.h"
@@ -33,6 +35,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/Basic/TypeID.h"
@@ -65,9 +68,11 @@ struct PropertyWrapperMutability;
 class RequirementRepr;
 class ReturnStmt;
 class AbstractSpecializeAttr;
+class PreInverseGenericsAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
 class TypeLoc;
+class UsingDecl;
 class Witness;
 class TypeResolution;
 struct TypeWitnessAndDecl;
@@ -79,6 +84,10 @@ class StorageImplInfo;
 void simple_display(
     llvm::raw_ostream &out,
     const llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> &value);
+
+void simple_display(
+    llvm::raw_ostream &out,
+    const llvm::PointerUnion<ValueDecl *, ExtensionDecl *> &value);
 
 void simple_display(llvm::raw_ostream &out, ASTContext *ctx);
 
@@ -1563,6 +1572,36 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Obtain the 'resolvable proxy adapter' thunk for the passed-in function.
+///
+/// This thunk is invoked on the recipient side of a remote call: it
+/// receives the wire-level proxy types ('$P') decoded from the
+/// invocation, forwards them into the user-facing 'any P' / 'some P'
+/// types the distributed function expects (an implicit existential
+/// erasure), invokes the function, and re-resolves the result back into
+/// the proxy type so it can be returned over the wire.
+class GetDistributedRecipientResolvableProxyAdapterThunkRequest
+    : public SimpleRequest<GetDistributedRecipientResolvableProxyAdapterThunkRequest,
+                           FuncDecl *(
+                               llvm::PointerUnion<AbstractStorageDecl *,
+                                                  AbstractFunctionDecl *>),
+                           RequestFlags::Cached> {
+  using Originator =
+      llvm::PointerUnion<AbstractStorageDecl *, AbstractFunctionDecl *>;
+
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, Originator originator) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Obtain the 'id' property of a 'distributed actor'.
 class GetDistributedActorIDPropertyRequest :
     public SimpleRequest<GetDistributedActorIDPropertyRequest,
@@ -1646,7 +1685,8 @@ using CustomAttrNominalPair = std::pair<CustomAttr *, NominalTypeDecl *>;
 /// declaration.
 ///
 /// This is the "raw" global actor attribute as written directly on the
-/// declaration, with any inference rules applied.
+/// declaration, along with the nominal type declaration to which it refers,
+/// without any inference rules applied.
 class GlobalActorAttributeRequest
     : public SimpleRequest<GlobalActorAttributeRequest,
                            std::optional<CustomAttrNominalPair>(
@@ -1672,18 +1712,21 @@ public:
 };
 
 /// Determine the actor isolation for the given declaration.
-class ActorIsolationRequest :
-    public SimpleRequest<ActorIsolationRequest,
-                         InferredActorIsolation(ValueDecl *),
-                         RequestFlags::Cached> {
+class ActorIsolationRequest
+    : public SimpleRequest<
+          ActorIsolationRequest,
+          InferredActorIsolation(
+              llvm::PointerUnion<ValueDecl *, ExtensionDecl *>),
+          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  InferredActorIsolation evaluate(Evaluator &evaluator,
-                                  ValueDecl *value) const;
+  InferredActorIsolation evaluate(
+      Evaluator &evaluator,
+      llvm::PointerUnion<ValueDecl *, ExtensionDecl *> declOrExtension) const;
 
 public:
   // Caching
@@ -2237,7 +2280,7 @@ class AbstractGenericSignatureRequest :
                          GenericSignatureWithError (const GenericSignatureImpl *,
                                                     SmallVector<GenericTypeParamType *, 2>,
                                                     SmallVector<Requirement, 2>,
-                                                    bool),
+                                                    DefaultRequirementOptions),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2251,7 +2294,7 @@ private:
            const GenericSignatureImpl *baseSignature,
            SmallVector<GenericTypeParamType *, 2> addedParameters,
            SmallVector<Requirement, 2> addedRequirements,
-           bool allowInverses) const;
+           DefaultRequirementOptions options) const;
 
 public:
   // Separate caching.
@@ -2271,7 +2314,7 @@ class InferredGenericSignatureRequest :
                                                     SmallVector<Requirement, 2>,
                                                     SmallVector<TypeBase *, 2>,
                                                     SourceLoc, ExtensionDecl *,
-                                                    bool),
+                                                    DefaultRequirementOptions),
                          RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2288,7 +2331,7 @@ private:
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeBase *, 2> inferenceSources,
            SourceLoc loc, ExtensionDecl *forExtension,
-           bool allowInverses) const;
+           DefaultRequirementOptions options) const;
 
 public:
   /// Inferred generic signature requests don't have source-location info.
@@ -3841,6 +3884,26 @@ private:
 
 public:
   // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
+class ResolvePreInverseGenericsRequest
+    : public SimpleRequest<ResolvePreInverseGenericsRequest,
+                           Type(Decl *, PreInverseGenericsAttr *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Type evaluate(Evaluator &evaluator,
+                Decl *decl,
+                PreInverseGenericsAttr *attr) const;
+
+public:
   bool isCached() const { return true; }
   std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
@@ -5535,9 +5598,12 @@ public:
   void cacheResult(std::optional<SemanticAvailabilitySpec> value) const;
 };
 
-class DefaultIsolationInSourceFileRequest
-    : public SimpleRequest<DefaultIsolationInSourceFileRequest,
-                           std::optional<DefaultIsolation>(const SourceFile *),
+/// Gathers the file-level defaults declared by `using ...` at the top of a
+/// source file, and diagnoses any issues that would affect results. Other
+/// validation in `visitUsingDecl` instead.
+class FileDefaultsRequest
+    : public SimpleRequest<FileDefaultsRequest,
+                           FileDefaults(const SourceFile *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5545,11 +5611,35 @@ public:
 private:
   friend SimpleRequest;
 
-  std::optional<DefaultIsolation> evaluate(Evaluator &evaluator,
-                                           const SourceFile *file) const;
+  FileDefaults evaluate(Evaluator &evaluator, const SourceFile *file) const;
 
 public:
   bool isCached() const { return true; }
+};
+
+/// Materializes file-level `using @available(...)` defaults onto \p decl's
+/// attribute list by tail-appending implicit clones of each applicable
+/// availability attr. Must only be called on top-level value decls and
+/// extensions.
+class ApplyFileDefaultsRequest
+    : public SimpleRequest<ApplyFileDefaultsRequest,
+                           evaluator::SideEffect(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+
+  /// Whether file-level defaults can apply to `decl`: it must be a top-level
+  /// value or extension with a source file. Checking this is cheaper than
+  /// needlessly requesting.
+  static bool appliesTo(const Decl *decl);
 };
 
 /// Performs extension binding for all of the extensions in a module.
@@ -5630,6 +5720,169 @@ public:
   std::optional<BraceStmt *> getCachedResult() const;
   void cacheResult(BraceStmt *stmt) const;
 };
+
+/// Describes how a `SubscriptDecl` is (or is not) be eligible to fulfill a
+/// `@dynamicMemberLookup` requirement.
+///
+/// `@dynamicMemberLookup` requires that a subscript:
+///
+///   1. Take an initial argument with an explicit `dynamicMember` argument
+///      label,
+///   2. Whose parameter type is non-variadic and is either
+///      * A `{{Reference}Writable}KeyPath`, or
+///      * A concrete type conforming to `ExpressibleByStringLiteral`,
+///   3. And whose following arguments (if any) are all either variadic or have
+///      a default value
+///
+/// Subscripts which don't meet these requirements strictly are not eligible.
+class DynamicMemberLookupSubscriptEligibility {
+public:
+  /// The kind of `dynamicMember` parameter the subscript takes (or could take,
+  /// if eligible for a fix-it for a missing `dynamicMember` label).
+  using DynamicMemberKind = SubscriptDecl::DynamicMemberLookupKind;
+
+  /// Reasons why a parameter disqualifies the subscript from meeting a
+  /// `@dynamicMemberLookup` requirement.
+  enum class InvalidParameterFlag: uint8_t {
+    /// The subscript has no `dynamicMember` parameter (so likely isn't eligible
+    /// for `@dynamicMemberLookup` subscript checking at all), but _could_ be
+    /// made valid if the parameter had a `"dynamicMember"` argument label
+    /// (e.g., `subscript(member: String)`).
+    ///
+    /// A fix-it can be provided to insert an argument label.
+    DynamicMemberMissingArgumentLabel = 1 << 0,
+
+    /// The parameter has a `dynamicMember` parameter label but no explicit
+    /// argument label (e.g., `subscript(dynamicMember: String)`). Since the
+    /// subscript must have `dynamicMember` as its argument label, we treat this
+    /// _as if_ the parameter label is missing.
+    ///
+    /// A fix-it can be provided to insert a parameter label.
+    DynamicMemberMissingParameterLabel = 1 << 1,
+
+    /// The parameter has a `"dynamicMember"` parameter label but a different
+    /// argument label (e.g., `subscript(_ dynamicMember: String)`).
+    ///
+    /// While it's possible that such a subscript isn't intended to implement a
+    /// `@dynamicMemberLookup` requirement, it's much more likely to be a
+    /// mistake than not and is worth diagnosing.
+    DynamicMemberInvalidArgumentLabel = 1 << 2,
+
+    /// The `dynamicMember` parameter does not appear first in the argument
+    /// list (e.g., `subscript(foo: Int = 42, dynamicMember member: String)`).
+    DynamicMemberInvalidOrder = 1 << 3,
+
+    /// The `dynamicMember` parameter has a type that does not meet the
+    /// requirements of being either key-path- or string-based.
+    DynamicMemberInvalidType = 1 << 4,
+
+    /// The parameter is a non-`dynamicMember` parameter which does not have a
+    /// default value.
+    ParameterMissingDefaultValue = 1 << 5,
+  };
+
+  using InvalidParameterFlags = OptionSet<InvalidParameterFlag>;
+
+private:
+  /// The subscript index of the `dynamicMember` parameter, if present.
+  std::optional<unsigned> DynamicMemberIdx;
+
+  /// The type of the `dynamicMember` parameter; separately-optional from
+  /// `DynamicMemberIdx` to represent an invalid parameter type.
+  std::optional<DynamicMemberKind> Kind;
+
+  /// Flags describing the validity of each of the subscript parameters.
+  SmallVector<InvalidParameterFlags> ParamFlags;
+
+public:
+  DynamicMemberLookupSubscriptEligibility(
+      std::optional<unsigned> dynamicMemberIdx,
+      std::optional<DynamicMemberKind> kind,
+      SmallVector<InvalidParameterFlags> paramFlags)
+      : DynamicMemberIdx(dynamicMemberIdx), Kind(kind),
+        ParamFlags(paramFlags) {}
+
+  bool isValid() const {
+    return DynamicMemberIdx == 0 && Kind &&
+           std::all_of(ParamFlags.begin(), ParamFlags.end(),
+                       [&](const InvalidParameterFlags &f) { return !f; });
+  }
+
+  bool isEligibleForArgumentLabelFixIt() const {
+    // We can offer a fix-it to insert a `dynamicMember` argument label iff the
+    // subscript is only missing the label itself.
+    return !DynamicMemberIdx && Kind &&
+           ParamFlags[0].containsOnly(
+               InvalidParameterFlag::DynamicMemberMissingArgumentLabel) &&
+           std::all_of(ParamFlags.begin() + 1, ParamFlags.end(),
+                       [&](const InvalidParameterFlags &f) { return !f; });
+  }
+
+  /// Returns the kind of the `dynamicMember` parameter if the decl is eligible
+  /// for dynamic member lookup; `std::nullopt` otherwise.
+  std::optional<DynamicMemberKind> getDynamicMemberKind() const {
+    return isValid() ? Kind : std::nullopt;
+  }
+
+  /// If invalid, produces diagnostics describing the ineligibility.
+  ///
+  /// Returns whether an error diagnostic was produced.
+  bool diagnose(SubscriptDecl *decl) const;
+
+  friend llvm::hash_code
+  hash_value(const DynamicMemberLookupSubscriptEligibility &e) {
+    auto hash = llvm::hash_combine(llvm::hash_value(e.DynamicMemberIdx),
+                                   llvm::hash_value(e.Kind));
+    for (auto flags : e.ParamFlags) {
+      hash = llvm::hash_combine(hash, flags.toRaw());
+    }
+
+    return hash;
+  }
+
+  friend bool operator==(const DynamicMemberLookupSubscriptEligibility &lhs,
+                         const DynamicMemberLookupSubscriptEligibility &rhs) {
+    return lhs.DynamicMemberIdx == rhs.DynamicMemberIdx &&
+           lhs.Kind == rhs.Kind &&
+           // `OptionSet` intentionally does not offer `==` in favor of
+           // requiring `containsOnly`.
+           llvm::equal(lhs.ParamFlags, rhs.ParamFlags,
+                       [&](const InvalidParameterFlags &lhs,
+                           const InvalidParameterFlags &rhs) {
+                         return lhs.containsOnly(rhs);
+                       });
+  }
+
+  friend bool operator!=(const DynamicMemberLookupSubscriptEligibility &lhs,
+                         const DynamicMemberLookupSubscriptEligibility &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+class DynamicMemberLookupSubscriptRequest
+    : public SimpleRequest<
+          DynamicMemberLookupSubscriptRequest,
+          DynamicMemberLookupSubscriptEligibility(const SubscriptDecl *),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  /// Given a `SubscriptDecl`, returns whether the decl is a viable candidate
+  /// for `@dynamicMemberLookup`.
+  DynamicMemberLookupSubscriptEligibility
+  evaluate(Evaluator &evaluator, const SubscriptDecl *decl) const;
+
+public:
+  SourceLoc getNearestLoc() const {
+    return std::get<0>(getStorage())->getLoc();
+  }
+
+  bool isCached() const { return true; }
+};
+
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

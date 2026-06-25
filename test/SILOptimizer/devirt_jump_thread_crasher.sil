@@ -49,7 +49,7 @@ bb3:                                              // Preds: bb1 bb6 bb8 bb10
   switch_enum_addr %3 : $*MyOptional<R>, case #MyOptional.some!enumelt: bb4, case #MyOptional.none!enumelt: bb5 // id: %12
 
 bb4:                                              // Preds: bb3
-  %13 = unchecked_take_enum_data_addr %3 : $*MyOptional<R>, #MyOptional.some!enumelt // user: %14
+  %13 = unchecked_inplace_enum_data_addr %3 : $*MyOptional<R>, #MyOptional.some!enumelt // user: %14
   copy_addr [take] %13 to [init] %0 : $*R // id: %14
   dealloc_stack %3 : $*MyOptional<R> // id: %15
   strong_release %2 : $Base // id: %16

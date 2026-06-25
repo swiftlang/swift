@@ -206,7 +206,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   const size_t initialCount = decls.size();
   size_t currentCount = decls.size();
 
-  auto updateNewDecls = [&](const DeclContext *moduleScopeContext) {
+  auto updateNewDecls = [&](const DeclContext *moduleScopeContext,
+                            bool fromScopedImport) {
     if (decls.size() == currentCount)
       return;
 
@@ -216,6 +217,9 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
         if (resolutionKind == ResolutionKind::TypesOnly && !isa<TypeDecl>(VD))
           return true;
         if (resolutionKind == ResolutionKind::MacrosOnly && !isa<MacroDecl>(VD))
+          return true;
+        // Macros are not scoped-importable.
+        if (fromScopedImport && isa<MacroDecl>(VD))
           return true;
         if (respectAccessControl &&
             !declIsVisibleToNameLookup(VD, moduleScopeContext, options))
@@ -241,7 +245,19 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   auto *module = moduleOrFile->getParentModule();
   getDerived()->doLocalLookup(
       module, accessPath, currentModuleLookupFlags, decls);
-  updateNewDecls(moduleScopeContext);
+  // Treat as scoped if the access path is scoped, or the target module is
+  // only visible via scoped imports (e.g. `@StructAndMacro.Foo` referenced
+  // through `import struct StructAndMacro.Foo`).
+  bool fromScopedImport = !accessPath.empty();
+  if (!fromScopedImport && module != moduleScopeContext->getParentModule()) {
+    auto visiblePaths =
+        ctx.getImportCache().getAllVisibleAccessPaths(module, moduleScopeContext);
+    if (!visiblePaths.empty() &&
+        llvm::all_of(visiblePaths,
+                     [](ImportPath::Access p) { return !p.empty(); }))
+      fromScopedImport = true;
+  }
+  updateNewDecls(moduleScopeContext, fromScopedImport);
 
   bool canReturnEarly = (initialCount != decls.size() &&
                          getDerived()->canReturnEarly());
@@ -275,7 +291,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
 
       getDerived()->doLocalLookup(import.importedModule, import.accessPath,
                                   importedModuleLookupFlags, decls);
-      updateNewDecls(moduleScopeContext);
+      updateNewDecls(moduleScopeContext,
+                     /*fromScopedImport=*/!import.accessPath.empty());
     };
 
     // If the ClangImporter's special header import module appears in the

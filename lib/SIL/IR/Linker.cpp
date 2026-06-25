@@ -61,6 +61,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -108,7 +109,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
   // an existing function with a wrong linkage, e.g. using `@_cdecl`.
   if(!(callerSerializedKind == IsNotSerialized ||
             F->hasValidLinkageForFragileRef(callerSerializedKind) ||
-            hasSharedVisibility(linkage) || F->isExternForwardDeclaration())) {
+            hasSharedVisibility(linkage))) {
     StringRef name = "a serialized function";
     llvm::SmallVector<char> scratch;
 
@@ -142,7 +143,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
       Worklist.push_back(F);
     }
 
-    if (F->markedAsAlwaysEmitIntoClient()) {
+    if (F->isAlwaysEmitIntoClient()) {
       // For @_alwaysEmitIntoClient functions, we need to lookup its
       // differentiability witness and, if present, ask SILLoader to obtain its
       // definition. Otherwise, a linker error would occur due to undefined
@@ -175,7 +176,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
   // So try deserializing HiddenExternal functions too.
   if (linkage == SILLinkage::HiddenExternal) {
     deserializeAndPushToWorklist(F);
-    if (!F->markedAsAlwaysEmitIntoClient())
+    if (!F->isAlwaysEmitIntoClient())
       return;
     // For @_alwaysEmitIntoClient functions, we need to lookup its
     // differentiability witness and, if present, ask SILLoader to obtain its
@@ -429,33 +430,41 @@ void SILLinkerVisitor::visitApplySubstitutions(SubstitutionMap subs) {
   }
 }
 
+/// Force-deserialize the witness tables for an existential's conformances.
+///
+/// A normal embedded conformance is shared and emitted lazily into the module
+/// that forms the existential, so without this the importer references a witness
+/// table no module defines, an undefined symbol at link. `init_existential_value`
+/// has no visitor: the linker runs after AddressLowering, which has already
+/// lowered it to `init_existential_addr`.
+///
+/// TODO: a two-step scheme (declare here, deserialize at the witness_method use)
+/// would be lazier, but risks visiting witness_method before this instruction.
+void SILLinkerVisitor::linkInExistentialConformances(
+    ArrayRef<ProtocolConformanceRef> conformances) {
+  for (ProtocolConformanceRef C : conformances) {
+    visitProtocolConformance(C, /*referencedFromInitExistential=*/true);
+  }
+}
+
 void SILLinkerVisitor::visitInitExistentialAddrInst(
     InitExistentialAddrInst *IEI) {
-  // Link in all protocol conformances that this touches.
-  //
-  // TODO: There might be a two step solution where the init_existential_inst
-  // causes the witness table to be brought in as a declaration and then the
-  // protocol method inst causes the actual deserialization. For now we are
-  // not going to be smart about this to enable avoiding any issues with
-  // visiting the open_existential_addr/witness_method before the
-  // init_existential_inst.
-  for (ProtocolConformanceRef C : IEI->getConformances()) {
-    visitProtocolConformance(C, true);
-  }
+  linkInExistentialConformances(IEI->getConformances());
 }
 
 void SILLinkerVisitor::visitInitExistentialRefInst(
     InitExistentialRefInst *IERI) {
-  // Link in all protocol conformances that this touches.
-  //
-  // TODO: There might be a two step solution where the init_existential_inst
-  // causes the witness table to be brought in as a declaration and then the
-  // protocol method inst causes the actual deserialization. For now we are
-  // not going to be smart about this to enable avoiding any issues with
-  // visiting the protocol_method before the init_existential_inst.
-  for (ProtocolConformanceRef C : IERI->getConformances()) {
-    visitProtocolConformance(C, true);
-  }
+  linkInExistentialConformances(IERI->getConformances());
+}
+
+void SILLinkerVisitor::visitAllocExistentialBoxInst(
+    AllocExistentialBoxInst *AEBI) {
+  linkInExistentialConformances(AEBI->getConformances());
+}
+
+void SILLinkerVisitor::visitInitExistentialMetatypeInst(
+    InitExistentialMetatypeInst *IEMI) {
+  linkInExistentialConformances(IEMI->getConformances());
 }
 
 void SILLinkerVisitor::visitBuiltinInst(BuiltinInst *bi) {
@@ -519,9 +528,15 @@ void SILLinkerVisitor::visitGlobalAddrInst(GlobalAddrInst *GAI) {
   if (!Mod.getOptions().EmbeddedSwift)
     return;
 
-  // In Embedded Swift, we want to actually link globals from other modules too,
-  // so strip "external" from the linkage.
+  // In Embedded Swift, globals from other modules are normally materialized
+  // as definitions in the importing module (linkonce_odr at IRGen time), so
+  // strip "external" from their linkage. The exception is the Interface code
+  // generation model: those globals have a unique strong definition in their
+  // defining module, and the importer must reference them externally.
   SILGlobalVariable *G = GAI->getReferencedGlobal();
+  if (auto cgModel = G->codeGenerationModel())
+    if (*cgModel == CodeGenerationModel::Interface)
+      return;
   if (G->isDefinition())
     G->setLinkage(stripExternalFromLinkage(G->getLinkage()));
 }

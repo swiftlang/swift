@@ -277,6 +277,14 @@ const size_t _swift_debug_metadataAllocatorPageSize;
 SWIFT_RUNTIME_STDLIB_SPI
 std::atomic<const void *> _swift_debug_metadataAllocationBacktraceList;
 
+// The end of a metadata allocation pool page contains a pointer to the previous
+// page. This is the offset of that pointer within a page. The back pointer
+// points to the previous back pointer, so a user of this value can subtract the
+// offset to find the beginning of the containing page. A value of ~0 means
+// there is no back pointer.
+SWIFT_RUNTIME_STDLIB_SPI
+size_t _swift_debug_allocationPoolBackPointerOffset;
+
 SWIFT_RUNTIME_STDLIB_SPI
 const void * const _swift_debug_protocolConformanceStatePointer;
 

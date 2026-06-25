@@ -383,17 +383,22 @@ public:
 
 /// Array based layouts like Builtin.FixedArray<N, T>
 class ArrayTypeInfo : public TypeInfo {
+  const TypeRef *ElementTR;
   const TypeInfo *ElementTI;
+  intptr_t ElementCount;
 
 public:
-  explicit ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI);
+  explicit ArrayTypeInfo(intptr_t size, const TypeRef *elementTR,
+                         const TypeInfo *elementTI);
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
                                 int *extraInhabitantIndex) const override;
 
   BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
+  const TypeRef *getElementTypeRef() const { return ElementTR; }
   const TypeInfo *getElementTypeInfo() const { return ElementTI; }
+  intptr_t getElementCount() const { return ElementCount; }
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Array;
   }

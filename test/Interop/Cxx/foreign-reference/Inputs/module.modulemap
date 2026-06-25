@@ -112,3 +112,25 @@ module RefKit {
   header "refkit.hpp"
   requires cplusplus
 }
+
+module Upcast {
+  header "upcast.h"
+  requires cplusplus
+}
+
+module SuperStaticDispatch {
+  header "super-static-dispatch.h"
+  requires cplusplus
+  export *
+}
+
+module SuperVirtualDispatch {
+  header "super-virtual-dispatch.h"
+  requires cplusplus
+  export *
+}
+
+module ImmortalFRTHashable {
+  header "immortal-frt-hashable.h"
+  requires cplusplus
+}

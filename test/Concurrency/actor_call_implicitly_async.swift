@@ -253,12 +253,12 @@ actor TestActor {}
 
 @globalActor
 struct BananaActor {
-  static var shared: TestActor { TestActor() }
+  static let shared = TestActor()
 }
 
 @globalActor
 struct OrangeActor {
-  static var shared: TestActor { TestActor() }
+  static let shared = TestActor()
 }
 
 func blender(_ peeler : () -> Void) {

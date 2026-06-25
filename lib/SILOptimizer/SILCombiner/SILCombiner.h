@@ -254,7 +254,6 @@ public:
   // NOTE: The load optimized in this method is a load [trivial].
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
 
-  SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
@@ -266,7 +265,7 @@ public:
   visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI);
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
   SILInstruction *
-  visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI);
+  visitUncheckedEnumDataAddrInstBase(UncheckedEnumDataAddrInstBase *TEDAI);
   SILInstruction *visitCondBranchInst(CondBranchInst *CBI);
   SILInstruction *
   visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);

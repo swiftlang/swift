@@ -14,7 +14,7 @@
 // Output path of the PCH differs in the new driver, so force SWIFT_USE_OLD_DRIVER for now.
 // RUN: env TMPDIR=%t/tmp/ SWIFT_USE_OLD_DRIVER=1 %target-swiftc_driver -typecheck -save-temps %s -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk
 // RUN: ls %t/tmp/*.pch >/dev/null 2>&1
-// RUN: llvm-objdump --raw-clang-ast %t/tmp/*.pch | llvm-bcanalyzer -dump | %FileCheck %s
+// RUN: llvm-objdump --raw-clang-ast %t/tmp/*.pch | %llvm-bcanalyzer -dump | %FileCheck %s
 // CHECK: ORIGINAL_FILE{{.*}}Inputs/c-bridging-header.h
 
 // Test the driver-automated version deletes its PCH file when done
@@ -40,7 +40,7 @@
 // Test the driver-automated version using persistent PCH
 // RUN: %target-swiftc_driver -typecheck -save-temps %s -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -pch-output-dir %t/pch3 -sdk %clang-importer-sdk
 // RUN: ls %t/pch3/*.pch >/dev/null 2>&1
-// RUN: llvm-objdump --raw-clang-ast %t/pch3/*.pch | llvm-bcanalyzer -dump | %FileCheck %s -check-prefix=PERSISTENT
+// RUN: llvm-objdump --raw-clang-ast %t/pch3/*.pch | %llvm-bcanalyzer -dump | %FileCheck %s -check-prefix=PERSISTENT
 // PERSISTENT: ORIGINAL_FILE{{.*}}Inputs/c-bridging-header.h
 
 // Test that -pch-disable-validation works in that it won't implicitly create a PCH

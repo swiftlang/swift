@@ -4,6 +4,9 @@
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -I %t \
 // RUN:   -module-name Lib -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -swift-version 5
+// RUN: %target-swift-frontend -emit-module %t/IPILib.swift -I %t \
+// RUN:   -module-name IPILib -emit-module-path %t/IPILib.swiftmodule \
+// RUN:   -swift-version 5 -library-level ipi
 // RUN: %target-swift-frontend -emit-module %t/APILib.swift -I %t \
 // RUN:   -swift-version 5 -verify -verify-ignore-unrelated \
 // RUN:   -experimental-spi-only-imports \
@@ -17,9 +20,27 @@
 // RUN:   -swift-version 5 -verify -verify-ignore-unrelated \
 // RUN:   -experimental-spi-only-imports
 
+// RUN: %target-swift-frontend -emit-module %t/APISpiOnlyIPI.swift -I %t \
+// RUN:   -swift-version 5 -verify -verify-ignore-unrelated \
+// RUN:   -experimental-spi-only-imports \
+// RUN:   -library-level api \
+// RUN:   -require-explicit-availability=ignore
+// RUN: %target-swift-frontend -emit-module %t/SPISpiOnlyIPI.swift -I %t \
+// RUN:   -swift-version 5 -verify -verify-ignore-unrelated \
+// RUN:   -experimental-spi-only-imports \
+// RUN:   -library-level spi
+
+// RUN: %target-swift-frontend -emit-module %t/IPISpiOnlyIPI.swift -I %t \
+// RUN:   -swift-version 5 -verify -verify-ignore-unrelated \
+// RUN:   -experimental-spi-only-imports \
+// RUN:   -library-level ipi
+
 //--- Lib.swift
 
 public struct LibStruct {}
+
+//--- IPILib.swift
+public struct IPIStruct {}
 
 //--- APILib.swift
 
@@ -41,3 +62,15 @@ public func publicClient() -> LibStruct { fatalError() }
 
 public func publicClient() -> LibStruct { fatalError() } // expected-error {{cannot use struct 'LibStruct' here; 'Lib' was imported for SPI only}}
 @_spi(X) public func spiClient() -> LibStruct { fatalError() }
+
+//--- APISpiOnlyIPI.swift
+
+@_spiOnly import IPILib // expected-warning {{Project internal module 'IPILib' cannot be imported publicly because 'APISpiOnlyIPI' has '-library-level api'}}
+
+//--- SPISpiOnlyIPI.swift
+
+@_spiOnly import IPILib // expected-warning {{Project internal module 'IPILib' cannot be imported publicly because 'SPISpiOnlyIPI' has '-library-level spi'}}
+
+//--- IPISpiOnlyIPI.swift
+
+@_spiOnly import IPILib

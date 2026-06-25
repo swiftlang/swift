@@ -315,6 +315,20 @@ struct S157801454 : P157801454 { // expected-error{{type 'S157801454' does not c
   }
 }
 
+// MARK: rdar://173716835, Associated type inference with lifetimes
+protocol IterProtocol<Element> {
+  associatedtype Element
+  mutating func next() -> Self.Element?
+}
+
+struct Iter<T: ~Escapable>: ~Escapable {
+  @_lifetime(copy self)
+  mutating func next() -> T? { fatalError() }
+}
+extension Iter: Escapable where T: Escapable {}
+extension Iter: IterProtocol where T: Escapable {} // OK: Dependencies are ignored when the target is Escapable
+
+
 // MARK: Simultaneous conformance to conflicting protocols
 protocol CopyF: ~Escapable {
   @_lifetime(copy self)

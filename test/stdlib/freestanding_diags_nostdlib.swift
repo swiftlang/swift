@@ -13,6 +13,7 @@ actor Simple {}
 class Goo {
   typealias ActorType = Simple
 
+  @diagnose(UnstableGlobalActorShared, as: ignored)
   static var shared : Simple { fatalError() }
 }
 

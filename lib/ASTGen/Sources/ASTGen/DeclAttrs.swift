@@ -176,6 +176,8 @@ extension ASTGenVisitor {
         return handle(self.generateOptimizeAttr(attribute: node)?.asDeclAttribute)
       case .OriginallyDefinedIn:
         return self.generateOriginallyDefinedInAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
+      case .PreInverseGenerics:
+        return handle(self.generatePreInverseGenericsAttr(attribute: node)?.asDeclAttribute)
       case .PrivateImport:
         return handle(self.generatePrivateImportAttr(attribute: node)?.asDeclAttribute)
       case .ProjectedValueProperty:
@@ -198,8 +200,8 @@ extension ASTGenVisitor {
         return handle(self.generateStorageRestrictionAttr(attribute: node)?.asDeclAttribute)
       case .SwiftNativeObjCRuntimeBase:
         return handle(self.generateSwiftNativeObjCRuntimeBaseAttr(attribute: node)?.asDeclAttribute)
-      case .Warn:
-        return handle(self.generateWarnAttr(attribute: node)?.asDeclAttribute)
+      case .Diagnose:
+        return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
       case .Transpose:
         return handle(self.generateTransposeAttr(attribute: node)?.asDeclAttribute)
       case .TypeEraser:
@@ -228,6 +230,9 @@ extension ASTGenVisitor {
       case nil where attrName == "_versioned":
         // TODO: Diagnose.
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .UsableFromInline))
+      case nil where attrName == "warn":
+        // TODO: Diagnose. 'warn' is renamed to 'diagnose'
+        return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
 
       // Simple attributes.
       case .AddressableSelf,
@@ -253,6 +258,7 @@ extension ASTGenVisitor {
         .Frozen,
         .GKInspectable,
         .GlobalActor,
+        .HasHiddenStoredProperties,
         .HasInitialValue,
         .HasMissingDesignatedInitializers,
         .HasStorage,
@@ -293,7 +299,6 @@ extension ASTGenVisitor {
         .ObjCNonLazyRealization,
         .Owned,
         .Preconcurrency,
-        .PreInverseGenerics,
         .PropertyWrapper,
         .Reparentable,
         .RequiresStoredPropertyInits,
@@ -1729,6 +1734,23 @@ extension ASTGenVisitor {
     )
   }
 
+  func generatePreInverseGenericsAttr(attribute node: AttributeSyntax) -> BridgedPreInverseGenericsAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      switch args.first?.label?.rawText {
+        case "except":
+          fatalError("ASTGen does not yet support the except: argument")
+        default:
+          // TODO: Diagnose.
+          fatalError("invalid argument for @_preInverseGenerics attribute")
+      }
+      return .createParsed(
+          self.ctx,
+          atLoc: self.generateSourceLoc(node.atSign),
+          range: self.generateAttrSourceRange(node)
+      )
+    }
+  }
+
   func generateRawLayoutAttr(attribute node: AttributeSyntax) -> BridgedRawLayoutAttr? {
     self.generateWithLabeledExprListArguments(attribute: node) { args in
       switch args.first?.label?.rawText {
@@ -2182,52 +2204,55 @@ extension ASTGenVisitor {
   
   /// E.g.:
   ///   ```
-  ///   @warn(DiagGroupID, as: Behavior, reason: String?)
+  ///   @diagnose(DiagGroupID, as: Behavior, reason: String?)
   ///   ```
-  func generateWarnAttr(attribute node: AttributeSyntax) -> BridgedWarnAttr? {
-    guard let diagGroupIdentifier: swift.Identifier = self.generateWithLabeledExprListArguments(attribute: node, { args in
-      self.generateConsumingAttrOption(args: &args, label: nil) { expr in
-        guard let declRefExpr = expr.as(DeclReferenceExprSyntax.self) else {
-          return nil
-        }
-        return self.generateIdentifier(declRefExpr.baseName)
+  func generateDiagnoseAttr(attribute node: AttributeSyntax) -> BridgedDiagnoseAttr? {
+    return self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard let diagGroupIdentifier: swift.Identifier =
+          self.generateConsumingAttrOption(args: &args, label: nil, { expr in
+            guard let declRefExpr = expr.as(DeclReferenceExprSyntax.self) else {
+              return nil
+            }
+            return self.generateIdentifier(declRefExpr.baseName)
+          })
+      else {
+        return nil
       }
-    }) else {
-      return nil
-    }
-    
-    guard let behavior: swift.WarningGroupBehavior = self.generateWithLabeledExprListArguments(attribute: node, { args in
-      self.generateConsumingAttrOption(args: &args, label: "as") { expr in
-        guard let declRefExpr = expr.as(DeclReferenceExprSyntax.self) else {
-          return nil
-        }
-        switch declRefExpr.baseName.text {
-        case "error": return swift.WarningGroupBehavior.error
-        case "warning": return swift.WarningGroupBehavior.warning
-        case "ignored": return swift.WarningGroupBehavior.ignored
-        default: return nil
-        }
-      }
-    }) else {
-      return nil
-    }
-    
-    let reason: BridgedStringRef
-    if let userSpecifiedReason = self.generateWithLabeledExprListArguments(attribute: node, { args in
-      self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "reason")}) {
-      reason = userSpecifiedReason
-    } else {
-      reason = allocateBridgedString("")
-    }
 
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateAttrSourceRange(node),
-      diagGroupName: diagGroupIdentifier,
-      behavior: behavior,
-      reason: reason
-    )
+      guard let behavior: swift.WarningGroupBehavior =
+          self.generateConsumingAttrOption(args: &args, label: "as", { expr in
+            guard let declRefExpr = expr.as(DeclReferenceExprSyntax.self) else {
+              return nil
+            }
+            switch declRefExpr.baseName.text {
+            case "error": return swift.WarningGroupBehavior.error
+            case "warning": return swift.WarningGroupBehavior.warning
+            case "ignored": return swift.WarningGroupBehavior.ignored
+            default: return nil
+            }
+          })
+      else {
+        return nil
+      }
+
+      let reason: BridgedStringRef
+      if let userSpecifiedReason = self.generateConsumingSimpleStringLiteralAttrOption(
+        args: &args, label: "reason")
+      {
+        reason = userSpecifiedReason
+      } else {
+        reason = allocateBridgedString("")
+      }
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        diagGroupName: diagGroupIdentifier,
+        behavior: behavior,
+        reason: reason
+      )
+    }
   }
 
   /// E.g.:

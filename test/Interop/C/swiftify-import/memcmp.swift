@@ -7,7 +7,7 @@
 // RUN: %empty-directory(%t/sdk)
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -strict-memory-safety -sdk %t/sdk \
-// RUN:   -Xcc -Werror %t%{fs-sep}test.swift -import-objc-header %t%{fs-sep}test.h -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions
+// RUN:   -Xcc -Werror %t%{fs-sep}test.swift -import-objc-header %t%{fs-sep}test.h -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -eager-macro-checking
 
 // Check that ClangImporter does not try to apply _SwiftifyImport to functions in SwiftShims,
 // as it does not import the standard library types.

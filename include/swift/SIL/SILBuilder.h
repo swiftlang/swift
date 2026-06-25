@@ -207,6 +207,9 @@ public:
   SILFunction *maybeGetFunction() const { return F; }
 
   bool isInsertingIntoGlobal() const { return F == nullptr; }
+  bool isInsertingIntoDebugReconstructionBlock() const {
+    return BB && BB->isDebugReconstructionBlock();
+  }
 
   TypeExpansionContext getTypeExpansionContext() const {
     if (!F)
@@ -251,8 +254,11 @@ public:
     // FIXME: Audit all uses and enable this assertion.
     // assert(getCurrentDebugScope() && "no debug scope");
     auto Scope = getCurrentDebugScope();
-    if (!Scope && F)
-        Scope = F->getDebugScope();
+    // The content of debug reconstruction block is always scopeless.
+    if (BB && BB->isDebugReconstructionBlock())
+      Scope = nullptr;
+    else if (!Scope && F)
+      Scope = F->getDebugScope();
     auto overriddenLoc = CurDebugLocOverride ? *CurDebugLocOverride : Loc;
     return SILDebugLocation(overriddenLoc, Scope);
   }
@@ -275,6 +281,8 @@ public:
   /// If we have a SILFunction, return SILFunction::hasOwnership(). If we have a
   /// SILGlobalVariable, just return false.
   bool hasOwnership() const {
+    if (BB && BB->isDebugReconstructionBlock())
+      return false;
     if (F)
       return F->hasOwnership();
     return false;
@@ -551,10 +559,13 @@ public:
       SILLocation loc, SILValue callee, SubstitutionMap subs,
       ArrayRef<SILValue> args, ApplyOptions options,
       const GenericSpecializationInformation *specializationInfo = nullptr,
-      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt) {
-    return insert(ApplyInst::create(getSILDebugLocation(loc), callee, subs,
-                                    args, options, C.silConv, *F,
-                                    specializationInfo, isolationCrossing));
+      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt,
+      std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt) {
+    ASSERT((!argLocs || argLocs->empty() || argLocs->size() == args.size()) &&
+           "createApply argLocs, when supplied, must be parallel to args");
+    return insert(ApplyInst::create(
+        getSILDebugLocation(loc), callee, subs, args, options, C.silConv, *F,
+        specializationInfo, isolationCrossing, argLocs));
   }
 
   TryApplyInst *createTryApply(
@@ -564,11 +575,14 @@ public:
       const GenericSpecializationInformation *specializationInfo = nullptr,
       std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt,
       ProfileCounter normalCount = ProfileCounter(),
-      ProfileCounter errorCount = ProfileCounter()) {
+      ProfileCounter errorCount = ProfileCounter(),
+      std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt) {
+    ASSERT((!argLocs || argLocs->empty() || argLocs->size() == args.size()) &&
+           "createTryApply argLocs, when supplied, must be parallel to args");
     return insertTerminator(TryApplyInst::create(
         getSILDebugLocation(loc), callee, subs, args, normalBB, errorBB,
-        options, *F, specializationInfo, isolationCrossing,
-        normalCount, errorCount));
+        options, *F, specializationInfo, isolationCrossing, normalCount,
+        errorCount, argLocs));
   }
 
   PartialApplyInst *createPartialApply(
@@ -579,7 +593,8 @@ public:
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       StackAllocationIsNested_t IsNested = StackAllocationIsNested,
-      const GenericSpecializationInformation *SpecializationInfo = nullptr) {
+      const GenericSpecializationInformation *SpecializationInfo = nullptr,
+      std::optional<ArrayRef<SILLocation>> ArgLocs = std::nullopt) {
     ASSERT(OnStack == PartialApplyInst::OnStackKind::OnStack ||
            llvm::all_of(Args,
                         [](SILValue value) {
@@ -587,19 +602,25 @@ public:
                               OwnershipKind::Owned);
                         }) &&
                "Must have an owned compatible object");
+    ASSERT((!ArgLocs || ArgLocs->empty() || ArgLocs->size() == Args.size()) &&
+           "createPartialApply ArgLocs, when supplied, must be parallel to "
+           "Args");
     return insert(PartialApplyInst::create(
         getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention,
-        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested));
+        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested, ArgLocs));
   }
 
   BeginApplyInst *createBeginApply(
       SILLocation loc, SILValue callee, SubstitutionMap subs,
       ArrayRef<SILValue> args, ApplyOptions options = ApplyOptions(),
       const GenericSpecializationInformation *specializationInfo = nullptr,
-      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt) {
+      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt,
+      std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt) {
+    ASSERT((!argLocs || argLocs->empty() || argLocs->size() == args.size()) &&
+           "createBeginApply argLocs, when supplied, must be parallel to args");
     return insert(BeginApplyInst::create(
         getSILDebugLocation(loc), callee, subs, args, options, C.silConv, *F,
-        specializationInfo, isolationCrossing));
+        specializationInfo, isolationCrossing, argLocs));
   }
 
   AbortApplyInst *createAbortApply(SILLocation loc, SILValue beginApply) {
@@ -794,7 +815,8 @@ public:
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
     ASSERT((Qualifier != LoadOwnershipQualifier::Unqualified) ||
-           !hasOwnership() && "Unqualified inst in qualified function");
+           !hasOwnership() &&
+           "Unqualified inst in qualified function");
     ASSERT((Qualifier == LoadOwnershipQualifier::Unqualified) ||
            hasOwnership() && "Qualified inst in unqualified function");
     ASSERT(isLoadableOrOpaque(LV->getType()));
@@ -1073,10 +1095,6 @@ public:
       PoisonRefs_t poisonRefs = DontPoisonRefs,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
-  DebugValueInst *createDebugValueAddr(
-      SILLocation Loc, SILValue src, SILDebugVariable Var,
-      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
-      bool trace = false);
 
   DebugStepInst *createDebugStep(SILLocation Loc) {
     return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));
@@ -1085,8 +1103,10 @@ public:
   /// Create a debug_value according to the type of \p src
   DebugValueInst *emitDebugDescription(SILLocation Loc, SILValue src,
                                        SILDebugVariable Var) {
-    if (src->getType().isAddress())
-      return createDebugValueAddr(Loc, src, Var);
+    if (src->getType().isAddress()) {
+      Var.DIExpr.prependElements(
+        {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+    }
     return createDebugValue(Loc, src, Var);
   }
 
@@ -1839,6 +1859,64 @@ public:
     SILType EltType = Operand->getType().getEnumElementType(
         Element, getModule(), getTypeExpansionContext());
     return createUncheckedTakeEnumDataAddr(Loc, Operand, Element, EltType);
+  }
+
+  UncheckedInPlaceEnumDataAddrInst *
+  createUncheckedInPlaceEnumDataAddr(SILLocation Loc, SILValue Operand,
+                                  EnumElementDecl *Element, SILType Ty) {
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
+    return insert(new (getModule()) UncheckedInPlaceEnumDataAddrInst(
+        getSILDebugLocation(Loc), Operand, Element, Ty));
+  }
+
+  UncheckedInPlaceEnumDataAddrInst *
+  createUncheckedInPlaceEnumDataAddr(SILLocation Loc, SILValue Operand,
+                                  EnumElementDecl *Element) {
+    SILType EltType = Operand->getType().getEnumElementType(
+        Element, getModule(), getTypeExpansionContext());
+    return createUncheckedInPlaceEnumDataAddr(Loc, Operand, Element, EltType);
+  }
+
+  UncheckedEnumDataAddrInstBase *
+  createUncheckedEnumDataAddrForTake(SILLocation Loc, SILValue Operand,
+                                     EnumElementDecl *Element, SILType Ty) {
+    if (UncheckedEnumDataAddrInstBase::isDestructive(Element->getParentEnum(),
+                                                     &getFunction())) {
+      return createUncheckedTakeEnumDataAddr(Loc, Operand, Element, Ty);
+    }
+    return createUncheckedInPlaceEnumDataAddr(Loc, Operand, Element, Ty);
+  }
+
+  UncheckedEnumDataAddrInstBase *
+  createUncheckedEnumDataAddrForTake(SILLocation Loc, SILValue Operand,
+                                     EnumElementDecl *Element) {
+    if (UncheckedEnumDataAddrInstBase::isDestructive(Element->getParentEnum(),
+                                                     &getFunction())) {
+      return createUncheckedTakeEnumDataAddr(Loc, Operand, Element);
+    }
+    return createUncheckedInPlaceEnumDataAddr(Loc, Operand, Element);
+  }
+
+  UncheckedBorrowEnumDataAddrInst *
+  createUncheckedBorrowEnumDataAddr(SILLocation Loc, SILValue Enum,
+                                    SILValue Scratch,
+                                  EnumElementDecl *Element, SILType Ty) {
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
+    return insert(new (getModule()) UncheckedBorrowEnumDataAddrInst(
+        getSILDebugLocation(Loc), Enum, Scratch, Element, Ty));
+  }
+
+  UncheckedBorrowEnumDataAddrInst *
+  createUncheckedBorrowEnumDataAddr(SILLocation Loc, SILValue Enum,
+                                    SILValue Scratch,
+                                  EnumElementDecl *Element) {
+    SILType EltType = Enum->getType().getEnumElementType(
+        Element, getModule(), getTypeExpansionContext());
+    return createUncheckedBorrowEnumDataAddr(Loc, Enum, Scratch, Element, EltType);
   }
 
   InjectEnumAddrInst *createInjectEnumAddr(SILLocation Loc, SILValue Operand,
@@ -2594,9 +2672,11 @@ public:
   //===--------------------------------------------------------------------===//
 
   IndexAddrInst *createIndexAddr(SILLocation Loc, SILValue Operand,
-                                 SILValue Index, bool needsStackProtection) {
+                                 SILValue Index, bool needsStackProtection,
+                                 bool isProjection) {
     return insert(new (getModule()) IndexAddrInst(getSILDebugLocation(Loc),
-                                    Operand, Index, needsStackProtection));
+                                    Operand, Index, needsStackProtection,
+                                    isProjection));
   }
 
   TailAddrInst *createTailAddr(SILLocation Loc, SILValue Operand,
@@ -3283,7 +3363,7 @@ private:
 #ifndef NDEBUG
     // A vector instruction can only be in a global initializer. Therefore there
     // is no point in verifying debug info or ownership.
-    if (!isa<VectorInst>(TheInst)) {
+    if (!isa<VectorInst>(TheInst) && !BB->isDebugReconstructionBlock()) {
       // If we are inserting into a specific function (rather than a block for a
       // global_addr), verify that our instruction/the associated location are in
       // sync. We don't care if an instruction is used in global_addr.

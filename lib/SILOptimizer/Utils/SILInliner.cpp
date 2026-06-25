@@ -109,6 +109,12 @@ class BeginApplySite {
 
   SmallVector<EndBorrowInst *, 2> EndBorrows;
 
+  // begin_borrow instructions introduced for owned values yielded @guaranteed.
+  // These need their borrow scopes completed when the coroutine is ended via
+  // end_borrow (rather than end_apply/abort_apply), because processTerminator
+  // does not emit end_borrow for them in that case.
+  SmallVector<BeginBorrowInst *, 2> guaranteedYields;
+
 public:
   BeginApplySite(BeginApplyInst *BeginApply, SILLocation Loc,
                  SILBuilder *Builder)
@@ -208,7 +214,6 @@ public:
       auto calleeYields = yield->getYieldedValues();
       auto callerYields = BeginApply->getYieldedValues();
       assert(calleeYields.size() == callerYields.size());
-      SmallVector<BeginBorrowInst *, 2> guaranteedYields;
       for (auto i : indices(calleeYields)) {
         auto remappedYield = getMappedValue(calleeYields[i]);
         // When owned values are yielded @guaranteed, the mapped value must be
@@ -320,7 +325,19 @@ public:
     // Complete lifetimes of all inlined values at the point where the `begin_apply`
     // is ended with an `end_borrow`.
     // See `SILInlineCloner::valuesToComplete`.
-    completeLifetimes(pm, ArrayRef(valuesToComplete), ArrayRef(endBorrowInsts));
+    //
+    // guaranteedYields (begin_borrow instructions for owned values yielded
+    // @guaranteed) are appended after all cloned values. completeLifetimes
+    // processes the list in reverse, so guaranteedYields are completed first
+    // (inserting end_borrow just before the dead-end point), and the owned
+    // bases are completed second (inserting destroy_value [dead_end] after the
+    // end_borrows).  This preserves the required borrow-before-destroy order.
+    llvm::SmallVector<SILValue, 32> allValuesToComplete(valuesToComplete.begin(),
+                                                        valuesToComplete.end());
+    for (auto *bbi : guaranteedYields)
+      allValuesToComplete.push_back(bbi);
+
+    completeLifetimes(pm, ArrayRef(allValuesToComplete), ArrayRef(endBorrowInsts));
 
     for (EndBorrowInst *endBorrow : EndBorrows) {
       endBorrow->eraseFromParent();
@@ -660,7 +677,7 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
 
       for (auto *insertPt : endBorrowInsertPts) {
         SILBuilderWithScope returnBuilder(insertPt, getBuilder());
-        returnBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
+        returnBuilder.createEndBorrow(Apply.getArgumentLoc(i), entryArgs[i]);
       }
     }
   }
@@ -674,7 +691,8 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
       for (auto *insertPt : endBorrowInsertPts) {
         SILBuilderWithScope returnBuilder(insertPt->getParent()->begin(),
                                           getBuilder());
-        returnBuilder.emitDestroyOperation(Apply.getLoc(), entryArgs[i]);
+        returnBuilder.emitDestroyOperation(Apply.getArgumentLoc(i),
+                                           entryArgs[i]);
       }
     }
   }
@@ -862,7 +880,8 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
     break;
   }
   SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
-  return beginBuilder.createBeginBorrow(Apply.getLoc(), callArg, isLexical);
+  return beginBuilder.createBeginBorrow(Apply.getArgumentLoc(index), callArg,
+                                        isLexical);
 }
 
 SILValue SILInlineCloner::moveFunctionArgument(SILValue callArg,
@@ -882,7 +901,8 @@ SILValue SILInlineCloner::moveFunctionArgument(SILValue callArg,
     break;
   }
   SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
-  return beginBuilder.createMoveValue(Apply.getLoc(), callArg, isLexical);
+  return beginBuilder.createMoveValue(Apply.getArgumentLoc(index), callArg,
+                                      isLexical);
 }
 
 void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {
@@ -1227,6 +1247,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::SwitchValueInst:
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
   case SILInstructionKind::DestroyNotEscapedClosureInst:

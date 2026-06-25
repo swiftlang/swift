@@ -388,19 +388,11 @@ void CompletionLookup::addImportModuleNames() {
 }
 
 void CompletionLookup::addUsingSpecifiers() {
-  for (unsigned i = 0,
-                n = static_cast<unsigned>(UsingSpecifier::LastSpecifier) + 1;
-       i != n; ++i) {
+  for (auto specifier :
+       {"@MainActor", "nonisolated", "@available", "@diagnose"}) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Keyword, SemanticContextKind::None);
-    switch (static_cast<UsingSpecifier>(i)) {
-    case UsingSpecifier::MainActor:
-      Builder.addTextChunk("@MainActor");
-      break;
-    case UsingSpecifier::Nonisolated:
-      Builder.addTextChunk("nonisolated");
-      break;
-    }
+    Builder.addTextChunk(specifier);
   }
 }
 
@@ -769,7 +761,8 @@ void CompletionLookup::analyzeActorIsolation(
     break;
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedConcurrent:
+  case ActorIsolation::NonisolatedNonsending:
   case ActorIsolation::NonisolatedUnsafe:
     return;
   }
@@ -792,6 +785,12 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   } else if (VD->hasInterfaceType()) {
     VarType = getTypeOfMember(VD, dynamicLookupInfo);
   }
+
+  // Make sure to look through the storage reference type if present. These
+  // shouldn't be presented to the user, and cannot be used in the constraint
+  // system when e.g computing type relations.
+  if (VarType)
+    VarType = VarType->getReferenceStorageReferent();
 
   std::optional<ContextualNotRecommendedReason> NotRecommended;
   // "not recommended" in its own getter.
@@ -1470,7 +1469,7 @@ static StringRef getTypeAnnotationString(const NominalTypeDecl *NTD,
 
   assert(stash.empty());
   llvm::raw_svector_ostream OS(stash);
-  llvm::interleave(attrRoleStrs, OS, ", ");
+  llvm::interleaveComma(attrRoleStrs, OS);
   return {stash.data(), stash.size()};
 }
 
@@ -1694,7 +1693,7 @@ static StringRef getTypeAnnotationString(const MacroDecl *MD,
 
   assert(stash.empty());
   llvm::raw_svector_ostream OS(stash);
-  llvm::interleave(roleStrs, OS, ", ");
+  llvm::interleaveComma(roleStrs, OS);
   return {stash.data(), stash.size()};
 }
 

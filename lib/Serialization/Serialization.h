@@ -441,6 +441,9 @@ private:
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);
 
+  /// Serializes the module's hidden-type layouts block.
+  void writeHiddenTypeLayoutsBlock();
+
   /// Serializes the given dependency graph into the incremental information
   /// section of this swift module.
   void writeIncrementalInfo(

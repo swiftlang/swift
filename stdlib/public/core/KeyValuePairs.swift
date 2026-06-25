@@ -128,10 +128,15 @@ extension KeyValuePairs: RandomAccessCollection {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension KeyValuePairs {
+  /// A span over the key-value pairs of this collection.
+  ///
+  /// - Returns: A `Span` over the elements of this collection.
+  ///
+  /// - Complexity: O(1)
   @available(SwiftCompatibilitySpan 5.0, *)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     get {
       let rp = unsafe UnsafeRawPointer(_elements._buffer.firstElementAddress)
       let span = unsafe Span(

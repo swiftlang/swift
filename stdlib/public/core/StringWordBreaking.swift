@@ -668,7 +668,7 @@ extension String {
   ///     addressing a word boundary.
   /// - Returns: A valid index less than equal to the input that is guaranteed to
   ///     identify some word boundary at or before `i`.
-  @available(SwiftStdlib 6.3, *)
+  @available(StdlibDeploymentTarget 6.3, *)
   public func _wordIndex(somewhereAtOrBefore i: Index) -> Index {
     var j = _guts.validateInclusiveScalarIndex(i)
     if j == endIndex {
@@ -706,6 +706,7 @@ extension String {
   ///     string.
   /// - Returns: The first word break strictly following `i` in the string.
   @available(StdlibDeploymentTarget 5.7, *)
+  @diagnose(UselessAvailabilityCheck, as: ignored)
   public func _wordIndex(after i: String.Index) -> String.Index {
     guard #available(StdlibDeploymentTarget 6.3, *) else {
       fatalError("Unreachable")
@@ -724,7 +725,7 @@ extension _StringGuts {
   @_effects(releasenone)
   internal func _nextUTF8WordIndex(after index: Index) -> Index {
     _internalInvariant(self.isFastUTF8)
-    let result = unsafe self.withFastUTF8 { utf8 in
+    let result = self.withFastUTF8 { utf8 in
       var offset = index._encodedOffset
       let first = unsafe _decodeScalar(utf8, startingAt: offset)
       offset &+= first.scalarLength

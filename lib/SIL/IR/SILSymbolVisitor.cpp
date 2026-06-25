@@ -507,10 +507,22 @@ public:
       }
     }
 
-    if (auto distributedThunk = AFD->getDistributedThunk()) {
-      auto thunk = SILDeclRef(distributedThunk).asDistributed();
-      addFunction(thunk);
-      addAsyncFunctionPointer(thunk);
+    {
+      // Distributed functions emit a number of thunks that we need to replicate here.
+
+      // Record the 'distributed_thunk'
+      if (auto distributedThunk = AFD->getDistributedThunk()) {
+        auto thunk = SILDeclRef(distributedThunk).asDistributed();
+        addFunction(thunk);
+        addAsyncFunctionPointer(thunk);
+      }
+
+      // Record the recipient-side 'distributed_proxy_adapter_thunk'
+      if (auto adapter = AFD->getDistributedResolvableProxyAdapterThunk()) {
+        auto adapterRef = SILDeclRef(adapter);
+        addFunction(adapterRef);
+        addAsyncFunctionPointer(adapterRef);
+      }
     }
 
     // Add derivative function symbols.

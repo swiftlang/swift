@@ -121,6 +121,7 @@ public func _fixLifetime<T: ~Copyable & ~Escapable>(_ x: borrowing T) {
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
 @inline(always)
+@safe
 public func withUnsafeMutablePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
@@ -182,6 +183,7 @@ public func _withUnprotectedUnsafeMutablePointer<
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
 @inline(always)
+@safe
 public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: borrowing T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
@@ -231,6 +233,7 @@ internal func __abi_withUnsafePointer<T, Result>(
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
 @inline(always)
+@safe
 public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
@@ -302,7 +305,7 @@ public func _copy<T>(_ value: T) -> T {
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(borrow source)
+@_lifetime(borrow source)
 public func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -318,7 +321,7 @@ public func _overrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(copy source)
+@_lifetime(copy source)
 public func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -334,7 +337,7 @@ public func _overrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(&source)
+@_lifetime(&source)
 public func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -343,3 +346,17 @@ public func _overrideLifetime<
 ) -> T {
   dependent
 }
+
+/// Unsafely discard any lifetime dependency on the `dependent` inout
+/// argument. Return a value identical to `dependent` with a lifetime dependency
+/// on the caller's borrow scope of the `source` argument.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@_lifetime(dependent: borrow source)
+public func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: inout T, borrowing source: borrowing U
+) {}

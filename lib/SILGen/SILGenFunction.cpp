@@ -388,6 +388,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     break;
   }
   return Result;
@@ -432,10 +433,10 @@ const SILDebugScope *SILGenFunction::getMacroScope(SourceLoc SLoc) {
     // Use the ExpansionLoc as the location so IRGenDebugInfo can extract the
     // human-readable macro name from the MacroExpansionDecl.
     SILFunction *MacroFn = B.getOrCreateFunction(
-        Macro.ExpansionLoc, MacroName,
-        SILLinkage::DefaultForDeclaration, FunctionType, IsNotBare,
-        IsNotTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
-        IsNotRuntimeAccessible);
+        Macro.ExpansionLoc, MacroName, SILLinkage::DefaultForDeclaration,
+        FunctionType, ActorIsolation::forNonisolated(/*unsafe=*/false),
+        IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+        IsNotDistributed, IsNotRuntimeAccessible);
     // At the end of the chain ExpansionLoc should be a macro expansion node.
     const SILDebugScope *InlinedAt = nullptr;
     const SILDebugScope *ExpansionScope = getOrCreateScope(Macro.ExpansionSLoc);
@@ -1303,9 +1304,11 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
 
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
-        NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized,
-        IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
-    auto NSStringFromClass = B.createFunctionRef(mainClass, NSStringFromClassFn);
+        NSStringFromClassType, ActorIsolation::forUnspecified(), IsBare,
+        IsTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
+        IsNotRuntimeAccessible);
+    auto NSStringFromClass =
+        B.createFunctionRef(mainClass, NSStringFromClassFn);
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
     metaTy = B.createInitExistentialMetatype(mainClass, metaTy,
@@ -1393,8 +1396,9 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     SILGenFunctionBuilder builder(SGM);
     auto NSApplicationMainFn = builder.getOrCreateFunction(
         mainClass, "NSApplicationMain", SILLinkage::PublicExternal,
-        NSApplicationMainType, IsBare, IsTransparent, IsNotSerialized,
-        IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
+        NSApplicationMainType, ActorIsolation::forUnspecified(), IsBare,
+        IsTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
+        IsNotRuntimeAccessible);
 
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };
@@ -1985,13 +1989,6 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   if (!expectedSelfTy->isEqual(selfTy)) {
     selfMetatype = B.createUpcast(loc, selfMetatype,
                              getLoweredType(MetatypeType::get(expectedSelfTy)));
-  }
-
-  if (auto invocationSig = initTy->getInvocationGenericSignature()) {
-    if (invocationSig->areAllParamsConcrete())
-      substitutions = SubstitutionMap();
-  } else {
-    substitutions = SubstitutionMap();
   }
 
   PartialApplyInst *initPAI =

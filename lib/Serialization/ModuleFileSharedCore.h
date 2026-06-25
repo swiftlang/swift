@@ -311,6 +311,8 @@ private:
   std::unique_ptr<SerializedDeclMemberNamesTable> DeclMemberNames;
   std::unique_ptr<SerializedDeclFingerprintsTable> DeclFingerprints;
 
+  llvm::StringMap<AbstractTypeLayout> HiddenTypeLayouts;
+
   class ObjCMethodTableInfo;
   using SerializedObjCMethodTable =
     llvm::OnDiskIterableChainedHashTable<ObjCMethodTableInfo>;
@@ -419,16 +421,14 @@ private:
     /// Whether this module enabled strict memory safety.
     unsigned StrictMemorySafety : 1;
 
-    /// Whether this module used deferred code generation.
-    unsigned DeferredCodeGen : 1;
+    /// The code generation model used by this module.
+    unsigned CodeGenModel : 2;
 
     /// Whether this module used deferred code generation.
     unsigned AggressiveCMOEnabled : 1;
 
     /// Discriminator for library level (LibraryLevel enum).
     unsigned LibraryLevel : 2;
-
-    // Explicitly pad out to the next word boundary if neccessary.
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -524,6 +524,11 @@ private:
   ///
   /// Returns false if there was an error.
   bool readIndexBlock(llvm::BitstreamCursor &cursor);
+
+  /// Reads the hidden-type layouts block, populating HiddenTypeLayouts.
+  ///
+  /// Returns false if there was an error.
+  bool readHiddenTypeLayoutsBlock(llvm::BitstreamCursor &cursor);
 
   /// Read an on-disk decl hash table stored in
   /// \c comment_block::DeclCommentListLayout format.
@@ -701,7 +706,9 @@ public:
 
   bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
 
-  bool deferredCodeGen() const { return Bits.DeferredCodeGen; }
+  CodeGenerationModel codeGenerationModel() const {
+    return static_cast<CodeGenerationModel>(Bits.CodeGenModel);
+  }
 
   bool isAggressiveCMOEnabled() const { return Bits.AggressiveCMOEnabled; }
 

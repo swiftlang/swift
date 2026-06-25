@@ -13,7 +13,7 @@ public struct Container {
   }
 
   @inline(never)
-  public func testclass<T>(_ t: T) -> T {
+  public func testclass<T: BinaryInteger>(_ t: T) -> T {
     var arr = Array<Base>()
     arr.append(Base())
     print(arr)
@@ -23,7 +23,7 @@ public struct Container {
 
   @inline(never)
   @_semantics("optimize.sil.specialize.generic.never")
-  public func testclass_gen<T>(_ t: T) -> T {
+  public func testclass_gen<T: BinaryInteger>(_ t: T) -> T {
     var arr = Array<Base>()
     arr.append(Base())
     print(arr)
@@ -31,7 +31,7 @@ public struct Container {
   }
 
   @inline(never)
-  public func testenum<T>(_ t: T) -> T {
+  public func testenum<T: BinaryInteger>(_ t: T) -> T {
     var arr = Array<PE<T>>()
     arr.append(.B(t))
     print(arr)
@@ -40,7 +40,7 @@ public struct Container {
 
   @inline(never)
   @_semantics("optimize.sil.specialize.generic.never")
-  public func testenum_gen<T>(_ t: T) -> T {
+  public func testenum_gen<T: BinaryInteger>(_ t: T) -> T {
     var arr = Array<PE<T>>()
     arr.append(.B(t))
     print(arr)
@@ -210,14 +210,14 @@ public func callGenericSubmoduleFunc_gen<T>(_ t: T) {
 }
 
 @inline(never)
-public func genericClosure<T>(_ t: T) -> T {
+public func genericClosure<T: BinaryInteger>(_ t: T) -> T {
   let c : () -> T = { return t }
   return c()
 }
 
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
-public func genericClosure_gen<T>(_ t: T) -> T {
+public func genericClosure_gen<T: BinaryInteger>(_ t: T) -> T {
   let c : () -> T = { return t }
   return c()
 }
@@ -265,22 +265,22 @@ func unrelated<U>(_ u: U) {
 }
 
 @inline(never)
-public func callUnrelated<T>(_ t: T) -> T {
+public func callUnrelated<T: BinaryInteger>(_ t: T) -> T {
   unrelated(43)
   return t
 }
 
-public func callImplementationOnlyType<T>(_ t: T) -> T {
+public func callImplementationOnlyType<T: BinaryInteger>(_ t: T) -> T {
   let p = PrivateStr(i: 27)
   print(p.test())
   return t
 }
 
-public func callImplementationOnlyFunc<T>(_ t: T) -> Int {
+public func callImplementationOnlyFunc<T: BinaryInteger>(_ t: T) -> Int {
   return privateFunc()
 }
 
-public func callCImplementationOnly<T>(_ t: T) -> Int {
+public func callCImplementationOnly<T: BinaryInteger>(_ t: T) -> Int {
   return Int(privateCFunc())
 }
 

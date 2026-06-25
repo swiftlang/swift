@@ -6,12 +6,12 @@ struct MySendable {}
 
 @globalActor
 actor MyGlobalActor {
-  static var shared = MyGlobalActor()
+  static let shared = MyGlobalActor()
 }
 
 @globalActor
 actor MyOtherGlobalActor {
-  static var shared = MyOtherGlobalActor()
+  static let shared = MyOtherGlobalActor()
 }
 
 @MyGlobalActor func globalFuncOnGlobalActor() {}

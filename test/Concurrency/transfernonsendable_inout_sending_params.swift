@@ -48,9 +48,7 @@ actor Custom {
 
 @globalActor
 struct CustomActor {
-  static var shared: Custom {
-    return Custom()
-  }
+  static let shared = Custom()
 }
 
 @MainActor func transferToMain<T>(_ t: T) {}
@@ -171,9 +169,9 @@ func passInOutSendingToInOutSending(_ x: inout sending NonSendableKlass) {
 
 func passInOutSendingMultipleTimes(_ x: inout NonSendableStruct) {
   useInOutSending(&x.first, &x.second) // expected-warning {{sending 'x.first' risks causing data races}}
-  // expected-note @-1 {{task-isolated 'x.first' is passed as a 'sending' parameter}}
+  // expected-note @-1 {{'x.first' is passed as a 'sending' parameter}}
   // expected-warning @-2 {{sending 'x.second' risks causing data races}}
-  // expected-note @-3 {{task-isolated 'x.second' is passed as a 'sending' parameter}}
+  // expected-note @-3 {{'x.second' is passed as a 'sending' parameter}}
 }
 
 func twoInoutSendingParamsInSameRegion(_ x: inout sending NonSendableKlass, _ y: inout sending NonSendableKlass) {

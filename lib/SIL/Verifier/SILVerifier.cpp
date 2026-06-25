@@ -87,6 +87,11 @@ static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
 #endif
                                                                 ));
 
+// Verify the type chain of debug_value instructions. Disabled by default
+// while we fix all root causes.
+static llvm::cl::opt<bool> VerifyDebugValueExpr("verify-debug-value-expr",
+                                                llvm::cl::init(false));
+
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
@@ -653,7 +658,17 @@ void verifyKeyPathComponent(SILModule &M,
         auto opIndex = index.Operand;
         auto contextType =
           index.LoweredType.subst(M, patternSubs);
-        require(contextType == operands[opIndex].get()->getType(),
+        auto operandType = operands[opIndex].get()->getType();
+        // The operand normally matches the pattern's lowered type exactly.
+        // In opaque-values mode, SILGen records address-only indices'
+        // LoweredType in the pattern as the address form (since the keypath
+        // runtime ABI passes them by address), but the operand is still at
+        // object type until AddressLowering rewrites it. Accept that
+        // intermediate shape.
+        require(contextType == operandType ||
+                    (!M.useLoweredAddresses() &&
+                     (contextType.isAddress() && operandType.isObject() &&
+                      contextType.getObjectType() == operandType)),
                 "operand must match type required by pattern");
         SILType loweredType = index.LoweredType;
         require(
@@ -981,15 +996,14 @@ struct ImmutableAddressUseVerifier {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
         }
         break;
-      case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
-        if (!cast<UncheckedTakeEnumDataAddrInst>(inst)->isDestructive()) {
-          for (auto result : inst->getResults()) {
-            llvm::copy(result->getUses(), std::back_inserter(worklist));
-          }
-          break;
-        }
+      case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
         return true;
-      }
+      case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+      case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
+        for (auto result : inst->getResults()) {
+          llvm::copy(result->getUses(), std::back_inserter(worklist));
+        }
+        break;
       case SILInstructionKind::TuplePackElementAddrInst: {
         if (&cast<TuplePackElementAddrInst>(inst)->getOperandRef(
               TuplePackElementAddrInst::TupleOperand) == use) {
@@ -1053,9 +1067,9 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   ModuleDecl *M;
   const SILFunction &F;
   CalleeCache *calleeCache;
+  DominanceInfo *Dominance;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
-  InstructionIndices instIndices;
 
   bool SingleFunction = true;
   bool checkLinearLifetime = false;
@@ -1113,6 +1127,25 @@ public:
       ~VerifierErrorEmitterGuard() { getEmitter().value = {}; }
     };
 
+    class VerifierErrorEmitterUnguard {
+      SILVerifier *verifier;
+      decltype(value) restore;
+
+      VerifierErrorEmitter &getEmitter() const {
+        return verifier->ErrorEmitter;
+      }
+
+    public:
+      VerifierErrorEmitterUnguard(SILVerifier *verifier)
+          : verifier(verifier) {
+        assert(bool(getEmitter().value) && "Construct is already unset");
+        restore = getEmitter().value;
+        getEmitter().value = {};
+      }
+
+      ~VerifierErrorEmitterUnguard() { getEmitter().value = restore; }
+    };
+
     void emitError(const Twine &complaint,
                    llvm::function_ref<void(SILPrintContext &)> extraContext) {
       if (!value.has_value()) {
@@ -1148,7 +1181,7 @@ public:
 
 private:
   VerifierErrorEmitter ErrorEmitter;
-  std::unique_ptr<DominanceInfo> Dominance;
+  std::unique_ptr<DominanceInfo> LocalDominance = nullptr;
 
   /// TODO: LifetimeCompletion: Remove.
   std::shared_ptr<DeadEndBlocks> DEBlocks;
@@ -1420,14 +1453,13 @@ public:
   }
 
   SILVerifier(const SILFunction &F, CalleeCache *calleeCache,
-              bool SingleFunction, bool checkLinearLifetime)
-      : M(F.getModule().getSwiftModule()), F(F),
-        calleeCache(calleeCache),
-        fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
-        instIndices(const_cast<SILFunction *>(&F)),
+              DominanceInfo *dominanceInfo = nullptr,
+              bool SingleFunction = true, bool checkLinearLifetime = true)
+      : M(F.getModule().getSwiftModule()), F(F), calleeCache(calleeCache),
+        Dominance(dominanceInfo), fnConv(F.getConventionsInContext()),
+        TC(F.getModule().Types),
         SingleFunction(SingleFunction),
-        checkLinearLifetime(checkLinearLifetime),
-        Dominance(nullptr) {
+        checkLinearLifetime(checkLinearLifetime) {
     if (F.isExternalDeclaration())
       return;
 
@@ -1439,7 +1471,10 @@ public:
               "Basic blocks must end with a terminator instruction");
     }
 
-    Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
+    if (!Dominance) {
+      LocalDominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
+      Dominance = LocalDominance.get();
+    }
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
@@ -1460,10 +1495,7 @@ public:
     if (aBlock != bBlock)
       return Dominance->properlyDominates(aBlock, bBlock);
 
-    // Note that it might happen that for absurdly large basic blocks, the instruction
-    // indices are "maxed out". In this case we cannot compute the before-after
-    // relation efficiently and we conservatively return true.
-    return a != b && instIndices.get(a) <= instIndices.get(b);
+    return a->strictlyDominatesInBlock(b);
   }
 
   void visitSILPhiArgument(SILPhiArgument *arg) {
@@ -1570,7 +1602,7 @@ public:
               "Once ownership is gone, all values should have none ownership");
       return;
     }
-    SILValue(V).verifyOwnership(DEBlocks.get(), &instIndices);
+    SILValue(V).verifyOwnership(DEBlocks.get());
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -1599,9 +1631,9 @@ public:
         auto userI = cast<SILInstruction>(user);
         require(userI->getParent(),
                 "instruction used by unparented instruction");
-        if (I->isStaticInitializerInst()) {
+        if (I->isStaticInitializerInst() || BB->isDebugReconstructionBlock()) {
           require(userI->getParent() == BB,
-                "instruction used by instruction not in same static initializer");
+                  "instruction used by instruction in different basic block");
         } else {
           require(userI->getFunction() == &F,
                   "instruction used by instruction in different function");
@@ -1622,9 +1654,9 @@ public:
       if (auto *valueI = operand.get()->getDefiningInstruction()) {
         require(valueI->getParent(),
                 "instruction uses value of unparented instruction");
-        if (I->isStaticInitializerInst()) {
+        if (I->isStaticInitializerInst() || BB->isDebugReconstructionBlock()) {
           require(valueI->getParent() == BB,
-              "instruction uses value which is not in same static initializer");
+              "instruction uses value which is not in the same basic block");
         } else {
           require(valueI->getFunction() == &F,
                   "instruction uses value of instruction from another function");
@@ -1780,34 +1812,12 @@ public:
   void checkDebugVariable(SILInstruction *inst) {
     std::optional<SILDebugVariable> varInfo;
     if (auto di = DebugVarCarryingInst(inst))
-      varInfo = di.getVarInfo();
+      varInfo = di.getCompleteVarInfo();
 
     if (!varInfo)
       return;
 
-    // Retrieve debug variable type
-    SILType SSAType;
-    switch (inst->getKind()) {
-    case SILInstructionKind::AllocStackInst:
-    case SILInstructionKind::AllocBoxInst:
-      // TODO: unwrap box for AllocBox
-      SSAType = inst->getResult(0)->getType().getObjectType();
-      break;
-    case SILInstructionKind::DebugValueInst:
-      SSAType = inst->getOperand(0)->getType();
-      break;
-    default:
-      llvm_unreachable("impossible instruction kind");
-    }
-    
-    SILType DebugVarTy = varInfo->Type ? *varInfo->Type :
-      SSAType.getObjectType();
-    if (!varInfo->DIExpr && !isa<SILBoxType>(SSAType.getASTType())) {
-      // FIXME: Remove getObjectType() below when we fix create/createAddr
-      require(DebugVarTy.removingMoveOnlyWrapper()
-              == SSAType.getObjectType().removingMoveOnlyWrapper(),
-              "debug type mismatch without a DIExpr");
-    }
+    SILType DebugVarTy = *varInfo->Type;
 
     auto *debugScope = inst->getDebugScope();
     if (varInfo->ArgNo)
@@ -1935,6 +1945,34 @@ public:
                   " in a di-expression");
       }
     }
+  }
+
+  void checkDebugValueInst(DebugValueInst *inst) {
+    // Verify debug basic block and type chain.
+    if (auto *DebugBB = inst->getDebugReconstructionBlock()) {
+      // Structural checks.
+      require(DebugBB->isDebugReconstructionBlock(),
+              "debug block must be marked as such");
+      require(DebugBB->getParent() == inst->getFunction(),
+              "debug block must belong to the same function");
+      require(!DebugBB->empty(),
+              "debug block must not be empty");
+      require(isa<ReturnInst>(DebugBB->getTerminator()),
+              "debug block must end with a return instruction");
+
+      // Verify basic block content.
+      {
+        VerifierErrorEmitter::VerifierErrorEmitterUnguard unguard(this);
+        for (auto &I : *DebugBB) {
+          visit(&I);
+        }
+      }
+    }
+
+    // Type chain: SSA operand -> DebugBB -> deref -> fragments -> vartype
+    if (VerifyDebugValueExpr)
+      require(inst->isExprTypeValid(),
+              "debug_value type chain should hold");
   }
 
   void checkInstructionsDebugInfo(SILInstruction *inst) {
@@ -2967,8 +3005,9 @@ public:
     switch (LI->getOwnershipQualifier()) {
     case LoadOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
-      // enabled.
-      require(!F.hasOwnership(),
+      // enabled, unless they are in a debug reconstruction block.
+      require(!F.hasOwnership() ||
+              LI->getParent()->isDebugReconstructionBlock(),
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
@@ -3963,26 +4002,44 @@ public:
     }
   }
 
-  void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
-    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
-    require(ud, "UncheckedTakeEnumDataAddrInst must take an enum operand");
+  void checkUncheckedEnumDataAddrInst(UncheckedEnumDataAddrInstBase *UI) {
+    EnumDecl *ud = UI->getEnum()->getType().getEnumOrBoundGenericEnum();
+    require(ud, "instruction must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
-            "UncheckedTakeEnumDataAddrInst case must be a case of the enum operand type");
+            "instruction case must be a case of the enum operand type");
     require(UI->getElement()->getPayloadInterfaceType(),
-            "UncheckedTakeEnumDataAddrInst case must have a data type");
-    require(UI->getOperand()->getType().isAddress(),
-            "UncheckedTakeEnumDataAddrInst must take an address operand");
+            "instruction case must have a data type");
+    require(UI->getEnum()->getType().isAddress(),
+            "instruction must take an address operand");
     require(UI->getType().isAddress(),
-            "UncheckedTakeEnumDataAddrInst must produce an address");
+            "instruction must produce an address");
 
-    SILType caseTy = UI->getOperand()->getType().getEnumElementType(
+    SILType caseTy = UI->getEnum()->getType().getEnumElementType(
         UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
     if (UI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(caseTy, UI->getType(),
-                      "UncheckedTakeEnumDataAddrInst result "
+                      "instruction result "
                       "does not match type of enum case");
     }
+  }
+
+  void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
+    checkUncheckedEnumDataAddrInst(UI);
+  }
+  void checkUncheckedBorrowEnumDataAddrInst(UncheckedBorrowEnumDataAddrInst *UI) {
+    checkUncheckedEnumDataAddrInst(UI);
+
+    require(UI->getEnum()->getType() == UI->getScratch()->getType(),
+            "scratch memory must be of the same type as the original enum");
+  }
+  void checkUncheckedInPlaceEnumDataAddrInst(UncheckedInPlaceEnumDataAddrInst *UI) {
+    checkUncheckedEnumDataAddrInst(UI);
+    
+    require(!UncheckedEnumDataAddrInstBase::isDestructive(UI->getEnumDecl(),
+                                                          UI->getFunction()),
+            "unchecked_in_place_enum_data_addr can only be used for enums whose "
+            "projection operation is nondestructive");
   }
 
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
@@ -4044,6 +4101,11 @@ public:
     auto MetaTy = MI->getType().castTo<MetatypeType>();
     require(MetaTy->hasRepresentation(),
             "metatype instruction must have a metatype representation");
+
+    require(!MetaTy.getInstanceType()->mapTypeOutOfEnvironment()->isValueParameter()
+            && !MetaTy.getInstanceType()->is<IntegerType>(),
+            "metatype cannot be a value generic argument");
+
     verifyLocalArchetype(MI, MetaTy.getInstanceType());
   }
   void checkValueMetatypeInst(ValueMetatypeInst *MI) {
@@ -5107,7 +5169,7 @@ public:
               "init_existential of class existential with non-class type");
     }
 
-    if (auto superclass = layout.getSuperclass()) {
+    if (auto superclass = layout.explicitSuperclass) {
       require(superclass->isExactSuperclassOf(concreteType),
               "init_existential of subclass existential with wrong type");
     }
@@ -5591,6 +5653,11 @@ public:
   }
 
   void checkReturnInst(ReturnInst *RI) {
+    // Return instruction has a different meaning in debug reconstruction
+    // blocks. This meaning is checked in checkDebugValueInst.
+    if (RI->getParent()->isDebugReconstructionBlock())
+      return;
+
     LLVM_DEBUG(RI->print(llvm::dbgs()));
 
     SILType functionResultType =
@@ -7550,7 +7617,7 @@ static bool verificationEnabled(const SILModule &M) {
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify(CalleeCache *calleeCache,
+void SILFunction::verify(CalleeCache *calleeCache, DominanceInfo *dominanceInfo,
                          bool SingleFunction, bool isCompleteOSSA,
                          bool checkLinearLifetime) const {
   if (!verificationEnabled(getModule()))
@@ -7563,7 +7630,8 @@ void SILFunction::verify(CalleeCache *calleeCache,
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier verifier(*this, calleeCache, SingleFunction, checkLinearLifetime);
+  SILVerifier verifier(*this, calleeCache, dominanceInfo, SingleFunction,
+                       checkLinearLifetime);
   verifier.verify(isCompleteOSSA);
 }
 
@@ -7572,8 +7640,10 @@ void SILFunction::verifyCriticalEdges() const {
     return;
 
   SILVerifier(*this, /*calleeCache=*/nullptr,
-                     /*SingleFunction=*/true,
-                     /*checkLinearLifetime=*/ false).verifyBranches(this);
+              /*dominanceInfo=*/nullptr,
+              /*SingleFunction=*/true,
+              /*checkLinearLifetime=*/false)
+      .verifyBranches(this);
 }
 
 /// Validate that all SILUndef in \p f have f as a parent.
@@ -7721,8 +7791,9 @@ void SILVTable::verify(const SILModule &M) const {
       // function must be compatible with being used as the requirement
       // type.
       SILVerifier(*entry.getImplementation(), /*calleeCache=*/nullptr,
-                                              /*SingleFunction=*/true,
-                                              /*checkLinearLifetime=*/ false)
+                  /*dominanceInfo=*/nullptr,
+                  /*SingleFunction=*/true,
+                  /*checkLinearLifetime=*/false)
           .requireABICompatibleFunctionTypes(
               entry.getImplementation()->getLoweredFunctionType(),
               baseInfo.getSILType().castTo<SILFunctionType>(),
@@ -7833,6 +7904,7 @@ void SILWitnessTable::verify(const SILModule &mod) const {
       }
 
       SILVerifier verifier(*witnessFunction, /*calleeCache=*/nullptr,
+                           /*dominanceInfo*/ nullptr,
                            /*SingleFunction=*/true,
                            /*checkLinearLifetime=*/false);
       SILVerifier::VerifierErrorEmitterGuard guard(&verifier, this);
@@ -7885,6 +7957,7 @@ void SILDefaultWitnessTable::verify(const SILModule &mod) const {
       }
 
       SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
+                  /*dominanceInfo=*/nullptr,
                   /*SingleFunction=*/true,
                   /*checkLinearLifetime=*/false)
           .requireABICompatibleFunctionTypes(
@@ -7945,7 +8018,8 @@ void SILModule::verify(CalleeCache *calleeCache,
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify(calleeCache, /*singleFunction*/ false, isCompleteOSSA, checkLinearLifetime);
+    f.verify(calleeCache, /*dominanceInfo=*/nullptr, /*singleFunction*/ false,
+             isCompleteOSSA, checkLinearLifetime);
   }
 
   // Check all globals.

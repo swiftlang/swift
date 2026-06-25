@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 
+// REQUIRES: objc_codegen
+
 sil_stage canonical
 
 import Builtin
@@ -116,7 +118,7 @@ bb4:
   switch_enum %0 : $Optional<C>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
 
 bb5(%bb5Some : @guaranteed $C):
-  %25 = unchecked_take_enum_data_addr %21 : $*Optional<C>, #Optional.some!enumelt
+  %25 = unchecked_inplace_enum_data_addr %21 : $*Optional<C>, #Optional.some!enumelt
   %26 = load [take] %25 : $*C
   dealloc_stack %21 : $*Optional<C>
   %26a = begin_borrow %26 : $C

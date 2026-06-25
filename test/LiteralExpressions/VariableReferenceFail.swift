@@ -18,3 +18,8 @@ let foo: Int32 = 42 + Int32.random(in: 0..<10)
 @section("mysection") let baz: Int32 = 1 + foo
 // expected-error@-1 {{unable to resolve variable reference in a literal expression}}
 
+// Publicly visible `let` bindings can't appear in a literal expression.
+public let publicConstant: Int32 = 7
+@section("mysection") let qux: Int32 = 1 + publicConstant
+// expected-error@-1 {{reference to a public 'let' binding is not permitted in a literal expression}}
+

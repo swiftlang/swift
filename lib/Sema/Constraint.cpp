@@ -680,15 +680,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   }
 }
 
-bool Constraint::isExplicitConversion() const {
-  assert(Kind == ConstraintKind::Disjunction);
-
-  if (auto *locator = getLocator())
-    return isExpr<CoerceExpr>(locator->getAnchor());
-
-  return false;
-}
-
 Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind, 
                                Type first, Type second,
                                ConstraintLocator *locator,

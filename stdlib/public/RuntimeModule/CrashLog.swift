@@ -366,7 +366,8 @@ extension CrashLog.Image {
         return .init(
             name: name,
             path: path,
-            uniqueID: CrashLog.bytesFromHexString(buildId ?? ""),
+            uniqueID:
+                (buildId != nil) ? CrashLog.bytesFromHexString(buildId!) : nil,
             baseAddress: ImageMap.Address(CrashLog.addressFromString(baseAddress) ?? 0),
             endOfText: ImageMap.Address(CrashLog.addressFromString(endOfText) ?? 0)
             )

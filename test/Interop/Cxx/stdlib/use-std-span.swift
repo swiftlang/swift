@@ -1,20 +1,16 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -enable-experimental-feature BorrowingForLoop)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG -enable-experimental-feature BorrowingForLoop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -enable-experimental-feature BorrowingSequence)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG -enable-experimental-feature BorrowingSequence)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -enable-experimental-feature BorrowingForLoop -enable-experimental-feature BorrowingSequence)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG -enable-experimental-feature BorrowingForLoop -enable-experimental-feature BorrowingSequence)
 
-
-// TODO: test failed in macOS PR testing but passes locally: rdar://163049442
-// UNSUPPORTED: OS_FAMILY=darwin && !CPU=arm64
 
 // REQUIRES: executable_test
 // REQUIRES: std_span
 // REQUIRES: swift_feature_BorrowingForLoop
+// REQUIRES: swift_feature_BorrowingSequence
 
 import StdlibUnittest
-#if !BRIDGING_HEADER
 import StdSpan
-#endif
 import CxxStdlib
 
 var StdSpanTestSuite = TestSuite("StdSpan")

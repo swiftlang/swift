@@ -40,4 +40,26 @@ ScopedEnumsTestSuite.test("Make and compare (MiddleDefinedScopedEnum)") {
   expectEqual(MiddleDefinedScopedEnum(rawValue: 43), .z)
 }
 
+ScopedEnumsTestSuite.test("Make and compare (ScopedEnumChar32)") {
+  let val: ScopedEnumChar32 = .x
+  expectEqual(val.rawValue, 0)
+  expectEqual(ScopedEnumChar32(rawValue: 42), .y)
+  expectNotEqual(ScopedEnumChar32(rawValue: 0), .y)
+}
+
+ScopedEnumsTestSuite.test("Make and compare (ScopedEnumChar16)") {
+  let val: ScopedEnumChar16 = .a
+  expectEqual(val.rawValue, 0)
+  expectEqual(ScopedEnumChar16(rawValue: 1), .b)
+}
+
+#if !os(Windows)
+ScopedEnumsTestSuite.test("Make and compare (ScopedEnumWChar)") {
+  let val: ScopedEnumWChar = .x
+  expectEqual(val.rawValue, 0)
+  expectEqual(ScopedEnumWChar(rawValue: 7), .y)
+  expectNotEqual(ScopedEnumWChar(rawValue: 0), .y)
+}
+#endif
+
 runAllTests()

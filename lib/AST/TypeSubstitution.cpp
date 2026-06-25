@@ -516,7 +516,8 @@ Type Type::subst(InFlightSubstitution &IFS) const {
 
 static Type getConcreteTypeForSuperclassTraversing(Type t) {
   if (t->isExistentialType()) {
-    return t->getExistentialLayout().getSuperclass();
+    // FIXME: This is broken, see the comment on that getter method.
+    return t->getExistentialLayout().getExplicitSuperclassOrProtocolSuperclass();
   } if (auto archetype = t->getAs<ArchetypeType>()) {
     return archetype->getSuperclass();
   } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {
@@ -968,6 +969,11 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
   if (!typeDecl) {
     return true;
   }
+
+  // Embedded has no resilient ABI boundary, so all type metadata is accessible
+  // across modules regardless of access level; the access checks below do not apply.
+  if (ty->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return true;
 
   switch (kind) {
   case OpaqueSubstitutionKind::DontSubstitute:

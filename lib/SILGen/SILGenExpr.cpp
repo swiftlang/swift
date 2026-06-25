@@ -35,6 +35,7 @@
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/InFlightSubstitution.h"
@@ -2008,49 +2009,12 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
                                                 SGFContext C) {
   CanAnyFunctionType destType =
       cast<FunctionType>(e->getType()->getCanonicalType());
-  assert(destType->getIsolation().isNonIsolatedCaller() &&
+  assert(destType->getIsolation().isNonisolatedNonsending() &&
          "Should only call this if destType is non isolated caller");
 
   auto *subExpr = e->getSubExpr();
   CanAnyFunctionType subExprType =
       cast<FunctionType>(subExpr->getType()->getCanonicalType());
-
-  // We are pattern matching the following two patterns:
-  //
-  // Swift 6:
-  //
-  // (fn_cvt_expr type="nonisolated(nonsending) () async -> ()"
-  //   (fn_cvt_expr type="nonisolated(nonsending) @Sendable () async -> ()"
-  //      (declref_expr type="() async -> ()"
-  //
-  // Swift 5:
-  //
-  // (fn_cvt_expr type="nonisolated(nonsending) () async -> ()"
-  //   (declref_expr type="() async -> ()"
-  //
-  // The @Sendable in Swift 6 mode is due to us not representing
-  // nonisolated(nonsending) or @Sendable in the constraint evaluator.
-  //
-  // The reason why we need to evaluate this especially is that otherwise we
-  // generate multiple conversion thunks.
-
-  bool needsSendableConversion = false;
-  if (auto *subCvt = dyn_cast<FunctionConversionExpr>(subExpr)) {
-    auto *subSubExpr = subCvt->getSubExpr();
-    CanAnyFunctionType subSubExprType =
-        cast<FunctionType>(subSubExpr->getType()->getCanonicalType());
-
-    if (subExprType->hasExtInfo() && subExprType->getExtInfo().isSendable() &&
-        subSubExprType->hasExtInfo() &&
-        !subExprType->getExtInfo().isSendable() &&
-        subExprType->withSendable(true) == subSubExprType) {
-      subExpr = subSubExpr;
-
-      // We changed our subExpr... so recompute our srcType.
-      subExprType = cast<FunctionType>(subExpr->getType()->getCanonicalType());
-      needsSendableConversion = true;
-    }
-  }
 
   // Check if the only difference in between our destType and srcType is our
   // isolation and optionally Sendable.
@@ -2065,7 +2029,7 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
     return RValue();
 
   auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
-  if (!decl || !getActorIsolation(decl).isCallerIsolationInheriting())
+  if (!decl || !getActorIsolation(decl).isNonisolatedNonsending())
     return RValue();
 
   // Ok, we found our target.
@@ -2075,12 +2039,6 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
   auto typeContext = SGF.getFunctionTypeInfo(substType);
   ManagedValue result = SGF.emitClosureValue(
       e, silDeclRef, typeContext, declRef->getDeclRef().getSubstitutions());
-  if (needsSendableConversion) {
-    auto funcType = cast<SILFunctionType>(result.getType().getASTType());
-    result = SGF.B.createConvertFunction(
-        e, result,
-        SILType::getPrimitiveObjectType(funcType->withSendable(true)));
-  }
   return RValue(SGF, e, destType, result);
 }
 
@@ -2115,9 +2073,9 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   CanAnyFunctionType subCvtType =
       cast<FunctionType>(subCvt->getType()->getCanonicalType());
 
-  // Src type should be isNonIsolatedCaller and they should only differ in
+  // Src type should be isNonisolatedNonsending and they should only differ in
   // isolation or sendability.
-  if (!subCvtType->getIsolation().isNonIsolatedCaller() ||
+  if (!subCvtType->getIsolation().isNonisolatedNonsending() ||
       subCvtType->withIsolation(destType->getIsolation())
               ->withSendable(destType->isSendable()) != destType)
     return RValue();
@@ -2128,13 +2086,13 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   if (!declRef)
     return RValue();
   auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
-  if (!decl || !getActorIsolation(decl).isCallerIsolationInheriting())
+  if (!decl || !getActorIsolation(decl).isNonisolatedNonsending())
     return RValue();
 
   // Make sure that subCvt/declRefType only differ by isolation and sendability.
   CanAnyFunctionType declRefType =
       cast<FunctionType>(declRef->getType()->getCanonicalType());
-  assert(!declRefType->getIsolation().isNonIsolatedCaller() &&
+  assert(!declRefType->getIsolation().isNonisolatedNonsending() &&
          "This should not be represented in interface types");
   if (declRefType->isSendable() || !subCvtType->isSendable())
     return RValue();
@@ -2287,7 +2245,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // @concurrent back to nonisolated(nonsending). This is done b/c we do
   // not represent nonisolated(nonsending) in interface types, so the actual decl ref
   // will be viewed as @async () -> ().
-  if (destType->getIsolation().isNonIsolatedCaller()) {
+  if (destType->getIsolation().isNonisolatedNonsending()) {
     if (RValue rv = emitFunctionCvtToExecutionCaller(e, C))
       return rv;
   }
@@ -3337,9 +3295,25 @@ static bool canEmitClosureFunctionUnderConversion(
 ///
 /// TODO: ideally, our prolog/epilog emission would be able to handle
 /// all possible subtype and reabstraction conversions.
-static bool canEmitSpecializedClosureFunction(CanAnyFunctionType closureType,
+static bool canEmitSpecializedClosureFunction(const AbstractClosureExpr *closure,
+                                        CanAnyFunctionType closureType,
                                         const FunctionTypeInfo &contextInfo) {
   auto destType = contextInfo.FormalType;
+
+  // This is a closure that is being converted to `nonisolated(nonsending)`
+  // type and is already behaves as such even though its statically known
+  // isolation is different. Such closures are emitted in a special way where
+  // they gain an implicit isolation parameter that gets ignored to avoid
+  // unnecessary hops.
+  if (contextInfo.ExpectedLoweredType->hasNonisolatedNonsendingIsolation()) {
+    if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+      if (explicitClosure->behavesLikeNonisolatedNonsending())
+        closureType = cast<AnyFunctionType>(
+            closureType
+                ->withIsolation(FunctionTypeIsolation::forNonisolatedNonsending())
+                ->getCanonicalType());
+    }
+  }
 
   // Require the closure's formal type to be closely related to the formal
   // type we're trying to convert it to.
@@ -3352,6 +3326,14 @@ static bool canEmitSpecializedClosureFunction(CanAnyFunctionType closureType,
   if (hasOpaqueThrownError(contextInfo.OrigType) &&
       (closureType->isThrowing() != destType->isThrowing() ||
        closureType.getThrownError() != destType.getThrownError()))
+    return false;
+
+  // If the closure has a different thrown error type than the destination,
+  // we cannot emit the closure directly because the SIL function type
+  // (derived from the closure's own type) will have a different error
+  // type than what the body expects (derived from the destination type).
+  if (closureType.getThrownError() != destType.getThrownError() &&
+      !isa<ClosureExpr>(closure))
     return false;
 
   return true;
@@ -3369,35 +3351,45 @@ ManagedValue RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
 
   // If we can emit the closure with all of the specialized type information,
   // that's great.
-  if (canEmitSpecializedClosureFunction(closureType, *info)) {
+  if (canEmitSpecializedClosureFunction(e, closureType, *info)) {
     return emitClosureReference(e, *info);
+  }
+
+  // Construct a conversion that just adds requested isolation and doesn't
+  // make any other changes to the closure type.
+  auto adjustClosureIsolation = [&](FunctionTypeIsolation isolation) {
+    // This assertion is why this isn't an infinite recursion.
+    assert(closureType->getIsolation() != isolation &&
+           "closure cannot directly have erased isolation");
+
+    auto newExtInfo = closureType->getExtInfo().withIsolation(isolation);
+    auto newClosureType = closureType.withExtInfo(newExtInfo);
+    auto newInfo = SGF.getFunctionTypeInfo(newClosureType);
+
+    // Emit the closure under that conversion.  This should always succeed.
+    assert(canEmitSpecializedClosureFunction(e, closureType, newInfo));
+    auto result = emitClosureReference(e, newInfo);
+
+    // Narrow the original conversion to start from the updated closure type.
+    auto convAfterIsolationChange = conv.withSourceType(SGF, newClosureType);
+
+    // Apply the narrowed conversion.
+    return convAfterIsolationChange.emit(SGF, e, result, SGFContext());
+  };
+
+  if (info->ExpectedLoweredType->hasNonisolatedNonsendingIsolation()) {
+    if (auto *closure = dyn_cast<ClosureExpr>(e)) {
+      if (closure->behavesLikeNonisolatedNonsending())
+        return adjustClosureIsolation(
+            FunctionTypeIsolation::forNonisolatedNonsending());
+    }
   }
 
   // If we're converting to an `@isolated(any)` type, at least force the
   // closure to be emitted using the erased-isolation pattern so that
   // we don't lose that information.
-  if (info->ExpectedLoweredType->hasErasedIsolation()) {
-    // This assertion is why this isn't an infinite recursion.
-    assert(!closureType->getIsolation().isErased() &&
-           "closure cannot directly have erased isolation");
-
-    // Construct a conversion that just erases isolation and doesn't make
-    // any other changes to the closure type.
-    auto erasedExtInfo = closureType->getExtInfo()
-      .withIsolation(FunctionTypeIsolation::forErased());
-    auto erasedClosureType = closureType.withExtInfo(erasedExtInfo);
-    auto erasureInfo = SGF.getFunctionTypeInfo(erasedClosureType);
-
-    // Emit the closure under that conversion.  This should always succeed.
-    assert(canEmitSpecializedClosureFunction(closureType, erasureInfo));
-    auto erasedResult = emitClosureReference(e, erasureInfo);
-
-    // Narrow the original conversion to start from the erased closure type.
-    auto convAfterErasure = conv.withSourceType(SGF, erasedClosureType);
-
-    // Apply the narrowed conversion.
-    return convAfterErasure.emit(SGF, e, erasedResult, SGFContext());
-  }
+  if (info->ExpectedLoweredType->hasErasedIsolation())
+    return adjustClosureIsolation(FunctionTypeIsolation::forErased());
 
   // Otherwise, give up.
   return ManagedValue();
@@ -3596,7 +3588,7 @@ static ManagedValue emitKeyPathRValueBase(SILGenFunction &subSGF,
 
   // If base is a metatype, it cannot be opened as an existential or upcasted
   // from a class.
-  if (baseType->is<MetatypeType>())
+  if (baseType->is<AnyMetatypeType>())
     return paramSubstValue;
   
   // Pop open an existential container base.
@@ -3666,14 +3658,23 @@ static PreparedArguments loadIndexValuesForKeyPathComponent(
   }
 
   for (unsigned i : indices(indexes)) {
-    SILValue eltAddr = pointer;
-    if (indexes.size() > 1) {
-      eltAddr = SGF.B.createTupleElementAddr(loc, eltAddr, i);
-    }
+    SILValue elt = pointer;
     auto ty = SGF.F.mapTypeIntoEnvironment(indexes[i].second);
-    auto value = SGF.emitLoad(loc, eltAddr,
-                              SGF.getTypeLowering(ty),
-                              SGFContext(), IsNotTake);
+    ManagedValue value;
+    if (pointer->getType().isAddress()) {
+      if (indexes.size() > 1)
+        elt = SGF.B.createTupleElementAddr(loc, elt, i);
+      value = SGF.emitLoad(loc, elt, SGF.getTypeLowering(ty), SGFContext(),
+                           IsNotTake);
+    } else {
+      // The index argument arrives as an `Indirect_In_Guaranteed` parameter,
+      // so a non-address shape is only possible when SIL operates on opaque
+      // values rather than addresses.
+      assert(!SGF.SGM.M.useLoweredAddresses());
+      if (indexes.size() > 1)
+        elt = SGF.B.createTupleExtract(loc, elt, i);
+      value = ManagedValue::forBorrowedRValue(elt).copy(SGF, loc);
+    }
     auto substType =
       SGF.F.mapTypeIntoEnvironment(indexes[i].first)->getCanonicalType();
     indexValues.add(loc, RValue(SGF, loc, substType, value));
@@ -3817,7 +3818,8 @@ static SILFunction *getOrCreateKeypathThunk(SILGenModule &SGM,
                                             RegularLocation loc) {
   SILGenFunctionBuilder builder(SGM);
   auto thunk = builder.getOrCreateSharedFunction(
-      loc, name, signature, IsBare, IsNotTransparent,
+      loc, name, signature, ActorIsolation::forUnspecified(), IsBare,
+      IsNotTransparent,
       (expansion == ResilienceExpansion::Minimal ? IsSerialized
                                                  : IsNotSerialized),
       ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
@@ -3876,7 +3878,9 @@ static SILFunction *getOrCreateKeyPathGetter(
   auto name = Mangle::ASTMangler(SGM.getASTContext(), property)
                   .mangleKeyPathGetterThunkHelper(property, genericSig,
                                                   baseType, subs, expansion);
-  auto loc = RegularLocation::getAutoGeneratedLocation();
+  auto getterDecl = property->getAccessor(AccessorKind::Get);
+  auto loc = getterDecl ? RegularLocation::getAutoGeneratedLocation(getterDecl)
+                        : RegularLocation::getAutoGeneratedLocation();
 
   auto thunk =
       getOrCreateKeypathThunk(SGM, name, signature, genericEnv, expansion, loc);
@@ -3973,7 +3977,9 @@ static SILFunction *getOrCreateKeyPathSetter(
   auto name = Mangle::ASTMangler(SGM.getASTContext(), property)
                   .mangleKeyPathSetterThunkHelper(property, genericSig,
                                                   baseType, subs, expansion);
-  auto loc = RegularLocation::getAutoGeneratedLocation();
+  auto setterDecl = property->getAccessor(AccessorKind::Set);
+  auto loc = setterDecl ? RegularLocation::getAutoGeneratedLocation(setterDecl)
+                        : RegularLocation::getAutoGeneratedLocation();
 
   auto thunk =
       getOrCreateKeypathThunk(SGM, name, signature, genericEnv, expansion, loc);
@@ -4327,16 +4333,16 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       .mangleKeyPathEqualsHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
     equals = builder.getOrCreateSharedFunction(
-        loc, name, signature, IsBare, IsNotTransparent,
-        (expansion == ResilienceExpansion::Minimal
-         ? IsSerialized
-         : IsNotSerialized),
+        loc, name, signature, ActorIsolation::forUnspecified(), IsBare,
+        IsNotTransparent,
+        (expansion == ResilienceExpansion::Minimal ? IsSerialized
+                                                   : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
         IsNotRuntimeAccessible);
     if (!equals->empty()) {
       return;
     }
-    
+
     SILGenFunction subSGF(SGM, *equals, SGM.SwiftModule);
     equals->setGenericEnvironment(genericEnv);
     auto entry = equals->begin();
@@ -4400,27 +4406,43 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
       Scope branchScope(subSGF, loc);
 
-      SILValue lhsEltAddr = lhsAddr;
-      SILValue rhsEltAddr = rhsAddr;
-      if (indexes.size() > 1) {
-        lhsEltAddr = subSGF.B.createTupleElementAddr(loc, lhsAddr, i);
-        rhsEltAddr = subSGF.B.createTupleElementAddr(loc, rhsAddr, i);
-      }
-      auto lhsArg = subSGF.emitLoad(loc, lhsEltAddr,
-             subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
-             SGFContext(), IsNotTake);
-      auto rhsArg = subSGF.emitLoad(loc, rhsEltAddr,
-             subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
-             SGFContext(), IsNotTake);
-      
-      if (!lhsArg.getType().isAddress()) {
-        auto lhsBuf = subSGF.emitTemporaryAllocation(loc, lhsArg.getType());
-        lhsArg.forwardInto(subSGF, loc, lhsBuf);
-        lhsArg = subSGF.emitManagedBufferWithCleanup(lhsBuf);
+      ManagedValue lhsArg, rhsArg;
+      if (lhsAddr->getType().isAddress()) {
+        SILValue lhsEltAddr = lhsAddr;
+        SILValue rhsEltAddr = rhsAddr;
+        if (indexes.size() > 1) {
+          lhsEltAddr = subSGF.B.createTupleElementAddr(loc, lhsAddr, i);
+          rhsEltAddr = subSGF.B.createTupleElementAddr(loc, rhsAddr, i);
+        }
+        lhsArg = subSGF.emitLoad(loc, lhsEltAddr,
+               subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
+               SGFContext(), IsNotTake);
+        rhsArg = subSGF.emitLoad(loc, rhsEltAddr,
+               subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
+               SGFContext(), IsNotTake);
 
-        auto rhsBuf = subSGF.emitTemporaryAllocation(loc, rhsArg.getType());
-        rhsArg.forwardInto(subSGF, loc, rhsBuf);
-        rhsArg = subSGF.emitManagedBufferWithCleanup(rhsBuf);
+        if (!lhsArg.getType().isAddress()) {
+          auto lhsBuf = subSGF.emitTemporaryAllocation(loc, lhsArg.getType());
+          lhsArg.forwardInto(subSGF, loc, lhsBuf);
+          lhsArg = subSGF.emitManagedBufferWithCleanup(lhsBuf);
+
+          auto rhsBuf = subSGF.emitTemporaryAllocation(loc, rhsArg.getType());
+          rhsArg.forwardInto(subSGF, loc, rhsBuf);
+          rhsArg = subSGF.emitManagedBufferWithCleanup(rhsBuf);
+        }
+      } else {
+        // Opaque-values mode: the function arguments are guaranteed object
+        // values rather than addresses. Extract the i-th element (if needed)
+        // and copy it; the apply will borrow the owned value for the
+        // @in_guaranteed Self parameter.
+        SILValue lhsElt = lhsAddr;
+        SILValue rhsElt = rhsAddr;
+        if (indexes.size() > 1) {
+          lhsElt = subSGF.B.createTupleExtract(loc, lhsAddr, i);
+          rhsElt = subSGF.B.createTupleExtract(loc, rhsAddr, i);
+        }
+        lhsArg = ManagedValue::forBorrowedRValue(lhsElt).copy(subSGF, loc);
+        rhsArg = ManagedValue::forBorrowedRValue(rhsElt).copy(subSGF, loc);
       }
 
       auto metaty = CanMetatypeType::get(formalCanTy,
@@ -4503,16 +4525,16 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       .mangleKeyPathHashHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
     hash = builder.getOrCreateSharedFunction(
-        loc, name, signature, IsBare, IsNotTransparent,
-        (expansion == ResilienceExpansion::Minimal
-         ? IsSerialized
-         : IsNotSerialized),
+        loc, name, signature, ActorIsolation::forUnspecified(), IsBare,
+        IsNotTransparent,
+        (expansion == ResilienceExpansion::Minimal ? IsSerialized
+                                                   : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
         IsNotRuntimeAccessible);
     if (!hash->empty()) {
       return;
     }
-    
+
     SILGenFunction subSGF(SGM, *hash, SGM.SwiftModule);
     hash->setGenericEnvironment(genericEnv);
     auto entry = hash->begin();
@@ -4534,7 +4556,11 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       // Extract the index value.
       SILValue indexAddr = indexPtr;
       if (indexes.size() > 1) {
-        indexAddr = subSGF.B.createTupleElementAddr(loc, indexPtr, 0);
+        if (indexPtr->getType().isAddress()) {
+          indexAddr = subSGF.B.createTupleElementAddr(loc, indexPtr, 0);
+        } else {
+          indexAddr = subSGF.B.createTupleExtract(loc, indexPtr, 0);
+        }
       }
 
       VarDecl *hashValueVar =
@@ -4556,7 +4582,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
           hashGenericSig, formalTy, hashable);
 
       // Read the storage.
-      ManagedValue base = ManagedValue::forBorrowedAddressRValue(indexAddr);
+      ManagedValue base = indexAddr->getType().isAddress()
+                              ? ManagedValue::forBorrowedAddressRValue(indexAddr)
+                              : ManagedValue::forBorrowedObjectRValue(indexAddr);
       hashCode =
         subSGF.emitRValueForStorageLoad(loc, base, formalTy, /*super*/ false,
                                         hashValueVar, PreparedArguments(),
@@ -4652,7 +4680,32 @@ static void lowerKeyPathMemberIndexTypes(
           AbstractionPattern::getOpaque(), paramTy,
           TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
               ResilienceExpansion::Minimal));
+
+      // In opaque-values mode, TypeLowering::handleAddressOnly lowers
+      // address-only AST types objects until AddressLowering runs, so the
+      // `getLoweredType` above returns the object form. The keypath runtime
+      // ABI requires the address form, and KeyPathPatternComponent caches
+      // its lowered index type — AddressLowering does not reconstruct the
+      // pattern with refreshed lowerings, so we have to embed the
+      // post-AddressLowering shape here. Bypass TypeLowering with
+      // SILType::isAddressOnly and switch address-only indices to address form.
+      // The keypath instruction's operand may still be at object type in
+      // opaque-values mode; the SIL verifier accepts that intermediate shape 
+      // and AddressLowering rewrites the operand later.
+      //
+      // TODO: Drop the cached lowering from KeyPathPatternComponent::Index,
+      // or have AddressLowering rebuild the keypath pattern with refreshed
+      // type lowerings.
+      bool addressOnly =
+          paramLoweredTy.isObject() &&
+          SILType::isAddressOnly(
+              paramTy->getCanonicalType(), SGM.Types,
+              sig ? sig->getCanonicalSignature() : CanGenericSignature(),
+              TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                  ResilienceExpansion::Minimal));
       paramLoweredTy = paramLoweredTy.mapTypeOutOfEnvironment();
+      if (addressOnly)
+        paramLoweredTy = paramLoweredTy.getAddressType();
 
       indexPatterns.push_back(
           {paramTy->mapTypeOutOfEnvironment()->getCanonicalType(), paramLoweredTy});
@@ -4899,7 +4952,7 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
       if (!var->getDeclContext()->isTypeContext()) {
         componentTy = var->getInterfaceType()->getCanonicalType();
       } else if (var->getDeclContext()->getSelfProtocolDecl() &&
-                 baseTy->isExistentialType()) {
+                 baseTy->isAnyExistentialType()) {
         componentTy = var->getValueInterfaceType()->getCanonicalType();
         ASSERT(!componentTy->hasTypeParameter());
       } else {
@@ -5251,14 +5304,11 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
   SmallVector<CleanupHandle, 8> cleanups;
 
   for (unsigned index : range(E->getNumElements())) {
-    auto destAddr = addr;
-
-    if (index != 0) {
-      SILValue indexValue = SGF.B.createIntegerLiteral(
-          E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-      destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
-                                   /*needsStackProtection=*/ false);
-    }
+    SILValue indexValue = SGF.B.createIntegerLiteral(
+        E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+    SILValue destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
+                                 /*needsStackProtection=*/ false,
+                                 /*isProjection=*/ true);
 
     // Create a dormant cleanup for the value in case we exit before the
     // full vector has been constructed.
@@ -5332,13 +5382,10 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   SmallVector<CleanupHandle, 8> cleanups;
 
   for (unsigned index : range(E->getNumElements())) {
-    auto destAddr = varargsInfo.getBaseAddress();
-    if (index != 0) {
-      SILValue indexValue = SGF.B.createIntegerLiteral(
-          loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-      destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue,
-              /*needsStackProtection=*/ false);
-    }
+    SILValue indexValue = SGF.B.createIntegerLiteral(
+        loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+    SILValue destAddr = SGF.B.createIndexAddr(loc, varargsInfo.getBaseAddress(), indexValue,
+            /*needsStackProtection=*/ false, /*isProjection=*/ true);
     auto &destTL = varargsInfo.getBaseTypeLowering();
     // Create a dormant cleanup for the value in case we exit before the
     // full array has been constructed.
@@ -5411,7 +5458,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
           SILValue addr =
               addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
           auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
-          input = SGF.B.createUncheckedTakeEnumDataAddr(
+          input = SGF.B.createUncheckedInPlaceEnumDataAddr(
               loc, input, someDecl, input.getType().getOptionalObjectType());
           SGF.B.createCopyAddr(loc, input.getValue(), addr, IsNotTake,
                                IsInitialization);
@@ -6186,7 +6233,7 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
   assert(eltTy);
   SILValue address = optValue.forward(*this);
   return emitManagedBufferWithCleanup(
-      B.createUncheckedTakeEnumDataAddr(loc, address, someDecl, eltTy));
+      B.createUncheckedInPlaceEnumDataAddr(loc, address, someDecl, eltTy));
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
@@ -7331,9 +7378,8 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     optTemp->finishInitialization(SGF);
 
     if (subType.isLoadable(SGF.F) || !SGF.useLoweredAddresses()) {
-      ManagedValue value = SGF.B.createLoadTake(E, optTemp->getManagedAddress());
-      if (value.getType().isTrivial(SGF.F))
-        return RValue(SGF, {value}, subType.getASTType());
+      ManagedValue value =
+          SGF.B.createLoadTake(E, optTemp->getManagedAddress());
       return RValue(SGF, {value}, subType.getASTType());
     }
 
@@ -7542,7 +7588,7 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
 
   auto isolation = getRealActorIsolationOfContext(SGF.FunctionDC);
 
-  if (isolation == ActorIsolation::CallerIsolationInheriting) {
+  if (isolation == ActorIsolation::NonisolatedNonsending) {
     auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
     assert(isolatedArg &&
            "Caller Isolation Inheriting without isolated parameter");

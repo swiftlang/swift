@@ -386,15 +386,13 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
         });
 
     // If this is an operator application and all of the arguments are holes,
-    // let's disable all but one overload to make sure holes don't cause
-    // performance problems because hole could be bound to any type.
+    // let's disable disjunction by binding type variable that represents it
+    // to a hole.
     //
     // Non-operator calls are exempted because they have fewer overloads,
     // and it's possible to filter them based on labels.
     if (allHoles && isOperatorDisjunction(disjunction)) {
-      auto choices = disjunction->getNestedConstraints();
-      for (auto *choice : choices.slice(1))
-        choice->setDisabled();
+      recordTypeVariablesAsHoles(fnTypeVar);
     }
   }
 
@@ -877,13 +875,13 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
         if (paramFlags.isAutoClosure())
           paramType = paramType->castTo<FunctionType>()->getResult();
 
-        reason |= canPossiblyConvertTo(cs, argType, paramType, genericSig);
+        reason |= checkConversion(cs, argType, paramType, genericSig);
       }
 
       auto overloadResultType = overloadType->getResult();
       auto applyResultType = argFuncType->getResult();
-      reason |= canPossiblyConvertTo(cs, overloadResultType,
-                                     applyResultType, genericSig);
+      reason |= checkConversion(cs, overloadResultType,
+                                applyResultType, genericSig);
 
       if (reason) {
         if (cs.isDebugMode()) {

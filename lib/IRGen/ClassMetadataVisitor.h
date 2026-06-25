@@ -79,8 +79,7 @@ public:
   // The regular `layout` method can be used for layout tasks for which the
   // actual superclass pointer is not relevant.
   void layoutEmbedded(CanType classTy) {
-    if (IGM.isEmbeddedWithExistentials())
-      asImpl().addValueWitnessTable();
+    asImpl().addValueWitnessTable();
     asImpl().noteAddressPoint();
     asImpl().addEmbeddedSuperclass(classTy);
     asImpl().addDestructorFunction();
@@ -93,8 +92,7 @@ public:
                   "Adjustment index must be synchronized with this layout");
 
     if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-      if (IGM.isEmbeddedWithExistentials())
-        asImpl().addValueWitnessTable();
+      asImpl().addValueWitnessTable();
       asImpl().noteAddressPoint();
       asImpl().addSuperclass();
       asImpl().addDestructorFunction();

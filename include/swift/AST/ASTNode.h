@@ -91,7 +91,7 @@ namespace swift {
 
     static inline ASTNode getFromOpaqueValue(void *ptr) {
       ASTNode result;
-      result.Val = decltype(result.Val)::getFromOpaqueValue(ptr);
+      result.Val = reinterpret_cast<intptr_t>(ptr);
       return result;
     }
 

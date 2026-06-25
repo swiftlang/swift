@@ -81,7 +81,10 @@ FEATURE(IsolatedDeinit,                                 (6, 1))
 FEATURE(ValueGenericType,                               (6, 2))
 FEATURE(InitRawStructMetadata2,                         (6, 2))
 FEATURE(TaskExecutor,                                   (6, 2))
+FEATURE(TaskPriorityEscalationHandlers,                 (6, 2))
 FEATURE(TypedCoroAlloc,                                 (6, 2))
+
+FEATURE(NoncopyableReflectionSafety,                    (6, 4))
 
 FEATURE(CustomGlobalExecutors,                          FUTURE)
 FEATURE(Differentiation,                                FUTURE)
@@ -89,5 +92,7 @@ FEATURE(ClearSensitive,                                 FUTURE)
 FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
 // TODO: CoroutineAccessors: Change to correct version number.
 FEATURE(CoroutineAccessors,                             FUTURE)
+FEATURE(GetObjCMetatypeFromMetadata,                    FUTURE)
+
 #undef FEATURE
 #undef FUTURE

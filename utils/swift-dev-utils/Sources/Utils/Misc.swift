@@ -73,6 +73,10 @@ public extension String {
     self = buffer.withUnsafeBytes(String.init(utf8:))
   }
 
+  init(utf8 seq: some Collection<UInt8>) {
+    self.init(decoding: seq, as: UTF8.self)
+  }
+
   func scanningUTF8<R>(_ scan: (inout ByteScanner) throws -> R) rethrows -> R {
     var tmp = self
     return try tmp.withUTF8 { utf8 in
@@ -143,6 +147,22 @@ public extension String {
         }
       }
       return bytes.isUnchanged ? self : String(utf8: bytes)
+    }
+  }
+}
+
+extension Sequence where Element == UInt8 {
+  public func scanning<R>(_ scan: (inout ByteScanner) throws -> R) rethrows -> R {
+    let result = try withContiguousStorageIfAvailable { buffer in
+      var scanner = ByteScanner(buffer)
+      return try scan(&scanner)
+    }
+    if let result {
+      return result
+    }
+    return try Array(self).withUnsafeBufferPointer { buffer in
+      var scanner = ByteScanner(buffer)
+      return try scan(&scanner)
     }
   }
 }

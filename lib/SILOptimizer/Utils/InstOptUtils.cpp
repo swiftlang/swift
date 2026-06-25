@@ -25,6 +25,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
@@ -141,6 +142,23 @@ bool swift::canTriviallyDeleteOSSAEndScopeInst(SILInstruction *i) {
          !opValue->getType().isMoveOnly();
 }
 
+/// Return true if \p inst is a forwarding operation that destructures an owned
+/// move-only value. Such instructions must not be deleted because they end
+/// the lifetime of their operand.
+bool swift::canDeleteDeadMoveOnlyOwnedDestructureInst(SILInstruction *inst) {
+  auto forwardingOperation = ForwardingOperation(inst);
+  if (!forwardingOperation || !forwardingOperation.isOwnedValueDestructure()) {
+    return true;
+  }
+  auto *singleForwardingOp = forwardingOperation.getSingleForwardingOperand();
+  ASSERT(singleForwardingOp);
+  if (!singleForwardingOp->get()->getType().isMoveOnly()) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
@@ -180,17 +198,15 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   if (isa<BorrowedFromInst>(inst))
     return false;
 
-  // A dead `destructure_struct` with an owned argument can appear for a non-copyable or
-  // non-escapable struct which has only trivial elements. The instruction is not trivially
-  // dead because it ends the lifetime of its operand.
-  if (isa<DestructureStructInst>(inst) &&
-      inst->getOperand(0)->getOwnershipKind() == OwnershipKind::Owned) {
+  if (!canDeleteDeadMoveOnlyOwnedDestructureInst(inst)) {
     return false;
   }
 
-  // These invalidate enums so "write" memory, but that is not an essential
+  // These invalidate enums, or use scratch space to avoid invalidating the
+  // original, so "write" memory, but that is not an essential
   // operation so we can remove these if they are trivially dead.
-  if (isa<UncheckedTakeEnumDataAddrInst>(inst))
+  if (isa<UncheckedTakeEnumDataAddrInst>(inst)
+      || isa<UncheckedBorrowEnumDataAddrInst>(inst))
     return true;
 
   // An ossa end scope instruction is trivially dead if its operand has
@@ -594,11 +610,6 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// to avoid any divergence between the check and the implementation in the
 /// future.
 ///
-/// \p usePoints are required when \p value has guaranteed ownership. It must be
-/// the last users of the returned, casted value. A usePoint cannot be a
-/// BranchInst (a phi is never the last guaranteed user). \p builder's current
-/// insertion point must dominate all \p usePoints. \p usePoints must
-/// collectively post-dominate \p builder's current insertion point.
 ///
 /// NOTE: The implementation of this function is very closely related to the
 /// rules checked by SILVerifier::requireABICompatibleFunctionTypes. It must
@@ -606,12 +617,8 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// areABICompatibleParamsOrReturns()).
 std::pair<SILValue, bool /* changedCFG */>
 swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
-                                    SILLocation loc,
-                                    SILValue value, SILType srcTy,
-                                    SILType destTy,
-                                    ArrayRef<SILInstruction *> usePoints) {
-  assert(value->getOwnershipKind() != OwnershipKind::Guaranteed ||
-         !usePoints.empty() && "guaranteed value must have use points");
+                                    SILLocation loc, SILValue value,
+                                    SILType srcTy, SILType destTy) {
 
   // No cast is required if types are the same.
   if (srcTy == destTy)
@@ -689,7 +696,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
     // Cast the unwrapped value.
     SILValue castedUnwrappedValue;
     std::tie(castedUnwrappedValue, std::ignore) = castValueToABICompatibleType(
-      builder, pm, loc, unwrappedValue, optionalSrcTy, optionalDestTy, usePoints);
+        builder, pm, loc, unwrappedValue, optionalSrcTy, optionalDestTy);
     // Wrap into optional. An owned value is forwarded through the cast and into
     // the Optional. A borrowed value will have a nested borrow for the
     // rewrapped Optional.
@@ -720,8 +727,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
         builder->createOptionalSome(loc, value, loweredOptionalSrcType);
     // Cast the wrapped value.
     return castValueToABICompatibleType(builder, pm, loc, wrappedValue,
-                                        wrappedValue->getType(), destTy,
-                                        usePoints);
+                                        wrappedValue->getType(), destTy);
   }
 
   // Handle tuple types.
@@ -734,7 +740,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
       bool neededCFGChange;
       std::tie(element, neededCFGChange) = castValueToABICompatibleType(
           builder, pm, loc, element, srcTy.getTupleElementType(idx),
-          destTy.getTupleElementType(idx), usePoints);
+          destTy.getTupleElementType(idx));
       changedCFG |= neededCFGChange;
       expectedTuple.push_back(element);
     };
@@ -1911,6 +1917,52 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
       });
 }
 
+/// Clone a nullary instruction (with no operands) into each debug value's
+/// reconstruction block, replacing the block argument.
+/// This uses the TrivialCloner, so its restrictions apply.
+static void salvageNullaryInst(SingleValueInstruction *inst) {
+  assert(inst->getNumOperands() == 0 &&
+         "salvageNullaryInst expects a single operand");
+  SmallVector<Operand *, 4> debugUses(getDebugUses(inst));
+  for (Operand *U : debugUses) {
+    auto *DbgInst = cast<DebugValueInst>(U->getUser());
+    SILBasicBlock *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
+    SILValue cloned = inst->clone(&*debugBB->begin());
+    debugBB->getArgument(0)->replaceAllUsesWith(cloned);
+    debugBB->eraseArgument(0);
+    DbgInst->setOperand(SILUndef::get(DbgInst->getOperand()));
+  }
+}
+
+/// Clone a unary instruction into each debug value's reconstruction block
+/// via TrivialCloner, rewiring the block argument to the instruction's input.
+static void salvageUnaryInst(SingleValueInstruction *SVI) {
+  assert(SVI->getNumOperands() == 1 &&
+         "salvageUnaryInst expects a single operand");
+  SmallVector<Operand *, 4> debugUses(getDebugUses(SVI));
+  for (Operand *U : debugUses) {
+    auto *DbgInst = cast<DebugValueInst>(U->getUser());
+    SILBasicBlock *debugBB =
+        DbgInst->getOrCreateDebugReconstructionBlock();
+    SILArgument *oldArg = debugBB->getArgument(0);
+
+    // Clone the instruction into the debug BB. TrivialCloner keeps
+    // original operands, which we fix up below.
+    auto *cloned =
+        cast<SingleValueInstruction>(SVI->clone(&*debugBB->begin()));
+    if (auto *fwdInst = ForwardingInstruction::get(cloned))
+      fwdInst->setForwardingOwnershipKind(OwnershipKind::None);
+    oldArg->replaceAllUsesWith(cloned);
+
+    // Replace the block arg type with the input operand type.
+    SILValue operand = SVI->getOperand(0);
+    auto *newArg =
+        debugBB->replacePhiArgument(0, operand->getType(), OwnershipKind::None);
+    cloned->setOperand(0, newArg);
+    DbgInst->setOperand(operand);
+  }
+}
+
 /// Create a new debug value from a store and a debug variable.
 static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
                                     SILInstruction *SI,
@@ -1918,17 +1970,17 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   auto VarInfo = DefiningInst.getVarInfo();
   if (!VarInfo)
     return;
-  // Fix the op_deref.
-  if (!isa<CopyAddrInst>(SI) && VarInfo->DIExpr.startsWithDeref())
-    VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());
-  else if (isa<CopyAddrInst>(SI) && !VarInfo->DIExpr.startsWithDeref())
-    VarInfo->DIExpr.prependElements({
-      SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+
   // Note: The instruction should logically be in the SI's scope.
   // However, LLVM does not support variables and stores in different scopes,
   // so we use the variable's scope.
-  SILBuilder(SI, DefiningInst->getDebugScope())
-    .createDebugValue(SI->getLoc(), original, *VarInfo);
+  auto *newDVI = SILBuilder(SI, DefiningInst->getDebugScope())
+      .createDebugValue(SI->getLoc(), original, *VarInfo);
+
+  if (auto *srcDVI = dyn_cast<DebugValueInst>(*DefiningInst))
+    newDVI->cloneReconstructionBlockFrom(srcDVI);
+
+  newDVI->stripDeref();
 }
 
 void swift::salvageStoreDebugInfo(SILInstruction *SI,
@@ -1938,6 +1990,65 @@ void swift::salvageStoreDebugInfo(SILInstruction *SI,
     transferStoreDebugValue(ASI, SI, SrcVal);
     for (Operand *U : getDebugUses(ASI))
       transferStoreDebugValue(U->getUser(), SI, SrcVal);
+  }
+}
+
+/// Transfer debug info associated with pack_element_set instruction \p PESI to
+/// a new `debug_value` instruction before \p PESI is deleted.
+///
+/// If the pack_element_set uses a scalar_pack_index, and the associated pack
+/// type contains no pack expansions, we can treat the pack as a tuple for the
+/// purposes of debug info. This allows us to salvage the associated debug
+/// information by creating a debug_value referring to the pack_element_set's
+/// value operand as a tuple fragment, using the index from scalar_pack_index.
+///
+/// If the pack contains exactly one element, treat it as the entire value of
+/// the pack; do not introduce a 1-element tuple.
+static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
+  auto *SPII = dyn_cast_or_null<ScalarPackIndexInst>(PESI->getIndex());
+  if (!SPII)
+    return;
+
+  auto *API = dyn_cast_or_null<AllocPackInst>(PESI->getPack());
+  if (!API)
+    return;
+
+  auto packType = API->getPackType();
+
+  if (packType->containsPackExpansionType())
+    return;
+
+  SILType silType;
+  TupleType *tupleType = nullptr;
+
+  if (packType.getElementTypes().size() == 1) {
+    silType = PESI->getFunction()->getLoweredType(packType.getElementType(0));
+  } else {
+    llvm::SmallVector<TupleTypeElt, 4> tupleElements;
+    for (const auto &elementType : packType.getElementTypes()) {
+      tupleElements.push_back(elementType);
+    }
+    tupleType = swift::TupleType::get(tupleElements, packType->getASTContext());
+
+    silType = PESI->getFunction()->getLoweredType(tupleType);
+  }
+
+  for (Operand *U : getDebugUses(API)) {
+    auto *DbgInst = cast<DebugValueInst>(U->getUser());
+    // TODO: Support salvaging reconstruction blocks for packs, and use a
+    // reconstruction block instead of tuple fragments to salvage their debug
+    // info.
+    ASSERT(DbgInst->getDebugReconstructionBlock() == nullptr &&
+           "We do not yet support reconstruction blocks for packs.");
+    auto VarInfo = DbgInst->getCompleteVarInfo();
+    VarInfo.Type = silType;
+    if (tupleType) {
+      auto FragDIExpr = SILDebugInfoExpression::createTupleFragment(
+          tupleType, SPII->getComponentIndex());
+      VarInfo.DIExpr.append(FragDIExpr);
+    }
+    SILBuilder(PESI, DbgInst->getDebugScope())
+        .createDebugValue(DbgInst->getLoc(), PESI->getValue(), VarInfo);
   }
 }
 
@@ -1960,6 +2071,9 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     for (Operand *U : getDebugUses(SI))
       transferStoreDebugValue(U->getUser(), SI, SI->getSrc());
   }
+  if (auto *PESI = dyn_cast<PackElementSetInst>(I)) {
+    salvagePackElementSetDebugInfo(PESI);
+  }
   // If a `struct` SIL instruction is "unwrapped" and removed,
   // for instance, in favor of using its enclosed value directly,
   // we need to make sure any of its related `debug_value` instructions
@@ -1967,25 +2081,53 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   if (auto *STI = dyn_cast<StructInst>(I)) {
     auto STVal = STI->getResult(0);
     llvm::ArrayRef<VarDecl *> FieldDecls =
-      STI->getStructDecl()->getStoredProperties();
-    for (Operand *U : getDebugUses(STVal)) {
-      auto *DbgInst = cast<DebugValueInst>(U->getUser());
-      auto VarInfo = DbgInst->getVarInfo();
-      if (!VarInfo)
-        continue;
-      for (VarDecl *FD : FieldDecls) {
-        SILDebugVariable NewVarInfo = *VarInfo;
-        auto FieldVal = STI->getFieldValue(FD);
-        // Build the corresponding fragment DIExpression
-        auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
-        NewVarInfo.DIExpr.append(FragDIExpr);
+        STI->getStructDecl()->getStoredProperties();
+    if (STI->getElements().empty()) {
+      // Empty structs cannot use fragments, as they have no fields.
+      salvageNullaryInst(STI);
+    } else {
+      SmallVector<Operand *, 4> debugUses(getDebugUses(STVal));
+      for (Operand *U : debugUses) {
+        auto *DbgInst = cast<DebugValueInst>(U->getUser());
+        auto VarInfo = DbgInst->getCompleteVarInfo();
+        if (SILBasicBlock *debugBB = DbgInst->getDebugReconstructionBlock()) {
+          // Cannot combine debug reconstruction blocks and fragments.
+          // As debug_values and debug reconstruction blocks only support a
+          // single operand, only salvage one field (the first one).
+          SILValue fieldVal = STI->getOperand(0);
+          SILType structTy = STVal->getType();
+          SILArgument *oldArg = debugBB->getArgument(0);
 
-        if (!NewVarInfo.Type)
-          NewVarInfo.Type = STI->getType();
+          // Create an all-undef struct instruction.
+          SILBuilder builder(debugBB->begin());
+          SmallVector<SILValue, 4> elements;
+          for (auto elt : STI->getElements())
+            elements.push_back(SILUndef::get(elt));
+          auto *newStructInst = builder.createStruct(
+            DbgInst->getLoc(), structTy, elements);
+          newStructInst->setForwardingOwnershipKind(OwnershipKind::None);
+          oldArg->replaceAllUsesWith(newStructInst);
 
-        // Create a new debug_value
-        SILBuilder(STI, DbgInst->getDebugScope())
-          .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
+          // Replace the block arg and wire the operand.
+          auto *newArg = debugBB->replacePhiArgument(
+            0, fieldVal->getType(), OwnershipKind::None);
+          newStructInst->setOperand(0, newArg);
+          DbgInst->setOperand(fieldVal);
+        } else {
+          // Fragments are the only way to use multiple operands to reconstruct
+          // a variable, as debug values can only have a single operand.
+          for (VarDecl *FD : FieldDecls) {
+            SILDebugVariable NewVarInfo = VarInfo;
+            auto FieldVal = STI->getFieldValue(FD);
+            // Build the corresponding fragment DIExpression.
+            auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
+            NewVarInfo.DIExpr.append(FragDIExpr);
+          
+            // Create a new debug_value for each fragment.
+            SILBuilder(STI, DbgInst->getDebugScope())
+              .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
+          }
+        }
       }
     }
   }
@@ -1994,117 +2136,83 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   // are preserved.
   if (auto *TTI = dyn_cast<TupleInst>(I)) {
     auto TTVal = TTI->getResult(0);
-    for (Operand *U : getDebugUses(TTVal)) {
-      auto *DbgInst = cast<DebugValueInst>(U->getUser());
-      auto VarInfo = DbgInst->getVarInfo();
-      if (!VarInfo)
-        continue;
-      TupleType *TT = TTI->getTupleType();
-      for (auto i : indices(TT->getElements())) {
-        SILDebugVariable NewVarInfo = *VarInfo;
-        auto FragDIExpr = SILDebugInfoExpression::createTupleFragment(TT, i);
-        NewVarInfo.DIExpr.append(FragDIExpr);
+    if (TTI->getElements().empty()) {
+      // Empty tuple: clone into a debug BB and set operand to undef.
+      salvageNullaryInst(TTI);
+    } else {
+      SmallVector<Operand *, 4> debugUses(getDebugUses(TTVal));
+      for (Operand *U : debugUses) {
+        auto *DbgInst = cast<DebugValueInst>(U->getUser());
+        auto VarInfo = DbgInst->getCompleteVarInfo();
+        if (SILBasicBlock *debugBB = DbgInst->getDebugReconstructionBlock()) {
+          // Cannot combine debug reconstruction blocks and fragments.
+          // Only salvage one element (the first one).
+          SILValue eltVal = TTI->getOperand(0);
+          SILType tupleTy = TTVal->getType();
+          SILArgument *oldArg = debugBB->getArgument(0);
 
-        if (!NewVarInfo.Type)
-          NewVarInfo.Type = TTI->getType();
+          // Create an all-undef tuple instruction.
+          SILBuilder builder(debugBB->begin());
+          SmallVector<SILValue, 4> elements;
+          for (auto elt : TTI->getElements())
+            elements.push_back(SILUndef::get(elt));
+          auto *tupleInst = builder.createTuple(
+            DbgInst->getLoc(), tupleTy, elements);
+          oldArg->replaceAllUsesWith(tupleInst);
 
-        // Create a new debug_value
-        SILBuilder(TTI, DbgInst->getDebugScope())
-          .createDebugValue(DbgInst->getLoc(), TTI->getElement(i), NewVarInfo);
-      }
-    }
-  }
+          // Replace the block arg and wire the operand.
+          auto *newArg = debugBB->replacePhiArgument(
+            0, eltVal->getType(), OwnershipKind::None);
+          tupleInst->setOperand(0, newArg);
+          // Update the debug_value operand.
+          DbgInst->setOperand(eltVal);
+        } else {
+          TupleType *TT = TTI->getTupleType();
+          for (auto i : indices(TT->getElements())) {
+            SILDebugVariable NewVarInfo = VarInfo;
+            auto FragDIExpr =
+              SILDebugInfoExpression::createTupleFragment(TT, i);
+            NewVarInfo.DIExpr.append(FragDIExpr);
 
-  if (auto *IA = dyn_cast<IndexAddrInst>(I)) {
-    if (IA->getBase() && IA->getIndex())
-      // Only handle cases where offset is constant.
-      if (const auto *LiteralInst =
-            dyn_cast<IntegerLiteralInst>(IA->getIndex())) {
-        SILValue Base = IA->getBase();
-        SILValue ResultAddr = IA->getResult(0);
-        APInt OffsetVal = LiteralInst->getValue();
-        const SILDIExprElement ExprElements[3] = {
-          SILDIExprElement::createOperator(OffsetVal.isNegative() ?
-            SILDIExprOperator::ConstSInt : SILDIExprOperator::ConstUInt),
-          SILDIExprElement::createConstInt(OffsetVal.getLimitedValue()),
-          SILDIExprElement::createOperator(SILDIExprOperator::Plus)
-        };
-        for (Operand *U : getDebugUses(ResultAddr)) {
-          auto *DbgInst = cast<DebugValueInst>(U->getUser());
-          auto VarInfo = DbgInst->getVarInfo();
-          if (!VarInfo)
-            continue;
-          VarInfo->DIExpr.prependElements(ExprElements);
-          // Create a new debug_value
-          SILBuilder(IA, DbgInst->getDebugScope())
-            .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
+            // Create a new debug_value for each fragment.
+            SILBuilder(TTI, DbgInst->getDebugScope())
+              .createDebugValue(DbgInst->getLoc(), TTI->getElement(i),
+                                NewVarInfo);
+          }
         }
       }
-  }
-
-  if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
-    APInt value = IL->getValue();
-    const SILDIExprElement ExprElements[2] = {
-      SILDIExprElement::createOperator(value.isNegative() ?
-        SILDIExprOperator::ConstSInt : SILDIExprOperator::ConstUInt),
-      SILDIExprElement::createConstInt(value.getLimitedValue()),
-    };
-    for (Operand *U : getDebugUses(IL)) {
-      auto *DbgInst = cast<DebugValueInst>(U->getUser());
-      auto VarInfo = DbgInst->getVarInfo();
-      if (!VarInfo)
-        continue;
-      VarInfo->DIExpr.prependElements(ExprElements);
-      // Create a new debug_value, with undef, and the correct const int
-      SILBuilder(DbgInst, DbgInst->getDebugScope())
-        .createDebugValue(DbgInst->getLoc(), SILUndef::get(IL), *VarInfo);
     }
   }
+
+  if (auto *EI = dyn_cast<EnumInst>(I)) {
+    if (EI->hasOperand())
+      salvageUnaryInst(EI);
+    else
+      salvageNullaryInst(EI);
+  }
+
+  if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I))
+    salvageNullaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<AddressToPointerInst>(I) || isa<PointerToAddressInst>(I))
+    salvageUnaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I) ||
+      isa<RefElementAddrInst>(I) || isa<VectorBaseAddrInst>(I))
+    salvageUnaryInst(cast<SingleValueInstruction>(I));
 }
 
 void swift::salvageLoadDebugInfo(LoadOperation load) {
-  for (Operand *debugUse : getDebugUses(load.getLoadInst())) {
-    // Create a new debug_value rather than reusing the old one so the
-    // SILBuilder adds 'expr(deref)' to account for the indirection.
+  // The use list is mutated during iteration.
+  SmallVector<Operand *, 4> debugUses(getDebugUses(load.getLoadInst()));
+  for (Operand *debugUse : debugUses) {
+    // Update the debug_value to use the loaded address.
     auto *debugInst = cast<DebugValueInst>(debugUse->getUser());
-    auto varInfo = debugInst->getVarInfo();
-    if (!varInfo)
-      continue;
-
-    // The new debug_value must be "hoisted" to the load to ensure that the
+    // The debug_value must be "hoisted" to the load to ensure that the
     // address is still valid.
-    SILBuilder(load.getLoadInst(), debugInst->getDebugScope())
-      .createDebugValueAddr(debugInst->getLoc(), load.getOperand(),
-                            varInfo.value());
-  }
-}
-
-// TODO: this currently fails to notify the pass with notifyNewInstruction.
-void swift::createDebugFragments(SILValue oldValue, Projection proj,
-                                 SILValue newValue) {
-  if (proj.getKind() != ProjectionKind::Struct)
-    return;
-
-  for (auto *use : getDebugUses(oldValue)) {
-    auto debugVal = dyn_cast<DebugValueInst>(use->getUser());
-    if (!debugVal)
-      continue;
-
-    auto varInfo = debugVal->getVarInfo();
-
-    SILType baseType = oldValue->getType();
-
-    // Copy VarInfo and add the corresponding fragment DIExpression.
-    SILDebugVariable newVarInfo = *varInfo;
-    newVarInfo.DIExpr.append(
-        SILDebugInfoExpression::createFragment(proj.getVarDecl(baseType)));
-
-    if (!newVarInfo.Type)
-      newVarInfo.Type = baseType;
-
-    // Create a new debug_value
-    SILBuilder(debugVal, debugVal->getDebugScope())
-        .createDebugValue(debugVal->getLoc(), newValue, newVarInfo);
+    debugInst->moveBefore(load.getLoadInst());
+    debugInst->setOperand(load.getOperand());
+    debugInst->prependDeref();
   }
 }
 
@@ -2168,20 +2276,29 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
   return SILUndef::get(insertionPoint->getFunction(), ty);
 }
 
+static bool findUnreferenceableStorageInType(SILType ty, SILFunction *func) {
+  if (auto *structDecl = ty.getStructOrBoundGenericStruct()) {
+    return swift::findUnreferenceableStorage(structDecl, ty, func);
+  }
+  if (auto tupleTy = ty.getAs<TupleType>()) {
+    for (unsigned i = 0, e = tupleTy->getNumElements(); i < e; ++i) {
+      if (findUnreferenceableStorageInType(ty.getTupleElementType(i), func))
+        return true;
+    }
+  }
+  return false;
+}
+
 bool swift::findUnreferenceableStorage(StructDecl *decl, SILType structType,
                                        SILFunction *func) {
   if (decl->hasUnreferenceableStorage()) {
     return true;
   }
-  // Check if any fields have unreferenceable stoage
   for (auto *field : decl->getStoredProperties()) {
     TypeExpansionContext tec = *func;
     auto fieldTy = structType.getFieldType(field, func->getModule(), tec);
-    if (auto *fieldStructDecl = fieldTy.getStructOrBoundGenericStruct()) {
-      if (findUnreferenceableStorage(fieldStructDecl, fieldTy, func)) {
-        return true;
-      }
-    }
+    if (findUnreferenceableStorageInType(fieldTy, func))
+      return true;
   }
   return false;
 }

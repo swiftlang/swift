@@ -336,14 +336,17 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
           }
 
           case DeclKind::Func: {
-            auto identifier = declRefExpr->getDecl()
-                                  ->getName()
-                                  .getBaseIdentifier()
-                                  .str()
-                                  .str();
+            auto funcDecl = cast<FuncDecl>(declRef.getDecl());
+            if (funcDecl->isStatic()) {
+              return std::make_shared<StaticFunctionCallValue>(
+                  baseIdentifierName, callExpr->getType(), parameters);
+            }
 
-            return std::make_shared<StaticFunctionCallValue>(
-                identifier, callExpr->getType(), parameters);
+            return std::make_shared<MemberFunctionCallValue>(
+                baseIdentifierName,
+                extractCompileTimeValue(dotSyntaxCallExpr->getBase(),
+                                        declContext),
+                parameters);
           }
 
           default: {
@@ -932,6 +935,50 @@ void writeValue(llvm::json::OStream &JSON,
     break;
   }
 
+  case CompileTimeValue::ValueKind::MemberFunctionCall: {
+    // Collect the chain: walk baseValue pointers until we reach a
+    // non-MemberFunctionCall
+    struct CallStep {
+      std::string Label;
+      std::vector<FunctionParameter> Parameters;
+    };
+    std::vector<CallStep> chain;
+    std::shared_ptr<CompileTimeValue> cursor = Value;
+    while (cursor && cursor->getKind() ==
+                         CompileTimeValue::ValueKind::MemberFunctionCall) {
+      auto *mfc = cast<MemberFunctionCallValue>(cursor.get());
+      chain.push_back({mfc->getLabel(), mfc->getParameters()});
+      cursor = mfc->getBaseValue();
+    }
+    // chain is in reverse order (outermost first), reverse so base is first
+    std::reverse(chain.begin(), chain.end());
+
+    JSON.attribute("valueKind", "MemberFunctionCall");
+    JSON.attributeObject("value", [&]() {
+      // Write the root (non-MemberFunctionCall) base once
+      JSON.attributeObject("baseValue", [&] { writeValue(JSON, cursor); });
+      // Flat list of call steps in order
+      JSON.attributeArray("calls", [&] {
+        for (auto &step : chain) {
+          JSON.object([&] {
+            JSON.attribute("memberLabel", step.Label);
+            JSON.attributeArray("arguments", [&] {
+              for (auto FP : step.Parameters) {
+                JSON.object([&] {
+                  JSON.attribute("label", FP.Label);
+                  JSON.attribute("type",
+                                 toFullyQualifiedTypeNameString(FP.Type));
+                  writeValue(JSON, FP.Value);
+                });
+              }
+            });
+          });
+        }
+      });
+    });
+    break;
+  }
+
   case CompileTimeValue::ValueKind::MemberReference: {
     auto memberReferenceValue = cast<MemberReferenceValue>(value);
     JSON.attribute("valueKind", "MemberReference");
@@ -1283,8 +1330,7 @@ extractBuilderValueIfExists(const swift::NominalTypeDecl *TypeDecl,
     return createBuilderCompileTimeValue(attr, VarDecl);
   }
 
-  for (ProtocolDecl *Decl :
-       TypeDecl->getLocalProtocols(ConformanceLookupKind::All)) {
+  for (ProtocolDecl *Decl : TypeDecl->getAllProtocols()) {
     // FIXME(noncopyable_generics): Should these be included?
     if (Decl->getInvertibleProtocolKind())
       continue;

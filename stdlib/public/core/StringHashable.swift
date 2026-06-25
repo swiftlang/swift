@@ -20,7 +20,7 @@ extension String: Hashable {
   ///   of this instance.
   public func hash(into hasher: inout Hasher) {
     if _fastPath(self._guts.isNFCFastUTF8) {
-      unsafe self._guts.withFastUTF8 {
+      self._guts.withFastUTF8 {
         unsafe hasher.combine(bytes: UnsafeRawBufferPointer($0))
       }
       hasher.combine(0xFF as UInt8) // terminator

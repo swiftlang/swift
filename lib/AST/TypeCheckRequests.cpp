@@ -52,6 +52,16 @@ void swift::simple_display(
   simple_display(out, ext);
 }
 
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const llvm::PointerUnion<ValueDecl *, ExtensionDecl *> &declOrExtension) {
+  if (auto *value = declOrExtension.dyn_cast<ValueDecl *>()) {
+    simple_display(out, value);
+    return;
+  }
+  simple_display(out, cast<ExtensionDecl *>(declOrExtension));
+}
+
 void swift::simple_display(llvm::raw_ostream &out, ASTContext *ctx) {
   out << "(AST Context)";
 }
@@ -1403,7 +1413,7 @@ void ConformanceIsolationRequest::cacheResult(ActorIsolation result) const {
   auto conformance = std::get<0>(getStorage());
 
   // Common case: conformance is nonisolated.
-  if (result.isNonisolated()) {
+  if (result.isNonisolatedOrConcurrent()) {
     conformance->setComputedNonnisolated();
     return;
   }
@@ -1631,6 +1641,25 @@ void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
     attr->TypeEraserExpr = TypeExpr::createImplicit(value,
                                                     value->getASTContext());
   }
+}
+
+//----------------------------------------------------------------------------//
+// ResolvePreInverseGenericsRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<Type> ResolvePreInverseGenericsRequest::getCachedResult() const {
+  auto *attr = std::get<1>(getStorage());
+  auto Ty = attr->ExceptType;
+  if (!Ty)
+    return std::nullopt;
+
+  return Ty;
+}
+
+void ResolvePreInverseGenericsRequest::cacheResult(Type Ty) const {
+  auto *attr = std::get<1>(getStorage());
+  assert(Ty && Ty->is<ProtocolCompositionType>());
+  attr->ExceptType = Ty;
 }
 
 //----------------------------------------------------------------------------//
@@ -1899,9 +1928,10 @@ SourceLoc MacroDefinitionRequest::getNearestLoc() const {
 
 bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
-  case CallerIsolationInheriting:
+  case NonisolatedNonsending:
   case ActorInstance:
   case Nonisolated:
+  case NonisolatedConcurrent:
   case NonisolatedUnsafe:
   case Unspecified:
     return false;
@@ -1915,8 +1945,9 @@ bool ActorIsolation::requiresSubstitution() const {
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
-  case CallerIsolationInheriting:
+  case NonisolatedNonsending:
   case Nonisolated:
+  case NonisolatedConcurrent:
   case NonisolatedUnsafe:
   case Unspecified:
     return *this;
@@ -1936,7 +1967,7 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     os << "actor" << (asNoun ? " isolation" : "-isolated");
     break;
 
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedNonsending:
     os << "caller isolation inheriting"
        << (asNoun ? " isolation" : "-isolated");
     break;
@@ -1956,6 +1987,13 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     break;
 
   case ActorIsolation::Nonisolated:
+    os << "nonisolated";
+    break;
+
+  case ActorIsolation::NonisolatedConcurrent:
+    os << "@concurrent";
+    break;
+
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     os << "nonisolated";
@@ -1964,6 +2002,16 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     }
     break;
   }
+}
+
+StringRef ActorIsolation::printStringForDiagnostics(
+    ASTContext &ctx, StringRef openingQuotationMark, bool asNoun) const {
+  SmallString<64> str;
+  {
+    llvm::raw_svector_ostream os(str);
+    printForDiagnostics(os, openingQuotationMark, asNoun);
+  }
+  return ctx.getIdentifier(str).str();
 }
 
 void ActorIsolation::print(llvm::raw_ostream &os) const {
@@ -1977,11 +2025,14 @@ void ActorIsolation::print(llvm::raw_ostream &os) const {
       os << ". name: '" << vd->getBaseIdentifier() << "'";
     }
     return;
-  case CallerIsolationInheriting:
-    os << "caller_isolation_inheriting";
-    return;
   case Nonisolated:
     os << "nonisolated";
+    return;
+  case NonisolatedNonsending:
+    os << "nonisolated(nonsending)";
+    return;
+  case NonisolatedConcurrent:
+    os << "@concurrent";
     return;
   case NonisolatedUnsafe:
     os << "nonisolated_unsafe";
@@ -2004,11 +2055,14 @@ void ActorIsolation::printForSIL(llvm::raw_ostream &os) const {
   case ActorInstance:
     os << "actor_instance";
     return;
-  case CallerIsolationInheriting:
-    os << "caller_isolation_inheriting";
-    return;
   case Nonisolated:
     os << "nonisolated";
+    return;
+  case NonisolatedNonsending:
+    os << "nonisolated(nonsending)";
+    return;
+  case NonisolatedConcurrent:
+    os << "@concurrent";
     return;
   case NonisolatedUnsafe:
     os << "nonisolated_unsafe";
@@ -2063,11 +2117,12 @@ void swift::simple_display(
       }
       break;
 
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedNonsending:
       out << "isolated to isolation of caller";
       break;
 
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedConcurrent:
     case ActorIsolation::NonisolatedUnsafe:
       out << "nonisolated";
       if (state == ActorIsolation::NonisolatedUnsafe) {
@@ -2100,6 +2155,10 @@ void IsolationSource::printForDiagnostics(
   switch (this->kind) {
   case IsolationSource::Explicit:
     os << "explicit isolation";
+    return;
+
+  case IsolationSource::FileDefault:
+    os << "file-level default isolation";
     return;
 
   case IsolationSource::None:
@@ -2575,12 +2634,17 @@ DeclAttributes SemanticDeclAttrsRequest::evaluate(Evaluator &evaluator,
     (void)getActorIsolation(vd);
     (void)vd->isDynamic();
     (void)vd->isFinal();
+  } else if (auto ed = dyn_cast<ExtensionDecl>(mutableDecl)) {
+    (void)getActorIsolation(ed);
   }
   if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
     (void)afd->isTransparent();
   } else if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
     (void)asd->hasStorage();
   }
+
+  // Materialize file-level `using ...` attributes onto top-level decls.
+  mutableDecl->applyFileDefaults();
 
   return decl->getAttrs();
 }
@@ -2631,6 +2695,7 @@ UniqueUnderlyingTypeSubstitutionsRequest::evaluate(
       case SourceFileKind::MacroExpansion:
       case SourceFileKind::DefaultArgument:
       case SourceFileKind::SIL:
+      case SourceFileKind::SyntheticMacro:
         return true;
       case SourceFileKind::Main:
       case SourceFileKind::Library:

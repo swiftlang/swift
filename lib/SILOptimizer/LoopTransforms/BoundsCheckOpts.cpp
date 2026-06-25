@@ -1058,12 +1058,10 @@ private:
   ///
   /// \param indexValue The index value to clone
   /// \param insertPos The position where cloned instructions should be inserted
-  /// \param instIndices Pre-computed instruction indices
   /// \returns The cloned index value or std::nullopt if cloning was not
   /// possible
   std::optional<SILValue>
-  cloneFixedStorageIndex(SILValue indexValue, SILInstruction *insertPos,
-                         InstructionIndices &instIndices);
+  cloneFixedStorageIndex(SILValue indexValue, SILInstruction *insertPos);
 
 public:
   void run() override {
@@ -1214,6 +1212,23 @@ bool BoundsCheckOpts::removeRedundantArrayChecksInBlock(SILBasicBlock &BB) {
   return Changed;
 }
 
+static bool canOptimize(FixedStorageSemanticsCall call) {
+  if (!call.hasSelf()) {
+    return false;
+  }
+  auto selfValue = call.getSelf();
+  if (!selfValue->getType().isAddress()) {
+    return true;
+  }
+  auto rootAddr = lookThroughAddressAndValueProjections(selfValue);
+  auto *funcArg = dyn_cast<SILFunctionArgument>(rootAddr);
+  if (!funcArg || funcArg->getArgumentConvention() !=
+                      SILArgumentConvention::Indirect_In_Guaranteed) {
+    return false;
+  }
+  return true;
+}
+
 bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block) {
   bool changed = false;
 
@@ -1234,6 +1249,10 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
       continue;
     }
 
+    if (!canOptimize(fixedStorageCall)) {
+      continue;
+    }
+
     auto selfValue = fixedStorageCall.getSelf();
     auto indexValue = fixedStorageCall.getIndex();
 
@@ -1243,15 +1262,6 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
     LLVM_DEBUG(llvm::dbgs() << "  Found fixed storage check: " << inst
                             << " with self: " << *selfValue
                             << " and index: " << *indexValue);
-  }
-
-  InstructionIndices instIndices(&block);
-
-  // If instruction indices have overflowed, the ordering comparisons are
-  // unreliable and can cause unnecessary cloning below in an already large
-  // block, bail out.
-  if (instIndices.hasOverflowedIndices()) {
-    return changed;
   }
 
   // Second pass: process each self group to place checks with same self next to
@@ -1269,7 +1279,7 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
 
       auto indexValue = check.getIndex();
       auto clonedValue =
-          cloneFixedStorageIndex(indexValue, *checks[0], instIndices);
+          cloneFixedStorageIndex(indexValue, *checks[0]);
       if (!clonedValue) {
         continue;
       }
@@ -1700,13 +1710,11 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInLoop(
             FixedStorageSemanticsCallKind::CheckIndex) {
       continue;
     }
-
-    if (!fixedStorageSemantics->hasSelfArgument()) {
+    if (!canOptimize(fixedStorageSemantics)) {
       continue;
     }
 
-    auto selfValue = fixedStorageSemantics->getSelfArgument();
-
+    auto selfValue = fixedStorageSemantics.getSelf();
     if (!DT->dominates(selfValue->getParentBlock(), preheader)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "  " << *selfValue << " does not dominate preheader\n");
@@ -1798,7 +1806,7 @@ bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
       continue;
     }
 
-    if (!fixedStorageSemantics->hasSelfArgument()) {
+    if (!canOptimize(fixedStorageSemantics)) {
       continue;
     }
 
@@ -1871,15 +1879,16 @@ static void mapResults(SILInstruction *cloned, SILInstruction *original,
 
 std::optional<SILValue>
 BoundsCheckOpts::cloneFixedStorageIndex(SILValue indexValue,
-                                        SILInstruction *insertPos,
-                                        InstructionIndices &instIndices) {
-  SmallVector<SILInstruction *, 8> toClone;
+                                        SILInstruction *insertPos) {
+  SmallVector<SILInstruction *, 8> worklist;
   llvm::DenseMap<ValueBase *, SILValue> valueMap;
+  ValueSet visited(getFunction());
 
-  ValueWorklist worklist(getFunction());
-  worklist.push(indexValue);
 
-  while (auto value = worklist.pop()) {
+  std::function<bool(SILValue)> collectOperands = [&](SILValue value) -> bool {
+    if (!visited.insert(value)) {
+      return true;
+    }
     auto *inst = value->getDefiningInstruction();
 
     // In ossa, bailout when we have an instruction with lifetime ending
@@ -1887,7 +1896,7 @@ BoundsCheckOpts::cloneFixedStorageIndex(SILValue indexValue,
     if (inst && getFunction()->hasOwnership()) {
       for (auto &operand : inst->getAllOperands()) {
         if (operand.isLifetimeEnding()) {
-          return std::nullopt;
+          return false;
         }
       }
     }
@@ -1898,26 +1907,30 @@ BoundsCheckOpts::cloneFixedStorageIndex(SILValue indexValue,
     // value dominates insertion point.
     if (isa<SILArgument>(value) ||
         inst->getParent() != insertPos->getParent() ||
-        instIndices.get(inst) < instIndices.get(insertPos)) {
+        inst->strictlyDominatesInBlock(insertPos)) {
       mapValue(value, value, valueMap);
-      continue;
+      return true;
     }
 
     if (!inst->isTriviallyDuplicatable() || inst->mayHaveSideEffects()) {
-      return std::nullopt;
+      return false;
     }
-
-    toClone.push_back(inst);
 
     for (auto operand : inst->getOperandValues()) {
-      worklist.pushIfNotVisited(operand);
+      if (!collectOperands(operand)) {
+        return false;
+      }
     }
+
+    worklist.push_back(inst);
+    return true;
+  };
+
+  if (!collectOperands(indexValue)) {
+    return std::nullopt;
   }
 
-  // Reverse the list to get topological order
-  std::reverse(toClone.begin(), toClone.end());
-
-  for (auto *inst : toClone) {
+  for (auto *inst : worklist) {
     auto *cloned = inst->clone(insertPos);
     mapOperands(cloned, valueMap);
     mapResults(cloned, inst, valueMap);

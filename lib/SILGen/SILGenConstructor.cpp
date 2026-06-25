@@ -646,9 +646,10 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
 
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedConcurrent:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedNonsending:
     return false;
   }
 }
@@ -1570,7 +1571,7 @@ void SILGenFunction::emitMemberInitializationViaInitAccessor(
   if (!init)
     return;
 
-  auto *varPattern = member->getPattern(0);
+  auto *varPattern = member->getCheckedPattern(0);
 
   // Cleanup after this initialization.
   FullExpr scope(Cleanups, varPattern);
@@ -1609,6 +1610,9 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
   assert(!field->isStatic());
 
   for (auto i : range(field->getNumPatternEntries())) {
+    if (auto *var = field->getAnchoringVarDecl(i))
+      (void)var->getImplInfo(); // trigger expansion of attached accessor macros
+
     auto init = field->getExecutableInit(i);
     if (!init)
       continue;
@@ -1625,8 +1629,9 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     // 'nonisolated' expressions can be evaluated from anywhere
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedConcurrent:
     case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedNonsending:
       break;
 
     case ActorIsolation::Erased:
@@ -1649,7 +1654,7 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     }
     }
 
-    auto *varPattern = field->getPattern(i);
+    auto *varPattern = field->getCheckedPattern(i);
 
     // Cleanup after this initialization.
     FullExpr scope(Cleanups, varPattern);

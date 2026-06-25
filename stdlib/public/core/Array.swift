@@ -1415,27 +1415,29 @@ extension Array: RangeReplaceableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return unsafe try withUnsafeMutableBufferPointer {
+    return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(&bufferPointer)
     }
   }
 
   @inlinable
+  @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return unsafe try withUnsafeMutableBufferPointer {
+    return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(&bufferPointer)
     }
   }
 
   @inlinable
+  @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return unsafe try withUnsafeBufferPointer {
+    return try withUnsafeBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(bufferPointer)
     }
@@ -1699,10 +1701,11 @@ extension Array {
   // for ABI reasons.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
+  @safe
   internal func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    return try unsafe _buffer.withUnsafeBufferPointer(body)
+    return try _buffer.withUnsafeBufferPointer(body)
   }
 
   /// Calls a closure with a pointer to the array's contiguous storage.
@@ -1735,15 +1738,25 @@ extension Array {
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @safe
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
-    return try unsafe _buffer.withUnsafeBufferPointer(body)
+    return try _buffer.withUnsafeBufferPointer(body)
   }
 
+  /// A span over the elements of this array.
+  ///
+  /// - Note: On Apple platforms, this property copies bridged `NSArray`
+  ///   instances into contiguous storage on first access and caches
+  ///   the result. Subsequent calls can reuse the cached copy.
+  ///
+  /// - Returns: A `Span` over the elements of this array.
+  ///
+  /// - Complexity: O(1) for native arrays, amortized O(1) for bridged arrays.
   @available(SwiftStdlib 6.2, *)
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_alwaysEmitIntoClient
     borrowing get {
 #if _runtime(_ObjC)
@@ -1836,6 +1849,7 @@ extension Array {
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
   // once we allocate noescape closures on the stack.
+  @safe
   public mutating func withUnsafeMutableBufferPointer<R, E>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -1860,10 +1874,16 @@ extension Array {
     return try unsafe body(&inoutBufferPointer)
   }
 
+  /// A mutable span over the elements of this array.
+  ///
+  /// - Returns: A `MutableSpan` over the elements of this array.
+  ///
+  /// - Complexity: O(1) when the array's storage is uniquely referenced,
+  ///   O(*n*) otherwise.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     mutating get {
       // _makeMutableAndUnique*() inserts begin_cow_mutation.
       // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.
@@ -2067,10 +2087,11 @@ extension Array {
   ///   execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
+  @safe
   public mutating func withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try unsafe self.withUnsafeMutableBufferPointer {
+    return try self.withUnsafeMutableBufferPointer {
       return try unsafe body(UnsafeMutableRawBufferPointer($0))
     }
   }
@@ -2103,10 +2124,11 @@ extension Array {
   ///   argument is valid only for the duration of the closure's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
+  @safe
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try unsafe self.withUnsafeBufferPointer {
+    return try self.withUnsafeBufferPointer {
       try unsafe body(UnsafeRawBufferPointer($0))
     }
   }

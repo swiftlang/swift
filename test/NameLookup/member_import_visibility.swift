@@ -137,8 +137,32 @@ class DerivedFromClassInC: DerivedClassInC {
   override func methodInC() {}
 }
 
-// FIXME: Visibility of defaultedRequirementInB() should be diagnosed (rdar://154237873)
-struct ConformsToProtocolInA: ProtocolInA {} // expected-member-visibility-error{{type 'ConformsToProtocolInA' does not conform to protocol 'ProtocolInA'}} expected-member-visibility-note {{add stubs for conformance}}{{44-44=\n    func defaultedRequirementInB() {\n        <#code#>\n    \}\n}}
+struct ConformsToProtocolInA1: ProtocolInA1 {}
+
+// FIXME: Should diagnose import needed for defaultedRequirementInB().
+struct ConformsToProtocolInA2: ProtocolInA2 {}
+// expected-member-visibility-error@-1{{type 'ConformsToProtocolInA2' does not conform to protocol 'ProtocolInA2'}}
+// expected-member-visibility-note@-2{{add stubs for conformance}}
+
+struct ConformsToProtocolInA3: ProtocolInA3 {}
+struct ConformsToProtocolInA4: ProtocolInA4 {}
+struct ConformsToProtocolInC1: ProtocolInC1 {}
+struct ConformsToProtocolInC2: ProtocolInC2 {}
+
+struct ConformsToProtocolInC3: ProtocolInC3, EmptyProtocolInA {}
+// expected-member-visibility-error@-1{{type 'ConformsToProtocolInC3' does not conform to protocol 'ProtocolInB3'}}
+// expected-member-visibility-note@-2{{add stubs for conformance}}
+
+// FIXME: The missing import for WitnessedInB should be diagnosed (rdar://154237873)
+extension StructInA1: ProtocolWithAssociatedTypesInA {}
+// expected-warning@-1{{extension declares a conformance of imported type 'StructInA1' to imported protocol 'ProtocolWithAssociatedTypesInA'; this will not behave correctly if the owners of 'members_A' introduce this conformance in the future}}
+// expected-note@-2{{add '@retroactive' to silence this warning}}
+// expected-member-visibility-error@-3{{type 'StructInA1' does not conform to protocol 'ProtocolWithAssociatedTypesInA'}}
+// expected-member-visibility-note@-4{{add stubs for conformance}}{{55-55=\n    public typealias WitnessedInB = <#type#>\n}}
+
+extension StructInA2: @retroactive Hashable {
+  public func hash(into: inout Hasher) { }
+}
 
 func testInheritedMethods(
   a: BaseClassInA,

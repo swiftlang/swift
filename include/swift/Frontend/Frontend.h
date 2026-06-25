@@ -18,6 +18,7 @@
 #ifndef SWIFT_FRONTEND_H
 #define SWIFT_FRONTEND_H
 
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/IRGenOptions.h"
@@ -64,10 +65,26 @@ class FrontendObserver;
 class SerializedModuleLoaderBase;
 class MemoryBufferSerializedModuleLoader;
 class SILModule;
+class StructDecl;
 
 namespace Lowering {
 class TypeConverter;
 }
+
+struct AbstractFieldLayout {
+  uint64_t offset;
+  llvm::StringRef name;
+  AbstractTypeLayout typeLayout;
+};
+
+struct AbstractStructLayout {
+  AbstractTypeLayout typeLayout;
+  llvm::SmallVector<AbstractFieldLayout, 4> fields;
+};
+
+std::optional<AbstractStructLayout>
+computeAbstractStructLayout(const StructDecl *decl,
+                            const IRGenOptions &irgenOpts);
 
 struct ModuleBuffers {
   std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
@@ -80,6 +97,20 @@ struct ModuleBuffers {
                   ModuleDocBuffer(std::move(ModuleDocBuffer)),
                   ModuleSourceInfoBuffer(std::move(ModuleSourceInfoBuffer)) {}
 };
+
+/// Parse `-enable-experimental-feature`, `-disable-experimental-feature`,
+/// `-enable-upcoming-feature`, and `-disable-upcoming-feature` arguments from
+/// \p Args and apply the resulting feature state to \p Opts. Also processes
+/// pseudo-features such as `StrictConcurrency=...`, `AvailabilityMacro=...`,
+/// `RequiresObjC=...`, `CodeGenerationModel=...`, and `ApproachableConcurrency`.
+///
+/// The last-specified flag for a given feature wins. Shared by
+/// `swift-frontend` and `swift-synthesize-interface`.
+///
+/// \returns true if any argument was malformed in a way that should prevent
+/// further compilation.
+bool parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
+                      DiagnosticEngine &Diags);
 
 /// The abstract configuration of the compiler, including:
 ///   - options for all stages of translation,
@@ -260,9 +291,6 @@ public:
   /// @note This should be called once, after search path options and frontend
   ///       options have been parsed.
   void setDefaultPrebuiltCacheIfNecessary();
-
-  /// If we haven't explicitly passed -blocklist-paths, set it to the default value.
-  void setDefaultBlocklistsIfNecessary();
 
   /// If we haven't explicitly passed '-in-process-plugin-server-path', infer
   /// it as a default value.

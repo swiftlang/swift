@@ -57,10 +57,21 @@ public:
     /// For example, a mutable stored property or synchronous function within
     /// the actor is isolated to the instance of that actor.
     ActorInstance,
-    /// The declaration is explicitly specified to be not isolated to any actor,
+    /// The declaration is explicitly 'nonisolated',
     /// meaning that it can be used from any actor but is also unable to
-    /// refer to the isolated state of any given actor.
+    /// refer to the isolated state. Synchronous functions may be nonisolated.
     Nonisolated,
+    /// The declaration is explicitly '@concurrent' to be not isolated to any actor,
+    /// meaning that it can be used from any actor but is also unable to
+    /// refer to the isolated state of any given actor. Only async functions may be '@concurrent'.
+    NonisolatedConcurrent,
+    /// Inherits isolation from the caller of the given function.
+    /// This may be expressed explicitly in source, inferred,
+    /// or enabled "by default" for nonisolated functions using an upcoming feature.
+    ///
+    /// DISCUSSION: This is used for nonisolated asynchronous functions that we
+    /// want to inherit from their context the context's actor isolation.
+    NonisolatedNonsending,
     /// The declaration is explicitly specified to be not isolated and with the
     /// "unsafe" annotation, which means that we do not enforce isolation.
     NonisolatedUnsafe,
@@ -70,11 +81,6 @@ public:
     /// The actor isolation iss statically erased, as for a call to
     /// an isolated(any) function.  This is not possible for declarations.
     Erased,
-    /// Inherits isolation from the caller of the given function.
-    ///
-    /// DISCUSSION: This is used for nonisolated asynchronous functions that we
-    /// want to inherit from their context the context's actor isolation.
-    CallerIsolationInheriting,
   };
 
 private:
@@ -167,10 +173,14 @@ public:
     return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated);
   }
 
-  static ActorIsolation forCallerIsolationInheriting() {
+  static ActorIsolation forNonisolatedConcurrent() {
+    return ActorIsolation(NonisolatedConcurrent);
+  }
+
+  static ActorIsolation forNonisolatedNonsending() {
     // NOTE: We do not use parameter indices since the parameter is implicit
     // from the perspective of the AST.
-    return ActorIsolation(CallerIsolationInheriting);
+    return ActorIsolation(NonisolatedNonsending);
   }
 
   static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
@@ -218,10 +228,21 @@ public:
 
   bool isUnspecified() const { return kind == Unspecified; }
 
-  bool isNonisolated() const {
-    return (kind == Nonisolated) || (kind == NonisolatedUnsafe);
+  /// Returns true for 'nonisolated', '@concurrent', or 'nonisolated(unsafe)'
+  /// but NOT 'nonisolated(nonsending)' which inherits caller isolation
+  bool isNonisolatedOrConcurrent() const {
+    return (kind == Nonisolated) ||
+      (kind == NonisolatedConcurrent) ||
+      (kind == NonisolatedUnsafe);
   }
 
+  /// Returns true if specifically 'nonisolated'.
+  bool isNonisolated() const { return kind == Nonisolated; }
+  /// Returns true if specifically '@concurrent'.
+  bool isNonisolatedConcurrent() const { return kind == NonisolatedConcurrent; }
+  /// Returns true if specifically 'nonisolated(nonsending)'.
+  bool isNonisolatedNonsending() const { return kind == NonisolatedNonsending; }
+  /// Returns true if specifically 'nonisolated(unsafe)'.
   bool isNonisolatedUnsafe() const { return kind == NonisolatedUnsafe; }
 
   /// Retrieve the parameter to which actor-instance isolation applies.
@@ -254,8 +275,9 @@ public:
 
     case Unspecified:
     case Nonisolated:
+    case NonisolatedConcurrent:
+    case NonisolatedNonsending:
     case NonisolatedUnsafe:
-    case CallerIsolationInheriting:
       return false;
     }
   }
@@ -279,10 +301,6 @@ public:
   bool isMainActor() const;
 
   bool isDistributedActor() const;
-
-  bool isCallerIsolationInheriting() const {
-    return getKind() == CallerIsolationInheriting;
-  }
 
   Type getGlobalActor() const {
     assert(isGlobalActor());
@@ -348,6 +366,10 @@ public:
                            StringRef openingQuotationMark = "'",
                            bool asNoun = false) const;
 
+  StringRef printStringForDiagnostics(ASTContext &ctx,
+                                      StringRef openingQuotationMark = "'",
+                                      bool asNoun = false) const;
+
   SWIFT_DEBUG_DUMPER(dump());
 
   // Defined out of line to prevent linker errors since libswiftBasic would
@@ -360,6 +382,8 @@ struct IsolationSource {
   enum Kind : uint8_t {
     /// Isolation is written in an explicit attribute.
     Explicit,
+    /// Isolation comes from a file-level default.
+    FileDefault,
     /// Isolation is inferred from the enclosing lexical context.
     LexicalContext,
     /// Isolation is inferred from conformance to a protocol.
@@ -387,8 +411,15 @@ struct IsolationSource {
                   Kind kind = Kind::None)
       : inferenceSource(inferenceSource), kind(kind) {}
 
-  bool isInferred() const {
-    return (kind != None) && (kind != Explicit);
+  // Whether this isolation was not explicitly written as an attribute here.
+  // \c FileDefault is considered inferred.
+  bool isInferred() const { return (kind != None) && (kind != Explicit); }
+
+  /// Whether this isolation should behave as if written explicitly on the
+  /// declaration for the purpose of maintaining behavior like explicit
+  /// isolated.
+  bool effectivelyExplicit() const {
+    return (kind == Explicit) || (kind == FileDefault);
   }
 
   void printForDiagnostics(llvm::raw_ostream &os,
@@ -412,11 +443,22 @@ struct InferredActorIsolation {
 };
 
 /// Determine how the given value declaration is isolated.
+///
+/// Includes applicable file-default isolation.
 ActorIsolation getActorIsolation(ValueDecl *value);
+
+/// Determine how the given extension declaration is isolated.
+///
+/// Includes applicable file-default isolation.
+ActorIsolation getActorIsolation(ExtensionDecl *ext);
 
 /// Infer the actor isolation of the given declaration, including
 /// the source of isolation inference.
 InferredActorIsolation getInferredActorIsolation(ValueDecl *value);
+
+/// Infer the actor isolation of the given extension, including the source of
+/// isolation inference.
+InferredActorIsolation getInferredActorIsolation(ExtensionDecl *ext);
 
 /// Trampoline for AbstractClosureExpr::getActorIsolation.
 ActorIsolation

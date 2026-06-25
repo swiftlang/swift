@@ -89,37 +89,6 @@ enum class TypeMetadataAddress {
 inline bool isEmbedded(CanType t) {
   return t->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 }
-inline bool isEmbeddedWithoutEmbeddedExitentials(CanType t) {
-  auto &langOpts = t->getASTContext().LangOpts;
-  return langOpts.hasFeature(Feature::Embedded) &&
-    !langOpts.hasFeature(Feature::EmbeddedExistentials);
-}
-// Metadata is not generated and not allowed to be referenced in Embedded Swift,
-// expect for classes (both generic and non-generic), dynamic self, and
-// class-bound existentials.
-inline bool isMetadataAllowedInEmbedded(CanType t) {
-  auto &langOpts = t->getASTContext().LangOpts;
-  bool embeddedExistentials =
-    langOpts.hasFeature(Feature::EmbeddedExistentials) &&
-    langOpts.hasFeature(Feature::Embedded);
-
-  if (isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
-      isa<DynamicSelfType>(t)) {
-    return true;
-  }
-  if (auto existentialTy = dyn_cast<ExistentialType>(t)) {
-    if (existentialTy->requiresClass())
-      return true;
-  }
-  if (auto archeTy = dyn_cast<ArchetypeType>(t)) {
-    if (archeTy->requiresClass())
-      return true;
-  }
-
-  if (embeddedExistentials)
-    return true;
-  return false;
-}
 
 inline bool isEmbedded(Decl *d) {
   return d->getASTContext().LangOpts.hasFeature(Feature::Embedded);
@@ -127,11 +96,6 @@ inline bool isEmbedded(Decl *d) {
 
 inline bool isEmbedded(const ProtocolConformance *c) {
   return c->getType()->getASTContext().LangOpts.hasFeature(Feature::Embedded);
-}
-
-inline bool isEmbeddedWithoutEmbeddedExitentials(const ProtocolConformance *c) {
-  return isEmbedded(c) && !c->getType()->getASTContext().
-    LangOpts.hasFeature(Feature::EmbeddedExistentials);
 }
 
 /// A link entity is some sort of named declaration, combined with all
@@ -936,7 +900,6 @@ public:
                                     TypeMetadataAddress addr,
                                     bool forceShared = false) {
     assert(!isObjCImplementation(concreteType));
-    assert(!isEmbedded(concreteType) || isMetadataAllowedInEmbedded(concreteType));
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadata, concreteType);
     entity.Data |= LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr));
@@ -1115,7 +1078,6 @@ public:
   }
 
   static LinkEntity forValueWitnessTable(CanType type) {
-    assert(!isEmbeddedWithoutEmbeddedExitentials(type));
     LinkEntity entity;
     entity.setForType(Kind::ValueWitnessTable, type);
     return entity;
@@ -1145,10 +1107,6 @@ public:
   }
 
   static LinkEntity forProtocolWitnessTable(const ProtocolConformance *C) {
-    if (isEmbeddedWithoutEmbeddedExitentials(C)) {
-      assert(C->getProtocol()->requiresClass());
-    }
-
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::ProtocolWitnessTable, C);
     return entity;
@@ -1656,6 +1614,10 @@ public:
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
+  }
+
+  bool hasExtension() const {
+    return getKind() == Kind::ExtensionDescriptor;
   }
   
   const ExtensionDecl *getExtension() const {

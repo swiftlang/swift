@@ -160,6 +160,16 @@ extension ContinuousObservation.State {
     while await track(state, options: options, apply: apply) {}
   }
 
+  @diagnose(
+    DeprecatedDeclaration,
+    as: ignored,
+    reason: "https://github.com/swiftlang/swift/issues/89045"
+  )
+  @diagnose(
+    ConversionFromIsolatedAnyToSynchronous,
+    as: ignored,
+    reason: "https://github.com/swiftlang/swift/issues/89361"
+  )
   fileprivate static func track(
     _ state: _ManagedCriticalState<ContinuousObservation.State>,
     options: ObservationTracking.Options,

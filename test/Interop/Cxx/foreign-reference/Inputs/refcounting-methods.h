@@ -88,7 +88,6 @@ struct DerivedVirtualRetainRelease : VirtualRetainRelease {
 
 struct PureVirtualRetainRelease {
   int value;
-  mutable int refCount = 1;
   SWIFT_RETURNS_RETAINED
   PureVirtualRetainRelease(int value) : value(value) {}
 
@@ -129,4 +128,47 @@ struct DerivedStaticRetainRelease : StaticRetainRelease {
   DerivedStaticRetainRelease(int value, int secondValue)
       : StaticRetainRelease(value), secondValue(secondValue) {}
 };
+
+struct SharedA {
+  void doRetain();
+  void doRelease();
+} SWIFT_SHARED_REFERENCE(.doRetain, .doRelease);
+
+struct SharedB {
+  void doRetain();
+  void doRelease();
+} SWIFT_SHARED_REFERENCE(.doRetain, .doRelease);
+
+// expected-warning@+1 {{unable to infer SWIFT_SHARED_REFERENCE}}
+struct SharedAB : SharedA, SharedB { SharedAB(int) {} };
 #endif
+
+// Multiple retain/release operations,
+// but we disambiguate them by arity.
+struct AmbiguousReleaseMethods {
+  int value;
+
+  SWIFT_RETURNS_RETAINED
+  AmbiguousReleaseMethods(int value) : value(value) {}
+
+  virtual void doRetain();
+  virtual void doRelease();
+  virtual void doRelease(int argument);
+} SWIFT_SHARED_REFERENCE(.doRetain, .doRelease);
+
+struct AmbiguousFreeReleaseAndRetainMethods {
+  int value;
+
+  SWIFT_RETURNS_RETAINED
+  AmbiguousFreeReleaseAndRetainMethods(int value) : value(value) {}
+} SWIFT_SHARED_REFERENCE(retainAmbiguousFreeReleaseAndRetainMethods,
+                         releaseAmbiguousFreeReleaseAndRetainMethods);
+
+void retainAmbiguousFreeReleaseAndRetainMethods(
+    AmbiguousFreeReleaseAndRetainMethods *v);
+void retainAmbiguousFreeReleaseAndRetainMethods(); // wrong arity: 0
+void releaseAmbiguousFreeReleaseAndRetainMethods(
+    AmbiguousFreeReleaseAndRetainMethods *v);
+void releaseAmbiguousFreeReleaseAndRetainMethods(
+    AmbiguousFreeReleaseAndRetainMethods *v,
+    int argument); // wrong arity: 2

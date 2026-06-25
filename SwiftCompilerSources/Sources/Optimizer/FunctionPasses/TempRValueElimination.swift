@@ -94,7 +94,7 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
   guard copy.parentFunction.hasOwnership ||
         allocStack.isDestroyedOnAllPaths(context) ||
         // We can easily remove a dead alloc_stack
-        allocStack.uses.ignore(user: copy).ignore(usersOfType: DeallocStackInst.self).isEmpty
+        allocStack.uses.ignore(user: copy).hasOnlyUsers(ofType: DeallocStackInst.self)
   else {
     return
   }
@@ -211,11 +211,8 @@ private struct UseCollector : AddressDefUseWalker {
       if !openExistential.isImmutable {
         return.abortWalk
       }
-    case let takeEnum as UncheckedTakeEnumDataAddrInst:
-      // In certain cases, `unchecked_take_enum_data_addr` invalidates the underlying memory.
-      if takeEnum.mayBeDestructive {
-        return .abortWalk
-      }
+    case is UncheckedTakeEnumDataAddrInst:
+      return .abortWalk
     case let beginAccess as BeginAccessInst:
       if beginAccess.accessKind != .read {
         return .abortWalk

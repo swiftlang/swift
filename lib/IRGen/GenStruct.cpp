@@ -1746,10 +1746,15 @@ const TypeInfo *irgen::getPhysicalStructFieldTypeInfo(IRGenModule &IGM,
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {
-  if (!IRGen.hasLazyMetadata(st) &&
-      !st->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+  bool isEmbedded = st->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+  // In embedded mode, generic types are handled via specialization, not
+  // eagerly emitted here.
+  bool shouldEmit = !IRGen.hasLazyMetadata(st) &&
+                    !(isEmbedded && st->isGenericContext());
+  if (shouldEmit) {
     emitStructMetadata(*this, st);
-    emitFieldDescriptor(st);
+    if (!isEmbedded)
+      emitFieldDescriptor(st);
   }
 
   emitNestedTypeDecls(st->getMembers());

@@ -48,7 +48,7 @@ void _swift_setExclusivityTLS(void * _Nullable newValue);
 
 static inline void * _Nullable * _Nonnull _swift_getExclusivityTLSPointer(void) {
   unsigned long tsd;
-  __asm__ ("mrs %0, TPIDRRO_EL0" : "=r" (tsd));
+  __asm__ ("mrs %x0, TPIDRRO_EL0" : "=r" (tsd));
   void **base = (void **)tsd;
   return &base[SWIFT_RUNTIME_EXCLUSIVITY_KEY];
 }

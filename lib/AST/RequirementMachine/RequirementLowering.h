@@ -73,6 +73,7 @@ void applyInverses(ASTContext &ctx,
                    ArrayRef<Type> gps,
                    ArrayRef<InverseRequirement> inverseList,
                    ArrayRef<StructuralRequirement> explicitRequirements,
+                   DefaultRequirementOptions options,
                    SmallVectorImpl<StructuralRequirement> &result,
                    SmallVectorImpl<RequirementError> &errors);
 

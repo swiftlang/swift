@@ -57,6 +57,8 @@ getPrimitiveTypeFromLLVMType(ASTContext &ctx, const llvm::Type *type) {
       return ctx.getUInt32Type();
     case 64:
       return ctx.getUInt64Type();
+    case 128:
+      return ctx.getUInt128Type();
     default:
       return std::nullopt;
     }

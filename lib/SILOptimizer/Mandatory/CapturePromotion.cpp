@@ -468,12 +468,12 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
   assert(!orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   auto *fn = functionBuilder.createFunction(
-      orig->getLinkage(), clonedName, clonedTy, orig->getGenericEnvironment(),
-      orig->getLocation(), orig->isBare(), IsNotTransparent, serialized,
-      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-      orig->getEntryCount(), orig->isThunk(), orig->getClassSubclassScope(),
-      orig->getInlineStrategy(), orig->getEffectsKind(), orig,
-      orig->getDebugScope());
+      orig->getLinkage(), clonedName, clonedTy, orig->getActorIsolation(),
+      orig->getGenericEnvironment(), orig->getLocation(), orig->isBare(),
+      IsNotTransparent, serialized, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, orig->getEntryCount(), orig->isThunk(),
+      orig->getClassSubclassScope(), orig->getInlineStrategy(),
+      orig->getEffectsKind(), orig, orig->getDebugScope());
   for (auto &attr : orig->getSemanticsAttrs())
     fn->addSemanticsAttr(attr);
   return fn;
@@ -592,6 +592,13 @@ void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
       auto varInfo = *inst->getVarInfo();
       if (varInfo.Scope)
         varInfo.Scope = getOpScope(inst->getDebugScope());
+      // The operand is promoted from a project_box (address), to an object
+      // type: strip the leading op_deref.
+      ASSERT(!inst->getDebugReconstructionBlock() &&
+             "Unexpected debug reconstruction block in Diagnostic Pass");
+      ASSERT(varInfo.DIExpr.startsWithDeref() &&
+             "Address value debug_value must start with op_deref");
+      varInfo.DIExpr.eraseElement(varInfo.DIExpr.element_begin());
       getBuilder().createDebugValue(inst->getLoc(), value, varInfo);
       return;
     }
@@ -1135,6 +1142,8 @@ public:
   // because we will peek though it's uses to find the actual mutation.
   RECURSIVE_INST_VISITOR(IsNotMutating, BeginAccess)
   RECURSIVE_INST_VISITOR(IsMutating, UncheckedTakeEnumDataAddr)
+  RECURSIVE_INST_VISITOR(IsMutating, UncheckedBorrowEnumDataAddr)
+  RECURSIVE_INST_VISITOR(IsNotMutating, UncheckedInPlaceEnumDataAddr)
 #undef RECURSIVE_INST_VISITOR
 
   bool visitCopyAddrInst(CopyAddrInst *cai) {
@@ -1559,11 +1568,17 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
     ++NumCapturesPromoted;
   }
 
-  // Create a new partial apply with the new arguments.
+  // Create a new partial apply with the new arguments. Capture promotion
+  // replaces each box-typed capture with the loaded value while keeping the
+  // surrounding argument order, so the original apply's per-argument
+  // SILLocations remain positionally valid 1:1 with `args`. Forward the
+  // optional storage straight through; the SILBuilder factory will assert
+  // in debug builds if the sizes ever diverge from this 1:1 invariant.
   auto *newPAI = builder.createPartialApply(
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
-      pai->getCalleeConvention(), pai->getResultIsolation(),
-      pai->isOnStack(), pai->isStackAllocationNested());
+      pai->getCalleeConvention(), pai->getResultIsolation(), pai->isOnStack(),
+      pai->isStackAllocationNested(),
+      /*SpecializationInfo=*/nullptr, ApplySite(pai).getArgumentLocs());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();
   if (fri->use_empty()) {

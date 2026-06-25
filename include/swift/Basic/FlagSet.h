@@ -25,10 +25,6 @@ namespace swift {
 
 /// A template designed to simplify the task of defining a wrapper type
 /// for a flags bitfield.
-///
-/// Unfortunately, this doesn't currently support functional-style
-/// building patterns, which means this can't practically be used for
-/// types that need to be used in constant expressions.
 template <typename IntType>
 class FlagSet {
   static_assert(std::is_integral<IntType>::value,
@@ -50,13 +46,13 @@ protected:
 
   /// Read a single-bit flag.
   template <unsigned Bit>
-  bool getFlag() const {
+  constexpr bool getFlag() const {
     return Bits & maskFor<Bit>();
   }
 
   /// Set a single-bit flag.
   template <unsigned Bit>
-  void setFlag(bool value) {
+  constexpr void setFlag(bool value) {
     if (value) {
       Bits |= maskFor<Bit>();
     } else {
@@ -72,7 +68,8 @@ protected:
 
   /// Assign to a multi-bit field.
   template <unsigned FirstBit, unsigned BitWidth, typename FieldType = IntType>
-  void setField(typename std::enable_if<true, FieldType>::type value) {
+  constexpr void
+  setField(typename std::enable_if<true, FieldType>::type value) {
     // Note that we suppress template argument deduction for FieldType.
     assert(IntType(value) <= lowMaskFor<BitWidth>() && "value out of range");
     Bits = (Bits & ~maskFor<FirstBit, BitWidth>())
@@ -87,6 +84,19 @@ protected:
   }                                                        \
   void SETTER(bool value) {                                \
     this->template setFlag<BIT>(value);                    \
+  }
+
+  // A convenient macro for defining a getter, setter and builder for a flag.
+  // The builder method returns a copy of the flagset with the relevant bit set
+  // to the specified value. Builder method chaining provides a clean, safe way
+  // to construct flag sets within (constant) expression contexts.
+#define FLAGSET_DEFINE_FLAG_ACCESSORS_AND_BUILDER(BIT, GETTER, SETTER,         \
+                                                  BUILDER)                     \
+  FLAGSET_DEFINE_FLAG_ACCESSORS(BIT, GETTER, SETTER)                           \
+  [[nodiscard]] constexpr auto BUILDER(bool value = true) const {              \
+    auto result = *this;                                                       \
+    result.template setFlag<BIT>(value);                                       \
+    return result;                                                             \
   }
 
   // A convenient macro for defining a getter and setter for a field.

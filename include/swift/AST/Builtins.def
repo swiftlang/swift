@@ -366,6 +366,13 @@ BUILTIN_SIL_OPERATION(GepRaw, "gepRaw", Integer)
 /// Like the GepRaw-builtin, but multiplies the index by stride-of type 'T'.
 BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
 
+/// GepProjection (Builtin.RawPointer, Builtin.Word, T.Type) -> Builtin.RawPointer
+///
+/// Like Gep, but marks the resulting index_addr as a projection, meaning the
+/// result can only reach the single element at the given index and cannot be
+/// used for general pointer arithmetic by chaining index_addr instructions.
+BUILTIN_SIL_OPERATION(GepProjection, "gepProjection", Integer)
+
 /// getTailAddr(Builtin.RawPointer,
 ///             Builtin.Word, T.Type, E.Type) -> Builtin.RawPointer
 ///
@@ -545,10 +552,18 @@ BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 /// Returns the number of items in a pack.
 BUILTIN_SIL_OPERATION(PackLength, "packLength", Special)
 
-/// makeBorrow: @lifetime(borrow referent)<T: ~Copyable>(_ referent: borrowing T) -> Borrow<T>
+/// makeBorrow: @lifetime(borrow referent)<T: ~Copyable & ~Escapable>(
+///   _ referent: borrowing T) -> Borrow<T>
 ///
 /// Form a `Builtin.Borrow` referencing the argument.
 BUILTIN_SIL_OPERATION(MakeBorrow, "makeBorrow", Special)
+
+/// borrowAt: <T: ~Copyable & ~Escapable>(_ referent: Builtin.RawPointer) -> T
+///
+/// Access the value stored at `referent` as a guaranteed value.
+///
+/// Assumes natural alignment. Does not assume strict aliasing.
+BUILTIN_SIL_OPERATION(BorrowAt, "borrowAt", Special)
 
 /// dereferenceBorrow: <T: ~Copyable>(_ borrow: Borrow<T>) -> T
 ///
@@ -864,6 +879,17 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
 /// (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(AssumeAlignment, "assumeAlignment", "n", Special)
 
+/// Allows the compiler to assume that the pointer is dereferenceable for at
+/// least the specified number of bytes. This enables LLVM optimizations that
+/// rely on knowing that a pointer can be safely dereferenced.
+///
+///   %derefPtr = builtin "dereferenceable" (%ptr : $Builtin.RawPointer,
+///                                          %size : $Builtin.Word)
+///                                        : $Builtin.RawPointer
+///
+/// (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION(Dereferenceable, "dereferenceable", "n", Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //
@@ -909,11 +935,6 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "",
 // This is readnone because, within the world modeled by SIL, the
 // current async task of a thread never changes.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "n", Special)
-
-/// cancelAsyncTask(): (Builtin.NativeObject) -> Void
-///
-/// Cancel the given asynchronous task.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
 
 /// startAsyncLetWithLocalBuffer: <T> (
 ///     __owned @escaping () async throws -> sending T,

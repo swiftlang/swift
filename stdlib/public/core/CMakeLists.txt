@@ -45,13 +45,13 @@ split_embedded_sources(
   EMBEDDED BidirectionalCollection.swift
   EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
-  EMBEDDED Borrow.swift
   EMBEDDED BorrowingSequence.swift
     NORMAL BridgeObjectiveC.swift
   EMBEDDED BridgeStorage.swift
     NORMAL BridgingBuffer.swift
   EMBEDDED Builtin.swift
   EMBEDDED BuiltinMath.swift
+  EMBEDDED ByteOrder.swift
   EMBEDDED CString.swift
   EMBEDDED CTypes.swift
   EMBEDDED Character.swift
@@ -93,6 +93,7 @@ split_embedded_sources(
   EMBEDDED Flatten.swift
   EMBEDDED FloatingPoint.swift
   EMBEDDED FloatingPointRandom.swift
+  EMBEDDED FullyInhabited.swift
   EMBEDDED HashTable.swift
   EMBEDDED Hashable.swift
   EMBEDDED Hasher.swift
@@ -100,7 +101,6 @@ split_embedded_sources(
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
   EMBEDDED InlineArray.swift
-  EMBEDDED Inout.swift
   EMBEDDED InputStream.swift
   EMBEDDED Instant.swift
   EMBEDDED Int128.swift
@@ -121,6 +121,7 @@ split_embedded_sources(
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
+  EMBEDDED MutableRef.swift
   EMBEDDED NFC.swift
   EMBEDDED NFD.swift
   EMBEDDED NativeDictionary.swift
@@ -144,10 +145,24 @@ split_embedded_sources(
   EMBEDDED RangeReplaceableCollection.swift
   EMBEDDED RangeSet.swift
   EMBEDDED RangeSetRanges.swift
+  EMBEDDED Ref.swift
     NORMAL ReflectionMirror.swift
   EMBEDDED Repeat.swift
   EMBEDDED Result.swift
   EMBEDDED Reverse.swift
+
+  # RigidArray sources
+  EMBEDDED RigidArray/RigidArray.swift
+  EMBEDDED RigidArray/RigidArray+Append.swift
+  EMBEDDED RigidArray/RigidArray+Container.swift
+  EMBEDDED RigidArray/RigidArray+Descriptions.swift
+  EMBEDDED RigidArray/RigidArray+Equatable.swift
+  EMBEDDED RigidArray/RigidArray+Hashable.swift
+  EMBEDDED RigidArray/RigidArray+Initializers.swift
+  EMBEDDED RigidArray/RigidArray+Insertions.swift
+  EMBEDDED RigidArray/RigidArray+Removals.swift
+  EMBEDDED RigidArray/RigidArray+Replacements.swift
+
   EMBEDDED Runtime.swift
     NORMAL RuntimeFunctionCounters.swift
   EMBEDDED Sendable.swift
@@ -215,6 +230,19 @@ split_embedded_sources(
     NORMAL ThreadLocalStorage.swift
   EMBEDDED UInt128.swift
   EMBEDDED UIntBuffer.swift
+
+  # UniqueArray sources
+  EMBEDDED UniqueArray/UniqueArray.swift
+  EMBEDDED UniqueArray/UniqueArray+Append.swift
+  EMBEDDED UniqueArray/UniqueArray+Container.swift
+  EMBEDDED UniqueArray/UniqueArray+Descriptions.swift
+  EMBEDDED UniqueArray/UniqueArray+Equatable.swift
+  EMBEDDED UniqueArray/UniqueArray+Hashable.swift
+  EMBEDDED UniqueArray/UniqueArray+Initializers.swift
+  EMBEDDED UniqueArray/UniqueArray+Insertions.swift
+  EMBEDDED UniqueArray/UniqueArray+Removals.swift
+  EMBEDDED UniqueArray/UniqueArray+Replacements.swift
+
   EMBEDDED UTF16.swift
   EMBEDDED UTF32.swift
   EMBEDDED UTF8.swift
@@ -237,6 +265,7 @@ split_embedded_sources(
   EMBEDDED UnicodeSPI.swift
   EMBEDDED UnicodeScalar.swift
   EMBEDDED UnicodeScalarProperties.swift
+  EMBEDDED UniqueBox.swift
   EMBEDDED Unmanaged.swift
   EMBEDDED UnmanagedOpaqueString.swift
   EMBEDDED UnmanagedString.swift
@@ -292,6 +321,7 @@ if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF" AND NOT SWIFT_FREESTANDING_FLAVOR AND N
 endif()
 
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
+  EmbeddedCasting.swift
   EmbeddedRuntime.swift
   EmbeddedStubs.swift
   EmbeddedPrint.swift
@@ -347,6 +377,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AllowUnsa
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SuppressedAssociatedTypesWithDefaults")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Reparenting")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Lifetimes")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAndMutateAccessors")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowInout")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 

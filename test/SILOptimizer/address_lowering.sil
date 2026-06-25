@@ -87,6 +87,10 @@ class TestGeneric<T> {
   @_borrowed @_hasStorage var borrowedGeneric: T { get set }
 }
 
+struct NCG<T> : ~Copyable {
+  var value: T
+}
+
 precedencegroup ComparisonPrecedence {
   assignment: true
   associativity: right
@@ -602,7 +606,7 @@ bb0(%0 : @owned $T):
 
 // CHECK-LABEL: sil [ossa] @f081_unwrap : $@convention(thin) <T> (@in Optional<T>) -> () {
 // CHECK: bb0(%0 : $*Optional<T>):
-// CHECK:   [[A:%.*]] = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+// CHECK:   [[A:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
 // CHECK:   apply %{{.*}}<T>([[A]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 // CHECK-LABEL: } // end sil function 'f081_unwrap'
 sil [ossa] @f081_unwrap : $@convention(thin) <T> (@in Optional<T>) -> () {
@@ -1009,7 +1013,7 @@ bb0(%0 : @owned $P):
 // CHECK:   [[INIT:%.*]] = init_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
 // CHECK:   copy_addr [[OPEN]] to [init] [[INIT]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   inject_enum_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
-// CHECK:   [[DATA:%.*]] = unchecked_take_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
+// CHECK:   [[DATA:%.*]] = unchecked_inplace_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
 // CHECK:   apply %{{.*}}<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>([[DATA]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   destroy_addr [[DATA:%[^,]+]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   destroy_addr [[ALLOCP]] : $*any P
@@ -1235,7 +1239,7 @@ sil [ossa] @f171_subtract_overflow_callee : $@convention(method) (Int, Int) -> (
 // CHECK: [[NONEBB]]:
 // CHECK:   br [[RETBB:bb[0-9]+]]
 // CHECK: [[SOMEBB]]:
-// CHECK:   [[CAST:%.*]] = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+// CHECK:   [[CAST:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[CAST]] to [init] %1 : $*T
 // CHECK:   br [[RETBB]]
 // CHECK: [[RETBB]]:
@@ -1262,17 +1266,17 @@ bb3:
 // CHECK: bb0(%0 : $*Mixed<T>, %1 : $*Builtin.Int64, %2 : $*T):
 // CHECK:   switch_enum_addr %0 : $*Mixed<T>, case #Mixed.i!enumelt: [[IBB:bb[0-9]+]], case #Mixed.t!enumelt: [[TBB:bb[0-9]+]], default [[DBB:bb[0-9]+]]
 // CHECK: [[DBB]]:
-// CHECK:   [[OBJADDR:%.*]] = unchecked_take_enum_data_addr %0 : $*Mixed<T>, #Mixed.o!enumelt
+// CHECK:   [[OBJADDR:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Mixed<T>, #Mixed.o!enumelt
 // CHECK:   [[LD:%.*]] = load [take] [[OBJADDR]] : $*AnyObject
 // CHECK:   destroy_value [[LD]] : $AnyObject 
 // CHECK:   br [[RBB:bb[0-9]+]]
 // CHECK: [[TBB]]:
-// CHECK:   [[CAST:%.*]] = unchecked_take_enum_data_addr %0 : $*Mixed<T>, #Mixed.t!enumelt
+// CHECK:   [[CAST:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Mixed<T>, #Mixed.t!enumelt
 // CHECK:   destroy_addr %2 : $*T
 // CHECK:   copy_addr [take] [[CAST]] to [init] %2 : $*T
 // CHECK:   br [[RBB]]
 // CHECK: [[IBB]]:
-// CHECK:   [[CAST:%.*]] = unchecked_take_enum_data_addr %0 : $*Mixed<T>, #Mixed.i!enumelt
+// CHECK:   [[CAST:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Mixed<T>, #Mixed.i!enumelt
 // CHECK:   [[VAL:%.*]] = load [trivial] [[CAST]] : $*Builtin.Int64
 // CHECK:   store [[VAL]] to [trivial] %1 : $*Builtin.Int64
 // CHECK:   br [[RBB]]
@@ -2517,12 +2521,64 @@ entry(%t : @guaranteed $T):
   return %retval : $()
 }
 
+// In a function whose only exit is `unreachable`, every block is dead-end.
+// The dealloc for an opaque value defined in an outer-loop body must still
+// be placed on the outer-loop back-edge, because that block flows into the
+// outer-loop header — a join point with the pre-loop predecessor where the
+// alloc is not live.
+// Skipping the dealloc on the back-edge breaks stack-state consistency at the header.
+//
+// CHECK-LABEL: sil hidden [ossa] @test_dead_end_outer_back_edge :
+// CHECK:       bb0:
+// CHECK-NEXT:    br [[OUTER_HEADER:bb[0-9]+]]
+// CHECK:       [[OUTER_HEADER]]:
+// CHECK-NEXT:    cond_br {{.*}}, [[OUTER_BODY:bb[0-9]+]], {{bb[0-9]+}}
+// CHECK:       [[OUTER_BODY]]:
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         apply undef<T>([[STK]])
+// CHECK-NEXT:    br [[INNER_HEADER:bb[0-9]+]]
+// CHECK:       [[INNER_HEADER]]:
+// CHECK-NEXT:    cond_br {{.*}}, [[INNER_BODY:bb[0-9]+]], [[OUTER_BACK:bb[0-9]+]]
+// CHECK:       [[OUTER_BACK]]:
+// CHECK-NEXT:    destroy_addr [[STK]]
+// CHECK-NEXT:    dealloc_stack [[STK]]
+// CHECK-NEXT:    br [[OUTER_HEADER]]
+// CHECK:       [[INNER_BODY]]:
+// CHECK-NEXT:    apply undef<T>([[STK]])
+// CHECK-NEXT:    br [[INNER_HEADER]]
+// CHECK-LABEL: } // end sil function 'test_dead_end_outer_back_edge'
+sil hidden [ossa] @test_dead_end_outer_back_edge : $@convention(thin) <T> () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb_outer_body, bb_unreachable
+
+bb_outer_body:
+  %v = apply undef<T>() : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  br bb_inner_header
+
+bb_inner_header:
+  cond_br undef, bb_inner_body, bb_outer_back
+
+bb_inner_body:
+  %use = apply undef<T>(%v) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  br bb_inner_header
+
+bb_outer_back:
+  destroy_value %v : $T
+  br bb1
+
+bb_unreachable:
+  unreachable
+}
+
 enum PairEnum<T> {
   case it(T, T)
 }
 
 // CHECK-LABEL: sil [ossa] @test_destructure_tuple_1_guaranteed : {{.*}} {
-// CHECK:         [[INSTANCE:%[^,]+]] = unchecked_take_enum_data_addr
+// CHECK:         [[INSTANCE:%[^,]+]] = unchecked_inplace_enum_data_addr
 // CHECK:         [[KLASS_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 0
 // CHECK:         [[KLASS:%[^,]+]] = load_borrow [[KLASS_ADDR]]
 // CHECK:         [[ANY_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 1
@@ -2559,7 +2615,7 @@ exit:
 // CHECK:         copy_addr [[INOUT_ADDR]] to [init] [[ORIGINAL_ADDR]] : $*PairEnum<T>
 // CHECK:         switch_enum_addr [[ORIGINAL_ADDR]] : $*PairEnum<T>
 // CHECK:       bb1:
-// CHECK:         [[ORIGINAL_PAYLOAD_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[ORIGINAL_ADDR]]
+// CHECK:         [[ORIGINAL_PAYLOAD_ADDR:%[^,]+]] = unchecked_inplace_enum_data_addr [[ORIGINAL_ADDR]]
 // CHECK:         [[NEW_PAYLOAD_ADDR:%[^,]+]] = init_enum_data_addr [[NEW_ADDR]]
 // CHECK:         [[NEW_FIRST_ADDR:%[^,]+]] = tuple_element_addr [[NEW_PAYLOAD_ADDR]] {{.*}}, 0
 // CHECK:         [[ORIGINAL_FIRST_ADDR:%[^,]+]] = tuple_element_addr [[ORIGINAL_PAYLOAD_ADDR]] {{.*}}, 0
@@ -2649,6 +2705,31 @@ exit:
   return %retval : $()
 }
 
+sil hidden [ossa] @borrow_use_NCG : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> () {
+bb0(%0 : @guaranteed $NCG<T>):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_elide_borrow_copy :
+// CHECK:       bb0(%0 : $*NCG<T>):
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     copy_addr
+// CHECK:         mark_unresolved_non_copyable_value [no_consume_or_assign] %0 : $*NCG<T>
+// CHECK-NOT:     destroy_addr
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'test_elide_borrow_copy'
+sil hidden [ossa] @test_elide_borrow_copy : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> () {
+bb0(%0 : @guaranteed $NCG<T>):
+  %1 = copy_value %0 : $NCG<T>
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $NCG<T>
+  %f = function_ref @borrow_use_NCG : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> ()
+  %3 = apply %f<T>(%2) : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> ()
+  destroy_value %2 : $NCG<T>
+  %4 = tuple ()
+  return %4 : $()
+}
+
 // Verify that the init_enum_data_addr instruction is created before its first
 // use.  Although the opaque values are visited in forward order, their
 // uses are visited at the same time.  At that point, addresses are
@@ -2724,6 +2805,36 @@ bb0:
   return %5
 }
 
+// CHECK-LABEL: sil hidden [ossa] @test_mark_dependence_addr_dep_opaque_base :
+// CHECK:       bb0(%0 : $*U):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         mark_dependence [unresolved] [[STK]] : $*T on %0 : $*U
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_addr_dep_opaque_base'
+sil hidden [ossa] @test_mark_dependence_addr_dep_opaque_base : $@convention(thin) <T, U> (@in_guaranteed U) -> () {
+bb0(%0 : @guaranteed $U):
+  %1 = alloc_stack $T
+  %2 = mark_dependence [unresolved] %1 : $*T on %0 : $U
+  dealloc_stack %1 : $*T
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_mark_dependence_opaque_dep_opaque_base :
+// CHECK:       bb0(%0 : $*T, %1 : $*T, %2 : $*U):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         copy_addr %1 to [init] [[STK]] : $*T
+// CHECK:         mark_dependence_addr [unresolved] [[STK]] : $*T on %2 : $*U
+// CHECK:         copy_addr [take] [[STK]] to [init] %0 : $*T
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_opaque_dep_opaque_base'
+sil hidden [ossa] @test_mark_dependence_opaque_dep_opaque_base : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> @out T {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $U):
+  %2 = copy_value %0 : $T
+  %3 = mark_dependence [unresolved] %2 : $T on %1 : $U
+  return %3 : $T
+}
+
 // CHECK-LABEL: sil [ossa] @test_mark_unresolved_non_copyable_value_1_consumable_and_assignable : {{.*}} {
 // CHECK:       bb0([[T:%[^,]+]] :
 // CHECK:         [[TP:%[^,]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[T]]
@@ -2776,6 +2887,38 @@ entry(%tmo : @guaranteed $@moveOnly T):
   apply %borrowT<T>(%t) : $@convention(thin) <T> (@in_guaranteed T) -> ()
   %retval = tuple ()
   return %retval : $()
+}
+
+// Don't apply the isMarkUnresolvedCopy def-projection optimization when the
+// mark has a transitive copy_value user. visitCopyValueInst's deletion of
+// the mark's destroy_value would shrink the mark's pruned-liveness boundary
+// and invalidate the isStoreCopy classification of the transitive copy.
+// This input is malformed (the move-only checker will diagnose the consume
+// in a later pass), but address-lowering must not crash on it.
+//
+// CHECK-LABEL: sil hidden [ossa] @test_no_elide_borrow_copy_with_transitive_copy :
+// CHECK-LABEL: } // end sil function 'test_no_elide_borrow_copy_with_transitive_copy'
+sil hidden [ossa] @test_no_elide_borrow_copy_with_transitive_copy : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> () {
+bb0(%0 : @guaranteed $NCG<T>):
+  %1 = copy_value %0 : $NCG<T>
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $NCG<T>
+  %stack = alloc_stack $NCG<T>
+  %3 = copy_value %2 : $NCG<T>
+  store %3 to [init] %stack : $*NCG<T>
+  destroy_addr %stack : $*NCG<T>
+  dealloc_stack %stack : $*NCG<T>
+  destroy_value %2 : $NCG<T>
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_no_implicit_copy_arg_flag_preserved :
+// CHECK:       bb0(%0 : @noImplicitCopy $*T):
+// CHECK-LABEL: } // end sil function 'test_no_implicit_copy_arg_flag_preserved'
+sil hidden [ossa] @test_no_implicit_copy_arg_flag_preserved : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $T):
+  %1 = tuple ()
+  return %1 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @test_open_pack_element_dominance : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}, Builtin.Word) -> () {
@@ -2911,11 +3054,49 @@ bb0(%c : @owned $Klass):
   return %retval : $()
 }
 
+// Phi-arg storage for an opaque enum constructed inside a loop must stay
+// outside the loop. `sinkToUses` skips sinking the phi's alloc_stack
+// when the sink target is inside a loop containing the alloc, since
+// the matching dealloc is placed based on the alloc's pre-sink location.
+// CHECK-LABEL: sil hidden [ossa] @test_phi_inside_loop :
+// CHECK:       bb0(%0 : $*T):
+// CHECK-NEXT:    [[STK:%[^,]+]] = alloc_stack $Optional<T>
+// CHECK-NEXT:    br [[HEADER:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK-NEXT:    cond_br
+// CHECK:       [[EXIT:bb[0-9]+]]:
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-NEXT:    return
+// CHECK:       [[LATCH:bb[0-9]+]]:
+// CHECK:         destroy_addr [[STK]]
+// CHECK-NEXT:    br [[HEADER]]
+// CHECK-LABEL: } // end sil function 'test_phi_inside_loop'
+sil hidden [ossa] @test_phi_inside_loop : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb_exit
+
+bb2:
+  %v = copy_value %0 : $T
+  %some = enum $Optional<T>, #Optional.some!enumelt, %v : $T
+  br bb3(%some : $Optional<T>)
+
+bb3(%phi : @owned $Optional<T>):
+  destroy_value %phi : $Optional<T>
+  br bb1
+
+bb_exit:
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @test_store_1 : {{.*}} {
 // CHECK:         [[MAYBE_ADDR:%[^,]+]] = alloc_stack $Optional<Self>
 // CHECK:         [[LOAD_ADDR:%[^,]+]] = alloc_stack $Self
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Self, var, name "self"
-// CHECK:         [[INSTANCE_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[MAYBE_ADDR]] : $*Optional<Self>, #Optional.some!enumelt
+// CHECK:         [[INSTANCE_ADDR:%[^,]+]] = unchecked_inplace_enum_data_addr [[MAYBE_ADDR]] : $*Optional<Self>, #Optional.some!enumelt
 // CHECK:         debug_value [[INSTANCE_ADDR]] : $*Self, var, name "self", expr op_deref
 // CHECK:         copy_addr [take] [[INSTANCE_ADDR]] to [init] [[ADDR]]
 // CHECK:         copy_addr [[ADDR]] to [init] [[LOAD_ADDR]]
@@ -3043,6 +3224,21 @@ bb0(%0 : @guaranteed $T, %1 : $@thick U.Type):
   return %6 : $U
 }
 
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast_from_loadable_trivial :
+// CHECK:       bb0(%0 : $*T, %1 : $Builtin.Int64):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         [[CAST:%[^,]+]] = unchecked_addr_cast [[STK]] : $*T to $*Builtin.Int64
+// CHECK:         store %1 to [trivial] [[CAST]] : $*Builtin.Int64
+// CHECK:         copy_addr [[STK]] to [init] %0 : $*T
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_unchecked_bitwise_cast_from_loadable_trivial'
+sil hidden [ossa] @test_unchecked_bitwise_cast_from_loadable_trivial : $@convention(thin) <T> (Builtin.Int64) -> @out T {
+bb0(%0 : $Builtin.Int64):
+  %1 = unchecked_bitwise_cast %0 : $Builtin.Int64 to $T
+  %2 = copy_value %1 : $T
+  return %2 : $T
+}
+
 // There's only one use and it's a copy, just rewrite it as a load [copy].
 // CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast_to_loadable :
 // CHECK:       {{bb[0-9]+}}([[ADDR_IN:%[^,]+]] : $*T):
@@ -3088,6 +3284,32 @@ bb0(%instance : @guaranteed $T):
   destroy_value %klass2 : $Klass
   destroy_value %copy : $T
   return %klass : $Klass
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_value_cast_from_loadable :
+// CHECK:       bb0(%0 : $*T, %1 : @owned $Klass):
+// CHECK:         [[CAST:%[^,]+]] = unchecked_addr_cast %0 : $*T to $*Klass
+// CHECK:         store %1 to [init] [[CAST]] : $*Klass
+// CHECK-LABEL: } // end sil function 'test_unchecked_value_cast_from_loadable'
+sil hidden [ossa] @test_unchecked_value_cast_from_loadable : $@convention(thin) <T> (@owned Klass) -> @out T {
+bb0(%0 : @owned $Klass):
+  %1 = unchecked_value_cast %0 : $Klass to $T
+  return %1 : $T
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_value_cast_opaque :
+// CHECK:       bb0(%0 : $*U, %1 : $*T):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         copy_addr %1 to [init] [[STK]] : $*T
+// CHECK:         [[CAST:%[^,]+]] = unchecked_addr_cast [[STK]] : $*T to $*U
+// CHECK:         copy_addr [take] [[CAST]] to [init] %0 : $*U
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_unchecked_value_cast_opaque'
+sil hidden [ossa] @test_unchecked_value_cast_opaque : $@convention(thin) <T, U> (@in_guaranteed T) -> @out U {
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0 : $T
+  %2 = unchecked_value_cast %1 : $T to $U
+  return %2 : $U
 }
 
 // CHECK-LABEL: sil hidden [ossa] @test_unconditional_checked_cast1 : $@convention(thin) <T> (Builtin.Int64) -> @out T {
@@ -3513,5 +3735,16 @@ bb1:
 bb2:
   abort_apply %4
   unwind
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_zero_initializer_opaque :
+// CHECK:       bb0(%0 : $*T):
+// CHECK:         builtin "zeroInitializer"(%0 : $*T) : $()
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_zero_initializer_opaque'
+sil hidden [ossa] @test_zero_initializer_opaque : $@convention(thin) <T> () -> @out T {
+bb0:
+  %0 = builtin "zeroInitializer"() : $T
+  return %0 : $T
 }
 

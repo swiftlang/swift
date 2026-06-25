@@ -714,8 +714,10 @@ public:
   /// \c true if this module was built with strict memory safety.
   bool strictMemorySafety() const { return Core->strictMemorySafety(); }
 
-  /// \c true if this module uses deferred code generation.
-  bool deferredCodeGen() const { return Core->deferredCodeGen(); }
+  /// The code generation model used by this module.
+  CodeGenerationModel codeGenerationModel() const {
+    return Core->codeGenerationModel();
+  }
 
 
   /// \c true if this module was built with aggressive CMO
@@ -926,6 +928,17 @@ public:
 
   StringRef getTargetTriple() const {
     return Core->TargetTriple;
+  }
+
+  /// Look up the layout of a hidden type by its mangled name. Returns
+  /// std::nullopt if this module does not define a layout for that mangled
+  /// name.
+  std::optional<AbstractTypeLayout>
+  lookupHiddenTypeLayout(StringRef mangledName) const {
+    auto it = Core->HiddenTypeLayouts.find(mangledName);
+    if (it == Core->HiddenTypeLayouts.end())
+      return std::nullopt;
+    return it->second;
   }
 
   /// AST-verify imported decls.

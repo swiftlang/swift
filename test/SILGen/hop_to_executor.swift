@@ -566,9 +566,9 @@ func validateHopToExecutorLifetimeShortEnough() async {
 // MARK: withCheckedContinuation (nonisolated(nonsending)) hop patterns
 //
 // withCheckedContinuation is now nonisolated(nonsending)
-// (CallerIsolationInheriting). At SILGen level the caller still emits a
+// (NonisolatedNonsending). At SILGen level the caller still emits a
 // hop_to_executor breadcrumb after the call. The optimizer later recognises
-// CallerIsolationInheriting calls as non-suspension-points and removes the
+// NonisolatedNonsending calls as non-suspension-points and removes the
 // breadcrumb as redundant.
 
 extension MyActor {

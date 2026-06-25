@@ -29,8 +29,6 @@ func moreComplexExample1(_ urlComponents: URLComponents) -> [String: AnyHashable
 }
 
 // Further reductions of the above.
-//
-// FIXME: All of these should work.
 
 do {
   func f<U, V>(_: U, _: V, _: (U, V) -> ()) -> U? { fatalError() }
@@ -69,54 +67,22 @@ do {
 
   func test1g(u: [String], v: AnyHashable) -> [AnyHashable] {
     let result = f(u, v) { u, v in g(u, v) } ?? []
-    // expected-note@-1 {{short-circuit using 'guard' to exit this function early if the optional value contains 'nil'}}
-    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
     return result
-    // expected-error@-1 {{cannot convert return expression of type '[Any]' to return type '[AnyHashable]'}}
-    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
-    // expected-note@-4 {{arguments to generic parameter 'Element' ('Any' and 'AnyHashable') are expected to be equal}}
-    // expected-error@-5 {{value of optional type '[Any]?' must be unwrapped to a value of type '[Any]'}}
   }
 
   func test1h(u: [AnyHashable], v: String) -> [AnyHashable] {
     let result = f(u, v) { u, v in g(u, v) } ?? []
-    // expected-note@-1 {{short-circuit using 'guard' to exit this function early if the optional value contains 'nil'}}
-    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
     return result
-    // expected-error@-1 {{cannot convert return expression of type '[Any]' to return type '[AnyHashable]'}}
-    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
-    // expected-note@-4 {{arguments to generic parameter 'Element' ('Any' and 'AnyHashable') are expected to be equal}}
-    // expected-error@-5 {{value of optional type '[Any]?' must be unwrapped to a value of type '[Any]'}}
   }
 
   func test1i(u: [() -> Int], v: @escaping () -> Any) -> [() -> Any] {
     let result = f(u, v) { u, v in g(u, v) } ?? []
-    // expected-note@-1 {{short-circuit using 'guard' to exit this function early if the optional value contains 'nil'}}
-    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
     return result
-    // expected-error@-1 {{cannot convert return expression of type '[Any]' to return type '[() -> Any]'}}
-    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
-    // expected-note@-4 {{arguments to generic parameter 'Element' ('Any' and '() -> Any') are expected to be equal}}
-    // expected-error@-5 {{value of optional type '[Any]?' must be unwrapped to a value of type '[Any]'}}
   }
 
   func test1j(u: [() -> Any], v: @escaping () -> Int) -> [() -> Any] {
     let result = f(u, v) { u, v in g(u, v) } ?? []
-    // expected-note@-1 {{short-circuit using 'guard' to exit this function early if the optional value contains 'nil'}}
-    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
     return result
-    // expected-error@-1 {{cannot convert return expression of type '[Any]' to return type '[() -> Any]'}}
-    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
-    // expected-note@-4 {{arguments to generic parameter 'Element' ('Any' and '() -> Any') are expected to be equal}}
-    // expected-error@-5 {{value of optional type '[Any]?' must be unwrapped to a value of type '[Any]'}}
   }
 
   func test2(u: [AnyHashable], v: String) -> [AnyHashable] {

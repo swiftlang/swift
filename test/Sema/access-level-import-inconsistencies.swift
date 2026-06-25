@@ -24,9 +24,9 @@ public struct LibType {}
 public import Lib // expected-warning {{public import of 'Lib' was not used in public declarations or inlinable code}}
 // expected-note @-1 4 {{imported 'public' here}}
 package import Lib // expected-warning {{package import of 'Lib' was not used in package declarations}}
-// expected-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'package' access level will be ignored}}
+// expected-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'package' access level will be ignored}}{{group-name=InconsistentImportAccess}}
 internal import Lib
-// expected-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'internal' access level will be ignored}}
+// expected-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'internal' access level will be ignored}}{{group-name=InconsistentImportAccess}}
 fileprivate import Lib
 // expected-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'fileprivate' access level will be ignored}}
 private import Lib

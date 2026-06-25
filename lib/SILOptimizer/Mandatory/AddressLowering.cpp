@@ -152,7 +152,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/StackList.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -417,6 +417,38 @@ static bool isStoreCopy(SILValue value) {
   return true;
 }
 
+/// Check if this is a copy that matches the following pattern:
+///   %source = <guaranteed ownership>
+///   %value = copy_value %source             // users: %mark
+///   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign] %value
+///   where no users of %mark are copy_value instructions.
+static bool isMarkUnresolvedCopy(SILValue value) {
+  auto *copyInst = dyn_cast<CopyValueInst>(value);
+  if (!copyInst)
+    return false;
+
+  if (!copyInst->hasOneUse())
+    return false;
+
+  auto *user = value->getSingleUse()->getUser();
+  auto *inst = dyn_cast<MarkUnresolvedNonCopyableValueInst>(user);
+  if (!inst)
+    return false;
+
+  auto source = copyInst->getOperand();
+  if (source->getOwnershipKind() != OwnershipKind::Guaranteed)
+    return false;
+  if (inst->getCheckKind() !=
+      MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign)
+    return false;
+  // Reject if the mark has any copy_value users.
+  for (auto *use : inst->getUses()) {
+    if (isa<CopyValueInst>(use->getUser()))
+      return false;
+  }
+  return true;
+}
+
 void ValueStorageMap::insertValue(SILValue value, SILValue storageAddress) {
   assert(!stableStorage && "cannot grow stable storage map");
 
@@ -512,9 +544,6 @@ struct AddressLoweringState {
   // Dominators remain valid throughout this pass.
   DominanceInfo *domInfo;
 
-  // Dead-end blocks remain valid through this pass.
-  DeadEndBlocks *deBlocks;
-
   InstructionDeleter deleter;
 
   // All opaque values mapped to their associated storage.
@@ -549,10 +578,12 @@ struct AddressLoweringState {
   // legal to reuse use projections for non-canonical users or for phis.
   SmallVector<SILValue, 16> useProjections;
 
+  SILLoopAnalysis *SLA;
+
   AddressLoweringState(SILFunction *function, DominanceInfo *domInfo,
-                       DeadEndBlocks *deBlocks)
+                       SILLoopAnalysis *SLA)
       : function(function), loweredFnConv(getLoweredFnConv(function)),
-        domInfo(domInfo), deBlocks(deBlocks) {
+        domInfo(domInfo), SLA(SLA) {
     for (auto &block : *function) {
       if (block.getTerminator()->isFunctionExiting())
         exitingInsts.push_back(block.getTerminator());
@@ -672,8 +703,11 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       arg->replaceAllUsesWith(load);
       assert(!pass.valueStorageMap.contains(arg));
 
-      arg = arg->getParent()->replaceFunctionArgument(
+      auto *oldArg = cast<SILFunctionArgument>(arg);
+      auto *newArg = arg->getParent()->replaceFunctionArgument(
           arg->getIndex(), addrType, OwnershipKind::None, arg->getDecl());
+      newArg->copyFlags(oldArg);
+      arg = newArg;
 
       assert(isa<LoadInst>(load) || isa<LoadBorrowInst>(load));
       load->setOperand(0, arg);
@@ -964,6 +998,8 @@ static Operand *getProjectedDefOperand(SILValue value) {
     return &cast<BeginBorrowInst>(value)->getOperandRef();
 
   case ValueKind::CopyValueInst:
+    if (isMarkUnresolvedCopy(value))
+      return &cast<CopyValueInst>(value)->getOperandRef();
     if (isStoreCopy(value))
       return &cast<CopyValueInst>(value)->getOperandRef();
 
@@ -971,6 +1007,10 @@ static Operand *getProjectedDefOperand(SILValue value) {
 
   case ValueKind::MarkUnresolvedNonCopyableValueInst:
     return &cast<MarkUnresolvedNonCopyableValueInst>(value)->getOperandRef();
+
+  case ValueKind::MarkDependenceInst:
+    return &cast<MarkDependenceInst>(value)
+                ->getAllOperands()[MarkDependenceInst::Dependent];
 
   case ValueKind::MoveValueInst:
     return &cast<MoveValueInst>(value)->getOperandRef();
@@ -1018,7 +1058,12 @@ static Operand *getProjectedDefOperand(SILValue value) {
 /// is address-only, then the operand must be address-only and therefore must
 /// mapped to ValueStorage.
 ///
-/// If \p value is an unchecked_bitwise_cast, then return the cast operand.
+/// If \p value is an unchecked_bitwise_cast or unchecked_value_cast with an
+/// address-only source operand, then return the cast operand. When the source
+/// operand is loadable, return nullptr instead: the cast result needs its own
+/// storage so the loadable source value can be stored into an
+/// unchecked_addr_cast view of that storage. The DefRewriter handles this
+/// case.
 ///
 /// open_existential_value must reuse storage because the boxed value is shared
 /// with other instances of the existential. An explicit copy is needed to
@@ -1036,8 +1081,20 @@ static Operand *getReusedStorageOperand(SILValue value) {
   case ValueKind::OpenExistentialValueInst:
   case ValueKind::OpenExistentialBoxValueInst:
   case ValueKind::UncheckedEnumDataInst:
-  case ValueKind::UncheckedBitwiseCastInst:
     return &cast<SingleValueInstruction>(value)->getOperandRef(0);
+
+  case ValueKind::UncheckedValueCastInst:
+  case ValueKind::UncheckedBitwiseCastInst: {
+    // Only share storage when the source is address-only. A loadable source
+    // has no ValueStorage to share; the DefRewriter materializes fresh storage
+    // for the cast result and stores the loadable source through an
+    // unchecked_addr_cast view.
+    auto *castInst = cast<SingleValueInstruction>(value);
+    if (!castInst->getOperand(0)->getType().isAddressOnly(
+            *castInst->getFunction()))
+      return nullptr;
+    return &castInst->getOperandRef(0);
+  }
 
   case ValueKind::SILPhiArgument: {
     if (auto *term = cast<SILPhiArgument>(value)->getTerminatorForResult()) {
@@ -1177,6 +1234,12 @@ bool ValueStorageMap::isComposingUseProjection(Operand *oper) const {
 }
 
 namespace {
+enum class SinkResult {
+  NoUsers,
+  Unmoved,
+  Moved,
+};
+
 /// Allocate storage on the stack for every opaque value defined in this
 /// function in postorder. If the definition is an argument of this function,
 /// simply replace the function argument with an address representing the
@@ -1234,6 +1297,8 @@ protected:
     pass.valueStorageMap.getStorage(value).storageAddress =
         createStackAllocation(value);
   }
+
+  SinkResult sinkToUses(SingleValueInstruction *svi, DominanceInfo *domInfo);
 };
 } // end anonymous namespace
 
@@ -1571,13 +1636,8 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
   return alloc;
 }
 
-namespace {
-enum class SinkResult {
-  NoUsers,
-  Unmoved,
-  Moved,
-};
-SinkResult sinkToUses(SingleValueInstruction *svi, DominanceInfo *domInfo) {
+SinkResult OpaqueStorageAllocation::sinkToUses(SingleValueInstruction *svi,
+                                               DominanceInfo *domInfo) {
   // Fast paths for 0 and 1 users.
 
   if (svi->use_begin() == svi->use_end()) {
@@ -1597,8 +1657,22 @@ SinkResult sinkToUses(SingleValueInstruction *svi, DominanceInfo *domInfo) {
 
   SILBasicBlock *lca = domInfo->getLeastCommonAncestorOfUses(svi);
 
-  // The lca may contain a user.  Look for the user to insert before it.
+  // If the materialized address is itself an alloc_stack, avoid sinking it
+  // into a loop.
+  // The deallocs were placed based on the alloc's current location.
+  // Relocating the alloc into a loop would re-execute it every iteration
+  // without matching deallocs on the back-edge, breaking stack discipline.
+  if (auto *asi = dyn_cast<AllocStackInst>(svi)) {
+    auto *LI = pass.SLA->get(asi->getFunction());
+    auto *startNode = domInfo->getNode(asi->getParent());
+    for (auto node = domInfo->getNode(lca); node && node != startNode;
+         node = node->getIDom()) {
+      if (LI->isLoopHeader(node->getBlock()))
+        return SinkResult::Unmoved;
+    }
+  }
 
+  // The lca may contain a user.  Look for the user to insert before it.
   InstructionSet userSet(svi->getFunction());
   for (auto user : svi->getUsers()) {
     userSet.insert(user);
@@ -1617,7 +1691,6 @@ SinkResult sinkToUses(SingleValueInstruction *svi, DominanceInfo *domInfo) {
   svi->moveBefore(&lca->back());
   return SinkResult::Moved;
 }
-} // end anonymous namespace
 
 void OpaqueStorageAllocation::finalizeOpaqueStorage() {
   SmallVector<SILBasicBlock *, 4> boundary;
@@ -1640,7 +1713,11 @@ void OpaqueStorageAllocation::finalizeOpaqueStorage() {
     // a use projection.
     computeDominatedBoundaryBlocks(alloc->getParent(), pass.domInfo, boundary);
     for (SILBasicBlock *deallocBlock : boundary) {
-      if (pass.deBlocks->isDeadEnd(deallocBlock))
+      // Owned values need not be destroyed on paths terminating in
+      // `unreachable`, so the corresponding storage need not be deallocated
+      // there either; emitting a dealloc_stack in such a block could free
+      // storage that was never deinitialized.
+      if (DeadEndBlocks::triviallyEndsInUnreachable(deallocBlock))
         continue;
       auto deallocBuilder = pass.getBuilder(deallocBlock->back().getIterator());
       deallocBuilder.createDeallocStack(pass.genLoc(), alloc);
@@ -1873,7 +1950,7 @@ SILValue AddressMaterialization::materializeDefProjection(SILValue origValue) {
     llvm_unreachable("Unexpected projection from def.");
 
   case ValueKind::CopyValueInst:
-    assert(isStoreCopy(origValue));
+    assert(isStoreCopy(origValue) || isMarkUnresolvedCopy(origValue));
     return pass.getMaterializedAddress(
         cast<CopyValueInst>(origValue)->getOperand());
 
@@ -2646,9 +2723,21 @@ SILValue ApplyRewriter::materializeIndirectOutputAddress(ApplyOutput kind,
 void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   auto *oldCall = cast<ApplyInst>(apply.getInstruction());
 
+  // Address lowering may change the rewritten apply's argument count
+  // when opaque-value lowering inserts or merges operands. Forward the
+  // original per-argument SILLocations only when the count is preserved;
+  // otherwise pass nullopt and the new apply has no per-argument storage.
+  // (The SILBuilder factory asserts on size mismatch by design — that's
+  // why this guard is at the call site rather than inside the factory.)
+  std::optional<ArrayRef<SILLocation>> argLocs =
+      ApplySite(oldCall).getArgumentLocs();
+  if (argLocs && argLocs->size() != newCallArgs.size())
+    argLocs = std::nullopt;
+
   auto *newCall = argBuilder.createApply(
       callLoc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
-      oldCall->getApplyOptions(), oldCall->getSpecializationInfo());
+      oldCall->getApplyOptions(), oldCall->getSpecializationInfo(),
+      /*isolationCrossing=*/std::nullopt, argLocs);
 
   this->apply = FullApplySite(newCall);
 
@@ -2681,11 +2770,18 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
     opValues.push_back(oper.get());
   }
 
+  // begin_apply yield-rewrite is a strict argument-preserving rewrite: we
+  // copy every operand through unchanged and only the result conventions
+  // change. The original per-argument SILLocations remain positionally
+  // valid 1:1 with `opValues`; just pass them through.
+
   // Recreate the begin_apply so that the instruction results have the right
   // ownership kind as per the lowered addresses convention.
   auto *newCall = argBuilder.createBeginApply(
       callLoc, apply.getCallee(), apply.getSubstitutionMap(), opValues,
-      origCall->getApplyOptions(), origCall->getSpecializationInfo());
+      origCall->getApplyOptions(), origCall->getSpecializationInfo(),
+      /*isolationCrossing=*/std::nullopt,
+      ApplySite(origCall).getArgumentLocs());
   this->apply = FullApplySite(newCall);
 
   // Replace uses of orig begin_apply with the new begin_apply
@@ -2867,10 +2963,23 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
 
   auto *tryApply = cast<TryApplyInst>(apply.getInstruction());
 
+  // Same shape as rewriteApply above: forward per-argument SILLocations
+  // only when the rewritten try_apply has the same argument count as the
+  // original; otherwise pass nullopt and the new try_apply has no
+  // per-argument storage. The SILBuilder factory asserts on size mismatch
+  // by design, so the guard has to live here.
+  std::optional<ArrayRef<SILLocation>> argLocs =
+      ApplySite(tryApply).getArgumentLocs();
+  if (argLocs && argLocs->size() != newCallArgs.size())
+    argLocs = std::nullopt;
+
   auto *newCallInst = argBuilder.createTryApply(
       callLoc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
       tryApply->getNormalBB(), tryApply->getErrorBB(),
-      tryApply->getApplyOptions(), tryApply->getSpecializationInfo());
+      tryApply->getApplyOptions(), tryApply->getSpecializationInfo(),
+      /*isolationCrossing=*/std::nullopt,
+      /*normalCount=*/ProfileCounter(),
+      /*errorCount=*/ProfileCounter(), argLocs);
 
   // Immediately delete the old try_apply (old applies hang around until
   // dead code removal because they directly define values).
@@ -3489,6 +3598,15 @@ protected:
     yield->setOperand(use->getOperandNumber(), addr);
   }
 
+  // Captured index value of a keypath. The keypath runtime ABI passes each
+  // index via address. Rewrite the operand to its storage address now; the
+  // pattern's recorded LoweredType is patched up after the main rewrite loop
+  // by rebuildKeyPathInstsForAddressOnlyIndices.
+  void visitKeyPathInst(KeyPathInst *kpi) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    kpi->setOperand(use->getOperandNumber(), addr);
+  }
+
   void visitIgnoredUseInst(IgnoredUseInst *ignored) {
     SILValue addr = addrMat.materializeAddress(use->get());
     ignored->setOperand(addr);
@@ -3561,6 +3679,29 @@ protected:
     pass.deleter.forceDelete(fli);
   }
 
+  void visitMarkDependenceInst(MarkDependenceInst *mdi) {
+    if (use->getOperandNumber() == MarkDependenceInst::Base) {
+      SILValue baseAddr = addrMat.materializeAddress(use->get());
+      mdi->setBase(baseAddr);
+      return;
+    }
+    assert(use->getOperandNumber() == MarkDependenceInst::Dependent);
+    SILValue valueAddr =
+        pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    builder.createMarkDependenceAddr(mdi->getLoc(), valueAddr, mdi->getBase(),
+                                     mdi->dependenceKind());
+    markRewritten(mdi, valueAddr);
+  }
+
+  void visitMarkDependenceAddrInst(MarkDependenceAddrInst *mdai) {
+    if (use->getOperandNumber() != MarkDependenceAddrInst::Base) {
+      visitSILInstruction(mdai);
+      return;
+    }
+    SILValue baseAddr = addrMat.materializeAddress(use->get());
+    mdai->setBase(baseAddr);
+  }
+
   void visitBranchInst(BranchInst *) {
     pass.getPhiRewriter().materializeOperand(use);
 
@@ -3569,6 +3710,22 @@ protected:
 
   // Copy from an opaque source operand.
   void visitCopyValueInst(CopyValueInst *copyInst) {
+    // For the isMarkUnresolvedCopy pattern, the mark's destroy_value is the
+    // artificial cleanup of the +1 owned form. Now that the copy and mark
+    // both project onto the guaranteed source's storage, that destroy would
+    // lower to a destroy_addr of borrowed storage — illegal. Erase it.
+    if (isMarkUnresolvedCopy(copyInst)) {
+      auto *mark = cast<MarkUnresolvedNonCopyableValueInst>(
+          copyInst->getSingleUse()->getUser());
+      SmallVector<DestroyValueInst *, 4> destroys;
+      for (auto *use : mark->getConsumingUses()) {
+        if (auto *d = dyn_cast<DestroyValueInst>(use->getUser()))
+          destroys.push_back(d);
+      }
+      for (auto *d : destroys)
+        pass.deleter.forceDelete(d);
+    }
+
     SILValue srcVal = copyInst->getOperand();
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
 
@@ -3584,9 +3741,8 @@ protected:
   void visitDebugValueInst(DebugValueInst *debugInst) {
     SILValue srcVal = debugInst->getOperand();
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
-    builder.createDebugValueAddr(debugInst->getLoc(), srcAddr,
-                                 *debugInst->getVarInfo());
-    pass.deleter.forceDelete(debugInst);
+    debugInst->setOperand(srcAddr);
+    debugInst->prependDeref();
   }
 
   void visitDeinitExistentialValueInst(
@@ -3738,9 +3894,8 @@ protected:
   // Extract from an opaque pack tuple.
   void visitTuplePackExtractInst(TuplePackExtractInst *extractInst);
 
-  void
-  visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCastInst) {
-    SILValue srcVal = uncheckedCastInst->getOperand();
+  void rewriteOpaqueUncheckedCastUse(SingleValueInstruction *uncheckedCastInst) {
+    SILValue srcVal = uncheckedCastInst->getOperand(0);
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
 
     auto destAddr = builder.createUncheckedAddrCast(
@@ -3767,6 +3922,15 @@ protected:
     uncheckedCastInst->replaceAllUsesWith(load);
     pass.deleter.forceDelete(uncheckedCastInst);
     emitEndBorrows(load, pass);
+  }
+
+  void
+  visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCastInst) {
+    rewriteOpaqueUncheckedCastUse(uncheckedCastInst);
+  }
+
+  void visitUncheckedValueCastInst(UncheckedValueCastInst *uncheckedCastInst) {
+    rewriteOpaqueUncheckedCastUse(uncheckedCastInst);
   }
 
   void visitUnconditionalCheckedCastInst(
@@ -4054,7 +4218,7 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
 
     SILBuilder caseBuilder = pass.getBuilder(caseBB->begin());
     auto *caseAddr =
-        caseBuilder.createUncheckedTakeEnumDataAddr(loc, enumAddr, caseDecl);
+        caseBuilder.createUncheckedEnumDataAddrForTake(loc, enumAddr, caseDecl);
     auto *caseLoad = caseBuilder.createTrivialLoadOr(
         loc, caseAddr, LoadOwnershipQualifier::Take);
     caseArg->replaceAllUsesWith(caseLoad);
@@ -4128,7 +4292,7 @@ void UseRewriter::visitUncheckedEnumDataInst(
   auto elt = enumDataInst->getElement();
   auto destTy = enumDataInst->getType().getAddressType();
   auto *enumAddrInst =
-      builder.createUncheckedTakeEnumDataAddr(loc, srcAddr, elt, destTy);
+      builder.createUncheckedEnumDataAddrForTake(loc, srcAddr, elt, destTy);
 
   markRewritten(enumDataInst, enumAddrInst);
 }
@@ -4210,6 +4374,31 @@ protected:
     ApplyRewriter(applyInst, pass).convertApplyWithIndirectResults();
   }
 
+  void rewriteOpaqueUncheckedCastDef(SingleValueInstruction *uncheckedCast) {
+    SILValue srcVal = uncheckedCast->getOperand(0);
+    assert(!srcVal->getType().isAddressOnly(*pass.function) &&
+           "opaque operand should share storage via getReusedStorageOperand");
+
+    addrMat.materializeAddress(uncheckedCast);
+    SILValue destAddr = storage.storageAddress;
+    auto loc = uncheckedCast->getLoc();
+    SILValue srcView = builder.createUncheckedAddrCast(
+        loc, destAddr, srcVal->getType().getAddressType());
+    auto qual = srcVal->getType().isTrivial(*pass.function)
+                    ? StoreOwnershipQualifier::Trivial
+                    : StoreOwnershipQualifier::Init;
+    builder.createStore(loc, srcVal, srcView, qual);
+    storage.markRewritten();
+  }
+
+  void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCast) {
+    rewriteOpaqueUncheckedCastDef(uncheckedCast);
+  }
+
+  void visitUncheckedValueCastInst(UncheckedValueCastInst *uncheckedCast) {
+    rewriteOpaqueUncheckedCastDef(uncheckedCast);
+  }
+
   void visitBeginApplyInst(BeginApplyInst *bai) {
     CallArgRewriter(bai, pass).rewriteArguments();
     ApplyRewriter(bai, pass).convertBeginApplyWithOpaqueYield();
@@ -4217,6 +4406,16 @@ protected:
 
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
+    case BuiltinValueKind::ZeroInitializer: {
+      // Value-form `builtin "zeroInitializer"() : $T` with an opaque T.
+      assert(bi->getNumOperands() == 0 &&
+             "address-form zeroInitializer should not appear as an opaque def");
+      addrMat.materializeAddress(bi);
+      SILValue destAddr = storage.storageAddress;
+      builder.createZeroInitAddr(bi->getLoc(), destAddr);
+      storage.markRewritten();
+      break;
+    }
     default:
       bi->dump();
       llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");
@@ -4614,10 +4813,9 @@ void AddressLowering::runOnFunction(SILFunction *function) {
   removeUnreachableBlocks(*function);
 
   auto *dominance = PM->getAnalysis<DominanceAnalysis>();
-  auto *deadEnds = PM->getAnalysis<DeadEndBlocksAnalysis>();
+  auto *SLA = PM->getAnalysis<SILLoopAnalysis>();
 
-  AddressLoweringState pass(function, dominance->get(function),
-                            deadEnds->get(function));
+  AddressLoweringState pass(function, dominance->get(function), SLA);
 
   // ## Step #1: Map opaque values
   //

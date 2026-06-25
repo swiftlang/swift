@@ -110,14 +110,14 @@ extension MyActor {
   func warningIfCallingGetter() async {
     await self.klass.asyncCall()
     // expected-ni-warning @-1 {{sending 'self.klass' risks causing data races}}
-    // expected-ni-note @-2 {{sending 'self'-isolated 'self.klass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-ni-note @-2 {{sending 'self'-isolated 'self.klass' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   func warningIfCallingAsyncOnFinalField() async {
     // Since we are calling finalKlass directly, we emit a warning here.
     await self.finalKlass.asyncCall()
     // expected-ni-warning @-1 {{sending 'self.finalKlass' risks causing data races}}
-    // expected-ni-note @-2 {{sending 'self'-isolated 'self.finalKlass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-ni-note @-2 {{sending 'self'-isolated 'self.finalKlass' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // We do not warn on this since we warn in the caller of our getter instead.
@@ -131,7 +131,7 @@ extension FinalActor {
     // Since our whole class is final, we emit the error directly here.
     await self.klass.asyncCall()
     // expected-ni-warning @-1 {{sending 'self.klass' risks causing data races}}
-    // expected-ni-note @-2 {{sending 'self'-isolated 'self.klass' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-ni-note @-2 {{sending 'self'-isolated 'self.klass' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 }
 
@@ -512,7 +512,7 @@ func testNoncopyableNonsendableStructWithNonescapingMainActorAsync() {
   let _ = {
     nonescapingAsyncClosure { @MainActor in
       useValueNoncopyable(x) // expected-warning {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against code in the current isolation context}}
     }
   }
 }
@@ -534,7 +534,7 @@ func testConversionsAndSendable(a: MyActor, f: @Sendable () -> Void, f2: () -> V
   await a.useNonSendableFunction(f2)
 
   // expected-warning @-2 {{sending 'f2' risks causing data races}}
-  // expected-note @-3 {{sending task-isolated 'f2' to actor-isolated instance method 'useNonSendableFunction' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-3 {{sending 'f2' to actor-isolated instance method 'useNonSendableFunction' risks causing data races between actor-isolated code and code in the current isolation context}}
 }
 
 func testSendableClosureCapturesNonSendable(a: MyActor) {
@@ -1468,7 +1468,7 @@ final actor FinalActorWithSetter {
 func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   let _ = { @MainActor in
     let _ = x // expected-warning {{sending 'x' risks causing data races}}
-    // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against code in the current isolation context}}
 
 
   }
@@ -1488,7 +1488,7 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
     // through the loop, we are now main actor isolated, but again b/c we
     // inherit isolation, we are ok.
     await useValueAsync(c) // expected-ni-warning {{sending 'c' risks causing data races}}
-    // expected-ni-note @-1 {{sending main actor-isolated 'c' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+    // expected-ni-note @-1 {{sending main actor-isolated 'c' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
 
     c = a.klass
   }
@@ -1499,7 +1499,7 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   var c = NonSendableKlass()
   for _ in 0..<1024 {
     await useValueAsync(c) // expected-ni-warning {{sending 'c' risks causing data races}}
-    // expected-ni-note @-1 {{sending main actor-isolated 'c' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+    // expected-ni-note @-1 {{sending main actor-isolated 'c' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
 
     c = a.klassLet
   }
@@ -1747,7 +1747,7 @@ actor FunctionWithSendableResultAndIsolationActor {
 func previouslyBrokenTestCase(ns: NonSendableKlass) async -> SendableGenericStruct? {
   return await { () -> SendableGenericStruct? in
     return await ns.getSendableGenericStructAsync() // expected-ni-warning {{sending 'ns' risks causing data races}}
-    // expected-ni-note @-1 {{sending main actor-isolated 'ns' to nonisolated instance method 'getSendableGenericStructAsync()' risks causing data races between nonisolated and main actor-isolated uses}}
+    // expected-ni-note @-1 {{sending main actor-isolated 'ns' to @concurrent instance method 'getSendableGenericStructAsync()' risks causing data races between @concurrent and main actor-isolated uses}}
   }()
 }
 
@@ -1792,8 +1792,8 @@ extension MyActor {
 
 func nonSendableAllocBoxConsumingParameter(x: consuming SendableKlass) async throws {
   try await withThrowingTaskGroup(of: Void.self) { group in
-    group.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      useValue(x) // expected-note {{closure captures reference to mutable parameter 'x' which remains modifiable by code in the current task}}
+    group.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+      useValue(x) // expected-note {{closure captures reference to mutable parameter 'x' which remains modifiable by code in the current isolation context}}
     }
 
     try await group.waitForAll()
@@ -1805,8 +1805,8 @@ func nonSendableAllocBoxConsumingVar() async throws {
   x = SendableKlass()
 
   try await withThrowingTaskGroup(of: Void.self) { group in
-    group.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      useValue(x) // expected-note {{closure captures reference to mutable var 'x' which remains modifiable by code in the current task}}
+    group.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+      useValue(x) // expected-note {{closure captures reference to mutable var 'x' which remains modifiable by code in the current isolation context}}
     }
 
     try await group.waitForAll()
@@ -1825,7 +1825,7 @@ func offByOneWithImplicitPartialApply() {
           let asdf = ""
           Task { @MainActor in
             a.description = asdf // expected-warning {{sending 'self' risks causing data races}}
-            // expected-note @-1 {{task-isolated 'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+            // expected-note @-1 {{'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against code in the current isolation context}}
           }
       }
   }
@@ -1863,8 +1863,8 @@ func testIndirectAndDirectSendingResultsWithGlobalActor() async {
 func testFunctionIsNotEmpty(input: SendableKlass) async throws {
   var result: [SendableKlass] = []
   try await withThrowingTaskGroup(of: Void.self) { taskGroup in // expected-warning {{no calls to throwing functions occur within 'try' expression}}
-    taskGroup.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      result.append(input) // expected-note {{closure captures reference to mutable var 'result' which remains modifiable by code in the current task}}
+    taskGroup.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+      result.append(input) // expected-note {{closure captures reference to mutable var 'result' which remains modifiable by code in the current isolation context}}
     }
   }
 }
@@ -1885,7 +1885,7 @@ extension NonIsolatedFinalKlass {
   // here. Make sure we do not crash.
   func testGetIsolationInfoOfField() async {
     await transferToMain(ns) // expected-warning {{sending 'self.ns' risks causing data races}}
-    // expected-note @-1 {{sending task-isolated 'self.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-note @-1 {{sending 'self.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
   }
 }
 
@@ -1895,10 +1895,7 @@ func mutableLocalCaptureDataRace() async {
   _ = x
 
   Task.detached { x = 1 }
-  // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-  // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
-  // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-  // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+  // expected-warning @-1 {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'x' which is accessed later by code in the current isolation context}}
 
   x = 2 // expected-note {{access can happen concurrently}}
 }
@@ -1907,11 +1904,7 @@ func mutableLocalCaptureDataRace2() async {
   var x = 0
   x = 0
 
-  Task.detached { x = 1 }
-  // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-  // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
-  // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-  // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+  Task.detached { x = 1 } // expected-warning {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'x' which is accessed later by code in the current isolation context}}
 
   print(x) // expected-note {{access can happen concurrently}}
 }
@@ -2005,7 +1998,7 @@ func inferLocationOfCapturedTaskIsolatedSelfCorrectly() {
     func d() {
       a.block = c
       // expected-warning @-1 {{sending 'self' risks causing data races}}
-      // expected-note @-2 {{task-isolated 'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-2 {{'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against code in the current isolation context}}
     }
 
     @MainActor
@@ -2015,10 +2008,10 @@ func inferLocationOfCapturedTaskIsolatedSelfCorrectly() {
 
 nonisolated(nonsending) func testCallNonisolatedNonsending(_ x: NonSendableKlass) async {
   await useValueAsync(x) // expected-ni-warning {{sending 'x' risks causing data races}}
-  // expected-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  // expected-ni-note @-1 {{sending 'x' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent code and code in the current isolation context}}
   await useValueAsyncConcurrent(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'useValueAsyncConcurrent' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
-  // expected-ni-ns-note @-2 {{sending task-isolated 'x' to @concurrent global function 'useValueAsyncConcurrent' risks causing data races between @concurrent and task-isolated uses}}
+  // expected-ni-note @-1 {{sending 'x' to @concurrent global function 'useValueAsyncConcurrent' risks causing data races between @concurrent code and code in the current isolation context}}
+  // expected-ni-ns-note @-2 {{sending 'x' to @concurrent global function 'useValueAsyncConcurrent' risks causing data races between @concurrent code and code in the current isolation context}}
 }
 
 func avoidThinkingClosureParameterIsSending() {
@@ -2029,12 +2022,12 @@ func avoidThinkingClosureParameterIsSending() {
     func perform() {
         Task { [value] in
           await value.asyncCall() // expected-ni-warning {{sending 'value' risks causing data races}}
-          // expected-ni-note @-1 {{sending main actor-isolated 'value' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and main actor-isolated uses}}
+          // expected-ni-note @-1 {{sending main actor-isolated 'value' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and main actor-isolated uses}}
         }
 
         Task {
           await value.asyncCall() // expected-ni-warning {{sending 'self.value' risks causing data races}}
-          // expected-ni-note @-1 {{sending main actor-isolated 'self.value' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and main actor-isolated uses}}
+          // expected-ni-note @-1 {{sending main actor-isolated 'self.value' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and main actor-isolated uses}}
         }
     }
   }
@@ -2043,22 +2036,16 @@ func avoidThinkingClosureParameterIsSending() {
 enum RequireSrcWhenStoringEvenWhenSendable {
   func test<T: Sendable>(t: T) {
     var result: T = t
-    Task { // expected-ni-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-      // expected-ni-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      // expected-ni-ns-warning @-2 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-      // expected-ni-ns-note @-3 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      result = t
+    Task {
+      result = t // expected-warning {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'result' which is accessed later by code in the current isolation context}}
     }
     useValue(result) // expected-note {{access can happen concurrently}}
   }
 
   func test2() {
     var result: Any = 0
-    Task { // expected-ni-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-      // expected-ni-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      // expected-ni-ns-warning @-2 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-      // expected-ni-ns-note @-3 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      result = 0
+    Task {
+      result = 0 // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'result' which is accessed later by code in the current isolation context}}
     }
     useValue(result) // expected-note {{access can happen concurrently}}
   }
@@ -2069,11 +2056,8 @@ enum RequireSrcWhenStoringEvenWhenSendable {
 
   func test3<T: Initializable & SendableMetatype>(type: T.Type) {
     var result = type.init()
-    Task { // expected-ni-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-      // expected-ni-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      // expected-ni-ns-warning @-2 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
-      // expected-ni-ns-note @-3 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-      result = type.init()
+    Task {
+      result = type.init() // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'result' which is accessed later by code in the current isolation context}}
     }
     useValue(result) // expected-note {{access can happen concurrently}}
   }
@@ -2087,8 +2071,8 @@ extension Optional where Wrapped: ~Copyable {
   mutating func takeSending() -> sending Self {
     let result = self
     self = nil
-    return result // expected-warning {{returning task-isolated 'result' as a 'sending' result risks causing data races}}
-    // expected-note @-1 {{returning task-isolated 'result' risks causing data races since the caller assumes that 'result' can be safely sent to other isolation domains}}
+    return result // expected-warning {{returning 'result' as a 'sending' result risks causing data races; this is an error in the Swift 6 language mode}}
+    // expected-note @-1 {{returning 'result' risks causing data races since the caller assumes that 'result' can be safely sent to other isolation domains}}
   }
 }
 
@@ -2102,7 +2086,7 @@ struct IndirectAssignTests {
       if let v = value {
         self.value = nil
         return v // expected-warning {{sending 'v' risks causing data races}}
-        // expected-note @-1 {{task-isolated 'v' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+        // expected-note @-1 {{'v' cannot be a 'sending' result. Code in the current task may race with caller uses}}
       } else {
         preconditionFailure("Consumed twice")
       }
@@ -2122,7 +2106,7 @@ struct IndirectAssignTests {
       if let value {
         self.value = nil
         return value // expected-warning {{sending 'value' risks causing data races}}
-        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+        // expected-note @-1 {{'value' cannot be a 'sending' result. Code in the current task may race with caller uses}}
       } else {
         preconditionFailure("Consumed twice")
       }
@@ -2135,8 +2119,8 @@ struct IndirectAssignTests {
     mutating func take() -> sending T {
       if let value {
         self.value = nil
-        return value // expected-warning {{returning task-isolated 'value' as a 'sending' result risks causing data races}}
-        // expected-note @-1 {{returning task-isolated 'value' risks causing data races since the caller assumes that 'value' can be safely sent to other isolation domains}}
+        return value // expected-warning {{returning 'value' as a 'sending' result risks causing data races; this is an error in the Swift 6 language mode}}
+        // expected-note @-1 {{returning 'value' risks causing data races since the caller assumes that 'value' can be safely sent to other isolation domains}}
       } else {
         preconditionFailure("Consumed twice")
       }
@@ -2152,7 +2136,7 @@ struct IndirectAssignTests {
       }
       self.value = nil
       return value // expected-warning {{sending 'value' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      // expected-note @-1 {{'value' cannot be a 'sending' result. Code in the current task may race with caller uses}}
     }
   }
 
@@ -2173,7 +2157,7 @@ struct IndirectAssignTests {
       if let value {
         self.value = nil
         return value.0 // expected-warning {{sending 'value.0' risks causing data races}}
-        // expected-note @-1 {{task-isolated 'value.0' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+        // expected-note @-1 {{'value.0' cannot be a 'sending' result. Code in the current task may race with caller uses}}
       } else {
         preconditionFailure("Consumed twice")
       }
@@ -2187,7 +2171,7 @@ struct IndirectAssignTests {
       if let value {
         self.value = nil
         return value // expected-warning {{sending 'value' risks causing data races}}
-        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+        // expected-note @-1 {{'value' cannot be a 'sending' result. Code in the current task may race with caller uses}}
       } else {
         preconditionFailure("Consumed twice")
       }
@@ -2216,7 +2200,7 @@ struct IndirectAssignTests {
       if let value {
         self.value = nil
         return value // expected-warning {{sending 'value' risks causing data races}}
-        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+        // expected-note @-1 {{'value' cannot be a 'sending' result. Code in the current task may race with caller uses}}
       } else {
         preconditionFailure("Consumed twice")
       }
@@ -2245,7 +2229,7 @@ struct IndirectAssignTests {
       if let value {
         self.value = nil
         return value // expected-warning {{sending 'value' risks causing data races}}
-        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+        // expected-note @-1 {{'value' cannot be a 'sending' result. Code in the current task may race with caller uses}}
       } else {
         preconditionFailure("Consumed twice")
       }
@@ -2259,7 +2243,7 @@ struct IndirectAssignTests {
       if let value, let innerValue = value {
         self.value = nil
         return innerValue // expected-warning {{sending 'innerValue' risks causing data races}}
-        // expected-note @-1 {{task-isolated 'innerValue' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+        // expected-note @-1 {{'innerValue' cannot be a 'sending' result. Code in the current task may race with caller uses}}
       } else {
         preconditionFailure("Consumed twice")
       }
@@ -2277,7 +2261,7 @@ struct IndirectAssignTests {
       case .full(let value):
         self = .empty
         return value // expected-warning {{sending 'value' risks causing data races}}
-        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+        // expected-note @-1 {{'value' cannot be a 'sending' result. Code in the current task may race with caller uses}}
       }
     }
   }
@@ -2288,7 +2272,7 @@ struct IndirectAssignTests {
     consuming func take() -> sending NonSendableKlass {
       if let value {
         return value // expected-warning {{sending 'value' risks causing data races}}
-        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+        // expected-note @-1 {{'value' cannot be a 'sending' result. Code in the current task may race with caller uses}}
       } else {
         preconditionFailure("Consumed twice")
       }
@@ -2319,7 +2303,7 @@ struct IndirectAssignTests {
       let value = values.removeFirst()
       values = []
       return value // expected-warning {{sending 'value' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      // expected-note @-1 {{'value' cannot be a 'sending' result. Code in the current task may race with caller uses}}
     }
   }
 
@@ -2332,7 +2316,7 @@ struct IndirectAssignTests {
       }
       values = [:]
       return value // expected-warning {{sending 'value' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      // expected-note @-1 {{'value' cannot be a 'sending' result. Code in the current task may race with caller uses}}
     }
   }
 
@@ -2352,7 +2336,7 @@ struct IndirectAssignTests {
       }
       // TODO: The warning should be on the user itself.
     } // expected-warning {{sending 'value2' risks causing data races}}
-    // expected-note @-1 {{task-isolated 'value2' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+    // expected-note @-1 {{'value2' cannot be a 'sending' result. Code in the current task may race with caller uses}}
   }
 
   struct LazyBox {
@@ -2368,7 +2352,7 @@ struct IndirectAssignTests {
       _value = nil
       initialized = false
       return result // expected-warning {{sending 'result' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'result' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      // expected-note @-1 {{'result' cannot be a 'sending' result. Code in the current task may race with caller uses}}
     }
   }
 
@@ -2380,7 +2364,7 @@ struct IndirectAssignTests {
     if let value = box.value {
       box.value = nil
       return value // expected-warning {{sending 'value' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      // expected-note @-1 {{'value' cannot be a 'sending' result. Code in the current task may race with caller uses}}
     } else {
       preconditionFailure("Consumed twice")
     }
@@ -2407,7 +2391,7 @@ struct IndirectAssignTests {
       if let value {
         self.value = nil
         return value // expected-warning {{sending 'value' risks causing data races}}
-        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+        // expected-note @-1 {{'value' cannot be a 'sending' result. Code in the current task may race with caller uses}}
       } else {
         preconditionFailure("Consumed twice")
       }
@@ -2421,7 +2405,7 @@ struct IndirectAssignTests {
 @MainActor
 class rdar169803154_Klass {
   init() {
-    Task.detached { @MainActor in
+    _ = Task.detached { @MainActor in
       _ = self
       for try await x in rdar169803154_Seq.seq { _ = x }
     }
@@ -2431,5 +2415,15 @@ class rdar169803154_Klass {
 enum rdar169803154_Seq {
   static var seq: some AsyncSequence<Float, Error> {
     AsyncThrowingStream(Float.self) { $0.finish() }
+  }
+}
+
+// Iterating over an existential sequence parameter in a nonisolated method on
+// an actor must not produce a false positive RBI error.
+actor ActorWithNonisolatedExistentialSequenceMethod {
+  nonisolated func process(sequence: any Sequence<Int>) {
+    for element in sequence {
+      _ = element
+    }
   }
 }

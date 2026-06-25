@@ -66,6 +66,10 @@ ERROR(swift_name_protocol_static, none, "swift_name cannot be used to define "
       (bool))
 ERROR(swift_name_no_prototype, none,
       "swift_name cannot be used on a non-prototyped function declaration", ())
+WARNING(swift_name_method_different_context, none,
+        "swift_name cannot be used to import a non-static C++ method as a "
+        "member of a different type",
+        ())
 
 GROUPED_WARNING(inconsistent_swift_name, ClangDeclarationImport, none,
         "inconsistent Swift name for Objective-C %select{method|property}0 "
@@ -77,6 +81,14 @@ WARNING(swift_name_attr_ignored, none,
         "ignoring swift_name attribute %0; swift_name attributes have no "
         "effect on method overrides",
         (StringRef))
+
+WARNING(swift_name_init_on_non_initializer, none,
+        "ignoring swift_name attribute '%0'; %1 cannot be imported as an "
+        "initializer",
+        (StringRef, const clang::NamedDecl *))
+
+NOTE(swift_name_use_backticks_in_init, none,
+     "use backticks (e.g. 'swift_name(\"`init`(...)\")')", ())
 
 GROUPED_WARNING(swift_name_circular_context_import, ClangDeclarationImport, none,
         "cycle detected while resolving '%0' in swift_name attribute for '%1'",
@@ -92,9 +104,6 @@ GROUPED_WARNING(unresolvable_clang_decl, ClangDeclarationImport, none,
 NOTE(unresolvable_clang_decl_is_a_framework_bug,none,
      "please report this issue to the owners of '%0'",
      (StringRef))
-
-GROUPED_WARNING(clang_swift_attr_unhandled, ClangDeclarationImport, none,
-        "ignoring unknown Swift attribute or modifier '%0'", (StringRef))
 
 GROUPED_WARNING(clang_error_code_must_be_sendable, ClangDeclarationImport, none,
         "cannot make error code type '%0' non-Sendable because Swift errors "
@@ -282,6 +291,9 @@ ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
 ERROR(foreign_reference_types_retain_release_not_an_instance_function, none,
       "specified %select{retain|release}0 function '%1' is a static function; expected an instance function",
       (bool, StringRef))
+ERROR(foreign_reference_type_unreachable, none,
+      "foreign reference type '%0' has unreachable definition",
+      (StringRef))
 
 GROUPED_WARNING(unannotated_cxx_func_returning_frt, ForeignReferenceType, none,
         "cannot infer ownership of foreign reference value returned by %0",

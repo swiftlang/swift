@@ -18,7 +18,7 @@ enum MaybeMaybeVoid<Wrapped: ~Copyable>: ~Copyable {
 // CHECK:         [[REGISTER_14:%[^,]+]] = tuple ()
 // CHECK:         end_access [[ACCESS]]
 // CHECK:         [[ACCESS_AGAIN:%[^,]+]] = begin_access [deinit] [static] [no_nested_conflict] [[ADDR]]
-// CHECK:         [[NONE_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[ACCESS_AGAIN]]
+// CHECK:         [[NONE_ADDR:%[^,]+]] = unchecked_inplace_enum_data_addr [[ACCESS_AGAIN]]
 // CHECK-SAME:        #MaybeMaybeVoid.none!enumelt
 // Verify that the load is trivial.
 // CHECK:         load [trivial] [[NONE_ADDR]]

@@ -495,8 +495,10 @@ bool LiteralExprFolding::supportedOperator(const ApplyExpr *operatorApplyExpr) {
 
   auto operatorIdentifier = operatorName.getIdentifier();
   if (!operatorIdentifier.isArithmeticOperator() &&
+      !operatorIdentifier.isOverflowArithmeticOperator() &&
       !operatorIdentifier.isBitwiseOperator() &&
       !operatorIdentifier.isShiftOperator() &&
+      !operatorIdentifier.isMaskingShiftOperator() &&
       !operatorIdentifier.isStandardComparisonOperator())
     return false;
 

@@ -29,26 +29,43 @@ public struct CrashLog: Sendable {
 
   static let abortRegex = #/^Abort:\s*function\s*(?<symbol>[^\s]+).*$/#
 
-  private static func checkStackOverflow(_ lines: [String]) -> Bool {
-    lines.contains { $0.scanningUTF8 { $0.scanForStackOverflow() } }
+  private static func checkStackOverflow(
+    _ lines: [some Sequence<UInt8>]
+  ) -> Bool {
+    lines.contains { $0.scanning { $0.scanForStackOverflow() } }
   }
 
-  private static func getFrames(from lines: [String]) -> [Frame] {
+  private static func getFrames(from lines: [some Collection<UInt8>]) -> [Frame] {
     var lines = lines[...]
 
     guard let stackDumpStart = lines.firstIndex(where: {
-      $0.hasPrefix("Stack dump without symbol names")
+      $0.scanning { $0.tryEat(utf8: "Stack dump without symbol names") }
     }) ?? lines.firstIndex(where: {
-      $0.contains("Stack dump without symbol names")
+      $0.scanning { scanner in
+        repeat {
+          if scanner.tryEat(utf8: "Stack dump without symbol names") {
+            return true
+          }
+        } while scanner.tryEat()
+        return false
+      }
     }) else {
       // The frame symbol can be included in the UBSan error.
       for line in lines {
-        guard let match = line.wholeMatch(of: sanitizerFrameSymbolRegex)?.output else {
+        guard
+          line.scanning({
+            $0.skip(while: \.isSpaceOrTab);
+            return $0.tryEat(utf8: "SUMMARY:")
+          }),
+          case let lineStr = String(utf8: line),
+          // TODO: Use a scanner instead of regex here.
+          let match = lineStr.wholeMatch(of: sanitizerFrameSymbolRegex)?.output
+        else {
           continue
         }
         return [
           Frame(
-            line: line,
+            line: lineStr,
             image: String(match.image),
             symbol: String(match.symbol),
             offset: nil
@@ -60,7 +77,7 @@ public struct CrashLog: Sendable {
     lines = lines[(stackDumpStart + 1)...]
 
     var frames: [Frame] = []
-    while let line = lines.first, let frame = Frame(from: line) {
+    while let line = lines.first, let frame = Frame(from: String(utf8: line)) {
       frames.append(frame)
       lines = lines.dropFirst()
     }
@@ -114,16 +131,18 @@ public struct CrashLog: Sendable {
     return [firstSymbol]
   }
 
-  private static func findAbort(_ lines: [String]) -> String? {
+  private static func findAbort(_ lines: [some Collection<UInt8>]) -> String? {
     for line in lines {
-      if let match = line.wholeMatch(of: Self.abortRegex) {
+      guard line.scanning({ $0.tryEat(utf8: "Abort:") }) else { continue }
+      // TODO: Use scanner for this.
+      if let match = String(utf8: line).wholeMatch(of: Self.abortRegex) {
         return String(match.symbol)
       }
     }
     return nil
   }
 
-  private static func findAssertion(_ lines: [String]) -> Assertion? {
+  private static func findAssertion(_ lines: [some Sequence<UInt8>]) -> Assertion? {
     for line in lines {
       guard let assert = Assertion(from: line) else { continue }
       return assert
@@ -131,8 +150,12 @@ public struct CrashLog: Sendable {
     return nil
   }
 
-  public init?(from log: String) {
-    let lines = log.components(separatedBy: "\n")
+  public init(from str: String) {
+    self.init(from: str.utf8)
+  }
+
+  public init(from bytes: some Collection<UInt8>) {
+    let lines = bytes.split(separator: UInt8(ascii: "\n"))
     self.isStackOverflow = Self.checkStackOverflow(lines)
     self.frames = Self.getFrames(from: lines)
 
@@ -151,8 +174,9 @@ public struct CrashLog: Sendable {
     if sig == nil {
       sig = assertion.map(Signature.assertion)
     }
-    guard let sig = sig else { return nil }
-    self.signature = sig
+    // If we still don't have a signature, just use a dummy "unknown" signature,
+    // this still allows to at least reduce the crasher.
+    self.signature = sig ?? .unknown
   }
 }
 

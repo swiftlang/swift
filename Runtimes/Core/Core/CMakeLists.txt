@@ -42,13 +42,13 @@ add_library(swiftCore
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
-  Borrow.swift
   BorrowingSequence.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   BridgingBuffer.swift
   Builtin.swift
   BuiltinMath.swift
+  ByteOrder.swift
   Character.swift
   CocoaArray.swift
   Codable.swift
@@ -85,6 +85,7 @@ add_library(swiftCore
   FloatingPoint.swift
   FloatingPointFromString.swift
   FloatingPointToString.swift
+  FullyInhabited.swift
   Hashable.swift
   AnyHashable.swift # ORDER DEPENDENCY
   Hasher.swift
@@ -94,7 +95,6 @@ add_library(swiftCore
   Indices.swift
   InlineArray.swift
   _InlineArray.swift
-  Inout.swift
   InputStream.swift
   IntegerParsing.swift
   Integers.swift
@@ -113,6 +113,7 @@ add_library(swiftCore
   Mirrors.swift
   Misc.swift
   MutableCollection.swift
+  MutableRef.swift
   NativeDictionary.swift
   NativeSet.swift
   NewtypeWrapper.swift
@@ -134,11 +135,25 @@ add_library(swiftCore
   RangeReplaceableCollection.swift
   RangeSet.swift
   RangeSetRanges.swift
+  Ref.swift
   ReflectionMirror.swift
   Repeat.swift
   REPL.swift
   Result.swift
   Reverse.swift
+
+  # RigidArray sources
+  RigidArray/RigidArray.swift
+  RigidArray/RigidArray+Append.swift
+  RigidArray/RigidArray+Container.swift
+  RigidArray/RigidArray+Descriptions.swift
+  RigidArray/RigidArray+Equatable.swift
+  RigidArray/RigidArray+Hashable.swift
+  RigidArray/RigidArray+Initializers.swift
+  RigidArray/RigidArray+Insertions.swift
+  RigidArray/RigidArray+Removals.swift
+  RigidArray/RigidArray+Replacements.swift
+
   Runtime.swift
   RuntimeFunctionCounters.swift
   SipHash.swift
@@ -209,6 +224,20 @@ add_library(swiftCore
   UnicodeScalarProperties.swift
   CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
   UnicodeSPI.swift
+
+  # UniqueArray sources
+  UniqueArray/UniqueArray.swift
+  UniqueArray/UniqueArray+Append.swift
+  UniqueArray/UniqueArray+Container.swift
+  UniqueArray/UniqueArray+Descriptions.swift
+  UniqueArray/UniqueArray+Equatable.swift
+  UniqueArray/UniqueArray+Hashable.swift
+  UniqueArray/UniqueArray+Initializers.swift
+  UniqueArray/UniqueArray+Insertions.swift
+  UniqueArray/UniqueArray+Removals.swift
+  UniqueArray/UniqueArray+Replacements.swift
+
+  UniqueBox.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
@@ -317,6 +346,7 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableParameters>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowAndMutateAccessors>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowInout>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
@@ -350,16 +380,25 @@ target_link_libraries(swiftCore
     swiftRuntimeCoreCMakeConfig)
 
 string(TOLOWER "${SwiftCore_OBJECT_FORMAT}" SwiftCore_OBJECT_FORMAT_lc)
+# Runtime clients need the Swift image-registration object on their link lines
+# (on COFF this supplies pSwiftImageConstructor and the .sw5* section ranges).
+# CMake propagates usage requirements for an OBJECT library that appears in an
+# INTERFACE_LINK_LIBRARIES chain, but it does not also add the object's payload to
+# the final link line. Keep the swiftrt target for its usage requirements, and
+# explicitly propagate the object payload through swiftCore's interface.
 if("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "elf")
   target_link_libraries(swiftCore INTERFACE
-    swiftrt)
+    swiftrt
+    $<TARGET_OBJECTS:swiftrt>)
 elseif("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "coff")
   if(BUILD_SHARED_LIBS)
     target_link_libraries(swiftCore INTERFACE
-      swiftrt)
+      swiftrt
+      $<TARGET_OBJECTS:swiftrt>)
   else()
     target_link_libraries(swiftCore INTERFACE
-      swiftrtT)
+      swiftrtT
+      $<TARGET_OBJECTS:swiftrtT>)
   endif()
 endif()
 

@@ -1,14 +1,15 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -Xcc -std=c++20 2>&1 -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -Xcc -std=c++20 2>&1 -disable-availability-checking -enable-experimental-feature BorrowingSequence
 // REQUIRES: std_span
+// REQUIRES: swift_feature_BorrowingSequence
 
 import StdSpan
 
 func takesSequence<T: Sequence>(_ _: T) {}
 // expected-note@-1 {{where 'T' = 'SpanOfNonCopyable'}}
 
-func takesBorrowingSequence<T: CxxBorrowingSequence>(_ _: T) {}
+func takesBorrowingSequence<T: CxxBorrowingSequence>(_ _: T) where T.Element: ~Copyable {}
 
-func takesSpan<S: CxxMutableSpan>(_ _: S) {}
+func takesSpan<S: CxxMutableSpan>(_ _: S) where S.Element: ~Copyable {}
 
 let arr: [Int32] = [1, 2, 3]
 arr.withUnsafeBufferPointer { ubpointer in

@@ -134,9 +134,12 @@ extension ManagedBuffer where Element: ~Copyable {
   /// `Header`.
   ///
   /// - Note: This pointer is valid only for the duration of the
-  ///   call to `body`.
+  ///   call to `body`. The caller is responsible for ensuring that
+  ///   the buffer is not being accessed elsewhere while performing
+  ///   this call.
   @_alwaysEmitIntoClient
   @inline(__always)
+  @unsafe
   public final func withUnsafeMutablePointerToHeader<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutablePointer<Header>) throws(E) -> R
   ) throws(E) -> R {
@@ -147,9 +150,12 @@ extension ManagedBuffer where Element: ~Copyable {
   /// storage.
   ///
   /// - Note: This pointer is valid only for the duration of the
-  ///   call to `body`.
+  ///   call to `body`. The caller is responsible for ensuring that
+  ///   the buffer is not being accessed elsewhere while performing
+  ///   this call.
   @_alwaysEmitIntoClient
   @inline(__always)
+  @unsafe
   public final func withUnsafeMutablePointerToElements<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutablePointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -160,9 +166,12 @@ extension ManagedBuffer where Element: ~Copyable {
   /// and raw `Element` storage.
   ///
   /// - Note: These pointers are valid only for the duration of the
-  ///   call to `body`.
+  ///   call to `body`. The caller is responsible for ensuring that
+  ///   the buffer is not being accessed elsewhere while performing
+  ///   this call.
   @_alwaysEmitIntoClient
   @inline(__always)
+  @unsafe
   public final func withUnsafeMutablePointers<E: Error, R: ~Copyable>(
     _ body: (
       UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>
@@ -339,7 +348,9 @@ public struct ManagedBufferPointer<
     bufferClass: AnyClass,
     minimumCapacity: Int
   ) {
+    #if !$Embedded
     ManagedBufferPointer._checkValidBufferClass(bufferClass, creating: true)
+    #endif
     _precondition(
       minimumCapacity >= 0,
       "ManagedBufferPointer must have non-negative capacity")
@@ -356,8 +367,10 @@ public struct ManagedBufferPointer<
     _uncheckedBufferClass: AnyClass,
     minimumCapacity: Int
   ) {
+    #if !$Embedded
     ManagedBufferPointer._internalInvariantValidBufferClass(
       _uncheckedBufferClass, creating: true)
+    #endif
     _internalInvariant(
       minimumCapacity >= 0,
       "ManagedBufferPointer must have non-negative capacity")
@@ -426,9 +439,11 @@ extension ManagedBufferPointer where Element: ~Copyable {
   /// Call `body` with an `UnsafeMutablePointer` to the stored
   /// `Header`.
   ///
-  /// - Note: This pointer is valid only
-  ///   for the duration of the call to `body`.
+  /// - Note: This pointer is valid only for the duration of the call to
+  /// `body`. The caller is responsible for ensuring that the buffer is not
+  /// being accessed anyone else while performing this call.
   @_alwaysEmitIntoClient
+  @unsafe
   public func withUnsafeMutablePointerToHeader<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutablePointer<Header>) throws(E) -> R
   ) throws(E) -> R {
@@ -439,8 +454,10 @@ extension ManagedBufferPointer where Element: ~Copyable {
   /// storage.
   ///
   /// - Note: This pointer is valid only for the duration of the
-  ///   call to `body`.
+  ///   call to `body`. The caller is responsible for ensuring that the
+  ///   buffer is not being accessed anyone else while performing this call.
   @_alwaysEmitIntoClient
+  @unsafe
   public func withUnsafeMutablePointerToElements<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutablePointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -451,8 +468,11 @@ extension ManagedBufferPointer where Element: ~Copyable {
   /// and raw `Element` storage.
   ///
   /// - Note: These pointers are valid only for the duration of the
-  ///   call to `body`.
+  ///   call to `body`. The caller is responsible for ensuring that
+  ///   the buffer is not being accessed elsewhere while performing
+  ///   this call.
   @_alwaysEmitIntoClient
+  @unsafe
   public func withUnsafeMutablePointers<E: Error, R: ~Copyable>(
     _ body: (
       UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>
@@ -508,6 +528,7 @@ extension ManagedBufferPointer {
 extension ManagedBufferPointer where Element: ~Copyable {
   @_preInverseGenerics
   @inlinable
+  @_unavailableInEmbedded
   internal static func _checkValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
@@ -527,6 +548,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
 
   @_preInverseGenerics
   @inlinable
+  @_unavailableInEmbedded
   internal static func _internalInvariantValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {

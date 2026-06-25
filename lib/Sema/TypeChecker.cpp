@@ -413,6 +413,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
+  case SourceFileKind::SyntheticMacro:
     diagnoseObjCMethodConflicts(SF);
     diagnoseObjCCategoryConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
@@ -439,7 +440,8 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::MacroExpansion:
-  case SourceFileKind::Main: {
+  case SourceFileKind::Main:
+  case SourceFileKind::SyntheticMacro: {
     CustomDerivativesRequest request(&SF);
     evaluateOrDefault(SF.getASTContext().evaluator, request, {});
     return;
@@ -451,8 +453,8 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
 }
 
 void swift::handleOSLogStringSectionName(ModuleDecl &module) {
-  /// We only care about the OSLog module.
-  if (!module.getName().is("OSLog"))
+  /// We only care about the os module.
+  if (!module.getName().is("os"))
     return;
 
   /// The name of the variable that defines the section name.
@@ -556,8 +558,8 @@ namespace {
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericSignature
-swift::handleSILGenericParams(GenericParamList *genericParams,
-                              DeclContext *DC, bool allowInverses) {
+swift::handleSILGenericParams(GenericParamList *genericParams, DeclContext *DC,
+                              DefaultRequirementOptions options) {
   if (genericParams == nullptr)
     return nullptr;
 
@@ -584,7 +586,7 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
       nestedList.back(), WhereClauseOwner(),
       {}, {}, genericParams->getLAngleLoc(),
       /*forExtension=*/nullptr,
-      allowInverses};
+      options};
   return evaluateOrDefault(DC->getASTContext().evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }

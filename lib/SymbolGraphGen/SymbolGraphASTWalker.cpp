@@ -230,7 +230,11 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   // If this is an extension, let's check that it implies some new conformances,
   // potentially with generic requirements.
   if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
+    // Ignore extensions with no nominal.
     const auto *ExtendedNominal = Extension->getExtendedNominal();
+    if (!ExtendedNominal)
+      return false;
+
     auto ExtendedSG = getModuleSymbolGraph(ExtendedNominal);
     // Ignore effectively private decls.
     if (ExtendedSG->isImplicitlyPrivate(Extension)) {

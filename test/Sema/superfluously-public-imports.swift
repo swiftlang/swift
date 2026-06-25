@@ -129,7 +129,7 @@ public struct Extended {
 //--- Client_Swift5.swift
 /// No diagnostics should be raised on the implicit access level.
 import UnusedImport
-public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-7=internal}}
+public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{group-name=UnusedImportAccess}} {{1-7=internal}}
 
 //--- Client.swift
 public import DepUsedFromInlinableCode
@@ -143,7 +143,7 @@ public import ExtensionA
 public import ExtensionB
 public import PropertyWrapper
 public import ExtendedDefinitionPublic
-public import ExtendedDefinitionNonPublic // expected-warning {{public import of 'ExtendedDefinitionNonPublic' was not used in public declarations or inlinable code}} {{1-8=}}
+public import ExtendedDefinitionNonPublic // expected-warning {{public import of 'ExtendedDefinitionNonPublic' was not used in public declarations or inlinable code}} {{group-name=UnusedImportAccess}} {{1-8=}}
 
 /// Repeat some imports to make sure we report all of them.
 public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-8=}}
@@ -329,7 +329,7 @@ typedef struct _TypedefTypeUnderlying {
 
 //--- ClientOfClangModules.swift
 public import ClangSimple
-public import ClangSimpleUnused // expected-warning {{public import of 'ClangSimpleUnused' was not used in public declarations or inlinable code}}
+public import ClangSimpleUnused // expected-warning {{public import of 'ClangSimpleUnused' was not used in public declarations or inlinable code}} {{group-name=UnusedImportAccess}}
 public import ClangSubmodule.ClangSubmoduleSubmodule
 public import ClangSubmoduleUnused.ClangSubmoduleUnsuedSubmodule // expected-warning {{public import of 'ClangSubmoduleUnused' was not used in public declarations or inlinable code}}
 

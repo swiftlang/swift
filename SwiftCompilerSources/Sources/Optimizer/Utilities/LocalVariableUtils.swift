@@ -52,7 +52,7 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
 // The effect of .dependenceSource on reachability is like a load of this local. The dependent value depends on any
 // value in this local that reaches this point.
 //
-// A .dependenceDest access is the point where another value becomes dependent on this local:
+// A .dependenceDest access is the point where this local becomes dependent on another value:
 //
 //     %local = alloc_stack // this local
 //     %md = mark_dependence %local on %val
@@ -520,6 +520,9 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
       // Handle instructions that initialize both temporaries and local variables. If operand's address is the same as
       // the local variable's address, then this fully kills operand liveness. The original value in operand's address
       // cannot be used in any way.
+      visit(LocalVariableAccess(.store, operand))
+    case let iba as InitBorrowAddrInst:
+      assert(iba.borrow == operand.value)
       visit(LocalVariableAccess(.store, operand))
     case let md as MarkDependenceAddrInst:
       assert(operand == md.addressOperand)

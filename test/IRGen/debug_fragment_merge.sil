@@ -56,8 +56,8 @@ bb1:                                              // Preds: bb0
   %16 = load %15 : $*String, loc "debug_fragment_merge.swift":19:28, scope 13 // users: %19, %22
   %17 = struct_element_addr %11 : $*Data, #Data.b, loc "debug_fragment_merge.swift":19:28, scope 13 // user: %18
   %18 = load %17 : $*String, loc "debug_fragment_merge.swift":19:28, scope 13 // users: %22, %20
-  debug_value %16 : $String, let, (name "data", loc "debug_fragment_merge.swift":16:7, scope 10), type $*Data, expr op_fragment:#Data.a, loc "debug_fragment_merge.swift":19:17, scope 12 // id: %19
-  debug_value %18 : $String, let, (name "data", loc "debug_fragment_merge.swift":16:7, scope 10), type $*Data, expr op_fragment:#Data.b, loc "debug_fragment_merge.swift":19:17, scope 12 // id: %20
+  debug_value %16 : $String, let, (name "data", loc "debug_fragment_merge.swift":16:7, scope 10), type $Data, expr op_fragment:#Data.a, loc "debug_fragment_merge.swift":19:17, scope 12 // id: %19
+  debug_value %18 : $String, let, (name "data", loc "debug_fragment_merge.swift":16:7, scope 10), type $Data, expr op_fragment:#Data.b, loc "debug_fragment_merge.swift":19:17, scope 12 // id: %20
   dealloc_stack %11 : $*Data, loc "debug_fragment_merge.swift":19:44, scope 13 // id: %21
   br bb3(%18 : $String, %16 : $String), loc * "debug_fragment_merge.swift":19:44, scope 13 // id: %22
 

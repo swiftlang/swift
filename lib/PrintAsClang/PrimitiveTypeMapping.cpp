@@ -112,10 +112,12 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   MAP(Int16, "int16_t", false);
   MAP(Int32, "int32_t", false);
   MAP(Int64, "int64_t", false);
+  MAP(Int128, "__int128", false);
   MAP(UInt8, "uint8_t", false);
   MAP(UInt16, "uint16_t", false);
   MAP(UInt32, "uint32_t", false);
   MAP(UInt64, "uint64_t", false);
+  MAP(UInt128, "unsigned __int128", false);
 
   MAP(Float, "float", false);
   MAP(Double, "double", false);

@@ -502,6 +502,46 @@ enum class FixKind : uint8_t {
   IgnoreIsolatedConformance,
 };
 
+enum class FixImpact : unsigned {
+  None = 0,
+  /// A default impact for an error.
+  Mismatch = 1,
+  /// The mismatch between to types i.e. in argument position.
+  TypeMismatch = 2,
+  /// The mismatch between two function types.
+  FunctionTypeMismatch = 5,
+  /// Attempting to call something that cannot be called.
+  InvalidApplication = 4,
+  /// Referencing a member that doesn't exist or cannot be referenced
+  /// in a particular way (i.e. wrong base, or mutability).
+  InvalidReference = 5,
+  /// Malformed AST of some kind. Invalid declarations, wrong transformations.
+  InvalidAST = 10,
+};
+
+inline constexpr FixImpact operator+(FixImpact impact, unsigned increment) {
+  return static_cast<FixImpact>(static_cast<unsigned>(impact) + increment);
+}
+
+inline constexpr FixImpact operator+(FixImpact impact, FixImpact increment) {
+  return static_cast<FixImpact>(static_cast<unsigned>(impact) +
+                                static_cast<unsigned>(increment));
+}
+
+inline constexpr FixImpact operator*(FixImpact impact, unsigned increment) {
+  return static_cast<FixImpact>(static_cast<unsigned>(impact) * increment);
+}
+
+inline constexpr FixImpact &operator+=(FixImpact &impact, unsigned increment) {
+  impact = static_cast<FixImpact>(static_cast<unsigned>(impact) + increment);
+  return impact;
+}
+
+inline constexpr FixImpact &operator+=(FixImpact &impact, FixImpact increment) {
+  impact += static_cast<unsigned>(increment);
+  return impact;
+}
+
 class ConstraintFix {
   ConstraintSystem &CS;
   FixKind Kind;
@@ -637,8 +677,7 @@ public:
   }
 
   /// Assess the impact this fix is going to have at the given location.
-  static unsigned assessImpact(ConstraintSystem &cs,
-                               ConstraintLocator *atLoc);
+  static FixImpact assessImpact(ConstraintSystem &cs, ConstraintLocator *atLoc);
 
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
@@ -2032,6 +2071,8 @@ class AllowInvalidRefInKeyPath final : public ConstraintFix {
   enum RefKind {
     // Allow invalid references to static members i.e. on instance of a type.
     StaticMember,
+    // Allow a reference to a static member through a protocol metatype root.
+    ProtocolMetatypeStaticMember,
     // Allow a reference to a static member as a key path component if it is
     // declared in a module with built with Swift 6.0 compiler version or older.
     UnsupportedStaticMember,
@@ -2067,6 +2108,9 @@ public:
     case RefKind::StaticMember:
       return "allow reference to a static member on invalid base in key path "
              "context";
+    case RefKind::ProtocolMetatypeStaticMember:
+      return "allow reference to a static member on a protocol metatype in "
+             "key path context";
     case RefKind::UnsupportedStaticMember:
       return "allow unsupported static member reference";
     case RefKind::MutatingGetter:

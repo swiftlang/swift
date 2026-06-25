@@ -41,6 +41,12 @@ import Swift
 /// ``SerialExecutor`` protocol's documentation.
 ///
 /// - SeeAlso: ``SerialExecutor``
+///
+/// For information about the language-level concurrency model that `GlobalActor` is part of,
+/// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
+///
+/// [concurrency]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency#Global-Actors
+/// [tspl]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/
 @available(SwiftStdlib 5.1, *)
 public protocol GlobalActor {
   /// The type of the shared actor instance that will be used to provide

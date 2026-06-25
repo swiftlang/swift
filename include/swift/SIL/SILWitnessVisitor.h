@@ -106,9 +106,11 @@ public:
     if (asDerived().shouldVisitRequirementSignatureOnly())
       return;
 
-    // Visit the witnesses for the direct members of a protocol.
-    for (Decl *member : protocol->getMembers()) {
-      ASTVisitor<T>::visit(member);
+    // Visit the witnesses for the ABI members of a protocol, including those
+    // introduced by freestanding declaration macro expansions.
+    for (Decl *member : protocol->getABIMembers()) {
+      if (member->isAvailableDuringLowering())
+        ASTVisitor<T>::visit(member);
     }
   }
 
@@ -151,19 +153,6 @@ public:
     if (!func->requiresNewWitnessTableEntry())
       return;
 
-    // Unreachable functions (with custom availability) should not generate
-    // witness entries
-    // FIXME: cannot use func->isUnreachableAtRuntime() here rdar://170184865
-    for (auto *attr : func->getAttrs().getAttributes<AvailableAttr>()) {
-      if (auto domain = attr->getDomainOrIdentifier().getAsDomain()) {
-        if (domain->isCustom() &&
-            domain->getCustomDomain()->getKind() ==
-                CustomAvailabilityDomain::Kind::Disabled) {
-          return;
-        }
-      }
-    }
-
     asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
     addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
     addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
@@ -179,6 +168,10 @@ public:
 
   void visitTypeAliasDecl(TypeAliasDecl *tad) {
     // We don't care about these by themselves for witnesses.
+  }
+
+  void visitMacroExpansionDecl(MacroExpansionDecl *) {
+    // The expanded declarations are visited through getABIMembers().
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {

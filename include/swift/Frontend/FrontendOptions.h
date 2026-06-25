@@ -49,6 +49,13 @@ struct CompilerDebuggingOptions {
   /// Indicates whether or not the Clang importer should dump lookup tables
   /// upon termination.
   bool DumpClangLookupTables = false;
+
+  bool DumpAbstractLayout = false;
+
+  /// Dump every hidden-type layout known to this compilation: those recorded
+  /// during the local module's compilation plus those deserialized from any
+  /// imported Swift modules.
+  bool DumpHiddenTypeLayouts = false;
 };
 
 /// Options for controlling the behavior of the frontend.
@@ -416,6 +423,10 @@ public:
   /// Whether the dependency scanner invocation should resolve imports
   /// to filesystem modules in parallel.
   bool ParallelDependencyScan = true;
+
+  /// Whether the dependency scanning worker should share a single Clang
+  /// compiler instance across named module dependency queries.
+  bool ShareClangCompilerInstance = true;
 
   /// When performing an incremental build, ensure that cross-module incremental
   /// build metadata is available in any swift modules emitted by this frontend

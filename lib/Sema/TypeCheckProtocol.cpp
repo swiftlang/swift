@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -25,6 +25,7 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckEffects.h"
+#include "TypeCheckFullyInhabited.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckUnsafe.h"
@@ -34,8 +35,10 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -326,8 +329,9 @@ static GenericSignature maybeAddDifferentiableFromContext(DeclContext *dc,
                   return protoKind && *protoKind == KnownProtocolKind::Differentiable;
                 });
 
-  return buildGenericSignature(dc->getASTContext(), derivativeGenSig,
-                               {}, std::move(diffRequirements), /*allowInverses=*/true);
+  return buildGenericSignature(dc->getASTContext(), derivativeGenSig, {},
+                               std::move(diffRequirements),
+                               ExpandDefaults);
 }
 
 /// Given a witness, a requirement, and an existing `RequirementMatch` result,
@@ -1556,6 +1560,65 @@ static bool contextMayExpandOperator(
   return potentialExpansions.shouldExpandForName(operatorName);
 }
 
+enum class DefaultImplementationKind {
+  /// The witness is not a member of a protocol extension.
+  None,
+  /// The witness is a member of an unconstrained extension on the protocol that
+  /// defined the requirement and is located in the same module as that
+  /// protocol.
+  Inherited,
+  /// The witness is a member of a protocol extension located in a different
+  /// module than the protocol.
+  Retroactive,
+  /// The exact witness is not identified at compile time but is assumed to
+  /// exist at runtime. This kind of witness may be used for conformances in
+  /// .swiftinterface files under the assumption that a concrete witness was
+  /// known when building the module from source but cannot be found when
+  /// building the module from its interface. Supporting this case is necessary
+  /// because there are conformance checking holes that allow witnesses to
+  /// satisfy requirements even though the witness will not be visible to
+  /// clients of the .swiftinterface.
+  Opaque,
+};
+
+/// Returns the kind of default implementation that \p witness is for \p
+/// requirement. A witness is a "default implementation" when it is defined in a
+/// protocol extension, as opposed to being explicitly defined in the conforming
+/// type. Default implementations can come from protocol extensions in any
+/// module, not necessarily the module that defines the protocol or the
+/// conformance.
+static DefaultImplementationKind
+getDefaultImplementationKind(ValueDecl *witness, ValueDecl *requirement) {
+  // Check whether the requirement is self-witnessing and therefore "opaque".
+  if (witness == requirement)
+    return DefaultImplementationKind::Opaque;
+
+  // Check if the witness is a member of a protocol extension. If it isn't, then
+  // it's not a default implementation.
+  auto *extension = dyn_cast_or_null<ExtensionDecl>(witness->getDeclContext());
+  if (!extension)
+    return DefaultImplementationKind::None;
+
+  auto *witnessProto =
+      dyn_cast_or_null<ProtocolDecl>(extension->getSelfNominalTypeDecl());
+  if (!witnessProto)
+    return DefaultImplementationKind::None;
+
+  if (extension->isConstrainedExtension())
+    return DefaultImplementationKind::Retroactive;
+
+  // The witness is a default implementation. Check whether it is inherited.
+  auto *requirementProto = cast<ProtocolDecl>(requirement->getDeclContext());
+  if (witnessProto == requirementProto) {
+    auto witnessModule = witness->getModuleContextForNameLookup();
+    if (witnessModule->isSameModuleLookingThroughOverlays(
+            requirementProto->getModuleContextForNameLookup()))
+      return DefaultImplementationKind::Inherited;
+  }
+
+  return DefaultImplementationKind::Retroactive;
+}
+
 SmallVector<ValueDecl *, 4>
 swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
@@ -1602,29 +1665,51 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
     // to restate them in the resulting list, or else an otherwise valid
     // conformance will become ambiguous.
     const NLOptions options =
-        doUnqualifiedLookup ? NLOptions(0) : NL_ProtocolMembers;
+        (doUnqualifiedLookup ? NLOptions(0) : NL_ProtocolMembers) |
+        NL_IgnoreMissingImports;
+
+    auto getWitness = [req, DC](ValueDecl *witness) -> ValueDecl * {
+      // Protocol members can't be witnesses.
+      if (isa<ProtocolDecl>(witness->getDeclContext()))
+        return nullptr;
+
+      // Filter out results that would require an import to be visible.
+      if (shouldDiagnoseMissingImportForMember(witness, DC)) {
+        auto defaultImplKind = getDefaultImplementationKind(witness, req);
+        switch (defaultImplKind) {
+        case DefaultImplementationKind::None:
+        case DefaultImplementationKind::Retroactive:
+          return nullptr;
+        case DefaultImplementationKind::Opaque:
+        case DefaultImplementationKind::Inherited:
+          // Default implementations that are inherited don't have to be
+          // imported in order to witness a requirement.
+          break;
+        }
+      }
+
+      // Distributed thunk requirements are witnessed by distributed thunks.
+      auto func = dyn_cast<AbstractFunctionDecl>(req);
+      if (func && func->isDistributedThunk()) {
+        if (auto candidate = dyn_cast<AbstractFunctionDecl>(witness)) {
+          if (auto thunk = candidate->getDistributedThunk())
+            return thunk;
+        }
+      }
+
+      return witness;
+    };
 
     SmallVector<ValueDecl *, 4> lookupResults;
     bool addedAny = false;
     DC->lookupQualified(nominal, reqName, nominal->getLoc(),
                         options, lookupResults);
     for (auto *decl : lookupResults) {
-      // a distributed thunk is the witness
-      if (!isa<ProtocolDecl>(decl->getDeclContext())) {
-        auto func = dyn_cast<AbstractFunctionDecl>(req);
-        if (func && func->isDistributedThunk()) {
-          if (auto candidate = dyn_cast<AbstractFunctionDecl>(decl)) {
-            if (auto thunk = candidate->getDistributedThunk()) {
-              witnesses.push_back(thunk);
-              addedAny = true;
-            }
-          }
-        } else {
-          witnesses.push_back(decl);
-          addedAny = true;
-        }
+      if (auto witness = getWitness(decl)) {
+        witnesses.push_back(witness);
+        addedAny = true;
       }
-    };
+    }
 
     // If we didn't find anything with the appropriate name, look
     // again using only the base name.
@@ -1633,9 +1718,8 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
       DC->lookupQualified(nominal, reqBaseName, nominal->getLoc(),
                           options, lookupResults);
       for (auto *decl : lookupResults) {
-        if (!isa<ProtocolDecl>(decl->getDeclContext())) {
-          witnesses.push_back(decl);
-        }
+        if (auto witness = getWitness(decl))
+          witnesses.push_back(witness);
       }
 
       *ignoringNames = true;
@@ -2014,11 +2098,10 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
 
   // Warn about deprecated default implementations if the requirement is
   // not deprecated, and the conformance is not deprecated.
-  bool isDefaultWitness = false;
-  if (auto *nominal = match.Witness->getDeclContext()->getSelfNominalTypeDecl())
-    isDefaultWitness = isa<ProtocolDecl>(nominal);
-  if (isDefaultWitness && match.Witness->isDeprecated() &&
-      !requirement->isDeprecated()) {
+  auto defaultImplKind =
+      getDefaultImplementationKind(match.Witness, requirement);
+  if (defaultImplKind != DefaultImplementationKind::None &&
+      match.Witness->isDeprecated() && !requirement->isDeprecated()) {
     auto conformanceContext = AvailabilityContext::forDeclSignature(DC->getInnermostDeclarationDeclContext());
     if (!conformanceContext.isDeprecated()) {
       return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
@@ -2455,8 +2538,9 @@ static void diagnoseConformanceImpliedByConditionalConformance(
 /// to the given protocol. This should return true when @unchecked can be
 /// used to disable those semantic checks.
 static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
-  return proto->isSpecificProtocol(KnownProtocolKind::Sendable) ||
-      proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype);
+  return proto->isSpecificProtocol(KnownProtocolKind::Sendable)
+      || proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype)
+      || proto->isSpecificProtocol(KnownProtocolKind::ConvertibleFromBytes);
 }
 
 /// Determine whether a conformance to this protocol can be determined at
@@ -2492,8 +2576,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   }
 
   // Dig out some of the fields from the conformance.
-  Type T = conformance->getType();
   DeclContext *DC = conformance->getDeclContext();
+  Type T = DC->getDeclaredInterfaceType();
   auto Proto = conformance->getProtocol();
   auto ProtoType = Proto->getDeclaredInterfaceType();
   SourceLoc ComplainLoc = conformance->getLoc();
@@ -3651,8 +3735,22 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
 
       // If this requirement is a function, check that its parameters are Sendable as well
       if (isa<AbstractFunctionDecl>(requirement)) {
+        // Create substitutions based on the conformance that are in the
+        // requirements generic environment, so that protocol generic parameters
+        // and associated types within the conformance can both resolve.
+        auto reqGenEnv = requirement->getInnermostDeclContext()
+                             ->getGenericEnvironmentOfContext();
+        // Map the conformance's type into its generic environment so that any
+        // conformer-introduced type parameters appearing in the substituted
+        // parameter type are archetypes carrying their conformer-side
+        // constraints (rather than bare interface-type generic parameters,
+        // which `lookupConformance` treats as trivially conforming).
+        Type mappedConformanceType =
+            DC->mapTypeIntoEnvironment(Conformance->getType());
+        auto reqSubs =
+            mappedConformanceType->getMemberSubstitutionMap(requirement, reqGenEnv);
         diagnoseNonSendableTypesInReference(
-            /*base=*/nullptr, getDeclRefInContext(requirement),
+            /*base=*/nullptr, ConcreteDeclRef(requirement, reqSubs),
             requirement->getInnermostDeclContext(), requirement->getLoc(),
             SendableCheckReason::Conformance, getActorIsolation(witness),
             FunctionCheckKind::Params, loc);
@@ -5603,8 +5701,8 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
     // Make sure any associated type witnesses don't make reference to a
     // type we can't emit metadata for, or we're going to have trouble at
     // runtime.
-    checkTypeMetadataAvailability(type, typeDecl->getLoc(),
-                                  where.getDeclContext());
+    SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, typeDecl);
+    checkTypeMetadataAvailability(type, diagLoc, where.getDeclContext());
 
     return false;
   });
@@ -6107,7 +6205,9 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
     // Note that `allowMissing` is not propagated here because it
     // would result in a missing conformance if type is `& Sendable`
     // protocol composition. It's handled for type as a whole below.
-    if (auto superclass = layout.getSuperclass()) {
+    //
+    // FIXME: This is broken, see the comment on that getter method.
+    if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass()) {
       auto conformance = lookupConformance(superclass, Proto,
                                            /*allowMissing=*/false);
       if (conformance)
@@ -6883,6 +6983,14 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
                              ConformanceEntryKind::Synthesized);
         break;
       }
+      case KnownProtocolKind::ConvertibleToBytes: {
+        checkConvertibleToBytesConformance(conformance);
+        break;
+      }
+      case KnownProtocolKind::ConvertibleFromBytes: {
+        checkConvertibleFromBytesConformance(conformance);
+        break;
+      }
       default:
         break;
       }
@@ -6941,7 +7049,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         continue;
 
       // Only nonisolated conformances can be affected.
-      if (!conformance->getIsolation().isNonisolated())
+      if (!conformance->getIsolation().isNonisolatedOrConcurrent())
         continue;
 
       auto nameLoc = normal->getProtocolNameLoc();
@@ -7000,27 +7108,35 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       SmallVector<ProtocolConformance *, 2> conformances;
       nominal->lookupConformance(diag.Protocol, conformances);
       for (auto conformance : conformances) {
-        if (isa<InheritedProtocolConformance>(conformance))
+        if (isa<InheritedProtocolConformance>(conformance)) {
           SendableConformance = conformance;
+          break;
+        }
       }
     }
+
+    // If the existing conformance was marked unavailable and should be
+    // described as unavailable in diagnostics.
+    bool existingDeclUnavailableConformance = false;
 
     if ((existingModule != dc->getParentModule() && conformanceInOrigModule) ||
         diag.Protocol->isMarkerProtocol()) {
       // Warn about the conformance.
-      if (isSendable && SendableConformance &&
-          isa<InheritedProtocolConformance>(SendableConformance)) {
-        // Allow re-stated unchecked conformances to Sendable in subclasses
-        // as long as the inherited conformance isn't unavailable.
-        auto *conformance = SendableConformance->getRootConformance();
-        auto *decl = conformance->getDeclContext()->getAsDecl();
-        if (!decl->isUnavailable()) {
-          continue;
-        }
+      if (isSendable && SendableConformance) {
+        auto *rootConf = SendableConformance->getRootConformance();
+        auto *decl = rootConf->getDeclContext()->getAsDecl();
 
-        Context.Diags.diagnose(diag.Loc, diag::unavailable_conformance,
+        // Allow redundant Sendable conformances when neither the existing
+        // declaration nor the root conformance is unavailable.
+        if (!(existingDecl->isUnavailable() || decl->isUnavailable()))
+          continue;
+
+        existingDeclUnavailableConformance = true;
+        Context.Diags.diagnose(diag.Loc, diag::unavailable_sendable_conformance,
                                nominal->getDeclaredInterfaceType(),
-                               diag.Protocol->getName());
+                               diag.ExistingKind ==
+                                   ConformanceEntryKind::Inherited,
+                               existingModule->getName());
       } else if (existingModule == dc->getParentModule()) {
         Context.Diags.diagnose(diag.Loc, diag::redundant_conformance,
                                nominal->getDeclaredInterfaceType(),
@@ -7095,12 +7211,17 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         }
       }
     }
+    existingDecl->diagnose(
+        existingDeclUnavailableConformance
+            ? diag::declared_protocol_unavailable_conformance_here
+            : diag::declared_protocol_conformance_here,
+        dc->getDeclaredInterfaceType(),
+        static_cast<unsigned>(diag.ExistingKind), diag.Protocol->getName(),
+        diag.ExistingExplicitProtocol->getName());
 
-    existingDecl->diagnose(diag::declared_protocol_conformance_here,
-                           dc->getDeclaredInterfaceType(),
-                           static_cast<unsigned>(diag.ExistingKind),
-                           diag.Protocol->getName(),
-                           diag.ExistingExplicitProtocol->getName());
+    // TODO: For ExistingKind == Inherited, walk the class hierarchy and show
+    // an appropriate amount of notes. We probably don't want to show a note for
+    // every single ancestor for long hierarchies...
   }
 
   if (groupChecker.getConformances().empty()) {

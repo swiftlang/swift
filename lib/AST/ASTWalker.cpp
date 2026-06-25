@@ -2380,7 +2380,7 @@ bool Traversal::visitSendingTypeRepr(SendingTypeRepr *T) {
   return doIt(T->getBase());
 }
 
-bool Traversal::visitCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *T) {
+bool Traversal::visitNonisolatedNonsendingTypeRepr(NonisolatedNonsendingTypeRepr *T) {
   return doIt(T->getBase());
 }
 

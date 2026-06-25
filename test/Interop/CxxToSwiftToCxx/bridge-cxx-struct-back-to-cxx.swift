@@ -194,11 +194,11 @@ public struct Strct {
 // CHECK: SWIFT_EXTERN void $s8UseCxxTy13retNonTrivialSo2nsO0030NonTrivialTemplateCInt_hHAFhrbVyF(SWIFT_INDIRECT_RESULT void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL; // retNonTrivial()
 // CHECK: SWIFT_EXTERN struct swift_interop_returnStub_UseCxxTy_uint32_t_0_4 $s8UseCxxTy10retTrivialSo0E0VyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // retTrivial()
 
-// CHECK: ns::Immortal *_Nonnull retImmortal() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: ns::Immortal *_Nonnull retImmortal() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT SWIFT_RETURNS_RETAINED {
 // CHECK-NEXT: return UseCxxTy::_impl::$s8UseCxxTy11retImmortalSo2nsO0E0VyF();
 // CHECK-NEXT: }
 
-// CHECK:  ns::ImmortalTemplate<int> *_Nonnull retImmortalTemplate() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK:  ns::ImmortalTemplate<int> *_Nonnull retImmortalTemplate() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT SWIFT_RETURNS_RETAINED {
 // CHECK-NEXT: return UseCxxTy::_impl::$s8UseCxxTy19retImmortalTemplateSo2nsO0028ImmortalTemplateCInt_jBAGgnbVyF();
 // CHECK-NEXT: }
 // CHECK-EMPTY:

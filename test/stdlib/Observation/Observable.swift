@@ -1,14 +1,13 @@
 // REQUIRES: swift_swift_parser, executable_test
 
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -Xfrontend -plugin-path -Xfrontend %swift-plugin-dir)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -Xfrontend -plugin-path -Xfrontend %swift-plugin-dir)
 
 // Run this test via the swift-plugin-server
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -Xfrontend -external-plugin-path -Xfrontend %swift-plugin-dir#%swift-plugin-server)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -Xfrontend -external-plugin-path -Xfrontend %swift-plugin-dir#%swift-plugin-server)
 
 // REQUIRES: observation
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_Macros
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 

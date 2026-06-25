@@ -315,16 +315,19 @@ extension OptionalMemberLookups {
 
 
 // CHECK-LABEL: sil {{.*}} @$s10objc_async12checkHotdogsySSSgx_So8NSObjectCtYaKSo16HotdogCompetitorRzlF : $@convention(thin) @async <τ_0_0 where τ_0_0 : HotdogCompetitor> (@guaranteed τ_0_0, @guaranteed NSObject) -> (@owned Optional<String>, @error any Error) {
+// CHECK: [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+// CHECK: hop_to_executor [[GENERIC_EXEC]] : $Optional<any Actor>
+// CHECK: [[PILE_OF_HOT_DOGS_REF:%.*]] = objc_method %0 : $τ_0_0, #HotdogCompetitor.pileOfHotdogsToEat!foreign
 // CHECK: hop_to_executor {{.*}} : $MainActor
-// CHECK: [[AUTO_REL_STR:%.*]] = apply {{.*}}<τ_0_0>({{.*}}) : $@convention(objc_method)
+// CHECK: [[AUTO_REL_STR:%.*]] = apply [[PILE_OF_HOT_DOGS_REF]]<τ_0_0>({{.*}}) : $@convention(objc_method)
 // CHECK: [[UNMANAGED_OPTIONAL:%.*]] = load [trivial] {{.*}} : $*@sil_unmanaged Optional<NSError>
 // CHECK: [[MANAGED_OPTIONAL:%.*]] = unmanaged_to_ref [[UNMANAGED_OPTIONAL]] : $@sil_unmanaged Optional<NSError> to $Optional<NSError>
 // CHECK: [[RETAINED_OPTIONAL:%.*]] = copy_value [[MANAGED_OPTIONAL]] : $Optional<NSError>
 // CHECK: [[MARKED:%.*]] = mark_dependence [[RETAINED_OPTIONAL]] : $Optional<NSError> on {{.*}} : $*Optional<NSError>
 // CHECK: assign [[MARKED]] to {{.*}} : $*Optional<NSError>
-// CHECK: destroy_value {{.*}} : $MainActor
 // CHECK: dealloc_stack {{.*}} : $*AutoreleasingUnsafeMutablePointer<Optional<NSError>>
 // CHECK: dealloc_stack {{.*}} : $*@sil_unmanaged Optional<NSError>
+// CHECK: destroy_value {{.*}} : $MainActor
 // CHECK: hop_to_executor {{.*}} : $Optional<any Actor>
 // CHECK: switch_enum
 func checkHotdogs(_ v: some HotdogCompetitor, _ timeLimit: NSObject) async throws -> String? {

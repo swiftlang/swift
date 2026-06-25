@@ -735,6 +735,7 @@ Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
     NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos),
     SymbolicReferenceResolver(std::move(Dem.SymbolicReferenceResolver))
 {
+  std::copy(Dem.Words, Dem.Words + MaxNumWords, Words);
   // Reset the demangler state for a nested job.
   Dem.NodeStack.init(Dem, 16);
   Dem.Substitutions.init(Dem, 16);
@@ -749,6 +750,7 @@ Demangler::DemangleInitRAII::~DemangleInitRAII() {
   Dem.NodeStack = NodeStack;
   Dem.Substitutions = Substitutions;
   Dem.NumWords = NumWords;
+  std::copy(Words, Words + MaxNumWords, Dem.Words);
   Dem.Text = Text;
   Dem.Pos = Pos;
   Dem.SymbolicReferenceResolver = std::move(SymbolicReferenceResolver);
@@ -2423,6 +2425,10 @@ NodePointer Demangler::demangleImplFunctionType() {
   if (nextIf('A'))
     type->addChild(createNode(Node::Kind::ImplErasedIsolation), *this);
 
+  if (nextIf('N'))
+    type->addChild(createNode(Node::Kind::ImplNonisolatedNonsendingIsolation),
+                   *this);
+
   switch ((MangledDifferentiabilityKind)peekChar()) {
   case MangledDifferentiabilityKind::Normal:  // 'd'
   case MangledDifferentiabilityKind::Linear:  // 'l'
@@ -3434,7 +3440,8 @@ NodePointer Demangler::demangleFunctionSpecialization() {
 
       auto ParamKind = (FunctionSigSpecializationParamKind)KindNd->getIndex();
       switch (ParamKind) {
-        case FunctionSigSpecializationParamKind::ClosureProp: {
+        case FunctionSigSpecializationParamKind::ClosureProp:
+        case FunctionSigSpecializationParamKind::EscapingClosureProp: {
           while (NodePointer Ty = popNode(Node::Kind::Type)) {
             paramToAdd = addChild(paramToAdd, Ty);
           }
@@ -3476,6 +3483,12 @@ NodePointer Demangler::demangleFuncSpecParam(Node::Kind Kind) {
       return addChild(Param, createNode(
         Node::Kind::FunctionSignatureSpecializationParamKind,
         uint64_t(FunctionSigSpecializationParamKind::ClosureProp)));
+    case 'E':
+      // Like 'c', but for escaping closures. Consumes an identifier and
+      // multiple type parameters. The parameters will be added later.
+      return addChild(Param, createNode(
+        Node::Kind::FunctionSignatureSpecializationParamKind,
+        uint64_t(FunctionSigSpecializationParamKind::EscapingClosureProp)));
     case 'C': {
       // Consumes an identifier and multiple type parameters.
       // The parameters will be added later.

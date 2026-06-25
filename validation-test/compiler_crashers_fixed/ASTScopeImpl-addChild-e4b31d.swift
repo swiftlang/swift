@@ -1,0 +1,7 @@
+// {"kind":"typecheck","original":"cb3e622a","signature":"swift::ast_scope::ASTScopeImpl::addChild(swift::ast_scope::ASTScopeImpl*, swift::ASTContext&)","signatureNext":"ScopeCreator::constructExpandAndInsert"}
+// RUN: not %target-swift-frontend -typecheck %s
+{
+  let a,
+    () {
+    }
+}

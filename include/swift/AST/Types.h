@@ -407,7 +407,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
 
 protected:
   enum { NumAFTExtInfoBits = 16 };
-  enum { NumSILExtInfoBits = 14 };
+  enum { NumSILExtInfoBits = 15 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -4231,8 +4231,19 @@ struct ParameterListInfo {
 public:
   ParameterListInfo() { }
 
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params);
   ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
                     const ValueDecl *paramOwner, bool skipCurriedSelf);
+
+  /// Constructs parameter information from the given set of parameters
+  /// that are associated with the given substituted declaration reference.
+  ///
+  /// Note that number of parameters doesn't necessary always match arity of the
+  /// parameter list because variadic generic parameters without arguments
+  /// are removed from the function type and multi-parameter matches are
+  /// flattened.
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                    bool skipCurriedSelf, ConcreteDeclRef declRef);
 
   /// Whether the parameter at the given index has a default argument.
   bool hasDefaultArgument(unsigned paramIdx) const;
@@ -4266,6 +4277,9 @@ public:
 
   /// Retrieve the number of parameters for which we have information.
   unsigned size() const { return defaultArguments.size(); }
+
+private:
+  void setFlagsFor(const ParamDecl *param, unsigned index);
 };
 
 /// Turn a param list into a symbolic and printable representation that does not
@@ -5488,6 +5502,9 @@ public:
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
+  bool hasNonisolatedNonsendingIsolation() const {
+    return getExtInfo().hasNonisolatedNonsendingIsolation();
+  }
   bool hasErasedIsolation() const { return getExtInfo().hasErasedIsolation(); }
   SILFunctionTypeIsolation getIsolation() const {
     return getExtInfo().getIsolation();
@@ -6308,9 +6325,8 @@ public:
                                 fieldIndexMutabilityUpdatePairs) const;
 
   using SILFieldIndexToSILTypeTransform = std::function<SILType(unsigned)>;
-  using SILFieldToSILTypeRange =
-      iterator_range<llvm::mapped_iterator<IntRange<unsigned>::iterator,
-                                           SILFieldIndexToSILTypeTransform>>;
+  using SILFieldToSILTypeRange = iterator_range<llvm::mapped_iterator<
+      IntRange<unsigned>::iterator, SILFieldIndexToSILTypeTransform, SILType>>;
 
   /// Returns a range of SILTypes that have been specialized correctly for use
   /// in the passed in SILFunction.
@@ -8372,6 +8388,52 @@ public:
   const ASTContext &getASTContext() { return Context; }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
+
+/// A placeholder type for a stored-property field whose real type has been
+/// elided from a serialized module because it was imported via an internal
+/// bridging header. The type carries the mangled name of the original type,
+/// which is used for deduplication and (eventually) for recovering the real
+/// type when the client has access to the defining header.
+///
+/// HiddenType is never produced by type-checking user code. It is synthesized
+/// only on the serialization path and consumed by deserialization and IRGen.
+///
+/// Each HiddenType also carries the ModuleDecl it was emitted from (the
+/// "defining module"). That module's HiddenTypeLayouts table holds the
+/// AbstractTypeLayout entry that backs this placeholder; IRGen resolves the
+/// layout via that module.
+class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  StringRef MangledName;
+  ModuleDecl *DefiningModule;
+
+  HiddenType(StringRef mangledName, ModuleDecl *definingModule,
+             const ASTContext &ctx)
+      : TypeBase(TypeKind::Hidden, &ctx, RecursiveTypeProperties()),
+        MangledName(mangledName), DefiningModule(definingModule) {}
+
+public:
+  static HiddenType *get(const ASTContext &ctx, StringRef mangledName,
+                         ModuleDecl *definingModule);
+
+  StringRef getMangledName() const { return MangledName; }
+  ModuleDecl *getDefiningModule() const { return DefiningModule; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getMangledName(), getDefiningModule());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName,
+                      ModuleDecl *definingModule) {
+    ID.AddString(mangledName);
+    ID.AddPointer(definingModule);
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Hidden;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(HiddenType, Type)
 
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() const {

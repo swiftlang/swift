@@ -574,6 +574,26 @@ static ManagedValue emitBuiltinGepRaw(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(offsetPtr);
 }
 
+static ManagedValue emitBuiltinGepImpl(SILGenFunction &SGF,
+                                       SILLocation loc,
+                                       SubstitutionMap substitutions,
+                                       ArrayRef<ManagedValue> args,
+                                       bool isProjection) {
+  SILType ElemTy = SGF.getLoweredType(substitutions.getReplacementTypes()[0]);
+  SILType RawPtrType = args[0].getUnmanagedValue()->getType();
+  SILValue addr = SGF.B.createPointerToAddress(loc,
+                                               args[0].getUnmanagedValue(),
+                                               ElemTy.getAddressType(),
+                                               /*strict*/ true,
+                                               /*invariant*/ false);
+  addr = SGF.B.createIndexAddr(loc, addr, args[1].getUnmanagedValue(),
+                               /*needsStackProtection=*/ true,
+                               isProjection);
+  addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType,
+                                      /*needsStackProtection=*/ true);
+  return ManagedValue::forObjectRValueWithoutOwnership(addr);
+}
+
 /// Specialized emitter for Builtin.gep.
 static ManagedValue emitBuiltinGep(SILGenFunction &SGF,
                                    SILLocation loc,
@@ -583,20 +603,19 @@ static ManagedValue emitBuiltinGep(SILGenFunction &SGF,
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "gep should have two substitutions");
   assert(args.size() == 3 && "gep should be given three arguments");
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args, /*isProjection=*/ false);
+}
 
-  SILType ElemTy = SGF.getLoweredType(substitutions.getReplacementTypes()[0]);
-  SILType RawPtrType = args[0].getUnmanagedValue()->getType();
-  SILValue addr = SGF.B.createPointerToAddress(loc,
-                                               args[0].getUnmanagedValue(),
-                                               ElemTy.getAddressType(),
-                                               /*strict*/ true,
-                                               /*invariant*/ false);
-  addr = SGF.B.createIndexAddr(loc, addr, args[1].getUnmanagedValue(),
-                               /*needsStackProtection=*/ true);
-  addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType,
-                                      /*needsStackProtection=*/ true);
-
-  return ManagedValue::forObjectRValueWithoutOwnership(addr);
+/// Specialized emitter for Builtin.gepProjection.
+static ManagedValue emitBuiltinGepProjection(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             SubstitutionMap substitutions,
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
+  assert(substitutions.getReplacementTypes().size() == 1 &&
+         "gepProjection should have two substitutions");
+  assert(args.size() == 3 && "gepProjection should be given three arguments");
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args, /*isProjection=*/ true);
 }
 
 /// Specialized emitter for Builtin.getTailAddr.
@@ -808,26 +827,24 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
                                          SubstitutionMap substitutions,
                                          ArrayRef<ManagedValue> args,
                                          SGFContext C) {
-  assert(args.size() == 1 && "reinterpretCast should be given one argument");
   assert(substitutions.getReplacementTypes().size() == 2 &&
          "reinterpretCast should have two subs");
   
   auto &fromTL = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
   auto &toTL = SGF.getTypeLowering(substitutions.getReplacementTypes()[1]);
-  
+
+  assert(args.size() == RValue::getRValueSize(fromTL.getLoweredType()
+                                                .getASTType())
+          && "reinterpretCast should be given one (exploded) argument");
+
+  // Build the value to be stored, reconstructing tuples if needed.
+  auto in = RValue(SGF, args, fromTL.getLoweredType().getASTType());
+
   // If casting between address types, cast the address.
   if (fromTL.isAddress() || toTL.isAddress()) {
-    SILValue fromAddr;
-
-    // If the from value is not an address, move it to a buffer.
-    if (!fromTL.isAddress()) {
-      fromAddr = SGF.emitTemporaryAllocation(loc, args[0].getValue()->getType());
-      fromTL.emitStore(SGF.B, loc, args[0].getValue(), fromAddr,
-                       StoreOwnershipQualifier::Init);
-    } else {
-      fromAddr = args[0].getValue();
-    }
-    auto toAddr = SGF.B.createUncheckedAddrCast(loc, fromAddr,
+    ManagedValue fromAddr = std::move(in).ensurePlusOne(SGF, loc)
+                                             .materialize(SGF, loc);
+    auto toAddr = SGF.B.createUncheckedAddrCast(loc, fromAddr.getValue(),
                                       toTL.getLoweredType().getAddressType());
     
     // Load and retain the destination value if it's loadable. Leave the cleanup
@@ -848,11 +865,12 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
                                IsInitialization);
         });
   }
-  // Create the appropriate bitcast based on the source and dest types.
-  ManagedValue in = args[0];
 
+  // Create the appropriate bitcast based on the source and dest types.
   SILType resultTy = toTL.getLoweredType();
-  return SGF.B.createUncheckedBitCast(loc, in, resultTy);
+  return SGF.B.createUncheckedBitCast(loc,
+                                      std::move(in).getAsSingleValue(SGF, loc),
+                                      resultTy);
 }
 
 /// Specialized emitter for Builtin.castToBridgeObject.
@@ -1497,13 +1515,6 @@ static ManagedValue emitBuiltinGetCurrentAsyncTask(
   return SGF.emitManagedRValueWithEndLifetimeCleanup(apply);
 }
 
-// Emit SIL for the named builtin: cancelAsyncTask.
-static ManagedValue emitBuiltinCancelAsyncTask(
-    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
-    ArrayRef<ManagedValue> args, SGFContext C) {
-  return SGF.emitCancelAsyncTask(loc, args[0].borrow(SGF, loc).forward(SGF));
-}
-
 // Emit SIL for the named builtin: getCurrentExecutor.
 static ManagedValue emitBuiltinGetCurrentExecutor(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
@@ -1866,7 +1877,7 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
 
     // After the continuation resumes with a failure, hop back to the expected executor.
     //
-    // This is critical for CallerIsolationInheriting (nonisolated(nonsending))
+    // This is critical for NonisolatedNonsending (nonisolated(nonsending))
     // functions: without this hop, the function may return on whichever thread
     // resumed the continuation, violating the contract that the function
     // maintains the caller's isolation.
@@ -2229,11 +2240,56 @@ static ManagedValue emitBuiltinTaskAddPriorityEscalationHandler(
   return ManagedValue::forRValueWithoutOwnership(b);
 }
 
+static bool isBorrowedByAddress(SILGenFunction &SGF, SILType loweredTy) {
+  if (loweredTy.isAddressableForDeps(SGF.F)) {
+    return true;
+  }
+  if (!SGF.useLoweredAddresses())
+    return false;
+
+  return !loweredTy.isLoadable(SGF.F);
+}
+
+static ManagedValue emitBorrowObject(
+  SILGenFunction &SGF, SILLocation loc, SILType loweredBorrowTy,
+  ArgumentSource &&arg) {
+
+  // Loadable referent (therefore loadable borrow).
+  assert(loweredBorrowTy.isLoadable(SGF.F)
+         && "borrow must be loadable if referent is");
+
+  auto referent = std::move(arg).getAsSingleValue(
+    SGF, SGFContext::AllowGuaranteedPlusZero);
+  if (referent.getType().isAddress()) {
+    referent = SGF.B.createLoadBorrow(loc, referent);
+  }
+  auto borrow = SGF.B.createMakeBorrow(loc, referent.getValue());
+  return ManagedValue::forUnmanagedOwnedValue(borrow);
+}
+
+static ManagedValue emitBorrowAddress(
+  SILGenFunction &SGF, SILLocation loc, SILType loweredBorrowTy,
+  SILValue referentAddr, SGFContext C) {
+
+  if (loweredBorrowTy.isLoadable(SGF.F)) {
+    // Address referent, loadable borrow.
+    auto borrow = SGF.B.createMakeAddrBorrow(loc, referentAddr);
+    return ManagedValue::forUnmanagedOwnedValue(borrow);
+  }
+
+  // Address-only referent and borrow.
+  loweredBorrowTy = loweredBorrowTy.getAddressType();
+  auto buffer = SGF.getBufferForExprResult(loc, loweredBorrowTy, C);
+  SGF.B.createInitBorrowAddr(loc, buffer, referentAddr);
+  return SGF.manageBufferForExprResult(buffer,
+                                       SGF.getTypeLowering(loweredBorrowTy), C);
+}
+
 static ManagedValue emitBuiltinMakeBorrow(SILGenFunction &SGF,
-                                       SILLocation loc,
-                                       SubstitutionMap subs,
-                                       PreparedArguments &&preparedArgs,
-                                       SGFContext C) {
+                                          SILLocation loc,
+                                          SubstitutionMap subs,
+                                          PreparedArguments &&preparedArgs,
+                                          SGFContext C) {
   auto args = std::move(preparedArgs).getSources();
   ASSERT(args.size() == 1 && "should only have one argument");
   ASSERT(subs.getReplacementTypes().size() == 1
@@ -2243,30 +2299,9 @@ static ManagedValue emitBuiltinMakeBorrow(SILGenFunction &SGF,
   auto loweredArgTy = SGF.getLoweredType(argTy);
   auto loweredBorrowTy = SILType::getPrimitiveObjectType(
        BuiltinBorrowType::get(loweredArgTy.getASTType()));
-
-  bool loadableReferent;
-  if (loweredArgTy.isAddressableForDeps(SGF.F)) {
-    loadableReferent = false;
-  } else {
-    loadableReferent = !SGF.useLoweredAddresses()
-      || loweredArgTy.isLoadable(SGF.F);
+  if (!isBorrowedByAddress(SGF, loweredArgTy)) {
+    return emitBorrowObject(SGF, loc, loweredBorrowTy, std::move(args[0]));
   }
-
-  if (loadableReferent) {
-    // Loadable referent (therefore loadable borrow).
-    assert(loweredBorrowTy.isLoadable(SGF.F)
-           && "borrow must be loadable if referent is");
-
-    auto referent = std::move(args[0]).getAsSingleValue(SGF,
-                                          SGFContext::AllowGuaranteedPlusZero);
-    if (referent.getType().isAddress()) {
-      referent = SGF.B.createLoadBorrow(loc, referent);
-    }
-    
-    auto borrow = SGF.B.createMakeBorrow(loc, referent.getValue());
-    return ManagedValue::forUnmanagedOwnedValue(borrow);
-  }
-
   // Form an address referent by prefering the addressable representation
   // if available.
   ManagedValue referent
@@ -2279,20 +2314,43 @@ static ManagedValue emitBuiltinMakeBorrow(SILGenFunction &SGF,
       referent = SGF.B.createStoreBorrowOrTrivial(loc, referent, temp);
     }
   }
-  
-  if (loweredBorrowTy.isLoadable(SGF.F)) {
-    // Address referent, loadable borrow.
-    // 
-    auto borrow = SGF.B.createMakeAddrBorrow(loc, referent.getValue());
-    return ManagedValue::forUnmanagedOwnedValue(borrow);
-  }
+  return emitBorrowAddress(SGF, loc, loweredBorrowTy, referent.getValue(), C);
+}
 
-  // Address-only referent and borrow.
-  loweredBorrowTy = loweredBorrowTy.getAddressType();
-  auto buffer = SGF.getBufferForExprResult(loc, loweredBorrowTy, C);
-  SGF.B.createInitBorrowAddr(loc, buffer, referent.getValue());
-  return SGF.manageBufferForExprResult(buffer,
-                                       SGF.getTypeLowering(loweredBorrowTy), C);
+static ManagedValue emitBuiltinBorrowAt(SILGenFunction &SGF,
+                                        SILLocation loc,
+                                        SubstitutionMap subs,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
+  ASSERT(subs.getReplacementTypes().size() == 1 &&
+         "makeBorrowAt should have one type argument");
+  ASSERT(args.size() == 1 && "makeBorrowAt should have a single argument");
+
+  // The substitution determines the type of the thing we're borrowing.
+
+  auto argTy = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto loweredArgTy = SGF.getLoweredType(argTy);
+
+  // Convert the pointer argument to a SIL address.
+  //
+  // Default to an unaligned pointer. This can be optimized in the presence of
+  // Builtin.assumeAlignment.
+  //
+  // Assume the borrowed value's address is from a raw pointer. Make no attempt
+  // at strict aliasing.
+  //
+  // The memory is invariant over the borrow scope, but not generally invariant.
+  //
+  // Assume natural alignment.
+  SILValue addr =
+    SGF.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
+                                 loweredArgTy.getAddressType(),
+                                 /*isStrict*/false, /*isInvariant*/false,
+                                 llvm::MaybeAlign());
+
+  // This can only be used in a borrow accessor. For bitwise-borrowable types,
+  // the accessor will emit the load_borrow + return_borrow pair.
+  return ManagedValue::forRValueWithoutOwnership(addr);
 }
 
 static ManagedValue emitBuiltinDereferenceBorrow(SILGenFunction &SGF,

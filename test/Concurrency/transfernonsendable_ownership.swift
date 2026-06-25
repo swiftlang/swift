@@ -23,9 +23,7 @@ actor Custom {
 
 @globalActor
 struct CustomActor {
-    static var shared: Custom {
-        return Custom()
-    }
+    static let shared = Custom()
 }
 
 @MainActor func transferToMain<T>(_ t: T) async {}
@@ -37,12 +35,12 @@ struct CustomActor {
 
 func testConsuming(_ x: consuming Klass) async {
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func testConsumingError(_ x: consuming Klass) async {
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
   print(x)
 }
 
@@ -54,7 +52,7 @@ func testConsumingError(_ x: consuming Klass) async {
 
 func testConsumingUseAfterConsumeError(_ x: consuming Klass) async { // expected-error {{'x' used after consume}}
   await consumeTransferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'consumeTransferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'consumeTransferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-note @-2 {{consumed here}}
   print(x)
   // expected-note @-1 {{used here}}
@@ -70,12 +68,12 @@ func testConsumingUseAfterConsumeError(_ x: consuming Klass) async { // expected
 
 func testBorrowing(_ x: borrowing Klass) async {
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func testBorrowingError(_ x: borrowing Klass) async { // expected-error {{'x' is borrowed and cannot be consumed}}
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
   print(x) // expected-note {{consumed here}}
 }
 
@@ -87,12 +85,12 @@ func testBorrowingError(_ x: borrowing Klass) async { // expected-error {{'x' is
 
 func testInOut(_ x: inout Klass) async {
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func testInOutError(_ x: inout Klass) async {
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
   print(x)
 }
 

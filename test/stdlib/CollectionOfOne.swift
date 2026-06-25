@@ -30,4 +30,16 @@ if #available(SwiftStdlib 6.4, *) {
   }
 }
 
+OneTests.test("withContigousStorageIfAvailable")
+.require(.stdlib_6_5).code {
+
+  struct W: ~Copyable { let i: Int }
+
+  let one = CollectionOfOne(42)
+  let wrapped = one.withContiguousStorageIfAvailable({ W(i: $0.count + $0[0]) })
+  if let count = expectNotNil(wrapped) {
+    expectEqual(43, count.i)
+  }
+}
+
 runAllTests()

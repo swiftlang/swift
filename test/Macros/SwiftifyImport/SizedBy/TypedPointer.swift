@@ -69,9 +69,8 @@ public func mutParam(_ ptr: UnsafeMutableRawBufferPointer) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func exprParam(_ ptr: UnsafeMutableRawBufferPointer, _ size: CInt, _ count: CInt) {
-    let _ptrCount = ptr.count
-    if _ptrCount != size * count {
-      fatalError("bounds check failure in exprParam: expected \(size * count) but got \(_ptrCount)")
+    if ptr.count != size * count {
+      fatalError("bounds check failure in exprParam: expected \(size * count) but got \(ptr.count)")
     }
     return unsafe exprParam(ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), size, count)
 }
@@ -106,7 +105,7 @@ public func exprReturn(_ size: CInt, _ count: CInt) -> UnsafeMutableRawBufferPoi
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func constParamNoreturn(_ ptr: RawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
-    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+    let _ptrPtr = ptr.withUnsafeBytes {
         unsafe $0
     }
     defer {
@@ -121,7 +120,7 @@ public func constParamNoreturn(_ ptr: RawSpan) {
 @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func mutParamNoreturn(_ ptr: inout MutableRawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
-    let _ptrPtr = unsafe ptr.withUnsafeMutableBytes {
+    let _ptrPtr = ptr.withUnsafeMutableBytes {
         unsafe $0
     }
     defer {
@@ -136,7 +135,7 @@ public func mutParamNoreturn(_ ptr: inout MutableRawSpan) {
 @_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
 public func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
     let size = CInt(exactly: ptr.byteCount)!
-    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+    let _ptrPtr = ptr.withUnsafeBytes {
         unsafe $0
     }
     defer {
@@ -151,7 +150,7 @@ public func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
 @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func mutReturnDependence(_ ptr: inout MutableRawSpan) -> MutableRawSpan {
     let size = CInt(exactly: ptr.byteCount)!
-    let _ptrPtr = unsafe ptr.withUnsafeMutableBytes {
+    let _ptrPtr = ptr.withUnsafeMutableBytes {
         unsafe $0
     }
     defer {

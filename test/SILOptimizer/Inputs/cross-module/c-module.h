@@ -1,4 +1,4 @@
 
-long privateCFunc();
+long privateCFunc(void);
 
 long privateCVar;

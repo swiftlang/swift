@@ -20,6 +20,7 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "ResultPlan.h"
+#include "SILGenFunction.h"
 #include "Scope.h"
 #include "SpecializedEmitter.h"
 #include "StorageRefResult.h"
@@ -39,6 +40,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
@@ -1435,8 +1437,24 @@ public:
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
       // FIXME(backDeploy): Handle calls to back deployed methods on super?
-      constant = SILDeclRef(declRef->getDecl())
-        .asForeign(requiresForeignEntryPoint(declRef->getDecl()));
+      auto funcDecl = cast<FuncDecl>(declRef->getDecl());
+
+      // A call to a virtual method of a foreign reference type in Swift
+      // resolves to a synthesized thunk that performs dynamic dispatch.
+      // However, a `super` call should statically dispatch to the base class
+      // implementation. Substitute it so the direct call below references that
+      // symbol instead of the thunk.
+      if (auto classDecl = funcDecl->getDeclContext()->getSelfClassDecl()) {
+        if (classDecl->isForeignReferenceType()) {
+          auto clangImporter = SGF.getASTContext().getClangModuleLoader();
+          if (auto original =
+                  clangImporter->getOriginalForVirtualThunk(funcDecl))
+            funcDecl = original;
+        }
+      }
+
+      constant =
+          SILDeclRef(funcDecl).asForeign(requiresForeignEntryPoint(funcDecl));
 
       if (declRef->getDeclRef().isSpecialized())
         substitutions = declRef->getDeclRef().getSubstitutions();
@@ -1740,17 +1758,17 @@ public:
           return false;
 
         // old type MUST NOT have nonisolated(nonsending).
-        if (oldFnTy->getIsolation().isNonIsolatedCaller())
+        if (oldFnTy->getIsolation().isNonisolatedNonsending())
           return false;
 
         // new type MUST nonisolated(nonsending)
-        if (!newFnTy->getIsolation().isNonIsolatedCaller())
+        if (!newFnTy->getIsolation().isNonisolatedNonsending())
           return false;
 
         // See if setting isolation of old type to nonisolated(nonsending)
         // yields the new type.
         auto addedNonIsolatedNonSending = oldFnTy->getExtInfo().withIsolation(
-            FunctionTypeIsolation::forNonIsolatedCaller());
+            FunctionTypeIsolation::forNonisolatedNonsending());
 
         return oldFnTy->withExtInfo(addedNonIsolatedNonSending) == newFnTy;
       }
@@ -2065,12 +2083,55 @@ static void emitRawApply(SILGenFunction &SGF,
     argValues.push_back(argValue);
   }
 
+  // Build the per-argument SILLocation array, but ONLY for functions that
+  // have opted in to isolation-history emission. The trailing per-argument
+  // location storage on apply instructions is reserved exclusively for that
+  // feature today (see PartitionUtils.h's SequenceBoundary push, which is the
+  // sole consumer). Skipping the array entirely for everyone else keeps the
+  // per-apply storage cost out of the common path and the change cherry-pick
+  // safe.
+  SmallVector<SILLocation, 4> argLocs;
+  bool haveArgLocs = false;
+  if (swift::shouldEmitIsolationHistoryFor(&SGF.F)) {
+    // Default every slot to the apply's anchor; getArgumentLoc()'s anchor
+    // fallback uses the same value, so this is the safe baseline.
+    argLocs.assign(argValues.size(), loc);
+    haveArgLocs = true;
+
+    // Best-effort refinement: when `loc` is an ApplyExpr and the AST
+    // argument count matches the lowered call-argument count exactly, copy
+    // each AST argument's source position into the corresponding slot. The
+    // call-arg portion of `argValues` is the trailing `args.size()` entries
+    // (preceded by indirect-result buffers and possibly an indirect-error
+    // address). On any count mismatch (curried calls, captures, foreign
+    // error/async params, tuple expansion, default args) we leave every
+    // slot at the anchor — the chain walker then sees identical locations
+    // and produces the same notes it does today.
+    if (auto *applyExpr = loc.getAsASTNode<ApplyExpr>()) {
+      auto *argList = applyExpr->getArgs();
+      if (argList && argList->size() == args.size()) {
+        unsigned callArgOffset = argValues.size() - args.size();
+        for (unsigned i = 0, n = args.size(); i != n; ++i) {
+          if (Expr *argExpr = argList->getExpr(i))
+            argLocs[callArgOffset + i] = RegularLocation(argExpr);
+        }
+      }
+    }
+  }
+
+  std::optional<ArrayRef<SILLocation>> argLocsRef =
+      haveArgLocs ? std::optional<ArrayRef<SILLocation>>(argLocs)
+                  : std::nullopt;
+
   auto resultType = substFnConv.getSILResultType(SGF.getTypeExpansionContext());
 
   // If the function is a coroutine, we need to use 'begin_apply'.
   if (substFnType->isCoroutine()) {
     assert(!substFnType->hasErrorResult());
-    auto apply = SGF.B.createBeginApply(loc, fnValue, subs, argValues);
+    auto apply =
+        SGF.B.createBeginApply(loc, fnValue, subs, argValues, ApplyOptions(),
+                               /*specializationInfo=*/nullptr,
+                               /*isolationCrossing=*/std::nullopt, argLocsRef);
     for (auto result : apply->getAllResults())
       rawResults.push_back(result);
     return;
@@ -2085,11 +2146,17 @@ static void emitRawApply(SILGenFunction &SGF,
   if (substFnType->hasErrorResult() &&
       SGF.F.isDistributed() &&
       dyn_cast<ClassDecl>(fnValue->getFunction()->getDeclContext()) ) {
-    auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
+    auto result =
+        SGF.B.createApply(loc, fnValue, subs, argValues, options,
+                          /*specializationInfo=*/nullptr,
+                          /*isolationCrossing=*/std::nullopt, argLocsRef);
     rawResults.push_back(result);
 
   } else if (!substFnType->hasErrorResult()) {
-    auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
+    auto result =
+        SGF.B.createApply(loc, fnValue, subs, argValues, options,
+                          /*specializationInfo=*/nullptr,
+                          /*isolationCrossing=*/std::nullopt, argLocsRef);
     rawResults.push_back(result);
 
   // Otherwise, we need to create a try_apply.
@@ -2121,7 +2188,10 @@ static void emitRawApply(SILGenFunction &SGF,
 
     options -= ApplyFlags::DoesNotThrow;
     SGF.B.createTryApply(loc, fnValue, subs, argValues, normalBB, errorBB,
-                         options);
+                         options, /*specializationInfo=*/nullptr,
+                         /*isolationCrossing=*/std::nullopt,
+                         /*normalCount=*/ProfileCounter(),
+                         /*errorCount=*/ProfileCounter(), argLocsRef);
 
     SGF.B.emitBlock(normalBB);
   }
@@ -2250,8 +2320,9 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
 /// If the given source loc is in a macro expansion buffer, this
 /// method walks up the macro expansion buffer tree to the outermost
 /// source file. Otherwise, the method returns the given loc.
-static SourceLoc
-getLocInOutermostSourceFile(SourceManager &sourceManager, SourceLoc loc) {
+SourceLoc
+SILGenFunction::getLocInOutermostSourceFile(SourceLoc loc) {
+  auto &sourceManager = getSourceManager();
   auto outermostLoc = loc;
   auto bufferID = sourceManager.findBufferContainingLoc(outermostLoc);
 
@@ -2297,7 +2368,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   case MagicIdentifierLiteralExpr::Column: {
     unsigned Value = 0;
     if (auto Loc = magicLiteral->getStartLoc()) {
-      Loc = getLocInOutermostSourceFile(SGF.getSourceManager(), Loc);
+      Loc = SGF.getLocInOutermostSourceFile(Loc);
       if (Loc.isValid()) {
         Value = magicLiteral->getKind() == MagicIdentifierLiteralExpr::Line
                     ? ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first
@@ -3191,7 +3262,8 @@ done:
 
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
-      case ActorIsolation::CallerIsolationInheriting:
+      case ActorIsolation::NonisolatedConcurrent:
+      case ActorIsolation::NonisolatedNonsending:
       case ActorIsolation::NonisolatedUnsafe:
         llvm_unreachable("Not isolated");
       }
@@ -3512,6 +3584,23 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
       if (auto addr = getVariableAddressableBuffer(param, expr,
                                                    ownership)) {
         return ManagedValue::forBorrowedAddressRValue(addr);
+      }
+    }
+  }
+  if (auto ae = dyn_cast<ApplyExpr>(expr)) {
+    if (auto declRef = ae->getFn()->getReferencedDecl()) {
+      if (declRef.getDecl()->getModuleContext()->isBuiltinModule()) {
+        auto &builtinInfo
+          = SGM.M.getBuiltinInfo(declRef.getDecl()->getBaseIdentifier());
+        // TODO: Support things like Builtin.makeBorrow(Builtin.borrowAt(p)).
+        // We should call a SGF.tryEmitBuiltinAsAddres() helper here. But
+        // CallEmission does not have a way to query ahead of time whether its
+        // result will be loaded into its RValue result.
+        if (builtinInfo.ID == BuiltinValueKind::BorrowAt) {
+          SGM.diagnose(expr, diag::not_implemented,
+                       "Builtin.borrowAt must be direclty returned from a "
+                       "borrow accessor");
+        }
       }
     }
   }
@@ -4840,7 +4929,7 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
   // Load if necessary.
   if (value.getType().isAddress()) {
     if (!param.isIndirectInGuaranteed() || !SGF.silConv.useLoweredAddresses()) {
-      if (value.getType().isMoveOnly()) {
+      if (value.getType().isMoveOnly() && !param.isIndirectInGuaranteed()) {
         // We use a formal access load [copy] instead of a load_borrow here
         // since in the case where we have a second parameter that is consuming,
         // we want to avoid emitting invalid SIL and instead allow for the
@@ -4852,6 +4941,12 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
         // guaranteed to be within the access scope meaning that it is easy for
         // SIL passes like the move only checker to convert this to a
         // load_borrow.
+        //
+        // For @in_guaranteed destinations the callee borrows, so emit a real
+        // load_borrow — emitting load [copy] there would be a copy of a
+        // ~Copyable value that the move-only checker can't always remove
+        // (in particular under opaque values, AddressLowering reifies it as
+        // alloc_stack + copy_addr [init] before the checker runs).
         value = SGF.B.createFormalAccessLoadCopy(loc, value);
         // Strip off the cleanup from the load [copy] since we do not want the
         // cleanup to be forwarded.
@@ -5500,9 +5595,6 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
   // Get the callee type information.
   auto calleeTypeInfo = callee.getTypeInfo(SGF);
 
-  std::optional<ManagedValue> self;
-  auto fnValue = callee.getFnValue(SGF, self);
-
   // Evaluate the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
   std::optional<SILLocation> uncurriedLoc;
@@ -5512,6 +5604,12 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
       uncurriedArgs, uncurriedLoc);
 
   auto selfArgMV = uncurriedArgs.back();
+
+  std::optional<ManagedValue> self;
+  if (callee.requiresSelfValueForDispatch()) {
+    self = selfArgMV;
+  }
+  auto fnValue = callee.getFnValue(SGF, self);
 
   // Strip the unnecessary copy_value + mark_unresolved_non_copyable_value +
   // begin_borrow instructions added for move-only self argument.
@@ -5625,6 +5723,13 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
       calleeTypeInfo.origResultType->getFunctionResultType();
     calleeTypeInfo.substResultType =
       cast<FunctionType>(calleeTypeInfo.substResultType).getResult();
+
+    // Static methods have their lifetime dependencies placed on the inner
+    // function type, since the outer function parameter is always an independent
+    // metatype.
+    if (lifetimeDependencies.empty()) {
+      lifetimeDependencies = calleeTypeInfo.origFormalType->getLifetimeDependencies();
+    }
   }
 
   ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
@@ -6006,8 +6111,30 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
                          call->isNoAsync());
 
     // For an implicitly-async call, record the target of the actor hop.
-    if (auto target = call->isImplicitlyAsync())
+    if (auto target = call->isImplicitlyAsync()) {
       emission.setImplicitlyAsync(target);
+    } else {
+      // If we are emitting a call to an `async` variant of an ObjC completion
+      // handler API, we need to hop at the call site because there is no
+      // `async` function that is going to hop in its body. Such calls are
+      // referencing a sync variant with a special completion handler
+      // synthesized the compiler and the isolation context has to be
+      // established beforehand.
+      //
+      // This is specific to global-actor isolated functions because by default
+      // async variants are `nonisolated(nonsending)` and won't switch
+      // isolation.
+      auto callee = call->getCalledValue(/*skipFunctionConversions=*/true);
+      if (auto *F = dyn_cast_or_null<FuncDecl>(callee)) {
+        if (F->getForeignAsyncConvention()) {
+          if (auto crossing = call->getIsolationCrossing()) {
+            auto calleeIsolation = crossing->getCalleeIsolation();
+            if (calleeIsolation.isGlobalActor())
+              emission.setImplicitlyAsync(calleeIsolation);
+          }
+        }
+      }
+    }
   }
 
   return emission;
@@ -6129,38 +6256,6 @@ RValue SILGenFunction::emitApply(
     }
   }
 
-  // If there's a foreign error or async parameter, fill it in.
-  ManagedValue errorTemp;
-  if (auto foreignAsync = calleeTypeInfo.foreign.async) {
-    unsigned completionIndex = foreignAsync->completionHandlerParamIndex();
-
-    // Ram the emitted completion into the argument list, over the placeholder
-    // we left during the first pass.
-    auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
-
-    // We have already lowered foreign self/moved it into position at this
-    // point, so we know that self will be back.
-    ManagedValue self;
-    if (substFnType->hasSelfParam()) {
-      self = args.back();
-    }
-
-    auto origFormalType = *calleeTypeInfo.origFormalType;
-    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(
-        *this, origFormalType, self, loc);
-  }
-  if (auto foreignError = calleeTypeInfo.foreign.error) {
-    unsigned errorParamIndex =
-        foreignError->getErrorParameterIndex();
-
-    // Ram the emitted error into the argument list, over the placeholder
-    // we left during the first pass.
-    auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
-
-    std::tie(errorTemp, errorArgSlot) =
-        resultPlan->emitForeignErrorArgument(*this, loc).value();
-  }
-
   // Emit the raw application.
   GenericSignature genericSig =
     fn.getType().castTo<SILFunctionType>()->getInvocationGenericSignature();
@@ -6221,7 +6316,8 @@ RValue SILGenFunction::emitApply(
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedConcurrent:
+    case ActorIsolation::NonisolatedNonsending:
     case ActorIsolation::NonisolatedUnsafe:
       llvm_unreachable("Not isolated");
       break;
@@ -6237,6 +6333,38 @@ RValue SILGenFunction::emitApply(
     // own executor afterward, since the callee could have made arbitrary hops
     // out of our isolation domain.
     breadcrumb = ExecutorBreadcrumb(true);
+  }
+
+  // If there's a foreign error or async parameter, fill it in.
+  ManagedValue errorTemp;
+  if (auto foreignAsync = calleeTypeInfo.foreign.async) {
+    unsigned completionIndex = foreignAsync->completionHandlerParamIndex();
+
+    // Ram the emitted completion into the argument list, over the placeholder
+    // we left during the first pass.
+    auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
+
+    // We have already lowered foreign self/moved it into position at this
+    // point, so we know that self will be back.
+    ManagedValue self;
+    if (substFnType->hasSelfParam()) {
+      self = args.back();
+    }
+
+    auto origFormalType = *calleeTypeInfo.origFormalType;
+    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(
+        *this, origFormalType, self, loc);
+  }
+  if (auto foreignError = calleeTypeInfo.foreign.error) {
+    unsigned errorParamIndex =
+        foreignError->getErrorParameterIndex();
+
+    // Ram the emitted error into the argument list, over the placeholder
+    // we left during the first pass.
+    auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
+
+    std::tie(errorTemp, errorArgSlot) =
+        resultPlan->emitForeignErrorArgument(*this, loc).value();
   }
 
   SILValue rawDirectResult;
@@ -6879,6 +7007,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
 }
 
 RValue SILGenFunction::emitApplyExpr(ApplyExpr *e, SGFContext c) {
+  PrettyStackTraceExpr trace(getASTContext(), "silgen emitApplyExpr", e);
   CallEmission emission = CallEmission::forApplyExpr(*this, e);
   return emission.apply(c);
 }
@@ -6978,8 +7107,7 @@ StringRef SILGenFunction::getMagicFunctionString() {
 
 StringRef SILGenFunction::getMagicFilePathString(SourceLoc loc) {
   assert(loc.isValid());
-  auto &sourceManager = getSourceManager();
-  auto outermostLoc = getLocInOutermostSourceFile(sourceManager, loc);
+  auto outermostLoc = getLocInOutermostSourceFile(loc);
 
   return getSourceManager().getDisplayNameForLoc(outermostLoc);
 }
@@ -7446,6 +7574,17 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
     if (selfParam.isConsumedInCaller() || base.getType().isAddressOnly(SGF.F)) {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
+      
+      // If the base is move only and a +0 value, then the copy we're about to emit is invalid
+      // and will later be diagnosed by the move checker. We'll mark the base as unresolved
+      // to give the move checker a chance to salvage things if it can eliminate the copy.
+      if (selfParam.isConsumedInCaller() && !shouldTake && base.getType().isMoveOnly() &&
+          !isa<MarkUnresolvedNonCopyableValueInst>(base.getValue())) {
+          auto marked = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+              loc, base.getValue(),
+              MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+          base = ManagedValue::forBorrowedAddressRValue(marked);
+      }
 
       auto isGuaranteed = selfParam.isGuaranteedInCaller();
 
@@ -8056,17 +8195,6 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
       getLoweredType(ctx.TheRawPointerType), subs,
       {taskOptions, taskFunction.getValue(), resultBuf});
 
-  return ManagedValue::forObjectRValueWithoutOwnership(apply);
-}
-
-ManagedValue SILGenFunction::emitCancelAsyncTask(
-    SILLocation loc, SILValue task) {
-  ASTContext &ctx = getASTContext();
-  auto apply = B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CancelAsyncTask)),
-      getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
-      { task });
   return ManagedValue::forObjectRValueWithoutOwnership(apply);
 }
 

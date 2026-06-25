@@ -318,6 +318,13 @@ private:
 public:
   /// The set of eagerly emitted opaque types.
   llvm::SmallPtrSet<OpaqueTypeDecl *, 4> EmittedNonLazyOpaqueTypeDecls;
+
+  /// A record of all ExtensionDescriptors emitted for protocol-to-protocol
+  /// conformances, as two such LinkEntity's can be unequal
+  /// (point to different extensions of the same protocol) but name the same
+  /// symbol ultimately, because the two extensions may have the same
+  /// generic signature, etc.
+  llvm::DenseSet<ExtensionDecl*> AllConformanceOfProtocolExtensionDescriptors;
 private:
 
   /// The queue of lazy field metadata records to emit.
@@ -1447,6 +1454,7 @@ private:
     unsigned align: 16;
     unsigned pod: 1;
     unsigned bitwiseTakable: 2;
+    unsigned addressableForDependencies: 1;
   };
   friend struct ::llvm::DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey>;
   llvm::DenseMap<FixedLayoutKey, llvm::Constant *> PrivateFixedLayouts;
@@ -2155,23 +2163,25 @@ struct DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey> {
   using FixedLayoutKey = swift::irgen::IRGenModule::FixedLayoutKey;
 
   static inline FixedLayoutKey getEmptyKey() {
-    return {0, 0xFFFFFFFFu, 0, 0, 0};
+    return {0, 0xFFFFFFFFu, 0, 0, 0, 0};
   }
 
   static inline FixedLayoutKey getTombstoneKey() {
-    return {0, 0xFFFFFFFEu, 0, 0, 0};
+    return {0, 0xFFFFFFFEu, 0, 0, 0, 0};
   }
 
   static unsigned getHashValue(const FixedLayoutKey &key) {
     return hash_combine(key.size, key.numExtraInhabitants, key.align,
-                        (bool)key.pod, (bool)key.bitwiseTakable);
+                        (bool)key.pod, (bool)key.bitwiseTakable,
+                        (bool)key.addressableForDependencies);
   }
   static bool isEqual(const FixedLayoutKey &a, const FixedLayoutKey &b) {
     return a.size == b.size
       && a.numExtraInhabitants == b.numExtraInhabitants
       && a.align == b.align
       && a.pod == b.pod
-      && a.bitwiseTakable == b.bitwiseTakable;
+      && a.bitwiseTakable == b.bitwiseTakable
+      && a.addressableForDependencies == b.addressableForDependencies;
   }
 };
 

@@ -7,7 +7,7 @@
 
 import Foo
 
-// CHECK-LABEL: sil shared @$s3Foo19functionToSerializeSiyF
+// CHECK-LABEL: sil shared [export_implementation] @$s3Foo19functionToSerializeSiyF
 // CHECK:       increment_profiler_counter 0, "$s3Foo19functionToSerializeSiyF", num_counters 2, hash 0
 // CHECK:       increment_profiler_counter 1, "$s3Foo19functionToSerializeSiyF", num_counters 2, hash 0
 

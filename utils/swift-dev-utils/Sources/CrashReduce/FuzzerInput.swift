@@ -45,6 +45,7 @@ extension FuzzerInput {
       case _splits = "splits"
       case _sourceKitRequests = "sourceKitRequests"
       case _frontendArgs = "frontendArgs"
+      case _extraArgs = "extraArgs"
     }
     private var _splits: [Int]?
     var splits: [Int] { _splits ?? [] }
@@ -56,6 +57,10 @@ extension FuzzerInput {
     var frontendArgs: [Command.Argument]? {
       guard let _frontendArgs else { return nil }
       return _frontendArgs.map { .value($0) }
+    }
+    var _extraArgs: [String]?
+    var extraArgs: [Command.Argument] {
+      _extraArgs?.map { .value($0) } ?? []
     }
   }
 

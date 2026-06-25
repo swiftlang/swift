@@ -17,6 +17,7 @@
 #ifndef SWIFT_MODULE_H
 #define SWIFT_MODULE_H
 
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityDomain.h"
@@ -53,6 +54,7 @@ namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
   class ASTWalker;
+  enum class CodeGenerationModel: uint8_t;
   class CustomAvailabilityDomain;
   class Decl;
   class DeclAttribute;
@@ -94,12 +96,13 @@ enum class FileUnitKind {
 };
 
 enum class SourceFileKind {
-  Library,  ///< A normal .swift file.
-  Main,     ///< A .swift file that can have top-level code.
-  SIL,      ///< Came from a .sil file.
+  Library,   ///< A normal .swift file.
+  Main,      ///< A .swift file that can have top-level code.
+  SIL,       ///< Came from a .sil file.
   Interface, ///< Came from a .swiftinterface file, representing another module.
-  MacroExpansion, ///< Came from a macro expansion.
+  MacroExpansion,  ///< Came from a macro expansion.
   DefaultArgument, ///< Came from default argument at caller side
+  SyntheticMacro,  ///< Came from a synthesized macro
 };
 
 /// Contains information about where a particular path is used in
@@ -851,13 +854,13 @@ public:
     Bits.ModuleDecl.StrictMemorySafety = value;
   }
 
-  /// Whether this module uses deferred code generation.
-  bool deferredCodeGen() const {
-    return Bits.ModuleDecl.DeferredCodeGen;
+  /// The code generation model used by this module.
+  CodeGenerationModel codeGenerationModel() const {
+    return static_cast<CodeGenerationModel>(Bits.ModuleDecl.CodeGenModel);
   }
 
-  void setDeferredCodeGen(bool value = true) {
-    Bits.ModuleDecl.DeferredCodeGen = value;
+  void setCodeGenerationModel(CodeGenerationModel value) {
+    Bits.ModuleDecl.CodeGenModel = static_cast<unsigned>(value);
   }
 
   bool isObjCNameLookupCachePopulated() const {
@@ -885,6 +888,9 @@ public:
 
 private:
   std::string CacheKey;
+
+  /// Storage for hidden-type layouts recorded via recordHiddenTypeLayout.
+  llvm::StringMap<AbstractTypeLayout> HiddenTypeLayouts;
 
 public:
   void setCacheKey(const std::string &key) { CacheKey = key; }
@@ -1284,6 +1290,20 @@ public:
   void setAvailabilityDomains(const AvailabilityDomainMap &&map) {
     AvailabilityDomains = std::move(map);
   }
+
+  /// Record layout information for a hidden type used by this module in
+  /// some of its stored properties.
+  void recordHiddenTypeLayout(StringRef mangledName,
+                              const AbstractTypeLayout &layout);
+
+  /// Look up a previously-recorded hidden-type layout by mangled name.
+  std::optional<AbstractTypeLayout>
+  lookupHiddenTypeLayout(StringRef mangledName) const;
+
+  /// Return the recorded hidden-type layouts sorted by mangled name, for
+  /// reproducible serialization output.
+  SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4>
+  getSortedHiddenTypeLayouts() const;
 
   static bool classof(const DeclContext *DC) {
     if (auto D = DC->getAsDecl())

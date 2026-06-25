@@ -2536,6 +2536,39 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   llvm_unreachable("bad synthesized function kind");
 }
 
+/// If the accessor is one of the given kinds, and there is a @section on a
+/// parsed accessor of one of the given kinds, transfer it to the accessor.
+///
+/// Returns true if anything was transferred.
+static bool tryTransferAccessorSection(
+    AccessorDecl *accessor, ArrayRef<AccessorKind> kinds) {
+  // Is our accessor one of the expected kinds?
+  if (std::find(kinds.begin(), kinds.end(), accessor->getAccessorKind()) ==
+        kinds.end())
+    return false;
+
+  // If the accessor has a @section attribute already, we're done.
+  if (accessor->getAttrs().hasAttribute<SectionAttr>())
+    return true;
+
+  // Look for a parsed accessor from which we can pull the section name.
+  auto storage = accessor->getStorage();
+  for (auto kind : kinds) {
+    auto parsed = storage->getParsedAccessor(kind);
+    if (!parsed)
+      continue;
+
+    if (auto section = parsed->getAttrs().getAttribute<SectionAttr>()) {
+      // Clone the attribute.
+      ASTContext &ctx = storage->getASTContext();
+      accessor->getAttrs().add(section->clone(ctx));
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static void finishImplicitAccessor(AccessorDecl *accessor,
                                    ASTContext &ctx) {
   accessor->setImplicit();
@@ -2545,6 +2578,28 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
 
   if (accessor->doesAccessorHaveBody())
     accessor->setBodySynthesizer(&synthesizeAccessorBody);
+
+  // Look for a @section attribute to transfer.
+  AccessorKind readAccessors[] = {
+    AccessorKind::Get,
+    AccessorKind::DistributedGet,
+    AccessorKind::Read,
+    AccessorKind::YieldingBorrow,
+    AccessorKind::Borrow,
+    AccessorKind::Address
+  };
+  AccessorKind writeAccessors[] = {
+    AccessorKind::Set,
+    AccessorKind::Modify,
+    AccessorKind::YieldingMutate,
+    AccessorKind::Mutate,
+    AccessorKind::MutableAddress,
+    AccessorKind::Init,
+    AccessorKind::WillSet,
+    AccessorKind::DidSet
+  };
+  if (!tryTransferAccessorSection(accessor, writeAccessors))
+    tryTransferAccessorSection(accessor, readAccessors);
 }
 
 static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
@@ -3433,8 +3488,20 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   // Determine the access level for the property.
   property->overwriteAccess(var->getFormalAccess());
 
-  // Determine setter access.
-  property->overwriteSetterAccess(var->getSetterFormalAccess());
+  // Determine setter access. `projectedValue` setter could be less
+  // accessible than the variable itself and vice versa, we need to
+  // account for that and take the less permitting access of the two.
+  property->overwriteSetterAccess(
+      wrapperVar ? std::min(var->getSetterFormalAccess(),
+                            wrapperVar->getSetterFormalAccess())
+                 : var->getSetterFormalAccess());
+
+  // The property must be as available as both the wrapped property and
+  // the wrapper type's `projectedValue` property.
+  SmallVector<const Decl *, 2> asAvailableAs = {var};
+  if (wrapperVar)
+    asAvailableAs.push_back(wrapperVar);
+  AvailabilityInference::applyInferredAvailableAttrs(property, asAvailableAs);
 
   // Add the accessors we need.
   if (var->hasImplicitPropertyWrapper()) {
@@ -4446,8 +4513,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   if (borrow || mutate) {
     if (auto *extDecl = dyn_cast<ExtensionDecl>(DC)) {
       auto extNominal = extDecl->getExtendedNominal();
-      if (!isa<StructDecl>(extNominal) && !isa<EnumDecl>(extNominal) &&
-          !isa<ClassDecl>(extNominal)) {
+      if (extNominal && !isa<StructDecl>(extNominal) &&
+          !isa<EnumDecl>(extNominal) && !isa<ClassDecl>(extNominal)) {
         if (borrow) {
           storage->getASTContext().Diags.diagnose(
               borrow->getLoc(),

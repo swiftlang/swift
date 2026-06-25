@@ -1,0 +1,77 @@
+{
+    "metadata": {
+        "formatVersion": {
+            "major": 0,
+            "minor": 6,
+            "patch": 0
+        },
+        "generator": ""
+    },
+    "module": {
+        "isVirtual": false,
+        "name": "Swift",
+        "platform": {
+            "architecture": "aarch64",
+            "operatingSystem": {
+                "minimumVersion": {
+                    "major": 26,
+                    "minor": 0,
+                    "patch": 0
+                },
+                "name": "macosx"
+            },
+            "vendor": "apple"
+        }
+    },
+    "relationships": [
+
+    ],
+    "symbols": [
+        {
+            "accessLevel": "public",
+            "identifier": {
+                "interfaceLanguage": "swift",
+                "precise": "s:kw@true"
+            },
+            "kind": {
+                "displayName": "Keyword",
+                "identifier": "type.property"
+            },
+            "names": {
+                "navigator": [
+                    {
+                        "kind": "Keyword",
+                        "spelling": "true"
+                    }
+                ],
+                "title": "true"
+            },
+            "pathComponents": [
+                "true"
+            ]
+        },
+        {
+            "accessLevel": "public",
+            "identifier": {
+                "interfaceLanguage": "swift",
+                "precise": "s:kw@false"
+            },
+            "kind": {
+                "displayName": "Keyword",
+                "identifier": "type.property"
+            },
+            "names": {
+                "navigator": [
+                    {
+                        "kind": "Keyword",
+                        "spelling": "false"
+                    }
+                ],
+                "title": "false"
+            },
+            "pathComponents": [
+                "false"
+            ]
+        }
+    ]
+}

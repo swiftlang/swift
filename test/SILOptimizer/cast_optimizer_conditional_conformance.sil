@@ -67,7 +67,7 @@ bb3:
   switch_enum_addr %6 : $*Optional<HasFoo>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
 
 bb4:
-  %14 = unchecked_take_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt
+  %14 = unchecked_inplace_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt
   copy_addr [take] %14 to [init] %3 : $*HasFoo
   dealloc_stack %6 : $*Optional<HasFoo>
   dealloc_stack %4 : $*S1<UInt8>
@@ -125,7 +125,7 @@ bb3:
   switch_enum_addr %6 : $*Optional<HasFoo>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
 
 bb4:
-  %14 = unchecked_take_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt
+  %14 = unchecked_inplace_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt
   copy_addr [take] %14 to [init] %3 : $*HasFoo
   dealloc_stack %6 : $*Optional<HasFoo>
   dealloc_stack %4 : $*S1<Int8>
@@ -197,7 +197,7 @@ bb3:
   switch_enum_addr %6 : $*Optional<HasFoo>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
 
 bb4:
-  %14 = unchecked_take_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt
+  %14 = unchecked_inplace_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt
   copy_addr [take] %14 to [init] %3 : $*HasFoo
   dealloc_stack %6 : $*Optional<HasFoo>
   dealloc_stack %4 : $*S2<IsP>
@@ -269,7 +269,7 @@ bb3:
   switch_enum_addr %6 : $*Optional<HasFoo>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
 
 bb4:
-  %14 = unchecked_take_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt
+  %14 = unchecked_inplace_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt
   copy_addr [take] %14 to [init] %3 : $*HasFoo
   dealloc_stack %6 : $*Optional<HasFoo>
   dealloc_stack %4 : $*S3<C>
@@ -339,7 +339,7 @@ bb3:
   switch_enum_addr %6 : $*Optional<HasFoo>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
 
 bb4:
-  %14 = unchecked_take_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt
+  %14 = unchecked_inplace_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt
   copy_addr [take] %14 to [init] %3 : $*HasFoo
   dealloc_stack %6 : $*Optional<HasFoo>
   dealloc_stack %4 : $*S4<SubC>

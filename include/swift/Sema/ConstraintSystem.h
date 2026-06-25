@@ -227,24 +227,37 @@ public:
 };
 
 
-class ExpressionTimer {
+class ComplexityTracker {
   ConstraintSystem &CS;
   llvm::TimeRecord StartTime;
 
   /// The number of seconds from creation until
-  /// this timer is considered expired.
+  /// this tracker is considered expired.
   unsigned ThresholdInSecs;
+
+  /// Threshold (in milliseconds) for emitting a wall-clock-based warning.
+  /// 0 disables the warning.
+  unsigned WarnTimeLimitInMillis;
+
+  /// Threshold for emitting a solver-scope-based warning.
+  /// 0 disables the warning.
+  unsigned WarnScopeLimit;
+
+  /// Threshold for emitting a solver-trail-step-based warning.
+  /// 0 disables the warning.
+  unsigned WarnTrailLimit;
 
   bool PrintWarning;
 
 public:
   const static unsigned NoLimit = (unsigned) -1;
 
-  ExpressionTimer(ConstraintSystem &CS, unsigned thresholdInSecs);
+  ComplexityTracker(ConstraintSystem &CS, unsigned thresholdInSecs,
+                    unsigned warnTimeLimitInMillis, unsigned warnScopeLimit,
+                    unsigned warnTrailLimit);
 
-  ~ExpressionTimer();
+  ~ComplexityTracker();
 
-  unsigned getWarnLimit() const;
   llvm::TimeRecord startedAt() const { return StartTime; }
 
   /// Return the elapsed process time (including fractional seconds)
@@ -285,7 +298,7 @@ using KeyPathCapability = std::pair<KeyPathMutability, /*isSendable=*/bool>;
 namespace constraints {
 
 template <typename T = Expr> T *castToExpr(ASTNode node) {
-  return cast<T>(cast<Expr *>(node));
+  return cast<T>(cast_or_null<Expr *>(node));
 }
 
 template <typename T = Expr> T *getAsExpr(ASTNode node) {
@@ -782,7 +795,7 @@ public:
   DeclContext *DC;
   ConstraintSystemOptions Options;
   DiagnosticTransaction *diagnosticTransaction;
-  std::optional<ExpressionTimer> Timer;
+  std::optional<ComplexityTracker> Timer;
 
   friend class Solution;
   friend class ConstraintFix;
@@ -2052,7 +2065,7 @@ public:
 
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
-  bool recordFix(ConstraintFix *fix, unsigned impact = 1,
+  bool recordFix(ConstraintFix *fix, FixImpact impact = FixImpact::Mismatch,
                  PreparedOverloadBuilder *preparedOverload = nullptr);
 
   void recordPotentialHole(TypeVariableType *typeVar);
@@ -4073,6 +4086,12 @@ public:
     return CurrentRange;
   }
 
+  /// Return the number of solver scopes created so far.
+  unsigned getNumSolverScopes() const { return NumSolverScopes; }
+
+  /// Return the number of solver trail steps taken so far.
+  unsigned getNumTrailSteps() const { return NumTrailSteps; }
+
   /// Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   std::pair<bool, SourceRange> isAlreadyTooComplex = {false, SourceRange()};
@@ -4099,13 +4118,7 @@ public:
 
   // If the given constraint is an applied disjunction, get the argument function
   // that the disjunction is applied to.
-  FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction) {
-    assert(disjunction->getKind() == ConstraintKind::Disjunction);
-    auto found = AppliedDisjunctions.find(disjunction->getLocator());
-    if (found == AppliedDisjunctions.end())
-      return nullptr;
-    return found->second;
-  }
+  FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction);
 
   /// The overload sets that have already been resolved along the current path.
   const llvm::DenseMap<ConstraintLocator *, SelectedOverload> &
@@ -4597,9 +4610,6 @@ bool exprNeedsParensInsideFollowingOperator(DeclContext *DC,
 bool exprNeedsParensOutsideFollowingOperator(
     DeclContext *DC, Expr *expr, PrecedenceGroupDecl *followingPG,
     llvm::function_ref<Expr *(const Expr *)> getParent);
-
-/// Determine whether this is a SIMD operator.
-bool isSIMDOperator(ValueDecl *value);
 
 std::string describeGenericType(ValueDecl *GP, bool includeName = false);
 

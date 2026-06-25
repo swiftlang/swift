@@ -31,6 +31,7 @@
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
@@ -72,6 +73,12 @@ namespace swift {
   struct Diag {
     /// The diagnostic ID corresponding to this diagnostic.
     DiagID ID;
+
+    // 0 corresponds to diag::invalid_diagnostic. Unfortunately we can't define
+    // this out-of-line due to the template, and we can't include the diagnostic
+    // since that's a header cycle.
+    Diag() : ID(static_cast<DiagID>(0)) {}
+    Diag(DiagID id) : ID(id) {}
   };
 
   namespace detail {
@@ -619,6 +626,15 @@ namespace swift {
     /// fatal error
     bool showDiagnosticsAfterFatalError = false;
 
+    /// Trap when any error diagnostic is emitted.
+    bool assertOnError = false;
+
+    /// Trap when any warning diagnostic is emitted.
+    bool assertOnWarning = false;
+
+    /// Trap when a diagnostic belonging to one of these groups is emitted.
+    llvm::SmallSet<DiagGroupID, 1> assertOnGroupIDs;
+
     /// Don't emit any warnings
     bool suppressWarnings = false;
 
@@ -627,9 +643,6 @@ namespace swift {
     
     /// Don't emit any remarks
     bool suppressRemarks = false;
-
-    /// Check for `@warn` diagnostic group behavior controls
-    bool checkSyntacticControls = false;
 
     /// A mapping from `DiagGroupID` identifiers to `WarningGroupBehaviorRule`
     /// values indicating how warnings belonging to the respective diagnostic groups
@@ -676,11 +689,12 @@ namespace swift {
       return showDiagnosticsAfterFatalError;
     }
 
-    void setCheckSyntacticControls(bool val = true) {
-      checkSyntacticControls = val;
-    }
-    bool getCheckSyntacticControls() const {
-      return checkSyntacticControls;
+    void setAssertOnError(bool val = true) { assertOnError = val; }
+    void setAssertOnWarning(bool val = true) { assertOnWarning = val; }
+    void addAssertOnGroupID(DiagGroupID id) { assertOnGroupIDs.insert(id); }
+
+    bool shouldAssertOnGroup(DiagGroupID id) const {
+      return assertOnGroupIDs.count(id);
     }
 
     /// Whether to skip emitting warnings
@@ -738,6 +752,8 @@ namespace swift {
     void swap(DiagnosticState &other) {
       std::swap(showDiagnosticsAfterFatalError,
                 other.showDiagnosticsAfterFatalError);
+      std::swap(assertOnError, other.assertOnError);
+      std::swap(assertOnWarning, other.assertOnWarning);
       std::swap(suppressWarnings, other.suppressWarnings);
       std::swap(suppressNotes, other.suppressNotes);
       std::swap(suppressRemarks, other.suppressRemarks);
@@ -934,6 +950,10 @@ namespace swift {
       return state.getShowDiagnosticsAfterFatalError();
     }
 
+    void setAssertOnError(bool val = true) { state.setAssertOnError(val); }
+    void setAssertOnWarning(bool val = true) { state.setAssertOnWarning(val); }
+    void addAssertOnGroupID(DiagGroupID id) { state.addAssertOnGroupID(id); }
+
     void flushConsumers() {
       ASSERT(NumActiveDiags == 0 && "Expected in-flight diags to be flushed");
       for (auto consumer : Consumers)
@@ -956,14 +976,6 @@ namespace swift {
     void setSuppressRemarks(bool val) { state.setSuppressRemarks(val); }
     bool getSuppressRemarks() const {
       return state.getSuppressRemarks();
-    }
-
-    /// Whether to check syntactic `@warn` controls
-    void setCheckSyntacticControls(bool val = true) {
-      state.setCheckSyntacticControls(val);
-    }
-    bool getCheckSyntacticControls() const {
-      return state.getCheckSyntacticControls();
     }
 
     /// Apply rules specifing what warnings should or shouldn't be treated as

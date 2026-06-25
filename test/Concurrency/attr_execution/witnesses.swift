@@ -27,16 +27,16 @@ struct S: P {
 // CHECK-NEXT: [[CONTEXT_ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_TO_ACTOR]]
 // CHECK-NEXT: [[CONTEXT_ISOLATION_B:%.*]] = begin_borrow [[CONTEXT_ISOLATION]]
 // CHECK-NEXT: [[CONTEXT_ISOLATION_B_CAST:%.*]] = unchecked_value_cast [[CONTEXT_ISOLATION_B]] to $Builtin.ImplicitActor
-// CHECK-NEXT: [[PROP_WITNESS:%.*]] = witness_method $T, #P.prop!getter : <Self where Self : P> (Self) -> () async -> String : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
-// CHECK-NEXT: {{.*}} = apply [[PROP_WITNESS]]<T>([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
+// CHECK-NEXT: [[PROP_WITNESS:%.*]] = witness_method $T, #P.prop!getter : <Self where Self : P> (Self) -> () async -> String : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
+// CHECK-NEXT: {{.*}} = apply [[PROP_WITNESS]]<T>([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
 // CHECK: hop_to_executor [[BORROWED_MAIN_ACTOR]]
 // CHECK: [[MAIN_ACTOR_COPY:%.*]] = copy_value [[BORROWED_MAIN_ACTOR]]
 // CHECK-NEXT: [[ERASED_TO_ACTOR:%.*]] = init_existential_ref [[MAIN_ACTOR_COPY]] : $MainActor : $MainActor, $any Actor
 // CHECK-NEXT: [[CONTEXT_ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_TO_ACTOR]]
 // CHECK-NEXT: [[CONTEXT_ISOLATION_B:%.*]] = begin_borrow [[CONTEXT_ISOLATION]]
 // CHECK-NEXT: [[CONTEXT_ISOLATION_B_CAST:%.*]] = unchecked_value_cast [[CONTEXT_ISOLATION_B]] to $Builtin.ImplicitActor
-// CHECK-NEXT: [[FN_WITNESS:%.*]] = witness_method $T, #P.fn : <Self where Self : P> (Self) -> () async -> () : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
-// CHECK-NEXT: {{.*}} = apply [[FN_WITNESS]]<T>([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: [[FN_WITNESS:%.*]] = witness_method $T, #P.fn : <Self where Self : P> (Self) -> () async -> () : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: {{.*}} = apply [[FN_WITNESS]]<T>([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
 // CHECK: } // end sil function '$s9witnesses21testMainActorDispatch1tyx_tYaAA1PRzlF'
 @MainActor
 func testMainActorDispatch<T: P>(t: T) async {
@@ -48,12 +48,12 @@ func testMainActorDispatch<T: P>(t: T) async {
 // CHECK: [[CONTEXT_ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK-NEXT: hop_to_executor [[CONTEXT_ISOLATION]]
 // CHECK-NEXT: [[CONTEXT_ISOLATION_CAST:%.*]] = unchecked_value_cast [[CONTEXT_ISOLATION]] to $Builtin.ImplicitActor
-// CHECK-NEXT: [[PROP_WITNESS:%.*]] = witness_method $T, #P.prop!getter : <Self where Self : P> (Self) -> () async -> String : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
-// CHECK-NEXT: {{.*}} = apply [[PROP_WITNESS]]<T>([[CONTEXT_ISOLATION_CAST]], %0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
+// CHECK-NEXT: [[PROP_WITNESS:%.*]] = witness_method $T, #P.prop!getter : <Self where Self : P> (Self) -> () async -> String : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
+// CHECK-NEXT: {{.*}} = apply [[PROP_WITNESS]]<T>([[CONTEXT_ISOLATION_CAST]], %0) : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
 // CHECK-NEXT: hop_to_executor [[CONTEXT_ISOLATION]]
 // CHECK: [[CONTEXT_ISOLATION_CAST:%.*]] = unchecked_value_cast [[CONTEXT_ISOLATION]] to $Builtin.ImplicitActor
-// CHECK-NEXT: [[FN_WITNESS:%.*]] = witness_method $T, #P.fn : <Self where Self : P> (Self) -> () async -> () : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
-// CHECK-NEXT: {{.*}} = apply [[FN_WITNESS]]<T>([[CONTEXT_ISOLATION_CAST]], %0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: [[FN_WITNESS:%.*]] = witness_method $T, #P.fn : <Self where Self : P> (Self) -> () async -> () : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: {{.*}} = apply [[FN_WITNESS]]<T>([[CONTEXT_ISOLATION_CAST]], %0) : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
 // CHECK: } // end sil function '$s9witnesses19testGenericExecutor1tyx_tYaAA1PRzlF'
 func testGenericExecutor<T: P>(t: T) async {
   _ = await t.prop
@@ -69,16 +69,16 @@ actor Test {
   // CHECK-NEXT: [[CONTEXT_ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_TO_ACTOR]]
   // CHECK-NEXT: [[CONTEXT_ISOLATION_B:%.*]] = begin_borrow [[CONTEXT_ISOLATION]]
   // CHECK-NEXT: [[CONTEXT_ISOLATION_B_CAST:%.*]] = unchecked_value_cast [[CONTEXT_ISOLATION_B]] to $Builtin.ImplicitActor
-  // CHECK-NEXT: [[PROP_WITNESS:%.*]] = witness_method $T, #P.prop!getter : <Self where Self : P> (Self) -> () async -> String : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
-  // CHECK-NEXT: {{.*}} = apply [[PROP_WITNESS]]<T>([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
+  // CHECK-NEXT: [[PROP_WITNESS:%.*]] = witness_method $T, #P.prop!getter : <Self where Self : P> (Self) -> () async -> String : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
+  // CHECK-NEXT: {{.*}} = apply [[PROP_WITNESS]]<T>([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> @owned String
   // CHECK: hop_to_executor [[ACTOR]]
   // CHECK: [[ACTOR_COPY:%.*]] = copy_value [[ACTOR]]
   // CHECK-NEXT: [[ERASED_TO_ACTOR:%.*]] = init_existential_ref [[ACTOR_COPY]] : $Test : $Test, $any Actor
   // CHECK-NEXT: [[CONTEXT_ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_TO_ACTOR]]
   // CHECK-NEXT: [[CONTEXT_ISOLATION_B:%.*]] = begin_borrow [[CONTEXT_ISOLATION]]
   // CHECK-NEXT: [[CONTEXT_ISOLATION_B_CAST:%.*]] = unchecked_value_cast [[CONTEXT_ISOLATION_B]] to $Builtin.ImplicitActor
-  // CHECK-NEXT: [[FN_WITNESS:%.*]] = witness_method $T, #P.fn : <Self where Self : P> (Self) -> () async -> () : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
-  // CHECK-NEXT: {{.*}} = apply [[FN_WITNESS]]<T>([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(witness_method: P) @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+  // CHECK-NEXT: [[FN_WITNESS:%.*]] = witness_method $T, #P.fn : <Self where Self : P> (Self) -> () async -> () : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+  // CHECK-NEXT: {{.*}} = apply [[FN_WITNESS]]<T>([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(witness_method: P) @caller_isolated @async <τ_0_0 where τ_0_0 : P> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   // CHECK: } // end sil function '$s9witnesses4TestC4test1tyx_tYaAA1PRzlF'
   func test<T: P>(t: T) async {
     _ = await t.prop
@@ -96,16 +96,16 @@ actor Test {
 // CHECK-NEXT: [[CONTEXT_ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_TO_ACTOR]]
 // CHECK-NEXT: [[CONTEXT_ISOLATION_B:%.*]] = begin_borrow [[CONTEXT_ISOLATION]]
 // CHECK-NEXT: [[CONTEXT_ISOLATION_B_CAST:%.*]] = unchecked_value_cast [[CONTEXT_ISOLATION_B]] to $Builtin.ImplicitActor
-// CHECK: [[PROP_REF:%.*]] = function_ref @$s9witnesses1SV4propSSvg : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, S) -> @owned String
-// CHECK-NEXT: {{.*}} = apply [[PROP_REF]]([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, S) -> @owned String
+// CHECK: [[PROP_REF:%.*]] = function_ref @$s9witnesses1SV4propSSvg : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, S) -> @owned String
+// CHECK-NEXT: {{.*}} = apply [[PROP_REF]]([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, S) -> @owned String
 // CHECK: hop_to_executor [[BORROWED_MAIN_ACTOR]]
 // CHECK: [[MAIN_ACTOR_COPY:%.*]] = copy_value [[BORROWED_MAIN_ACTOR]]
 // CHECK-NEXT: [[ERASED_TO_ACTOR:%.*]] = init_existential_ref [[MAIN_ACTOR_COPY]] : $MainActor : $MainActor, $any Actor
 // CHECK-NEXT: [[CONTEXT_ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_TO_ACTOR]]
 // CHECK-NEXT: [[CONTEXT_ISOLATION_B:%.*]] = begin_borrow [[CONTEXT_ISOLATION]]
 // CHECK-NEXT: [[CONTEXT_ISOLATION_B_CAST:%.*]] = unchecked_value_cast [[CONTEXT_ISOLATION_B]] to $Builtin.ImplicitActor
-// CHECK: [[FN_REF:%.*]] = function_ref @$s9witnesses1SV2fnyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, S) -> ()
-// CHECK-NEXT: {{.*}} = apply [[FN_REF]]([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, S) -> ()
+// CHECK: [[FN_REF:%.*]] = function_ref @$s9witnesses1SV2fnyyYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, S) -> ()
+// CHECK-NEXT: {{.*}} = apply [[FN_REF]]([[CONTEXT_ISOLATION_B_CAST]], %0) : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, S) -> ()
 // CHECK: } // end sil function '$s9witnesses14testDirectCall1syAA1SV_tYaF'
 @MainActor
 func testDirectCall(s: S) async {

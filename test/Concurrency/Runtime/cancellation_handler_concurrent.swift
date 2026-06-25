@@ -6,6 +6,7 @@
 
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: freestanding
+// UNSUPPORTED: OS=emscripten
 
 func recurseABunch(_ call: () async throws -> Void, n: Int = 100) async throws {
   try await withTaskCancellationHandler {

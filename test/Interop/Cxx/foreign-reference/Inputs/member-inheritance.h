@@ -37,7 +37,7 @@ public:
     int getDerivedX() const {
         return getX();
     }
-} IMMORTAL_FRT;
+};
 
 CopyTrackedDerivedClass *makeCopyTrackedDerivedClass(int x) {
     return new CopyTrackedDerivedClass(x);
@@ -55,7 +55,7 @@ private:
 class CopyTrackedDerivedDerivedClass: public NonEmptyBase, public CopyTrackedDerivedClass {
 public:
     CopyTrackedDerivedDerivedClass(int x) : CopyTrackedDerivedClass(x) {}
-} IMMORTAL_FRT;
+};
 
 CopyTrackedDerivedDerivedClass *makeCopyTrackedDerivedDerivedClass(int x) {
     return new CopyTrackedDerivedDerivedClass(x);
@@ -73,7 +73,7 @@ BaseReturningFRTFromSubscript *makeBaseReturningFRTFromSubscript() {
 }
 
 class DerivedFromBaseReturningFRTFromSubscript
-    : public BaseReturningFRTFromSubscript{public : } IMMORTAL_FRT;
+    : public BaseReturningFRTFromSubscript{public : };
 
 DerivedFromBaseReturningFRTFromSubscript *makeDerivedFromBaseReturningFRTFromSubscript() {
     return new DerivedFromBaseReturningFRTFromSubscript();
@@ -92,7 +92,7 @@ private:
 } IMMORTAL_FRT;
 
 class DerivedFromBaseReturningFRTFromSubscriptPointer
-    : public BaseReturningFRTFromSubscriptPointer{public : } IMMORTAL_FRT;
+    : public BaseReturningFRTFromSubscriptPointer{public : };
 
 DerivedFromBaseReturningFRTFromSubscriptPointer *makeDerivedFromBaseReturningFRTFromSubscriptPointer() {
     return new DerivedFromBaseReturningFRTFromSubscriptPointer();
@@ -106,14 +106,14 @@ struct IMMORTAL_FRT ImmortalBase {
   virtual int getIntValue() const { return value; }
 };
 
-struct IMMORTAL_FRT Immortal : public ImmortalBase {
+struct Immortal : public ImmortalBase {
   static Immortal *_Nonnull create() { return new Immortal(); }
 
   virtual int getOverridden42() const override { return 42; }
   virtual void setIntValue(int newValue) { this->value = newValue; }
 };
 
-struct IMMORTAL_FRT DerivedFromImmortal : public Immortal {
+struct DerivedFromImmortal : public Immortal {
   static DerivedFromImmortal *_Nonnull create() {
     return new DerivedFromImmortal();
   }
@@ -365,3 +365,44 @@ struct DerivedAbstractFRT : AbstractFRT {
 };
 
 struct EmptyDerivedAbstractFRT : AbstractFRT {};
+
+struct IMMORTAL_FRT BaseWithInitMethod {
+  virtual int init() const { return 1; }
+  static BaseWithInitMethod *_Nonnull create() { return new BaseWithInitMethod(); }
+};
+
+struct DerivedWithInitMethod : BaseWithInitMethod {
+  virtual int init() const override { return 2; }
+  static DerivedWithInitMethod *_Nonnull create() {
+    return new DerivedWithInitMethod();
+  }
+};
+
+struct IMMORTAL_FRT RenamedBaseWithInitMethod {
+  virtual int method() const __attribute__((swift_name("init()"))) {
+    return 11;
+  }
+  static RenamedBaseWithInitMethod *_Nonnull create() {
+    return new RenamedBaseWithInitMethod();
+  }
+};
+
+struct RenamedDerivedWithInitMethod : RenamedBaseWithInitMethod {
+  virtual int method() const override __attribute__((swift_name("init()"))) {
+    return 12;
+  }
+  static RenamedDerivedWithInitMethod *_Nonnull create() {
+    return new RenamedDerivedWithInitMethod();
+  }
+};
+
+struct IMMORTAL_FRT HasCreateMethodImportedAsInitializer {
+  int field;
+
+  int getField() const { return field; }
+
+  static HasCreateMethodImportedAsInitializer *_Nonnull create(int v)
+      __attribute__((swift_name("init(n:)"))) {
+    return new HasCreateMethodImportedAsInitializer{v * 5};
+  }
+};

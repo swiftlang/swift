@@ -118,9 +118,9 @@ static const constexpr StoredDiagnosticInfo storedDiagnosticInfos[] = {
 #define GROUPED_WARNING(ID, Group, Options, Text, Signature)                   \
   StoredDiagnosticInfo(DiagnosticKind::Warning, DiagnosticOptions::Options,    \
                        DiagGroupID::Group),
-#define NOTE(ID, Options, Text, Signature)                                     \
+#define GROUPED_NOTE(ID, Group, Options, Text, Signature)                      \
   StoredDiagnosticInfo(DiagnosticKind::Note, DiagnosticOptions::Options,       \
-                       DiagGroupID::no_group),
+                       DiagGroupID::Group),
 #define REMARK(ID, Options, Text, Signature)                                   \
   StoredDiagnosticInfo(DiagnosticKind::Remark, DiagnosticOptions::Options,     \
                        DiagGroupID::no_group),
@@ -270,14 +270,27 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
   // the token we want to remove.
   auto &SM = Engine->SourceMgr;
   auto charRange = toCharSourceRange(SM, R);
+  auto charAfter = extractCharAfter(SM, charRange.getEnd());
 
-  // If we're removing something (e.g. a keyword), do a bit of extra work to
-  // make sure that we leave the code in a good place, without extraneous white
-  // space around its hole.  Specifically, check to see there is whitespace
-  // before and after the end of range.  If so, nuke the space afterward to keep
-  // things consistent.
-  if (extractCharAfter(SM, charRange.getEnd()) == ' ' &&
-      isspace(extractCharBefore(SM, charRange.getStart()))) {
+  // If we're removing something (e.g. a keyword or an attribute), do a bit of
+  // extra work to make sure that we leave the code in a good place, without
+  // extraneous white space around its hole:
+  //
+  //  - If there's a newline immediately following the range, check whether the
+  //    content of the line leading up to the range is all whitespace. Remove
+  //    the entire line if so.
+  //  - If there is a space before and after the end of range, nuke the
+  //    space afterward to keep things consistent.
+  if (charAfter == '\n' || charAfter == '\r') {
+    auto lineStartLoc = Lexer::getLocForStartOfLine(SM, charRange.getStart());
+    auto lineStart = SM.extractText(
+        toCharSourceRange(SM, lineStartLoc, charRange.getStart()));
+    if (lineStart.ltrim().empty()) {
+      charRange = CharSourceRange(
+          lineStartLoc, lineStart.size() + charRange.getByteLength() + 1);
+    }
+  } else if (charAfter == ' ' &&
+             isspace(extractCharBefore(SM, charRange.getStart()))) {
     charRange = CharSourceRange(charRange.getStart(),
                                 charRange.getByteLength()+1);
   }
@@ -589,11 +602,11 @@ bool DiagnosticEngine::finishProcessing() {
 
 bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (getCheckSyntacticControls() && sf &&
-      sf->Kind != SourceFileKind::Interface && sf->getExportedSourceFile()) {
+  if (sf && sf->Kind != SourceFileKind::Interface &&
+      sf->getExportedSourceFile()) {
     auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
     return swift_ASTGen_isWarningGroupEnabledInFile(
-        sf->getExportedSourceFile(),
+        sf->getExportedSourceFile(), sf->getASTContext(),
         BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
         StringRef(getDiagGroupInfoByID(groupID).name));
   }
@@ -1314,15 +1327,6 @@ DiagnosticBehavior toDiagnosticBehavior(DiagnosticKind kind, bool isFatal) {
   llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
-// A special option only for compiler writers that causes Diagnostics to assert
-// when a failure diagnostic is emitted. Intended for use in the debugger.
-llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
-                                  llvm::cl::init(false));
-// A special option only for compiler writers that causes Diagnostics to assert
-// when a warning diagnostic is emitted. Intended for use in the debugger.
-llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
-                                    llvm::cl::init(false));
-
 std::optional<DiagnosticBehavior>
 DiagnosticState::determineUserControlledWarningBehavior(
     const Diagnostic &diag, SourceManager &sourceMgr) const {
@@ -1352,9 +1356,6 @@ DiagnosticState::determineUserControlledWarningBehavior(
   } else
     userControlledBehavior = std::nullopt;
 
-  if (!checkSyntacticControls)
-    return userControlledBehavior;
-
 #if SWIFT_BUILD_SWIFT_SYNTAX
   // Use the combined global controls (command-line flags such as `-Werror`)
   // and syntactic controls at the source location of this diagnostic to
@@ -1365,14 +1366,13 @@ DiagnosticState::determineUserControlledWarningBehavior(
         sourceMgr.findBufferContainingLoc(loc));
     if (!sourceFiles.empty()) {
       SourceFile *SF = sourceFiles.front();
-      // Don't run syntactic @warn controls for .swiftinterface files.
-      if (getCheckSyntacticControls() && SF &&
-          SF->Kind != SourceFileKind::Interface &&
+      // Don't run syntactic @diagnose controls for .swiftinterface files.
+      if (SF && SF->Kind != SourceFileKind::Interface &&
           SF->getExportedSourceFile()) {
         auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
         WarningGroupBehavior behavior =
             swift_ASTGen_warningGroupBehaviorAtPosition(
-                SF->getExportedSourceFile(),
+                SF->getExportedSourceFile(), SF->getASTContext(),
                 BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
                 StringRef(getDiagGroupInfoByID(diag.getGroupID()).name), loc);
         switch (behavior) {
@@ -1463,8 +1463,8 @@ void DiagnosticState::updateFor(DiagnosticBehavior behavior) {
     anyErrorOccurred = true;
   }
 
-  ASSERT((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-  ASSERT((!AssertOnWarning || (behavior != DiagnosticBehavior::Warning)) &&
+  ASSERT((!assertOnError || !anyErrorOccurred) && "We emitted an error?!");
+  ASSERT((!assertOnWarning || (behavior != DiagnosticBehavior::Warning)) &&
          "We emitted a warning?!");
 
   previousBehavior = behavior;
@@ -1530,6 +1530,15 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   auto behavior = state.determineBehavior(diagnostic, SourceMgr);
   state.updateFor(behavior);
 
+  if (behavior != DiagnosticBehavior::Ignore) {
+    auto groupID = diagnostic.getGroupID();
+    if (groupID != DiagGroupID::no_group &&
+        state.shouldAssertOnGroup(groupID)) {
+      ASSERT(false && "Trapping on diagnostic group (see "
+                      "-diagnostics-assert-on-group)");
+    }
+  }
+
   if (behavior == DiagnosticBehavior::Ignore)
     return std::nullopt;
 
@@ -1552,12 +1561,12 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   StringRef CategoryName;
   if (auto wrapped = diagnostic.getWrappedDiagnostic())
     CategoryName = wrapped.value()->getCategoryName();
+  else if (groupID != DiagGroupID::no_group)
+    CategoryName = getDiagGroupInfoByID(groupID).name;
   else if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     CategoryName = "api-digester-breaking-change";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
     CategoryName = "no-usage";
-  else if (groupID != DiagGroupID::no_group)
-    CategoryName = getDiagGroupInfoByID(groupID).name;
   else if (isDeprecationDiagnostic(diagnostic.getID()))
     CategoryName = "deprecation";
 
@@ -1574,6 +1583,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
       case GeneratedSourceInfo::PrettyPrinted:
       case GeneratedSourceInfo::DefaultArgument:
       case GeneratedSourceInfo::AttributeFromClang:
+      case GeneratedSourceInfo::SyntheticMacro:
         fixIts = {};
         break;
       case GeneratedSourceInfo::ReplacedFunctionBody:
@@ -1622,6 +1632,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacro:
     return DeclName();
   }
 }
@@ -1684,6 +1695,7 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
     case GeneratedSourceInfo::DefaultArgument:
     case GeneratedSourceInfo::ReplacedFunctionBody:
     case GeneratedSourceInfo::AttributeFromClang:
+    case GeneratedSourceInfo::SyntheticMacro:
       return childNotes;
     }
 

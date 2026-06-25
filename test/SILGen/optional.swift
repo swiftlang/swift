@@ -46,7 +46,7 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK-NEXT: cond_br [[HASVALUE]], bb1, bb3
 //   If so, pull out the value...
 // CHECK:    bb1:
-// CHECK-NEXT: [[T1:%.*]] = unchecked_take_enum_data_addr [[READ]]
+// CHECK-NEXT: [[T1:%.*]] = unchecked_inplace_enum_data_addr [[READ]]
 // CHECK-NEXT: [[T0:%.*]] = load [copy] [[T1]]
 // CHECK-NEXT: end_access [[READ]]
 //   ...evaluate the rest of the suffix...
@@ -83,7 +83,7 @@ func wrap_then_unwrap<T>(_ x: T) -> T {
   // CHECK: [[FAIL]]:
   // CHECK:   unreachable
   // CHECK: [[OK]]:
-  // CHECK:   unchecked_take_enum_data_addr
+  // CHECK:   unchecked_inplace_enum_data_addr
   return wrap(x)!
 }
 

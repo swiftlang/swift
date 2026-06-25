@@ -1731,6 +1731,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     case SourceFileKind::Library:
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
+    case SourceFileKind::SyntheticMacro:
       break;
     }
   }
@@ -1850,6 +1851,26 @@ static void diagnoseRetroactiveConformances(
   // We better only be conforming it to protocols declared within this module.
   llvm::SmallMapVector<ProtocolDecl *, bool, 8> protocols;
   llvm::SmallPtrSet<ProtocolDecl *, 2> protocolsWithRetroactiveAttr;
+  llvm::SmallPtrSet<ProtocolDecl *, 4> unavailableProtocols;
+
+  // Collect the protocols with unavailable extensions; we shouldn't diagnose
+  // these as needing @retroactive, since they are unavailable.
+  for (auto *otherExt : extendedNominalDecl->getExtensions()) {
+    if (otherExt == ext || !otherExt->isUnavailable())
+      continue;
+    for (const auto &inherited : otherExt->getInherited().getEntries()) {
+      auto inheritedTy = inherited.getType();
+      if (inheritedTy.isNull() || !inheritedTy->isExistentialType())
+        continue;
+
+      auto layout = inheritedTy->getExistentialLayout();
+      for (auto *proto : layout.getProtocols()) {
+        unavailableProtocols.insert(proto);
+        for (auto *inherited : proto->getAllInheritedProtocols())
+          unavailableProtocols.insert(inherited);
+      }
+    }
+  }
 
   for (auto *conformance : ext->getLocalConformances()) {
     auto *proto = conformance->getProtocol();
@@ -1933,16 +1954,46 @@ static void diagnoseRetroactiveConformances(
   }
 
   // Remove protocols that are reachable through a @retroactive conformance.
+  // Separate unavailable protocols, and ignore unavailable Sendable since that
+  // is handled by TypeCheckProtocol.
   SmallSetVector<ProtocolDecl *, 4> externalProtocols;
+  SmallSetVector<ProtocolDecl *, 4> unavailableExternalProtocols;
   for (auto pair : protocols) {
-    if (pair.second && !protocolsWithRetroactiveAttr.count(pair.first))
+    if (!pair.second || protocolsWithRetroactiveAttr.count(pair.first))
+      continue;
+
+    if (unavailableProtocols.count(pair.first)) {
+      // TypeCheckProtocol handles sendable.
+      if (!pair.first->isSpecificProtocol(KnownProtocolKind::Sendable))
+        unavailableExternalProtocols.insert(pair.first);
+    } else {
       externalProtocols.insert(pair.first);
+    }
   }
 
   // If we didn't find any violations, we're done.
-  if (externalProtocols.empty()) {
+  if (externalProtocols.empty() && unavailableExternalProtocols.empty()) {
     return;
   }
+
+  // Diagnose unavailable non-Sendable protocols.
+  if (!unavailableExternalProtocols.empty()) {
+    llvm::SmallString<32> unavailableList;
+    {
+      llvm::raw_svector_ostream os(unavailableList);
+      llvm::interleaveComma(
+          unavailableExternalProtocols, os,
+          [&os](ProtocolDecl *proto) { os << "'" << proto->getName() << "'"; });
+    }
+    ext->diagnose(diag::extension_retroactive_conformance_unavailable,
+                  extendedNominalDecl->getName(),
+                  unavailableExternalProtocols.size() == 1,
+                  unavailableList.str(), extTypeModule->getName());
+  }
+
+  // If there are no non-unavailable retroactive conformances, we're done.
+  if (externalProtocols.empty())
+    return;
 
   // Diagnose the list of protocols we're introducing a conformance to.
 
@@ -1970,6 +2021,8 @@ static void diagnoseRetroactiveConformances(
   // declaration to silence the warning. Each one of these gets removed from the
   // externalProtocols list, and that might end up being all of them.
   for (const InheritedEntry &entry : ext->getInherited().getEntries()) {
+    // TODO: Handle compositions where all protocols could have `@retroactive `
+    // inserted. A composition won't have a nominal type.
     auto protoDecl =
         dyn_cast_or_null<ProtocolDecl>(entry.getType()->getAnyNominal());
     TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
@@ -2131,25 +2184,46 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
 }
 
 static void dumpGenericSignature(ASTContext &ctx, GenericContext *GC) {
-  if (ctx.TypeCheckerOpts.DebugGenericSignatures) {
-    if (auto sig = GC->getGenericSignature()) {
+  if (!ctx.TypeCheckerOpts.DebugGenericSignatures)
+    return;
+
+  auto *VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl());
+
+  auto dumpSig = [&](GenericSignature sig, bool isOpaque) {
+    llvm::errs() << "\n";
+    if (isOpaque) {
+      llvm::errs() << "Opaque result type of ";
+    }
+    if (VD) {
+      VD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
-      if (auto *VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
-        VD->dumpRef(llvm::errs());
-        llvm::errs() << "\n";
-      } else {
-        GC->printContext(llvm::errs());
+    } else {
+      GC->printContext(llvm::errs());
+    }
+    llvm::errs() << (isOpaque ? "Opaque result signature: "
+                              : "Generic signature: ");
+    PrintOptions Opts = PrintOptions::forDebugging();
+    Opts.ProtocolQualifiedDependentMemberTypes = true;
+    Opts.PrintInverseRequirements =
+        !ctx.TypeCheckerOpts.DebugInverseRequirements;
+    sig->print(llvm::errs(), Opts);
+    llvm::errs() << "\n";
+    llvm::errs() << (isOpaque ? "Canonical opaque result signature: "
+                              : "Canonical generic signature: ");
+    sig.getCanonicalSignature()->print(llvm::errs(), Opts);
+    llvm::errs() << "\n";
+  };
+
+  if (auto sig = GC->getGenericSignature())
+    dumpSig(sig, /*isOpaque=*/false);
+
+  // If we have a ValueDecl, also visit its opaque result type and
+  // dump its signature.
+  if (VD) {
+    if (auto *OTD = VD->getOpaqueResultTypeDecl()) {
+      if (auto sig = OTD->getOpaqueInterfaceGenericSignature()) {
+        dumpSig(sig, /*isOpaque=*/true);
       }
-      llvm::errs() << "Generic signature: ";
-      PrintOptions Opts = PrintOptions::forDebugging();
-      Opts.ProtocolQualifiedDependentMemberTypes = true;
-      Opts.PrintInverseRequirements =
-          !ctx.TypeCheckerOpts.DebugInverseRequirements;
-      sig->print(llvm::errs(), Opts);
-      llvm::errs() << "\n";
-      llvm::errs() << "Canonical generic signature: ";
-      sig.getCanonicalSignature()->print(llvm::errs(), Opts);
-      llvm::errs() << "\n";
     }
   }
 }
@@ -2322,6 +2396,18 @@ public:
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
     }
+    // Report import of an IPI module from a non-IPI module.
+    if (target && target->getLibraryLevel() == LibraryLevel::IPI &&
+        Ctx.LangOpts.LibraryLevel > LibraryLevel::IPI &&
+        !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+        ID->getAccessLevel() == AccessLevel::Public) {
+      auto importer = ID->getModuleContext();
+      unsigned importerLevel =
+          Ctx.LangOpts.LibraryLevel == LibraryLevel::API ? 0 : 1;
+      Ctx.Diags.diagnose(ID, diag::warn_import_of_ipi_module,
+                         target->getName(), importer->getName(),
+                         importerLevel);
+    }
 
     // Preconcurrency imports aren't strictly memory-safe when we have strict
     // concurrency checking enabled.
@@ -2334,7 +2420,10 @@ public:
   }
 
   void visitUsingDecl(UsingDecl *UD) {
-    // Nothing to validate yet.
+    if (!UD->getDeclContext()->isModuleScopeContext()) {
+      // 'using' is only valid at file scope.
+      UD->diagnose(diag::decl_inner_scope);
+    }
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
@@ -2695,6 +2784,7 @@ public:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             var->diagnose(diag::opaque_type_var_no_init);
             break;
           }
@@ -2720,6 +2810,7 @@ public:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             break;
           }
 
@@ -2742,6 +2833,7 @@ public:
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             break;
           }
 
@@ -2959,11 +3051,10 @@ public:
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    // Force requests that can emit diagnostics.
-    (void) OTD->getGenericSignature();
-
-    TypeChecker::checkDeclAttributes(OTD);
-    checkAccessControl(OTD);
+    // OpaqueTypeDecls don't appear as members of types or extensions, or
+    // directly within statements, so we will never see them directly in
+    // this walk.
+    ABORT("Shouldn't end up here");
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
@@ -3833,49 +3924,65 @@ public:
     }
   }
 
+  void diagnoseInvalidExtension(ExtensionDecl *ED, Type extType) {
+    const bool wasAlreadyInvalid = ED->isInvalid();
+    ED->setInvalid();
+
+    // Diagnose unsupported cases.
+    if (!extType->hasError() && extType->getAnyNominal()) {
+      auto canExtType = extType->getCanonicalType();
+      if (auto existential = canExtType->getAs<ExistentialType>()) {
+        ED->diagnose(diag::unsupported_existential_extension, extType)
+            .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+        ED->diagnose(diag::invalid_extension_rewrite,
+                     existential->getConstraintType())
+            .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                          existential->getConstraintType()->getString());
+        return;
+      }
+
+      // If we've got here, then we have some kind of extension of a prima
+      // facie non-nominal type.  This can come up when we're projecting
+      // typealiases out of bound generic types.
+      //
+      // struct Array<T> { typealias Indices = Range<Int> }
+      // extension Array.Indices.Bound {}
+      //
+      // Offer to rewrite it to the underlying nominal type.
+      if (canExtType.getPointer() != extType.getPointer()) {
+        ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
+            .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+        ED->diagnose(diag::invalid_extension_rewrite, canExtType)
+            .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                          canExtType->getString());
+        return;
+      }
+    }
+
+    if (wasAlreadyInvalid)
+      return;
+
+    // If nothing else applies, fall back to a generic diagnostic.
+    ED->diagnose(diag::non_nominal_extension, extType);
+  }
+
   void visitExtensionDecl(ExtensionDecl *ED) {
     // Produce any diagnostics for the extended type.
     auto extType = ED->getExtendedType();
 
     auto *nominal = ED->getExtendedNominal();
 
+    // If we couldn't resolve the extended decl, diagnose.
+    // FIXME: We shouldn't be diagnosing here, we should be diagnosing directly
+    // in the request such that the extension's "is invalid" bit is accurate.
     if (nominal == nullptr) {
-      const bool wasAlreadyInvalid = ED->isInvalid();
-      ED->setInvalid();
-      if (!extType->hasError() && extType->getAnyNominal()) {
-        auto canExtType = extType->getCanonicalType();
-        if (auto existential = canExtType->getAs<ExistentialType>()) {
-          ED->diagnose(diag::unsupported_existential_extension, extType)
-              .highlight(ED->getExtendedTypeRepr()->getSourceRange());
-          ED->diagnose(diag::invalid_extension_rewrite,
-                       existential->getConstraintType())
-              .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
-                            existential->getConstraintType()->getString());
-          return;
-        }
+      diagnoseInvalidExtension(ED, extType);
 
-        // If we've got here, then we have some kind of extension of a prima
-        // facie non-nominal type.  This can come up when we're projecting
-        // typealiases out of bound generic types.
-        //
-        // struct Array<T> { typealias Indices = Range<Int> }
-        // extension Array.Indices.Bound {}
-        //
-        // Offer to rewrite it to the underlying nominal type.
-        if (canExtType.getPointer() != extType.getPointer()) {
-          ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
-              .highlight(ED->getExtendedTypeRepr()->getSourceRange());
-          ED->diagnose(diag::invalid_extension_rewrite, canExtType)
-              .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
-                            canExtType->getString());
-          return;
-        }
-      }
-
-      if (!wasAlreadyInvalid) {
-        // If nothing else applies, fall back to a generic diagnostic.
-        ED->diagnose(diag::non_nominal_extension, extType);
-      }
+      // Make sure to still recurse into the extension members though, otherwise
+      // they will be left un-type-checked, which violates the assumption that
+      // all AST is type-checked after Sema runs.
+      for (Decl *Member : ED->getMembers())
+        visit(Member);
 
       return;
     }

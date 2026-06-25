@@ -59,6 +59,9 @@
     },
     {
        "name": "debug-info-explicit-dependency"
+    },
+    {
+       "name": "ipi-clang-module"
     }
   ]
 }

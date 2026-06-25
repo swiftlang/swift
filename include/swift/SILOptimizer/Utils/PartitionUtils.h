@@ -248,11 +248,11 @@ private:
 class IsolationHistory {
 public:
   class Factory;
+  class Node;
 
 private:
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
-  class Node;
 
   // TODO: This shouldn't need to be a friend.
   friend class Partition;
@@ -1302,10 +1302,17 @@ public:
     Element sentElement;
     SILDynamicMergedIsolationInfo isolationRegionInfo;
 
+    /// The isolation history of the partition at the point the send was
+    /// detected. Used to emit notes explaining why a disconnected element ended
+    /// up in an isolated region.
+    IsolationHistory isolationHistory;
+
     SentNeverSendableError(const PartitionOp &op, Element sentElement,
-                           SILDynamicMergedIsolationInfo isolationRegionInfo)
+                           SILDynamicMergedIsolationInfo isolationRegionInfo,
+                           IsolationHistory isolationHistory)
         : op(&op), sentElement(sentElement),
-          isolationRegionInfo(isolationRegionInfo) {}
+          isolationRegionInfo(isolationRegionInfo),
+          isolationHistory(isolationHistory) {}
 
     SentNeverSendableError(SentNeverSendableError &&other) = default;
     SentNeverSendableError &operator=(SentNeverSendableError &&other) = default;
@@ -1401,6 +1408,9 @@ public:
     /// If we are actor isolated due to being in the same region as the out
     /// parameter of a actor isolated method... this is that actor isolation.
     SILDynamicMergedIsolationInfo isolationInfo;
+
+    /// If set, the emitter should downgrade this error to a warning.
+    bool downgradeToWarning = false;
 
     InOutSendingReturnedError(const PartitionOp &op,
                               Element inoutSendingElement,
@@ -1742,6 +1752,28 @@ public:
     return SILValue();
   }
 
+  /// If \p region is contains a sending indirect out parameter, return that.
+  std::optional<Element> findSendingOutParameterInRegion(Region region) const {
+    for (const auto &pair : p.range()) {
+      if (pair.second != region)
+        continue;
+      // See if we have an indirect out parameter...
+      if (asImpl().getSendingIndirectOutParameter(pair.first)) {
+        return pair.first;
+      }
+
+      // If this was not an out parameter, return {}.
+      return {};
+    }
+
+    // After going over our loop, if result is not SILValue(), then we found
+    // that our region is not disconnected due only to a single 'indirect out'
+    // parameter. If SILValue() then we had all disconnected values. If we found
+    // multiple non-disconnected things, we would have bailed earlier in the
+    // loop itself.
+    return {};
+  }
+  
   /// Given the region \p regionOfInOutSendingParam containing the 'inout
   /// sending' parameter \p firstInOutSendingParam, see if that region contains
   /// any other 'inout sending' parameters with greater element numbers than \p
@@ -1890,8 +1922,21 @@ public:
 
     // Set the boundary so that as we push, this shows when to stop processing
     // for this PartitionOp.
-    SILLocation loc = op.hasSourceInst() ? getLoc(op.getSourceInst())
-                                         : getLoc(op.getSourceOp());
+    //
+    // For PartitionOps sourced from a specific apply argument operand, prefer
+    // the apply's per-argument SILLocation when one is stored. This is the
+    // ONLY consumer of those per-argument locations today: the location ends
+    // up on a SequenceBoundary node and is read back by the
+    // IsolationHistoryNoteEmitter chain walker. When the producer (SILGen)
+    // hasn't filled in per-argument locations, getArgumentLoc() falls back to
+    // the apply's anchor location, so behavior is unchanged for functions
+    // that haven't opted in to isolation-history.
+    SILLocation loc = SILLocation::invalid();
+    if (op.hasSourceInst()) {
+      loc = getLoc(op.getSourceInst());
+    } else if (Operand *srcOp = op.getSourceOp()) {
+      loc = getLoc(srcOp);
+    }
     p.pushHistorySequenceBoundary(loc);
 
     switch (op.getKind()) {
@@ -2117,9 +2162,8 @@ public:
              "Require PartitionOp's argument should already be tracked");
 
       // First check if the region of our 'inout sending' element has been
-      // sent. In that case, we emit a special use after free error so that the
-      // user knows that they need to reinitialize the 'inout sending'
-      // parameter.
+      // sent. In that case, we emit a special error so that the user knows that
+      // they need to reinitialize the 'inout sending' parameter.
       if (auto *sentOperandSet = p.getSentOperandSet(op.getOpArg1())) {
         for (auto sentOperand : sentOperandSet->data()) {
           handleError(InOutSendingNotInitializedAtExitError(op, op.getOpArg1(),
@@ -2179,6 +2223,8 @@ public:
         // exit error... check if our dynamic region isolation is not
         // disconnected since it is in the same region an out parameter. In that
         // case we want to emit a special 'cannot return value' error.
+        //
+        // This handles task-isolated captures.
         if (auto outParam =
                 findNonDisconnectedOutParameterInRegion(inoutSendingRegion)) {
           handleError(InOutSendingReturnedError(op, op.getOpArg1(),
@@ -2209,7 +2255,7 @@ public:
         return;
       }
 
-      // Finally We could still be returning a disconnected value in the same
+      // Finally we could still be returning a disconnected value in the same
       // region as an 'inout sending' parameter. We cannot allow that since the
       // caller considers 'inout sending' values to be in their own region on
       // function return. So it would assume that it could potentially send the
@@ -2224,6 +2270,22 @@ public:
         dynamicRegionIsolation = {isolation};
       }
 
+      // Then check if we have a sending out parameter. This will actually be
+      // disconnected unlike most other out parameters that are
+      // task-isolated. So it will look like we have a disconnected value, but
+      // we do not want to allow for an 'inout sending' parameter to also be
+      // returned as a 'sending' result since it would potentially allow for
+      // them to be send separately.
+      if (auto outParam =
+          findSendingOutParameterInRegion(inoutSendingRegion)) {
+        InOutSendingReturnedError error(op, op.getOpArg1(), outParam.value(),
+                                       dynamicRegionIsolation);
+        error.downgradeToWarning = true;
+        handleError(std::move(error));
+        return;
+      }
+
+      // If we did not, then handle the direct return case.
       handleDirectReturn();
       return;
     }
@@ -2342,13 +2404,12 @@ private:
       // If our instruction does not have any isolation info associated with it,
       // it must be nonisolated. See if our function has a matching isolation to
       // our sent operand. If so, we can squelch this.
-      if (auto functionIsolation =
-              sentOp->getUser()->getFunction()->getActorIsolation()) {
-        if (functionIsolation->isActorIsolated() &&
-            SILIsolationInfo::get(sentOp->getUser())
-                .hasSameIsolation(*functionIsolation))
-          return;
-      }
+      auto functionIsolation =
+          sentOp->getUser()->getFunction()->getActorIsolation();
+      if (functionIsolation.isActorIsolated() &&
+          SILIsolationInfo::get(sentOp->getUser())
+              .hasSameIsolation(functionIsolation))
+        return;
     }
 
     // Ok, we actually need to emit a call to the callback.
@@ -2386,8 +2447,8 @@ private:
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleError(
-        SentNeverSendableError(op, elt, dynamicMergedIsolationInfo));
+    return handleError(SentNeverSendableError(
+        op, elt, dynamicMergedIsolationInfo, p.getIsolationHistory()));
   }
 };
 
@@ -2423,6 +2484,10 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// return that value.
   SILValue getIndirectOutParameter(Element elt) const { return {}; }
 
+  /// If \p elt maps to a representative that is a sending indirect out parameter,
+  /// return that value.
+  SILValue getSendingIndirectOutParameter(Element elt) const { return {}; }
+  
   /// If \p elt maps to a representative that is an 'inout sending' parameter
   /// that returns that value.
   SILValue getInOutSendingParameter(Element elt) const { return {}; }
@@ -2462,7 +2527,20 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   bool shouldTryToSquelchErrors() const { return true; }
 
   static SILLocation getLoc(SILInstruction *inst) { return inst->getLoc(); }
-  static SILLocation getLoc(Operand *op) { return op->getUser()->getLoc(); }
+  static SILLocation getLoc(Operand *op) {
+    // For PartitionOps sourced from a specific apply argument operand, prefer
+    // the apply's per-argument SILLocation when one is stored. This is the
+    // ONLY consumer of those per-argument locations today: the location ends
+    // up on a SequenceBoundary node and is read back by the
+    // IsolationHistoryNoteEmitter chain walker. When the producer (SILGen)
+    // hasn't filled in per-argument locations, getArgumentLoc() falls back to
+    // the apply's anchor location, so behavior is unchanged for functions
+    // that haven't opted in to isolation-history.
+    if (auto as = ApplySite::isa(op->getUser());
+        as && as.isArgumentOperand(*op))
+      return as.getArgumentLoc(op);
+    return op->getUser()->getLoc();
+  }
   static SILInstruction *getSourceInst(const PartitionOp &partitionOp) {
     return partitionOp.getSourceInst();
   }

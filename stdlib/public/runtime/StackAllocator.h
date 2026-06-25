@@ -35,6 +35,19 @@
 
 namespace swift {
 
+/// malloc/free-based allocator to be used with the StackAllocator to allocate
+/// the slabs themselves.
+class MallocFreeAllocator {
+public:
+  void *allocateGlobal(size_t size, size_t alignMask) {
+    return malloc(size);
+  }
+
+  void deallocateGlobal(void* ptr, size_t size, size_t alignMask) {
+    free(ptr);
+  }
+};
+
 /// A bump-pointer allocator that obeys a stack discipline.
 ///
 /// StackAllocator performs fast allocation and deallocation of memory by
@@ -64,9 +77,12 @@ namespace swift {
 ///   returns true - the slab allocator is used
 /// This function MUST return the same value throughout the lifetime the stack
 /// allocator.
+///
+/// UnderlyingAllocator 
 template <size_t SlabCapacity, Metadata *SlabMetadataPtr,
-          typename SlabAllocatorConfiguration>
-class StackAllocator {
+          typename SlabAllocatorConfiguration,
+          typename UnderlyingAllocator = MallocFreeAllocator>
+class StackAllocator: public UnderlyingAllocator {
 private:
 
   struct Allocation;
@@ -273,7 +289,8 @@ private:
 
     size_t capacity = std::max(SlabCapacity,
                                Allocation::includingHeader(size));
-    void *slabBuffer = malloc(Slab::includingHeader(capacity));
+    void *slabBuffer = this->allocateGlobal(Slab::includingHeader(capacity),
+                                            alignof(Slab) - 1);
     Slab *newSlab = ::new (slabBuffer) Slab(capacity);
     if (slab)
       slab->next = newSlab;
@@ -292,7 +309,7 @@ private:
       Slab *next = slab->next;
       freedCapacity += slab->capacity;
       slab->clearMetadata();
-      free(slab);
+      this->deallocateGlobal(slab, slab->capacity, alignof(Slab) - 1);
       numAllocatedSlabs--;
       slab = next;
     }
@@ -303,6 +320,12 @@ public:
   /// Construct a StackAllocator without a pre-allocated first slab.
   StackAllocator()
       : firstSlab(nullptr), firstSlabIsPreallocated(false),
+        numAllocatedSlabs(0), configuration() {}
+
+  /// Construct a StackAllocator given an underlying allocator.
+  StackAllocator(const UnderlyingAllocator &underlying)
+      : UnderlyingAllocator(underlying),
+        firstSlab(nullptr), firstSlabIsPreallocated(false),
         numAllocatedSlabs(0), configuration() {}
 
   /// Construct a StackAllocator with a pre-allocated first slab.
@@ -350,7 +373,7 @@ public:
     // getting folded into its enableSlabAllocator() call, and the fast path
     // where `slab` is non-null ends up with no extra conditionals at all.
     if (SWIFT_UNLIKELY(!slab))
-      return malloc(size);
+      return this->allocateGlobal(size, alignment - 1);
 
     Allocation *allocation = slab->allocate(alignedSize, lastAllocation);
     lastAllocation = allocation;
@@ -364,7 +387,8 @@ public:
     if (SWIFT_UNLIKELY(!lastAllocation ||
                        lastAllocation->getAllocatedMemory() != ptr)) {
       if (!configuration.enableSlabAllocator())
-        return free(ptr);
+        return this->deallocateGlobal(ptr, -1, 0);
+
       SWIFT_FATAL_ERROR(0, "freed pointer was not the last allocation");
     }
 

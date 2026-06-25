@@ -30,9 +30,7 @@ actor Custom {
 
 @globalActor
 struct CustomActor {
-    static var shared: Custom {
-        return Custom()
-    }
+    static let shared = Custom()
 }
 
 @MainActor func transferToMainIndirect<T>(_ t: T) async {}
@@ -151,8 +149,8 @@ func transferInAndOut(_ x: sending NonSendableKlass) -> sending NonSendableKlass
 
 func transferReturnArg(_ x: NonSendableKlass) -> sending NonSendableKlass {
   return x // expected-warning {{sending 'x' risks causing data races}}
-  // expected-ni-note @-1 {{task-isolated 'x' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
-  // expected-ni-ns-note @-2 {{task-isolated 'x' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+  // expected-ni-note @-1 {{'x' cannot be a 'sending' result. Code in the current task may race with caller uses}}
+  // expected-ni-ns-note @-2 {{'x' cannot be a 'sending' result. Code in the current task may race with caller uses}}
 }
 
 // TODO: This will be fixed once I represent @MainActor on func types.
@@ -194,8 +192,8 @@ extension MainActorIsolatedEnum {
     case .second(let ns):
       return ns
     }
-  } // expected-warning {{sending 'ns.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
+  } // expected-warning {{sending 'ns' risks causing data races; this is an error in the Swift 6 language mode}}
+  // expected-note @-1 {{main actor-isolated 'ns' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   func testSwitchReturnNoTransfer() -> NonSendableKlass? {
     switch self {
@@ -211,8 +209,8 @@ extension MainActorIsolatedEnum {
       return ns // TODO: The error below should be here.
     }
     return nil
-  } // expected-warning {{sending 'ns.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
+  } // expected-warning {{sending 'ns' risks causing data races; this is an error in the Swift 6 language mode}}
+  // expected-note @-1 {{main actor-isolated 'ns' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   func testIfLetReturnNoTransfer() -> NonSendableKlass? {
     if case .second(let ns) = self {
@@ -249,7 +247,7 @@ func asyncLetReabstractionThunkTest() async {
 func asyncLetReabstractionThunkTest2() async {
   // We emit the error here since we are returning a MainActor-isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
-  // expected-ni-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
+  // expected-ni-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to @concurrent context}}
   // expected-ni-ns-warning @-2 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to @concurrent context}}
 
   let _ = await newValue
@@ -273,7 +271,7 @@ func asyncLetReabstractionThunkTest2() async {
 @MainActor func asyncLetReabstractionThunkTestGlobalActor2() async {
   // We emit the error here since we are returning a MainActor-isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
-  // expected-ni-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
+  // expected-ni-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to @concurrent context}}
   // expected-ni-ns-warning @-2 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to @concurrent context}}
 
   let _ = await newValue
@@ -288,28 +286,28 @@ func asyncLetReabstractionThunkTest2() async {
 ///////////////////////////////////
 
 func indirectSending<T>(_ t: T) -> sending T {
-  return t // expected-warning {{returning task-isolated 't' as a 'sending' result risks causing data races}}
-  // expected-note @-1 {{returning task-isolated 't' risks causing data races since the caller assumes that 't' can be safely sent to other isolation domains}}
+  return t // expected-warning {{returning 't' as a 'sending' result risks causing data races; this is an error in the Swift 6 language mode}}
+  // expected-note @-1 {{returning 't' risks causing data races since the caller assumes that 't' can be safely sent to other isolation domains}}
 }
 
 func indirectSendingStructField<T>(_ t: GenericNonSendableStruct<T>) -> sending T {
-  return t.t // expected-warning {{returning task-isolated 't.t' as a 'sending' result risks causing data races}}
-  // expected-note @-1 {{returning task-isolated 't.t' risks causing data races since the caller assumes that 't.t' can be safely sent to other isolation domains}}
+  return t.t // expected-warning {{returning 't.t' as a 'sending' result risks causing data races; this is an error in the Swift 6 language mode}}
+  // expected-note @-1 {{returning 't.t' risks causing data races since the caller assumes that 't.t' can be safely sent to other isolation domains}}
 }
 
 func indirectSendingStructOptionalField<T>(_ t: GenericNonSendableStruct<T>) -> sending T {
-  return t.t2! // expected-warning {{returning task-isolated 't.t2.some' as a 'sending' result risks causing data races}}
-  // expected-note @-1 {{returning task-isolated 't.t2.some' risks causing data races since the caller assumes that 't.t2.some' can be safely sent to other isolation domains}}
+  return t.t2! // expected-warning {{returning 't.t2.some' as a 'sending' result risks causing data races; this is an error in the Swift 6 language mode}}
+  // expected-note @-1 {{returning 't.t2.some' risks causing data races since the caller assumes that 't.t2.some' can be safely sent to other isolation domains}}
 }
 
 func indirectSendingClassField<T>(_ t: GenericNonSendableKlass<T>) -> sending T {
-  return t.t // expected-warning {{returning task-isolated 't.t' as a 'sending' result risks causing data races}}
-  // expected-note @-1 {{returning task-isolated 't.t' risks causing data races since the caller assumes that 't.t' can be safely sent to other isolation domains}}
+  return t.t // expected-warning {{returning 't.t' as a 'sending' result risks causing data races; this is an error in the Swift 6 language mode}}
+  // expected-note @-1 {{returning 't.t' risks causing data races since the caller assumes that 't.t' can be safely sent to other isolation domains}}
 }
 
 func indirectSendingOptionalClassField<T>(_ t: GenericNonSendableKlass<T>) -> sending T {
-  return t.t2! // expected-warning {{returning a task-isolated 'Optional<T>' value as a 'sending' result risks causing data races}}
-  // expected-note @-1 {{returning a task-isolated 'Optional<T>' value risks causing races since the caller assumes the value can be safely sent to other isolation domains}}
+  return t.t2! // expected-warning {{returning a 'Optional<T>' value as a 'sending' result risks causing data races; this is an error in the Swift 6 language mode}}
+  // expected-note @-1 {{returning a 'Optional<T>' value risks causing races since the caller assumes the value can be safely sent to other isolation domains}}
   // expected-note @-2 {{'Optional<T>' is a non-Sendable type}}
 }
 

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-as-library -o %t %s
-// RUN: llvm-bcanalyzer %t/global_init.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/global_init.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -enable-sil-verify-all %t/global_init.swiftmodule | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode

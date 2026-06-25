@@ -85,7 +85,7 @@ typealias Foo = some P // expected-error{{'some' types are only permitted}}
 
 func blibble(blobble: some P) {}
 func blib() -> P & some Q { return 1 } // expected-error{{'some' should appear at the beginning}}
-func blab() -> some P? { return 1 } // expected-error{{must specify only}} expected-note{{did you mean to write an optional of an 'some' type?}}
+func blab() -> some P? { return 1 }
 func blorb<T: some P>(_: T) { } // expected-error{{'some' types are only permitted}}
 func blub<T>() -> T where T == some P { return 1 } // expected-error{{'some' types are only permitted}}
 
@@ -608,4 +608,14 @@ do {
     S()
     // expected-error@-1 {{return type of local function 'test3()' requires that 'S' inherit from 'A'}}
   }
+}
+
+// https://github.com/swiftlang/swift/issues/89853 - Make sure we don't emit a
+// second spurious diagnostic in the below cases:
+do {
+  func f1() -> some P3<Int, String> {}
+  // expected-error@-1 {{protocol type 'P3' specialized with too many type arguments (got 2, but expected 1)}}
+
+  func f2() -> some P33333 {}
+  // expected-error@-1 {{cannot find type 'P33333' in scope}}
 }

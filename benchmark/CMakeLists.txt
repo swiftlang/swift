@@ -212,11 +212,13 @@ set(SWIFT_BENCH_MODULES
     single-source/SuperChars
     single-source/TaskGroups
     single-source/TaskLocalGet
+    single-source/ToddCoxeter
     single-source/TwoSum
     single-source/TypeFlood
     single-source/UTF8Decode
     single-source/UTF16Decode
     single-source/Walsh
+    single-source/WithUnsafeCurrentTask
     single-source/WordCount
     single-source/XorLoop
     cxx-source/CreateObjects

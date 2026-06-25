@@ -76,6 +76,7 @@ namespace swift {
   class ASTPrinter;
   class ASTWalker;
   enum class BuiltinMacroKind: uint8_t;
+  enum class CodeGenerationModel: uint8_t;
   class ConstructorDecl;
   class DestructorDecl;
   class DiagnosticEngine;
@@ -282,16 +283,6 @@ enum class MemberwiseInitKind {
   /// initialized variables. This only exists for migration purposes, and will
   /// be removed in a future language mode.
   Compatibility
-};
-
-enum class UsingSpecifier : uint8_t {
-  MainActor,
-  Nonisolated,
-  LastSpecifier = Nonisolated,
-};
-enum : unsigned {
-  NumUsingSpecifierBits =
-      countBitsUsed(static_cast<unsigned>(UsingSpecifier::LastSpecifier))
 };
 
 /// Diagnostic printing of \c SelfAccessKind.
@@ -778,7 +769,7 @@ protected:
     HasLazyUnderlyingSubstitutions : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8+1+2,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+2+8+1+2,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -849,8 +840,8 @@ protected:
     /// Whether this module has enabled strict memory safety checking.
     StrictMemorySafety : 1,
 
-    /// Whether this module uses deferred code generation in Embedded Swift.
-    DeferredCodeGen : 1,
+    /// The code generation model used by this module.
+    CodeGenModel : 2,
 
     /// Whether this module was compile with "aggressive" CMO i.e
     /// the flag: -cross-module-optimization.
@@ -873,10 +864,6 @@ protected:
 
     /// The number of elements in this path.
     NumPathElements : 8
-  );
-
-  SWIFT_INLINE_BITFIELD(UsingDecl, Decl, NumUsingSpecifierBits,
-    Specifier : NumUsingSpecifierBits
   );
 
   SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1,
@@ -1091,6 +1078,11 @@ public:
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
 
+  /// If this is a top-level value declaration or extension, materialize any
+  /// applicable file-level `using` defaults onto this declaration. Otherwise do
+  /// nothing.
+  void applyFileDefaults();
+
   /// Set this declaration's attributes to the specified attribute list,
   /// applying any post-processing logic appropriate for attributes parsed
   /// from source code.
@@ -1126,6 +1118,31 @@ public:
   /// This can be spelled with @export(interface) or the historical
   /// @_neverEmitIntoClient.
   bool isNeverEmittedIntoClient() const;
+
+  /// Compute the code generation model that is required for this declaration.
+  ///
+  /// This function applies the limitations of the compilation model to
+  /// determine if there's a code generation model that *must* be used for the
+  /// given declaration. For example, generic declarations must be
+  /// `@export(implementation)` in Embedded Swift, because it does not support
+  /// unspecialized generics.
+  std::optional<CodeGenerationModel>
+  getRequiredCodeGenerationModel() const;
+
+  /// Compute the code generation model that was explicitly requested for
+  /// this declaration.
+  ///
+  /// This function queries attributes relevant to the code generation
+  /// model (@export, @inlinable, etc.) but does not apply defaults based
+  /// on Embedded Swift or feature flags.
+  std::optional<CodeGenerationModel>
+  getExplicitCodeGenerationModel() const;
+
+  /// Compute the code generation model for the declaration, combining the
+  /// explicitly-specified information from attributes with defaults
+  /// based on Embedded Swift or feature flags.
+  CodeGenerationModel
+  getEffectiveCodeGenerationModel() const;
 
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
@@ -2650,6 +2667,13 @@ public:
 
   /// Returns the typechecked binding entry at the given index.
   const PatternBindingEntry *getCheckedPatternBindingEntry(unsigned i) const;
+
+  /// Returns the typechecked pattern at the given index, if any.
+  Pattern *getCheckedPattern(unsigned i) const {
+    if (auto *entry = getCheckedPatternBindingEntry(i))
+      return entry->getPattern();
+    return nullptr;
+  }
 
   /// Clean up walking the initializers for the pattern
   class InitIterator {
@@ -6473,6 +6497,14 @@ public:
   /// 'distributed' and and nullptr otherwise.
   FuncDecl *getDistributedThunk() const;
 
+  /// Return the 'resolvable proxy adapter' thunk for this computed
+  /// property, if a distributed thunk includes an `any P` / `some P`
+  /// where the P is a distributed `@Resolvable protocol`, and must
+  /// therefore be mapped to the proxy type `$P` that we use as wire
+  /// format to erase the actual implementation type (underlying the
+  /// `any P`), which may not be available on the remote peer.
+  FuncDecl *getDistributedResolvableProxyAdapterThunk() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -7581,6 +7613,7 @@ enum class ObjCSubscriptKind {
   Keyed
 };
 
+
 /// Declares a subscripting operator for a type.
 ///
 /// A subscript declaration is defined as a get/set pair that produces a
@@ -7610,6 +7643,19 @@ enum class ObjCSubscriptKind {
 /// signatures (indices and element type) are distinct.
 ///
 class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
+public:
+  /// Describes the kinds of supported types for `dynamicMember` parameters to a
+  /// subscript which can fulfill a `@dynamicMemberLookup` requirement.
+  enum class DynamicMemberLookupKind : uint8_t {
+    /// A `{{Reference}Writable}KeyPath`.
+    KeyPath,
+
+    /// A concrete type conforming to `ExpressibleByStringLiteral`.
+    String,
+  };
+
+private:
+  friend class DynamicMemberLookupSubscriptRequest;
   friend class ResultTypeRequest;
 
   SourceLoc StaticLoc;
@@ -7634,6 +7680,11 @@ class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
     Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
   }
+
+  /// Returns the given type as a `BoundGenericType` if it is a
+  /// `{{Reference}Writable}KeyPath` type which could be used to fulfill
+  /// `@dynamicMemberLookup` requirements; `nullptr` otherwise.
+  static BoundGenericType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
 
 public:
   /// Factory function only for use by deserialization.
@@ -7695,6 +7746,20 @@ public:
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
   ObjCSubscriptKind getObjCSubscriptKind() const;
+
+  /// If the decl can be used to satisfy an `@dynamicMemberLookup` requirement,
+  /// returns whether it satisfies the requirement using a key-path- or string-
+  /// based type.
+  std::optional<DynamicMemberLookupKind> getDynamicMemberLookupKind() const;
+
+  /// If the decl can be used to satisfy an `@dynamicMemberLookup` requirement
+  /// using a `{{Reference}Writable}KeyPath` dynamic member parameter, returns
+  /// the type of that parameter; `nullptr` otherwise.
+  ///
+  /// If `useDC` is provided (where the decl is being used), validates that
+  /// access control is being used consistently and that `decl` is appropriately
+  /// accessible, returning `nullptr` if inaccessible.
+  BoundGenericType *getDynamicMemberLookupKeyPathType() const;
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(
@@ -8076,6 +8141,17 @@ public:
   /// \return the synthesized thunk, or null if the base of the call has
   ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
+
+  /// Get the 'resolvable proxy adapter' thunk used on the recipient side
+  /// of a remote call to bridge between the wire-level `@Resolvable`
+  /// proxy types (`$P`) and the user-facing `any P` / `some P` types.
+  FuncDecl *getDistributedResolvableProxyAdapterThunk() const;
+
+  /// Detect whether this function declaration is an unstructured task
+  /// factory: a `Task` initializer or one of the `detached`,
+  /// `immediate`, or `immediateDetached` factory methods from the
+  /// `_Concurrency` module.
+  bool isUnstructuredTaskFactory() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
@@ -8578,13 +8654,12 @@ public:
                           ParameterList *BodyParams, TypeRepr *ResultTyR,
                           DeclContext *Parent);
 
-  static FuncDecl *createImplicit(ASTContext &Context,
-                                  StaticSpellingKind StaticSpelling,
-                                  DeclName Name, SourceLoc NameLoc, bool Async,
-                                  bool Throws, Type ThrownType,
-                                  GenericParamList *GenericParams,
-                                  ParameterList *BodyParams, Type FnRetType,
-                                  DeclContext *Parent);
+  static FuncDecl *
+  createImplicit(ASTContext &Context, StaticSpellingKind StaticSpelling,
+                 DeclName Name, SourceLoc NameLoc, bool Async, bool Throws,
+                 Type ThrownType, GenericParamList *GenericParams,
+                 ParameterList *BodyParams, Type FnRetType, DeclContext *Parent,
+                 bool isSynthesized = false);
 
   static FuncDecl *createImported(ASTContext &Context, SourceLoc FuncLoc,
                                   DeclName Name, SourceLoc NameLoc, bool Async,
@@ -9964,23 +10039,31 @@ class UsingDecl : public Decl {
   friend class Decl;
 
 private:
-  SourceLoc UsingLoc, SpecifierLoc;
+  SourceLoc UsingLoc;
 
-  UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
-            UsingSpecifier specifier, DeclContext *parent);
+  DeclAttributes SpecifiedAttributes;
+
+  UsingDecl(SourceLoc usingLoc, DeclAttributes specifiedAttributes,
+            DeclContext *parent);
 
 public:
-  UsingSpecifier getSpecifier() const {
-    return static_cast<UsingSpecifier>(Bits.UsingDecl.Specifier);
-  }
-
-  std::string getSpecifierName() const;
+  DeclAttributes getSpecifiedAttributes() const { return SpecifiedAttributes; }
 
   SourceLoc getLocFromSource() const { return UsingLoc; }
-  SourceRange getSourceRange() const { return {UsingLoc, SpecifierLoc}; }
+  SourceRange getSourceRange() const {
+    if (SpecifiedAttributes.isEmpty())
+      return UsingLoc;
+    // Head is most recently inserted, last in source order, and there
+    // should only be one except for @available where each synthetic
+    // attribute should point to the same attribute.
+    auto endLoc = (*SpecifiedAttributes.begin())->getEndLoc();
+    if (endLoc.isInvalid())
+      return UsingLoc;
+    return {UsingLoc, endLoc};
+  }
 
   static UsingDecl *create(ASTContext &ctx, SourceLoc usingLoc,
-                           SourceLoc specifierLoc, UsingSpecifier specifier,
+                           DeclAttributes specifiedAttributes,
                            DeclContext *parent);
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Using; }
@@ -10161,6 +10244,12 @@ const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 /// Retrieve parameter declaration from the given source at given index, or
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
+
+/// Whether the given \p loc is within a macro expansion relative to
+/// \p parentSF. If the file is itself in a macro expansion, the method
+/// returns \c true if the loc is in a different macro expansion buffer than
+/// the file. If \p parentSF is \c nullptr, \c false is returned.
+bool isMacroExpansionInContext(SourceLoc loc, SourceFile *parentSF);
 
 class ABIRole {
 public:

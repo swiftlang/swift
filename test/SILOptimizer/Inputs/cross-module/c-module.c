@@ -1,7 +1,7 @@
 
 #include "c-module.h"
 
-long privateCFunc() {
+long privateCFunc(void) {
   return 123;
 }
 

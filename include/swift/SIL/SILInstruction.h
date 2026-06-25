@@ -46,6 +46,7 @@
 #include "swift/Strings.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/ilist.h"
@@ -469,6 +470,14 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   /// instruction as an array of ValueBase objects.
   SILInstructionResultArray getResultsImpl() const;
 
+  /// Tries to assign a valid index to this instruction based on the indices of
+  /// its neighbors, without a full block recomputation.
+  ///
+  /// Called automatically by all insertion and move APIs. Leaves the index as
+  /// zero (uncomputed) if a gap-fill is not possible, e.g. because a neighbor
+  /// has no index yet or the gap between neighbors is exhausted.
+  void assignNewIndexInList();
+
 protected:
   friend class SwiftPassInvocation;
 
@@ -562,6 +571,19 @@ public:
 
   /// This method unlinks 'self' from the containing basic block and deletes it.
   void eraseFromParent();
+
+  /// Returns the raw index of this instruction in its parent block for ordering
+  /// comparisons. A value of 0 means the index has not been computed yet.
+  /// Indices are lazily computed and persist across optimization passes.
+  /// Within a block, non-zero indices are monotonically increasing.
+  uint32_t getRawIndexInList() const { return asSILNode()->getIndexInList(); }
+
+  /// Clears the index of this instruction, marking it as uncomputed.
+  void clearIndexInList() { asSILNode()->setIndexInList(0); }
+
+  /// Returns true if this instruction comes before \p other in the same block.
+  /// Both instructions must be in the same block.
+  bool strictlyDominatesInBlock(const SILInstruction *other) const;
 
   /// Unlink this instruction from its current basic block and insert the
   /// instruction such that it is the first instruction of \p Block.
@@ -2052,8 +2074,7 @@ class AllocStackInst final
                              AllocationInst>,
       private SILDebugVariableSupplement,
       private llvm::TrailingObjects<AllocStackInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    Operand, char> {
+                                    const SILDebugScope *, Operand, char> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -2203,11 +2224,16 @@ public:
     else if (complete)
       VarDeclScope = getDebugScope();
 
-    llvm::ArrayRef<SILDIExprElement> DIExprElements(
-        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+    // An alloc_stack always has a single implicit op_deref.
+    // It is not returned with complete = false, so that it isn't printed.
+    static const SILDIExprElement SingleDeref[] = {
+        SILDIExprElement::createOperator(SILDIExprOperator::Dereference)};
+    llvm::ArrayRef<SILDIExprElement> VarDIExpr = {};
+    if (complete)
+      VarDIExpr = SingleDeref;
 
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
-                       VarDeclLoc, VarDeclScope, DIExprElements);
+                       VarDeclLoc, VarDeclScope, VarDIExpr);
   }
 
   /// True if this AllocStack has var info that a pass purposely invalidated.
@@ -2742,8 +2768,15 @@ class ApplyInstBase<Impl, Base, false> : public Base {
   /// Stores an ApplyOptions.
   unsigned Options: 2;
 
+  /// Whether this apply has trailing per-argument SILLocation storage.
+  /// When true, `numTrailingObjects(SILLocation)` is `NumCallArguments`
+  /// and every slot in the trailing array holds a valid (non-null)
+  /// location. When false, no SILLocation storage is allocated and
+  /// `getArgumentLoc()` always falls back to the apply's anchor.
+  unsigned HasArgumentLocs : 1;
+
   /// The number of call arguments as required by the callee.
-  unsigned NumCallArguments : 30;
+  unsigned NumCallArguments : 29;
 
   /// The total number of type-dependent operands.
   unsigned NumTypeDependentOperands;
@@ -2760,14 +2793,22 @@ protected:
                 SILValue callee, SILType substCalleeType, SubstitutionMap subs,
                 ArrayRef<SILValue> args,
                 ArrayRef<SILValue> typeDependentOperands,
+                std::optional<ArrayRef<SILLocation>> argLocs,
                 const GenericSpecializationInformation *specializationInfo,
                 BaseArgTys... baseArgs)
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
-        SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
+        SpecializationInfo(specializationInfo),
+        // The "all-or-nothing" contract: nullopt or empty ArrayRef means
+        // no per-argument storage; otherwise the array must be parallel
+        // to `args` (asserted below).
+        HasArgumentLocs(argLocs.has_value() && !argLocs->empty()),
+        NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
         Substitutions(subs.getCanonical()) {
     ASSERT(!!subs == !!callee->getType().castTo<SILFunctionType>()
         ->getInvocationGenericSignature());
+    assert((!argLocs || argLocs->empty() || argLocs->size() == args.size()) &&
+           "argLocs, when supplied, must be parallel to args");
 
     // Initialize the operands.
     auto allOperands = getAllOperands();
@@ -2778,6 +2819,20 @@ protected:
     for (size_t i : indices(typeDependentOperands)) {
       new (&allOperands[NumStaticOperands + args.size() + i])
         Operand(this, typeDependentOperands[i]);
+    }
+
+    // Initialize the per-argument locations only when storage was
+    // reserved. The invariant is "if HasArgumentLocs, every slot holds
+    // a valid (non-null) SILLocation". Asserted per-slot here so any
+    // producer that drops a null into the array trips a debug check
+    // rather than corrupting downstream consumers.
+    if (auto argLocsBuf = getArgumentLocsBuf()) {
+      for (size_t i : indices(args)) {
+        assert(!(*argLocs)[i].isNull() &&
+               "every argLoc slot must be a valid SILLocation when "
+               "per-argument location storage is allocated");
+        ::new (&(*argLocsBuf)[i]) SILLocation((*argLocs)[i]);
+      }
     }
   }
 
@@ -2791,6 +2846,29 @@ protected:
 
   unsigned numTrailingObjects(OverloadToken<Operand>) const {
     return getNumAllOperands();
+  }
+
+  unsigned numTrailingObjects(OverloadToken<SILLocation>) const {
+    return HasArgumentLocs ? NumCallArguments : 0;
+  }
+
+  /// Returns the trailing per-argument SILLocation buffer, or
+  /// `std::nullopt` when no storage was reserved on this apply. The
+  /// optional shape mirrors the in-memory invariant: an apply either
+  /// has zero per-argument location slots or it has exactly
+  /// NumCallArguments of them; "empty buffer" is not a valid state.
+  std::optional<MutableArrayRef<SILLocation>> getArgumentLocsBuf() {
+    if (!HasArgumentLocs)
+      return std::nullopt;
+    return asImpl().template getTrailingObjectsNonStrict<SILLocation>(
+        NumCallArguments);
+  }
+
+  std::optional<ArrayRef<SILLocation>> getArgumentLocsBuf() const {
+    if (!HasArgumentLocs)
+      return std::nullopt;
+    return asImpl().template getTrailingObjectsNonStrict<SILLocation>(
+        NumCallArguments);
   }
 
   static size_t getNumAllOperands(ArrayRef<SILValue> args,
@@ -2992,6 +3070,44 @@ public:
   /// Set the ith argument of this instruction.
   void setArgument(unsigned i, SILValue V) {
     return getArgumentOperands()[i].set(V);
+  }
+
+  /// Returns the per-argument SILLocations stored on this apply, parallel
+  /// to `getArguments()`. `std::nullopt` when no per-argument storage was
+  /// reserved at construction time; when present, every slot is
+  /// guaranteed to hold a valid (non-null) location for the corresponding
+  /// argument.
+  std::optional<ArrayRef<SILLocation>> getArgumentLocs() const {
+    return getArgumentLocsBuf();
+  }
+
+  /// Returns the SILLocation associated with the argument at \p argIdx,
+  /// falling back to the apply's anchor location when no per-argument
+  /// storage was allocated. Out-of-range indices also return the anchor
+  /// location — defensive for inliner / optimizer call sites that derive
+  /// `argIdx` from a callee's SIL argument list which can include
+  /// indirect-result slots not modelled in the apply's NumCallArguments.
+  SILLocation getArgumentLoc(unsigned argIdx) const {
+    if (argIdx >= NumCallArguments)
+      return this->getLoc();
+    if (auto buf = getArgumentLocsBuf())
+      return (*buf)[argIdx];
+    return this->getLoc();
+  }
+
+  /// Set the per-argument location for the argument at \p argIdx. Requires
+  /// that this apply was constructed with per-argument location storage
+  /// (i.e. `getArgumentLocs()` returns a value) and \p loc must be a
+  /// valid (non-null) SILLocation, preserving the "every slot is valid"
+  /// invariant.
+  void setArgumentLoc(unsigned argIdx, SILLocation loc) {
+    assert(argIdx < NumCallArguments);
+    assert(!loc.isNull() &&
+           "setArgumentLoc requires a valid (non-null) SILLocation");
+    auto buf = getArgumentLocsBuf();
+    assert(buf && "setArgumentLoc requires the apply to have per-argument "
+                  "location storage; pass argLocs at construction time");
+    (*buf)[argIdx] = loc;
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
@@ -3232,13 +3348,13 @@ public:
 class ApplyInst final
     : public InstructionBase<SILInstructionKind::ApplyInst,
                              ApplyInstBase<ApplyInst, SingleValueInstruction>>,
-      public llvm::TrailingObjects<ApplyInst, Operand> {
+      public llvm::TrailingObjects<ApplyInst, Operand, SILLocation> {
   friend SILBuilder;
 
   ApplyInst(SILDebugLocation debugLoc, SILValue callee, SILType substCalleeType,
             SILType returnType, SubstitutionMap substitutions,
             ArrayRef<SILValue> args, ArrayRef<SILValue> typeDependentOperands,
-            ApplyOptions options,
+            std::optional<ArrayRef<SILLocation>> argLocs, ApplyOptions options,
             const GenericSpecializationInformation *sSpecializationInfo,
             std::optional<ApplyIsolationCrossing> isolationCrossing);
 
@@ -3249,7 +3365,8 @@ class ApplyInst final
          std::optional<SILModuleConventions> moduleConventions,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
-         std::optional<ApplyIsolationCrossing> isolationCrossing);
+         std::optional<ApplyIsolationCrossing> isolationCrossing,
+         std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt);
 
 public:
   bool hasGuaranteedResult() const {
@@ -3270,10 +3387,10 @@ public:
 /// PartialApplyInst - Represents the creation of a closure object by partial
 /// application of a function value.
 class PartialApplyInst final
-    : public InstructionBase<SILInstructionKind::PartialApplyInst,
-                             ApplyInstBase<PartialApplyInst,
-                                           SingleValueInstruction>>,
-      public llvm::TrailingObjects<PartialApplyInst, Operand> {
+    : public InstructionBase<
+          SILInstructionKind::PartialApplyInst,
+          ApplyInstBase<PartialApplyInst, SingleValueInstruction>>,
+      public llvm::TrailingObjects<PartialApplyInst, Operand, SILLocation> {
   USE_SHARED_UINT8;
 
   friend SILBuilder;
@@ -3285,12 +3402,11 @@ public:
 
 private:
   PartialApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
-                   SILType SubstCalleeType,
-                   SubstitutionMap Substitutions,
+                   SILType SubstCalleeType, SubstitutionMap Substitutions,
                    ArrayRef<SILValue> Args,
                    ArrayRef<SILValue> TypeDependentOperands,
-                   SILType ClosureType,
-                   StackAllocationIsNested_t IsNested,
+                   std::optional<ArrayRef<SILLocation>> ArgLocs,
+                   SILType ClosureType, StackAllocationIsNested_t IsNested,
                    const GenericSpecializationInformation *SpecializationInfo);
 
   static PartialApplyInst *
@@ -3298,7 +3414,8 @@ private:
          SubstitutionMap Substitutions, ParameterConvention CalleeConvention,
          SILFunctionTypeIsolation ResultIsolation, SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo,
-         OnStackKind onStack, StackAllocationIsNested_t isNested);
+         OnStackKind onStack, StackAllocationIsNested_t isNested,
+         std::optional<ArrayRef<SILLocation>> ArgLocs = std::nullopt);
 
 public:
   /// Return the result function type of this partial apply.
@@ -3344,14 +3461,14 @@ using EndApplyRange = OptionalTransformRange<ValueBase::use_range,
 /// BeginApplyInst - Represents the beginning of the full application of
 /// a yield_once coroutine (up until the coroutine yields a value back).
 class BeginApplyInst final
-    : public InstructionBase<SILInstructionKind::BeginApplyInst,
-                             ApplyInstBase<BeginApplyInst,
-                                           MultipleValueInstruction>>,
+    : public InstructionBase<
+          SILInstructionKind::BeginApplyInst,
+          ApplyInstBase<BeginApplyInst, MultipleValueInstruction>>,
       public MultipleValueInstructionTrailingObjects<
           BeginApplyInst,
           // These must be earlier trailing objects because their
           // count fields are initialized by an earlier base class.
-          InitialTrailingObjects<Operand>> {
+          InitialTrailingObjects<Operand, SILLocation>> {
   friend SILBuilder;
 
   template <class, class...>
@@ -3366,7 +3483,9 @@ class BeginApplyInst final
                  SILType substCalleeType, ArrayRef<SILType> allResultTypes,
                  ArrayRef<ValueOwnershipKind> allResultOwnerships,
                  SubstitutionMap substitutions, ArrayRef<SILValue> args,
-                 ArrayRef<SILValue> typeDependentOperands, ApplyOptions options,
+                 ArrayRef<SILValue> typeDependentOperands,
+                 std::optional<ArrayRef<SILLocation>> argLocs,
+                 ApplyOptions options,
                  const GenericSpecializationInformation *specializationInfo,
                  std::optional<ApplyIsolationCrossing> isolationCrossing);
 
@@ -3377,7 +3496,8 @@ class BeginApplyInst final
          std::optional<SILModuleConventions> moduleConventions,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
-         std::optional<ApplyIsolationCrossing> isolationCrossing);
+         std::optional<ApplyIsolationCrossing> isolationCrossing,
+         std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt);
 
 public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
@@ -5616,18 +5736,18 @@ class DebugValueInst final
   TailAllocatedDebugVariable VarInfo;
   USE_SHARED_UINT8;
 
+  /// Optional debug basic block holding reconstruction instructions.
+  SILBasicBlock *ReconstructionBlock = nullptr;
+
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                  SILDebugVariable Var, PoisonRefs_t poisonRefs,
-                 UsesMoveableValueDebugInfo_t operandWasMoved, bool trace);
+                 UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
+                 bool prependDeref);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
                                 PoisonRefs_t poisonRefs,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
-  static DebugValueInst *createAddr(SILDebugLocation DebugLoc, SILValue Operand,
-                                    SILModule &M, SILDebugVariable Var,
-                                    UsesMoveableValueDebugInfo_t wasMoved,
-                                    bool trace);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -5660,44 +5780,70 @@ public:
     return getLoc().strippedForDebugVariable();
   }
 
+  /// Returns the effective variable type for this debug value.
+  /// If there is a stored type, returns that. If there is a debug
+  /// reconstruction block, returns its return type. Otherwise returns the
+  /// SSA operand type.
+  SILType getVarType() const;
+
   /// Return the debug variable information attached to this instruction.
   ///
-  /// \param complete If true, always retrieve the complete variable with
-  /// location and scope, and the type if possible. If false, only return the
-  /// values if they are stored (if they are different from the instruction's
-  /// location, scope, and type). This should only be set to false in
-  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
-  /// have location and scope and sometimes not.
-  ///
-  /// \note The type is not included because it can change during a pass.
-  /// Passes must make sure to not lose the type information.
-  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
+  /// \param includeLoc If true (by default), always return a variable with
+  ///   location and scope. If false, only return the stored values (if they
+  ///   are different from the instruction's location, scope, and type). This
+  ///   should only be set to false in SILPrinter. Incomplete var info is
+  ///   unpredictable, as it will sometimes have location and scope and
+  ///   sometimes not.
+  /// \param includeType If true, fills in the variable type from the SSA
+  ///   operand when not explicitly stored. Off by default because passes
+  ///   that copy VarInfo into new debug_values may get a stale type.
+  ///   Passes must make sure to not lose the type information.
+  /// \note Use `getCompleteVarInfo()` to include everything.
+  std::optional<SILDebugVariable>
+  getVarInfo(bool includeLoc = true, bool includeType = false) const {
     std::optional<SILType> AuxVarType;
     std::optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
 
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
-    // TODO: passes break if we set the type here, as the type of the operand
-    // can be changed during a pass.
-    // else if (complete)
-    //   AuxVarType = getOperand()->getType().getObjectType();
+    else if (includeType)
+      AuxVarType = getVarType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
-    else if (complete)
+    else if (includeLoc)
       VarDeclLoc = getLoc().strippedForDebugVariable();
 
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
-    else if (complete)
+    else if (includeLoc)
       VarDeclScope = getDebugScope();
 
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
 
+    // Make a temporary copy to prepend a deref. This is safe as
+    // SILDebugVariable contains a copy of the expression.
+    llvm::SmallVector<SILDIExprElement, 4> DIExprCopy;
+    if (hasDeref()) {
+      DIExprCopy.push_back(SILDIExprElement::createOperator(
+          SILDIExprOperator::Dereference));
+      DIExprCopy.append(DIExprElements.begin(), DIExprElements.end());
+      DIExprElements = DIExprCopy;
+    }
+
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
                        VarDeclLoc, VarDeclScope, DIExprElements);
+  }
+
+  /// Like getVarInfo, but always includes the variable type (falling back
+  /// to the SSA operand type), location and scope. Should always be used
+  /// when adding a DIExpr that affects the type.
+  SILDebugVariable getCompleteVarInfo() const {
+    auto info = getVarInfo(/*includeLoc*/ true, /*includeType*/ true);
+    assert(info && "DebugValueInst must always have debug variable info");
+    return *info;
   }
 
   void setDebugVarScope(const SILDebugScope *NewDS) {
@@ -5718,9 +5864,73 @@ public:
     return DVI && DVI->hasAddrVal()? DVI : nullptr;
   }
 
-  /// Whether the attached di-expression (if there is any) starts
-  /// with `op_deref`.
-  bool exprStartsWithDeref() const;
+  /// Whether this debug value has a DIExpr with a deref.
+  /// For address-only types with a debug reconstruction block, the deref
+  /// applies after the BB's result. Otherwise, this is incompatible with
+  /// debug reconstruction blocks.
+  bool hasDeref() const {
+    return sharedUInt8().DebugValueInst.prependDeref;
+  }
+
+  /// Prepends a deref operator to this debug_value in place.
+  /// This must be called when the operand is changed from an object type to
+  /// an address type (when moved to the stack, for example).
+  /// If a reconstruction block exists, a load is added at the beginning.
+  /// Otherwise, it will be prepended to the DIExpr.
+  void prependDeref();
+
+  /// Removes a deref operator to this debug_value in place.
+  /// This must be called when the operand is changed from an address type to
+  /// an object type (when moved from the stack to a register, for example).
+  /// Asserts that the type is loadable (cannot strip deref for address-only).
+  /// If a reconstruction block exists, a load is removed at the beginning. If
+  /// there is no load at the beginning, the operand is killed, marking the
+  /// variable as optimized away.
+  void stripDeref();
+
+  /// Validates the type chain of the DIExpr.
+  /// Starting from VarType, narrows through fragments (outermost first)
+  /// and checks that the result matches the SSA operand type, and that there
+  /// is the right amount of op_deref.
+  /// Returns false if the type chain is invalid, true otherwise.
+  bool isExprTypeValid() const;
+
+  /// Returns the optional debug basic block attached to this instruction.
+  /// The debug BB contains reconstruction instructions for the debug value.
+  /// If this debug value does not have a reconstruction block, this returns
+  /// nullptr. Use getOrCreateDebugReconstructionBlock to create one.
+  SILBasicBlock *getDebugReconstructionBlock() const {
+    return ReconstructionBlock;
+  }
+
+  /// Sets the debug-only basic block for this instruction.
+  /// This should not be called by optimization passes. Optimization passes
+  /// and debug information salvage operations should append to existing
+  /// blocks using getOrCreateDebugReconstructionBlock.
+  void setDebugReconstructionBlock(SILBasicBlock *BB) {
+    ReconstructionBlock = BB;
+  }
+
+  /// Clones the reconstruction block from \p src onto this debug value.
+  void cloneReconstructionBlockFrom(DebugValueInst *src);
+
+  /// Returns a variable reconstruction basic block for this debug value.
+  /// If this debug value has no debug reconstruction block, a new one is
+  /// created and attached to this instruction.
+  /// The newly created basic block will be well-formed, returning the SSA
+  /// value of this debug_value directly.
+  /// If this debug_value has an undef operand, the reconstruction block
+  /// has no arguments and returns undef directly.
+  SILBasicBlock *getOrCreateDebugReconstructionBlock();
+
+  /// Drops the operand from this debug value.
+  /// This function must be called by passes whenever the operand of this debug
+  /// value is no longer valid and cannot be salvaged.
+  /// This will replace the operand with an undef, and clear any DIExpr or debug
+  /// reconstruction block.
+  /// If \p varType is specified, the undef will use that type (in the
+  /// appropriate address/object form) instead of the current operand's type.
+  void killOperand(SILType operandType = SILType());
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds
@@ -7190,6 +7400,7 @@ class UncheckedEnumDataInst
       : UnaryInstructionBase(DebugLoc, Operand, ResultTy,
                              forwardingOwnershipKind),
         Element(Element) {
+    assert(Element->getPayloadInterfaceType());
     sharedUInt32().UncheckedEnumDataInst.caseIndex = InvalidCaseIndex;
   }
 
@@ -7288,6 +7499,63 @@ public:
   }
 };
 
+/// Base class for instructions that project the payload from an enum in
+/// memory.
+class UncheckedEnumDataAddrInstBase
+  : public SingleValueInstruction
+{
+  enum : unsigned { InvalidCaseIndex = ~unsigned(0) };
+
+  EnumElementDecl *Element;
+  USE_SHARED_UINT32;
+
+protected:
+  UncheckedEnumDataAddrInstBase(SILInstructionKind Kind,
+                                SILDebugLocation DebugLoc,
+                                EnumElementDecl *Element, SILType ResultTy)
+    : SingleValueInstruction(Kind, DebugLoc, ResultTy),
+      Element(Element)
+  {
+    sharedUInt32().UncheckedEnumDataAddrInstBase.caseIndex = InvalidCaseIndex;
+  }
+
+public:
+  /// Returns true if the projection operation is possibly destructive for
+  /// instances of the given enum declaration.
+  ///
+  /// If true, the `UncheckedInPlaceEnumDataAddr` instruction variant
+  /// is not available for instances of the given enum.
+  static bool isDestructive(EnumDecl *forEnum, SILFunction *F);
+
+  EnumElementDecl *getElement() const { return Element; }
+
+  unsigned getCaseIndex() {
+    unsigned idx = sharedUInt32().UncheckedEnumDataAddrInstBase.caseIndex;
+    if (idx != InvalidCaseIndex)
+      return idx;
+
+    unsigned index = getCachedCaseIndex(getElement());
+    sharedUInt32().UncheckedEnumDataAddrInstBase.caseIndex = index;
+    return index;
+  }
+
+  EnumDecl *getEnumDecl() const {
+    auto *E = getEnum()->getType().getEnumOrBoundGenericEnum();
+    assert(E && "Operand of unchecked_take_enum_data_addr must be of enum"
+                " type");
+    return E;
+  }
+
+  /// Return the value of the base enum operand that will be projected.
+  SILValue getEnum() const;
+
+  static bool classof(SILNodePointer node) {
+    SILNodeKind kind = node->getKind();
+    return (unsigned)kind >= (unsigned)SILNodeKind::First_UncheckedEnumDataAddrInstBase
+        && (unsigned)kind <= (unsigned)SILNodeKind::Last_UncheckedEnumDataAddrInstBase;
+  }
+};
+
 /// Project an enum's payload data without checking the case of the enum or
 /// moving it in memory.
 ///
@@ -7298,48 +7566,70 @@ public:
 /// static method returns true for enums where this is potentially the case.
 class UncheckedTakeEnumDataAddrInst
   : public UnaryInstructionBase<SILInstructionKind::UncheckedTakeEnumDataAddrInst,
-                                SingleValueInstruction>
+                                UncheckedEnumDataAddrInstBase>
 {
   friend SILBuilder;
-  enum : unsigned { InvalidCaseIndex = ~unsigned(0) };
-
-  EnumElementDecl *Element;
-  USE_SHARED_UINT32;
 
   UncheckedTakeEnumDataAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
                                 EnumElementDecl *Element, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), Element(Element) {
-    sharedUInt32().UncheckedTakeEnumDataAddrInst.caseIndex = InvalidCaseIndex;
-  }
+      : UnaryInstructionBase(DebugLoc, Operand, Element, ResultTy)
+  {}
 
 public:
-  // Returns true if the projection operation is possibly destructive for
-  // instances of the given enum declaration.
-  static bool isDestructive(EnumDecl *forEnum, SILModule &M);
+  SILValue getEnum() const { return getOperand(); }
+};
 
-  // Returns true if this projection operation is possibly destructive.
-  bool isDestructive() const {
-    return isDestructive(Element->getParentEnum(), getModule());
-  }
+/// Project an enum's payload data without checking the case of the enum or
+/// moving it in memory, with the intent of borrowing the payload.
+/// The instruction is given the address of a scratch area where the representation
+/// may be bitwise-copied if projection would invalidate the original value.
+/// The result address is thus dependent on both the original enum operand and
+/// the scratch operand.
+class UncheckedBorrowEnumDataAddrInst
+  : public InstructionBase<SILInstructionKind::UncheckedBorrowEnumDataAddrInst,
+                           UncheckedEnumDataAddrInstBase>
+{
+  enum OperandIndex {
+    Enum,
+    Scratch,
+  };
+  friend SILBuilder;
+  FixedOperandList<2> Operands;
 
-  EnumElementDecl *getElement() const { return Element; }
+  UncheckedBorrowEnumDataAddrInst(SILDebugLocation DebugLoc,
+                                  SILValue Enum, SILValue Scratch,
+                                  EnumElementDecl *Element, SILType ResultTy)
+    : InstructionBase(DebugLoc, Element, ResultTy),
+      Operands(this, Enum, Scratch)
+  {}
 
-  unsigned getCaseIndex() {
-    unsigned idx = sharedUInt32().UncheckedTakeEnumDataAddrInst.caseIndex;
-    if (idx != InvalidCaseIndex)
-      return idx;
+public:
+  SILValue getEnum() const { return Operands[OperandIndex::Enum].get(); }
+  SILValue getScratch() const { return Operands[OperandIndex::Scratch].get(); }
 
-    unsigned index = getCachedCaseIndex(getElement());
-    sharedUInt32().UncheckedTakeEnumDataAddrInst.caseIndex = index;
-    return index;
-  }
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+};
 
-  EnumDecl *getEnumDecl() const {
-    auto *E = getOperand()->getType().getEnumOrBoundGenericEnum();
-    assert(E && "Operand of unchecked_take_enum_data_addr must be of enum"
-                " type");
-    return E;
-  }
+/// Project an enum's payload data without checking the case of the enum or
+/// moving it in memory.
+///
+/// This performs the projection in-place without modifying the value. As such,
+/// this instruction is only valid for enums for which 
+/// UncheckedEnumDataAddrInstBase::isDestructive returns false.
+class UncheckedInPlaceEnumDataAddrInst
+  : public UnaryInstructionBase<SILInstructionKind::UncheckedInPlaceEnumDataAddrInst,
+                                UncheckedEnumDataAddrInstBase>
+{
+  friend SILBuilder;
+  UncheckedInPlaceEnumDataAddrInst(SILDebugLocation DebugLoc,
+                                  SILValue Enum,
+                                  EnumElementDecl *Element, SILType ResultTy)
+    : UnaryInstructionBase(DebugLoc, Enum, Element, ResultTy)
+  {}
+
+public:
+  SILValue getEnum() const { return getOperand(); }
 };
 
 /// Common base class for the select_enum and select_enum_addr instructions,
@@ -10095,14 +10385,23 @@ class IndexAddrInst
   enum { Base, Index };
 
   IndexAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILValue Index,
-                bool needsStackProtection)
+                bool needsStackProtection, bool isProjection)
       : InstructionBase(DebugLoc, Operand->getType(), Operand, Index) {
     sharedUInt8().IndexAddrInst.needsStackProtection = needsStackProtection;
+    sharedUInt8().IndexAddrInst.isProjection = isProjection;
   }
 
 public:
   bool needsStackProtection() const {
     return sharedUInt8().IndexAddrInst.needsStackProtection;
+  }
+  /// True if this instruction projects a single array element address from an
+  /// array base, as opposed to being used for general pointer arithmetic.
+  /// When set, the result cannot be used to reach other array elements (e.g.
+  /// by chaining index_addr instructions); without this flag such chaining is
+  /// permitted.
+  bool isProjection() const {
+    return sharedUInt8().IndexAddrInst.isProjection;
   }
 };
 
@@ -11540,19 +11839,19 @@ public:
 class TryApplyInst final
     : public InstructionBase<SILInstructionKind::TryApplyInst,
                              ApplyInstBase<TryApplyInst, TryApplyInstBase>>,
-      public llvm::TrailingObjects<TryApplyInst, Operand> {
+      public llvm::TrailingObjects<TryApplyInst, Operand, SILLocation> {
   friend SILBuilder;
 
   TryApplyInst(SILDebugLocation debugLoc, SILValue callee,
                SILType substCalleeType, SubstitutionMap substitutions,
                ArrayRef<SILValue> args,
                ArrayRef<SILValue> typeDependentOperands,
+               std::optional<ArrayRef<SILLocation>> argLocs,
                SILBasicBlock *normalBB, SILBasicBlock *errorBB,
                ApplyOptions options,
                const GenericSpecializationInformation *specializationInfo,
                std::optional<ApplyIsolationCrossing> isolationCrossing,
-               ProfileCounter normalCount,
-               ProfileCounter errorCount);
+               ProfileCounter normalCount, ProfileCounter errorCount);
 
   static TryApplyInst *
   create(SILDebugLocation debugLoc, SILValue callee,
@@ -11561,8 +11860,8 @@ class TryApplyInst final
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing,
-         ProfileCounter normalCount,
-         ProfileCounter errorCount);
+         ProfileCounter normalCount, ProfileCounter errorCount,
+         std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt);
 };
 
 /// DifferentiableFunctionInst - creates a `@differentiable` function-typed

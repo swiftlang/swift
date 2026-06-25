@@ -726,34 +726,6 @@ ManagedValue Transform::transform(ManagedValue v,
                                         ctxt);
   }
 
-  // - upcasting class-constrained existentials or metatypes thereof
-  if (inputSubstType->isAnyExistentialType()) {
-    auto instanceType = inputSubstType;
-    while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(instanceType))
-      instanceType = metatypeType.getInstanceType();
-
-    auto layout = instanceType.getExistentialLayout();
-    if (layout.getSuperclass()) {
-      CanType openedType = ExistentialArchetypeType::getAny(inputSubstType)
-          ->getCanonicalType();
-      SILType loweredOpenedType = SGF.getLoweredType(openedType);
-
-      FormalEvaluationScope scope(SGF);
-
-      auto payload = SGF.emitOpenExistential(Loc, v,
-                                             loweredOpenedType,
-                                             AccessKind::Read);
-      payload = payload.ensurePlusOne(SGF, Loc);
-      return transform(payload,
-                       AbstractionPattern::getOpaque(),
-                       openedType,
-                       outputOrigType,
-                       outputSubstType,
-                       loweredResultTy,
-                       ctxt);
-    }
-  }
-
   // - T : Hashable to AnyHashable
   if (outputSubstType->isAnyHashable()) {
     auto *protocol = SGF.getASTContext().getProtocol(
@@ -765,6 +737,31 @@ ManagedValue Transform::transform(ManagedValue v,
     if (result.isInContext())
       return ManagedValue::forInContext();
     return std::move(result).getAsSingleValue(SGF, Loc);
+  }
+
+  // - upcasting class-constrained existentials or metatypes thereof
+  if (inputSubstType->isAnyExistentialType()) {
+    auto instanceType = inputSubstType;
+    while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(instanceType))
+      instanceType = metatypeType.getInstanceType();
+
+    CanType openedType = ExistentialArchetypeType::getAny(inputSubstType)
+        ->getCanonicalType();
+    SILType loweredOpenedType = SGF.getLoweredType(openedType);
+
+    FormalEvaluationScope scope(SGF);
+
+    auto payload = SGF.emitOpenExistential(Loc, v,
+                                           loweredOpenedType,
+                                           AccessKind::Read);
+    payload = payload.ensurePlusOne(SGF, Loc);
+    return transform(payload,
+                     AbstractionPattern::getOpaque(),
+                     openedType,
+                     outputOrigType,
+                     outputSubstType,
+                     loweredResultTy,
+                     ctxt);
   }
 
   // - T.TangentVector to Optional<T>.TangentVector
@@ -3295,6 +3292,7 @@ class ResultPlanner : public ExpanderBase<ResultPlanner, IndirectSlot> {
   SmallVector<Operation, 8> Operations;
   ArrayRef<SILResultInfo> AllOuterResults;
   ArrayRef<SILResultInfo> AllInnerResults;
+  CanSILFunctionType UnsubstInnerFnType;
   SmallVectorImpl<SILValue> &InnerArgs;
   InnerPackResultGenerator InnerPacks;
 
@@ -3319,7 +3317,8 @@ public:
             .getNumIndirectSILResults());
 
     AllOuterResults = outerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults();
-    AllInnerResults = innerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults();
+    UnsubstInnerFnType = innerFnType->getUnsubstitutedType(SGF.SGM.M);
+    AllInnerResults = UnsubstInnerFnType->getResults();
 
     // Recursively walk the result types.
     expand(innerOrigType, innerSubstType, outerOrigType, outerSubstType);
@@ -4546,6 +4545,51 @@ ResultPlanner::expandInnerTupleOuterIndirect(AbstractionPattern innerOrigType,
   // injecting into an optional tuple.
 
   auto outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
+
+  // FIXME: This entire function dispatches on whether `outerSubstType` is a
+  // tuple to decide between "single-slot injection" (optional/existential)
+  // and "parallel tuple walk". That's the wrong dimension: the abstraction
+  // pattern determines how the value is *passed*, not the substituted type.
+  // When `outerOrigType` is opaque (e.g. an archetype) the outer is a
+  // single `@out` slot regardless of whether the substituted type happens
+  // to be a tuple.
+  //
+  // The branch below handles the case where the inner result is a single
+  // tuple-typed indirect slot being injected into the outer's single opaque
+  // slot. This covers the typed-throws reabstraction patterns:
+  //  - closure returning `()` into generic `T ~> ()`
+  //    (https://github.com/swiftlang/swift/issues/77880,
+  //     https://github.com/swiftlang/swift/issues/88027)
+  //  - closure returning `(A, B, ...)` into generic `T ~> (A, B, ...)`
+  // Without it, the parallel tuple walk either under-claims (empty tuple;
+  // `AllInnerResults.empty()` assertion) or over-claims (non-empty tuple;
+  // `claimNext` on empty assertion). The fix only applies when the inner
+  // has a single unclaimed result slot matching the outer single slot; if
+  // the inner has per-element result slots (no single whole-tuple slot),
+  // the parallel walk's per-element claims remain correct.
+  //
+  // A more principled fix dispatches this whole function on
+  // `outerOrigType.isTuple()` and handles 1-to-N result-slot mappings in
+  // `planSingleIntoIndirect` (or a new helper). That's tracked separately.
+  //
+  // Exclude tuples containing pack expansions: the existing parallel walk
+  // handles them correctly (pack-expansion-aware reabstraction), and
+  // `planSingleIntoIndirect` does not — its downstream `Transform` machinery
+  // treats the slot as a single fixed-layout value and would crash on the
+  // dynamic-layout pack-expansion tuple.
+  if (outerSubstTupleType && !outerOrigType.isTuple()
+      && AllInnerResults.size() == 1 &&
+      AllInnerResults.front().getReturnValueType(
+          SGF.SGM.M, UnsubstInnerFnType, TypeExpansionContext::minimal()) ==
+          innerSubstType
+      && !outerSubstTupleType.containsPackExpansionType()) {
+    SILResultInfo innerResult = claimNextInnerResult();
+    planSingleIntoIndirect(innerOrigType, innerSubstType,
+                           outerOrigType, outerSubstType,
+                           innerResult,
+                           outerResultAddrMV.getLValueAddress());
+    return;
+  }
 
   // If the outer type is not a tuple, it must be optional.
   if (!outerSubstTupleType) {
@@ -6254,7 +6298,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   auto loc = F.getLocation();
   SILGenFunctionBuilder fb(SGM);
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
+    loc, name, thunkDeclType, F.getActorIsolation(), IsBare, IsTransparent, IsSerialized,
       ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible);
 
@@ -6612,13 +6656,13 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   // linkage of derivative thunks so we can serialize them (the original
   // function itself might be HiddenExternal in this case if we only have
   // declaration without definition).
-  auto linkage = originalFn->markedAsAlwaysEmitIntoClient()
+  auto linkage = originalFn->isAlwaysEmitIntoClient()
                      ? SILLinkage::PublicNonABI
                      : stripExternalFromLinkage(originalFn->getLinkage());
 
   auto *thunk = fb.getOrCreateFunction(
-      loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
-      customDerivativeFn->getSerializedKind(),
+      loc, name, linkage, thunkFnTy, customDerivativeFn->getActorIsolation(),
+      IsBare, IsNotTransparent, customDerivativeFn->getSerializedKind(),
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->isDistributed(),
       customDerivativeFn->isRuntimeAccessible(),
@@ -7169,6 +7213,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
       switch (baseIsolation) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedConcurrent:
       case ActorIsolation::NonisolatedUnsafe:
         return emitNonIsolatedIsolation(loc).getValue();
       case ActorIsolation::Erased:
@@ -7179,11 +7224,12 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
         return emitGlobalActorIsolation(loc, globalActor).getValue();
       }
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::CallerIsolationInheriting: {
+      case ActorIsolation::NonisolatedNonsending: {
         auto derivedIsolation = getDerivedIsolation();
         switch (derivedIsolation) {
         case ActorIsolation::Unspecified:
         case ActorIsolation::Nonisolated:
+        case ActorIsolation::NonisolatedConcurrent:
         case ActorIsolation::NonisolatedUnsafe:
           return emitNonIsolatedIsolation(loc).getValue();
         case ActorIsolation::Erased:
@@ -7195,7 +7241,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
           return emitGlobalActorIsolation(loc, globalActor).getValue();
         }
         case ActorIsolation::ActorInstance:
-        case ActorIsolation::CallerIsolationInheriting: {
+        case ActorIsolation::NonisolatedNonsending: {
           auto isolatedArg = F.maybeGetIsolatedArgument();
           assert(isolatedArg);
           return isolatedArg;
@@ -7210,8 +7256,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     // If our derived isolation is caller isolation inheriting and our base
     // isn't, we need to insert a hop so that derived can assume that it does
     // not have to hop in its prologue.
-    if (!baseIsolation.isCallerIsolationInheriting() &&
-        getDerivedIsolation().isCallerIsolationInheriting()) {
+    if (!baseIsolation.isNonisolatedNonsending() &&
+        getDerivedIsolation().isNonisolatedNonsending()) {
       B.createHopToExecutor(loc, args.back(), false /*mandatory*/);
     }
   }
@@ -7679,6 +7725,7 @@ void SILGenFunction::emitProtocolWitness(
       switch (reqtIsolation) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedConcurrent:
       case ActorIsolation::NonisolatedUnsafe:
         return emitNonIsolatedIsolation(loc).getValue();
       case ActorIsolation::Erased:
@@ -7689,11 +7736,12 @@ void SILGenFunction::emitProtocolWitness(
         return emitGlobalActorIsolation(loc, globalActor).getValue();
       }
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::CallerIsolationInheriting: {
+      case ActorIsolation::NonisolatedNonsending: {
         auto witnessIsolation = getWitnessIsolation();
         switch (witnessIsolation) {
         case ActorIsolation::Unspecified:
         case ActorIsolation::Nonisolated:
+        case ActorIsolation::NonisolatedConcurrent:
         case ActorIsolation::NonisolatedUnsafe:
           return emitNonIsolatedIsolation(loc).getValue();
         case ActorIsolation::Erased:
@@ -7705,7 +7753,7 @@ void SILGenFunction::emitProtocolWitness(
           return emitGlobalActorIsolation(loc, globalActor).getValue();
         }
         case ActorIsolation::ActorInstance:
-        case ActorIsolation::CallerIsolationInheriting: {
+        case ActorIsolation::NonisolatedNonsending: {
           auto isolatedArg = F.maybeGetIsolatedArgument();
           assert(isolatedArg);
           return isolatedArg;
@@ -7721,8 +7769,8 @@ void SILGenFunction::emitProtocolWitness(
     // isolation is caller isolation inheriting, hop onto the reqtIsolation so
     // that it is safe for our witness to assume that it is already on its
     // actor.
-    if (!reqtIsolation.isCallerIsolationInheriting() &&
-        getWitnessIsolation().isCallerIsolationInheriting()) {
+    if (!reqtIsolation.isNonisolatedNonsending() &&
+        getWitnessIsolation().isNonisolatedNonsending()) {
       B.createHopToExecutor(loc, args.back(), false /*mandatory*/);
     }
   }

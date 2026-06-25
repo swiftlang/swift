@@ -784,11 +784,14 @@ public:
       }
       // Diagnose a protocol conformance has been removed.
       if (auto *Conf = dyn_cast<SDKNodeConformance>(Left)) {
-        auto *TD = Conf->getNominalTypeDecl();
-        TD->emitDiag(SourceLoc(),
-                     diag::conformance_removed,
-                     Conf->getName(),
-                     TD->isProtocol());
+        // Removing conformance to a marker protocol does not affect ABI
+        if (!(Ctx.checkingABI() && Conf->isMarkerProtocol())) {
+          auto *TD = Conf->getNominalTypeDecl();
+          TD->emitDiag(SourceLoc(),
+                       diag::conformance_removed,
+                       Conf->getName(),
+                       TD->isProtocol());
+        }
       }
       if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Left)) {
         diagnoseRemovedDecl(Acc);

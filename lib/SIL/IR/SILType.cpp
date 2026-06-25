@@ -311,38 +311,7 @@ static bool isSingleSwiftRefcounted(SILModule &M,
   if (isa<SILBoxType>(Ty))
     return true;
   
-  // Is the type a Swift-refcounted class?
-  // For a generic type, consider its superclass constraint, if any.
-  auto ClassTy = Ty;
-  if (auto archety = dyn_cast<ArchetypeType>(Ty)) {
-    if (auto superclass = Ty->getSuperclass()) {
-      ClassTy = superclass->getCanonicalType();
-    }
-  }
-  // For an existential type, consider its superclass constraint, if it carries
-  // no witness tables.
-  if (Ty->isAnyExistentialType()) {
-    auto layout = Ty->getExistentialLayout();
-    // Must be no protocol constraints that aren't @objc or @_marker.
-    if (layout.containsSwiftProtocol) {
-      return false;
-    }
-    
-    // The Error existential has its own special layout.
-    if (layout.isErrorExistential()) {
-      return false;
-    }
-    
-    // We can look at the superclass constraint, if any, to see if it's
-    // Swift-refcounted.
-    if (!layout.getSuperclass()) {
-      return false;
-    }
-    ClassTy = layout.getSuperclass()->getCanonicalType();
-  }
-  
-  // TODO: Does the base class we found have fully native Swift ancestry,
-  // so we can use Swift native refcounting on it?
+  // FIXME: Draw the rest of the horse.
   return false;
 }
 
@@ -975,30 +944,30 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
           ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
           ->getCanonicalType();
         didChange |= param.getInterfaceType() != newParamTy;
-        newParams.push_back(SILParameterInfo(newParamTy, param.getConvention()));
+        newParams.push_back(param.getWithInterfaceType(newParamTy));
       }
       for (auto yield : sft->getYields()) {
         auto newYieldTy = yield.getInterfaceType()
           ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
           ->getCanonicalType();
         didChange |= yield.getInterfaceType() != newYieldTy;
-        newYields.push_back(SILYieldInfo(newYieldTy, yield.getConvention()));
+        newYields.push_back(yield.getWithInterfaceType(newYieldTy));
       }
       for (auto result : sft->getResults()) {
         auto newResultTy = result.getInterfaceType()
           ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
           ->getCanonicalType();
         didChange |= result.getInterfaceType() != newResultTy;
-        newResults.push_back(SILResultInfo(newResultTy, result.getConvention()));
+        newResults.push_back(result.getWithInterfaceType(newResultTy));
       }
       if (auto error = sft->getOptionalErrorResult()) {
         auto newErrorTy = error->getInterfaceType()
           ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
           ->getCanonicalType();
         didChange |= error->getInterfaceType() != newErrorTy;
-        newErrorResult = SILResultInfo(newErrorTy, error->getConvention());
+        newErrorResult = error->getWithInterfaceType(newErrorTy);
       }
-      
+
       if (!didChange)
         return sft;
       

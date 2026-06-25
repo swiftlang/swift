@@ -564,19 +564,7 @@ public:
 protected:
   bool attempt(const TypeVariableBinding &choice) override;
 
-  bool shouldSkip(const TypeVariableBinding &choice) const override {
-    // Let's always attempt types inferred from "defaultable" constraints
-    // in diagnostic mode. This allows the solver to attempt i.e. `Any`
-    // for collection literals and produce better diagnostics for for-in
-    // statements like `for (x, y, z) in [] { ... }` when pattern type
-    // could not be inferred.
-    if (CS.shouldAttemptFixes())
-      return false;
-
-    // If this is a defaultable binding and we have found solutions,
-    // don't explore the default binding.
-    return AnySolved && choice.isDefaultable();
-  }
+  bool shouldSkip(const TypeVariableBinding &choice) const override;
 
   /// Check whether attempting type variable binding choices should
   /// be stopped, because optimal solution has already been found.
@@ -884,8 +872,13 @@ public:
     if (HadFailure)
       restoreBestScore();
 
-    if (OuterTimeRemaining)
-      CS.Timer.emplace(CS, *OuterTimeRemaining);
+    if (OuterTimeRemaining) {
+      const auto &opts = CS.getASTContext().TypeCheckerOpts;
+      CS.Timer.emplace(CS, *OuterTimeRemaining,
+                       opts.WarnLongExpressionTypeChecking,
+                       opts.WarnLongExpressionTypeCheckingScopes,
+                       opts.WarnLongExpressionTypeCheckingTrail);
+    }
   }
 
   StepResult resume(bool prevFailed) override;

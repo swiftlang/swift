@@ -120,6 +120,8 @@ struct MatchCallArgumentResult {
       Bindings.push_back({i});
     return {TrailingClosureMatching::Forward, Bindings, std::nullopt};
   }
+
+  void dump(llvm::raw_ostream &out);
 };
 
 /// Provides information about the application of a function argument to a

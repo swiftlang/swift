@@ -129,7 +129,6 @@ UNINTERESTING_FEATURE(FlowSensitiveConcurrencyCaptures)
 UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
-UNINTERESTING_FEATURE(DeferredCodeGen)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
 UNINTERESTING_FEATURE(NoImplicitCopy)
@@ -169,13 +168,13 @@ UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypesWithDefaults)
+UNINTERESTING_FEATURE(SourceWarningControl)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
-UNINTERESTING_FEATURE(EmbeddedExistentials)
 UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
 UNINTERESTING_FEATURE(TypedAllocation)
 
@@ -277,6 +276,21 @@ static bool usesFeatureLifetimes(Decl *decl) {
   if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
     return !varDecl->getTypeInContext()->isEscapable();
   }
+  return false;
+}
+
+static PreInverseGenericsAttr *getPreInverseGenericsExcept(Decl *decl) {
+  if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
+    for (auto i : range(pbd->getNumPatternEntries()))
+      if (auto anchorVar = pbd->getAnchoringVarDecl(i))
+        return getPreInverseGenericsExcept(anchorVar);
+
+  return decl->getAttrs().getAttribute<PreInverseGenericsAttr>();
+}
+
+static bool usesFeaturePreInverseGenericsExcept(Decl *decl) {
+  if (auto *attr = getPreInverseGenericsExcept(decl))
+    return attr->hasExcept(decl);
   return false;
 }
 
@@ -443,35 +457,18 @@ static bool usesFeatureIsolatedConformances(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureSourceWarningControl(Decl *decl) {
-  return decl->getAttrs().hasAttribute<WarnAttr>();
-}
+UNINTERESTING_FEATURE(ConcurrencySyntaxSugar)
 
 static bool usesFeatureCompileTimeValues(Decl *decl) {
   return decl->getAttrs().hasAttribute<ConstValAttr>() ||
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
 }
 
-static bool usesFeatureClosureBodyMacro(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinTaskCancellationShield(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinAddTaskLocalValue(Decl *decl) {
-  return false;
-}
-
+UNINTERESTING_FEATURE(ClosureBodyMacro)
+UNINTERESTING_FEATURE(BuiltinConcurrencyStackNesting)
+UNINTERESTING_FEATURE(BuiltinTaskCancellationShield)
+UNINTERESTING_FEATURE(BuiltinAddTaskLocalValue)
+UNINTERESTING_FEATURE(BuiltinContinuationNonCopyableSuccess)
 UNINTERESTING_FEATURE(CompileTimeValuesPreview)
 UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
@@ -480,6 +477,7 @@ UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(ImportCxxMembersLazily)
+UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -505,6 +503,7 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 UNINTERESTING_FEATURE(CustomAvailability)
 UNINTERESTING_FEATURE(BuiltinMarkDependence)
+UNINTERESTING_FEATURE(BuiltinGepProjection)
 
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.
@@ -517,12 +516,12 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
       return true;
   }
 
-  auto hasCallerIsolatedAttr = [](TypeRepr *R) {
+  auto hasNonisolatedNonsendingAttr = [](TypeRepr *R) {
     if (!R)
       return false;
 
     return R->findIf([](TypeRepr *repr) {
-      if (isa<CallerIsolatedTypeRepr>(repr))
+      if (isa<NonisolatedNonsendingTypeRepr>(repr))
         return true;
 
       // We don't check for @concurrent here because it's
@@ -539,19 +538,19 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
 
   // The declaration is going to be printed with `nonisolated(nonsending)`
   // attribute.
-  if (getActorIsolation(VD).isCallerIsolationInheriting())
+  if (getActorIsolation(VD).isNonisolatedNonsending())
     return true;
 
   // Check if any parameters that have `nonisolated(nonsending)` attribute.
   if (auto *PL = VD->getParameterList()) {
     if (llvm::any_of(*PL, [&](const ParamDecl *P) {
-          return hasCallerIsolatedAttr(P->getTypeRepr());
+          return hasNonisolatedNonsendingAttr(P->getTypeRepr());
         }))
       return true;
   }
 
   // Check if result type has explicit `nonisolated(nonsending)` attribute.
-  if (hasCallerIsolatedAttr(VD->getResultTypeRepr()))
+  if (hasNonisolatedNonsendingAttr(VD->getResultTypeRepr()))
     return true;
 
   return false;
@@ -674,7 +673,8 @@ static bool usesFeatureReparenting(Decl *decl) {
 
   // Check if this decl itself is a reparentable protocol (of extension of).
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    decl = ext->getExtendedNominal();
+    if (auto *nominal = ext->getExtendedNominal())
+      decl = nominal;
   }
 
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
@@ -686,6 +686,11 @@ static bool usesFeatureReparenting(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(StrictAccessControl)
+UNINTERESTING_FEATURE(BorrowingSequence)
+UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
+UNINTERESTING_FEATURE(FlowIsolationGlobalActor)
+
+UNINTERESTING_FEATURE(DeriveConformancesViaMacros)
 
 static bool usesFeatureBorrowInout(Decl *decl) {
   auto &ctx = decl->getASTContext();
@@ -694,10 +699,10 @@ static bool usesFeatureBorrowInout(Decl *decl) {
     decl = ext->getExtendedNominal();
   }
 
-  return decl == ctx.getBorrowDecl() || decl == ctx.getInoutDecl();
+  return decl == ctx.getRefDecl() || decl == ctx.getMutableRefDecl();
 }
 
-UNINTERESTING_FEATURE(BorrowingSequence)
+UNINTERESTING_FEATURE(BuiltinDereferenceable)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

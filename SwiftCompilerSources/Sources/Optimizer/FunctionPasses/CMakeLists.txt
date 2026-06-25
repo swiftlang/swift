@@ -9,6 +9,7 @@
 swift_compiler_sources(Optimizer
   AllocBoxToStack.swift
   AssumeSingleThreaded.swift
+  CommonSubexpressionElimination.swift
   AsyncDemotion.swift
   AutoDiffBranchTracingEnumUtilities.swift
   BooleanLiteralFolding.swift
@@ -34,6 +35,7 @@ swift_compiler_sources(Optimizer
   ObjectOutliner.swift
   ObjCBridgingOptimization.swift
   MandatoryDestroyHoisting.swift
+  MergeBorrowScopes.swift
   MergeCondFails.swift
   NamedReturnValueOptimization.swift
   RedundantLoadElimination.swift

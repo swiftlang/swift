@@ -345,11 +345,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   // Everything else cares about the (rvalue) argument.
 
-  case BuiltinValueKind::CancelAsyncTask: {
-    emitTaskCancel(IGF, args.claimNext());
-    return;
-  }
-
   case BuiltinValueKind::ConvertTaskToJob: {
     auto task = args.claimNext();
     // The job object starts at the beginning of the task.
@@ -1504,6 +1499,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto pointerSrc = args.claimNext();
     (void)args.claimAll();
     out.add(pointerSrc);
+    return;
+  }
+
+  case BuiltinValueKind::Dereferenceable: {
+    auto pointer = args.claimNext();
+    auto sizeValue = args.claimNext();
+    IGF.Builder.CreateDereferenceableAssumption(pointer, sizeValue);
+    out.add(pointer);
     return;
   }
 

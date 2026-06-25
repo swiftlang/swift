@@ -207,7 +207,7 @@ TEST(DiagnosticInfo, CategoryNoUsage) {
             .warnUntilLanguageMode(LanguageMode::future);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
-        EXPECT_EQ(info.getCategoryName(), "no-usage");
+        EXPECT_EQ(info.getCategoryName(), "NoUsage");
       },
       /*expectedNumCallbackCalls=*/3);
 }

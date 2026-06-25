@@ -1,0 +1,27 @@
+// RUN: %scale-test --invert-result --begin 10 --end 100 --step 10 --select NumStructEltBaseScans -Xfrontend=-emit-sil %s
+// REQUIRES: asserts
+
+// Test that DIMemoryUseCollector does not scale quadratically when visiting
+// struct element addresses in a non-delegating struct initializer.
+//
+// The pattern:
+//   - A struct with N stored Int properties
+//   - An init() that assigns each property once, in order
+//   - Each assignment lowers to a struct_element_addr instruction
+//   - collectStructElementUses() computes the base element index by iterating
+//     over all preceding stored properties — O(k) for property k
+//   - Summed over N properties: 0 + 1 + ... + (N-1) = O(N²) total scans,
+//     counted by NumStructEltBaseScans
+//
+// This test uses --invert-result to document the *known-bad* quadratic scaling.
+
+struct S${N} {
+% for i in range(N):
+    var prop${i}: Int
+% end
+    init() {
+% for i in range(N):
+        self.prop${i} = 0
+% end
+    }
+}

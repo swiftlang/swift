@@ -168,3 +168,28 @@ extension Array where Element == Foo {
     }
   }
 }
+
+
+public struct StaticInExtensionStruct {}
+
+public extension StaticInExtensionStruct {
+  // CHECK-LABEL: sil_property #StaticInExtensionStruct.staticLet ()
+  static let staticLet = "hello"
+
+  // NONRESILIENT-LABEL: sil_property #StaticInExtensionStruct.staticVar ()
+  // PRIVATEIMPORTS-LABEL: sil_property #StaticInExtensionStruct.staticVar ()
+  // RESILIENT-LABEL: sil_property #StaticInExtensionStruct.staticVar (settable_property
+  static var staticVar = "hello"
+}
+
+public enum StaticInExtensionEnum {}
+
+public extension StaticInExtensionEnum {
+  // CHECK-LABEL: sil_property #StaticInExtensionEnum.staticLet ()
+  static let staticLet = "hello"
+
+  // NONRESILIENT-LABEL: sil_property #StaticInExtensionEnum.staticVar ()
+  // PRIVATEIMPORTS-LABEL: sil_property #StaticInExtensionEnum.staticVar ()
+  // RESILIENT-LABEL: sil_property #StaticInExtensionEnum.staticVar (settable_property
+  static var staticVar = "hello"
+}

@@ -1,0 +1,226 @@
+// RUN: %target-sil-opt %s -test-runner -o /dev/null | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil @helper_fn_a : $@convention(thin) () -> ()
+sil @helper_fn_b : $@convention(thin) () -> ()
+
+// -----------------------------------------------------------------------
+// print: duplicate is skipped — map contains only the first occurrence.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_print: scoped-hash-table
+// CHECK:       integer_literal $Builtin.Int64, 1
+// CHECK:       integer_literal $Builtin.Int64, 2
+// CHECK-NOT:   %2 = integer_literal
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_print: scoped-hash-table
+sil @scoped_hash_table_print : $@convention(thin) () -> () {
+bb0:
+  specify_test "scoped-hash-table"
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = integer_literal $Builtin.Int64, 2
+  %2 = integer_literal $Builtin.Int64, 1  // duplicate of %0 — must not appear in map
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// -----------------------------------------------------------------------
+// print: multiple groups of duplicates — each unique value appears once.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_print_dedup: scoped-hash-table
+// CHECK:       integer_literal $Builtin.Int64, 10
+// CHECK:       integer_literal $Builtin.Int64, 20
+// CHECK:       integer_literal $Builtin.Int64, 30
+// CHECK-NOT:   %3 = integer_literal
+// CHECK-NOT:   %4 = integer_literal
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_print_dedup: scoped-hash-table
+sil @scoped_hash_table_print_dedup : $@convention(thin) () -> () {
+bb0:
+  specify_test "scoped-hash-table"
+  %0 = integer_literal $Builtin.Int64, 10
+  %1 = integer_literal $Builtin.Int64, 20
+  %2 = integer_literal $Builtin.Int64, 30
+  %3 = integer_literal $Builtin.Int64, 10  // dup of %0
+  %4 = integer_literal $Builtin.Int64, 20  // dup of %1
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// -----------------------------------------------------------------------
+// print: mixed instruction kinds — integer_literal and function_ref,
+// each with one duplicate.  Only the first of each pair appears in the map.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_print_mixed: scoped-hash-table
+// CHECK:       integer_literal $Builtin.Int64, 42
+// CHECK:       function_ref @helper_fn_a
+// CHECK-NOT:   %2 = integer_literal
+// CHECK-NOT:   %3 = function_ref
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_print_mixed: scoped-hash-table
+sil @scoped_hash_table_print_mixed : $@convention(thin) () -> () {
+bb0:
+  specify_test "scoped-hash-table"
+  %0 = integer_literal $Builtin.Int64, 42
+  %1 = function_ref @helper_fn_a : $@convention(thin) () -> ()
+  %2 = integer_literal $Builtin.Int64, 42                        // dup of %0
+  %3 = function_ref @helper_fn_a : $@convention(thin) () -> ()   // dup of %1
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// -----------------------------------------------------------------------
+// print: all unique — every instruction appears in the map.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_print_all_unique: scoped-hash-table
+// CHECK:       integer_literal $Builtin.Int64, 100
+// CHECK:       integer_literal $Builtin.Int64, 200
+// CHECK:       integer_literal $Builtin.Int64, 300
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_print_all_unique: scoped-hash-table
+sil @scoped_hash_table_print_all_unique : $@convention(thin) () -> () {
+bb0:
+  specify_test "scoped-hash-table"
+  %0 = integer_literal $Builtin.Int64, 100
+  %1 = integer_literal $Builtin.Int64, 200
+  %2 = integer_literal $Builtin.Int64, 300
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// -----------------------------------------------------------------------
+// insert-lookup: same integer_literal should match.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_same_literal: scoped-hash-table-insert-lookup
+// CHECK:       hit
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_same_literal: scoped-hash-table-insert-lookup
+sil @scoped_hash_table_same_literal : $@convention(thin) () -> () {
+bb0:
+  specify_test "scoped-hash-table-insert-lookup @instruction @instruction[+1]"
+  %0 = integer_literal $Builtin.Int64, 42
+  %1 = integer_literal $Builtin.Int64, 42
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// -----------------------------------------------------------------------
+// insert-lookup: instruction never inserted returns nil.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_lookup_miss: scoped-hash-table-insert-lookup
+// CHECK:       miss
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_lookup_miss: scoped-hash-table-insert-lookup
+sil @scoped_hash_table_lookup_miss : $@convention(thin) () -> () {
+bb0:
+  specify_test "scoped-hash-table-insert-lookup @instruction @instruction[+1]"
+  %0 = integer_literal $Builtin.Int64, 42
+  %1 = integer_literal $Builtin.Int64, 99  // never inserted; value differs from %0
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// -----------------------------------------------------------------------
+// insert-lookup: same kind, different values must NOT match.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_diff_values: scoped-hash-table-insert-lookup
+// CHECK:       miss
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_diff_values: scoped-hash-table-insert-lookup
+sil @scoped_hash_table_diff_values : $@convention(thin) () -> () {
+bb0:
+  specify_test "scoped-hash-table-insert-lookup @instruction @instruction[+1]"
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = integer_literal $Builtin.Int64, 2
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// -----------------------------------------------------------------------
+// pop: insert in bb0 and bb1; pop bb1; only bb0 entry survives.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_pop: scoped-hash-table-pop
+// CHECK:       keep: hit
+// CHECK:       pop: miss
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_pop: scoped-hash-table-pop
+sil @scoped_hash_table_pop : $@convention(thin) () -> () {
+bb0:
+  specify_test "scoped-hash-table-pop @instruction @block[1].instruction[0] @block[1]"
+  %0 = integer_literal $Builtin.Int64, 10
+  br bb1
+bb1:
+  %1 = integer_literal $Builtin.Int64, 20
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// -----------------------------------------------------------------------
+// insert-lookup: FunctionRefInst — two refs to the same function match.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_funcref_same: scoped-hash-table-insert-lookup
+// CHECK:       hit
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_funcref_same: scoped-hash-table-insert-lookup
+sil @scoped_hash_table_funcref_same : $@convention(thin) () -> () {
+bb0:
+  specify_test "scoped-hash-table-insert-lookup @instruction @instruction[+1]"
+  %0 = function_ref @helper_fn_a : $@convention(thin) () -> ()
+  %1 = function_ref @helper_fn_a : $@convention(thin) () -> ()
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// -----------------------------------------------------------------------
+// insert-lookup: FunctionRefInst — refs to different functions must NOT match.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_funcref_diff: scoped-hash-table-insert-lookup
+// CHECK:       miss
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_funcref_diff: scoped-hash-table-insert-lookup
+sil @scoped_hash_table_funcref_diff : $@convention(thin) () -> () {
+bb0:
+  specify_test "scoped-hash-table-insert-lookup @instruction @instruction[+1]"
+  %0 = function_ref @helper_fn_a : $@convention(thin) () -> ()
+  %1 = function_ref @helper_fn_b : $@convention(thin) () -> ()
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// -----------------------------------------------------------------------
+// insert-lookup: BuiltinInst — two identical builtins match.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_builtin_same: scoped-hash-table-insert-lookup
+// CHECK:       hit
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_builtin_same: scoped-hash-table-insert-lookup
+sil @scoped_hash_table_builtin_same : $@convention(thin) (Builtin.Word, Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
+  specify_test "scoped-hash-table-insert-lookup @instruction @instruction[+1]"
+  %2 = builtin "add_Word"(%0 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  %3 = builtin "add_Word"(%0 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// -----------------------------------------------------------------------
+// insert-lookup: BuiltinInst — different builtins must NOT match.
+// -----------------------------------------------------------------------
+
+// CHECK-LABEL: begin running test {{.*}} on scoped_hash_table_builtin_diff: scoped-hash-table-insert-lookup
+// CHECK:       miss
+// CHECK-LABEL: end running test {{.*}} on scoped_hash_table_builtin_diff: scoped-hash-table-insert-lookup
+sil @scoped_hash_table_builtin_diff : $@convention(thin) (Builtin.Word, Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
+  specify_test "scoped-hash-table-insert-lookup @instruction @instruction[+1]"
+  %2 = builtin "add_Word"(%0 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  %3 = builtin "mul_Word"(%0 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  %99 = tuple ()
+  return %99 : $()
+}

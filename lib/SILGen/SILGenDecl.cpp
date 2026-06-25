@@ -37,6 +37,7 @@
 #include "swift/SIL/SILSymbolVisitor.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
+#include "clang/AST/DeclarationName.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <iterator>
@@ -1325,11 +1326,10 @@ void EnumElementPatternInitialization::emitEnumMatch(
 
         if (mv.getType().isAddress()) {
           // If the enum is address-only, take from the enum we have and load it
-          // if
-          // the element value is loadable.
+          // if the element value is loadable.
           assert((eltTL.isTrivial() || mv.hasCleanup()) &&
                  "must be able to consume value");
-          mv = SGF.B.createUncheckedTakeEnumDataAddr(loc, mv, eltDecl, eltTy);
+          mv = SGF.B.createUncheckedEnumDataAddrForTake(loc, mv, eltDecl, eltTy);
           // Load a loadable data value.
           if (eltTL.isLoadable())
             mv = SGF.B.createLoadTake(loc, mv);
@@ -2096,35 +2096,6 @@ CleanupHandle SILGenFunction::enterDeinitExistentialCleanup(
 }
 
 namespace {
-  /// A cleanup that cancels an asynchronous task.
-  class CancelAsyncTaskCleanup: public Cleanup {
-    SILValue task;
-  public:
-    CancelAsyncTaskCleanup(SILValue task) : task(task) { }
-
-    void emit(SILGenFunction &SGF, CleanupLocation l,
-              ForUnwind_t forUnwind) override {
-      SILValue borrowedTask = SGF.B.createBeginBorrow(l, task);
-      SGF.emitCancelAsyncTask(l, borrowedTask);
-      SGF.B.createEndBorrow(l, borrowedTask);
-    }
-
-    void dump(SILGenFunction &) const override {
-#ifndef NDEBUG
-      llvm::errs() << "CancelAsyncTaskCleanup\n"
-                   << "Task:" << task << "\n";
-#endif
-    }
-  };
-} // end anonymous namespace
-
-CleanupHandle SILGenFunction::enterCancelAsyncTaskCleanup(SILValue task) {
-  Cleanups.pushCleanupInState<CancelAsyncTaskCleanup>(
-      CleanupState::Active, task);
-  return Cleanups.getTopCleanup();
-}
-
-namespace {
 /// A cleanup that destroys the AsyncLet along with the child task and record.
 class AsyncLetCleanup: public Cleanup {
   SILValue alet;
@@ -2568,8 +2539,12 @@ SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
                           cleanupPoint.state);
     cleanupPoint.inst->eraseFromParent();
   }
-  
-  return storeBorrow;
+
+  SILValue result = storeBorrow;
+  if (result->getType().isMoveOnly()) {
+    result = B.createMarkUnresolvedNonCopyableValueInst(result.getLoc(), result, MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+  }
+  return result;
 }
 
 void BlackHoleInitialization::performPackExpansionInitialization(

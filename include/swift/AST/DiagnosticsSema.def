@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -646,7 +646,7 @@ NOTE(async_inferred_from_operation,none,
 // Key-path expressions.
 ERROR(expr_keypath_no_objc_runtime,none,
       "'#keyPath' can only be used with the Objective-C runtime", ())
-ERROR(expression_unused_keypath_result,NoUsage,
+GROUPED_ERROR(expression_unused_keypath_result,NoUsage,NoUsage,
       "result of key path is unused", ())
 ERROR(expr_keypath_non_objc_property,none,
       "argument of '#keyPath' refers to non-'@objc' property %0",
@@ -728,6 +728,9 @@ ERROR(expr_keypath_application_root_type_mismatch, none,
       (Type, Type))
 ERROR(expr_swift_keypath_anyobject_root,none,
       "the root type of a Swift key path cannot be 'AnyObject'", ())
+ERROR(expr_keypath_protocol_metatype_static_member,none,
+      "key path cannot refer to static member %0 of protocol type %1",
+      (DeclNameRef, Type))
 ERROR(expr_keypath_multiparam_func_conversion, none,
       "cannot convert key path into a multi-argument function type %0", (Type))
 ERROR(cannot_convert_type_to_keypath_subscript_index,none,
@@ -822,6 +825,13 @@ ERROR(const_unsupported_keypath,none,
       "keypaths not supported in a literal expression", ())
 ERROR(const_opaque_decl_ref,none,
       "unable to resolve variable reference in a literal expression", ())
+ERROR(const_public_let_ref,none,
+      "reference to a %select{%error|%error|%error|package|public|open}0 "
+      "'let' binding is not permitted in a literal expression",
+      (AccessLevel))
+ERROR(const_usable_from_inline_let_ref,none,
+      "reference to a '@usableFromInline' 'let' binding is not permitted "
+      "in a literal expression", ())
 ERROR(const_opaque_func_decl_ref,none,
       "unable to resolve function reference in a literal expression", ())
 ERROR(const_non_convention_c_conversion,none,
@@ -834,6 +844,12 @@ ERROR(const_integer_overflow,none,
       "operation results in integer overflow", ())
 ERROR(const_divide_by_zero,none,
       "division by zero", ())
+ERROR(const_shift_negative,none,
+      "negative shift amount is not permitted in a literal expression", ())
+ERROR(const_shift_out_of_range,none,
+      "shift amount %0 is greater than or equal to the %1-bit width of "
+      "the operand in a literal expression",
+      (unsigned, unsigned))
 ERROR(const_unknown_default,none,
       "not supported in a literal expression", ())
 NOTE(const_failed_fold_declref_init,none,
@@ -857,9 +873,9 @@ NOTE(sema_no_import_no_sdk,none,
 NOTE(sema_no_import_no_sdk_xcrun,none,
      "use \"xcrun swiftc\" to select the default macOS SDK "
      "installed with Xcode", ())
-WARNING(sema_import_current_module,none,
+GROUPED_WARNING(sema_import_current_module,ModuleSelfImport,none,
         "this file is part of module %0; ignoring import", (Identifier))
-WARNING(sema_import_current_module_with_file,none,
+GROUPED_WARNING(sema_import_current_module_with_file,ModuleSelfImport,none,
         "file '%0' is part of module %1; ignoring import",
         (StringRef, Identifier))
 ERROR(sema_opening_import,Fatal,
@@ -1244,7 +1260,8 @@ ERROR(in_package_module_not_compiled_from_source_or_package_interface,none,
       "modules of the same package can only be loaded if built from source or package interface: %2",
       (Identifier, StringRef, StringRef))
 
-WARNING(in_package_module_not_compiled_locally,none,
+GROUPED_WARNING(in_package_module_not_compiled_locally,
+        PackageModuleLoadedFromSDK,none,
         "module %0 is in package %1 but was loaded from SDK; "
         "modules of the same package should be built locally from source only: %2",
         (Identifier, Identifier, StringRef))
@@ -1316,6 +1333,10 @@ REMARK(transitive_dependency_behavior,none,
 GROUPED_WARNING(cannot_find_module_version,ModuleVersionMissing,none,
         "cannot find user version number for%select{| Clang}1 module '%0';"
         " version number ignored", (StringRef, bool))
+
+GROUPED_WARNING(canimport_missing_module,CanImportMissingModule,none,
+        "cannot find module '%0' for canImport check; the directive will"
+        " evaluate to false", (StringRef))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
@@ -1736,10 +1757,25 @@ ERROR(invalid_dynamic_member_lookup_type,none,
       "'@dynamicMemberLookup' requires %0 to have a "
       "'subscript(dynamicMember:)' method that accepts either "
       "'ExpressibleByStringLiteral' or a key path", (Type))
-NOTE(invalid_dynamic_member_subscript, none,
-     "add an explicit argument label to this subscript to satisfy "
-     "the '@dynamicMemberLookup' requirement", ())
-ERROR(dynamic_member_lookup_candidate_inaccessible,none,
+ERROR(invalid_dynamic_member_subscript_missing_param_label, none,
+      "'@dynamicMemberLookup' requires %0 to have an explicit parameter label",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_arg_label, none,
+      "'@dynamicMemberLookup' requires %0 to have an explicit 'dynamicMember' "
+      "argument label",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_order, none,
+      "'@dynamicMemberLookup' requires %0 to appear first in the parameter "
+      "list",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_type, none,
+      "'@dynamicMemberLookup' requires %0 to be either "
+      "'ExpressibleByStringLiteral' or a key path",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_missing_default, none,
+      "'@dynamicMemberLookup' requires %0 to have a default value",
+      (ParamDecl *))
+ERROR(dynamic_member_lookup_candidate_inaccessible, none,
       "'@dynamicMemberLookup' requires %0 to be as accessible as its "
       "enclosing type",
       (ValueDecl *))
@@ -1856,6 +1892,8 @@ NOTE(note_make_optional,none,
       "add '?' to form the optional type %0", (Type))
 NOTE(note_make_implicitly_unwrapped_optional,none,
       "add '!' to form an implicitly unwrapped optional", ())
+NOTE(note_use_nil_for_cxx_optional,none,
+     "use the 'nil' literal instead", ())
 
 ERROR(invalid_ibdesignable_extension,none,
       "'@IBDesignable' can only be applied to classes and extensions "
@@ -2722,7 +2760,7 @@ ERROR(spi_attribute_on_frozen_stored_properties,none,
 ERROR(spi_attribute_on_frozen_enum_case,none,
       "%kind0 cannot be declared '@_spi' in a '@frozen' enum",
       (const ValueDecl *))
-WARNING(spi_attribute_on_import_of_public_module,none,
+GROUPED_WARNING(spi_attribute_on_import_of_public_module,SPIImportIgnored,none,
         "'@_spi' import of %0 will not include any SPI symbols; "
         "%0 was built from the public interface at %1",
         (DeclName, StringRef))
@@ -2859,6 +2897,12 @@ WARNING(extension_retroactive_conformance,none,
 NOTE(extension_retroactive_conformance_silence,none,
      "add '@retroactive' to silence this warning", ())
 
+WARNING(extension_retroactive_conformance_unavailable,none,
+       "extension declares a conformance of imported type %0 to imported "
+       "%select{protocols|protocol}1 %2; the owners of %3 have marked "
+       "%select{these conformances|this conformance}1 as unavailable",
+       (Identifier, bool, StringRef, Identifier))
+
 // Protocols
 ERROR(type_does_not_conform,none,
       "type %0 does not conform to protocol %1", (Type, Type))
@@ -2888,6 +2932,8 @@ NOTE(nonsendable_function_type,none,
 NOTE(nonsendable_tuple_type,none,
      "a tuple type must be composed of 'Sendable' elements to conform to "
      "'Sendable'", ())
+NOTE(nonescapable_function_type,none,
+     "a function type can be marked '@escaping' to conform to 'Escapable'", ())
 NOTE(non_sendable_nominal,none,
      "%kind0 does not conform to the 'Sendable' protocol",
       (const ValueDecl *))
@@ -2897,17 +2943,17 @@ NOTE(add_nominal_sendable_conformance,none,
 NOTE(add_generic_parameter_conformance,none,
      "consider making generic parameter %0 conform to the %1 protocol",
      (Type, ProtocolDecl *))
-WARNING(add_predates_concurrency_import,none,
+GROUPED_WARNING(add_predates_concurrency_import,AddPreconcurrencyImport,none,
      "add '@preconcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
      "%select{| as warnings}0", (bool, Identifier))
 GROUPED_WARNING(remove_predates_concurrency_import,PreconcurrencyImport,
                 none,
                 "'@preconcurrency' on module %0 has no effect", (Identifier))
-WARNING(remove_public_import,none,
+GROUPED_WARNING(remove_public_import,UnusedImportAccess,none,
         "public import of %0 was not used in public declarations or inlinable code",
         (Identifier))
-WARNING(remove_package_import,none,
+GROUPED_WARNING(remove_package_import,UnusedImportAccess,none,
         "package import of %0 was not used in package declarations",
         (Identifier))
 GROUPED_WARNING(public_decl_needs_sendable,ExplicitSendable,none,
@@ -3380,6 +3426,11 @@ NOTE(declared_protocol_conformance_here,none,
      "%0 implicitly conforms to protocol %2|"
      "%0 implicitly conforms to protocol %2 (via conformance to %3)}1 here",
      (Type, unsigned, Identifier, Identifier))
+NOTE(declared_protocol_unavailable_conformance_here,none,
+     "%select{%0 inherits unavailable conformance to protocol %2 from superclass|"
+     "%0 declares unavailable conformance to protocol %2|"
+     "%error|%error|%error}1 here",
+     (Type, unsigned, Identifier, Identifier))
 
 ERROR(witness_unavailable,none,
         "unavailable %kind0 was used to satisfy a requirement of protocol %1%select{|: %2}2",
@@ -3391,9 +3442,12 @@ GROUPED_WARNING(
     "protocol %1%select{|: %2}2",
     (const ValueDecl *, Identifier, StringRef))
 
-WARNING(unavailable_conformance,none,
-        "conformance of %0 to protocol %1 is already unavailable",
-        (Type, Identifier))
+GROUPED_WARNING(
+    unavailable_sendable_conformance, UnavailableSendableConformance, none,
+    "%0 %select{was declared with|inherits}1 an unavailable 'Sendable' conformance"
+    "%select{ in %2|}1; conforming here risks data races",
+    (Type, bool, Identifier))
+
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, Identifier))
 ERROR(redundant_conformance_conditional,none,
@@ -3985,6 +4039,10 @@ NOTE(spi_only_import_conflict_here,none,
 ERROR(error_public_import_of_private_module,none,
       "private module %0 is imported publicly from the public module %1",
       (Identifier, Identifier))
+GROUPED_WARNING(warn_import_of_ipi_module,PublicImportOfProjectInternalModule,none,
+      "Project internal module %0 cannot be imported publicly because "
+      "%1 has '-library-level %select{api|spi}2'",
+      (Identifier, Identifier, unsigned))
 
 ERROR(inconsistent_implicit_access_level_on_import,none,
       "ambiguous implicit access level for import of %0; it is imported as "
@@ -4001,7 +4059,7 @@ NOTE(inconsistent_implicit_access_level_on_import_here,none,
 FIXIT(inconsistent_implicit_access_level_on_import_fixit,
      "%select{private|fileprivate|internal|package|public|%error}0 ",
      (AccessLevel))
-WARNING(inconsistent_import_access_levels,none,
+GROUPED_WARNING(inconsistent_import_access_levels,InconsistentImportAccess,none,
         "module %0 is imported as "
         "'%select{private|fileprivate|internal|package|public|%error}1' "
         "from the same file; "
@@ -4416,6 +4474,13 @@ ERROR(attr_rawlayout_cannot_have_alignment_attr,none,
 ERROR(attr_rawlayout_invalid_count_type,none,
       "'@_rawLayout' count must either be integer literal or a generic "
       "argument", ())
+
+ERROR(attr_pre_inverse_generics_invalid_except,none,
+      "'except' argument to '@_preInverseGenerics' must consist only of "
+      "inverse constraints such as '~Copyable' or '~Escapable'", ())
+WARNING(attr_pre_inverse_generics_except_all,none,
+      "'@_preInverseGenerics' that excepts all inverse constraints is "
+      "equivalent to not using the attribute", ())
 
 // lazy
 ERROR(lazy_not_on_let,none,
@@ -5213,7 +5278,7 @@ ERROR(capture_across_type_decl,none,
       "scope",
       (const NominalTypeDecl *, const ValueDecl *))
 
-ERROR(isolated_any_conversion_to_synchronous_func,none,
+GROUPED_ERROR(isolated_any_conversion_to_synchronous_func,ConversionFromIsolatedAnyToSynchronous,none,
       "converting @isolated(any) function of type %0 to synchronous function type %1 is not allowed",
       (Type, Type))
 
@@ -5268,43 +5333,51 @@ ERROR(implicit_async_super_init,none,
       "'super.init' is 'async' and requires an explicit call",
       ())
 
-WARNING(if_always_true,none,
+GROUPED_WARNING(if_always_true,UselessConditionalStatement,none,
         "'if' condition is always true", ())
-WARNING(while_always_true,none,
+GROUPED_WARNING(while_always_true,UselessConditionalStatement,none,
         "'while' condition is always true", ())
 
-WARNING(guard_always_succeeds,none,
+GROUPED_WARNING(guard_always_succeeds,UselessConditionalStatement,none,
         "'guard' condition is always true, body is unreachable", ())
 
 
-ERROR(expression_unused_closure,NoUsage,
+GROUPED_ERROR(expression_unused_closure,NoUsage,NoUsage,
       "closure expression is unused", ())
-ERROR(expression_unused_function,NoUsage,
+GROUPED_ERROR(expression_unused_function,NoUsage,NoUsage,
       "function is unused", ())
-WARNING(expression_unused_lvalue,NoUsage,
+GROUPED_WARNING(expression_unused_lvalue,NoUsage,NoUsage,
       "%select{"
         "variable|"
         "property is accessed but result|"
         "subscript is accessed but result"
       "}0 is unused",
       (unsigned))
-WARNING(expression_unused_result_call,NoUsage,
+GROUPED_WARNING(expression_unused_result_call,NoUsage,NoUsage,
         "result of call to %0 is unused", (const ValueDecl *))
-WARNING(expression_unused_result_operator,NoUsage,
+GROUPED_WARNING(expression_unused_throwing_unstructured_task,
+        NoUseUnstructuredThrowingTask, none,
+        "unstructured throwing task created by %0 is not used, "
+        "which may accidentally ignore errors thrown inside the task",
+        (const ValueDecl *))
+NOTE(expression_unused_throwing_unstructured_task_silence, none,
+     "to silence this warning, handle the error inside the task, or "
+     "store/discard the task value explicitly", ())
+GROUPED_WARNING(expression_unused_result_operator,NoUsage,NoUsage,
         "result of operator %0 is unused", (const ValueDecl *))
-WARNING(expression_unused_result_operator_name,NoUsage,
+GROUPED_WARNING(expression_unused_result_operator_name,NoUsage,NoUsage,
         "result of operator %0 is unused", (DeclName))
-WARNING(expression_unused_result_unknown, NoUsage,
+GROUPED_WARNING(expression_unused_result_unknown, NoUsage, NoUsage,
         "result of call to %select{function|closure}0 returning %1 is unused", (bool, Type))
-WARNING(expression_unused_result, NoUsage,
+GROUPED_WARNING(expression_unused_result, NoUsage, NoUsage,
         "expression of type %0 is unused", (Type))
-WARNING(expression_unused_init_result,NoUsage,
+GROUPED_WARNING(expression_unused_init_result,NoUsage,NoUsage,
         "result of %0 initializer is unused", (Type))
-WARNING(expression_unused_optional_try,NoUsage,
+GROUPED_WARNING(expression_unused_optional_try,NoUsage,NoUsage,
         "result of 'try?' is unused", ())
-WARNING(expression_unused_selector_result, NoUsage,
+GROUPED_WARNING(expression_unused_selector_result, NoUsage, NoUsage,
         "result of '#selector' is unused", ())
-WARNING(expression_unused_literal,NoUsage,
+GROUPED_WARNING(expression_unused_literal,NoUsage,NoUsage,
         "%0 literal is unused", (StringRef))
 
 ERROR(assignment_lhs_not_lvalue,none,
@@ -5628,6 +5701,9 @@ NOTE(because_rethrows_default_argument_throws,none,
 NOTE(because_rethrows_conformance_throws,none,
      "call is to 'rethrows' function, but a conformance has a throwing witness", ())
 
+ERROR(for_throw_without_try,none,
+      "for-in loop can throw, but is not marked with 'try'", ())
+
 ERROR(throwing_call_in_nonthrowing_autoclosure,none,
       "%0 can throw, but it is executed in a non-throwing "
       "autoclosure",(StringRef))
@@ -5691,7 +5767,7 @@ NOTE(note_error_to_optional,none,
 NOTE(note_disable_error_propagation,none,
       "did you mean to disable error propagation?", ())
 
-WARNING(no_throw_in_try,none,
+GROUPED_WARNING(no_throw_in_try,UnnecessaryEffectMarker,none,
         "no calls to throwing functions occur within 'try' expression", ())
 
 WARNING(no_throw_in_do_with_catch,none,
@@ -5718,7 +5794,7 @@ NOTE(async_call_without_await_in_autoclosure,none,
 NOTE(async_call_without_await_in_async_let,none,
       "call is 'async' in an 'async let' initializer", ())
 
-WARNING(no_async_in_await,none,
+GROUPED_WARNING(no_async_in_await,UnnecessaryEffectMarker,none,
         "no 'async' operations occur within 'await' expression", ())
 ERROR(async_in_nonasync_function,none,
       "%select{'async'|'async' call|'await'|'async let'|'async' property access|'async' subscript access}0 in "
@@ -5974,6 +6050,38 @@ ERROR(distributed_actor_func_param_not_codable,none,
       "parameter %0 of type %1 in %kindonly2 does not conform to "
       "serialization requirement '%3'",
       (Identifier, Type, const AbstractFunctionDecl *, StringRef))
+ERROR(distributed_actor_func_param_resolvable_actor_system_mismatch,none,
+      "parameter %0 of type %1 in %kindonly2 must match the enclosing actor's "
+      "ActorSystem (%5)",
+      (Identifier, Type, const AbstractFunctionDecl *, DeclName, Type, Type))
+NOTE(distributed_actor_func_param_resolvable_actor_system_mismatch_note,none,
+     "'@Resolvable protocol' %0 uses actor system %1",
+     (DeclName, Type))
+ERROR(distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system,none,
+      "parameter %0 of type %1 in %kindonly2 uses '@Resolvable protocol' %3 "
+      "without a concrete 'ActorSystem' constraint",
+      (Identifier, Type, const AbstractFunctionDecl *, DeclName))
+NOTE(distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system_fixit,none,
+     "add 'where Self.ActorSystem == ...' to %0", (DeclName))
+ERROR(distributed_actor_func_param_resolvable_protocol_composition_ambiguous,none,
+      "parameter %0 of type %1 in %kindonly2 contains more than one '@Resolvable protocol'",
+      (Identifier, Type, const AbstractFunctionDecl *))
+ERROR(distributed_actor_func_result_resolvable_protocol_composition_ambiguous,none,
+      "result type %0 of %kindonly1 contains more than one '@Resolvable protocol'",
+      (Type, const ValueDecl *))
+NOTE(distributed_actor_func_resolvable_protocol_composition_ambiguous_note,none,
+     "declare a new '@Resolvable protocol' that refines those protocols and use it instead",
+     ())
+ERROR(distributed_actor_func_result_resolvable_actor_system_mismatch,none,
+      "result type %0 of %kindonly1 must match the enclosing actor's actor system %3",
+      (Type, const ValueDecl *, DeclName, Type))
+NOTE(distributed_actor_func_result_resolvable_actor_system_mismatch_note,none,
+     "'@Resolvable protocol' %0 uses actor system %1",
+     (DeclName, Type))
+ERROR(distributed_actor_func_result_resolvable_protocol_no_concrete_actor_system,none,
+      "result type %0 of %kindonly1 uses '@Resolvable protocol' %2 "
+      "without a concrete 'ActorSystem' constraint",
+      (Type, const ValueDecl *, DeclName))
 ERROR(distributed_actor_target_result_not_codable,none,
       "result type %0 of %kindbase1 does not conform to serialization requirement '%2'",
       (Type, const ValueDecl *, StringRef))
@@ -6154,10 +6262,12 @@ ERROR(concurrent_value_outside_source_file,none,
       (const ValueDecl *))
 ERROR(concurrent_value_nonfinal_class,none,
       "non-final class %0 cannot conform to the 'Sendable' protocol", (DeclName))
-ERROR(concurrent_value_inherit,none,
-      "'Sendable' class %1 cannot inherit from another class"
-      "%select{| other than 'NSObject'}0",
-      (bool, DeclName))
+GROUPED_ERROR(concurrent_value_nonsendable_superclass,NonSendableSuperclass,none,
+      "class %0 cannot conform to the 'Sendable' protocol", (DeclName))
+NOTE(concurrent_value_nonsendable_superclass_note,none,
+     "a 'Sendable' class cannot inherit from a non-Sendable class", ())
+NOTE(concurrent_value_nonsendable_superclass_here,none,
+     "inherits from non-Sendable class %0", (DeclName))
 ERROR(non_sendable_type,none,
       "type %0 does not conform to the 'Sendable' protocol", (Type))
 GROUPED_ERROR(non_sendable_metatype_type,SendableMetatypes,none,
@@ -6314,6 +6424,20 @@ ERROR(global_actor_arg,none,
       (Type))
 ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
+
+GROUPED_WARNING(global_actor_shared_non_let_witness,
+                UnstableGlobalActorShared,none,
+                "GlobalActor witness %kind0 may return different actor "
+                "instances, which would lead to global actor isolation "
+                "violations",
+                (const ValueDecl *))
+NOTE(global_actor_shared_non_let_witness_use_let,none,
+     "declare it as 'static let' to guarantee a stable instance",
+     ())
+NOTE(global_actor_shared_non_let_witness_silence,none,
+     "if this property always returns the same instance, silence the warning "
+     "with '@diagnose(UnstableGlobalActorShared, as: ignored)'",
+     ())
 ERROR(global_actor_top_level_var,none,
       "top-level code variables cannot have a global actor", ())
 ERROR(global_actor_access,none,
@@ -6546,6 +6670,12 @@ ERROR(invalid_ownership_incompatible_class,none,
 ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
       "%0 is incompatible with 'weak' references, because it is a foreign reference type",
       (Type))
+ERROR(downcast_to_foreign_reference_type,none,
+      "downcast from %0 to %1 is not supported for foreign reference types",
+      (Type, Type))
+ERROR(cxx_super_pure_virtual_call,none,
+      "cannot use 'super' to call C++ pure virtual method %0; it has no base "
+      "class implementation", (const ValueDecl *))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,
@@ -6591,8 +6721,11 @@ ERROR(unsupported_convention,none,
 ERROR(invalid_isolated_and_convention_attributes,none,
       "'@convention(%0)' attribute is not allowed on '@isolated' types",
       (StringRef))
-ERROR(unreferenced_generic_parameter,NoUsage,
+GROUPED_ERROR(unreferenced_generic_parameter,NoUsage,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
+ERROR(non_inferrable_opaque_generic_parameter,none,
+      "opaque generic parameter %0 appears in position that cannot be inferred "
+      "from a function call", (TypeRepr *))
 ERROR(unexpected_ctype_for_non_c_convention,none,
       "convention '%0' does not support the 'cType' argument label, did you "
       "mean '@convention(c, cType: \"%1\")' or "
@@ -7318,9 +7451,10 @@ ERROR(availability_inout_accessor_only_in, none,
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
 
-WARNING(availability_query_useless_enclosing_scope, none,
-        "unnecessary check for '%0'; enclosing scope ensures guard "
-        "will always be true", (StringRef))
+GROUPED_WARNING(availability_query_useless_enclosing_scope,
+                UselessAvailabilityCheck, none,
+                "unnecessary check for '%0'; enclosing scope ensures guard "
+                "will always be true", (StringRef))
 
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
@@ -7609,31 +7743,31 @@ NOTE(specialize_found_function_of_type, none,
 // MARK: Variable usage diagnostics
 //------------------------------------------------------------------------------
 
-WARNING(pbd_never_used_stmtcond, NoUsage,
+GROUPED_WARNING(pbd_never_used_stmtcond, NoUsage, NoUsage,
         "value %0 was defined but never used; consider replacing "
         "with boolean test",
         (Identifier))
-WARNING(unused_setter_parameter, NoUsage,
+GROUPED_WARNING(unused_setter_parameter, NoUsage, NoUsage,
         "setter argument %0 was never used, but the property was accessed",
         (Identifier))
 NOTE(fixit_for_unused_setter_parameter, none,
      "did you mean to use %0 instead of accessing the property's current value?", (Identifier))
 
-WARNING(pbd_never_used, NoUsage,
+GROUPED_WARNING(pbd_never_used, NoUsage, NoUsage,
         "initialization of %select{variable|immutable value}1 %0 was never used"
         "; consider replacing with assignment to '_' or removing it",
         (Identifier, unsigned))
 
 
-WARNING(capture_never_used, NoUsage,
+GROUPED_WARNING(capture_never_used, NoUsage, NoUsage,
         "capture %0 was never used",
         (Identifier))
 
-WARNING(variable_never_used, NoUsage,
+GROUPED_WARNING(variable_never_used, NoUsage, NoUsage,
         "%select{variable|immutable value}1 %0 was never used; "
         "consider replacing with '_' or removing it",
         (Identifier, unsigned))
-WARNING(immutable_value_never_used_but_assigned, NoUsage,
+GROUPED_WARNING(immutable_value_never_used_but_assigned, NoUsage, NoUsage,
         "immutable value %0 was never used; consider removing it",
         (Identifier))
 WARNING(variable_never_mutated, none,
@@ -7682,6 +7816,12 @@ WARNING(debug_long_closure_body, none,
         (unsigned, unsigned))
 WARNING(debug_long_expression, none,
         "expression took %0ms to type-check (limit: %1ms)",
+        (unsigned, unsigned))
+WARNING(debug_long_expression_scopes, none,
+        "expression took %0 scope(s) to type-check (limit: %1)",
+        (unsigned, unsigned))
+WARNING(debug_long_expression_trail, none,
+        "expression took %0 trail step(s) to type-check (limit: %1)",
         (unsigned, unsigned))
 
 //------------------------------------------------------------------------------
@@ -8292,9 +8432,6 @@ ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
 
-ERROR(experimental_macro,none,
-      "macro %0 is experimental",
-      (DeclName))
 ERROR(experimental_closure_body_macro,none,
       "function body macros on closures is experimental",
       ())
@@ -8412,6 +8549,18 @@ NOTE(add_generic_parameter_non_bitwise_copyable_conformance,none,
 ERROR(bitwise_copyable_outside_module,none,
       "conformance to 'BitwiseCopyable' must occur in the same module as %kind0",
       (const ValueDecl *))
+ERROR(convertible_to_bytes_outside_stdlib,none,
+      "type conforming to 'ConvertibleToBytes' must be defined in the standard library module",
+      (const ValueDecl *))
+ERROR(convertible_to_bytes_outside_module,none,
+      "conformance to 'ConvertibleToBytes' must occur in the same module as %kind0",
+      (const ValueDecl *))
+ERROR(convertible_from_bytes_outside_stdlib,none,
+      "type conforming to 'ConvertibleFromBytes' must be defined in the standard library module",
+      (const ValueDecl *))
+ERROR(convertible_from_bytes_outside_module,none,
+      "conformance to 'ConvertibleFromBytes' must occur in the same module as %kind0",
+      (const ValueDecl *))
 ERROR(suppress_inferrable_protocol_extension,none,
       "conformance to inferrable protocol %0 cannot be suppressed in an extension", (const ProtocolDecl *))
 ERROR(suppress_nonsuppressable_protocol,none,
@@ -8428,12 +8577,6 @@ ERROR(inverse_conditional_must_be_fully_explicit,none,
         "conditional conformance to %0 must explicitly "
         "state whether %1 is required to conform to %2 or not",
         (const ProtocolDecl *, Type, const ProtocolDecl *))
-NOTE(make_inverse_conditional_non_requirement_explicit,none,
-     "specify that the conformance does not require %0 to conform to %1",
-     (Type, const ProtocolDecl *))
-NOTE(make_inverse_conditional_requirement_explicit,none,
-     "specify that the conformance requires %0 to conform to %1",
-     (Type, const ProtocolDecl *))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
@@ -8444,9 +8587,8 @@ NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
-ERROR(noncopyable_generics_variadic, none,
-      "noncopyable type %0 cannot be used within a variadic type yet",
-      (Type))
+NOTE(noncopyable_or_nonescaping_variadic, none,
+     "required because variadic parameter type must be stored inside an 'Array'", ())
 NOTE(noncopyable_generics_implicit_conformance_req, none,
      "'where %noformat0: %noformat1' is implicit here",
      (Type, Type))
@@ -8512,6 +8654,11 @@ ERROR(for_loop_sequence_conformance_unavailable,none,
       "for-in loop requires %0 to conform to %1, which is "
       "only available in %2 %3 or newer",
       (Type, ProtocolDecl *, StringRef, StringRef))
+
+ERROR(for_loop_sequence_conformance_unavailable_unconditionally,none,
+      "for-in loop requires %0 to conform to %1, "
+      "but the conformance is unavailable",
+      (Type, ProtocolDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors
@@ -8582,20 +8729,13 @@ ERROR(lifetime_dependence_duplicate_param_id, none,
 ERROR(lifetime_dependence_cannot_use_kind, none,
       "invalid use of %0 lifetime dependence for %1 ownership",
       (StringRef, StringRef))
-ERROR(lifetime_dependence_cannot_use_parsed_scoped_consuming, none,
-      "invalid use of scoped lifetime dependence with consuming ownership",
-      ())
 ERROR(lifetime_dependence_only_on_function_method_init_result, none,
       "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers", ())
-ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
-      "expected 'nil' or 'self' as return values in an initializer with "
-      "lifetime dependent specifiers",
-       ())
 ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
       "lifetime dependence specifiers cannot be applied to tuple elements", ())
-ERROR(lifetime_dependence_immortal_conflict_name, none,
-      "conflict between the parameter name and 'immortal' contextual keyword", ())
+ERROR(lifetime_dependence_contextual_keyword_conflict_name, none,
+      "conflict between the parameter name and '%0' contextual keyword", (StringRef))
 ERROR(lifetime_dependence_function_type, none,
       "lifetime dependencies on function types are not supported",
       ())
@@ -8625,10 +8765,6 @@ NOTE(lifetime_escapable_source_requires_escapable_note, none,
      "use '@_lifetime(%0%1)' instead", (StringRef, StringRef))
 ERROR(lifetime_dependence_unknown_type, none,
       "lifetime dependence checking failed due to unknown %0 type", (StringRef))
-
-ERROR(borrow_inout_experimental,none,
-      "'%0' is an experimental feature",
-      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements
@@ -8791,9 +8927,9 @@ GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
-WARNING(no_unsafe_in_unsafe,none,
+GROUPED_WARNING(no_unsafe_in_unsafe,UnnecessaryUnsafe,none,
         "no unsafe operations occur within 'unsafe' expression", ())
-WARNING(no_unsafe_in_unsafe_for,none,
+GROUPED_WARNING(no_unsafe_in_unsafe_for,UnnecessaryUnsafe,none,
         "no unsafe operations occur within 'unsafe' for-in loop", ())
 NOTE(make_subclass_unsafe,none,
      "make class %0 '@unsafe' to allow unsafe overrides of safe superclass "
@@ -8870,6 +9006,12 @@ GROUPED_ERROR(self_referential_superclass_in_embedded_swift,
               "a generic argument of the superclass refers to the subclass itself, "
               "creating a circular metadata dependency",
               (Type, Type))
+
+GROUPED_ERROR(export_interface_on_generic_in_embedded_swift,
+              EmbeddedRestrictions, none,
+              "'@export(interface)' cannot be applied to a "
+              "%kind0 in Embedded Swift",
+              (const Decl *))
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
@@ -9009,7 +9151,7 @@ GROUPED_WARNING(isolated_conformance_will_become_nonisolated,IsolatedConformance
 GROUPED_ERROR(isolated_conformance_to_sendable_metatype,IsolatedConformances,none,
     "cannot form %0 conformance of %1 to SendableMetatype-inheriting %kind2",
     (ActorIsolation, Type, const ValueDecl *))
-GROUPED_ERROR(isolated_conformance_may_cross_isolation,IsolatedConformances,none,
+GROUPED_WARNING(isolated_conformance_may_cross_isolation,IsolatedConformances,none,
     "conformance of %select{underlying type of 'some %1'|%0}0 to protocol "
     "'%1' may be isolated and cannot be passed to %2 context",
     (Identifier, StringRef, ActorIsolation))
@@ -9147,20 +9289,31 @@ ERROR(nonexhaustive_attr_on_internal_type,none,
 // MARK: `using` declaration
 //===----------------------------------------------------------------------===//
 ERROR(invalid_redecl_of_file_isolation,none,
-      "invalid redeclaration of file-level default actor isolation", ())
+      "invalid redeclaration of file-level default isolation", ())
 NOTE(invalid_redecl_of_file_isolation_prev,none,
-     "default isolation was previously declared here", ())
+     "file-level default isolation previously declared here", ())
+ERROR(invalid_actor_for_file_isolation,none,
+     "global actor %0 is not valid in a 'using' declaration",
+     (Type))
+NOTE(invalid_actor_for_file_isolation_note,none,
+     "file-level default isolation must be '@MainActor' or 'nonisolated'", ())
+ERROR(using_decl_invalid_attribute,none,
+     "'%0' is not valid in a 'using' declaration",
+     (DeclAttribute))
+NOTE(using_decl_invalid_attribute_note,none,
+     "'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'", ())
+ERROR(using_decl_must_precede_other_decls,none,
+     "'using' must appear before any non-import declaration", ())
+NOTE(using_decl_must_precede_other_decls_previous,none,
+     "first non-import declaration here", ())
 
 //===----------------------------------------------------------------------===//
 // MARK: `@inline(always)` attribute
 //===----------------------------------------------------------------------===//
 ERROR(attr_inline_always_experimental,none,
       "'@inline(always)' is an experimental feature", ())
-ERROR(attr_inline_always_requires_inlinable,none,
-      "'@inline(always)' on public or package declarations must be used "
-      "together with '@inlinable'", ())
 ERROR(attr_inline_always_no_usable_from_inline,none,
-      "cannot use '@inline(always)' together with '@usableFromInline'", ())
+      "'@inline(always)' implies '@usableFromInline'; do not use both", ())
 ERROR(attr_inline_always_requires_final_method,none,
       "'@inline(always)' on class %select{methods|vars}1 requires %0 to be "
       "marked 'final'", (DeclName, bool))
@@ -9196,10 +9349,6 @@ GROUPED_WARNING(perf_hint_closure_returns_array,ReturnTypeImplicitCopy,none,
                 "Performance: closure returns a%select{ dictionary|n array}0, leading to implicit copies. "
                 "Consider using an 'inout' parameter instead.", (bool))
 
-GROUPED_WARNING(perf_hint_param_expects_existential,ExistentialType,none,
-                "Performance: %0 expects an existential, leading to heap allocation, reference counting, "
-                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
-                (const ParamDecl*))
 GROUPED_WARNING(perf_hint_func_returns_existential,ExistentialType,none,
                 "Performance: %0 returns an existential, leading to heap allocation, reference counting, "
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
@@ -9232,7 +9381,7 @@ ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
 REMARK(macro_expansion_line, none, "macro content: |%0|", (StringRef))
 
 GROUPED_WARNING(oslog_missing_string_section,OSLog,none,
-                "global variable 'osLogStringSectionName' is missing from the OSLog module; defaulting to '__TEXT,__oslogstring,cstring_literals'", ())
+                "global variable 'osLogStringSectionName' is missing from the 'os' module; defaulting to '__TEXT,__oslogstring,cstring_literals'", ())
 GROUPED_ERROR(oslog_string_section_not_literal,OSLog,none,
               "global variable 'osLogStringSectionName' requires a string literal initializer", ())
 

@@ -125,10 +125,11 @@ Error cas::CachedResultLoader::replay(CallbackTy Callback) {
 }
 
 static Expected<std::optional<ObjectRef>>
-lookupCacheKey(ObjectStore &CAS, ActionCache &Cache, ObjectRef CacheKey) {
+lookupCacheKey(ObjectStore &CAS, ActionCache &Cache, ObjectRef CacheKey,
+               bool CanBeDistributed) {
   // Lookup the cache key for the input file.
   auto OutID = CAS.getID(CacheKey);
-  auto Lookup = Cache.get(OutID);
+  auto Lookup = Cache.get(OutID, CanBeDistributed);
   if (!Lookup)
     return Lookup.takeError();
 
@@ -298,11 +299,11 @@ static bool replayCachedCompilerOutputsImpl(
                     toString(std::move(E)));
       return failedReplay();
     }
-  }
 
-  if (CacheRemarks)
-    Diag.diagnose(SourceLoc(), diag::replay_output, "<cached-diagnostics>",
-                  DiagnosticsOutput->Key.toString());
+    if (CacheRemarks)
+      Diag.diagnose(SourceLoc(), diag::replay_output, "<cached-diagnostics>",
+                    DiagnosticsOutput->Proxy.getID().toString());
+  }
 
   // Replay the result only when everything is resolved.
   for (auto &Output : OutputProxies) {
@@ -349,7 +350,7 @@ static bool replayCachedCompilerOutputsImpl(
     }
     if (CacheRemarks)
       Diag.diagnose(SourceLoc(), diag::replay_output, Output.Path,
-                    Output.Key.toString());
+                    Output.Proxy.getID().toString());
   }
 
   if (DiagHelper)
@@ -377,7 +378,8 @@ bool replayCachedCompilerOutputs(
     }
 
     auto OutID = CAS.getID(*OutputKey);
-    auto OutputRef = lookupCacheKey(CAS, Cache, *OutputKey);
+    auto OutputRef =
+        lookupCacheKey(CAS, Cache, *OutputKey, /*CanBeDistributed=*/true);
     if (!OutputRef) {
       Diag.diagnose(SourceLoc(), diag::error_cas, "cache key lookup",
                     toString(OutputRef.takeError()));
@@ -390,6 +392,10 @@ bool replayCachedCompilerOutputs(
                       OutID.toString());
       return std::nullopt;
     }
+
+    if (CacheRemarks)
+      Diag.diagnose(SourceLoc(), diag::output_cache_hit, InputPath,
+                    OutID.toString());
 
     return *OutputRef;
   };
@@ -451,7 +457,10 @@ loadCachedCompileResultFromCacheKey(ObjectStore &CAS, ActionCache &Cache,
   if (!Ref)
     return nullptr;
 
-  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref);
+  // This function is used to load compiler inputs like swift module or swift
+  // interface file produced by previous commands. Those should be available
+  // locally.
+  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref, /*CanBeDistributed=*/false);
   if (!OutputRef)
     return failure("lookup cache key", OutputRef.takeError());
 
@@ -490,7 +499,9 @@ loadCachedCompileResultProxy(llvm::cas::ObjectStore &CAS,
   if (!Ref)
     return std::nullopt;
 
-  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref);
+  // This function is used to load compiler inputs like pch files. The result
+  // should be available locally.
+  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref, /*CanBeDistributed=*/false);
   if (!OutputRef)
     return OutputRef.takeError();
 

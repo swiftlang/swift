@@ -640,7 +640,7 @@ extension Value {
     guard apply.singleDirectResult != nil else {
       return false
     }
-    return apply.functionConvention.results[0].convention == .guaranteed
+    return apply.functionConvention.resultsWithError[0].convention == .guaranteed
   }
 }
 
@@ -672,10 +672,19 @@ public func gatherEnclosingValuesFromPredecessors(
   for predecessor in phi.predecessors {
     let incomingOperand = phi.incomingOperand(inPredecessor: predecessor)
 
-    for predEV in incomingOperand.value.getEnclosingValues(context) {
-      let ev = predecessor.getEnclosingValueInSuccessor(ofIncoming: predEV)
-      if alreadyAdded.insert(ev) {
-        enclosingValues.push(ev)
+    if phi.isReborrow {
+      for predEV in incomingOperand.value.getEnclosingValues(context) {
+        let ev = predecessor.getEnclosingValueInSuccessor(ofIncoming: predEV)
+        if alreadyAdded.insert(ev) {
+          enclosingValues.push(ev)
+        }
+      }
+    } else {
+      for predEV in incomingOperand.value.getBorrowIntroducers(context) {
+        let ev = predecessor.getEnclosingValueInSuccessor(ofIncoming: predEV.value)
+        if alreadyAdded.insert(ev) {
+          enclosingValues.push(ev)
+        }
       }
     }
   }

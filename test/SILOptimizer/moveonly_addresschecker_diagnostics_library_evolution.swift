@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil -enable-experimental-feature NoImplicitCopy -sil-verify-all -verify -enable-library-evolution %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature NoImplicitCopy -sil-verify-all -verify -enable-library-evolution -enable-sil-opaque-values %s
 
 // REQUIRES: swift_feature_NoImplicitCopy
 

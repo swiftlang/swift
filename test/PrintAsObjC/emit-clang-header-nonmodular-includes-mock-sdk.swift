@@ -35,11 +35,11 @@ public class HelloWorld: NSObject {
 // CHECK-NEXT: #elif defined(__OBJC__)
 // CHECK-NEXT: #import <CoreGraphics.h>
 // CHECK-NEXT: #import <Mixed/Mixed.h>
-// CHECK-NEXT: #import <objc/objc.h>
-// CHECK-NEXT: #import <objc/NSObject.h>
+// CHECK-DAG: #import <objc/objc.h>
+// CHECK-DAG: #import <objc/NSObject.h>
 // CHECK-NEXT: #else
 // CHECK-NEXT: #include <CoreGraphics.h>
 // CHECK-NEXT: #include <Mixed/Mixed.h>
-// CHECK-NEXT: #include <objc/objc.h>
-// CHECK-NEXT: #include <objc/NSObject.h>
+// CHECK-DAG: #include <objc/objc.h>
+// CHECK-DAG: #include <objc/NSObject.h>
 // CHECK-NEXT: #endif

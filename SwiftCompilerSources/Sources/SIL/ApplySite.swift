@@ -197,6 +197,30 @@ extension ApplySite {
     argumentOperands.values
   }
 
+  /// Returns true when this apply has per-argument SILLocations stored on it.
+  ///
+  /// Per-argument locations are reserved today for the IsolationHistory
+  /// diagnostic feature: they are filled in by SILGen for functions opted
+  /// in to isolation-history (frontend flag or
+  /// `@diagnose(RegionIsolationIsolationHistory, ...)`). Other producers do
+  /// not currently fill them in. See `getArgumentLocation(operand:)` for the
+  /// anchor-fallback semantics callers should rely on.
+  public var hasArgumentLocations: Bool {
+    bridged.ApplySite_hasArgumentLocations()
+  }
+
+  /// Returns the SILLocation associated with the given apply argument
+  /// operand. Falls back to the apply's anchor location when no
+  /// per-argument override has been stored, so callers that don't need to
+  /// distinguish stored-vs-anchor can use this directly.
+  ///
+  /// `operand` must be one of this apply's argument operands (i.e., come
+  /// from `argumentOperands`); it must not be the callee operand or a
+  /// type-dependent operand.
+  public func getArgumentLocation(operand: Operand) -> Location {
+    Location(bridged: bridged.ApplySite_getArgumentLocation(operand.bridged))
+  }
+
   /// Indirect results including the error result.
   public var indirectResultOperands: OperandArray {
     let ops = operandConventions
@@ -408,6 +432,30 @@ extension FullApplySite {
     }
     return values
   }
+}
+
+extension Instruction {
+  /// To be used for fast type casting to `FullApplySite` in time critical code.
+  /// This is a workaround for the slow runtime type casts. After toolchain builders are
+  /// upgraded to a compiler version which includes the fix for this problem
+  /// (https://github.com/swiftlang/swift/pull/88270), we don't need this anymore and
+  /// the regular `as FullApplySite` casts can be used instead.
+  public var isFullApplySite: Bool {
+    switch self {
+    case is ApplyInst, is TryApplyInst, is BeginApplyInst:
+      return true
+    default:
+      return false
+    }
+  }
+}
+
+/// For pattern matching in switch statements.
+public struct IsFullApplySite {}
+public let isFullApplySite = IsFullApplySite()
+
+public func ~= (pattern: IsFullApplySite, value: Instruction) -> Bool {
+  return value.isFullApplySite
 }
 
 let addressableTest = Test("addressable_arguments") {

@@ -75,7 +75,7 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
 
     // They're also convertible to Error if they have a class bound that
     // conforms to Error.
-    if (auto superclass = layout.getSuperclass()) {
+    if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass()) {
       type = superclass->getCanonicalType();
 
     // Otherwise, they are not convertible to Error.
@@ -1576,9 +1576,10 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
 
   SILGenFunctionBuilder fb(SGM);
   auto closure = fb.getOrCreateSharedFunction(
-      loc, closureName, closureTy, IsBare, IsNotTransparent,
-      F.getSerializedKind(), ProfileCounter(), IsThunk, IsNotDynamic,
-      IsNotDistributed, IsNotRuntimeAccessible);
+      loc, closureName, closureTy,
+      ActorIsolation::forNonisolated(/*unsafe=*/false), IsBare,
+      IsNotTransparent, F.getSerializedKind(), ProfileCounter(), IsThunk,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
 
   auto closureRef = B.createFunctionRef(loc, closure);
 
@@ -1652,15 +1653,27 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   // A hop/check is only needed in the thunk if it is global-actor isolated.
   // Native, instance-isolated async methods will hop in the prologue.
   if (isolation && isolation->isGlobalActor()) {
-    if (F.isAsync()) {
-      // Hop to the actor for the method's actor constraint.
-      // Note that, since an async native-to-foreign thunk only ever runs in a
-      // task purpose-built for running the Swift async code triggering the
-      // completion handler, there is no need for us to hop back to the existing
-      // executor, since the task will end after we invoke the completion handler.
-      emitPrologGlobalActorHop(loc, isolation->getGlobalActor());
-    } else {
-      emitPreconditionCheckExpectedExecutor(loc, *isolation, std::nullopt);
+    // For an isolated `deinit`, the native `__deallocating_deinit` already
+    // performs the hop via `swift_task_deinitOnExecutor`. The @objc thunk
+    // must not assert or hop, because ObjC `release` can run from any
+    // thread; dropping the last reference from a non-isolated context would
+    // otherwise crash in `_checkExpectedExecutor`.
+    bool isIsolatingDeinitThunk = false;
+    if (thunk.hasDecl()) {
+      if (auto *dd = dyn_cast<DestructorDecl>(thunk.getDecl()))
+        isIsolatingDeinitThunk = needsIsolatingDestructor(dd);
+    }
+    if (!isIsolatingDeinitThunk) {
+      if (F.isAsync()) {
+        // Hop to the actor for the method's actor constraint.
+        // Note that, since an async native-to-foreign thunk only ever runs in a
+        // task purpose-built for running the Swift async code triggering the
+        // completion handler, there is no need for us to hop back to the existing
+        // executor, since the task will end after we invoke the completion handler.
+        emitPrologGlobalActorHop(loc, isolation->getGlobalActor());
+      } else {
+        emitPreconditionCheckExpectedExecutor(loc, *isolation, std::nullopt);
+      }
     }
   }
 
@@ -1716,8 +1729,9 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       switch (isolation->getKind()) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedConcurrent:
       case ActorIsolation::NonisolatedUnsafe:
-      case ActorIsolation::CallerIsolationInheriting:
+      case ActorIsolation::NonisolatedNonsending:
         return emitNonIsolatedIsolation(loc).getValue();
       case ActorIsolation::ActorInstance:
         llvm::report_fatal_error("Should never see this");

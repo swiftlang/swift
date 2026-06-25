@@ -55,9 +55,11 @@ class TakesArrayLiteral<Element> : ExpressibleByArrayLiteral {
 // CHECK: [[BB:%.*]] = begin_borrow [[ARR]]
 // CHECK:            = struct_extract [[BB]]
 // CHECK: [[POINTER:%.*]] = ref_tail_addr
-// CHECK: store [[TMP:%.*]] to [trivial] [[POINTER]]
+// CHECK: [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[POINTER0:%.*]] = index_addr [projection] [[POINTER]] : $*Int, [[IDX0]] : $Builtin.Word
+// CHECK: store [[TMP:%.*]] to [trivial] [[POINTER0]]
 // CHECK: [[IDX1:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK: [[POINTER1:%.*]] = index_addr [[POINTER]] : $*Int, [[IDX1]] : $Builtin.Word
+// CHECK: [[POINTER1:%.*]] = index_addr [projection] [[POINTER]] : $*Int, [[IDX1]] : $Builtin.Word
 // CHECK: store [[TMP:%.*]] to [trivial] [[POINTER1]]
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Int>([[ARR]])
@@ -81,10 +83,12 @@ class Klass {}
 // CHECK: [[BB:%.*]] = begin_borrow [[ARR]]
 // CHECK:            = struct_extract [[BB]]
 // CHECK: [[POINTER:%.*]] = ref_tail_addr
+// CHECK: [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[POINTER0:%.*]] = index_addr [projection] [[POINTER]] : $*Klass, [[IDX0]] : $Builtin.Word
 // CHECK: [[KLASS_METATYPE:%.*]] = metatype $@thick Klass.Type
 // CHECK: [[CTOR:%.*]] = function_ref @$s8literals5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
 // CHECK: [[TMP:%.*]] = apply [[CTOR]]([[KLASS_METATYPE]]) : $@convention(method) (@thick Klass.Type) -> @owned Klass
-// CHECK: store [[TMP]] to [init] [[POINTER]]
+// CHECK: store [[TMP]] to [init] [[POINTER0]]
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Klass>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<Klass>.Type
@@ -107,7 +111,9 @@ struct Foo<T> {
 // CHECK: [[BB:%.*]] = begin_borrow [[ARR]]
 // CHECK:            = struct_extract [[BB]]
 // CHECK: [[POINTER:%.*]] = ref_tail_addr
-// CHECK: copy_addr %0 to [init] [[POINTER]] : $*Foo<T>
+// CHECK: [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[POINTER0:%.*]] = index_addr [projection] [[POINTER]] : $*Foo<T>, [[IDX0]] : $Builtin.Word
+// CHECK: copy_addr %0 to [init] [[POINTER0]] : $*Foo<T>
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo<T>>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<Foo<T>>.Type
@@ -126,7 +132,9 @@ func returnsAddressOnlyElementArray<T>(t: Foo<T>) -> TakesArrayLiteral<Foo<T>> {
 // CHECK: [[BB:%.*]] = begin_borrow [[ARR]]
 // CHECK:            = struct_extract [[BB]]
 // CHECK: [[POINTER:%.*]] = ref_tail_addr
-// CHECK: copy_addr %0 to [init] [[POINTER]] : $*Foo<T>
+// CHECK: [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[POINTER0:%.*]] = index_addr [projection] [[POINTER]] : $*Foo<T>, [[IDX0]] : $Builtin.Word
+// CHECK: copy_addr %0 to [init] [[POINTER0]] : $*Foo<T>
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo<T>>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<Foo<T>>.Type
@@ -147,8 +155,10 @@ extension Foo {
 // CHECK: [[BB:%.*]] = begin_borrow [[ARR]]
 // CHECK:            = struct_extract [[BB]]
 // CHECK: [[POINTER:%.*]] = ref_tail_addr
+// CHECK: [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[POINTER0:%.*]] = index_addr [projection] [[POINTER]] : $*Foo<T>, [[IDX0]] : $Builtin.Word
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*Foo<T>
-// CHECK: copy_addr [[ACCESS]] to [init] [[POINTER]] : $*Foo<T>
+// CHECK: copy_addr [[ACCESS]] to [init] [[POINTER0]] : $*Foo<T>
 // CHECK: end_access [[ACCESS]] : $*Foo<T>
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo<T>>([[ARR]])
@@ -201,11 +211,13 @@ func returnsNonTrivialStruct() -> TakesArrayLiteral<Foo2> {
 // CHECK:            = struct_extract [[BB]]
 // CHECK: [[POINTER:%.*]] = ref_tail_addr
 
+// CHECK: [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[POINTER0:%.*]] = index_addr [projection] [[POINTER]] : $*NestedLValuePath, [[IDX0]] : $Builtin.Word
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] %0 : $*NestedLValuePath
 // CHECK: [[OTHER_FN:%.*]] = function_ref @$s8literals16NestedLValuePathV21otherMutatingFunctionACyF : $@convention(method) (@inout NestedLValuePath) -> @owned NestedLValuePath
 // CHECK: [[TMP:%.*]] = apply [[OTHER_FN]]([[ACCESS]]) : $@convention(method) (@inout NestedLValuePath) -> @owned NestedLValuePath
 // CHECK: end_access [[ACCESS]] : $*NestedLValuePath
-// CHECK: store [[TMP]] to [init] [[POINTER]] : $*NestedLValuePath
+// CHECK: store [[TMP]] to [init] [[POINTER0]] : $*NestedLValuePath
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<NestedLValuePath>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<NestedLValuePath>.Type
@@ -240,8 +252,10 @@ protocol WrapsSelfInArray {}
 // CHECK: [[BB:%.*]] = begin_borrow [[ARR]]
 // CHECK:            = struct_extract [[BB]]
 // CHECK: [[POINTER:%.*]] = ref_tail_addr
+// CHECK: [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[POINTER0:%.*]] = index_addr [projection] [[POINTER]] : $*any WrapsSelfInArray, [[IDX0]] : $Builtin.Word
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*Self
-// CHECK: [[EXISTENTIAL:%.*]] = init_existential_addr [[POINTER]] : $*any WrapsSelfInArray, $Self
+// CHECK: [[EXISTENTIAL:%.*]] = init_existential_addr [[POINTER0]] : $*any WrapsSelfInArray, $Self
 // CHECK: copy_addr [[ACCESS]] to [init] [[EXISTENTIAL]] : $*Self
 // CHECK: end_access [[ACCESS]] : $*Self
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
@@ -271,10 +285,12 @@ func makeBasic<T : FooProtocol>() -> T { return T() }
 // CHECK: [[BB:%.*]] = begin_borrow [[ARR]]
 // CHECK:            = struct_extract [[BB]]
 // CHECK: [[POINTER:%.*]] = ref_tail_addr
+// CHECK: [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[POINTER0:%.*]] = index_addr [projection] [[POINTER]] : $*T, [[IDX0]] : $Builtin.Word
 // CHECK: [[FN:%.*]] = function_ref @$s8literals9makeBasicxyAA11FooProtocolRzlF : $@convention(thin)
-// CHECK: [[TMP:%.*]] = apply [[FN]]<T>([[POINTER]])
+// CHECK: [[TMP:%.*]] = apply [[FN]]<T>([[POINTER0]])
 // CHECK: [[IDX:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK: [[POINTER1:%.*]] = index_addr [[POINTER]] : $*T, [[IDX]] : $Builtin.Word
+// CHECK: [[POINTER1:%.*]] = index_addr [projection] [[POINTER]] : $*T, [[IDX]] : $Builtin.Word
 // CHECK: [[FN:%.*]] = function_ref @$s8literals12makeThrowingxyKAA11FooProtocolRzlF : $@convention(thin)
 // CHECK: try_apply [[FN]]<T>([[POINTER1]]) : {{.*}} normal bb1, error bb2
 
@@ -284,7 +300,7 @@ func makeBasic<T : FooProtocol>() -> T { return T() }
 // CHECK: return [[FIN_ARR]]
 
 // CHECK: bb2([[ERR:%.*]] : @owned $any Error):
-// CHECK: destroy_addr [[POINTER]] : $*T
+// CHECK: destroy_addr [[POINTER0]] : $*T
 // CHECK: [[DEALLOC:%.*]] = function_ref @$ss29_deallocateUninitializedArrayyySayxGnlF
 // CHECK: [[TMP:%.*]] = apply [[DEALLOC]]<T>([[ARR]])
 // CHECK: throw [[ERR]] : $any Error
@@ -307,12 +323,14 @@ class TakesDictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
 // CHECK: [[BB:%.*]] = begin_borrow [[ARR]]
 // CHECK:            = struct_extract [[BB]]
 // CHECK: [[TUPLE_ADDR:%.*]] = ref_tail_addr
-// CHECK: [[KEY_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
-// CHECK: [[VALUE_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 1
+// CHECK: [[IDX0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[TUPLE_ADDR0:%.*]] = index_addr [projection] [[TUPLE_ADDR]] : $*(Int, Int), [[IDX0]] : $Builtin.Word
+// CHECK: [[KEY_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR0]] : $*(Int, Int), 0
+// CHECK: [[VALUE_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR0]] : $*(Int, Int), 1
 // CHECK: store [[TMP]] to [trivial] [[KEY_ADDR]] : $*Int
 // CHECK: store [[TMP]] to [trivial] [[VALUE_ADDR]] : $*Int
 // CHECK: [[IDX1:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK: [[TUPLE_ADDR1:%.*]] = index_addr [[TUPLE_ADDR]] : $*(Int, Int), [[IDX1]] : $Builtin.Word
+// CHECK: [[TUPLE_ADDR1:%.*]] = index_addr [projection] [[TUPLE_ADDR]] : $*(Int, Int), [[IDX1]] : $Builtin.Word
 // CHECK: [[KEY_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR1]] : $*(Int, Int), 0
 // CHECK: [[VALUE_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR1]] : $*(Int, Int), 1
 // CHECK: store [[TMP]] to [trivial] [[KEY_ADDR]] : $*Int

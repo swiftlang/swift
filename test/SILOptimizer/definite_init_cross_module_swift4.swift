@@ -6,6 +6,8 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module/OtherModule.swift
 // RUN: %target-swift-frontend -emit-sil -verify -verify-ignore-unknown -I %t -swift-version 4 %s > /dev/null -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
 
+// REQUIRES: objc_codegen
+
 import OtherModule
 
 extension Point {
@@ -75,7 +77,9 @@ extension ImmutablePoint {
 
   init(other: ImmutablePoint, xx: Double) {
     self.x = xx // expected-warning {{initializer for struct 'ImmutablePoint' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
-    self = other // expected-error {{immutable value 'self.x' may only be initialized once}}
+    // A subsequent whole-self overwrite is now permitted: it replaces the
+    // entire value, rather than re-initializing the already-written `let`.
+    self = other
   }
 
   init(other: ImmutablePoint, x: Double, cond: Bool) {

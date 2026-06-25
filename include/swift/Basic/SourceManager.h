@@ -70,6 +70,9 @@ public:
 
     /// A Swift attribute expressed in C headers.
     AttributeFromClang,
+
+    /// A macro declaration synthesized by the compiler
+    SyntheticMacro,
   } kind;
 
   static StringRef kindToString(GeneratedSourceInfo::Kind kind) {
@@ -87,6 +90,8 @@ public:
       return "DefaultArgument";
     case AttributeFromClang:
       return "AttributeFromClang";
+    case SyntheticMacro:
+      return "SyntheticMacro";
     }
     llvm_unreachable("Invalid kind");
   }

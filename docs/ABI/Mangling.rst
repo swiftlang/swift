@@ -871,6 +871,9 @@ mangled in to disambiguate.
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
 
   ISOLATION ::= 'A'                          // @isolated(any)
+#if SWIFT_RUNTIME_VERSION >= 6.4
+  ISOLATION ::= 'N'                          // nonisolated(nonsending)
+#endif
 
   DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable
   DIFFERENTIABILITY-KIND ::= 'l'             // @differentiable(_linear)
@@ -1381,6 +1384,7 @@ Some kinds need arguments, which precede ``Tf``.
   ARG-SPEC-KIND ::= 'n'                      // Unmodified argument
   ARG-SPEC-KIND ::= 'c'                      // Consumes n 'type' arguments which are closed over types in argument order
                                              // and one 'identifier' argument which is the closure symbol name
+  ARG-SPEC-KIND ::= 'E'                      // like 'c', but for escaping closures
   ARG-SPEC-KIND ::= 'C' NATURAL-ZERO         // the same closure as a previous argument <n>
   ARG-SPEC-KIND ::= 'p' CONST-PROP           // Constant propagated argument
   ARG-SPEC-KIND ::= 'e' 'D'? 'G'? 'X'?       // Generic argument, with optional dead, owned=>guaranteed or exploded-specifier

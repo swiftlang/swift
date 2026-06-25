@@ -37,7 +37,6 @@ private func removeAddressToPointerToAddressPair(
   _ context: SimplifyContext
 ) -> Bool {
   guard let addr2Ptr = ptr2Addr.pointer as? AddressToPointerInst,
-        ptr2Addr.isStrict,
         !ptr2Addr.hasIllegalUsesAfterLifetime(of: addr2Ptr, context)
   else {
     return false
@@ -45,11 +44,14 @@ private func removeAddressToPointerToAddressPair(
 
   if ptr2Addr.type == addr2Ptr.address.type {
     ptr2Addr.replace(with: addr2Ptr.address, context)
-  } else {
+    return true
+  }
+  if ptr2Addr.isStrict {
     let cast = Builder(before: ptr2Addr, context).createUncheckedAddrCast(from: addr2Ptr.address, to: ptr2Addr.type)
     ptr2Addr.replace(with: cast, context)
+    return true
   }
-  return true
+  return false
 }
 
 /// Replace an `index_raw_pointer` with a manually computed stride with `index_addr`:
@@ -81,7 +83,8 @@ private func simplifyIndexRawPointer(of ptr2Addr: PointerToAddressInst, _ contex
   let newPtr2Addr = builder.createPointerToAddress(pointer: indexRawPtr.base, addressType: ptr2Addr.type,
                                                    isStrict: ptr2Addr.isStrict, isInvariant: ptr2Addr.isInvariant)
   let newIndex = builder.createCastIfNeeded(of: index, toIndexTypeOf: indexRawPtr)
-  let indexAddr = builder.createIndexAddr(base: newPtr2Addr, index: newIndex, needStackProtection: false)
+  let indexAddr = builder.createIndexAddr(base: newPtr2Addr, index: newIndex,
+                                          needStackProtection: false, isProjection: false)
   ptr2Addr.replace(with: indexAddr, context)
   return true
 }
@@ -266,6 +269,10 @@ private struct AddressUses : AddressDefUseWalker {
   }
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    if let ia = address.instruction as? IndexAddrInst {
+      // The AddressDefUseWalker treats `index_addr` without the `[projection]` flag as leaf use.
+      return walkDownUses(ofAddress: ia, path: path)
+    }
     users.pushIfNotVisited(address.instruction)
     return .continueWalk
   }

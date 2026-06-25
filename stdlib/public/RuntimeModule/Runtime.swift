@@ -17,7 +17,7 @@
 
 import Swift
 
-internal import BacktracingImpl.Runtime
+@_implementationOnly import BacktracingImpl.Runtime
 
 typealias CrashInfo = swift.runtime.backtrace.CrashInfo
 

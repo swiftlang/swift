@@ -184,6 +184,7 @@ private:
 
   bool prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                        SubstitutionMap ParamSubs,
+                       bool isMandatory,
                        OptRemark::Emitter *ORE = nullptr);
   void performFullSpecializationPreparation(SILFunction *Callee,
                                             SubstitutionMap ParamSubs);
@@ -206,6 +207,7 @@ public:
                     ApplySite Apply, SILFunction *Callee,
                     SubstitutionMap ParamSubs, SerializedKind_t Serialized,
                     bool ConvertIndirectToDirect, bool dropUnusedArguments,
+                    bool isMandatory = false,
                     OptRemark::Emitter *ORE = nullptr);
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with

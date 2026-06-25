@@ -493,45 +493,6 @@ SILInstruction *SILCombiner::legacyVisitAllocStackInst(AllocStackInst *AS) {
   return eraseInstFromFunction(*AS);
 }
 
-/// Returns the base address if \p val is an index_addr with constant index.
-static SILValue isConstIndexAddr(SILValue val, unsigned &index) {
-  auto *IA = dyn_cast<IndexAddrInst>(val);
-  if (!IA)
-    return nullptr;
-  auto *Index = dyn_cast<IntegerLiteralInst>(IA->getIndex());
-
-  // Limiting to 32 bits is more than enough. The reason why not limiting to 64
-  // bits is to leave room for overflow when we add two indices.
-  if (!Index || Index->getValue().getActiveBits() > 32)
-    return nullptr;
-
-  index = Index->getValue().getZExtValue();
-  return IA->getBase();
-}
-
-/// Optimize nested index_addr instructions:
-/// Example in SIL pseudo code:
-///    %1 = index_addr %ptr, x
-///    %2 = index_addr %1, y
-/// ->
-///    %2 = index_addr %ptr, x+y
-SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
-  unsigned index = 0;
-  SILValue base = isConstIndexAddr(IA, index);
-  if (!base)
-    return nullptr;
-
-  unsigned index2 = 0;
-  SILValue base2 = isConstIndexAddr(base, index2);
-  if (!base2)
-    return nullptr;
-
-  auto *newIndex = Builder.createIntegerLiteral(IA->getLoc(),
-                                    IA->getIndex()->getType(), index + index2);
-  return Builder.createIndexAddr(IA->getLoc(), base2, newIndex,
-    IA->needsStackProtection() || cast<IndexAddrInst>(base)->needsStackProtection());
-}
-
 /// Whether there exists a unique value to which \p addr is always initialized
 /// at \p forInst.
 ///
@@ -1037,8 +998,8 @@ visitUnreachableInst(UnreachableInst *UI) {
 ///
 /// Also remove dead unchecked_take_enum_data_addr:
 ///   (destroy_addr (unchecked_take_enum_data_addr x)) -> (destroy_addr x)
-SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
-    UncheckedTakeEnumDataAddrInst *tedai) {
+SILInstruction *SILCombiner::visitUncheckedEnumDataAddrInstBase(
+    UncheckedEnumDataAddrInstBase *tedai) {
   // If our TEDAI has no users, there is nothing to do.
   if (tedai->use_empty())
     return nullptr;
@@ -1073,7 +1034,7 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
 
   if (onlyDestroys) {
     // Destroying whole non-copyable enums with a deinit would wrongly trigger calling its deinit.
-    if (tedai->getOperand()->getType().isValueTypeWithDeinit())
+    if (tedai->getEnum()->getType().isMoveOnly())
       return nullptr;
 
     // The unchecked_take_enum_data_addr is dead: remove it and replace all
@@ -1082,7 +1043,7 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
       Operand *use = *tedai->use_begin();
       SILInstruction *user = use->getUser();
       if (auto *dai = dyn_cast<DestroyAddrInst>(user)) {
-        dai->setOperand(tedai->getOperand());
+        dai->setOperand(tedai->getEnum());
       } else {
         assert(user->isDebugInstruction());
         eraseInstFromFunction(*user);
@@ -1098,18 +1059,18 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   // thing to remember is that an enum is address only if any of its cases are
   // address only. So we *could* have a loadable payload resulting from the
   // TEDAI without the TEDAI being loadable itself.
-  if (tedai->getOperand()->getType().isAddressOnly(*tedai->getFunction()))
+  if (tedai->getEnum()->getType().isAddressOnly(*tedai->getFunction()))
     return nullptr;
 
   // If the enum is noncopyable and any loads cause copies, the transformation
   // would be illegal because it would introduce a copy of the noncopyable enum.
-  if (tedai->getOperand()->getType().isMoveOnly() && anyLoadCopies)
+  if (tedai->getEnum()->getType().isMoveOnly() && anyLoadCopies)
     return nullptr;
 
   // Grab the EnumAddr.
   SILLocation loc = tedai->getLoc();
   Builder.setCurrentDebugScope(tedai->getDebugScope());
-  SILValue enumAddr = tedai->getOperand();
+  SILValue enumAddr = tedai->getEnum();
   EnumElementDecl *enumElt = tedai->getElement();
   SILType payloadType = tedai->getType().getObjectType();
 
@@ -1653,11 +1614,9 @@ SILCombiner::visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtrac
     if (!opTI->isABICompatibleWith(resTI, *DFEI->getFunction()).isCompatible())
       return nullptr;
 
-    std::tie(newValue, std::ignore) =
-      castValueToABICompatibleType(&Builder, parentTransform->getPassManager(),
-                                   DFEI->getLoc(),
-                                   newValue,
-                                   newValue->getType(), DFEI->getType(), {});
+    std::tie(newValue, std::ignore) = castValueToABICompatibleType(
+        &Builder, parentTransform->getPassManager(), DFEI->getLoc(), newValue,
+        newValue->getType(), DFEI->getType());
   }
 
   replaceInstUsesWith(*DFEI, newValue);

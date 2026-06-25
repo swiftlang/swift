@@ -762,33 +762,136 @@ public struct AddArbitraryMembers: MemberMacro {
   }
 }
 
+private func extractCodeStringArgument(
+  _ arguments: LabeledExprListSyntax
+) throws -> String {
+  guard let firstElement = arguments.first,
+        let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self) else {
+    throw CustomError.message("Macro requires a string literal")
+  }
+  return try stringLiteral.segments.map { segment in
+    switch segment {
+    case .stringSegment(let string):
+      return string.content.text
+    case .expressionSegment(_):
+      throw CustomError.message("Macro cannot handle string interpolation")
+    }
+  }.joined(separator: "")
+}
+
 public struct MemberThatCallsCodeMacro: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
     providingMembersOf decl: some DeclGroupSyntax,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    guard case let .argumentList(arguments) = node.arguments,
-          let firstElement = arguments.first,
-          let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self) else {
+    guard case let .argumentList(arguments) = node.arguments else {
       throw CustomError.message("Macro requires a string literal")
     }
-
-    let codeString = try stringLiteral.segments.map { segment in
-      switch segment {
-      case .stringSegment(let string):
-        return string.content.text
-
-      case .expressionSegment(_):
-        throw CustomError.message("Macro cannot handle string interpolation")
-      }
-    }.joined(separator: "")
+    let codeString = try extractCodeStringArgument(arguments)
     return [
       """
       static var synthesizedMember: String {
         \(raw: codeString)
 
         return "hello"
+      }
+      """,
+    ]
+  }
+}
+
+public struct PeerMethodThatCallsCodeMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard case let .argumentList(arguments) = node.arguments else {
+      throw CustomError.message("Macro requires a string literal")
+    }
+    let codeString = try extractCodeStringArgument(arguments)
+    return [
+      """
+      static func synthesizedPeer() {
+        \(raw: codeString)
+      }
+      """,
+    ]
+  }
+}
+
+public struct GetterThatCallsCodeMacro: AccessorMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingAccessorsOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    guard case let .argumentList(arguments) = node.arguments else {
+      throw CustomError.message("Macro requires a string literal")
+    }
+    let codeString = try extractCodeStringArgument(arguments)
+    return [
+      """
+      get {
+        \(raw: codeString)
+        fatalError()
+      }
+      """
+    ]
+  }
+}
+
+public struct BodyThatCallsCodeMacro: BodyMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    guard case let .argumentList(arguments) = node.arguments else {
+      throw CustomError.message("Macro requires a string literal")
+    }
+    let codeString = try extractCodeStringArgument(arguments)
+    return [
+      "\(raw: codeString)",
+    ]
+  }
+}
+
+public struct ExtensionMethodThatCallsCodeMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    guard case let .argumentList(arguments) = node.arguments else {
+      throw CustomError.message("Macro requires a string literal")
+    }
+    let codeString = try extractCodeStringArgument(arguments)
+    let ext: DeclSyntax =
+      """
+      extension \(type.trimmed) {
+        static func synthesizedExtensionMethod() {
+          \(raw: codeString)
+        }
+      }
+      """
+    return [ext.cast(ExtensionDeclSyntax.self)]
+  }
+}
+
+public struct FuncThatCallsCodeMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let codeString = try extractCodeStringArgument(node.arguments)
+    return [
+      """
+      func synthesizedDecl() {
+        \(raw: codeString)
       }
       """,
     ]
@@ -2245,6 +2348,54 @@ public struct StaticFooFuncMacro: DeclarationMacro {
   }
 }
 
+public struct ProtocolRequirementMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func macroRequirement() -> Int",
+    ]
+  }
+}
+
+public struct ProtocolAssociatedTypeMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "associatedtype MacroAssociatedType",
+      "func makeMacroAssociatedValue() -> MacroAssociatedType",
+    ]
+  }
+}
+
+public struct PeerProtocolRequirementMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func peerRequirement() -> Int",
+    ]
+  }
+}
+
+public struct MemberProtocolRequirementMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func memberRequirement() -> Int",
+    ]
+  }
+}
+
 public struct SelfAlwaysEqualOperator: DeclarationMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
@@ -2741,6 +2892,49 @@ struct EmptyBodyMacro: BodyMacro {
   }
 }
 
+public struct PrintBodyMacro: BodyMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    func nameFromContextNode(_ node: Syntax) -> String? {
+      if let varDecl = node.as(VariableDeclSyntax.self) {
+        return varDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
+      }
+      if let binding = node.as(PatternBindingSyntax.self) {
+        return binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
+      }
+      if let named = node.asProtocol(NamedDeclSyntax.self) {
+        return named.name.text
+      }
+      return nil
+    }
+
+    // Determine the declaration's own name component (for named decls like functions).
+    // For accessors, the name comes from the lexical context instead.
+    let ownName: String?
+    if let funcDecl = declaration.as(FunctionDeclSyntax.self) {
+      ownName = funcDecl.name.text
+    } else if let varDecl = declaration.as(VariableDeclSyntax.self) {
+      ownName = varDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
+    } else {
+      ownName = nil
+    }
+
+    // Build the full dot-separated path from outermost to innermost context, then own name.
+    let contextNames = context.lexicalContext.compactMap { nameFromContextNode($0) }.reversed()
+    let allNames = Array(contextNames) + (ownName.map { [$0] } ?? [])
+    let name = allNames.isEmpty ? "unknown" : allNames.joined(separator: ".")
+
+    let originalBody = declaration.body.map { Array($0.statements) } ?? []
+    return [
+      "print(\"start body (from macro, \(raw: name))\")",
+      "defer { print(\"end body (from macro, \(raw: name))\") }",
+    ] + originalBody
+  }
+}
+
 @_spi(ExperimentalLanguageFeatures)
 public struct TracedPreambleMacro: PreambleMacro {
   public static func expansion(
@@ -3014,3 +3208,17 @@ public struct CustomConditionCheckMacro: ExpressionMacro {
     return "\(literal: isSet)"
   }
 }
+
+public enum BorrowMutateMacro: AccessorMacro {
+    public static func expansion(
+        of node: AttributeSyntax,
+        providingAccessorsOf declaration: some DeclSyntaxProtocol,
+        in context: some MacroExpansionContext
+    ) throws -> [AccessorDeclSyntax] {
+        [
+            "borrow { _x }",
+            "mutate { return &_x }",
+        ]
+    }
+}
+

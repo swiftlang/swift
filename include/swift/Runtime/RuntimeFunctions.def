@@ -1266,6 +1266,15 @@ FUNCTION(GetObjCClassFromMetadata, Swift, swift_getObjCClassFromMetadata,
          EFFECT(RuntimeEffect::NoEffect), // ?
          MEMEFFECTS(ReadNone))
 
+// id swift_getObjCMetatypeFromMetadata(Metadata *);
+FUNCTION(GetObjCMetatypeFromMetadata, Swift, swift_getObjCMetatypeFromMetadata,
+         C_CC, GetObjCMetatypeFromMetadataAvailability,
+         RETURNS(ObjCPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, WillReturn),
+         EFFECT(RuntimeEffect::NoEffect), // ?
+         MEMEFFECTS(ReadNone))
+
 // Metadata *swift_getObjCClassFromObject(id object);
 // This reads object metadata so cannot be marked ReadNone.
 FUNCTION(GetObjCClassFromObject, Swift, swift_getObjCClassFromObject,
@@ -2706,7 +2715,7 @@ FUNCTION(TaskRemoveCancellationHandler,
 //     void *context);
 FUNCTION(TaskAddPriorityEscalationHandler,
         _Concurrency, swift_task_addPriorityEscalationHandler, SwiftCC,
-        ConcurrencyAvailability,
+        TaskPriorityEscalationHandlersAvailability,
         RETURNS(Int8PtrTy),
         ARGS(Int8PtrTy, Int8PtrTy),
         ATTRS(NoUnwind),
@@ -2717,7 +2726,7 @@ FUNCTION(TaskAddPriorityEscalationHandler,
 //   EscalationNotificationStatusRecord *record);
 FUNCTION(TaskRemovePriorityEscalationHandler,
          _Concurrency, swift_task_removePriorityEscalationHandler, SwiftCC,
-         ConcurrencyAvailability,
+         TaskPriorityEscalationHandlersAvailability,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),

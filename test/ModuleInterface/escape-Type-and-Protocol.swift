@@ -73,3 +73,13 @@ public enum UncoolEnum {
   case `Type`, `Protocol`
 // CHECK: }
 }
+
+// CHECK: public protocol SillyProtocol {
+public protocol SillyProtocol {
+  // CHECK-NEXT: associatedtype `Type`
+  associatedtype `Type`
+
+  // CHECK-NEXT: var type: Self.`Type` { get }
+  var type: Self.`Type` { get }
+// CHECK: }
+}

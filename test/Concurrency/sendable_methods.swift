@@ -192,7 +192,7 @@ actor TestActor {}
 
 @globalActor
 struct SomeGlobalActor {
-  static var shared: TestActor { TestActor() }
+  static let shared = TestActor()
 }
 
 @SomeGlobalActor

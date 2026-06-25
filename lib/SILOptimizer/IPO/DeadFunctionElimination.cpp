@@ -113,6 +113,12 @@ class DeadFunctionAndGlobalElimination {
     if (F->isDistributed() || F->isThunk() == IsDistributedThunk)
       return true;
 
+    // The recipient-side `$distributedProxyAdapter$<base>` thunk is
+    // referenced by name from the IRGen-only distributed-target accessor;
+    // it has no SIL caller. DFE must not remove it.
+    if (F->isThunk() == IsDistributedProxyAdapterThunk)
+      return true;
+
     if (F->getDynamicallyReplacedFunction())
       return true;
 

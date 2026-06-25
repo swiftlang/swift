@@ -18,13 +18,17 @@ class C {
   // CHECK: // C.init()
   // CHECK-NEXT: // Isolation: global_actor. type: MainActor
   init() {}
+
+  // CHECK: // C.number.getter
+  // CHECK-NEXT: // Isolation: nonisolated
+  nonisolated let number = 5
 }
 
 // CHECK: // test()
 // CHECK-NEXT: // Isolation: global_actor. type: MainActor
 func test() {
   // CHECK: // closure #1 in test()
-  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: // Isolation: @concurrent
   Task.detached {
     let s = S(value: 0)
   }
@@ -43,7 +47,7 @@ nonisolated func test_defer() {
 using nonisolated
 
 // CHECK: // S.init(value:)
-// CHECK-NEXT: // Isolation: unspecified
+// CHECK-NEXT: // Isolation: nonisolated
 struct S {
   var value: Int
 }

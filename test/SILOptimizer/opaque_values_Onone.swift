@@ -18,10 +18,10 @@ enum Maybe1<T : Equatable> {
   // CHECK:         switch_enum_addr [[LHS_ADDR]] : $*Maybe1<T>, case #Maybe1.yep!enumelt: [[L_YEP:bb[0-9]+]], case #Maybe1.nope!enumelt: {{bb[0-9]+}}
   // CHECK:       [[L_YEP]]:
   // CHECK:         [[RHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe1
-  // CHECK:         unchecked_take_enum_data_addr [[LHS_ADDR]] : $*Maybe1<T>, #Maybe1.yep!enumelt
+  // CHECK:         unchecked_inplace_enum_data_addr [[LHS_ADDR]] : $*Maybe1<T>, #Maybe1.yep!enumelt
   // CHECK:         switch_enum_addr [[RHS_ADDR]] : $*Maybe1<T>, case #Maybe1.yep!enumelt: [[L_AND_R_YEP:bb[0-9]+]], default {{bb[0-9]+}}
   // CHECK:       [[L_AND_R_YEP]]:
-  // CHECK:         unchecked_take_enum_data_addr [[RHS_ADDR]] : $*Maybe1<T>, #Maybe1.yep!enumelt
+  // CHECK:         unchecked_inplace_enum_data_addr [[RHS_ADDR]] : $*Maybe1<T>, #Maybe1.yep!enumelt
   // CHECK-LABEL: } // end sil function 'maybe1_compare'
   @_silgen_name("maybe1_compare")
   static func compare(_ lhs: Maybe1, _ rhs: Maybe1) -> Bool {
@@ -45,10 +45,10 @@ enum Maybe2<T : Equatable> {
   // CHECK:         switch_enum_addr [[LHS_ADDR]] : $*Maybe2<T>, case #Maybe2.yep!enumelt: [[L_YEP:bb[0-9]+]], case #Maybe2.nope!enumelt: {{bb[0-9]+}}
   // CHECK:       [[L_YEP]]:
   // CHECK:         [[RHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe2<T>
-  // CHECK:         unchecked_take_enum_data_addr [[LHS_ADDR]] : $*Maybe2<T>, #Maybe2.yep!enumelt
+  // CHECK:         unchecked_inplace_enum_data_addr [[LHS_ADDR]] : $*Maybe2<T>, #Maybe2.yep!enumelt
   // CHECK:         switch_enum_addr [[RHS_ADDR]] : $*Maybe2<T>, case #Maybe2.yep!enumelt: [[R_YEP:bb[0-9]+]], default {{bb[0-9]+}}
   // CHECK:       [[L_AND_R_YEP]]:
-  // CHECK:         unchecked_take_enum_data_addr [[RHS_ADDR]] : $*Maybe2<T>, #Maybe2.yep!enumelt
+  // CHECK:         unchecked_inplace_enum_data_addr [[RHS_ADDR]] : $*Maybe2<T>, #Maybe2.yep!enumelt
   // CHECK-LABEL: } // end sil function 'maybe2_compare'
   @_silgen_name("maybe2_compare")
   static func compare(_ lhs: Maybe2, _ rhs: Maybe2) -> Bool {
@@ -132,7 +132,7 @@ func duplicate_with_int2<Value>(value: Value) -> ((Value, Value), Int) {
 // CHECK:         apply {{%[^,]+}}<(Int, (Value, (Value, (Value, Int), Value)), Int)>({{%[^,]+}}, [[CONVERTED]])
 // CHECK-LABEL: } // end sil function 'duplicate_with_int3'
 // CHECK-LABEL: sil private @$s19opaque_values_Onone19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_ {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*(Int, (Value, (Value, (Value, Int), Value)), Int), [[IN_ADDR:%[^,]+]] : $*Value):
+// CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*(Int, (Value, (Value, (Value, Int), Value)), Int), [[IN_ADDR:%[^,]+]] : @closureCapture $*Value):
 // CHECK:         [[OUT_1_ADDR:%[^,]+]] = tuple_element_addr [[OUT_ADDR]] : $*(Int, (Value, (Value, (Value, Int), Value)), Int), 1
 // CHECK:         [[OUT_1_0_ADDR:%[^,]+]] = tuple_element_addr [[OUT_1_ADDR]] : $*(Value, (Value, (Value, Int), Value)), 0
 // CHECK:         copy_addr [[IN_ADDR]] to [init] [[OUT_1_0_ADDR]]

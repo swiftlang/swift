@@ -71,7 +71,7 @@ var _ : Int = foo()
 import français
 import func français.phoûx
 
-import main // expected-warning {{file 'import.swift' is part of module 'main'; ignoring import}}
+import main // expected-warning {{file 'import.swift' is part of module 'main'; ignoring import}}{{group-name=ModuleSelfImport}}
 
 @_exported @_implementationOnly import empty // expected-error {{module 'empty' cannot be both exported and implementation-only}} {{12-33=}}
 // expected-warning @-1 {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}

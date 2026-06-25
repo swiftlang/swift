@@ -191,7 +191,8 @@ OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction f
   ReabstractionInfo ReInfo(mod->getSwiftModule(), mod->isWholeModule(),
                            ApplySite(), origFunc, subs, origFunc->getSerializedKind(),
                            convertIndirectToDirect,
-                           /*dropUnusedArguments=*/false);
+                           /*dropUnusedArguments=*/false,
+                           isMandatory);
 
   if (!ReInfo.canBeSpecialized()) {
     return {nullptr};
@@ -461,7 +462,7 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
       // classes (the classSubclassScope), because that may incorrectly
       // influence the linkage.
       getSpecializedLinkage(original, original->getLinkage()), specializedName.unbridged(),
-      ClonedTy,
+      ClonedTy, original->getActorIsolation(),
       preserveGenericSignature ? original->getGenericEnvironment() : nullptr,
       original->getLocation(), makeBare ? IsBare : original->isBare(), original->isTransparent(),
       original->getSerializedKind(), IsNotDynamic, IsNotDistributed,

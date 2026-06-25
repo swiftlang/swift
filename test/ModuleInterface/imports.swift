@@ -8,7 +8,7 @@
 @_exported import empty // expected-warning {{module 'empty' was not compiled with library evolution support; using it means binary compatibility for 'imports' can't be guaranteed}}
 @_exported import emptyButWithLibraryEvolution
 import B.B2
-import func C.c // expected-warning {{scoped imports are not yet supported in module interfaces}}
+import func C.c // expected-warning {{scoped imports are not yet supported in module interfaces}}{{group-name=UnsupportedScopedImport}}
 import D
 @_implementationOnly import Secret_BAD
 

@@ -122,6 +122,10 @@ static bool isLeafTypeMetadata(CanType type) {
   // Integer types are leaves.
   case TypeKind::Integer:
     return true;
+
+  // Hidden types are leaves.
+  case TypeKind::Hidden:
+    return true;
   }
   llvm_unreachable("bad type kind");
 }

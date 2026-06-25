@@ -118,4 +118,19 @@ ProtocolAddReparentedTest.test("Existential Types") {
   #endif
 }
 
+
+struct MultiParentConformer: MultiParent {
+  func helloA() -> Int { clientVersion }
+  func helloC() -> Int { clientVersion }
+  func helloE() -> Int { clientVersion }
+}
+
+ProtocolAddReparentedTest.test("MultiParent") {
+  let mpc = MultiParentConformer()
+  // 3 methods defined in client, 1 in the library, and the library *might* be new and provide the 5th one.
+  let ans = (3 * clientVersion) + 10 + libraryVersion()
+  expectEqual(library_testMultiParent_someType(mpc), ans)
+  expectEqual(library_testMultiParent_anyType(mpc), ans)
+}
+
 runAllTests()

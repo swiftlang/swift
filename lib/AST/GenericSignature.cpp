@@ -792,6 +792,14 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
   return GenericSignatureImpl::Profile(ID, genericParams, requirements);
 }
 
+void swift::simple_display(raw_ostream &out,
+                           DefaultRequirementOptions options) {
+  out << "DefaultRequirementOptions(expandingDefaults="
+      << options.contains(ExpandDefaults)
+      << ", inferOutOfScopeImpliedInverses="
+      << options.contains(InferOutOfScopeImpliedInverses) << ")";
+}
+
 void swift::simple_display(raw_ostream &out, GenericSignature sig) {
   if (sig)
     sig->print(out);
@@ -1179,11 +1187,9 @@ void swift::validateGenericSignature(ASTContext &context,
   {
     PrettyStackTraceGenericSignature debugStack("verifying", sig);
 
-    auto newSigWithError = buildGenericSignatureWithError(context,
-                                                      GenericSignature(),
-                                                      genericParams,
-                                                      requirements,
-                                                      /*allowInverses*/ false);
+    auto newSigWithError = buildGenericSignatureWithError(
+        context, GenericSignature(), genericParams, requirements,
+        DefaultRequirementOptions());
     // If there were any errors, the signature was invalid.
     auto errorFlags = newSigWithError.getInt();
     if (errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements) ||
@@ -1218,7 +1224,7 @@ void swift::validateGenericSignature(ASTContext &context,
           nullptr,
           genericParams,
           newRequirements,
-          /*allowInverses=*/false},
+          DefaultRequirementOptions()},
         GenericSignatureWithError());
 
     // If there were any errors, we formed an invalid signature, so
@@ -1308,14 +1314,14 @@ swift::buildGenericSignatureWithError(ASTContext &ctx,
                              GenericSignature baseSignature,
                              SmallVector<GenericTypeParamType *, 2> addedParameters,
                              SmallVector<Requirement, 2> addedRequirements,
-                             bool allowInverses) {
+                             DefaultRequirementOptions options) {
   return evaluateOrDefault(
       ctx.evaluator,
       AbstractGenericSignatureRequest{
         baseSignature.getPointer(),
         addedParameters,
         addedRequirements,
-        allowInverses},
+        options},
       GenericSignatureWithError());
 }
 
@@ -1324,10 +1330,10 @@ swift::buildGenericSignature(ASTContext &ctx,
                              GenericSignature baseSignature,
                              SmallVector<GenericTypeParamType *, 2> addedParameters,
                              SmallVector<Requirement, 2> addedRequirements,
-                             bool allowInverses) {
+                             DefaultRequirementOptions options) {
   return buildGenericSignatureWithError(ctx, baseSignature,
                                         addedParameters, addedRequirements,
-                                        allowInverses).getPointer();
+                                        options).getPointer();
 }
 
 GenericSignature GenericSignature::withoutMarkerProtocols() const {
@@ -1354,11 +1360,20 @@ GenericSignature GenericSignature::withoutMarkerProtocols() const {
 void GenericSignatureImpl::getRequirementsWithInverses(
     SmallVector<Requirement, 2> &reqs,
     SmallVector<InverseRequirement, 2> &inverses) const {
-  auto &ctx = getASTContext();
+  getRequirementsWithInversesImpl(reqs, inverses, /*ForPrinting*/ false);
+}
 
-  // TODO: deprecate support for this old version of the feature.
-  const bool LegacySuppAssoc =
-      ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes);
+void GenericSignatureImpl::getRequirementsWithInversesForPrinting(
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses) const {
+  getRequirementsWithInversesImpl(reqs, inverses, /*ForPrinting*/ true);
+}
+
+void GenericSignatureImpl::getRequirementsWithInversesImpl(
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses,
+    bool ForPrinting) const {
+  auto &ctx = getASTContext();
 
   llvm::SmallSet<CanType, 12> seenDMTs;
   auto addInverses = [&](Type tyParam) {
@@ -1410,21 +1425,19 @@ void GenericSignatureImpl::getRequirementsWithInverses(
   ///     public func i<T: P>(..) where T.A: ~Copyable {}
   ///     public func c<T: P>(..) where T.A: Copyable {}
   ///
-  /// The legacy version of the feature, without defaults, `i` would not mention
-  /// any inverses, as it was taken as a given it's ~Copyable, and only in `c`
-  /// would we see (both in mangling and interfaces) `T.A: Copyable`.
+  /// Function `i` WILL mention the inverse `T.A: ~Copyable` in its symbol
+  /// and interfaces, but `c` will NOT mention `T.A: Copyable`, as that's a
+  /// given for primary associated types.
   ///
-  /// In the new version, WITH defaults for PATs, it's the opposite.
-  /// Function `f` now WILL mention the inverse `T.A: ~Copyable` in `i`,
-  /// but `c` will not mention `T.A: Copyable`, as it's a given.
+  /// For non-primary associated types, it's the opposite.
+  /// Function `i` WILL NOT mention the inverse `T.A: ~Copyable` in its symbol
+  /// or interfaces, but `c` WILL mention `T.A: Copyable`, as that's NOT assumed
+  /// for a non-primary associated type.
   ///
-  /// For non-primary associated types, the behavior is the same as the legacy
-  /// version of the feature.
+  /// In theory this scheme is generalizable to any subset of associated types
+  /// for which a default is to be assumed for either Copyable and/or Escapable.
+  /// The idea is to mention what is NOT the default for the associatedtype.
   for (auto req : getRequirements()) {
-
-    // We never emitted inverses for any associated types in the legacy version.
-    if (LegacySuppAssoc)
-      break;
 
     if (req.getKind() != RequirementKind::Conformance)
       continue;
@@ -1470,7 +1483,11 @@ void GenericSignatureImpl::getRequirementsWithInverses(
 
     // If the subject matches a primary associated type we identified earlier,
     // then we will infer a default for them, so drop this requirement.
-    if (seenDMTs.contains(subject->getCanonicalType()))
+    //
+    // To maintain with compatability between SE-503 and the deprecated
+    // SuppressedAssociatedTypes, we preserve these requirements when the
+    // purpose is for the ASTPrinter.
+    if (!ForPrinting && seenDMTs.contains(subject->getCanonicalType()))
       continue;
 
     // Otherwise, for a non-primary associated type, no default is inferred,

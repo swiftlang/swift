@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,8 +29,8 @@ suite.test("Initialize with Span<Int>")
 
   let capacity = 4
   Array(0..<capacity).withUnsafeBufferPointer {
-    let intSpan = Span(_unsafeElements: $0)
-    var span = RawSpan(_elements: intSpan)
+    let intSpan = unsafe Span(_unsafeElements: $0)
+    var span = unsafe RawSpan(unsafeElements: intSpan)
     expectEqual(span.byteCount, capacity*MemoryLayout<Int>.stride)
     expectFalse(span.isEmpty)
 
@@ -40,8 +40,8 @@ suite.test("Initialize with Span<Int>")
 
   let a: [Int] = []
   a.withUnsafeBufferPointer {
-    let intSpan = Span(_unsafeElements: $0)
-    let span = RawSpan(_elements: intSpan)
+    let intSpan = unsafe Span(_unsafeElements: $0)
+    let span = unsafe RawSpan(unsafeElements: intSpan)
     expectTrue(span.isEmpty)
   }
 }
@@ -143,13 +143,8 @@ suite.test("unsafeLoadUnaligned(as:)")
 }
 
 suite.test("extracting() functions")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+.require(.minimumStdlib(.stdlib_6_2))
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
   let capacity = 4
   let b = (0..<capacity).map(Int8.init)
   b.withUnsafeBytes {
@@ -158,6 +153,7 @@ suite.test("extracting() functions")
     let sub2 = span.extracting(..<2)
     let sub3 = span.extracting(...)
     let sub4 = span.extracting(2...)
+    let sub5 = span.extracting(1...2)
 
     sub1.withUnsafeBytes { p1 in
       sub2.withUnsafeBytes { p2 in
@@ -174,17 +170,29 @@ suite.test("extracting() functions")
         expectFalse(p4.elementsEqual(p3))
       }
     }
+    expectEqual(sub5.byteCount, 2)
+    sub5.withUnsafeBytes { p5 in
+      span.extracting(1..<3).withUnsafeBytes { p15 in
+        expectTrue(p5.elementsEqual(p15))
+      }
+    }
   }
 }
 
-suite.test("extracting(unchecked:) functions")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+suite.test("extracting() bounds checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Byte offset range out of bounds", when: _isDebugAssertConfiguration())
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
+  let b: ContiguousArray<UInt8> = [0, 1, 2, 3]
+  let bytes = b.span.bytes
+  expectCrashLater()
+  _ = bytes.extracting(2 ..< .max)
+}
 
+suite.test("extracting(unchecked:) functions")
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
   let capacity = 32
   let b = (0..<capacity).map(UInt8.init)
   b.withUnsafeBytes {
@@ -197,13 +205,8 @@ suite.test("extracting(unchecked:) functions")
 }
 
 suite.test("prefix extracting() functions")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+.require(.minimumStdlib(.stdlib_6_2))
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
   let capacity = 4
   let a = Array(0..<UInt8(capacity))
   a.withUnsafeBytes {
@@ -216,6 +219,7 @@ suite.test("prefix extracting() functions")
       ),
       UInt8(capacity-1)
     )
+    expectEqual(span.extracting(first: capacity + 5).byteCount, capacity)
     expectTrue(span.extracting(droppingLast: capacity).isEmpty)
     expectEqual(
       span.extracting(droppingLast: 1).unsafeLoad(
@@ -223,6 +227,7 @@ suite.test("prefix extracting() functions")
       ),
       UInt8(capacity-2)
     )
+    expectTrue(span.extracting(droppingLast: capacity + 5).isEmpty)
     let emptySpan = span.extracting(first: 0)
     let emptierSpan = emptySpan.extracting(0..<0)
     expectTrue(emptySpan.isIdentical(to: emptierSpan))
@@ -237,14 +242,31 @@ suite.test("prefix extracting() functions")
   }
 }
 
-suite.test("suffix extracting() functions")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+suite.test("extracting(first:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't have a prefix of negative length", when: _isDebugAssertConfiguration())
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
+  let b: ContiguousArray<UInt8> = [0, 1, 2, 3]
+  let bytes = b.span.bytes
+  expectCrashLater()
+  _ = bytes.extracting(first: -1)
+}
 
+suite.test("extracting(droppingLast:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
+.code {
+  let b: ContiguousArray<UInt8> = [0, 1, 2, 3]
+  let bytes = b.span.bytes
+  expectCrashLater()
+  _ = bytes.extracting(droppingLast: -1)
+}
+
+suite.test("suffix extracting() functions")
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
   let capacity = 4
   let a = Array(0..<UInt8(capacity))
   a.withUnsafeBytes {
@@ -253,8 +275,10 @@ suite.test("suffix extracting() functions")
     expectEqual(span.extracting(last: capacity).unsafeLoad(as: UInt8.self), 0)
     expectEqual(span.extracting(last: capacity-1).unsafeLoad(as: UInt8.self), 1)
     expectEqual(span.extracting(last: 1).unsafeLoad(as: UInt8.self), UInt8(capacity-1))
+    expectEqual(span.extracting(last: capacity + 5).byteCount, capacity)
     expectTrue(span.extracting(droppingFirst: capacity).isEmpty)
     expectEqual(span.extracting(droppingFirst: 1).unsafeLoad(as: UInt8.self), 1)
+    expectTrue(span.extracting(droppingFirst: capacity + 5).isEmpty)
   }
 
   do {
@@ -264,6 +288,28 @@ suite.test("suffix extracting() functions")
     expectEqual(span.extracting(last: 1).byteCount, b.count)
     expectEqual(span.extracting(droppingFirst: 1).byteCount, b.count)
   }
+}
+
+suite.test("extracting(last:) bound checking")
+.require(.minimumStdlib(.stdlib_6_2))
+.require(.crashTesting)
+.crashOutputMatches("Can't have a suffix of negative length", when: _isDebugAssertConfiguration())
+.code {
+  let b: ContiguousArray<UInt8> = [0, 1, 2, 3]
+  let bytes = b.span.bytes
+  expectCrashLater()
+  _ = bytes.extracting(last: -1)
+}
+
+suite.test("extracting(droppingFirst:) bound checking")
+.require(.stdlib_6_2)
+.require(.crashTesting)
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
+.code {
+  let b: ContiguousArray<UInt8> = [0, 1, 2, 3]
+  let bytes = b.span.bytes
+  expectCrashLater()
+  _ = bytes.extracting(droppingFirst: -1)
 }
 
 suite.test("withUnsafeBytes()")
@@ -277,8 +323,8 @@ suite.test("withUnsafeBytes()")
   let capacity = 4
   let array = Array(0..<capacity)
   array.withUnsafeBufferPointer {
-    let intSpan = Span(_unsafeElements: $0)
-    let span = RawSpan(_elements: intSpan)
+    let intSpan = unsafe Span(_unsafeElements: $0)
+    let span = unsafe RawSpan(unsafeElements: intSpan)
     array.withUnsafeBytes {  b1 in
       span.withUnsafeBytes { b2 in
         expectTrue(b1.elementsEqual(b2))
@@ -342,4 +388,125 @@ suite.test("RawSpan Sendability")
 
   let span = RawSpan(_unsafeBytes: buffer)
   send(span)
+}
+
+suite.test("RawSpan safe loading")
+.require(.stdlib_6_4).code {
+
+  let array = ContiguousArray(repeating: UInt8.zero, count: 64)
+  let bytes = array.span.bytes
+
+  let u8 = bytes.load(fromByteOffset: 0, as: UInt8.self)
+  expectEqual(u8, 0)
+
+  let i8 = bytes.load(fromByteOffset: 0, as: Int8.self)
+  expectEqual(i8, 0)
+
+  let i64 = bytes.load(fromByteOffset: 37, as: Int64.self)
+  expectEqual(i64, 0)
+}
+
+suite.test("RawSpan safe loading bounds underflow")
+.require(.crashTesting)
+.require(.stdlib_6_4).code {
+
+  let array = ContiguousArray(repeating: UInt8.zero, count: 64)
+  let bytes = array.span.bytes
+
+  expectCrashLater()
+  _ = bytes.load(fromByteOffset: -1, as: Int64.self)
+}
+
+suite.test("RawSpan safe loading bounds overflow")
+.require(.crashTesting)
+.require(.stdlib_6_4).code {
+
+  let array = ContiguousArray(repeating: UInt8.zero, count: 64)
+  let bytes = array.span.bytes
+
+  expectCrashLater()
+  _ = bytes.load(fromByteOffset: 59, as: Int64.self)
+}
+
+suite.test("RawSpan safe loading with ByteOrder")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { expectTrue(false); return }
+
+  var array = ContiguousArray<UInt8>(repeating: 0, count: 8)
+  array[0] = 0x01
+  array[1] = 0x02
+  let bytes = array.span.bytes
+
+  let big = bytes.load(fromByteOffset: 0, as: UInt16.self, .bigEndian)
+  expectEqual(big, 0x0102)
+
+  let little = bytes.load(fromByteOffset: 0, as: UInt16.self, .littleEndian)
+  expectEqual(little, 0x0201)
+
+  let native = bytes.load(fromByteOffset: 0, as: UInt16.self, .native)
+  let unqualified = bytes.load(fromByteOffset: 0, as: UInt16.self)
+  expectEqual(native, unqualified)
+}
+
+suite.test("RawSpan subscript")
+.require(.stdlib_6_4).code {
+  let array: ContiguousArray<UInt8> = [10, 20, 30, 40]
+  let bytes = array.span.bytes
+  expectEqual(bytes[0], 10)
+  expectEqual(bytes[1], 20)
+  expectEqual(bytes[3], 40)
+}
+
+suite.test("RawSpan subscript bounds underflow")
+.require(.crashTesting)
+.require(.stdlib_6_4).code {
+  let array: ContiguousArray<UInt8> = [10, 20, 30, 40]
+  let bytes = array.span.bytes
+
+  expectCrashLater()
+  _ = bytes[-1]
+}
+
+suite.test("RawSpan subscript bounds overflow")
+.require(.crashTesting)
+.require(.stdlib_6_4).code {
+  let array: ContiguousArray<UInt8> = [10, 20, 30, 40]
+  let bytes = array.span.bytes
+
+  expectCrashLater()
+  _ = bytes[4]
+}
+
+suite.test("RawSpan unchecked subscript")
+.require(.stdlib_6_4).code {
+  let array: ContiguousArray<UInt8> = [10, 20, 30, 40]
+  let bytes = array.span.bytes.extracting(first: 3)
+  expectEqual(unsafe bytes[unchecked: 0], 10)
+  expectEqual(unsafe bytes[unchecked: 3], 40)
+}
+
+suite.test("RawSpan init(elements:)")
+.require(.stdlib_6_4).code {
+  let capacity = 4
+  let array = ContiguousArray(0..<capacity)
+  let bytes = array.span.bytes
+  expectEqual(bytes.byteCount, capacity * MemoryLayout<Int>.stride)
+}
+
+suite.test("Typed Span")
+.require(.stdlib_6_4).code {
+  let array = ContiguousArray(repeating: UInt64.zero, count: 64)
+  let bytes = array.span.bytes
+
+  let su8 = Span<UInt8>(viewing: bytes)
+  expectEqual(su8[0], 0)
+
+  let si8 = Span<Int8>(viewing: bytes)
+  expectEqual(si8[0], 0)
+
+  let i8 = bytes.load(fromByteOffset: 0, as: Int8.self)
+  expectEqual(i8, 0)
+
+  let i64 = bytes.load(fromByteOffset: 59, as: Int64.self)
+  expectEqual(i64, 0)
 }

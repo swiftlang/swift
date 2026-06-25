@@ -57,7 +57,7 @@ public protocol WalkingPath : Equatable {
   /// Returns the merged path of this path and `with`.
   func merge(with: Self) -> Self
   
-  /// Pops the first path component if it is exactly of kind `kind` - not considering wildcards.
+  /// Pops the first path component if it is exactly of kind `kind`.
   ///
   /// Returns the index of the component and the new path or - if not matching - returns nil.
   /// Called for destructure instructions during down-walking and for aggregate instructions during up-walking.
@@ -496,6 +496,14 @@ extension AddressDefUseWalker {
   
   public mutating func walkDownDefault(address operand: Operand, path: Path) -> WalkResult {
     let instruction = operand.instruction
+
+    func handleEnumInst(_ ei: any SingleValueInstruction & EnumInstruction) -> WalkResult {
+      if let path = path.popIfMatches(.enumCase, index: ei.caseIndex) {
+        return walkDownUses(ofAddress: ei, path: path)
+      } else {
+        return unmatchedPath(address: operand, path: path)
+      }
+    }
     switch instruction {
     case let sea as StructElementAddrInst:
       if let path = path.popIfMatches(.structField, index: sea.fieldIndex) {
@@ -515,28 +523,27 @@ extension AddressDefUseWalker {
       } else {
         return unmatchedPath(address: operand, path: path)
       }
-    case is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst:
-      let ei = instruction as! SingleValueInstruction
-      if let path = path.popIfMatches(.enumCase, index: (instruction as! EnumInstruction).caseIndex) {
-        return walkDownUses(ofAddress: ei, path: path)
-      } else {
-        return unmatchedPath(address: operand, path: path)
-      }
+    case let ieda as InitEnumDataAddrInst:
+      return handleEnumInst(ieda)
+    case let ueda as UncheckedEnumDataAddrInstBase where ueda.enum == operand.value:
+      return handleEnumInst(ueda)
     case is InitExistentialAddrInst, is OpenExistentialAddrInst:
       if let path = path.popIfMatches(.existential, index: 0) {
         return walkDownUses(ofAddress: instruction as! SingleValueInstruction, path: path)
       } else {
         return unmatchedPath(address: operand, path: path)
       }
-    case let ia as IndexAddrInst:
-      if let (pathIdx, subPath) = path.pop(kind: .indexedElement) {
-        if let idx = ia.constantIndex,
-           idx == pathIdx {
+    case let ia as IndexAddrInst where ia.isProjection:
+      if let idx = ia.constantIndex {
+        if let subPath = path.popIfMatches(.indexedElement, index: idx) {
           return walkDownUses(ofAddress: ia, path: subPath)
         }
-        return walkDownUses(ofAddress: ia, path: subPath.push(.anyIndexedElement, index: 0))
+      } else {
+        if let subPath = path.popIfMatches(.indexedElement, index: nil) {
+          return walkDownUses(ofAddress: ia, path: subPath)
+        }
       }
-      return walkDownUses(ofAddress: ia, path: path)
+      return unmatchedPath(address: operand, path: path)
     case is MarkUninitializedInst,
          is MoveOnlyWrapperToCopyableAddrInst,
          is CopyableToMoveOnlyWrapperAddrInst,
@@ -828,11 +835,11 @@ extension AddressUseDefWalker {
       return walkUp(address: vba.vector, path: path.push(.vectorBase, index: 0))
     case let ida as InitEnumDataAddrInst:
       return walkUp(address: ida.operand.value, path: path.push(.enumCase, index: ida.caseIndex))
-    case let uteda as UncheckedTakeEnumDataAddrInst:
-      return walkUp(address: uteda.operand.value, path: path.push(.enumCase, index: uteda.caseIndex))
+    case let uteda as UncheckedEnumDataAddrInstBase:
+      return walkUp(address: uteda.enum, path: path.push(.enumCase, index: uteda.caseIndex))
     case is InitExistentialAddrInst, is OpenExistentialAddrInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path.push(.existential, index: 0))
-    case let ia as IndexAddrInst:
+    case let ia as IndexAddrInst where ia.isProjection:
       if let idx = ia.constantIndex {
         return walkUp(address: ia.base, path: path.push(.indexedElement, index: idx))
       } else {
@@ -854,15 +861,3 @@ extension AddressUseDefWalker {
     }
   }
 }
-
-private extension IndexAddrInst {
-  var constantIndex: Int? {
-    if let literal = index as? IntegerLiteralInst,
-       let indexValue = literal.value
-    {
-      return indexValue
-    }
-    return nil
-  }
-}
-

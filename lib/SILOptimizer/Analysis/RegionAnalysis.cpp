@@ -39,16 +39,6 @@ using namespace swift::PartitionPrimitives;
 using namespace swift::PatternMatch;
 using namespace swift::regionanalysisimpl;
 
-bool swift::regionanalysisimpl::AbortOnUnknownPatternMatchError = false;
-
-static llvm::cl::opt<bool, true> AbortOnUnknownPatternMatchErrorCmdLine(
-    "sil-region-isolation-assert-on-unknown-pattern",
-    llvm::cl::desc("Abort if SIL region isolation detects an unknown pattern. "
-                   "Intended only to be used when debugging the compiler!"),
-    llvm::cl::Hidden,
-    llvm::cl::location(
-        swift::regionanalysisimpl::AbortOnUnknownPatternMatchError));
-
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
@@ -293,7 +283,7 @@ struct AddressBaseComputingVisitor
         break;
       case ProjectionKind::Enum: {
         // NOTE: Preserves immutability prefix path.
-        auto op = cast<UncheckedTakeEnumDataAddrInst>(projInst)->getOperand();
+        auto op = cast<UncheckedEnumDataAddrInstBase>(projInst)->getEnum();
 
         // If our operand is Sendable and our field is non-Sendable and we have
         // not stashed a value yet, stash value.
@@ -433,6 +423,8 @@ static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   case SILInstructionKind::RawPointerToRefInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
     return true;
   }
@@ -773,8 +765,53 @@ TrackableValue RegionAnalysisValueMap::getTrackableValueHelper(
         iter.first->getSecond().removeFlag(TrackableValueFlag::isMayAlias);
       }
 
-      if (auto isolation = SILIsolationInfo::get(storage.base)) {
-        iter.first->getSecond().setIsolationRegionInfo(isolation);
+      // Determine whether this value is a non-Sendable field projected directly
+      // out of a Sendable aggregate (e.g. '.v' of an @unchecked Sendable struct
+      // 'W' stored on an actor). In that case the value was deliberately rooted
+      // as its own non-Sendable value by getUnderlyingTrackedValue (see
+      // AddressBaseComputingVisitor's Struct, Tuple, and Enum cases). Because
+      // it is reached *through* a Sendable value, it must not inherit the
+      // isolation of the underlying access base (e.g. the actor instance), so
+      // we skip the base-isolation inheritance below.
+      //
+      // NOTE: This is a check on the *operand* being Sendable, and a Sendable
+      // operand can be Sendable for two very different reasons:
+      //
+      //   1. It is @unchecked Sendable (an unchecked promise that its contents
+      //      may freely cross isolation boundaries). A field projected out of
+      //      it genuinely is disconnected.
+      //
+      //   2. It is global-actor isolated (global-actor-isolated value types are
+      //      implicitly Sendable). A field projected out of it is NOT
+      //      disconnected -- it is isolated to that global actor.
+      //
+      // Skipping the base-isolation inheritance is correct for *both* cases,
+      // and in particular does not lose the global-actor isolation of case 2.
+      // The reason is that the base isolation we skip here is the isolation of
+      // the *access base* (e.g. the enclosing actor instance), not the
+      // isolation of the field itself. A global-actor-isolated field carries
+      // its own isolation via its declaration, which is re-derived
+      // independently by the SILIsolationInfo::get(value) fallback at the end
+      // of this function (it runs precisely because we left the isolation
+      // region info unset here). So a global-actor field ends up global-actor
+      // isolated, while an
+      // @unchecked Sendable field -- which has no declared isolation -- has
+      // get(value) return nothing and so correctly ends up disconnected.
+      bool projectedOutOfSendableAggregate = false;
+      if (auto *svi = dyn_cast<SingleValueInstruction>(value)) {
+        if (isa<StructElementAddrInst, TupleElementAddrInst,
+                UncheckedEnumDataAddrInstBase>(svi)) {
+          SILValue op = svi->getOperand(0);
+          if (SILIsolationInfo::isSendable(op) &&
+              SILIsolationInfo::isNonSendable(value))
+            projectedOutOfSendableAggregate = true;
+        }
+      }
+
+      if (!projectedOutOfSendableAggregate) {
+        if (auto isolation = SILIsolationInfo::get(storage.base)) {
+          iter.first->getSecond().setIsolationRegionInfo(isolation);
+        }
       }
     }
   }
@@ -1946,9 +1983,11 @@ public:
   }
 
   void addUnknownPatternError(SILValue value) {
-    if (shouldAbortOnUnknownPatternMatchError()) {
+    if (currentInst->getFunction()->getModule().getOptions()
+            .AbortOnUnknownRegionIsolationPatternError) {
       llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
+          "RegionIsolation: Found unknown SIL pattern in PartitionOpBuilder. "
+          "See -sil-region-isolation-assert-on-unknown-pattern");
     }
     currentInstPartitionOps->emplace_back(
         PartitionOp::UnknownPatternError(lookupValueID(value), currentInst));
@@ -2727,7 +2766,7 @@ public:
     translateSILMultiAssign(
         directResults,
         ArrayRef<Operand *>(), // No indirect results for a partial_apply.
-        makeOperandRefRange(pai->getAllOperands()),
+        pai->getRealOperands(),
         RegionMergeReason::NonisolatedClosure);
   }
 
@@ -2983,7 +3022,7 @@ public:
         // locations (which is how we grab our AST information).
         !(applyExpr && applyExpr->getIsolationCrossing()
                            ->getCalleeIsolation()
-                           .isNonisolated());
+                           .isNonisolatedOrConcurrent());
 
     for (auto result : applyResults) {
       if (auto lookupResult = tryToTrackValue(result)) {
@@ -3737,8 +3776,6 @@ CONSTANT_TRANSLATION(CopyBlockInst, AssignDirect)
 CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, AssignDirect)
 CONSTANT_TRANSLATION(IndexAddrInst, AssignDirect)
 CONSTANT_TRANSLATION(InitBlockStorageHeaderInst, AssignDirect)
-CONSTANT_TRANSLATION(InitExistentialAddrInst, AssignDirect)
-CONSTANT_TRANSLATION(InitExistentialRefInst, AssignDirect)
 CONSTANT_TRANSLATION(OpenExistentialBoxInst, AssignDirect)
 CONSTANT_TRANSLATION(OpenExistentialRefInst, AssignDirect)
 CONSTANT_TRANSLATION(TailAddrInst, AssignDirect)
@@ -4138,6 +4175,8 @@ PartitionOpTranslator::visitProjection(SingleValueInstruction *proj) {
 EMIT_PROJECTION(StructElementAddrInst)
 EMIT_PROJECTION(TupleElementAddrInst)
 EMIT_PROJECTION(UncheckedTakeEnumDataAddrInst)
+EMIT_PROJECTION(UncheckedBorrowEnumDataAddrInst)
+EMIT_PROJECTION(UncheckedInPlaceEnumDataAddrInst)
 
 #undef EMIT_PROJECTION
 
@@ -4511,10 +4550,56 @@ PartitionOpTranslator::visitPartialApplyInst(PartialApplyInst *pai) {
 }
 
 TranslationSemantics
+PartitionOpTranslator::visitInitExistentialAddrInst(
+    InitExistentialAddrInst *ieai) {
+  // If the formal concrete type involves an opened archetype, the conformance
+  // is abstract — derived from an existing existential that was already
+  // validated at its formation site. SE-0470's dependent conformance rule
+  // guarantees the associated conformance can never be more isolated than the
+  // parent, so no new isolated-conformance region should be introduced.
+  //
+  // Instead, merge the result into the region of the opened existential (the
+  // type-dependent operand) along with the primary operand (the existential
+  // buffer), without passing a conformance isolation override.
+  if (ieai->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(
+        ieai->getResults(),
+        ArrayRef<Operand *>(),
+        makeOperandRefRange(ieai->getAllOperands()),
+        RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
+  return TranslationSemantics::AssignDirect;
+}
+
+TranslationSemantics
 PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *ievi) {
   if (isStaticallyLookThroughInst(ievi))
     return TranslationSemantics::LookThrough;
 
+  if (ievi->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(
+        ievi->getResults(),
+        ArrayRef<Operand *>(),
+        makeOperandRefRange(ievi->getAllOperands()),
+        RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
+
+  return TranslationSemantics::AssignDirect;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitInitExistentialRefInst(
+    InitExistentialRefInst *ieri) {
+  if (ieri->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(
+        ieri->getResults(),
+        ArrayRef<Operand *>(),
+        makeOperandRefRange(ieri->getAllOperands()),
+        RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
   return TranslationSemantics::AssignDirect;
 }
 

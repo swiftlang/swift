@@ -34,6 +34,8 @@
 namespace swift {
 
 class ASTContext;
+class ActorIsolation;
+enum class CodeGenerationModel: uint8_t;
 class SILInstruction;
 class SILModule;
 class SILFunctionBuilder;
@@ -42,6 +44,7 @@ class BasicBlockBitfield;
 class NodeBitfield;
 class OperandBitfield;
 class CalleeCache;
+class DominanceInfo;
 class SILTypeProperties;
 class SILUndef;
 
@@ -60,6 +63,7 @@ enum IsThunk_t {
   IsSignatureOptimizedThunk,
   IsBackDeployedThunk,
   IsDistributedThunk,
+  IsDistributedProxyAdapterThunk,
 };
 enum IsDynamicallyReplaceable_t {
   IsNotDynamic,
@@ -361,7 +365,7 @@ private:
   unsigned BlockListChangeIdx = 0;
 
   /// The isolation of this function.
-  std::optional<ActorIsolation> actorIsolation;
+  ActorIsolation actorIsolation;
 
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
@@ -403,6 +407,11 @@ private:
   /// Whether cross-module references to this function should always use weak
   /// linking.
   unsigned IsAlwaysWeakImported : 1;
+
+  /// The code generation model used for this particular function. This is
+  /// zero in the case where it's using the default model, or 1 + the
+  /// CodeGenerationModel otherwise.
+  unsigned CodeGenModel : 2;
 
   /// Whether the implementation can be dynamically replaced.
   unsigned IsDynamicReplaceable : 1;
@@ -500,6 +509,7 @@ private:
     case IsReabstractionThunk:
     case IsBackDeployedThunk:
     case IsDistributedThunk:
+    case IsDistributedProxyAdapterThunk:
       thunkCanHaveSubclassScope = false;
       break;
     }
@@ -512,12 +522,12 @@ private:
   }
 
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
-              CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-              IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-              SerializedKind_t serializedKind, ProfileCounter entryCount,
-              IsThunk_t isThunk, SubclassScope classSubclassScope,
-              Inline_t inlineStrategy, EffectsKind E,
-              const SILDebugScope *debugScope,
+              CanSILFunctionType loweredType, ActorIsolation isolation,
+              GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
+              IsTransparent_t isTrans, SerializedKind_t serializedKind,
+              ProfileCounter entryCount, IsThunk_t isThunk,
+              SubclassScope classSubclassScope, Inline_t inlineStrategy,
+              EffectsKind E, const SILDebugScope *debugScope,
               IsDynamicallyReplaceable_t isDynamic,
               IsExactSelfClass_t isExactSelfClass,
               IsDistributed_t isDistributed,
@@ -525,11 +535,11 @@ private:
 
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
-         CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-         std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
-         IsTransparent_t isTrans, SerializedKind_t serializedKind,
-         ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
-         IsDistributed_t isDistributed,
+         CanSILFunctionType loweredType, ActorIsolation isolation,
+         GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
+         IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+         SerializedKind_t serializedKind, ProfileCounter entryCount,
+         IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
          IsRuntimeAccessible_t isRuntimeAccessible,
          IsExactSelfClass_t isExactSelfClass, IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
@@ -539,11 +549,12 @@ private:
          const SILDebugScope *DebugScope = nullptr);
 
   void init(SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
-            GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
-            IsTransparent_t isTrans, SerializedKind_t serializedKind,
-            ProfileCounter entryCount, IsThunk_t isThunk,
-            SubclassScope classSubclassScope, Inline_t inlineStrategy,
-            EffectsKind E, const SILDebugScope *DebugScope,
+            ActorIsolation isolation, GenericEnvironment *genericEnv,
+            IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+            SerializedKind_t serializedKind, ProfileCounter entryCount,
+            IsThunk_t isThunk, SubclassScope classSubclassScope,
+            Inline_t inlineStrategy, EffectsKind E,
+            const SILDebugScope *DebugScope,
             IsDynamicallyReplaceable_t isDynamic,
             IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
             IsRuntimeAccessible_t isRuntimeAccessible);
@@ -981,6 +992,11 @@ public:
   void setIsAlwaysWeakImported(bool value) { IsAlwaysWeakImported = value; }
 
   bool isWeakImported(ModuleDecl *module) const;
+
+  /// Determine the explicit code generation model
+  std::optional<CodeGenerationModel> codeGenerationModel() const;
+
+  void setCodeGenerationModel(std::optional<CodeGenerationModel> value);
 
   /// Returns whether this function implementation can be dynamically replaced.
   IsDynamicallyReplaceable_t isDynamicallyReplaceable() const {
@@ -1446,15 +1462,11 @@ public:
     return false;
   }
 
-  /// Returns true if this function belongs to a declaration that
-  /// has `@_alwaysEmitIntoClient` attribute.
-  bool markedAsAlwaysEmitIntoClient() const {
-    if (!hasLocation())
-      return false;
+  /// Whether this declaration is always emitted into the client.
+  bool isAlwaysEmitIntoClient() const;
 
-    auto *V = getLocation().getAsASTNode<ValueDecl>();
-    return V && V->isAlwaysEmittedIntoClient();
-  }
+  /// Whether this declaration is never emitted into the client.
+  bool isNeverEmitIntoClient() const;
 
   /// Return whether this function has attribute @used on it
   bool markedAsUsed() const { return MarkedAsUsed; }
@@ -1520,16 +1532,12 @@ public:
     return false;
   }
 
-  void setActorIsolation(ActorIsolation newActorIsolation) {
-    actorIsolation = newActorIsolation;
-  }
-
-  std::optional<ActorIsolation> getActorIsolation() const {
+  ActorIsolation getActorIsolation() const {
     return actorIsolation;
   }
 
   bool isNonisolatedNonsending() const {
-    return actorIsolation && actorIsolation->isCallerIsolationInheriting();
+    return actorIsolation.isNonisolatedNonsending();
   }
 
   /// Return the source file that this SILFunction belongs to if it exists.
@@ -1562,6 +1570,12 @@ public:
   SILBasicBlock *createBasicBlock(llvm::StringRef debugName);
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
+
+  /// Creates a standalone debug reconstruction block that is NOT inserted into
+  /// the function's BlockList. This should only be called by the cloner and
+  /// the SIL parser, optimization passes should go through the debug value
+  /// instruction's getOrCreateDebugReconstructionBlock.
+  SILBasicBlock *createEmptyDebugReconstructionBlock();
 
   /// Removes and destroys \p BB;
   void eraseBlock(SILBasicBlock *BB) {
@@ -1734,14 +1748,15 @@ public:
   /// verify - Run the SIL verifier to make sure that the SILFunction follows
   /// invariants.
   void verify(CalleeCache *calleeCache = nullptr,
-              bool SingleFunction = true,
-              bool isCompleteOSSA = true,
+              DominanceInfo *dominanceInfo = nullptr,
+              bool SingleFunction = true, bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
 
   /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
   /// blocks.
   void verifyIncompleteOSSA() const {
-    verify(/*calleeCache*/nullptr, /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
+    verify(/*calleeCache*/ nullptr, /*dominanceInfo=*/nullptr,
+           /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
   }
 
   /// Verifies the lifetime of memory locations in the function.
@@ -1828,6 +1843,21 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   F.print(OS);
   return OS;
 }
+
+/// Returns true when isolation-history note emission should run for \p fn.
+///
+/// Isolation-history is opt-in. It is enabled when:
+///   - The frontend flag \c -sil-region-isolation-emit-isolation-history was
+///     passed (\c SILOptions::EmitIsolationHistory), or
+///   - The function carries a
+///     \c \@diagnose(RegionIsolationIsolationHistory, as: <not ignored>)
+///     attribute.
+///
+/// Both producers (SILGen, when deciding whether to record per-argument
+/// SILLocations on apply instructions) and consumers (SendNonSendable's
+/// IsolationHistoryNoteEmitter) consult this single predicate so the two
+/// sides stay in lock-step.
+bool shouldEmitIsolationHistoryFor(const SILFunction *fn);
 
 } // end swift namespace
 

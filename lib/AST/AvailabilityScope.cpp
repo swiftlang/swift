@@ -20,13 +20,14 @@
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
+#include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/Lexer.h"
 
 using namespace swift;
 
@@ -61,6 +62,7 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
   SourceRange range;
   AvailabilityScope *parentContext = nullptr;
   switch (SF->Kind) {
+  case SourceFileKind::SyntheticMacro:
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::DefaultArgument: {
     // Look up the parent context in the enclosing file that this file's
@@ -71,9 +73,42 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
     if (auto parentScope = enclosingSF->getAvailabilityScope()) {
       auto charRange = Ctx.SourceMgr.getRangeForBuffer(SF->getBufferID());
       range = SourceRange(charRange.getStart(), charRange.getEnd());
-      auto originalNode = SF->getNodeInEnclosingSourceFile();
-      parentContext = parentScope->findMostRefinedSubContext(
-          originalNode.getStartLoc(), Ctx);
+
+      // For peer, conformance, and extension macros, the expansion is a
+      // sibling of the attached declaration rather than nested inside it.
+      // The expansion should therefore inherit availability from the
+      // enclosing context, not from the attached declaration. Locate the
+      // parent scope using the buffer's logical declaration context instead
+      // of the attached node's source location.
+      SourceLoc lookupLoc;
+      if (auto role = SF->getFulfilledMacroRole()) {
+        switch (*role) {
+        case MacroRole::Peer:
+        case MacroRole::Conformance:
+        case MacroRole::Extension:
+          if (auto *dcDecl =
+                  SF->getGeneratedSourceFileInfo()->declContext->getAsDecl())
+            lookupLoc = dcDecl->getStartLoc();
+          break;
+        case MacroRole::Expression:
+        case MacroRole::Declaration:
+        case MacroRole::CodeItem:
+        case MacroRole::Accessor:
+        case MacroRole::MemberAttribute:
+        case MacroRole::Member:
+        case MacroRole::Body:
+        case MacroRole::Preamble:
+          lookupLoc = SF->getNodeInEnclosingSourceFile().getStartLoc();
+          break;
+        }
+      } else {
+        lookupLoc = SF->getNodeInEnclosingSourceFile().getStartLoc();
+      }
+
+      parentContext =
+          lookupLoc.isValid()
+              ? parentScope->findMostRefinedSubContext(lookupLoc, Ctx)
+              : parentScope;
     }
     break;
   }
@@ -169,6 +204,42 @@ AvailabilityScope *AvailabilityScope::createForWhileStmtBody(
                                      S->getBody()->getSourceRange(), Info);
 }
 
+AvailabilityScope *AvailabilityScope::createForSwitchStmt(
+    ASTContext &Ctx, SwitchStmt *S, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
+  ASSERT(S);
+  ASSERT(Parent);
+  // Use the brace range so that the subject expression (which sits between
+  // the `switch` keyword and the opening brace) isn't covered by this
+  // scope's source range. The subject is type-checked before the case label
+  // items, so excluding it avoids triggering this scope's lazy expansion
+  // before the patterns are ready.
+  //
+  // Widen the source range to the end of its last token so it contains
+  // child availability scopes that extend their ranges similarly (such as
+  // implicit decl scopes).
+  SourceRange range(S->getLBraceLoc(), S->getRBraceLoc());
+  if (range.End.isValid())
+    range.End = Lexer::getLocForEndOfToken(Ctx.SourceMgr, range.End);
+  return new (Ctx)
+      AvailabilityScope(Ctx, IntroNode(S, DC), Parent, range, Info);
+}
+
+AvailabilityScope *AvailabilityScope::createForSwitchStmtCaseBody(
+    ASTContext &Ctx, CaseStmt *S, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
+  ASSERT(S);
+  ASSERT(Parent);
+  // Widen the body source range to the end of its last token so it contains
+  // child availability scopes that extend their ranges similarly (such as
+  // implicit decl scopes).
+  SourceRange range = S->getBody()->getSourceRange();
+  if (range.End.isValid())
+    range.End = Lexer::getLocForEndOfToken(Ctx.SourceMgr, range.End);
+  return new (Ctx)
+      AvailabilityScope(Ctx, IntroNode(S, DC), Parent, range, Info);
+}
+
 void AvailabilityScope::addChild(AvailabilityScope *Child, ASTContext &Ctx) {
   bool validSourceRange = Child->getSourceRange().isValid();
   ASSERT(validSourceRange);
@@ -259,6 +330,12 @@ SourceLoc AvailabilityScope::getIntroductionLoc() const {
   case Reason::WhileStmtBody:
     return Node.getAsWhileStmt()->getStartLoc();
 
+  case Reason::SwitchStmt:
+    return Node.getAsSwitchStmt()->getStartLoc();
+
+  case Reason::SwitchStmtCaseBody:
+    return Node.getAsCaseStmt()->getStartLoc();
+
   case Reason::Root:
     return SourceLoc();
   }
@@ -347,6 +424,8 @@ SourceRange AvailabilityScope::getAvailabilityConditionVersionSourceRange(
         Node.getAsWhileStmt()->getCond(), Node.getDeclContext(), Domain,
         Version);
 
+  case Reason::SwitchStmt:
+  case Reason::SwitchStmtCaseBody:
   case Reason::Root:
   case Reason::DeclImplicit:
     return SourceRange();
@@ -380,6 +459,8 @@ AvailabilityScope::getExplicitAvailabilityRange(AvailabilityDomain domain,
   case Reason::GuardStmtFallthrough:
   case Reason::GuardStmtElseBranch:
   case Reason::WhileStmtBody:
+  case Reason::SwitchStmt:
+  case Reason::SwitchStmtCaseBody:
     // Availability is inherently explicit for all of these nodes.
     return getAvailabilityContext().getAvailabilityRange(domain, ctx);
   }
@@ -478,6 +559,12 @@ StringRef AvailabilityScope::getReasonName(Reason R) {
 
   case Reason::WhileStmtBody:
     return "while_body";
+
+  case Reason::SwitchStmt:
+    return "switch_stmt";
+
+  case Reason::SwitchStmtCaseBody:
+    return "switch_case_body";
   }
 
   llvm_unreachable("Unhandled Reason in switch.");

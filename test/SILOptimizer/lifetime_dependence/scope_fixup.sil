@@ -798,7 +798,7 @@ bb0(%0 : @owned $B):
 // CHECK:   switch_enum_addr [[TMP_NC]], case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK: bb2:
-// CHECK:   [[DATA:%[0-9]+]] = unchecked_take_enum_data_addr [[TMP_NC]], #Optional.some!enumelt
+// CHECK:   [[DATA:%[0-9]+]] = unchecked_inplace_enum_data_addr [[TMP_NC]], #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[DATA]] to [init] [[VIEW]]
 // CHECK:   begin_access [modify] [unknown] [[ATHING]]
 // CHECK:   apply %{{.*}} : $@convention(thin) (@inout AThing) -> ()
@@ -844,7 +844,7 @@ bb1:
   unreachable
 
 bb2:
-  %44 = unchecked_take_enum_data_addr %14, #Optional.some!enumelt
+  %44 = unchecked_inplace_enum_data_addr %14, #Optional.some!enumelt
   copy_addr [take] %44 to [init] %12
   dealloc_stack %13
 
@@ -969,4 +969,58 @@ bb3:
   destroy_value %11
   %18 = tuple ()
   return %18
+}
+
+// Test handling of disjoint scopes that should not be extended.
+
+sil [ossa] @getDependentHolder : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @guaranteed Holder
+
+// The path from the loadborrow to the end_borrow in b5 never reaches the inner
+// store_borrow scope, so scope extension should simply ignore it.
+// 
+// CHECK-LABEL: sil hidden [noinline] [ossa] @testDisjointParentScopes : $@convention(thin) (@in_guaranteed Holder) -> () {
+// CHECK:       bb0(%0 : $*Holder):
+// CHECK:         %1 = load_borrow %0
+// CHECK-NEXT:    cond_br undef, bb1, bb2
+// CHECK:       bb1:
+// CHECK:         cond_br undef, bb4, bb5
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    %5 = alloc_stack $Holder
+// CHECK:       bb4:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb5:
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'testDisjointParentScopes'
+sil hidden [noinline] [ossa] @testDisjointParentScopes : $@convention(thin) (@in_guaranteed Holder) -> () {
+bb0(%0 : $*Holder):
+  %1 = load_borrow %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb4, bb5
+
+bb2:
+  br bb3
+
+bb3:
+  %5 = alloc_stack $Holder
+  %6 = store_borrow %1 to %5
+  %7 = function_ref @getDependentHolder : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @guaranteed Holder
+  %8 = apply %7(%6) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @guaranteed Holder
+  %9 = mark_dependence [unresolved] %8 on %6
+  end_borrow %6
+  dealloc_stack %5
+  end_borrow %1
+  %13 = tuple ()
+  return %13
+
+bb4:
+  br bb3
+
+bb5:
+  end_borrow %1
+  unreachable
 }

@@ -1402,7 +1402,7 @@ internal func _BinaryIntegerToASCII<T: BinaryInteger>(
   let radix = radix.magnitude
 
   // We need a `MutableRawSpan` to use wide store/load operations.
-  var buffer = unsafe utf8Buffer.mutableBytes
+  var buffer = utf8Buffer.mutableBytes
   var offset = buffer.byteCount
 
   if value == (0 as T.Magnitude) {
@@ -1702,7 +1702,7 @@ extension BinaryInteger {
     let safetyMargin = radix >= 10 ? 21 : 65
     let capacity =
       (radix >= 10 ? (bitWidth * 5 + 15) &>> 4 : bitWidth) + safetyMargin
-    return unsafe withUnsafeTemporaryAllocation(
+    return withUnsafeTemporaryAllocation(
       of: UTF8.CodeUnit.self,
       capacity: capacity
     ) {

@@ -58,7 +58,7 @@ namespace api {
 ///
 /// When the json format changes in a way that requires version-specific handling, this number should be incremented.
 /// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
-const uint8_t DIGESTER_JSON_VERSION = 8; // add isFromExtension
+const uint8_t DIGESTER_JSON_VERSION = 9; // add isMarkerProtocol on conformances
 const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
 const StringRef ABIRootKey = "ABIRoot";
 const StringRef ConstValuesKey = "ConstValues";
@@ -606,12 +606,14 @@ public:
 class SDKNodeConformance: public SDKNode {
   StringRef Usr;
   StringRef MangledName;
+  bool IsMarkerProtocol;
   SDKNodeDeclType *TypeDecl;
   friend class SDKNodeDeclType;
 
 public:
   SDKNodeConformance(SDKNodeInitInfo Info);
   StringRef getUsr() const { return Usr; }
+  bool isMarkerProtocol() const { return IsMarkerProtocol; }
   ArrayRef<SDKNode*> getTypeWitnesses() const { return Children; }
   SDKNodeDeclType *getNominalTypeDecl() const { return TypeDecl; }
   void jsonize(json::Output &out) override;

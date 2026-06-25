@@ -19,7 +19,7 @@ SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest,
               GenericSignatureWithError (const GenericSignatureImpl *,
                                          SmallVector<GenericTypeParamType *, 2>,
                                          SmallVector<Requirement, 2>,
-                                         bool),
+                                         DefaultRequirementOptions),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ApplyAccessNoteRequest,
               evaluator::SideEffect(ValueDecl *), SeparatelyCached, NoLocationInfo)
@@ -151,6 +151,9 @@ SWIFT_REQUEST(TypeChecker, GetDistributedTargetInvocationResultHandlerOnReturnFu
 SWIFT_REQUEST(TypeChecker, GetDistributedThunkRequest,
               FuncDecl *(llvm::PointerUnion<AbstractStorageDecl *, AbstractFunctionDecl *>),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetDistributedRecipientResolvableProxyAdapterThunkRequest,
+              FuncDecl *(llvm::PointerUnion<AbstractStorageDecl *, AbstractFunctionDecl *>),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorIDPropertyRequest,
               VarDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
@@ -177,7 +180,8 @@ SWIFT_REQUEST(TypeChecker, GlobalActorAttributeRequest,
                   llvm::PointerUnion<Decl *, ClosureExpr *>),
               SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ActorIsolationRequest,
-              ActorIsolationState(ValueDecl *),
+              ActorIsolationState(
+                  llvm::PointerUnion<ValueDecl *, ExtensionDecl *>),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasIsolatedSelfRequest,
               bool(ValueDecl *),
@@ -201,7 +205,7 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                          WhereClauseOwner,
                                          SmallVector<Requirement, 2>,
                                          SmallVector<TypeBase *, 2>,
-                                         SourceLoc, ExtensionDecl *, bool),
+                                         SourceLoc, ExtensionDecl *, DefaultRequirementOptions),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DistributedModuleIsAvailableRequest,
               bool(const ValueDecl *), Cached, NoLocationInfo)
@@ -430,6 +434,9 @@ SWIFT_REQUEST(TypeChecker, ConformanceIsolationRequest,
 SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,
               Type (const TypeResolution *, TypeRepr *, GenericParamList *),
               Uncached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolvePreInverseGenericsRequest,
+              Type(Decl *, PreInverseGenericsAttr *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveRawLayoutTypeRequest,
               Type(StructDecl *, RawLayoutAttr *, bool),
               SeparatelyCached, NoLocationInfo)
@@ -654,8 +661,12 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailabilitySpecRequest,
               (const AvailabilitySpec *, const DeclContext *),
               SeparatelyCached, NoLocationInfo)
 
-SWIFT_REQUEST(TypeChecker, DefaultIsolationInSourceFileRequest,
-              std::optional<DefaultIsolation>(const SourceFile *),
+SWIFT_REQUEST(TypeChecker, FileDefaultsRequest,
+              FileDefaults(const SourceFile *),
+              Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, ApplyFileDefaultsRequest,
+              evaluator::SideEffect(Decl *),
               Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, BindExtensionsRequest,
@@ -672,6 +683,10 @@ SWIFT_REQUEST(TypeChecker, IsCustomAvailabilityDomainPermanentlyEnabled,
 
 SWIFT_REQUEST(TypeChecker, EmitPerformanceHints,
               evaluator::SideEffect(SourceFile *),
+              Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, DynamicMemberLookupSubscriptRequest,
+              DynamicMemberLookupSubscriptEligibility(const SubscriptDecl *),
               Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, DesugarForEachStmtRequest,

@@ -13,6 +13,7 @@ function(set_if_arch_bitness var_name)
      "${SIA_ARCH}" STREQUAL "x86" OR
      "${SIA_ARCH}" STREQUAL "armv4t" OR
      "${SIA_ARCH}" STREQUAL "armv5" OR
+     "${SIA_ARCH}" STREQUAL "armv5te" OR
      "${SIA_ARCH}" STREQUAL "armv6" OR
      "${SIA_ARCH}" STREQUAL "armv6m" OR
      "${SIA_ARCH}" STREQUAL "armv7" OR
@@ -21,6 +22,8 @@ function(set_if_arch_bitness var_name)
      "${SIA_ARCH}" STREQUAL "armv7m" OR
      "${SIA_ARCH}" STREQUAL "armv7em" OR
      "${SIA_ARCH}" STREQUAL "armv7s" OR
+     "${SIA_ARCH}" STREQUAL "armv8m.main" OR
+     "${SIA_ARCH}" STREQUAL "armv8.1m.main" OR
      "${SIA_ARCH}" STREQUAL "m68k" OR
      "${SIA_ARCH}" STREQUAL "riscv32" OR
      "${SIA_ARCH}" STREQUAL "wasm32" OR

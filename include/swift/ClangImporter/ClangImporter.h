@@ -63,15 +63,13 @@ namespace clang {
   namespace driver {
     class Driver;
   }
-namespace tooling {
 namespace dependencies {
   struct ModuleDeps;
   struct TranslationUnitDeps;
   enum class ModuleOutputKind;
   using ModuleDepsGraph = std::vector<ModuleDeps>;
 }
-}
-}
+} // namespace clang
 
 namespace swift {
 enum class ResultConvention : uint8_t;
@@ -236,19 +234,12 @@ public:
   std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
 
-  std::optional<std::vector<std::string>>
-  getClangCC1Arguments(ASTContext &ctx,
-                       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                       bool ignoreClangTarget = false);
-
   std::vector<std::string>
   getClangDepScanningInvocationArguments(ASTContext &ctx);
 
-  static std::unique_ptr<clang::CompilerInvocation>
-  createClangInvocation(ClangImporter *importer,
-                        const ClangImporterOptions &importerOpts,
-                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                        const std::vector<std::string> &CC1Args);
+  std::unique_ptr<clang::CompilerInvocation> createClangInvocation(
+      ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs,
+      bool forCodeGen = false);
 
   /// Creates a Clang Driver based on the Swift compiler options.
   ///
@@ -534,7 +525,7 @@ public:
 
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
-      const clang::tooling::dependencies::TranslationUnitDeps &deps,
+      const clang::dependencies::TranslationUnitDeps &deps,
       std::vector<std::string> &swiftArgs);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
@@ -565,7 +556,7 @@ public:
   clang::TargetInfo &getTargetInfo() const;
   clang::CodeGenOptions &getCodeGenOpts() const;
 
-  std::string getClangModuleHash() const;
+  std::string computeClangContextHash() const;
 
   /// Get clang file mapping.
   const ClangInvocationFileMapping &getClangFileMapping() const {
@@ -657,6 +648,8 @@ public:
 
   bool isCXXMethodMutating(const clang::CXXMethodDecl *method) override;
 
+  bool isCxxMoveOnlyType(const clang::CXXRecordDecl *decl) override;
+
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
@@ -696,6 +689,7 @@ public:
                                   ClangInheritanceInfo inheritance) override;
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
+  FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
@@ -736,7 +730,7 @@ bool isCompletionHandlerParamName(StringRef paramName);
 namespace importer {
 /// Returns true if the given C/C++ reference type uses "immortal"
 /// retain/release functions.
-bool hasImmortalAttrs(const clang::RecordDecl *decl);
+bool hasAnyImmortalAttr(const clang::RecordDecl *decl);
 
 struct ReturnOwnershipInfo {
   ReturnOwnershipInfo(const clang::NamedDecl *decl);
@@ -776,6 +770,12 @@ bool isCxxConstReferenceType(const clang::Type *type);
 /// Determine whether the given Clang record declaration has an attribute that
 /// makes it import as a reference types. Does not check its bases, if any.
 bool hasImportReferenceAttr(const clang::RecordDecl *decl);
+
+/// Determine whether the given Clang record declaration has the
+/// swift_attr("import_opaque_pointer") attribute, which causes any pointer
+/// to this type to be imported as OpaquePointer regardless of whether the
+/// struct definition is complete.
+bool hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl);
 
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
@@ -824,6 +824,24 @@ bool declIsCxxOnly(const Decl *decl);
 
 /// Is this DeclContext an `enum` that represents a C++ namespace?
 bool isClangNamespace(const DeclContext *dc);
+
+/// Enumerate and import all members of the C++ namespace represented by
+/// \p namespaceEnum, invoking \p emit once for each newly imported member.
+///
+/// This is an expensive operation.
+///
+/// \param namespaceEnum  An imported \c EnumDecl whose Clang decl is
+///                       a \c clang::NamespaceDecl.
+/// \param emit           Callback invoked once per unique imported member.
+/// \param includeSpecializations   If true, also emit imported class template
+///                                 specializations declared in the namespace.
+/// \param includeOtherModules      If true, include namespace redeclarations
+///                                 from Clang modules other than where the
+///                                 underlying namespace is from.
+void forEachCXXNamespaceMember(EnumDecl *namespaceEnum,
+                               llvm::function_ref<void(ValueDecl *)> emit,
+                               bool includeSpecializations,
+                               bool includeOtherModules);
 
 /// For some \a templatedClass that inherits from \a base, whether they are
 /// derived from the same class template.
@@ -983,7 +1001,9 @@ public:
   /// was inherited with private inheritance.
   ///
   /// Does nothing if this ClangInheritanceInfo::isInheriting() is \c false.
-  void setUnavailableIfNecessary(const ValueDecl *baseDecl,
+  ///
+  /// Returns true if \param clonedDecl was marked unavailable.
+  bool setUnavailableIfNecessary(const ValueDecl *baseDecl,
                                  ValueDecl *clonedDecl) const;
 
   friend llvm::hash_code hash_value(const ClangInheritanceInfo &info) {

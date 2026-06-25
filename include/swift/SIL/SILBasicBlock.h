@@ -111,6 +111,7 @@ private:
   /// Used by BasicBlockData to index the Data vector.
   ///
   /// A value of -1 means that the index is not initialized yet.
+  /// A value of -2 means this is a debug-only block (no data).
   int index = -1;
 
   /// Custom bits managed by BasicBlockBitfield.
@@ -131,6 +132,13 @@ private:
   ///
   /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
   uint64_t lastInitializedBitfieldID = 0;
+
+  uint64_t getLastInitializedBitfieldID() const {
+    return lastInitializedBitfieldID;
+  }
+  void setLastInitializedBitfieldID(uint64_t bitfieldID) {
+    lastInitializedBitfieldID = bitfieldID;
+  }
 
   // Used by `BasicBlockBitfield`.
   unsigned getCustomBits() const { return customBits; }
@@ -191,6 +199,11 @@ public:
   using reverse_iterator = InstListType::reverse_iterator;
   using const_reverse_iterator = InstListType::const_reverse_iterator;
 
+  /// The stride used when (re-)computing instruction indices.
+  /// Indices are assigned as multiples of this value, leaving room to assign
+  /// numbers in-between when instructions are inserted later.
+  enum { instructionIndexStride = 8 };
+
   void insert(iterator InsertPt, SILInstruction *I);
   void insert(SILInstruction *InsertPt, SILInstruction *I) {
     insert(InsertPt->getIterator(), I);
@@ -202,6 +215,10 @@ public:
   void erase(SILInstruction *I, SILModule &module);
   static void moveInstruction(SILInstruction *inst, SILInstruction *beforeInst);
   void moveInstructionToFront(SILInstruction *inst);
+
+  /// Recomputes instruction indices for all instructions in this block,
+  /// assigning each a unique index spaced by `instructionIndexStride`.
+  void recomputeInstructionIndices();
 
   void eraseAllInstructions(SILModule &module);
 
@@ -217,10 +234,14 @@ public:
 
   /// Transfer the instructions from Other to the end of this block.
   void spliceAtEnd(SILBasicBlock *Other) {
+    for (SILInstruction &I : *Other)
+      I.clearIndexInList();
     InstList.splice(end(), Other->InstList);
   }
 
   void spliceAtBegin(SILBasicBlock *Other) {
+    for (SILInstruction &I : *Other)
+      I.clearIndexInList();
     InstList.splice(begin(), Other->InstList);
   }
 
@@ -524,6 +545,18 @@ public:
 
   /// Returns true if this BB is the entry BB of its parent.
   bool isEntry() const;
+
+  /// Returns true if this block is a debug_value's reconstruction block,
+  /// not part of the function's BlockList.
+  bool isDebugReconstructionBlock() const { return index == -2; }
+
+  /// Update the parent function of a debug-only block (e.g. when the owning
+  /// instruction is moved between functions).
+  void setParentFunction(SILFunction *F) {
+    ASSERT(isDebugReconstructionBlock() &&
+           "only debug reconstruction blocks can be reparented");
+    Parent = F;
+  }
 
   /// Returns true if this block ends in an unreachable or an apply of a
   /// no-return apply or builtin.

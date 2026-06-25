@@ -15,10 +15,9 @@ public func testit() {
   print("Hello")
 }
 
-// We need to remove the debug scope within alloc_stack's auxiliary debug var info
-// in sil-based-dbg mode.
-// To create something like `alloc_stack ..., (name "foo", loc ..., scope 0)...`
-// as our testing input, we're only running SROA over the input swift code.
+// SILDebugInfoGenerator erases debug_values and invalidates alloc_stack
+// debug variable info (IRGen only emits line tables in sil-based-dbg mode).
+// Verify that the pass doesn't crash and the alloc_stack varinfo is gone.
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false %s -disable-debugger-shadow-copies -emit-sil -g -o %t/stage1.sil
 // RUN: %target-sil-opt -parse-serialized-sil -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -sil-print-debuginfo -access-marker-elim -sroa %t/stage1.sil -o %t/stage2.sil
 // The verification shouldn't fail
@@ -29,12 +28,11 @@ struct TheStruct {
 }
 // CHECK_DBG_SCOPE-LABEL: sil {{.*}}test_debug_scope
 public func test_debug_scope(val : Int) -> Int {
-    // CHECK_DBG_SCOPE: alloc_stack $Builtin.Int{{[0-9]+}},
-    // CHECK_DBG_SCOPE-SAME:  var, (name "the_struct",
-    // CHECK_DBG_SCOPE-SAME:  loc
-    // CHECK_DBG_SCOPE-SAME:  expr op_fragment:#TheStruct.the_member:op_fragment:#Int._value
-    // The auxiliary debug scope should be removed
-    // CHECK_DBG_SCOPE-NOT:   scope {{[0-9]+}})
+    // debug_values are erased by SILDebugInfoGenerator.
+    // CHECK_DBG_SCOPE-NOT: debug_value
+    // alloc_stack varinfo is invalidated.
+    // CHECK_DBG_SCOPE: alloc_stack $Builtin.Int{{[0-9]+}}
+    // CHECK_DBG_SCOPE-NOT: name "the_struct"
     var the_struct = TheStruct(the_member: 0)
     the_struct.the_member = val + 13
     return the_struct.the_member

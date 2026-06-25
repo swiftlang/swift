@@ -1277,12 +1277,18 @@ $1_SiBV
 // CHECK-64:      (builtin_fixed_array
 // CHECK-64-NEXT:   (integer value=2)
 // CHECK-64-NEXT:   (struct Swift.Int))
-// CHECK-64-NEXT: (array size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1)
+// CHECK-64-NEXT: (array size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1 count=2
+// CHECK-64-NEXT:   (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:     (field name=_value offset=0
+// CHECK-64-NEXT:       (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 
 // CHECK-32:      (builtin_fixed_array
 // CHECK-32-NEXT:   (integer value=2)
 // CHECK-32-NEXT:   (struct Swift.Int))
-// CHECK-32-NEXT: (array size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1)
+// CHECK-32-NEXT: (array size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1 count=2
+// CHECK-32-NEXT:   (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:     (field name=_value offset=0
+// CHECK-32-NEXT:       (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
 
 SiBW
 // CHECK-64:      (builtin_borrow
@@ -1418,3 +1424,115 @@ $1_12TypeLowering10SimpleEnumOBVBW
 // CHECK-32:         (builtin_borrow
 // CHECK-32-NEXT:      (struct TypeLowering.Big))
 // CHECK-32-NEXT:    (borrow size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)
+
+// `unmanaged_storage` applied to a single-field pointer-sized struct.
+SpySiGXu
+// CHECK:      (unmanaged_storage
+// CHECK-NEXT:   (bound_generic_struct Swift.UnsafeMutablePointer
+// CHECK-NEXT:     (struct Swift.Int)))
+// CHECK-64-NEXT: (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1
+// CHECK-64-NEXT:   (field name=_rawValue offset=0
+// CHECK-64-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)))
+// CHECK-32-NEXT: (struct size=4 alignment=4 stride=4 num_extra_inhabitants={{[0-9]+}} bitwise_takable=1
+// CHECK-32-NEXT:   (field name=_rawValue offset=0
+// CHECK-32-NEXT:     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants={{[0-9]+}} bitwise_takable=1)))
+
+// Existential metatype of a constrained existential
+12TypeLowering2PP_pSi1TAaCPRts_XPXp
+// CHECK: (existential_metatype
+// CHECK-NEXT: (constrained_existential_type
+// CHECK-NEXT: (protocol_composition
+// CHECK-NEXT: (protocol TypeLowering.PP))
+// CHECK-64: (existential_metatype size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1
+// CHECK-64-NEXT: (field name=metadata offset=0
+// CHECK-64-NEXT: (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1))
+// CHECK-64-NEXT: (field name=wtable offset=8
+// CHECK-64-NEXT: (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)))
+// CHECK-32: (existential_metatype size=8 alignment=4 stride=8 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT: (field name=metadata offset=0
+// CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))
+// CHECK-32-NEXT: (field name=wtable offset=4
+// CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)))
+
+// Protocol composition with class component.
+12TypeLowering27ClassBoundCompositionHolderVySiG
+// CHECK:           (bound_generic_struct TypeLowering.ClassBoundCompositionHolder
+// CHECK-NEXT:        (struct Swift.Int))
+// CHECK-64-NEXT: (struct size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI_SUB_1]] bitwise_takable=1
+// CHECK-64-NEXT:   (field name=field offset=0
+// CHECK-64-NEXT:     (single_payload_enum size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI_SUB_1]] bitwise_takable=1
+// CHECK-64-NEXT:       (case name=some index=0 offset=0
+// CHECK-64-NEXT:         (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1
+// CHECK-64-NEXT:           (field name=object offset=0
+// CHECK-64-NEXT:             (reference kind=strong refcounting=native))
+// CHECK-64-NEXT:           (field name=wtable offset=8
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))))
+// CHECK-64-NEXT:       (case name=none index=1)))
+// CHECK-32-NEXT: (struct size=8 alignment=4 stride=8 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32-NEXT:   (field name=field offset=0
+// CHECK-32-NEXT:     (single_payload_enum size=8 alignment=4 stride=8 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32-NEXT:       (case name=some index=0 offset=0
+// CHECK-32-NEXT:         (class_existential size=8 alignment=4 stride=8 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT:           (field name=object offset=0
+// CHECK-32-NEXT:             (reference kind=strong refcounting=native))
+// CHECK-32-NEXT:           (field name=wtable offset=4
+// CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1))))
+// CHECK-32-NEXT:       (case name=none index=1)))
+
+// Parameterized protocol composition (no class bound).
+12TypeLowering27ParameterizedProtocolHolderVySiG
+// CHECK:           (bound_generic_struct TypeLowering.ParameterizedProtocolHolder
+// CHECK-NEXT:        (struct Swift.Int))
+// CHECK-64-NEXT: (struct size=48 alignment=8 stride=48 num_extra_inhabitants=[[PTR_XI_SUB_1]] bitwise_takable=1
+// CHECK-64-NEXT:   (field name=field offset=0
+// CHECK-64-NEXT:     (single_payload_enum size=48 alignment=8 stride=48 num_extra_inhabitants=[[PTR_XI_SUB_1]] bitwise_takable=1
+// CHECK-64-NEXT:       (case name=some index=0 offset=0
+// CHECK-64-NEXT:         (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1
+// CHECK-64-NEXT:           (field name=metadata offset=24
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1))
+// CHECK-64-NEXT:           (field name=wtable offset=32
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))
+// CHECK-64-NEXT:           (field name=wtable offset=40
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))))
+// CHECK-64-NEXT:       (case name=none index=1)))
+// CHECK-32-NEXT: (struct size=24 alignment=4 stride=24 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32-NEXT:   (field name=field offset=0
+// CHECK-32-NEXT:     (single_payload_enum size=24 alignment=4 stride=24 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32-NEXT:       (case name=some index=0 offset=0
+// CHECK-32-NEXT:         (opaque_existential size=24 alignment=4 stride=24 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT:           (field name=metadata offset=12
+// CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))
+// CHECK-32-NEXT:           (field name=wtable offset=16
+// CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1))
+// CHECK-32-NEXT:           (field name=wtable offset=20
+// CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1))))
+// CHECK-32-NEXT:       (case name=none index=1)))
+
+// Parameterized protocol composition with class bound.
+12TypeLowering37ClassBoundParameterizedProtocolHolderVySiG
+// CHECK:           (bound_generic_struct TypeLowering.ClassBoundParameterizedProtocolHolder
+// CHECK-NEXT:        (struct Swift.Int))
+// CHECK-64-NEXT: (struct size=24 alignment=8 stride=24 num_extra_inhabitants=[[PTR_XI_SUB_1]] bitwise_takable=1
+// CHECK-64-NEXT:   (field name=field offset=0
+// CHECK-64-NEXT:     (single_payload_enum size=24 alignment=8 stride=24 num_extra_inhabitants=[[PTR_XI_SUB_1]] bitwise_takable=1
+// CHECK-64-NEXT:       (case name=some index=0 offset=0
+// CHECK-64-NEXT:         (class_existential size=24 alignment=8 stride=24 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1
+// CHECK-64-NEXT:           (field name=object offset=0
+// CHECK-64-NEXT:             (reference kind=strong refcounting=native))
+// CHECK-64-NEXT:           (field name=wtable offset=8
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))
+// CHECK-64-NEXT:           (field name=wtable offset=16
+// CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1))))
+// CHECK-64-NEXT:       (case name=none index=1)))
+// CHECK-32-NEXT: (struct size=12 alignment=4 stride=12 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32-NEXT:   (field name=field offset=0
+// CHECK-32-NEXT:     (single_payload_enum size=12 alignment=4 stride=12 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32-NEXT:       (case name=some index=0 offset=0
+// CHECK-32-NEXT:         (class_existential size=12 alignment=4 stride=12 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT:           (field name=object offset=0
+// CHECK-32-NEXT:             (reference kind=strong refcounting=native))
+// CHECK-32-NEXT:           (field name=wtable offset=4
+// CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1))
+// CHECK-32-NEXT:           (field name=wtable offset=8
+// CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1))))
+// CHECK-32-NEXT:       (case name=none index=1)))

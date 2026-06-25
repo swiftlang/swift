@@ -18,6 +18,10 @@ import SwiftSyntax
 enum IfConfigOrUnderlying<Element> {
   case ifConfigDecl(IfConfigDeclSyntax)
   case underlying(Element)
+
+  /// The element was handled by `split` itself (e.g. a `#warning`/`#error`
+  /// directive that was diagnosed in place) and should not be visited.
+  case skip
 }
 
 extension ASTGenVisitor {
@@ -64,6 +68,9 @@ extension ASTGenVisitor {
 
       case .underlying(let element):
         body(element)
+
+      case .skip:
+        break
     }
     }
   }

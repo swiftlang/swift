@@ -186,6 +186,8 @@ def verify_ignore_unrelated: Flag<["-"], "verify-ignore-unrelated">,
   HelpText<"Allow diagnostics in files outside those with expected diagnostics in verify mode">;
 def verify_ignore_macro_note: Flag<["-"], "verify-ignore-macro-note">,
   HelpText<"Skip verifying notes about macro location">;
+def verify_child_notes: Flag<["-"], "verify-child-notes">,
+  HelpText<"Verify child notes in child diagnostics blocks">;
 def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
@@ -195,6 +197,17 @@ def expansion_remarks:  Flag<["-"], "Rmacro-expansions">,
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
+
+def swift_diagnostics_assert_on_error : Flag<["-"], "diagnostics-assert-on-error">,
+  HelpText<"Trap when an error diagnostic is emitted. For compiler developers only.">;
+
+def swift_diagnostics_assert_on_warning : Flag<["-"], "diagnostics-assert-on-warning">,
+  HelpText<"Trap when a warning diagnostic is emitted. For compiler developers only.">;
+
+def swift_diagnostics_assert_on_group : Separate<["-"], "diagnostics-assert-on-group">,
+  MetaVarName<"<diagnostic_group>">,
+  HelpText<"Trap when any diagnostic in the given group is emitted. "
+           "For compiler developers only.">;
 
 def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
   HelpText<"Automatically import declared cross-import overlays.">;
@@ -304,6 +317,11 @@ def parallel_scan : Flag<["-"], "parallel-scan">,
 def no_parallel_scan : Flag<["-"], "no-parallel-scan">,
    HelpText<"Perform dependency scanning in a single-threaded fashion.">;
 
+def no_clang_compiler_instance_sharing
+    : Flag<["-"], "no-clang-scanner-instance-sharing">,
+      HelpText<"Disable sharing of the Clang compiler instance across "
+               "dependency scans.">;
+
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
   HelpText<"Always run SIL copy propagation with lexical lifetimes to shorten object "
            "lifetimes while preserving variable lifetimes.">;
@@ -373,44 +391,51 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     HelpText<"Disable requiring uses of @objc to require importing the "
              "Foundation module">;
 
-def enable_experimental_concurrency :
-  Flag<["-"], "enable-experimental-concurrency">,
-  HelpText<"Enable experimental concurrency model">;
+  def enable_experimental_concurrency :
+    Flag<["-"], "enable-experimental-concurrency">,
+    HelpText<"Enable experimental concurrency model">;
 
-def enable_experimental_move_only :
-  Flag<["-"], "enable-experimental-move-only">,
-  HelpText<"Enable experimental move only">;
+  def enable_experimental_move_only :
+    Flag<["-"], "enable-experimental-move-only">,
+    HelpText<"Enable experimental move only">;
 
-def enable_experimental_distributed :
-  Flag<["-"], "enable-experimental-distributed">,
-  HelpText<"Enable experimental 'distributed' actors and functions">;
+  def enable_experimental_distributed :
+    Flag<["-"], "enable-experimental-distributed">,
+    HelpText<"Enable experimental 'distributed' actors and functions">;
 
-def enable_experimental_flow_sensitive_concurrent_captures :
-  Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
-  HelpText<"Enable flow-sensitive concurrent captures">;
+  def enable_experimental_flow_sensitive_concurrent_captures :
+    Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
+    HelpText<"Enable flow-sensitive concurrent captures">;
 
-def disable_experimental_clang_importer_diagnostics :
-  Flag<["-"], "disable-experimental-clang-importer-diagnostics">,
-  HelpText<"Disable experimental diagnostics when importing C, C++, and Objective-C libraries">;
+  def disable_experimental_clang_importer_diagnostics :
+    Flag<["-"], "disable-experimental-clang-importer-diagnostics">,
+    HelpText<"Disable experimental diagnostics when importing C, C++, and Objective-C libraries">;
 
-def enable_experimental_eager_clang_module_diagnostics :
-  Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
-  HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
+  def enable_experimental_eager_clang_module_diagnostics :
+    Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
+    HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
 
-def enable_experimental_pairwise_build_block :
-  Flag<["-"], "enable-experimental-pairwise-build-block">,
-  HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
+  def enable_experimental_pairwise_build_block :
+    Flag<["-"], "enable-experimental-pairwise-build-block">,
+    HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
 
-def enable_resilience : Flag<["-"], "enable-resilience">,
-     HelpText<"Deprecated, use -enable-library-evolution instead">;
+  def enable_resilience : Flag<["-"], "enable-resilience">,
+       HelpText<"Deprecated, use -enable-library-evolution instead">;
 
-def enable_experimental_async_top_level :
-  Flag<["-"], "enable-experimental-async-top-level">,
-  HelpText<"Enable experimental concurrency in top-level code">;
+  def enable_experimental_async_top_level :
+    Flag<["-"], "enable-experimental-async-top-level">,
+    HelpText<"Enable experimental concurrency in top-level code">;
 
-def public_autolink_library :
-  Separate<["-"], "public-autolink-library">,
-  HelpText<"Add public dependent library">;
+  def disable_force_load_symbols : Flag<["-"],"disable-force-load-symbols">,
+      HelpText<"Disable generation of all Swift _FORCE_LOAD symbols">;
+
+  def public_autolink_library :
+    Separate<["-"], "public-autolink-library">,
+    HelpText<"Add public dependent library">;
+
+  def enable_com_interop
+    : Flag<["-"], "enable-experimental-com-interop">,
+      HelpText<"Enable COM interop code generation and configuration directives">;
 }
 
 // HIDDEN FLAGS
@@ -450,12 +475,6 @@ def solver_enable_transitive_conformance : Flag<["-"], "solver-enable-transitive
 def solver_disable_transitive_conformance : Flag<["-"], "solver-disable-transitive-conformance">,
   HelpText<"Disable transitive conformance constraint optimization">;
 
-def solver_enable_binding_optimizations : Flag<["-"], "solver-enable-binding-optimizations">,
-  HelpText<"Enable experimental optimizations to speed up type variable binding">;
-
-def solver_disable_binding_optimizations : Flag<["-"], "solver-disable-binding-optimizations">,
-  HelpText<"Disable experimental optimizations to speed up type variable binding">;
-
 def disable_named_lazy_import_as_member_loading :
   Flag<["-"], "disable-named-lazy-import-as-member-loading">,
   HelpText<"Import all of a type's import-as-member globals together, as Swift "
@@ -467,6 +486,9 @@ def dump_requirement_machine : Flag<["-"], "dump-requirement-machine">,
 
 def debug_requirement_machine : Joined<["-"], "debug-requirement-machine=">,
   HelpText<"Fine-grained debug output from the generics implementation">;
+
+def eager_macro_checking : Flag<["-"], "eager-macro-checking">,
+  HelpText<"Enable eager type-checking of declarations in macro expansions">;
 
 def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
   HelpText<"Dumps the results of each macro expansion">;
@@ -595,6 +617,10 @@ def disable_implicit_string_processing_module_import : Flag<["-"],
   "disable-implicit-string-processing-module-import">,
   HelpText<"Disable the implicit import of the _StringProcessing module.">;
 
+def disable_implicit_com_module_import
+  : Flag<["-"], "disable-implicit-com-module-import">,
+    HelpText<"Disable the implicit import of the COM module.">;
+
 def disable_implicit_cxx_module_import : Flag<["-"],
   "disable-implicit-cxx-module-import">,
   HelpText<"Disable the implicit import of the C++ Standard Library module.">;
@@ -644,10 +670,6 @@ def disable_autolink_frameworks : Flag<["-"],"disable-autolink-frameworks">,
 
 def disable_all_autolinking : Flag<["-"],"disable-all-autolinking">,
   HelpText<"Disable all Swift autolink directives">;
-
-def disable_force_load_symbols : Flag<["-"],"disable-force-load-symbols">,
-  Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Disable generation of all Swift _FORCE_LOAD symbols">;
 
 def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
   HelpText<"Don't run diagnostic passes">;
@@ -721,6 +743,13 @@ def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
 def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
+
+def dump_abstract_layout : Flag<["-"], "dump-abstract-layout">,
+  HelpText<"Dump abstract layout information for Clang-backed types">;
+
+def dump_hidden_type_layouts : Flag<["-"], "dump-hidden-type-layouts">,
+  HelpText<"Dump every hidden-type layout known to this compilation, "
+           "including those deserialized from imported swiftmodules">;
 
 def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
                                HelpText<"Dump availability scopes to stderr">;
@@ -911,6 +940,18 @@ def warn_long_expression_type_checking : Separate<["-"], "warn-long-expression-t
 def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-type-checking=">,
   Alias<warn_long_expression_type_checking>;
 
+def warn_long_expression_type_checking_scopes : Separate<["-"], "warn-long-expression-type-checking-scopes">,
+  MetaVarName<"<n>">,
+  HelpText<"Warns when type-checking an expression uses more than <n> solver scopes">;
+def warn_long_expression_type_checking_scopes_EQ : Joined<["-"], "warn-long-expression-type-checking-scopes=">,
+  Alias<warn_long_expression_type_checking_scopes>;
+
+def warn_long_expression_type_checking_trail : Separate<["-"], "warn-long-expression-type-checking-trail">,
+  MetaVarName<"<n>">,
+  HelpText<"Warns when type-checking an expression uses more than <n> solver trail steps">;
+def warn_long_expression_type_checking_trail_EQ : Joined<["-"], "warn-long-expression-type-checking-trail=">,
+  Alias<warn_long_expression_type_checking_trail>;
+
 def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
   HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
 
@@ -943,12 +984,6 @@ def solver_disable_prune_disjunctions : Flag<["-"], "solver-disable-prune-disjun
 
 def solver_enable_prune_disjunctions : Flag<["-"], "solver-enable-prune-disjunctions">,
   HelpText<"Enable experimental disjunction pruning algorithm for lookahead in the solver">;
-
-def solver_disable_optimize_operator_defaults : Flag<["-"], "solver-disable-optimize-operator-defaults">,
-  HelpText<"Disable experimental optimization to sometimes skip operators in protocol extensions">;
-
-def solver_enable_optimize_operator_defaults : Flag<["-"], "solver-enable-optimize-operator-defaults">,
-  HelpText<"Enable experimental optimization to sometimes skip operators in protocol extensions">;
 
 def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-hacks">,
   HelpText<"Disable various constraint solver performance optimizations that have been "
@@ -1072,6 +1107,19 @@ def sil_verify_none : Flag<["-"], "sil-verify-none">,
 
 def sil_ownership_verify_all : Flag<["-"], "sil-ownership-verify-all">,
   HelpText<"Verify ownership after each transform">;
+
+def sil_region_isolation_assert_on_unknown_pattern :
+  Flag<["-"], "sil-region-isolation-assert-on-unknown-pattern">,
+  HelpText<"Abort if SIL region isolation detects an unknown pattern. "
+           "For compiler developers only.">;
+
+def sil_region_isolation_emit_isolation_history
+    : Flag<["-"], "sil-region-isolation-emit-isolation-history">,
+      HelpText<
+          "Emit notes explaining why a disconnected value ended up in an "
+          "isolated region. Enables isolation-history for every function in "
+          "the module; otherwise, isolation-history is opt-in per function "
+          "via @diagnose(RegionIsolationIsolationHistory, ...).">;
 
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;

@@ -287,7 +287,8 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   SerializationOpts.OutputPath = OutPathStr.c_str();
   SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
   SerializationOpts.AutolinkForceLoad =
-      !Invocation.getIRGenOptions().ForceLoadSymbolName.empty();
+      !Invocation.getIRGenOptions().ForceLoadSymbolName.empty() &&
+      !Invocation.getIRGenOptions().DisableForceLoadSymbols;
   SerializationOpts.PublicDependentLibraries =
       Invocation.getIRGenOptions().PublicLinkLibraries;
   SerializationOpts.UserModuleVersion = FEOpts.UserModuleVersion;
@@ -435,7 +436,7 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
       diagnose(diag::interface_file_lock_timed_out, interfacePath);
     }
     // Clear the lock file so that future invocations can make progress.
-    Lock.unsafeMaybeUnlock();
+    Lock.unsafeUnlock();
     continue;
   }
   }

@@ -144,6 +144,12 @@ class CMake(object):
             define("CMAKE_C_COMPILER_LAUNCHER:PATH", toolchain.sccache)
             define("CMAKE_CXX_COMPILER_LAUNCHER:PATH", toolchain.sccache)
 
+        if args.enable_caching:
+            cc_dir = os.path.dirname(toolchain.cc)
+            clang_cache_path = os.path.join(cc_dir, 'clang-cache')
+            define("CMAKE_C_COMPILER_LAUNCHER:PATH", clang_cache_path)
+            define("CMAKE_CXX_COMPILER_LAUNCHER:PATH", clang_cache_path)
+
         if args.cmake_c_launcher:
             define("CMAKE_C_COMPILER_LAUNCHER:PATH", args.cmake_c_launcher)
         if args.cmake_cxx_launcher:

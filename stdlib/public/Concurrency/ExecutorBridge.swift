@@ -18,7 +18,7 @@
 import Swift
 
 @available(StdlibDeploymentTarget 6.3, *)
-@_silgen_name("_swift_exit")
+@_extern(c, "_swift_exit")
 internal func _exit(result: CInt)
 
 #if !$Embedded
@@ -91,7 +91,7 @@ internal func _jobGetExecutorPrivateData(
   _ job: Builtin.Job
 ) -> UnsafeMutableRawPointer
 
-#if os(WASI) || !$Embedded
+#if os(WASI) || os(Emscripten) || !$Embedded
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_getMainExecutor")
@@ -104,7 +104,7 @@ internal func _getMainExecutorAsSerialExecutor() -> UnownedSerialExecutor {
 @_silgen_name("swift_getMainExecutor")
 internal func _getMainExecutorAsSerialExecutor() -> UnownedSerialExecutor
 #endif // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-#endif // os(WASI) || !$Embedded
+#endif // os(WASI) || os(Emscripten) || !$Embedded
 
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_getDefaultExecutor")

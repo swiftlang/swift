@@ -62,6 +62,7 @@
 
 namespace clang {
 class APValue;
+class BuiltinType;
 class DeclarationName;
 class MangleContext;
 class ObjCInterfaceDecl;
@@ -332,9 +333,16 @@ private:
   PlatformKind platformKind;
 
 public:
+  /// Returns a non-optional `PlatformKind` corresponding to the platform name
+  /// if the given platform should be considered for availability on imported
+  /// declarations.
+  std::optional<PlatformKind> platformKindIfRelevant(StringRef platform) const;
+
   /// Returns true when the given platform should be considered for
-  /// availabilityon imported declarations.
-  bool isPlatformRelevant(StringRef platform) const;
+  /// availability on imported declarations.
+  bool isPlatformRelevant(StringRef platform) const {
+    return platformKindIfRelevant(platform).has_value();
+  }
 
   /// Returns true when the given declaration with the given deprecation
   /// should be included in the cutoff of imported deprecated APIs marked
@@ -679,19 +687,11 @@ public:
       llvm::DenseMap<llvm::StringRef, std::pair<FuncDecl *, FuncDecl *>>>
       GetterSetterMap;
 
-  /// Keep track of getter/setter pairs for functions imported from C++
-  /// subscript operators based on the type in which they are declared and
-  /// the type of their parameter.
-  ///
-  /// `.first` corresponds to a getter
-  /// `.second` corresponds to a setter
-  llvm::DenseMap<NominalTypeDecl *,
-                 llvm::MapVector<SmallVector<TypeBase *>,
-                                 std::pair<FuncDecl *, FuncDecl *>,
-                                 std::map<SmallVector<TypeBase *>, unsigned>>>
-      cxxSubscripts;
-
   llvm::SmallPtrSet<const clang::Decl *, 1> synthesizedAndAlwaysVisibleDecls;
+
+  /// For virtual methods of foreign reference types, whenever a virtual thunk
+  /// is generated, keep track of the original C++ method.
+  llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
 
 private:
   // Keep track of the decls that were already cloned for this specific class.
@@ -701,14 +701,6 @@ private:
   // Map all cloned methods back to the original member
   llvm::DenseMap<ValueDecl *, ValueDecl *> clonedMembers;
   llvm::DenseSet<const ValueDecl *> membersSynthesizedPerType;
-
-  // Keep track of methods that are unavailale in each class.
-  // We need this set because these methods will be imported lazily. We don't
-  // have the corresponding Swift method when the availability check is
-  // performed, so instead we store the information in this set and then, when
-  // the method is finally generated, we check if it's present here
-  llvm::DenseSet<std::pair<const clang::CXXRecordDecl *, DeclName>>
-      unavailableMethods;
 
 public:
   /// Attempt to lookup and import the synthesized .pointee computed property.
@@ -724,23 +716,48 @@ public:
   std::tuple<VarDecl *, FuncDecl *, FuncDecl *>
   lookupAndImportPointeeAndOperatorStar(NominalTypeDecl *Record);
 
-  // Attempt to lookup and import the synthesized .pointee computed property.
-  //
-  /// Requires that \a Record is a (Swift) StructDecl and is imported from
-  /// a CXXRecordDecl.
-  //
+  /// Attempt to lookup and import the synthesized .pointee computed property.
+  ///
+  /// Requires that \a Record is a (Swift) StructDecl or ClassDecl that is
+  /// imported from a CXXRecordDecl.
+  ///
   /// This function is idempotent, and if successful, ensures the synthesized
   /// .pointee that it returns are members of \a Record.
   VarDecl *lookupAndImportPointee(NominalTypeDecl *Record);
 
   /// Attempt to lookup and import the synthesized .successor() method.
-  //
+  ///
   /// Requires that \a Record is a (Swift) StructDecl and is imported from
   /// a CXXRecordDecl.
-  //
+  ///
   /// This function is idempotent, and if successful, ensures the synthesized
   /// .successor() that it returns is a member of \a Record.
   FuncDecl *lookupAndImportSuccessor(NominalTypeDecl *Record);
+
+  /// Attempt to lookup and import the synthesized .subscript members.
+  ///
+  /// Requires that \a Record is imported from a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// .subscript that it returns is a member of \a Record.
+  ///
+  /// If \a noSynthesize is set to true, then no .subscript members will be
+  /// synthesized, and an empty result will be cached. This parameter exists
+  /// specifically to support the prevention of .subscript synthesis for types
+  /// that conform to CxxDictionary, so that the Cxx overlay can provide its
+  /// own implementation of .subscript that returns a nil value instead of
+  /// default-initializing a new entry when given a non-existent key.
+  llvm::ArrayRef<SubscriptDecl *>
+  lookupAndImportSubscripts(NominalTypeDecl *Struct, bool noSynthesize = false);
+
+  /// Attempt to lookup and import the synthesized __convertToBool() method.
+  ///
+  /// Requires that \a Record is a (Swift) StructDecl and is imported from
+  /// a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// __convertToBool() that it returns is a member of \a Record.
+  FuncDecl *lookupAndImportOperatorBool(NominalTypeDecl *Struct);
 
 private:
   /// Stores <.pointee, func __operatorStar(), mutating func __operatorStar()>
@@ -748,6 +765,9 @@ private:
                  std::tuple<VarDecl *, FuncDecl *, FuncDecl *>>
       importedPointeeCache;
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedSuccessorCache;
+  llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<SubscriptDecl *, 1>>
+      importedSubscriptsCache;
+  llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorBoolCache;
 
 public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
@@ -759,9 +779,11 @@ public:
   static bool isSwiftFunctionWrapper(const clang::RecordDecl *decl);
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
-                                  ClangInheritanceInfo inheritance);
+                                  ClangInheritanceInfo inherit);
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
+  FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
+
   bool isMemberSynthesizedPerType(const ValueDecl *decl);
   void markMemberSynthesizedPerType(const ValueDecl *decl);
 
@@ -787,17 +809,14 @@ public:
     return getNameImporter().getEnumKind(decl);
   }
 
-  bool findUnavailableMethod(const clang::CXXRecordDecl *classDecl,
-                             DeclName name) {
-    return unavailableMethods.contains({classDecl, name});
-  }
+private:
+  llvm::DenseMap<const clang::CXXRecordDecl *,
+                 llvm::SmallDenseSet<const clang::CXXMethodDecl *>>
+      ambiguousVirtualOverrides;
 
-  void insertUnavailableMethod(const clang::CXXRecordDecl *classDecl,
-                               DeclName name) {
-    unavailableMethods.insert({classDecl, name});
-  }
-
-  void handleAmbiguousSwiftName(ValueDecl *decl);
+public:
+  bool isAmbiguouslyOverridden(const clang::CXXRecordDecl *Record,
+                               const clang::CXXMethodDecl *Method);
 
 private:
   /// A mapping from imported declarations to their "alternate" declarations,
@@ -2048,6 +2067,20 @@ bool isSpecialAppKitFunctionKeyProperty(const clang::NamedDecl *decl);
 bool hasSameUnderlyingType(const clang::Type *a,
                            const clang::TemplateTypeParmDecl *b);
 
+/// Map a `clang::BuiltinType` to its Swift stdlib counterpart as listed in
+/// `BuiltinMappedTypes.def`, if there is one.
+[[nodiscard]] std::optional<StringRef>
+getBuiltinTypeSwiftName(const clang::BuiltinType *bt);
+
+/// Return the Swift type name if `ty` is a `clang::BuiltinType` with a Swift
+/// counterpart.
+[[nodiscard]] std::optional<StringRef> static inline getBuiltinTypeSwiftName(
+    clang::QualType ty) {
+  if (const auto *bt = ty->getAs<clang::BuiltinType>())
+    return getBuiltinTypeSwiftName(bt);
+  return std::nullopt;
+}
+
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                                   ASTContext &ctx, bool ignoreClangTarget);
@@ -2202,7 +2235,7 @@ Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
 /// correspond to an overloaded C++ operator.
 Identifier getOperatorName(ASTContext &ctx, Identifier op);
 
-bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr);
+bool hasSwiftAttribute(const clang::Decl *decl, ArrayRef<StringRef> attrs);
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
 bool hasIteratorAPIAttr(const clang::Decl *decl);
@@ -2258,8 +2291,8 @@ ImportedType findOptionSetEnum(clang::QualType type,
 /// and with the given name.
 ///
 /// The name we're looking for is the Swift name.
-llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(NominalTypeDecl* decl, StringRef name);
+TinyPtrVector<ValueDecl *> getValueDeclsForName(NominalTypeDecl *decl,
+                                                StringRef name);
 
 template <typename T>
 const T *
@@ -2287,6 +2320,18 @@ bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
 /// Note that \p Node cannot itself be a clang::Module.
 const clang::Module *getClangOwningModule(ClangNode Node,
                                           const clang::ASTContext &ClangCtx);
+
+enum class RetainReleaseOperationKind {
+  notAfunction,
+  notAnInstanceFunction,
+  invalidReturnType,
+  invalidParameters,
+  valid
+};
+
+RetainReleaseOperationKind checkRetainReleaseOperationValidity(
+    const ClassDecl *classDecl, ValueDecl *operation,
+    CustomRefCountingOperationKind operationKind);
 } // end namespace importer
 } // end namespace swift
 

@@ -35,11 +35,10 @@ public func ifAvailableDisabledDomain() {
 // CHECK-LABEL:   define {{.*}}swiftcc void @"$s4Test24ifAvailableDynamicDomainyyF"()
 // CHECK:         entry:
 // CHECK-O-NONE:    [[QUERY_RESULT:%.*]] = call swiftcc i1 @"$sSC33__swift_DynamicDomain_isAvailableBi1_yF"()
-// CHECK-O:         [[QUERY_RESULT:%.*]] = call {{.*}}i1 @__DynamicDomain_isAvailable()
-// CHECK:           br i1 [[QUERY_RESULT]], label %[[TRUE_LABEL:.*]], label %[[FALSE_LABEL:.*]]
-// CHECK:         [[TRUE_LABEL]]:
+// CHECK-O:         [[PRED_RESULT:%.*]] = {{(tail )?}}call i32 @dynamic_domain_pred()
+// CHECK-O:         [[QUERY_RESULT:%.*]] = icmp {{eq|ne}} i32 [[PRED_RESULT]], 0
+// CHECK:           br i1 [[QUERY_RESULT]], label %{{.*}}, label %{{.*}}
 // CHECK:           call void @available_in_dynamic_domain()
-// CHECK:         [[FALSE_LABEL]]:
 // CHECK:           call void @unavailable_in_dynamic_domain()
 public func ifAvailableDynamicDomain() {
   if #available(DynamicDomain) {
@@ -51,11 +50,6 @@ public func ifAvailableDynamicDomain() {
 
 // CHECK-O-NONE-LABEL: define {{.*}}swiftcc i1 @"$sSC33__swift_DynamicDomain_isAvailableBi1_yF"()
 // CHECK-O-NONE:       entry:
-// CHECK-O-NONE:         [[CALL:%.*]] = call {{.*}}i1 @__DynamicDomain_isAvailable()
-// CHECK-O-NONE:         ret i1 [[CALL]]
-
-// CHECK-LABEL: define {{.*}}i1 @__DynamicDomain_isAvailable()
-// CHECK:       entry:
-// CHECK:         [[CALL:%.*]] = call i32 @dynamic_domain_pred{{(.ptrauth)?}}()
-// CHECK:         [[TOBOOL:%.*]] = icmp ne i32 [[CALL]], 0
-// CHECK:         ret i1 [[TOBOOL]]
+// CHECK-O-NONE:         [[CALL:%.*]] = call i32 @dynamic_domain_pred()
+// CHECK-O-NONE:         [[TOBOOL:%.*]] = icmp ne i32 [[CALL]], 0
+// CHECK-O-NONE:         ret i1 [[TOBOOL]]

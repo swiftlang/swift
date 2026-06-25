@@ -166,57 +166,10 @@ getNameForParsedLifetimeDependenceKind(ParsedLifetimeDependenceKind kind) {
 
 } // namespace swift
 
-std::string LifetimeDependenceInfo::getString() const {
-  std::string lifetimeDependenceString = "@lifetime(";
-  auto addressable = getAddressableIndices();
-  auto condAddressable = getConditionallyAddressableIndices();
-  
-  bool isFirstSpecifier = true;
-  auto getSourceString = [&](IndexSubset *bitvector, StringRef kind) {
-    std::string result;
-    for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
-      if (bitvector->contains(i)) {
-        if (!isFirstSpecifier) {
-          result += ", ";
-        }
-        result += kind;
-        if (addressable && addressable->contains(i)) {
-          result += "address ";
-        } else if (condAddressable && condAddressable->contains(i)) {
-          result += "address_for_deps ";
-        }
-        result += std::to_string(i);
-        isFirstSpecifier = false;
-      }
-    }
-    return result;
-  };
-  // Unlike the AST printer, there is no need check isDefaultSuppressed() for
-  // SIL printing because SIL does not assume any defaults.
-  if (hasImmortalSpecifier()) {
-    if (!isFirstSpecifier) {
-      lifetimeDependenceString += ", ";
-    }
-    lifetimeDependenceString += "immortal";
-    isFirstSpecifier = false;
-  }
-  if (inheritLifetimeParamIndices) {
-    assert(!inheritLifetimeParamIndices->isEmpty());
-    lifetimeDependenceString +=
-        getSourceString(inheritLifetimeParamIndices, "copy ");
-  }
-  if (scopeLifetimeParamIndices) {
-    assert(!scopeLifetimeParamIndices->isEmpty());
-    lifetimeDependenceString +=
-        getSourceString(scopeLifetimeParamIndices, "borrow ");
-  }
-  lifetimeDependenceString += ") ";
-  return lifetimeDependenceString;
-}
-
 void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
   ID.AddBoolean(hasImmortalSpecifier());
   ID.AddBoolean(isFromAnnotation());
+  ID.AddBoolean(hasCaptures());
   ID.AddInteger(targetIndex);
   if (inheritLifetimeParamIndices) {
     ID.AddInteger((uint8_t)LifetimeDependenceKind::Inherit);
@@ -306,23 +259,22 @@ struct LifetimeDependenceBuilder {
   struct TargetDeps {
     SmallBitVector inheritIndices;
     SmallBitVector scopeIndices;
-    HasAnnotation hasAnnotationStatus;
     TargetKind targetKind;
-    bool hasImmortalSpecifier = false;
+    LifetimeFlags flags;
 
     TargetDeps(HasAnnotation hasAnnotation, TargetKind targetKind,
                unsigned capacity)
         : inheritIndices(capacity), scopeIndices(capacity),
-          hasAnnotationStatus(hasAnnotation), targetKind(targetKind) {}
+          targetKind(targetKind),
+          flags(LifetimeFlags().withAnnotated(hasAnnotation ==
+                                              HasAnnotation::Annotated)) {}
 
     bool empty() const {
-      return !(hasImmortalSpecifier || inheritIndices.any()
-               || scopeIndices.any());
+      return !(flags.hasImmortalSpecifier() || flags.hasCaptures() ||
+               inheritIndices.any() || scopeIndices.any());
     }
 
-    bool hasAnnotation() const {
-      return hasAnnotationStatus == HasAnnotation::Annotated;
-    }
+    bool hasAnnotation() const { return flags.isFromAnnotation(); }
 
     bool isInout() const {
       return targetKind == TargetKind::Inout;
@@ -331,8 +283,8 @@ struct LifetimeDependenceBuilder {
     void addIfNew(unsigned sourceIndex, LifetimeDependenceKind kind) {
       // Some inferrence rules may attempt to add an inherit dependency after a
       // scope dependency (accessor wrapper + getter method).
-      if (hasImmortalSpecifier || inheritIndices[sourceIndex]
-          || scopeIndices[sourceIndex]) {
+      if (flags.hasImmortalSpecifier() || inheritIndices[sourceIndex] ||
+          scopeIndices[sourceIndex]) {
         return;
       }
       switch (kind) {
@@ -411,7 +363,7 @@ public:
                             TargetKind::Inout, sourceIndexCap()).first;
     // An immortal specifier erases any inferred inout dependency;
     // other annotations do not.
-    if (!iter->second.hasImmortalSpecifier) {
+    if (!iter->second.flags.hasImmortalSpecifier()) {
       iter->second.addIfNew(paramIndex, LifetimeDependenceKind::Inherit);
     }
   }
@@ -420,7 +372,7 @@ public:
     auto targetDeps = getInferredTargetDeps(resultIndex);
     if (!targetDeps)
       return;
-    targetDeps->hasImmortalSpecifier = true;
+    targetDeps->flags.setImmortalSpecifier(true);
   }
 
   // Allocate LifetimeDependenceInfo in the ASTContext. Initialize it by
@@ -443,20 +395,22 @@ public:
       IndexSubset *inheritIndices = nullptr;
       if (deps.inheritIndices.any()) {
         inheritIndices = IndexSubset::get(ctx, deps.inheritIndices);
-        ASSERT(!deps.hasImmortalSpecifier || deps.isInout() &&
-               "cannot combine immortal lifetime with parameter dependency");
+        ASSERT(
+            !deps.flags.hasImmortalSpecifier() ||
+            deps.isInout() &&
+                "cannot combine immortal lifetime with parameter dependency");
       }
       IndexSubset *scopeIndices = nullptr;
       if (deps.scopeIndices.any()) {
         scopeIndices = IndexSubset::get(ctx, deps.scopeIndices);
-        ASSERT(!deps.hasImmortalSpecifier || deps.isInout() &&
-               "cannot combine immortal lifetime with parameter dependency");
+        ASSERT(
+            !deps.flags.hasImmortalSpecifier() ||
+            deps.isInout() &&
+                "cannot combine immortal lifetime with parameter dependency");
       }
       lifetimeDependencies.push_back(LifetimeDependenceInfo(
           /*inheritLifetimeParamIndices*/ inheritIndices,
-          /*scopeLifetimeParamIndices*/ scopeIndices, targetIndex,
-          /*hasImmortalSpecifier*/ deps.hasImmortalSpecifier,
-          /*isFromAnnotation*/ deps.hasAnnotation()));
+          /*scopeLifetimeParamIndices*/ scopeIndices, targetIndex, deps.flags));
     }
     if (lifetimeDependencies.empty()) {
       return std::nullopt;
@@ -755,12 +709,8 @@ public:
       inferMutatingSelf();
       inferInoutParams();
 
-      // TODO: Once we infer dependence on the closure context, enable
-      // diagnostics for missing functino type result dependencies.
-      if (isLifetimeForDecl()) {
-        diagnoseMissingResultDependencies(
+      diagnoseMissingResultDependencies(
           diag::lifetime_dependence_feature_required_return.ID);
-      }
       diagnoseMissingSelfDependencies(
         diag::lifetime_dependence_feature_required_mutating.ID);
       diagnoseMissingInoutDependencies(
@@ -785,10 +735,8 @@ public:
     // If precise diagnostics were already issued, bypass
     // diagnoseMissingDependencies to avoid redundant diagnostics.
     if (!performedDiagnostics) {
-      if (isLifetimeForDecl()) {
-        diagnoseMissingResultDependencies(
+      diagnoseMissingResultDependencies(
           diag::lifetime_dependence_cannot_infer_return.ID);
-      }
       diagnoseMissingSelfDependencies(
         diag::lifetime_dependence_cannot_infer_mutating.ID);
       diagnoseMissingInoutDependencies(
@@ -1177,6 +1125,11 @@ protected:
 
     switch (parsedLifetimeKind) {
     case ParsedLifetimeDependenceKind::Default: {
+      // Infer copy dependence on @noescape function types by default.
+      if (type->isNoEscape()) {
+        return LifetimeDependenceKind::Inherit;
+      }
+
       if (type->isEscapable()) {
         if (loweredOwnership == ValueOwnership::Shared ||
             loweredOwnership == ValueOwnership::InOut) {
@@ -1373,22 +1326,35 @@ protected:
   }
 
   // Initialize TargetDeps based on the function's @_lifetime attributes.
-  void initializeDescriptorDeps(unsigned targetIndex,
-                                TargetDeps &deps,
+  void initializeDescriptorDeps(unsigned targetIndex, TargetDeps &deps,
                                 LifetimeDescriptor source) {
-    if (source.isImmortalSpecifier()) {
-      // Record the immortal dependency even if it is invalid to suppress other diagnostics.
-      deps.hasImmortalSpecifier = true;
-      auto immortalParam =
-          llvm::find_if(parameterInfos, [](auto const &paramInfo) {
-            return paramInfo.param.getInternalLabel().is("immortal");
+    // Find a parameter in parameterInfos with internal label 'keyword'.
+    // If one exists, diagnose a conflict with the contextual keyword, and
+    // return an iterator to it. Otherwise, return parameterInfos.end().
+    const auto findAndDiagnoseConflictingName = [&](const StringRef keyword) {
+      auto conflictParam =
+          llvm::find_if(parameterInfos, [&](auto const &paramInfo) {
+            return paramInfo.param.getInternalLabel().is(keyword);
           });
 
-      if (immortalParam != parameterInfos.end()) {
-        ctx.Diags.diagnose(immortalParam->loc,
-                           diag::lifetime_dependence_immortal_conflict_name);
-        return;
+      if (conflictParam != parameterInfos.end()) {
+        ctx.Diags.diagnose(
+            conflictParam->loc,
+            diag::lifetime_dependence_contextual_keyword_conflict_name,
+            keyword);
       }
+
+      return conflictParam;
+    };
+
+    if (source.isImmortalSpecifier()) {
+      // Record the immortal dependency even if it is invalid to suppress other
+      // diagnostics.
+      deps.flags.setImmortalSpecifier(true);
+      auto immortalParam = findAndDiagnoseConflictingName("immortal");
+      if (immortalParam != parameterInfos.end())
+        return;
+
       // @_lifetime(target: immortal, copy source) is allowed for inout targets.
       if (!deps.isInout()) {
         if (deps.inheritIndices.any() || deps.scopeIndices.any()) {
@@ -1396,6 +1362,14 @@ protected:
                              diag::lifetime_dependence_immortal_alone);
         }
       }
+      return;
+    }
+
+    if (!isLifetimeForDecl() && source.isCapturesSpecifier()) {
+      // Record the closure context dependency for function types.
+      deps.flags.setCaptures(true);
+      findAndDiagnoseConflictingName(
+          LifetimeDescriptor::CapturesContextSpecifier);
       return;
     }
 
@@ -1429,7 +1403,7 @@ protected:
                             unsigned paramIndexToSet,
                             LifetimeDependenceKind lifetimeKind) {
     // @_lifetime(target: immortal, copy source) is allowed for inout targets.
-    if (deps.hasImmortalSpecifier && !deps.isInout()) {
+    if (deps.flags.hasImmortalSpecifier() && !deps.isInout()) {
       diagnose(descriptor.getLoc(), diag::lifetime_dependence_immortal_alone);
       return;
     }
@@ -1500,6 +1474,9 @@ protected:
           // Regular functions and initializers that return a non-Escapable
           // value - single parameter default rule.
           inferNonEscapableResultOnParam();
+        } else {
+          // Function types - closure context default rule
+          inferNonEscapingResultOnClosureContext();
         }
       }
     }
@@ -1851,13 +1828,19 @@ protected:
       // The usual diagnostic check is sufficient.
       return;
     }
-    // Do not infer non-escapable dependence kind -- it is ambiguous.
+    // Do not infer non-escapable dependence kind -- it is ambiguous, except for
+    // noescape function types, for which we should always infer a copy dependence.
     auto const &paramInfo = parameterInfos[0];
     Type paramTypeInContext = paramInfo.typeInContext;
     if (paramTypeInContext->hasError()) {
       return;
     }
     if (!paramTypeInContext->isEscapable()) {
+      if (paramTypeInContext->isNoEscape()) {
+        resultDeps->addIfNew(/*paramIndex*/ 0, LifetimeDependenceKind::Inherit);
+        return;
+      }
+      
       diagnose(returnLoc, diag::lifetime_dependence_cannot_infer_kind,
                diagnosticQualifier(), paramInfo.name());
       return;
@@ -1917,6 +1900,17 @@ protected:
       return;
     }
     resultDeps->addIfNew(*candidateParamIndex, *candidateLifetimeKind);
+  }
+
+  // Infer result dependence on the closure context for function types.
+  void inferNonEscapingResultOnClosureContext() {
+    assert(!isLifetimeForDecl() &&
+           "Only infer closure context dependence for function types");
+    TargetDeps *resultDeps = depBuilder.getInferredTargetDeps(resultIndex);
+    if (!resultDeps)
+      return;
+
+    resultDeps->flags.setCaptures(true);
   }
 
   // Infer a mutating 'self' dependency when 'self' is non-Escapable and the
@@ -2073,12 +2067,96 @@ ArrayRef<LifetimeDependenceInfo> LifetimeDependenceInfo::uncurry(
     const auto targetIndex = (innerDep.getTargetIndex() == numInnerParams)
                                  ? numUncurriedParams
                                  : innerDep.getTargetIndex();
-    uncurried.push_back(LifetimeDependenceInfo(
-        inherit, scope, targetIndex, innerDep.hasImmortalSpecifier(),
-        innerDep.isFromAnnotation(), addressable, conditionallyAddressable));
+    uncurried.push_back(
+        LifetimeDependenceInfo(inherit, scope, targetIndex, addressable,
+                               conditionallyAddressable, innerDep.flags));
   }
 
   return ctx.AllocateCopy(uncurried);
+}
+
+ArrayRef<LifetimeDependenceInfo> LifetimeDependenceInfo::partialApply(
+    ASTContext &ctx, ArrayRef<LifetimeDependenceInfo> lifetimes,
+    unsigned numFormalParams, unsigned numBoundParams) {
+
+  if (numBoundParams == 0)
+    return lifetimes;
+
+  ASSERT(numBoundParams <= numFormalParams &&
+         "A partial application can only bind as many parameters as the "
+         "function has.");
+
+  // How many parameters the resulting closure will have.
+  const unsigned numClosureParams = numFormalParams - numBoundParams;
+
+  SmallVector<LifetimeDependenceInfo, 2> curried;
+
+  for (const auto &dep : lifetimes) {
+    // Determine the new target index.
+    unsigned targetIndex;
+    if (dep.getTargetIndex() == numFormalParams) {
+      // The target is the result.
+      // Its index is the number of parameters.
+      targetIndex = numClosureParams;
+    } else if (dep.getTargetIndex() >= numClosureParams) {
+      // The target is a captured parameter.
+      // The resulting closure does not need a lifetime dependence entry for it.
+      continue;
+    } else {
+      // The target is an uncaptured parameter.
+      // Its index remains the same.
+      targetIndex = dep.getTargetIndex();
+    }
+
+    auto flags = dep.flags;
+
+    const auto captureBoundParams = [&](IndexSubset *indices) -> IndexSubset * {
+      if (!indices)
+        return nullptr;
+
+      ASSERT(indices->getCapacity() <= numFormalParams &&
+             "There should be at most 1 index per parameter. SIL functions "
+             "cannot have "
+             "an implicit self parameter.");
+
+      auto bits = indices->getBitVector();
+
+      if (bits.find_last() >= int(numClosureParams)) {
+        // One of the lifetime source parameters is bound by the partial_apply.
+        // This becomes a captures dependence in the resulting closure.
+        flags.setCaptures(true);
+      }
+
+      // Remove the indices of the captured parameters, leaving only those of
+      // the closure parameters.
+
+      if (bits.find_first() >= int(numClosureParams)) {
+        // All lifetime sources are captured. The resulting empty list of
+        // indices should be represented with a nullptr.
+        return nullptr;
+      }
+
+      if (bits.size() > numClosureParams)
+        bits.resize(numClosureParams);
+
+      return IndexSubset::get(ctx, bits);
+    };
+
+    auto inherit = captureBoundParams(dep.getInheritIndices());
+    auto scope = captureBoundParams(dep.getScopeIndices());
+    auto addressable = captureBoundParams(dep.getAddressableIndices());
+    auto conditionallyAddressable =
+        captureBoundParams(dep.getConditionallyAddressableIndices());
+
+    curried.push_back(LifetimeDependenceInfo(inherit, scope, targetIndex,
+                                             addressable,
+                                             conditionallyAddressable, flags));
+  }
+
+  // FIXME: Avoid allocating context memory for every partial apply. Instead,
+  // cache a single uniqueLifetimeDependenceInfo array for each combination
+  // of FunctionType + numBoundParams.
+  return ctx.AllocateCopy(curried);
 }
 
 void LifetimeDependenceInfo::dump() const {
@@ -2209,6 +2287,11 @@ bool LifetimeDependentInterface::canConvertTargetTo(
     return true;
   }
 
+  // A dependence on closure captures can be added, but not removed.
+  if (fromDeps.hasCaptures() && other && !other->hasCaptures()) {
+    return false;
+  }
+
   const auto isSubset = [&](IndexSubset *from, IndexSubset *to,
                             bool ignoreEscapableSources = false) {
     // The empty set is a subset of every set, and every set is a subset of
@@ -2298,7 +2381,9 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
       return false;
     };
 
-  bool hasImmortalSpecifier= false;
+  LifetimeFlags flags;
+  flags.setAnnotated(true);
+
   for (auto source : lifetimeDependentRepr->getLifetimeEntry()->getSources())
   {
     switch (source.getDescriptorKind()) {
@@ -2327,32 +2412,39 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
       break;
     }
     case LifetimeDescriptor::DescriptorKind::Named: {
-      assert(source.isImmortalSpecifier());
-      hasImmortalSpecifier = true;
+      if (source.isImmortalSpecifier()) {
+        flags.setImmortalSpecifier(true);
+      } else if (source.isCapturesSpecifier()) {
+        flags.setCaptures(true);
+      } else {
+        llvm_unreachable(
+            "SIL can only have ordered, immortal or captures lifetime "
+            "dependence specifier kind");
+      }
       break;
     }
     default:
-      llvm_unreachable("SIL can only have ordered or immortal lifetime "
-                       "dependence specifier kind");
+      llvm_unreachable(
+          "SIL can only have ordered, immortal or captures lifetime "
+          "dependence specifier kind");
     }
   }
 
   return LifetimeDependenceInfo(
-    inheritLifetimeParamIndices.any()
-    ? IndexSubset::get(ctx, inheritLifetimeParamIndices)
-    : nullptr,
-    scopeLifetimeParamIndices.any()
-    ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
-    : nullptr,
-    targetIndex,
-    /*hasImmortalSpecifier*/ hasImmortalSpecifier,
-    /*isFromAnnotation*/ true,
-    addressableLifetimeParamIndices.any()
-    ? IndexSubset::get(ctx, addressableLifetimeParamIndices)
-    : nullptr,
-    conditionallyAddressableLifetimeParamIndices.any()
-    ? IndexSubset::get(ctx, conditionallyAddressableLifetimeParamIndices)
-    : nullptr);
+      inheritLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, inheritLifetimeParamIndices)
+          : nullptr,
+      scopeLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
+          : nullptr,
+      targetIndex,
+      addressableLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, addressableLifetimeParamIndices)
+          : nullptr,
+      conditionallyAddressableLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, conditionallyAddressableLifetimeParamIndices)
+          : nullptr,
+      flags);
 }
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>

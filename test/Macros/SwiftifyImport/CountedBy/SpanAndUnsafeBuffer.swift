@@ -20,7 +20,7 @@ public func myFunc(_ ptr1: UnsafePointer<CInt>, _ len1: CInt, _ ptr2: UnsafePoin
 public func myFunc(_ ptr1: Span<CInt>, _ ptr2: UnsafeBufferPointer<CInt>) {
     let len1 = CInt(exactly: ptr1.count)!
     let len2 = CInt(exactly: ptr2.count)!
-    let _ptr1Ptr = unsafe ptr1.withUnsafeBufferPointer {
+    let _ptr1Ptr = ptr1.withUnsafeBufferPointer {
         unsafe $0
     }
     defer {

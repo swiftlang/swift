@@ -40,6 +40,14 @@ public struct DeclRef: CustomStringConvertible, NoReflectionChildren {
   public var sourceFile: SourceFile? { SourceFile(bridged: bridged.getSourceFile()) }
 }
 
+extension DeclRef: Equatable {}
+
+extension DeclRef: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(decl)
+  }
+}
+
 extension DeclRef: DiagnosticArgument {
   public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
     fn(bridged.asDiagnosticArgument())

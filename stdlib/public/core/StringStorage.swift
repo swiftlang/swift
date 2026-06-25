@@ -21,6 +21,7 @@ internal protocol _AbstractStringStorage: _NSCopying {
   var isASCII: Bool { get }
   var start: UnsafePointer<UInt8> { get }
   var UTF16Length: Int { get }
+  var hasBreadcrumbs: Bool { get }
 }
 
 #else
@@ -31,6 +32,7 @@ internal protocol _AbstractStringStorage {
   var count: Int { get }
   var isASCII: Bool { get }
   var start: UnsafePointer<UInt8> { get }
+  var hasBreadcrumbs: Bool { get }
 }
 
 #endif
@@ -394,13 +396,15 @@ extension __StringStorage {
   // the resulting StringStorage accordingly
   internal static func create<E: Error>(
     uninitializedCodeUnitCapacity capacity: Int,
+    precalculatedUTF16Count utf16Len: Int? = nil,
     initializingUncheckedUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
     ) throws(E) -> Int
   ) throws(E) -> __StringStorage {
     let storage = __StringStorage.create(
       codeUnitCapacity: capacity,
-      countAndFlags: _CountAndFlags(mortalCount: 0, isASCII: false)
+      countAndFlags: _CountAndFlags(mortalCount: 0, isASCII: false),
+      precalculatedUTF16Count: utf16Len
     )
     let buffer = unsafe UnsafeMutableBufferPointer(start: storage.mutableStart,
                                             count: capacity)
@@ -600,7 +604,11 @@ extension __StringStorage {
 extension __StringStorage {
   // Perform common post-RRC adjustments and invariant enforcement.
   @_effects(releasenone)
-  internal func _updateCountAndFlags(newCount: Int, newIsASCII: Bool) {
+  internal func _updateCountAndFlags(
+    newCount: Int,
+    newIsASCII: Bool,
+    precalculatedUTF16Count utf16Len: Int? = nil
+  ) {
     let countAndFlags = _CountAndFlags(
       mortalCount: newCount, isASCII: newIsASCII)
 #if _pointerBitWidth(_64)
@@ -613,8 +621,15 @@ extension __StringStorage {
 #endif
     unsafe self.terminator.pointee = 0
 
-    // TODO(String performance): Consider updating breadcrumbs when feasible.
-    if hasAllocatedBreadcrumbs {
+#if _pointerBitWidth(_64)
+    if let utf16Len, hasBreadcrumbs, utf16Len <= Int32.max {
+      // `_oneCrumb`'s setter uses a raw `storeBytes`, so an ARC reference in
+      // the slot would be leaked. Current callers only pass `utf16Len` on
+      // freshly-created storage where the slot holds a small integer or nil
+      // pointer; this invariant catches future misuse.
+      _internalInvariant(!hasAllocatedBreadcrumbs)
+      self._oneCrumb = utf16Len
+    } else if hasAllocatedBreadcrumbs {
       unsafe self._breadcrumbsAddress.pointee = nil
     } else if hasOneCrumb {
       // The slot holds a raw integer (UTF-16 count), not an ARC reference.
@@ -622,6 +637,14 @@ extension __StringStorage {
       unsafe UnsafeMutableRawPointer(_breadcrumbsAddress)
         .storeBytes(of: 0, as: Int.self)
     }
+#else
+    if hasAllocatedBreadcrumbs {
+      unsafe self._breadcrumbsAddress.pointee = nil
+    } else if hasOneCrumb {
+      unsafe UnsafeMutableRawPointer(_breadcrumbsAddress)
+        .storeBytes(of: 0, as: Int.self)
+    }
+#endif
     _invariantCheck()
   }
 
@@ -809,6 +832,11 @@ final internal class __SharedStringStorage
   final internal var utf16: String.UTF16View {
     String.UTF16View(_StringGuts(self))
   }
+  
+  @inline(always)
+  final internal var hasBreadcrumbs: Bool {
+    _breadcrumbs != nil
+  }
 
   internal init(
     _mortal ptr: UnsafePointer<UInt8>,
@@ -916,9 +944,16 @@ extension _StringGuts {
   
   @_effects(releasenone)
   internal func getUTF16Count() -> Int {
+#if _pointerBitWidth(_64)
     // Read the one-crumb value in a single atomic load to avoid a TOCTOU race
     // with loadUnmanagedBreadcrumbs(), which can CAS the slot to zero or
     // replace it with a real breadcrumbs pointer concurrently.
+    //
+    // On 32-bit platforms, Int(Int32.max) == Int.max, so any positive value
+    // (including a breadcrumbs pointer) would pass the range check below,
+    // causing a pointer address to be returned as a UTF-16 count. The
+    // one-crumb optimization is already disabled on 32-bit (hasOneCrumb
+    // returns false), so skip this fast path entirely.
     if hasNativeStorage {
       let val = _object.withNativeStorage { storage -> Int in
         guard storage.hasBreadcrumbs else { return -1 }
@@ -928,6 +963,7 @@ extension _StringGuts {
         return val
       }
     }
+#endif
 
     let result: Int
     if _useBreadcrumbs(forEncodedOffset: endIndex._encodedOffset) {

@@ -143,27 +143,28 @@ bool TreatRValueAsLValue::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
-unsigned TreatRValueAsLValue::assessImpact(ConstraintSystem &cs,
-                                           ConstraintLocator *atLoc) {
-    // Results of calls can never be l-value.
-    unsigned impact = isExpr<CallExpr>(atLoc->getAnchor()) ? 2 : 1;
-    // An overload choice that isn't settable is least interesting for
-    // diagnosis.
-    auto *calleeLoc = cs.getCalleeLocator(atLoc, /*lookThroughApply=*/false);
-    if (auto overload = cs.findSelectedOverloadFor(calleeLoc)) {
-      if (auto *var = dyn_cast_or_null<AbstractStorageDecl>(
-              overload->choice.getDeclOrNull())) {
-        impact += !var->isSettableInSwift(cs.DC) ? 1 : 0;
-      } else {
-        impact += 1;
-      }
+FixImpact TreatRValueAsLValue::assessImpact(ConstraintSystem &cs,
+                                            ConstraintLocator *atLoc) {
+  // Results of calls can never be l-value.
+  auto impact = isExpr<CallExpr>(atLoc->getAnchor()) ? FixImpact::TypeMismatch
+                                                     : FixImpact::Mismatch;
+  // An overload choice that isn't settable is least interesting for
+  // diagnosis.
+  auto *calleeLoc = cs.getCalleeLocator(atLoc, /*lookThroughApply=*/false);
+  if (auto overload = cs.findSelectedOverloadFor(calleeLoc)) {
+    if (auto *var = dyn_cast_or_null<AbstractStorageDecl>(
+            overload->choice.getDeclOrNull())) {
+      impact += !var->isSettableInSwift(cs.DC) ? 1 : 0;
+    } else {
+      impact += 1;
     }
+  }
 
-    // This is extra impactful if location has other issues.
-    if (cs.hasFixFor(atLoc) || cs.hasFixFor(calleeLoc))
-      impact += 2;
+  // This is extra impactful if location has other issues.
+  if (cs.hasFixFor(atLoc) || cs.hasFixFor(calleeLoc))
+    impact += FixImpact::TypeMismatch;
 
-    return impact;
+  return impact;
 }
 
 TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
@@ -1289,6 +1290,12 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
     return failure.diagnose(asNote);
   }
 
+  case RefKind::ProtocolMetatypeStaticMember: {
+    InvalidProtocolMetatypeStaticMemberRefInKeyPath failure(
+        solution, BaseType, Member, getLocator());
+    return failure.diagnose(asNote);
+  }
+
   case RefKind::UnsupportedStaticMember: {
     UnsupportedStaticMemberRefInKeyPath failure(solution, BaseType, Member,
                                                 getLocator());
@@ -1367,9 +1374,17 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
       }
     }
 
-    if (!baseType->getRValueType()->is<AnyMetatypeType>())
+    auto baseRValueType = baseType->getRValueType();
+    if (auto *metatype = baseRValueType->getAs<AnyMetatypeType>()) {
+      if (metatype->getInstanceType()->isExistentialType()) {
+        return AllowInvalidRefInKeyPath::create(
+            cs, baseType, RefKind::ProtocolMetatypeStaticMember, member,
+            locator);
+      }
+    } else {
       return AllowInvalidRefInKeyPath::create(
           cs, baseType, RefKind::StaticMember, member, locator);
+    }
   }
 
   // Referencing enum cases in key path is not currently allowed.

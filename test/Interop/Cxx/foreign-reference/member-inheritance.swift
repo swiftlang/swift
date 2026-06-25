@@ -178,4 +178,27 @@ if #available(SwiftStdlib 5.8, *) {
   }
 }
 
+if #available(SwiftStdlib 5.8, *) {
+  FunctionsTestSuite.test("calls C++ methods called init()") {
+    let base = BaseWithInitMethod.create()
+    expectEqual(base.`init`(), 1)
+
+    let derived = DerivedWithInitMethod.create()
+    expectEqual(derived.`init`(), 2)
+
+    let renamedBase = RenamedBaseWithInitMethod.create()
+    expectEqual(renamedBase.method(), 11)
+
+    let renamedDerived = RenamedDerivedWithInitMethod.create()
+    expectEqual(renamedDerived.method(), 12)
+  }
+}
+
+if #available(SwiftStdlib 5.8, *) {
+  FunctionsTestSuite.test("static create() imported as initializer") {
+    let instance = HasCreateMethodImportedAsInitializer(n: 5)
+    expectEqual(instance.getField(), 25)
+  } 
+}
+
 runAllTests()

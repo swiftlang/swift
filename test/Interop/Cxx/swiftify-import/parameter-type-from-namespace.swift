@@ -3,7 +3,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default %t/namespace.swift -emit-module \
-// RUN:   -verify -verify-additional-file %t%{fs-sep}namespace.h -Rmacro-expansions -strict-memory-safety -o %t/out.swiftmodule -import-bridging-header %t/bridging.h
+// RUN:   -verify -verify-additional-file %t%{fs-sep}namespace.h -Rmacro-expansions -strict-memory-safety -o %t/out.swiftmodule -import-bridging-header %t/bridging.h -eager-macro-checking
 
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default %t/namespace.swift -typecheck \
 // RUN:   -dump-source-file-imports -import-bridging-header %t/bridging.h 2>&1 | %FileCheck --dry-run > %t/imports.txt
@@ -70,7 +70,7 @@ namespace foo {
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bar(_ p: UnsafeMutableBufferPointer<Float>, _ extra: foo.foo_t) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe bar(p.baseAddress!, len, extra)|}}
+//   expected-remark@4{{macro content: |    return unsafe bar(p.baseAddress, len, extra)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 // expected-expansion@+3:102{{
@@ -81,13 +81,13 @@ __attribute__((swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(1), count
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func bar2(_ p: Span<foo.foo_t>, _ extra: foo.foo_t) {|}}
 //   expected-remark@3{{macro content: |    let len = foo.foo_t(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = unsafe p.withUnsafeBufferPointer {|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe bar2(_pPtr.baseAddress!, len, extra)|}}
+//   expected-remark@10{{macro content: |    return unsafe bar2(_pPtr.baseAddress, len, extra)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 // expected-expansion@+3:6{{
@@ -100,13 +100,13 @@ namespace baz {
   //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public static func baz_func(_ p: Span<foo.foo_t>, _ extra: foo.foo_t) {|}}
   //   expected-remark@4{{macro content: |    let len = foo.foo_t(exactly: p.count)!|}}
-  //   expected-remark@5{{macro content: |    let _pPtr = unsafe p.withUnsafeBufferPointer {|}}
+  //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeBufferPointer {|}}
   //   expected-remark@6{{macro content: |        unsafe $0|}}
   //   expected-remark@7{{macro content: |    }|}}
   //   expected-remark@8{{macro content: |    defer {|}}
   //   expected-remark@9{{macro content: |        _fixLifetime(p)|}}
   //   expected-remark@10{{macro content: |    }|}}
-  //   expected-remark@11{{macro content: |    return unsafe baz_func(_pPtr.baseAddress!, len, extra)|}}
+  //   expected-remark@11{{macro content: |    return unsafe baz_func(_pPtr.baseAddress, len, extra)|}}
   //   expected-remark@12{{macro content: |}|}}
   // }}
   // expected-expansion@+3:8{{

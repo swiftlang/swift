@@ -1,0 +1,25 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s | %FileCheck %s
+
+// Check that `[export_interface]` and `[export_implementation]` round-trip
+// through the SIL textual parser and printer for `sil_global`.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public var exportedInterface: Int
+
+public var exportedImplementation: Int
+
+public var implicitDefault: Int
+
+// CHECK: sil_global [export_interface] @$s8sil_vars17exportedInterfaceSivp : $Int
+sil_global [export_interface] @$s8sil_vars17exportedInterfaceSivp : $Int
+
+// CHECK: sil_global [export_implementation] @$s8sil_vars22exportedImplementationSivp : $Int
+sil_global [export_implementation] @$s8sil_vars22exportedImplementationSivp : $Int
+
+// CHECK: sil_global @$s8sil_vars15implicitDefaultSivp : $Int
+sil_global @$s8sil_vars15implicitDefaultSivp : $Int

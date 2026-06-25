@@ -438,6 +438,13 @@ public:
                           clang::DeclarationName preferredName =
                             clang::DeclarationName());
 
+  /// Clear the cached imported name for a particular Clang decl so that the
+  /// next call to importName will recompute it.
+  void clearCachedName(const clang::NamedDecl *decl,
+                       ImportNameVersion version) {
+    importNameCache.erase({decl, version});
+  }
+
   /// Attempts to import the name of \p decl with each possible
   /// ImportNameVersion. \p action will be called with each unique name.
   ///

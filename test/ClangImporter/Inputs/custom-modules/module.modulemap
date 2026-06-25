@@ -302,3 +302,8 @@ module SystemModuleWithWarnings {
   header "SystemModuleWithWarnings.h"
   export *
 }
+
+module RawIdentifierSwiftNames {
+  header "RawIdentifierSwiftNames.h"
+  export *
+}

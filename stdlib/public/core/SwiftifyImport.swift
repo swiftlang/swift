@@ -27,9 +27,21 @@ public enum _SwiftifyInfo {
     /// Corresponds to the C `__sized_by(size)` attribute.
     /// Parameter pointer: index of pointer in function parameter list. Must be of type
     /// `Unsafe[Mutable]RawPointer[?]`, i.e. not an `UnsafePointer<T>`.
-    /// Parameter count: string containing valid Swift syntax containing the size of the buffer,
+    /// Parameter size: string containing valid Swift syntax containing the size of the buffer,
     /// in bytes.
     case sizedBy(pointer: _SwiftifyExpr, size: String)
+    /// Corresponds to the C `__counted_by_or_null(count)` attribute.
+    /// Parameter pointer: index of pointer in function parameter list. Must be of type
+    /// `Unsafe[Mutable]Pointer<T>[?]`, i.e. not an `UnsafeRawPointer`.
+    /// Parameter count: string containing valid Swift syntax containing the number of elements in
+    /// the buffer.
+    case countedByOrNull(pointer: _SwiftifyExpr, count: String)
+    /// Corresponds to the C `__sized_by_or_null(size)` attribute.
+    /// Parameter pointer: index of pointer in function parameter list. Must be of type
+    /// `Unsafe[Mutable]RawPointer[?]`, i.e. not an `UnsafePointer<T>`.
+    /// Parameter size: string containing valid Swift syntax containing the size of the buffer,
+    /// in bytes.
+    case sizedByOrNull(pointer: _SwiftifyExpr, size: String)
     /// Corresponds to the C `__ended_by(end)` attribute.
     /// Parameter start: index of pointer in function parameter list.
     /// Parameter end: index of pointer in function parameter list, pointing one past the end of
@@ -99,7 +111,7 @@ public enum _SwiftifyProtocolMethodInfo {
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(borrow source)
+@_lifetime(borrow source)
 public func _swiftifyOverrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -119,7 +131,7 @@ public func _swiftifyOverrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(copy source)
+@_lifetime(copy source)
 public func _swiftifyOverrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(

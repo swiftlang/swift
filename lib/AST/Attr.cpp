@@ -1079,7 +1079,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         if (!BD->hasClangNode() &&
             !BD->getFormalAccessScope(VD->getDeclContext(),
                                       /*treatUsableFromInlineAsPublic*/ true)
-                 .isPublic()) {
+                 .isPublicOrPackage()) {
           return false;
         }
       }
@@ -1338,14 +1338,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
     break;
       
-  case DeclAttrKind::Warn: {
-    auto warnAttr = cast<WarnAttr>(this);
-    Printer.printAttrName("@warn(");
-    
-    auto &diagGroupInfo = getDiagGroupInfoByID(warnAttr->DiagnosticGroupID);
+  case DeclAttrKind::Diagnose: {
+    auto diagnoseAttr = cast<DiagnoseAttr>(this);
+    Printer.printAttrName("@diagnose(");
+
+    auto &diagGroupInfo = getDiagGroupInfoByID(diagnoseAttr->DiagnosticGroupID);
     Printer.printText(diagGroupInfo.name);
     Printer << ", ";
-    switch (cast<WarnAttr>(this)->DiagnosticBehavior) {
+    switch (cast<DiagnoseAttr>(this)->DiagnosticBehavior) {
       case WarningGroupBehavior::None:
       case WarningGroupBehavior::AsWarning:
         Printer << "as: warning";
@@ -1357,8 +1357,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         Printer << "as: ignored";
         break;
     }
-    if (cast<WarnAttr>(this)->Reason) {
-      Printer << ", \"" << *(cast<WarnAttr>(this)->Reason) << "\"";
+    if (cast<DiagnoseAttr>(this)->Reason) {
+      Printer << ", \"" << *(cast<DiagnoseAttr>(this)->Reason) << "\"";
     }
     Printer <<")";
   }
@@ -1710,6 +1710,31 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::PreInverseGenerics: {
+    auto *attr = cast<PreInverseGenericsAttr>(this);
+    Type exceptTy = attr->getResolvedExceptType(D);
+    auto *pct = exceptTy->castTo<ProtocolCompositionType>();
+
+    // To avoid condfails during Span<~Escapable> adoption, emit
+    // `@_preInverseGenericsExceptCopyable` instead of
+    // `@_preInverseGenerics(except: ~Copyable)`.
+    if (pct->getInverses() ==
+        InvertibleProtocolSet({InvertibleProtocolKind::Copyable})) {
+      Printer.printAttrName("@_preInverseGenericsExceptCopyable");
+      break;
+    }
+
+    Printer.printAttrName("@_preInverseGenerics");
+    // Avoid printing `@_preInverseGenerics(except: Any)` despite that being the
+    // meaning of the no-arg version. It's rejected as it can confuse people.
+    if (exceptTy->getCanonicalType() != D->getASTContext().TheAnyType) {
+      Printer << "(except: ";
+      exceptTy.print(Printer, Options);
+      Printer << ")";
+    }
+    break;
+  }
+
   case DeclAttrKind::RawLayout: {
     auto *attr = cast<RawLayoutAttr>(this);
     Printer.printAttrName("@_rawLayout");
@@ -1729,6 +1754,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     } else {
       llvm_unreachable("unhandled @_rawLayout form");
     }
+    if (attr->shouldMoveAsLikeType())
+      Printer << ", movesAsLike";
     Printer << ")";
     break;
   }
@@ -2050,12 +2077,14 @@ StringRef DeclAttribute::getAttrName() const {
     case MacroSyntax::Attached:
       return "attached";
     }
+  case DeclAttrKind::PreInverseGenerics:
+    return "_preInverseGenerics";
   case DeclAttrKind::RawLayout:
     return "_rawLayout";
   case DeclAttrKind::Extern:
     return "_extern";
-  case DeclAttrKind::Warn:
-    return "warn";
+  case DeclAttrKind::Diagnose:
+    return "diagnose";
   case DeclAttrKind::AllowFeatureSuppression:
     if (cast<AllowFeatureSuppressionAttr>(this)->getInverted()) {
       return "_disallowFeatureSuppression";
@@ -2293,6 +2322,43 @@ bool TypeEraserAttr::isEquivalent(const TypeEraserAttr *other,
   if (thisType.isNull() || otherType.isNull())
     return false;
   return thisType->getCanonicalType() == otherType->getCanonicalType();
+}
+
+PreInverseGenericsAttr::PreInverseGenericsAttr(SourceLoc AtLoc,
+                                               SourceRange Range,
+                                               TypeRepr *exceptRepr,
+                                               Type exceptType)
+    : DeclAttribute(DeclAttrKind::PreInverseGenerics, AtLoc, Range,
+                    /*Implicit=*/false),
+      ExceptTypeRepr(exceptRepr), ExceptType(exceptType) {
+  assert(!exceptType || exceptType->is<ProtocolCompositionType>());
+}
+
+bool PreInverseGenericsAttr::isEquivalent(const PreInverseGenericsAttr *other,
+                    Decl *attachedTo) const {
+  return eqTypes(getResolvedExceptType(attachedTo),
+                 other->getResolvedExceptType(attachedTo));
+}
+
+Type PreInverseGenericsAttr::getResolvedExceptType(
+    const Decl *attachedTo) const {
+  if (!ExceptType) {
+    auto &ctx = attachedTo->getASTContext();
+    evaluateOrDefault(ctx.evaluator,
+                      ResolvePreInverseGenericsRequest{
+                          const_cast<Decl *>(attachedTo),
+                          const_cast<PreInverseGenericsAttr *>(this)},
+                      ctx.TheAnyType);
+  }
+  assert(ExceptType && "resolution didn't save the except type?");
+  return ExceptType;
+}
+
+InvertibleProtocolSet
+PreInverseGenericsAttr::getAllowedInverses(const Decl *attachedTo) const {
+  return getResolvedExceptType(attachedTo)
+      ->castTo<ProtocolCompositionType>()
+      ->getInverses();
 }
 
 Type RawLayoutAttr::getResolvedLikeType(StructDecl *sd) const {

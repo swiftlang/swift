@@ -359,12 +359,12 @@ public:
   }
 
   /// Destroy the storage associated with the group.
-  virtual void destroy() = 0;
+  SWIFT_CONCURRENCY_ABSTRACT(virtual void destroy());
 
   bool isAccumulatingResults() const {
     return !isDiscardingResults();
   }
-  virtual bool isDiscardingResults() const = 0;
+  SWIFT_CONCURRENCY_ABSTRACT(virtual bool isDiscardingResults() const);
 
   /// Any TaskGroup always IS its own TaskRecord.
   /// This allows us to easily get the group while cancellation is propagated throughout the task tree.
@@ -379,7 +379,7 @@ public:
   /// If possible, and an existing task is already waiting on next(), this will
   /// schedule it immediately. If not, the result is enqueued and will be picked
   /// up whenever a task calls next() the next time.
-  virtual void offer(AsyncTask *completed, AsyncContext *context) = 0;
+  SWIFT_CONCURRENCY_ABSTRACT(virtual void offer(AsyncTask *completed, AsyncContext *context));
 
   /// Attempt to park the `waitingTask` in the waiting queue.
   ///
@@ -405,7 +405,7 @@ public:
                      AsyncContext *rawContext);
 
   // Enqueue the completed task onto ready queue if there are no waiting tasks yet
-  virtual void enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) = 0;
+  SWIFT_CONCURRENCY_ABSTRACT(virtual void enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult));
 
   /// Resume waiting task with result from `completedTask`
   PreparedWaitingTask prepareWaitingTaskWithTask(AsyncTask *waitingTask,
@@ -590,19 +590,18 @@ struct TaskGroupStatus {
   }
 
   static void reportPendingTaskOverflow(TaskGroupBase* group, TaskGroupStatus status) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+    // For Embedded Swift, don't burn code size on providing details.
+    swift_Concurrency_fatalError(0, "TaskGroup: pending task count overflow");
+#else
     char *message;
     swift_asprintf(
         &message,
         "error: %sTaskGroup: detected pending task count overflow, in task group %p! Status: %s",
         group->isDiscardingResults() ? "Discarding" : "", group,
-#if !SWIFT_CONCURRENCY_EMBEDDED
         status.to_string(group).c_str()
-#else
-        "<status unavailable in embedded>"
-#endif
-                   );
+    );
 
-#if !SWIFT_CONCURRENCY_EMBEDDED
     if (_swift_shouldReportFatalErrorsToDebugger()) {
       RuntimeErrorDetails details = {
           .version = RuntimeErrorDetails::currentVersion,
@@ -619,12 +618,11 @@ struct TaskGroupStatus {
       };
       _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
     }
-#endif
 
-#if defined(_WIN32) && !SWIFT_CONCURRENCY_EMBEDDED
+#if defined(_WIN32)
     #define STDERR_FILENO 2
    _write(STDERR_FILENO, message, strlen(message));
-#elif defined(STDERR_FILENO) && !SWIFT_CONCURRENCY_EMBEDDED
+#elif defined(STDERR_FILENO)
     write(STDERR_FILENO, message, strlen(message));
 #else
     puts(message);
@@ -640,6 +638,7 @@ struct TaskGroupStatus {
 
     free(message);
     abort();
+#endif
   }
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
@@ -1817,7 +1816,7 @@ reevaluate_if_taskgroup_has_results:;
       assumed = TaskGroupStatus{assumedStatus};
       continue; // We raced with something, try again.
     }
-    SWIFT_TASK_DEBUG_LOG("poll, after CAS: %s", status.to_string().c_str());
+    SWIFT_TASK_DEBUG_LOG("poll, after CAS: %s", statusString().c_str());
 
     // We're going back to running the task, so if we suspended before,
     // we need to flag it as running again.
@@ -2160,9 +2159,9 @@ SWIFT_CC(swift)
 static bool swift_taskGroup_addPendingImpl(TaskGroup *_group, bool unconditionally) {
   auto group = asBaseImpl(_group);
   auto assumed = group->statusAddPendingTaskAssumeRelaxed(unconditionally);
-  SWIFT_TASK_DEBUG_LOG("add pending %s to group(%p), tasks pending = %d",
-                       unconditionally ? "unconditionally" : "",
-                       group, assumed.pendingTasks(group));
+  SWIFT_TASK_DEBUG_LOG("add pending %s to group(%p), tasks pending = %llu",
+                       unconditionally ? "unconditionally" : "", group,
+                       assumed.pendingTasks(group));
   return !assumed.isCancelled();
 }
 

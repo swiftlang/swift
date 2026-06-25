@@ -3067,7 +3067,7 @@ const {
   auto substSig = buildGenericSignature(TC.Context, GenericSignature(),
                                         std::move(visitor.substGenericParams),
                                         std::move(visitor.substRequirements),
-                                        /*allowInverses=*/false)
+                                        DefaultRequirementOptions())
     .getCanonicalSignature();
   
   auto subMap = SubstitutionMap::get(substSig,

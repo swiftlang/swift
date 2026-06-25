@@ -3316,8 +3316,8 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                                        isolated->getBase(), dc, options);
   }
 
-  case TypeReprKind::CallerIsolated: {
-    auto callerIsolated = cast<CallerIsolatedTypeRepr>(typeRepr);
+  case TypeReprKind::NonisolatedNonsending: {
+    auto callerIsolated = cast<NonisolatedNonsendingTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
                                        callerIsolated->getBase(), dc, options);
   }

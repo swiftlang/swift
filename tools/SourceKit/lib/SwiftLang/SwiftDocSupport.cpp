@@ -1305,7 +1305,6 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   }
 
   ASTContext &Ctx = CI.getASTContext();
-  CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
   CI.performSema();
 
   SourceTextInfo SourceInfo;

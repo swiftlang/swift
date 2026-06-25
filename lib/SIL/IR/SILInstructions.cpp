@@ -219,7 +219,7 @@ AllocStackInst::AllocStackInst(
     IsFromVarDecl_t isFromVarDecl,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
-      SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
+      SILDebugVariableSupplement(0,
                                  Var ? Var->Type.has_value() : false,
                                  Var ? Var->Loc.has_value() : false,
                                  Var ? Var->Scope != nullptr : false),
@@ -241,7 +241,7 @@ AllocStackInst::AllocStackInst(
       Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
       getTrailingObjects<SILLocation>(),
       getTrailingObjects<const SILDebugScope *>(),
-      getTrailingObjects<SILDIExprElement>());
+      nullptr);
 
   assert(sharedUInt32().AllocStackInst.numOperands ==
              TypeDependentOperands.size() &&
@@ -265,6 +265,13 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
       Var->Scope = nullptr;
     if (Var->Type == elementType)
       Var->Type = {};
+    if (Var->DIExpr) {
+      // alloc_stack cannot carry a DIExpression.
+      // Strip a single implied op_deref. Anything else is an error.
+      assert(Var->DIExpr.getNumElements() == 1 && Var->DIExpr.startsWithDeref()
+             && "alloc_stack cannot have a DIExpr; use debug_value instead");
+      Var->DIExpr = {};
+    }
   }
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
@@ -431,7 +438,7 @@ SILType AllocBoxInst::getAddressType() const {
 DebugValueInst::DebugValueInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILDebugVariable Var,
     PoisonRefs_t poisonRefs,
-    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace)
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace, bool prependDeref)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
@@ -444,6 +451,8 @@ DebugValueInst::DebugValueInst(
   if (usesMoveableValueDebugInfo || Operand->getType().isMoveOnly())
     setUsesMoveableValueDebugInfo();
   setTrace(trace);
+  if (prependDeref)
+    this->prependDeref();
 }
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
@@ -457,34 +466,257 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
     Var.Loc = {};
   if (Var.Scope == DebugLoc.getScope())
     Var.Scope = nullptr;
-  if (Var.Type == Operand->getType().getObjectType())
+  if (Var.Type == Operand->getType().getObjectType() &&
+      !Var.DIExpr.getFragmentPart())
     Var.Type = {};
+  // Use the prependDeref bit rather than storing it in the DIExpr.
+  bool prependDeref = Var.DIExpr.startsWithDeref();
+  if (prependDeref) {
+    Var.DIExpr.eraseElement(Var.DIExpr.element_begin());
+  }
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
   return ::new (buf)
-    DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace);
+    DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace, prependDeref);
 }
 
-DebugValueInst *
-DebugValueInst::createAddr(SILDebugLocation DebugLoc, SILValue Operand,
-                           SILModule &M, SILDebugVariable Var,
-                           UsesMoveableValueDebugInfo_t wasMoved, bool trace) {
-  // For alloc_stack, debug_value is used to annotate the associated
-  // memory location, so we shouldn't attach op_deref.
-  if (!isa<AllocStackInst>(Operand))
-    Var.DIExpr.prependElements(
-      {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
-  return DebugValueInst::create(DebugLoc, Operand, M, Var, DontPoisonRefs,
-                                wasMoved, trace);
+void DebugValueInst::prependDeref() {
+  if (!ReconstructionBlock) {
+    ASSERT(!hasDeref() && "Debug value cannot have two derefs!");
+    sharedUInt8().DebugValueInst.prependDeref = true;
+    return;
+  }
+  // If we have an undef, the reconstruction block shouldn't have an argument.
+  // Nothing to do.
+  if (isa<SILUndef>(getOperand()))
+    return;
+
+  // If the type is address-only (not loadable or opaque), we cannot insert
+  // a load into the reconstruction block. Kill the operand instead.
+  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  if (!oldArg->getType().isLoadableOrOpaque(*getFunction()))
+    return killOperand();
+
+  // If we have a reconstruction block, add a load at the beginning.
+  SILBuilder builder(ReconstructionBlock->begin());
+  SILType addrType = oldArg->getType().getAddressType();
+  SILValue undefAddress = SILUndef::get(getFunction(), addrType);
+  LoadInst *load = builder.createLoad(getLoc(), undefAddress,
+                                      LoadOwnershipQualifier::Unqualified);
+  oldArg->replaceAllUsesWith(load);
+  SILArgument *newArg =
+      ReconstructionBlock->replacePhiArgument(0, addrType, OwnershipKind::None);
+  load->setOperand(newArg);
 }
 
-bool DebugValueInst::exprStartsWithDeref() const {
-  if (!NumDIExprOperands)
+void DebugValueInst::stripDeref() {
+  // If we have an undef, nothing to do.
+  if (isa<SILUndef>(getOperand()))
+    return;
+  ASSERT(getOperand()->getType().isLoadableOrOpaque(*getFunction()) &&
+         "cannot strip deref for address-only types");
+  if (!ReconstructionBlock) {
+    ASSERT(hasDeref() && "Cannot strip deref without one!");
+    sharedUInt8().DebugValueInst.prependDeref = false;
+    return;
+  }
+
+  // Replace all uses of the operand with undef.
+  // Load users are salvaged to use the direct value.
+  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  SILType objType = oldArg->getType().getObjectType();
+  SILValue undefAddr = SILUndef::get(oldArg);
+  SmallVector<LoadInst *, 16> loads;
+  while (!oldArg->use_empty()) {
+    Operand *use = *oldArg->use_begin();
+    SILInstruction *user = use->getUser();
+    use->set(undefAddr);
+    // Only load users of the operand can be salvaged.
+    if (auto *load = dyn_cast<LoadInst>(user)) {
+      loads.push_back(load);
+    }
+  }
+
+  // If there are no loads, this operand is no longer used. Kill it.
+  if (loads.empty())
+    return killOperand();
+
+  // Otherwise, replace the arguments and all uses
+  SILArgument *newArg =
+      ReconstructionBlock->replacePhiArgument(0, objType, OwnershipKind::None);
+
+  for (LoadInst *load : loads) {
+    load->replaceAllUsesWith(newArg);
+    load->eraseFromParent();
+  }
+}
+
+SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
+  if (ReconstructionBlock)
+    return ReconstructionBlock;
+
+  // Create a new no-op reconstruction block.
+  auto *block = getFunction()->createEmptyDebugReconstructionBlock();
+  SILBuilder builder(block);
+
+  SILValue operand = getOperand();
+  bool addressOnly = !operand->getType().isLoadableOrOpaque(*getFunction());
+  SILValue retVal;
+  if (isa<SILUndef>(operand)) {
+    // No arguments, return the same undef directly.
+    retVal = operand;
+    // Clear the op_deref, unless we have an address-only type.
+    if (!addressOnly)
+      sharedUInt8().DebugValueInst.prependDeref = false;
+  } else if (hasDeref()) {
+    SILArgument *arg = block->createPhiArgument(
+        operand->getType().getAddressType(), OwnershipKind::None);
+    if (addressOnly) {
+      // Address-only: keep op_deref, cannot load.
+      retVal = arg;
+    } else {
+      // Convert the deref to a load.
+      retVal = builder.createLoad(getLoc(), arg,
+                                  LoadOwnershipQualifier::Unqualified);
+      sharedUInt8().DebugValueInst.prependDeref = false;
+    }
+  } else {
+    // Add a block argument matching the operand type.
+    retVal = block->createPhiArgument(operand->getType(), OwnershipKind::None);
+  }
+
+  builder.createReturn(getLoc(), retVal);
+  ReconstructionBlock = block;
+  return block;
+}
+
+void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
+  auto *srcBB = src->getDebugReconstructionBlock();
+  if (!srcBB)
+    return;
+  auto *newBB = getFunction()->createEmptyDebugReconstructionBlock();
+  setDebugReconstructionBlock(newBB);
+  DebugBasicBlockCloner(*getFunction()).clone(srcBB, newBB);
+}
+
+void DebugValueInst::killOperand(SILType operandType) {
+  if (isa<SILUndef>(getOperand())) {
+    // Already undef: no operand to kill.
+    return;
+  }
+
+  SILType origType = operandType ? operandType : getOperand()->getType();
+  bool addressOnly = !origType.isLoadableOrOpaque(*getFunction());
+
+  // For address-only types, keep the address type and prependDeref flag.
+  // For loadable types, use the object type and strip prependDeref.
+  SILValue undef =
+      SILUndef::get(getFunction(), addressOnly ? origType.getAddressType()
+                                               : origType.getObjectType());
+  setOperand(undef);
+
+  // Strip prependDeref (unless address-only).
+  // The stored DIExpr only contains fragments, which we want to keep.
+  if (!addressOnly)
+    sharedUInt8().DebugValueInst.prependDeref = false;
+
+  // Rather than completely removing the debug reconstruction block, remove its
+  // argument, as a part of the variable might be constant and recoverable.
+  if (auto bb = getDebugReconstructionBlock()) {
+    ASSERT(bb->getNumArguments() == 1);
+    auto argument = bb->getArgument(0);
+    argument->replaceAllUsesWithUndef();
+    bb->eraseArgument(0);
+  }
+}
+
+SILType DebugValueInst::getVarType() const {
+  if (HasAuxDebugVariableType)
+    return *getTrailingObjects<SILType>();
+  if (auto *debugBB = getDebugReconstructionBlock())
+    return cast<ReturnInst>(debugBB->getTerminator())
+        ->getOperand()->getType().getObjectType();
+  return getOperand()->getType().getObjectType();
+}
+
+bool DebugValueInst::isExprTypeValid() const {
+  auto varInfo = getCompleteVarInfo();
+
+  // Ignore trace debug values.
+  if (hasTrace())
+    return true;
+
+  SILFunction *F = getFunction();
+  if (!F)
     return false;
 
-  llvm::ArrayRef<SILDIExprElement> DIExprElements(
-      getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
-  return DIExprElements.front().getAsOperator()
-          == SILDIExprOperator::Dereference;
+  SILType valueType = getOperand()->getType();
+
+  // Special case: a DebugValueInst with an alloc_box operand is equivalent to
+  // the alloc_box.
+  if (auto *box = dyn_cast<AllocBoxInst>(getOperand()))
+    if (varInfo.DIExpr.elements().empty() &&
+        getDebugReconstructionBlock() == nullptr &&
+        varInfo.Type == box->getAddressType().getObjectType())
+      return true;
+
+  // Transform: debug BB transforms the SSA value to its return type.
+  if (auto *debugBB = getDebugReconstructionBlock()) {
+    if (debugBB->getNumArguments() > 0) {
+      if (debugBB->getNumArguments() > 1)
+        return false;
+      if (debugBB->getArgument(0)->getType() != valueType)
+        return false;
+    }
+    auto *terminator = cast<ReturnInst>(debugBB->getTerminator());
+    valueType = terminator->getOperand()->getType();
+    // Cannot have both an op_deref and a debug reconstruction block, unless
+    // the type is genuinely address-only (not loadable or opaque).
+    if (hasDeref() && valueType.isLoadableOrOpaque(*getFunction()))
+      return false;
+  }
+
+  // Fragments are in the opposite direction, process from right to left.
+  SILType RunningType = *varInfo.Type;
+  unsigned derefCount = 0;
+
+  for (const SILDIExprOperand &Operand : varInfo.DIExpr.operands()) {
+    switch (Operand.getOperator()) {
+    case SILDIExprOperator::Dereference:
+      ++derefCount;
+      break;
+    case SILDIExprOperator::Fragment: {
+      auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
+      auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
+      if (!FieldParent ||
+          RunningType.getNominalOrBoundGenericNominal() != FieldParent)
+        return false;
+      RunningType = RunningType.getFieldType(Field, F);
+      break;
+    }
+    case SILDIExprOperator::TupleFragment: {
+      if (!Operand.args()[0].getAsType()->isEqual(RunningType.getASTType()))
+        return false;
+      unsigned Idx = Operand.args()[1].getAsConstInt().value();
+      RunningType = RunningType.getTupleElementType(Idx);
+      break;
+    }
+    default:
+      // Invalid operator
+      return false;
+    }
+  }
+
+  // There must be as many op_derefs as SIL type indirection levels.
+  // SIL only supports one level of indirection, so op_deref too.
+  if (derefCount != valueType.isAddress())
+    return false;
+
+  // The op_deref must be stored in the prependDeref bit.
+  if (derefCount != hasDeref())
+    return false;
+
+  return RunningType.removingMoveOnlyWrapper() ==
+         valueType.getObjectType().removingMoveOnlyWrapper();
 }
 
 VarDecl *DebugValueInst::getDecl() const {
@@ -584,11 +816,13 @@ ApplyInst::ApplyInst(SILDebugLocation loc, SILValue callee,
                      SILType substCalleeTy, SILType result,
                      SubstitutionMap subs, ArrayRef<SILValue> args,
                      ArrayRef<SILValue> typeDependentOperands,
+                     std::optional<ArrayRef<SILLocation>> argLocs,
                      ApplyOptions options,
                      const GenericSpecializationInformation *specializationInfo,
                      std::optional<ApplyIsolationCrossing> isolationCrossing)
     : InstructionBase(isolationCrossing, loc, callee, substCalleeTy, subs, args,
-                      typeDependentOperands, specializationInfo, result) {
+                      typeDependentOperands, argLocs, specializationInfo,
+                      result) {
   setApplyOptions(options);
   assert(!substCalleeTy.castTo<SILFunctionType>()->isCoroutine());
 }
@@ -599,7 +833,8 @@ ApplyInst::create(SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
                   std::optional<SILModuleConventions> moduleConventions,
                   SILFunction &parentFunction,
                   const GenericSpecializationInformation *specializationInfo,
-                  std::optional<ApplyIsolationCrossing> isolationCrossing) {
+                  std::optional<ApplyIsolationCrossing> isolationCrossing,
+                  std::optional<ArrayRef<SILLocation>> argLocs) {
   SILType substCalleeSILTy = callee->getType().substGenericArgs(
       parentFunction.getModule(), subs,
       parentFunction.getTypeExpansionContext());
@@ -615,10 +850,14 @@ ApplyInst::create(SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, parentFunction,
                                substCalleeSILTy.getASTType(), subs);
-  void *buffer = allocateTrailingInst<ApplyInst, Operand>(
-      parentFunction, getNumAllOperands(args, typeDependentOperands));
+  // Per the all-or-nothing contract: reserve trailing storage for argLocs
+  // only when the caller actually supplied a non-empty array.
+  bool reserveArgLocs = argLocs.has_value() && !argLocs->empty();
+  void *buffer = allocateTrailingInst<ApplyInst, Operand, SILLocation>(
+      parentFunction, getNumAllOperands(args, typeDependentOperands),
+      reserveArgLocs ? args.size() : 0);
   return ::new (buffer) ApplyInst(loc, callee, substCalleeSILTy, result, subs,
-                                  args, typeDependentOperands, options,
+                                  args, typeDependentOperands, argLocs, options,
                                   specializationInfo, isolationCrossing);
 }
 
@@ -627,11 +866,11 @@ BeginApplyInst::BeginApplyInst(
     ArrayRef<SILType> allResultTypes,
     ArrayRef<ValueOwnershipKind> allResultOwnerships, SubstitutionMap subs,
     ArrayRef<SILValue> args, ArrayRef<SILValue> typeDependentOperands,
-    ApplyOptions options,
+    std::optional<ArrayRef<SILLocation>> argLocs, ApplyOptions options,
     const GenericSpecializationInformation *specializationInfo,
     std::optional<ApplyIsolationCrossing> isolationCrossing)
     : InstructionBase(isolationCrossing, loc, callee, substCalleeTy, subs, args,
-                      typeDependentOperands, specializationInfo),
+                      typeDependentOperands, argLocs, specializationInfo),
       MultipleValueInstructionTrailingObjects(this, allResultTypes,
                                               allResultOwnerships) {
   setApplyOptions(options);
@@ -644,7 +883,8 @@ BeginApplyInst *BeginApplyInst::create(
     std::optional<SILModuleConventions> moduleConventions,
     SILFunction &parentFunction,
     const GenericSpecializationInformation *specializationInfo,
-    std::optional<ApplyIsolationCrossing> isolationCrossing) {
+    std::optional<ApplyIsolationCrossing> isolationCrossing,
+    std::optional<ArrayRef<SILLocation>> argLocs) {
   SILType substCalleeSILType = callee->getType().substGenericArgs(
       parentFunction.getModule(), subs,
       parentFunction.getTypeExpansionContext());
@@ -686,15 +926,16 @@ BeginApplyInst *BeginApplyInst::create(
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, parentFunction,
                                substCalleeType, subs);
-  void *buffer =
-      allocateTrailingInst<BeginApplyInst, Operand, MultipleValueInstruction *,
-                           MultipleValueInstructionResult>(
-          parentFunction, getNumAllOperands(args, typeDependentOperands), 1,
-          resultTypes.size());
+  bool reserveArgLocs = argLocs.has_value() && !argLocs->empty();
+  void *buffer = allocateTrailingInst<BeginApplyInst, Operand, SILLocation,
+                                      MultipleValueInstruction *,
+                                      MultipleValueInstructionResult>(
+      parentFunction, getNumAllOperands(args, typeDependentOperands),
+      reserveArgLocs ? args.size() : 0, 1, resultTypes.size());
   return ::new (buffer)
       BeginApplyInst(loc, callee, substCalleeSILType, resultTypes,
                      resultOwnerships, subs, args, typeDependentOperands,
-                     options, specializationInfo, isolationCrossing);
+                     argLocs, options, specializationInfo, isolationCrossing);
 }
 
 void BeginApplyInst::getCoroutineEndPoints(
@@ -748,7 +989,8 @@ bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
 PartialApplyInst::PartialApplyInst(
     SILDebugLocation Loc, SILValue Callee, SILType SubstCalleeTy,
     SubstitutionMap Subs, ArrayRef<SILValue> Args,
-    ArrayRef<SILValue> TypeDependentOperands, SILType ClosureType,
+    ArrayRef<SILValue> TypeDependentOperands,
+    std::optional<ArrayRef<SILLocation>> ArgLocs, SILType ClosureType,
     StackAllocationIsNested_t IsNested,
     const GenericSpecializationInformation *SpecializationInfo)
     // FIXME: the callee should have a lowered SIL function type, and
@@ -756,7 +998,8 @@ PartialApplyInst::PartialApplyInst(
     // should derive the type of its result by partially applying the callee's
     // type.
     : InstructionBase(Loc, Callee, SubstCalleeTy, Subs, Args,
-                      TypeDependentOperands, SpecializationInfo, ClosureType) {
+                      TypeDependentOperands, ArgLocs, SpecializationInfo,
+                      ClosureType) {
   sharedUInt8().PartialApplyInst.isNested = uint8_t(IsNested);
 }
 
@@ -765,7 +1008,8 @@ PartialApplyInst *PartialApplyInst::create(
     SubstitutionMap Subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation, SILFunction &F,
     const GenericSpecializationInformation *specializationInfo,
-    OnStackKind onStack, StackAllocationIsNested_t isNested) {
+    OnStackKind onStack, StackAllocationIsNested_t isNested,
+    std::optional<ArrayRef<SILLocation>> ArgLocs) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
 
@@ -776,13 +1020,13 @@ PartialApplyInst *PartialApplyInst::create(
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
                                SubstCalleeTy.getASTType(), Subs);
-  void *Buffer =
-    allocateTrailingInst<PartialApplyInst, Operand>(
-      F, getNumAllOperands(Args, TypeDependentOperands));
-  return ::new(Buffer) PartialApplyInst(Loc, Callee, SubstCalleeTy,
-                                        Subs, Args,
-                                        TypeDependentOperands, ClosureType,
-                                        isNested, specializationInfo);
+  bool reserveArgLocs = ArgLocs.has_value() && !ArgLocs->empty();
+  void *Buffer = allocateTrailingInst<PartialApplyInst, Operand, SILLocation>(
+      F, getNumAllOperands(Args, TypeDependentOperands),
+      reserveArgLocs ? Args.size() : 0);
+  return ::new (Buffer) PartialApplyInst(
+      Loc, Callee, SubstCalleeTy, Subs, Args, TypeDependentOperands, ArgLocs,
+      ClosureType, isNested, specializationInfo);
 }
 
 TryApplyInstBase::TryApplyInstBase(SILInstructionKind kind,
@@ -797,15 +1041,15 @@ TryApplyInstBase::TryApplyInstBase(SILInstructionKind kind,
 TryApplyInst::TryApplyInst(
     SILDebugLocation loc, SILValue callee, SILType substCalleeTy,
     SubstitutionMap subs, ArrayRef<SILValue> args,
-    ArrayRef<SILValue> typeDependentOperands, SILBasicBlock *normalBB,
+    ArrayRef<SILValue> typeDependentOperands,
+    std::optional<ArrayRef<SILLocation>> argLocs, SILBasicBlock *normalBB,
     SILBasicBlock *errorBB, ApplyOptions options,
     const GenericSpecializationInformation *specializationInfo,
     std::optional<ApplyIsolationCrossing> isolationCrossing,
-    ProfileCounter normalCount,
-    ProfileCounter errorCount)
+    ProfileCounter normalCount, ProfileCounter errorCount)
     : InstructionBase(isolationCrossing, loc, callee, substCalleeTy, subs, args,
-                      typeDependentOperands, specializationInfo, normalBB,
-                      errorBB, normalCount, errorCount) {
+                      typeDependentOperands, argLocs, specializationInfo,
+                      normalBB, errorBB, normalCount, errorCount) {
   setApplyOptions(options);
 }
 
@@ -816,8 +1060,8 @@ TryApplyInst::create(SILDebugLocation loc, SILValue callee,
                      ApplyOptions options, SILFunction &parentFunction,
                      const GenericSpecializationInformation *specializationInfo,
                      std::optional<ApplyIsolationCrossing> isolationCrossing,
-                     ProfileCounter normalCount,
-                     ProfileCounter errorCount) {
+                     ProfileCounter normalCount, ProfileCounter errorCount,
+                     std::optional<ArrayRef<SILLocation>> argLocs) {
   SILType substCalleeTy = callee->getType().substGenericArgs(
       parentFunction.getModule(), subs,
       parentFunction.getTypeExpansionContext());
@@ -836,11 +1080,13 @@ TryApplyInst::create(SILDebugLocation loc, SILValue callee,
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, parentFunction,
                                substCalleeTy.getASTType(), subs);
-  void *buffer = allocateTrailingInst<TryApplyInst, Operand>(
-      parentFunction, getNumAllOperands(args, typeDependentOperands));
+  bool reserveArgLocs = argLocs.has_value() && !argLocs->empty();
+  void *buffer = allocateTrailingInst<TryApplyInst, Operand, SILLocation>(
+      parentFunction, getNumAllOperands(args, typeDependentOperands),
+      reserveArgLocs ? args.size() : 0);
   return ::new (buffer) TryApplyInst(
-      loc, callee, substCalleeTy, subs, args, typeDependentOperands, normalBB,
-      errorBB, options, specializationInfo, isolationCrossing,
+      loc, callee, substCalleeTy, subs, args, typeDependentOperands, argLocs,
+      normalBB, errorBB, options, specializationInfo, isolationCrossing,
       normalCount, errorCount);
 }
 
