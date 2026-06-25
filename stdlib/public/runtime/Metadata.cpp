@@ -3605,6 +3605,7 @@ void swift::swift_initRawStructMetadata2(StructMetadata *structType,
   
   vwtable->flags = vwtable->flags
     .withBitwiseBorrowable(isRawLayoutBitwiseBorrowable(rawLayoutFlags));
+  vwtable->flags = vwtable->flags.withPOD(isRawLayoutPOD(rawLayoutFlags));
 
   // If the calculated size of this raw layout type is available to be put in
   // value buffers, then set the inline storage bit if our like type is also
