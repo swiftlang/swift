@@ -43,7 +43,7 @@ import Swift
 // CHECK-LABEL: {{^}}// caller(_:_:)
 // CHECK:       sil [ossa] @$s7closure6calleryS2f_SftF : $@convention(thin) (Float, Float) -> Float {
 // CHECK:       bb0(%0 : $Float, %1 : $Float):
-// CHECK:         %[[#A8:]] = function_ref @$s7closure6calleeyS2f_S2fXEtF43$s7closure8wrapper2yS2fcSfF8closure2L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper1yde13F8closure1L_yG1FS2fIegyd_Tf1nc_n020$s7closure8wrapper0yde13F8closure0L_yG1FSfTf1nc_n : $@convention(thin) (Float, Float) -> Float
+// CHECK:         %[[#A8:]] = function_ref @$s7closure6calleeyS2f_S2fXEtF43$s7closure8wrapper2yS2fcSfF8closure2L_yS2fFS2fIegyd_Tf1nE_n020$s7closure8wrapper1yde13F8closure1L_yG1FS2fIegyd_Tf1nE_n020$s7closure8wrapper0yde13F8closure0L_yG1FSfTf1nE_n : $@convention(thin) (Float, Float) -> Float
 // CHECK-NEXT:    %[[#A9:]] = apply %[[#A8]](%1, %0) : $@convention(thin) (Float, Float) -> Float
 // CHECK-NEXT:    return %[[#A9]] : $Float
 // CHECK-NEXT:  } // end sil function '$s7closure6calleryS2f_SftF'
@@ -70,12 +70,12 @@ bb0(%0 : $Float, %1 : $Float):
 } // end sil function '$s7closure6calleryS2f_SftF'
 
 // CHECK-LABEL: {{^}}// specialized callee(_:_:)
-// CHECK:       sil private [ossa] @$s7closure6calleeyS2f_S2fXEtF43$s7closure8wrapper2yS2fcSfF8closure2L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper1yde13F8closure1L_yG1FS2fIegyd_Tf1nc_n020$s7closure8wrapper0yde13F8closure0L_yG1FSfTf1nc_n : $@convention(thin) (Float, Float) -> Float {
+// CHECK:       sil private [ossa] @$s7closure6calleeyS2f_S2fXEtF43$s7closure8wrapper2yS2fcSfF8closure2L_yS2fFS2fIegyd_Tf1nE_n020$s7closure8wrapper1yde13F8closure1L_yG1FS2fIegyd_Tf1nE_n020$s7closure8wrapper0yde13F8closure0L_yG1FSfTf1nE_n : $@convention(thin) (Float, Float) -> Float {
 // CHECK:       bb0(%0 : $Float, %1 : $Float):
-// CHECK:         %[[#B16:]] = function_ref @$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF43$s7closure8wrapper1yS2fcSfF8closure1L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper0yef13F8closure0L_yH1FSfTf1nc_n : $@convention(thin) (Float, Float) -> Float
+// CHECK:         %[[#B16:]] = function_ref @$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF43$s7closure8wrapper1yS2fcSfF8closure1L_yS2fFS2fIegyd_Tf1nE_n020$s7closure8wrapper0yef13F8closure0L_yH1FSfTf1nE_n : $@convention(thin) (Float, Float) -> Float
 // CHECK-NEXT:    %[[#B17:]] = apply %[[#B16]](%0, %1) : $@convention(thin) (Float, Float) -> Float
 // CHECK:         return %[[#B17]] : $Float
-// CHECK-NEXT:  } // end sil function '$s7closure6calleeyS2f_S2fXEtF43$s7closure8wrapper2yS2fcSfF8closure2L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper1yde13F8closure1L_yG1FS2fIegyd_Tf1nc_n020$s7closure8wrapper0yde13F8closure0L_yG1FSfTf1nc_n'
+// CHECK-NEXT:  } // end sil function '$s7closure6calleeyS2f_S2fXEtF43$s7closure8wrapper2yS2fcSfF8closure2L_yS2fFS2fIegyd_Tf1nE_n020$s7closure8wrapper1yde13F8closure1L_yG1FS2fIegyd_Tf1nE_n020$s7closure8wrapper0yde13F8closure0L_yG1FSfTf1nE_n'
 
 // callee(_:_:)
 sil private [ossa] @$s7closure6calleeyS2f_S2fXEtF : $@convention(thin) (Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float) -> Float {
@@ -85,12 +85,12 @@ bb0(%0 : $Float, %1 : @guaranteed $@noescape @callee_guaranteed (Float) -> Float
 } // end sil function '$s7closure6calleeyS2f_S2fXEtF'
 
 // CHECK-LABEL: {{^}}// specialized closure2 #1 (_:) in wrapper2(_:)
-// CHECK:       sil private [ossa] @$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF43$s7closure8wrapper1yS2fcSfF8closure1L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper0yef13F8closure0L_yH1FSfTf1nc_n : $@convention(thin) (Float, Float) -> Float {
+// CHECK:       sil private [ossa] @$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF43$s7closure8wrapper1yS2fcSfF8closure1L_yS2fFS2fIegyd_Tf1nE_n020$s7closure8wrapper0yef13F8closure0L_yH1FSfTf1nE_n : $@convention(thin) (Float, Float) -> Float {
 // CHECK:       bb0(%0 : $Float, %1 : $Float):
-// CHECK:         %[[#C12:]] = function_ref @$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF43$s7closure8wrapper0yS2fcSfF8closure0L_yS2fFSfTf1nc_n : $@convention(thin) (Float, Float) -> Float
+// CHECK:         %[[#C12:]] = function_ref @$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF43$s7closure8wrapper0yS2fcSfF8closure0L_yS2fFSfTf1nE_n : $@convention(thin) (Float, Float) -> Float
 // CHECK-NEXT:    %[[#C13:]] = apply %[[#C12]](%0, %1) : $@convention(thin) (Float, Float) -> Float
 // CHECK:         return %[[#C13]] : $Float
-// CHECK-NEXT:  } // end sil function '$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF43$s7closure8wrapper1yS2fcSfF8closure1L_yS2fFS2fIegyd_Tf1nc_n020$s7closure8wrapper0yef13F8closure0L_yH1FSfTf1nc_n'
+// CHECK-NEXT:  } // end sil function '$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF43$s7closure8wrapper1yS2fcSfF8closure1L_yS2fFS2fIegyd_Tf1nE_n020$s7closure8wrapper0yef13F8closure0L_yH1FSfTf1nE_n'
 
 // closure2 #1 (_:) in wrapper2(_:)
 sil private [ossa] @$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> Float {
@@ -100,12 +100,12 @@ bb0(%0 : $Float, %1 : @closureCapture @guaranteed $@callee_guaranteed (Float) ->
 } // end sil function '$s7closure8wrapper2yS2fcSfF8closure2L_yS2fF'
 
 // CHECK-LABEL: {{^}}// specialized closure1 #1 (_:) in wrapper1(_:)
-// CHECK:       sil private [ossa] @$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF43$s7closure8wrapper0yS2fcSfF8closure0L_yS2fFSfTf1nc_n : $@convention(thin) (Float, Float) -> Float {
+// CHECK:       sil private [ossa] @$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF43$s7closure8wrapper0yS2fcSfF8closure0L_yS2fFSfTf1nE_n : $@convention(thin) (Float, Float) -> Float {
 // CHECK:       bb0(%0 : $Float, %1 : $Float):
 // CHECK:         %[[#D2:]] = function_ref @$s7closure8wrapper0yS2fcSfF8closure0L_yS2fF : $@convention(thin) (Float, Float) -> Float
 // CHECK:         %[[#D8:]] = apply %[[#D2]](%0, %1) : $@convention(thin) (Float, Float) -> Float
 // CHECK:         return %[[#D8]] : $Float
-// CHECK-NEXT:  } // end sil function '$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF43$s7closure8wrapper0yS2fcSfF8closure0L_yS2fFSfTf1nc_n'
+// CHECK-NEXT:  } // end sil function '$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF43$s7closure8wrapper0yS2fcSfF8closure0L_yS2fFSfTf1nE_n'
 
 // closure1 #1 (_:) in wrapper1(_:)
 sil private [ossa] @$s7closure8wrapper1yS2fcSfF8closure1L_yS2fF : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> Float {

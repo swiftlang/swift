@@ -24,7 +24,7 @@ import _Differentiation
 // CHECK: bb0(%0 : $Float):
 // CHECK:   %[[#A3:]] = function_ref @$sSo4sinfyS2fFTo : $@convention(c) (Float) -> Float
 // CHECK:   %[[#A4:]] = apply %[[#A3]](%0) : $@convention(c) (Float) -> Float
-// CHECK:   %[[#A9:]] = function_ref @$s3src3baryS2fFTJpSpSr22$s3src3fooyS2fFTJpSpSrS2fIegyd_Tf1nc_n62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n : $@convention(thin) (Float, Float) -> Float
+// CHECK:   %[[#A9:]] = function_ref @$s3src3baryS2fFTJpSpSr22$s3src3fooyS2fFTJpSpSrS2fIegyd_Tf1nE_n62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nE_n : $@convention(thin) (Float, Float) -> Float
 // CHECK:   %[[#A10:]] = partial_apply [callee_guaranteed] %[[#A9]](%0) : $@convention(thin) (Float, Float) -> Float
 // CHECK:   %[[#A11:]] = tuple (%[[#A4]] : $Float, %[[#A10]] : $@callee_guaranteed (Float) -> Float)
 // CHECK:   return %[[#A11]] : $(Float, @callee_guaranteed (Float) -> Float)
@@ -50,12 +50,12 @@ bb0(%0 : $Float):
 } // end sil function '$s3src3baryS2fFTJrSpSr'
 
 // CHECK: // specialized pullback of bar(_:)
-// CHECK: sil private [ossa] @$s3src3baryS2fFTJpSpSr22$s3src3fooyS2fFTJpSpSrS2fIegyd_Tf1nc_n62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n : $@convention(thin) (Float, Float) -> Float {
+// CHECK: sil private [ossa] @$s3src3baryS2fFTJpSpSr22$s3src3fooyS2fFTJpSpSrS2fIegyd_Tf1nE_n62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nE_n : $@convention(thin) (Float, Float) -> Float {
 // CHECK: bb0(%0 : $Float, %1 : $Float):
-// CHECK:   %[[#B10:]] = function_ref @$s3src3fooyS2fFTJpSpSr62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n : $@convention(thin) (Float, Float) -> Float
+// CHECK:   %[[#B10:]] = function_ref @$s3src3fooyS2fFTJpSpSr62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nE_n : $@convention(thin) (Float, Float) -> Float
 // CHECK:   %[[#B11:]] = apply %[[#B10]](%0, %1) : $@convention(thin) (Float, Float) -> Float
 // CHECK:   return %[[#B11]] : $Float
-// CHECK: } // end sil function '$s3src3baryS2fFTJpSpSr22$s3src3fooyS2fFTJpSpSrS2fIegyd_Tf1nc_n62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n'
+// CHECK: } // end sil function '$s3src3baryS2fFTJpSpSr22$s3src3fooyS2fFTJpSpSrS2fIegyd_Tf1nE_n62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nE_n'
 
 // pullback of bar(_:)
 sil private [ossa] @$s3src3baryS2fFTJpSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float {
@@ -66,12 +66,12 @@ bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (Float) -> Float):
 } // end sil function '$s3src3baryS2fFTJpSpSr'
 
 // CHECK: // specialized pullback of foo(_:)
-// CHECK: sil private [ossa] @$s3src3fooyS2fFTJpSpSr62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n : $@convention(thin) (Float, Float) -> Float {
+// CHECK: sil private [ossa] @$s3src3fooyS2fFTJpSpSr62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nE_n : $@convention(thin) (Float, Float) -> Float {
 // CHECK: bb0(%0 : $Float, %1 : $Float):
 // CHECK:   %[[#C2:]] = function_ref @$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_ : $@convention(thin) (Float, Float) -> Float
 // CHECK:   %[[#C7:]] = apply %[[#C2]](%0, %1) : $@convention(thin) (Float, Float) -> Float
 // CHECK:   return %[[#C7]] : $Float
-// CHECK: } // end sil function '$s3src3fooyS2fFTJpSpSr62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n'
+// CHECK: } // end sil function '$s3src3fooyS2fFTJpSpSr62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nE_n'
 
 // pullback of foo(_:)
 sil private [ossa] @$s3src3fooyS2fFTJpSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float {
