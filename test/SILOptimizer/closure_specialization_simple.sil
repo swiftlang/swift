@@ -5,7 +5,7 @@ import Swift
 
 sil @simple_partial_apply_fun : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
 
-// CHECK-LABEL: sil shared [ossa] @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+// CHECK-LABEL: sil shared [ossa] @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1E_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 // CHECK: bb0([[CAPTURED_ARG:%.*]] : $Builtin.Int1):
 // CHECK: [[CLOSED_OVER_FUN:%.*]] = function_ref @simple_partial_apply_fun :
 // CHECK: [[NEW_PAI:%.*]] = partial_apply [[CLOSED_OVER_FUN]]
@@ -30,9 +30,9 @@ bb3:
   return %2 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s37simple_partial_apply_2nd_level_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+// CHECK-LABEL: sil shared [ossa] @$s37simple_partial_apply_2nd_level_caller0a1_b1_C4_funBi1_Tf1E_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 // CHECK: bb0([[CAPTURED_ARG:%.*]] : $Builtin.Int1):
-// CHECK: [[SPECIALIZED_CALLEE:%.*]] = function_ref @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n  :
+// CHECK: [[SPECIALIZED_CALLEE:%.*]] = function_ref @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1E_n  :
 // CHECK: [[RET:%.*]]= apply [[SPECIALIZED_CALLEE]]([[CAPTURED_ARG]])
 // CHECK: return [[RET]]
 sil [ossa] @simple_partial_apply_2nd_level_caller : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1 {
@@ -54,19 +54,19 @@ bb3:
 }
 sil @simple_partial_apply_caller_decl : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
 
-// CHECK-LABEL: sil shared [ossa] @$s36simple_multiple_partial_apply_caller0a1_c1_D4_funBi1_ABBi1_Tf1cc_n : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+// CHECK-LABEL: sil shared [ossa] @$s36simple_multiple_partial_apply_caller0a1_c1_D4_funBi1_ABBi1_Tf1EE_n : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 // CHECK:         [[C:%.*]] = function_ref @simple_partial_apply_fun : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
 // CHECK:           = partial_apply [[C]](%0) : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
 // CHECK:           = partial_apply [[C]](%1) : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
-// CHECK:       } // end sil function '$s36simple_multiple_partial_apply_caller0a1_c1_D4_funBi1_ABBi1_Tf1cc_n'
+// CHECK:       } // end sil function '$s36simple_multiple_partial_apply_caller0a1_c1_D4_funBi1_ABBi1_Tf1EE_n'
 
-// CHECK-LABEL: sil shared [ossa] @$s36simple_multiple_partial_apply_caller19closure_with_stringSSTf1cC0_n : $@convention(thin) (@owned String) -> Builtin.Int1 {
+// CHECK-LABEL: sil shared [ossa] @$s36simple_multiple_partial_apply_caller19closure_with_stringSSTf1EC0_n : $@convention(thin) (@owned String) -> Builtin.Int1 {
 // %0                                             // user: %2
 // CHECK:         %1 = function_ref @closure_with_string : $@convention(thin) (Builtin.Int1, @guaranteed String) -> Builtin.Int1
 // CHECK:         [[P:%.*]] = partial_apply %1(%0) : $@convention(thin) (Builtin.Int1, @guaranteed String) -> Builtin.Int1
 // CHECK:         copy_value [[P]]
 // CHECK:         br bb1
-// CHECK:       } // end sil function '$s36simple_multiple_partial_apply_caller19closure_with_stringSSTf1cC0_n'
+// CHECK:       } // end sil function '$s36simple_multiple_partial_apply_caller19closure_with_stringSSTf1EC0_n'
 sil [ossa] @simple_multiple_partial_apply_caller : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1, @owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : @owned $@callee_owned (Builtin.Int1) -> Builtin.Int1, %1 : @owned $@callee_owned (Builtin.Int1) -> Builtin.Int1):
   br bb1
@@ -267,9 +267,9 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @loop_driver : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
-// CHECK-DAG:     [[SPECIALIZED_FUN:%.*]] = function_ref @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+// CHECK-DAG:     [[SPECIALIZED_FUN:%.*]] = function_ref @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1E_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
 // CHECK:         apply [[SPECIALIZED_FUN]]
-// CHECK-DAG:     [[SPECIALIZED_FUN2:%.*]] = function_ref @$s37simple_partial_apply_2nd_level_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+// CHECK-DAG:     [[SPECIALIZED_FUN2:%.*]] = function_ref @$s37simple_partial_apply_2nd_level_caller0a1_b1_C4_funBi1_Tf1E_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
 // CHECK:         apply [[SPECIALIZED_FUN2]]
 
 // We can't call this one b/c it is just a declaration.
@@ -293,7 +293,7 @@ bb3:
 
 // Closure with indirect result but no captured indirect parameter.
 // CHECK-NOT:     apply [[CALLER1]]
-// CHECK:         [[INLINEDCLOSURE_CALLER1:%.*]] = function_ref @$s40indirect_parameter_partial_apply_caller10a1_b1_c1_D4_funTf1c_n
+// CHECK:         [[INLINEDCLOSURE_CALLER1:%.*]] = function_ref @$s40indirect_parameter_partial_apply_caller10a1_b1_c1_D4_funTf1E_n
 // CHECK:         apply [[INLINEDCLOSURE_CALLER1]]()
 // CHECK-NOT:     apply [[CALLER1]]
 
@@ -302,7 +302,7 @@ bb3:
 // CHECK:         apply [[CALLER3]]([[CLOSURE3]])
 // CHECK:         apply [[CALLER4]]([[CLOSURE4]])
 
-// CHECK:         [[SM:%.*]] = function_ref @$s36simple_multiple_partial_apply_caller0a1_c1_D4_funBi1_ABBi1_Tf1cc_n : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+// CHECK:         [[SM:%.*]] = function_ref @$s36simple_multiple_partial_apply_caller0a1_c1_D4_funBi1_ABBi1_Tf1EE_n : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
 // CHECK:         apply [[SM]](%0, %0) : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
 
 // CHECK:       } // end sil function 'loop_driver'
@@ -382,7 +382,7 @@ sil @closure_with_string : $@convention(thin) (Builtin.Int1, @guaranteed String)
 
 // CHECK-LABEL: sil [ossa] @test_multi_closure_with_string :
 // CHECK:         [[C:%.*]] = copy_value %0
-// CHECK:         [[F:%.*]] = function_ref @$s36simple_multiple_partial_apply_caller19closure_with_stringSSTf1cC0_n : $@convention(thin) (@owned String) -> Builtin.Int1
+// CHECK:         [[F:%.*]] = function_ref @$s36simple_multiple_partial_apply_caller19closure_with_stringSSTf1EC0_n : $@convention(thin) (@owned String) -> Builtin.Int1
 // CHECK:           = apply [[F]]([[C]]) : $@convention(thin) (@owned String) -> Builtin.Int1
 // CHECK:       } // end sil function 'test_multi_closure_with_string'
 sil [ossa] @test_multi_closure_with_string : $@convention(thin) (@owned String) -> () {
