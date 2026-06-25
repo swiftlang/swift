@@ -1439,3 +1439,23 @@ func testKeypathWithTypeReference() {
 
   _ = \S.Type.Q // expected-error {{key path cannot refer to type 'Q'}}
 }
+
+// Invalid reference combined with a missing member shouldn't prevent key path from being resolved.
+protocol P1 {
+  subscript(name: String) -> Int { get }
+}
+
+protocol P2 {
+  func access<T>(keyPath: KeyPath<Self, T>)
+}
+
+extension P1 {
+  subscript(name: String) -> Int {
+    get {
+      (self as? any P2)?.access(keyPath: \.[name: name])
+      // expected-error@-1 {{member 'access' cannot be used on value of type 'any P2'; consider using a generic constraint instead}}
+      // expected-error@-2 {{value of type 'any P2' has no subscripts}}
+      return 1
+    }
+  }
+}

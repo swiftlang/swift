@@ -5186,7 +5186,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       if (!overload) {
         // If overload cannot be found because member is missing,
         // that's a failure.
-        if (hasFixFor(componentLoc, FixKind::DefineMemberBasedOnUse))
+        if (hasFixFor(calleeLoc, FixKind::DefineMemberBasedOnUse))
           return fail();
 
         return delay();
