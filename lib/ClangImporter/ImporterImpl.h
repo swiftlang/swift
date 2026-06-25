@@ -2320,6 +2320,18 @@ bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
 /// Note that \p Node cannot itself be a clang::Module.
 const clang::Module *getClangOwningModule(ClangNode Node,
                                           const clang::ASTContext &ClangCtx);
+
+enum class RetainReleaseOperationKind {
+  notAfunction,
+  notAnInstanceFunction,
+  invalidReturnType,
+  invalidParameters,
+  valid
+};
+
+RetainReleaseOperationKind checkRetainReleaseOperationValidity(
+    const ClassDecl *classDecl, ValueDecl *operation,
+    CustomRefCountingOperationKind operationKind);
 } // end namespace importer
 } // end namespace swift
 

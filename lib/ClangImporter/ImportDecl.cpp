@@ -3059,85 +3059,6 @@ namespace {
         return;
       }
 
-      enum class RetainReleaseOperationKind {
-        notAfunction,
-        notAnInstanceFunction,
-        invalidReturnType,
-        invalidParameters,
-        valid
-      };
-
-      auto getOperationValidity =
-          [&](ValueDecl *operation,
-              CustomRefCountingOperationKind operationKind)
-          -> RetainReleaseOperationKind {
-        auto operationFn = dyn_cast<FuncDecl>(operation);
-        if (!operationFn)
-          return RetainReleaseOperationKind::notAfunction;
-
-        if (operationFn->isStatic())
-          return RetainReleaseOperationKind::notAnInstanceFunction;
-
-        if (operationFn->isInstanceMember()) {
-          if (operationFn->getParameters()->size() != 0)
-            return RetainReleaseOperationKind::invalidParameters;
-        } else {
-          if (operationFn->getParameters()->size() != 1)
-            return RetainReleaseOperationKind::invalidParameters;
-        }
-
-        Type paramType;
-        NominalTypeDecl *paramDecl = nullptr;
-        if (!operationFn->isInstanceMember()) {
-          paramType = operationFn->getParameters()
-                          ->get(0)
-                          ->getInterfaceType()
-                          ->lookThroughSingleOptionalType();
-
-          paramDecl = paramType->getAnyNominal();
-        } else {
-          paramDecl = cast<NominalTypeDecl>(operationFn->getParent());
-          paramType = paramDecl->getDeclaredInterfaceType();
-        }
-
-        // The return type should be void (for release functions), or void
-        // or the parameter type (for retain functions).
-        auto resultInterfaceType = operationFn->getResultInterfaceType();
-        if (!resultInterfaceType->isVoid() &&
-            !resultInterfaceType->isUInt() &&
-            !resultInterfaceType->isUInt8() &&
-            !resultInterfaceType->isUInt16() &&
-            !resultInterfaceType->isUInt32() &&
-            !resultInterfaceType->isUInt64() &&
-            !resultInterfaceType->isInt() &&
-            !resultInterfaceType->isInt8() &&
-            !resultInterfaceType->isInt16() &&
-            !resultInterfaceType->isInt32() &&
-            !resultInterfaceType->isInt64()) {
-          if (operationKind == CustomRefCountingOperationKind::release ||
-              !resultInterfaceType->lookThroughSingleOptionalType()->isEqual(paramType))
-            return RetainReleaseOperationKind::invalidReturnType;
-        }
-
-        // The parameter of the retain/release function should be pointer to the
-        // same FRT or a base FRT.
-        if (paramDecl != classDecl) {
-          if (auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
-            if (const clang::Decl *paramClangDecl = paramDecl->getClangDecl()) {
-              if (const auto *paramTypeDecl =
-                      dyn_cast<clang::CXXRecordDecl>(paramClangDecl)) {
-                if (cxxDecl->isDerivedFrom(paramTypeDecl)) {
-                  return RetainReleaseOperationKind::valid;
-                }
-              }
-            }
-          }
-          return RetainReleaseOperationKind::invalidParameters;
-        }
-
-        return RetainReleaseOperationKind::valid;
-      };
-
       HeaderLoc loc(decl->getLocation());
 
       if (retainOperation.kind ==
@@ -3165,8 +3086,10 @@ namespace {
                       false, retainOperation.name, decl->getNameAsString());
       } else if (retainOperation.kind ==
                  CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperationKind operationKind = getOperationValidity(
-            retainOperation.operation, CustomRefCountingOperationKind::retain);
+        RetainReleaseOperationKind operationKind =
+            importer::checkRetainReleaseOperationValidity(
+                classDecl, retainOperation.operation,
+                CustomRefCountingOperationKind::retain);
         switch (operationKind) {
         case RetainReleaseOperationKind::notAfunction:
           Impl.diagnose(
@@ -3226,8 +3149,9 @@ namespace {
       } else if (releaseOperation.kind ==
                  CustomRefCountingOperationResult::foundOperation) {
         RetainReleaseOperationKind operationKind =
-            getOperationValidity(releaseOperation.operation,
-                                 CustomRefCountingOperationKind::release);
+            importer::checkRetainReleaseOperationValidity(
+                classDecl, releaseOperation.operation,
+                CustomRefCountingOperationKind::release);
         switch (operationKind) {
         case RetainReleaseOperationKind::notAfunction:
           Impl.diagnose(
