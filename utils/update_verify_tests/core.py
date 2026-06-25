@@ -2272,6 +2272,116 @@ def _pick_keeper(diags):
     return min(diags, key=sort_key)
 
 
+def _find_merge_prefix(prefixes, prefix_to_runs, runs_to_prefixes):
+    """Given a list of prefixes, compute their combined RUN-line coverage
+    and return a single prefix that covers exactly that set, or ``None``
+    if no such prefix exists.  Prefers the default (empty) prefix."""
+    coverage = set()
+    for p in prefixes:
+        rset = prefix_to_runs.get(p)
+        if rset is None:
+            return None
+        coverage |= rset
+    candidates = runs_to_prefixes.get(frozenset(coverage))
+    if not candidates:
+        return None
+    if "" in candidates:
+        return ""
+    return min(candidates, key=lambda p: (len(p), p))
+
+
+def _nested_diag_key(nd):
+    """Overlap key for a directive nested inside an expansion block."""
+    return (
+        nd.absolute_target(),
+        nd.category,
+        nd.diag_content,
+        nd.count,
+        nd.is_re,
+        nd.fixits_raw_str,
+    )
+
+
+def _merge_expansion_groups(expansion_diags, prefix_to_runs,
+                            runs_to_prefixes, lines):
+    """Merge expansion blocks that target the same source location.
+
+    Two expansion blocks at the same ``(absolute_target, column)`` are
+    combined into one whose prefix covers the union of runs.  Their
+    nested directives are individually merged where an appropriate prefix
+    exists; non-overlapping nested directives are kept with their original
+    prefix.
+    """
+    # Group by (absolute_target, col).
+    groups = {}
+    for d in expansion_diags:
+        key = (d.absolute_target(), d.col())
+        groups.setdefault(key, []).append(d)
+
+    changed = False
+    for key, exp_list in groups.items():
+        if len(exp_list) < 2:
+            continue
+
+        # Find a prefix for the merged expansion block.
+        exp_prefix = _find_merge_prefix(
+            [d.prefix for d in exp_list], prefix_to_runs, runs_to_prefixes)
+        if exp_prefix is None:
+            continue
+
+        keeper = _pick_keeper(exp_list)
+
+        # Collect all nested lines from every block in the group.
+        all_nested = []
+        for d in exp_list:
+            all_nested.extend(d.nested_lines)
+
+        # Group nested diags by overlap key within the expansion.
+        nested_groups = {}
+        for nl in all_nested:
+            if not nl.diag:
+                continue
+            nk = _nested_diag_key(nl.diag)
+            nested_groups.setdefault(nk, []).append(nl)
+
+        # Merge overlapping nested diags where possible.
+        merged_nested = []
+        for nk, nl_list in nested_groups.items():
+            if len(nl_list) > 1:
+                np = _find_merge_prefix(
+                    [nl.diag.prefix for nl in nl_list],
+                    prefix_to_runs, runs_to_prefixes)
+                if np is not None:
+                    nl_list[0].diag.prefix = np
+                    merged_nested.append(nl_list[0])
+                    continue
+            # Single diag or unmergeable — keep all.
+            merged_nested.extend(nl_list)
+
+        # Sort by target line within expansion, then by category for
+        # stability.
+        merged_nested.sort(
+            key=lambda nl: (nl.diag.absolute_target() if nl.diag else 0,
+                            nl.diag.category if nl.diag else ""))
+
+        # Install merged content into the keeper.
+        keeper.prefix = exp_prefix
+        keeper.nested_lines = merged_nested
+        for i, nl in enumerate(keeper.nested_lines):
+            nl.line_n = i + 1
+
+        # Remove the other expansion blocks from `lines`.
+        for d in exp_list:
+            if d is keeper:
+                continue
+            if d.target is not None:
+                d.unset_target()
+            remove_line(d.line, lines)
+        changed = True
+
+    return changed
+
+
 def minimize_verify_test(filename):
     """Read *filename*, merge redundant prefixed expected-* directives where
     a single prefix can replace a set of overlapping ones, and write the
@@ -2295,7 +2405,6 @@ def minimize_verify_test(filename):
 
     # Parse every expected-* directive (all prefixes).
     expansion_context = []
-    all_diags = []
     for line in lines:
         diag = parse_diag(line, filename, "", all_prefixes=True)
         if diag:
@@ -2315,53 +2424,40 @@ def minimize_verify_test(filename):
                     diag.parent = expansion_context[-1]
                 else:
                     diag.set_target(lines[diag.absolute_target() - 1])
-                all_diags.append(diag)
 
-    # Group by overlap key.
+    # Fold expansion blocks so nested lines live inside the parent diag.
+    fold_expansions(lines)
+
+    # Separate expansion and regular diags.
+    expansion_diags = []
+    regular_diags = []
+    for line in lines:
+        if line.diag and not isinstance(line.diag, ExpansionDiagClose):
+            if line.diag.category == "expansion":
+                expansion_diags.append(line.diag)
+            else:
+                regular_diags.append(line.diag)
+
+    changed = False
+
+    # --- Pass 1: merge expansion blocks at the same location. ---
+    changed |= _merge_expansion_groups(
+        expansion_diags, prefix_to_runs, runs_to_prefixes, lines)
+
+    # --- Pass 2: merge regular (non-expansion) diags. ---
     groups = {}
-    for diag in all_diags:
+    for diag in regular_diags:
         key = _overlap_key(diag)
         groups.setdefault(key, []).append(diag)
 
-    changed = False
-    # Process each group that has more than one directive.
     for key, diag_list in groups.items():
         if len(diag_list) < 2:
             continue
 
-        # All prefixes in the group must be known to the RUN-line map.
-        # Directives whose prefix is not mentioned in any RUN line cannot
-        # be reasoned about; skip the group.
-        coverage = set()
-        skip = False
-        for d in diag_list:
-            rset = prefix_to_runs.get(d.prefix)
-            if rset is None:
-                skip = True
-                break
-            coverage |= rset
-        if skip:
+        merge_prefix = _find_merge_prefix(
+            [d.prefix for d in diag_list], prefix_to_runs, runs_to_prefixes)
+        if merge_prefix is None:
             continue
-        coverage = frozenset(coverage)
-
-        # Is there a prefix that covers exactly this set of runs?
-        candidates = runs_to_prefixes.get(coverage)
-        if not candidates:
-            continue
-
-        # Prefer the default prefix when possible; otherwise pick the
-        # shortest candidate (arbitrary but stable).
-        if "" in candidates:
-            merge_prefix = ""
-        else:
-            merge_prefix = min(candidates, key=lambda p: (len(p), p))
-
-        # If one of the diags already uses the merge prefix, we'd end up
-        # keeping it and removing the others.  Make sure we don't create a
-        # duplicate by checking whether there's already a surviving diag
-        # with the merge prefix at this location outside this group.
-        # (In a well-formed passing test this shouldn't happen, but be
-        # safe.)
 
         keeper = _pick_keeper(diag_list)
         keeper.prefix = merge_prefix
@@ -2374,6 +2470,7 @@ def minimize_verify_test(filename):
         changed = True
 
     if changed:
+        expand_expansions(lines)
         with open(filename, "w") as f:
             for line in lines:
                 f.write(line.render())

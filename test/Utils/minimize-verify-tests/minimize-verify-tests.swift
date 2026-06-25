@@ -33,6 +33,10 @@
 // RUN: %minimize-verify-tests %t/run-line-continuation.swift
 // RUN: %diff %t/run-line-continuation.swift %t/run-line-continuation.swift.expected
 
+// --- expansion: Prefixed expansion blocks merge -------------------------
+// RUN: %minimize-verify-tests %t/expansion.swift
+// RUN: %diff %t/expansion.swift %t/expansion.swift.expected
+
 //--- basic-merge.swift
 // RUN: true -verify -verify-additional-prefix swift5-
 // RUN: true -verify -verify-additional-prefix swift6-
@@ -193,3 +197,31 @@ func run_line_continuation() {
   let x = 1
   // expected-error @-1 {{error msg}}
 }
+//--- expansion.swift
+// RUN: true -verify -verify-additional-prefix a-
+// RUN: true -verify -verify-additional-prefix b-
+
+@freestanding(expression)
+macro myMacro() = #externalMacro(module: "M", type: "T")
+let x = #myMacro
+// expected-a-expansion@-1:9{{
+//   expected-a-warning@1 {{shared warning}}
+//   expected-a-warning@2 {{a-only warning}}
+// }}
+// expected-b-expansion@-5:9{{
+//   expected-b-warning@1 {{shared warning}}
+// }}
+// expected-a-error @-7 {{some error}}
+// expected-b-error @-8 {{some error}}
+//--- expansion.swift.expected
+// RUN: true -verify -verify-additional-prefix a-
+// RUN: true -verify -verify-additional-prefix b-
+
+@freestanding(expression)
+macro myMacro() = #externalMacro(module: "M", type: "T")
+let x = #myMacro
+// expected-expansion@-1:9{{
+//   expected-warning@1 {{shared warning}}
+//   expected-a-warning@2 {{a-only warning}}
+// }}
+// expected-error @-4 {{some error}}
