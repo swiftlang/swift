@@ -581,6 +581,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool hasValidLinkageForFragileRef(SerializedKind) const;
   BRIDGED_INLINE ThunkKind isThunk() const;
   BRIDGED_INLINE void setThunk(ThunkKind) const;
+  BRIDGED_INLINE bool isWithoutActuallyEscapingThunk() const;
   BRIDGED_INLINE bool needsStackProtection() const;
   BRIDGED_INLINE bool shouldOptimize() const;
   BRIDGED_INLINE bool isReferencedInModule() const;
