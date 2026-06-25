@@ -1830,3 +1830,20 @@ do {
   f(0, "")
   // expected-error@-1:4 {{missing argument label 'p:' in call}}{{5-5=p: }}
 }
+
+do {
+  func testNamed(_: String, a: Int? = nil, b: Int? = nil, action: () -> Void = {}) {}
+  // expected-note@-1 {{candidate expects argument 'a' must precede argument 'b'}}
+  func testNamed(d labeled: String, b: Int? = nil, a: Int? = nil, action: () -> Void = {}) {}
+  // expected-note@-1 {{incorrect labels for candidate (have: '(_:b:a:)', expected: '(d:b:a:)')}}
+
+  testNamed("", b: 0, a: 0)
+  // expected-error@-1 {{no exact matches in call to local function 'testNamed'}}
+
+  func testUnnamed(_: String, a: Int? = nil, _: Int? = nil, action: () -> Void = {}) {}
+  func testUnNamed(d labeled: String, _: Int? = nil, a: Int? = nil, action: () -> Void = {}) {}
+
+  testUnnamed("", 0, a: 0) // expected-error {{argument 'a' must precede unnamed argument #2}}
+  testUnnamed("", b: 0, a: 0) // expected-error {{incorrect argument labels in call (have '_:b:a:', expected '_:a:_:action:')}}
+  testUnnamed(d: "", 0, a: 0) // expected-error {{incorrect argument labels in call (have 'd:_:a:', expected '_:a:_:action:')}}
+}

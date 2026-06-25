@@ -6221,6 +6221,38 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
   return true;
 }
 
+bool OutOfOrderArgumentFailure::diagnoseAsNote() {
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *argList = getArgumentListFor(getLocator());
+  if (!argList)
+    return false;
+
+  auto first = argList->getLabel(ArgIdx);
+  auto second = argList->getLabel(PrevArgIdx);
+
+  if (first.nonempty() && second.nonempty()) {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_named, first, second);
+  } else if (first.empty() && second.empty()) {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_unnamed, ArgIdx + 1,
+                     PrevArgIdx + 1);
+  } else if (first.empty()) {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_unnamed_named, ArgIdx + 1,
+                     second);
+  } else {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_named_unnamed, first,
+                     PrevArgIdx + 1);
+  }
+
+  return true;
+}
+
 SourceLoc ExtraneousArgumentsFailure::getLoc() const {
   if (auto *argList = getArgumentListFor(getLocator()))
     return argList->getLoc();
