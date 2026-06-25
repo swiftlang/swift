@@ -2167,3 +2167,214 @@ def check_expectations(tool_output, prefix):
         return update_test_files(top_level, prefix, unparsed_files)
     else:
         return ("no mismatching diagnostics found", None)
+
+
+# ---------------------------------------------------------------------------
+# minimize-verify-tests: merge redundant prefixed expected-* directives
+# ---------------------------------------------------------------------------
+
+# Regex to extract `-verify-additional-prefix <prefix>` from a RUN command.
+_additional_prefix_re = re.compile(r"-verify-additional-prefix\s+(\S+)")
+
+# Detects that a RUN command involves the diagnostic verifier.  Matches
+# `-verify` as a standalone flag (not part of `-verify-additional-prefix`,
+# `-verify-ignore-unrelated`, etc.) or known lit substitutions that imply it.
+_verify_flag_re = re.compile(
+    r"(?:-verify(?![-\w])|%-*target-typecheck-verify-swift\b|"
+    r"%-*target-swift-frontend-verify\b)"
+)
+
+
+def _parse_run_lines(raw_lines):
+    """Return a list of full RUN-line command strings with continuations
+    joined.  Each entry is a single logical RUN command."""
+    runs = []
+    current = None
+    for raw in raw_lines:
+        text = raw.rstrip("\n")
+        m = re.match(r"^\s*//\s*RUN:\s*(.*)", text)
+        if m:
+            part = m.group(1)
+            if current is not None:
+                current += " " + part
+            else:
+                current = part
+            if current.endswith("\\"):
+                current = current[:-1]
+            else:
+                runs.append(current)
+                current = None
+        else:
+            if current is not None:
+                runs.append(current)
+                current = None
+    if current is not None:
+        runs.append(current)
+    return runs
+
+
+def _collect_verify_prefixes(raw_lines):
+    """Parse every verify-RUN line and return two structures:
+
+    * ``run_prefixes``: a list of ``frozenset`` where each element is the
+      set of active prefixes for that verify-RUN line (always includes the
+      default ``""``).
+    * ``prefix_to_runs``: a dict mapping each prefix to the
+      ``frozenset`` of verify-RUN indices where it is active.
+
+    Non-verify RUN lines are silently skipped.
+    """
+    commands = _parse_run_lines(raw_lines)
+    run_prefixes = []
+    for cmd in commands:
+        if not _verify_flag_re.search(cmd):
+            continue
+        prefixes = {""}
+        for m in _additional_prefix_re.finditer(cmd):
+            prefixes.add(m.group(1))
+        run_prefixes.append(frozenset(prefixes))
+
+    prefix_to_runs = {}
+    for run_idx, pset in enumerate(run_prefixes):
+        for p in pset:
+            prefix_to_runs.setdefault(p, set()).add(run_idx)
+    # Freeze the sets so they are hashable / easily comparable.
+    prefix_to_runs = {p: frozenset(s) for p, s in prefix_to_runs.items()}
+    return run_prefixes, prefix_to_runs
+
+
+def _overlap_key(diag):
+    """Return a hashable key that groups directives which could potentially
+    be merged: same target line, same category, same content, same count,
+    same regex flag, and same fix-it annotations."""
+    return (
+        diag.absolute_target(),
+        diag.category,
+        diag.diag_content,
+        diag.count,
+        diag.is_re,
+        diag.fixits_raw_str,
+    )
+
+
+def _pick_keeper(diags):
+    """From a list of mergeable ``Diag`` objects choose the one to keep.
+
+    Preference order:
+    1. On the same line as the target (relative offset 0) — avoids ``@+N``.
+    2. Closest to the target (smallest absolute relative offset).
+    3. Earliest in the file (smallest ``line.line_n``).
+    """
+    def sort_key(d):
+        rel = abs(d.relative_target())
+        return (rel != 0, rel, d.line.line_n)
+
+    return min(diags, key=sort_key)
+
+
+def minimize_verify_test(filename):
+    """Read *filename*, merge redundant prefixed expected-* directives where
+    a single prefix can replace a set of overlapping ones, and write the
+    result back.  Returns an error string on failure, or ``None`` on
+    success."""
+    with open(filename, "r") as f:
+        raw_lines = f.readlines()
+
+    run_prefixes, prefix_to_runs = _collect_verify_prefixes(raw_lines)
+    if not run_prefixes:
+        return None  # no verify-RUN lines — nothing to do
+
+    # Build the inverse mapping: frozenset-of-runs → list of prefixes that
+    # cover exactly that set.
+    runs_to_prefixes = {}
+    for pfx, rset in prefix_to_runs.items():
+        runs_to_prefixes.setdefault(rset, []).append(pfx)
+
+    lines = [Line(line, i + 1) for i, line in enumerate(raw_lines + [""])]
+    orig_lines = list(lines)
+
+    # Parse every expected-* directive (all prefixes).
+    expansion_context = []
+    all_diags = []
+    for line in lines:
+        diag = parse_diag(line, filename, "", all_prefixes=True)
+        if diag:
+            line.diag = diag
+            if isinstance(diag, ExpansionDiagClose):
+                if expansion_context:
+                    diag.parent = expansion_context[-1]
+                    expansion_context.pop()
+            elif diag.category == "expansion":
+                if expansion_context:
+                    diag.parent = expansion_context[-1]
+                else:
+                    diag.set_target(lines[diag.absolute_target() - 1])
+                expansion_context.append(diag)
+            else:
+                if expansion_context:
+                    diag.parent = expansion_context[-1]
+                else:
+                    diag.set_target(lines[diag.absolute_target() - 1])
+                all_diags.append(diag)
+
+    # Group by overlap key.
+    groups = {}
+    for diag in all_diags:
+        key = _overlap_key(diag)
+        groups.setdefault(key, []).append(diag)
+
+    changed = False
+    # Process each group that has more than one directive.
+    for key, diag_list in groups.items():
+        if len(diag_list) < 2:
+            continue
+
+        # All prefixes in the group must be known to the RUN-line map.
+        # Directives whose prefix is not mentioned in any RUN line cannot
+        # be reasoned about; skip the group.
+        coverage = set()
+        skip = False
+        for d in diag_list:
+            rset = prefix_to_runs.get(d.prefix)
+            if rset is None:
+                skip = True
+                break
+            coverage |= rset
+        if skip:
+            continue
+        coverage = frozenset(coverage)
+
+        # Is there a prefix that covers exactly this set of runs?
+        candidates = runs_to_prefixes.get(coverage)
+        if not candidates:
+            continue
+
+        # Prefer the default prefix when possible; otherwise pick the
+        # shortest candidate (arbitrary but stable).
+        if "" in candidates:
+            merge_prefix = ""
+        else:
+            merge_prefix = min(candidates, key=lambda p: (len(p), p))
+
+        # If one of the diags already uses the merge prefix, we'd end up
+        # keeping it and removing the others.  Make sure we don't create a
+        # duplicate by checking whether there's already a surviving diag
+        # with the merge prefix at this location outside this group.
+        # (In a well-formed passing test this shouldn't happen, but be
+        # safe.)
+
+        keeper = _pick_keeper(diag_list)
+        keeper.prefix = merge_prefix
+        for d in diag_list:
+            if d is keeper:
+                continue
+            if d.target is not None:
+                d.unset_target()
+            remove_line(d.line, lines)
+        changed = True
+
+    if changed:
+        with open(filename, "w") as f:
+            for line in lines:
+                f.write(line.render())
+    return None
