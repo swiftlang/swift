@@ -1308,10 +1308,10 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
     observer->performedSemanticAnalysis(Instance);
 
   switch (opts.CrashMode) {
-  case FrontendOptions::DebugCrashMode::AssertAfterParse:
+  case FrontendOptions::DebugCrashMode::AssertAfterTypeChecking:
     debugFailWithAssertion();
     return true;
-  case FrontendOptions::DebugCrashMode::CrashAfterParse:
+  case FrontendOptions::DebugCrashMode::CrashAfterTypeChecking:
     debugFailWithCrash();
     return true;
   case FrontendOptions::DebugCrashMode::None:
