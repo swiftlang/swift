@@ -442,13 +442,17 @@ final class C14: Sendable {
 
 // Synthesizing an implicit Sendable conformance for global-actor-isolated
 // classes with non-Sendable superclasses was a mistake, but it is maintained
-// for source compatibility. When Sendable is not explicitly stated, the
-// diagnostic is suppressed.
+// for source compatibility. Starting in Swift 6, a warning explains where
+// the conformance came from and offers fix-its.
 @MainActor
 class IsolatedNonSendable: NotSendable {}
 
 final class InheritedIsolationSubclass: IsolatedNonSendable {}
+// expected-swift6-warning @-1 {{class 'InheritedIsolationSubclass' is implicitly 'Sendable' due to inherited 'MainActor' isolation but has a non-Sendable superclass; this will be an error in a future Swift language mode}}
+// expected-swift6-note @-2 {{make 'InheritedIsolationSubclass' explicitly 'MainActor' to retain implicit 'Sendable' conformance}} {{1-1=@MainActor }}
+// expected-swift6-note @-3 {{mark 'InheritedIsolationSubclass' as '~Sendable' to suppress the implicit conformance}} {{60-60=, ~Sendable}}
 
+// The subclass is still Sendable (source compatibility), so this compiles.
 func requiresSendable<T: Sendable>(_: T.Type) {}
 func testInheritedIsolationIsSendable() {
   requiresSendable(InheritedIsolationSubclass.self)

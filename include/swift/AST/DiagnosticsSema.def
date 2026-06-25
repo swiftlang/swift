@@ -6268,6 +6268,15 @@ NOTE(concurrent_value_nonsendable_superclass_note,none,
      "a 'Sendable' class cannot inherit from a non-Sendable class", ())
 NOTE(concurrent_value_nonsendable_superclass_here,none,
      "inherits from non-Sendable class %0", (DeclName))
+GROUPED_ERROR(implicit_sendable_nonsendable_superclass,NonSendableSuperclass,none,
+     "class %0 is implicitly 'Sendable' due to inherited %1 isolation "
+     "but has a non-Sendable superclass", (DeclName, Type))
+NOTE(implicit_sendable_nonsendable_superclass_fixit,none,
+     "make %0 explicitly %1 to retain implicit 'Sendable' conformance",
+     (DeclName, Type))
+NOTE(implicit_sendable_nonsendable_superclass_suppress,none,
+     "mark %0 as '~Sendable' to suppress the implicit conformance",
+     (DeclName))
 ERROR(non_sendable_type,none,
       "type %0 does not conform to the 'Sendable' protocol", (Type))
 GROUPED_ERROR(non_sendable_metatype_type,SendableMetatypes,none,

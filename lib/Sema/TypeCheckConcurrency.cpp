@@ -7608,7 +7608,8 @@ bool swift::checkSendableConformance(
   // not be 'final'. Adding global-actor isolation to a non-Sendable superclass,
   // however, does not make the subclass safely 'Sendable'.
   bool isGlobalActorIsolated = false;
-  switch (getActorIsolation(nominal)) {
+  auto nominalIsolation = getActorIsolation(nominal);
+  switch (nominalIsolation) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::ActorInstance:
   case ActorIsolation::Nonisolated:
@@ -7684,67 +7685,114 @@ bool swift::checkSendableConformance(
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         // `NSObject` is permitted as a superclass for Objective-C interop.
         // TODO: can `NSObject` be `Sendable` or `~Sendable` instead?
-        // Synthesizing a Sendable conformance for global-actor-isolated
-        // classes with non-Sendable superclasses was a mistake, but we
-        // maintain it for source compatibility. When the conformance
-        // is implicit (the user never wrote Sendable), skip the
-        // diagnostic entirely.
-        if (!superclassDecl->isNSObject() &&
-            !(isGlobalActorIsolated && isImplicitSendableCheck(check))) {
-          // Inheritance checking for global-actor-isolated classes was
-          // historically skipped, so we need to downgrade this to a warning to
-          // stage it in.
-          bool isError = false;
-          if (isGlobalActorIsolated) {
-            // TODO: remove this staging once people have had a chance to fix
-            // their code.
-            conformanceDecl
-                ->diagnose(diag::concurrent_value_nonsendable_superclass,
-                           classDecl->getName())
-                .limitBehaviorWithPreconcurrency(
-                    DiagnosticBehavior::Warning,
-                    impliedByPreconcurrencyProtocol, LanguageMode::future);
+        if (!superclassDecl->isNSObject()) {
+          if (isGlobalActorIsolated && isImplicitSendableCheck(check)) {
+            // Synthesizing a Sendable conformance for global-actor-isolated
+            // classes with non-Sendable superclasses was a mistake, but we
+            // maintain it for source compatibility. Warn starting in
+            // Swift 6; error in a future language mode.
+            auto globalActorType = nominalIsolation.getGlobalActor();
+            classDecl
+                ->diagnose(
+                    diag::implicit_sendable_nonsendable_superclass,
+                    classDecl->getName(), globalActorType)
+                .limitBehaviorUntilLanguageMode(
+                    DiagnosticBehavior::Warning, LanguageMode::future)
+                .limitBehaviorUntilLanguageMode(
+                    DiagnosticBehavior::Ignore, LanguageMode::v6);
+
+            // Fix-it: add explicit global actor attribute.
+            {
+              std::string attrStr = "@" +
+                  globalActorType->getString() + " ";
+              classDecl
+                  ->diagnose(
+                      diag::implicit_sendable_nonsendable_superclass_fixit,
+                      classDecl->getName(), globalActorType)
+                  .fixItInsert(
+                      classDecl->getAttributeInsertionLoc(false),
+                      attrStr)
+                  .limitBehaviorUntilLanguageMode(
+                      DiagnosticBehavior::Ignore, LanguageMode::v6);
+            }
+
+            // Fix-it: suppress with ~Sendable.
+            {
+              auto inheritance = classDecl->getInherited();
+              auto note = classDecl->diagnose(
+                  diag::implicit_sendable_nonsendable_superclass_suppress,
+                  classDecl->getName());
+              if (inheritance.empty()) {
+                auto *genericParams = classDecl->getGenericParams();
+                auto insertionLoc = genericParams
+                    ? genericParams->getRAngleLoc()
+                    : classDecl->getNameLoc();
+                note.fixItInsertAfter(insertionLoc, ": ~Sendable");
+              } else {
+                note.fixItInsertAfter(
+                    inheritance.getEndLoc(), ", ~Sendable");
+              }
+              note.limitBehaviorUntilLanguageMode(
+                  DiagnosticBehavior::Ignore, LanguageMode::v6);
+            }
           } else {
-            conformanceDecl
-                ->diagnose(diag::concurrent_value_nonsendable_superclass,
-                           classDecl->getName())
-                .limitBehaviorWithPreconcurrency(
-                    behavior, impliedByPreconcurrencyProtocol,
-                    LanguageMode::v6);
-            isError = behavior == DiagnosticBehavior::Unspecified;
+            // Inheritance checking for global-actor-isolated classes was
+            // historically skipped, so we need to downgrade this to a
+            // warning to stage it in.
+            bool isError = false;
+            if (isGlobalActorIsolated) {
+              // TODO: remove this staging once people have had a chance
+              // to fix their code.
+              conformanceDecl
+                  ->diagnose(diag::concurrent_value_nonsendable_superclass,
+                             classDecl->getName())
+                  .limitBehaviorWithPreconcurrency(
+                      DiagnosticBehavior::Warning,
+                      impliedByPreconcurrencyProtocol, LanguageMode::future);
+            } else {
+              conformanceDecl
+                  ->diagnose(diag::concurrent_value_nonsendable_superclass,
+                             classDecl->getName())
+                  .limitBehaviorWithPreconcurrency(
+                      behavior, impliedByPreconcurrencyProtocol,
+                      LanguageMode::v6);
+              isError = behavior == DiagnosticBehavior::Unspecified;
+            }
+
+            conformanceDecl->diagnose(
+                diag::concurrent_value_nonsendable_superclass_note);
+
+            // Point at where the class inherits the non-Sendable superclass.
+            // Be slightly defensive here in the presence of badly-ordered
+            // inheritance clauses: the superclass is not necessarily the first
+            // entry once `superclass must appear first` recovery has run.
+            // TODO: abstract this? The same search exists in
+            // TypeCheckAccess.cpp.
+            auto inheritedEntries = classDecl->getInherited().getEntries();
+            auto superclassLocIter = std::find_if(
+                inheritedEntries.begin(), inheritedEntries.end(),
+                [&](TypeLoc inherited) {
+                  if (!inherited.wasValidated())
+                    return false;
+                  Type ty = inherited.getType();
+                  if (ty->is<ProtocolCompositionType>())
+                    if (auto superclass =
+                            ty->getExistentialLayout().explicitSuperclass)
+                      ty = superclass;
+                  return ty->getAnyNominal() == superclassDecl;
+                });
+            SourceLoc superclassLoc =
+                superclassLocIter == inheritedEntries.end()
+                    ? classDecl->getLoc()
+                    : superclassLocIter->getSourceRange().Start;
+            classDecl->getASTContext().Diags.diagnose(
+                superclassLoc,
+                diag::concurrent_value_nonsendable_superclass_here,
+                superclassDecl->getName());
+
+            if (isError)
+              return true;
           }
-
-          conformanceDecl->diagnose(
-              diag::concurrent_value_nonsendable_superclass_note);
-
-          // Point at where the class inherits the non-Sendable superclass. Be
-          // slightly defensive here in the presence of badly-ordered
-          // inheritance clauses: the superclass is not necessarily the first
-          // entry once `superclass must appear first` recovery has run.
-          // TODO: abstract this? The same search exists in TypeCheckAccess.cpp.
-          auto inheritedEntries = classDecl->getInherited().getEntries();
-          auto superclassLocIter = std::find_if(
-              inheritedEntries.begin(), inheritedEntries.end(),
-              [&](TypeLoc inherited) {
-                if (!inherited.wasValidated())
-                  return false;
-                Type ty = inherited.getType();
-                if (ty->is<ProtocolCompositionType>())
-                  if (auto superclass =
-                          ty->getExistentialLayout().explicitSuperclass)
-                    ty = superclass;
-                return ty->getAnyNominal() == superclassDecl;
-              });
-          SourceLoc superclassLoc =
-              superclassLocIter == inheritedEntries.end()
-                  ? classDecl->getLoc()
-                  : superclassLocIter->getSourceRange().Start;
-          classDecl->getASTContext().Diags.diagnose(
-              superclassLoc, diag::concurrent_value_nonsendable_superclass_here,
-              superclassDecl->getName());
-
-          if (isError)
-            return true;
         }
       }
     }
