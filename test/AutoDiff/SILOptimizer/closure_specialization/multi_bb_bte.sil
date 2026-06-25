@@ -68,7 +68,7 @@ bb0(%0 : $Optional<Float>):
   // TRUNNER-LABEL: Specialized BTE payload arguments of basic blocks in pullback $s4test5mul42yS2fSgFTJpSpSr:
   // TRUNNER-EMPTY:
 
-  // CHECK:         sil private [signature_optimized_thunk] [heuristic_always_inline] [ossa] @$s4test5mul42yS2fSgFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_S2fTf1nnc_n : $@convention(thin) (Float, _AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, Float, Float) -> Optional<Float>.TangentVector {
+  // CHECK:         sil private [signature_optimized_thunk] [heuristic_always_inline] [ossa] @$s4test5mul42yS2fSgFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_S2fTf1nnE_n : $@convention(thin) (Float, _AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, Float, Float) -> Optional<Float>.TangentVector {
   // CHECK:         bb0(%0 : $Float, %1 : $_AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, %2 : $Float, %3 : $Float):
   // CHECK:           %[[#A6:]] = function_ref @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
   // CHECK:           %[[#A4:]] = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
@@ -84,7 +84,7 @@ bb0(%0 : $Optional<Float>):
   // CHECK:         %[[#B4:]] = struct $Float (%[[#]] : $Builtin.FPIEEE32)
   // COMBINE-NOT:   = partial_apply
   // COMBINE-NOT:   = function_ref
-  // CHECK:         %[[#B15:]] = function_ref @$s4test5mul42yS2fSgFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_S2fTf1nnc_n : $@convention(thin) (Float, _AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, Float, Float) -> Optional<Float>.TangentVector
+  // CHECK:         %[[#B15:]] = function_ref @$s4test5mul42yS2fSgFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_S2fTf1nnE_n : $@convention(thin) (Float, _AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, Float, Float) -> Optional<Float>.TangentVector
   // CHECK:         %[[#B16:]] = partial_apply [callee_guaranteed] %[[#B15]](%[[#]], %2, %[[#B4]]) : $@convention(thin) (Float, _AD__$s4test5mul42yS2fSgF_bb2__Pred__src_0_wrt_0, Float, Float) -> Optional<Float>.TangentVector
   // CHECK:         %[[#B18:]] = tuple (%[[#]] : $Float, %[[#B16]] : $@callee_guaranteed (Float) -> Optional<Float>.TangentVector)
   // CHECK:         return %[[#B18]]
@@ -383,7 +383,7 @@ bb0(%0 : $Class):
   // TRUNNER-NEXT:  %[[#]] = argument of bb2 : $(predecessor: _AD__$s4test5ClassV6methodSfyF_bb1__Pred__src_0_wrt_0_spec_bb0_0_1, (Float, Float))
   // TRUNNER-EMPTY:
 
-  // CHECK:         sil private [ossa] @$s4test5ClassV6methodSfyFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktk1_l5FZSf_L6SfcfU_S2fAES2fTf1nncc_n : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0, Float, Float, Float, Float) -> Class.TangentVector {
+  // CHECK:         sil private [ossa] @$s4test5ClassV6methodSfyFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktk1_l5FZSf_L6SfcfU_S2fAES2fTf1nnEE_n : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0, Float, Float, Float, Float) -> Class.TangentVector {
   // CHECK:         bb0(%0 : $Float, %1 : @owned $_AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0, %2 : $Float, %3 : $Float, %4 : $Float, %5 : $Float):
   // CHECK:           %[[#D8:]] = function_ref @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
   // CHECK:           %[[#D6:]] = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
@@ -407,7 +407,7 @@ bb0(%0 : $Class):
   // COMBINE-NOT:     = partial_apply
   // COMBINE-NOT:     = function_ref @$s4test5ClassV6methodSfyFTJpSpSr
 
-  // CHECK:           %[[#E44:]] = function_ref @$s4test5ClassV6methodSfyFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktk1_l5FZSf_L6SfcfU_S2fAES2fTf1nncc_n : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0, Float, Float, Float, Float) -> Class.TangentVector
+  // CHECK:           %[[#E44:]] = function_ref @$s4test5ClassV6methodSfyFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktk1_l5FZSf_L6SfcfU_S2fAES2fTf1nnEE_n : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0, Float, Float, Float, Float) -> Class.TangentVector
   // CHECK:           %[[#E45:]] = partial_apply [callee_guaranteed] %[[#E44]](%[[#E33]], %[[#E34]], %[[#E2]], %[[#E34]], %[[#E37]]) : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0, Float, Float, Float, Float) -> Class.TangentVector
   // CHECK:           %[[#E48:]] = tuple (%[[#]] : $Float, %[[#E45]] : $@callee_guaranteed (Float) -> Class.TangentVector)
   // CHECK:           return %[[#E48]]

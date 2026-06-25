@@ -3440,7 +3440,8 @@ NodePointer Demangler::demangleFunctionSpecialization() {
 
       auto ParamKind = (FunctionSigSpecializationParamKind)KindNd->getIndex();
       switch (ParamKind) {
-        case FunctionSigSpecializationParamKind::ClosureProp: {
+        case FunctionSigSpecializationParamKind::ClosureProp:
+        case FunctionSigSpecializationParamKind::EscapingClosureProp: {
           while (NodePointer Ty = popNode(Node::Kind::Type)) {
             paramToAdd = addChild(paramToAdd, Ty);
           }
@@ -3482,6 +3483,12 @@ NodePointer Demangler::demangleFuncSpecParam(Node::Kind Kind) {
       return addChild(Param, createNode(
         Node::Kind::FunctionSignatureSpecializationParamKind,
         uint64_t(FunctionSigSpecializationParamKind::ClosureProp)));
+    case 'E':
+      // Like 'c', but for escaping closures. Consumes an identifier and
+      // multiple type parameters. The parameters will be added later.
+      return addChild(Param, createNode(
+        Node::Kind::FunctionSignatureSpecializationParamKind,
+        uint64_t(FunctionSigSpecializationParamKind::EscapingClosureProp)));
     case 'C': {
       // Consumes an identifier and multiple type parameters.
       // The parameters will be added later.
