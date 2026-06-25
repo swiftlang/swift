@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-build-swift -O -I %t/Inputs %t/test.swift -cxx-interoperability-mode=default %if OS=macosx %{ -target %target-cpu-apple-macosx13.3 %} -o %t/a.out
+// RUN: %swiftc_driver -target %target-swift-5.8-abi-triple -O -I %t/Inputs %t/test.swift -cxx-interoperability-mode=default -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
