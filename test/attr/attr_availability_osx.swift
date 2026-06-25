@@ -84,7 +84,7 @@ doSomethingDeprecatedOniOS() // okay
 struct TestStruct {} // expected-note 2 {{enclosing scope requires availability of macOS 10.10 or newer}}
 
 @available(macOS 10.10, *)
-extension TestStruct { // expected-note {{enclosing scope requires availability of macOS 10.10 or newer}}
+extension TestStruct { // expected-note 2 {{enclosing scope requires availability of macOS 10.10 or newer}}
   @available(swift 400)
   func doTheThing() {} // expected-note {{'doTheThing()' was introduced in Swift 400}}
 
@@ -99,6 +99,14 @@ extension TestStruct { // expected-note {{enclosing scope requires availability 
   @available(macOS 10.12, *)
   @available(swift 1)
   func doFourthThing() {}
+
+  func doLocalThing() {
+    @available(macOS 10.9, *) // expected-warning {{local function cannot be more available than enclosing scope}}
+    func moreAvailableFunction() { }
+
+    @available(macOS 10.12, *)
+    func lessAvailableFunction() { }
+  }
 
   @available(*, deprecated)
   func doDeprecatedThing() {}
