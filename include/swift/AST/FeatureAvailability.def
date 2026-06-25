@@ -92,5 +92,7 @@ FEATURE(ClearSensitive,                                 FUTURE)
 FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
 // TODO: CoroutineAccessors: Change to correct version number.
 FEATURE(CoroutineAccessors,                             FUTURE)
+FEATURE(GetObjCMetatypeFromMetadata,                    FUTURE)
+
 #undef FEATURE
 #undef FUTURE
