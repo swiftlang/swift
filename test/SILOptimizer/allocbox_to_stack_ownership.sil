@@ -1496,3 +1496,65 @@ bb0(%0 : $Int):
   destroy_value %1
   return %4 : $Int
 }
+
+// Two promotable boxes each captured by separate closures, both closures
+// passed to the same apply. The pass must insert dealloc_stack for both,
+// not just the first.
+// https://github.com/swiftlang/swift/issues/90119
+//
+// CHECK-LABEL: sil [ossa] @test_two_boxes_one_apply :
+// CHECK:         alloc_stack
+// CHECK:         alloc_stack
+// CHECK-NOT:     alloc_box
+// CHECK:         dealloc_stack
+// CHECK:         dealloc_stack
+// CHECK:       } // end sil function 'test_two_boxes_one_apply'
+sil [ossa] @test_two_boxes_one_apply : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %box1 = alloc_box ${ var Int }
+  %proj1 = project_box %box1 : ${ var Int }, 0
+  store %0 to [trivial] %proj1 : $*Int
+
+  %box2 = alloc_box ${ var Int }
+  %proj2 = project_box %box2 : ${ var Int }, 0
+  store %0 to [trivial] %proj2 : $*Int
+
+  %fn1 = function_ref @two_boxes_closure1 : $@convention(thin) (@owned { var Int }) -> ()
+  %copy1 = copy_value %box1 : ${ var Int }
+  %pa1 = partial_apply %fn1(%copy1) : $@convention(thin) (@owned { var Int }) -> ()
+
+  %fn2 = function_ref @two_boxes_closure2 : $@convention(thin) (@owned { var Int }) -> ()
+  %copy2 = copy_value %box2 : ${ var Int }
+  %pa2 = partial_apply %fn2(%copy2) : $@convention(thin) (@owned { var Int }) -> ()
+
+  %callee = function_ref @take_two_closures : $@convention(thin) (@owned @callee_owned () -> (), @owned @callee_owned () -> ()) -> ()
+  apply %callee(%pa1, %pa2) : $@convention(thin) (@owned @callee_owned () -> (), @owned @callee_owned () -> ()) -> ()
+  destroy_value %box1 : ${ var Int }
+  destroy_value %box2 : ${ var Int }
+  %r = tuple ()
+  return %r : $()
+}
+
+sil private [ossa] @two_boxes_closure1 : $@convention(thin) (@owned { var Int }) -> () {
+bb0(%0 : @owned ${ var Int }):
+  %p = project_box %0 : ${ var Int }, 0
+  destroy_value %0 : ${ var Int }
+  %r = tuple ()
+  return %r : $()
+}
+
+sil private [ossa] @two_boxes_closure2 : $@convention(thin) (@owned { var Int }) -> () {
+bb0(%0 : @owned ${ var Int }):
+  %p = project_box %0 : ${ var Int }, 0
+  destroy_value %0 : ${ var Int }
+  %r = tuple ()
+  return %r : $()
+}
+
+sil private [ossa] @take_two_closures : $@convention(thin) (@owned @callee_owned () -> (), @owned @callee_owned () -> ()) -> () {
+bb0(%0 : @owned $@callee_owned () -> (), %1 : @owned $@callee_owned () -> ()):
+  apply %0() : $@callee_owned () -> ()
+  apply %1() : $@callee_owned () -> ()
+  %r = tuple ()
+  return %r : $()
+}
