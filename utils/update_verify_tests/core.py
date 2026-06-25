@@ -2243,10 +2243,63 @@ def _collect_verify_prefixes(raw_lines):
     return run_prefixes, prefix_to_runs
 
 
+def _trailing_content(diag):
+    """Return the portion of the line content after the ``{{DIAG}}``
+    placeholder.  This captures ``{{children:...}}`` blocks and any other
+    trailing text that is semantically part of the directive."""
+    marker = "{{DIAG}}"
+    idx = diag.line.content.find(marker)
+    if idx < 0:
+        return ""
+    return diag.line.content[idx + len(marker):]
+
+
+# Matches `@-N` or `@+N` that follow an `expected-*` directive prefix
+# inside a ``{{children:...}}`` block.
+_children_ref_re = re.compile(
+    r"(expected-[a-zA-Z0-9-]*(?:note|warning|error|remark)(?:-re)?\s*)@([+-])(\d+)"
+)
+
+
+def _normalized_trailing(diag):
+    """Like ``_trailing_content`` but with relative ``@-N`` / ``@+N``
+    references inside ``{{children:...}}`` blocks resolved to absolute
+    line numbers.  This allows two directives on different lines to be
+    recognised as overlapping when their children blocks reference the
+    same target lines."""
+    trailing = _trailing_content(diag)
+    line_n = diag.line.line_n
+
+    def _resolve(m):
+        prefix = m.group(1)
+        sign = m.group(2)
+        offset = int(m.group(3))
+        abs_n = line_n + (-offset if sign == "-" else offset)
+        return f"{prefix}@={abs_n}"
+
+    return _children_ref_re.sub(_resolve, trailing)
+
+
 def _overlap_key(diag):
     """Return a hashable key that groups directives which could potentially
     be merged: same target line, same category, same content, same count,
-    same regex flag, and same fix-it annotations."""
+    same regex flag, same fix-it annotations, and same trailing content
+    (which includes ``{{children:...}}`` blocks with offsets normalised
+    to absolute line numbers).
+
+    For multi-line ``{{children:`` blocks the continuation lines have been
+    folded into ``nested_lines``; those are included as a content
+    fingerprint so that blocks with different child notes stay separate."""
+    nested_key = ()
+    if diag.nested_lines:
+        parts = []
+        for nl in diag.nested_lines:
+            nd = nl.diag
+            if nd:
+                parts.append((nd.absolute_target(), nd.category,
+                              nd.diag_content, nd.count, nd.is_re,
+                              nd.fixits_raw_str))
+        nested_key = tuple(parts)
     return (
         diag.absolute_target(),
         diag.category,
@@ -2254,6 +2307,8 @@ def _overlap_key(diag):
         diag.count,
         diag.is_re,
         diag.fixits_raw_str,
+        _normalized_trailing(diag),
+        nested_key,
     )
 
 
@@ -2299,6 +2354,7 @@ def _nested_diag_key(nd):
         nd.count,
         nd.is_re,
         nd.fixits_raw_str,
+        _trailing_content(nd),
     )
 
 
@@ -2382,6 +2438,33 @@ def _merge_expansion_groups(expansion_diags, prefix_to_runs,
     return changed
 
 
+def _has_multiline_children_open(diag):
+    """Return True if *diag*'s line opens a multi-line ``{{children:``
+    block (the block continues on subsequent lines rather than closing
+    on the same line)."""
+    trailing = _trailing_content(diag)
+    # Look for {{children: that is NOT closed by }} on the same line.
+    idx = trailing.find("{{children:")
+    if idx < 0:
+        return False
+    after = trailing[idx:]
+    # Count braces: the block is multi-line if we never see the matching }}.
+    depth = 0
+    i = 0
+    while i < len(after):
+        if after[i:i+2] == "{{":
+            depth += 1
+            i += 2
+        elif after[i:i+2] == "}}":
+            depth -= 1
+            if depth == 0:
+                return False  # closed on the same line
+            i += 2
+        else:
+            i += 1
+    return True  # never closed — multi-line
+
+
 def minimize_verify_test(filename):
     """Read *filename*, merge redundant prefixed expected-* directives where
     a single prefix can replace a set of overlapping ones, and write the
@@ -2404,28 +2487,50 @@ def minimize_verify_test(filename):
     orig_lines = list(lines)
 
     # Parse every expected-* directive (all prefixes).
+    # Both expansion_context (for expected-expansion blocks) and
+    # children_context (for multi-line {{children: blocks) track nesting
+    # so that continuation lines get a parent reference and are later
+    # folded out of the main line list.
     expansion_context = []
+    children_context = []
     for line in lines:
         diag = parse_diag(line, filename, "", all_prefixes=True)
         if diag:
             line.diag = diag
+            # Pick the innermost active context.
+            parent_ctx = (children_context or expansion_context)
             if isinstance(diag, ExpansionDiagClose):
-                if expansion_context:
+                if children_context:
+                    diag.parent = children_context[-1]
+                    children_context.pop()
+                elif expansion_context:
                     diag.parent = expansion_context[-1]
                     expansion_context.pop()
             elif diag.category == "expansion":
-                if expansion_context:
-                    diag.parent = expansion_context[-1]
+                if parent_ctx:
+                    diag.parent = parent_ctx[-1]
                 else:
                     diag.set_target(lines[diag.absolute_target() - 1])
                 expansion_context.append(diag)
             else:
-                if expansion_context:
-                    diag.parent = expansion_context[-1]
+                if parent_ctx:
+                    diag.parent = parent_ctx[-1]
+                    # Notes inside multi-line {{children: blocks still
+                    # need their target resolved before folding, so that
+                    # absolute_target() works after line renumbering.
+                    if children_context:
+                        diag.set_target(
+                            lines[diag.absolute_target() - 1])
                 else:
                     diag.set_target(lines[diag.absolute_target() - 1])
+                # Check if this diag opens a multi-line children block.
+                if (not parent_ctx
+                        and not isinstance(diag, ExpansionDiagClose)
+                        and _has_multiline_children_open(diag)):
+                    children_context.append(diag)
 
-    # Fold expansion blocks so nested lines live inside the parent diag.
+    # Fold expansion blocks *and* multi-line children blocks so nested
+    # lines live inside the parent diag.
     fold_expansions(lines)
 
     # Separate expansion and regular diags.
@@ -2470,7 +2575,22 @@ def minimize_verify_test(filename):
         changed = True
 
     if changed:
+        # Re-insert nested lines for both expansion blocks and multi-line
+        # children blocks.
         expand_expansions(lines)
+        # Also expand children-block nested lines on non-expansion diags.
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if (line.diag
+                    and not isinstance(line.diag, ExpansionDiagClose)
+                    and line.diag.category != "expansion"
+                    and line.diag.nested_lines):
+                for j, nested in enumerate(
+                        line.diag.nested_lines + [line.diag.closer]):
+                    nested.line_n = line.line_n + j + 1
+                    add_line(nested, lines)
+            i += 1
         with open(filename, "w") as f:
             for line in lines:
                 f.write(line.render())
