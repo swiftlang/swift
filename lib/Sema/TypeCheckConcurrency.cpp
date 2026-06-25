@@ -7684,7 +7684,12 @@ bool swift::checkSendableConformance(
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         // `NSObject` is permitted as a superclass for Objective-C interop.
         // TODO: can `NSObject` be `Sendable` or `~Sendable` instead?
-        if (!superclassDecl->isNSObject()) {
+        // For implicit conformances on global-actor-isolated classes,
+        // skip the diagnostic. The user never asked for Sendable; the
+        // conformance was synthesized and is maintained for source
+        // compatibility.
+        if (!superclassDecl->isNSObject() &&
+            !(isGlobalActorIsolated && isImplicitSendableCheck(check))) {
           // Inheritance checking for global-actor-isolated classes was
           // historically skipped, so we need to downgrade this to a warning to
           // stage it in.
