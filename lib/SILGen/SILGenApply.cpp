@@ -40,6 +40,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
@@ -7006,6 +7007,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
 }
 
 RValue SILGenFunction::emitApplyExpr(ApplyExpr *e, SGFContext c) {
+  PrettyStackTraceExpr trace(getASTContext(), "silgen emitApplyExpr", e);
   CallEmission emission = CallEmission::forApplyExpr(*this, e);
   return emission.apply(c);
 }

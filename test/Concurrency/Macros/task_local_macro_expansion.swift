@@ -13,7 +13,7 @@ struct Nein {
   public static var example: String = "hello"
 }
 
-// CHECK: public static let $example: TaskLocal<String> = TaskLocal(wrappedValue: "hello")
+// CHECK: public nonisolated static let $example: TaskLocal<String> = TaskLocal(wrappedValue: "hello")
 //
 // CHECK:  {
 // CHECK:    get {
@@ -31,7 +31,7 @@ struct Available {
 }
 
 // CHECK: @available(OSX 10.9, *)
-// CHECK: private static let $example: TaskLocal<AvailableValue?> = TaskLocal(wrappedValue: nil)
+// CHECK: private nonisolated static let $example: TaskLocal<AvailableValue?> = TaskLocal(wrappedValue: nil)
 //
 // CHECK:  {
 // CHECK:    get {
@@ -49,7 +49,7 @@ public struct UsableFromInline {
 }
 
 // CHECK: @usableFromInline
-// CHECK: internal static let $usableVar: TaskLocal<Int?>
+// CHECK: internal nonisolated static let $usableVar: TaskLocal<Int?>
 
 @available(SwiftStdlib 5.1, *)
 extension UsableFromInline {
@@ -66,7 +66,7 @@ struct SPIExample {
 }
 
 // CHECK: @_spi(ExampleSPI)
-// CHECK: public static let $spiVar: TaskLocal<Int?>
+// CHECK: public nonisolated static let $spiVar: TaskLocal<Int?>
 
 struct SPIAvailableExample {
   @TaskLocal
@@ -75,4 +75,4 @@ struct SPIAvailableExample {
 }
 
 // CHECK: @_spi_available(macOS 10.15, *)
-// CHECK: public static let $spiAvailableVar: TaskLocal<Int?>
+// CHECK: public nonisolated static let $spiAvailableVar: TaskLocal<Int?>
