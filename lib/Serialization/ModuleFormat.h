@@ -2698,6 +2698,12 @@ namespace decls_block {
     BCFixed<2>  // mode
   >;
 
+  using COMDeclAttrLayout = BCRecordLayout<COM_DECL_ATTR,
+                                           BCFixed<1>,  // implicit flag
+                                           BCFixed<1>,  // interface
+                                           BCFixed<3>,  // threading model
+                                           BCBlob>;     // IID/CLSID
+
   // clang-format on
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT

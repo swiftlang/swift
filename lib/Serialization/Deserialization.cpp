@@ -6580,6 +6580,24 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::COM_DECL_ATTR: {
+        bool implicit;
+        bool interface;
+        unsigned model;
+
+        serialization::decls_block::COMDeclAttrLayout::readRecord(
+            scratch, implicit, interface, model);
+
+        StringRef iid = interface ? blobData : "";
+        std::optional<StringRef> clsid =
+            !interface && !blobData.empty() ? std::optional<StringRef>(blobData)
+                                            : std::nullopt;
+        Attr = new (ctx) COMAttr(SourceLoc(), SourceRange(), iid, clsid,
+                                 model ? static_cast<COMThreadingModel>(model - 1)
+                                       : COMThreadingModel::Apartment, implicit);
+        break;
+      }
+
       case decls_block::Documentation_DECL_ATTR: {
         bool isImplicit;
         uint64_t CategoryID;

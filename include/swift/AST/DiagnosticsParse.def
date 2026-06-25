@@ -1572,6 +1572,16 @@ ERROR(attr_expected_label,none,
 ERROR(attr_expected_colon_after_label,none,
       "expected ':' after label '%0'", (StringRef))
 
+// @COM
+ERROR(attr_com_expected_label, none,
+      "expected 'interface:', 'implementation:', or 'threading:' in '@com' attribute", ())
+ERROR(attr_com_expected_threading_model, none,
+      "expected threading model (.single, .apartment, .free, .both, or .neutral)", ())
+ERROR(attr_com_unknown_label, none,
+      "unknown label '%0' in '@com' attribute; expected 'interface:', 'implementation:', or 'threading:'", (StringRef))
+ERROR(attr_com_unknown_threading_model, none,
+      "unknown threading model '%0'; expected 'single', 'apartment', 'free', 'both', or 'neutral'", (StringRef))
+
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 

@@ -5685,6 +5685,34 @@ public:
       printFieldQuoted(Attr->Reason, Label::always("reason:"));
     printFoot();
   }
+
+  void visitCOMAttr(COMAttr *Attr, Label label) {
+    printCommon(Attr, "com_attr", label);
+    if (!Attr->IID.empty())
+      printFieldQuoted(Attr->IID, Label::always("IID"));
+    if (Attr->CLSID && !Attr->CLSID->empty())
+      printFieldQuoted(Attr->CLSID, Label::always("CLSID"));
+    const char *Model;
+    switch (Attr->getThreadingModel()) {
+    case COMThreadingModel::Single:
+      Model = "single";
+      break;
+    case COMThreadingModel::Apartment:
+      Model = "apartment";
+      break;
+    case COMThreadingModel::Free:
+      Model = "free";
+      break;
+    case COMThreadingModel::Both:
+      Model = "both";
+      break;
+    case COMThreadingModel::Neutral:
+      Model = "neutral";
+      break;
+    }
+    printField(StringRef{Model}, Label::always("threading"));
+    printFoot();
+  }
 };
 
 } // end anonymous namespace
