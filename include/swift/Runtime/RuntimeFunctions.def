@@ -1266,6 +1266,15 @@ FUNCTION(GetObjCClassFromMetadata, Swift, swift_getObjCClassFromMetadata,
          EFFECT(RuntimeEffect::NoEffect), // ?
          MEMEFFECTS(ReadNone))
 
+// id swift_getObjCMetatypeFromMetadata(Metadata *);
+FUNCTION(GetObjCMetatypeFromMetadata, Swift, swift_getObjCMetatypeFromMetadata,
+         C_CC, GetObjCMetatypeFromMetadataAvailability,
+         RETURNS(ObjCPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, WillReturn),
+         EFFECT(RuntimeEffect::NoEffect), // ?
+         MEMEFFECTS(ReadNone))
+
 // Metadata *swift_getObjCClassFromObject(id object);
 // This reads object metadata so cannot be marked ReadNone.
 FUNCTION(GetObjCClassFromObject, Swift, swift_getObjCClassFromObject,
