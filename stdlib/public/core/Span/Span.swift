@@ -138,9 +138,10 @@ extension Span where Element: ~Copyable {
       "baseAddress must be properly aligned to access Element"
     )
 
-    // FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
-    let baseAddress = unsafe UnsafeRawPointer(buffer.baseAddress)
-    let span = unsafe Span(_unchecked: baseAddress, count: buffer.count)
+    let span = unsafe Span(
+      _unchecked: buffer.baseAddress._unsafelyUnwrappedUnchecked,
+      count: buffer.count
+    )
 
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
