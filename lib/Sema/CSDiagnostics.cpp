@@ -3888,8 +3888,12 @@ bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
   }
 
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    ArgumentMismatchFailure failure(getSolution(), fromType, toType, locator);
-    return failure.diagnoseAsError();
+    std::optional<ArgumentMismatchFailure> failure =
+        ArgumentMismatchFailure::create(getSolution(), fromType, toType,
+                                        locator);
+    if (!failure)
+      return false;
+    return failure.value().diagnoseAsError();
   }
 
   std::optional<Diag<Type, Type>> diagnostic;
@@ -3929,9 +3933,12 @@ bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsNote() {
   }
 
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    ArgumentMismatchFailure failure(getSolution(), getFromType(), getToType(),
-                                    getLocator());
-    return failure.diagnoseAsNote();
+    std::optional<ArgumentMismatchFailure> failure =
+        ArgumentMismatchFailure::create(getSolution(), getFromType(),
+                                        getToType(), getLocator());
+    if (!failure)
+      return false;
+    return failure.value().diagnoseAsNote();
   }
 
   return false;
@@ -4015,9 +4022,12 @@ bool MissingCallFailure::diagnoseAsError() {
       auto fnType = type->castTo<FunctionType>();
 
       if (MissingArgumentsFailure::isMisplacedMissingArgument(getSolution(), locator)) {
-        ArgumentMismatchFailure failure(getSolution(), fnType,
-                                        fnType->getResult(), locator);
-        return failure.diagnoseMisplacedMissingArgument();
+        std::optional<ArgumentMismatchFailure> failure =
+            ArgumentMismatchFailure::create(getSolution(), fnType,
+                                            fnType->getResult(), locator);
+        if (!failure)
+          return false;
+        return failure.value().diagnoseMisplacedMissingArgument();
       }
 
       emitDiagnostic(diag::missing_nullary_call, fnType->getResult())
@@ -7709,6 +7719,35 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
       .fixItReplaceChars(startLoc, endLoc, scratch);
 }
 
+std::optional<FunctionArgApplyInfo>
+ArgumentMismatchFailure::buildInfo(const Solution &solution,
+                                   ConstraintLocator *locator) {
+  auto info = solution.getFunctionArgApplyInfo(locator);
+  if (!info) {
+    auto path = locator->getPath();
+    auto iter = path.rbegin();
+    if (locator->findLast<LocatorPathElt::ApplyArgument>(iter)) {
+      auto *newLoc = solution.getConstraintLocator(
+          locator->getAnchor(), path.drop_back(iter - path.rbegin()));
+      if (hasFixFor(solution, newLoc, FixKind::AddMissingArguments))
+        return std::nullopt;
+    }
+    ABORT("expected function arg apply info for apply argument locator");
+  }
+  return info;
+}
+
+std::optional<ArgumentMismatchFailure>
+ArgumentMismatchFailure::create(const Solution &solution, Type argType,
+                                Type paramType, ConstraintLocator *locator,
+                                FixBehavior fixBehavior) {
+  auto info = buildInfo(solution, locator);
+  if (!info)
+    return std::nullopt;
+  return ArgumentMismatchFailure(solution, argType, paramType, locator,
+                                 info.value(), fixBehavior);
+}
+
 bool ArgumentMismatchFailure::diagnoseAsError() {
   const auto paramType = getToType();
 
@@ -7718,25 +7757,6 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   // fulfill, and let the member access failure prevail.
   if (paramType->hasOpenedExistential()) {
     return false;
-  }
-
-  // FIXME: After Argument Synthesis, we're still generating Argument Mismatch
-  // fixes and errors
-  //  But the locator for the ApplyArgument is not a suitable match for a
-  //  FunctionApplyArgInfo This causes crashes when attempting to build one.
-  //  Blocking here is a stop gap while we devise a means of either not having
-  //  argument mismatches or of having usable locators.
-  if (!Info) {
-    auto locator = getLocator();
-    auto path = locator->getPath();
-    auto iter = path.rbegin();
-    if (locator->findLast<LocatorPathElt::ApplyArgument>(iter)) {
-      auto *newLoc = getSolution().getConstraintLocator(
-          locator->getAnchor(), path.drop_back(iter - path.rbegin()));
-      if (hasFixFor(getSolution(), newLoc, FixKind::AddMissingArguments))
-        return false;
-    }
-    ABORT("expected function arg apply info for argument mismatch");
   }
 
   if (diagnoseKeyPathLiteralMutabilityMismatch())
@@ -8079,7 +8099,7 @@ bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
   auto &ctx = getASTContext();
 
   // Should be a lone trailing closure argument.
-  if (!Info->isTrailingClosure() || !Info->getArgList()->isUnary())
+  if (!Info.isTrailingClosure() || !Info.getArgList()->isUnary())
     return false;
 
   // Check if this an application of a Regex initializer, and the user has not
@@ -8117,7 +8137,7 @@ bool ArgumentMismatchFailure::diagnoseClosureMismatch() const {
   if (paramType->lookThroughAllOptionalTypes()->is<AnyFunctionType>())
     return false;
 
-  emitDiagnostic(diag::closure_bad_param, paramType, Info->isTrailingClosure())
+  emitDiagnostic(diag::closure_bad_param, paramType, Info.isTrailingClosure())
       .highlight(getSourceRange());
 
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
@@ -8225,6 +8245,20 @@ bool ExtraneousCallFailure::diagnoseAsError() {
       emitDiagnostic(diag::cannot_call_non_function_value, getType(anchor));
   removeParensFixIt(diagnostic);
   return true;
+}
+
+std::optional<NonEphemeralConversionFailure>
+NonEphemeralConversionFailure::create(const Solution &solution,
+                                      ConstraintLocator *locator, Type fromType,
+                                      Type toType,
+                                      ConversionRestrictionKind conversionKind,
+                                      FixBehavior fixBehavior) {
+  auto info = ArgumentMismatchFailure::buildInfo(solution, locator);
+  if (!info)
+    return std::nullopt;
+  return NonEphemeralConversionFailure(solution, locator, info.value(),
+                                       fromType, toType, conversionKind,
+                                       fixBehavior);
 }
 
 void NonEphemeralConversionFailure::emitSuggestionNotes() const {

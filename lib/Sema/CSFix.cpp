@@ -1987,9 +1987,12 @@ unsigned AllowArgumentMismatch::getParamIdx() const {
 
 bool AllowArgumentMismatch::diagnose(const Solution &solution,
                                      bool asNote) const {
-  ArgumentMismatchFailure failure(solution, getFromType(), getToType(),
-                                  getLocator());
-  return failure.diagnose(asNote);
+  std::optional<ArgumentMismatchFailure> failure =
+      ArgumentMismatchFailure::create(solution, getFromType(), getToType(),
+                                      getLocator());
+  if (!failure)
+    return false;
+  return failure.value().diagnose(asNote);
 }
 
 AllowArgumentMismatch *
@@ -2011,10 +2014,14 @@ RemoveInvalidCall *RemoveInvalidCall::create(ConstraintSystem &cs,
 
 bool TreatEphemeralAsNonEphemeral::diagnose(const Solution &solution,
                                             bool asNote) const {
-  NonEphemeralConversionFailure failure(solution, getLocator(), getFromType(),
-                                        getToType(), ConversionKind,
-                                        fixBehavior);
-  return failure.diagnose(asNote);
+
+  std::optional<NonEphemeralConversionFailure> failure =
+      NonEphemeralConversionFailure::create(solution, getLocator(),
+                                            getFromType(), getToType(),
+                                            ConversionKind, fixBehavior);
+  if (failure.has_value())
+    return failure.value().diagnose(asNote);
+  return false;
 }
 
 TreatEphemeralAsNonEphemeral *TreatEphemeralAsNonEphemeral::create(
