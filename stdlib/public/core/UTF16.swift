@@ -441,28 +441,21 @@ private enum ScalarFallbackResult: UInt8 {
   case multiByte
 }
 
-@_transparent var utf8OneByteMax: UInt16 { 0x7F }
-@_transparent var utf8TwoByteMax: UInt16 { 0x7FF }
-@_transparent var utf16LeadSurrogateMin: UInt16 { 0xD800 }
-@_transparent var utf16TrailSurrogateMin: UInt16 { 0xDC00 }
-@_transparent var utf16SurrogateMax: UInt16 { 0xDFFF }
-@_transparent var utf16ReplacementCharacter: UInt32 { 0xFFFD }
-@_transparent var utf16ScalarMax: UInt32 { 0x10FFFF }
-@_transparent var utf16BasicMultilingualPlaneMax: UInt32 { 0xFFFF }
-@_transparent var utf16AstralPlaneMin: UInt32 { 0x10000 }
+@_transparent private var utf8OneByteMax: UInt16 { 0x7F }
+@_transparent private var utf8TwoByteMax: UInt16 { 0x7FF }
+@_transparent private var utf16LeadSurrogateMin: UInt16 { 0xD800 }
+@_transparent private var utf16TrailSurrogateMin: UInt16 { 0xDC00 }
+@_transparent private var utf16SurrogateMax: UInt16 { 0xDFFF }
+@_transparent private var utf16ReplacementCharacter: UInt32 { 0xFFFD }
+@_transparent private var utf16ScalarMax: UInt32 { 0x10FFFF }
+@_transparent private var utf16BasicMultilingualPlaneMax: UInt32 { 0xFFFF }
+@_transparent private var utf16AstralPlaneMin: UInt32 { 0x10000 }
 
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
-#if _pointerBitWidth(_32) && !arch(arm64_32)
-@_transparent var blockSize:Int { 8 }
-typealias CodeUnitBlock = SIMD8<UInt16>
-typealias ByteBlock = SIMD16<UInt8>
-typealias ByteHalfBlock = SIMD8<UInt8>
-#else
-@_transparent var blockSize:Int { 8 }
-typealias CodeUnitBlock = SIMD8<UInt16>
-typealias ByteBlock = SIMD16<UInt8>
-typealias ByteHalfBlock = SIMD8<UInt8>
-#endif
+@_transparent private var blockSize:Int { 8 }
+private typealias CodeUnitBlock = SIMD8<UInt16>
+private typealias ByteBlock = SIMD16<UInt8>
+private typealias ByteHalfBlock = SIMD8<UInt8>
 
 /*
  SIMD<...> isn't generating the right code for the transcoding loop, so we use
@@ -475,17 +468,17 @@ typealias ByteHalfBlock = SIMD8<UInt8>
   * UTF16ToIdx.longCJK
  */
 @_transparent
-func _wrappedSum(_ v: SIMD8<Int8>) -> Int8 {
+internal func _wrappedSum(_ v: SIMD8<Int8>) -> Int8 {
   Int8(Builtin.int_vector_reduce_add_Vec8xInt8(v._storage._value))
 }
 
 @_transparent
-func _wrappedSum(_ v: SIMD8<UInt16>) -> UInt16 {
+internal func _wrappedSum(_ v: SIMD8<UInt16>) -> UInt16 {
   UInt16(Builtin.int_vector_reduce_add_Vec8xInt16(v._storage._value))
 }
 
 @_transparent
-func _anySurrogate(_ block: CodeUnitBlock) -> Bool {
+private func _anySurrogate(_ block: CodeUnitBlock) -> Bool {
   /* A UTF-16 code unit is a surrogate iff it's in [0xD800, 0xDFFF],
    i.e. (cu &- 0xD800) <= 0x7FF as an unsigned value */
   let shifted = Builtin.sub_Vec8xInt16(
@@ -496,7 +489,7 @@ func _anySurrogate(_ block: CodeUnitBlock) -> Bool {
 }
 
 @_transparent
-func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> ByteHalfBlock? {
+private func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> ByteHalfBlock? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: CodeUnitBlock.self)
   if block.max() <= utf8OneByteMax {
     return unsafe unsafeBitCast(block, to: ByteBlock.self).evenHalf
@@ -505,7 +498,7 @@ func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> ByteHalfBlock? {
 }
 
 @_transparent
-func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16? {
+private func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: CodeUnitBlock.self)
   if block.max() <= utf8OneByteMax {
     return UInt16(truncatingIfNeeded: blockSize)
@@ -521,16 +514,16 @@ func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16? {
 }
 
 @_transparent
-func nonSurrogateBlock(at pointer: UnsafePointer<UInt16>) -> CodeUnitBlock? {
+private func nonSurrogateBlock(at pointer: UnsafePointer<UInt16>) -> CodeUnitBlock? {
   let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: CodeUnitBlock.self)
   return _anySurrogate(block) ? nil : block
 }
 
 #else
-@_transparent var blockSize:Int { 1 }
+@_transparent private var blockSize:Int { 1 }
 
 @_transparent
-func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>? {
+private func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>? {
   let value = unsafe pointer.pointee
   if value <= utf8OneByteMax {
     return CollectionOfOne(UInt8(truncatingIfNeeded: value))
@@ -539,7 +532,7 @@ func allASCIIBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt8>?
 }
 
 @_transparent
-func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16? {
+private func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16? {
   return switch unsafe pointer.pointee {
   case 0 ... utf8OneByteMax: 1
   case (utf8OneByteMax + 1) ... utf8TwoByteMax: 2
@@ -549,7 +542,7 @@ func fastUTF8LengthOfBlock(at pointer: UnsafePointer<UInt16>) -> UInt16? {
 }
 
 @_transparent
-func nonSurrogateBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt16>? {
+private func nonSurrogateBlock(at pointer: UnsafePointer<UInt16>) -> CollectionOfOne<UInt16>? {
   let value = unsafe pointer.pointee
   return value < utf16LeadSurrogateMin || value > utf16SurrogateMax ?
     CollectionOfOne(value) : nil

@@ -732,7 +732,7 @@ extension String.UTF16View {
   
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
   @inline(__always)
-  internal func _utf16Length(
+  internal func _utf16LengthWithoutUnalignedTail(
     readPtr: inout UnsafeRawPointer,
     endPtr: UnsafeRawPointer
   ) -> Int {
@@ -746,7 +746,7 @@ extension String.UTF16View {
 
       //Find the number of 4 byte code points (0b11110xxx)
       let uValue = unsafe readPtr.loadUnaligned(as: SIMD8<UInt8>.self)
-      let fourBytes = unsafe SIMD8<Int8>.zero.replacing(
+      let fourBytes = SIMD8<Int8>.zero.replacing(
         with: SIMD8<Int8>.one,
         where: uValue .>= 0b11110000
       )
@@ -784,10 +784,7 @@ extension String.UTF16View {
       }
 
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
-      // TODO: Currently, using SIMD sizes above SIMD8 is slower
-      // Once that's fixed we should go up to SIMD64 here
-      
-      unsafe utf16Count &+= _utf16Length(
+      unsafe utf16Count &+= _utf16LengthWithoutUnalignedTail(
         readPtr: &readPtr,
         endPtr: endPtr
       )
