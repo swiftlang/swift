@@ -1,7 +1,20 @@
 // RUN: %empty-directory(%t)
+
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern -wmo %s -c -o %t/main.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-single-threaded-shim -o %t/a.out -dead_strip
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-single-threaded-shim %target-embedded-posix-shim -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out
+
+// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern -D LOCK_LOCKED -module-name lock_locked -wmo %s -c -o %t/lock-locked.o
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/lock-locked.o %target-embedded-single-threaded-shim %target-embedded-posix-shim -o %t/lock-locked.out -dead_strip
+// RUN: %target-not-crash %target-run %t/lock-locked.out
+
+// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern -D UNLOCK_UNLOCKED -module-name unlock_unlocked -wmo %s -c -o %t/unlock-unlocked.o
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/unlock-unlocked.o %target-embedded-single-threaded-shim %target-embedded-posix-shim -o %t/unlock-unlocked.out -dead_strip
+// RUN: %target-not-crash %target-run %t/unlock-unlocked.out
+
+// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern -D DESTROY_LOCKED -module-name destroy_locked -wmo %s -c -o %t/destroy-locked.o
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/destroy-locked.o %target-embedded-single-threaded-shim %target-embedded-posix-shim -o %t/destroy-locked.out -dead_strip
+// RUN: %target-not-crash %target-run %t/destroy-locked.out
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
@@ -40,6 +53,24 @@ func withMutexStorage(_ body: (UnsafeMutableRawPointer) -> Void) {
 @main
 struct Main {
   static func main() {
+#if LOCK_LOCKED
+    withMutexStorage { mutex in
+      _swift_mutex_init(mutex, 1)
+      _swift_mutex_lock(mutex)
+      _swift_mutex_lock(mutex)
+    }
+#elseif UNLOCK_UNLOCKED
+    withMutexStorage { mutex in
+      _swift_mutex_init(mutex, 1)
+      _swift_mutex_unlock(mutex)
+    }
+#elseif DESTROY_LOCKED
+    withMutexStorage { mutex in
+      _swift_mutex_init(mutex, 1)
+      _swift_mutex_lock(mutex)
+      _swift_mutex_destroy(mutex)
+    }
+#else
     withMutexStorage { mutex in
       _swift_mutex_init(mutex, 1)
       check(_swift_mutex_tryLock(mutex) != 0)
@@ -66,5 +97,6 @@ struct Main {
       _swift_mutex_unlock(mutex)
       _swift_mutex_destroy(mutex)
     }
+#endif
   }
 }
