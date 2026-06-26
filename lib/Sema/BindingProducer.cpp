@@ -570,13 +570,28 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
         // completion token at all.
         return std::nullopt;
       }
+
+      // If one or more variables covered by this pattern have been determined
+      // to be invalid, let's not produce a fix because they'd be diagnosed
+      // separately as well.
+      auto *P = pattern.get();
+      {
+        SmallVector<VarDecl *, 2> variables;
+        P->collectVariables(variables);
+
+        if (llvm::any_of(variables, [](auto *var) {
+              return var->hasInterfaceType() && var->isInvalid();
+            }))
+          return std::nullopt;
+      }
+
       // Not being able to infer the type of a variable in a pattern binding
       // decl is more dramatic than anything that could happen inside the
       // expression because we want to preferrably point the diagnostic to a
       // part of the expression that caused us to be unable to infer the
       // variable's type.
       ConstraintFix *fix =
-          IgnoreUnresolvedPatternVar::create(cs, pattern.get(), dstLocator);
+          IgnoreUnresolvedPatternVar::create(cs, P, dstLocator);
       return std::make_pair(fix, FixImpact::InvalidAST * 10);
     }
   }
