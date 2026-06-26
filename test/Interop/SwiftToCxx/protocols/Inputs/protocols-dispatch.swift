@@ -64,3 +64,13 @@ func createIntArrayContainer(_ outPtr: UnsafeMutableRawPointer, _ n: Int) {
     outPtr.assumingMemoryBound(to: (any Container<Int>).self)
         .initialize(to: IntArray(Array(1...n)))
 }
+
+// Functions that accept and return existentials, testing
+// Phase 0.5 (existentials in function signatures).
+public func drawTwice(_ d: any Drawable) -> Int {
+    return d.draw() + d.draw()
+}
+
+public func bestDrawable(_ a: any Drawable, _ b: any Drawable) -> any Drawable {
+    return a.draw() >= b.draw() ? a : b
+}

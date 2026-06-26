@@ -435,7 +435,94 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
           printCxxImplClassName(os, PD);
           os << " {\npublic:\n";
           printImplFromExistentialFactory(PD, declAndTypePrinter);
+          printImplGetOpaquePointer(PD);
+          printImplReturnNewValue(PD);
           os << "};\n";
         });
   });
+}
+
+void ClangExistentialTypePrinter::printImplGetOpaquePointer(
+    const ProtocolDecl *PD) {
+  ClangSyntaxPrinter printer(PD->getASTContext(), os);
+  auto pats = PD->getPrimaryAssociatedTypes();
+  auto printProtoName = [&]() {
+    printer.printBaseName(PD);
+    if (!pats.empty()) {
+      os << "<";
+      llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+        os << pat->getNameStr();
+      });
+      os << ">";
+    }
+  };
+
+  // const overload
+  if (!pats.empty()) {
+    os << "  template <";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << "typename " << pat->getNameStr();
+    });
+    os << ">\n";
+  }
+  os << "  static ";
+  printer.printInlineForThunk();
+  os << "const char * _Nonnull getOpaquePointer(const ";
+  printProtoName();
+  os << " &object) { return reinterpret_cast<const char *>(&object); }\n";
+
+  // non-const overload
+  if (!pats.empty()) {
+    os << "  template <";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << "typename " << pat->getNameStr();
+    });
+    os << ">\n";
+  }
+  os << "  static ";
+  printer.printInlineForThunk();
+  os << "char * _Nonnull getOpaquePointer(";
+  printProtoName();
+  os << " &object) { return reinterpret_cast<char *>(&object); }\n";
+}
+
+void ClangExistentialTypePrinter::printImplReturnNewValue(
+    const ProtocolDecl *PD) {
+  ClangSyntaxPrinter printer(PD->getASTContext(), os);
+  auto pats = PD->getPrimaryAssociatedTypes();
+
+  os << "  template <";
+  bool needsComma = false;
+  for (auto *pat : pats) {
+    if (needsComma) os << ", ";
+    os << "typename " << pat->getNameStr();
+    needsComma = true;
+  }
+  if (needsComma) os << ", ";
+  os << "class T>\n";
+
+  os << "  static ";
+  printer.printInlineForHelperFunction();
+  printer.printBaseName(PD);
+  if (!pats.empty()) {
+    os << "<";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << pat->getNameStr();
+    });
+    os << ">";
+  }
+  os << " returnNewValue(T callable) {\n";
+  os << "    ";
+  printer.printBaseName(PD);
+  if (!pats.empty()) {
+    os << "<";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << pat->getNameStr();
+    });
+    os << ">";
+  }
+  os << " result;\n";
+  os << "    callable(reinterpret_cast<char *>(&result));\n";
+  os << "    return result;\n";
+  os << "  }\n";
 }

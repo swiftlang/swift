@@ -303,6 +303,42 @@ public:
       return ClangRepresentation::objcxxonly;
     }
 
+    // Non-ObjC existential with a single protocol constraint:
+    // emit the C++ existential wrapper class name.
+    if (languageMode == OutputLanguageMode::Cxx) {
+      if (auto *protoTy = ty->getConstraintType()->getAs<ProtocolType>()) {
+        auto *PD = protoTy->getDecl();
+        if (!PD->isObjC() && !PD->isMarkerProtocol() &&
+            declPrinter.shouldInclude(PD)) {
+          if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
+            if (!isInOutParam)
+              os << "const ";
+            printOptional(optionalKind, [&]() {
+              ClangSyntaxPrinter(PD->getASTContext(), os)
+                  .printPrimaryCxxTypeName(PD, moduleContext);
+            });
+            os << '&';
+          } else {
+            printOptional(optionalKind, [&]() {
+              if (modifiersDelegate.mapValueTypeUseKind) {
+                ClangSyntaxPrinter printer(PD->getASTContext(), os);
+                printer.printModuleNamespaceQualifiersIfNeeded(
+                    PD->getModuleContext(), moduleContext);
+                if (!printer.printNestedTypeNamespaceQualifiers(PD))
+                  os << "::";
+                os << cxx_synthesis::getCxxImplNamespaceName() << "::";
+                ClangValueTypePrinter::printCxxImplClassName(os, PD);
+              } else {
+                ClangSyntaxPrinter(PD->getASTContext(), os)
+                    .printPrimaryCxxTypeName(PD, moduleContext);
+              }
+            });
+          }
+          return ClangRepresentation::representable;
+        }
+      }
+    }
+
     return visitPart(ty->getConstraintType(), optionalKind, isInOutParam);
   }
 
@@ -1157,6 +1193,27 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
       namePrinter();
       return;
     }
+
+    // Non-ObjC existential: pass pointer to the wrapper's storage.
+    if (auto *existTy = type->getAs<ExistentialType>()) {
+      if (auto *protoTy =
+              existTy->getConstraintType()->getAs<ProtocolType>()) {
+        auto *PD = protoTy->getDecl();
+        ClangSyntaxPrinter(PD->getASTContext(), os)
+            .printModuleNamespaceQualifiersIfNeeded(PD->getModuleContext(),
+                                                    moduleContext);
+        if (!ClangSyntaxPrinter(PD->getASTContext(), os)
+                 .printNestedTypeNamespaceQualifiers(PD))
+          os << "::";
+        os << cxx_synthesis::getCxxImplNamespaceName() << "::";
+        ClangValueTypePrinter::printCxxImplClassName(os, PD);
+        os << "::getOpaquePointer(";
+        namePrinter();
+        os << ')';
+        return;
+      }
+    }
+
     if (auto *classDecl = type->getClassOrBoundGenericClass()) {
       if (classDecl->hasClangNode()) {
         if (isInOut)
@@ -1545,6 +1602,32 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           os, classDecl, moduleContext,
           [&]() { printCallToCFunc(/*additionalParam=*/std::nullopt); });
       return;
+    }
+    // Non-ObjC existential return: construct wrapper via _impl::returnNewValue.
+    if (auto *existTy = resultTy->getAs<ExistentialType>()) {
+      if (!existTy->isObjCExistentialType()) {
+        if (existTy->getConstraintType()->is<ProtocolType>()) {
+          os << "  return ";
+          printTypeImplTypeSpecifier(resultTy, moduleContext);
+          os << "::returnNewValue([&](char * _Nonnull result) "
+                "SWIFT_INLINE_THUNK_ATTRIBUTES {\n    ";
+          if (auto directResultType = signature.getDirectResultType()) {
+            std::string typeEncoding =
+                encodeTypeInfo(*directResultType, moduleContext, typeMapping);
+            ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+                .printBaseName(moduleContext);
+            os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+               << "::swift_interop_returnDirect_" << typeEncoding << '('
+               << "result" << ", ";
+            printCallToCFunc(std::nullopt);
+            os << ')';
+          } else {
+            printCallToCFunc(/*firstParam=*/StringRef("result"));
+          }
+          os << ";\n  });\n";
+          return;
+        }
+      }
     }
     if (auto *decl = resultTy->getNominalOrBoundGenericNominal();
         decl && !resultTy->isObjCExistentialType() &&

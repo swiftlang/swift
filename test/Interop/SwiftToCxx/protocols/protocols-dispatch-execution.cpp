@@ -113,6 +113,39 @@ int main() {
     }
 // CHECK-NEXT: container.count() = 5
 
+    // Test 6: Existential parameter -- drawTwice(any Drawable) -> Int.
+    {
+        alignas(alignof(ProtoDispatch::Drawable))
+            char storage[sizeof(ProtoDispatch::Drawable)];
+        createCircleDrawable(storage, 7);
+
+        auto &drawable =
+            *reinterpret_cast<ProtoDispatch::Drawable *>(storage);
+        swift::Int result = ProtoDispatch::drawTwice(drawable);
+        printf("drawTwice() = %ld\n", result);
+        assert(result == 98);  // 49 + 49
+    }
+// CHECK-NEXT: drawTwice() = 98
+
+    // Test 7: Existential return -- bestDrawable picks the one with higher draw().
+    {
+        alignas(alignof(ProtoDispatch::Drawable))
+            char storageA[sizeof(ProtoDispatch::Drawable)];
+        createCircleDrawable(storageA, 7);  // draw() = 49
+
+        alignas(alignof(ProtoDispatch::Drawable))
+            char storageB[sizeof(ProtoDispatch::Drawable)];
+        createCircleDrawable(storageB, 3);  // draw() = 9
+
+        auto &a = *reinterpret_cast<ProtoDispatch::Drawable *>(storageA);
+        auto &b = *reinterpret_cast<ProtoDispatch::Drawable *>(storageB);
+        ProtoDispatch::Drawable best = ProtoDispatch::bestDrawable(a, b);
+        swift::Int result = best.draw();
+        printf("bestDrawable().draw() = %ld\n", result);
+        assert(result == 49);  // a wins (49 >= 9)
+    }
+// CHECK-NEXT: bestDrawable().draw() = 49
+
     printf("done\n");
 // CHECK-NEXT: done
     return 0;

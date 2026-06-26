@@ -75,6 +75,12 @@ private:
   void printImplFromExistentialFactory(const ProtocolDecl *PD,
                                        DeclAndTypePrinter &declAndTypePrinter);
 
+  /// Emits getOpaquePointer helpers in the _impl class body.
+  void printImplGetOpaquePointer(const ProtocolDecl *PD);
+
+  /// Emits returnNewValue helper in the _impl class body.
+  void printImplReturnNewValue(const ProtocolDecl *PD);
+
   /// Returns the C++ type name for a Swift type if it is a simple
   /// C-representable primitive, or None otherwise.
   std::optional<std::string> getCxxTypeName(Type ty,

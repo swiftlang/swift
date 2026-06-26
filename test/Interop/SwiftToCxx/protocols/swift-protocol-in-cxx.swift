@@ -29,6 +29,15 @@ public protocol Stylable: Drawable {
     func style() -> Bool
 }
 
+// Functions with existential params/returns (Phase 0.5).
+public func drawTwice(_ d: any Drawable) -> Int {
+    return d.draw() + d.draw()
+}
+
+public func bestDrawable(_ a: any Drawable, _ b: any Drawable) -> any Drawable {
+    return a.draw() >= b.draw() ? a : b
+}
+
 // CHECK-LABEL: namespace Protocols
 
 // --- Protocol with primary associated type: Container<Element> ---
@@ -51,6 +60,11 @@ public protocol Stylable: Drawable {
 // CHECK:         template <typename Element>
 // CHECK-NEXT:    static {{.*}} Container<Element> _fromExistential(const swift::_impl::SwiftExistentialType &src, const void *_Nonnull wt) {
 // CHECK-NEXT:      Container<Element> result;
+// CHECK:         template <typename Element>
+// CHECK-NEXT:    static {{.*}} const char * _Nonnull getOpaquePointer(const Container<Element> &object)
+// CHECK:         template <typename Element>
+// CHECK-NEXT:    static {{.*}} char * _Nonnull getOpaquePointer(Container<Element> &object)
+// CHECK:         static {{.*}} Container<Element> returnNewValue(T callable) {
 // CHECK:       };
 
 // --- Non-marker protocol: Drawable ---
@@ -79,7 +93,10 @@ public protocol Stylable: Drawable {
 // CHECK-NEXT:      result._witnessTable = wt;
 // CHECK-NEXT:      return result;
 // CHECK-NEXT:    }
-// CHECK-NEXT:  };
+// CHECK:         static {{.*}} const char * _Nonnull getOpaquePointer(const Drawable &object)
+// CHECK:         static {{.*}} char * _Nonnull getOpaquePointer(Drawable &object)
+// CHECK:         static {{.*}} Drawable returnNewValue(T callable) {
+// CHECK:       };
 
 // --- Marker protocol: Priority (subclass of swift::Any) ---
 
@@ -119,6 +136,8 @@ public protocol Stylable: Drawable {
 // CHECK:       class _impl_Resizable {
 // CHECK-NEXT:  public:
 // CHECK:         static {{.*}} Resizable _fromExistential(const swift::_impl::SwiftExistentialType &src, const void *_Nonnull wt) {
+// CHECK:         static {{.*}} const char * _Nonnull getOpaquePointer(const Resizable &object)
+// CHECK:         static {{.*}} Resizable returnNewValue(T callable) {
 // CHECK:       };
 
 // --- Non-marker protocol inheriting Drawable: Stylable ---
@@ -153,6 +172,8 @@ public protocol Stylable: Drawable {
 // CHECK:       class _impl_Stylable {
 // CHECK-NEXT:  public:
 // CHECK:         static {{.*}} Stylable _fromExistential(const swift::_impl::SwiftExistentialType &src, const void *_Nonnull wt) {
+// CHECK:         static {{.*}} const char * _Nonnull getOpaquePointer(const Stylable &object)
+// CHECK:         static {{.*}} Stylable returnNewValue(T callable) {
 // CHECK:       };
 
 // --- Non-marker protocol inheriting Sendable: Taggable ---
@@ -171,4 +192,16 @@ public protocol Stylable: Drawable {
 // CHECK:       class _impl_Taggable {
 // CHECK-NEXT:  public:
 // CHECK:         static {{.*}} Taggable _fromExistential(const swift::_impl::SwiftExistentialType &src, const void *_Nonnull wt) {
+// CHECK:         static {{.*}} const char * _Nonnull getOpaquePointer(const Taggable &object)
+// CHECK:         static {{.*}} Taggable returnNewValue(T callable) {
 // CHECK:       };
+
+// --- Functions with existential params/returns (Phase 0.5) ---
+
+// CHECK-LABEL: Drawable bestDrawable(const Drawable& a, const Drawable& b)
+// CHECK:         return _impl::_impl_Drawable::returnNewValue([&](char * _Nonnull result)
+// CHECK:           _impl::_impl_Drawable::getOpaquePointer(a)
+// CHECK:           _impl::_impl_Drawable::getOpaquePointer(b)
+
+// CHECK-LABEL: swift::Int drawTwice(const Drawable& d)
+// CHECK:         _impl::_impl_Drawable::getOpaquePointer(d)
