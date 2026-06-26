@@ -732,34 +732,30 @@ extension String.UTF16View {
   
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
   @inline(__always)
-  internal func _utf16Length<U: SIMD, S: SIMD>(
+  internal func _utf16LengthWithoutUnalignedTail(
     readPtr: inout UnsafeRawPointer,
-    endPtr: UnsafeRawPointer,
-    unsignedSIMDType: U.Type,
-    signedSIMDType: S.Type
-  ) -> Int where U.Scalar == UInt8, S.Scalar == Int8 {
+    endPtr: UnsafeRawPointer
+  ) -> Int {
     var utf16Count = 0
-    
-    while unsafe readPtr + MemoryLayout<U>.stride < endPtr {
+
+    while unsafe readPtr + MemoryLayout<SIMD8<UInt8>>.stride < endPtr {
       //Find the number of continuations (0b10xxxxxx)
-      let sValue = unsafe readPtr.loadUnaligned(as: S.self)
-      let continuations = S.zero.replacing(with: S.one, where: sValue .< -65 + 1)
-            
+      let sValue = unsafe readPtr.loadUnaligned(as: SIMD8<Int8>.self)
+      let continuations = SIMD8<Int8>.zero.replacing(
+        with: SIMD8<Int8>.one, where: sValue .< -65 + 1)
+
       //Find the number of 4 byte code points (0b11110xxx)
-      let uValue = unsafe readPtr.loadUnaligned(as: U.self)
-      let fourBytes = unsafe S.zero.replacing(
-        with: S.one,
-        where: unsafeBitCast(
-          uValue .>= 0b11110000,
-          to: SIMDMask<S.MaskStorage>.self
-        )
+      let uValue = unsafe readPtr.loadUnaligned(as: SIMD8<UInt8>.self)
+      let fourBytes = SIMD8<Int8>.zero.replacing(
+        with: SIMD8<Int8>.one,
+        where: uValue .>= 0b11110000
       )
-      
-      utf16Count &+= U.scalarCount + Int((fourBytes &- continuations).wrappedSum())
-            
-      unsafe readPtr += MemoryLayout<U>.stride
+
+      utf16Count &+= 8 + Int(_wrappedSum(fourBytes &- continuations))
+
+      unsafe readPtr += MemoryLayout<SIMD8<UInt8>>.stride
     }
-    
+
     return utf16Count
   }
 #endif
@@ -788,14 +784,9 @@ extension String.UTF16View {
       }
 
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
-      // TODO: Currently, using SIMD sizes above SIMD8 is slower
-      // Once that's fixed we should go up to SIMD64 here
-      
-      unsafe utf16Count &+= _utf16Length(
+      unsafe utf16Count &+= _utf16LengthWithoutUnalignedTail(
         readPtr: &readPtr,
-        endPtr: endPtr,
-        unsignedSIMDType: SIMD8<UInt8>.self,
-        signedSIMDType: SIMD8<Int8>.self
+        endPtr: endPtr
       )
    
       //TO CONSIDER: SIMD widths <8 here
@@ -927,7 +918,6 @@ extension String.UTF16View {
     return _guts.withFastUTF8 { utf8 in
       var readIdx = crumb._encodedOffset
       let readEnd = utf8.count
-      _internalInvariant(readIdx < readEnd)
 
       var utf16I = 0
       let utf16End: Int = remaining
@@ -938,6 +928,47 @@ extension String.UTF16View {
       if crumb.transcodedOffset != 0 {
         utf16I = -1
       }
+
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+      // Guess-and-check fast path.
+      //
+      // The smallest possible UTF8 distance for N UTF16 code units is N bytes.
+      // Start there, and use the vectorized length function to quickly find how
+      // far over that minimum we actually are. If this run happens to be all
+      // ASCII, it will be correct. If not, it gets us vectorized counting of
+      // the initial prefix, and we then repeat from where we landed: each round
+      // turns another chunk of the remaining distance into a vectorized count
+      // instead of a scalar walk. The range shrinks every round (dense UTF-8
+      // means a larger undershoot, so more rounds), so we stop once it drops
+      // below `guessThreshold` and let the scalar loop below finish the tail.
+      //
+      // `guessThreshold` has to be at least 16, otherwise we don't hit the
+      // vector path in _utf16Distance. It also amortizes setup/call overhead,
+      // and gates each round so we never guess a range too small to vectorize.
+      let guessThreshold = 32
+      if remaining >= guessThreshold {
+        var current = crumb
+        var unitsRemaining = remaining
+        repeat {
+          let guessOffset = unsafe _scalarAlign(
+            utf8, current._encodedOffset &+ unitsRemaining)
+          let guessIndex = String.Index(
+            encodedOffset: guessOffset, transcodedOffset: 0
+          )._knownUTF8
+          let guessDistance = _utf16Distance(from: current, to: guessIndex)
+          _internalInvariant(guessDistance <= unitsRemaining)
+          if guessDistance == unitsRemaining {
+            return guessIndex
+          }
+          unitsRemaining &-= guessDistance
+          current = guessIndex
+        } while unitsRemaining >= guessThreshold
+        readIdx = current._encodedOffset
+        utf16I = remaining &- unitsRemaining
+      }
+#endif
+
+      _internalInvariant(readIdx < readEnd)
 
       while true {
         _precondition(readIdx < readEnd, "String index is out of bounds")
@@ -978,6 +1009,48 @@ extension String.UTF16View {
       into: buffer,
       alignedRange: alignedRange.lowerBound ..< alignedRange.upperBound)
   }
+
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+  @inline(__always)
+  internal static func _utf8WordIsASCII(_ p: UnsafePointer<UInt8>) -> Bool {
+    let word = unsafe UnsafeRawPointer(p).loadUnaligned(as: UInt64.self)
+    return word & 0x8080_8080_8080_8080 == 0
+  }
+
+  @inline(never) //outlined to avoid regressing codegen for non-ASCII inputs
+  internal static func transcodeASCIIChunk(
+    _ utf8: UnsafeBufferPointer<UInt8>,
+    from start: Int,
+    to end: Int,
+    into buffer: UnsafeMutableBufferPointer<UInt16>,
+    at writeStart: Int
+  ) -> Int {
+    let src = unsafe utf8.baseAddress._unsafelyUnwrappedUnchecked
+    let dst = unsafe buffer.baseAddress._unsafelyUnwrappedUnchecked
+    var readIdx = start
+    var writeIdx = writeStart
+    let blockSize = 16
+    while readIdx &+ blockSize <= end {
+      let block = unsafe UnsafeRawPointer(
+        src + readIdx
+      ).loadUnaligned(as: SIMD16<UInt8>.self)
+      if block.max() >= 0x80 { break }
+      for i in 0 ..< blockSize {
+        unsafe (dst + writeIdx + i).initialize(to: UInt16(block[i]))
+      }
+      readIdx &+= blockSize
+      writeIdx &+= blockSize
+    }
+    while readIdx < end {
+      let byte = unsafe src[readIdx]
+      if byte >= 0x80 { break }
+      unsafe (dst + writeIdx).initialize(to: UInt16(byte))
+      readIdx &+= 1
+      writeIdx &+= 1
+    }
+    return readIdx &- start
+  }
+#endif
 
   // Copy (i.e. transcode to UTF-16) our contents into a buffer. `alignedRange`
   // means that the indices are part of the UTF16View.indices -- they are either
@@ -1028,6 +1101,19 @@ extension String.UTF16View {
       
       // Transcode middle
       while readIdx < readEnd {
+        #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+        if readIdx &+ 8 <= readEnd {
+          let p = unsafe utf8.baseAddress._unsafelyUnwrappedUnchecked + readIdx
+          // If we see 8 bytes of ASCII, guess that we may be at the start of a long run of ASCII and bulk-transcode until we hit non-ASCII. transcodeASCIIChunk() is frameless, so the overhead if we guess wrong is minimal
+          if unsafe Self._utf8WordIsASCII(p) {
+            let transcodedCount = unsafe Self.transcodeASCIIChunk(
+              utf8, from: readIdx, to: readEnd, into: buffer, at: writeIdx)
+            readIdx &+= transcodedCount
+            writeIdx &+= transcodedCount
+            continue
+          }
+        }
+        #endif
         let (scalar, len) = unsafe _decodeScalar(utf8, startingAt: readIdx)
         unsafe buffer[writeIdx] = scalar.utf16[0]
         readIdx &+= len

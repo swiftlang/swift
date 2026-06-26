@@ -98,6 +98,29 @@ StringBreadcrumbsTests.test("surrogates-heavy") {
   validateBreadcrumbs("aé" + nonBMP)
 }
 
+// Exercise the guess-and-check fast path in `_nativeGetIndex`. It is only
+// taken for non-ASCII strings when the target offset is >= 32 UTF-16 code
+// units past the nearest breadcrumb (stride 64).
+StringBreadcrumbsTests.test("guess-and-verify") {
+  let asciiRun = String(repeating: "a", count: 80)
+  let asciiRun2 = String(repeating: "b", count: 40)
+  let cjkRun = String(repeating: "界", count: 50)   // 3-byte UTF-8, 1 unit each
+
+  // Density drops across the guessed span (ASCII crumb -> CJK target): the
+  // ASCII guess undershoots the encoded offset
+  validateBreadcrumbs(asciiRun + cjkRun + asciiRun2)
+  // Density rises (CJK crumb -> ASCII target)
+  validateBreadcrumbs(cjkRun + asciiRun + cjkRun)
+  // Pure CJK: guess covers only ~1/3 of the distance
+  validateBreadcrumbs(String(repeating: "語", count: 120))
+  // Breadcrumb lands mid-surrogate-pair while the guess path is active (the
+  // leading 1/2 ASCII units misalign the stride-64 crumb onto a trailing
+  // surrogate). Validates that the SIMD distance supersedes the -1
+  // `transcodedOffset` adjustment rather than double-counting it.
+  validateBreadcrumbs("a" + String(repeating: "𓀀", count: 70))
+  validateBreadcrumbs("ab" + String(repeating: "𓀀", count: 70))
+}
+
 // Test bread-crumb invalidation
 StringBreadcrumbsTests.test("stale breadcrumbs") {
   var str = nonBMP + "𓀀"
