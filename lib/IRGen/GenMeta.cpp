@@ -7597,7 +7597,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
     
   // The other known protocols aren't special at runtime.
   case KnownProtocolKind::Sequence:
-  case KnownProtocolKind::BorrowingSequence:
+  case KnownProtocolKind::Iterable:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::IteratorProtocol:
   case KnownProtocolKind::BorrowingIteratorProtocol:
@@ -7662,7 +7662,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::CxxMutableRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
-  case KnownProtocolKind::CxxBorrowingSequence:
+  case KnownProtocolKind::CxxIterable:
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
   case KnownProtocolKind::CxxSpan:

@@ -1,22 +1,22 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=CustomBorrowingSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -module-cache-path %t -enable-experimental-feature BorrowingSequence | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterable -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -module-cache-path %t -enable-experimental-feature BorrowingSequence | %FileCheck %s
 
 // REQUIRES: swift_feature_BorrowingSequence
 
-// CHECK:     struct SimpleNonCopyableSequence : ~Copyable, CxxBorrowingSequence {
+// CHECK:     struct SimpleNonCopyableSequence : ~Copyable, CxxIterable {
 // CHECK:       typealias Element = ConstIterator.Pointee
 // CHECK:       typealias RawIterator = ConstIterator
 // CHECK:       typealias BorrowingIterator = CxxBorrowingIterator<SimpleNonCopyableSequence>
 // CHECK-NOT-TODO:   typealias Iterator
 // CHECK:     }
 
-// CHECK:     struct SimpleConditionallyCopyableSequence<CInt> : CxxConvertibleToCollection, CxxBorrowingSequence {
+// CHECK:     struct SimpleConditionallyCopyableSequence<CInt> : CxxConvertibleToCollection, CxxIterable {
 // CHECK:       typealias Element = ConstIterator.Pointee
 // CHECK:       typealias RawIterator = ConstIterator
 // CHECK:       typealias BorrowingIterator = CxxBorrowingIterator<SimpleConditionallyCopyableSequence<CInt>>
 // CHECK:       typealias Iterator = CxxIterator<SimpleConditionallyCopyableSequence<CInt>>
 // CHECK:     }
 
-// CHECK:     struct SimpleConditionallyCopyableSequence<NonCop> : ~Copyable, CxxBorrowingSequence {
+// CHECK:     struct SimpleConditionallyCopyableSequence<NonCop> : ~Copyable, CxxIterable {
 // CHECK:       typealias Element = ConstIterator.Pointee
 // CHECK:       typealias RawIterator = ConstIterator
 // CHECK:       typealias BorrowingIterator = CxxBorrowingIterator<SimpleConditionallyCopyableSequence<NonCop>>
@@ -41,7 +41,7 @@
 // CHECK-NOT:   typealias Iterator
 // CHECK: }
 
-// CHECK: struct DifferentResultsDereferenceOperatorSequence : CxxConvertibleToCollection, CxxBorrowingSequence {
+// CHECK: struct DifferentResultsDereferenceOperatorSequence : CxxConvertibleToCollection, CxxIterable {
 // CHECK:   typealias Element = DifferentResultsDereferenceOperator.Pointee
 // CHECK:   typealias RawIterator = DifferentResultsDereferenceOperator
 // CHECK:   typealias BorrowingIterator = CxxBorrowingIterator<DifferentResultsDereferenceOperatorSequence>
