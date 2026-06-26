@@ -104,10 +104,12 @@ template <unsigned char ELFClass> struct ELFTraits;
 
 template <> struct ELFTraits<llvm::ELF::ELFCLASS32> {
   using Pointer = uint32_t;
+  static constexpr size_t PointerSize = sizeof(Pointer);
 };
 
 template <> struct ELFTraits<llvm::ELF::ELFCLASS64> {
   using Pointer = uint64_t;
+  static constexpr size_t PointerSize = sizeof(Pointer);
 };
 
 } // namespace
@@ -538,9 +540,7 @@ public:
     // Must match SwiftRT-ELF.cpp
     constexpr llvm::StringRef ELFReflectionSectionSymbol =
         "__swift5_reflection_sections";
-    constexpr uint64_t ELFReflectionSectionsVersion = 1;
-
-    const unsigned pointerSize = sizeof(typename T::Pointer);
+    constexpr uint64_t ELFReflectionSectionsVersion = 1u;
 
     // Locate reflection section table
     RemoteAddress tableAddr = getReader().getSymbolAddress(
@@ -550,18 +550,25 @@ public:
       return std::nullopt;
 
     typename T::Pointer version = 0;
-    if (!getReader().readInteger(tableAddr, pointerSize, &version))
+    if (!getReader().readInteger(tableAddr, T::PointerSize, &version))
       return std::nullopt;
     if (version != ELFReflectionSectionsVersion)
       return std::nullopt;
 
-    auto readTableSection =
-        [&](unsigned index) -> std::pair<RemoteRef<void>, uint64_t> {
-      RemoteAddress startFieldAddr = tableAddr + (1 + 2 * index) * pointerSize;
-      RemoteAddress stopFieldAddr = tableAddr + (2 + 2 * index) * pointerSize;
+    struct ReflectionSection {
+      RemoteRef<void> contents;
+      uint64_t size;
+      explicit operator bool() const { return contents != nullptr; }
+    };
 
-      auto start = getReader().readPointer(startFieldAddr, pointerSize);
-      auto stop = getReader().readPointer(stopFieldAddr, pointerSize);
+    auto readTableSection = [&](unsigned index) -> ReflectionSection {
+      RemoteAddress startFieldAddr =
+          tableAddr + (1 + 2 * index) * T::PointerSize;
+      RemoteAddress stopFieldAddr =
+          tableAddr + (2 + 2 * index) * T::PointerSize;
+
+      auto start = getReader().readPointer(startFieldAddr, T::PointerSize);
+      auto stop = getReader().readPointer(stopFieldAddr, T::PointerSize);
 
       if (!start || !stop)
         return {nullptr, 0};
@@ -584,42 +591,34 @@ public:
       return {secContents, secSize};
     };
 
-    enum {
-      idx_fieldmd = 0,
-      idx_assocty,
-      idx_builtin,
-      idx_capture,
-      idx_typeref,
-      idx_reflstr,
-      idx_conform,
-      idx_mpenum,
+    enum : unsigned {
+#define SWIFT_REFLECTION_SECTION(Name, Field) idx_##Name,
+#include "ELFReflectionSections.def"
+#undef SWIFT_REFLECTION_SECTION
+      kELFReflectionSectionCount
     };
 
-    auto fieldMd = readTableSection(idx_fieldmd);
-    auto assoctyMd = readTableSection(idx_assocty);
-    auto builtinMd = readTableSection(idx_builtin);
-    auto captureMd = readTableSection(idx_capture);
-    auto typerefMd = readTableSection(idx_typeref);
-    auto reflstrMd = readTableSection(idx_reflstr);
-    auto conformanceMd = readTableSection(idx_conform);
-    auto mpenumMd = readTableSection(idx_mpenum);
+    ReflectionSection sections[kELFReflectionSectionCount];
+    bool populated = false;
 
-    if (!(fieldMd.first || assoctyMd.first || builtinMd.first ||
-          captureMd.first || typerefMd.first || reflstrMd.first ||
-          conformanceMd.first || mpenumMd.first))
+#define SWIFT_REFLECTION_SECTION(Name, Field)                                  \
+  sections[idx_##Name] = readTableSection(idx_##Name);                         \
+  populated |= bool(sections[idx_##Name]);
+#include "ELFReflectionSections.def"
+#undef SWIFT_REFLECTION_SECTION
+
+    if (!populated)
       return std::nullopt;
 
-    return this->addReflectionInfo({
-        {fieldMd.first, fieldMd.second},
-        {assoctyMd.first, assoctyMd.second},
-        {builtinMd.first, builtinMd.second},
-        {captureMd.first, captureMd.second},
-        {typerefMd.first, typerefMd.second},
-        {reflstrMd.first, reflstrMd.second},
-        {conformanceMd.first, conformanceMd.second},
-        {mpenumMd.first, mpenumMd.second},
+    ReflectionInfo info{
+#define SWIFT_REFLECTION_SECTION(Name, Field)                                  \
+  {sections[idx_##Name].contents, sections[idx_##Name].size},
+#include "ELFReflectionSections.def"
+#undef SWIFT_REFLECTION_SECTION
         PotentialModuleNames,
-    });
+    };
+
+    return this->addReflectionInfo(info);
   }
 
   /// Parses metadata information from an ELF image. Because the Section
