@@ -7,7 +7,7 @@ import StdSpan
 func takesSequence<T: Sequence>(_ _: T) {}
 // expected-note@-1 {{where 'T' = 'SpanOfNonCopyable'}}
 
-func takesBorrowingSequence<T: CxxBorrowingSequence>(_ _: T) where T.Element: ~Copyable {}
+func takesIterable<T: CxxIterable>(_ _: T) where T.Element: ~Copyable {}
 
 func takesSpan<S: CxxMutableSpan>(_ _: S) where S.Element: ~Copyable {}
 
@@ -25,7 +25,7 @@ arr.withUnsafeBufferPointer { ubpointer in
 let s1 = initSpan()
 for _ in s1 {}
 takesSequence(s1)
-takesBorrowingSequence(s1)
+takesIterable(s1)
 takesSpan(s1)
 
 let s2 = makeSpanOfNonCopyable()
@@ -33,5 +33,5 @@ for _ in s2 {}
 // expected-error@-1 {{for-in loop requires 'SpanOfNonCopyable'}} to conform to 'Sequence'
 takesSequence(s2)
 // expected-error@-1 {{global function 'takesSequence' requires that 'SpanOfNonCopyable'}} conform to 'Sequence'
-takesBorrowingSequence(s2)
+takesIterable(s2)
 takesSpan(s2)
