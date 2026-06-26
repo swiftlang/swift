@@ -252,6 +252,16 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "#endif\n";
   os << "}\n\n";
 
+  // _initializeWithCopy
+  os << "SWIFT_INLINE_PRIVATE_HELPER\n";
+  os << "void\n";
+  os << "SwiftExistentialType::_initializeWithCopy(\n";
+  os << "    const SwiftExistentialType &src) noexcept {\n";
+  os << "  _type = src._type;\n";
+  os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
+  os << "      _buffer, const_cast<void **>(src._buffer), _type);\n";
+  os << "}\n\n";
+
   // _projectValue
   os << "SWIFT_INLINE_PRIVATE_HELPER\n";
   os << "void *_Nonnull\n";

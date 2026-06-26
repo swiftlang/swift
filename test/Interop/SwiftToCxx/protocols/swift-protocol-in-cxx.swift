@@ -46,6 +46,12 @@ public protocol Stylable: Drawable {
 
 // CHECK:       class _impl_Drawable {
 // CHECK-NEXT:  public:
+// CHECK:         static {{.*}} Drawable _fromExistential(const swift::_impl::SwiftExistentialType &src, const void *_Nonnull wt) {
+// CHECK-NEXT:      Drawable result;
+// CHECK-NEXT:      result._initializeWithCopy(src);
+// CHECK-NEXT:      result._witnessTable = wt;
+// CHECK-NEXT:      return result;
+// CHECK-NEXT:    }
 // CHECK-NEXT:  };
 
 // --- Marker protocol: Priority (subclass of swift::Any) ---
@@ -85,7 +91,8 @@ public protocol Stylable: Drawable {
 
 // CHECK:       class _impl_Resizable {
 // CHECK-NEXT:  public:
-// CHECK-NEXT:  };
+// CHECK:         static {{.*}} Resizable _fromExistential(const swift::_impl::SwiftExistentialType &src, const void *_Nonnull wt) {
+// CHECK:       };
 
 // --- Non-marker protocol inheriting Drawable: Stylable ---
 // Inherited draw() uses two-level dispatch through base WT.
@@ -106,6 +113,10 @@ public protocol Stylable: Drawable {
 // CHECK-NEXT:      struct _w { _w() = delete; static SWIFT_CALL bool call(void *_Nonnull, const void *_Nonnull, SWIFT_CONTEXT void *_Nonnull); };
 // CHECK-NEXT:      return _loadWitness<2, {{[0-9]+}}, decltype(&_w::call)>(_witnessTable)(_type, _witnessTable, _projectValue());
 // CHECK-NEXT:    }
+// CHECK:         Drawable asDrawable() const {
+// CHECK-NEXT:      auto *baseWT = reinterpret_cast<const void *const *>(_witnessTable)[1];
+// CHECK-NEXT:      return _impl::_impl_Drawable::_fromExistential(*this, baseWT);
+// CHECK-NEXT:    }
 // CHECK:       private:
 // CHECK:         Stylable() noexcept : SwiftExistentialType(uninit_t{}) {}
 // CHECK:         const void *_Nonnull _witnessTable;
@@ -114,7 +125,8 @@ public protocol Stylable: Drawable {
 
 // CHECK:       class _impl_Stylable {
 // CHECK-NEXT:  public:
-// CHECK-NEXT:  };
+// CHECK:         static {{.*}} Stylable _fromExistential(const swift::_impl::SwiftExistentialType &src, const void *_Nonnull wt) {
+// CHECK:       };
 
 // --- Non-marker protocol inheriting Sendable: Taggable ---
 
@@ -131,4 +143,5 @@ public protocol Stylable: Drawable {
 
 // CHECK:       class _impl_Taggable {
 // CHECK-NEXT:  public:
-// CHECK-NEXT:  };
+// CHECK:         static {{.*}} Taggable _fromExistential(const swift::_impl::SwiftExistentialType &src, const void *_Nonnull wt) {
+// CHECK:       };

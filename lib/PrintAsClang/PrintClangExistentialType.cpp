@@ -232,6 +232,63 @@ void ClangExistentialTypePrinter::emitExistentialMethod(
   os << "  }\n";
 }
 
+void ClangExistentialTypePrinter::printConversionMethods(
+    const ProtocolDecl *PD, DeclAndTypePrinter &declAndTypePrinter) {
+  auto printCxxImplClassName = ClangValueTypePrinter::printCxxImplClassName;
+  ClangSyntaxPrinter printer(PD->getASTContext(), os);
+
+  auto requirements = PD->getRequirementSignature().getRequirements();
+  size_t currentOffset = 1; // offset 0 is conformance descriptor
+
+  for (const auto &reqt : requirements) {
+    if (reqt.getKind() != RequirementKind::Conformance)
+      continue;
+
+    auto protocol = reqt.getProtocolDecl();
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
+      continue;
+
+    auto type = reqt.getFirstType()->getCanonicalType();
+    if (isa<GenericTypeParamType>(type) && !protocol->isMarkerProtocol()) {
+      // Emit asBaseProtocol() conversion method.
+      os << "  ";
+      printer.printInlineForThunk();
+      printer.printBaseName(protocol);
+      os << " as";
+      printer.printBaseName(protocol);
+      os << "() const {\n";
+      os << "    auto *baseWT = reinterpret_cast<const void *const *>"
+            "(_witnessTable)["
+         << currentOffset << "];\n";
+      os << "    return " << cxx_synthesis::getCxxImplNamespaceName() << "::";
+      printCxxImplClassName(os, protocol);
+      os << "::_fromExistential(*this, baseWT);\n";
+      os << "  }\n";
+    }
+
+    currentOffset++;
+  }
+}
+
+void ClangExistentialTypePrinter::printImplFromExistentialFactory(
+    const ProtocolDecl *PD, DeclAndTypePrinter &declAndTypePrinter) {
+  ClangSyntaxPrinter printer(PD->getASTContext(), os);
+
+  os << "  static ";
+  printer.printInlineForThunk();
+  printer.printBaseName(PD);
+  os << " _fromExistential("
+        "const swift::_impl::SwiftExistentialType &src, "
+        "const void *_Nonnull wt) {\n";
+  os << "    ";
+  printer.printBaseName(PD);
+  os << " result;\n";
+  os << "    result._initializeWithCopy(src);\n";
+  os << "    result._witnessTable = wt;\n";
+  os << "    return result;\n";
+  os << "  }\n";
+}
+
 void ClangExistentialTypePrinter::printMarkerProtocolDecl(
     const ProtocolDecl *PD, DeclAndTypePrinter &declAndTypePrinter) {
   auto printCxxImplClassName = ClangValueTypePrinter::printCxxImplClassName;
@@ -316,6 +373,9 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
     // Emit protocol requirement methods.
     printProtocolRequirementMethods(PD, declAndTypePrinter);
 
+    // Emit conversion methods (asBaseProtocol()) for direct base protocols.
+    printConversionMethods(PD, declAndTypePrinter);
+
     os << "private:\n";
     os << "  ";
     printer.printInlineForThunk();
@@ -341,6 +401,7 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
           os << ' ';
           printCxxImplClassName(os, PD);
           os << " {\npublic:\n";
+          printImplFromExistentialFactory(PD, declAndTypePrinter);
           os << "};\n";
         });
   });

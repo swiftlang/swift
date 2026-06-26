@@ -79,6 +79,23 @@ int main() {
 // CHECK-NEXT: stylable.draw() = 147
 // CHECK-NEXT: stylable.style() = true
 
+    // Test 4: Conversion -- Stylable::asDrawable() copies the existential
+    // into a Drawable wrapper with the base witness table.
+    {
+        alignas(alignof(ProtoDispatch::Stylable))
+            char storage[sizeof(ProtoDispatch::Stylable)];
+        createStyledCircleStylable(storage, 7);
+
+        auto &stylable =
+            *reinterpret_cast<ProtoDispatch::Stylable *>(storage);
+
+        ProtoDispatch::Drawable drawable = stylable.asDrawable();
+        swift::Int drawResult = drawable.draw();
+        printf("asDrawable().draw() = %ld\n", drawResult);
+        assert(drawResult == 147);  // same as stylable.draw()
+    }
+// CHECK-NEXT: asDrawable().draw() = 147
+
     printf("done\n");
 // CHECK-NEXT: done
     return 0;

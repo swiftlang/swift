@@ -66,6 +66,15 @@ private:
                              ArrayRef<BaseWTStep> baseChain,
                              DeclAndTypePrinter &declAndTypePrinter);
 
+  /// Emits asBaseProtocol() conversion methods for each direct base
+  /// protocol conformance.
+  void printConversionMethods(const ProtocolDecl *PD,
+                              DeclAndTypePrinter &declAndTypePrinter);
+
+  /// Emits the _fromExistential factory in the _impl class body.
+  void printImplFromExistentialFactory(const ProtocolDecl *PD,
+                                       DeclAndTypePrinter &declAndTypePrinter);
+
   /// Returns the C++ type name for a Swift type if it is a simple
   /// C-representable primitive, or None otherwise.
   std::optional<std::string> getCxxTypeName(Type ty,

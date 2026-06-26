@@ -276,6 +276,13 @@ protected:
   struct uninit_t {};
   SWIFT_INLINE_THUNK SwiftExistentialType(uninit_t) noexcept {}
 
+  /// Copy the existential value (buffer + type metadata) from another
+  /// existential into this one. Used by conversion methods that construct
+  /// a base-protocol wrapper from a derived-protocol wrapper.
+  /// Defined out-of-line in the generated scaffolding (needs VWT).
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _initializeWithCopy(const SwiftExistentialType &src) noexcept;
+
   /// Project the contained value for passing to witness functions.
   /// Defined out-of-line in the generated scaffolding (needs VWT).
   SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull

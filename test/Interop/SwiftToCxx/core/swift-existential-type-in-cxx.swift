@@ -22,6 +22,12 @@
 // CHECK:   auto *vwTableAddr = reinterpret_cast<ValueWitnessTable **>(_type) - 1;
 // CHECK: }
 
+// CHECK: SwiftExistentialType::_initializeWithCopy(
+// CHECK:     const SwiftExistentialType &src) noexcept {
+// CHECK:   _type = src._type;
+// CHECK:   _getVWT()->initializeBufferWithCopyOfBuffer(
+// CHECK: }
+
 // CHECK: SwiftExistentialType::_projectValue() const noexcept {
 // CHECK:   auto *vwTable = _getVWT();
 // CHECK: }
