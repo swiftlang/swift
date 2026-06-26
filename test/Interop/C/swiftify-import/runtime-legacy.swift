@@ -1,9 +1,14 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
-// REQUIRES: swift_feature_SafeInteropWrappersNullAsEmptySpan
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-run-simple-swift-split-file(test.swift -I %t%{fs-sep}Inputs -target %target-swift-6.2-abi-triple -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan)
+// Mirrors runtime.swift but exercises the legacy opt-in wrapper shape:
+// without SafeInteropWrappersNullAsEmptySpan, `counted_by`/`sized_by`
+// nullable parameters propagate as Optional in the wrapper, so the call
+// sites here use `var spanOut = Optional(arr.mutableSpan)` (a
+// `MutableSpan<...>?`) where the new-mode runtime.swift uses a plain
+// `MutableSpan<...>`.
+// RUN: %target-run-simple-swift-split-file(test.swift -I %t%{fs-sep}Inputs -target %target-swift-6.2-abi-triple -enable-experimental-feature SafeInteropWrappers)
 //
 // REQUIRES: executable_test
 
@@ -263,7 +268,7 @@ Suite.test("Non-empty inline array with counted_by") {
 Suite.test("Empty array with counted_by_nullable and noescape") {
     let emptyArr: [Int32] = []
     var emptyArrOut: [Int32] = []
-    var spanOut = emptyArrOut.mutableSpan
+    var spanOut = Optional(emptyArrOut.mutableSpan)
     interop_counted_noescape_nullable(emptyArr.span, &spanOut)
     expectEqual(emptyArr, emptyArrOut)
 }
@@ -282,7 +287,7 @@ Suite.test("Empty array with counted_by_nullable") {
 Suite.test("Non-empty array with counted_by_nullable and noescape") {
     let arr: [Int32] = [1, 2, 3]
     var arrOut: [Int32] = [3, 2, 1]
-    var spanOut = arrOut.mutableSpan
+    var spanOut = Optional(arrOut.mutableSpan)
     interop_counted_noescape_nullable(arr.span, &spanOut)
     expectEqual(arr, arrOut)
 }
@@ -301,7 +306,7 @@ Suite.test("Non-empty array with counted_by_nullable") {
 Suite.test("Empty inline array with counted_by_nullable and noescape") {
     let emptyArr: [0 of Int32] = []
     var emptyArrOut: [0 of Int32] = []
-    var spanOut = emptyArrOut.mutableSpan
+    var spanOut = Optional(emptyArrOut.mutableSpan)
     interop_counted_noescape_nullable(emptyArr.span, &spanOut)
     expectEqual(emptyArr, emptyArrOut)
 }
@@ -321,7 +326,7 @@ Suite.test("Empty inline array with counted_by_nullable") {
 Suite.test("Non-empty inline array with counted_by_nullable and noescape") {
     let arr: [3 of Int32] = [1, 2, 3]
     var arrOut: [3 of Int32] = [3, 2, 1]
-    var spanOut = arrOut.mutableSpan
+    var spanOut = Optional(arrOut.mutableSpan)
     interop_counted_noescape_nullable(arr.span, &spanOut)
     expectEqual(arr, arrOut)
 }
@@ -628,7 +633,7 @@ Suite.test("Mismatching lengths span") {
 Suite.test("Mismatching lengths span nullable") {
     let emptyArr: [Int32] = [1]
     var emptyArrOut: [Int32] = []
-    var spanOut = emptyArrOut.mutableSpan
+    var spanOut = Optional(emptyArrOut.mutableSpan)
     expectCrash { interop_counted_noescape_nullable(emptyArr.span, &spanOut) }
 }
 

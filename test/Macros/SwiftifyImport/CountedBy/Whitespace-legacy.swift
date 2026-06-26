@@ -7,10 +7,14 @@
 // RUN: env SWIFT_BACKTRACE="" %target-swift-frontend %t/test.swift -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -enable-experimental-feature Lifetimes 2> %t/expansions.out
 // RUN: %diff %t/expansions.out %t/expansions.expected
 
-// This test is meant to act as an alarm bell to unintended changes in whitespace
+// Mirrors Whitespace.swift but exercises the legacy opt-in
+// behavior: without `nullableAsEmptySpan: true`, Optional pointer
+// parameters / return values propagate as Optional in the wrapper. The
+// invocation deliberately omits `nullableAsEmptySpan` so this also mirrors
+// what a pre-`nullableAsEmptySpan` compiler would emit.
 
 //--- test.swift
-@_SwiftifyImport(.countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), .countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedBy(pointer: .param(3), count: "len2"), .nonescaping(pointer: .param(3)), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), .countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedBy(pointer: .param(3), count: "len2"), .nonescaping(pointer: .param(3)))
 public func myFunc(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt, _ ptr2: UnsafeMutablePointer<CInt>?, _ len2: CInt) -> UnsafeMutablePointer<CInt>? { nil }
 
 //--- expansions.expected
@@ -18,25 +22,24 @@ public func myFunc(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt, _ ptr2: Unsa
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_lifetime(ptr2: copy ptr2) @_disfavoredOverload
-public func myFunc(_ ptr: inout MutableSpan<CInt>, _ ptr2: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
-    let len = CInt(exactly: ptr.count)!
-    let len2 = CInt(exactly: ptr2.count)!
-    let _ptrPtr = ptr.withUnsafeMutableBufferPointer {
+public func myFunc(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
+    let len = CInt(exactly: ptr?.count ?? 0)!
+    let len2 = CInt(exactly: ptr2?.count ?? 0)!
+    let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
         _fixLifetime(ptr)
     }
-    let _ptr2Ptr = ptr2.withUnsafeMutableBufferPointer {
+    let _ptr2Ptr = ptr2?.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
         _fixLifetime(ptr2)
     }
-    let _resultValue = unsafe myFunc(_ptrPtr.baseAddress, len, _ptr2Ptr.baseAddress, len2)
+    let _resultValue = unsafe myFunc(_ptrPtr?.baseAddress, len, _ptr2Ptr?.baseAddress, len2)
     if unsafe _resultValue == nil {
-      precondition(len == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")
-      return MutableSpan<CInt>()
+      return nil
     }
     return unsafe _swiftifyOverrideLifetime(MutableSpan<CInt>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())
 }
