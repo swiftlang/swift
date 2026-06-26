@@ -4005,14 +4005,15 @@ void ConstraintSystem::generateOverloadConstraints(
         getFix) {
   SmallVector<ValueDecl *, 1> requirements;
 
-  if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
-    for (auto choice : choices) {
-      if (auto *decl = choice.getDeclOrNull()) {
-        if (decl->isOperator() &&
-            isa<ProtocolDecl>(decl->getDeclContext()) &&
-            !isDeclUnavailable(decl, locator)) {
-          requirements.push_back(decl);
-        }
+  // Skip protocol extension operators that are refinements of a protocol
+  // requirement operator, because they never participate in a valid
+  // solution.
+  for (auto choice : choices) {
+    if (auto *decl = choice.getDeclOrNull()) {
+      if (decl->isOperator() &&
+          isa<ProtocolDecl>(decl->getDeclContext()) &&
+          !isDeclUnavailable(decl, locator)) {
+        requirements.push_back(decl);
       }
     }
   }
@@ -4029,14 +4030,12 @@ void ConstraintSystem::generateOverloadConstraints(
     // Skip protocol extension operators that are refinements of a protocol
     // requirement operator, because they never participate in a valid
     // solution.
-    if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
-      if (auto *decl = choice.getDeclOrNull()) {
-        if (decl->getDeclContext()->getExtendedProtocolDecl()) {
-          if (llvm::any_of(requirements, [&](ValueDecl *req) {
-            return TypeChecker::isDeclRefinementOf(decl, req);
-          })) {
-            continue;
-          }
+    if (auto *decl = choice.getDeclOrNull()) {
+      if (decl->getDeclContext()->getExtendedProtocolDecl()) {
+        if (llvm::any_of(requirements, [&](ValueDecl *req) {
+          return TypeChecker::isDeclRefinementOf(decl, req);
+        })) {
+          continue;
         }
       }
     }
@@ -4195,7 +4194,11 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto argPath = path.drop_back(iter - path.rbegin());
   auto *argLocator = getConstraintLocator(anchor, argPath);
 
-  auto *argExpr = castToExpr(simplifyLocatorToAnchor(argLocator));
+  auto simplifiedAnchor = simplifyLocatorToAnchor(argLocator);
+  if (!simplifiedAnchor)
+    return std::nullopt;
+
+  auto *argExpr = getAsExpr(simplifiedAnchor);
 
   // If we were unable to simplify down to the argument expression, we don't
   // know what this is.
@@ -5183,7 +5186,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       if (!overload) {
         // If overload cannot be found because member is missing,
         // that's a failure.
-        if (hasFixFor(componentLoc, FixKind::DefineMemberBasedOnUse))
+        if (hasFixFor(calleeLoc, FixKind::DefineMemberBasedOnUse))
           return fail();
 
         return delay();

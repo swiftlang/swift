@@ -8495,17 +8495,13 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   ConcreteDeclRef callee;
   auto *calleeLoc = cs.getConstraintLocator(calleeLocator);
   auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc);
-  if (overload) {
-    // If this is a call through an implicit `dynamicMember:` subscript,
-    // of a `@dynamicMemberLookup` type there is no callee because the
-    // call happens on a value returned by the subscript invocation and
-    // not necessary the member looked up.
-    if (overload->choice.isKeyPathDynamicMemberLookup()) {
-      callee = ConcreteDeclRef();
-    } else {
-      auto *decl = overload->choice.getDeclOrNull();
-      callee = resolveConcreteDeclRef(decl, calleeLoc);
-    }
+  // If this is a call through an implicit `dynamicMember:` subscript
+  // of a `@dynamicMemberLookup` type there is no callee because the
+  // call happens on a value returned by the subscript invocation and
+  // not necessary the member looked up.
+  if (overload && !overload->choice.isAnyDynamicMemberLookup()) {
+    auto *decl = overload->choice.getDeclOrNull();
+    callee = resolveConcreteDeclRef(decl, calleeLoc);
   }
 
   // Make sure we have a function type that is callable. This helps ensure

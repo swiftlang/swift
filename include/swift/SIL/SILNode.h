@@ -19,9 +19,11 @@
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SwiftObjectHeader.h"
 #include <type_traits>
+#include <limits>
 
 namespace swift {
 
@@ -126,13 +128,13 @@ public:
   enum { NumAllocRefTailTypesBits = 4 };
   enum { NumMarkDependenceKindBits = 2 };
 
-  enum { numCustomBits = 20 };
+  enum { numCustomBits = 16 };
 
-  constexpr static const uint64_t maxBitfieldID =
-      std::numeric_limits<uint64_t>::max() >> numCustomBits;
+  constexpr static const uint64_t maxBitfieldID = std::numeric_limits<uint64_t>::max();
 
 protected:
   friend class SILInstruction;
+  friend class SILBasicBlock;
   template <class, class> friend class SILBitfield;
 
   static_assert((unsigned)SILNodeKind::Last_SILNode <= (unsigned)std::numeric_limits<uint8_t>::max(),
@@ -140,7 +142,8 @@ protected:
 
   uint8_t kind;
 
-  bool deleted = false;
+  bool deleted : 1;
+  bool hasLargeCustomBits : 1;
 
   // Part of SILInstruction's debug location. Together with
   // `SILInstruction::locationStorage` this forms the SILLocation.
@@ -382,27 +385,89 @@ protected:
 
   //===---------------------- end of shared fields ------------------------===//
 
-  // Used by `NodeBitfield`.
-  uint64_t customBits : numCustomBits;
+  /// The default storage for custom bits, which uses one 64 bit word.
+  /// It is _very_ unlikely that the counters overflow in `SmallCustomBits`. But
+  /// it can happen, e.g. if a basic block has more than 8k instructions.
+  /// In case of overflow we switch to the heap-allocated LargeCustomBits.
+  /// Using LargeCustomBits by default (as inline storage) would increase the size
+  /// of SILNode by one word, which result in ~3% more memory usage of the compiler.
+  /// It's not worth spending this memory, given that overflows are _very_ seldom.
+  struct SmallCustomBits {
+    /// The NodeBitfield ID of the last initialized bitfield in `customBits`.
+    /// Example:
+    ///
+    ///                   Last initialized field:
+    ///           lastInitializedBitfieldID == C.bitfieldID
+    ///                              |
+    ///                              V
+    /// customBits:  <unused> EE DDD C BB AAA
+    ///              31         ...         0
+    ///
+    /// -> AAA, BB and C are initialized,
+    ///    DD and EEE are uninitialized
+    ///
+    /// The size of lastInitializedBitfieldID should be more than 32 bits to
+    /// absolutely avoid an overflow.
+    ///
+    /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
+    uint32_t lastInitializedBitfieldID = 0;
 
-  /// The NodeBitfield ID of the last initialized bitfield in `customBits`.
-  /// Example:
-  ///
-  ///                   Last initialized field:
-  ///           lastInitializedBitfieldID == C.bitfieldID
-  ///                              |
-  ///                              V
-  /// customBits:  <unused> EE DDD C BB AAA
-  ///              31         ...         0
-  ///
-  /// -> AAA, BB and C are initialized,
-  ///    DD and EEE are uninitialized
-  ///
-  /// The size of lastInitializedBitfieldID should be more than 32 bits to
-  /// absolutely avoid an overflow.
-  ///
-  /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
-  uint64_t lastInitializedBitfieldID : (64 - numCustomBits);
+    // Used by `NodeBitfield`.
+    uint16_t customBits = 0;
+
+    // If not 0, a monotonically increasing index in the basic block's instruction list.
+    uint16_t indexInList = 0;
+  };
+
+  /// The "bigger" version of `SmallCustomBits`.
+  struct LargeCustomBits {
+    uint64_t lastInitializedBitfieldID = 0;
+
+    uint32_t indexInList = 0;
+
+    // The number of used custom bits does not depend on the input SIL, but is
+    // a fixed property of optimization implementations. Therefore, in case of
+    // overflow it would overflow for most instructions in the module - and
+    // always - independent of the program being compiled. Therefore it doesn't
+    // make sense to dynamically overflow custom bits.
+    uint16_t customBits = 0;
+
+    LargeCustomBits(SmallCustomBits smallBits) :
+      lastInitializedBitfieldID(smallBits.lastInitializedBitfieldID),
+      indexInList(smallBits.indexInList),
+      customBits(smallBits.customBits) {}
+  };
+
+  union {
+    SmallCustomBits smallCustomBits;
+    LargeCustomBits *largeCustomBits;
+  };
+
+  uint64_t getLastInitializedBitfieldID() const {
+    return hasLargeCustomBits ? largeCustomBits->lastInitializedBitfieldID
+                              : smallCustomBits.lastInitializedBitfieldID;
+  }
+  void setLastInitializedBitfieldID(uint64_t bitfieldID) {
+    if (hasLargeCustomBits) {
+      largeCustomBits->lastInitializedBitfieldID = bitfieldID;
+    } else if (bitfieldID <= std::numeric_limits<uint32_t>::max()) {
+      smallCustomBits.lastInitializedBitfieldID = bitfieldID;
+    } else {
+      // The real maximum bitfield ID is in the range of several 100K. So a
+      // 32-bit overflow is extremely unlikely. But let's be a bit paranoid.
+      switchToLargeCustomBits();
+      largeCustomBits->lastInitializedBitfieldID = bitfieldID;
+    }
+  }
+
+  // This happens if the function's bitfield ID overflows (= extremely unlikely)
+  // or for very large basic blocks (> 8K instructions).
+  void switchToLargeCustomBits() {
+    ASSERT(!hasLargeCustomBits);
+    auto smallBits = smallCustomBits;
+    largeCustomBits = new LargeCustomBits(smallBits);
+    hasLargeCustomBits = true;
+  }
 
 private:
   SwiftMetatype getSILNodeMetatype(SILNodeKind kind);
@@ -410,15 +475,44 @@ private:
 protected:
   SILNode(SILNodeKind kind) : SwiftObjectHeader(getSILNodeMetatype(kind)),
                               kind((uint8_t)kind),
-                              customBits(0), lastInitializedBitfieldID(0) {
+                              deleted(false), hasLargeCustomBits(false),
+                              smallCustomBits(SmallCustomBits()) {
     _sharedUInt8_private.opaque = 0;
     _sharedUInt32_private.opaque = 0;
   }
 
+  ~SILNode() {
+    if (hasLargeCustomBits)
+      delete largeCustomBits;
+  }
+
   // Used by `NodeBitfield`.
-  unsigned getCustomBits() const { return customBits; }
+  unsigned getCustomBits() const {
+    return hasLargeCustomBits ? largeCustomBits->customBits : smallCustomBits.customBits;
+  }
   // Used by `NodeBitfield`.
-  void setCustomBits(unsigned value) { customBits = value; }
+  void setCustomBits(unsigned value) {
+    if (hasLargeCustomBits) {
+      largeCustomBits->customBits = value;
+    } else {
+      smallCustomBits.customBits = value;
+    }
+  }
+
+  // Used by `SILBasicBlock` for native instruction ordering.
+  uint32_t getIndexInList() const {
+    return hasLargeCustomBits ? largeCustomBits->indexInList : smallCustomBits.indexInList;
+  }
+  void setIndexInList(uint64_t index) {
+    if (!hasLargeCustomBits && index <= std::numeric_limits<uint16_t>::max()) {
+      smallCustomBits.indexInList = (uint16_t)index;
+    } else {
+      if (!hasLargeCustomBits)
+        switchToLargeCustomBits();
+      ASSERT(index <= std::numeric_limits<uint32_t>::max() && "too many instructions in basic block");
+      largeCustomBits->indexInList = (uint32_t)index;
+    }
+  }
 
 public:
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -461,7 +555,13 @@ public:
   
   // Called when transferring basic blocks from one function to another.
   void resetBitfields() {
-    lastInitializedBitfieldID = 0;
+    if (hasLargeCustomBits) {
+      largeCustomBits->lastInitializedBitfieldID = 0;
+      largeCustomBits->indexInList = 0;
+    } else {
+      smallCustomBits.lastInitializedBitfieldID = 0;
+      smallCustomBits.indexInList = 0;
+    }
   }
 
   void markAsDeleted() { deleted = true; }

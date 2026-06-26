@@ -2225,6 +2225,12 @@ bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc,
     return false;
   }
 
+  // SILMem2Reg has a problem with non-copyable types which are empty or only
+  // have trivial fields. It produces ownership errors in OSSA. However,
+  // outside OSSA this is fine.
+  if (f.hasOwnership() && alloc->getType().isMoveOnly())
+    return false;
+
   // Don't handle captured AllocStacks.
   bool inSingleBlock = false;
   if (isCaptured(alloc, &inSingleBlock)) {

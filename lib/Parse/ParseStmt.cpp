@@ -1924,7 +1924,7 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
   if (IfWasImplicitlyInserted) {
     // The code was invalid due to a missing 'if' (e.g. 'else x < y {') and a
     // fixit implicitly inserted it.
-    IfLoc = Tok.getLoc();
+    IfLoc = PreviousLoc;
   } else {
     IfLoc = consumeToken(tok::kw_if);
   }

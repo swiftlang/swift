@@ -13,7 +13,7 @@ struct FRT_IMMORTAL Base {
   }
 };
 
-struct FRT_IMMORTAL Derived : Base {
+struct Derived : Base {
   int virtualMethod() const override { return 200; }
 
   static Derived &create() {
@@ -22,7 +22,7 @@ struct FRT_IMMORTAL Derived : Base {
   }
 };
 
-struct FRT_IMMORTAL LeafDerived : Derived {
+struct LeafDerived : Derived {
   int virtualMethod() const override { return 300; }
 
   static LeafDerived &create() {
@@ -31,14 +31,14 @@ struct FRT_IMMORTAL LeafDerived : Derived {
   }
 };
 
-struct FRT_IMMORTAL DerivedNoOverride : Base {
+struct DerivedNoOverride : Base {
   static DerivedNoOverride &create() {
     static DerivedNoOverride instance;
     return instance;
   }
 };
 
-struct FRT_IMMORTAL LeafOverNoOverride : DerivedNoOverride {
+struct LeafOverNoOverride : DerivedNoOverride {
   int virtualMethod() const override { return 400; }
 
   static LeafOverNoOverride &create() {
@@ -51,7 +51,7 @@ struct UnrelatedBase {
   int unrelatedMethod() const { return 999; }
 };
 
-struct FRT_IMMORTAL DerivedWithUnrelatedBase : Base, UnrelatedBase {
+struct DerivedWithUnrelatedBase : Base, UnrelatedBase {
   int virtualMethod() const override { return 500; }
 
   static DerivedWithUnrelatedBase &create() {
@@ -65,7 +65,7 @@ struct SecondBaseWithSameMethod {
   virtual ~SecondBaseWithSameMethod() = default;
 };
 
-struct FRT_IMMORTAL DerivedWithConflictingBase : Base, SecondBaseWithSameMethod {
+struct DerivedWithConflictingBase : Base, SecondBaseWithSameMethod {
   int virtualMethod() const override { return 600; }
 
   static DerivedWithConflictingBase &create() {
@@ -79,7 +79,7 @@ struct FRT_IMMORTAL AbstractBase {
   virtual ~AbstractBase() = default;
 };
 
-struct FRT_IMMORTAL ConcreteDerived : AbstractBase {
+struct ConcreteDerived : AbstractBase {
   int pureMethod() const override { return 42; }
 
   static ConcreteDerived &create() {

@@ -58,10 +58,15 @@
 using namespace swift;
 using namespace constraints;
 
-static bool hasFixFor(const Solution &solution, ConstraintLocator *locator) {
-  return llvm::any_of(solution.Fixes, [&locator](const ConstraintFix *fix) {
-    return fix->getLocator() == locator;
-  });
+static bool hasFixFor(const Solution &solution, ConstraintLocator *locator,
+                      std::optional<FixKind> expectedKind = std::nullopt) {
+  return llvm::any_of(
+      solution.Fixes, [&locator, &expectedKind](const ConstraintFix *fix) {
+        if (fix->getLocator() == locator) {
+          return !expectedKind || fix->getKind() == *expectedKind;
+        }
+        return false;
+      });
 }
 
 FailureDiagnostic::~FailureDiagnostic() {}
@@ -2250,52 +2255,52 @@ bool AssignmentFailure::diagnoseAsError() {
       // If there is a masked property of the same type, emit a
       // note to fixit prepend a 'self.' or 'Type.'.
       if (auto typeContext = DC->getInnermostTypeContext()) {
-        SmallVector<ValueDecl *, 2> results;
-        DC->lookupQualified(typeContext->getSelfNominalTypeDecl(),
-                            VD->createNameRef(), Loc,
-                            NL_QualifiedDefault, results);
+        if (auto *nominal = typeContext->getSelfNominalTypeDecl()) {
+          SmallVector<ValueDecl *, 2> results;
+          DC->lookupQualified(nominal, VD->createNameRef(), Loc,
+                              NL_QualifiedDefault, results);
 
-        auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
-          // We're looking for a settable property that is the same type as the
-          // var we found.
-          auto *var = dyn_cast<VarDecl>(decl);
-          if (!var || var == VD)
-            return false;
-
-          if (!var->isSettable(DC) || !var->isSetterAccessibleFrom(DC))
-            return false;
-
-          if (!var->getTypeInContext()->isEqual(VD->getTypeInContext()))
-            return false;
-
-          // Don't suggest a property if we're in one of its accessors.
-          auto *methodDC = DC->getInnermostMethodContext();
-          if (auto *AD = dyn_cast_or_null<AccessorDecl>(methodDC))
-            if (AD->getStorage() == var)
+          auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
+            // We're looking for a settable property that is the same type as
+            // the var we found.
+            auto *var = dyn_cast<VarDecl>(decl);
+            if (!var || var == VD)
               return false;
 
-          return true;
-        });
+            if (!var->isSettable(DC) || !var->isSetterAccessibleFrom(DC))
+              return false;
 
-        if (foundProperty != results.end()) {
-          auto startLoc = immutableExpr->getStartLoc();
-          auto *property = cast<VarDecl>(*foundProperty);
-          auto selfTy = typeContext->getSelfTypeInContext();
+            if (!var->getTypeInContext()->isEqual(VD->getTypeInContext()))
+              return false;
 
-          // If we found an instance property, suggest inserting "self.",
-          // otherwise suggest "Type." for a static property.
-          std::string fixItText;
-          if (property->isInstanceMember()) {
-            fixItText = "self.";
-          } else {
-            fixItText = selfTy->getString() + ".";
+            // Don't suggest a property if we're in one of its accessors.
+            auto *methodDC = DC->getInnermostMethodContext();
+            if (auto *AD = dyn_cast_or_null<AccessorDecl>(methodDC))
+              if (AD->getStorage() == var)
+                return false;
+
+            return true;
+          });
+
+          if (foundProperty != results.end()) {
+            auto startLoc = immutableExpr->getStartLoc();
+            auto *property = cast<VarDecl>(*foundProperty);
+            auto selfTy = typeContext->getSelfTypeInContext();
+
+            // If we found an instance property, suggest inserting "self.",
+            // otherwise suggest "Type." for a static property.
+            std::string fixItText;
+            if (property->isInstanceMember()) {
+              fixItText = "self.";
+            } else {
+              fixItText = selfTy->getString() + ".";
+            }
+            emitDiagnosticAt(startLoc, diag::masked_mutable_property, fixItText,
+                             property, selfTy)
+            .fixItInsert(startLoc, fixItText);
           }
-          emitDiagnosticAt(startLoc, diag::masked_mutable_property, fixItText,
-                           property, selfTy)
-              .fixItInsert(startLoc, fixItText);
         }
       }
-
       // If this is a simple variable marked with a 'let', emit a note to fixit
       // hint it to 'var'.
       VD->emitLetToVarNoteIfSimple(DC);
@@ -2727,11 +2732,7 @@ bool ContextualFailure::diagnoseAsError() {
     break;
   }
   case ConstraintLocator::CoercionOperand:
-  case ConstraintLocator::InstanceType: {
-    if (diagnoseCoercionToUnrelatedType())
-      return true;
-    break;
-  }
+    return diagnoseCoercionToUnrelatedType();
 
   case ConstraintLocator::TernaryBranch: {
     auto *ternaryExpr = castToExpr<TernaryExpr>(getRawAnchor());
@@ -3994,8 +3995,8 @@ bool MissingCallFailure::diagnoseAsError() {
       auto fnType = type->castTo<FunctionType>();
 
       if (MissingArgumentsFailure::isMisplacedMissingArgument(getSolution(), locator)) {
-        ArgumentMismatchFailure failure(
-            getSolution(), fnType, fnType->getResult(), locator);
+        ArgumentMismatchFailure failure(getSolution(), fnType,
+                                        fnType->getResult(), locator);
         return failure.diagnoseMisplacedMissingArgument();
       }
 
@@ -5400,13 +5401,15 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // foo(bar) // `() -> Void` vs. `(Int) -> Void`
   // ```
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    auto info = *(getFunctionArgApplyInfo(locator));
+    if (auto info = getFunctionArgApplyInfo(locator)) {
 
-    auto *argExpr = info.getArgExpr();
-    emitDiagnosticAt(argExpr->getLoc(), diag::cannot_convert_argument_value,
-                     info.getArgType(), info.getParamType());
-    // TODO: It would be great so somehow point out which arguments are missing.
-    return true;
+      auto *argExpr = info->getArgExpr();
+      emitDiagnosticAt(argExpr->getLoc(), diag::cannot_convert_argument_value,
+                       info->getArgType(), info->getParamType());
+      // TODO: It would be great so somehow point out which arguments are
+      // missing.
+      return true;
+    }
   }
 
   // Function type has fewer arguments than expected by context:
@@ -6215,6 +6218,38 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
     addFixIts(emitDiagnosticAt(diagLoc, diag::argument_out_of_order_named_named,
                                first, second));
   }
+  return true;
+}
+
+bool OutOfOrderArgumentFailure::diagnoseAsNote() {
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *argList = getArgumentListFor(getLocator());
+  if (!argList)
+    return false;
+
+  auto first = argList->getLabel(ArgIdx);
+  auto second = argList->getLabel(PrevArgIdx);
+
+  if (first.nonempty() && second.nonempty()) {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_named, first, second);
+  } else if (first.empty() && second.empty()) {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_unnamed, ArgIdx + 1,
+                     PrevArgIdx + 1);
+  } else if (first.empty()) {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_unnamed_named, ArgIdx + 1,
+                     second);
+  } else {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_named_unnamed, first,
+                     PrevArgIdx + 1);
+  }
+
   return true;
 }
 
@@ -7647,6 +7682,25 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
     return false;
   }
 
+  // FIXME: After Argument Synthesis, we're still generating Argument Mismatch
+  // fixes and errors
+  //  But the locator for the ApplyArgument is not a suitable match for a
+  //  FunctionApplyArgInfo This causes crashes when attempting to build one.
+  //  Blocking here is a stop gap while we devise a means of either not having
+  //  argument mismatches or of having usable locators.
+  if (!Info) {
+    auto locator = getLocator();
+    auto path = locator->getPath();
+    auto iter = path.rbegin();
+    if (locator->findLast<LocatorPathElt::ApplyArgument>(iter)) {
+      auto *newLoc = getSolution().getConstraintLocator(
+          locator->getAnchor(), path.drop_back(iter - path.rbegin()));
+      if (hasFixFor(getSolution(), newLoc, FixKind::AddMissingArguments))
+        return false;
+    }
+    ABORT("expected function arg apply info for argument mismatch");
+  }
+
   if (diagnoseKeyPathLiteralMutabilityMismatch())
     return true;
 
@@ -7987,7 +8041,7 @@ bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
   auto &ctx = getASTContext();
 
   // Should be a lone trailing closure argument.
-  if (!Info.isTrailingClosure() || !Info.getArgList()->isUnary())
+  if (!Info->isTrailingClosure() || !Info->getArgList()->isUnary())
     return false;
 
   // Check if this an application of a Regex initializer, and the user has not
@@ -8025,8 +8079,7 @@ bool ArgumentMismatchFailure::diagnoseClosureMismatch() const {
   if (paramType->lookThroughAllOptionalTypes()->is<AnyFunctionType>())
     return false;
 
-  emitDiagnostic(diag::closure_bad_param, paramType,
-                 Info.isTrailingClosure())
+  emitDiagnostic(diag::closure_bad_param, paramType, Info->isTrailingClosure())
       .highlight(getSourceRange());
 
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
@@ -8925,15 +8978,15 @@ SourceLoc MissingOptionalUnwrapKeyPathFailure::getLoc() const {
 }
 
 bool TrailingClosureRequiresExplicitLabel::diagnoseAsError() {
-  auto argInfo = *getFunctionArgApplyInfo(getLocator());
+  auto argInfo = getFunctionArgApplyInfo(getLocator());
 
   {
     auto diagnostic = emitDiagnostic(
-        diag::unlabeled_trailing_closure_deprecated, argInfo.getParamLabel());
-    fixIt(diagnostic, argInfo);
+        diag::unlabeled_trailing_closure_deprecated, argInfo->getParamLabel());
+    fixIt(diagnostic, *argInfo);
   }
 
-  if (auto *callee = argInfo.getCallee()) {
+  if (auto *callee = argInfo->getCallee()) {
     emitDiagnosticAt(callee, diag::decl_declared_here, callee);
   }
 

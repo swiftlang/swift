@@ -58,14 +58,8 @@ public class C<R> {
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 2)
     g(s)
-    // Jump-threading removes the basic block containing debug_value
-    // "t" before the second call to `g(r)`. When this happens, the
-    // ref_element_addr in that removed block is left with a single
-    // debug_value use, so they are both deleted. This means we have
-    // no debug value for "t" in the call to `g(r)`.
-    //   dbg_value({{.*}}, ![[GR_T:[0-9]+]]
-
-    // IR: #dbg_value({{.*}}, ![[GR_U:[0-9]+]], !DIExp
+    // IR: #dbg_value({{.*}}, ![[GR_T:[0-9]+]], !DIExpression
+    // IR: #dbg_value({{.*}}, ![[GR_U:[0-9]+]], !DIExpression
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 3)
     g(r)
@@ -112,10 +106,8 @@ public class C<R> {
 // IR-DAG: ![[GS_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GS_U:[0-9]+]], {{.*}} type: ![[LET_TAU_1_0]])
 // IR-DAG: ![[SP_GS_U]] = {{.*}}linkageName: "$s1A1hyyxlFx_Ti5qd___Ti5"
 
-// Debug info for this variable is removed. See the note above the call to g(r).
-//   ![[GR_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GR_T:[0-9]+]], {{.*}}type: ![[LET_TAU_0_0]])
-// S has the same generic parameter numbering s T and U.
-//   ![[SP_GR_T]] = {{.*}}linkageName: "$s1A1gyyxlF"
+// IR-DAG: ![[GR_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GR_T:[0-9]+]], {{.*}}type: ![[LET_TAU_0_0]])
+// IR-DAG: ![[SP_GR_T]] = {{.*}}linkageName: "$s1A1gyyxlFx_Ti5"
 
 // IR-DAG: ![[GR_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GR_U:[0-9]+]], {{.*}}type: ![[LET_TAU_0_0]])
 // IR-DAG: ![[SP_GR_U]] = {{.*}}linkageName: "$s1A1hyyxlFx_Ti5x_Ti5"

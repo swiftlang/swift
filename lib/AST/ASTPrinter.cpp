@@ -2054,7 +2054,7 @@ void PrintAST::printGenericSignature(
     requirements.append(genericSig.getRequirements().begin(),
                         genericSig.getRequirements().end());
   } else if (flags & PrintInverseRequirements) {
-    genericSig->getRequirementsWithInverses(requirements, inverses);
+    genericSig->getRequirementsWithInversesForPrinting(requirements, inverses);
     llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
       return !inverseFilter(inverse);
     });
@@ -3422,7 +3422,9 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 
 void PrintAST::visitUsingDecl(UsingDecl *decl) {
   Printer.printIntroducerKeyword("using", Options, " ");
-  Printer << decl->getSpecifierName();
+  for (auto attr : decl->getSpecifiedAttributes()) {
+    attr->print(Printer, Options, decl);
+  }
 }
 
 void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
@@ -3454,7 +3456,7 @@ void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
     SmallVector<Requirement, 2> requirements;
     SmallVector<InverseRequirement, 2> inverses;
     auto Sig = ED->getGenericSignature();
-    Sig->getRequirementsWithInverses(requirements, inverses);
+    Sig->getRequirementsWithInversesForPrinting(requirements, inverses);
     printSingleDepthOfGenericSignature(
         Sig.getGenericParams(),
         requirements,
@@ -4104,7 +4106,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4135,7 +4137,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4166,7 +4168,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4226,7 +4228,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4695,7 +4697,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     SourceLoc StartLoc = decl->getStartLoc();
     SourceLoc EndLoc;
     if (decl->getResultTypeRepr()) {

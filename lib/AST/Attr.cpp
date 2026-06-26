@@ -1364,6 +1364,35 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
   break;
 
+  case DeclAttrKind::COM: {
+    const auto *Attr = cast<COMAttr>(this);
+    Printer.printAttrName("@com");
+    if (!Attr->IID.empty()) {
+      Printer << "(interface: \"" << Attr->IID << "\")";
+    } else if (!Attr->CLSID->empty()) {
+      Printer << "(implementation: " << Attr->CLSID.value() << ", threading: .";
+      switch (Attr->getThreadingModel()) {
+      case COMThreadingModel::Single:
+        Printer << "single";
+        break;
+      case COMThreadingModel::Apartment:
+        Printer << "apartment";
+        break;
+      case COMThreadingModel::Free:
+        Printer << "free";
+        break;
+      case COMThreadingModel::Both:
+        Printer << "both";
+        break;
+      case COMThreadingModel::Neutral:
+        Printer << "neutral";
+        break;
+      }
+      Printer << ")";
+    }
+    break;
+  }
+
   case DeclAttrKind::ObjC: {
     Printer.printAttrName("@objc");
     llvm::SmallString<32> scratch;
@@ -2085,6 +2114,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_extern";
   case DeclAttrKind::Diagnose:
     return "diagnose";
+  case DeclAttrKind::COM:
+    return "com";
   case DeclAttrKind::AllowFeatureSuppression:
     if (cast<AllowFeatureSuppressionAttr>(this)->getInverted()) {
       return "_disallowFeatureSuppression";

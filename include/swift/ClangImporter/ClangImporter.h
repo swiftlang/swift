@@ -63,15 +63,13 @@ namespace clang {
   namespace driver {
     class Driver;
   }
-namespace tooling {
 namespace dependencies {
   struct ModuleDeps;
   struct TranslationUnitDeps;
   enum class ModuleOutputKind;
   using ModuleDepsGraph = std::vector<ModuleDeps>;
 }
-}
-}
+} // namespace clang
 
 namespace swift {
 enum class ResultConvention : uint8_t;
@@ -236,19 +234,12 @@ public:
   std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
 
-  std::optional<std::vector<std::string>>
-  getClangCC1Arguments(ASTContext &ctx,
-                       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                       bool ignoreClangTarget = false);
-
   std::vector<std::string>
   getClangDepScanningInvocationArguments(ASTContext &ctx);
 
-  static std::unique_ptr<clang::CompilerInvocation>
-  createClangInvocation(ClangImporter *importer,
-                        const ClangImporterOptions &importerOpts,
-                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                        const std::vector<std::string> &CC1Args);
+  std::unique_ptr<clang::CompilerInvocation> createClangInvocation(
+      ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs,
+      bool forCodeGen = false);
 
   /// Creates a Clang Driver based on the Swift compiler options.
   ///
@@ -534,7 +525,7 @@ public:
 
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
-      const clang::tooling::dependencies::TranslationUnitDeps &deps,
+      const clang::dependencies::TranslationUnitDeps &deps,
       std::vector<std::string> &swiftArgs);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
@@ -565,7 +556,7 @@ public:
   clang::TargetInfo &getTargetInfo() const;
   clang::CodeGenOptions &getCodeGenOpts() const;
 
-  std::string getClangModuleHash() const;
+  std::string computeClangContextHash() const;
 
   /// Get clang file mapping.
   const ClangInvocationFileMapping &getClangFileMapping() const {
@@ -1010,7 +1001,9 @@ public:
   /// was inherited with private inheritance.
   ///
   /// Does nothing if this ClangInheritanceInfo::isInheriting() is \c false.
-  void setUnavailableIfNecessary(const ValueDecl *baseDecl,
+  ///
+  /// Returns true if \param clonedDecl was marked unavailable.
+  bool setUnavailableIfNecessary(const ValueDecl *baseDecl,
                                  ValueDecl *clonedDecl) const;
 
   friend llvm::hash_code hash_value(const ClangInheritanceInfo &info) {

@@ -27,21 +27,21 @@ func funcTestSendingResult() async {
   // Just to show that without the sending param, we generate diagnostics.
   let x2 = NonSendableCStruct()
   let y2 = returnUserDefinedFromGlobalFunction(x2)
-  await sendToMain(x2) // expected-error {{sending 'x2' risks causing data races}}
+  await sendToMain(x2) // expected-warning {{sending 'x2' risks causing data races}}
   // expected-note @-1 {{sending 'x2' to main actor-isolated global function 'sendToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(y2) // expected-note {{access can happen concurrently}}
 }
 
 func funcTestSendingArg() async {
   let x = NonSendableCStruct()
-  sendUserDefinedIntoGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
+  sendUserDefinedIntoGlobalFunction(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
 func funcTestSendingClosureArg() async {
   sendingWithCompletionHandler { (x: sending NonSendableCStruct) in
-    sendUserDefinedIntoGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
+    sendUserDefinedIntoGlobalFunction(x) // expected-warning {{sending 'x' risks causing data races}}
     // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
     useValue(x) // expected-note {{access can happen concurrently}}
   }
@@ -49,7 +49,7 @@ func funcTestSendingClosureArg() async {
   let x = sendingWithLazyReturn { () -> sending NonSendableCStruct in
     NonSendableCStruct()
   }
-  sendUserDefinedIntoGlobalFunction(x) // expected-error {{sending 'x' risks causing data races}}
+  sendUserDefinedIntoGlobalFunction(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }

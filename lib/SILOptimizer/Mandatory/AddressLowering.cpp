@@ -417,6 +417,38 @@ static bool isStoreCopy(SILValue value) {
   return true;
 }
 
+/// Check if this is a copy that matches the following pattern:
+///   %source = <guaranteed ownership>
+///   %value = copy_value %source             // users: %mark
+///   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign] %value
+///   where no users of %mark are copy_value instructions.
+static bool isMarkUnresolvedCopy(SILValue value) {
+  auto *copyInst = dyn_cast<CopyValueInst>(value);
+  if (!copyInst)
+    return false;
+
+  if (!copyInst->hasOneUse())
+    return false;
+
+  auto *user = value->getSingleUse()->getUser();
+  auto *inst = dyn_cast<MarkUnresolvedNonCopyableValueInst>(user);
+  if (!inst)
+    return false;
+
+  auto source = copyInst->getOperand();
+  if (source->getOwnershipKind() != OwnershipKind::Guaranteed)
+    return false;
+  if (inst->getCheckKind() !=
+      MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign)
+    return false;
+  // Reject if the mark has any copy_value users.
+  for (auto *use : inst->getUses()) {
+    if (isa<CopyValueInst>(use->getUser()))
+      return false;
+  }
+  return true;
+}
+
 void ValueStorageMap::insertValue(SILValue value, SILValue storageAddress) {
   assert(!stableStorage && "cannot grow stable storage map");
 
@@ -671,8 +703,11 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       arg->replaceAllUsesWith(load);
       assert(!pass.valueStorageMap.contains(arg));
 
-      arg = arg->getParent()->replaceFunctionArgument(
+      auto *oldArg = cast<SILFunctionArgument>(arg);
+      auto *newArg = arg->getParent()->replaceFunctionArgument(
           arg->getIndex(), addrType, OwnershipKind::None, arg->getDecl());
+      newArg->copyFlags(oldArg);
+      arg = newArg;
 
       assert(isa<LoadInst>(load) || isa<LoadBorrowInst>(load));
       load->setOperand(0, arg);
@@ -963,6 +998,8 @@ static Operand *getProjectedDefOperand(SILValue value) {
     return &cast<BeginBorrowInst>(value)->getOperandRef();
 
   case ValueKind::CopyValueInst:
+    if (isMarkUnresolvedCopy(value))
+      return &cast<CopyValueInst>(value)->getOperandRef();
     if (isStoreCopy(value))
       return &cast<CopyValueInst>(value)->getOperandRef();
 
@@ -1913,7 +1950,7 @@ SILValue AddressMaterialization::materializeDefProjection(SILValue origValue) {
     llvm_unreachable("Unexpected projection from def.");
 
   case ValueKind::CopyValueInst:
-    assert(isStoreCopy(origValue));
+    assert(isStoreCopy(origValue) || isMarkUnresolvedCopy(origValue));
     return pass.getMaterializedAddress(
         cast<CopyValueInst>(origValue)->getOperand());
 
@@ -2686,9 +2723,21 @@ SILValue ApplyRewriter::materializeIndirectOutputAddress(ApplyOutput kind,
 void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   auto *oldCall = cast<ApplyInst>(apply.getInstruction());
 
+  // Address lowering may change the rewritten apply's argument count
+  // when opaque-value lowering inserts or merges operands. Forward the
+  // original per-argument SILLocations only when the count is preserved;
+  // otherwise pass nullopt and the new apply has no per-argument storage.
+  // (The SILBuilder factory asserts on size mismatch by design — that's
+  // why this guard is at the call site rather than inside the factory.)
+  std::optional<ArrayRef<SILLocation>> argLocs =
+      ApplySite(oldCall).getArgumentLocs();
+  if (argLocs && argLocs->size() != newCallArgs.size())
+    argLocs = std::nullopt;
+
   auto *newCall = argBuilder.createApply(
       callLoc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
-      oldCall->getApplyOptions(), oldCall->getSpecializationInfo());
+      oldCall->getApplyOptions(), oldCall->getSpecializationInfo(),
+      /*isolationCrossing=*/std::nullopt, argLocs);
 
   this->apply = FullApplySite(newCall);
 
@@ -2721,11 +2770,18 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
     opValues.push_back(oper.get());
   }
 
+  // begin_apply yield-rewrite is a strict argument-preserving rewrite: we
+  // copy every operand through unchanged and only the result conventions
+  // change. The original per-argument SILLocations remain positionally
+  // valid 1:1 with `opValues`; just pass them through.
+
   // Recreate the begin_apply so that the instruction results have the right
   // ownership kind as per the lowered addresses convention.
   auto *newCall = argBuilder.createBeginApply(
       callLoc, apply.getCallee(), apply.getSubstitutionMap(), opValues,
-      origCall->getApplyOptions(), origCall->getSpecializationInfo());
+      origCall->getApplyOptions(), origCall->getSpecializationInfo(),
+      /*isolationCrossing=*/std::nullopt,
+      ApplySite(origCall).getArgumentLocs());
   this->apply = FullApplySite(newCall);
 
   // Replace uses of orig begin_apply with the new begin_apply
@@ -2907,10 +2963,23 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
 
   auto *tryApply = cast<TryApplyInst>(apply.getInstruction());
 
+  // Same shape as rewriteApply above: forward per-argument SILLocations
+  // only when the rewritten try_apply has the same argument count as the
+  // original; otherwise pass nullopt and the new try_apply has no
+  // per-argument storage. The SILBuilder factory asserts on size mismatch
+  // by design, so the guard has to live here.
+  std::optional<ArrayRef<SILLocation>> argLocs =
+      ApplySite(tryApply).getArgumentLocs();
+  if (argLocs && argLocs->size() != newCallArgs.size())
+    argLocs = std::nullopt;
+
   auto *newCallInst = argBuilder.createTryApply(
       callLoc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
       tryApply->getNormalBB(), tryApply->getErrorBB(),
-      tryApply->getApplyOptions(), tryApply->getSpecializationInfo());
+      tryApply->getApplyOptions(), tryApply->getSpecializationInfo(),
+      /*isolationCrossing=*/std::nullopt,
+      /*normalCount=*/ProfileCounter(),
+      /*errorCount=*/ProfileCounter(), argLocs);
 
   // Immediately delete the old try_apply (old applies hang around until
   // dead code removal because they directly define values).
@@ -3529,6 +3598,15 @@ protected:
     yield->setOperand(use->getOperandNumber(), addr);
   }
 
+  // Captured index value of a keypath. The keypath runtime ABI passes each
+  // index via address. Rewrite the operand to its storage address now; the
+  // pattern's recorded LoweredType is patched up after the main rewrite loop
+  // by rebuildKeyPathInstsForAddressOnlyIndices.
+  void visitKeyPathInst(KeyPathInst *kpi) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    kpi->setOperand(use->getOperandNumber(), addr);
+  }
+
   void visitIgnoredUseInst(IgnoredUseInst *ignored) {
     SILValue addr = addrMat.materializeAddress(use->get());
     ignored->setOperand(addr);
@@ -3632,6 +3710,22 @@ protected:
 
   // Copy from an opaque source operand.
   void visitCopyValueInst(CopyValueInst *copyInst) {
+    // For the isMarkUnresolvedCopy pattern, the mark's destroy_value is the
+    // artificial cleanup of the +1 owned form. Now that the copy and mark
+    // both project onto the guaranteed source's storage, that destroy would
+    // lower to a destroy_addr of borrowed storage — illegal. Erase it.
+    if (isMarkUnresolvedCopy(copyInst)) {
+      auto *mark = cast<MarkUnresolvedNonCopyableValueInst>(
+          copyInst->getSingleUse()->getUser());
+      SmallVector<DestroyValueInst *, 4> destroys;
+      for (auto *use : mark->getConsumingUses()) {
+        if (auto *d = dyn_cast<DestroyValueInst>(use->getUser()))
+          destroys.push_back(d);
+      }
+      for (auto *d : destroys)
+        pass.deleter.forceDelete(d);
+    }
+
     SILValue srcVal = copyInst->getOperand();
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
 

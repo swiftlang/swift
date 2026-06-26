@@ -1,0 +1,100 @@
+// RUN: %target-sil-opt -sil-print-types %s -sil-combine -sil-print-debuginfo | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+// Test that struct_element_addr, tuple_element_addr, ref_element_addr, and
+// vector_base_addr are salvaged into debug reconstruction blocks when they
+// become dead (only debug uses remain).
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct MyStruct {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+}
+
+class MyClass {
+  @_hasStorage var field: Int64 { get set }
+  deinit
+  init()
+}
+
+sil_scope 1 { loc "test.swift":1:1 parent @test_salvage_struct_element_addr : $@convention(thin) (@in_guaranteed MyStruct) -> () }
+sil_scope 2 { loc "test.swift":10:1 parent @test_salvage_tuple_element_addr : $@convention(thin) (@in_guaranteed (Int64, Int64)) -> () }
+sil_scope 3 { loc "test.swift":20:1 parent @test_salvage_ref_element_addr : $@convention(thin) (@guaranteed MyClass) -> () }
+sil_scope 4 { loc "test.swift":30:1 parent @test_salvage_vector_base_addr : $@convention(thin) (@in_guaranteed Builtin.FixedArray<4, Int64>) -> () }
+
+// CHECK-LABEL: sil @test_salvage_struct_element_addr
+// CHECK:       bb0([[ADDR:%[0-9]+]] : $*MyStruct):
+// CHECK:         debug_value [[ADDR]] : $*MyStruct, let, name "field_x", transform {
+// CHECK:           bb0([[SEA_ARG:%[0-9]+]] : $*MyStruct):
+// CHECK:             [[SEA:%[0-9]+]] = struct_element_addr [[SEA_ARG]] : $*MyStruct, #MyStruct.x
+// CHECK:             [[SEA_LD:%[0-9]+]] = load [[SEA]] : $*Int64
+// CHECK:             return [[SEA_LD]] : $Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_salvage_struct_element_addr'
+sil @test_salvage_struct_element_addr : $@convention(thin) (@in_guaranteed MyStruct) -> () {
+bb0(%0 : $*MyStruct):
+  %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.x
+  debug_value %1 : $*Int64, let, name "field_x", expr op_deref, loc "test.swift":1:1, scope 1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_salvage_tuple_element_addr
+// CHECK:       bb0([[ADDR:%[0-9]+]] : $*(Int64, Int64)):
+// CHECK:         debug_value [[ADDR]] : $*(Int64, Int64), let, name "elt0", transform {
+// CHECK:           bb0([[TEA_ARG:%[0-9]+]] : $*(Int64, Int64)):
+// CHECK:             [[TEA:%[0-9]+]] = tuple_element_addr [[TEA_ARG]] : $*(Int64, Int64), 0
+// CHECK:             [[TEA_LD:%[0-9]+]] = load [[TEA]] : $*Int64
+// CHECK:             return [[TEA_LD]] : $Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_salvage_tuple_element_addr'
+sil @test_salvage_tuple_element_addr : $@convention(thin) (@in_guaranteed (Int64, Int64)) -> () {
+bb0(%0 : $*(Int64, Int64)):
+  %1 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  debug_value %1 : $*Int64, let, name "elt0", expr op_deref, loc "test.swift":10:1, scope 2
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_salvage_ref_element_addr
+// CHECK:       bb0([[REF:%[0-9]+]] : $MyClass):
+// CHECK:         debug_value [[REF]] : $MyClass, let, name "obj_field", transform {
+// CHECK:           bb0([[REA_ARG:%[0-9]+]] : $MyClass):
+// CHECK:             [[REA:%[0-9]+]] = ref_element_addr [[REA_ARG]] : $MyClass, #MyClass.field
+// CHECK:             [[REA_LD:%[0-9]+]] = load [[REA]] : $*Int64
+// CHECK:             return [[REA_LD]] : $Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_salvage_ref_element_addr'
+sil @test_salvage_ref_element_addr : $@convention(thin) (@guaranteed MyClass) -> () {
+bb0(%0 : $MyClass):
+  %1 = ref_element_addr %0 : $MyClass, #MyClass.field
+  debug_value %1 : $*Int64, let, name "obj_field", expr op_deref, loc "test.swift":20:1, scope 3
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_salvage_vector_base_addr
+// CHECK:       bb0([[ADDR:%[0-9]+]] : $*Builtin.FixedArray<4, Int64>):
+// CHECK:         debug_value [[ADDR]] : $*Builtin.FixedArray<4, Int64>, let, name "base", transform {
+// CHECK:           bb0([[VBA_ARG:%[0-9]+]] : $*Builtin.FixedArray<4, Int64>):
+// CHECK:             [[VBA:%[0-9]+]] = vector_base_addr [[VBA_ARG]] : $*Builtin.FixedArray<4, Int64>
+// CHECK:             [[VBA_LD:%[0-9]+]] = load [[VBA]] : $*Int64
+// CHECK:             return [[VBA_LD]] : $Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_salvage_vector_base_addr'
+sil @test_salvage_vector_base_addr : $@convention(thin) (@in_guaranteed Builtin.FixedArray<4, Int64>) -> () {
+bb0(%0 : $*Builtin.FixedArray<4, Int64>):
+  %1 = vector_base_addr %0 : $*Builtin.FixedArray<4, Int64>
+  debug_value %1 : $*Int64, let, name "base", expr op_deref, loc "test.swift":30:1, scope 4
+  %r = tuple ()
+  return %r : $()
+}

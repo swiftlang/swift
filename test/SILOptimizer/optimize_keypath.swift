@@ -3,7 +3,16 @@
 // RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK1 %s < %t/output.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output.sil
 
+// RUN: %empty-directory(%t) 
+// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-print-types -emit-sil -enable-sil-opaque-values >%t/output.sil
+// RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK1 %s < %t/output.sil
+// RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output.sil
+
 // RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -swift-version 6 -Xllvm -sil-print-types -emit-sil >%t/output6.sil
+// RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK2 %s < %t/output6.sil
+// RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output6.sil
+
+// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -swift-version 6 -Xllvm -sil-print-types -emit-sil -enable-sil-opaque-values >%t/output6.sil
 // RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK2 %s < %t/output6.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output6.sil
 

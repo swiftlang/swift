@@ -63,6 +63,7 @@
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseDeclName.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -3058,85 +3059,6 @@ namespace {
         return;
       }
 
-      enum class RetainReleaseOperationKind {
-        notAfunction,
-        notAnInstanceFunction,
-        invalidReturnType,
-        invalidParameters,
-        valid
-      };
-
-      auto getOperationValidity =
-          [&](ValueDecl *operation,
-              CustomRefCountingOperationKind operationKind)
-          -> RetainReleaseOperationKind {
-        auto operationFn = dyn_cast<FuncDecl>(operation);
-        if (!operationFn)
-          return RetainReleaseOperationKind::notAfunction;
-
-        if (operationFn->isStatic())
-          return RetainReleaseOperationKind::notAnInstanceFunction;
-
-        if (operationFn->isInstanceMember()) {
-          if (operationFn->getParameters()->size() != 0)
-            return RetainReleaseOperationKind::invalidParameters;
-        } else {
-          if (operationFn->getParameters()->size() != 1)
-            return RetainReleaseOperationKind::invalidParameters;
-        }
-
-        Type paramType;
-        NominalTypeDecl *paramDecl = nullptr;
-        if (!operationFn->isInstanceMember()) {
-          paramType = operationFn->getParameters()
-                          ->get(0)
-                          ->getInterfaceType()
-                          ->lookThroughSingleOptionalType();
-
-          paramDecl = paramType->getAnyNominal();
-        } else {
-          paramDecl = cast<NominalTypeDecl>(operationFn->getParent());
-          paramType = paramDecl->getDeclaredInterfaceType();
-        }
-
-        // The return type should be void (for release functions), or void
-        // or the parameter type (for retain functions).
-        auto resultInterfaceType = operationFn->getResultInterfaceType();
-        if (!resultInterfaceType->isVoid() &&
-            !resultInterfaceType->isUInt() &&
-            !resultInterfaceType->isUInt8() &&
-            !resultInterfaceType->isUInt16() &&
-            !resultInterfaceType->isUInt32() &&
-            !resultInterfaceType->isUInt64() &&
-            !resultInterfaceType->isInt() &&
-            !resultInterfaceType->isInt8() &&
-            !resultInterfaceType->isInt16() &&
-            !resultInterfaceType->isInt32() &&
-            !resultInterfaceType->isInt64()) {
-          if (operationKind == CustomRefCountingOperationKind::release ||
-              !resultInterfaceType->lookThroughSingleOptionalType()->isEqual(paramType))
-            return RetainReleaseOperationKind::invalidReturnType;
-        }
-
-        // The parameter of the retain/release function should be pointer to the
-        // same FRT or a base FRT.
-        if (paramDecl != classDecl) {
-          if (auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
-            if (const clang::Decl *paramClangDecl = paramDecl->getClangDecl()) {
-              if (const auto *paramTypeDecl =
-                      dyn_cast<clang::CXXRecordDecl>(paramClangDecl)) {
-                if (cxxDecl->isDerivedFrom(paramTypeDecl)) {
-                  return RetainReleaseOperationKind::valid;
-                }
-              }
-            }
-          }
-          return RetainReleaseOperationKind::invalidParameters;
-        }
-
-        return RetainReleaseOperationKind::valid;
-      };
-
       HeaderLoc loc(decl->getLocation());
 
       if (retainOperation.kind ==
@@ -3164,8 +3086,10 @@ namespace {
                       false, retainOperation.name, decl->getNameAsString());
       } else if (retainOperation.kind ==
                  CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperationKind operationKind = getOperationValidity(
-            retainOperation.operation, CustomRefCountingOperationKind::retain);
+        RetainReleaseOperationKind operationKind =
+            importer::checkRetainReleaseOperationValidity(
+                classDecl, retainOperation.operation,
+                CustomRefCountingOperationKind::retain);
         switch (operationKind) {
         case RetainReleaseOperationKind::notAfunction:
           Impl.diagnose(
@@ -3225,8 +3149,9 @@ namespace {
       } else if (releaseOperation.kind ==
                  CustomRefCountingOperationResult::foundOperation) {
         RetainReleaseOperationKind operationKind =
-            getOperationValidity(releaseOperation.operation,
-                                 CustomRefCountingOperationKind::release);
+            importer::checkRetainReleaseOperationValidity(
+                classDecl, releaseOperation.operation,
+                CustomRefCountingOperationKind::release);
         switch (operationKind) {
         case RetainReleaseOperationKind::notAfunction:
           Impl.diagnose(
@@ -4142,6 +4067,22 @@ namespace {
                           diag::note_while_importing, decl->getName());
             return nullptr;
           }
+        }
+      }
+
+      if (auto *attr = decl->getAttr<clang::SwiftNameAttr>();
+          attr && isActiveSwiftVersion()) {
+        ParsedDeclName parsedName = parseDeclName(attr->getName());
+        // If this function has a swift_name attribute 'init' but we can't
+        // import it as an initializer, we ignore the swift_name attribute and
+        // emit a warning.
+        if (parsedName.BaseNameKind == DeclBaseName::Kind::Constructor &&
+            !importedName.getDeclName().getBaseName().isConstructor()) {
+          Impl.diagnose(HeaderLoc(decl->getLocation()),
+                        diag::swift_name_init_on_non_initializer,
+                        attr->getName(), cast<clang::NamedDecl>(decl));
+          Impl.diagnose(HeaderLoc(decl->getLocation()),
+                        diag::swift_name_use_backticks_in_init);
         }
       }
 
@@ -10742,22 +10683,6 @@ ValueDecl *ClangImporter::Implementation::createUnavailableDecl(
   markUnavailable(var, UnavailableMessage);
 
   return var;
-}
-
-void ClangImporter::Implementation::handleAmbiguousSwiftName(ValueDecl *decl) {
-  if (!decl || decl->isUnavailable())
-    return;
-
-  auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(
-      decl->getDeclContext()->getAsDecl()->getClangDecl());
-
-  if (!cxxRecordDecl)
-    return;
-
-  if (findUnavailableMethod(cxxRecordDecl, decl->getName())) {
-    markUnavailable(decl,
-                    "overrides multiple C++ methods with different Swift names");
-  }
 }
 
 // Force the members of the entire inheritance hierarchy to be loaded and

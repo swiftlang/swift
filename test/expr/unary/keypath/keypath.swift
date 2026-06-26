@@ -1387,7 +1387,7 @@ func keypath_function_transitive_conversions() {
   let _: (Base) -> Base? = \Base?.self
   let _: (Base) -> Base? = \Base?.self?.base
   // FIXME: This error text is bogus due to KeyPath base covariance.
-  let _: (Base?) -> Base = \Base.base // expected-error {{value of optional type 'Optional<Base>' must be unwrapped to refer to member 'base' of wrapped base type 'Base'}} expected-note {{use unwrapped type 'Base' as key path root}} {{29-33=Base}}
+  let _: (Base?) -> Base = \Base.base // expected-error {{value of optional type 'Base?' must be unwrapped to refer to member 'base' of wrapped base type 'Base'}} expected-note {{use unwrapped type 'Base' as key path root}} {{29-33=Base}}
   let _: (Base) -> Base = \.base
   let _: (Base) -> Base = \Base.derived
   let _: (Base) -> Base = \.derived
@@ -1438,4 +1438,24 @@ func testKeypathWithTypeReference() {
   _ = \S.Q.Type.i // okay
 
   _ = \S.Type.Q // expected-error {{key path cannot refer to type 'Q'}}
+}
+
+// Invalid reference combined with a missing member shouldn't prevent key path from being resolved.
+protocol P1 {
+  subscript(name: String) -> Int { get }
+}
+
+protocol P2 {
+  func access<T>(keyPath: KeyPath<Self, T>)
+}
+
+extension P1 {
+  subscript(name: String) -> Int {
+    get {
+      (self as? any P2)?.access(keyPath: \.[name: name])
+      // expected-error@-1 {{member 'access' cannot be used on value of type 'any P2'; consider using a generic constraint instead}}
+      // expected-error@-2 {{value of type 'any P2' has no subscripts}}
+      return 1
+    }
+  }
 }

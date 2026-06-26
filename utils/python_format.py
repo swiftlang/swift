@@ -174,9 +174,9 @@ def main():
         if path == known_path or path in known_path.parents
     }
 
-    # Add requested paths that exists, but aren't included in the format set.
+    # Add requested paths that aren't included in the format set.
     for path in requested_paths:
-        if path not in format_paths and path.exists():
+        if path not in format_paths:
             format_paths.add(path)
 
     command += sorted([str(path) for path in format_paths])

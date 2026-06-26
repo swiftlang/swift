@@ -829,6 +829,9 @@ ERROR(const_public_let_ref,none,
       "reference to a %select{%error|%error|%error|package|public|open}0 "
       "'let' binding is not permitted in a literal expression",
       (AccessLevel))
+ERROR(const_usable_from_inline_let_ref,none,
+      "reference to a '@usableFromInline' 'let' binding is not permitted "
+      "in a literal expression", ())
 ERROR(const_opaque_func_decl_ref,none,
       "unable to resolve function reference in a literal expression", ())
 ERROR(const_non_convention_c_conversion,none,
@@ -1664,6 +1667,18 @@ ERROR(argument_out_of_order_unnamed_unnamed,none,
 ERROR(argument_out_of_order_binary_op,none,
       "operator argument #%0 must precede operator argument #%1",
       (unsigned, unsigned))
+NOTE(argument_out_of_order_note_named, none,
+     "candidate expects argument %0 must precede argument %1",
+     (Identifier, Identifier))
+NOTE(argument_out_of_order_note_unnamed, none,
+     "candidate expects argument #%0 must precede argument #%1",
+     (unsigned, unsigned))
+NOTE(argument_out_of_order_note_named_unnamed, none,
+     "candidate expects argument %0 must precede argument #%1",
+     (Identifier, unsigned))
+NOTE(argument_out_of_order_note_unnamed_named, none,
+     "candidate expects argument #%0 must precede argument #%1",
+     (unsigned, Identifier))
 NOTE(candidate_expected_different_labels,none,
      "incorrect labels for candidate (have: '%0', expected: '%1')",
      (StringRef, StringRef))
@@ -2188,6 +2203,17 @@ WARNING(extern_c_maybe_invalid_name, none,
         (StringRef))
 ERROR(extern_variable_initializer, none,
       "'@_extern' variable cannot have an initializer", ())
+
+// @com
+ERROR(attr_com_requires_flag, none, "'@com' requires '-enable-experimental-com-interop'", ())
+ERROR(attr_com_invalid_guid, none,
+      "'%0' is not a valid GUID; expected format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'", (StringRef))
+ERROR(attr_com_protocol_requires_iid, none,
+      "'@com' on a protocol requires 'interface:' argument", ())
+ERROR(attr_com_protocol_unexpected_arg, none,
+      "'@com' on a protocol must only have 'interface:'; '%0' is not allowed", (StringRef))
+ERROR(attr_com_class_unexpected_iid, none,
+      "'@com' on a class must not have 'interface:'; use 'implementation:' instead", ())
 
 // @_staticExclusiveOnly
 ERROR(attr_static_exclusive_only_disabled,none,
@@ -6047,6 +6073,38 @@ ERROR(distributed_actor_func_param_not_codable,none,
       "parameter %0 of type %1 in %kindonly2 does not conform to "
       "serialization requirement '%3'",
       (Identifier, Type, const AbstractFunctionDecl *, StringRef))
+ERROR(distributed_actor_func_param_resolvable_actor_system_mismatch,none,
+      "parameter %0 of type %1 in %kindonly2 must match the enclosing actor's "
+      "ActorSystem (%5)",
+      (Identifier, Type, const AbstractFunctionDecl *, DeclName, Type, Type))
+NOTE(distributed_actor_func_param_resolvable_actor_system_mismatch_note,none,
+     "'@Resolvable protocol' %0 uses actor system %1",
+     (DeclName, Type))
+ERROR(distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system,none,
+      "parameter %0 of type %1 in %kindonly2 uses '@Resolvable protocol' %3 "
+      "without a concrete 'ActorSystem' constraint",
+      (Identifier, Type, const AbstractFunctionDecl *, DeclName))
+NOTE(distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system_fixit,none,
+     "add 'where Self.ActorSystem == ...' to %0", (DeclName))
+ERROR(distributed_actor_func_param_resolvable_protocol_composition_ambiguous,none,
+      "parameter %0 of type %1 in %kindonly2 contains more than one '@Resolvable protocol'",
+      (Identifier, Type, const AbstractFunctionDecl *))
+ERROR(distributed_actor_func_result_resolvable_protocol_composition_ambiguous,none,
+      "result type %0 of %kindonly1 contains more than one '@Resolvable protocol'",
+      (Type, const ValueDecl *))
+NOTE(distributed_actor_func_resolvable_protocol_composition_ambiguous_note,none,
+     "declare a new '@Resolvable protocol' that refines those protocols and use it instead",
+     ())
+ERROR(distributed_actor_func_result_resolvable_actor_system_mismatch,none,
+      "result type %0 of %kindonly1 must match the enclosing actor's actor system %3",
+      (Type, const ValueDecl *, DeclName, Type))
+NOTE(distributed_actor_func_result_resolvable_actor_system_mismatch_note,none,
+     "'@Resolvable protocol' %0 uses actor system %1",
+     (DeclName, Type))
+ERROR(distributed_actor_func_result_resolvable_protocol_no_concrete_actor_system,none,
+      "result type %0 of %kindonly1 uses '@Resolvable protocol' %2 "
+      "without a concrete 'ActorSystem' constraint",
+      (Type, const ValueDecl *, DeclName))
 ERROR(distributed_actor_target_result_not_codable,none,
       "result type %0 of %kindbase1 does not conform to serialization requirement '%2'",
       (Type, const ValueDecl *, StringRef))
@@ -6227,10 +6285,12 @@ ERROR(concurrent_value_outside_source_file,none,
       (const ValueDecl *))
 ERROR(concurrent_value_nonfinal_class,none,
       "non-final class %0 cannot conform to the 'Sendable' protocol", (DeclName))
-ERROR(concurrent_value_inherit,none,
-      "'Sendable' class %1 cannot inherit from another class"
-      "%select{| other than 'NSObject'}0",
-      (bool, DeclName))
+GROUPED_ERROR(concurrent_value_nonsendable_superclass,NonSendableSuperclass,none,
+      "class %0 cannot conform to the 'Sendable' protocol", (DeclName))
+NOTE(concurrent_value_nonsendable_superclass_note,none,
+     "a 'Sendable' class cannot inherit from a non-Sendable class", ())
+NOTE(concurrent_value_nonsendable_superclass_here,none,
+     "inherits from non-Sendable class %0", (DeclName))
 ERROR(non_sendable_type,none,
       "type %0 does not conform to the 'Sendable' protocol", (Type))
 GROUPED_ERROR(non_sendable_metatype_type,SendableMetatypes,none,
@@ -6387,6 +6447,20 @@ ERROR(global_actor_arg,none,
       (Type))
 ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
+
+GROUPED_WARNING(global_actor_shared_non_let_witness,
+                UnstableGlobalActorShared,none,
+                "GlobalActor witness %kind0 may return different actor "
+                "instances, which would lead to global actor isolation "
+                "violations",
+                (const ValueDecl *))
+NOTE(global_actor_shared_non_let_witness_use_let,none,
+     "declare it as 'static let' to guarantee a stable instance",
+     ())
+NOTE(global_actor_shared_non_let_witness_silence,none,
+     "if this property always returns the same instance, silence the warning "
+     "with '@diagnose(UnstableGlobalActorShared, as: ignored)'",
+     ())
 ERROR(global_actor_top_level_var,none,
       "top-level code variables cannot have a global actor", ())
 ERROR(global_actor_access,none,
@@ -8414,6 +8488,12 @@ WARNING(macro_on_import_not_loadable, none,
         "could not load macro '%0'; this may cause errors down the line",
         (StringRef))
 
+WARNING(swiftify_nullable_as_empty_span_param_missing, none,
+        "the loaded _SwiftifyImport macro plugin does not support the "
+        "'nullableAsEmptySpan' parameter; generated safe wrappers will "
+        "retain the legacy Optional-propagating behavior for _Nullable "
+        "__counted_by and __sized_by pointers", ())
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
@@ -9238,9 +9318,23 @@ ERROR(nonexhaustive_attr_on_internal_type,none,
 // MARK: `using` declaration
 //===----------------------------------------------------------------------===//
 ERROR(invalid_redecl_of_file_isolation,none,
-      "invalid redeclaration of file-level default actor isolation", ())
+      "invalid redeclaration of file-level default isolation", ())
 NOTE(invalid_redecl_of_file_isolation_prev,none,
-     "default isolation was previously declared here", ())
+     "file-level default isolation previously declared here", ())
+ERROR(invalid_actor_for_file_isolation,none,
+     "global actor %0 is not valid in a 'using' declaration",
+     (Type))
+NOTE(invalid_actor_for_file_isolation_note,none,
+     "file-level default isolation must be '@MainActor' or 'nonisolated'", ())
+ERROR(using_decl_invalid_attribute,none,
+     "'%0' is not valid in a 'using' declaration",
+     (DeclAttribute))
+NOTE(using_decl_invalid_attribute_note,none,
+     "'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'", ())
+ERROR(using_decl_must_precede_other_decls,none,
+     "'using' must appear before any non-import declaration", ())
+NOTE(using_decl_must_precede_other_decls_previous,none,
+     "first non-import declaration here", ())
 
 //===----------------------------------------------------------------------===//
 // MARK: `@inline(always)` attribute

@@ -122,9 +122,11 @@ public:
     SubstOptions SavedOptions;
 
   public:
-    OptionsAdjustmentScope(InFlightSubstitution &IFS, SubstOptions newOptions)
+    // Save the current substitution options of IFS, and add some extra options.
+    // The original options are restored at the end of the current scope.
+    OptionsAdjustmentScope(InFlightSubstitution &IFS, SubstOptions extraOptions)
       : IFS(IFS), SavedOptions(IFS.Options) {
-      IFS.Options = newOptions;
+      IFS.Options |= extraOptions;
     }
 
     OptionsAdjustmentScope(const OptionsAdjustmentScope &) = delete;

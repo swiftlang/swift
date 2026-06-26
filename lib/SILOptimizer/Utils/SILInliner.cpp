@@ -677,7 +677,7 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
 
       for (auto *insertPt : endBorrowInsertPts) {
         SILBuilderWithScope returnBuilder(insertPt, getBuilder());
-        returnBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
+        returnBuilder.createEndBorrow(Apply.getArgumentLoc(i), entryArgs[i]);
       }
     }
   }
@@ -691,7 +691,8 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
       for (auto *insertPt : endBorrowInsertPts) {
         SILBuilderWithScope returnBuilder(insertPt->getParent()->begin(),
                                           getBuilder());
-        returnBuilder.emitDestroyOperation(Apply.getLoc(), entryArgs[i]);
+        returnBuilder.emitDestroyOperation(Apply.getArgumentLoc(i),
+                                           entryArgs[i]);
       }
     }
   }
@@ -879,7 +880,8 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
     break;
   }
   SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
-  return beginBuilder.createBeginBorrow(Apply.getLoc(), callArg, isLexical);
+  return beginBuilder.createBeginBorrow(Apply.getArgumentLoc(index), callArg,
+                                        isLexical);
 }
 
 SILValue SILInlineCloner::moveFunctionArgument(SILValue callArg,
@@ -899,7 +901,8 @@ SILValue SILInlineCloner::moveFunctionArgument(SILValue callArg,
     break;
   }
   SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
-  return beginBuilder.createMoveValue(Apply.getLoc(), callArg, isLexical);
+  return beginBuilder.createMoveValue(Apply.getArgumentLoc(index), callArg,
+                                      isLexical);
 }
 
 void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {

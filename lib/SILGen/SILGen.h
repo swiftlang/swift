@@ -360,6 +360,11 @@ public:
   /// with it.
   void emitDistributedThunkForDecl(AbstractFunctionDecl * afd);
 
+  /// Emits the distributed 'resolvable proxy adapter' thunk for the decl
+  /// if there is one associated with it.
+  void emitDistributedResolvableProxyAdapterThunkForDecl(
+      AbstractFunctionDecl *afd);
+
   /// Returns true if the given declaration must be referenced through a
   /// back deployment thunk in a context with the given resilience expansion.
   bool requiresBackDeploymentThunk(ValueDecl *decl,

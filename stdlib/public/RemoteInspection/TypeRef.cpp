@@ -1705,7 +1705,21 @@ public:
 
   const TypeRef *
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
-    return PC;
+    // Visit every member of the composition. The protocols are either
+    // NominalTypeRef or ObjCProtocolTypeRef and substituting them is a no-op,
+    // but visit them anyway so this visitor stays exhaustive.
+    std::vector<const TypeRef *> Protocols;
+    for (auto *Protocol : PC->getProtocols())
+      Protocols.push_back(visit(Protocol));
+
+    // The "superclass" of a protocol composition is its class bound
+    // (the `C` in `(C & P)`), not a parent class in an inheritance chain.
+    const TypeRef *Superclass = nullptr;
+    if (PC->getSuperclass())
+      Superclass = visit(PC->getSuperclass());
+
+    return ProtocolCompositionTypeRef::create(Builder, Protocols, Superclass,
+                                              PC->hasExplicitAnyObject());
   }
 
   const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -1756,6 +1770,7 @@ public:
 
   const TypeRef *
   visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    auto *Base = cast<ProtocolCompositionTypeRef>(visit(CET->getBase()));
     std::vector<TypeRefRequirement> constraints;
     for (auto Req : CET->getRequirements()) {
       auto substReq = visitTypeRefRequirement(Req);
@@ -1763,8 +1778,7 @@ public:
         continue;
       constraints.emplace_back(*substReq);
     }
-    return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
-                                                 constraints);
+    return ConstrainedExistentialTypeRef::create(Builder, Base, constraints);
   }
 
   const TypeRef *visitSymbolicExtendedExistentialTypeRef(

@@ -3987,6 +3987,23 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
   return call;
 }
 
+llvm::Value *irgen::emitObjCMetatypeForMetatype(IRGenFunction &IGF,
+                                                llvm::Value *metatype,
+                                                CanType type) {
+  // If the type is known to have Swift metadata, this is trivial.
+  if (hasKnownSwiftMetadata(IGF.IGM, type))
+    return metatype;
+
+  assert(IGF.IGM.Context.LangOpts.EnableObjCInterop);
+  metatype = IGF.Builder.CreateBitCast(metatype, IGF.IGM.TypeMetadataPtrTy);
+
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetObjCMetatypeFromMetadataFunctionPointer(), metatype);
+  call->setDoesNotThrow();
+  call->setDoesNotAccessMemory();
+  return call;
+}
+
 /// Produce the heap metadata pointer for the given class type.  For
 /// Swift-defined types, this is equivalent to the metatype for the
 /// class, but for Objective-C-defined types, this is the class

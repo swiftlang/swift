@@ -936,6 +936,14 @@ BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
     swift::SourceRange range, swift::PlatformKind platform,
     BridgedVersionTuple cVersion);
 
+SWIFT_NAME("BridgedCOMAttr.createParsed(_:atLoc:range:interface:implementation:threading:)")
+BridgedCOMAttr BridgedCOMAttr_createParsed(BridgedASTContext context,
+                                           swift::SourceLoc location,
+                                           swift::SourceRange range,
+                                           BridgedStringRef interface,
+                                           BridgedStringRef implementation,
+                                           swift::COMThreadingModel threading);
+
 SWIFT_NAME("BridgedCDeclAttr.createParsed(_:atLoc:range:name:underscored:)")
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                swift::SourceLoc atLoc,
@@ -1707,18 +1715,13 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     swift::SourceLoc importKeywordLoc, BridgedImportKind cImportKind,
     swift::SourceLoc importKindLoc, BridgedArrayRef cImportPathElements);
 
-enum ENUM_EXTENSIBILITY_ATTR(open) BridgedUsingSpecifier {
-  BridgedUsingSpecifierMainActor,
-  BridgedUsingSpecifierNonisolated,
-};
-
 SWIFT_NAME("BridgedUsingDecl.createParsed(_:declContext:usingKeywordLoc:"
-           "specifierLoc:specifier:)")
-BridgedUsingDecl BridgedUsingDecl_createParsed(BridgedASTContext cContext,
-                                               BridgedDeclContext cDeclContext,
-                                               swift::SourceLoc usingKeywordLoc,
-                                               swift::SourceLoc specifierLoc,
-                                               BridgedUsingSpecifier specifier);
+           "specifiedAttributes:)")
+BridgedUsingDecl
+BridgedUsingDecl_createParsed(BridgedASTContext cContext,
+                              BridgedDeclContext cDeclContext,
+                              swift::SourceLoc usingKeywordLoc,
+                              BridgedDeclAttributes cSpecifiedAttributes);
 
 SWIFT_NAME("BridgedSubscriptDecl.createParsed(_:declContext:staticLoc:"
            "staticSpelling:subscriptKeywordLoc:genericParamList:parameterList:"

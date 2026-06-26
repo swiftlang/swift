@@ -3823,6 +3823,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     break;
   case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
   case IsDistributedThunk: OS << "[distributed_thunk] "; break;
+  case IsDistributedProxyAdapterThunk: OS << "[distributed_proxy_adapter_thunk] "; break;
   }
   if (isDynamicallyReplaceable()) {
     OS << "[dynamically_replacable] ";

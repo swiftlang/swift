@@ -1,7 +1,12 @@
-// RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=swift-5.9 -print-implicit-attrs -module-to-print=MemberInheritance -I %S/Inputs -source-filename=x | %FileCheck --check-prefixes=CHECK,CHECK-OFF %s
-// RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=swift-6 -print-implicit-attrs -module-to-print=MemberInheritance -I %S/Inputs -source-filename=x | %FileCheck --check-prefixes=CHECK,CHECK-OFF %s
-// RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=upcoming-swift -print-implicit-attrs -module-to-print=MemberInheritance -I %S/Inputs -source-filename=x | %FileCheck --check-prefixes=CHECK,CHECK-OFF %s
-// RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature ForeignReferenceTypeInheritance -print-implicit-attrs -module-to-print=MemberInheritance -I %S/Inputs -source-filename=x | %FileCheck --check-prefixes=CHECK,CHECK-ON %s
+// RUN: %target-swift-ide-test -source-filename=x -print-module -print-implicit-attrs \
+// RUN:   -cxx-interoperability-mode=default \
+// RUN:   -module-to-print=MemberInheritance -I %S/Inputs  \
+// RUN: | %FileCheck --check-prefixes=CHECK,CHECK-OFF %s
+// RUN: %target-swift-ide-test -source-filename=x -print-module -print-implicit-attrs \
+// RUN:   -cxx-interoperability-mode=default \
+// RUN:   -module-to-print=MemberInheritance -I %S/Inputs  \
+// RUN:   -enable-experimental-feature ForeignReferenceTypeInheritance \
+// RUN: | %FileCheck --check-prefixes=CHECK,CHECK-ON %s
 
 // REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
@@ -192,4 +197,25 @@
 // CHECK-OFF:   final func pureRenameDerived() -> Int32
 // CHECK-OFF: }
 // CHECK-ON: class EmptyDerivedAbstractFRT : AbstractFRT {
+// CHECK-ON: }
+
+// CHECK: class BaseWithInitMethod {
+// CHECK:   func `init`() -> Int32
+// CHECK: }
+
+// CHECK-OFF: class DerivedWithInitMethod {
+// CHECK-OFF:   func `init`() -> Int32
+// CHECK-OFF: }
+// CHECK-ON: class DerivedWithInitMethod : BaseWithInitMethod {
+// CHECK-ON:   func `init`() -> Int32
+// CHECK-ON: }
+
+// CHECK: class RenamedBaseWithInitMethod {
+// CHECK:   func method() -> Int32
+// CHECK: }
+
+// CHECK-OFF: class RenamedDerivedWithInitMethod {
+// CHECK-OFF:   func method() -> Int32
+// CHECK-OFF: }
+// CHECK-ON: class RenamedDerivedWithInitMethod : RenamedBaseWithInitMethod {
 // CHECK-ON: }

@@ -417,6 +417,7 @@ public:
   void visitAvailableAttr(AvailableAttr *attr);
 
   void visitCDeclAttr(CDeclAttr *attr);
+  void visitCOMAttr(COMAttr *attr);
   void visitExposeAttr(ExposeAttr *attr);
   void visitExternAttr(ExternAttr *attr);
   void visitUsedAttr(UsedAttr *attr);
@@ -2444,6 +2445,48 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
   }
+}
+
+void AttributeChecker::visitCOMAttr(COMAttr *attr) {
+  if (!Ctx.LangOpts.EnableCOMInterop) {
+    diagnoseAndRemoveAttr(attr, diag::attr_com_requires_flag);
+    return;
+  }
+
+  if (isa<ProtocolDecl>(D)) {
+    if (attr->IID.empty()) {
+      diagnose(attr->getLocation(), diag::attr_com_protocol_requires_iid);
+      attr->setInvalid();
+      return;
+    }
+
+    if (attr->CLSID && !attr->CLSID->empty()) {
+      diagnose(attr->getLocation(), diag::attr_com_protocol_unexpected_arg, "CLSID");
+      attr->setInvalid();
+      return;
+    }
+
+    if (!UUID::fromString(attr->IID.str().c_str())) {
+      diagnose(attr->getLocation(), diag::attr_com_invalid_guid, attr->IID);
+      attr->setInvalid();
+      return;
+    }
+  } else if (isa<ClassDecl>(D)) {
+    if (!attr->IID.empty()) {
+      diagnose(attr->getLocation(), diag::attr_com_class_unexpected_iid);
+      attr->setInvalid();
+      return;
+    }
+
+    if (attr->CLSID && (attr->CLSID->empty() ||
+                        !UUID::fromString(attr->CLSID->str().c_str()))) {
+      diagnose(attr->getLocation(), diag::attr_com_invalid_guid, *attr->CLSID);
+      attr->setInvalid();
+      return;
+    }
+  }
+
+  // TODO(compnerd) ensure that `ISwiftObject` is not conformed to.
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
@@ -4570,8 +4613,12 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   }
 
   // Check that the decl we're decorating is a member of a type that actually
-  // conforms to the specified protocol.
+  // conforms to the specified protocol. If we have an invalid extension, we
+  // can bail.
   NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
+  if (!NTD)
+    return;
+
   if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
     if (!(OtherPD == PD || OtherPD->inheritsFrom(PD)) &&
         !(OtherPD->isSpecificProtocol(KnownProtocolKind::DistributedActor) ||
@@ -8379,6 +8426,33 @@ void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
   }
 
   (void)nominal->isGlobalActor();
+
+  // GlobalActor requires 'shared' to always return the same actor instance.
+  // Only a stored 'let' guarantees this; any other shape
+  // can silently violate the contract.
+  if (auto *var = nominal->getGlobalActorInstance(); var && !var->isLet()) {
+    var->diagnose(diag::global_actor_shared_non_let_witness, var);
+
+    {
+      auto useLet =
+          var->diagnose(diag::global_actor_shared_non_let_witness_use_let);
+      SourceLoc fixItLoc = getFixItLocForVarToLet(var);
+      if (fixItLoc.isValid())
+        useLet.fixItReplace(fixItLoc, "let");
+    }
+
+    {
+      auto silence =
+          var->diagnose(diag::global_actor_shared_non_let_witness_silence);
+      if (auto *pbd = var->getParentPatternBinding()) {
+        SourceLoc insertLoc = pbd->getStartLoc();
+        if (insertLoc.isValid())
+          silence.fixItInsert(
+              insertLoc,
+              "@diagnose(UnstableGlobalActorShared, as: ignored) ");
+      }
+    }
+  }
 }
 
 void AttributeChecker::visitAsyncAttr(AsyncAttr *attr) {
@@ -9263,4 +9337,161 @@ ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
     return ctx.AllocateCopy(ArrayRef<VarDecl *>());
 
   return ctx.AllocateCopy(results);
+}
+
+FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
+                                           const SourceFile *file) const {
+  auto &ctx = file->getASTContext();
+  FileDefaults result;
+
+  std::optional<Decl *> firstNonImportDecl;
+
+  for (auto *D : file->getTopLevelDecls()) {
+    auto *UD = dyn_cast<UsingDecl>(D);
+    if (!UD) {
+      if (!firstNonImportDecl && !isa<ImportDecl>(D)) {
+        firstNonImportDecl = D;
+      }
+      continue;
+    }
+
+    if (firstNonImportDecl) {
+      UD->diagnose(diag::using_decl_must_precede_other_decls);
+      firstNonImportDecl.value()->diagnose(
+          diag::using_decl_must_precede_other_decls_previous);
+      // TODO: emit a fix-it
+    }
+
+    std::optional<DeclAttrKind> seen;
+    for (auto *attr : UD->getSpecifiedAttributes()) {
+      // It shouldn't be possible to get here with multiple attributes (it
+      // shouldn't parse), but make sure. @available can end up being multiple
+      // attributes though.
+      ASSERT((!seen || (seen == DeclAttrKind::Available &&
+                        attr->getKind() == DeclAttrKind::Available)) &&
+             "'using' should only have one specified attribute");
+      seen = attr->getKind();
+
+      if (isa<DiagnoseAttr>(attr)) {
+        // `@diagnose` is handled via the swift-syntax region tree.
+        continue;
+      }
+
+      // TODO: call validation when it exists! For example, validate the
+      // the structure of `@available`, if we do it for normal attrs.
+
+      if (auto *availAttr = dyn_cast<AvailableAttr>(attr)) {
+        result.availability.push_back(availAttr);
+        continue;
+      }
+
+      auto setDefaultIsolation = [&](DefaultIsolation isolation) {
+        if (result.isolation) {
+          UD->diagnose(diag::invalid_redecl_of_file_isolation);
+          result.isolation.value().source->diagnose(
+              diag::invalid_redecl_of_file_isolation_prev);
+        } else {
+          result.isolation = {isolation, UD};
+        }
+      };
+
+      if (isa<NonisolatedAttr>(attr)) {
+        setDefaultIsolation(DefaultIsolation::Nonisolated);
+        continue;
+      }
+
+      if (auto *custom = dyn_cast<CustomAttr>(attr)) {
+        auto type = evaluateOrDefault(
+            ctx.evaluator,
+            CustomAttrTypeRequest{custom, UD->getDeclContext(),
+                                  CustomAttrTypeKind::GlobalActor},
+            Type());
+        if (type) {
+          if (type->hasError()) {
+            // CustomAttrTypeRequest already produced an error. Instead of
+            // piling on, we can attach a note.
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::using_decl_invalid_attribute_note);
+            continue;
+          }
+
+          if (type->isEqual(ctx.getMainActorType())) {
+            setDefaultIsolation(DefaultIsolation::MainActor);
+            continue;
+          }
+
+          auto *nominal = type->getAnyNominal();
+          if (nominal && nominal->isGlobalActor()) {
+            // Some non MainActor global actor, diagnose.
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::invalid_actor_for_file_isolation, type);
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::invalid_actor_for_file_isolation_note);
+            continue;
+          }
+        }
+        // Not a global actor (some other illegal attribute) so fall through to
+        // the generic diagnostic.
+      }
+
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::using_decl_invalid_attribute, attr);
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::using_decl_invalid_attribute_note);
+    }
+  }
+
+  return result;
+}
+
+bool ApplyFileDefaultsRequest::appliesTo(const Decl *decl) {
+  auto *dc = decl->getDeclContext();
+  return dc->isModuleScopeContext() &&
+         (isa<ValueDecl>(decl) || isa<ExtensionDecl>(decl)) &&
+         dc->getParentSourceFile();
+}
+
+evaluator::SideEffect ApplyFileDefaultsRequest::evaluate(Evaluator &evaluator,
+                                                         Decl *decl) const {
+  // Decl::applyFileDefaults() gates on appliesTo() before requesting, but
+  // nobody should call without checking to not waste time and cache.
+  //
+  // TODO: Would this be better served by a new `precondition` API for requests?
+  if (!appliesTo(decl)) {
+    DEBUG_ASSERT(false && "ApplyFileDefaultsRequest on a decl that can't have "
+                          "file defaults; caller should have checked");
+    return {};
+  }
+
+  // Known to exist thanks to appliesTo.
+  auto *file = decl->getDeclContext()->getParentSourceFile();
+  auto defaults = file->getFileDefaults();
+  if (defaults.availability.empty())
+    return {};
+
+  auto &ctx = decl->getASTContext();
+  auto &attrs = decl->getAttrs();
+
+  // Put defaults on the tail of the linked list, so explicit attrs take
+  // priority. With no attrs, use \c add to set the head.
+
+  DeclAttribute *tail = nullptr;
+  for (auto *existing : attrs)
+    tail = existing;
+
+  auto append = [&](DeclAttribute *attr) {
+    if (tail)
+      *tail->getMutableNext() = attr;
+    else
+      attrs.add(attr);
+    tail = attr;
+  };
+
+  // We append in reverse, since printing will reverse again, to get the printed
+  // order and priority order to correctly reflect the top to bottom order of
+  // the file-level defaults.
+  for (auto *attr : llvm::reverse(defaults.availability))
+    append(attr->clone(ctx, /*implicit=*/true));
+
+  return {};
 }

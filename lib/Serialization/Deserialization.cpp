@@ -6580,6 +6580,24 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::COM_DECL_ATTR: {
+        bool implicit;
+        bool interface;
+        unsigned model;
+
+        serialization::decls_block::COMDeclAttrLayout::readRecord(
+            scratch, implicit, interface, model);
+
+        StringRef iid = interface ? blobData : "";
+        std::optional<StringRef> clsid =
+            !interface && !blobData.empty() ? std::optional<StringRef>(blobData)
+                                            : std::nullopt;
+        Attr = new (ctx) COMAttr(SourceLoc(), SourceRange(), iid, clsid,
+                                 model ? static_cast<COMThreadingModel>(model - 1)
+                                       : COMThreadingModel::Apartment, implicit);
+        break;
+      }
+
       case decls_block::Documentation_DECL_ATTR: {
         bool isImplicit;
         uint64_t CategoryID;
@@ -9265,16 +9283,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       diagnoseAndConsumeError(thirdOrError.takeError());
     } else {
       fatal(thirdOrError.takeError());
-    }
-    if (isa_and_nonnull<TypeAliasDecl>(third) &&
-        third->getModuleContext() != getAssociatedModule() &&
-        !third->getDeclaredInterfaceType()->isEqual(second)) {
-      // Conservatively drop references to typealiases in other modules
-      // that may have changed. This may also drop references to typealiases
-      // that /haven't/ changed but just happen to have generics in them, but
-      // in practice having a declaration here isn't actually required by the
-      // rest of the compiler.
-      third = nullptr;
     }
     typeWitnesses[first] = {second, third};
   }

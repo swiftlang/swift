@@ -970,6 +970,11 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
     return true;
   }
 
+  // Embedded has no resilient ABI boundary, so all type metadata is accessible
+  // across modules regardless of access level; the access checks below do not apply.
+  if (ty->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return true;
+
   switch (kind) {
   case OpaqueSubstitutionKind::DontSubstitute:
     return false;

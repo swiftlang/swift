@@ -342,6 +342,10 @@ def create_argument_parser():
     option('--dump-config', toggle_true,
            help='instead of building, write JSON to stdout containing '
                 'various values used to build in this configuration')
+    option('--dump-options', store_true,
+           help='instead of building, write a JSON description of every '
+                'recognized option (both build-script and build-script-impl) '
+                'to stdout and exit')
 
     option(['--reconfigure'], store_true,
            help="Reconfigure all projects as we build")
@@ -1516,7 +1520,10 @@ def create_argument_parser():
            default=True,
            help='emit -index-store-path while building LLVM/Clang and Swift '
                 'host tools (gated on the host compiler accepting the flag, '
-                'so it is a no-op for older compilers). Defaults to ON.')
+                'so it is a no-op for older compilers). Defaults to ON, but '
+                'is forced OFF when --sccache is in use (sccache cannot '
+                'cache the index-store side outputs and would otherwise '
+                'miss on every translation unit).')
 
     option('--llvm-targets-to-build', store,
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',

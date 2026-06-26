@@ -76,7 +76,7 @@ bb2(%4 : @owned $E):
 // CHECK:       bb0(%0 : @guaranteed $String):
 // CHECK-NEXT:    br bb1(%0 : $String)
 // CHECK:       bb1(%2 : @guaranteed $String):
-// CHECK-NEXT:    %3 = borrowed %2 : $String from ()
+// CHECK-NEXT:    %3 = borrowed %2 : $String from (%0 : $String)
 // CHECK-NEXT:    %4 = copy_value %3
 // CHECK-NEXT:    return %4 : $String
 // CHECK-NOT:   bb2
@@ -118,7 +118,7 @@ bb2(%7 : @owned $E):
 // CHECK-NEXT:    end_borrow
 // CHECK-NEXT:    br bb1(%0 : $String)
 // CHECK:       bb1([[A:%.*]] : @guaranteed $String):
-// CHECK-NEXT:    [[B:%.*]] = borrowed [[A]] : $String from ()
+// CHECK-NEXT:    [[B:%.*]] = borrowed [[A]] : $String from (%0 : $String)
 // CHECK-NEXT:    [[C:%.*]] = copy_value [[B]]
 // CHECK-NEXT:    return [[C]] : $String
 // CHECK-NOT:   bb2

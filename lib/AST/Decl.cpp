@@ -437,6 +437,13 @@ DeclAttributes Decl::getSemanticAttrs() const {
   return getAttrs();
 }
 
+void Decl::applyFileDefaults() {
+  if (!ApplyFileDefaultsRequest::appliesTo(this))
+    return;
+  (void)evaluateOrDefault(getASTContext().evaluator,
+                          ApplyFileDefaultsRequest{this}, {});
+}
+
 void Decl::attachParsedAttrs(DeclAttributes attrs) {
   ASSERT(getAttrs().isEmpty() && "attaching when there are already attrs?");
 
@@ -1865,28 +1872,15 @@ bool ImportDecl::isAccessLevelImplicit() const {
   return true;
 }
 
-UsingDecl::UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
-                     UsingSpecifier specifier, DeclContext *parent)
+UsingDecl::UsingDecl(SourceLoc usingLoc, DeclAttributes specifiedAttributes,
+                     DeclContext *parent)
     : Decl(DeclKind::Using, parent), UsingLoc(usingLoc),
-      SpecifierLoc(specifierLoc) {
-  Bits.UsingDecl.Specifier = static_cast<unsigned>(specifier);
-  assert(getSpecifier() == specifier &&
-         "not enough bits in UsingDecl flags for specifier");
-}
-
-std::string UsingDecl::getSpecifierName() const {
-  switch (getSpecifier()) {
-  case UsingSpecifier::MainActor:
-    return "@MainActor";
-  case UsingSpecifier::Nonisolated:
-    return "nonisolated";
-  }
-}
+      SpecifiedAttributes(specifiedAttributes) {}
 
 UsingDecl *UsingDecl::create(ASTContext &ctx, SourceLoc usingLoc,
-                             SourceLoc specifierLoc, UsingSpecifier specifier,
+                             DeclAttributes specifiedAttributes,
                              DeclContext *parent) {
-  return new (ctx) UsingDecl(usingLoc, specifierLoc, specifier, parent);
+  return new (ctx) UsingDecl(usingLoc, specifiedAttributes, parent);
 }
 
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -2399,6 +2393,15 @@ Decl::getExplicitCodeGenerationModel() const {
 std::optional<CodeGenerationModel>
 Decl::getRequiredCodeGenerationModel() const {
   bool isEmbedded = getASTContext().LangOpts.hasFeature(Feature::Embedded);
+
+  // A @_transparent function or storage must be @export(implementation).
+  if (auto func = dyn_cast<AbstractFunctionDecl>(this)) {
+    if (func->isTransparent())
+      return CodeGenerationModel::Implementation;
+  } else if (auto storage = dyn_cast<AbstractStorageDecl>(this)) {
+    if (storage->isTransparent())
+      return CodeGenerationModel::Implementation;
+  }
 
   // A generic declaration must be @export(implementation) in Embedded Swift.
   auto dc = getInnermostDeclContext();
@@ -12582,7 +12585,7 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       case ActorIsolation::ActorInstance:
         auto isolatedVar = isolation.getActorInstance();
         return isolatedVar->isSelfParameter() ||
-            isolatedVar-isSelfParamCapture();
+               isolatedVar->isSelfParamCapture();
       }
     }
 
@@ -12597,12 +12600,22 @@ ActorIsolation swift::getActorIsolation(ValueDecl *value) {
   return getInferredActorIsolation(value).isolation;
 }
 
+ActorIsolation swift::getActorIsolation(ExtensionDecl *ext) {
+  return getInferredActorIsolation(ext).isolation;
+}
+
 InferredActorIsolation
 swift::getInferredActorIsolation(ValueDecl *value) {
   auto &ctx = value->getASTContext();
   return evaluateOrDefault(
       ctx.evaluator, ActorIsolationRequest{value},
       InferredActorIsolation::forUnspecified());
+}
+
+InferredActorIsolation swift::getInferredActorIsolation(ExtensionDecl *ext) {
+  auto &ctx = ext->getASTContext();
+  return evaluateOrDefault(ctx.evaluator, ActorIsolationRequest{ext},
+                           InferredActorIsolation::forUnspecified());
 }
 
 ActorIsolation swift::getActorIsolationOfContext(

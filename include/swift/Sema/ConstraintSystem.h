@@ -298,7 +298,7 @@ using KeyPathCapability = std::pair<KeyPathMutability, /*isSendable=*/bool>;
 namespace constraints {
 
 template <typename T = Expr> T *castToExpr(ASTNode node) {
-  return cast<T>(cast<Expr *>(node));
+  return cast<T>(cast_or_null<Expr *>(node));
 }
 
 template <typename T = Expr> T *getAsExpr(ASTNode node) {
@@ -2065,7 +2065,7 @@ public:
 
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
-  bool recordFix(ConstraintFix *fix, unsigned impact = 1,
+  bool recordFix(ConstraintFix *fix, FixImpact impact = FixImpact::Mismatch,
                  PreparedOverloadBuilder *preparedOverload = nullptr);
 
   void recordPotentialHole(TypeVariableType *typeVar);
@@ -4118,13 +4118,7 @@ public:
 
   // If the given constraint is an applied disjunction, get the argument function
   // that the disjunction is applied to.
-  FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction) {
-    assert(disjunction->getKind() == ConstraintKind::Disjunction);
-    auto found = AppliedDisjunctions.find(disjunction->getLocator());
-    if (found == AppliedDisjunctions.end())
-      return nullptr;
-    return found->second;
-  }
+  FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction);
 
   /// The overload sets that have already been resolved along the current path.
   const llvm::DenseMap<ConstraintLocator *, SelectedOverload> &
@@ -4616,9 +4610,6 @@ bool exprNeedsParensInsideFollowingOperator(DeclContext *DC,
 bool exprNeedsParensOutsideFollowingOperator(
     DeclContext *DC, Expr *expr, PrecedenceGroupDecl *followingPG,
     llvm::function_ref<Expr *(const Expr *)> getParent);
-
-/// Determine whether this is a SIMD operator.
-bool isSIMDOperator(ValueDecl *value);
 
 std::string describeGenericType(ValueDecl *GP, bool includeName = false);
 

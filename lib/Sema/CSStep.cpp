@@ -446,6 +446,24 @@ void TypeVariableStep::setup() {
   ++CS.solverState->NumTypeVariablesBound;
 }
 
+bool TypeVariableStep::shouldSkip(const TypeVariableBinding &choice) const {
+  // Let's always attempt types inferred from "defaultable" constraints
+  // in diagnostic mode. This allows the solver to attempt i.e. `Any`
+  // for collection literals and produce better diagnostics for for-in
+  // statements like `for (x, y, z) in [] { ... }` when pattern type
+  // could not be inferred.
+  //
+  // A notable exception are closure result types, there is no reason
+  // to attempt `Void` if there is a contextual type, it would always
+  // produce a worse solution.
+  if (CS.shouldAttemptFixes() && !TypeVar->getImpl().isClosureResultType())
+    return false;
+
+  // If this is a defaultable binding and we have found solutions,
+  // don't explore the default binding.
+  return AnySolved && choice.isDefaultable();
+}
+
 bool TypeVariableStep::attempt(const TypeVariableBinding &choice) {
   ++CS.solverState->NumTypeVariableBindings;
 
@@ -495,12 +513,6 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
     if (!choice.isGenericOperator() && choice.isSymmetricOperator()) {
       if (!BestNonGenericScore || score < BestNonGenericScore) {
         BestNonGenericScore = score;
-        if (shouldSkipGenericOperators()) {
-          // The disjunction choice producer shouldn't do the work
-          // to partition the generic operator choices if generic
-          // operators are going to be skipped.
-          Producer.setNeedsGenericOperatorOrdering(false);
-        }
       }
     }
 
@@ -683,27 +695,6 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   return !hasUnavailableOverloads && !hasFixes && !hasAsyncMismatch &&
          (isBeginningOfPartition ||
           shortCircuitDisjunctionAt(choice, lastChoice));
-}
-
-bool swift::isSIMDOperator(ValueDecl *value) {
-  if (!value)
-    return false;
-
-  auto func = dyn_cast<FuncDecl>(value);
-  if (!func)
-    return false;
-
-  if (!func->isOperator())
-    return false;
-
-  auto nominal = func->getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominal)
-    return false;
-
-  if (nominal->getName().empty())
-    return false;
-
-  return nominal->getName().str().starts_with_insensitive("simd");
 }
 
 bool DisjunctionStep::shortCircuitDisjunctionAt(

@@ -219,10 +219,10 @@ extension Value {
       return true
     case let arg as Argument:
       return arg.parentBlock == instruction.parentBlock
-    case let svi as SingleValueInstruction:
-      return svi.dominatesInSameBlock(instruction)
-    case let mvi as MultipleValueInstructionResult:
-      return mvi.parentInstruction.dominatesInSameBlock(instruction)
+    case let svi as SingleValueInstruction where svi.parentBlock == instruction.parentBlock:
+      return svi.dominatesInBlock(instruction)
+    case let mvi as MultipleValueInstructionResult where mvi.parentBlock == instruction.parentBlock:
+      return mvi.parentInstruction.dominatesInBlock(instruction)
     default:
       return false
     }
@@ -246,12 +246,18 @@ extension ApplySite {
     let builder = Builder(before: self, context)
     let calleeRef = builder.createFunctionRef(callee)
 
+    // Preserve any per-argument SILLocations stored on the original apply.
+    // The bridged Builder factories silently drop the locations when the
+    // count doesn't match the rewritten argument list (e.g., callee shape
+    // change); see SILBridgingImpl.h:getBridgedArgLocsFrom for the
+    // count-match guard.
     switch self {
     case let applyInst as ApplyInst:
       let newApply = builder.createApply(function: calleeRef,
                                          applyInst.substitutionMap,
                                          arguments: newArguments,
-                                         isNonThrowing: applyInst.isNonThrowing)
+                                         isNonThrowing: applyInst.isNonThrowing,
+                                         argumentLocationsFrom: self)
       applyInst.replace(with: newApply, context)
 
     case let partialAp as PartialApplyInst:
@@ -261,20 +267,23 @@ extension ApplySite {
                                                 calleeConvention: partialAp.calleeConvention,
                                                 hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
                                                 isOnStack: partialAp.isOnStack,
-                                                isNested:  partialAp.isNested)
+                                                isNested:  partialAp.isNested,
+                                                argumentLocationsFrom: self)
       partialAp.replace(with: newApply, context)
 
     case let tryApply as TryApplyInst:
       builder.createTryApply(function: calleeRef,
                              tryApply.substitutionMap,
                              arguments: newArguments,
-                             normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock)
+                             normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock,
+                             argumentLocationsFrom: self)
       context.erase(instruction: tryApply)
 
     case let beginApply as BeginApplyInst:
       let newApply = builder.createBeginApply(function: calleeRef,
                                               beginApply.substitutionMap,
-                                              arguments: newArguments)
+                                              arguments: newArguments,
+                                              argumentLocationsFrom: self)
       beginApply.replace(with: newApply, context)
 
     default:
@@ -533,32 +542,6 @@ extension Instruction {
     }
   }
 
-  /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction.
-  /// To be used as simple dominance check if both instructions are most likely located in the same block
-  /// and no DominatorTree is available (like in instruction simplification).
-  func dominatesInSameBlock(_ otherInst: Instruction) -> Bool {
-    if parentBlock != otherInst.parentBlock {
-      return false
-    }
-    // Walk in both directions. This is most efficient if both instructions are located nearby but it's not clear
-    // which one comes first in the block's instruction list.
-    var forwardIter = self
-    var backwardIter = self
-    while let f = forwardIter.next {
-      if f == otherInst {
-        return true
-      }
-      forwardIter = f
-      if let b = backwardIter.previous {
-        if b == otherInst {
-          return false
-        }
-        backwardIter = b
-      }
-    }
-    return false
-  }
-  
   /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction or
   /// the parent block of the instruction dominates parent block of `otherInst`.
   func dominates(
@@ -566,7 +549,7 @@ extension Instruction {
     _ domTree: DominatorTree
   ) -> Bool {
     if parentBlock == otherInst.parentBlock {
-      return dominatesInSameBlock(otherInst)
+      return dominatesInBlock(otherInst)
     } else {
       return parentBlock.dominates(
         otherInst.parentBlock,

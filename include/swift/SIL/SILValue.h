@@ -38,7 +38,6 @@ class DominanceInfo;
 class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
-class InstructionIndices;
 class SILInstruction;
 class SILArgument;
 class SILLocation;
@@ -729,7 +728,7 @@ public:
   /// Verify that this SILValue and its uses respects ownership invariants.
   ///
   /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
-  void verifyOwnership(DeadEndBlocks *DEBlocks, InstructionIndices *instIndices) const;
+  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
 
   SWIFT_DEBUG_DUMP;
 };
@@ -836,6 +835,11 @@ struct OperandOwnership {
     /// to a small number of operations that are allowed to take Unowned values.
     /// (copy_value, single-instruction apply with @unowned argument))
     UnownedInstantaneousUse,
+
+    /// A debug_value use. Semantically equivalent to UnownedInstantaneousUse
+    /// but the value is not required to be alive. The OwnershipModelEliminator
+    /// automatically removes such invalid debug uses.
+    DebugUse,
 
     /// Forwarding instruction with an Unowned result. Its operands may have any
     /// ownership.
@@ -968,6 +972,7 @@ inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   case OperandOwnership::NonUse:
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::DebugUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::PointerEscape:
   case OperandOwnership::BitwiseEscape:
@@ -998,6 +1003,7 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   switch (operandOwnership) {
   case OperandOwnership::NonUse:
   case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::DebugUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::PointerEscape:
   case OperandOwnership::BitwiseEscape:
@@ -1087,6 +1093,13 @@ private:
 
   // For details see SILNode::lastInitializedBitfieldID
   uint64_t lastInitializedBitfieldID : (64 - numCustomBits);
+
+  uint64_t getLastInitializedBitfieldID() const {
+    return lastInitializedBitfieldID;
+  }
+  void setLastInitializedBitfieldID(uint64_t bitfieldID) {
+    lastInitializedBitfieldID = bitfieldID;
+  }
 
 public:
   Operand(SILInstruction *owner)

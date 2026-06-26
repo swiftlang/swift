@@ -13,7 +13,9 @@ extension { // expected-error {{expected type name in extension declaration}}
     func foo(t: T) {}
   }
 
-  class M : S {}
+  // A little unfortunate we emit this error, but because there's no
+  // extended nominal, there's no way to do a qualified lookup.
+  class M : S {} // expected-error {{cannot find type 'S' in scope}}
 
   protocol P {
     associatedtype A

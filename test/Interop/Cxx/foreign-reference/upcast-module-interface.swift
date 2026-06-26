@@ -43,7 +43,9 @@
 
 // CHECK: class OverridesLifetimeOps {
 
-// CHECK: class OverridesLifetimeOpsDerived : OverridesLifetimeOps {
+// CHECK: class OverridesLifetimeOpsDerived {
+
+// CHECK: class ReannotatedRefCountedDerived {
 
 // CHECK: class DerivedFromEmptyAndBase : Base {
 // CHECK:   var extraValue: Int32

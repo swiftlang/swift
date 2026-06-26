@@ -211,6 +211,103 @@ Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
   return getAssociatedTypeOfDistributedSystemOfActor(actor, C.Id_ActorID);
 }
 
+Identifier swift::getDistributedResolvableProtocolStubName(ProtocolDecl *proto) {
+  if (!proto)
+    return Identifier();
+
+  auto &ctx = proto->getASTContext();
+
+  // @Resolvable can only be attached to protocols which inherit from DistributedActor,
+  // so there cannot be a "stub type" for a not-DistributedActor protocol.
+  auto *distributedActorProto = ctx.getDistributedActorDecl();
+  if (!distributedActorProto || !proto->inheritsFrom(distributedActorProto))
+    return Identifier();
+
+  llvm::SmallString<32> buf;
+  return ctx.getIdentifier(
+      llvm::Twine("$", proto->getNameStr()).toStringRef(buf));
+}
+
+NominalTypeDecl *swift::getDistributedResolvableProtocolStubDecl(ProtocolDecl *proto) {
+  if (!proto)
+    return nullptr;
+
+  auto &ctx = proto->getASTContext();
+
+  // Only relevant for protocols that refine `DistributedActor`.
+  auto *distributedActorProto = ctx.getDistributedActorDecl();
+  if (!distributedActorProto)
+    return nullptr;
+  if (!proto->inheritsFrom(distributedActorProto))
+    return nullptr;
+
+  auto *stubProto = ctx.get_DistributedActorStubDecl();
+  if (!stubProto)
+    return nullptr;
+
+  // The `@Resolvable` macro generates a peer `distributed actor $P`
+  // in the same context as the protocol. Look it up by synthesizing the prefixed name.
+  // Users cannot declare $-prefixed names, so we are confident this is the synthesized type.
+  SmallVector<ValueDecl *, 4> results;
+  proto->getModuleContext()->lookupValue(
+    getDistributedResolvableProtocolStubName(proto), NLKind::QualifiedLookup, results);
+
+  for (auto *result : results) {
+    auto *classDecl = dyn_cast<ClassDecl>(result);
+    if (!classDecl || !classDecl->isDistributedActor())
+      continue;
+
+    auto stubConformance =
+        lookupConformance(classDecl->getDeclaredInterfaceType(), stubProto);
+    if (stubConformance.isInvalid())
+      continue;
+
+    return classDecl;
+  }
+
+  return nullptr;
+}
+
+ResolvableProtocolMatch
+swift::findDistributedResolvableExistentialOrOpaqueProtocol(Type T) {
+  ResolvableProtocolMatch match;
+  if (!T)
+    return match;
+
+  auto recordMatch = [&](ProtocolDecl *p) {
+    if (getDistributedResolvableProtocolStubDecl(p)) {
+      if (match.proto && match.proto != p) {
+        match.isAmbiguous = true;
+      } else {
+        match.proto = p;
+      }
+    }
+  };
+
+  if (T->isAnyExistentialType() || T->isConstraintType()) {
+    // Covers `any P` and protocol composition like `any P & Q`.
+    auto layout = T->getExistentialLayout();
+    for (auto *proto : layout.getProtocols())
+      recordMatch(proto);
+  } else if (auto archetype = T->getAs<ArchetypeType>()) {
+    // Covers `some P`, generic params constrained to P.
+    for (auto *proto : archetype->getConformsTo())
+      recordMatch(proto);
+  }
+
+  if (match.isAmbiguous)
+    match.proto = nullptr;
+  return match;
+}
+
+Type swift::getResolvableProtocolConcreteActorSystemType(ProtocolDecl *proto) {
+  auto sysTy = getConcreteReplacementForProtocolActorSystemType(proto);
+  if (!sysTy || sysTy->is<GenericTypeParamType>() ||
+      sysTy->is<ArchetypeType>() || sysTy->hasError())
+    return Type();
+  return sysTy;
+}
+
 static Type getTypeWitnessByName(NominalTypeDecl *type, ProtocolDecl *protocol,
                                  Identifier member) {
   if (!protocol)
@@ -1473,6 +1570,36 @@ AbstractFunctionDecl::getDistributedThunk() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
       GetDistributedThunkRequest{mutableThis},
+      nullptr);
+}
+
+FuncDecl *
+AbstractStorageDecl::getDistributedResolvableProxyAdapterThunk() const {
+  if (!isDistributed())
+    return nullptr;
+
+  auto mutableThis = const_cast<AbstractStorageDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedRecipientResolvableProxyAdapterThunkRequest{mutableThis}, nullptr);
+}
+
+FuncDecl *
+AbstractFunctionDecl::getDistributedResolvableProxyAdapterThunk() const {
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+
+  // For an accessor, get the Storage (VarDecl) and get the thunk off it.
+  if (auto accessor = dyn_cast<AccessorDecl>(mutableThis)) {
+    auto Storage = accessor->getStorage();
+    return Storage->getDistributedResolvableProxyAdapterThunk();
+  }
+
+  if (!isDistributed())
+    return nullptr;
+
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedRecipientResolvableProxyAdapterThunkRequest{mutableThis},
       nullptr);
 }
 

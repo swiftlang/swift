@@ -1,10 +1,11 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_SafeInteropWrappersNullAsEmptySpan
 // REQUIRES: swift_feature_Lifetimes
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-nullability-completeness \
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -verify-additional-prefix experimental- -Rmacro-expansions -suppress-notes -eager-macro-checking
 
 // lifetimebound support is not stabilized yet. Don't generate _any_ overloads on functions with lifetimebound to prevent future sourcebreak.
@@ -222,7 +223,7 @@ module Test {
 }
 
 //--- test.swift
-// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
+// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
 // GENERATED-HASH: bf29f52677b1fff57eab42e8b47ee90713cf42d2944fed19a9bad80a49b73b68
 import Test
 

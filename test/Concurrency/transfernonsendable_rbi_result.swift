@@ -14,9 +14,7 @@ actor Custom {
 
 @globalActor
 struct CustomActor {
-  static var shared: Custom {
-    return Custom()
-  }
+  static let shared = Custom()
 }
 
 class NonSendable {} // expected-note 3{{}}

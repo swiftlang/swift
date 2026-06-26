@@ -12,7 +12,7 @@
 
 import Swift
 
-#if os(WASI) || !$Embedded
+#if os(WASI) || os(Emscripten) || !$Embedded
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
@@ -42,7 +42,8 @@ import Swift
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
 ///
 /// [concurrency]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/#The-Main-Actor
-/// [tspl]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/
+/// A singleton actor whose executor is equivalent to the main
+/// dispatch queue.
 @available(SwiftStdlib 5.1, *)
 @globalActor public final actor MainActor: GlobalActor {
   public static let shared = MainActor()
@@ -202,4 +203,4 @@ public func _deinitOnExecutorMainActorBackDeploy(
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-#endif // os(WASI) || !$Embedded
+#endif // os(WASI) || os(Emscripten) || !$Embedded

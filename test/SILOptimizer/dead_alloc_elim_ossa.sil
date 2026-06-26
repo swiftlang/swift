@@ -509,6 +509,8 @@ struct Foo {
 
 // CHECK-LABEL: sil [ossa] @remove_nontrivial_dead_keypath
 // CHECK-NOT:   keypath
+// CHECK:       destroy_value %0
+// CHECK-NOT:   keypath
 // CHECK: } // end sil function 'remove_nontrivial_dead_keypath'
 sil [ossa] @remove_nontrivial_dead_keypath : $@convention(thin) (@owned String) -> () {
 bb0(%0 : @owned $String):
@@ -518,7 +520,68 @@ bb0(%0 : @owned $String):
   return %r : $()
 } 
 
+struct KeyPathRoot {
+  @_hasStorage var int: Int { get set }
+}
+
+struct KeyPathWrapper<Root, Value> {
+  @_hasStorage var object: Kl { get set }
+  @_hasStorage var value: Optional<Value> { get set }
+  @_hasStorage var keyPath: KeyPath<Root, Value> { get set }
+}
+
 sil @createit : $@convention(thin) () -> @owned Kl
+
+// https://github.com/swiftlang/swift/issues/89791
+// A removed keypath user may consume an owned value defined outside the dead
+// object graph. DeadObjectElimination must replace that consume with an
+// explicit destroy.
+//
+// CHECK-LABEL: sil [ossa] @dead_keypath_user_with_consumed_operand
+// CHECK: %[[OBJECT:[0-9]+]] = apply
+// CHECK-NEXT: destroy_value %[[OBJECT]]
+// CHECK-NOT: keypath
+// CHECK-NOT: struct $KeyPathWrapper
+// CHECK: } // end sil function 'dead_keypath_user_with_consumed_operand'
+sil [ossa] @dead_keypath_user_with_consumed_operand : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @createit : $@convention(thin) () -> @owned Kl
+  %1 = apply %0() : $@convention(thin) () -> @owned Kl
+  %2 = keypath $any KeyPath<KeyPathRoot, Int> & Sendable, (root $KeyPathRoot; stored_property #KeyPathRoot.int : $Int)
+  %3 = open_existential_ref %2 to $@opened("11111111-1111-1111-1111-111111111111", any KeyPath<KeyPathRoot, Int> & Sendable) Self
+  %4 = upcast %3 to $KeyPath<KeyPathRoot, Int>
+  %5 = enum $Optional<Int>, #Optional.none!enumelt
+  %6 = struct $KeyPathWrapper<KeyPathRoot, Int> (%1, %5, %4)
+  destroy_value %6 : $KeyPathWrapper<KeyPathRoot, Int>
+  %7 = tuple ()
+  return %7 : $()
+}
+
+struct LexicalKeyPathWrapper<Root, Value> {
+  @_hasStorage var object: Kl { get set }
+  @_hasStorage var keyPath: KeyPath<Root, Value> { get set }
+}
+
+// A removed keypath user that consumes a lexical owned value defined outside
+// the dead object graph must make DeadObjectElimination bail out. This keeps
+// the function unchanged rather than shortening the lexical value's lifetime.
+//
+// CHECK-LABEL: sil [ossa] @dead_keypath_user_with_lexical_operand
+// CHECK: move_value [lexical]
+// CHECK: keypath
+// CHECK: struct $LexicalKeyPathWrapper
+// CHECK: } // end sil function 'dead_keypath_user_with_lexical_operand'
+sil [ossa] @dead_keypath_user_with_lexical_operand : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @createit : $@convention(thin) () -> @owned Kl
+  %1 = apply %0() : $@convention(thin) () -> @owned Kl
+  %2 = move_value [lexical] %1 : $Kl
+  %3 = keypath $KeyPath<KeyPathRoot, Int>, (root $KeyPathRoot; stored_property #KeyPathRoot.int : $Int)
+  %4 = struct $LexicalKeyPathWrapper<KeyPathRoot, Int> (%2, %3)
+  destroy_value %4 : $LexicalKeyPathWrapper<KeyPathRoot, Int>
+  %5 = tuple ()
+  return %5 : $()
+}
 
 // Check that we don't crash here.
 sil [ossa] @not_dominating_stores : $@convention(thin) () -> () {

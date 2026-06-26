@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil -sanitize=thread -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s -Xllvm -sil-print-final-ossa-module | %FileCheck %s
+// RUN: %target-swift-emit-sil -sanitize=thread -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses -enable-sil-opaque-values %s -Xllvm -sil-print-final-ossa-module | %FileCheck %s
 // RUN: %target-swift-emit-sil -sanitize=thread -O -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_MoveOnlyClasses

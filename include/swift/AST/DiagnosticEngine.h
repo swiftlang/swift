@@ -73,6 +73,12 @@ namespace swift {
   struct Diag {
     /// The diagnostic ID corresponding to this diagnostic.
     DiagID ID;
+
+    // 0 corresponds to diag::invalid_diagnostic. Unfortunately we can't define
+    // this out-of-line due to the template, and we can't include the diagnostic
+    // since that's a header cycle.
+    Diag() : ID(static_cast<DiagID>(0)) {}
+    Diag(DiagID id) : ID(id) {}
   };
 
   namespace detail {

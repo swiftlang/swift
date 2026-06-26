@@ -474,6 +474,7 @@ UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(LibraryEvolution)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
+UNINTERESTING_FEATURE(SafeInteropWrappersNullAsEmptySpan)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(ImportCxxMembersLazily)
@@ -673,7 +674,8 @@ static bool usesFeatureReparenting(Decl *decl) {
 
   // Check if this decl itself is a reparentable protocol (of extension of).
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    decl = ext->getExtendedNominal();
+    if (auto *nominal = ext->getExtendedNominal())
+      decl = nominal;
   }
 
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {

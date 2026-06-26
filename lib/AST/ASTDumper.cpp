@@ -2217,7 +2217,13 @@ namespace {
 
     void visitUsingDecl(UsingDecl *UD, Label label) {
       printCommon(UD, "using_decl", label);
-      printFieldQuoted(UD->getSpecifierName(), Label::always("specifier"));
+
+      ASTContext *Ctx = &UD->getASTContext();
+      DeclContext *DC = UD->getDeclContext();
+      printList(
+          UD->getSpecifiedAttributes(),
+          [&](auto *attr, Label label) { printRec(attr, Ctx, DC, label); },
+          Label::optional("specified_attrs"));
     }
 
     void visitExtensionDecl(ExtensionDecl *ED, Label label) {
@@ -5677,6 +5683,34 @@ public:
     }
     if (Attr->Reason)
       printFieldQuoted(Attr->Reason, Label::always("reason:"));
+    printFoot();
+  }
+
+  void visitCOMAttr(COMAttr *Attr, Label label) {
+    printCommon(Attr, "com_attr", label);
+    if (!Attr->IID.empty())
+      printFieldQuoted(Attr->IID, Label::always("IID"));
+    if (Attr->CLSID && !Attr->CLSID->empty())
+      printFieldQuoted(Attr->CLSID, Label::always("CLSID"));
+    const char *Model;
+    switch (Attr->getThreadingModel()) {
+    case COMThreadingModel::Single:
+      Model = "single";
+      break;
+    case COMThreadingModel::Apartment:
+      Model = "apartment";
+      break;
+    case COMThreadingModel::Free:
+      Model = "free";
+      break;
+    case COMThreadingModel::Both:
+      Model = "both";
+      break;
+    case COMThreadingModel::Neutral:
+      Model = "neutral";
+      break;
+    }
+    printField(StringRef{Model}, Label::always("threading"));
     printFoot();
   }
 };

@@ -13,7 +13,9 @@
 #define DEBUG_TYPE "sil-function"
 
 #include "swift/SIL/SILFunction.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
@@ -1060,6 +1062,11 @@ bool SILFunction::hasValidLinkageForFragileRef(SerializedKind_t callerSerialized
   if (hasForeignBody())
     return true;
 
+  // An external forward declaration is resolved at link time, so any linkage
+  // is valid.
+  if (isExternForwardDeclaration())
+    return true;
+
   // The call site of this function must have checked that
   // caller.isAnySerialized() is true, as indicated by the
   // function name itself (contains 'ForFragileRef').
@@ -1420,4 +1427,27 @@ SourceFile *SILFunction::getSourceFile() const {
     return nullptr;
 
   return declRef.getInnermostDeclContext()->getParentSourceFile();
+}
+
+bool swift::shouldEmitIsolationHistoryFor(const SILFunction *fn) {
+  if (fn->getModule().getOptions().EmitIsolationHistory)
+    return true;
+
+  // Per-function opt-in: a `@diagnose(RegionIsolationIsolationHistory,
+  // as: <not ignored>)` on the function's own decl turns it on for that
+  // function only.
+  auto *dc = fn->getDeclContext();
+  if (!dc)
+    return false;
+  auto *decl = dc->getAsDecl();
+  if (!decl)
+    return false;
+
+  for (auto *attr : decl->getAttrs().getAttributes<DiagnoseAttr>()) {
+    if (attr->DiagnosticGroupID ==
+            DiagGroupID::RegionIsolationIsolationHistory &&
+        attr->DiagnosticBehavior != WarningGroupBehavior::Ignored)
+      return true;
+  }
+  return false;
 }

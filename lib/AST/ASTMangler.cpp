@@ -19,6 +19,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExtInfo.h"
@@ -953,7 +954,11 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   Node *NewGlobal = Dem.createNode(Node::Kind::Global);
   NewGlobal->addChild(TyMangling, Dem);
   auto mangling = mangleNodeOld(NewGlobal);
-  ASSERT(mangling.isSuccess());
+  if (!mangling.isSuccess()) {
+    // The old mangler doesn't support every kind of type (e.g. opaque types).
+    // Fall back to the new mangling in those cases.
+    return NewName;
+  }
   return mangling.result();
 #endif
 }
@@ -3194,7 +3199,6 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
         return false;
     }
 
-    auto *nominal = dyn_cast<NominalTypeDecl>(decl);
     auto namedDecl = getClangDeclForMangling(decl);
     if (!namedDecl) {
       if (auto typedefType = getTypeDefForCXXCFOptionsDefinition(decl)) {
@@ -3231,7 +3235,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       // `ClassTemplateSpecializationDecl`'s name does not include information about
       // template arguments, and in order to prevent name clashes we use the
       // name of the Swift decl which does include template arguments.
-      appendIdentifier(nominal->getName().str(),
+      appendIdentifier(decl->getName().str(),
                        /*allowRawIdentifiers=*/false);
     } else {
       appendIdentifier(namedDecl->getName());
@@ -3250,14 +3254,15 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       // imported as a Swift enum.
       appendOperator("V");
     } else if (isa<clang::TypedefNameDecl>(namedDecl) ||
-               isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
+               isa<clang::ObjCCompatibleAliasDecl>(namedDecl) ||
+               isa<clang::NamespaceAliasDecl>(namedDecl)) {
       appendOperator("a");
     } else if (isa<clang::NamespaceDecl>(namedDecl)) {
       // Note: Namespaces are not really enums, but since namespaces are
       // imported as enums, be consistent.
       appendOperator("O");
     } else if (isa<clang::ClassTemplateDecl>(namedDecl)) {
-      appendIdentifier(nominal->getName().str(),
+      appendIdentifier(decl->getName().str(),
                        /*allowRawIdentifiers=*/false);
     } else {
       llvm_unreachable("unknown imported Clang type");
@@ -4858,7 +4863,8 @@ void ASTMangler::appendDistributedThunk(
     auto M = thunk->getModuleContext();
 
     SmallVector<ValueDecl *, 1> stubClassLookupResults;
-    Context.lookupInModule(M, llvm::Twine("$", P->getNameStr()).str(), stubClassLookupResults);
+    Context.lookupInModule(M, getDistributedResolvableProtocolStubName(P).str(),
+                           stubClassLookupResults);
 
     assert(stubClassLookupResults.size() <= 1 && "Found multiple distributed stub types!");
     if (stubClassLookupResults.size() > 0) {

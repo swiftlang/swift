@@ -799,13 +799,12 @@ private:
       return;
     }
 
-    auto nominalType =
-        fn->getDeclContext()->getSelfNominalTypeDecl()->getDeclaredType();
-    if (!nominalType) {
+    auto nominal = fn->getDeclContext()->getSelfNominalTypeDecl();
+    if (!nominal) {
       hadError = true;
       return;
     }
-
+    auto nominalType = nominal->getDeclaredType();
     auto *selfExpr = discardStmt->getSubExpr();
 
     createConjunction(

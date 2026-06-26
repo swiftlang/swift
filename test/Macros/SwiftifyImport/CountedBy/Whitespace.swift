@@ -10,7 +10,7 @@
 // This test is meant to act as an alarm bell to unintended changes in whitespace
 
 //--- test.swift
-@_SwiftifyImport(.countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), .countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedBy(pointer: .param(3), count: "len2"), .nonescaping(pointer: .param(3)))
+@_SwiftifyImport(.countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), .countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedBy(pointer: .param(3), count: "len2"), .nonescaping(pointer: .param(3)), nullableAsEmptySpan: true)
 public func myFunc(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt, _ ptr2: UnsafeMutablePointer<CInt>?, _ len2: CInt) -> UnsafeMutablePointer<CInt>? { nil }
 
 //--- expansions.expected

@@ -34,24 +34,18 @@ do {
   let _: Array<(any Command.Type)?> = [Cut.self, Copy.self, Paste.self]
 
   let _ = Array<any Command>([Cut(), Copy(), Paste()])
-  // expected-error@-1 {{no exact matches in call to initializer}}
   let _ = Array<(any Command)?>([Cut(), Copy(), Paste()])
-  // expected-error@-1 {{cannot convert value of type '[Any]' to expected argument type '[(any Command)?]'}}
-  // expected-note@-2 {{arguments to generic parameter 'Element' ('Any' and '(any Command)?') are expected to be equal}}
   let _ = Array<any Command.Type>([Cut.self, Copy.self, Paste.self])
   let _ = Array<(any Command.Type)?>([Cut.self, Copy.self, Paste.self])
 
   var commands1: [any Command] = [Undo(), Cut()]
   commands1.append(contentsOf: [Copy(), Paste()])
-  // expected-error@-1 {{no exact matches in call to instance method 'append'}}
 
   var commands2: [any Command.Type] = [Undo.self, Cut.self]
   commands2.append(contentsOf: [Copy.self, Paste.self])
 
   var commands3: [(any Command)?] = [Undo(), Cut()]
   commands3.append(contentsOf: [Copy(), Paste()])
-  // expected-error@-1 {{cannot convert value of type '[Any]' to expected argument type '[(any Command)?]'}}
-  // expected-note@-2 {{arguments to generic parameter 'Element' ('Any' and '(any Command)?') are expected to be equal}}
 
   var commands4: [(any Command.Type)?] = [Undo.self, Cut.self]
   commands4.append(contentsOf: [Copy.self, Paste.self])
@@ -68,13 +62,15 @@ do {
   func perform4<S: Sequence>(_: S) where S.Element == Any.Type? {}
   perform4([Undo.self, Cut.self, Copy.self])
 
-  // expected-error@+1 {{failed to produce diagnostic for expression; please submit a bug report}}
   let _: [Int: any Command] = Dictionary(
     uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
+  // expected-error@-1 {{value of type 'Any' has no member 'name'}}
+  // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
 
-  // expected-error@+1 {{failed to produce diagnostic for expression; please submit a bug report}}
   let _: [Int: (any Command)?] = Dictionary(
     uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
+  // expected-error@-1 {{value of type 'Any' has no member 'name}}
+  // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
 
   let _: [Int: any Command.Type] = Dictionary(
     uniqueKeysWithValues: [Undo.self, Cut.self, Copy.self, Paste.self].map { ($0.id, $0) })
@@ -120,11 +116,10 @@ do {
     Optional<String>.self, Int.self
   ].map { (ObjectIdentifier($0), false) })
 
-  // FIXME: This is broken
+  // This works!
   let _: [ObjectIdentifier: Bool] = .init(uniqueKeysWithValues: [
     String.self, Optional<String>.self, Array<String>.self
   ].map { (ObjectIdentifier($0), false) })
-  // expected-error@-1 {{argument type 'Any' expected to be an instance of a class or class-constrained type}}
 
   // This works too!
   let _: [ObjectIdentifier: Bool] = .init(uniqueKeysWithValues: [
@@ -207,29 +202,23 @@ do {
 
   func f1<T: Collection, U: Collection>(_: T)
     where T.Element == U, U.Element == any P {}
-  // expected-note@-2 5{{where 'U.Element' = 'Any'}}
 
   func test1(_ elts: [C]) {
     f1(elts.map { c in [c.string] })
 
     f1(elts.map { c in [c.string, c.integer] })
-    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
 
     f1(elts.map { c in [c.string, c.integer, c.data] })
-    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
 
     f1(elts.map { c in [c.string, c.integer, c.optData] })
-    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
 
     f1(elts.map { c in [c.string, c.integer, c.optOptData] })
 
     f1(elts.map { c in [c.string, c.integer, c.data, c.optData] })
-    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
 
     f1(elts.map { c in [c.string, c.integer, c.data, c.optData, c.optOptData] })
 
     f1(elts.map { c in [c.string, c.integer, c.dictionary.map { C._data($0) }] })
-    // expected-error@-1 {{local function 'f1' requires the types 'Any' and 'any P' be equivalent}}
 
     f1(elts.map { c in [c.string, c.integer, c.dictionary.map { C._optData($0) }] })
   }
@@ -246,7 +235,6 @@ do {
       func appendLiteral(_: String) {}
       func appendInterpolation<T: Collection, U: Collection>(_: T)
         where T.Element == U, U.Element == any P {}
-        // expected-note@-2 5{{where 'U.Element' = 'Any'}}
     }
   }
 
@@ -256,23 +244,18 @@ do {
     f2("\(elts.map { c in [c.string] })")
 
     f2("\(elts.map { c in [c.string, c.integer] })")
-    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
 
     f2("\(elts.map { c in [c.string, c.integer, c.data] })")
-    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
 
     f2("\(elts.map { c in [c.string, c.integer, c.optData] })")
-    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
 
     f2("\(elts.map { c in [c.string, c.integer, c.optOptData ] })")
 
     f2("\(elts.map { c in [c.string, c.integer, c.data, c.optData] })")
-    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
 
     f2("\(elts.map { c in [c.string, c.integer, c.data, c.optData, c.optOptData] })")
 
     f2("\(elts.map { c in [c.string, c.integer, c.dictionary.map { C._data($0) }] })")
-    // expected-error@-1 {{instance method 'appendInterpolation' requires the types 'Any' and 'any P' be equivalent}}
 
     f2("\(elts.map { c in [c.string, c.integer, c.dictionary.map { C._optData($0) }] })")
   }

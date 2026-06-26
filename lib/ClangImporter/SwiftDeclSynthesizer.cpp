@@ -2455,7 +2455,14 @@ FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
       clangDC, clangDC, clangMethodDecl, ForwardingMethodKind::Virtual,
       ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
       /*forceConstQualifier*/ false);
-  
+
+  llvm::SmallString<64> backtickedSwiftName;
+  if (swiftName == "init" || swiftName.starts_with("init(")) {
+    backtickedSwiftName = "`init`";
+    backtickedSwiftName += swiftName.drop_front(StringRef("init").size());
+    swiftName = backtickedSwiftName;
+  }
+
   // If the override has a swift_name different from the base
   // method, we ignore the swift_name attribute and instead use the base method's name.
   // In this case, swiftName holds the correct derived method name obtained through NameImporter

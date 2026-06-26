@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_Macros
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/plugins)
@@ -23,7 +22,7 @@
 
 // RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
 // RUN:   -typecheck -verify \
-// RUN:   -swift-version 5 -enable-experimental-feature Macros \
+// RUN:   -swift-version 5 \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
 // RUN:   -Rmacro-loading -verify-ignore-unknown \
 // RUN:   -module-name MyApp \
@@ -39,7 +38,7 @@
 
 // RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
 // RUN:   -typecheck -verify \
-// RUN:   -swift-version 5 -enable-experimental-feature Macros \
+// RUN:   -swift-version 5 \
 // RUN:   -external-plugin-path %t/alt#%swift-plugin-server \
 // RUN:   -load-resolved-plugin lib-do-not-exist.dylib##MacroDefinition \
 // RUN:   -load-resolved-plugin %t/plugins/%target-library-name(MacroDefinition)#%swift-plugin-server#MacroDefinition \

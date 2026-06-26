@@ -38,6 +38,11 @@ class ConstraintSystem;
 /// - std::nullopt if unknown.
 std::optional<bool> isLikelyExactMatch(Type first, Type second);
 
+bool isSubclassOf(Type candidateType, Type superclassType);
+
+bool isSubtypeOfExistentialType(Type candidateType,
+                                Type existentialType);
+
 enum class ConversionBehavior : unsigned {
   /// Most nominal types, archetypes, empty tuple.
   None,
@@ -71,11 +76,24 @@ enum class ConversionBehavior : unsigned {
   /// as a supertype.
   Optional,
 
-  /// Function types and metatypes.
-  Structural,
+  /// Function types support contravariant conversion in parameter position and
+  /// covariant conversion in result position.
+  Function,
+
+  /// Metatypes allow some conversions between instance types.
+  Metatype,
 
   /// Tuples.
   Tuple,
+
+  /// Existential types are supertypes of their conforming types, and subtypes of
+  /// less constrained existential types as supertypes. A class-bound existential
+  /// type is also a subtype of its superclass bound.
+  Existential,
+
+  /// Existential metatypes are supertypes of their conforming metatypes, and
+  /// subtypes of less constrained existential metatypes.
+  ExistentialMetatype,
 
   /// InOut types have Pointer types as supertypes.
   InOut,
@@ -126,7 +144,7 @@ enum ConflictFlag : unsigned {
   Category = 1 << 0,
   Exact = 1 << 1,
   Class = 1 << 2,
-  Structural = 1 << 3,
+  Metatype = 1 << 3,
   Array = 1 << 4,
   DictionaryKey = 1 << 5,
   DictionaryValue = 1 << 6,
@@ -135,7 +153,8 @@ enum ConflictFlag : unsigned {
   Double = 1 << 9,
   Conformance = 1 << 10,
   TupleArity = 1 << 11,
-  TupleElement = 1 << 11
+  TupleElement = 1 << 12,
+  Existential = 1 << 13
 };
 using ConflictReason = OptionSet<ConflictFlag>;
 
@@ -149,15 +168,78 @@ void simple_display(llvm::raw_ostream &out, ConflictReason reason);
 /// type variables are just assumed opaque.
 ///
 /// The answer is conservative, so we err on the side of saying that
-/// a convesion _can_ happen. We only return a non-empty ConflictReason
+/// a conversion _can_ happen. We only return a non-empty ConflictReason
 /// if the conversion will definitely fail.
 ///
 /// Even if the types do not contain type variables or type parameters,
 /// this does not give a completely accurate answer, yet.
-ConflictReason canPossiblyConvertTo(
-    ConstraintSystem &cs,
-    Type lhs, Type rhs,
-    GenericSignature sig);
+ConflictReason checkConversion(ConstraintSystem &cs,
+                               Type lhs, Type rhs,
+                               GenericSignature sig);
+
+/// More meaningful overload for when you want a boolean result.
+bool canConvertTo(ConstraintSystem &cs,
+                  Type lhs, Type rhs,
+                  GenericSignature sig);
+
+/// Computes the join between two types.
+///
+/// The join of two types X and Y is the type T with the property
+/// that:
+/// 1) X conv T
+/// 2) Y conv T
+/// 3) for any other U such that X conv U, Y conv U, we have T conv U.
+///
+/// For example, given a simple class hierarchy as follows:
+///
+/// \code
+/// class A { }
+/// class B: A { }
+/// class C: A { }
+/// class D { }
+/// \endcode
+///
+/// The join of B and C is A, the join of A and B is A.
+///
+/// \param existentialUpperBound If set, the upper bound was not
+/// precise, and contains at least one occurrence of the Any type
+/// to represent some unknown existential upper bound. Note that
+/// even if the original types were noncopyable, the result of
+/// Any is used for now. The type should not be used if
+/// existentialUpperBound is true, because the real supertype
+/// might actually be a more constrained existential than Any.
+
+/// \returns the join of the two types.
+Type subtypeJoin(Type lhs, Type rhs, bool *existentialUpperBound);
+
+/// Computes the meet between two types.
+///
+/// The meet of two types X and Y is the type T with the property
+/// that:
+/// 1) T conv X
+/// 2) T conv Y
+/// 3) for any other U such that U conv U, U conv Y, we have U conv T.
+///
+/// For example, given a simple class hierarchy as follows:
+///
+/// \code
+/// class A { }
+/// class B: A { }
+/// class C: A { }
+/// \endcode
+///
+/// The meet of A and B is B, and the meet of B and C is uninhabited.
+///
+/// \param uninhabited If set, the two types have no subtypes in
+/// common. The resulting type will contain occurrences of the Never
+/// type in failed positions.
+
+/// \returns the meet of the two types.
+Type subtypeMeet(Type lhs, Type rhs, bool *uninhabited);
+
+/// Replace JoinType and MeetType with fresh type variables.
+Type openTypeJoinsAndMeets(ConstraintSystem &cs, Type type,
+                           ConstraintLocator *locator);
 
 }  // end namespace constraints
 

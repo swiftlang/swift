@@ -8,19 +8,19 @@
 // RUN: %diff %t/expansions.out %t/expansions.expected
 
 //--- test.swift
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), nullableAsEmptySpan: true)
 public func myFunc(_ ptr: UnsafeRawPointer?, _ size: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "len"), .nonescaping(pointer: .param(1)))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "len"), .nonescaping(pointer: .param(1)), nullableAsEmptySpan: true)
 public func myFunc2(_ ptr: UnsafeMutableRawPointer?, _ len: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "len"), .nonescaping(pointer: .param(1)), .sizedBy(pointer: .param(3), size: "len2"), .nonescaping(pointer: .param(3)))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "len"), .nonescaping(pointer: .param(1)), .sizedBy(pointer: .param(3), size: "len2"), .nonescaping(pointer: .param(3)), nullableAsEmptySpan: true)
 public func myFunc3(_ ptr: UnsafeMutableRawPointer?, _ len: CInt, _ ptr2: UnsafeMutableRawPointer?, _ len2: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "len"), .sizedBy(pointer: .return, size: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "len"), .sizedBy(pointer: .return, size: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
 public func myFunc4(_ ptr: UnsafeMutableRawPointer?, _ len: CInt) -> UnsafeMutableRawPointer? {
 // expected-error@+1{{missing return in global function expected to return 'UnsafeMutableRawPointer?'}}
 }

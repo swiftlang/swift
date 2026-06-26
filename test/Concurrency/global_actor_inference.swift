@@ -27,6 +27,9 @@ struct OtherGlobalActor {
 @globalActor
 struct GenericGlobalActor<T> {
   static var shared: SomeActor { SomeActor() }
+  // expected-warning@-1{{GlobalActor witness static property 'shared' may return different actor instances, which would lead to global actor isolation violations}}
+  // expected-note@-2{{declare it as 'static let' to guarantee a stable instance}}
+  // expected-note@-3{{if this property always returns the same instance, silence the warning with '@diagnose(UnstableGlobalActorShared, as: ignored)'}}
 }
 
 // ----------------------------------------------------------------------

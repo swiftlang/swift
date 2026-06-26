@@ -12,7 +12,7 @@ struct FRT_IMMORTAL Base {
   }
 };
 
-struct FRT_IMMORTAL Derived : Base {
+struct Derived : Base {
   int nonVirtualMethod() const { return 99; }
 
   static Derived &create() {

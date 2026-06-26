@@ -1550,6 +1550,12 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
   emitDistributedThunkForDecl(AFD);
 
+  // If \p AFD has an `any P` / `some P` `@Resolvable protocol` parameter
+  // or result, also emit the recipient-side thunk that adapts between the
+  // wire-level proxy stub `$P` and the user-facing `any P` / `some P`
+  // for the call into \p AFD itself.
+  emitDistributedResolvableProxyAdapterThunkForDecl(AFD);
+
   if (AFD->isBackDeployed()) {
     // Emit the fallback function that will be used when the original function
     // is unavailable at runtime.
@@ -2171,10 +2177,6 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
-  // TODO: Key path code emission doesn't handle opaque values properly yet.
-  if (!SILModuleConventions(M).useLoweredAddresses())
-    return;
-  
   auto descriptorContext = decl->getPropertyDescriptorGenericSignature();
   if (!descriptorContext)
     return;

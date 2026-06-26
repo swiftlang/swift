@@ -572,6 +572,7 @@ Added: _swift_clearSensitive
 Added: _swift_updatePureObjCClassMetadata
 Added: _swift_initRawStructMetadata2
 Added: _swift_getFixedArrayTypeMetadata
+Added: _swift_getObjCMetatypeFromMetadata
 
 // Runtime bincompat functions for Concurrency runtime to detect legacy mode
 Added: _swift_bincompat_useLegacyNonCrashingExecutorChecks
@@ -1338,3 +1339,8 @@ Added: _$ss11UniqueArrayVyxGSHsSHRzRi_zrlMc
 Added: _$ss11UniqueArrayVyxGSQsSQRzRi_zrlMc
 Added: _$ss11UniqueArrayVsRi_zrlE11descriptionSSvg
 Added: _$ss11UniqueArrayVsRi_zrlE16debugDescriptionSSvg
+
+// Reference counting
+Added: _swift_releaseReturningCount
+Added: _swift_retainReturningCount
+

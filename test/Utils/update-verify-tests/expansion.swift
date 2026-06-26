@@ -47,6 +47,21 @@
 // RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/escaped.swift -Rmacro-expansions
 // RUN: %diff %t/escaped.swift %t/escaped.swift.expected
 
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/empty-expansion-fill.swift 2>%t/output.txt -Rmacro-expansions
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/empty-expansion-fill.swift -Rmacro-expansions
+// RUN: %diff %t/empty-expansion-fill.swift %t/empty-expansion-fill.swift.expected
+
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/empty-expansion-remove.swift 2>%t/output.txt -Rmacro-expansions
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/empty-expansion-remove.swift -Rmacro-expansions
+// RUN: %diff %t/empty-expansion-remove.swift %t/empty-expansion-remove.swift.expected
+
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/empty-expansion-for-prefix.swift 2>%t/output.txt -Rmacro-expansions
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/empty-expansion-for-prefix.swift -Rmacro-expansions
+// RUN: %diff %t/empty-expansion-for-prefix.swift %t/empty-expansion-for-prefix.swift.expected
+
 //--- single.swift
 @attached(peer, names: overloaded)
 macro unstringifyPeer(_ s: String) =
@@ -304,4 +319,62 @@ func foo(_ x: Int) {
 //   expected-remark@4{{macro content: |}|}}
 // }}
 func foo() { let _ = "\(2)" }
+
+//--- empty-expansion-fill.swift
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+@unstringifyPeer("""
+func foo(_ x: Int) -> Int {
+    return x
+}
+""")
+// expected-expansion@+2:30{{
+// }}
+func foo() { let _ = "\(2)" }
+
+//--- empty-expansion-fill.swift.expected
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+1 3{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
+@unstringifyPeer("""
+func foo(_ x: Int) -> Int {
+    return x
+}
+""")
+// expected-expansion@+5:30{{
+//   expected-remark@1{{macro content: |func foo(_ x: Int) -> Int {|}}
+//   expected-remark@2{{macro content: |    return x|}}
+//   expected-remark@3{{macro content: |}|}}
+// }}
+func foo() { let _ = "\(2)" }
+
+//--- empty-expansion-remove.swift
+// expected-expansion@+2:14{{
+// }}
+func foo() {}
+
+//--- empty-expansion-remove.swift.expected
+func foo() {}
+
+//--- empty-expansion-for-prefix.swift
+// expected-expansion@+5:14{{
+//   expected-asdf-remark@1{{asdf}}
+//   expected-hjkl-remark@1{{hjkl}}
+//   expected-hjkl-remark@2{{hjkl}}
+// }}
+func foo() {}
+
+//--- empty-expansion-for-prefix.swift.expected
+// expected-asdf-expansion@+7:14{{
+//   expected-asdf-remark@1{{asdf}}
+// }}
+// expected-hjkl-expansion@+4:14{{
+//   expected-hjkl-remark@1{{hjkl}}
+//   expected-hjkl-remark@2{{hjkl}}
+// }}
+func foo() {}
 

@@ -126,9 +126,6 @@ TypeVarBindingProducer::TypeVarBindingProducer(
     return;
   }
 
-  // A binding to `Any` which should always be considered as a last resort.
-  std::optional<Binding> Any;
-
   // FIXME: Move this into BindingSet.
   auto adjustBinding = [&](const Binding &binding) -> Binding {
     // Adjust optionality of existing bindings based on presence of
@@ -143,11 +140,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(
     // Adjust optionality of existing bindings based on presence of
     // `ExpressibleByNilLiteral` requirement.
     auto adjustedBinding = adjustBinding(binding);
-    if (adjustedBinding.BindingType->isAny()) {
-      Any.emplace(adjustedBinding);
-    } else {
-      Bindings.push_back(adjustedBinding);
-    }
+    Bindings.push_back(adjustedBinding);
   };
 
   if (TypeVar->getImpl().isPackExpansion()) {
@@ -202,13 +195,6 @@ TypeVarBindingProducer::TypeVarBindingProducer(
                 literal.isDirectRequirement() ? BindingKind::Subtypes
                                               : BindingKind::Supertypes,
                 literal.getSource()});
-  }
-
-  // Let's always consider `Any` to be a last resort binding because
-  // it's always better to infer concrete type and erase it if required
-  // by the context.
-  if (Any) {
-    Bindings.push_back(*Any);
   }
 
   for (auto *constraint : bindings.Defaults) {
@@ -273,9 +259,6 @@ bool TypeVarBindingProducer::computeNext() {
     auto type = binding.BindingType;
 
     // If we've already tried this binding, move on.
-    if (!BoundTypes.insert(type.getPointer()).second)
-      return;
-
     if (!ExploredTypes.insert(type->getCanonicalType()).second)
       return;
 
@@ -454,7 +437,7 @@ bool TypeVarBindingProducer::computeNext() {
   return true;
 }
 
-std::optional<std::pair<ConstraintFix *, unsigned>>
+std::optional<std::pair<ConstraintFix *, FixImpact>>
 TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
   auto *dstLocator = TypeVar->getImpl().getLocator();
   auto *srcLocator = Binding.getLocator();
@@ -475,7 +458,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
       return std::nullopt;
   }
 
-  unsigned defaultImpact = 1;
+  auto defaultImpact = FixImpact::Mismatch;
 
   if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
     // If it is representative for a key path root, let's emit a more
@@ -494,7 +477,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
             return fix->getAnchor() == dstLocator->getAnchor() ||
                    fix->getAnchor() == srcLocator->getAnchor();
           })) {
-        defaultImpact += 3;
+        defaultImpact += FixImpact::TypeMismatch + 1;
       }
 
       auto path = dstLocator->getPath();
@@ -557,7 +540,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // nil fix.
     if (isExpr<NilLiteralExpr>(srcLocator->getAnchor())) {
       ConstraintFix *fix = SpecifyContextualTypeForNil::create(cs, dstLocator);
-      return std::make_pair(fix, /*impact=*/(unsigned)10);
+      return std::make_pair(fix, FixImpact::InvalidAST);
     }
 
     // If the placeholder is in an invalid position, we'll have already
@@ -573,7 +556,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // This is a dramatic event, it means that there is absolutely
     // no contextual information to resolve type of `nil`.
     ConstraintFix *fix = SpecifyContextualTypeForNil::create(cs, dstLocator);
-    return std::make_pair(fix, /*impact=*/(unsigned)10);
+    return std::make_pair(fix, FixImpact::InvalidAST);
   }
 
   if (auto pattern = dstLocator->getPatternMatch()) {
@@ -606,7 +589,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
       // variable's type.
       ConstraintFix *fix =
           IgnoreUnresolvedPatternVar::create(cs, pattern.get(), dstLocator);
-      return std::make_pair(fix, /*impact=*/(unsigned)100);
+      return std::make_pair(fix, FixImpact::InvalidAST * 10);
     }
   }
 

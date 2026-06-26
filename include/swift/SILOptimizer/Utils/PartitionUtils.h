@@ -248,11 +248,11 @@ private:
 class IsolationHistory {
 public:
   class Factory;
+  class Node;
 
 private:
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
-  class Node;
 
   // TODO: This shouldn't need to be a friend.
   friend class Partition;
@@ -1302,10 +1302,17 @@ public:
     Element sentElement;
     SILDynamicMergedIsolationInfo isolationRegionInfo;
 
+    /// The isolation history of the partition at the point the send was
+    /// detected. Used to emit notes explaining why a disconnected element ended
+    /// up in an isolated region.
+    IsolationHistory isolationHistory;
+
     SentNeverSendableError(const PartitionOp &op, Element sentElement,
-                           SILDynamicMergedIsolationInfo isolationRegionInfo)
+                           SILDynamicMergedIsolationInfo isolationRegionInfo,
+                           IsolationHistory isolationHistory)
         : op(&op), sentElement(sentElement),
-          isolationRegionInfo(isolationRegionInfo) {}
+          isolationRegionInfo(isolationRegionInfo),
+          isolationHistory(isolationHistory) {}
 
     SentNeverSendableError(SentNeverSendableError &&other) = default;
     SentNeverSendableError &operator=(SentNeverSendableError &&other) = default;
@@ -1915,8 +1922,21 @@ public:
 
     // Set the boundary so that as we push, this shows when to stop processing
     // for this PartitionOp.
-    SILLocation loc = op.hasSourceInst() ? getLoc(op.getSourceInst())
-                                         : getLoc(op.getSourceOp());
+    //
+    // For PartitionOps sourced from a specific apply argument operand, prefer
+    // the apply's per-argument SILLocation when one is stored. This is the
+    // ONLY consumer of those per-argument locations today: the location ends
+    // up on a SequenceBoundary node and is read back by the
+    // IsolationHistoryNoteEmitter chain walker. When the producer (SILGen)
+    // hasn't filled in per-argument locations, getArgumentLoc() falls back to
+    // the apply's anchor location, so behavior is unchanged for functions
+    // that haven't opted in to isolation-history.
+    SILLocation loc = SILLocation::invalid();
+    if (op.hasSourceInst()) {
+      loc = getLoc(op.getSourceInst());
+    } else if (Operand *srcOp = op.getSourceOp()) {
+      loc = getLoc(srcOp);
+    }
     p.pushHistorySequenceBoundary(loc);
 
     switch (op.getKind()) {
@@ -2427,8 +2447,8 @@ private:
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleError(
-        SentNeverSendableError(op, elt, dynamicMergedIsolationInfo));
+    return handleError(SentNeverSendableError(
+        op, elt, dynamicMergedIsolationInfo, p.getIsolationHistory()));
   }
 };
 
@@ -2507,7 +2527,20 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   bool shouldTryToSquelchErrors() const { return true; }
 
   static SILLocation getLoc(SILInstruction *inst) { return inst->getLoc(); }
-  static SILLocation getLoc(Operand *op) { return op->getUser()->getLoc(); }
+  static SILLocation getLoc(Operand *op) {
+    // For PartitionOps sourced from a specific apply argument operand, prefer
+    // the apply's per-argument SILLocation when one is stored. This is the
+    // ONLY consumer of those per-argument locations today: the location ends
+    // up on a SequenceBoundary node and is read back by the
+    // IsolationHistoryNoteEmitter chain walker. When the producer (SILGen)
+    // hasn't filled in per-argument locations, getArgumentLoc() falls back to
+    // the apply's anchor location, so behavior is unchanged for functions
+    // that haven't opted in to isolation-history.
+    if (auto as = ApplySite::isa(op->getUser());
+        as && as.isArgumentOperand(*op))
+      return as.getArgumentLoc(op);
+    return op->getUser()->getLoc();
+  }
   static SILInstruction *getSourceInst(const PartitionOp &partitionOp) {
     return partitionOp.getSourceInst();
   }

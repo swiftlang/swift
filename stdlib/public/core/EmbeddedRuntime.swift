@@ -134,11 +134,11 @@ public struct HeapObject {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
 // Mirrors the interface defined in swift/EmbeddedPlatform.h
 
-@_extern(c, "_swift_alignedAllocate")
-public func _swift_alignedAllocate(_ pointer: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ alignment: Int, _ size: Int) -> CInt
+@_extern(c, "_swift_allocate")
+public func _swift_allocate(_ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong) -> UnsafeMutableRawPointer?
 
-@_extern(c, "_swift_alignedFree")
-public func _swift_alignedFree(_ p: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int)
+@_extern(c, "_swift_free")
+public func _swift_free(_ p: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong)
 
 @_extern(c, "_swift_generateRandom")
 public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
@@ -167,13 +167,13 @@ func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
 
 func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
   let alignment = max(alignment, unsafe MemoryLayout<UnsafeRawPointer>.size)
-  var r: UnsafeMutableRawPointer? = nil
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  _ = unsafe _swift_alignedAllocate(&r, alignment, size)
+  return unsafe _swift_allocate(alignment, size, 0)
 #else
+  var r: UnsafeMutableRawPointer? = nil
   _ = unsafe posix_memalign(&r, alignment, size)
-#endif
   return unsafe r
+#endif
 }
 
 @c
@@ -197,7 +197,7 @@ public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPo
 @c
 public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int) {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  unsafe _swift_alignedFree(ptr, size, alignMask)
+  unsafe _swift_free(ptr, size, alignMask, 0)
 #else
   unsafe free(ptr)
 #endif
@@ -669,6 +669,28 @@ public func swift_release_n(object: Builtin.RawPointer, n: UInt32) {
   unsafe swift_release_n_(object: o, n: n)
 }
 
+// Non-atomic refcount entry points. For now, just route to the atomic versions.
+// This can be optimized later.
+@c @discardableResult
+public func swift_nonatomic_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
+  return swift_retain(object: object)
+}
+
+@c @discardableResult
+public func swift_nonatomic_retain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
+  return swift_retain_n(object: object, n: n)
+}
+
+@c
+public func swift_nonatomic_release(object: Builtin.RawPointer) {
+  swift_release(object: object)
+}
+
+@c
+public func swift_nonatomic_release_n(object: Builtin.RawPointer, n: UInt32) {
+  swift_release_n(object: object, n: n)
+}
+
 func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBoxRelease: Bool = false) {
   guard let object = unsafe object else {
     return
@@ -964,6 +986,19 @@ public func _swift_intToFloat64(
   result += Double(Int(bitPattern: unsafe data[numChunks - 1])) * scale
   return result
 }
+
+// Version information for the Platform Abstraction Layer
+
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+@c @used
+public func swift_getPlatformLayerVersion(
+  _ major: UnsafeMutablePointer<Int>,
+  _ minor: UnsafeMutablePointer<Int>
+) {
+  unsafe major.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR
+  unsafe minor.pointee = 0 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
+}
+#endif
 
 // CXX Exception Personality
 

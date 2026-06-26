@@ -33,6 +33,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
@@ -708,7 +709,8 @@ namespace {
     /// Records a fix for an invalid AST node, and returns a hole for it.
     Type recordInvalidNode(ASTNode node) {
       CS.recordFix(
-          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(node)));
+          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(node)),
+          FixImpact::InvalidAST);
 
       // Ideally we wouldn't need a type variable here, but we don't have a
       // suitable placeholder originator for all the cases here.
@@ -3667,13 +3669,11 @@ namespace {
 
       auto &ctx = CS.getASTContext();
 
+      bool existentialUpperBound = false;
       auto join =
-          Type::join(lhsMeta->getInstanceType(), rhsMeta->getInstanceType());
-
-      if (!join)
-        return ErrorType::get(ctx);
-
-      return MetatypeType::get(*join, ctx)->getCanonicalType();
+          subtypeJoin(lhsMeta->getInstanceType(), rhsMeta->getInstanceType(),
+                      &existentialUpperBound);
+      return MetatypeType::get(join, ctx);
     }
 
     /// Assuming that we are solving for code completion, assign \p expr a fresh
@@ -4388,7 +4388,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 
     recordAnyTypeVarAsPotentialHole(paramType);
 
-    if (recordFix(fix, /*impact=*/1, preparedOverload))
+    if (recordFix(fix, /*impact=*/FixImpact::Mismatch, preparedOverload))
       return getTypeMatchFailure(locator);
 
     return getTypeMatchSuccess();
