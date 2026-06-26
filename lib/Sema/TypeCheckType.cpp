@@ -2293,9 +2293,9 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
   }
 }
 
-/// Diagnose when this is one of the BorrowingSequence types, which currently require
+/// Diagnose when this is one of the Iterable types, which currently require
 /// an experimental feature to use.
-static void diagnoseBorrowingSequenceType(TypeDecl *typeDecl, SourceLoc loc,
+static void diagnoseIterableType(TypeDecl *typeDecl, SourceLoc loc,
                              const DeclContext *dc) {
   if (loc.isInvalid())
     return;
@@ -2308,7 +2308,7 @@ static void diagnoseBorrowingSequenceType(TypeDecl *typeDecl, SourceLoc loc,
     return;
 
   auto nameString = typeDecl->getName().str();
-  if (nameString != "BorrowingSequence" && nameString != "BorrowingIteratorProtocol"
+  if (nameString != "Iterable" && nameString != "BorrowingIteratorProtocol"
       && nameString != "SpanIterator" && nameString != "BorrowingIteratorAdapter")
     return;
 
@@ -2423,7 +2423,7 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       return ErrorType::get(ctx);
     }
 
-    diagnoseBorrowingSequenceType(currentDecl, repr->getLoc(), DC);
+    diagnoseIterableType(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -2653,7 +2653,7 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
 
-    diagnoseBorrowingSequenceType(member, repr->getLoc(), DC);
+    diagnoseIterableType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
