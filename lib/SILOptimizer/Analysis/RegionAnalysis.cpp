@@ -2727,7 +2727,7 @@ public:
     translateSILMultiAssign(
         directResults,
         ArrayRef<Operand *>(), // No indirect results for a partial_apply.
-        makeOperandRefRange(pai->getAllOperands()));
+        pai->getRealOperands());
   }
 
   void translateCreateAsyncTask(BuiltinInst *bi) {
