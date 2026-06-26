@@ -273,6 +273,9 @@ public:
   SWIFT_INLINE_THUNK ~SwiftExistentialType() noexcept;
 
 protected:
+  struct uninit_t {};
+  SWIFT_INLINE_THUNK SwiftExistentialType(uninit_t) noexcept {}
+
   /// Project the contained value for passing to witness functions.
   /// Defined out-of-line in the generated scaffolding (needs VWT).
   SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
