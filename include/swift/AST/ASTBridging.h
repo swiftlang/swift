@@ -50,6 +50,7 @@ class ASTContext;
 struct ASTNode;
 class CanGenericSignature;
 struct CaptureListEntry;
+enum class COMThreadingModel : uint8_t;
 class DeclAttributes;
 class DeclBaseName;
 class DeclNameLoc;
