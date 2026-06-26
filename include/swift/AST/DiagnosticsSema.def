@@ -8488,6 +8488,12 @@ WARNING(macro_on_import_not_loadable, none,
         "could not load macro '%0'; this may cause errors down the line",
         (StringRef))
 
+WARNING(swiftify_nullable_as_empty_span_param_missing, none,
+        "the loaded _SwiftifyImport macro plugin does not support the "
+        "'nullableAsEmptySpan' parameter; generated safe wrappers will "
+        "retain the legacy Optional-propagating behavior for _Nullable "
+        "__counted_by and __sized_by pointers", ())
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------

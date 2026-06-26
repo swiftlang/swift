@@ -126,6 +126,16 @@ struct CountedBy: ParamInfo {
   var dependencies: [LifetimeDependence]
   var original: SyntaxProtocol
   var emitBoundCheck: Bool = false
+  // When true, non-`*OrNull` Optional pointers are exposed as
+  // non-Optional Spans/UBPs (with a runtime check that null pointers only
+  // appear when count == 0). When false, Optional pointer parameters /
+  // return values are preserved as Optional Spans/buffer pointers in the
+  // generated wrapper, matching the original SafeInteropWrappers signature.
+  // `*OrNull` variants always propagate Optional regardless of this flag.
+  // This flag affects only `_Nullable` (normal-Optional) pointers, not
+  // `_Null_unspecified` (IUO) pointers, which always follow the
+  // empty-Span convention.
+  var nullableAsEmptySpan: Bool = false
 
   var description: String {
     let name: String
@@ -148,12 +158,14 @@ struct CountedBy: ParamInfo {
         base: base, index: i - 1, countExpr: count,
         funcDecl: funcDecl,
         nonescaping: nonescaping, isSizedBy: sizedBy, isOrNull: isOrNull,
+        nullableAsEmptySpan: nullableAsEmptySpan,
         emitBoundCheck: emitBoundCheck)
     case .return:
       return CountedOrSizedReturnPointerThunkBuilder(
         base: base, countExpr: count,
         funcDecl: funcDecl,
         nonescaping: nonescaping, isSizedBy: sizedBy, isOrNull: isOrNull,
+        nullableAsEmptySpan: nullableAsEmptySpan,
         dependencies: dependencies)
     case .self:
       return base
@@ -797,6 +809,7 @@ protocol PointerBoundsThunkBuilder: BoundsThunkBuilder {
   var nullable: Bool { get }
   var isSizedBy: Bool { get }
   var isOrNull: Bool { get }
+  var nullableAsEmptySpan: Bool { get }
   var generateSpan: Bool { get }
   var isParameter: Bool { get }
 }
@@ -804,8 +817,11 @@ protocol PointerBoundsThunkBuilder: BoundsThunkBuilder {
 extension PointerBoundsThunkBuilder {
   // Whether the wrapper exposes the buffer parameter / return value as an
   // Optional. Only the `*OrNull` variants propagate the underlying nullability;
-  // the plain variants always produce a non-Optional Span/buffer pointer.
-  var nullable: Bool { return isOrNull && oldTypeIsNormalOptional }
+  // the plain variants always produce a non-Optional Span/buffer pointer
+  // (except for projects using the legacy signature).
+  var nullable: Bool {
+    return (!nullableAsEmptySpan || isOrNull) && oldTypeIsNormalOptional
+  }
 
   var oldTypeIsNormalOptional: Bool { return oldType.is(OptionalTypeSyntax.self) }
   var oldTypeIsAnyOptional: Bool { return oldType.is(OptionalTypeSyntax.self) ||
@@ -813,7 +829,7 @@ extension PointerBoundsThunkBuilder {
 
   var newType: TypeSyntax {
     get throws {
-      if !isOrNull, let optType = oldType.as(OptionalTypeSyntax.self) {
+      if !nullable, let optType = oldType.as(OptionalTypeSyntax.self) {
         return try transformType(optType.wrappedType, generateSpan, isSizedBy, isParameter)
       }
       return try transformType(oldType, generateSpan, isSizedBy, isParameter)
@@ -851,6 +867,7 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   public let nonescaping: Bool
   public let isSizedBy: Bool
   public let isOrNull: Bool
+  public let nullableAsEmptySpan: Bool
   public let dependencies: [LifetimeDependence]
   let isParameter: Bool = false
 
@@ -981,6 +998,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   public let nonescaping: Bool
   public let isSizedBy: Bool
   public let isOrNull: Bool
+  public let nullableAsEmptySpan: Bool
   public let emitBoundCheck: Bool
   let isParameter: Bool = true
 
@@ -1282,7 +1300,7 @@ func parseSwiftifyExpr(_ expr: ExprSyntax) throws -> SwiftifyExpr {
 
 func parseCountedByEnum(
   _ enumConstructorExpr: FunctionCallExprSyntax, _ signature: FunctionSignatureSyntax,
-  _ rewriter: CountExprRewriter, isOrNull: Bool
+  _ rewriter: CountExprRewriter, isOrNull: Bool, nullableAsEmptySpan: Bool
 ) throws -> ParamInfo {
   let argumentList = enumConstructorExpr.arguments
   let pointerExprArg = try getArgumentByName(argumentList, "pointer")
@@ -1305,11 +1323,13 @@ func parseCountedByEnum(
   }
   return CountedBy(
     pointerIndex: pointerExpr, count: rewrittenCountExpr, sizedBy: false, isOrNull: isOrNull,
-    nonescaping: false, dependencies: [], original: ExprSyntax(enumConstructorExpr))
+    nonescaping: false, dependencies: [], original: ExprSyntax(enumConstructorExpr),
+    nullableAsEmptySpan: nullableAsEmptySpan)
 }
 
 func parseSizedByEnum(
-  _ enumConstructorExpr: FunctionCallExprSyntax, _ rewriter: CountExprRewriter, isOrNull: Bool
+  _ enumConstructorExpr: FunctionCallExprSyntax, _ rewriter: CountExprRewriter, isOrNull: Bool,
+  nullableAsEmptySpan: Bool
 ) throws -> ParamInfo {
   let argumentList = enumConstructorExpr.arguments
   let pointerExprArg = try getArgumentByName(argumentList, "pointer")
@@ -1323,7 +1343,8 @@ func parseSizedByEnum(
   let rewrittenCountExpr = rewriter.visit(unwrappedCountExpr)
   return CountedBy(
     pointerIndex: pointerExpr, count: rewrittenCountExpr, sizedBy: true, isOrNull: isOrNull,
-    nonescaping: false, dependencies: [], original: ExprSyntax(enumConstructorExpr))
+    nonescaping: false, dependencies: [], original: ExprSyntax(enumConstructorExpr),
+    nullableAsEmptySpan: nullableAsEmptySpan)
 }
 
 func parseEndedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> ParamInfo {
@@ -1428,6 +1449,30 @@ func parseSpanAvailabilityParam(_ paramAST: LabeledExprSyntax?) throws -> String
   return stringLitExpr.representedLiteralValue
 }
 
+func parseNullableAsEmptySpanParam(_ paramAST: LabeledExprSyntax?) throws -> Bool? {
+  guard let unwrappedParamAST = paramAST else {
+    return nil
+  }
+  guard let label = unwrappedParamAST.label else {
+    return nil
+  }
+  if label.trimmed.text != "nullableAsEmptySpan" {
+    return nil
+  }
+  let paramExpr = unwrappedParamAST.expression
+  guard let boolLitExpr = paramExpr.as(BooleanLiteralExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected a bool literal, got '\(paramExpr)'", node: paramExpr)
+  }
+  switch boolLitExpr.literal.tokenKind {
+  case .keyword(.true): return true
+  case .keyword(.false): return false
+  default:
+    throw DiagnosticError(
+      "expected a bool literal, got '\(paramExpr)'", node: paramExpr)
+  }
+}
+
 func parseCxxSpansInSignature(
   _ signature: FunctionSignatureSyntax,
   _ typeMappings: [String: String]?
@@ -1461,7 +1506,8 @@ func parseCxxSpansInSignature(
 func parseMacroParam(
   _ paramExpr: ExprSyntax, _ signature: FunctionSignatureSyntax, _ rewriter: CountExprRewriter,
   nonescapingPointers: inout Set<Int>,
-  lifetimeDependencies: inout [SwiftifyExpr: [LifetimeDependence]]
+  lifetimeDependencies: inout [SwiftifyExpr: [LifetimeDependence]],
+  nullableAsEmptySpan: Bool
 ) throws -> ParamInfo? {
   guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
     throw DiagnosticError(
@@ -1470,13 +1516,21 @@ func parseMacroParam(
   let enumName = try parseEnumName(paramExpr)
   switch enumName {
   case "countedBy":
-    return try parseCountedByEnum(enumConstructorExpr, signature, rewriter, isOrNull: false)
+    return try parseCountedByEnum(
+      enumConstructorExpr, signature, rewriter, isOrNull: false,
+      nullableAsEmptySpan: nullableAsEmptySpan)
   case "countedByOrNull":
-    return try parseCountedByEnum(enumConstructorExpr, signature, rewriter, isOrNull: true)
+    return try parseCountedByEnum(
+      enumConstructorExpr, signature, rewriter, isOrNull: true,
+      nullableAsEmptySpan: nullableAsEmptySpan)
   case "sizedBy":
-    return try parseSizedByEnum(enumConstructorExpr, rewriter, isOrNull: false)
+    return try parseSizedByEnum(
+      enumConstructorExpr, rewriter, isOrNull: false,
+      nullableAsEmptySpan: nullableAsEmptySpan)
   case "sizedByOrNull":
-    return try parseSizedByEnum(enumConstructorExpr, rewriter, isOrNull: true)
+    return try parseSizedByEnum(
+      enumConstructorExpr, rewriter, isOrNull: true,
+      nullableAsEmptySpan: nullableAsEmptySpan)
   case "endedBy": return try parseEndedByEnum(enumConstructorExpr)
   case "nonescaping":
     let index = try parseNonEscaping(enumConstructorExpr)
@@ -1911,7 +1965,9 @@ func deconstructFunction(_ declaration: some DeclSyntaxProtocol) throws -> Funct
 
 func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, leadingTrivia: Trivia,
                                args arguments: [ExprSyntax], spanAvailability: String?,
-                               typeMappings: [String: String]?, parentNode: Syntax?) throws -> DeclSyntax {
+                               typeMappings: [String: String]?,
+                               nullableAsEmptySpan: Bool,
+                               parentNode: Syntax?) throws -> DeclSyntax {
   let origFuncComponents = try deconstructFunction(declaration)
   let (funcComponents, rewriter) = renameParameterNamesIfNeeded(origFuncComponents)
 
@@ -1920,7 +1976,8 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
   var parsedArgs = try arguments.compactMap {
     try parseMacroParam(
       $0, funcComponents.signature, rewriter, nonescapingPointers: &nonescapingPointers,
-      lifetimeDependencies: &lifetimeDependencies)
+      lifetimeDependencies: &lifetimeDependencies,
+      nullableAsEmptySpan: nullableAsEmptySpan)
   }
   parsedArgs.append(
     contentsOf: try parseCxxSpansInSignature(funcComponents.signature, typeMappings))
@@ -2070,6 +2127,10 @@ public struct SwiftifyImportMacro: PeerMacro {
     do {
       let argumentList = node.arguments!.as(LabeledExprListSyntax.self)!
       var arguments = [LabeledExprSyntax](argumentList)
+      let nullableAsEmptySpan = try parseNullableAsEmptySpanParam(arguments.last)
+      if nullableAsEmptySpan != nil {
+        arguments = arguments.dropLast()
+      }
       let typeMappings = try parseTypeMappingParam(arguments.last)
       if typeMappings != nil {
         arguments = arguments.dropLast()
@@ -2083,7 +2144,9 @@ public struct SwiftifyImportMacro: PeerMacro {
         try constructOverloadFunction(
           forDecl: declaration, leadingTrivia: node.leadingTrivia, args: args,
           spanAvailability: spanAvailability,
-          typeMappings: typeMappings, parentNode: context.lexicalContext.first)]
+          typeMappings: typeMappings,
+          nullableAsEmptySpan: nullableAsEmptySpan ?? false,
+          parentNode: context.lexicalContext.first)]
     } catch let error as DiagnosticError {
       context.diagnose(
         Diagnostic(
@@ -2181,7 +2244,9 @@ public struct SwiftifyImportProtocolMacro: ExtensionMacro {
         let result = try constructOverloadFunction(
           forDecl: method, leadingTrivia: Trivia(), args: args,
           spanAvailability: spanAvailability,
-          typeMappings: typeMappings, parentNode: context.lexicalContext.first)
+          typeMappings: typeMappings,
+          nullableAsEmptySpan: false,
+          parentNode: context.lexicalContext.first)
         guard let resultFunc = result.as(FunctionDeclSyntax.self) else {
           throw RuntimeError("expected FunctionDeclSyntax but got \(result.kind) for \(method.description)")
         }

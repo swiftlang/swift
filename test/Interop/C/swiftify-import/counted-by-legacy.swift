@@ -1,10 +1,15 @@
-// REQUIRES: swift_feature_SafeInteropWrappersNullAsEmptySpan
+// REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -strict-memory-safety -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast \
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast \
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -eager-macro-checking
+
+// Mirrors counted-by.swift but exercises the legacy opt-in wrapper shape:
+// with `SafeInteropWrappers` but without `SafeInteropWrappersNullAsEmptySpan`,
+// `_Nullable` pointer parameters/returns propagate as Optional in the
+// generated wrapper.
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __counted_by parameters.
 
@@ -82,9 +87,9 @@ void nonnull(int len, int * __counted_by(len) _Nonnull p);
 
 // expected-expansion@+7:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe nullable(len, p.baseAddress)|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: UnsafeMutableBufferPointer<Int32>?) {|}}
+//   expected-remark@3{{macro content: |    let len = Int32(exactly: unsafe p?.count ?? 0)!|}}
+//   expected-remark@4{{macro content: |    return unsafe nullable(len, p?.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void nullable(int len, int * __counted_by(len) _Nullable p);
@@ -220,10 +225,10 @@ void pointerCastToInt(int *square, int * __counted_by((int) square) p);
 // expected-expansion@+11:50{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nanAsInt(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != ((CInt(0) / CInt(0))) {|}}
 //   expected-error@3{{division by zero}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in nanAsInt: expected \\(((CInt(0) / CInt(0)))) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != ((CInt(0) / CInt(0))) {|}}
 //   expected-error@4 2{{division by zero}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in nanAsInt: expected \\(((CInt(0) / CInt(0)))) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe nanAsInt(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
@@ -340,8 +345,8 @@ module Test {
 }
 
 //--- test.swift
-// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: c7d707a50bd9c4ca53248a76c697e3ba1bf980ffe5fb422a590f70c8e4f4e349
+// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -enable-experimental-feature SafeInteropWrappers -plugin-path %swift-plugin-dir -I %t -source-filename=x -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
+// GENERATED-HASH: 90547ce36a26b7c34fc78fffa6e93940b13787c026267ff75683a7f55056ae25
 import Test
 
 func call_simple(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!) {
@@ -544,7 +549,7 @@ func call_castParam2(_ p: UnsafeMutablePointer<Int32>!, _ len: UInt32) {
   return unsafe nullUnspecified(p)
 }
 
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableBufferPointer<Int32>) {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableBufferPointer<Int32>?) {
   return unsafe nullable(p)
 }
 
