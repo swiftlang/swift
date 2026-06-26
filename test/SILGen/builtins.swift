@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -enable-sil-opaque-values -Xllvm -sil-print-types  -enable-builtin-module %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types  -enable-builtin-module %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop -o %t/builtins.silgen
 // RUN: %FileCheck -input-file %t/builtins.silgen %s

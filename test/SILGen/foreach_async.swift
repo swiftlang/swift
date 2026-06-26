@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -enable-sil-opaque-values -module-name foreach_async -swift-version 5 -disable-availability-checking %s
+
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -module-name foreach_async -swift-version 5  -disable-availability-checking  | %FileCheck %s
 // REQUIRES: concurrency
 
