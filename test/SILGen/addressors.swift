@@ -185,7 +185,7 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T1:%.*]] = apply [[T0]]<(Int32) -> Int32>({{%.*}}, [[WRITE]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<(Int32) -> Int32>, #UnsafeMutablePointer._rawValue
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32>
-// CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] [[T3]] : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32> on [[WRITE]] : $*CArray<(Int32) -> Int32>
+// CHECK:   [[MD:%.*]] = mark_dependence [[T3]] : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32> on [[WRITE]] : $*CArray<(Int32) -> Int32>
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]]
 // CHECK:   store {{%.*}} to [[ACCESS]] :
   array[0] = id_int

@@ -947,6 +947,10 @@ void BridgedFunction::setThunk(ThunkKind kind) const {
   getFunction()->setThunk((swift::IsThunk_t)kind);
 }
 
+bool BridgedFunction::isWithoutActuallyEscapingThunk() const {
+  return getFunction()->isWithoutActuallyEscapingThunk();
+}
+
 BridgedFunction::SerializedKind BridgedFunction::getSerializedKind() const {
   return (SerializedKind)getFunction()->getSerializedKind();
 }
