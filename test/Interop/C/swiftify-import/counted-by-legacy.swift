@@ -1,10 +1,15 @@
-// REQUIRES: swift_feature_SafeInteropWrappersNullAsEmptySpan
+// REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -strict-memory-safety -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast \
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast \
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -eager-macro-checking
+
+// Mirrors counted-by.swift but exercises the legacy opt-in wrapper shape:
+// with `SafeInteropWrappers` but without `SafeInteropWrappersNullAsEmptySpan`,
+// `_Nullable` pointer parameters/returns propagate as Optional in the
+// generated wrapper.
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __counted_by parameters.
 
@@ -82,9 +87,9 @@ void nonnull(int len, int * __counted_by(len) _Nonnull p);
 
 // expected-expansion@+7:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe nullable(len, p.baseAddress)|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: UnsafeMutableBufferPointer<Int32>?) {|}}
+//   expected-remark@3{{macro content: |    let len = Int32(exactly: unsafe p?.count ?? 0)!|}}
+//   expected-remark@4{{macro content: |    return unsafe nullable(len, p?.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void nullable(int len, int * __counted_by(len) _Nullable p);
@@ -174,9 +179,9 @@ void constInt(int * __counted_by(42 * 10) p);
 // }}
 void constFloatCastedToInt(int * __counted_by((int) (4.2 / 12)) p);
 
-void sizeofType(int * __counted_by(sizeof(int *)) p);
+void sizeofType(int * __counted_by((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(char)) p);
 
-void sizeofParam(int * __counted_by(sizeof(p)) p);
+void sizeofParam(char * __counted_by((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(*p)) p);
 
 void derefLen(int * len, int * __counted_by(*len) p);
 
@@ -229,6 +234,28 @@ void binaryLiteral(int * __counted_by(0b10) p);
 // }}
 void octalLiteral(int * __counted_by(0777) p);
 
+// Regression test: by printing the count expression with C syntax,
+// this example would fail to typecheck since it relies on implicit
+// casts present in C but not in Swift.
+// expected-expansion@+11:83{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func implicitIntCast(_ offset: Int64, _ len: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
+//   expected-error@3{{binary operator '+' cannot be applied to operands of type 'Int64' and 'Int32'}}
+//   expected-remark@3{{macro content: |    if p.count != offset + len {|}}
+//   expected-error@4{{binary operator '+' cannot be applied to operands of type 'Int64' and 'Int32'}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in implicitIntCast: expected \\(offset + len) but got \\(p.count)")|}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    return unsafe implicitIntCast(offset, len, p.baseAddress)|}}
+//   expected-remark@7{{macro content: |}|}}
+// }}
+void implicitIntCast(long long offset, int len, int * __counted_by(offset + len) p);
+
+void castTwiceLiteral(int * __counted_by((unsigned int)(signed short)-1) p);
+
+void castParam(int * __counted_by((unsigned int)len) p, signed short len);
+
+void castParam2(int * __counted_by((signed int)len) p, unsigned int len);
+
 void variadic(int len, int * __counted_by(len) p, ...);
 
 //--- module.modulemap
@@ -237,8 +264,8 @@ module Test {
 }
 
 //--- test.swift
-// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: c7d707a50bd9c4ca53248a76c697e3ba1bf980ffe5fb422a590f70c8e4f4e349
+// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -enable-experimental-feature SafeInteropWrappers -plugin-path %swift-plugin-dir -I %t -source-filename=x -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
+// GENERATED-HASH: f0716f21762a1a163670a162c5fb7663407d8cfad653edab77af4de0e263a7e9
 import Test
 
 func call_simple(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!) {
@@ -309,7 +336,7 @@ func call_sizeofType(_ p: UnsafeMutablePointer<Int32>!) {
   return unsafe sizeofType(p)
 }
 
-func call_sizeofParam(_ p: UnsafeMutablePointer<Int32>!) {
+func call_sizeofParam(_ p: UnsafeMutablePointer<CChar>!) {
   return unsafe sizeofParam(p)
 }
 
@@ -361,6 +388,22 @@ func call_octalLiteral(_ p: UnsafeMutablePointer<Int32>!) {
   return unsafe octalLiteral(p)
 }
 
+func call_implicitIntCast(_ offset: Int64, _ len: Int32, _ p: UnsafeMutablePointer<Int32>!) {
+  return unsafe implicitIntCast(offset, len, p)
+}
+
+func call_castTwiceLiteral(_ p: UnsafeMutablePointer<Int32>!) {
+  return unsafe castTwiceLiteral(p)
+}
+
+func call_castParam(_ p: UnsafeMutablePointer<Int32>!, _ len: Int16) {
+  return unsafe castParam(p, len)
+}
+
+func call_castParam2(_ p: UnsafeMutablePointer<Int32>!, _ len: UInt32) {
+  return unsafe castParam2(p, len)
+}
+
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_binaryLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {
   return unsafe binaryLiteral(p)
 }
@@ -389,6 +432,10 @@ func call_octalLiteral(_ p: UnsafeMutablePointer<Int32>!) {
   return unsafe hexLiteral(p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_implicitIntCast(_ offset: Int64, _ len: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {
+  return unsafe implicitIntCast(offset, len, p)
+}
+
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: UnsafeMutableBufferPointer<Int32>) {
   return unsafe nonnull(p)
 }
@@ -397,7 +444,7 @@ func call_octalLiteral(_ p: UnsafeMutablePointer<Int32>!) {
   return unsafe nullUnspecified(p)
 }
 
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableBufferPointer<Int32>) {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableBufferPointer<Int32>?) {
   return unsafe nullable(p)
 }
 
