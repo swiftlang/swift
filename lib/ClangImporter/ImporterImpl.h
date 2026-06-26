@@ -1888,6 +1888,12 @@ public:
 
   void swiftify(AbstractFunctionDecl *MappedDecl);
 
+  /// Tracks whether we have already warned the user that the loaded
+  /// _SwiftifyImport macro plugin lacks the `nullableAsEmptySpan`
+  /// parameter required by the `SafeInteropWrappersNullAsEmptySpan` feature.
+  /// Used to avoid emitting the same warning once per imported function.
+  bool DiagnosedMissingNullableAsEmptySpanParam = false;
+
   /// Find the lookup table that corresponds to the given Clang module.
   ///
   /// \param clangModule The module, or null to indicate that we're talking
