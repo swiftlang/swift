@@ -281,20 +281,15 @@ protected:
   SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
   _projectValue() const noexcept;
 
-  /// Call a protocol witness table entry directly.
-  /// EntryOffset is the index into the witness table.
-  /// The witness entry must have a C-compatible calling convention.
-  ///
-  /// This is a template -- instantiation is deferred to the use site
-  /// in the generated header, where _projectValue() is defined.
-  template <size_t EntryOffset, typename Ret, typename... Args>
-  SWIFT_INLINE_PRIVATE_HELPER Ret
-  _callWitness(const void *_Nonnull wt, Args... args) const {
-    using Fn = Ret (*)(void *_Nonnull, void *_Nonnull,
-                       const void *_Nonnull, Args...);
-    auto fn = reinterpret_cast<Fn>(
-        reinterpret_cast<void *const *>(wt)[EntryOffset]);
-    return fn(_projectValue(), _type, wt, args...);
+  template <size_t EntryOffset, uint16_t PtrAuthDisc, typename FnTy>
+  SWIFT_INLINE_PRIVATE_HELPER FnTy _loadWitness(
+      const void *_Nonnull wt) const {
+    struct slot {
+      FnTy __ptrauth_swift_protocol_witness_function_pointer(PtrAuthDisc) fn;
+    };
+    auto *s = reinterpret_cast<const slot *>(
+        reinterpret_cast<const void *const *>(wt) + EntryOffset);
+    return s->fn;
   }
 
   void *_Nonnull _buffer[3];
