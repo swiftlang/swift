@@ -1,0 +1,24 @@
+//===--- ELFReflectionSections.def ----------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_REFLECTION_SECTION
+#define SWIFT_REFLECTION_SECTION(name, field)
+#endif
+
+SWIFT_REFLECTION_SECTION(swift5_fieldmd,               Field)
+SWIFT_REFLECTION_SECTION(swift5_assocty,               AssociatedType)
+SWIFT_REFLECTION_SECTION(swift5_builtin,               Builtin)
+SWIFT_REFLECTION_SECTION(swift5_capture,               Capture)
+SWIFT_REFLECTION_SECTION(swift5_typeref,               TypeReference)
+SWIFT_REFLECTION_SECTION(swift5_reflstr,               ReflectionString)
+SWIFT_REFLECTION_SECTION(swift5_protocol_conformances, Conformance)
+SWIFT_REFLECTION_SECTION(swift5_mpenum,                MultiPayloadEnum)
