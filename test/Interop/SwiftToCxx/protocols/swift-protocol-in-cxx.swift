@@ -29,7 +29,12 @@ public protocol Taggable: Sendable {}
 // CHECK:       class
 // CHECK-SAME:  Drawable final : public swift::_impl::SwiftExistentialType {
 // CHECK-NEXT:  public:
-// CHECK-NEXT:  private:
+// CHECK:         swift::Int draw() const {
+// CHECK-NEXT:      // Type-only witness signature (never instantiated).
+// CHECK-NEXT:      struct _w { _w() = delete; static SWIFT_CALL swift::Int call(void *_Nonnull, const void *_Nonnull, SWIFT_CONTEXT void *_Nonnull); };
+// CHECK-NEXT:      return _loadWitness<1, {{[0-9]+}}, decltype(&_w::call)>(_witnessTable)(_type, _witnessTable, _projectValue());
+// CHECK-NEXT:    }
+// CHECK:       private:
 // CHECK:         Drawable() noexcept : SwiftExistentialType(uninit_t{}) {}
 // CHECK:         const void *_Nonnull _witnessTable;
 // CHECK:         friend class _impl::_impl_Drawable;
@@ -63,7 +68,12 @@ public protocol Taggable: Sendable {}
 // CHECK:       class
 // CHECK-SAME:  Resizable final : public swift::_impl::SwiftExistentialType {
 // CHECK-NEXT:  public:
-// CHECK-NEXT:  private:
+// CHECK:         bool resize(swift::Int factor) const {
+// CHECK-NEXT:      // Type-only witness signature (never instantiated).
+// CHECK-NEXT:      struct _w { _w() = delete; static SWIFT_CALL bool call(swift::Int, void *_Nonnull, const void *_Nonnull, SWIFT_CONTEXT void *_Nonnull); };
+// CHECK-NEXT:      return _loadWitness<1, {{[0-9]+}}, decltype(&_w::call)>(_witnessTable)(factor, _type, _witnessTable, _projectValue());
+// CHECK-NEXT:    }
+// CHECK:       private:
 // CHECK:         Resizable() noexcept : SwiftExistentialType(uninit_t{}) {}
 // CHECK:         const void *_Nonnull _witnessTable;
 // CHECK:         friend class _impl::_impl_Resizable;

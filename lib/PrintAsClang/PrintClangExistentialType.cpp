@@ -13,10 +13,200 @@
 #include "PrintClangExistentialType.h"
 #include "ClangSyntaxPrinter.h"
 #include "DeclAndTypePrinter.h"
+#include "PrimitiveTypeMapping.h"
 #include "PrintClangValueType.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolAssociations.h"
+#include "swift/AST/Types.h"
+#include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/TypeLowering.h"
+#include "llvm/Support/SipHash.h"
 
 using namespace swift;
+
+std::optional<std::string>
+ClangExistentialTypePrinter::getCxxTypeName(Type ty,
+                                            DeclAndTypePrinter &printer) {
+  if (ty->isVoid())
+    return std::string("void");
+
+  if (auto *typeDecl = ty->getAnyNominal()) {
+    auto info = printer.getTypeMapping().getKnownCxxTypeInfo(typeDecl);
+    if (info)
+      return info->name.str();
+  }
+
+  return std::nullopt;
+}
+
+bool ClangExistentialTypePrinter::canEmitExistentialMethod(
+    const FuncDecl *FD, DeclAndTypePrinter &printer) {
+  if (FD->isStatic())
+    return false;
+  if (FD->isOperator())
+    return false;
+  if (FD->hasAsync())
+    return false;
+  if (FD->hasThrows())
+    return false;
+  if (FD->getAttrs().hasAttribute<MutatingAttr>())
+    return false;
+  if (FD->isMutating())
+    return false;
+  if (!FD->requiresNewWitnessTableEntry())
+    return false;
+
+  auto methodTy = FD->getMethodInterfaceType()->castTo<FunctionType>();
+
+  if (!getCxxTypeName(methodTy->getResult(), printer))
+    return false;
+
+  for (auto &param : methodTy->getParams()) {
+    if (param.isInOut())
+      return false;
+    if (!getCxxTypeName(param.getPlainType(), printer))
+      return false;
+  }
+
+  return true;
+}
+
+void ClangExistentialTypePrinter::printProtocolRequirementMethods(
+    const ProtocolDecl *PD, DeclAndTypePrinter &declAndTypePrinter) {
+  // Compute witness table entry offsets by walking the protocol's
+  // requirement signature and ABI members in the same order as
+  // SILWitnessVisitor. This must stay in sync with IRGen's
+  // WitnessTableLayout.
+  //
+  // Offset 0 is the protocol conformance descriptor (header).
+  // Requirement entries start at offset 1
+  // (WitnessTableFirstRequirementOffset).
+  size_t currentOffset = 1;
+
+  // 1. Base protocol conformances and associated conformances from
+  //    the requirement signature.
+  auto requirements = PD->getRequirementSignature().getRequirements();
+  for (const auto &reqt : requirements) {
+    if (reqt.getKind() != RequirementKind::Conformance)
+      continue;
+
+    auto requirement = reqt.getProtocolDecl();
+
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(requirement))
+      continue;
+
+    // Base protocol or associated conformance -- both take a WT entry.
+    currentOffset++;
+  }
+
+  // 2. Associated types.
+  for (auto *assocType : PD->getAssociatedTypeMembers()) {
+    if (assocType->getOverriddenDecls().empty())
+      currentOffset++;
+  }
+
+  // 3. Method entries from ABI members.
+  ClangSyntaxPrinter printer(PD->getASTContext(), os);
+
+  for (Decl *member : PD->getABIMembers()) {
+    if (!member->isAvailableDuringLowering())
+      continue;
+
+    if (auto *FD = dyn_cast<FuncDecl>(member)) {
+      if (isa<AccessorDecl>(FD))
+        continue;
+      if (!FD->requiresNewWitnessTableEntry()) {
+        continue;
+      }
+
+      size_t methodOffset = currentOffset;
+      currentOffset++;
+
+      if (!canEmitExistentialMethod(FD, declAndTypePrinter))
+        continue;
+
+      // Compute the ptrauth discriminator for this witness entry.
+      // This matches IRGen: siphash(SILDeclRef::mangle()) truncated to 16 bits.
+      uint16_t ptrAuthDisc =
+          llvm::getPointerAuthStableSipHash(SILDeclRef(FD).mangle());
+
+      auto methodTy = FD->getMethodInterfaceType()->castTo<FunctionType>();
+      auto resultCxxName = getCxxTypeName(methodTy->getResult(),
+                                          declAndTypePrinter);
+
+      os << "  ";
+      printer.printInlineForThunk();
+      os << *resultCxxName << " ";
+      os << FD->getBaseIdentifier().str() << "(";
+
+      // Print parameter list.
+      bool firstParam = true;
+      for (auto *param : *FD->getParameters()) {
+        if (!firstParam)
+          os << ", ";
+        firstParam = false;
+
+        auto paramCxxName = getCxxTypeName(param->getInterfaceType(),
+                                           declAndTypePrinter);
+        os << *paramCxxName << " " << param->getNameStr();
+      }
+
+      os << ") const {\n";
+
+      // Use a local struct with a static method to define the swiftcall
+      // function type -- Clang accepts SWIFT_CONTEXT on function
+      // declarations but not on typedef/using type aliases.
+      // _loadWitness handles the ptrauth struct overlay.
+      //
+      // Witness method ABI: [user args, Self metadata, WT, self(ctx)]
+      os << "    // Type-only witness signature (never instantiated).\n";
+      os << "    struct _w { _w() = delete; static SWIFT_CALL "
+         << *resultCxxName << " call(";
+
+      // User parameter types.
+      bool firstTyParam = true;
+      for (auto *param : *FD->getParameters()) {
+        if (!firstTyParam)
+          os << ", ";
+        firstTyParam = false;
+        auto paramCxxName = getCxxTypeName(param->getInterfaceType(),
+                                           declAndTypePrinter);
+        os << *paramCxxName;
+      }
+      if (!firstTyParam)
+        os << ", ";
+      os << "void *_Nonnull, const void *_Nonnull, "
+            "SWIFT_CONTEXT void *_Nonnull); };\n";
+
+      // Load and call through the authenticated witness pointer.
+      os << "    return _loadWitness<" << methodOffset << ", "
+         << ptrAuthDisc << ", decltype(&_w::call)>(_witnessTable)(";
+
+      // User arguments.
+      bool firstArg = true;
+      for (auto *param : *FD->getParameters()) {
+        if (!firstArg)
+          os << ", ";
+        firstArg = false;
+        os << param->getNameStr();
+      }
+      if (!firstArg)
+        os << ", ";
+      os << "_type, _witnessTable, _projectValue());\n";
+      os << "  }\n";
+    } else if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
+      // Count accessor entries but don't emit methods for them yet.
+      ASD->visitOpaqueAccessors([&](AccessorDecl *accessor) {
+        if (accessor->requiresNewWitnessTableEntry())
+          currentOffset++;
+      });
+    } else if (auto *CD = dyn_cast<ConstructorDecl>(member)) {
+      if (CD->requiresNewWitnessTableEntry())
+        currentOffset++;
+    }
+  }
+}
 
 void ClangExistentialTypePrinter::printMarkerProtocolDecl(
     const ProtocolDecl *PD, DeclAndTypePrinter &declAndTypePrinter) {
@@ -98,6 +288,9 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
     printer.printBaseName(PD);
     os << " final : public swift::_impl::SwiftExistentialType";
     os << " {\npublic:\n";
+
+    // Emit protocol requirement methods.
+    printProtocolRequirementMethods(PD, declAndTypePrinter);
 
     os << "private:\n";
     os << "  ";

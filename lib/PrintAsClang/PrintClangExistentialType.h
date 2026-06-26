@@ -15,11 +15,15 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
+#include <string>
 
 namespace swift {
 
 class DeclAndTypePrinter;
+class FuncDecl;
 class ProtocolDecl;
+class Type;
 
 /// Prints a C++ wrapper class for a Swift protocol existential type.
 /// Non-marker protocols inherit from SwiftExistentialType with a witness
@@ -34,6 +38,22 @@ public:
 private:
   void printMarkerProtocolDecl(const ProtocolDecl *PD,
                                DeclAndTypePrinter &declAndTypePrinter);
+
+  /// Emits C++ methods for protocol requirements, dispatching through
+  /// the witness table via _callWitness.
+  void printProtocolRequirementMethods(const ProtocolDecl *PD,
+                                       DeclAndTypePrinter &declAndTypePrinter);
+
+  /// Returns the C++ type name for a Swift type if it is a simple
+  /// C-representable primitive, or None otherwise.
+  std::optional<std::string> getCxxTypeName(Type ty,
+                                            DeclAndTypePrinter &printer);
+
+  /// Returns true if the given FuncDecl can be emitted as a C++ method
+  /// on an existential wrapper (non-throwing, non-mutating, non-static,
+  /// all params and return C-primitive).
+  bool canEmitExistentialMethod(const FuncDecl *FD,
+                                DeclAndTypePrinter &printer);
 
   raw_ostream &os;
 };
