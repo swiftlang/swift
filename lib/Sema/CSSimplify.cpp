@@ -39,6 +39,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/CSFix.h"
+#include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
@@ -6895,6 +6896,11 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::PatternMatch: {
+    // Let's let the matching (i.e. deep equality) happen before attempting any
+    // fixes for patterns.
+    if (hasAnyRestriction())
+      return false;
+
     auto *pattern = elt.castTo<LocatorPathElt::PatternMatch>().getPattern();
 
     // TODO: We ought to introduce a new locator element for this.
