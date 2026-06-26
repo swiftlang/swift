@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}

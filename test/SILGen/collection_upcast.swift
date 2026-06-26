@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -module-name collection_upcast -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
 

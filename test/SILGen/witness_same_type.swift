@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -module-name witness_same_type %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -module-name witness_same_type %s

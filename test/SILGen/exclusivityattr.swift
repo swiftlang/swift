@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name=test %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ON
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name=test -enforce-exclusivity=none %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OFF
 

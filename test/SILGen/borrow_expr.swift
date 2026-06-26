@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -enable-experimental-move-only -o - -Xllvm -sil-print-types -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -enable-experimental-move-only -o - -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 
 final class Klass {

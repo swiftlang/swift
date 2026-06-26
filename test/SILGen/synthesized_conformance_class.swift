@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -swift-version 4 | %FileCheck %s
 
 final class Final<T> {

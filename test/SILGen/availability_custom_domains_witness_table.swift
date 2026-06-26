@@ -7,6 +7,7 @@
 
 // RUN: %empty-directory(%t)
 
+// RUN: %target-swift-frontend -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values %s -verify %{args}
 // RUN: %target-swift-frontend -emit-silgen %s -verify %{args} \
 // RUN:   | %FileCheck %s --check-prefixes=CHECK
 

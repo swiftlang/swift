@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
 
 // Only derived classes with non-trivial ivars need an ivar destroyer.

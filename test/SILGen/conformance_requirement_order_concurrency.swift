@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s -module-name main | %FileCheck %s
 
 // See conformance_requirement_order.swift for the general case.

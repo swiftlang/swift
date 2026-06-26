@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -experimental-skip-non-inlinable-function-bodies-without-types -emit-module %s
 
 let s: Int? = nil

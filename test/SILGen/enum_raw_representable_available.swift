@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.52
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-cpu-apple-macosx10.52 -emit-sorted-sil %s -o %t.fragile.sil

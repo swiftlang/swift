@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -sdk %S/Inputs -I %S/Inputs -enable-source-import %s
 // RUN: %target-swift-emit-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop

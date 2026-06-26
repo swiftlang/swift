@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-sil-opaque-values -Xllvm -sil-full-demangle -enable-library-evolution %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 

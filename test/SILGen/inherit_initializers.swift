@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s -verify
 
 // We just want to SILGen this and ensure it doesn't crash. Don't particularly

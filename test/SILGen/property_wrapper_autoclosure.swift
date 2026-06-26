@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-codesign %t/a.out

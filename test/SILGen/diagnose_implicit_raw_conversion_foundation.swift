@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -import-objc-header %S/Inputs/readbytes.h %s -o /dev/null -verify
 // RUN: %target-swift-emit-silgen -import-objc-header %S/Inputs/readbytes.h %s -o /dev/null -verify
 //
 // REQUIRES: objc_interop

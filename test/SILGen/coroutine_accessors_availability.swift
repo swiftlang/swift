@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %t/Library.swift -enable-library-evolution -module-name Library -enable-experimental-feature CoroutineAccessors -I %t
 // RUN: %target-swift-emit-silgen                           \
 // RUN:     %t/Library.swift                                \
 // RUN:     -enable-library-evolution                       \

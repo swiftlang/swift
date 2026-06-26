@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -disable-availability-checking -verify %s
 protocol P {}
 extension Int: P {}

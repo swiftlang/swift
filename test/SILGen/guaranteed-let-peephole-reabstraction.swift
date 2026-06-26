@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -verify %s 
 class BlockBox<T> {
   let block: (T) -> Void = { _ in }

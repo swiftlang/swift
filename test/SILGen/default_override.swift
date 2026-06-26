@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s -enable-callee-allocated-coro-abi -enable-library-evolution -enable-experimental-feature BuiltinModule -enable-experimental-feature CoroutineAccessors
 // RUN: %target-swift-emit-silgen                           \
 // RUN:     %s                                              \
 // RUN:     -enable-callee-allocated-coro-abi               \

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -emit-silgen %s
 
 // Make sure an unbound method reference which is then immediately

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -enable-experimental-move-only -parse-stdlib -disable-availability-checking -verify %s
 // RUN: %target-swift-emit-sil -enable-experimental-move-only -parse-stdlib -disable-availability-checking -verify %s
 
 import Swift

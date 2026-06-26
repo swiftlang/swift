@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -enable-library-evolution %s | %FileCheck %s
 
 public struct ConditionallyCopyable<T: ~Copyable>: ~Copyable {

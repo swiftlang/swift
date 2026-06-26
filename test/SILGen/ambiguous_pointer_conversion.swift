@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // rdar://146780049

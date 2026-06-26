@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // -- Try all the permutations of file order possible.
 
 // Abc

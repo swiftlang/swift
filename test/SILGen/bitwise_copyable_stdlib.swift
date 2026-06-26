@@ -1,5 +1,6 @@
 // R N: %target-swift-frontend  -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
 
+// RUN: %target-swift-frontend -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values %s -parse-stdlib -module-name Swift -disable-availability-checking -enable-experimental-feature BuiltinModule -enable-experimental-feature Lifetimes -enable-builtin-module
 // RUN: %target-swift-frontend                               \
 // RUN:     -emit-sil                                        \
 // RUN:     %s                                               \

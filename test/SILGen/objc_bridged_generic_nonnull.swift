@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -verify -import-objc-header %S/Inputs/objc_bridged_generic_nonnull.h %s
 // RUN: %target-swift-emit-silgen -verify -import-objc-header %S/Inputs/objc_bridged_generic_nonnull.h %s
 // REQUIRES: objc_interop
 

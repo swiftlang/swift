@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -O -emit-sil -primary-file %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [transparent] @$s18subscript_accessor1XVxSgyciM

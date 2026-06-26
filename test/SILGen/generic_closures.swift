@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -module-name generic_closures  -parse-stdlib %s | %FileCheck %s
 
 import Swift

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -emit-verbose-sil -enable-library-evolution | %FileCheck %s
 
 @propertyWrapper

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name collection_downcast -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 

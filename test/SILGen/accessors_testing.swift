@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name accessors %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -parse-as-library -enable-testing -module-name accessors %s | %FileCheck %s
 

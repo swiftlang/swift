@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -parse-stdlib %s
 // RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s
 
 typealias Int = Builtin.Int64

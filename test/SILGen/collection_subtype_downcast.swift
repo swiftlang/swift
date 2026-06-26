@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -module-name collection_subtype_downcast -sdk %S/Inputs %s | %FileCheck %s
 

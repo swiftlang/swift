@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -parse-as-library -primary-file %s | %FileCheck %s
 
 // <rdar://problem/17405715> lazy property crashes silgen of implicit memberwise initializer

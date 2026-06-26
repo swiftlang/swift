@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values -enable-experimental-move-only %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen -enable-experimental-move-only %s | %FileCheck %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -enable-experimental-move-only %s | %FileCheck -check-prefix=SIL %s
 

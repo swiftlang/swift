@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -parse-as-library %s
 // RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
 
 @main enum Horse {

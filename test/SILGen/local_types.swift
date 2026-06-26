@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen  -parse-as-library %s -verify | %FileCheck %s
 // RUN: %target-swift-emit-ir  -parse-as-library %s
 

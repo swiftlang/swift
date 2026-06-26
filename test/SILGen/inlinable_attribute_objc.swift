@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -module-name switch_bool -import-objc-header %S/Inputs/switch_bool.h %s
 // RUN: %target-swift-emit-silgen -module-name switch_bool -import-objc-header %S/Inputs/switch_bool.h %s
 
 // REQUIRES: objc_interop

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -module-name main %s -verify | %FileCheck %s --check-prefix=FRAGILE
 // RUN: %target-swift-emit-silgen -module-name main %s -verify -enable-library-evolution | %FileCheck %s --check-prefix=RESILIENT
 

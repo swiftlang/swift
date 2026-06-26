@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -emit-module -g -experimental-skip-non-inlinable-function-bodies-without-types %s
 
 // Just make sure we don't crash.

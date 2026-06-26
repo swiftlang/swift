@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s | %FileCheck %s
 
 // 1. Make sure the wrapped property setter calls the observers
