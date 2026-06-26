@@ -599,6 +599,7 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
         // completion token at all.
         return std::nullopt;
       }
+
       // Not being able to infer the type of a variable in a pattern binding
       // decl is more dramatic than anything that could happen inside the
       // expression because we want to preferrably point the diagnostic to a
