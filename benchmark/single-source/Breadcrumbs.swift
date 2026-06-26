@@ -19,6 +19,8 @@ import TestsUtils
 public let benchmarks: [BenchmarkInfo] = [
   UTF16ToIdx(workload: longASCIIWorkload, count: 5_000).info,
   UTF16ToIdx(workload: longMixedWorkload, count: 5_000).info,
+  UTF16ToIdx(workload: longCyrillicWorkload, count: 5_000).info,
+  UTF16ToIdx(workload: longCJKWorkload, count: 5_000).info,
   IdxToUTF16(workload: longASCIIWorkload, count: 5_000).info,
   IdxToUTF16(workload: longMixedWorkload, count: 5_000).info,
 
@@ -225,6 +227,36 @@ let mixedWorkload = Workload(
 let longMixedWorkload = Workload(
   name: "longMixed",
   string: String(repeating: mixedBase, count: 100))
+
+// Dense 2-byte UTF-8 (Cyrillic). Each scalar is 2 bytes / 1 UTF-16 unit, so the
+// ASCII guess in `_nativeGetIndex` undershoots by ~2x: a middle case between
+// pure ASCII (exact) and CJK (worst).
+let cyrillicBase = """
+    в чащах юга жил-был цитрус? да, но фальшивый экземпляр
+    шифрование данных обеспечивает конфиденциальность и целостность информации
+    съешь же ещё этих мягких французских булок да выпей чаю
+  """
+let cyrillicWorkload = Workload(
+  name: "Cyrillic",
+  string: cyrillicBase)
+let longCyrillicWorkload = Workload(
+  name: "longCyrillic",
+  string: String(repeating: cyrillicBase, count: 100))
+
+// Dense 3-byte UTF-8 (CJK). Each scalar is 3 bytes / 1 UTF-16 unit -- the
+// densest non-surrogate UTF-8 -- so the ASCII guess in `_nativeGetIndex` covers
+// ~1/3 of the distance. Worst case for the guess-and-check optimization
+let cjkBase = """
+    今回のアップデートでスイフトに大幅な改良が施され、安定していてしかも直感的に使うことができるプラットフォーム向けプログラミング言語になりました
+    本次更新对编程语言进行了全面优化，功能强大且直观易用，是面向各类平台的现代化语言
+    이번 업데이트에서는 강력하면서도 직관적인 플랫폼용 프로그래밍 언어를 완벽히 개선하였습니다
+  """
+let cjkWorkload = Workload(
+  name: "CJK",
+  string: cjkBase)
+let longCJKWorkload = Workload(
+  name: "longCJK",
+  string: String(repeating: cjkBase, count: 100))
 
 
 //==============================================================================
