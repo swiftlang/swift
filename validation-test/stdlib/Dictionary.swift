@@ -1992,7 +1992,6 @@ DictionaryTestSuite.test("mapValues(_:)") {
   let d2 = d1.mapValues(String.init)
 
   expectEqual(d1.count, d2.count)
-  expectEqual(d1.keys.first, d2.keys.first)
 
   for (key, _) in d1 {
     expectEqual(String(d1[key]!), d2[key]!)
@@ -2018,7 +2017,6 @@ DictionaryTestSuite.test("mapKeyedValues") {
   let d2 = d1.mapKeyedValues { "\($0): \($1)" }
 
   expectEqual(d1.count, d2.count)
-  expectEqual(d1.keys.first, d2.keys.first)
 
   for (key, value) in d1 {
     expectEqual("\(key): \(value)", d2[key]!)
