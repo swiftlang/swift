@@ -4106,7 +4106,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4137,7 +4137,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4168,7 +4168,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4228,7 +4228,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4697,7 +4697,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     SourceLoc StartLoc = decl->getStartLoc();
     SourceLoc EndLoc;
     if (decl->getResultTypeRepr()) {
