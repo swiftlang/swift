@@ -692,19 +692,19 @@ extension ASTGenVisitor {
     if node.arguments == nil {
       return .createParsed(ctx, atLoc: location, range: range, interface: "",
                            implementation: BridgedStringRef(), threading:
-                           .Apartment)
+                           .apartment)
     }
 
     typealias Result =
         (interface: BridgedStringRef,
          implementation: BridgedStringRef,
-         threading: swift.COMThreadingModel)
+         threading: BridgedCOMThreadingModel)
 
     guard let parsed =
         generateWithLabeledExprListArguments(attribute: node, { arguments -> Result? in
           var interface: BridgedStringRef = ""
           var implementation: BridgedStringRef = BridgedStringRef()
-          var threading: swift.COMThreadingModel? = .Apartment
+          var threading: BridgedCOMThreadingModel? = .apartment
 
           for argument in arguments {
             switch argument.label?.rawText {
@@ -730,11 +730,11 @@ extension ASTGenVisitor {
               threading =
                   switch argument.expression.as(MemberAccessExprSyntax.self)?
                             .declName.baseName.rawText {
-                  case "single"?: .Single
-                  case "apartment"?, "sta"?: .Apartment
-                  case "free"?, "mta"?: .Free
-                  case "both"?: .Both
-                  case "neutral"?: .Neutral
+                  case "single"?: .single
+                  case "apartment"?, "sta"?: .apartment
+                  case "free"?, "mta"?: .free
+                  case "both"?: .both
+                  case "neutral"?: .neutral
                   default: nil
                   }
             default:
