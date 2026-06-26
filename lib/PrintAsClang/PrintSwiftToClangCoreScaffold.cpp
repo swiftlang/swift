@@ -228,6 +228,96 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   }
 }
 
+static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
+  os << "// Out-of-line method definitions for SwiftExistentialType.\n";
+  os << "// Defined here because they need the complete ValueWitnessTable\n";
+  os << "// type (declared above). The class declaration is in\n";
+  os << "// _SwiftCxxInteroperability.h with a forward-declared VWT.\n\n";
+
+  // _getVWT
+  os << "SWIFT_INLINE_PRIVATE_HELPER\n";
+  os << "const ValueWitnessTable *_Nonnull\n";
+  os << "SwiftExistentialType::_getVWT() const noexcept {\n";
+  os << "  auto *vwTableAddr = "
+        "reinterpret_cast<ValueWitnessTable **>(_type) - 1;\n";
+  os << "#ifdef __arm64e__\n";
+  os << "  return reinterpret_cast<ValueWitnessTable *>(\n";
+  os << "      ptrauth_auth_data(\n";
+  os << "          reinterpret_cast<void *>(*vwTableAddr),\n";
+  os << "          ptrauth_key_process_independent_data,\n";
+  os << "          ptrauth_blend_discriminator(vwTableAddr, "
+     << SpecialPointerAuthDiscriminators::ValueWitnessTable << ")));\n";
+  os << "#else\n";
+  os << "  return *vwTableAddr;\n";
+  os << "#endif\n";
+  os << "}\n\n";
+
+  // _projectValue
+  os << "SWIFT_INLINE_PRIVATE_HELPER\n";
+  os << "void *_Nonnull\n";
+  os << "SwiftExistentialType::_projectValue() const noexcept {\n";
+  os << "  auto *vwTable = _getVWT();\n";
+  os << "  if (vwTable->size <= sizeof(_buffer) &&\n";
+  os << "      (vwTable->flags & "
+     << TargetValueWitnessFlags<uint64_t>::IsNonBitwiseTakable
+     << ") == 0)\n";
+  os << "    return const_cast<void **>(_buffer);\n";
+  os << "  return const_cast<void *>(_buffer[0]);\n";
+  os << "}\n\n";
+
+  // Copy constructor
+  os << "SWIFT_INLINE_THUNK\n";
+  os << "SwiftExistentialType::SwiftExistentialType(\n";
+  os << "    const SwiftExistentialType &other) noexcept\n";
+  os << "    : _type(other._type) {\n";
+  os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
+  os << "      _buffer, const_cast<void **>(other._buffer), _type);\n";
+  os << "}\n\n";
+
+  // Move constructor (copy semantics -- C++ move is non-consuming)
+  os << "SWIFT_INLINE_THUNK\n";
+  os << "SwiftExistentialType::SwiftExistentialType(\n";
+  os << "    SwiftExistentialType &&other) noexcept\n";
+  os << "    : _type(other._type) {\n";
+  os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
+  os << "      _buffer, other._buffer, _type);\n";
+  os << "}\n\n";
+
+  // Copy assignment
+  os << "SWIFT_INLINE_THUNK\n";
+  os << "SwiftExistentialType &\n";
+  os << "SwiftExistentialType::operator=(\n";
+  os << "    const SwiftExistentialType &other) noexcept {\n";
+  os << "  if (this != &other) {\n";
+  os << "    _getVWT()->destroy(_buffer, _type);\n";
+  os << "    _type = other._type;\n";
+  os << "    _getVWT()->initializeBufferWithCopyOfBuffer(\n";
+  os << "        _buffer, const_cast<void **>(other._buffer), _type);\n";
+  os << "  }\n";
+  os << "  return *this;\n";
+  os << "}\n\n";
+
+  // Move assignment (copy semantics)
+  os << "SWIFT_INLINE_THUNK\n";
+  os << "SwiftExistentialType &\n";
+  os << "SwiftExistentialType::operator=(\n";
+  os << "    SwiftExistentialType &&other) noexcept {\n";
+  os << "  if (this != &other) {\n";
+  os << "    _getVWT()->destroy(_buffer, _type);\n";
+  os << "    _type = other._type;\n";
+  os << "    _getVWT()->initializeBufferWithCopyOfBuffer(\n";
+  os << "        _buffer, other._buffer, _type);\n";
+  os << "  }\n";
+  os << "  return *this;\n";
+  os << "}\n\n";
+
+  // Destructor
+  os << "SWIFT_INLINE_THUNK\n";
+  os << "SwiftExistentialType::~SwiftExistentialType() noexcept {\n";
+  os << "  _getVWT()->destroy(_buffer, _type);\n";
+  os << "}\n\n";
+}
+
 void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                           ASTContext &astContext,
                                           PrimitiveTypeMapping &typeMapping,
@@ -247,6 +337,7 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                                 /*isCForwardDefinition=*/true);
               });
               os << "\n";
+              printSwiftExistentialTypeMethodDefs(os);
             });
         os << "\n";
         // C++ only supports inline variables from C++17.

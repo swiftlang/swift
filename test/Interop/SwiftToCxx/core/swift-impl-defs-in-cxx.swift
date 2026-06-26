@@ -97,8 +97,8 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
 // CHECK-EMPTY:
-// CHECK-EMPTY:
-// CHECK-NEXT: } // namespace _impl
+// CHECK: // Out-of-line method definitions for SwiftExistentialType.
+// CHECK: } // namespace _impl
 // CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT: #pragma clang diagnostic push

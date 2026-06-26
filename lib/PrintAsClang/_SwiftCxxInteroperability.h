@@ -237,6 +237,67 @@ public:
   }
 };
 
+// Forward declaration -- defined in the generated scaffolding after
+// the ValueWitnessTable struct.
+struct ValueWitnessTable;
+
+/// Base class for C++ wrappers of Swift protocol existentials.
+///
+/// Owns the existential buffer and type metadata. Provides
+/// VWT-delegated copy/move/destroy. Protocol-specific subclasses
+/// add witness table pointer(s) and protocol requirement methods.
+///
+/// Layout: [buffer: 3 * sizeof(void*)] [type metadata pointer]
+/// Subclasses append witness table pointers after _type.
+///
+/// Not virtual -- derived witness table pointers are trivial
+/// (const void*) with no destructor work, so the base destructor
+/// handles everything.
+class SwiftExistentialType {
+  // Get the VWT from the stored type metadata.
+  // Defined out-of-line in the generated scaffolding (needs
+  // ValueWitnessTable to be complete and arm64e ptrauth).
+  SWIFT_INLINE_PRIVATE_HELPER const ValueWitnessTable *_Nonnull
+  _getVWT() const noexcept;
+
+public:
+  // Defined out-of-line in the generated scaffolding (needs VWT).
+  SWIFT_INLINE_THUNK SwiftExistentialType(
+      const SwiftExistentialType &other) noexcept;
+  SWIFT_INLINE_THUNK SwiftExistentialType(
+      SwiftExistentialType &&other) noexcept;
+  SWIFT_INLINE_THUNK SwiftExistentialType &
+  operator=(const SwiftExistentialType &other) noexcept;
+  SWIFT_INLINE_THUNK SwiftExistentialType &
+  operator=(SwiftExistentialType &&other) noexcept;
+  SWIFT_INLINE_THUNK ~SwiftExistentialType() noexcept;
+
+protected:
+  /// Project the contained value for passing to witness functions.
+  /// Defined out-of-line in the generated scaffolding (needs VWT).
+  SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
+  _projectValue() const noexcept;
+
+  /// Call a protocol witness table entry directly.
+  /// EntryOffset is the index into the witness table.
+  /// The witness entry must have a C-compatible calling convention.
+  ///
+  /// This is a template -- instantiation is deferred to the use site
+  /// in the generated header, where _projectValue() is defined.
+  template <size_t EntryOffset, typename Ret, typename... Args>
+  SWIFT_INLINE_PRIVATE_HELPER Ret
+  _callWitness(const void *_Nonnull wt, Args... args) const {
+    using Fn = Ret (*)(void *_Nonnull, void *_Nonnull,
+                       const void *_Nonnull, Args...);
+    auto fn = reinterpret_cast<Fn>(
+        reinterpret_cast<void *const *>(wt)[EntryOffset]);
+    return fn(_projectValue(), _type, wt, args...);
+  }
+
+  void *_Nonnull _buffer[3];
+  void *_Nonnull _type;
+};
+
 } // namespace _impl
 
 /// Swift's Int type.
