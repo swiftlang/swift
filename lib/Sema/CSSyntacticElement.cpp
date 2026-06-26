@@ -636,6 +636,13 @@ private:
         ContextualPattern::forPatternBindingDecl(patternBinding, index);
     Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
 
+    // Fail immediately if this is an invalid pattern and the solver is not
+    // in the diagnostic mode.
+    if (patternType->hasError() && !cs.shouldAttemptFixes()) {
+      hadError = true;
+      return;
+    }
+
     auto target = getTargetForPattern(patternBinding, index, patternType);
     if (!target) {
       hadError = true;
