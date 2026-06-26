@@ -114,6 +114,21 @@ func testIntegerArithmetic() {
   _ = DIVIDE_MIXED_TYPES as CLongLong
 }
 
+// CHECK-LABEL: // testCStyleIntegerCasts()
+func testCStyleIntegerCasts() {
+  // CHECK: %[[P0:.*]] = integer_literal $Builtin.Int32, -1, loc {{.*}}
+  // CHECK: %{{.*}} = struct $UInt32 (%[[P0]] : $Builtin.Int32), loc {{.*}}
+  _ = CAST_UNSIGNED_MINUS_ONE as CUnsignedInt
+
+  // CHECK: %[[P1:.*]] = integer_literal $Builtin.Int32, -10, loc {{.*}}
+  // CHECK: %{{.*}} = struct $UInt32 (%[[P1]] : $Builtin.Int32), loc {{.*}}
+  _ = CAST_UNSIGNED_MINUS_TEN as CUnsignedInt
+
+  // CHECK: %[[P2:.*]] = integer_literal $Builtin.Int32, -1, loc {{.*}}
+  // CHECK: %{{.*}} = struct $UInt32 (%[[P2]] : $Builtin.Int32), loc {{.*}}
+  _ = CAST_TYPEDEF_UNSIGNED_MINUS_ONE as TEST_DWORD
+}
+
 // CHECK-LABEL: // testIntegerComparisons()
 func testIntegerComparisons() {
 
