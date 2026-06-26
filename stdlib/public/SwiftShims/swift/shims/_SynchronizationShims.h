@@ -84,8 +84,37 @@ static inline __swift_uint32_t _swift_stdlib_futex_wake(
 #endif // defined(__linux__)
 
 #if defined(__FreeBSD__)
+#include <errno.h>
+#include <stddef.h>
 #include <sys/types.h>
 #include <sys/umtx.h>
-#endif
+
+// Plain-futex wait using UMTX_OP_WAIT_UINT_PRIVATE: sleeps if *addr == expected.
+// Returns 0 on success (woken by UMTX_OP_WAKE_PRIVATE), or the errno value.
+// EBUSY (16) means the value changed before we slept (analogous to Linux EAGAIN).
+// EINTR (4) means interrupted by a signal.
+static inline __swift_uint32_t _swift_stdlib_futex_wait(
+    __swift_uint32_t *addr, __swift_uint32_t expected) {
+  int ret = _umtx_op(addr, UMTX_OP_WAIT_UINT_PRIVATE,
+                     (unsigned long)expected, NULL, NULL);
+  if (ret == 0) {
+    return 0;
+  }
+  return (__swift_uint32_t)errno;
+}
+
+// Plain-futex wake using UMTX_OP_WAKE_PRIVATE: wakes up to `count` waiters.
+// Returns the number woken on success, or errno on failure.
+static inline __swift_uint32_t _swift_stdlib_futex_wake(
+    __swift_uint32_t *addr, __swift_uint32_t count) {
+  long ret = _umtx_op(addr, UMTX_OP_WAKE_PRIVATE,
+                      (unsigned long)count, NULL, NULL);
+  if (ret >= 0) {
+    return (__swift_uint32_t)ret;
+  }
+  return (__swift_uint32_t)errno;
+}
+
+#endif // defined(__FreeBSD__)
 
 #endif // SWIFT_STDLIB_SYNCHRONIZATION_SHIMS_H

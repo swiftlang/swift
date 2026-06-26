@@ -64,6 +64,7 @@ set(SWIFT_SYNCHRONIZATION_LINUX_SOURCES
 set(SWIFT_SYNCHRONIZATION_FREEBSD_SOURCES
   Mutex/FreeBSDImpl.swift
   Mutex/Mutex.swift
+  Mutex/SpinLoopHint.swift
 )
 
 # Wasm sources
