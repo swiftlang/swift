@@ -714,38 +714,27 @@ func testLotsOfNil(_ x: LotsOfOptional) {
 func issue66752(_ x: Result<String, Error>) {
   let _ = {
     if case .failure() = x {}
-    // expected-error@-1 {{type '()' cannot conform to 'Error}}
-    // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-    // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+    // expected-error@-1 {{missing pattern #1 in enum associated value match}}
   }
   let _ = {
     if case (.failure(), let y) = (x, 0) {}
-    // expected-error@-1 {{type '()' cannot conform to 'Error}}
-    // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-    // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+    // expected-error@-1 {{missing pattern #1 in enum associated value match}}
   }
   if case .failure() = x {}
-  // expected-error@-1 {{type '()' cannot conform to 'Error}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-  // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+  // expected-error@-1 {{missing pattern #1 in enum associated value match}}
   
   if case (.failure(), let y) = (x, 0) {}
-  // expected-error@-1 {{type '()' cannot conform to 'Error}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-  // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+  // expected-error@-1 {{missing pattern #1 in enum associated value match}}
 }
 
 // https://github.com/apple/swift/issues/66750
-// FIXME: We ought to improve the diagnostics here
 func issue66750(_ x: Result<String, Error>) {
   let _ = {
     switch x {
     case .success:
       "a"
     case .failure():
-      // expected-error@-1 {{type '()' cannot conform to 'Error}}
-      // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-      // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+      // expected-error@-1 {{missing pattern #1 in enum associated value match}}
       "b"
     }
   }
@@ -754,24 +743,35 @@ func issue66750(_ x: Result<String, Error>) {
     case (.success, let y):
       "a"
     case (.failure(), let y):
-      // expected-error@-1 {{type '()' cannot conform to 'Error}}
-      // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-      // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+      // expected-error@-1 {{missing pattern #1 in enum associated value match}}
       "b"
     }
   }
   switch x {
   case .success:
     break
-  case .failure(): // expected-error {{tuple pattern cannot match values of the non-tuple type 'any Error'}}
+  // FIXME: We ought to improve the diagnostics here
+  case .failure():
+    // expected-error@-1 {{tuple pattern cannot match values of the non-tuple type 'any Error'}}
     break
   }
   switch (x, 0) {
   case (.success, let y):
     break
+  // FIXME: We ought to improve the diagnostics here
   case (.failure(), let y):
     // expected-error@-1 {{tuple pattern cannot match values of the non-tuple type 'any Error'}}
     break
+  }
+
+  _ = {
+    switch x {
+    case .success():
+      // expected-error@-1 {{missing pattern #1 in enum associated value match}}
+      break
+    case .failure(let error):
+      break
+    }
   }
 }
 
