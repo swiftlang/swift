@@ -91,7 +91,7 @@ bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (Float) -> Class.TangentVector)
 // reverse-mode derivative of methodWrapper(_:)
 sil hidden [ossa] @$s4test13methodWrapperySfAA5ClassVFTJrSpSr : $@convention(thin) (Class) -> (Float, @owned @callee_guaranteed (Float) -> Class.TangentVector) {
 bb0(%0 : $Class):
-  // CHECK:         sil private [signature_optimized_thunk] [heuristic_always_inline] [ossa] @$s4test13methodWrapperySfAA5ClassVFTJpSpSr08$s4test5D19V6methodSfyFTJpSpSr4main05_AD__edfG24F_bb3__Pred__src_0_wrt_0OTf1nc_n : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector {
+  // CHECK:         sil private [signature_optimized_thunk] [heuristic_always_inline] [ossa] @$s4test13methodWrapperySfAA5ClassVFTJpSpSr08$s4test5D19V6methodSfyFTJpSpSr4main05_AD__edfG24F_bb3__Pred__src_0_wrt_0OTf1nE_n : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector {
   // CHECK:         bb0(%0 : $Float, %1 : @owned $_AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0):
   // CHECK:           %[[#B2:]] = function_ref @$s4test5ClassV6methodSfyFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector
   // COMBINE-NOT:     partial_apply
@@ -103,7 +103,7 @@ bb0(%0 : $Class):
   // COMBINE-NOT:     function_ref @$s4test5ClassV6methodSfyFTJpSpSr
   // COMBINE-NOT:     partial_apply
   // COMBINE-NOT:     function_ref @$s4test13methodWrapperySfAA5ClassVFTJpSpSr
-  // CHECK:           %[[#C39:]] = function_ref @$s4test13methodWrapperySfAA5ClassVFTJpSpSr08$s4test5D19V6methodSfyFTJpSpSr4main05_AD__edfG24F_bb3__Pred__src_0_wrt_0OTf1nc_n : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector
+  // CHECK:           %[[#C39:]] = function_ref @$s4test13methodWrapperySfAA5ClassVFTJpSpSr08$s4test5D19V6methodSfyFTJpSpSr4main05_AD__edfG24F_bb3__Pred__src_0_wrt_0OTf1nE_n : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector
   // CHECK:           %[[#C40:]] = partial_apply [callee_guaranteed] %[[#C39]](%[[#C34]]) : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector
   // CHECK:           %[[#C42:]] = tuple (%[[#C33]] : $Float, %[[#C40]] : $@callee_guaranteed (Float) -> Class.TangentVector)
   // CHECK:           return %[[#C42]]

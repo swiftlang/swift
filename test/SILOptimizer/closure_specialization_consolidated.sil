@@ -507,7 +507,7 @@ bb0(%0 : @unowned $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : @owned $Built
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s18owned_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [ossa] @$s18owned_apply_callee014large_closure_C0BoBi32_BoBoTf1Ennnn_n : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0
 // CHECK: [[FUN:%.*]] = function_ref @large_closure_callee : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: [[CLOSURE:%.*]] = partial_apply [[FUN]](
@@ -530,7 +530,7 @@ bb0(%0 : @owned $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Buil
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s23guaranteed_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [ossa] @$s23guaranteed_apply_callee014large_closure_C0BoBi32_BoBoTf1Ennnn_n : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0(%0 : @unowned $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : @owned $Builtin.NativeObject, %3 : @guaranteed $Builtin.NativeObject, %4 : @owned $Builtin.NativeObject, %5 : $Builtin.Int32, %6 : @owned $Builtin.NativeObject, %7 : @owned $Builtin.NativeObject):
 // CHECK: [[FUN:%.*]] = function_ref @large_closure_callee : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: [[CLOSURE:%.*]] = partial_apply [[FUN]](
@@ -580,11 +580,11 @@ bb0(%0 : @guaranteed $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned
 // CHECK-NEXT: [[E3:%.*]] = copy_value [[C3]]
 // CHECK-NOT: partial_apply [[OLD_CLOSURE_CALLEE1]]
 // CHECK-NOT: thin_to_thick_function [[OLD_CLOSURE_CALLEE2]]
-// CHECK: [[SPECFUN1:%.*]] = function_ref @$s18owned_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
+// CHECK: [[SPECFUN1:%.*]] = function_ref @$s18owned_apply_callee014large_closure_C0BoBi32_BoBoTf1Ennnn_n
 // CHECK: apply [[SPECFUN1]](
 // CHECK: [[SPECFUN3:%.*]] = function_ref @$s18owned_apply_callee014small_closure_C0Tf1cnnnn_n
 // CHECK: apply [[SPECFUN3]](
-// CHECK: [[SPECFUN0:%.*]] = function_ref @$s23guaranteed_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
+// CHECK: [[SPECFUN0:%.*]] = function_ref @$s23guaranteed_apply_callee014large_closure_C0BoBi32_BoBoTf1Ennnn_n
 // CHECK: apply [[SPECFUN0]](
 // CHECK: [[SPECFUN2:%.*]] = function_ref @$s23guaranteed_apply_callee014small_closure_C0Tf1cnnnn_n
 // CHECK: apply [[SPECFUN2]](

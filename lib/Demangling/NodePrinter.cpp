@@ -1229,6 +1229,7 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << "]";
       break;
     case FunctionSigSpecializationParamKind::ClosureProp:
+    case FunctionSigSpecializationParamKind::EscapingClosureProp:
       if (Idx + 2 > End)
         return;
       Printer << "[";
@@ -1994,6 +1995,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       return nullptr;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";
+      return nullptr;
+    case FunctionSigSpecializationParamKind::EscapingClosureProp:
+      Printer << "Escaping Closure Propagated";
       return nullptr;
     case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
       Printer << "Same As Argument";
