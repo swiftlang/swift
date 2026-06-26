@@ -4238,6 +4238,13 @@ bool ConstraintSystem::generateConstraints(
           target.getPatternBindingOfUninitializedVar(),
           target.getIndexOfUninitializedVar());
 
+      // If `typeCheckPattern` produced a type with errors, let's turn pattern
+      // type into a hole to avoid a recording fallback fix.
+      if (target.getTypeOfUninitializedVar()->hasError()) {
+        increaseScore(SK_Hole, locator);
+        recordTypeVariablesAsHoles(patternType);
+      }
+
       return !patternType;
     }
   }
