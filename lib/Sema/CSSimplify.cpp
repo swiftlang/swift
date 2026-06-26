@@ -182,12 +182,16 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
          "Expected a member reference");
 
   // For a reference to an instance method on a metatype, we want to keep the
-  // curried self.
+  // curried self.  The synthesized COM `IID` member is an exception: the
+  // metatype value IS self, so the curried self is applied.
   if (decl->isInstanceMember()) {
     assert(baseTy);
     if (isa<AbstractFunctionDecl>(decl) &&
-        baseTy->getRValueType()->is<AnyMetatypeType>())
+        baseTy->getRValueType()->is<AnyMetatypeType>()) {
+      if (isCOMInterfaceIDMember(decl))
+        return true;
       return false;
+    }
   }
 
   // Otherwise the reference applies self.
@@ -10712,11 +10716,24 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
     };
 
+    // The synthesized COM `IID` is only accessible on the protocol metatype
+    // itself, not on conforming types.
+    if (isCOMInterfaceIDMember(decl) && !instanceTy->isExistentialType())
+      return;
+
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
 
     if (decl->isInstanceMember()) {
       if (baseObjTy->is<AnyMetatypeType>()) {
+        // The synthesized COM `IID` is a member of the protocol metatype
+        // itself.  It is accessed directly on the metatype value (`P.IID`),
+        // not on an instance of the protocol.
+        if (isCOMInterfaceIDMember(decl)) {
+          result.addViable(candidate);
+          return;
+        }
+
         // `AnyObject` has special semantics, so let's just let it be.
         // Otherwise adjust base type and reference kind to make it
         // look as if lookup was done on the instance, that helps
@@ -10796,6 +10813,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                !cast<TypeAliasDecl>(decl)
                   ->getUnderlyingType()->getCanonicalType()
                     ->hasTypeParameter()) {
+
+      /* We're OK */
+
+    // The synthesized COM `IID` belongs to the protocol metatype itself and is
+    // accessible on `(any P).Type` without binding `Self`.
+    } else if (instanceTy->isExistentialType() &&
+               isCOMInterfaceIDMember(decl)) {
 
       /* We're OK */
     } else if (hasStaticMembers && baseObjTy->is<MetatypeType>() &&

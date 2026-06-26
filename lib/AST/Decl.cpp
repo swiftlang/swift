@@ -9614,6 +9614,22 @@ Type DeclContext::getSelfInterfaceType() const {
       return builtinTupleDecl->getTupleSelfType(dyn_cast<ExtensionDecl>(this));
 
     if (isa<ProtocolDecl>(nominalDecl)) {
+      // For the synthesized COM `IID` extension, `Self` is the metatype of the
+      // existential type: the member belongs to the protocol metatype, so its
+      // self parameter has type `(any P).Type`.  Walk outwards so this also
+      // applies when computing the self type of a member (e.g. the accessor)
+      // nested in the extension.
+      for (auto *dc = this; dc; dc = dc->getParent()) {
+        if (auto *ext = dyn_cast<ExtensionDecl>(dc)) {
+          if (isCOMInterfaceIDExtension(ext))
+            return MetatypeType::get(
+                ExistentialType::get(nominalDecl->getDeclaredInterfaceType()));
+          break;
+        }
+        if (isa<NominalTypeDecl>(dc))
+          break;
+      }
+
       auto *genericParams = nominalDecl->getGenericParams();
       return genericParams->getParams().front()
           ->getDeclaredInterfaceType();
@@ -9623,6 +9639,25 @@ Type DeclContext::getSelfInterfaceType() const {
   }
 
   return ErrorType::get(getASTContext());
+}
+
+bool swift::isCOMInterfaceIDExtension(const ExtensionDecl *ED) {
+  // `isImplicit()` is true only for extensions the compiler created, never for
+  // one written in source.  Our `IID` extension is synthesized, so anything the
+  // user wrote bails here.  This matters because the predicate is consulted on
+  // hot paths (getSelfInterfaceType, GenericSignatureRequest) and the
+  // `getExtendedNominal()` query below can drive the request evaluator; the
+  // short-circuit confines that to the handful of implicit extensions in a
+  // module rather than every extension being type-checked.
+  if (!ED->isImplicit())
+    return false;
+  auto *PD = dyn_cast_or_null<ProtocolDecl>(ED->getExtendedNominal());
+  return PD && PD->getAttrs().hasAttribute<COMAttr>();
+}
+
+bool swift::isCOMInterfaceIDMember(const ValueDecl *VD) {
+  auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+  return ED && isCOMInterfaceIDExtension(ED);
 }
 
 /// Return the full source range of this parameter.

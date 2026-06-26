@@ -10251,6 +10251,21 @@ const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
 /// the file. If \p parentSF is \c nullptr, \c false is returned.
 bool isMacroExpansionInContext(SourceLoc loc, SourceFile *parentSF);
 
+/// Whether \p ED is the compiler-synthesized extension that carries the
+/// \c IID member of a \c @com protocol.  Such an extension is implicit and
+/// extends a protocol bearing the \c @com attribute.  Its sole member, \c IID,
+/// is a (non-static) member of the protocol metatype: it is referenced on
+/// \c (any P).Type without binding \c Self and is not inherited by conforming
+/// types.  This is handled ad-hoc rather than as a general language feature, so
+/// the extension is non-generic (no generic signature or parameter list) and
+/// its self type is the metatype \c (any P).Type.
+bool isCOMInterfaceIDExtension(const ExtensionDecl *ED);
+
+/// Whether \p VD is a member of the synthesized \c IID extension of a \c @com
+/// protocol (see \c isCOMInterfaceIDExtension) — the \c IID property or one of
+/// its accessors.
+bool isCOMInterfaceIDMember(const ValueDecl *VD);
+
 class ABIRole {
 public:
   enum Value : uint8_t {

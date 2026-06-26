@@ -2014,6 +2014,9 @@ ConstraintSystem::getTypeOfMemberReferencePre(
                                   preparedOverload);
         }
       }
+    } else if (isCOMInterfaceIDMember(value)) {
+      // The synthesized COM `IID` belongs to the protocol metatype itself, not
+      // a conforming type, so it does not require opening the existential.
     } else {
       // Open the existential.
       auto openedArchetype =

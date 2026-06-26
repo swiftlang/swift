@@ -2577,15 +2577,20 @@ VarDecl *generateIDAccessor(ASTContext &C, DeclContext *DC, Identifier name,
   return VD;
 }
 
-/// Synthesize \c static \c var \c IID: \c GUID in an \c extension \c P.Protocol
-/// for a \c @com protocol.  The getter is \c @_alwaysEmitIntoClient.
+/// Synthesize \c var \c IID: \c GUID in an implicit \c extension of a \c @com
+/// protocol.  The getter is \c @_alwaysEmitIntoClient.  The member is declared
+/// as a regular (non-\c static) member rather than \c static: the extension's
+/// self type is the protocol metatype \c (any P).Type, so a regular member is
+/// already a member of the metatype, whereas \c static would hoist it one
+/// further level.  It is handled ad-hoc so that it is accessible on \c P.IID
+/// without binding \c Self and is not inherited by conforming types (see
+/// \c isCOMInterfaceIDExtension).
 void synthesizeIIDProperty(ProtocolDecl *PD, ASTContext &C, StringRef value) {
-  // Create an implicit `extension P.Protocol`.
+  // Create an implicit `extension P`.
   ExtensionDecl *ext =
       ExtensionDecl::create(C, SourceLoc(), nullptr, {},
                             PD->getModuleScopeContext(), nullptr);
   ext->setImplicit();
-  // ext->setIsMetatypeExtension();
   C.evaluator.cacheOutput(ExtendedTypeRequest{ext}, PD->getDeclaredType());
   ext->setExtendedNominal(PD);
   PD->addExtension(ext);
@@ -2594,7 +2599,7 @@ void synthesizeIIDProperty(ProtocolDecl *PD, ASTContext &C, StringRef value) {
     SF->addTopLevelDecl(ext);
 
   VarDecl *property =
-      generateIDAccessor(C, ext, C.Id_IID, value, /*isStatic=*/true,
+      generateIDAccessor(C, ext, C.Id_IID, value, /*isStatic=*/false,
                          /*AEIC=*/true, PD, /*isParent=*/false);
   if (!property)
     return;

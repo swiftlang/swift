@@ -3346,9 +3346,17 @@ public:
       if (!AFD->hasInterfaceType())
         return;
 
+      // The synthesized COM `IID` accessor lives in a protocol extension but is
+      // deliberately non-generic (its extension has no generic signature), so
+      // the generic-context invariants below do not apply to it.
+      bool isCOMInterfaceIDAccessor = false;
+      if (auto *ED = dyn_cast<ExtensionDecl>(AFD->getDeclContext()))
+        isCOMInterfaceIDAccessor = isCOMInterfaceIDExtension(ED);
+
       // If this function is generic or is within a generic context, it should
       // have an interface type.
-      if (AFD->isGenericContext() !=
+      if (!isCOMInterfaceIDAccessor &&
+          AFD->isGenericContext() !=
           AFD->getInterfaceType()->is<GenericFunctionType>()) {
         Out << "Functions in generic context must have an interface type\n";
         AFD->dump(Out);
@@ -3357,7 +3365,8 @@ public:
 
       // If the function has a generic interface type, it should also have a
       // generic signature.
-      if (AFD->isGenericContext() !=
+      if (!isCOMInterfaceIDAccessor &&
+          AFD->isGenericContext() !=
           (!AFD->getGenericSignature().isNull())) {
         Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
