@@ -1950,8 +1950,6 @@ static void salvageUnaryInst(SingleValueInstruction *SVI) {
     // original operands, which we fix up below.
     auto *cloned =
         cast<SingleValueInstruction>(SVI->clone(&*debugBB->begin()));
-    if (auto *fwdInst = ForwardingInstruction::get(cloned))
-      fwdInst->setForwardingOwnershipKind(OwnershipKind::None);
     oldArg->replaceAllUsesWith(cloned);
 
     // Replace the block arg type with the input operand type.
@@ -2146,7 +2144,6 @@ void swift::salvageDebugInfo(SILInstruction *I) {
             elements.push_back(SILUndef::get(elt));
           auto *newStructInst = builder.createStruct(
             DbgInst->getLoc(), structTy, elements);
-          newStructInst->setForwardingOwnershipKind(OwnershipKind::None);
           oldArg->replaceAllUsesWith(newStructInst);
 
           // Replace the block arg and wire the operand.

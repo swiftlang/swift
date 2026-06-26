@@ -1727,6 +1727,11 @@ public:
                            ArrayRef<SILValue> Elements,
                            ValueOwnershipKind forwardingOwnershipKind) {
     ASSERT(isLoadableOrOpaque(Ty) || isInsertingIntoGlobal());
+    // Debug reconstruction blocks have no ownership semantics.
+    if (BB && BB->isDebugReconstructionBlock())
+      forwardingOwnershipKind = OwnershipKind::None;
+    else
+      forwardingOwnershipKind = forwardingOwnershipKind.forwardToInit(Ty);
     return insert(StructInst::create(getSILDebugLocation(Loc), Ty, Elements,
                                      getModule(), forwardingOwnershipKind));
   }
@@ -1776,6 +1781,12 @@ public:
            (isInsertingIntoGlobal() && getTypeLowering(Ty).isFixedABI()));
     // Assert that this works and does not crash.
     (void)getModule().getCaseIndex(Element);
+
+    // Debug reconstruction blocks have no ownership semantics.
+    if (BB && BB->isDebugReconstructionBlock())
+      forwardingOwnershipKind = OwnershipKind::None;
+    else
+      forwardingOwnershipKind = forwardingOwnershipKind.forwardToInit(Ty);
 
     return insert(new (getModule())
                       EnumInst(getSILDebugLocation(Loc), Operand, Element, Ty,
