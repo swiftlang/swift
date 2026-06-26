@@ -416,7 +416,7 @@ extension OwnershipUseVisitor {
       }
       return pointerEscapingUse(of: operand)
 
-    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .bitwiseEscape:
+    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .debugUse, .bitwiseEscape:
       return ownershipLeafUse(of: operand, isInnerLifetime: false)
 
     case .borrow:
@@ -448,7 +448,7 @@ extension OwnershipUseVisitor {
       }
       return pointerEscapingUse(of: operand)
 
-    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .bitwiseEscape, .endBorrow, .reborrow:
+    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .debugUse, .bitwiseEscape, .endBorrow, .reborrow:
       return ownershipLeafUse(of: operand, isInnerLifetime: false)
 
     case .guaranteedForwarding:

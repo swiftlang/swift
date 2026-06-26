@@ -215,6 +215,7 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         return CanEscape;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
+      case OperandOwnership::DebugUse:
       case OperandOwnership::BitwiseEscape:
         if (updateLivenessAndWeakStores)
           liveness->updateForUse(user, /*lifetimeEnding*/ false);

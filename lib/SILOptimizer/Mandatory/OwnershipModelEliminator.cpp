@@ -67,10 +67,29 @@ struct OwnershipModelEliminatorVisitor
   /// builderCtxStorage.
   SILBuilderContext builderCtx;
 
+  /// A possibly null, possibly owned, possibly unowned pointer.
+  /// Owned if the boolean is true.
+  llvm::PointerIntPair<DominanceInfo *, 1, bool> domTree;
+
+  DominanceInfo *getDomTree(SILFunction *fn) {
+    if (!domTree.getPointer())
+      domTree = {new DominanceInfo(fn), true};
+    return domTree.getPointer();
+  }
+
+  ~OwnershipModelEliminatorVisitor() {
+    if (domTree.getInt())
+      delete domTree.getPointer();
+  }
+
   /// Construct an OME visitor for eliminating ownership from \p fn.
-  OwnershipModelEliminatorVisitor(SILFunction &fn)
+  OwnershipModelEliminatorVisitor(SILFunction &fn,
+                                  DominanceAnalysis *da = nullptr)
       : trackingList(), instructionsToSimplify(),
         builderCtx(fn.getModule(), &trackingList) {
+    if (da)
+      if (auto *cached = da->maybeGet(&fn).getPtrOrNull())
+        domTree = {cached, false};
   }
 
   /// A "syntactic" high level function that combines our insertPt with a
@@ -645,6 +664,13 @@ bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(
   withBuilder<void>(dvi, [&](SILBuilder &b, SILLocation loc) {
     b.emitDestroyValueOperation(loc, operand);
   });
+  // Kill debug_values that appear after the destroy: this instruction might
+  // free stored pointers, so later debug uses are wrong.
+  for (auto *use : getDebugUses(operand)) {
+    auto *dbgInst = cast<DebugValueInst>(use->getUser());
+    if (getDomTree(dvi->getFunction())->dominates(dvi, dbgInst))
+      dbgInst->killOperand();
+  }
   if (dvi->poisonRefs()) {
     injectDebugPoison(dvi);
   }
@@ -796,7 +822,8 @@ bool OwnershipModelEliminatorVisitor::visitDestructureTupleInst(
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
 
-static bool stripOwnership(SILFunction &func) {
+static bool stripOwnership(SILFunction &func,
+                           DominanceAnalysis *domAnalysis = nullptr) {
   // If F is an external declaration, do not process it.
   if (func.isExternalDeclaration())
     return false;
@@ -838,7 +865,7 @@ static bool stripOwnership(SILFunction &func) {
 
   bool madeChange = false;
   SmallVector<SILInstruction *, 32> createdInsts;
-  OwnershipModelEliminatorVisitor visitor(func);
+  OwnershipModelEliminatorVisitor visitor(func, domAnalysis);
 
   for (auto &block : func) {
     // Change all arguments to have OwnershipKind::None.
@@ -939,7 +966,7 @@ struct OwnershipModelEliminator : SILModuleTransform {
         getPassManager()->runSwiftFunctionVerification(&f);
       }
 
-      if (stripOwnership(f)) {
+      if (stripOwnership(f, getAnalysis<DominanceAnalysis>())) {
         auto InvalidKind = SILAnalysis::InvalidationKind::BranchesAndInstructions;
         invalidateAnalysis(&f, InvalidKind);
       }
