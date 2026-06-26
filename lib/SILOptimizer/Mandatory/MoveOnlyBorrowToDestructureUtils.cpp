@@ -297,6 +297,7 @@ bool Implementation::gatherUses(SILValue value) {
     case OperandOwnership::TrivialUse:
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::DebugUse:
     case OperandOwnership::InteriorPointer:
     case OperandOwnership::AnyInteriorPointer:
     case OperandOwnership::BitwiseEscape: {
@@ -1575,6 +1576,7 @@ static bool gatherBorrows(SILValue rootValue,
 
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::DebugUse:
     case OperandOwnership::BitwiseEscape:
       // We don't care about these types of uses.
       continue;

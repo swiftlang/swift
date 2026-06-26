@@ -1963,6 +1963,47 @@ static void salvageUnaryInst(SingleValueInstruction *SVI) {
   }
 }
 
+/// Salvage debug info for destructure_struct / destructure_tuple instructions.
+///
+/// These are multi-value instructions. For each result that has debug uses,
+/// creates the equivalent struct_extract or tuple_extract in the debug
+/// reconstruction block.
+/// IRGen does not support destructure instructions, so only extract
+/// instructions can be put into reconstruction blocks.
+static void salvageDestructureInst(SILInstruction *I) {
+  SILValue structOrTupleOperand = I->getOperand(0);
+
+  for (auto [i, result] : llvm::enumerate(I->getResults())) {
+    SmallVector<Operand *, 4> debugUses(getDebugUses(result));
+    for (Operand *U : debugUses) {
+      auto *DbgInst = cast<DebugValueInst>(U->getUser());
+      SILBasicBlock *debugBB =
+          DbgInst->getOrCreateDebugReconstructionBlock();
+      SILArgument *oldArg = debugBB->getArgument(0);
+
+      // Create the equivalent extract instruction in the debug BB.
+      SILBuilder builder(&*debugBB->begin());
+      SILValue undef = SILUndef::get(structOrTupleOperand);
+      SingleValueInstruction *extractInst;
+      if (auto *DSI = dyn_cast<DestructureStructInst>(I)) {
+        VarDecl *field = DSI->getStructDecl()->getStoredProperties()[i];
+        extractInst = builder.createStructExtract(
+            DbgInst->getLoc(), undef, field, result->getType());
+      } else {
+        extractInst = builder.createTupleExtract(
+            DbgInst->getLoc(), undef, i, result->getType());
+      }
+      oldArg->replaceAllUsesWith(extractInst);
+
+      // Replace the block arg type with the struct/tuple operand type.
+      auto *newArg = debugBB->replacePhiArgument(
+          0, structOrTupleOperand->getType(), OwnershipKind::None);
+      extractInst->setOperand(0, newArg);
+      DbgInst->setOperand(structOrTupleOperand);
+    }
+  }
+}
+
 /// Create a new debug value from a store and a debug variable.
 static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
                                     SILInstruction *SI,
@@ -2193,6 +2234,12 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 
   if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I))
     salvageNullaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<StructExtractInst>(I) || isa<TupleExtractInst>(I))
+    salvageUnaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<DestructureStructInst>(I) || isa<DestructureTupleInst>(I))
+    salvageDestructureInst(I);
 
   if (isa<AddressToPointerInst>(I) || isa<PointerToAddressInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
