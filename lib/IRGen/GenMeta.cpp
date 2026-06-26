@@ -7964,9 +7964,15 @@ GenericArgumentMetadata irgen::addGenericRequirements(
                                            /*key argument*/false,
                                            isPackRequirement,
                                            isValueRequirement);
-      auto typeName =
-          IGM.getTypeRef(requirement.getSecondType(), nullptr,
-                         MangledTypeRefRole::Metadata).first;
+      // Pass along the generic signature so that, if the runtime demangler is
+      // too old to understand this type's mangled name and we fall back to a
+      // dangling metadata-accessor function, the accessor can map the
+      // type-parameter-dependent type into a generic environment and bind it
+      // from the generic requirements buffer at runtime.
+      auto typeName = IGM.getTypeRef(requirement.getSecondType(),
+                                     sig.getCanonicalSignature(),
+                                     MangledTypeRefRole::Metadata)
+                          .first;
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),
