@@ -23,10 +23,11 @@
 #endif
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "swift/ABI/Actor.h"
-#include "swift/ABI/Task.h"
+#include "Debug.h"
 #include "ExecutorBridge.h"
 #include "TaskPrivate.h"
+#include "swift/ABI/Actor.h"
+#include "swift/ABI/Task.h"
 #include "swift/Basic/HeaderFooterLayout.h"
 #include "swift/Basic/PriorityQueue.h"
 #include "swift/Concurrency/Actor.h"
@@ -211,6 +212,11 @@ SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
 ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace
+
+[[gnu::used, gnu::retain]]
+const swift::_concurrency_current_task_storage_kind
+    swift::_swift_concurrency_debug_currentTaskStorageKind =
+        SWIFT_THREAD_LOCAL_STORAGE_KIND;
 
 void swift::runJobInEstablishedExecutorContext(Job *job,
                                                SerialExecutorRef serialExecutor,
