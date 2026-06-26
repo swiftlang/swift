@@ -4893,7 +4893,7 @@ public:
 
   SourceLoc getStartLoc() const { return EnumLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(EnumLoc, getBraces().End);
+    return SourceRange::combine(EnumLoc, getBraces().End);
   }
 
 public:
@@ -5097,7 +5097,7 @@ public:
 
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(StructLoc, getBraces().End);
+    return SourceRange::combine(StructLoc, getBraces().End);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -5253,7 +5253,7 @@ public:
 
   SourceLoc getStartLoc() const { return ClassLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(ClassLoc, getBraces().End);
+    return SourceRange::combine(ClassLoc, getBraces().End);
   }
 
   /// Determine whether the member area of this class's metadata (which consists
@@ -5741,7 +5741,7 @@ public:
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(ProtocolLoc, getBraces().End);
+    return SourceRange::combine(ProtocolLoc, getBraces().End);
   }
 
   /// True if this protocol can only be conformed to by class types.
