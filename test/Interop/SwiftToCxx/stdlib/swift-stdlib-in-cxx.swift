@@ -132,7 +132,7 @@
 // CHECK-NEXT: private:
 
 // CHECK: class AnyKeyPath { } SWIFT_UNAVAILABLE_MSG("class 'AnyKeyPath' is not yet exposed to C++");
-// CHECK: class Comparable { } SWIFT_UNAVAILABLE_MSG("protocol 'Comparable' can not yet be represented in C++");
+// CHECK: class Comparable { } SWIFT_UNAVAILABLE_MSG("protocol 'Comparable' is not yet exposed to C++");
 // CHECK: class FloatingPointSign { } SWIFT_UNAVAILABLE_MSG("enum 'FloatingPointSign' is not yet exposed to C++");
 // CHECK: // Unavailable in C++: Swift global function 'abs(_:)'.{{.*}}can not yet be {{.*}} in C++.
 

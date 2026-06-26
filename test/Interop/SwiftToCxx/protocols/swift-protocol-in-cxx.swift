@@ -1,0 +1,91 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -module-name Protocols -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/protocols.h -cxx-interoperability-mode=upcoming-swift
+// RUN: %FileCheck %s < %t/protocols.h
+
+// RUN: %check-interop-cxx-header-in-clang(%t/protocols.h -DSWIFT_CXX_INTEROP_UPCOMING_SWIFT)
+
+// REQUIRES: objc_interop
+
+// expected-no-diagnostics
+
+public protocol Drawable {
+    func draw() -> Int
+}
+
+public protocol Resizable {
+    func resize(to factor: Int) -> Bool
+}
+
+public protocol Taggable: Sendable {}
+
+@_marker public protocol Priority {}
+
+// CHECK-LABEL: namespace Protocols
+
+// --- Non-marker protocol: Drawable ---
+
+// CHECK-LABEL: class _impl_Drawable;
+
+// CHECK:       class
+// CHECK-SAME:  Drawable final : public swift::_impl::SwiftExistentialType {
+// CHECK-NEXT:  public:
+// CHECK-NEXT:  private:
+// CHECK:         Drawable() noexcept : SwiftExistentialType(uninit_t{}) {}
+// CHECK:         const void *_Nonnull _witnessTable;
+// CHECK:         friend class _impl::_impl_Drawable;
+// CHECK:       };
+
+// CHECK:       class _impl_Drawable {
+// CHECK-NEXT:  public:
+// CHECK-NEXT:  };
+
+// --- Marker protocol: Priority (subclass of swift::Any) ---
+
+// CHECK-LABEL: class _impl_Priority;
+
+// CHECK:       class
+// CHECK-SAME:  Priority final : public swift::Any {
+// CHECK-NEXT:  public:
+// CHECK-NEXT:  private:
+// CHECK:         Priority() noexcept : Any() {}
+// CHECK-NOT:     _witnessTable
+// CHECK:         friend class _impl::_impl_Priority;
+// CHECK:       };
+
+// CHECK:       class _impl_Priority {
+// CHECK-NEXT:  public:
+// CHECK-NEXT:  };
+
+// --- Non-marker protocol: Resizable ---
+
+// CHECK-LABEL: class _impl_Resizable;
+
+// CHECK:       class
+// CHECK-SAME:  Resizable final : public swift::_impl::SwiftExistentialType {
+// CHECK-NEXT:  public:
+// CHECK-NEXT:  private:
+// CHECK:         Resizable() noexcept : SwiftExistentialType(uninit_t{}) {}
+// CHECK:         const void *_Nonnull _witnessTable;
+// CHECK:         friend class _impl::_impl_Resizable;
+// CHECK:       };
+
+// CHECK:       class _impl_Resizable {
+// CHECK-NEXT:  public:
+// CHECK-NEXT:  };
+
+// --- Non-marker protocol inheriting Sendable: Taggable ---
+
+// CHECK-LABEL: class _impl_Taggable;
+
+// CHECK:       class
+// CHECK-SAME:  Taggable final : public swift::_impl::SwiftExistentialType {
+// CHECK-NEXT:  public:
+// CHECK-NEXT:  private:
+// CHECK:         Taggable() noexcept : SwiftExistentialType(uninit_t{}) {}
+// CHECK:         const void *_Nonnull _witnessTable;
+// CHECK:         friend class _impl::_impl_Taggable;
+// CHECK:       };
+
+// CHECK:       class _impl_Taggable {
+// CHECK-NEXT:  public:
+// CHECK-NEXT:  };

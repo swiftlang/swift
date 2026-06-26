@@ -303,6 +303,15 @@ protected:
 
 } // namespace _impl
 
+/// Swift's Any type -- a zero-witness-table existential container.
+/// Holds any Swift value with type metadata for lifecycle operations.
+/// C++ code cannot inspect the contained value but can pass it back
+/// to Swift APIs for unboxing. Marker protocols inherit from this.
+class Any : public _impl::SwiftExistentialType {
+protected:
+  SWIFT_INLINE_THUNK Any() noexcept : SwiftExistentialType(uninit_t{}) {}
+};
+
 /// Swift's Int type.
 using Int = ptrdiff_t;
 
