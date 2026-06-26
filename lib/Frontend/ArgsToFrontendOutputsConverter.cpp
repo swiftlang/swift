@@ -533,6 +533,7 @@ static bool shouldEmitFineModuleTrace(FrontendOptions::ActionType action) {
   switch(action) {
   case swift::FrontendOptions::ActionType::Typecheck:
   case swift::FrontendOptions::ActionType::EmitSILGen:
+  case swift::FrontendOptions::ActionType::EmitSILGenOSSA:
   case swift::FrontendOptions::ActionType::EmitSIL:
   case swift::FrontendOptions::ActionType::EmitAssembly:
   case swift::FrontendOptions::ActionType::EmitLoweredSIL:
