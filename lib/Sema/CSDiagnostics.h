@@ -2406,15 +2406,6 @@ public:
   bool diagnoseAsError() override;
 };
 
-class InvalidUseOfTrailingClosure final : public ArgumentMismatchFailure {
-public:
-  InvalidUseOfTrailingClosure(const Solution &solution, Type argType,
-                              Type paramType, ConstraintLocator *locator)
-      : ArgumentMismatchFailure(solution, argType, paramType, locator) {}
-
-  bool diagnoseAsError() override;
-};
-
 /// Diagnose the invalid conversion of a temporary pointer argument generated
 /// from an X-to-pointer conversion to an @_nonEphemeral parameter.
 ///
