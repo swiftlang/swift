@@ -2027,6 +2027,12 @@ public:
   lookupImplementationFileDecls(llvm::function_ref<bool(ClangNode)> filter,
     llvm::function_ref<void(const clang::Decl*)> receiver,
     llvm::function_ref<void(const swift::ImportDecl *)> receiverImports) const;
+
+private:
+  std::optional<const clang::NamespaceDecl *> stdNS;
+
+public:
+  const clang::NamespaceDecl *getCxxStdNamespace();
 };
 
 class ImportDiagnosticAdder {

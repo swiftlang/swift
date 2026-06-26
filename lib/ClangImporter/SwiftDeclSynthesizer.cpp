@@ -2188,7 +2188,7 @@ FuncDecl *SwiftDeclSynthesizer::makeHashFunc(NominalTypeDecl *decl,
       /*Throws=*/false, /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, returnType, decl);
   hashFunc->setSynthesized();
-  hashFunc->setAccess(AccessLevel::Public);
+  hashFunc->setAccess(decl->getEffectiveAccess());
   hashFunc->setBodySynthesizer(synthesizeHashFuncBody, stdHash);
 
   return hashFunc;

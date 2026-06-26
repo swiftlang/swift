@@ -31,6 +31,7 @@ bool hasIteratorCategory(const clang::CXXRecordDecl *clangDecl);
 bool isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl);
 
 void deriveAutomaticCxxConformances(ClangImporter::Implementation &Impl,
+                                    SwiftDeclSynthesizer &synthesizer,
                                     NominalTypeDecl *result,
                                     const clang::CXXRecordDecl *clangDecl);
 } // namespace swift

@@ -3386,7 +3386,7 @@ namespace {
       validatePrivateFileIDAttributes(decl);
 
       if (auto *nominalResult = dyn_cast<NominalTypeDecl>(result)) {
-        deriveAutomaticCxxConformances(Impl, nominalResult, decl);
+        deriveAutomaticCxxConformances(Impl, synthesizer, nominalResult, decl);
 
         if (ClangImporter::Implementation::needsClosureConstructor(decl)) {
           if (auto *ctor = synthesizer.makeClosureConstructor(nominalResult))
