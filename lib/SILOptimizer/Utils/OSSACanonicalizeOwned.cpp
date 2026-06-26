@@ -219,6 +219,7 @@ bool OSSACanonicalizeOwned::computeCanonicalLiveness() {
         return false;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
+      case OperandOwnership::DebugUse:
         liveness->updateForUse(user, /*lifetimeEnding*/ false);
         break;
       case OperandOwnership::ForwardingConsume:

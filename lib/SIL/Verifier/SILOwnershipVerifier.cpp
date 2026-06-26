@@ -236,7 +236,8 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
 
     // For example, type dependent operands are non-use. It is not interesting
     // from an ownership perspective.
-    if (op->getOperandOwnership() == OperandOwnership::NonUse)
+    if (op->getOperandOwnership() == OperandOwnership::NonUse ||
+        op->getOperandOwnership() == OperandOwnership::DebugUse)
       continue;
 
     // First check if this recursive use is compatible with our values ownership
@@ -350,9 +351,10 @@ bool SILValueOwnershipChecker::gatherUsers(
       return false;
     }
 
-    // If this op is a type dependent operand, skip it. It is not interesting
+    // For example, type dependent operands are non-use. It is not interesting
     // from an ownership perspective.
-    if (user->isTypeDependentOperand(*op))
+    if (op->getOperandOwnership() == OperandOwnership::NonUse ||
+        op->getOperandOwnership() == OperandOwnership::DebugUse)
       continue;
 
     // First check if this recursive use is compatible with our values
