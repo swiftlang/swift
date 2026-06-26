@@ -14,6 +14,8 @@
 #define SWIFT_PRINTASCLANG_PRINTCLANGEXISTENTIALTYPE_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
 #include <string>
@@ -39,10 +41,30 @@ private:
   void printMarkerProtocolDecl(const ProtocolDecl *PD,
                                DeclAndTypePrinter &declAndTypePrinter);
 
-  /// Emits C++ methods for protocol requirements, dispatching through
-  /// the witness table via _callWitness.
+  /// Emits C++ methods for protocol requirements, including inherited
+  /// requirements from base protocols (flattened into the wrapper).
   void printProtocolRequirementMethods(const ProtocolDecl *PD,
                                        DeclAndTypePrinter &declAndTypePrinter);
+
+  /// A step in the chain of base witness table loads needed to reach
+  /// an inherited protocol's witness table from _witnessTable.
+  struct BaseWTStep {
+    size_t offset;
+  };
+
+  /// Recursively emits methods for PD and all its base protocols.
+  /// baseChain describes the sequence of WT loads from _witnessTable
+  /// needed to reach PD's witness table.
+  void emitMethodsForProtocol(
+      const ProtocolDecl *PD, ArrayRef<BaseWTStep> baseChain,
+      llvm::SmallPtrSetImpl<const FuncDecl *> &emittedMethods,
+      DeclAndTypePrinter &declAndTypePrinter);
+
+  /// Emits a single C++ method that dispatches through a witness table.
+  void emitExistentialMethod(const FuncDecl *FD, size_t methodOffset,
+                             uint16_t ptrAuthDisc,
+                             ArrayRef<BaseWTStep> baseChain,
+                             DeclAndTypePrinter &declAndTypePrinter);
 
   /// Returns the C++ type name for a Swift type if it is a simple
   /// C-representable primitive, or None otherwise.

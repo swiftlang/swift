@@ -20,6 +20,10 @@ public protocol Taggable: Sendable {}
 
 @_marker public protocol Priority {}
 
+public protocol Stylable: Drawable {
+    func style() -> Bool
+}
+
 // CHECK-LABEL: namespace Protocols
 
 // --- Non-marker protocol: Drawable ---
@@ -80,6 +84,35 @@ public protocol Taggable: Sendable {}
 // CHECK:       };
 
 // CHECK:       class _impl_Resizable {
+// CHECK-NEXT:  public:
+// CHECK-NEXT:  };
+
+// --- Non-marker protocol inheriting Drawable: Stylable ---
+// Inherited draw() uses two-level dispatch through base WT.
+
+// CHECK-LABEL: class _impl_Stylable;
+
+// CHECK:       class
+// CHECK-SAME:  Stylable final : public swift::_impl::SwiftExistentialType {
+// CHECK-NEXT:  public:
+// CHECK:         swift::Int draw() const {
+// CHECK-NEXT:      // Type-only witness signature (never instantiated).
+// CHECK-NEXT:      struct _w { _w() = delete; static SWIFT_CALL swift::Int call(void *_Nonnull, const void *_Nonnull, SWIFT_CONTEXT void *_Nonnull); };
+// CHECK-NEXT:      auto *_bwt0 = reinterpret_cast<const void *const *>(_witnessTable)[1];
+// CHECK-NEXT:      return _loadWitness<1, {{[0-9]+}}, decltype(&_w::call)>(_bwt0)(_type, _bwt0, _projectValue());
+// CHECK-NEXT:    }
+// CHECK:         bool style() const {
+// CHECK-NEXT:      // Type-only witness signature (never instantiated).
+// CHECK-NEXT:      struct _w { _w() = delete; static SWIFT_CALL bool call(void *_Nonnull, const void *_Nonnull, SWIFT_CONTEXT void *_Nonnull); };
+// CHECK-NEXT:      return _loadWitness<2, {{[0-9]+}}, decltype(&_w::call)>(_witnessTable)(_type, _witnessTable, _projectValue());
+// CHECK-NEXT:    }
+// CHECK:       private:
+// CHECK:         Stylable() noexcept : SwiftExistentialType(uninit_t{}) {}
+// CHECK:         const void *_Nonnull _witnessTable;
+// CHECK:         friend class _impl::_impl_Stylable;
+// CHECK:       };
+
+// CHECK:       class _impl_Stylable {
 // CHECK-NEXT:  public:
 // CHECK-NEXT:  };
 

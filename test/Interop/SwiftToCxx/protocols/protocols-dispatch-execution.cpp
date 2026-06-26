@@ -20,6 +20,7 @@
 
 extern "C" void createCircleDrawable(void *out, swift::Int radius);
 extern "C" void createCircleResizable(void *out, swift::Int radius);
+extern "C" void createStyledCircleStylable(void *out, swift::Int radius);
 
 int main() {
     // Test 1: Drawable::draw() -- no user params, offset 1.
@@ -38,7 +39,7 @@ int main() {
 // CHECK: draw() = 49
 
     // Test 2: Resizable::resize(to:) -- one Int param, tests the
-    // _callWitness parameter ordering (user args before self/metadata/wt).
+    // parameter ordering (user args before self/metadata/wt).
     {
         alignas(alignof(ProtoDispatch::Resizable))
             char storage[sizeof(ProtoDispatch::Resizable)];
@@ -56,6 +57,27 @@ int main() {
     }
 // CHECK-NEXT: resize(3) = true
 // CHECK-NEXT: resize(10) = false
+
+    // Test 3: Stylable -- inherited draw() via two-level WT dispatch,
+    // plus own style() via direct dispatch.
+    {
+        alignas(alignof(ProtoDispatch::Stylable))
+            char storage[sizeof(ProtoDispatch::Stylable)];
+        createStyledCircleStylable(storage, 7);
+
+        auto &stylable =
+            *reinterpret_cast<ProtoDispatch::Stylable *>(storage);
+
+        swift::Int drawResult = stylable.draw();
+        printf("stylable.draw() = %ld\n", drawResult);
+        assert(drawResult == 147);  // 7*7*3
+
+        bool styleResult = stylable.style();
+        printf("stylable.style() = %s\n", styleResult ? "true" : "false");
+        assert(styleResult == true);  // 7 > 5
+    }
+// CHECK-NEXT: stylable.draw() = 147
+// CHECK-NEXT: stylable.style() = true
 
     printf("done\n");
 // CHECK-NEXT: done
