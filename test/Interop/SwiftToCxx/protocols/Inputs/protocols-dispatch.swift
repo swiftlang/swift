@@ -12,6 +12,11 @@ public protocol Stylable: Drawable {
     func style() -> Bool
 }
 
+public protocol Container<Element> {
+    associatedtype Element
+    func count() -> Int
+}
+
 public struct Circle: Drawable, Resizable {
     var radius: Int
     public init(radius: Int) { self.radius = radius }
@@ -24,6 +29,13 @@ public struct StyledCircle: Stylable {
     public init(radius: Int) { self.radius = radius }
     public func draw() -> Int { return radius * radius * 3 }
     public func style() -> Bool { return radius > 5 }
+}
+
+public struct IntArray: Container {
+    public typealias Element = Int
+    var storage: [Int]
+    public init(_ values: [Int]) { self.storage = values }
+    public func count() -> Int { return storage.count }
 }
 
 // Thunks to create existentials from C++. The compiler will
@@ -45,4 +57,10 @@ func createCircleResizable(_ outPtr: UnsafeMutableRawPointer, _ radius: Int) {
 func createStyledCircleStylable(_ outPtr: UnsafeMutableRawPointer, _ radius: Int) {
     outPtr.assumingMemoryBound(to: (any Stylable).self)
         .initialize(to: StyledCircle(radius: radius))
+}
+
+@_cdecl("createIntArrayContainer")
+func createIntArrayContainer(_ outPtr: UnsafeMutableRawPointer, _ n: Int) {
+    outPtr.assumingMemoryBound(to: (any Container<Int>).self)
+        .initialize(to: IntArray(Array(1...n)))
 }

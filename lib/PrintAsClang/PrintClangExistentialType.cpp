@@ -21,6 +21,7 @@
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/TypeLowering.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/SipHash.h"
 
 using namespace swift;
@@ -274,14 +275,37 @@ void ClangExistentialTypePrinter::printImplFromExistentialFactory(
     const ProtocolDecl *PD, DeclAndTypePrinter &declAndTypePrinter) {
   ClangSyntaxPrinter printer(PD->getASTContext(), os);
 
+  auto pats = PD->getPrimaryAssociatedTypes();
+  if (!pats.empty()) {
+    os << "  template <";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << "typename " << pat->getNameStr();
+    });
+    os << ">\n";
+  }
+
   os << "  static ";
   printer.printInlineForThunk();
   printer.printBaseName(PD);
+  if (!pats.empty()) {
+    os << "<";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << pat->getNameStr();
+    });
+    os << ">";
+  }
   os << " _fromExistential("
         "const swift::_impl::SwiftExistentialType &src, "
         "const void *_Nonnull wt) {\n";
   os << "    ";
   printer.printBaseName(PD);
+  if (!pats.empty()) {
+    os << "<";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << pat->getNameStr();
+    });
+    os << ">";
+  }
   os << " result;\n";
   os << "    result._initializeWithCopy(src);\n";
   os << "    result._witnessTable = wt;\n";
@@ -362,6 +386,15 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
                            });
 
     // Existential wrapper class: subclass of SwiftExistentialType.
+    // Protocols with primary associated types become class templates.
+    auto pats = PD->getPrimaryAssociatedTypes();
+    if (!pats.empty()) {
+      os << "template <";
+      llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+        os << "typename " << pat->getNameStr() << " = swift::Any";
+      });
+      os << ">\n";
+    }
     os << "class";
     declAndTypePrinter.printAvailability(os, PD);
     ClangSyntaxPrinter(PD->getASTContext(), os).printSymbolUSRAttribute(PD);

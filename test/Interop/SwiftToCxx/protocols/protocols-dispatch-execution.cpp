@@ -21,6 +21,7 @@
 extern "C" void createCircleDrawable(void *out, swift::Int radius);
 extern "C" void createCircleResizable(void *out, swift::Int radius);
 extern "C" void createStyledCircleStylable(void *out, swift::Int radius);
+extern "C" void createIntArrayContainer(void *out, swift::Int n);
 
 int main() {
     // Test 1: Drawable::draw() -- no user params, offset 1.
@@ -95,6 +96,22 @@ int main() {
         assert(drawResult == 147);  // same as stylable.draw()
     }
 // CHECK-NEXT: asDrawable().draw() = 147
+
+    // Test 5: Container<swift::Int> -- protocol with primary associated type.
+    // The template parameter is a type tag; the existential layout is the same.
+    {
+        using ContainerInt = ProtoDispatch::Container<swift::Int>;
+        alignas(alignof(ContainerInt))
+            char storage[sizeof(ContainerInt)];
+        createIntArrayContainer(storage, 5);
+
+        auto &container =
+            *reinterpret_cast<ContainerInt *>(storage);
+        swift::Int n = container.count();
+        printf("container.count() = %ld\n", n);
+        assert(n == 5);
+    }
+// CHECK-NEXT: container.count() = 5
 
     printf("done\n");
 // CHECK-NEXT: done

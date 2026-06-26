@@ -12,6 +12,11 @@ public protocol Drawable {
     func draw() -> Int
 }
 
+public protocol Container<Element> {
+    associatedtype Element
+    func count() -> Int
+}
+
 public protocol Resizable {
     func resize(to factor: Int) -> Bool
 }
@@ -25,6 +30,28 @@ public protocol Stylable: Drawable {
 }
 
 // CHECK-LABEL: namespace Protocols
+
+// --- Protocol with primary associated type: Container<Element> ---
+
+// CHECK-LABEL: class _impl_Container;
+
+// CHECK:       template <typename Element = swift::Any>
+// CHECK-NEXT:  class
+// CHECK-SAME:  Container final : public swift::_impl::SwiftExistentialType {
+// CHECK-NEXT:  public:
+// CHECK:         swift::Int count() const {
+// CHECK:       private:
+// CHECK:         Container() noexcept : SwiftExistentialType(uninit_t{}) {}
+// CHECK:         const void *_Nonnull _witnessTable;
+// CHECK:         friend class _impl::_impl_Container;
+// CHECK:       };
+
+// CHECK:       class _impl_Container {
+// CHECK-NEXT:  public:
+// CHECK:         template <typename Element>
+// CHECK-NEXT:    static {{.*}} Container<Element> _fromExistential(const swift::_impl::SwiftExistentialType &src, const void *_Nonnull wt) {
+// CHECK-NEXT:      Container<Element> result;
+// CHECK:       };
 
 // --- Non-marker protocol: Drawable ---
 
