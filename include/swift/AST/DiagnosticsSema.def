@@ -2204,6 +2204,17 @@ WARNING(extern_c_maybe_invalid_name, none,
 ERROR(extern_variable_initializer, none,
       "'@_extern' variable cannot have an initializer", ())
 
+// @com
+ERROR(attr_com_requires_flag, none, "'@com' requires '-enable-experimental-com-interop'", ())
+ERROR(attr_com_invalid_guid, none,
+      "'%0' is not a valid GUID; expected format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'", (StringRef))
+ERROR(attr_com_protocol_requires_iid, none,
+      "'@com' on a protocol requires 'interface:' argument", ())
+ERROR(attr_com_protocol_unexpected_arg, none,
+      "'@com' on a protocol must only have 'interface:'; '%0' is not allowed", (StringRef))
+ERROR(attr_com_class_unexpected_iid, none,
+      "'@com' on a class must not have 'interface:'; use 'implementation:' instead", ())
+
 // @_staticExclusiveOnly
 ERROR(attr_static_exclusive_only_disabled,none,
       "attribute requires '-enable-experimental feature StaticExclusiveOnly'", ())

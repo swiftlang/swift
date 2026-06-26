@@ -293,6 +293,10 @@ protected:
     SWIFT_INLINE_BITFIELD(NonexhaustiveAttr, DeclAttribute, NumNonexhaustiveModeBits,
       mode : NumNonexhaustiveModeBits
     );
+
+    SWIFT_INLINE_BITFIELD(COMAttr, DeclAttribute, 3,
+      threading : 3
+    );
   } Bits;
   // clang-format on
 
@@ -3760,6 +3764,60 @@ public:
   bool isEquivalent(const DiagnoseAttr *other,
                     Decl *attachedTo) const {
     return Reason == other->Reason;
+  }
+};
+
+
+/// Threading model for COM coclass, specified via `@com(threading:)`.
+//Must match COMThreadingModel in the COM module.
+enum class COMThreadingModel : uint8_t {
+  Single = 0,
+  Apartment,
+  Free,
+  Both,
+  Neutral,
+};
+
+/// Defines a @com attribute, appertains to `protocol` and `class`.
+///
+/// On a `protocol`: `@com(interface: "...")`
+///   Declares a COM interface with the given Interface ID.
+///
+/// On a `class`: `@com(implementation: "...", threading: .apartment)`
+///   Declares a COM coclass with the given Class ID and optional threading
+///   model (defaults to `.apartment`).
+///
+/// The parser accepts the superset of arguments; sema validates that the
+//correct subset is present for the declaration kind.
+class COMAttr : public DeclAttribute {
+public:
+  const StringRef IID;
+  const std::optional<StringRef> CLSID;
+
+  COMAttr(SourceLoc Loc, SourceRange Range, StringRef IID,
+          std::optional<StringRef> CLSID, COMThreadingModel ThreadingModel,
+          bool Implicit = false)
+      : DeclAttribute(DeclAttrKind::COM, Loc, Range, Implicit),
+        IID(IID), CLSID(CLSID) {
+    Bits.COMAttr.threading = static_cast<unsigned>(ThreadingModel);
+  }
+
+  COMThreadingModel getThreadingModel() const {
+    return static_cast<COMThreadingModel>(Bits.COMAttr.threading);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::COM;
+  }
+
+  COMAttr *clone(ASTContext &context) const {
+    return new (context) COMAttr(AtLoc, Range, IID, CLSID, getThreadingModel(),
+                                 isImplicit());
+  }
+
+  bool isEquivalent(const COMAttr *other, Decl *attachedTo) const {
+    return IID == other->IID && CLSID == other->CLSID &&
+        getThreadingModel() == other->getThreadingModel();
   }
 };
 

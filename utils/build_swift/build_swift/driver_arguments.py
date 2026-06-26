@@ -1520,7 +1520,10 @@ def create_argument_parser():
            default=True,
            help='emit -index-store-path while building LLVM/Clang and Swift '
                 'host tools (gated on the host compiler accepting the flag, '
-                'so it is a no-op for older compilers). Defaults to ON.')
+                'so it is a no-op for older compilers). Defaults to ON, but '
+                'is forced OFF when --sccache is in use (sccache cannot '
+                'cache the index-store side outputs and would otherwise '
+                'miss on every translation unit).')
 
     option('--llvm-targets-to-build', store,
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',

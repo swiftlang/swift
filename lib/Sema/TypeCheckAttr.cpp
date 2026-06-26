@@ -417,6 +417,7 @@ public:
   void visitAvailableAttr(AvailableAttr *attr);
 
   void visitCDeclAttr(CDeclAttr *attr);
+  void visitCOMAttr(COMAttr *attr);
   void visitExposeAttr(ExposeAttr *attr);
   void visitExternAttr(ExternAttr *attr);
   void visitUsedAttr(UsedAttr *attr);
@@ -2444,6 +2445,48 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
   }
+}
+
+void AttributeChecker::visitCOMAttr(COMAttr *attr) {
+  if (!Ctx.LangOpts.EnableCOMInterop) {
+    diagnoseAndRemoveAttr(attr, diag::attr_com_requires_flag);
+    return;
+  }
+
+  if (isa<ProtocolDecl>(D)) {
+    if (attr->IID.empty()) {
+      diagnose(attr->getLocation(), diag::attr_com_protocol_requires_iid);
+      attr->setInvalid();
+      return;
+    }
+
+    if (attr->CLSID && !attr->CLSID->empty()) {
+      diagnose(attr->getLocation(), diag::attr_com_protocol_unexpected_arg, "CLSID");
+      attr->setInvalid();
+      return;
+    }
+
+    if (!UUID::fromString(attr->IID.str().c_str())) {
+      diagnose(attr->getLocation(), diag::attr_com_invalid_guid, attr->IID);
+      attr->setInvalid();
+      return;
+    }
+  } else if (isa<ClassDecl>(D)) {
+    if (!attr->IID.empty()) {
+      diagnose(attr->getLocation(), diag::attr_com_class_unexpected_iid);
+      attr->setInvalid();
+      return;
+    }
+
+    if (attr->CLSID && (attr->CLSID->empty() ||
+                        !UUID::fromString(attr->CLSID->str().c_str()))) {
+      diagnose(attr->getLocation(), diag::attr_com_invalid_guid, *attr->CLSID);
+      attr->setInvalid();
+      return;
+    }
+  }
+
+  // TODO(compnerd) ensure that `ISwiftObject` is not conformed to.
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
