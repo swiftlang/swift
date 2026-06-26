@@ -765,6 +765,12 @@ extension LifetimeDependenceDefUseWalker {
     if let apply = operand.instruction as? FullApplySite {
       return visitAppliedUse(of: operand, by: apply)
     }
+    // withoutActuallyEscaping captures a noescape closure while returning an escaping closure.
+    if let pa = operand.instruction as? PartialApplyInst,
+       let closureFunction = pa.referencedFunction,
+       closureFunction.isWithoutActuallyEscapingThunk {
+      return .continueWalk
+    }
     if operand.instruction is ReturnInstruction, !operand.value.isEscapable {
       return returnedDependence(result: operand)
     }
@@ -851,6 +857,13 @@ extension LifetimeDependenceDefUseWalker {
   }
 
   mutating func pointerEscapingUse(of operand: Operand) -> WalkResult {
+    // OwnershipUseVisitor calls pointerEscapingUse for an escaping mark_dependence. If, however, the dependent value is
+    // escapable, then it can be ignored by lifetime dependence analysis, which generally ignores escapable
+    // values. SILGen may generate an escaping mark_dependence for patterns that don't otherwise have proper ownership
+    // support, e.g. createWithoutActuallyEscapingClosure().
+    if let mdi = operand.instruction as? MarkDependenceInst, operand == mdi.baseOperand, mdi.mayEscape {
+      return .continueWalk
+    }
     return escapingDependence(on: operand)
   }
 

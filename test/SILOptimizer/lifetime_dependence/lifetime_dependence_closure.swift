@@ -2,6 +2,7 @@
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
+// RUN:   -disable-availability-checking \
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature Lifetimes
 
@@ -239,4 +240,48 @@ func copyClosureNE(body: () -> NE) -> NE {
 func callCopyClosureNE(ne: NE) -> NE {
   let neo = copyClosureNE { ne }
   return neo
+}
+
+// =============================================================================
+// easily recognizable patterns involving the capture of an array's span
+
+func closure_array_int(_: [Int], _ f: ()->Int) -> Int { f() }
+
+func testCaptureSpanReturnElement(array: consuming [Int]) -> Int {
+  let span = array.span
+  return closure_array_int(array) { span[0] }
+}
+
+func closure_consuming_array_int(_: consuming [Int], _ f: ()->Int) -> Int { f() }
+
+func testConsumeAndCaptureSpanReturnElement(array: consuming [Int]) -> Int {
+  // expected-error@-1{{'array' used after consume}}
+  let span = array.span // expected-note{{conflicting access is here}}
+  return closure_consuming_array_int(array) { span[0] }
+  // expected-error@-1{{overlapping accesses to 'array', but deinitialization requires exclusive access}}
+  // expected-note@-2{{consumed here}}
+}
+
+func closure_span(_ f: ()->Span<Int>) -> Span<Int> { f() }
+
+func testArgSpanCaptureReturnSpan(array: [Int]) -> Span<Int> {
+  let span = array.span
+  return closure_span { span }
+}
+
+@_lifetime(immortal)
+func testConsumingArgSpanCaptureReturnSpan(array: consuming [Int]) -> Span<Int> {
+  let span = array.span // expected-note{{it depends on this scoped access to variable 'array'}}
+  return closure_span { span }
+  // expected-error@-1{{lifetime-dependent value escapes its scope}}
+  // expected-note@-2{{this use causes the lifetime-dependent value to escape}}
+}
+
+@_lifetime(immortal)
+func testLocalSpanCaptureReturnSpan() -> Span<Int> {
+  let array = [1,2,3] // expected-note{{it depends on the lifetime of variable 'array'}}
+  let span = array.span
+  return closure_span { span }
+  // expected-error@-1{{lifetime-dependent value escapes its scope}}
+  // expected-note@-2{{this use causes the lifetime-dependent value to escape}}
 }
