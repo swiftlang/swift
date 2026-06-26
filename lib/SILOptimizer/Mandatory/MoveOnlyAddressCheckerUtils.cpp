@@ -400,6 +400,19 @@ static bool isReinitToInitConvertibleInst(SILInstruction *memInst) {
 
 using ScopeRequiringFinalInit = DiagnosticEmitter::ScopeRequiringFinalInit;
 
+/// Unwrap a mark_unresolved_non_copyable_value to get the underlying address.
+static SILValue
+unwrapMarkedAddrOperand(MarkUnresolvedNonCopyableValueInst *markedAddr) {
+  SILValue operand = markedAddr->getOperand();
+
+  // Look through wrappers.
+  if (auto m = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand)) {
+    operand = m->getOperand();
+  }
+
+  return operand;
+}
+
 /// If \p markedAddr's operand must be initialized at the end of the scope it
 /// introduces, visit those scope ending ends.
 ///
@@ -431,7 +444,6 @@ using ScopeRequiringFinalInit = DiagnosticEmitter::ScopeRequiringFinalInit;
 static bool visitScopeEndsRequiringInit(
     MarkUnresolvedNonCopyableValueInst *markedAddr,
     llvm::function_ref<void(SILInstruction *, ScopeRequiringFinalInit)> visit) {
-  SILValue operand = markedAddr->getOperand();
 
   // TODO: This should really be a property of the marker instruction.
   switch (markedAddr->getCheckKind()) {
@@ -446,10 +458,7 @@ static bool visitScopeEndsRequiringInit(
     llvm_unreachable("invalid check!?");
   }
 
-  // Look through wrappers.
-  if (auto m = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand)) {
-    operand = m->getOperand();
-  }
+  SILValue operand = unwrapMarkedAddrOperand(markedAddr);
 
   // Check for inout types of arguments that are marked with consumable and
   // assignable.
@@ -3361,6 +3370,140 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
     });
   };
 
+  auto *deadEndBlocks = deba->get(markedValue->getFunction());
+
+  // Determine the argument convention, if any, of the marked address.
+  // 
+  // If the marked address is not an argument, determine if it is a local
+  // variable by checking if the marked address wraps an alloc_stack.
+  // TODO: Is there a better way to detect local variables?
+  SILValue unwrappedValue = unwrapMarkedAddrOperand(markedValue);
+  std::optional<SILArgumentConvention> argumentConvention = std::nullopt;
+  AllocStackInst *unwrappedAllocStack = nullptr;
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(unwrappedValue)) {
+    argumentConvention = fArg->getArgumentConvention();
+  } else {
+    unwrappedAllocStack = dyn_cast<AllocStackInst>(unwrappedValue);
+  }
+
+  // Local helper to insert a destroy and accompanying debug_value undef for a
+  // value before the specified instruction if appropriate.
+  auto maybeInsertDestroyAndUndef = [&](SILInstruction *insertPt,
+                                        SmallBitVector &bv) {
+    auto *insertBlock = insertPt->getParent();
+
+    // Both inout arguments and local variables are expected to be live at the
+    // end of a dead end (i.e. the `unreachable` instruction).
+    //
+    // If the lifetime boundary is in a dead-end block, then we may have to
+    // defer destroy insertion until the next reinit on each path, if any, to
+    // avoid prematurely destroying these addresses.
+    //
+    // If the address is not reinitialised in the same block, and this block is
+    // not itself a terminator, we can defer destroying the address until the
+    // start of the next block where the address is live (which must be where it
+    // is reinitialised).
+    auto shouldDeferDestroyInsertion = [&] {
+      // Only defer dead end destroy insertion for inout arguments and local
+      // variables.
+      if (argumentConvention.has_value()) {
+        if (!argumentConvention->isInoutConvention())
+          return false;
+      } else if (nullptr == unwrappedAllocStack) {
+        return false;
+      }
+
+      // Only defer the destroy if it would be inserted in a dead end block
+      if (!deadEndBlocks->isDeadEnd(insertBlock)) {
+        return false;
+      }
+
+      // Do not defer the destroy if the address will be reinitialised in the
+      // same basic block. Check the insertPt separately, since
+      // precedesReinitInSameBlock checks only the instructions after its
+      // operand.
+      if (addressUseState.reinitInsts.contains(insertPt) ||
+          addressUseState.precedesReinitInSameBlock(insertPt)) {
+        return false;
+      }
+
+      return true;
+    };
+
+    SILValue baseAddress = liveness.getRootValue();
+
+    auto insertDestroyAndUndefBeforePoint = [&](SILInstruction *insertPt,
+                                                SmallBitVector &bv) {
+      insertDestroyBeforeInstruction(addressUseState, insertPt, baseAddress, bv,
+                                     consumes);
+      // We insert the debug_value undef /after/ the last use since we
+      // want the value to be around when we stop at the last use
+      // instruction.
+      insertUndefDebugValue(insertPt);
+    };
+
+    if (!shouldDeferDestroyInsertion()) {
+      insertDestroyAndUndefBeforePoint(insertPt, bv);
+      return;
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "Deferring address destruction in dead end.\n");
+
+    // Inserting a destroy before the end of a dead end could shorten the
+    // lifetime of an inout parameter or local, which would normally be expected
+    // to live to be alive at that point. If there is no subsequent
+    // reinitialisation and use of the address before the end of a dead end
+    // region, do not emit a destroy.
+    //
+    // Do a forward scan from the insertBlock.
+    if (insertBlock->succ_empty()) {
+      // This is a terminator block. The address cannot be reinitialised. Do
+      // nothing.
+      return;
+    }
+    auto discovered = liveness.getDiscoveredBlocks();
+    if (discovered.size() < 2) {
+      // There is at most one live block. The insertBlock contains the
+      // lifetime boundary, so it must be that single block.
+      // We do not need to insert any destroys in this case.
+      //
+      // TODO: Verify & strengthen this logic.
+      return;
+    }
+
+    auto *function = insertBlock->getFunction();
+
+    BasicBlockSet liveSet(function);
+    for (auto *liveBlock : discovered) {
+      if (liveBlock != insertBlock)
+        liveSet.insert(liveBlock);
+    }
+
+    // A local allocation may be dead prior to any dealloc_stack instructions,
+    // but we still must ensure the address is destroyed before it, so add any
+    // blocks containing deallocations to the "live set".
+    if (unwrappedAllocStack) {
+      for (auto user : baseAddress->getUsersOfType<DeallocStackInst>()) {
+        auto deallocBlock = user->getParentBlock();
+        if (deallocBlock != insertBlock)
+          liveSet.insert(deallocBlock);
+      }
+    }
+
+    BasicBlockWorklist worklist(function);
+    for (auto *succ : insertBlock->getSuccessorBlocks())
+      worklist.pushIfNotVisited(succ);
+    while (auto *block = worklist.pop()) {
+      if (liveSet.contains(block)) {
+        // This is a live block; insert a destroy_addr at the top.
+        insertDestroyAndUndefBeforePoint(&*block->begin(), bv);
+      }
+      // This is not a live block; continue scanning forward.
+      for (auto *succ : block->getSuccessorBlocks())
+        worklist.pushIfNotVisited(succ);
+    }
+  };
+
   // Control flow merge blocks used as insertion points.
   llvm::DenseMap<SILBasicBlock *, SmallBitVector> mergeBlocks;
 
@@ -3424,13 +3567,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
             }
 
             auto *insertPt = &*succBlock->begin();
-            insertDestroyBeforeInstruction(addressUseState, insertPt,
-                                           liveness.getRootValue(), bits,
-                                           consumes);
-            // We insert the debug_value undef /after/ the last use since we
-            // want the value to be around when we stop at the last use
-            // instruction.
-            insertUndefDebugValue(insertPt);
+            maybeInsertDestroyAndUndef(insertPt, bits);
           }
           continue;
         }
@@ -3448,11 +3585,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
         }
 
         auto *insertPt = inst->getNextInstruction();
-        insertDestroyBeforeInstruction(addressUseState, insertPt,
-                                       liveness.getRootValue(), bits, consumes);
-        // We insert the debug_value undef /after/ the last use since we want
-        // the value to be around when we stop at the last use instruction.
-        insertUndefDebugValue(insertPt);
+        maybeInsertDestroyAndUndef(insertPt, bits);
         continue;
       }
     }
@@ -3460,10 +3593,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
 
   for (auto pair : boundary.getBoundaryEdges()) {
     auto *insertPt = &*pair.first->begin();
-    insertDestroyBeforeInstruction(addressUseState, insertPt,
-                                   liveness.getRootValue(), pair.second,
-                                   consumes);
-    insertUndefDebugValue(insertPt);
+    maybeInsertDestroyAndUndef(insertPt, pair.second);
     LLVM_DEBUG(llvm::dbgs() << "    Inserting destroy on edge bb"
                             << pair.first->getDebugID() << "\n");
   }
@@ -3474,10 +3604,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
 
     if (auto *arg = dyn_cast<SILArgument>(defPair.first)) {
       auto *insertPt = &*arg->getParent()->begin();
-      insertDestroyBeforeInstruction(addressUseState, insertPt,
-                                     liveness.getRootValue(), defPair.second,
-                                     consumes);
-      insertUndefDebugValue(insertPt);
+      maybeInsertDestroyAndUndef(insertPt, defPair.second);
     } else {
       auto *inst = cast<SILInstruction>(defPair.first);
 
@@ -3501,10 +3628,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
         insertPt = inst->getNextInstruction();
         assert(insertPt && "instruction is a terminator that wasn't handled?");
       }
-      insertDestroyBeforeInstruction(addressUseState, insertPt,
-                                     liveness.getRootValue(), defPair.second,
-                                     consumes);
-      insertUndefDebugValue(insertPt);
+      maybeInsertDestroyAndUndef(insertPt, defPair.second);
     }
   }
 
