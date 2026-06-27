@@ -9,4 +9,6 @@ let dictC: [D : String] = [:] // expected-error {{type 'D' does not conform to p
 
 let dictD: [E : String] = [:] // expected-error {{type 'E' does not conform to protocol 'Hashable'}}
 
-let dictF: [F : String] = [:] //expected-error {{type 'F' does not conform to protocol 'Hashable'}}
+let dictF: [F : String] = [:] // expected-error {{type 'F' does not conform to protocol 'Hashable'}}
+
+let dictG: [G : String] = [:] // expected-error {{type 'G' does not conform to protocol 'Hashable'}}

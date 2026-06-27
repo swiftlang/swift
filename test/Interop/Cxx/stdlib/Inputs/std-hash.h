@@ -87,3 +87,16 @@ struct F {
 
 template <>
 struct std::hash<F> {};
+
+// Test Suite 4: no default constructor
+struct G {
+  int value;
+  std::string comment;
+
+  bool operator==(const G &rhs) const { return value == rhs.value; }
+};
+template <>
+struct std::hash<G> {
+  hash() = delete;
+  size_t operator()(const G &x) const { return std::hash<int>{}(x.value); }
+};
