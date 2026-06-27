@@ -68,6 +68,27 @@ func mixedStructConstruction() -> MixedStrongWeakArc {
   return MixedStrongWeakArc(strong: MYObject(), weak: MYObject(), tag: 42)
 }
 
+// Weak fields with a Swift-bridged ObjC type (NSString) should NOT be bridged.
+// Bridging would require loading the weak reference (consuming a +1 retain),
+// converting to the bridged type, then releasing -- losing the weak semantics.
+// CHECK-IDE-TEST: struct WeakNSStringArc {
+// CHECK-IDE-TEST:   init()
+// CHECK-IDE-TEST:   init(name: NSString?, tag: CInt)
+// CHECK-IDE-TEST:   weak var name: @sil_weak NSString?
+// CHECK-IDE-TEST:   var tag: CInt
+// CHECK-IDE-TEST: }
+
+// Weak NSString field is accessed as NSString?, not String.
+func weakNSStringFieldAccess(_ s: WeakNSStringArc) -> NSString? {
+  return s.name
+}
+
+func weakNSStringFieldStore(_ str: NSString) {
+  var s = WeakNSStringArc()
+  s.name = str
+  _ = s
+}
+
 // An ARC struct marked NS_SWIFT_UNAVAILABLE is still imported but cannot be used.
 func unavailableArcStructIsRejected() {
   _ = UnavailableArcStruct(myobj: MYObject()) // expected-error {{'UnavailableArcStruct' is unavailable in Swift: Use MySwiftType instead}}
