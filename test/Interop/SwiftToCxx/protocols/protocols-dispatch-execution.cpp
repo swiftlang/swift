@@ -11,43 +11,28 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-// End-to-end test: compiler-generated protocol wrapper methods
-// dispatch through the real witness table via _callWitness.
+// End-to-end test: protocol existential wrappers with boxing
+// constructors, method dispatch, conversion, and VWT lifecycle.
 
 #include <cassert>
 #include <cstdio>
 #include "proto-dispatch.h"
 
-extern "C" void createCircleDrawable(void *out, swift::Int radius);
-extern "C" void createCircleResizable(void *out, swift::Int radius);
-extern "C" void createStyledCircleStylable(void *out, swift::Int radius);
-extern "C" void createIntArrayContainer(void *out, swift::Int n);
-
 int main() {
-    // Test 1: Drawable::draw() -- no user params, offset 1.
+    // Test 1: Drawable -- boxing constructor + draw().
     {
-        // Create uninitialized storage matching the wrapper layout.
-        alignas(alignof(ProtoDispatch::Drawable))
-            char storage[sizeof(ProtoDispatch::Drawable)];
-        createCircleDrawable(storage, 7);
-
-        auto &drawable =
-            *reinterpret_cast<ProtoDispatch::Drawable *>(storage);
+        auto circle = ProtoDispatch::Circle::init(7);
+        ProtoDispatch::Drawable drawable(circle);
         swift::Int result = drawable.draw();
         printf("draw() = %ld\n", result);
         assert(result == 49);
     }
 // CHECK: draw() = 49
 
-    // Test 2: Resizable::resize(to:) -- one Int param, tests the
-    // parameter ordering (user args before self/metadata/wt).
+    // Test 2: Resizable -- boxing constructor + resize(to:).
     {
-        alignas(alignof(ProtoDispatch::Resizable))
-            char storage[sizeof(ProtoDispatch::Resizable)];
-        createCircleResizable(storage, 5);
-
-        auto &resizable =
-            *reinterpret_cast<ProtoDispatch::Resizable *>(storage);
+        auto circle = ProtoDispatch::Circle::init(5);
+        ProtoDispatch::Resizable resizable(circle);
         bool ok = resizable.resize(3);
         printf("resize(3) = %s\n", ok ? "true" : "false");
         assert(ok == true);
@@ -62,12 +47,8 @@ int main() {
     // Test 3: Stylable -- inherited draw() via two-level WT dispatch,
     // plus own style() via direct dispatch.
     {
-        alignas(alignof(ProtoDispatch::Stylable))
-            char storage[sizeof(ProtoDispatch::Stylable)];
-        createStyledCircleStylable(storage, 7);
-
-        auto &stylable =
-            *reinterpret_cast<ProtoDispatch::Stylable *>(storage);
+        auto sc = ProtoDispatch::StyledCircle::init(7);
+        ProtoDispatch::Stylable stylable(sc);
 
         swift::Int drawResult = stylable.draw();
         printf("stylable.draw() = %ld\n", drawResult);
@@ -80,71 +61,79 @@ int main() {
 // CHECK-NEXT: stylable.draw() = 147
 // CHECK-NEXT: stylable.style() = true
 
-    // Test 4: Conversion -- Stylable::asDrawable() copies the existential
-    // into a Drawable wrapper with the base witness table.
+    // Test 4: Conversion -- Stylable::asDrawable() copies the
+    // existential into a Drawable wrapper with the base WT.
     {
-        alignas(alignof(ProtoDispatch::Stylable))
-            char storage[sizeof(ProtoDispatch::Stylable)];
-        createStyledCircleStylable(storage, 7);
-
-        auto &stylable =
-            *reinterpret_cast<ProtoDispatch::Stylable *>(storage);
+        auto sc = ProtoDispatch::StyledCircle::init(7);
+        ProtoDispatch::Stylable stylable(sc);
 
         ProtoDispatch::Drawable drawable = stylable.asDrawable();
         swift::Int drawResult = drawable.draw();
         printf("asDrawable().draw() = %ld\n", drawResult);
-        assert(drawResult == 147);  // same as stylable.draw()
+        assert(drawResult == 147);
     }
 // CHECK-NEXT: asDrawable().draw() = 147
 
-    // Test 5: Container<swift::Int> -- protocol with primary associated type.
-    // The template parameter is a type tag; the existential layout is the same.
+    // Test 5: Container<swift::Int> -- PAT class template via boxing.
     {
-        using ContainerInt = ProtoDispatch::Container<swift::Int>;
-        alignas(alignof(ContainerInt))
-            char storage[sizeof(ContainerInt)];
-        createIntArrayContainer(storage, 5);
-
-        auto &container =
-            *reinterpret_cast<ContainerInt *>(storage);
+        auto arr = ProtoDispatch::IntArray::init(5);
+        ProtoDispatch::Container<swift::Int> container(arr);
         swift::Int n = container.count();
         printf("container.count() = %ld\n", n);
         assert(n == 5);
     }
 // CHECK-NEXT: container.count() = 5
 
-    // Test 6: Existential parameter -- drawTwice(any Drawable) -> Int.
+    // Test 6: Existential parameter -- drawTwice(any Drawable).
     {
-        alignas(alignof(ProtoDispatch::Drawable))
-            char storage[sizeof(ProtoDispatch::Drawable)];
-        createCircleDrawable(storage, 7);
-
-        auto &drawable =
-            *reinterpret_cast<ProtoDispatch::Drawable *>(storage);
+        auto circle = ProtoDispatch::Circle::init(7);
+        ProtoDispatch::Drawable drawable(circle);
         swift::Int result = ProtoDispatch::drawTwice(drawable);
         printf("drawTwice() = %ld\n", result);
         assert(result == 98);  // 49 + 49
     }
 // CHECK-NEXT: drawTwice() = 98
 
-    // Test 7: Existential return -- bestDrawable picks the one with higher draw().
+    // Test 7: Existential return -- bestDrawable picks the higher draw().
     {
-        alignas(alignof(ProtoDispatch::Drawable))
-            char storageA[sizeof(ProtoDispatch::Drawable)];
-        createCircleDrawable(storageA, 7);  // draw() = 49
+        auto ca = ProtoDispatch::Circle::init(7);
+        ProtoDispatch::Drawable a(ca);
 
-        alignas(alignof(ProtoDispatch::Drawable))
-            char storageB[sizeof(ProtoDispatch::Drawable)];
-        createCircleDrawable(storageB, 3);  // draw() = 9
+        auto cb = ProtoDispatch::Circle::init(3);
+        ProtoDispatch::Drawable b(cb);
 
-        auto &a = *reinterpret_cast<ProtoDispatch::Drawable *>(storageA);
-        auto &b = *reinterpret_cast<ProtoDispatch::Drawable *>(storageB);
         ProtoDispatch::Drawable best = ProtoDispatch::bestDrawable(a, b);
         swift::Int result = best.draw();
         printf("bestDrawable().draw() = %ld\n", result);
-        assert(result == 49);  // a wins (49 >= 9)
+        assert(result == 49);  // a wins
     }
 // CHECK-NEXT: bestDrawable().draw() = 49
+
+    // Test 8: VWT copy construction.
+    {
+        auto circle = ProtoDispatch::Circle::init(5);
+        ProtoDispatch::Drawable original(circle);
+        ProtoDispatch::Drawable copy(original);
+        swift::Int result = copy.draw();
+        printf("copy.draw() = %ld\n", result);
+        assert(result == 25);
+    }
+// CHECK-NEXT: copy.draw() = 25
+
+    // Test 9: VWT copy assignment.
+    {
+        auto c1 = ProtoDispatch::Circle::init(5);
+        ProtoDispatch::Drawable assigned(c1);
+        printf("before assign: %ld\n", assigned.draw());
+
+        auto c2 = ProtoDispatch::Circle::init(3);
+        ProtoDispatch::Drawable other(c2);
+        assigned = other;
+        printf("after assign: %ld\n", assigned.draw());
+        assert(assigned.draw() == 9);
+    }
+// CHECK-NEXT: before assign: 25
+// CHECK-NEXT: after assign: 9
 
     printf("done\n");
 // CHECK-NEXT: done
