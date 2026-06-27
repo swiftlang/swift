@@ -883,3 +883,15 @@ func testMissingPatternDiagnosticsInExpressionContext() {
     if case let .test(_, answer) = k {} // expected-error {{missing patterns #3, #4 in enum associated value match}} {{32-32=, <#Int#>, <#String#>}}
   }
 }
+
+// https://github.com/swiftlang/swift/issues/82520
+func testNestedMissingMembers() {
+  enum E {
+    case e
+  }
+
+  func foo(_ e: E) {
+    if case .a(.x) = e { // expected-error {{type 'E' has no member 'a'}}
+    }
+  }
+}
