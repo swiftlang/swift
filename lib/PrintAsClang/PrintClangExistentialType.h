@@ -24,6 +24,7 @@ namespace swift {
 
 class DeclAndTypePrinter;
 class FuncDecl;
+class NominalTypeDecl;
 class ProtocolDecl;
 class Type;
 
@@ -32,7 +33,8 @@ class Type;
 /// table pointer. Marker protocols inherit from swift::Any (zero WTs).
 class ClangExistentialTypePrinter {
 public:
-  ClangExistentialTypePrinter(raw_ostream &os) : os(os) {}
+  ClangExistentialTypePrinter(raw_ostream &os, raw_ostream &outOfLineOS)
+      : os(os), outOfLineOS(outOfLineOS) {}
 
   void printExistentialTypeDecl(const ProtocolDecl *PD,
                                 DeclAndTypePrinter &declAndTypePrinter);
@@ -81,6 +83,19 @@ private:
   /// Emits returnNewValue helper in the _impl class body.
   void printImplReturnNewValue(const ProtocolDecl *PD);
 
+  /// A concrete type in the same module that conforms to the protocol,
+  /// along with the mangled symbol for its witness table.
+  struct ConformingType {
+    NominalTypeDecl *type;
+    std::string wtSymbol;
+  };
+
+  /// Emits per-conformance boxing constructors that allow constructing
+  /// an existential wrapper from a concrete type that conforms to the protocol.
+  void printBoxingConstructors(const ProtocolDecl *PD,
+                               ArrayRef<ConformingType> boxingConformances,
+                               DeclAndTypePrinter &declAndTypePrinter);
+
   /// Returns the C++ type name for a Swift type if it is a simple
   /// C-representable primitive, or None otherwise.
   std::optional<std::string> getCxxTypeName(Type ty,
@@ -93,6 +108,8 @@ private:
                                 DeclAndTypePrinter &printer);
 
   raw_ostream &os;
+  raw_ostream &outOfLineOS;
+  bool isClassBound = false;
 };
 
 } // end namespace swift

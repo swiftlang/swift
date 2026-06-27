@@ -93,6 +93,19 @@ extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
 
 extern "C" void swift_release(void *_Nonnull) noexcept;
 
+extern "C" SWIFT_CALL void *_Nonnull swift_getObjectType(
+    void *_Nonnull object) noexcept;
+
+struct SwiftBoxPair {
+  void *_Nonnull object;
+  void *_Nonnull buffer;
+};
+extern "C" SWIFT_CALL SwiftBoxPair swift_allocBox(
+    void *_Nonnull type) noexcept;
+
+extern "C" void *_Nonnull swift_projectBox(
+    void *_Nonnull object) noexcept;
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreserved-identifier"
 
@@ -260,6 +273,10 @@ class SwiftExistentialType {
   SWIFT_INLINE_PRIVATE_HELPER const ValueWitnessTable *_Nonnull
   _getVWT() const noexcept;
 
+  // Destroy the contained value and deallocate any outline storage.
+  // Defined out-of-line in the generated scaffolding.
+  SWIFT_INLINE_PRIVATE_HELPER void _destroyValue() noexcept;
+
 public:
   // Defined out-of-line in the generated scaffolding (needs VWT).
   SWIFT_INLINE_THUNK SwiftExistentialType(
@@ -283,6 +300,13 @@ protected:
   SWIFT_INLINE_PRIVATE_HELPER void
   _initializeWithCopy(const SwiftExistentialType &src) noexcept;
 
+  /// Initialize this existential container from a concrete value.
+  /// _type must already be set before calling this method.
+  /// Handles both inline and out-of-line value storage.
+  /// Defined out-of-line in the generated scaffolding (needs VWT).
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _initializeWithValue(const void *_Nonnull src) noexcept;
+
   /// Project the contained value for passing to witness functions.
   /// Defined out-of-line in the generated scaffolding (needs VWT).
   SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
@@ -301,6 +325,77 @@ protected:
 
   void *_Nonnull _buffer[3];
   void *_Nonnull _type;
+};
+
+/// Base class for class-constrained protocol existential wrappers.
+/// Layout: [class pointer] -- no value buffer, no stored type metadata.
+/// Type metadata is recovered from the object's isa pointer at runtime.
+/// Copy/destroy uses reference counting instead of VWT indirection.
+class SwiftClassExistentialType {
+public:
+  SWIFT_INLINE_THUNK SwiftClassExistentialType(
+      const SwiftClassExistentialType &other) noexcept
+      : _value(other._value) {
+    swift_retain(_value);
+  }
+  SWIFT_INLINE_THUNK SwiftClassExistentialType(
+      SwiftClassExistentialType &&other) noexcept
+      : _value(other._value) {
+    swift_retain(_value);
+  }
+  SWIFT_INLINE_THUNK SwiftClassExistentialType &
+  operator=(const SwiftClassExistentialType &other) noexcept {
+    if (this != &other) {
+      auto *old = _value;
+      _value = other._value;
+      swift_retain(_value);
+      swift_release(old);
+    }
+    return *this;
+  }
+  SWIFT_INLINE_THUNK SwiftClassExistentialType &
+  operator=(SwiftClassExistentialType &&other) noexcept {
+    if (this != &other) {
+      auto *old = _value;
+      _value = other._value;
+      swift_retain(_value);
+      swift_release(old);
+    }
+    return *this;
+  }
+  SWIFT_INLINE_THUNK ~SwiftClassExistentialType() noexcept {
+    swift_release(_value);
+  }
+
+protected:
+  struct uninit_t {};
+  SWIFT_INLINE_THUNK SwiftClassExistentialType(uninit_t) noexcept
+      : _value(nullptr) {}
+
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _initializeWithCopy(const SwiftClassExistentialType &src) noexcept {
+    _value = src._value;
+    swift_retain(_value);
+  }
+
+  SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
+  _projectValue() const noexcept { return _value; }
+
+  SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
+  _getType() const noexcept { return swift_getObjectType(_value); }
+
+  template <size_t EntryOffset, uint16_t PtrAuthDisc, typename FnTy>
+  SWIFT_INLINE_PRIVATE_HELPER FnTy _loadWitness(
+      const void *_Nonnull wt) const {
+    struct slot {
+      FnTy __ptrauth_swift_protocol_witness_function_pointer(PtrAuthDisc) fn;
+    };
+    auto *s = reinterpret_cast<const slot *>(
+        reinterpret_cast<const void *const *>(wt) + EntryOffset);
+    return s->fn;
+  }
+
+  void *_Nonnull _value;
 };
 
 } // namespace _impl

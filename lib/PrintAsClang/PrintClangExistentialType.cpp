@@ -15,10 +15,14 @@
 #include "DeclAndTypePrinter.h"
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangValueType.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolAssociations.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/STLExtras.h"
@@ -229,7 +233,8 @@ void ClangExistentialTypePrinter::emitExistentialMethod(
   }
   if (!firstArg)
     os << ", ";
-  os << "_type, " << wtExpr << ", _projectValue());\n";
+  os << (isClassBound ? "_getType(), " : "_type, ")
+     << wtExpr << ", _projectValue());\n";
   os << "  }\n";
 }
 
@@ -295,7 +300,10 @@ void ClangExistentialTypePrinter::printImplFromExistentialFactory(
     os << ">";
   }
   os << " _fromExistential("
-        "const swift::_impl::SwiftExistentialType &src, "
+        "const swift::_impl::"
+     << (isClassBound ? "SwiftClassExistentialType"
+                      : "SwiftExistentialType")
+     << " &src, "
         "const void *_Nonnull wt) {\n";
   os << "    ";
   printer.printBaseName(PD);
@@ -371,11 +379,42 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
     return;
   }
 
+  isClassBound = PD->requiresClass();
+
   auto printCxxImplClassName = ClangValueTypePrinter::printCxxImplClassName;
   ClangSyntaxPrinter printer(PD->getASTContext(), os);
 
+  // Collect same-module conformances for boxing constructors.
+  SmallVector<ConformingType, 4> boxingConformances;
+  {
+    auto *module = PD->getModuleContext();
+    SmallVector<Decl *, 64> decls;
+    module->getTopLevelDeclsWithAuxiliaryDecls(decls);
+    for (auto *D : decls) {
+      auto *NTD = dyn_cast<NominalTypeDecl>(D);
+      if (!NTD || isa<ProtocolDecl>(NTD))
+        continue;
+      if (!isClassBound && isa<ClassDecl>(NTD))
+        continue;
+      if (!declAndTypePrinter.shouldInclude(NTD))
+        continue;
+      SmallVector<ProtocolConformance *, 1> conformances;
+      if (!NTD->lookupConformance(const_cast<ProtocolDecl *>(PD),
+                                  conformances))
+        continue;
+      if (conformances.empty())
+        continue;
+      auto *conformance = conformances.front()->getRootConformance();
+      auto wtEntity =
+          irgen::LinkEntity::forProtocolWitnessTable(conformance);
+      boxingConformances.push_back(
+          {NTD, wtEntity.mangleAsString(PD->getASTContext())});
+    }
+  }
+
   printer.printParentNamespaceForNestedTypes(PD, [&](raw_ostream &os) {
-    // Forward declaration of the _impl helper class.
+    // Forward declaration of the _impl helper class, plus WT externs
+    // for boxing constructors.
     printer.printNamespace(cxx_synthesis::getCxxImplNamespaceName(),
                            [&](raw_ostream &os) {
                              os << "class";
@@ -383,7 +422,20 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
                              os << ' ';
                              printCxxImplClassName(os, PD);
                              os << ";\n";
+                             for (auto &c : boxingConformances) {
+                               os << "SWIFT_EXTERN const char "
+                                  << c.wtSymbol << "[];\n";
+                             }
                            });
+
+    // Forward-declare conforming types so boxing constructor
+    // declarations can reference them (definitions are emitted
+    // out-of-line after all types).
+    for (auto &c : boxingConformances) {
+      os << "class ";
+      ClangSyntaxPrinter(PD->getASTContext(), os).printBaseName(c.type);
+      os << ";\n";
+    }
 
     // Existential wrapper class: subclass of SwiftExistentialType.
     // Protocols with primary associated types become class templates.
@@ -400,7 +452,9 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
     ClangSyntaxPrinter(PD->getASTContext(), os).printSymbolUSRAttribute(PD);
     os << ' ';
     printer.printBaseName(PD);
-    os << " final : public swift::_impl::SwiftExistentialType";
+    os << " final : public swift::_impl::";
+    os << (isClassBound ? "SwiftClassExistentialType"
+                        : "SwiftExistentialType");
     os << " {\npublic:\n";
 
     // Emit protocol requirement methods.
@@ -409,11 +463,17 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
     // Emit conversion methods (asBaseProtocol()) for direct base protocols.
     printConversionMethods(PD, declAndTypePrinter);
 
+    // Emit per-conformance boxing constructors for concrete types in
+    // this module that conform to the protocol.
+    printBoxingConstructors(PD, boxingConformances, declAndTypePrinter);
+
     os << "private:\n";
     os << "  ";
     printer.printInlineForThunk();
     printer.printBaseName(PD);
-    os << "() noexcept : SwiftExistentialType(uninit_t{}) {}\n";
+    os << "() noexcept : "
+       << (isClassBound ? "SwiftClassExistentialType" : "SwiftExistentialType")
+       << "(uninit_t{}) {}\n";
     os << "#pragma clang diagnostic push\n";
     os << "#pragma clang diagnostic ignored \"-Wunused-private-field\"\n";
     os << "  const void *_Nonnull _witnessTable;\n";
@@ -525,4 +585,73 @@ void ClangExistentialTypePrinter::printImplReturnNewValue(
   os << "    callable(reinterpret_cast<char *>(&result));\n";
   os << "    return result;\n";
   os << "  }\n";
+}
+
+void ClangExistentialTypePrinter::printBoxingConstructors(
+    const ProtocolDecl *PD,
+    ArrayRef<ConformingType> boxingConformances,
+    DeclAndTypePrinter &declAndTypePrinter) {
+  ClangSyntaxPrinter printer(PD->getASTContext(), os);
+  ClangSyntaxPrinter ooPrinter(PD->getASTContext(), outOfLineOS);
+
+  auto pats = PD->getPrimaryAssociatedTypes();
+
+  for (auto &c : boxingConformances) {
+    // Inline declaration (forward-declared type is enough).
+    os << "  ";
+    printer.printInlineForThunk();
+    printer.printBaseName(PD);
+    os << "(const ";
+    printer.printBaseName(c.type);
+    os << " &value) noexcept;\n";
+
+    // Out-of-line definition (emitted after all types are declared).
+    // For protocols with primary associated types (class templates),
+    // emit a template prefix and qualified name with template args.
+    if (!pats.empty()) {
+      outOfLineOS << "  template <";
+      llvm::interleaveComma(pats, outOfLineOS,
+                            [&](const AssociatedTypeDecl *pat) {
+                              outOfLineOS << "typename " << pat->getNameStr();
+                            });
+      outOfLineOS << ">\n";
+    }
+    outOfLineOS << "  ";
+    ooPrinter.printInlineForThunk();
+    ooPrinter.printBaseName(PD);
+    if (!pats.empty()) {
+      outOfLineOS << "<";
+      llvm::interleaveComma(pats, outOfLineOS,
+                            [&](const AssociatedTypeDecl *pat) {
+                              outOfLineOS << pat->getNameStr();
+                            });
+      outOfLineOS << ">";
+    }
+    outOfLineOS << "::";
+    ooPrinter.printBaseName(PD);
+    outOfLineOS << "(const ";
+    ooPrinter.printBaseName(c.type);
+    outOfLineOS << " &value) noexcept\n";
+    outOfLineOS << "    : "
+       << (isClassBound ? "SwiftClassExistentialType"
+                        : "SwiftExistentialType")
+       << "(uninit_t{}) {\n";
+    if (isClassBound) {
+      outOfLineOS << "    _value = "
+         << "swift::_impl::_impl_RefCountedClass::getOpaquePointer(value);\n";
+      outOfLineOS << "    swift::_impl::swift_retain(_value);\n";
+    } else {
+      outOfLineOS << "    _type = swift::TypeMetadataTrait<";
+      ooPrinter.printBaseName(c.type);
+      outOfLineOS << ">::getTypeMetadata();\n";
+      outOfLineOS << "    _initializeWithValue(";
+      outOfLineOS << cxx_synthesis::getCxxImplNamespaceName() << "::";
+      ClangValueTypePrinter::printCxxImplClassName(outOfLineOS, c.type);
+      outOfLineOS << "::getOpaquePointer(value));\n";
+    }
+    outOfLineOS << "    _witnessTable = reinterpret_cast<const void *>("
+       << cxx_synthesis::getCxxImplNamespaceName() << "::" << c.wtSymbol
+       << ");\n";
+    outOfLineOS << "  }\n";
+  }
 }

@@ -306,9 +306,17 @@ public:
     // Non-ObjC existential with a single protocol constraint:
     // emit the C++ existential wrapper class name.
     if (languageMode == OutputLanguageMode::Cxx) {
-      if (auto *protoTy = ty->getConstraintType()->getAs<ProtocolType>()) {
-        auto *PD = protoTy->getDecl();
-        if (!PD->isObjC() && !PD->isMarkerProtocol() &&
+      ProtocolDecl *PD = nullptr;
+      ArrayRef<Type> patArgs;
+      if (auto *protoTy = ty->getConstraintType()->getAs<ProtocolType>())
+        PD = protoTy->getDecl();
+      else if (auto *paramProtoTy =
+                   ty->getConstraintType()
+                       ->getAs<ParameterizedProtocolType>()) {
+        PD = paramProtoTy->getProtocol();
+        patArgs = paramProtoTy->getArgs();
+      }
+      if (PD && !PD->isObjC() && !PD->isMarkerProtocol() &&
             declPrinter.shouldInclude(PD)) {
           if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
             if (!isInOutParam)
@@ -316,6 +324,7 @@ public:
             printOptional(optionalKind, [&]() {
               ClangSyntaxPrinter(PD->getASTContext(), os)
                   .printPrimaryCxxTypeName(PD, moduleContext);
+              visitGenericArgs(patArgs);
             });
             os << '&';
           } else {
@@ -331,12 +340,12 @@ public:
               } else {
                 ClangSyntaxPrinter(PD->getASTContext(), os)
                     .printPrimaryCxxTypeName(PD, moduleContext);
+                visitGenericArgs(patArgs);
               }
             });
           }
           return ClangRepresentation::representable;
         }
-      }
     }
 
     return visitPart(ty->getConstraintType(), optionalKind, isInOutParam);
@@ -1195,10 +1204,24 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
     }
 
     // Non-ObjC existential: pass pointer to the wrapper's storage.
+    // Class-bound existentials are loadable and may be passed directly
+    // (via a passStub struct), so wrap in swift_interop_passDirect when needed.
     if (auto *existTy = type->getAs<ExistentialType>()) {
+      ProtocolDecl *PD = nullptr;
       if (auto *protoTy =
-              existTy->getConstraintType()->getAs<ProtocolType>()) {
-        auto *PD = protoTy->getDecl();
+              existTy->getConstraintType()->getAs<ProtocolType>())
+        PD = protoTy->getDecl();
+      else if (auto *paramProtoTy =
+                   existTy->getConstraintType()
+                       ->getAs<ParameterizedProtocolType>())
+        PD = paramProtoTy->getProtocol();
+      if (PD) {
+        if (!directTypeEncoding.empty()) {
+          ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+              .printBaseName(moduleContext);
+          os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+             << "::swift_interop_passDirect_" << directTypeEncoding << '(';
+        }
         ClangSyntaxPrinter(PD->getASTContext(), os)
             .printModuleNamespaceQualifiersIfNeeded(PD->getModuleContext(),
                                                     moduleContext);
@@ -1210,6 +1233,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
         os << "::getOpaquePointer(";
         namePrinter();
         os << ')';
+        if (!directTypeEncoding.empty())
+          os << ')';
         return;
       }
     }
@@ -1606,10 +1631,29 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     // Non-ObjC existential return: construct wrapper via _impl::returnNewValue.
     if (auto *existTy = resultTy->getAs<ExistentialType>()) {
       if (!existTy->isObjCExistentialType()) {
-        if (existTy->getConstraintType()->is<ProtocolType>()) {
+        if (existTy->getConstraintType()->is<ProtocolType>() ||
+            existTy->getConstraintType()
+                ->is<ParameterizedProtocolType>()) {
           os << "  return ";
           printTypeImplTypeSpecifier(resultTy, moduleContext);
-          os << "::returnNewValue([&](char * _Nonnull result) "
+          os << "::returnNewValue";
+          if (auto *paramProtoTy =
+                  existTy->getConstraintType()
+                      ->getAs<ParameterizedProtocolType>()) {
+            os << '<';
+            llvm::interleaveComma(
+                paramProtoTy->getArgs(), os, [&](Type argTy) {
+                  CFunctionSignatureTypePrinter typePrinter(
+                      os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
+                      interopContext,
+                      CFunctionSignatureTypePrinterModifierDelegate(),
+                      moduleContext, declPrinter,
+                      FunctionSignatureTypeUse::TypeReference);
+                  typePrinter.visit(argTy, std::nullopt, false);
+                });
+            os << '>';
+          }
+          os << "([&](char * _Nonnull result) "
                 "SWIFT_INLINE_THUNK_ATTRIBUTES {\n    ";
           if (auto directResultType = signature.getDirectResultType()) {
             std::string typeEncoding =

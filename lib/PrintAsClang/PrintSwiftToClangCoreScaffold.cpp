@@ -262,6 +262,32 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "      _buffer, const_cast<void **>(src._buffer), _type);\n";
   os << "}\n\n";
 
+  // _initializeWithValue
+  os << "SWIFT_INLINE_PRIVATE_HELPER\n";
+  os << "void\n";
+  os << "SwiftExistentialType::_initializeWithValue(\n";
+  os << "    const void *_Nonnull src) noexcept {\n";
+  os << "  auto *vwt = _getVWT();\n";
+  os << "  if (vwt->size <= sizeof(_buffer) &&\n";
+  os << "      (vwt->flags & "
+     << TargetValueWitnessFlags<uint64_t>::IsNonBitwiseTakable
+     << ") == 0) {\n";
+  os << "    vwt->initializeWithCopy(\n";
+  os << "        reinterpret_cast<char *>(_buffer),\n";
+  os << "        const_cast<char *>(\n";
+  os << "            reinterpret_cast<const char *>(src)),\n";
+  os << "        _type);\n";
+  os << "  } else {\n";
+  os << "    auto box = swift_allocBox(_type);\n";
+  os << "    _buffer[0] = box.object;\n";
+  os << "    vwt->initializeWithCopy(\n";
+  os << "        reinterpret_cast<char *>(box.buffer),\n";
+  os << "        const_cast<char *>(\n";
+  os << "            reinterpret_cast<const char *>(src)),\n";
+  os << "        _type);\n";
+  os << "  }\n";
+  os << "}\n\n";
+
   // _projectValue
   os << "SWIFT_INLINE_PRIVATE_HELPER\n";
   os << "void *_Nonnull\n";
@@ -272,7 +298,25 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
      << TargetValueWitnessFlags<uint64_t>::IsNonBitwiseTakable
      << ") == 0)\n";
   os << "    return const_cast<void **>(_buffer);\n";
-  os << "  return const_cast<void *>(_buffer[0]);\n";
+  os << "  return swift_projectBox(_buffer[0]);\n";
+  os << "}\n\n";
+
+  // _destroyValue
+  os << "SWIFT_INLINE_PRIVATE_HELPER\n";
+  os << "void\n";
+  os << "SwiftExistentialType::_destroyValue() noexcept {\n";
+  os << "  auto *vwt = _getVWT();\n";
+  os << "  if (vwt->size <= sizeof(_buffer) &&\n";
+  os << "      (vwt->flags & "
+     << TargetValueWitnessFlags<uint64_t>::IsNonBitwiseTakable
+     << ") == 0) {\n";
+  os << "    vwt->destroy(reinterpret_cast<char *>(_buffer), _type);\n";
+  os << "  } else {\n";
+  os << "    vwt->destroy(\n";
+  os << "        reinterpret_cast<char *>(swift_projectBox(_buffer[0])),\n";
+  os << "        _type);\n";
+  os << "    swift_release(_buffer[0]);\n";
+  os << "  }\n";
   os << "}\n\n";
 
   // Copy constructor
@@ -299,7 +343,7 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "SwiftExistentialType::operator=(\n";
   os << "    const SwiftExistentialType &other) noexcept {\n";
   os << "  if (this != &other) {\n";
-  os << "    _getVWT()->destroy(_buffer, _type);\n";
+  os << "    _destroyValue();\n";
   os << "    _type = other._type;\n";
   os << "    _getVWT()->initializeBufferWithCopyOfBuffer(\n";
   os << "        _buffer, const_cast<void **>(other._buffer), _type);\n";
@@ -313,7 +357,7 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "SwiftExistentialType::operator=(\n";
   os << "    SwiftExistentialType &&other) noexcept {\n";
   os << "  if (this != &other) {\n";
-  os << "    _getVWT()->destroy(_buffer, _type);\n";
+  os << "    _destroyValue();\n";
   os << "    _type = other._type;\n";
   os << "    _getVWT()->initializeBufferWithCopyOfBuffer(\n";
   os << "        _buffer, other._buffer, _type);\n";
@@ -324,7 +368,7 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   // Destructor
   os << "SWIFT_INLINE_THUNK\n";
   os << "SwiftExistentialType::~SwiftExistentialType() noexcept {\n";
-  os << "  _getVWT()->destroy(_buffer, _type);\n";
+  os << "  _destroyValue();\n";
   os << "}\n\n";
 }
 

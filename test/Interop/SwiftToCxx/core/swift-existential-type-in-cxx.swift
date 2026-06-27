@@ -44,18 +44,18 @@
 
 // CHECK: SwiftExistentialType::operator=(
 // CHECK:     const SwiftExistentialType &other) noexcept {
-// CHECK:     _getVWT()->destroy(
+// CHECK:     _destroyValue();
 // CHECK:     _getVWT()->initializeBufferWithCopyOfBuffer(
 // CHECK: }
 
 // CHECK: SwiftExistentialType::operator=(
 // CHECK:     SwiftExistentialType &&other) noexcept {
-// CHECK:     _getVWT()->destroy(
+// CHECK:     _destroyValue();
 // CHECK:     _getVWT()->initializeBufferWithCopyOfBuffer(
 // CHECK: }
 
 // CHECK: SwiftExistentialType::~SwiftExistentialType() noexcept {
-// CHECK:   _getVWT()->destroy(
+// CHECK:   _destroyValue();
 // CHECK: }
 
 // CHECK: } // namespace _impl
