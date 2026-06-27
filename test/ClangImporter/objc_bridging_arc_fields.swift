@@ -105,6 +105,16 @@ func mixedStructConstruction() -> MixedStrongWeakArc {
 // CHECK-IDE-TEST:   var name: String
 // CHECK-IDE-TEST: }
 
+// Weak fields with a Swift-bridged ObjC type (NSString) should NOT be bridged.
+// Bridging would require loading the weak reference (consuming a +1 retain),
+// converting to the bridged type, then releasing -- losing the weak semantics.
+// CHECK-IDE-TEST: struct WeakNSStringArc {
+// CHECK-IDE-TEST:   init()
+// CHECK-IDE-TEST:   init(name: NSString?, tag: Int32)
+// CHECK-IDE-TEST:   weak var name: @sil_weak NSString?
+// CHECK-IDE-TEST:   var tag: Int32
+// CHECK-IDE-TEST: }
+
 func bridgedFieldAccess(_ s: StrongNSStringArc) -> String {
   return s.name
 }
@@ -116,6 +126,17 @@ func bridgedFieldConstruction() -> StrongNSStringArc {
 func bridgedFieldMutation() {
   var s = StrongNSStringArc(name: "hello", tag: 1)
   s.name = "world"
+  _ = s
+}
+
+// Weak NSString field is accessed as NSString?, not String.
+func weakNSStringFieldAccess(_ s: WeakNSStringArc) -> NSString? {
+  return s.name
+}
+
+func weakNSStringFieldStore(_ str: NSString) {
+  var s = WeakNSStringArc()
+  s.name = str
   _ = s
 }
 

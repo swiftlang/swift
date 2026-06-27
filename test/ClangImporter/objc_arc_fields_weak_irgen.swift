@@ -79,3 +79,23 @@ func testWeakFieldInit() -> WeaksInAStructArc {
 func testMixedWeakFieldAccess(_ s: MixedStrongWeakArc) -> MYObject? {
   return s.weak
 }
+
+// A __weak NSString * field is NOT bridged to String. It stays as NSString?
+// and uses ObjC weak intrinsics, not swift_unknownObjectWeak* or bridging calls.
+// CHECK-LABEL: define {{.*}} @"$s{{.*}}testWeakNSStringFieldAccess
+// CHECK: call ptr @llvm.objc.loadWeakRetained
+// CHECK-NOT: swift_bridgeObjectRetain
+// CHECK-NOT: swift_unknownObjectWeak
+// CHECK: ret
+func testWeakNSStringFieldAccess(_ s: WeakNSStringArc) -> NSString? {
+  return s.name
+}
+
+// Storing to a __weak NSString * field also uses ObjC weak intrinsics directly.
+// CHECK-LABEL: define {{.*}} @"$s{{.*}}testWeakNSStringFieldStore
+// CHECK: call ptr @llvm.objc.storeWeak
+// CHECK-NOT: swift_unknownObjectWeak
+// CHECK: ret
+func testWeakNSStringFieldStore(_ s: inout WeakNSStringArc, _ str: NSString) {
+  s.name = str
+}
