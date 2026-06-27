@@ -6515,14 +6515,76 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
   setLoweredAddress(i, referent);
 }
 
+/// Check whether a SIL address operand is a struct_element_addr projecting
+/// a Clang-imported __weak field. When true, weak load/store must use
+/// objc_*Weak directly instead of swift_unknownObjectWeak* to match the
+/// Clang-synthesized VWT functions on the containing struct.
+static bool isClangObjCWeakField(SILValue operand) {
+  auto *SEA = dyn_cast<StructElementAddrInst>(operand);
+  if (!SEA)
+    return false;
+  auto *field = SEA->getField();
+  if (!field->hasClangNode())
+    return false;
+  auto *clangField = dyn_cast<clang::FieldDecl>(field->getClangDecl());
+  if (!clangField)
+    return false;
+  return clangField->getType().getObjCLifetime() == clang::Qualifiers::OCL_Weak;
+}
+
+static bool tryEmitObjCWeakLoad(IRGenSILFunction &IGF, SILValue operand,
+                                Address source, bool isOptional, bool isTake,
+                                Explosion &out) {
+  if (!isClangObjCWeakField(operand))
+    return false;
+
+  auto *addr = source.getAddress();
+  auto *loaded = IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::objc_loadWeakRetained, {addr});
+
+  if (isTake)
+    IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::objc_destroyWeak, {addr});
+
+  if (isOptional)
+    out.add(IGF.Builder.CreatePtrToInt(loaded, IGF.IGM.IntPtrTy));
+  else
+    out.add(loaded);
+  return true;
+}
+
+static bool tryEmitObjCWeakStore(IRGenSILFunction &IGF, SILValue destOperand,
+                                 Explosion &src, Address dest, bool isOptional,
+                                 bool isInit) {
+  if (!isClangObjCWeakField(destOperand))
+    return false;
+
+  llvm::Value *value = src.claimNext();
+  if (isOptional)
+    value = IGF.Builder.CreateIntToPtr(value, IGF.IGM.Int8PtrTy);
+
+  auto *addr = dest.getAddress();
+  if (isInit)
+    IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::objc_initWeak,
+                                   {addr, value});
+  else
+    IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::objc_storeWeak,
+                                   {addr, value});
+  return true;
+}
+
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   void IRGenSILFunction::visitLoad##Name##Inst(swift::Load##Name##Inst *i) { \
     Address source = getLoweredAddress(i->getOperand()); \
     auto silTy = i->getOperand()->getType(); \
     auto ty = cast<Name##StorageType>(silTy.getASTType()); \
     auto isOptional = bool(ty.getReferentType()->getOptionalObjectType()); \
-    auto &ti = getReferentTypeInfo(*this, silTy); \
     Explosion result; \
+    if (tryEmitObjCWeakLoad(*this, i->getOperand(), source, isOptional, \
+                            bool(i->isTake()), result)) { \
+      setLoweredExplosion(i, result); \
+      return; \
+    } \
+    auto &ti = getReferentTypeInfo(*this, silTy); \
     if (i->isTake()) { \
       ti.name##TakeStrong(*this, source, result, isOptional); \
     } else { \
@@ -6536,6 +6598,9 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
     auto silTy = i->getDest()->getType(); \
     auto ty = cast<Name##StorageType>(silTy.getASTType()); \
     auto isOptional = bool(ty.getReferentType()->getOptionalObjectType()); \
+    if (tryEmitObjCWeakStore(*this, i->getDest(), source, dest, isOptional, \
+                             bool(i->isInitializationOfDest()))) \
+      return; \
     auto &ti = getReferentTypeInfo(*this, silTy); \
     if (i->isInitializationOfDest()) { \
       ti.name##Init(*this, source, dest, isOptional); \
