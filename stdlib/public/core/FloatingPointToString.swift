@@ -770,7 +770,7 @@ internal func _Float64ToASCII(
 
   // Step 3: Look up power-of-10 scale factor
 
-  var powerOfTen: _UInt128 = 0
+  var powerOfTen: UInt128 = 0
   let powerOfTenExponent = _powerOf10_Binary64(p: 0 &- base10Power,
                                                significand: &powerOfTen)
 
@@ -779,19 +779,19 @@ internal func _Float64ToASCII(
   // After scaling, we'll use a 54.74 fixed-point format
   let integerBits = significandBitCount + 1
   let fractionBits = 128 - integerBits
-  let fractionMask = (_UInt128(1) << fractionBits) - 1
-  let oneHalf = _UInt128(1) << (fractionBits - 1)
+  let fractionMask = (UInt128(1) << fractionBits) - 1
+  let oneHalf = UInt128(1) << (fractionBits - 1)
 
   let narrowInterval = f.significandBitPattern & 1
 
   // Scale one binary ULP
   let align = integerBits &- (binaryExponent &+ powerOfTenExponent)
   var scaledBinaryUlp = powerOfTen &>> align
-  scaledBinaryUlp &+= _UInt128(bitPattern: _Int128(3 &- 6 &* Int(narrowInterval)))
+  scaledBinaryUlp &+= UInt128(truncatingIfNeeded: 3 &- 6 &* Int(narrowInterval))
 
   // Scale the upper limit
-  let low = _UInt128(powerOfTen._low) &* _UInt128(significand)
-  let high = _UInt128(powerOfTen._high) &* _UInt128(significand)
+  let low = UInt128(powerOfTen._low) &* UInt128(significand)
+  let high = UInt128(powerOfTen._high) &* UInt128(significand)
   let upperBound = ((low &>> align)
                       &+ (high &<< (64 - align))
                       &+ (scaledBinaryUlp &>> 1))
@@ -813,13 +813,13 @@ internal func _Float64ToASCII(
 
   // Convert the digits we have so far and write them out...
   let digits = _intToSixteenDecimalDigits(base10Significand)
-  let zeros = _UInt128(
+  let zeros = UInt128(
     _low: 0x3030303030303030,
     _high: 0x3030303030303030)
   buffer.storeBytes(
     of: digits &+ zeros,
     toByteOffset: firstDigit,
-    as: _UInt128.self)
+    as: UInt128.self)
   nextDigit &+= 16
 
   // Trim leading zero digits
@@ -843,7 +843,7 @@ internal func _Float64ToASCII(
     var digit = UInt8(truncatingIfNeeded: delta >> fractionBits)
     delta &= fractionMask
 
-    let epsilon = _UInt128(64)
+    let epsilon = UInt128(64)
     let greater = unsafe unsafeBitCast(delta > (oneHalf &+ epsilon), to: UInt8.self)
     let greaterOrEqual = unsafe unsafeBitCast(delta > (oneHalf &- epsilon), to: UInt8.self)
     let outOfInterval = unsafe unsafeBitCast(delta > intervalWidth, to: UInt8.self)
@@ -1005,7 +1005,7 @@ internal func _Float80ToASCII(
     utf8Buffer: &utf8Buffer,
     isBoundary: isBoundary,
     binaryExponent: binaryExponent,
-    significand: _UInt128(significand),
+    significand: UInt128(significand),
     sign: f.sign)
 }
 #endif
@@ -1067,7 +1067,7 @@ internal func _Float128ToASCII(
     utf8Buffer: &utf8Buffer,
     isBoundary: f.significandBitPattern == 0,
     binaryExponent: binaryExponent,
-    significand: _UInt128(significand),
+    significand: UInt128(significand),
     sign: f.sign)
 }
 
@@ -1087,7 +1087,7 @@ fileprivate func _Float128Backend(
   utf8Buffer: inout MutableSpan<UTF8.CodeUnit>,
   isBoundary: Bool,
   binaryExponent: Int,
-  significand: _UInt128,
+  significand: UInt128,
   sign: FloatingPointSign
 ) -> Range<Int> {
   assert(utf8Buffer.count >= 56)
@@ -1163,18 +1163,18 @@ fileprivate func _Float128Backend(
   var delta = upperBound & fractionMask
 
   let zeros8 = UInt64(0x3030303030303030)
-  let zeros16 = _UInt128(
+  let zeros16 = UInt128(
     _low: 0x3030303030303030,
     _high: 0x3030303030303030)
   let TenE16 = UInt64(10000000000000000)
 
   // As noted above, Float128 has at most 35 digits at this point.
   // Top part is at most 1.38e18, which fits in 64 bits
-  let reciprocal = _UInt128(UInt64(0xe69594bec44de15b)) // ≈ 2^117 / 10^16
-  let hi19low = (_UInt128(base10Significand._low) * reciprocal) >> 64
-  let hi19extended = (_UInt128(base10Significand._high) * reciprocal + hi19low) >> 53
+  let reciprocal = UInt128(UInt64(0xe69594bec44de15b)) // ≈ 2^117 / 10^16
+  let hi19low = (UInt128(base10Significand._low) * reciprocal) >> 64
+  let hi19extended = (UInt128(base10Significand._high) * reciprocal + hi19low) >> 53
   var hi19 = UInt64(truncatingIfNeeded: hi19extended)
-  var lo16 = UInt64(truncatingIfNeeded: base10Significand - _UInt128(hi19) * _UInt128(TenE16))
+  var lo16 = UInt64(truncatingIfNeeded: base10Significand - UInt128(hi19) * UInt128(TenE16))
   // Correct the two values above...
   if lo16 >= TenE16 {
     lo16 -= TenE16
@@ -1183,8 +1183,8 @@ fileprivate func _Float128Backend(
 
   // The above is a faster version of this div/rem pair, which otherwise
   // accounts for >80% of the total runtime of this function:
-  // let hi19 = UInt64(truncatingIfNeeded: base10Significand / _UInt128(TenE16))
-  // let lo16 = UInt64(truncatingIfNeeded: base10Significand % _UInt128(TenE16))
+  // let hi19 = UInt64(truncatingIfNeeded: base10Significand / UInt128(TenE16))
+  // let lo16 = UInt64(truncatingIfNeeded: base10Significand % UInt128(TenE16))
 
   let hi3 = UInt32(truncatingIfNeeded: hi19 / TenE16)
   let digitsHi = _intToEightDecimalDigits(hi3)
@@ -1199,14 +1199,14 @@ fileprivate func _Float128Backend(
   buffer.storeBytes(
     of: digitsMid &+ zeros16,
     toByteOffset: nextDigit,
-    as: _UInt128.self)
+    as: UInt128.self)
   nextDigit &+= 16
 
   let digitsLo = _intToSixteenDecimalDigits(lo16)
   buffer.storeBytes(
     of: digitsLo &+ zeros16,
     toByteOffset: nextDigit,
-    as: _UInt128.self)
+    as: UInt128.self)
   nextDigit &+= 16
 
   // Trim leading zero digits
@@ -1611,11 +1611,11 @@ fileprivate func _intToEightDecimalDigits(_ n: UInt32) -> UInt64 {
 }
 
 @inline(__always)
-fileprivate func _intToSixteenDecimalDigits(_ n: UInt64) -> _UInt128 {
+fileprivate func _intToSixteenDecimalDigits(_ n: UInt64) -> UInt128 {
   let hi8 = n / 100000000
   let lo8 = n &- hi8 * 100000000
 
-  return _UInt128(
+  return UInt128(
     _low: _intToEightDecimalDigits(UInt32(truncatingIfNeeded: hi8)),
     _high: _intToEightDecimalDigits(UInt32(truncatingIfNeeded: lo8))
   )
@@ -1631,8 +1631,8 @@ fileprivate func _intToSixteenDecimalDigits(_ n: UInt64) -> _UInt128 {
 // helpers as methods.
 // Used by 80- and 128-bit floating point formatting logic above...
 fileprivate struct _UInt256 {
-  var high: _UInt128
-  var low: _UInt128
+  var high: UInt128
+  var low: UInt128
 
   init() {
     self.high = 0
@@ -1640,64 +1640,64 @@ fileprivate struct _UInt256 {
   }
 
   init(high: UInt64, _ midHigh: UInt64, _ midLow: UInt64, low: UInt64) {
-    self.high = _UInt128(_low: midHigh, _high: high)
-    self.low = _UInt128(_low: low, _high: midLow)
+    self.high = UInt128(_low: midHigh, _high: high)
+    self.low = UInt128(_low: low, _high: midLow)
   }
 
-  init(high: _UInt128, low: _UInt128) {
+  init(high: UInt128, low: UInt128) {
     self.high = high
     self.low = low
   }
 
-  init(_ low: _UInt128) {
+  init(_ low: UInt128) {
       self.high = 0
       self.low = low
   }
 
   init(_ low: UInt64) {
       self.high = 0
-      self.low = _UInt128(low)
+      self.low = UInt128(low)
   }
 
   mutating func multiply(by rhs: UInt32) {
-    var t = _UInt128(low._low) &* _UInt128(rhs)
+    var t = UInt128(low._low) &* UInt128(rhs)
     let newlow = t._low
-    t = _UInt128(t._high) &+ _UInt128(low._high) &* _UInt128(rhs)
-    low = _UInt128(_low: newlow, _high: t._low)
-    t = _UInt128(t._high) &+ _UInt128(high._low) &* _UInt128(rhs)
+    t = UInt128(t._high) &+ UInt128(low._high) &* UInt128(rhs)
+    low = UInt128(_low: newlow, _high: t._low)
+    t = UInt128(t._high) &+ UInt128(high._low) &* UInt128(rhs)
     let newmidhigh = t._low
-    t = _UInt128(t._high) &+ _UInt128(high._high) &* _UInt128(rhs)
-    high = _UInt128(_low: newmidhigh, _high: t._low)
+    t = UInt128(t._high) &+ UInt128(high._high) &* UInt128(rhs)
+    high = UInt128(_low: newmidhigh, _high: t._low)
     assert(t._high == 0)
   }
 
   // Multiply by a UInt128,
   // shift 384-bit intermediate value right by the specified amount, and
   // return the low-order 256 bits
-  mutating func multiply(by rhs: _UInt128, lsr: Int) {
+  mutating func multiply(by rhs: UInt128, lsr: Int) {
     // Break into 64-bit components
-    let rhs1 = _UInt128(rhs._high)
-    let rhs0 = _UInt128(rhs._low)
-    let lhs3 = _UInt128(high._high)
-    let lhs2 = _UInt128(high._low)
-    let lhs1 = _UInt128(low._high)
-    let lhs0 = _UInt128(low._low)
+    let rhs1 = UInt128(rhs._high)
+    let rhs0 = UInt128(rhs._low)
+    let lhs3 = UInt128(high._high)
+    let lhs2 = UInt128(high._low)
+    let lhs1 = UInt128(low._high)
+    let lhs0 = UInt128(low._low)
 
     // Compute cross-products, propagate carries
     let w0 = rhs0 * lhs0
     let w1a = rhs0 * lhs1
     let w1b = rhs1 * lhs0
-    let w1 = (_UInt128(w0._high)
-                + _UInt128(w1a._low) + _UInt128(w1b._low))
+    let w1 = (UInt128(w0._high)
+                + UInt128(w1a._low) + UInt128(w1b._low))
     let w2a = rhs0 * lhs2
     let w2b = rhs1 * lhs1
-    let w2 = (_UInt128(w1a._high) + _UInt128(w1b._high) + _UInt128(w1._high)
-                + _UInt128(w2a._low) + _UInt128(w2b._low))
+    let w2 = (UInt128(w1a._high) + UInt128(w1b._high) + UInt128(w1._high)
+                + UInt128(w2a._low) + UInt128(w2b._low))
     let w3a = rhs0 * lhs3
     let w3b = rhs1 * lhs2
-    let w3 = (_UInt128(w2a._high) + _UInt128(w2b._high) + _UInt128(w2._high)
-                + _UInt128(w3a._low) + _UInt128(w3b._low))
-    let w4 = (_UInt128(w3a._high) + _UInt128(w3b._high) + _UInt128(w3._high)
+    let w3 = (UInt128(w2a._high) + UInt128(w2b._high) + UInt128(w2._high)
+                + UInt128(w3a._low) + UInt128(w3b._low))
+    let w4 = (UInt128(w3a._high) + UInt128(w3b._high) + UInt128(w3._high)
                 + rhs1 * lhs3)
 
     // Discard overhead bits
@@ -1731,11 +1731,11 @@ fileprivate struct _UInt256 {
     }
 
     // Keep the low-order 256 bits
-    low = _UInt128(_low: x0, _high: x1)
-    high = _UInt128(_low: x2, _high: x3)
+    low = UInt128(_low: x0, _high: x1)
+    high = UInt128(_low: x2, _high: x3)
   }
 
-  mutating func multiplyHigh(by rhs: _UInt128) {
+  mutating func multiplyHigh(by rhs: UInt128) {
     multiply(by: rhs, lsr: 128)
   }
 
@@ -1743,72 +1743,72 @@ fileprivate struct _UInt256 {
   // as a nested for loop with additional bookkeeping, or
   // by recursively using the 256-bit x 128-bit multiplies above.
   mutating func multiplyHigh(by rhs: _UInt256) {
-    var current = _UInt128(low._low) * _UInt128(rhs.low._low)
+    var current = UInt128(low._low) * UInt128(rhs.low._low)
 
-    current = _UInt128(current._high)
-    var t = _UInt128(low._low) &* _UInt128(rhs.low._high)
-    current += _UInt128(t._low)
-    var next = _UInt128(t._high)
-    t = _UInt128(low._high) &* _UInt128(rhs.low._low)
-    current += _UInt128(t._low)
-    next += _UInt128(t._high)
+    current = UInt128(current._high)
+    var t = UInt128(low._low) &* UInt128(rhs.low._high)
+    current += UInt128(t._low)
+    var next = UInt128(t._high)
+    t = UInt128(low._high) &* UInt128(rhs.low._low)
+    current += UInt128(t._low)
+    next += UInt128(t._high)
 
-    current = next + _UInt128(current._high)
-    t = _UInt128(low._low) &* _UInt128(rhs.high._low)
-    current += _UInt128(t._low)
-    next = _UInt128(t._high)
-    t = _UInt128(low._high) &* _UInt128(rhs.low._high)
-    current += _UInt128(t._low)
-    next += _UInt128(t._high)
-    t = _UInt128(high._low) &* _UInt128(rhs.low._low)
-    current += _UInt128(t._low)
-    next += _UInt128(t._high)
+    current = next + UInt128(current._high)
+    t = UInt128(low._low) &* UInt128(rhs.high._low)
+    current += UInt128(t._low)
+    next = UInt128(t._high)
+    t = UInt128(low._high) &* UInt128(rhs.low._high)
+    current += UInt128(t._low)
+    next += UInt128(t._high)
+    t = UInt128(high._low) &* UInt128(rhs.low._low)
+    current += UInt128(t._low)
+    next += UInt128(t._high)
 
-    current = next + _UInt128(current._high)
-    t = _UInt128(low._low) &* _UInt128(rhs.high._high)
-    current += _UInt128(t._low)
-    next = _UInt128(t._high)
-    t = _UInt128(low._high) &* _UInt128(rhs.high._low)
-    current += _UInt128(t._low)
-    next += _UInt128(t._high)
-    t = _UInt128(high._low) &* _UInt128(rhs.low._high)
-    current += _UInt128(t._low)
-    next += _UInt128(t._high)
-    t = _UInt128(high._high) &* _UInt128(rhs.low._low)
-    current += _UInt128(t._low)
-    next += _UInt128(t._high)
+    current = next + UInt128(current._high)
+    t = UInt128(low._low) &* UInt128(rhs.high._high)
+    current += UInt128(t._low)
+    next = UInt128(t._high)
+    t = UInt128(low._high) &* UInt128(rhs.high._low)
+    current += UInt128(t._low)
+    next += UInt128(t._high)
+    t = UInt128(high._low) &* UInt128(rhs.low._high)
+    current += UInt128(t._low)
+    next += UInt128(t._high)
+    t = UInt128(high._high) &* UInt128(rhs.low._low)
+    current += UInt128(t._low)
+    next += UInt128(t._high)
 
-    current = next + _UInt128(current._high)
-    t = _UInt128(low._high) &* _UInt128(rhs.high._high)
-    current += _UInt128(t._low)
-    next = _UInt128(t._high)
-    t = _UInt128(high._low) &* _UInt128(rhs.high._low)
-    current += _UInt128(t._low)
-    next += _UInt128(t._high)
-    t = _UInt128(high._high) &* _UInt128(rhs.low._high)
-    current += _UInt128(t._low)
-    next += _UInt128(t._high)
+    current = next + UInt128(current._high)
+    t = UInt128(low._high) &* UInt128(rhs.high._high)
+    current += UInt128(t._low)
+    next = UInt128(t._high)
+    t = UInt128(high._low) &* UInt128(rhs.high._low)
+    current += UInt128(t._low)
+    next += UInt128(t._high)
+    t = UInt128(high._high) &* UInt128(rhs.low._high)
+    current += UInt128(t._low)
+    next += UInt128(t._high)
     let newlow = current._low
 
-    current = next + _UInt128(current._high)
-    t = _UInt128(high._low) &* _UInt128(rhs.high._high)
-    current += _UInt128(t._low)
-    next = _UInt128(t._high)
-    t = _UInt128(high._high) &* _UInt128(rhs.high._low)
-    current += _UInt128(t._low)
-    next += _UInt128(t._high)
-    low = _UInt128(_low: newlow, _high: current._low)
+    current = next + UInt128(current._high)
+    t = UInt128(high._low) &* UInt128(rhs.high._high)
+    current += UInt128(t._low)
+    next = UInt128(t._high)
+    t = UInt128(high._high) &* UInt128(rhs.high._low)
+    current += UInt128(t._low)
+    next += UInt128(t._high)
+    low = UInt128(_low: newlow, _high: current._low)
 
-    current = next + _UInt128(current._high)
-    high = current + _UInt128(high._high) &* _UInt128(rhs.high._high)
+    current = next + UInt128(current._high)
+    high = current + UInt128(high._high) &* UInt128(rhs.high._high)
   }
 
   static func &- (lhs: _UInt256, rhs: _UInt256) -> _UInt256 {
-    var t = _UInt128(lhs.low._low) &+ _UInt128(~rhs.low._low) &+ 1
+    var t = UInt128(lhs.low._low) &+ UInt128(~rhs.low._low) &+ 1
     let w0 = t._low
-    t = _UInt128(t._high) &+ _UInt128(lhs.low._high) &+ _UInt128(~rhs.low._high)
+    t = UInt128(t._high) &+ UInt128(lhs.low._high) &+ UInt128(~rhs.low._high)
     let w1 = t._low
-    t = _UInt128(t._high) &+ _UInt128(lhs.high._low) &+ _UInt128(~rhs.high._low)
+    t = UInt128(t._high) &+ UInt128(lhs.high._low) &+ UInt128(~rhs.high._low)
     let w2 = t._low
     let w3 = t._high &+ lhs.high._high &+ ~rhs.high._high
     return _UInt256(high: w3, w2, w1, low: w0)
@@ -1826,7 +1826,7 @@ fileprivate struct _UInt256 {
 
   static func &+ (lhs: _UInt256, rhs: _UInt256) -> _UInt256 {
     let low = lhs.low &+ rhs.low
-    let carry: _UInt128 = low < lhs.low ? 1 : 0
+    let carry: UInt128 = low < lhs.low ? 1 : 0
     let high = lhs.high &+ rhs.high &+ carry
     return _UInt256(high: high, low: low)
   }
@@ -1834,14 +1834,14 @@ fileprivate struct _UInt256 {
   // Add a signed int...
   static func &+= (lhs: inout _UInt256, rhs: Int) {
     if rhs >= 0 {
-      let r = _UInt128(UInt(rhs))
+      let r = UInt128(UInt(rhs))
       let newlow = lhs.low &+ r
-      let carry: _UInt128 = newlow < lhs.low ? 1 : 0
+      let carry: UInt128 = newlow < lhs.low ? 1 : 0
       lhs.high &+= carry
       lhs.low = newlow
     } else {
-      let magnitude = _UInt128(UInt(bitPattern: 0 &- rhs))
-      let borrow: _UInt128 = lhs.low < magnitude ? 1 : 0
+      let magnitude = UInt128(UInt(bitPattern: 0 &- rhs))
+      let borrow: UInt128 = lhs.low < magnitude ? 1 : 0
       lhs.low &-= magnitude
       lhs.high &-= borrow
     }
@@ -1886,12 +1886,12 @@ fileprivate struct _UInt256 {
 @inline(__always)
 fileprivate func _powerOf10_Binary64(
   p: Int,
-  significand: inout _UInt128
+  significand: inout UInt128
 ) -> Int {
   if p >= 0 && p <= 55 {
     let upper64 = powersOf10_Exact128[p &* 2 &+ 1]
     let lower64 = powersOf10_Exact128[p &* 2]
-    significand = _UInt128(_low: lower64, _high: upper64)
+    significand = UInt128(_low: lower64, _high: upper64)
     return binaryExponentFor10ToThe(p)
   }
 
@@ -1903,15 +1903,15 @@ fileprivate func _powerOf10_Binary64(
   let baseExponent = binaryExponentFor10ToThe(p &- extraPower)
 
   if extraPower == 0 {
-    significand = _UInt128(_low: baseLow, _high: baseHigh)
+    significand = UInt128(_low: baseLow, _high: baseHigh)
     return baseExponent
   } else {
     let extra = powersOf10_Exact128[extraPower &* 2 &+ 1]
-    let high = (_UInt128(truncatingIfNeeded:baseHigh)
-                &* _UInt128(truncatingIfNeeded:extra))
-    let low = (_UInt128(truncatingIfNeeded:baseLow)
-               &* _UInt128(truncatingIfNeeded:extra)
-               &+ _UInt128(UInt64.max >> 1))
+    let high = (UInt128(truncatingIfNeeded:baseHigh)
+                &* UInt128(truncatingIfNeeded:extra))
+    let low = (UInt128(truncatingIfNeeded:baseLow)
+               &* UInt128(truncatingIfNeeded:extra)
+               &+ UInt128(UInt64.max >> 1))
     significand = high &+ (low &>> 64)
     return baseExponent &+ binaryExponentFor10ToThe(extraPower)
   }
@@ -1953,7 +1953,7 @@ fileprivate func _powerOf10_Binary128(
     low: powersOf10_Binary128_Medium[mediumIndex + 0])
   significand.multiplyHigh(by: medium)
 
-  let fine = _UInt128(
+  let fine = UInt128(
     _low: powersOf10_Exact128[fineIndex],
     _high: powersOf10_Exact128[fineIndex + 1])
   significand.multiplyHigh(by: fine)

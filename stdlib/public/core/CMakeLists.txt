@@ -291,7 +291,6 @@ split_embedded_sources(
   EMBEDDED FloatingPointToString.swift
   EMBEDDED FloatingPointTypes.swift.gyb
   EMBEDDED IntegerTypes.swift.gyb
-  EMBEDDED LegacyInt128.swift.gyb
   EMBEDDED UnsafeBufferPointer.swift.gyb
   EMBEDDED UnsafeRawBufferPointer.swift.gyb
   EMBEDDED Tuple.swift.gyb

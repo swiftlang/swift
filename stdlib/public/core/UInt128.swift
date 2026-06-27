@@ -13,7 +13,7 @@
 // MARK: Memory layout
 
 /// A 128-bit unsigned integer value type.
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 @frozen
 public struct UInt128: Sendable, BitwiseCopyable {
 #if _pointerBitWidth(_64) || arch(arm64_32)
@@ -22,26 +22,26 @@ public struct UInt128: Sendable, BitwiseCopyable {
   //  of `Builtin.Int128`.
   public var _value: Builtin.Int128
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public init(_ _value: Builtin.Int128) {
     self._value = _value
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var _low: UInt64 {
     UInt64(Builtin.trunc_Int128_Int64(_value))
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var _high: UInt64 {
     let shifted: UInt128 = self &>> 64
     return UInt64(Builtin.trunc_Int128_Int64(shifted._value))
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public init(_low: UInt64, _high: UInt64) {
 #if _endian(little)
@@ -65,14 +65,14 @@ public struct UInt128: Sendable, BitwiseCopyable {
   public var _low: UInt64
 #endif
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public init(_low: UInt64, _high: UInt64) {
     self._low = _low
     self._high = _high
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public var _value: Builtin.Int128 {
     @_transparent
     get {
@@ -85,7 +85,7 @@ public struct UInt128: Sendable, BitwiseCopyable {
     }
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public init(_ _value: Builtin.Int128) {
     self = unsafe unsafeBitCast(_value, to: Self.self)
@@ -102,7 +102,7 @@ public struct UInt128: Sendable, BitwiseCopyable {
   ///
   /// - Parameter bitPattern: A value to use as the source of the new instance's
   ///   binary representation.
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public init(bitPattern: Int128) {
     self.init(bitPattern._value)
@@ -110,21 +110,21 @@ public struct UInt128: Sendable, BitwiseCopyable {
 }
 
 // MARK: - Constants
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128 {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static var zero: Self {
     Self(Builtin.zeroInitializer())
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static var min: Self {
     zero
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static var max: Self {
     Self(_low: .max, _high: .max)
@@ -132,19 +132,19 @@ extension UInt128 {
 }
 
 // MARK: - Conversions from other integers
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128: ExpressibleByIntegerLiteral,
                    _ExpressibleByBuiltinIntegerLiteral {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public typealias IntegerLiteralType = Self
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public init(_builtinIntegerLiteral x: Builtin.IntLiteral) {
     self.init(Builtin.s_to_u_checked_trunc_IntLiteral_Int128(x).0)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @inlinable
   public init?<T>(exactly source: T) where T: BinaryInteger {
     guard let high = UInt64(exactly: source >> 64) else { return nil }
@@ -152,7 +152,7 @@ extension UInt128: ExpressibleByIntegerLiteral,
     self.init(_low: low, _high: high)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @inlinable
   public init<T>(_ source: T) where T: BinaryInteger {
     guard let value = Self(exactly: source) else {
@@ -161,7 +161,7 @@ extension UInt128: ExpressibleByIntegerLiteral,
     self = value
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @inlinable
   public init<T>(clamping source: T) where T: BinaryInteger {
     guard let value = Self(exactly: source) else {
@@ -171,7 +171,7 @@ extension UInt128: ExpressibleByIntegerLiteral,
     self = value
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @inlinable
   public init<T>(truncatingIfNeeded source: T) where T: BinaryInteger {
     let high = UInt64(truncatingIfNeeded: source >> 64)
@@ -179,7 +179,7 @@ extension UInt128: ExpressibleByIntegerLiteral,
     self.init(_low: low, _high: high)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public init(_truncatingBits source: UInt) {
     self.init(_low: UInt64(source), _high: .zero)
@@ -187,9 +187,9 @@ extension UInt128: ExpressibleByIntegerLiteral,
 }
 
 // MARK: - Conversions from Binary floating-point
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128 {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @inlinable
   public init?<T>(exactly source: T) where T: BinaryFloatingPoint {
     let highAsFloat = (source * 0x1.0p-64).rounded(.towardZero)
@@ -200,7 +200,7 @@ extension UInt128 {
     self.init(_low: low, _high: high)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @inlinable
   public init<T>(_ source: T) where T: BinaryFloatingPoint {
     guard let value = Self(exactly: source.rounded(.towardZero)) else {
@@ -211,27 +211,27 @@ extension UInt128 {
 }
 
 // MARK: - Non-arithmetic utility conformances
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128: Equatable {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func ==(a: Self, b: Self) -> Bool {
     Bool(Builtin.cmp_eq_Int128(a._value, b._value))
   }
 }
 
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128: Comparable {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func <(a: Self, b: Self) -> Bool {
     Bool(Builtin.cmp_ult_Int128(a._value, b._value))
   }
 }
 
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128: Hashable {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_low)
@@ -240,9 +240,9 @@ extension UInt128: Hashable {
 }
 
 // MARK: - Overflow-reporting arithmetic
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128 {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public func addingReportingOverflow(
     _ other: Self
@@ -253,7 +253,7 @@ extension UInt128 {
     return (Self(result), Bool(overflow))
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public func subtractingReportingOverflow(
     _ other: Self
@@ -264,7 +264,7 @@ extension UInt128 {
     return (Self(result), Bool(overflow))
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public func multipliedReportingOverflow(
     by other: Self
@@ -275,7 +275,7 @@ extension UInt128 {
     return (Self(result), Bool(overflow))
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public func dividedReportingOverflow(
     by other: Self
@@ -287,7 +287,7 @@ extension UInt128 {
     return (Self(Builtin.udiv_Int128(self._value, other._value)), false)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public func remainderReportingOverflow(
     dividingBy other: Self
@@ -301,9 +301,9 @@ extension UInt128 {
 }
 
 // MARK: - AdditiveArithmetic conformance
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128: AdditiveArithmetic {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func +(a: Self, b: Self) -> Self {
     let (result, overflow) = a.addingReportingOverflow(b)
@@ -318,7 +318,7 @@ extension UInt128: AdditiveArithmetic {
     return result
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func -(a: Self, b: Self) -> Self {
     let (result, overflow) = a.subtractingReportingOverflow(b)
@@ -331,9 +331,9 @@ extension UInt128: AdditiveArithmetic {
 }
 
 // MARK: - Multiplication and division
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128 {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func *(a: Self, b: Self) -> Self {
     let (result, overflow) = a.multipliedReportingOverflow(by: b)
@@ -344,13 +344,13 @@ extension UInt128 {
     return result
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func *=(a: inout Self, b: Self) {
     a = a * b
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func /(a: Self, b: Self) -> Self {
     if _slowPath(b == .zero) {
@@ -360,13 +360,13 @@ extension UInt128 {
     return Self(Builtin.udiv_Int128(a._value, b._value))
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func /=(a: inout Self, b: Self) {
     a = a / b
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func %(a: Self, b: Self) -> Self {
     if _slowPath(b == .zero) {
@@ -376,7 +376,7 @@ extension UInt128 {
     return Self(Builtin.urem_Int128(a._value, b._value))
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func %=(a: inout Self, b: Self) {
     a = a % b
@@ -384,12 +384,12 @@ extension UInt128 {
 }
 
 // MARK: - Numeric conformance
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128: Numeric {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public typealias Magnitude = Self
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var magnitude: Self {
     self
@@ -397,66 +397,66 @@ extension UInt128: Numeric {
 }
 
 // MARK: - BinaryInteger conformance
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128: BinaryInteger {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @frozen
   public struct Words {
     @usableFromInline
     let _value: UInt128
 
-    @available(SwiftStdlib 6.0, *)
+    @available(StdlibDeploymentTarget 6.0, *)
     @_transparent
     public init(_value: UInt128) {
       self._value = _value
     }
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var words: Words {
     Words(_value: self)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func &=(a: inout Self, b: Self) {
     a._value = Builtin.and_Int128(a._value, b._value)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func |=(a: inout Self, b: Self) {
     a._value = Builtin.or_Int128(a._value, b._value)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func ^=(a: inout Self, b: Self) {
     a._value = Builtin.xor_Int128(a._value, b._value)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func &>>=(a: inout Self, b: Self) {
     let masked = b & 127
     a._value = Builtin.lshr_Int128(a._value, masked._value)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static func &<<=(a: inout Self, b: Self) {
     let masked = b & 127
     a._value = Builtin.shl_Int128(a._value, masked._value)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var trailingZeroBitCount: Int {
     _low == 0 ? 64 + _high.trailingZeroBitCount : _low.trailingZeroBitCount
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var _lowWord: UInt {
 #if _pointerBitWidth(_64)
@@ -471,57 +471,57 @@ extension UInt128: BinaryInteger {
   }
 }
 
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128.Words: RandomAccessCollection {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public typealias Element = UInt
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public typealias Index = Int
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public typealias SubSequence = Slice<Self>
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public typealias Indices = Range<Int>
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var count: Int {
     128 / UInt.bitWidth
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var startIndex: Int {
     0
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var endIndex: Int {
     count
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var indices: Indices {
     startIndex ..< endIndex
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public func index(after i: Int) -> Int {
     i + 1
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public func index(before i: Int) -> Int {
     i - 1
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public subscript(position: Int) -> UInt {
     @inlinable
     get {
@@ -540,25 +540,25 @@ extension UInt128.Words: RandomAccessCollection {
 }
 
 // MARK: - FixedWidthInteger conformance
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128: FixedWidthInteger, UnsignedInteger {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public static var bitWidth: Int { 128 }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var nonzeroBitCount: Int {
     _high.nonzeroBitCount &+ _low.nonzeroBitCount
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var leadingZeroBitCount: Int {
     _high == 0 ? 64 + _low.leadingZeroBitCount : _high.leadingZeroBitCount
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_transparent
   public var byteSwapped: Self {
     return Self(_low: _high.byteSwapped, _high: _low.byteSwapped)
@@ -566,7 +566,7 @@ extension UInt128: FixedWidthInteger, UnsignedInteger {
 }
 
 // MARK: - Integer comparison type inference
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128 {
   // IMPORTANT: The following four apparently unnecessary overloads of
   // comparison operations are necessary for literal comparands to be
@@ -592,5 +592,5 @@ extension UInt128 {
   }
 }
 
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension UInt128: ConvertibleToBytes, ConvertibleFromBytes {}
