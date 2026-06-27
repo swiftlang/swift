@@ -49,3 +49,9 @@ module CxxForeignRef {
   header "cxx-frt.h"
   requires cplusplus
 }
+
+module ObjCBaseWithCxxParams {
+  header "objc-base-with-cxx-params.h"
+  requires objc
+  requires cplusplus
+}
