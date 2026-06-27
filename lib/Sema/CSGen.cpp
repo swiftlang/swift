@@ -2435,9 +2435,14 @@ namespace {
         auto enumPattern = cast<EnumElementPattern>(pattern);
 
         // Create a type variable to represent the pattern.
+        //
+        // This type is contextually dependent in cases like `.a` where
+        // `patternType` represents an implicit base type of `.a` and so
+        // should be allowed to bind to a hole just like regular leading-dot
+        // syntax.
         Type patternType =
             CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                  TVO_CanBindToNoEscape);
+                                  TVO_CanBindToNoEscape | TVO_CanBindToHole);
 
         // Form the member constraint for a reference to a member of this
         // type.
