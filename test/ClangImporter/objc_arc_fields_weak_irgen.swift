@@ -29,11 +29,10 @@ func testCopyWeak(_ s: WeaksInAStructArc) -> WeaksInAStructArc {
   return s
 }
 
-// Field access still uses the existing swift_unknownObjectWeakLoadStrong
-// runtime function, which correctly dispatches based on the object's
-// nativeness at runtime.
+// Field access uses objc_loadWeakRetained directly to match the
+// Clang-synthesized VWT functions that use objc_copyWeak/objc_destroyWeak.
 // CHECK-LABEL: define {{.*}} @"$s{{.*}}testWeakFieldAccess
-// CHECK: call ptr @swift_unknownObjectWeakLoadStrong
+// CHECK: call ptr @llvm.objc.loadWeakRetained
 // CHECK: ret
 func testWeakFieldAccess(_ s: WeaksInAStructArc) -> MYObject? {
   return s.myobj
@@ -55,4 +54,28 @@ func testCreateAndDestroyMixed() {
 // CHECK: ret void
 func testCopyMixed(_ s: MixedStrongWeakArc) -> MixedStrongWeakArc {
   return s
+}
+
+// Storing to a weak field uses objc_storeWeak directly.
+// CHECK-LABEL: define {{.*}} @"$s{{.*}}testWeakFieldStore
+// CHECK: call ptr @llvm.objc.storeWeak
+// CHECK: ret
+func testWeakFieldStore(_ s: inout WeaksInAStructArc, _ obj: MYObject?) {
+  s.myobj = obj
+}
+
+// Initializing a weak field uses objc_initWeak directly.
+// CHECK-LABEL: define {{.*}} @"$s{{.*}}testWeakFieldInit
+// CHECK: call ptr @llvm.objc.initWeak
+// CHECK: ret
+func testWeakFieldInit() -> WeaksInAStructArc {
+  return WeaksInAStructArc(myobj: MYObject())
+}
+
+// Mixed struct field access at non-zero offset also uses objc_loadWeakRetained.
+// CHECK-LABEL: define {{.*}} @"$s{{.*}}testMixedWeakFieldAccess
+// CHECK: call ptr @llvm.objc.loadWeakRetained
+// CHECK: ret
+func testMixedWeakFieldAccess(_ s: MixedStrongWeakArc) -> MYObject? {
+  return s.weak
 }
