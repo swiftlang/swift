@@ -1321,7 +1321,7 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
   dc->lookupQualified(
       builderType, DeclNameRef(fnName),
       builderType->getAnyNominal()->getLoc(),
-      {NLFlag::QualifiedDefault, NLFlag::ProtocolMembers, NLFlag::IgnoreMissingImports},
+      {NLFlags::QualifiedDefault, NLFlags::ProtocolMembers, NLFlags::IgnoreMissingImports},
       foundDecls);
   for (auto decl : foundDecls) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {

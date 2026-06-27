@@ -159,15 +159,15 @@ private:
 bool swift::declIsVisibleToNameLookup(
     const ValueDecl *decl, const DeclContext *moduleScopeContext,
     NLOptions options) {
-  // NLFlag::IgnoreAccessControl only applies to the current module. If
+  // NLFlags::IgnoreAccessControl only applies to the current module. If
   // it applies here, the declaration is visible.
-  if (options.contains(NLFlag::IgnoreAccessControl) &&
+  if (options.contains(NLFlags::IgnoreAccessControl) &&
       moduleScopeContext &&
       moduleScopeContext->getParentModule() ==
           decl->getDeclContext()->getParentModule())
     return true;
 
-  bool includeUsableFromInline = options.contains(NLFlag::IncludeUsableFromInline);
+  bool includeUsableFromInline = options.contains(NLFlags::IncludeUsableFromInline);
   return decl->isAccessibleFrom(moduleScopeContext, false,
                                 includeUsableFromInline);
 }
@@ -234,9 +234,9 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   };
 
   OptionSet<ModuleLookupFlags> currentModuleLookupFlags = {};
-  if (options.contains(NLFlag::ExcludeMacroExpansions))
+  if (options.contains(NLFlags::ExcludeMacroExpansions))
     currentModuleLookupFlags |= ModuleLookupFlags::ExcludeMacroExpansions;
-  if (options.contains(NLFlag::ABIProviding))
+  if (options.contains(NLFlags::ABIProviding))
     currentModuleLookupFlags |= ModuleLookupFlags::ABIProviding;
   if (hasModuleSelector)
     currentModuleLookupFlags |= ModuleLookupFlags::HasModuleSelector;
@@ -277,7 +277,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
     auto &imports = ctx.getImportCache().getImportSet(moduleOrFile);
 
     OptionSet<ModuleLookupFlags> importedModuleLookupFlags = {};
-    if (options.contains(NLFlag::ABIProviding))
+    if (options.contains(NLFlags::ABIProviding))
       currentModuleLookupFlags |= ModuleLookupFlags::ABIProviding;
     // Do not propagate HasModuleSelector here; the selector wasn't specific.
 
@@ -422,7 +422,7 @@ void namelookup::lookupVisibleDeclsInModule(
   LookupVisibleDecls lookup(ctx, resolutionKind, lookupKind);
   lookup.lookupInModule(decls, moduleOrFile, accessPath, moduleScopeContext,
                         /*hasModuleSelector=*/false,
-                        NLFlag::QualifiedDefault);
+                        NLFlags::QualifiedDefault);
 }
 
 void namelookup::simple_display(llvm::raw_ostream &out, ResolutionKind kind) {

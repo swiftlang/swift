@@ -1181,9 +1181,9 @@ static void collectNonOveriddenSuperclassInits(
   superclassDecl->synthesizeSemanticMembersIfNeeded(
     DeclBaseName::createConstructor());
 
-  NLOptions subOptions = {NLFlag::QualifiedDefault,
-                          NLFlag::IgnoreAccessControl,
-                          NLFlag::IgnoreMissingImports};
+  NLOptions subOptions = {NLFlags::QualifiedDefault,
+                          NLFlags::IgnoreAccessControl,
+                          NLFlags::IgnoreMissingImports};
   SmallVector<ValueDecl *, 4> lookupResults;
   subclass->lookupQualified(
       superclassDecl, DeclNameRef::createConstructor(),

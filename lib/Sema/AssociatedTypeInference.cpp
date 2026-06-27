@@ -558,11 +558,11 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   }
 
   // Next, look for a member type declaration with this name.
-  NLOptions subOptions = {NLFlag::QualifiedDefault,
-                          NLFlag::RemoveAssociatedTypes,
-                          NLFlag::OnlyTypes,
-                          NLFlag::ProtocolMembers,
-                          NLFlag::IncludeAttributeImplements};
+  NLOptions subOptions = {NLFlags::QualifiedDefault,
+                          NLFlags::RemoveAssociatedTypes,
+                          NLFlags::OnlyTypes,
+                          NLFlags::ProtocolMembers,
+                          NLFlags::IncludeAttributeImplements};
 
   // Look for a member type with the same name as the associated type.
   SmallVector<ValueDecl *, 4> candidates;
@@ -2193,10 +2193,10 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
     defaultName = DeclNameRef(getASTContext().getIdentifier(defaultNameStr));
   }
 
-  NLOptions subOptions = {NLFlag::OnlyTypes,
-                          NLFlag::RemoveAssociatedTypes,
-                          NLFlag::ProtocolMembers,
-                          NLFlag::IncludeAttributeImplements};
+  NLOptions subOptions = {NLFlags::OnlyTypes,
+                          NLFlags::RemoveAssociatedTypes,
+                          NLFlags::ProtocolMembers,
+                          NLFlags::IncludeAttributeImplements};
 
   // Look for types with the given default name that have appropriate
   // @_implements attributes.
@@ -2563,7 +2563,7 @@ AssociatedTypeDecl *swift::findDefaultedAssociatedType(
   // Otherwise, look for all associated types with the same name along all the
   // protocols that the adoptee conforms to.
   SmallVector<ValueDecl *, 4> decls;
-  NLOptions options = {NLFlag::ProtocolMembers, NLFlag::OnlyTypes};
+  NLOptions options = {NLFlags::ProtocolMembers, NLFlags::OnlyTypes};
   dc->lookupQualified(adoptee, DeclNameRef(assocType->getName()),
                       SourceLoc(), options, decls);
 

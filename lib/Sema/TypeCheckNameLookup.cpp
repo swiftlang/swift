@@ -375,17 +375,17 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   assert(type->mayHaveMembers());
 
   LookupResult result;
-  NLOptions subOptions = {NLFlag::QualifiedDefault, NLFlag::ProtocolMembers};
+  NLOptions subOptions = {NLFlags::QualifiedDefault, NLFlags::ProtocolMembers};
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
-    subOptions |= NLFlag::IgnoreAccessControl;
+    subOptions |= NLFlags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
-    subOptions |= NLFlag::IgnoreMissingImports;
+    subOptions |= NLFlags::IgnoreMissingImports;
   if (options.contains(NameLookupFlags::ABIProviding))
-    subOptions |= NLFlag::ABIProviding;
+    subOptions |= NLFlags::ABIProviding;
 
   // We handle our own overriding/shadowing filtering.
-  subOptions -= NLFlag::RemoveOverridden;
-  subOptions -= NLFlag::RemoveNonVisible;
+  subOptions -= NLFlags::RemoveOverridden;
+  subOptions -= NLFlags::RemoveNonVisible;
 
   // Make sure we've resolved implicit members, if we need them.
   namelookup::installSemanticMembersIfNeeded(type, name);
@@ -474,18 +474,18 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
-  NLOptions subOptions = {NLFlag::QualifiedDefault,
-                          NLFlag::OnlyTypes,
-                          NLFlag::ProtocolMembers};
+  NLOptions subOptions = {NLFlags::QualifiedDefault,
+                          NLFlags::OnlyTypes,
+                          NLFlags::ProtocolMembers};
 
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
-    subOptions |= NLFlag::IgnoreAccessControl;
+    subOptions |= NLFlags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
-    subOptions |= NLFlag::IgnoreMissingImports;
+    subOptions |= NLFlags::IgnoreMissingImports;
   if (options.contains(NameLookupFlags::IncludeUsableFromInline))
-    subOptions |= NLFlag::IncludeUsableFromInline;
+    subOptions |= NLFlags::IncludeUsableFromInline;
   if (options.contains(NameLookupFlags::ABIProviding))
-    subOptions |= NLFlag::ABIProviding;
+    subOptions |= NLFlags::ABIProviding;
 
   // Make sure we've resolved implicit members, if we need them.
   namelookup::installSemanticMembersIfNeeded(type, name);

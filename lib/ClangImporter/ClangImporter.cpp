@@ -6728,9 +6728,9 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
     swiftName = func->getName();
 
   if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
-    NLOptions options = {NLFlag::IgnoreAccessControl, NLFlag::IgnoreMissingImports};
+    NLOptions options = {NLFlags::IgnoreAccessControl, NLFlags::IgnoreMissingImports};
     ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
-                        (NLFlag::QualifiedDefault) | options, results);
+                        (NLFlags::QualifiedDefault) | options, results);
   }
   else {
     ASTContext &ctx = func->getASTContext();
@@ -8214,7 +8214,7 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
         ctx.MainModule, ctx.getIdentifier(name), /*hasModuleSelector=*/false,
         results, NLKind::UnqualifiedLookup,
         namelookup::ResolutionKind::Overloadable, ctx.MainModule, SourceLoc(),
-        NLFlag::UnqualifiedDefault);
+        NLFlags::UnqualifiedDefault);
 
     // Filter out any declarations that didn't come from Clang.
     auto newEnd =

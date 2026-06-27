@@ -1516,7 +1516,7 @@ lookupValueWitnessesViaImplementsAttr(
   auto name = req->createNameRef();
   auto *nominal = DC->getSelfNominalTypeDecl();
 
-  NLOptions subOptions = {NLFlag::ProtocolMembers, NLFlag::IncludeAttributeImplements};
+  NLOptions subOptions = {NLFlags::ProtocolMembers, NLFlags::IncludeAttributeImplements};
 
   nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
 
@@ -1665,8 +1665,8 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
     // to restate them in the resulting list, or else an otherwise valid
     // conformance will become ambiguous.
     const NLOptions options =
-        (doUnqualifiedLookup ? NLOptions() : NLFlag::ProtocolMembers) |
-        NLFlag::IgnoreMissingImports;
+        (doUnqualifiedLookup ? NLOptions() : NLFlags::ProtocolMembers) |
+        NLFlags::IgnoreMissingImports;
 
     auto getWitness = [req, DC](ValueDecl *witness) -> ValueDecl * {
       // Protocol members can't be witnesses.
@@ -6768,8 +6768,8 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
 
     static bool hasValidMethod(NominalTypeDecl *typeDecl,
                                SmallVectorImpl<InvalidMethod> &invalid) {
-      NLOptions subOptions = NLFlag::QualifiedDefault;
-      subOptions |= NLFlag::ProtocolMembers;
+      NLOptions subOptions = NLFlags::QualifiedDefault;
+      subOptions |= NLFlags::ProtocolMembers;
 
       DeclNameRef baseName(typeDecl->getASTContext().Id_appendInterpolation);
 
@@ -7666,7 +7666,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     // (canonicalized) requirement.
     if (assocType->getProtocol() != proto) {
       SmallVector<ValueDecl *, 2> found;
-      NLOptions options = {NLFlag::QualifiedDefault, NLFlag::ProtocolMembers, NLFlag::OnlyTypes};
+      NLOptions options = {NLFlags::QualifiedDefault, NLFlags::ProtocolMembers, NLFlags::OnlyTypes};
       module->lookupQualified(
                            proto, DeclNameRef(assocType->getName()),
                            proto->getLoc(),

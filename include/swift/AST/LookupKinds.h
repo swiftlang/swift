@@ -39,7 +39,7 @@ enum class NLKind {
 void simple_display(llvm::raw_ostream &out, NLKind kind);
 
 /// Constants used to customize name lookup.
-enum class NLFlag : unsigned {
+enum class NLFlags : unsigned {
   /// Consider declarations within protocols to which the context type conforms.
   ProtocolMembers = 1 << 0,
 
@@ -92,8 +92,8 @@ enum class NLFlag : unsigned {
   UnqualifiedDefault = RemoveNonVisible | RemoveOverridden
 };
 
-/// A set of `NLFlag` options for name lookup.
-using NLOptions = OptionSet<NLFlag>;
+/// A set of `NLFlags` options for name lookup.
+using NLOptions = OptionSet<NLFlags>;
 
 inline bool operator==(NLOptions lhs, NLOptions rhs) {
   return lhs.containsOnly(rhs);

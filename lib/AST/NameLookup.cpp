@@ -1846,7 +1846,7 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
 
     ModuleQualifiedLookupRequest req{moduleScopeDC, moduleDecl, macroName,
                                      SourceLoc(),
-                                     {NLFlag::ExcludeMacroExpansions, NLFlag::OnlyMacros}};
+                                     {NLFlags::ExcludeMacroExpansions, NLFlags::OnlyMacros}};
     auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
     for (auto *found : lookup)
       addChoiceIfApplicable(found);
@@ -2490,8 +2490,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
   }
 
   // Check access.
-  if (!options.contains(NLFlag::IgnoreAccessControl) && !ctx.isAccessControlDisabled()) {
-    bool allowUsableFromInline = options.contains(NLFlag::IncludeUsableFromInline);
+  if (!options.contains(NLFlags::IgnoreAccessControl) && !ctx.isAccessControlDisabled()) {
+    bool allowUsableFromInline = options.contains(NLFlags::IncludeUsableFromInline);
     if (!decl->isAccessibleFrom(dc, /*forConformance*/ false,
                                 allowUsableFromInline))
       return false;
@@ -2501,7 +2501,7 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
   if (requireImport) {
     // If the options indicate that visibility should be enforced in this
     // lookup, check if the decl is imported.
-    bool checkDeclImport = !options.contains(NLFlag::IgnoreMissingImports);
+    bool checkDeclImport = !options.contains(NLFlags::IgnoreMissingImports);
 
     // Even when missing imports are being ignored, we still need to filter out
     // overrides that haven't been imported. Otherwise, removeOverriddenDecls()
@@ -2537,7 +2537,7 @@ void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
                                       Identifier moduleSelector,
                                       SmallVectorImpl<ValueDecl *> &decls) {
   // If we're supposed to remove associated type declarations, do so now.
-  if (options.contains(NLFlag::RemoveAssociatedTypes)) {
+  if (options.contains(NLFlags::RemoveAssociatedTypes)) {
     decls.erase(
       std::remove_if(decls.begin(), decls.end(),
                      [&](ValueDecl *decl) {
@@ -2547,11 +2547,11 @@ void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
   }
 
   // If we're supposed to remove overridden declarations, do so now.
-  if (options.contains(NLFlag::RemoveOverridden))
+  if (options.contains(NLFlags::RemoveOverridden))
     removeOverriddenDecls(decls);
 
   // If we're supposed to remove shadowed/hidden declarations, do so now.
-  if (options.contains(NLFlag::RemoveNonVisible)) {
+  if (options.contains(NLFlags::RemoveNonVisible)) {
     removeOutOfModuleDecls(decls, moduleSelector, dc);
     removeShadowedDecls(decls, dc);
   }
@@ -2763,7 +2763,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
 
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
-  bool wantProtocolMembers = options.contains(NLFlag::ProtocolMembers);
+  bool wantProtocolMembers = options.contains(NLFlags::ProtocolMembers);
   while (!stack.empty()) {
     auto current = stack.back();
     stack.pop_back();
@@ -2774,11 +2774,11 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
     auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    if (options.contains(NLFlag::IncludeAttributeImplements))
+    if (options.contains(NLFlags::IncludeAttributeImplements))
       flags |= NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements;
-    if (options.contains(NLFlag::ExcludeMacroExpansions))
+    if (options.contains(NLFlags::ExcludeMacroExpansions))
       flags |= NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
-    if (options.contains(NLFlag::ABIProviding))
+    if (options.contains(NLFlags::ABIProviding))
       flags |= NominalTypeDecl::LookupDirectFlags::ABIProviding;
 
     // Note that the source loc argument doesn't matter, because excluding
@@ -2787,12 +2787,12 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                                            SourceLoc(), flags)) {
       // If we're performing a type lookup, don't even attempt to validate
       // the decl if its not a type.
-      if (options.contains(NLFlag::OnlyTypes) && !isa<TypeDecl>(decl))
+      if (options.contains(NLFlags::OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
       // If we're performing a macro lookup, don't even attempt to validate
       // the decl if its not a macro.
-      if (options.contains(NLFlag::OnlyMacros) && !isa<MacroDecl>(decl))
+      if (options.contains(NLFlags::OnlyMacros) && !isa<MacroDecl>(decl))
         continue;
 
       if (isAcceptableLookupResult(DC, options, decl, onlyCompleteObjectInits,
@@ -2824,7 +2824,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     auto gpList = current->getGenericParams();
 
     // .. But not in type contexts (yet)
-    if (!options.contains(NLFlag::OnlyTypes) && gpList && !member.isSpecial()) {
+    if (!options.contains(NLFlags::OnlyTypes) && gpList && !member.isSpecial()) {
       auto gp = gpList->lookUpGenericParam(member.getBaseIdentifier());
 
       if (gp && gp->isValue()) {
@@ -2891,8 +2891,8 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   using namespace namelookup;
   QualifiedLookupResult decls;
 
-  auto kind = (options.contains(NLFlag::OnlyTypes)    ? ResolutionKind::TypesOnly
-               : options.contains(NLFlag::OnlyMacros) ? ResolutionKind::MacrosOnly
+  auto kind = (options.contains(NLFlags::OnlyTypes)    ? ResolutionKind::TypesOnly
+               : options.contains(NLFlags::OnlyMacros) ? ResolutionKind::MacrosOnly
                : ResolutionKind::Overloadable);
   auto topLevelScope = DC->getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
@@ -2937,8 +2937,8 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
 
   // Type-only and macro lookup won't find anything on AnyObject.
   // AnyObject doesn't provide ABI.
-  if (options.contains(NLFlag::OnlyTypes) || options.contains(NLFlag::OnlyMacros)
-      || options.contains(NLFlag::ABIProviding))
+  if (options.contains(NLFlags::OnlyTypes) || options.contains(NLFlags::OnlyMacros)
+      || options.contains(NLFlags::ABIProviding))
     return decls;
 
   // Collect all of the visible declarations.
@@ -3222,19 +3222,19 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
   {
     // Look into the base types.
     SmallVector<ValueDecl *, 4> members;
-    NLOptions options = {NLFlag::RemoveNonVisible, NLFlag::OnlyTypes};
+    NLOptions options = {NLFlags::RemoveNonVisible, NLFlags::OnlyTypes};
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::AllowUsableFromInline))
-      options |= NLFlag::IncludeUsableFromInline;
+      options |= NLFlags::IncludeUsableFromInline;
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
-      options |= NLFlag::IgnoreMissingImports;
+      options |= NLFlags::IgnoreMissingImports;
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
-      options |= NLFlag::ExcludeMacroExpansions;
+      options |= NLFlags::ExcludeMacroExpansions;
 
     // Look through the type declarations we were given, resolving them down
     // to nominal type declarations, module declarations, and
@@ -3250,8 +3250,8 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
     // Search all of the modules.
     for (auto module : moduleDecls) {
       auto innerOptions = options;
-      innerOptions -= NLFlag::RemoveOverridden;
-      innerOptions -= NLFlag::RemoveNonVisible;
+      innerOptions -= NLFlags::RemoveOverridden;
+      innerOptions -= NLFlags::RemoveNonVisible;
       SmallVector<ValueDecl *, 4> moduleMembers;
       dc->lookupQualified(module, name, loc, innerOptions, moduleMembers);
       members.append(moduleMembers.begin(), moduleMembers.end());
@@ -4359,8 +4359,8 @@ bool IsCallAsFunctionNominalRequest::evaluate(Evaluator &evaluator,
   // that will be checked when we actually try to solve with a `callAsFunction`
   // member access.
   SmallVector<ValueDecl *, 4> results;
-  NLOptions opts = {NLFlag::QualifiedDefault, NLFlag::ProtocolMembers,
-              NLFlag::IgnoreAccessControl, NLFlag::IgnoreMissingImports};
+  NLOptions opts = {NLFlags::QualifiedDefault, NLFlags::ProtocolMembers,
+              NLFlags::IgnoreAccessControl, NLFlags::IgnoreMissingImports};
   dc->lookupQualified(decl, DeclNameRef(ctx.Id_callAsFunction),
                       decl->getLoc(), opts, results);
 
@@ -4483,7 +4483,7 @@ FuncDecl *LookupIntrinsicRequest::evaluate(Evaluator &evaluator,
                                            Identifier funcName) const {
   llvm::SmallVector<ValueDecl *, 1> decls;
   module->lookupQualified(module, DeclNameRef(funcName), SourceLoc(),
-                          {NLFlag::QualifiedDefault, NLFlag::IncludeUsableFromInline},
+                          {NLFlags::QualifiedDefault, NLFlags::IncludeUsableFromInline},
                           decls);
   if (decls.size() != 1)
     return nullptr;
@@ -4507,17 +4507,17 @@ void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
   using Flag = std::pair<NLOptions, StringRef>;
   Flag possibleFlags[] = {
 #define FLAG(Name) {Name, #Name},
-    FLAG(NLFlag::ProtocolMembers)
-    FLAG(NLFlag::RemoveNonVisible)
-    FLAG(NLFlag::RemoveOverridden)
-    FLAG(NLFlag::IgnoreAccessControl)
-    FLAG(NLFlag::OnlyTypes)
-    FLAG(NLFlag::IncludeAttributeImplements)
-    FLAG(NLFlag::IncludeUsableFromInline)
-    FLAG(NLFlag::ExcludeMacroExpansions)
-    FLAG(NLFlag::OnlyMacros)
-    FLAG(NLFlag::IgnoreMissingImports)
-    FLAG(NLFlag::ABIProviding)
+    FLAG(NLFlags::ProtocolMembers)
+    FLAG(NLFlags::RemoveNonVisible)
+    FLAG(NLFlags::RemoveOverridden)
+    FLAG(NLFlags::IgnoreAccessControl)
+    FLAG(NLFlags::OnlyTypes)
+    FLAG(NLFlags::IncludeAttributeImplements)
+    FLAG(NLFlags::IncludeUsableFromInline)
+    FLAG(NLFlags::ExcludeMacroExpansions)
+    FLAG(NLFlags::OnlyMacros)
+    FLAG(NLFlags::IgnoreMissingImports)
+    FLAG(NLFlags::ABIProviding)
 #undef FLAG
   };
 

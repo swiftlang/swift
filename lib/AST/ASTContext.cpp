@@ -1424,7 +1424,7 @@ DECLTYPE *ASTContext::get##NAME##Decl() const { \
        * and the Clang module it imports. */ \
       SmallVector<ValueDecl *, 1> decls; \
       M->lookupQualified(M, DeclNameRef(getIdentifier(#NAME)), SourceLoc(), \
-                         (NLFlag::OnlyTypes), decls); \
+                         (NLFlags::OnlyTypes), decls); \
       if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
         auto decl = cast<DECLTYPE>(decls[0]); \
         if (isa<ProtocolDecl>(decl) \
@@ -1766,7 +1766,7 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
                 {Id_regexString, Id_version});
   SmallVector<ValueDecl *, 1> results;
   spModule->lookupQualified(getRegexType(), DeclNameRef(name),
-                            SourceLoc(), NLFlag::IncludeUsableFromInline,
+                            SourceLoc(), NLFlags::IncludeUsableFromInline,
                             results);
   assert(results.size() == 1);
   auto *foundDecl = cast<ConstructorDecl>(results[0]);
@@ -1791,7 +1791,7 @@ static ConcreteDeclRef getCGFloatOrDoubleInitDecl(
   // control. But there is only going to be one overload that exactly
   // with no label and the right argument type.
   toDecl->lookupQualified(toDecl, initRef, SourceLoc(),
-                          NLFlag::QualifiedDefault, candidates);
+                          NLFlags::QualifiedDefault, candidates);
 
   for (auto *candidate : candidates) {
     auto *ctor = cast<ConstructorDecl>(candidate);
