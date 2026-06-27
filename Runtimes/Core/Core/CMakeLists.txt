@@ -12,9 +12,6 @@ gyb_expand(FloatingPointTypes.swift.gyb FloatingPointTypes.swift
 gyb_expand(IntegerTypes.swift.gyb IntegerTypes.swift
   FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
 
-gyb_expand(LegacyInt128.swift.gyb LegacyInt128.swift
-  FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
-
 gyb_expand(UnsafeBufferPointer.swift.gyb UnsafeBufferPointer.swift
   FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
 
@@ -286,7 +283,6 @@ add_library(swiftCore
   "${CMAKE_CURRENT_BINARY_DIR}/FloatingPointParsing.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/FloatingPointTypes.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/IntegerTypes.swift"
-  "${CMAKE_CURRENT_BINARY_DIR}/LegacyInt128.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/UnsafeBufferPointer.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/UnsafeRawBufferPointer.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Tuple.swift")
