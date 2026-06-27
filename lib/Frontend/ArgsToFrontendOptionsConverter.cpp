@@ -670,6 +670,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitSIL;
   if (Opt.matches(OPT_emit_silgen))
     return FrontendOptions::ActionType::EmitSILGen;
+  if (Opt.matches(OPT_emit_silgen_ossa))
+    return FrontendOptions::ActionType::EmitSILGenOSSA;
   if (Opt.matches(OPT_emit_lowered_sil))
     return FrontendOptions::ActionType::EmitLoweredSIL;
   if (Opt.matches(OPT_emit_sib))
