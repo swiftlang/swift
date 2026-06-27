@@ -4134,6 +4134,20 @@ namespace {
       if (!unsatisfiedIsolation)
         return false;
 
+      // Record whether the callee isolation or the context isolation
+      // is preconcurrency, which is used later to downgrade errors to
+      // warnings in minimal checking.
+      bool preconcurrency = getContextIsolation().preconcurrency() ||
+          (calleeDecl && getActorIsolation(calleeDecl).preconcurrency());
+      unsatisfiedIsolation =
+          unsatisfiedIsolation->withPreconcurrency(preconcurrency);
+
+      bool onlyArgsCrossIsolation = callOptions.contains(
+          ActorReferenceResult::Flags::OnlyArgsCrossIsolation);
+      if (!onlyArgsCrossIsolation &&
+          refineRequiredIsolation(*unsatisfiedIsolation))
+        return false;
+
       // Check for isolated conformances escaping through the callee's
       // generic substitutions across the isolation boundary.
       {
@@ -4151,20 +4165,6 @@ namespace {
               RefineConformances{*this});
         }
       }
-
-      // Record whether the callee isolation or the context isolation
-      // is preconcurrency, which is used later to downgrade errors to
-      // warnings in minimal checking.
-      bool preconcurrency = getContextIsolation().preconcurrency() ||
-          (calleeDecl && getActorIsolation(calleeDecl).preconcurrency());
-      unsatisfiedIsolation =
-          unsatisfiedIsolation->withPreconcurrency(preconcurrency);
-
-      bool onlyArgsCrossIsolation = callOptions.contains(
-          ActorReferenceResult::Flags::OnlyArgsCrossIsolation);
-      if (!onlyArgsCrossIsolation &&
-          refineRequiredIsolation(*unsatisfiedIsolation))
-        return false;
 
       // At this point, we know a jump is made to the callee that yields
       // an isolation requirement unsatisfied by the calling context, so
