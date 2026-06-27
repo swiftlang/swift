@@ -1449,6 +1449,8 @@ def emit_sil : Flag<["-"], "emit-sil">,
   HelpText<"Emit canonical SIL file(s)">, ModeOpt;
 def emit_silgen : Flag<["-"], "emit-silgen">,
   HelpText<"Emit raw SIL file(s)">, ModeOpt;
+def emit_silgen_ossa : Flag<["-"], "emit-silgen-ossa">,
+  HelpText<"Emit raw SIL file(s) at the earliest point it has reached complete OSSA after SILGen">, ModeOpt;
 def emit_lowered_sil : Flag<["-"], "emit-lowered-sil">,
   HelpText<"Emit lowered SIL file(s)">, ModeOpt;
 def emit_sib : Flag<["-"], "emit-sib">,

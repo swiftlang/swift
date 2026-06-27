@@ -1855,9 +1855,10 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM) {
   FrontendStatsTracer tracer(SM->getASTContext().Stats,
                              "SIL-mandatory-passes");
+  auto Action = Invocation.getFrontendOptions().RequestedAction;
+
   // Don't run diagnostic passes at all when merging modules.
-  if (Invocation.getFrontendOptions().RequestedAction ==
-      FrontendOptions::ActionType::MergeModules) {
+  if (Action == FrontendOptions::ActionType::MergeModules) {
     return false;
   }
   if (Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
@@ -1865,7 +1866,18 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
     // to run the ownership evaluator.
     return runSILOwnershipEliminatorPass(*SM);
   }
-  return runSILDiagnosticPasses(*SM);
+
+  const bool RequestedSILGenOSSA =
+    (Action == FrontendOptions::ActionType::EmitSILGenOSSA);
+
+  // Run the passes SILGen relies on to reach verified OSSA SIL.
+  runSILGenPasses(*SM, /*VerifySILGen=*/RequestedSILGenOSSA);
+
+  // Stop here if the OSSA after SILGen is all that was requested.
+  if (RequestedSILGenOSSA)
+    return true;
+
+  return runSILDiagnosticPasses(*SM, /*RunSILGenPasses=*/false);
 }
 
 /// Perform SIL optimization passes if optimizations haven't been disabled.

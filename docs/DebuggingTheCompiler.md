@@ -85,10 +85,18 @@ Here is how to dump the IR after the main phases of the Swift compiler
 swiftc -dump-ast -O file.swift
 ```
 
-* **SILGen** To print the SIL immediately after SILGen:
+* **SILGen** To print the SIL immediately after SILGen (without any SIL verification):
 
 ```sh
-swiftc -emit-silgen -O file.swift
+swiftc -emit-silgen file.swift
+```
+
+* **SILGen (OSSA)** To print verified SIL immediately after SILGen's cleanup passes that 
+  turn it into complete OSSA SIL, stopping before running any diagnostic passes. This is a
+  frontend-only flag:
+
+```sh
+swift-frontend -emit-silgen-ossa file.swift
 ```
 
 * **Mandatory SIL passes** To print the SIL after the mandatory passes:

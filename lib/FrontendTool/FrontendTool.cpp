@@ -1444,6 +1444,7 @@ static bool performAction(CompilerInstance &Instance, int &ReturnValue,
         });
   }
   case FrontendOptions::ActionType::EmitSILGen:
+  case FrontendOptions::ActionType::EmitSILGenOSSA:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:
   case FrontendOptions::ActionType::EmitLoweredSIL:
@@ -2201,8 +2202,17 @@ static bool performCompileStepsPostSILGen(
   SM->setSerializeSILAction(SerializeSILModuleAction);
 
   // Perform optimizations and mandatory/diagnostic passes.
-  if (Instance.performSILProcessing(SM.get()))
+  if (Instance.performSILProcessing(SM.get())) {
+
+    // If requested, the performSILProcessing stopped at the first point
+    // it reached OSSA SIL, so emit that.
+    if (Action == FrontendOptions::ActionType::EmitSILGenOSSA) {
+      return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
+    }
+
+    // Some other error occurred.
     return true;
+  }
 
   if (observer)
     observer->performedSILProcessing(*SM);
