@@ -151,7 +151,7 @@ Swift functions can be called from C++, with some restrictions. See this table f
 | C++ `struct`/`class` parameter or result types  | Yes   |
 | Objective-C `@interface` parameter or result types  | Yes   |
 | Swift closure parameter or result types  | No           |
-| Swift protocol type parameter or result types  | No           |
+| Swift protocol type parameter or result types  | Partially: single-protocol existentials (including Equatable/Hashable/Comparable with operator dispatch); no ad-hoc compositions           |
 | SIMD type parameter or result types  | No           |
 | Variadic parameters            | No                                                       |
 | Multiple return values         | No                                                       |

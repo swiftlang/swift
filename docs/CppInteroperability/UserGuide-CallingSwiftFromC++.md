@@ -13,7 +13,6 @@ design for the Swift to C++ interoperability layer.
 
 * Closures
 * overridden methods/properties in classes
-* Existential types (any P)
 * Nested types
 * Operators
 * Tuples & functions returning multiple parameters
@@ -724,6 +723,292 @@ void useBicycle() {
 
 Swift classes that are marked as `final` are also marked `final` in C++.
 Swift classes that are not marked as `final` should not be derived from in C++.
+
+## Using Swift Existential Types
+
+A Swift existential type (`any Protocol`) is a type-erased container that holds a value of any concrete type conforming to the protocol. Swift existential types are bridged to C++ as wrapper classes that inherit from `swift::_impl::SwiftExistentialType`.
+
+### Protocol Wrappers
+
+Each non-marker protocol gets a `final` C++ class. The wrapper exposes the protocol's requirements as C++ methods and manages the existential container's lifecycle automatically (copy, move, destroy).
+
+For example, given the following Swift protocol and conforming type:
+
+```swift
+// Swift module 'Drawing'
+public protocol Drawable {
+    func draw() -> Int
+}
+
+public struct Circle: Drawable {
+    var radius: Int
+    public init(radius: Int) { self.radius = radius }
+    public func draw() -> Int { return radius * radius }
+}
+```
+
+The generated C++ interface provides a `Drawable` wrapper class:
+
+```c++
+// "Drawing-Swift.h" -- generated C++ interface
+class Drawable final : public swift::_impl::SwiftExistentialType {
+public:
+  swift::Int draw() const;
+
+  // Boxing constructor: implicit conversion from Circle.
+  Drawable(const Circle &value) noexcept;
+};
+```
+
+### Calling Protocol Methods
+
+Protocol methods are dispatched through the witness table at runtime, just like in Swift. From C++, you call them like any other method:
+
+```c++
+#include "Drawing-Swift.h"
+using namespace Drawing;
+
+void useDrawable(const Drawable &d) {
+  swift::Int result = d.draw();
+}
+```
+
+### Constructing Existentials from Concrete Types (Boxing)
+
+For each concrete type in the same module that conforms to a protocol, the wrapper class provides an implicit conversion constructor. This lets you construct an existential from a concrete value:
+
+```c++
+#include "Drawing-Swift.h"
+using namespace Drawing;
+
+void example() {
+  auto circle = Circle::init(7);
+  Drawable drawable(circle);          // box Circle into any Drawable
+  swift::Int result = drawable.draw(); // dispatches through witness table
+}
+```
+
+Because these are implicit constructors, you can pass concrete types directly to functions expecting existentials:
+
+```c++
+swift::Int drawTwice(const Drawable &d);
+
+void example() {
+  auto circle = Circle::init(7);
+  swift::Int result = drawTwice(circle); // implicit conversion to Drawable
+}
+```
+
+Boxing constructors are only emitted for conformances in the same module as the protocol. Cross-module conformances are not supported in v1.
+
+### Functions with Existential Parameters and Returns
+
+Swift functions that take or return existential types (`any Protocol`) are exposed in C++ using the wrapper class:
+
+```swift
+// Swift module 'Drawing'
+public func bestDrawable(_ a: any Drawable, _ b: any Drawable) -> any Drawable {
+    return a.draw() >= b.draw() ? a : b
+}
+```
+
+```c++
+// C++ use site
+Drawable best = Drawing::bestDrawable(circle1, circle2);
+```
+
+### Protocol Inheritance and Conversion
+
+When a protocol inherits from another protocol (e.g., `Stylable: Drawable`), the derived wrapper class includes all inherited methods as well as a conversion method to obtain the base protocol wrapper:
+
+```c++
+Stylable stylable = /* ... */;
+stylable.draw();   // inherited from Drawable, dispatched through base WT
+stylable.style();  // own requirement
+
+Drawable drawable = stylable.asDrawable(); // explicit conversion (value copy)
+```
+
+Note that conversion between protocol wrappers is a value copy, not a pointer cast. Different protocols may have different container sizes.
+
+### Marker Protocols
+
+Marker protocols (declared with `@_marker` in Swift) have no requirements and no witness tables. They are represented as `final` subclasses of `swift::Any`:
+
+```c++
+class Priority final : public swift::Any {
+  // No methods -- marker protocols have no requirements.
+};
+```
+
+### Primary Associated Types
+
+Protocols with primary associated types are emitted as class templates. The template parameter is a compile-time type tag and does not affect the existential container layout:
+
+```swift
+public protocol Container<Element> {
+    associatedtype Element
+    func count() -> Int
+}
+```
+
+```c++
+template <typename Element = swift::Any>
+class Container final : public swift::_impl::SwiftExistentialType {
+public:
+  swift::Int count() const;
+};
+```
+
+Functions using constrained PAT existentials use the template parameter in their signature:
+
+```swift
+public func countItems(_ c: any Container<Int>) -> Int {
+    return c.count()
+}
+
+public func firstContainer(_ a: any Container<Int>,
+                            _ b: any Container<Int>) -> any Container<Int> {
+    return a
+}
+```
+
+```c++
+// Parameter type uses Container<swift::Int>
+swift::Int countItems(const Container<swift::Int>& c);
+
+// Return type uses Container<swift::Int> with explicit template arg on returnNewValue
+Container<swift::Int> firstContainer(const Container<swift::Int>& a,
+                                     const Container<swift::Int>& b);
+```
+
+Nested PAT existentials work via recursive template instantiation:
+
+```swift
+public func nestedContainer(_ c: any Container<any Container<any Drawable>>) -> Int
+```
+
+```c++
+swift::Int nestedContainer(const Container<Container<Drawable>>& c);
+```
+
+### Class-Bound Protocol Existentials
+
+Protocols that inherit from `AnyObject` (class-bound protocols) use a smaller existential container based on `SwiftClassExistentialType`. Instead of a three-word value buffer, the container stores only a retained class pointer:
+
+```swift
+public protocol Renderable: AnyObject {
+    func render() -> Int
+}
+
+public class Canvas: Renderable {
+    public func render() -> Int { return 42 }
+}
+```
+
+```c++
+// Renderable inherits from SwiftClassExistentialType (16 bytes, not 40)
+Renderable r = Canvas::init(100);  // implicit boxing with retain
+r.render();  // witness dispatch, same as opaque existentials
+```
+
+The lifecycle uses `swift_retain`/`swift_release` instead of VWT operations. Type metadata is recovered from the object's isa pointer via `swift_getObjectType`.
+
+### Stdlib Protocol Conformance Records
+
+Swift types conforming to `Equatable`, `Hashable`, or `Comparable` automatically get C++ operators that dispatch through protocol witness tables. No manual bridging is needed.
+
+#### Equatable: `==` and `!=`
+
+```swift
+public struct Point: Equatable {
+    public var x: Int
+    public var y: Int
+}
+```
+
+```c++
+auto p1 = Point::init(1, 2);
+auto p2 = Point::init(1, 2);
+auto p3 = Point::init(3, 4);
+
+p1 == p2;  // true -- dispatches through Equatable witness table
+p1 != p3;  // true
+```
+
+#### Comparable: `<`, `<=`, `>`, `>=`
+
+```swift
+public struct Temperature: Comparable {
+    public var degrees: Int
+    public static func < (lhs: Temperature, rhs: Temperature) -> Bool {
+        return lhs.degrees < rhs.degrees
+    }
+}
+```
+
+```c++
+auto t1 = Temperature::init(20);
+auto t2 = Temperature::init(30);
+
+t1 < t2;   // true -- dispatches through Comparable witness table
+t1 <= t2;  // true -- derived from < and ==
+t2 > t1;   // true
+t1 >= t1;  // true
+```
+
+Only `<` and `==` perform witness table dispatch. The remaining operators (`<=`, `>`, `>=`) are defined in terms of those two, matching Swift's `Comparable` contract.
+
+#### STL algorithm compatibility
+
+The generated operators work with C++ standard library algorithms and ordered containers:
+
+```c++
+#include <algorithm>
+#include <set>
+#include <vector>
+
+// Sorting and searching (Comparable types)
+std::vector<Temperature> temps = { /* ... */ };
+std::sort(temps.begin(), temps.end());
+std::binary_search(temps.begin(), temps.end(), Temperature::init(20));
+auto lo = std::min(Temperature::init(10), Temperature::init(30));
+
+// Finding and counting (Equatable types)
+std::vector<Point> points = { /* ... */ };
+auto it = std::find(points.begin(), points.end(), Point::init(1, 2));
+auto n = std::count(points.begin(), points.end(), Point::init(3, 4));
+
+// Ordered containers (Comparable types)
+std::set<Temperature> tempSet;
+tempSet.insert(Temperature::init(20));
+```
+
+#### How it works
+
+The compiler emits a **conformance record** specialization for each (type, stdlib protocol) pair. Conformance records are lightweight types that lazily resolve the protocol witness table via the Swift runtime:
+
+```c++
+template<>
+struct swift::EquatableConformance<MyModule::Point> {
+    static inline const void* getWitnessTable() {
+        // Calls swift_getWitnessTable with the conformance descriptor.
+        // Result is cached after the first call.
+    }
+};
+```
+
+Free operator templates at global scope constrain on the conformance record and dispatch through witness table function pointer slots. `using` declarations inside the module namespace ensure the operators are found by ADL when called from STL algorithm internals.
+
+These operators require C++20 (`__cpp_concepts`). On C++14/C++17 the conformance record types are still declared but the operator templates are not available.
+
+### Limitations
+
+The following existential type features are not yet supported in C++:
+
+* Ad-hoc protocol compositions (`any A & B`) -- declare a new protocol `protocol AB: A, B {}` as a workaround (a `typealias` to a composition does not help because it still resolves to a multi-WT container)
+* `std::hash` specializations for `Hashable` types (planned -- will dispatch via `Hasher.combine`)
+* Cross-module conformance boxing
 
 ## Accessing Properties In C++
 
