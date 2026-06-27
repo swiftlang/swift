@@ -106,6 +106,11 @@ extern "C" SWIFT_CALL SwiftBoxPair swift_allocBox(
 extern "C" void *_Nonnull swift_projectBox(
     void *_Nonnull object) noexcept;
 
+extern "C" const void *_Nonnull swift_getWitnessTable(
+    const void *_Nonnull conformanceDescriptor,
+    const void *_Nonnull type,
+    const void *_Nullable const *_Nullable instantiationArgs) noexcept;
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreserved-identifier"
 
@@ -409,6 +414,16 @@ protected:
   SWIFT_INLINE_THUNK Any() noexcept : SwiftExistentialType(uninit_t{}) {}
 };
 
+/// Primary conformance record templates for stdlib protocols.
+/// Per-module specializations are emitted by PrintAsClang for each
+/// same-module (type, protocol) conformance. An empty primary template
+/// means "T does not conform"; a specialization with a getWitnessTable()
+/// static method means "T conforms" and lazily resolves the witness
+/// table via swift_getWitnessTable at first call.
+template<typename T> struct EquatableConformance {};
+template<typename T> struct HashableConformance {};
+template<typename T> struct ComparableConformance {};
+
 /// Swift's Int type.
 using Int = ptrdiff_t;
 
@@ -481,9 +496,157 @@ private:
 
 } // namespace _impl
 
+/// Scaffolded existential wrapper for Swift.Equatable.
+/// ABI-frozen witness table layout. No methods -- Self-constrained
+/// requirements (==) are dispatched via EquatableConformance<T>.
+class Equatable final : public _impl::SwiftExistentialType {
+public:
+#ifdef __cpp_concepts
+  template<typename T>
+      requires requires { EquatableConformance<T>::getWitnessTable(); }
+  SWIFT_INLINE_THUNK Equatable(const T& value) noexcept
+      : SwiftExistentialType(uninit_t{}) {
+    _type = TypeMetadataTrait<T>::getTypeMetadata();
+    _initializeWithValue(_impl::getOpaquePointer(value));
+    _witnessTable = EquatableConformance<T>::getWitnessTable();
+  }
+#endif
+private:
+  SWIFT_INLINE_THUNK Equatable() noexcept
+      : SwiftExistentialType(uninit_t{}) {}
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-private-field"
+  const void *_Nonnull _witnessTable;
+#pragma clang diagnostic pop
+};
+
+/// Scaffolded existential wrapper for Swift.Hashable.
+class Hashable final : public _impl::SwiftExistentialType {
+public:
+#ifdef __cpp_concepts
+  template<typename T>
+      requires requires { HashableConformance<T>::getWitnessTable(); }
+  SWIFT_INLINE_THUNK Hashable(const T& value) noexcept
+      : SwiftExistentialType(uninit_t{}) {
+    _type = TypeMetadataTrait<T>::getTypeMetadata();
+    _initializeWithValue(_impl::getOpaquePointer(value));
+    _witnessTable = HashableConformance<T>::getWitnessTable();
+  }
+#endif
+private:
+  SWIFT_INLINE_THUNK Hashable() noexcept
+      : SwiftExistentialType(uninit_t{}) {}
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-private-field"
+  const void *_Nonnull _witnessTable;
+#pragma clang diagnostic pop
+};
+
+/// Scaffolded existential wrapper for Swift.Comparable.
+class Comparable final : public _impl::SwiftExistentialType {
+public:
+#ifdef __cpp_concepts
+  template<typename T>
+      requires requires { ComparableConformance<T>::getWitnessTable(); }
+  SWIFT_INLINE_THUNK Comparable(const T& value) noexcept
+      : SwiftExistentialType(uninit_t{}) {
+    _type = TypeMetadataTrait<T>::getTypeMetadata();
+    _initializeWithValue(_impl::getOpaquePointer(value));
+    _witnessTable = ComparableConformance<T>::getWitnessTable();
+  }
+#endif
+private:
+  SWIFT_INLINE_THUNK Comparable() noexcept
+      : SwiftExistentialType(uninit_t{}) {}
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-private-field"
+  const void *_Nonnull _witnessTable;
+#pragma clang diagnostic pop
+};
+
+#ifdef __cpp_concepts
+
+namespace _impl {
+
+template <size_t EntryOffset, uint16_t PtrAuthDisc, typename FnTy>
+SWIFT_INLINE_PRIVATE_HELPER FnTy _loadWitnessFromTable(
+    const void *_Nonnull wt) {
+  struct slot {
+    FnTy __ptrauth_swift_protocol_witness_function_pointer(PtrAuthDisc) fn;
+  };
+  auto *s = reinterpret_cast<const slot *>(
+      reinterpret_cast<const void *const *>(wt) + EntryOffset);
+  return s->fn;
+}
+
+} // namespace _impl
+#endif // __cpp_concepts
+
 #pragma clang diagnostic pop
 
 } // namespace swift SWIFT_PRIVATE_ATTR
 #endif
+
+#ifdef __cpp_concepts
+
+/// Free operator== for any Swift type with an Equatable conformance record.
+/// Dispatches through the Equatable witness table at offset 1 (==).
+template<typename T>
+    requires requires { swift::EquatableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator==(const T& lhs, const T& rhs) noexcept {
+  struct _w { _w() = delete; static SWIFT_CALL bool call(
+      const void * _Nonnull, const void * _Nonnull,
+      SWIFT_CONTEXT const void * _Nonnull,
+      const void * _Nonnull, const void * _Nonnull); };
+  auto *wt = swift::EquatableConformance<T>::getWitnessTable();
+  auto fn = swift::_impl::_loadWitnessFromTable<1, 38891, decltype(&_w::call)>(wt);
+  auto *metadata = swift::TypeMetadataTrait<T>::getTypeMetadata();
+  return fn(swift::_impl::getOpaquePointer(lhs),
+            swift::_impl::getOpaquePointer(rhs),
+            metadata, metadata, wt);
+}
+
+template<typename T>
+    requires requires { swift::EquatableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator!=(const T& lhs, const T& rhs) noexcept {
+  return !(lhs == rhs);
+}
+
+/// Free operator< for any Swift type with a Comparable conformance record.
+/// Dispatches through the Comparable witness table at offset 2 (<).
+template<typename T>
+    requires requires { swift::ComparableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator<(const T& lhs, const T& rhs) noexcept {
+  struct _w { _w() = delete; static SWIFT_CALL bool call(
+      const void * _Nonnull, const void * _Nonnull,
+      SWIFT_CONTEXT const void * _Nonnull,
+      const void * _Nonnull, const void * _Nonnull); };
+  auto *wt = swift::ComparableConformance<T>::getWitnessTable();
+  auto fn = swift::_impl::_loadWitnessFromTable<2, 59511, decltype(&_w::call)>(wt);
+  auto *metadata = swift::TypeMetadataTrait<T>::getTypeMetadata();
+  return fn(swift::_impl::getOpaquePointer(lhs),
+            swift::_impl::getOpaquePointer(rhs),
+            metadata, metadata, wt);
+}
+
+template<typename T>
+    requires requires { swift::ComparableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator<=(const T& lhs, const T& rhs) noexcept {
+  return !(rhs < lhs);
+}
+
+template<typename T>
+    requires requires { swift::ComparableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator>(const T& lhs, const T& rhs) noexcept {
+  return rhs < lhs;
+}
+
+template<typename T>
+    requires requires { swift::ComparableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator>=(const T& lhs, const T& rhs) noexcept {
+  return !(lhs < rhs);
+}
+
+#endif // __cpp_concepts
 
 #endif // SWIFT_CXX_INTEROPERABILITY_H
