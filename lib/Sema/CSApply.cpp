@@ -8481,6 +8481,16 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           OpenExistentialExpr(existential, opaqueValue, callSubExpr,
                               resultTy);
         cs.setType(replacement, resultTy);
+
+        // Embedded Swift prohibits opened existentials.
+        if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+                dc, apply->getLoc())) {
+          ctx.Diags.diagnose(apply->getLoc(),
+                             diag::open_existential_in_embedded_swift,
+                             existentialInstanceTy)
+            .limitBehavior(*behavior);
+        }
+
         return replacement;
       }
       
