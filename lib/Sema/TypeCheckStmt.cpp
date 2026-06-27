@@ -3778,10 +3778,12 @@ public:
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
-    if (auto constraint = seqConformanceRef.getAvailabilityConstraint(
-            dc, stmt->getForLoc())) {
-      emitDiagnosticsForUnavailableConformance(seqType, constraint.value());
-      return nullptr;
+    if (!ctx.LangOpts.DisableAvailabilityChecking) {
+      if (auto constraint = seqConformanceRef.getAvailabilityConstraint(
+              dc, stmt->getForLoc())) {
+        emitDiagnosticsForUnavailableConformance(seqType, constraint.value());
+        return nullptr;
+      }
     }
 
     buildMakeIteratorVar();
