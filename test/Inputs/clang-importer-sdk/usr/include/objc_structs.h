@@ -52,6 +52,11 @@ struct StrongNSStringArc {
   int tag;
 };
 
+struct WeakNSStringArc {
+  __weak NSString *_Nullable name;
+  int tag;
+};
+
 struct UnavailableArcStruct {
   __strong MYObject *_Nonnull myobj;
 } NS_SWIFT_UNAVAILABLE("Use MySwiftType instead");
