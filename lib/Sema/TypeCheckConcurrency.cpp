@@ -317,7 +317,7 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
   SmallVector<ValueDecl *, 4> decls;
   nominal->lookupQualified(
       nominal, DeclNameRef(ctx.Id_shared),
-      nominal->getLoc(), NL_QualifiedDefault, decls);
+      nominal->getLoc(), NLFlags::QualifiedDefault, decls);
   for (auto decl : decls) {
     auto var = dyn_cast<VarDecl>(decl);
     if (!var)

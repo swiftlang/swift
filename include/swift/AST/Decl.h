@@ -34,6 +34,7 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -100,7 +101,6 @@ namespace swift {
   class MacroDefinition;
   class ModuleDecl;
   class NamedPattern;
-  enum NLOptions : unsigned;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;

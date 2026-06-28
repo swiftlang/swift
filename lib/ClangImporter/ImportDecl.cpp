@@ -8005,7 +8005,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) const {
   SmallVector<ValueDecl *, 4> results;
   superDecl->lookupQualified(
       superDecl, DeclNameRef(decl->getName()), decl->getLoc(),
-      NL_QualifiedDefault | NL_IgnoreMissingImports, results);
+      {NLFlags::QualifiedDefault, NLFlags::IgnoreMissingImports}, results);
   for (auto member : results) {
     if (member->getKind() != decl->getKind() ||
         member->isInstanceMember() != decl->isInstanceMember() ||
@@ -8077,7 +8077,7 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   SmallVector<ValueDecl *, 2> lookup;
   subscript->getModuleContext()->lookupQualified(
       superDecl, DeclNameRef(subscript->getName()),
-      subscript->getLoc(), NL_QualifiedDefault, lookup);
+      subscript->getLoc(), NLFlags::QualifiedDefault, lookup);
 
   for (auto result : lookup) {
     auto parentSub = dyn_cast<SubscriptDecl>(result);
@@ -10156,10 +10156,10 @@ static void finishTypeWitnesses(NormalProtocolConformance *conformance,
     bool satisfied = false;
 
     SmallVector<ValueDecl *, 4> lookupResults;
-    NLOptions options = (NL_QualifiedDefault |
-                         NL_RemoveAssociatedTypes |
-                         NL_OnlyTypes |
-                         NL_ProtocolMembers);
+    NLOptions options = {NLFlags::QualifiedDefault,
+                         NLFlags::RemoveAssociatedTypes,
+                         NLFlags::OnlyTypes,
+                         NLFlags::ProtocolMembers};
 
     dc->lookupQualified(nominal, DeclNameRef(assocType->getName()),
                         nominal->getLoc(), options,

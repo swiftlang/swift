@@ -2227,7 +2227,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                getIdentifier(privateDiscriminator));
     } else {
       baseModule->lookupQualified(baseModule, DeclNameRef(name),
-                                  SourceLoc(), NL_RemoveOverridden,
+                                  SourceLoc(), NLFlags::RemoveOverridden,
                                   values);
     }
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
@@ -2437,7 +2437,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                    getIdentifier(privateDiscriminator));
         } else {
           otherModule->lookupQualified(otherModule, DeclNameRef(name),
-                                       SourceLoc(), NL_RemoveOverridden,
+                                       SourceLoc(), NLFlags::RemoveOverridden,
                                        values);
         }
 
