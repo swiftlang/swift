@@ -9029,6 +9029,11 @@ GROUPED_WARNING(dynamic_cast_involving_protocol_in_embedded_swift,
                 "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
                 (const Decl *))
 
+GROUPED_WARNING(open_existential_in_embedded_swift,
+                EmbeddedRestrictions, none,
+                "cannot open existential type %0 in Embedded Swift",
+                (Type))
+
 GROUPED_ERROR(self_referential_superclass_in_embedded_swift,
               EmbeddedRestrictions, none,
               "class %0 cannot inherit from %1 in Embedded Swift because "
