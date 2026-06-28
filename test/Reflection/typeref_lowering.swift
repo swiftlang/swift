@@ -13,7 +13,7 @@
 // UNSUPPORTED: CPU=arm64e
 
 // This started failing for Android with #89305, disable until NDK 30 is used.
-// XFAIL: OS=linux-android, OS=linux-androideabi
+// XFAIL: OS=linux-android && CPU=aarch64
 
 // RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library %no-fixup-chains -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
 // RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable %no-fixup-chains -module-name TypeLowering -o %t/TypesToReflect
