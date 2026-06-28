@@ -2258,7 +2258,7 @@ bool AssignmentFailure::diagnoseAsError() {
         if (auto *nominal = typeContext->getSelfNominalTypeDecl()) {
           SmallVector<ValueDecl *, 2> results;
           DC->lookupQualified(nominal, VD->createNameRef(), Loc,
-                              NL_QualifiedDefault, results);
+                              NLFlags::QualifiedDefault, results);
 
           auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
             // We're looking for a settable property that is the same type as

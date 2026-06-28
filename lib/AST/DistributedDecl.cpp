@@ -1732,7 +1732,7 @@ FuncDecl *swift::getDoneRecordingOnDistributedInvocationEncoder(
 
   llvm::SmallVector<ValueDecl *, 2> results;
   nominal->lookupQualified(nominal, DeclNameRef(ctx.Id_doneRecording),
-                           SourceLoc(), NL_QualifiedDefault, results);
+                           SourceLoc(), NLFlags::QualifiedDefault, results);
   for (auto result : results) {
     auto *fd = dyn_cast<FuncDecl>(result);
     if (!fd)
