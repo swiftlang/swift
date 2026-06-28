@@ -605,7 +605,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           SmallVector<ValueDecl *, 8> Decls;
           TopLevelModule->lookupQualified(
               TopLevelModule, DeclNameRef(ScopeID),
-              SourceLoc(), NL_QualifiedDefault, Decls);
+              SourceLoc(), NLFlags::QualifiedDefault, Decls);
           // Skip macro until `import macro` is implemented.
           llvm::erase_if(Decls, [](ValueDecl *VD) {
             return isa<MacroDecl>(VD);

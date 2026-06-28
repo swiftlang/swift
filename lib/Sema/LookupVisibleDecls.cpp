@@ -1066,7 +1066,7 @@ static void lookupVisibleDynamicMemberLookupDecls(
 
   SmallVector<ValueDecl *, 4> subscripts;
   dc->lookupQualified(baseType, DeclNameRef::createSubscript(), loc,
-                      NL_QualifiedDefault | NL_ProtocolMembers, subscripts);
+                      {NLFlags::QualifiedDefault, NLFlags::ProtocolMembers}, subscripts);
 
   for (ValueDecl *VD : subscripts) {
     auto *subscript = dyn_cast<SubscriptDecl>(VD);

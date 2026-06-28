@@ -5069,7 +5069,7 @@ abi_role_detail::Storage abi_role_detail::computeStorage(Decl *decl) {
 }
 
 ABIRole::ABIRole(NLOptions opts)
-  : value(opts & NL_ABIProviding ? ProvidesABI : ProvidesAPI)
+  : value(opts.contains(NLFlags::ABIProviding) ? ProvidesABI : ProvidesAPI)
 { }
 
 VarDecl *PatternBindingDecl::
@@ -6841,7 +6841,7 @@ NominalTypeDecl::getExecutorOwnedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -6880,7 +6880,7 @@ NominalTypeDecl::getExecutorLegacyOwnedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -6919,7 +6919,7 @@ NominalTypeDecl::getExecutorLegacyUnownedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -12464,7 +12464,7 @@ const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   this->lookupQualified(getSelfNominalTypeDecl(),
                         DeclNameRef(C.Id_unownedExecutor),
-                        getLoc(), NL_ProtocolMembers,
+                        getLoc(), NLFlags::ProtocolMembers,
                         results);
 
   for (auto candidate: results) {
