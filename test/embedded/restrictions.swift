@@ -160,3 +160,21 @@ func stillNotProblematicAtAll(object: AnyObject) throws {
   }
 }
 #endif
+
+// ---------------------------------------------------------------------------
+// Existential opening is not permitted
+// ---------------------------------------------------------------------------
+
+func acceptP<T: P>(_ t: T) { }
+
+func openme(p: any P) {
+  func generic<T: P>(_ t: T) { }
+
+  // explicit opening
+  // expected-warning@+1{{cannot open existential type 'any P' in Embedded Swift}}
+  _openExistential(p, do: generic)
+
+  // implicit opening
+  // expected-warning@+1{{cannot use generic global function 'acceptP' on a value of type 'any P' in Embedded Swift}}
+  acceptP(p)
+}
