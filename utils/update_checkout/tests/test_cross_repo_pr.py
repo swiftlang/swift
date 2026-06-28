@@ -90,11 +90,14 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
             rev_scheme_name=rev_scheme_name, repo_name=repo_name
         )
         pr_head_branch = "pr_head_branch"
+        pr_merge_branch = f"pull/{pr_id}/merge"
 
         # Goal:
-        #   C---D (pr_head_branch)
-        #  /   /
-        # A---B---E (pr_base_branch)
+        #       .---C (pr_head_branch)
+        #      /     \
+        #     /   .---D (pr_merge_branch)
+        #    /   /
+        # --o---B---------E (pr_base_branch)
         #
         # We will use commit D for the PR merge ref. Commit E is created if
         # the `stale` argument is true.
@@ -105,11 +108,8 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         # we cloned using a different branch scheme).
         self.call(["git", "checkout", "-B", pr_base_branch, "HEAD"], cwd=repo_path)
 
-        # Create commit B. Commit A should already exist from initial setup.
-        self.call(
-            ["git", "commit", "--allow-empty", "-m", "B"],
-            cwd=repo_path,
-        )
+        # Create commit B.
+        self.call(["git", "commit", "--allow-empty", "-m", "B"], cwd=repo_path)
 
         # Create and checkout pr_head_branch.
         self.call(["git", "checkout", "-b", pr_head_branch, "HEAD~1"], cwd=repo_path)
@@ -123,12 +123,16 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
                 f.write("pr-version\n")
             self.call(["git", "add", "."], cwd=repo_path)
 
-        # Create commit C and the merge commit D.
+        # Create commit C.
+        self.call(["git", "commit", "--allow-empty", "-m", "C"], cwd=repo_path)
+
+        # Create and checkout pr_merge_branch.
         self.call(
-            ["git", "commit", "--allow-empty", "-m", "C"],
-            cwd=repo_path,
+            ["git", "checkout", "-b", pr_merge_branch, pr_base_branch], cwd=repo_path
         )
-        self.call(["git", "merge", "--no-ff", "-m", "D", pr_base_branch], cwd=repo_path)
+
+        # Create commit D (merge pr_head_branch into pr_merge_branch).
+        self.call(["git", "merge", "--no-ff", "-m", "D", pr_head_branch], cwd=repo_path)
 
         # If asked to, advance pr_base_branch (create commit E) to make the
         # merge commit D stale.
@@ -154,7 +158,7 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
                 "push",
                 "origin",
                 pr_base_branch,
-                f"{pr_head_branch}:refs/pull/{pr_id}/merge",
+                f"{pr_merge_branch}:refs/{pr_merge_branch}",
             ],
             cwd=repo_path,
         )
