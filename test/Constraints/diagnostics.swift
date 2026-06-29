@@ -1592,3 +1592,18 @@ do {
     let x: String = 0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
   }. // expected-error {{expected member name following '.'}}
 }
+
+// https://github.com/swiftlang/swift/issues/87218 - when every viable solution
+// in an ambiguous overload set carries the same set of fixes, diagnose those
+// shared fixes instead of falling back to a generic overload ambiguity error.
+func issue87218() {
+  let dictionary = [String: [String]]()
+  var optionalValue: String?
+
+  if let array = dictionary["foo"] {
+    array.append(optionalValue) // expected-error {{cannot use mutating member on immutable value: 'array' is a 'let' constant}}
+    // expected-error@-1 {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
+    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  }
+}
