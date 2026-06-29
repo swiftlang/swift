@@ -44,8 +44,12 @@ def _exit_propagating_remote_signal(returncode, stdout, stderr):
     Evidence considered (any one is sufficient):
       1. rc in [129, 159] — shell-translated `128 + signum`.
       2. "Killed by signal N" in stderr — emitted by ssh on some setups.
-      3. rc == 255 with any remote output — almost certainly signal-killed
-         (SSH-level failures yield no remote output).
+      3. rc == 255 with stderr free of any known SSH-level error pattern.
+         OpenSSH overloads 255 for both "remote killed by signal" and
+         connection/auth/network failures, but the latter always emit a
+         recognizable stderr message; everything else is the remote dying
+         by signal (possibly silently, e.g. dispatch_assert_queue traps
+         with SWIFT_BACKTRACE=enable=no).
     Otherwise, plain sys.exit.
     """
     signal_killed = False
@@ -53,10 +57,17 @@ def _exit_propagating_remote_signal(returncode, stdout, stderr):
         signal_killed = True
     elif stderr and re.search(r'Killed by signal \d+', stderr):
         signal_killed = True
-    elif returncode == 255 and (stdout or stderr):
+    elif returncode == 255 and not _stderr_looks_like_ssh_failure(stderr):
         signal_killed = True
     if signal_killed:
         try:
+            # When piped (e.g. under a lit `… 2>&1 | FileCheck` pipeline),
+            # sys.stdout/stderr are fully buffered. Self-killing via signal
+            # bypasses the normal Python shutdown that would flush them, so
+            # without an explicit flush here the captured remote output that
+            # was just print()ed by the caller would be discarded.
+            sys.stdout.flush()
+            sys.stderr.flush()
             signal.signal(signal.SIGTERM, signal.SIG_DFL)
             os.kill(os.getpid(), signal.SIGTERM)
         except (ValueError, OSError):
@@ -64,6 +75,26 @@ def _exit_propagating_remote_signal(returncode, stdout, stderr):
     if returncode is None:
         returncode = 1
     sys.exit(returncode)
+
+
+_SSH_FAILURE_PATTERNS = (
+    'Permission denied',
+    'Connection refused',
+    'Connection reset by peer',
+    'Connection timed out',
+    'Network is unreachable',
+    'No route to host',
+    'Could not resolve hostname',
+    'Host key verification failed',
+    'kex_exchange_identification',
+    'ssh: connect to host',
+    'Operation not permitted',
+)
+
+def _stderr_looks_like_ssh_failure(stderr):
+    if not stderr:
+        return False
+    return any(p in stderr for p in _SSH_FAILURE_PATTERNS)
 
 class CommandRunner(object):
     def __init__(self):
