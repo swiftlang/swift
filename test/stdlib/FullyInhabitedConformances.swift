@@ -62,6 +62,68 @@ func collectionOfOneConformances(
   fullyInhabited(b)
 }
 
+// Concrete SIMD types
+
+func simdConformancesA(
+  _ a: SIMD2<UInt8>, _ b: SIMD4<UInt8>, _ c: SIMD8<UInt8>,
+  _ d: SIMD16<UInt8>, _ e: SIMD32<UInt8>, _ f: SIMD64<UInt8>,
+  _ g: SIMD2<UInt16>, _ h: SIMD4<UInt16>, _ i: SIMD8<UInt16>,
+  _ j: SIMD16<UInt16>, _ k: SIMD32<UInt16>, _ l: SIMD64<UInt16>
+) {
+  fullyInhabited(a)
+  fullyInhabited(b)
+  fullyInhabited(c)
+  fullyInhabited(d)
+  fullyInhabited(e)
+  fullyInhabited(f)
+  fullyInhabited(g)
+  fullyInhabited(h)
+  fullyInhabited(i)
+  fullyInhabited(j)
+  fullyInhabited(k)
+  fullyInhabited(l)
+}
+
+func simdConformancesB(
+  _ a: SIMD2<UInt32>, _ b: SIMD4<UInt32>, _ c: SIMD8<UInt32>,
+  _ d: SIMD16<UInt32>, _ e: SIMD32<UInt32>, _ f: SIMD64<UInt32>,
+  _ g: SIMD2<UInt64>, _ h: SIMD4<UInt64>, _ i: SIMD8<UInt64>,
+  _ j: SIMD16<UInt64>, _ k: SIMD32<UInt64>, _ l: SIMD64<UInt64>
+) {
+  fullyInhabited(a)
+  fullyInhabited(b)
+  fullyInhabited(c)
+  fullyInhabited(d)
+  fullyInhabited(e)
+  fullyInhabited(f)
+  fullyInhabited(g)
+  fullyInhabited(h)
+  fullyInhabited(i)
+  fullyInhabited(j)
+  fullyInhabited(k)
+  fullyInhabited(l)
+}
+
+func simdConformancesC(
+  _ a: SIMD2<Float32>, _ b: SIMD4<Float32>, _ c: SIMD8<Float32>,
+  _ d: SIMD16<Float32>, _ e: SIMD32<Float32>, _ f: SIMD64<Float32>,
+  _ g: SIMD2<Float64>, _ h: SIMD4<Float64>, _ i: SIMD8<Float64>,
+  _ j: SIMD16<Float64>, _ k: SIMD32<Float64>, _ l: SIMD64<Float64>
+) {
+  fullyInhabited(a)
+  fullyInhabited(b)
+  fullyInhabited(c)
+  fullyInhabited(d)
+  fullyInhabited(e)
+  fullyInhabited(f)
+  fullyInhabited(g)
+  fullyInhabited(h)
+  fullyInhabited(i)
+  fullyInhabited(j)
+  fullyInhabited(k)
+  fullyInhabited(l)
+}
+
 // Range types (ConvertibleToBytes only)
 
 func rangeConformances(
