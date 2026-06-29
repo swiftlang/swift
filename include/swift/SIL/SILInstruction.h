@@ -7343,8 +7343,7 @@ class EnumInst
   EnumInst(SILDebugLocation DebugLoc, SILValue Operand,
            EnumElementDecl *Element, SILType ResultTy,
            ValueOwnershipKind forwardingOwnershipKind)
-    : InstructionBase(DebugLoc, ResultTy,
-                      forwardingOwnershipKind.forwardToInit(ResultTy)),
+    : InstructionBase(DebugLoc, ResultTy, forwardingOwnershipKind),
       Element(Element) {
     sharedUInt32().EnumInst.caseIndex = InvalidCaseIndex;
 
