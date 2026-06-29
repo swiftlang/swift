@@ -1863,6 +1863,11 @@ class DestructureInputs {
   SmallBitVector &AddressableLoweredParameters;
   SmallBitVector &ConditionallyAddressableLoweredParameters;
   unsigned NextOrigParamIndex = 0;
+  /// Whether the result has a scoped (borrow) lifetime dependency on a foreign
+  /// 'self' (e.g. a C++ method's 'this'). Set before
+  /// maybeAddForeignParameters() so that the foreign self is lowered as
+  /// addressable-for-dependencies.
+  bool ForeignSelfHasScopedDependency = false;
 
   void addLoweredParameter(SILParameterInfo parameter,
                            unsigned formalParameterIndex) {
@@ -1974,11 +1979,6 @@ private:
       }
     }
 
-    // Add any foreign parameters that are positioned at the start
-    // of the sequence.  visit() will add foreign parameters that are
-    // positioned after any parameters it adds.
-    maybeAddForeignParameters();
-    
     // Parameters may lower differently when they have scoped dependencies.
     SmallBitVector paramsWithScopedDependencies(params.size(), false);
     for (auto &depInfo : extInfoBuilder.getLifetimeDependencies()) {
@@ -1986,7 +1986,18 @@ private:
         paramsWithScopedDependencies |= scopeIndices->getBitVector();
       }
     }
-    
+
+    if (Foreign.self.isInstance() && !params.empty()) {
+      // The foreign self is the last formal parameter.
+      ForeignSelfHasScopedDependency =
+          paramsWithScopedDependencies[params.size() - 1];
+    }
+
+    // Add any foreign parameters that are positioned at the start
+    // of the sequence.  visit() will add foreign parameters that are
+    // positioned after any parameters it adds.
+    maybeAddForeignParameters();
+
     // Process all the non-self parameters.
     origType.forEachFunctionParam(params.drop_back(hasSelf ? 1 : 0),
                                   /*ignore final orig param*/ hasSelf,
@@ -2301,7 +2312,7 @@ private:
       // This is a "self", but it's not a Swift self, we handle it differently.
       visit(ForeignSelf->SubstSelfParam.getValueOwnership(),
             Foreign.self.getSelfIndex(),
-            /*forSelf=*/false, /*scoped dependency=*/false,
+            /*forSelf=*/false, ForeignSelfHasScopedDependency,
             ForeignSelf->OrigSelfParam,
             ForeignSelf->SubstSelfParam.getParameterType(), {});
     }
