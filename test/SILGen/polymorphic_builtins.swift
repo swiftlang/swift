@@ -1,5 +1,5 @@
 // FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-frontend -enable-builtin-module -Xllvm -sil-print-types -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values %s
+// RUN: not --crash %target-swift-frontend -enable-builtin-module -Xllvm -sil-print-types -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s
 
 // RUN: %target-swift-frontend -enable-builtin-module -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 

@@ -1,5 +1,5 @@
 // FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -enable-sil-opaque-values -module-name existential_erasure %s
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name existential_erasure %s
 
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name existential_erasure %s | %FileCheck %s

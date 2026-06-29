@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s --check-prefix=SILGEN
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s --check-prefix=OPTIMIZED
 

@@ -47,4 +47,4 @@ var topLevelObject2:TopLevelObjectTyWithoutDestructor
 // CHECK-LABEL: sil hidden [ossa] @$s23sil_locations_top_level33TopLevelObjectTyWithoutDestructorCfd
 // CHECK:   return {{.*}}// {{.*}} line:12:7:imp_return:auto_gen
 
-// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -emit-verbose-sil %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -emit-verbose-sil %s

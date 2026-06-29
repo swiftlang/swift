@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -DTRIVIAL %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -DTRIVIAL %s
 // RUN: %target-swift-emit-silgen -DTRIVIAL %s | %FileCheck --check-prefix TRIVIAL %s
 // RUN: %target-swift-emit-sil -DTRIVIAL -sil-verify-all %s > /dev/null
 

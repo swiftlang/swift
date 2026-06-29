@@ -1,5 +1,5 @@
 // FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -enable-sil-opaque-values -enable-library-evolution %s
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-library-evolution %s
 
 // RUN: %target-swift-emit-silgen -enable-library-evolution %s | %FileCheck %s
 @_silgen_name("use")

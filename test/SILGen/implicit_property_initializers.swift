@@ -1,5 +1,5 @@
 // FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -enable-sil-opaque-values -module-name implicit_property_initializers -enable-testing %s
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name implicit_property_initializers -enable-testing %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name implicit_property_initializers -Xllvm -sil-full-demangle -enable-testing %s | %FileCheck %s
 

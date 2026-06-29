@@ -1,5 +1,5 @@
 // FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk) -enable-sil-opaque-values -target %target-swift-5.1-abi-triple -verify %s
+// RUN: not --crash %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk) -o /dev/null -enable-sil-opaque-values -target %target-swift-5.1-abi-triple -verify %s
 
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -target %target-swift-5.1-abi-triple -verify %s
 // REQUIRES: concurrency

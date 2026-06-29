@@ -31,4 +31,4 @@ func physicalFunctionValue() {
 // CHECK-NEXT: assign [[SRC_REABSTR]] to [[DEST]] : $*@callee_guaranteed @substituted <τ_0_0> () -> @out Optional<τ_0_0> for <Bool>
 // CHECK: } // end sil function '$[[SETTER]]'
 
-// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo %s
