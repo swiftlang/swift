@@ -245,6 +245,13 @@ void ExistentialSpecializerCloner::cloneArguments(
                                             StoreOwnershipQualifier::Init);
         InitRef = alloc;
         AllocStackInsts.push_back(alloc);
+        // When the argument is not consumed (@in_guaranteed), the
+        // load [copy] created a +1 that was stored into the stack. The
+        // original function body borrows but doesn't consume it, so we
+        // must destroy_addr before dealloc_stack.
+        if (NewFBuilder.hasOwnership() && !origConsumed) {
+          CleanupValues.push_back(alloc);
+        }
       }
 
       entryArgs.push_back(InitRef);
@@ -487,7 +494,15 @@ void ExistentialTransform::populateThunkBody() {
           SILValue ASI = Builder.createAllocStack(Loc, OpenedSILType);
           Builder.emitStoreValueOperation(Loc, archetypeValue, ASI,
                                           StoreOwnershipQualifier::Init);
-          Temps.push_back({ASI, SILValue()});
+          // When the argument is not consumed (@in_guaranteed), the load [copy]
+          // created a +1 that was forwarded through open_existential_ref and
+          // stored into the stack. The callee borrows but doesn't consume it,
+          // so we must destroy_addr before dealloc_stack.
+          if (Builder.hasOwnership() && !OriginallyConsumed) {
+            Temps.push_back({ASI, ASI});
+          } else {
+            Temps.push_back({ASI, SILValue()});
+          }
           archetypeValue = ASI;
         } else {
           // Otherwise in ossa, we need to add open_existential_ref as something
