@@ -1,13 +1,25 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=keypath | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=keypath | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-ONONE %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=keypath | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-O %s
 
 sil_stage canonical
 
 import Builtin
 import Swift
 
+class Index : Hashable, Equatable {
+  public func hash(into hasher: inout Hasher)
+  public static func == (lhs: Index, rhs: Index) -> Bool
+}
+
 struct S {
   @_hasStorage var a: Int
   @_hasStorage var b: Int
+
+  subscript(i: Index) -> Int { get set }
+}
+
+struct GenS<I> where I : Hashable {
+  subscript(i: I) -> Int { get set }
 }
 
 // CHECK-LABEL: sil [ossa] @remove_dead_keypath_ossa :
@@ -30,18 +42,207 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @remove_dead_keypath :
+// CHECK-LABEL: sil [ossa] @debug_value_user :
+// CHECK-O-NOT:   keypath
+// CHECK-ONONE:   = keypath
+// CHECK:       } // end sil function 'debug_value_user'
+sil [ossa] @debug_value_user : $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $WritableKeyPath<S, Int>, (root $S; stored_property #S.b : $Int)
+  debug_value %0, var, name "x"
+  destroy_value %0
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @class_method_user :
 // CHECK-NOT:     keypath
-// CHECK-NOT:     strong_release
-// CHECK:         %0 = tuple
-// CHECK-NEXT:    return
-// CHECK:       } // end sil function 'remove_dead_keypath'
-sil @remove_dead_keypath : $@convention(thin) () -> () {
+// CHECK:       } // end sil function 'class_method_user'
+sil [ossa] @class_method_user : $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $KeyPath<S, Int>, (root $S; stored_property #S.b : $Int)
+  %1 = begin_borrow [lexical] %0
+  %2 = upcast %1 to $AnyKeyPath
+  %3 = class_method %2, #AnyKeyPath._storedInlineOffset!getter : (AnyKeyPath) -> () -> Int?, $@convention(method) (@guaranteed AnyKeyPath) -> Optional<Int>
+  end_borrow %1
+  destroy_value %0
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @class_method_with_apply :
+// CHECK:         keypath
+// CHECK:         apply
+// CHECK:       } // end sil function 'class_method_with_apply'
+sil [ossa] @class_method_with_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $KeyPath<S, Int>, (root $S; stored_property #S.b : $Int)
+  %1 = begin_borrow [lexical] %0
+  %2 = upcast %1 to $AnyKeyPath
+  %3 = class_method %2, #AnyKeyPath._storedInlineOffset!getter : (AnyKeyPath) -> () -> Int?, $@convention(method) (@guaranteed AnyKeyPath) -> Optional<Int>
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed AnyKeyPath) -> Optional<Int>
+  end_borrow %1
+  destroy_value %0
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @keypath_not_dead :
+// CHECK:         keypath
+// CHECK:       } // end sil function 'keypath_not_dead'
+sil [ossa] @keypath_not_dead : $@convention(thin) () -> @owned WritableKeyPath<S, Int> {
+bb0:
+  %0 = keypath $WritableKeyPath<S, Int>, (root $S; stored_property #S.b : $Int)
+  %1 = copy_value %0
+  destroy_value %0
+  return %1
+}
+
+// CHECK-LABEL: sil @no_non_ossa_support :
+// CHECK:       keypath
+// CHECK:       } // end sil function 'no_non_ossa_support'
+sil @no_non_ossa_support : $@convention(thin) () -> () {
 bb0:
   %0 = keypath $WritableKeyPath<S, Int>, (root $S; stored_property #S.b : $Int)
   %1 = upcast %0 : $WritableKeyPath<S, Int> to $KeyPath<S, Int>
   strong_release %1 : $KeyPath<S, Int>
   %r = tuple()
   return %r : $()
+}
+
+struct II { }
+
+struct I {
+  @_hasStorage public let x: II { get }
+}
+
+struct S2 { }
+
+sil @getter1 : $@convention(method) (@guaranteed KeyPath<I, II>, S2) -> @out II
+sil @kpgetter1 : $@convention(keypath_accessor_getter) (@in_guaranteed S2, @in_guaranteed KeyPath<I, II>) -> @out II
+sil @getter2 : $@convention(keypath_accessor_getter) (@guaranteed String, Foo) -> @owned String
+sil @kpgetter2 : $@convention(keypath_accessor_getter) (@in_guaranteed Foo, @in_guaranteed KeyPath<I, II>) -> @out String
+sil @equ : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<I, II>, @in_guaranteed KeyPath<I, II>) -> Bool
+sil @hsh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<I, II>) -> Int
+
+
+// CHECK-LABEL: sil [ossa] @remove_nested_dead_keypath
+// CHECK-NOT:     keypath
+// CHECK:       } // end sil function 'remove_nested_dead_keypath'
+sil [ossa] @remove_nested_dead_keypath: $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $KeyPath<I, II>, (root $I; stored_property #I.x : $II)
+  %1 = keypath $KeyPath<S2, II>, (root $S2; gettable_property $II, id @getter1 : $@convention(method) (@guaranteed KeyPath<I, II>, S2) -> @out II, getter @kpgetter1: $@convention(keypath_accessor_getter) (@in_guaranteed S2, @in_guaranteed KeyPath<I, II>) -> @out II, indices [%$0 : $KeyPath<I, II> : $KeyPath<I, II>], indices_equals @equ : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<I, II>, @in_guaranteed KeyPath<I, II>) -> Bool, indices_hash @hsh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<I, II>) -> Int) (%0)
+  destroy_value %1 : $KeyPath<S2, II>
+  %r = tuple ()
+  return %r : $()
+}
+
+struct Foo {
+  subscript(x: String) -> String { get }
+  init()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_nontrivial_dead_keypath
+// CHECK-NOT:     keypath
+// CHECK:       } // end sil function 'remove_nontrivial_dead_keypath'
+sil [ossa] @remove_nontrivial_dead_keypath : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %3 = keypath $KeyPath<Foo, String>, (root $Foo; gettable_property $String,  id @getter2 : $@convention(keypath_accessor_getter) (@guaranteed String, Foo) -> @owned String, getter @kpgetter2 : $@convention(keypath_accessor_getter) (@in_guaranteed Foo, @in_guaranteed KeyPath<I, II>) -> @out String, indices [%$0 : $String : $String], indices_equals @equ : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<I, II>, @in_guaranteed KeyPath<I, II>) -> Bool, indices_hash @hsh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<I, II>) -> Int) (%0) // user: %4
+  destroy_value %3 : $KeyPath<Foo, String>
+  %r = tuple ()
+  return %r : $()
+} 
+
+sil @subscript_getter : $@convention(method) (@guaranteed Index, S) -> Int
+sil @keypath_getter : $@convention(keypath_accessor_getter) (@in_guaranteed S, @in_guaranteed Index) -> @out Int
+sil @keypath_setter : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @inout S, @in_guaranteed Index) -> ()
+sil @index_equal : $@convention(keypath_accessor_equals) (@in_guaranteed Index, @in_guaranteed Index) -> Bool
+sil @index_hash : $@convention(keypath_accessor_hash) (@in_guaranteed Index) -> Int
+
+// CHECK-LABEL: sil [ossa] @owned_keypath_operand :
+// CHECK-NOT:     keypath
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    br bb3
+// CHECK: } // end sil function 'owned_keypath_operand'
+sil [ossa] @owned_keypath_operand : $@convention(thin) (@owned Index) -> () {
+bb0(%0 : @owned $Index):
+  %1 = keypath $WritableKeyPath<S, Int>, (root $S; settable_property $Int,  id @subscript_getter : $@convention(method) (@guaranteed Index, S) -> Int, getter @keypath_getter : $@convention(keypath_accessor_getter) (@in_guaranteed S, @in_guaranteed Index) -> @out Int, setter @keypath_setter : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @inout S, @in_guaranteed Index) -> (), indices [%$0 : $Index : $Index], indices_equals @index_equal : $@convention(keypath_accessor_equals) (@in_guaranteed Index, @in_guaranteed Index) -> Bool, indices_hash @index_hash : $@convention(keypath_accessor_hash) (@in_guaranteed Index) -> Int) (%0)
+  %2 = move_value [lexical] [var_decl] %1
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %2
+  br bb3
+
+bb2:
+  destroy_value %2
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @owned_keypath_operand_and_copy :
+// CHECK:         keypath
+// CHECK: } // end sil function 'owned_keypath_operand_and_copy'
+sil [ossa] @owned_keypath_operand_and_copy : $@convention(thin) (@owned Index) -> () {
+bb0(%0 : @owned $Index):
+  %1 = keypath $WritableKeyPath<S, Int>, (root $S; settable_property $Int,  id @subscript_getter : $@convention(method) (@guaranteed Index, S) -> Int, getter @keypath_getter : $@convention(keypath_accessor_getter) (@in_guaranteed S, @in_guaranteed Index) -> @out Int, setter @keypath_setter : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @inout S, @in_guaranteed Index) -> (), indices [%$0 : $Index : $Index], indices_equals @index_equal : $@convention(keypath_accessor_equals) (@in_guaranteed Index, @in_guaranteed Index) -> Bool, indices_hash @index_hash : $@convention(keypath_accessor_hash) (@in_guaranteed Index) -> Int) (%0)
+  %2 = copy_value %1
+  destroy_value %1
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+sil @gen_subscript_getter : $@convention(method) <I where I : Hashable> (@in_guaranteed I, GenS<I>) -> Int
+sil @gen_keypath_getter : $@convention(keypath_accessor_getter) <I where I : Hashable> (@in_guaranteed GenS<I>, @in_guaranteed I) -> @out Int
+sil @gen_keypath_setter : $@convention(keypath_accessor_setter) <I where I : Hashable> (@in_guaranteed Int, @inout GenS<I>, @in_guaranteed I) -> ()
+sil @gen_index_equal : $@convention(keypath_accessor_equals) <I where I : Hashable> (@in_guaranteed I, @in_guaranteed I) -> Bool
+sil @gen_index_hash : $@convention(keypath_accessor_hash) <I where I : Hashable> (@in_guaranteed I) -> Int
+
+// CHECK-LABEL: sil [ossa] @address_keypath_operand :
+// CHECK:         %1 = alloc_stack $I
+// CHECK-NEXT:    copy_addr %0 to [init] %1
+// CHECK-NEXT:    %3 = alloc_stack $I
+// CHECK-NEXT:    copy_addr [take] %1 to [init] %3
+// CHECK-NEXT:    cond_br
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_addr %3
+// CHECK-NEXT:    dealloc_stack %3
+// CHECK-NEXT:    dealloc_stack %1
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_addr %3
+// CHECK-NEXT:    dealloc_stack %3
+// CHECK-NEXT:    dealloc_stack %1
+// CHECK-NEXT:    br bb3
+// CHECK: } // end sil function 'address_keypath_operand'
+sil [ossa] @address_keypath_operand : $@convention(thin) <I where I : Hashable> (@in_guaranteed I) -> () {
+bb0(%0 : $*I):
+  %1 = alloc_stack $I
+  copy_addr %0 to [init] %1
+  %3 = keypath $WritableKeyPath<GenS<I>, Int>, <τ_0_0 where τ_0_0 : Hashable> (root $GenS<τ_0_0>; settable_property $Int,  id @gen_subscript_getter : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0, GenS<τ_0_0>) -> Int, getter @gen_keypath_getter : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed GenS<τ_0_0>, @in_guaranteed τ_0_0) -> @out Int, setter @gen_keypath_setter : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed Int, @inout GenS<τ_0_0>, @in_guaranteed τ_0_0) -> (), indices [%$0 : $τ_0_0 : $*τ_0_0], indices_equals @gen_index_equal : $@convention(keypath_accessor_equals) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool, indices_hash @gen_index_hash : $@convention(keypath_accessor_hash) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> Int) <I> (%1)
+  %4 = move_value [lexical] [var_decl] %3
+  dealloc_stack %1
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %4
+  br bb3
+
+bb2:
+  destroy_value %4
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
 }
 
