@@ -133,6 +133,12 @@ def get_branch_for_repo(
 
             # Fetch the PR merge branch into repo_branch, and also fetch the
             # scheme branch, which ought to match the PR base branch.
+            #
+            # Two-step fetch so the merge below can find the common ancestor:
+            #
+            # Step 1: fetch the PR merge ref at depth=2. GitHub's merge ref
+            # is a merge commit whose parent is the base-branch HEAD (X)
+            # at the time GitHub created it. Depth=2 makes X visible locally.
             Git.run(
                 repo_path,
                 [
@@ -143,8 +149,26 @@ def get_branch_for_repo(
                     # If repo_branch exists and is checked out, this will
                     # prevent Git from refusing the fetch.
                     "--update-head-ok",
-                    "--tags",
+                    "--depth", "2",
                     f"pull/{pr_id}/merge:{repo_branch}",
+                ],
+                echo=True,
+                prefix=prefix,
+            )
+            # Step 2: fetch the scheme branch back to X's timestamp so its
+            # history includes X. Using timestamp-1 ensures X itself is
+            # included.
+            timestamp, _, _ = Git.run(
+                repo_path,
+                ["log", "--format=%ct", "-1", f"{repo_branch}^1"],
+            )
+            Git.run(
+                repo_path,
+                [
+                    "fetch",
+                    "origin",
+                    "--tags",
+                    f"--shallow-since=@{int(timestamp) - 1}",
                     scheme_branch,
                 ],
                 echo=True,
