@@ -2,8 +2,10 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend  -I %t/Inputs -emit-sil -verify %t/globals.swift -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -diagnostic-style llvm
 
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 //--- Inputs/module.modulemap
 module Test {
@@ -220,8 +222,8 @@ NonEscapableHasAnonUnionNonEscapable makeNonEscapableHasAnonUnionNonEscapable(
 // CHECK: sil {{.*}}[clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0, borrow address 1) @owned View
-// CHECK: sil {{.*}}[clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
-// CHECK: sil {{.*}}[clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow 1) @owned View
+// CHECK: sil {{.*}}[clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow address_for_deps 0) @owned View
+// CHECK: sil {{.*}}[clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow address_for_deps 1) @owned View
 // CHECK: sil {{.*}}[clang getViewFromEither] {{.*}} : $@convention(c) (View, View) -> @lifetime(copy 0, copy 1) @owned View
 // CHECK: sil {{.*}}[clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
 // CHECK: sil {{.*}}[clang OtherView.init] {{.*}} : $@convention(c) (View) -> @lifetime(copy 0) @out OtherView
@@ -274,4 +276,45 @@ func anonymousUnionsAndStructs(_ v: borrowing View) {
     let _ = makeAnonUnionNonEscapable(o)
     let _ = makeAnonStructNonEscapable(o)
     let _ = makeNonEscapableHasAnonUnionNonEscapable(o)
+}
+
+//--- globals.swift
+
+import Test
+
+var globalOwner = makeOwner()
+
+struct Wrapper { var o: Owner }
+var globalWrapper = Wrapper(o: makeOwner())
+
+@_lifetime(immortal)
+func viaMethod() -> View {
+  return globalOwner.handOutView()
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'globalOwner'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+@_lifetime(immortal)
+func viaFreeFunc() -> View {
+  return getView(globalOwner)
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'globalOwner'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+@_lifetime(immortal)
+func viaFieldMethod() -> View {
+  return globalWrapper.o.handOutView()
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'globalWrapper'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+@_lifetime(immortal)
+func viaFieldFreeFunc() -> View {
+  return getView(globalWrapper.o)
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'globalWrapper'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
 }
