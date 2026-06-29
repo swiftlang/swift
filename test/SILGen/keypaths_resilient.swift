@@ -1,6 +1,4 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -enable-sil-opaque-values -enable-library-evolution %s
-
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -enable-library-evolution %s
 // RUN: %target-swift-emit-silgen %s -enable-library-evolution | %FileCheck %s
 
 public enum E: Hashable {

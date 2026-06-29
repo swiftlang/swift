@@ -1,8 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-library-evolution -emit-module -o %t/ExternalKeyPaths.swiftmodule -module-name ExternalKeyPaths %S/Inputs/ExternalKeyPaths.swift
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -enable-sil-opaque-values -swift-version 5 -I %t %s
-
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -swift-version 5 -I %t %s
 // RUN: %target-swift-emit-silgen -swift-version 5 -I %t %s | %FileCheck %s
 
 import ExternalKeyPaths

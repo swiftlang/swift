@@ -1,6 +1,4 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -enable-sil-opaque-values -Xllvm -sil-print-types -import-objc-header %swift_src_root/test/Inputs/ObjCOptionalRequirements.h %s
-
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -Xllvm -sil-print-types -import-objc-header %swift_src_root/test/Inputs/ObjCOptionalRequirements.h %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -import-objc-header %swift_src_root/test/Inputs/ObjCOptionalRequirements.h %s | %FileCheck  %s --check-prefix=CHECK --check-prefix=CHECK-%target-os-%target-cpu
 // RUN: %target-swift-emit-ir -import-objc-header %swift_src_root/test/Inputs/ObjCOptionalRequirements.h %s
 

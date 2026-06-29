@@ -1,6 +1,4 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -enable-sil-opaque-values -enable-experimental-feature KeyPathWithMethodMembers -Xllvm -sil-print-types -target %target-swift-5.1-abi-triple -module-name keypaths %s
-
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -enable-experimental-feature KeyPathWithMethodMembers -Xllvm -sil-print-types -target %target-swift-5.1-abi-triple -module-name keypaths %s
 // RUN: %target-swift-emit-silgen -enable-experimental-feature KeyPathWithMethodMembers -Xllvm -sil-print-types -target %target-swift-5.1-abi-triple -module-name keypaths %s | %FileCheck %s
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 
