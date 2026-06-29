@@ -149,6 +149,40 @@ do {
   let _: Dictionary<Double, StaticString> = .init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
 }
 
+// Another contentsOf: funny case.
+do {
+  let x = ""
+  var s1: [(a: String, b: String)] = []
+  s1.append(contentsOf: [(x, "")])
+  s1.append(contentsOf: [(x, ""), (x, "")])
+  s1.append(contentsOf: [(x, ""), (x, ""), (x, "")])
+
+  var s2: [(a: String, b: Int?)] = []
+  s2.append(contentsOf: [(x, 3)])
+  s2.append(contentsOf: [(x, 3), (x, 4)])
+  s2.append(contentsOf: [(x, 3), (x, 4), (x, 4)])
+
+  var s3: [(a: String?, b: Int)] = []
+  s3.append(contentsOf: [(x, 3)])
+  s3.append(contentsOf: [(x, 3), (x, 4)])
+  s3.append(contentsOf: [(x, 3), (x, 4), (x, 4)])
+}
+
+do {
+  struct S {
+    let a = 0.0
+    let b = 0.0
+    let c = 0.0
+    let d = 0.0
+
+    var customMirror: Mirror {
+      Mirror(self, children: [("a", a), ("b", b), ("c", c), ("d", d)],
+             displayStyle: .struct,
+             ancestorRepresentation: .suppressed)
+    }
+  }
+}
+
 // Tests for a special form of inference where we have both a
 // subtype and a supertype binding for a type variable, and the
 // subtype binding contains a type variable but the supertype
