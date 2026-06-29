@@ -112,11 +112,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // This guarantees that stack-promotable boxes have [static] enforcement.
   P.addAccessEnforcementSelection();
 
-#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT
   P.addMandatoryAllocBoxToStack();
-#else
-  P.addLegacyAllocBoxToStack();
-#endif
+
   // Needs to run after MandatoryAllocBoxToStack, because MandatoryAllocBoxToStack
   // can convert dynamic accesses to static accesses.
   P.addDiagnoseStaticExclusivity();
