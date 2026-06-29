@@ -7650,13 +7650,23 @@ bool swift::checkSendableConformance(
       conformanceDC->getOutermostParentSourceFile() !=
       nominal->getOutermostParentSourceFile()) {
     if (!(nominal->hasClangNode() && wasImplied)) {
-      conformanceDecl
-          ->diagnose(diag::concurrent_value_outside_source_file, nominal)
-          .limitBehaviorWithPreconcurrency(
-              behavior, impliedByPreconcurrencyProtocol, LanguageMode::v6);
+      InFlightDiagnostic outsideSourceFileDiag = conformanceDecl
+          ->diagnose(diag::concurrent_value_outside_source_file, nominal);
 
-      if (behavior == DiagnosticBehavior::Unspecified)
-        return true;
+      // TODO: Remove this staging (and suppress the conformance) once people
+      // have had a chance to adopt...
+      if (isGlobalActorIsolated) {
+        // This branch was being skipped for global actor isolated tests
+        // until 6.4 so we can't emit this as an error for isolated decls.
+        outsideSourceFileDiag.limitBehaviorWithPreconcurrency(
+            behavior, impliedByPreconcurrencyProtocol, LanguageMode::future);
+      } else {
+        outsideSourceFileDiag.limitBehaviorWithPreconcurrency(
+            behavior, impliedByPreconcurrencyProtocol, LanguageMode::v6);
+
+        if (behavior == DiagnosticBehavior::Unspecified)
+          return true;
+      }
     }
   }
 
