@@ -10,16 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Plain-futex Mutex for FreeBSD: 3-state lock word, bounded spin, kernel
-// fallback using UMTX_OP_WAIT_UINT_PRIVATE / UMTX_OP_WAKE_PRIVATE.
-// Mirrors LinuxImpl.swift; see docs/SynchronizationMutexLinux.md for design.
+// Plain-futex Mutex for FreeBSD: a 3-state lock word (unlocked / locked /
+// contended) with a short bounded spin before sleeping in the kernel via
+// UMTX_OP_WAIT_UINT_PRIVATE / UMTX_OP_WAKE_PRIVATE.
 //
-// The previous implementation called UMTX_OP_MUTEX_LOCK on a raw uint32_t,
-// which is incorrect: that op is for struct umutex. Under contention the kernel
-// parked threads on the umutex wait-queue but the corresponding unlock never
-// generated the right wakeup, causing a permanent deadlock. Fixed by using the
-// plain-integer wait/wake pair (UMTX_OP_WAIT_UINT_PRIVATE / _WAKE_PRIVATE),
-// which operates correctly on a bare uint32_t address.
+// The previous implementation stored a zero-initialized `struct umutex` and
+// drove it through the kernel umutex operations (UMTX_OP_MUTEX_LOCK / TRYLOCK /
+// UNLOCK) directly; under contention that deadlocks. Rather than reconstruct
+// the full umutex ownership/contention protocol, this uses the kernel's
+// plain-integer futex operations on a bare uint32_t, which need no owner or
+// flags bookkeeping.
 //
 //===----------------------------------------------------------------------===//
 
