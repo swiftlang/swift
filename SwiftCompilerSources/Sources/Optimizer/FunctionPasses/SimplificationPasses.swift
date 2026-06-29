@@ -30,6 +30,9 @@ protocol LateOnoneSimplifiable : Instruction {
   func simplifyLate(_ context: SimplifyContext)
 }
 
+/// Instructions whose `simplify()` is safe to run inside debug reconstruction blocks.
+protocol DebugReconstructionBlockSimplifiable : Simplifiable {}
+
 //===--------------------------------------------------------------------===//
 //                        Simplification passes
 //===--------------------------------------------------------------------===//
@@ -64,6 +67,11 @@ let lateOnoneSimplificationPass = FunctionPass(name: "late-onone-simplification"
       i.simplify($1)
     }
   }
+}
+
+let debugReconstructionBlockSimplificationPass = FunctionPass(name: "debug-reconstruction-block-simplification") {
+  (function: Function, context: FunctionPassContext) in
+  runDebugReconstructionBlockSimplification(on: function, context)
 }
 
 //===--------------------------------------------------------------------===//
@@ -142,6 +150,52 @@ private func cleanupDeadBlocks(in function: Function,
     for block in function.blocks.reversed() {
       if let bi = block.terminator as? BranchInst {
         worklist.pushIfNotVisited(bi)
+      }
+    }
+  }
+}
+
+//===--------------------------------------------------------------------===//
+//          Debug Reconstruction Block Simplification
+//===--------------------------------------------------------------------===//
+
+private func runDebugReconstructionBlockSimplification(on function: Function, _ context: FunctionPassContext) {
+  var worklist = InstructionWorklist(context)
+  defer { worklist.deinitialize() }
+
+  let simplifyCtxt = context.createSimplifyContext(preserveDebugInfo: false,
+                                                   notifyInstructionChanged: {
+    worklist.pushIfNotVisited($0)
+  })
+
+  // Collect all debug reconstruction blocks and push their instructions onto the worklist.
+  var debugBlocks: [BasicBlock] = []
+  for block in function.blocks {
+    for inst in block.instructions {
+      guard let debugValue = inst as? DebugValueInst,
+            let debugBB = debugValue.debugReconstructionBlock else {
+        continue
+      }
+      debugBlocks.append(debugBB)
+      for debugInst in debugBB.instructions.reversed() {
+        worklist.pushIfNotVisited(debugInst)
+      }
+    }
+  }
+
+  // Core worklist loop.
+  while let instruction = worklist.popAndForget() {
+    if instruction.isDeleted { continue }
+    if let simplifiable = instruction as? DebugReconstructionBlockSimplifiable {
+      simplifiable.simplify(simplifyCtxt)
+    }
+  }
+
+  // Clean up trivially dead instructions in all debug BBs.
+  for debugBB in debugBlocks {
+    for inst in debugBB.instructions.reversed() {
+      if inst.isTriviallyDead {
+        context.erase(instruction: inst)
       }
     }
   }
