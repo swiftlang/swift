@@ -10,8 +10,6 @@
 // RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
 
 // REQUIRES: executable_test
-//
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=freebsd
 
 // Undefined hidden symbol to C++ voidify in libcxx
 // rdar://121551667
