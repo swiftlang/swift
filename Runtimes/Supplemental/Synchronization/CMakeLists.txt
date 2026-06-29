@@ -157,6 +157,10 @@ endif()
 set_target_properties(swiftSynchronization PROPERTIES
   Swift_MODULE_NAME Synchronization)
 
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(swiftSynchronization INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
+
 target_link_libraries(swiftSynchronization PRIVATE
   swiftCore
   $<$<PLATFORM_ID:Android>:swiftAndroid>
@@ -211,6 +215,25 @@ install(TARGETS swiftSynchronization
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftSynchronization)
 install_swift_interface(swiftSynchronization)
+
+# Inter-project install info
+export(EXPORT SwiftSynchronizationTargets
+  FILE "cmake/SwiftSynchronization/SwiftSynchronizationTargets.cmake")
+install(EXPORT SwiftSynchronizationTargets
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftSynchronization"
+  FILE "SwiftSynchronizationTargets.cmake"
+  COMPONENT SwiftSynchronizationCMake)
+include(CMakePackageConfigHelpers)
+configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/interface/SwiftSynchronizationConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftSynchronization/SwiftSynchronizationConfig.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftSynchronization")
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftSynchronization/SwiftSynchronizationConfigVersion.cmake"
+  VERSION "${PROJECT_VERSION}"
+  COMPATIBILITY ExactVersion)
+install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftSynchronization/SwiftSynchronizationConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftSynchronization/SwiftSynchronizationConfigVersion.cmake"
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftSynchronization")
 
 # Configure plist creation for Darwin platforms.
 generate_plist(swiftSynchronization "${CMAKE_PROJECT_VERSION}" swiftSynchronization)
