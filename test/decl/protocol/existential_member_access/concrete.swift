@@ -56,9 +56,13 @@ do {
   let exist: any ConcreteAssocTypes
 
   let _ = exist.method1 // expected-error {{member 'method1' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+    // expected-note@-1 {{member 'method1' refrences 'Self.A1', which cannot be resolved on type 'any ConcreteAssocTypes'}}
   let _ = exist.method2 // expected-error {{member 'method2' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'method2' refrences 'Self.A2', which cannot be resolved on type 'any ConcreteAssocTypes'}}
   let _ = exist.method3 // expected-error {{member 'method3' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'method3' refrences 'Self.A3', which cannot be resolved on type 'any ConcreteAssocTypes'}}
   let _ = exist.property1 // expected-error {{member 'property1' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'property1' refrences 'Self', which cannot be resolved on type 'any ConcreteAssocTypes'}}
   // Covariant 'Self' erasure works in conjunction with concrete associated types.
   do {
     var types = SwiftTypePair(
@@ -69,9 +73,13 @@ do {
   }
 
   let _ = exist.property3 // expected-error {{member 'property3' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'property3' refrences 'Self.A4', which cannot be resolved on type 'any ConcreteAssocTypes'}}
   let _ = exist[subscript1: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences 'Self.A3', which cannot be resolved on type 'any ConcreteAssocTypes'}}
   let _ = exist[subscript2: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences 'Self.A1', which cannot be resolved on type 'any ConcreteAssocTypes'}}
   let _ = exist[subscript3: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences 'Self.A2', which cannot be resolved on type 'any ConcreteAssocTypes'}}
 
   do {
     var types = SwiftTypePair(
