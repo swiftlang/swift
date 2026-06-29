@@ -1,0 +1,63 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -O -wmo -sil-disable-pass=DeadFunctionAndGlobalElimination -sil-disable-pass=function-signature-opts | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+// ExistentialTransform's cloner was missing destroy_addr before
+// dealloc_stack for class-constrained @in_guaranteed existential
+// arguments. The MemoryLifetimeVerifier caught this as "memory is
+// initialized, but shouldn't be" at the dealloc_stack.
+//
+// The cloner creates: load [copy] -> init_existential_ref ->
+// alloc_stack -> store [init] -> (cloned body borrows via
+// @in_guaranteed) -> dealloc_stack. Without destroy_addr, the +1
+// from load [copy] is leaked.
+
+import Builtin
+import Swift
+
+protocol ClassProto: AnyObject {
+  func doSomething()
+}
+
+class ConcreteClass: ClassProto {
+  func doSomething()
+}
+
+sil @ConcreteClass_doSomething : $@convention(method) (@guaranteed ConcreteClass) -> ()
+sil @ConcreteClass_doSomething_witness : $@convention(witness_method: ClassProto) (@guaranteed ConcreteClass) -> ()
+
+// Verify that the existential specializer produces a valid specialized
+// function without crashing in the MemoryLifetimeVerifier.
+//
+// CHECK-LABEL: sil shared [noinline] @$s32use_class_existential_guaranteedTf4e_n :
+// CHECK: bb0(
+// CHECK:   return
+// CHECK: } // end sil function '$s32use_class_existential_guaranteedTf4e_n'
+sil [ossa] [noinline] @use_class_existential_guaranteed : $@convention(thin) (@in_guaranteed ClassProto) -> () {
+bb0(%0 : $*ClassProto):
+  %1 = load [copy] %0 : $*ClassProto
+  %2 = open_existential_ref %1 : $ClassProto to $@opened("AABBCCDD-0011-2233-4455-66778899AABB", ClassProto) Self
+  %f = witness_method $@opened("AABBCCDD-0011-2233-4455-66778899AABB", ClassProto) Self, #ClassProto.doSomething : <Self: ClassProto> (Self) -> () -> (), %2 : $@opened("AABBCCDD-0011-2233-4455-66778899AABB", ClassProto) Self : $@convention(witness_method: ClassProto) <Self: ClassProto> (@guaranteed Self) -> ()
+  apply %f<@opened("AABBCCDD-0011-2233-4455-66778899AABB", ClassProto) Self>(%2) : $@convention(witness_method: ClassProto) <Self: ClassProto> (@guaranteed Self) -> ()
+  destroy_value %2 : $@opened("AABBCCDD-0011-2233-4455-66778899AABB", ClassProto) Self
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @invoke_class_existential_guaranteed : $@convention(thin) (@guaranteed ConcreteClass) -> () {
+bb0(%0 : @guaranteed $ConcreteClass):
+  %copy = copy_value %0 : $ConcreteClass
+  %1 = init_existential_ref %copy : $ConcreteClass : $ConcreteClass, $ClassProto
+  %z = alloc_stack $ClassProto
+  store %1 to [init] %z : $*ClassProto
+  %f = function_ref @use_class_existential_guaranteed : $@convention(thin) (@in_guaranteed ClassProto) -> ()
+  apply %f(%z) : $@convention(thin) (@in_guaranteed ClassProto) -> ()
+  destroy_addr %z : $*ClassProto
+  dealloc_stack %z : $*ClassProto
+  %r = tuple ()
+  return %r : $()
+}
+
+sil_witness_table ConcreteClass: ClassProto module main {
+  method #ClassProto.doSomething: <Self: ClassProto> (Self) -> () -> () : @ConcreteClass_doSomething_witness
+}
