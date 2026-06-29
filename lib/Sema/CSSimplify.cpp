@@ -4820,6 +4820,19 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
+  // If a type assigned to a synthesized argument has type variables
+  // it should be possible to assign holes to them because it's not
+  // guaranteed that they could always be resolved from the context.
+  //
+  // For example, when a parameter has a function type that returns
+  // a generic parameter, if it's not connected to anything else i.e.
+  // doesn't appear in other parameter positions or there is no
+  // contextual type for the call when it's a result, it won't be
+  // possible to resolve.
+  if (typeVar->getImpl().isSynthesizedArgument()) {
+    recordAnyTypeVarAsPotentialHole(type);
+  }
+
   assignFixedType(typeVar, type, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
