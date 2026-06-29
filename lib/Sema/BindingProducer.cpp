@@ -17,6 +17,7 @@
 #include "swift/Sema/BindingProducer.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 
 using namespace swift;
@@ -294,6 +295,8 @@ bool TypeVarBindingProducer::computeNext() {
     // Allow solving for T even for a binding kind where that's invalid
     // if fixes are allowed, because that gives us the opportunity to
     // match T? values to the T binding by adding an unwrap fix.
+    //
+    // FIXME: Remove this.
     if (binding.Kind == BindingKind::Subtypes || CS.shouldAttemptFixes()) {
       // If we were unsuccessful solving for T?, try solving for T.
       if (auto objTy = type->getOptionalObjectType()) {
@@ -338,6 +341,7 @@ bool TypeVarBindingProducer::computeNext() {
       }
     }
 
+    // FIXME: Remove this.
     auto srcLocator = binding.getLocator();
     if (srcLocator &&
         (srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
@@ -651,6 +655,9 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     type = cs.replaceInferableTypesWithTypeVars(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
   }
+
+  if (type->hasJoinOrMeet())
+    type = openTypeJoinsAndMeets(cs, type, dstLocator);
 
   // If type variable has been marked as a possible hole due to
   // e.g. reference to a missing member. Let's propagate that
