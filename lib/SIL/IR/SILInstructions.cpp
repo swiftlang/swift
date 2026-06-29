@@ -1772,7 +1772,7 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
                        ArrayRef<SILValue> Elems,
                        ValueOwnershipKind forwardingOwnershipKind)
     : InstructionBaseWithTrailingOperands(
-      Elems, Loc, Ty, forwardingOwnershipKind.forwardToInit(Ty))
+      Elems, Loc, Ty, forwardingOwnershipKind)
 {
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
