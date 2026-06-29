@@ -149,6 +149,7 @@ def get_branch_for_repo(
                     # If repo_branch exists and is checked out, this will
                     # prevent Git from refusing the fetch.
                     "--update-head-ok",
+                    "--tags",
                     "--depth", "2",
                     f"pull/{pr_id}/merge:{repo_branch}",
                 ],
