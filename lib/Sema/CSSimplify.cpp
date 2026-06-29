@@ -6797,6 +6797,9 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
+    if (hasAnyRestriction())
+      return false;
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       return true;
@@ -14696,6 +14699,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (loc->isForAssignment() || loc->isForCoercion() ||
         loc->isForContextualType() ||
         loc->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
+        loc->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>() ||
         loc->isForOptionalTry()) {
       if (restriction == ConversionRestrictionKind::Superclass) {
         if (auto *fix = CoerceToCheckedCast::attempt(
