@@ -438,6 +438,10 @@ class BuildScriptInvocation(object):
                     shlex.quote(opt) for opt in args.extra_cmake_options)
             ]
 
+        impl_args += [
+            "--llvm-enable-index-store=%s" % (1 if args.llvm_enable_index_store else 0)
+        ]
+
         if args.lto_type is not None:
             impl_args += [
                 "--llvm-enable-lto=%s" % args.lto_type,
