@@ -14,12 +14,56 @@
 import argparse
 import os
 import posixpath
+import re
+import signal
 import subprocess
 import sys
 import shutil
 
 def quote(arg):
     return repr(arg)
+
+def _exit_propagating_remote_signal(returncode, stdout, stderr):
+    """Exit so that `not --crash` (and similar) can recognize a signal-killed
+    remote command as a crash.
+
+    `not --crash CMD` returns success only if CMD was terminated by a signal.
+    Tests like `not --crash %target-run …` rely on this. But over SSH the
+    signal info is fragile: sshd may not send the `exit-signal` channel
+    request, ssh may collapse signal exits to 255, the "Killed by signal N"
+    marker may be silenced by LogLevel — leaving remote-run with only an
+    opaque 255 to propagate, which `not --crash` reads as "didn't crash".
+
+    Detect the signal-kill case from whichever evidence is available, then
+    re-raise SIGTERM on this process so the parent observes a real signal
+    exit. We use SIGTERM rather than the original signum (or SIGABRT) because
+    `not --crash` only checks "was killed by *some* signal", and on macOS
+    re-raising fatal signals like SIGABRT/SIGSEGV trips Crash Reporter and
+    pops up "Python quit unexpectedly".
+
+    Evidence considered (any one is sufficient):
+      1. rc in [129, 159] — shell-translated `128 + signum`.
+      2. "Killed by signal N" in stderr — emitted by ssh on some setups.
+      3. rc == 255 with any remote output — almost certainly signal-killed
+         (SSH-level failures yield no remote output).
+    Otherwise, plain sys.exit.
+    """
+    signal_killed = False
+    if returncode is not None and 128 < returncode <= 159:
+        signal_killed = True
+    elif stderr and re.search(r'Killed by signal \d+', stderr):
+        signal_killed = True
+    elif returncode == 255 and (stdout or stderr):
+        signal_killed = True
+    if signal_killed:
+        try:
+            signal.signal(signal.SIGTERM, signal.SIG_DFL)
+            os.kill(os.getpid(), signal.SIGTERM)
+        except (ValueError, OSError):
+            pass  # fall through to sys.exit rather than crash remote-run
+    if returncode is None:
+        returncode = 1
+    sys.exit(returncode)
 
 class CommandRunner(object):
     def __init__(self):
@@ -113,13 +157,13 @@ class CommandRunner(object):
             if remote_proc.returncode:
                 # FIXME: We may still want to fetch the output files to see what
                 # went wrong.
-                sys.exit(remote_proc.returncode)
+                _exit_propagating_remote_signal(remote_proc.returncode, stdout, stderr)
             else:
                 # Nothing went wrong. Return
                 return
 
         if attempt > 3 and remote_proc is not None:
-            sys.exit(remote_proc.returncode)
+            _exit_propagating_remote_signal(remote_proc.returncode, stdout, stderr)
 
     def run_rsync(self, invocation, sources):
         attempt = 1
