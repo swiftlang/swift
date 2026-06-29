@@ -2,20 +2,20 @@
 
 // REQUIRES: objc_interop
 
-@IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{1-11=}}
+@IBAction // expected-error {{'@IBAction' may only be used on 'func' declarations}} {{1-11=}}
 var iboutlet_global: Int
 
 var iboutlet_accessor: Int {
-  @IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{3-13=}}
+  @IBAction // expected-error {{'@IBAction' may only be used on 'func' declarations}} {{3-13=}}
   get { return 42 }
 }
 
-@IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{1-11=}}
+@IBAction // expected-error {{'@IBAction' may only be used on 'func' declarations}} {{1-11=}}
 class IBOutletClassTy {}
-@IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{1-11=}}
+@IBAction // expected-error {{'@IBAction' may only be used on 'func' declarations}} {{1-11=}}
 struct IBStructTy {}
 
-@IBAction // expected-error {{only instance methods can be declared @IBAction}} {{1-11=}}
+@IBAction // expected-error {{only instance methods can be declared '@IBAction'}} {{1-11=}}
 func IBFunction() -> () {}
 
 class IBActionWrapperTy {
@@ -23,14 +23,14 @@ class IBActionWrapperTy {
   func click(_: AnyObject) -> () {} // no-warning
 
   func outer(_: AnyObject) -> () {
-    @IBAction  // expected-error {{only instance methods can be declared @IBAction}} {{5-15=}}
+    @IBAction  // expected-error {{only instance methods can be declared '@IBAction'}} {{5-15=}}
     func inner(_: AnyObject) -> () {}
   }
-  @IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{3-13=}}
+  @IBAction // expected-error {{'@IBAction' may only be used on 'func' declarations}} {{3-13=}}
   var value : Void = ()
 
   @IBAction
-  func process(x: AnyObject) -> Int {}  // expected-error {{methods declared @IBAction must not return a value}}
+  func process(x: AnyObject) -> Int {}  // expected-error {{methods declared '@IBAction' must not return a value}}
 
   // @IBAction does /not/ semantically imply @objc.
   @IBAction // expected-note {{attribute already specified here}}
@@ -45,7 +45,7 @@ class IBActionWrapperTy {
   @available(SwiftStdlib 5.5, *)
   @IBAction
   func asyncIBActionNoSpace(_: AnyObject) async -> () {}
-  // expected-error@-1 {{@IBAction instance method cannot be async}}
+  // expected-error@-1 {{'@IBAction' instance method cannot be asynchronous}}
   // expected-note@-2 {{remove 'async' and wrap in 'Task' to use concurrency in 'asyncIBActionNoSpace'}}{{45:3-47:57=@available(SwiftStdlib 5.5, *)\n  @IBAction\n  func asyncIBActionNoSpace(_: AnyObject) -> () {\nTask { @MainActor in \}\n\}}}
 
   @available(SwiftStdlib 5.5, *)
@@ -53,12 +53,12 @@ class IBActionWrapperTy {
   func asyncIBActionWithFullBody(_: AnyObject) async {
       print("Hello World")
   }
-  // expected-error@-3 {{@IBAction instance method cannot be async}}
+  // expected-error@-3 {{'@IBAction' instance method cannot be asynchronous}}
   // expected-note@-4 {{remove 'async' and wrap in 'Task' to use concurrency in 'asyncIBActionWithFullBody'}}{{51:3-55:4=@available(SwiftStdlib 5.5, *)\n  @IBAction\n  func asyncIBActionWithFullBody(_: AnyObject) {\nTask { @MainActor in\n      print("Hello World")\n  \}\n\}}}
 
   @available(SwiftStdlib 5.5, *) @IBAction func asyncIBActionNoBody(_: AnyObject) async
   // expected-error@-1 {{expected '{' in body of function declaration}}
-  // expected-error@-2 {{@IBAction instance method cannot be asynchronous}}
+  // expected-error@-2 {{'@IBAction' instance method cannot be asynchronous}}
   // expected-note@-3 {{remove 'async' and wrap in 'Task' to use concurrency in 'asyncIBActionNoBody}}{{3-88=@available(SwiftStdlib 5.5, *) @IBAction func asyncIBActionNoBody(_: AnyObject)}}
 
 }

@@ -307,8 +307,8 @@ ERROR(class_cannot_be_addressable_for_dependencies,none,
       "a class cannot be '@_addressableForDependencies'", ())
 
 ERROR(unsupported_closure_attr,none,
-      "%select{attribute |}0%1 is not supported on a closure",
-      (bool, DeclAttribute))
+      "%0 is not supported on a closure",
+      (DeclAttribute))
 
 NOTE(suggest_partial_overloads,none,
       "overloads for '%1' exist with these %select{"
@@ -1843,7 +1843,7 @@ ERROR(attribute_requires_single_argument,none,
       "%0 requires a function with one argument", (DeclAttribute))
 
 ERROR(attribute_requires_experimental_feature,none,
-      "'%0' is an experimental feature; use '-enable-experimental-feature %1'",
+      "%0 is an experimental feature; use '-enable-experimental-feature %1'",
       (DeclAttribute, StringRef))
 
 ERROR(nominal_type_not_attribute,none,
@@ -2312,13 +2312,13 @@ ERROR(attr_decl_async,none,
       "%0 %kindonly1 cannot be asynchronous", (DeclAttribute, const FuncDecl *))
 
 ERROR(attr_only_at_non_local_scope, none,
-      "attribute %0 can only be used in a non-local scope", (DeclAttribute))
+      "%kind0 can only be used in a non-local scope", (DeclAttribute))
 ERROR(attr_name_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
 ERROR(attr_only_at_non_generic_scope, none,
-      "attribute %0 cannot be used in a generic context", (DeclAttribute))
+      "%kind0 cannot be used in a generic context", (DeclAttribute))
 ERROR(attr_only_on_static_properties, none,
-      "properties with attribute %0 must be static", (DeclAttribute))
+      "properties with %kind0 must be static", (DeclAttribute))
 
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
@@ -2378,12 +2378,12 @@ ERROR(access_control_requires_package_name, none,
       "requires a package name; set it with the compiler flag -package-name",
       (bool, const Decl*))
 ERROR(invalid_decl_attribute,none,
-      "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
+      "%0 attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(attr_invalid_on_decl_kind,none,
-      "'%0' attribute cannot be applied to %kindonly1 declarations",
+      "%0 attribute cannot be applied to %kindonly1 declarations",
       (DeclAttribute, const Decl *))
 ERROR(attr_invalid_in_context,none,
-      "'%0' attribute cannot be applied to declaration in %kindonly1",
+      "%0 attribute cannot be applied to declaration in %kindonly1",
       (DeclAttribute, const Decl *))
 ERROR(invalid_decl_modifier,none,
       "%0 modifier cannot be applied to this declaration", (DeclAttribute))
@@ -2457,7 +2457,7 @@ NOTE(option_set_empty_set_init,none,
      "use [] to silence this warning", ())
 
 ERROR(originally_definedin_topleve_decl,none,
-      "'%0' is only applicable to top-level decl", (DeclAttribute))
+      "%0 is only applicable to top-level decl", (DeclAttribute))
 
 ERROR(originally_definedin_must_not_before_available_version,none,
       "symbols are moved to the current module before they were available in "
@@ -2807,7 +2807,7 @@ ERROR(access_level_on_import_unsupported, none,
       "are accepted",
       (DeclAttribute))
 ERROR(access_level_conflict_with_exported,none,
-      "'%0' is incompatible with %1; it can only be applied to public imports",
+      "%0 is incompatible with %1; it can only be applied to public imports",
       (DeclAttribute, DeclAttribute))
 NOTE(module_imported_here,none,
      "module %0 imported as '%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' here",
@@ -3957,9 +3957,9 @@ ERROR(enum_with_raw_type_case_with_argument,none,
 NOTE(enum_raw_type_here,none,
      "declared raw type %0 here", (Type))
 ERROR(objc_enum_no_raw_type,none,
-      "'%0' enum must declare an integer raw type", (DeclAttribute))
+      "%0 enum must declare an integer raw type", (DeclAttribute))
 ERROR(objc_enum_raw_type_not_integer,none,
-      "'%0' enum raw type %1 is not an integer type", (DeclAttribute, Type))
+      "%0 enum raw type %1 is not an integer type", (DeclAttribute, Type))
 ERROR(enum_non_integer_raw_value_auto_increment,none,
       "enum case must declare a raw value when the preceding raw value is not an integer", ())
 ERROR(enum_non_integer_convertible_raw_type_no_value,none,
@@ -4275,33 +4275,33 @@ ERROR(attr_only_valid_on_func_or_init_params,none,
 ERROR(attr_not_on_variadic_parameters,none,
       "'%0' must not be used on variadic parameters", (StringRef))
 ERROR(attr_not_on_stored_properties,none,
-      "'%0' must not be used on stored properties", (DeclAttribute))
+      "%0 must not be used on stored properties", (DeclAttribute))
 ERROR(attr_not_on_computed_properties,none,
-      "'%0' must not be used on computed properties", (DeclAttribute))
+      "%0 must not be used on computed properties", (DeclAttribute))
 
 WARNING(attr_has_no_effect_on_decl_with_access_level,none,
-       "'%0' does not have any effect on "
+       "%0 does not have any effect on "
        "%select{private|fileprivate|internal|package|%error|%error}1 declarations",
        (DeclAttribute, AccessLevel))
 ERROR(attr_not_on_decl_with_invalid_access_level,none,
-      "'%0' may not be used on "
+      "%0 may not be used on "
       "%select{private|fileprivate|internal|package|public|%error}1 declarations",
       (DeclAttribute, AccessLevel))
 
 ERROR(attr_has_no_effect_decl_not_available_before,none,
-      "'%0' has no effect because %1 is not "
+      "%0 has no effect because %1 is not "
       "available before %2 %3",
       (DeclAttribute, const ValueDecl *, AvailabilityDomain, AvailabilityRange))
 
 ERROR(attr_has_no_effect_on_unavailable_decl,none,
-      "'%0' has no effect because %1 is unavailable on %2",
+      "%0 has no effect because %1 is unavailable on %2",
       (DeclAttribute, const ValueDecl *, AvailabilityDomain))
 
 ERROR(attr_ambiguous_reference_to_decl,none,
       "ambiguous reference to %0 in %1 attribute", (DeclNameRef, DeclAttribute))
 
 ERROR(attr_contains_multiple_versions_for_platform,none,
-      "'%0' contains multiple versions for %1", (DeclAttribute, StringRef))
+      "%0 contains multiple versions for %1", (DeclAttribute, StringRef))
 
 ERROR(override_final,none,
       "%kindonly0 overrides a 'final' %kindonly1",
@@ -4319,23 +4319,23 @@ ERROR(final_not_allowed_here,none,
       "subscripts", ())
 
 ERROR(attr_incompatible_with_attr,none,
-      "'%0' cannot be used with '%1'",
+      "%0 cannot be used with %1",
       (DeclAttribute, DeclAttribute))
 
 ERROR(attr_incompatible_with_non_final,none,
-      "'%0' cannot be applied to a non-final %kindonly1",
+      "%0 cannot be applied to a non-final %kindonly1",
       (DeclAttribute, const ValueDecl *))
 
 ERROR(attr_incompatible_with_override,none,
-      "'%0' cannot be combined with 'override'",
+      "%0 cannot be combined with 'override'",
       (DeclAttribute))
 
 ERROR(attr_incompatible_with_objc,none,
-      "'%0' must not be used on an '@objc' %kindonly1",
+      "%0 must not be used on an '@objc' %kindonly1",
       (DeclAttribute, const ValueDecl *))
 
 ERROR(attr_unusable_in_protocol,none,
-      "'%0' cannot be used inside a protocol declaration",
+      "%0 cannot be used inside a protocol declaration",
       (DeclAttribute))
 
 ERROR(final_not_on_accessors,none,
@@ -7331,29 +7331,29 @@ ERROR(availability_domain_requires_feature, none,
       (AvailabilityDomain, StringRef))
 
 WARNING(attr_availability_expected_deprecated_version, none,
-       "expected version number with 'deprecated' in '%0' attribute for %1",
+       "expected version number with 'deprecated' in %0 attribute for %1",
        (const DeclAttribute, AvailabilityDomain))
 WARNING(attr_availability_cannot_be_used_for_domain, none,
-       "'%0' cannot be used in '%1' attribute for %2",
+       "'%0' cannot be used in %1 attribute for %2",
        (StringRef, const DeclAttribute, AvailabilityDomain))
 WARNING(attr_availability_expected_version_spec, none,
-       "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
+       "expected 'introduced', 'deprecated', or 'obsoleted' in %0 attribute "
        "for %1", (const DeclAttribute, AvailabilityDomain))
 ERROR(attr_availability_domain_access, none,
       "availability domain '%0' is "
       "%select{private|fileprivate|internal|package|%error|%error}1 "
-      "and cannot be used in '%2' on "
+      "and cannot be used in %2 on "
       "%select{private|fileprivate|internal|package|public|%error}3 %kind4",
       (AvailabilityDomain, AccessLevel, DeclAttribute, AccessLevel,
        const Decl *))
 ERROR(attr_availability_domain_not_usable_from_inline, none,
-      "availability domain '%0' used in '%1' on %kind2 must be "
+      "availability domain '%0' used in %1 on %kind2 must be "
       "'@usableFromInline' or public",
       (AvailabilityDomain, DeclAttribute, const Decl *))
 
 GROUPED_WARNING(attr_availability_has_no_effect_domain_always_available,
                 AlwaysAvailableDomain, none,
-                "'%0' has no effect because '%1' is always available",
+                "%0 has no effect because '%1' is always available",
                 (DeclAttribute, AvailabilityDomain))
 GROUPED_WARNING(attr_availability_domain_always_available,
                 AlwaysAvailableDomain, none,
@@ -7538,7 +7538,7 @@ ERROR(public_decl_needs_availability, none,
       "with an introduction version", ())
 
 ERROR(attr_requires_decl_availability_for_platform,none,
-      "'%0' requires that %1 have explicit availability for %2",
+      "%0 requires that %1 have explicit availability for %2",
       (DeclAttribute, const Decl *, StringRef))
 
 // This doesn't display as an availability diagnostic, but it's
@@ -7714,7 +7714,7 @@ ERROR(class_designated_init_inlinable_resilient,none,
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,
-      none, "'%0' attribute cannot be applied to stored properties", (DeclAttribute))
+      none, "%0 attribute cannot be applied to stored properties", (DeclAttribute))
 
 ERROR(inlinable_dynamic_not_supported,
       none, "'@inlinable' attribute cannot be applied to 'dynamic' declarations", ())
@@ -8296,15 +8296,15 @@ ERROR(cannot_convert_default_value_type_to_argument_type, none,
 //------------------------------------------------------------------------------
 
 ERROR(attr_incompatible_with_back_deployed,none,
-      "'%0' cannot be applied to a back deployed %kind1",
+      "%0 cannot be applied to a back deployed %kind1",
       (DeclAttribute, const Decl *))
 
 WARNING(back_deployed_opaque_result_not_supported,none,
-      "'%0' cannot be applied to %kind1 because it has a 'some' return type",
+      "%0 cannot be applied to %kind1 because it has a 'some' return type",
       (DeclAttribute, const ValueDecl *))
 
 ERROR(back_deployed_requires_body,none,
-      "'%0' requires that %kind1 have a body",
+      "%0 requires that %kind1 have a body",
       (DeclAttribute, const ValueDecl *))
 
 //------------------------------------------------------------------------------

@@ -482,7 +482,7 @@ ERROR(operator_decl_no_fixity,none,
 ERROR(operator_decl_expected_precedencegroup, none,
       "expected precedence group name after ':' in operator declaration", ())
 ERROR(operator_decl_should_not_contain_other_attributes, none, 
-      "unexpected attribute %0 in operator declaration", (DeclAttribute))
+      "unexpected %kind0 in operator declaration", (DeclAttribute))
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,
@@ -1601,7 +1601,7 @@ WARNING(attr_renamed_to_modifier_warning, none,
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 ERROR(attr_unsupported_on_target, none,
-      "attribute %0 is unsupported on target '%1'", (DeclAttribute, StringRef))
+      "%kind0 is unsupported on target '%1'", (DeclAttribute, StringRef))
 ERROR(attr_name_unsupported_on_target, none,
       "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
 

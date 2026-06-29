@@ -175,6 +175,11 @@ diagnostic arguments of a given type.
 - `%kind0` - Replaced with `attribute 'foo'`, whereas `%0` is replaced with
   `'@foo'`.
 
+#### `DeclAttribute`
+
+- `%kind0` - Replaced with `attribute 'foo'` or `modifier 'foo'`, whereas `%0`
+  is replaced with `'@foo'` or `'foo'` based on if it's an attribute or modifier.
+
 Note: If your diagnostic could apply to accessors, be careful how you format the declaration's name; accessors have an empty name, so you need to display their accessor kind and the name of their storage decl instead. Inserting the name with a `Decl *` parameter will handle these complications automatically; if you want to use `DeclName` or `Identifier` instead, you'll probably need a separate version of the diagnostic for accessors. 
 
 ### Diagnostic Verifier ###

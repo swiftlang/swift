@@ -6,4 +6,4 @@
 @_private(sourceFile: "empty.swift") import empty // no-error
 @_private(sourceFile: "nonexistent_file.swift") import empty // no-error
 
-@_private(sourceFile: "none") func foo() {} // expected-error {{@_private may only be used on 'import' declarations}} {{1-31=}}
+@_private(sourceFile: "none") func foo() {} // expected-error {{'@_private' may only be used on 'import' declarations}} {{1-31=}}

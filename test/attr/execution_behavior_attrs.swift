@@ -8,7 +8,7 @@ nonisolated(something) func invalidAttr() async {} // expected-error {{cannot fi
 // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
 
 @concurrent nonisolated(nonsending) func mutipleAttrs() async {}
-// expected-error@-1 {{global function 'mutipleAttrs()' has multiple actor-isolation attributes (@concurrent and 'nonisolated(nonsending)')}}
+// expected-error@-1 {{global function 'mutipleAttrs()' has multiple actor-isolation attributes ('@concurrent' and 'nonisolated(nonsending)')}}
 
 do {
   nonisolated(nonsending) struct S {}
@@ -21,7 +21,7 @@ do {
 }
 
 @concurrent func nonAsync1() {}
-// expected-error@-1 {{cannot use @concurrent on non-async global function 'nonAsync1()'}}
+// expected-error@-1 {{cannot use '@concurrent' on non-async global function 'nonAsync1()'}}
 
 nonisolated(nonsending) func nonAsync2() {}
 // expected-error@-1 {{cannot use 'nonisolated(nonsending)' on non-async global function 'nonAsync2()'}}
@@ -30,17 +30,17 @@ nonisolated(nonsending) func nonAsync2() {}
 
 struct Test {
   @concurrent init() {}
-  // expected-error@-1 {{cannot use @concurrent on non-async initializer 'init()'}}
+  // expected-error@-1 {{cannot use '@concurrent' on non-async initializer 'init()'}}
 
   @concurrent init(async: Void) async {}
 
   @concurrent func member() {}
-  // expected-error@-1 {{cannot use @concurrent on non-async instance method 'member()'}}
+  // expected-error@-1 {{cannot use '@concurrent' on non-async instance method 'member()'}}
 
   @concurrent func member() async {} // Ok
 
   @concurrent var syncP: Int {
-  // expected-error@-1 {{cannot use @concurrent on non-async property 'syncP'}}
+  // expected-error@-1 {{cannot use '@concurrent' on non-async property 'syncP'}}
     get {}
   }
   @concurrent var asyncP: Int {
@@ -60,9 +60,9 @@ struct Test {
 
   // FIXME: Incorrect quotes due to inconsistent DeclAttribute printing between modifiers and attributes
   nonisolated(nonsending) var storedVar: Int
-  // expected-error@-1 {{''nonisolated(nonsending)'' must not be used on stored properties}}
+  // expected-error@-1 {{'nonisolated(nonsending)' must not be used on stored properties}}
   nonisolated(nonsending) let storedLet: Int
-  // expected-error@-1 {{''nonisolated(nonsending)'' must not be used on stored properties}}
+  // expected-error@-1 {{'nonisolated(nonsending)' must not be used on stored properties}}
 }
 
 do {
@@ -87,9 +87,9 @@ struct TestAttributeCollisions {
   @concurrent nonisolated func testNonIsolated() async {}
 
   @concurrent func test(arg: isolated MainActor) async {}
-  // expected-error@-1 {{cannot use @concurrent on instance method 'test(arg:)' because it has an isolated parameter: 'arg'}}
+  // expected-error@-1 {{cannot use '@concurrent' on instance method 'test(arg:)' because it has an isolated parameter: 'arg'}}
   @concurrent subscript(test arg: isolated MainActor) -> Int {
-  // expected-error@-1 {{cannot use @concurrent on subscript 'subscript(test:)' because it has an isolated parameter: 'arg'}}
+  // expected-error@-1 {{cannot use '@concurrent' on subscript 'subscript(test:)' because it has an isolated parameter: 'arg'}}
     get async {}
   }
 
@@ -99,11 +99,11 @@ struct TestAttributeCollisions {
   }
 
   @MainActor @concurrent func testGlobalActor() async {}
-  // expected-error@-1 {{instance method 'testGlobalActor()' has multiple actor-isolation attributes (@MainActor and @concurrent)}}
+  // expected-error@-1 {{instance method 'testGlobalActor()' has multiple actor-isolation attributes ('@MainActor' and '@concurrent')}}
 
   nonisolated(nonsending) nonisolated func testNonIsolatedCaller() async {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
   @MainActor nonisolated(nonsending) func testGlobalActorCaller() async {}
-  // expected-error@-1 {{instance method 'testGlobalActorCaller()' has multiple actor-isolation attributes (@MainActor and 'nonisolated(nonsending)')}}
+  // expected-error@-1 {{instance method 'testGlobalActorCaller()' has multiple actor-isolation attributes ('@MainActor' and 'nonisolated(nonsending)')}}
   nonisolated(nonsending) func testCaller(arg: isolated MainActor) async {}
   // expected-error@-1 {{cannot use 'nonisolated(nonsending)' on instance method 'testCaller(arg:)' because it has an isolated parameter: 'arg'}}
   
@@ -128,12 +128,12 @@ struct IsolatedType {
 // `@concurrent` on closures does not contribute to `async` inference.
 do {
   _ = { @concurrent in }
-  // expected-error@-1:9 {{cannot use @concurrent on non-async closure}}{{none}}
+  // expected-error@-1:9 {{cannot use '@concurrent' on non-async closure}}{{none}}
   _ = { @concurrent () -> Int in }
-  // expected-error@-1:9 {{cannot use @concurrent on non-async closure}}{{none}}
+  // expected-error@-1:9 {{cannot use '@concurrent' on non-async closure}}{{none}}
   // Explicit effect precludes effects inference from the body.
   _ = { @concurrent () throws in await awaitMe() }
-  // expected-error@-1:9 {{cannot use @concurrent on non-async closure}}{{none}}
+  // expected-error@-1:9 {{cannot use '@concurrent' on non-async closure}}{{none}}
   // expected-error@-2:40 {{'async' call in a function that does not support concurrency}}{{none}}
   _ = { @concurrent () async in }
   _ = { @concurrent in await awaitMe() }
@@ -146,7 +146,7 @@ do {
 
     func sync() {
       foo { @concurrent in }
-      // expected-error@-1:13 {{cannot use @concurrent on non-async closure}}{{none}}
+      // expected-error@-1:13 {{cannot use '@concurrent' on non-async closure}}{{none}}
     }
     // expected-note@+1:10 {{add 'async' to function 'sync2()' to make it asynchronous}}{{17-17= async}}
     func sync2() {
@@ -157,7 +157,7 @@ do {
       // Even though the context is async, the sync overload is favored because
       // the closure is sync, so the error is expected.
       foo { @concurrent in }
-      // expected-error@-1:13 {{cannot use @concurrent on non-async closure}}{{none}}
+      // expected-error@-1:13 {{cannot use '@concurrent' on non-async closure}}{{none}}
 
       foo { @concurrent in await awaitMe() }
       // expected-error@-1:7 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
@@ -175,7 +175,7 @@ do {
     }
     func async() async {
       foo { @concurrent _ in }
-      // expected-error@-1:13 {{cannot use @concurrent on non-async closure}}{{none}}
+      // expected-error@-1:13 {{cannot use '@concurrent' on non-async closure}}{{none}}
       // expected-error@-2:7 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
       // expected-note@-3:7 {{call is 'async'}}{{none}}
     }
@@ -185,12 +185,12 @@ do {
     func foo<T>(_: T) {}
 
     foo({@concurrent in })
-    // expected-error@-1:10 {{cannot use @concurrent on non-async closure}}{{none}}
+    // expected-error@-1:10 {{cannot use '@concurrent' on non-async closure}}{{none}}
   }
 }
 
 _ = { @MainActor @concurrent in
-  // expected-error@-1 {{cannot use @concurrent because function type is isolated to a global actor 'MainActor'}}
+  // expected-error@-1 {{cannot use '@concurrent' because function type is isolated to a global actor 'MainActor'}}
 }
 
 // Make sure that explicit use of `@concurrent` doesn't interfere with inference of `throws` from the body.

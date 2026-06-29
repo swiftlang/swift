@@ -9013,8 +9013,7 @@ public:
 
   void visitDeclAttribute(DeclAttribute *attr) {
     ctx.Diags
-        .diagnose(attr->getLocation(), diag::unsupported_closure_attr,
-                  attr->isDeclModifier(), attr)
+        .diagnose(attr->getLocation(), diag::unsupported_closure_attr, attr)
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
   }
@@ -9096,8 +9095,7 @@ public:
 
     // Otherwise, it's an error.
     ctx.Diags
-        .diagnose(attr->getLocation(), diag::unsupported_closure_attr,
-                  attr->isDeclModifier(), attr)
+        .diagnose(attr->getLocation(), diag::unsupported_closure_attr, attr)
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
   }

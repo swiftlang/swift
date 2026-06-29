@@ -35,7 +35,7 @@ protocol A2 {}
 @_typeEraser(AnyP // expected-note {{to match this opening '('}}
 protocol A3 {} // expected-error {{expected ')' after type name for '@_typeEraser'}}
 
-@_typeEraser(AnyP) // expected-error {{@_typeEraser may only be used on 'protocol' declarations}}
+@_typeEraser(AnyP) // expected-error {{'@_typeEraser' may only be used on 'protocol' declarations}}
 func notAProtocol() {}
 
 // MARK: - Type eraser must be a concrete nominal type
