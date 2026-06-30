@@ -130,12 +130,12 @@ def get_pr_branch(
         prefix=prefix,
     )
 
-    # 2. Check out a dedicated branch at the PR merge ref, resetting the branch
-    #    if it exists.
+    # 2. Check out a dedicated branch at the PR merge ref, hard-resetting the
+    #    branch if it's already checked out or exists.
     pr_branch = "ci_pr_{0}".format(pr_id)
     Git.run(
         repo_path,
-        ["checkout", "-B", pr_branch, local_pr_merge_ref],
+        ["checkout", "--force", "-B", pr_branch, local_pr_merge_ref],
         echo=True,
         prefix=prefix,
     )
