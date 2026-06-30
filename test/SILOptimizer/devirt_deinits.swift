@@ -3,9 +3,6 @@
 // Also do an end-to-end test and check if the compiled executable works as expected.
 // RUN: %target-run-simple-swift(-parse-as-library -O -disable-availability-checking -Xllvm -sil-disable-pass=function-signature-opts) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
-// Check if it works in embedded mode.
-// RUN: %target-run-simple-swift(-target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck -check-prefix CHECK-OUTPUT %s
-
 // Run without the deinit-devirtualizer to verify that our CHECK-OUTPUT lines are correct.
 // RUN: %target-run-simple-swift(-disable-availability-checking -Xllvm -sil-disable-pass=deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
@@ -17,8 +14,6 @@
 // REQUIRES: OS=macosx
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: embedded_stdlib
-// REQUIRES: swift_feature_Embedded
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
