@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -g -enable-experimental-feature Embedded -c -o %t/main.o
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 // https://github.com/swiftlang/swift/issues/72627 - crash with noncopyable

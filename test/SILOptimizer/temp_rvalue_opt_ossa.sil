@@ -1,7 +1,6 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -O -wmo -sil-disable-pass=DeadFunctionAndGlobalElimination -sil-disable-pass=function-signature-opts | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // ExistentialTransform's cloner was missing destroy_addr before
 // dealloc_stack for class-constrained @in_guaranteed existential

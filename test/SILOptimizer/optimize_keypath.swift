@@ -31,7 +31,6 @@
 // REQUIRES: executable_test,optimized_stdlib
 // REQUIRES: CPU=arm64 || CPU=x86_64
 
-// REQUIRES: swift_in_compiler
 
 protocol P {
   mutating func modifyIt()

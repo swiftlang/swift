@@ -4,7 +4,6 @@
 // RUN: %target-build-swift -enable-experimental-feature Embedded -wmo %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out %target-embedded-posix-shim
 // RUN: %target-not-crash %target-run %t/a.out 2>&1 | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: swift_feature_Embedded

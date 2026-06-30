@@ -5,7 +5,6 @@
 // RUN: llvm-objdump -r %t/b.o | %FileCheck -check-prefix B-OBJDUMP %s
 
 // UNSUPPORTED: CPU=wasm32
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM
 // REQUIRES: embedded_stdlib_cross_compiling

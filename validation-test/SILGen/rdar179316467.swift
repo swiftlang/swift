@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-silgen -sil-verify-all -enable-library-evolution -enable-experimental-feature Lifetimes %s
 // RUN: %target-swift-emit-sil -sil-verify-all -enable-library-evolution -enable-experimental-feature Lifetimes -verify %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: objc_interop
 

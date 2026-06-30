@@ -8,7 +8,6 @@
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/Main.o %t/MyModuleA.o %t/MyModuleB.o %t/MyModuleC.o %target-embedded-posix-shim -o %t/a.out
 // RUN: %target-run %t/a.out
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
 

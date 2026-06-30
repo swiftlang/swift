@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-experimental-feature Embedded -emit-ir -Osize -disable-llvm-merge-functions-pass | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded

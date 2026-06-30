@@ -2,7 +2,6 @@
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CHECK-SIL %s
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -O -Xllvm -sil-disable-pass=FunctionSignatureOpts | %FileCheck -check-prefix=CHECK-SIL-OPT %s
 
-// REQUIRES: swift_in_compiler
 
 import Swift
 

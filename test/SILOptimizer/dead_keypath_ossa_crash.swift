@@ -17,7 +17,6 @@
 // https://github.com/swiftlang/swift/issues/89791
 // RUN: %target-swift-frontend -c %t/Main.swift -parse-as-library -O -swift-version 6 -enable-default-cmo -sil-verify-all -I %t -module-name Main -o /dev/null
 
-// REQUIRES: swift_in_compiler
 
 //--- ResLib.swift
 

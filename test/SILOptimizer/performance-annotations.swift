@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -enable-experimental-feature RawLayout -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_RawLayout
 

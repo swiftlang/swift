@@ -8,7 +8,6 @@
 // RUN: %llvm-nm -a %t/MyModule.o | %FileCheck --check-prefix=ORIGINBINARY %s
 // RUN: %llvm-nm -a %t/a.o | %FileCheck --check-prefix=CLIENTBINARY %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 

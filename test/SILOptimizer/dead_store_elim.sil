@@ -1,7 +1,6 @@
 // RUN: %target-sil-opt -sil-print-types %s -dead-store-elimination -enable-sil-verify-all | %FileCheck %s
 // RUN: %target-sil-opt -sil-print-types %s -compute-side-effects -dead-store-elimination -enable-sil-verify-all | %FileCheck %s --check-prefix=CHECK-SEA-DSE
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

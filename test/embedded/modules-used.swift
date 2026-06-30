@@ -7,7 +7,6 @@
 // RUN: %target-embedded-link %t/a.o %target-embedded-posix-shim -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded

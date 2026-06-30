@@ -1,6 +1,5 @@
 // RUN: %target-swift-emit-ir  %s -module-name=main -enable-experimental-feature Embedded | %FileCheck %s --check-prefix=EXIST
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 // EXIST: @"$e4main8MyBufferCMf" = {{.*}} <{ ptr @"$eBoWV{{[^"]*}}", {{.*}} ptr @"$es13ManagedBufferCySis5UInt8VGMf", i32 0, i32 1), ptr @"$e4main8MyBufferCfD{{[^"]*}}", ptr null, ptr @"$e4main8MyBufferC12_doNotCallMeACyt_tcfC{{[^"]*}}" }>
