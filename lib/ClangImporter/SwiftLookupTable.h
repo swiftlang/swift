@@ -280,7 +280,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 23; // effective ctx of nested unscoped enums
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 24; // begin() returning FRT is __Unsafe
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.

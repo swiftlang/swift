@@ -8657,14 +8657,14 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
         isa<clang::CXXConstructorDecl>(decl))
       return true;
 
-    if (clangTypeIsForeignReference(method->getReturnType(), desc.ctx))
-      return true;
-
-    // begin and end methods likely return an interator, so they're unsafe. This
-    // is required so that automatic the conformance to RAC works properly.
+    // begin and end methods likely return an iterator, so they're unsafe.
+    // This is required so that automatic the conformance to RAC works properly.
     if (method->getNameAsString() == "begin" ||
         method->getNameAsString() == "end")
       return false;
+
+    if (clangTypeIsForeignReference(method->getReturnType(), desc.ctx))
+      return true;
 
     auto parentQualType = method
       ->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
