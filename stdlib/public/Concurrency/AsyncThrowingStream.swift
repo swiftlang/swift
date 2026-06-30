@@ -34,7 +34,8 @@ import Swift
 /// `finish(throwing:)` method, which causes the iterator's `next()` method to
 /// throw the error to the awaiting call point. The continuation is `Sendable`,
 /// which permits calling it from concurrent contexts external to the iteration
-/// of the `AsyncThrowingStream`.
+/// of the `AsyncThrowingStream`. When you iterate the stream concurrently,
+/// each element you provide to the `yield(_:)` method is delivered to only a single consumer.
 ///
 /// An arbitrary source of elements can produce elements faster than they are
 /// consumed by a caller iterating over them. Because of this, `AsyncThrowingStream`

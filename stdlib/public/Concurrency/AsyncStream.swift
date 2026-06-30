@@ -29,7 +29,8 @@ import Swift
 /// `finish()` method. This causes the sequence iterator to produce a `nil`,
 /// which terminates the sequence. The continuation conforms to `Sendable`, which permits
 /// calling it from concurrent contexts external to the iteration of the
-/// `AsyncStream`.
+/// `AsyncStream`. When you iterate the stream concurrently,
+/// each element you provide to the `yield(_:)` method is delivered to only a single consumer.
 ///
 /// An arbitrary source of elements can produce elements faster than they are
 /// consumed by a caller iterating over them. Because of this, `AsyncStream`
