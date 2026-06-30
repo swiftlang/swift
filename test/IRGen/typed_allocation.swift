@@ -2,7 +2,6 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: embedded_stdlib
-// REQUIRES: swift_in_compiler
 // REQUIRES: embedded_stdlib
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_TypedAllocation

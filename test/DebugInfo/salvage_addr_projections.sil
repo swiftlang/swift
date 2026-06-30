@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types %s -sil-combine -sil-print-debuginfo | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // Test that struct_element_addr, tuple_element_addr, ref_element_addr, and
 // vector_base_addr are salvaged into debug reconstruction blocks when they

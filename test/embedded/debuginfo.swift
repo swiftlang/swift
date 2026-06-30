@@ -5,7 +5,6 @@
 // RUN: %target-swift-frontend -O -emit-ir %s -enable-experimental-feature Embedded
 // RUN: %target-swift-frontend -Osize -emit-ir %s -enable-experimental-feature Embedded
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 

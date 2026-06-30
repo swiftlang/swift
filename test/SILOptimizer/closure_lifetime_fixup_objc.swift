@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -sil-verify-all -Xllvm -sil-print-types -emit-sil -enable-copy-propagation=false -o - -I %S/Inputs/usr/include | %FileCheck %s
 // REQUIRES: objc_interop
 
-// REQUIRES: swift_in_compiler
 
 // Using -enable-copy-propagation=false to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around

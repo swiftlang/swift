@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -wmo -O -Xlinker %swift_obj_root/lib/swift/embedded/%module-target-triple/libswiftUnicodeDataTables.a) | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_stdlib_no_asserts

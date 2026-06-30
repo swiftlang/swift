@@ -34,7 +34,6 @@ _vsnprintf
 //--- test.swift
 // RUN: %target-run %t/a.out | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib

@@ -1,6 +1,5 @@
 // RUN: %target-swift-emit-ir -enable-experimental-feature Extern -enable-experimental-feature Embedded -mergeable-traps -wmo -Xllvm -link-embedded-runtime=0 %s -O | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
