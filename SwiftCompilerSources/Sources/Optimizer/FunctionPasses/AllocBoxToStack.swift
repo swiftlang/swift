@@ -54,6 +54,10 @@ import SIL
 let allocBoxToStack = FunctionPass(name: "allocbox-to-stack") {
   (function: Function, context: FunctionPassContext) in
 
+  guard function.hasOwnership else {
+    return
+  }
+
   _ = tryConvertBoxesToStack(in: function, isMandatory: false, context)
 }
 
@@ -155,7 +159,7 @@ private func canPromote(allocBox: AllocBoxInst) -> (promotableArguments: [Functi
     for use in value.uses {
       // Note: all instructions which are handled here must also be handled in `FunctionSpecializations.rewriteUses`!
       switch use.instruction {
-      case is StrongRetainInst, is StrongReleaseInst, is ProjectBoxInst, is DestroyValueInst,
+      case is ProjectBoxInst, is DestroyValueInst,
            is EndBorrowInst, is DebugValueInst, is DeallocStackInst:
         break
       case let deallocBox as DeallocBoxInst where deallocBox.parentFunction == allocBox.parentFunction:
@@ -232,7 +236,7 @@ private struct FunctionSpecializations {
     while let use = box.uses.first {
       let user = use.instruction
       switch user {
-      case is StrongRetainInst, is StrongReleaseInst, is DestroyValueInst, is EndBorrowInst, is DeallocBoxInst:
+      case is DestroyValueInst, is EndBorrowInst, is DeallocBoxInst:
         context.erase(instruction: user)
       case let projectBox as ProjectBoxInst:
         assert(projectBox.fieldIndex == 0, "only single-field boxes are handled")
@@ -359,35 +363,14 @@ private func createAllocStack(for allocBox: AllocBoxInst, flags: Flags, _ contex
   }
 
   for destroy in getFinalDestroys(of: allocBox, context) {
+    if destroy.isDeadEndDestroy {
+      // Don't bother to create destroy_addr and dealloc_stack instructions in dead-ends.
+      continue
+    }
     let loc = allocBox.location.asCleanup.withScope(of: destroy.location)
     Builder.insert(after: destroy, location: loc, context) { builder in
-      if !(destroy is DeallocBoxInst),
-         context.deadEndBlocks.isDeadEnd(destroy.parentBlock),
-         !isInLoop(block: destroy.parentBlock, context) {
-        // "Last" releases in dead-end regions may not actually destroy the box
-        // and consequently may not actually release the stored value.  That's
-        // because values (including boxes) may be leaked along paths into
-        // dead-end regions.  Thus it is invalid to lower such final releases of
-        // the box to destroy_addr's/dealloc_box's of the stack-promoted storage.
-        //
-        // There is one exception: if the alloc_box is in a dead-end loop.  In
-        // that case SIL invariants require that the final releases actually
-        // destroy the box; otherwise, a box would leak once per loop.  To check
-        // for this, it is sufficient check that the LastRelease is in a dead-end
-        // loop: if the alloc_box is not in that loop, then the entire loop is in
-        // the live range, so no release within the loop would be a "final
-        // release".
-        //
-        // None of this applies to dealloc_box instructions which always destroy
-        // the box.
-        return
-      }
       if !unboxedType.isTrivial(in: allocBox.parentFunction), !(destroy is DeallocBoxInst) {
         builder.createDestroyAddr(address: stackLocation)
-      }
-      if let dbi = destroy as? DeallocBoxInst, dbi.isDeadEnd {
-        // Don't bother to create dealloc_stack instructions in dead-ends.
-        return
       }
       builder.createDeallocStack(asi)
     }
@@ -421,7 +404,7 @@ private func getFinalDestroys(of allocBox: AllocBoxInst, _ context: FunctionPass
       switch user {
       case is MarkUninitializedInst, is CopyValueInst, is MoveValueInst, is PartialApplyInst, is BeginBorrowInst:
         worklist.pushIfNotVisited(user as! SingleValueInstruction)
-      case is StrongReleaseInst, is DestroyValueInst, is DeallocBoxInst:
+      case is DestroyValueInst, is DeallocBoxInst:
         destroys.push(user)
       case let apply as FullApplySite:
         if apply.convention(of: use) == .directOwned {
@@ -501,5 +484,18 @@ private extension ApplySite {
       return callee
     }
     return nil
+  }
+}
+
+private extension Instruction {
+  var isDeadEndDestroy: Bool {
+    switch self {
+    case let destroy as DestroyValueInst:
+      return destroy.isDeadEnd
+    case let dealloc as DeallocBoxInst:
+      return dealloc.isDeadEnd
+    default:
+      return false
+    }
   }
 }
