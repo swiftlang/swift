@@ -64,6 +64,23 @@ struct Region {
 namespace llvm {
 
 template <>
+struct DenseMapInfo<swift::PartitionPrimitives::Element> {
+  using Element = swift::PartitionPrimitives::Element;
+
+  static Element getEmptyKey() {
+    return Element(DenseMapInfo<unsigned>::getEmptyKey());
+  }
+  static Element getTombstoneKey() {
+    return Element(DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(Element element) {
+    return DenseMapInfo<unsigned>::getHashValue(element);
+  }
+  static bool isEqual(Element LHS, Element RHS) { return LHS == RHS; }
+};
+
+template <>
 struct DenseMapInfo<swift::PartitionPrimitives::Region> {
   using Region = swift::PartitionPrimitives::Region;
 
@@ -298,10 +315,21 @@ public:
   void pushRemoveElementFromRegion(Element otherElementInOldRegion,
                                    Element element);
 
-  /// \p elementToMergeInto is the element whose region we merge \p otherRegions
-  /// into.
-  void pushMergeElementRegions(Element elementToMergeInto,
-                               ArrayRef<Element> otherRegions);
+  /// NOTE: Assumes that \p elementInNewRegion and \p elementInOldRegion are not
+  /// in the same region.
+  ///
+  /// \arg elementInNewRegion the element that defines the region that
+  /// elementInOldRegion and otherElementsInOldRegion were merged into.
+  ///
+  /// \arg elementInOldRegion the element in the old region that was actually
+  /// said to be merged by the merge operation.
+  ///
+  /// \arg otherElementsInOldRegion the other elements in the old region that
+  /// were updated to be in the new region. Importantly these were not actually
+  /// used as the merge operand.
+  void pushMergeElementRegions(Element elementInNewRegion,
+                               Element elementInOldRegion,
+                               ArrayRef<Element> otherElementsInOldRegion);
 
   /// Assign \p elementToMerge's region to \p elementToMergeInto's region.
   void pushAssignElementRegions(Element elementToMergeInto,
@@ -316,6 +344,8 @@ public:
   }
 
   Node *pop();
+  void print(ASTContext &ctx, llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMPER(dump(ASTContext &ctx)) { print(ctx, llvm::dbgs()); }
 };
 
 class IsolationHistory::Node final
@@ -357,18 +387,18 @@ public:
   };
 
 private:
+  /// Tells what type of node that this is.
   Kind kind;
-  Node *parent;
 
-  /// Child node. Never set on construction.
-  Node *child = nullptr;
+  /// The next pointer of the linked list.
+  Node *next;
 
   /// Contains:
   ///
   /// 1. Node * if we have a CFGHistoryJoin.
   /// 2. A SILLocation if we have a SequenceBoundary.
   /// 3. An element otherwise.
-  std::variant<Element, Node *, SILLocation> subject;
+  std::variant<Element, Node *, SILLocation> data;
 
   /// Number of additional element arguments stored in the tail allocated array.
   unsigned numAdditionalElements;
@@ -378,15 +408,14 @@ private:
     return getTrailingObjects(numAdditionalElements);
   }
 
-  Node(Kind kind, Node *parent)
-      : kind(kind), parent(parent), subject(nullptr) {}
-  Node(Kind kind, Node *parent, SILLocation loc)
-      : kind(kind), parent(parent), subject(loc) {}
-  Node(Kind kind, Node *parent, Element value)
-      : kind(kind), parent(parent), subject(value), numAdditionalElements(0) {}
-  Node(Kind kind, Node *parent, Element primaryElement,
+  Node(Kind kind, Node *next) : kind(kind), next(next), data(nullptr) {}
+  Node(Kind kind, Node *next, SILLocation loc)
+      : kind(kind), next(next), data(loc) {}
+  Node(Kind kind, Node *next, Element value)
+      : kind(kind), next(next), data(value), numAdditionalElements(0) {}
+  Node(Kind kind, Node *next, Element primaryElement,
        std::initializer_list<Element> restOfTheElements)
-      : kind(kind), parent(parent), subject(primaryElement),
+      : kind(kind), next(next), data(primaryElement),
         numAdditionalElements(restOfTheElements.size()) {
     unsigned writeIndex = 0;
     for (Element restElt : restOfTheElements) {
@@ -403,33 +432,40 @@ private:
   }
 
   Node(Kind kind, Node *parent, Element lhsValue, ArrayRef<Element> rhsValue)
-      : kind(kind), parent(parent), subject(lhsValue),
+      : kind(kind), next(parent), data(lhsValue),
         numAdditionalElements(rhsValue.size()) {
     std::uninitialized_copy(rhsValue.begin(), rhsValue.end(),
                             getAdditionalElementArgs().data());
   }
 
+  Node(Kind kind, Node *parent, Element lhsValue, Element rhsValue,
+       ArrayRef<Element> otherRHSValues)
+      : kind(kind), next(parent), data(lhsValue),
+        numAdditionalElements(1 + otherRHSValues.size()) {
+    getAdditionalElementArgs().data()[0] = rhsValue;
+    std::uninitialized_copy(otherRHSValues.begin(), otherRHSValues.end(),
+                            &getAdditionalElementArgs().data()[1]);
+  }
+
   Node(Kind kind, Node *parent, Node *node)
-      : kind(kind), parent(parent), subject(node), numAdditionalElements(0) {}
+      : kind(kind), next(parent), data(node), numAdditionalElements(0) {}
 
 public:
   Kind getKind() const { return kind; }
 
-  Node *getParent() const { return parent; }
-
-  Node *getChild() const { return child; }
-  void setChild(Node *newChild) { child = newChild; }
+  Node *getNext() const { return next; }
+  void setNext(Node *newNext) { next = newNext; }
 
   Element getFirstArgAsElement() const {
     assert(kind != CFGHistoryJoin);
-    assert(std::holds_alternative<Element>(subject));
-    return std::get<Element>(subject);
+    assert(std::holds_alternative<Element>(data));
+    return std::get<Element>(data);
   }
 
   Node *getFirstArgAsNode() const {
     assert(kind == CFGHistoryJoin);
-    assert(std::holds_alternative<Node *>(subject));
-    return std::get<Node *>(subject);
+    assert(std::holds_alternative<Node *>(data));
+    return std::get<Node *>(data);
   }
 
   ArrayRef<Element> getAdditionalElementArgs() const {
@@ -452,8 +488,15 @@ public:
   std::optional<SILLocation> getHistoryBoundaryLoc() const {
     if (kind != SequenceBoundary)
       return {};
-    return std::get<SILLocation>(subject);
+    return std::get<SILLocation>(data);
   }
+
+  void print(ASTContext &ctx, llvm::raw_ostream &os,
+             unsigned whitespacePrefix) const;
+  void print(ASTContext &ctx, llvm::raw_ostream &os) const {
+    print(ctx, os, 0);
+  }
+  SWIFT_DEBUG_DUMPER(dump(ASTContext &ctx)) { print(ctx, llvm::dbgs()); }
 };
 
 class IsolationHistory::Factory {
@@ -959,11 +1002,6 @@ public:
   static Partition singleRegion(SILLocation loc, ArrayRef<Element> indices,
                                 IsolationHistory inputHistory);
 
-  /// Return a new Partition that has each element of \p indices in their own
-  /// region.
-  static Partition separateRegions(SILLocation loc, ArrayRef<Element> indices,
-                                   IsolationHistory inputHistory);
-
   /// Test two partititons for equality by first putting them in canonical form
   /// then comparing for exact equality.
   ///
@@ -1073,7 +1111,7 @@ public:
       return count;
     ++count;
 
-    while ((head = head->getParent()))
+    while ((head = head->getNext()))
       ++count;
 
     return count;
@@ -1201,7 +1239,10 @@ private:
 
   /// Walk the elementToRegionMap updating all elements in the region of \p
   /// targetElement will be changed to now point at \p newRegion.
-  void horizontalUpdate(Element targetElement, Region newRegion,
+  ///
+  /// \arg mergedElements out parameter that includes all elements in the old
+  /// region that were updated. It does not include elementInOldRegion.
+  void horizontalUpdate(Element elementInOldRegion, Region newRegion,
                         SmallVectorImpl<Element> &mergedElements);
 
   /// Push onto the history list that \p element should be added into its own
@@ -1229,10 +1270,13 @@ private:
       history.pushCFGHistoryJoin(head);
   }
 
-  /// NOTE: Assumes that \p elementToMergeInto and \p otherRegions are disjoint.
-  void pushMergeElementRegions(Element elementToMergeInto,
-                               ArrayRef<Element> otherRegions) {
-    history.pushMergeElementRegions(elementToMergeInto, otherRegions);
+  /// \see IsolationHistory::pushMergeElementRegions.
+  void
+  pushMergeElementRegions(Element elementInNewRegion,
+                          Element elementInOldRegion,
+                          ArrayRef<Element> otherElementsInOldRegion = {}) {
+    history.pushMergeElementRegions(elementInNewRegion, elementInOldRegion,
+                                    otherElementsInOldRegion);
   }
 
   /// Remove a single element without touching the region to sending inst
@@ -1247,6 +1291,20 @@ private:
     assert(result && "Failed to erase?!");
   }
 };
+
+} // namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::Partition &p) {
+  p.print(os);
+  return os;
+}
+
+} // namespace llvm
+
+namespace swift {
 
 /// Swift style enum we use to decouple and reduce boilerplate in between the
 /// diagnostic and non-diagnostic part of the infrastructure.
