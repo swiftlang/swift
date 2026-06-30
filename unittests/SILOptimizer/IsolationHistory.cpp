@@ -46,7 +46,7 @@ struct HistoryNodeCounts {
 
   static HistoryNodeCounts from(IsolationHistory history) {
     HistoryNodeCounts counts;
-    for (auto *node = history.getHead(); node; node = node->getParent()) {
+    for (auto *node = history.getHead(); node; node = node->getNext()) {
       ++counts.total;
       switch (node->getKind()) {
       case IsolationHistory::Node::AddNewRegionForElement:
@@ -77,11 +77,11 @@ struct HistoryNodeCounts {
 /// SequenceBoundary somewhere on its parent path. The chain walker
 /// depends on this anchoring to attribute originating notes correctly.
 bool everyMergeHasAncestorBoundary(IsolationHistory history) {
-  for (auto *node = history.getHead(); node; node = node->getParent()) {
+  for (auto *node = history.getHead(); node; node = node->getNext()) {
     if (node->getKind() != IsolationHistory::Node::MergeElementRegions)
       continue;
     bool foundBoundary = false;
-    for (auto *p = node->getParent(); p; p = p->getParent()) {
+    for (auto *p = node->getNext(); p; p = p->getNext()) {
       if (p->getKind() == IsolationHistory::Node::SequenceBoundary) {
         foundBoundary = true;
         break;
@@ -114,7 +114,7 @@ TEST(IsolationHistory, BoundaryAtHead) {
   ASSERT_TRUE(p.hasHistory());
   auto *head = p.getIsolationHistory().getHead();
   EXPECT_EQ(head->getKind(), IsolationHistory::Node::SequenceBoundary);
-  EXPECT_EQ(head->getParent(), nullptr);
+  EXPECT_EQ(head->getNext(), nullptr);
 }
 
 // pushNewElementRegion records an AddNewRegionForElement node at head with
@@ -130,7 +130,7 @@ TEST(IsolationHistory, PushNewElementRegionPrimitive) {
   EXPECT_EQ(history.getHead(), node);
   EXPECT_EQ(node->getKind(), IsolationHistory::Node::AddNewRegionForElement);
   EXPECT_EQ(node->getFirstArgAsElement(), Element(7));
-  EXPECT_EQ(node->getParent(), nullptr);
+  EXPECT_EQ(node->getNext(), nullptr);
 }
 
 // pushMergeElementRegions records a MergeElementRegions node carrying
@@ -141,7 +141,7 @@ TEST(IsolationHistory, PushMergeElementRegionsPrimitive) {
   IsolationHistory::Factory historyFactory(allocator);
 
   IsolationHistory history = historyFactory.get();
-  history.pushMergeElementRegions(Element(0), {Element(2), Element(5)});
+  history.pushMergeElementRegions(Element(0), Element(2), {Element(5)});
 
   const auto *head = history.getHead();
   ASSERT_NE(head, nullptr);
@@ -232,7 +232,7 @@ TEST(IsolationHistory, CFGHistoryJoinDistinctNonEmptyCreatesNode) {
   EXPECT_NE(newHead, mainHeadBefore);
   EXPECT_EQ(newHead->getKind(), IsolationHistory::Node::CFGHistoryJoin);
   EXPECT_EQ(newHead->getFirstArgAsNode(), otherHead);
-  EXPECT_EQ(newHead->getParent(), mainHeadBefore);
+  EXPECT_EQ(newHead->getNext(), mainHeadBefore);
 }
 
 //===----------------------------------------------------------------------===//
@@ -308,7 +308,7 @@ TEST(IsolationHistory, SingleRegionMergeNodesAreSinglePeer) {
 
   llvm::SmallVector<Element, 4> mergedPeers;
   for (const IsolationHistory::Node *n = p.getIsolationHistory().getHead(); n;
-       n = n->getParent()) {
+       n = n->getNext()) {
     if (n->getKind() != IsolationHistory::Node::MergeElementRegions)
       continue;
     EXPECT_EQ(n->getFirstArgAsElement(), Element(0));
@@ -391,12 +391,12 @@ TEST(IsolationHistory, SingleRegionParentChainShape) {
     auto args = node->getAdditionalElementArgs();
     ASSERT_EQ(args.size(), 1u);
     EXPECT_EQ(args[0], Element(peer));
-    node = node->getParent();
+    node = node->getNext();
 
     ASSERT_NE(node, nullptr);
     EXPECT_EQ(node->getKind(), IsolationHistory::Node::AddNewRegionForElement);
     EXPECT_EQ(node->getFirstArgAsElement(), Element(peer));
-    node = node->getParent();
+    node = node->getNext();
   }
 
   // Then the rep element's AddNewRegionForElement (pushed first inside the
@@ -404,36 +404,34 @@ TEST(IsolationHistory, SingleRegionParentChainShape) {
   ASSERT_NE(node, nullptr);
   EXPECT_EQ(node->getKind(), IsolationHistory::Node::AddNewRegionForElement);
   EXPECT_EQ(node->getFirstArgAsElement(), Element(0));
-  node = node->getParent();
+  node = node->getNext();
 
   // Finally the boundary that opened the sequence.
   ASSERT_NE(node, nullptr);
   EXPECT_EQ(node->getKind(), IsolationHistory::Node::SequenceBoundary);
-  EXPECT_EQ(node->getParent(), nullptr);
+  EXPECT_EQ(node->getNext(), nullptr);
 }
 
-// Partition::singleRegion iterates `indices` blindly. For a repeated
-// element, elementToRegionMap.insert_or_assign collapses to one entry but
-// each iteration unconditionally pushes pushNewElementRegion(index) plus
-// pushMergeElementRegions(rep, index). popHistoryOnce on the second
-// MergeElementRegions tries to removeElement an element that the first
-// pop already removed, tripping the "Failed to erase?!" assert.
-TEST(IsolationHistory, SingleRegionDuplicateIndexCrashOnPop) {
+// Partition::singleRegion requires distinct indices. A repeated element
+// would push pushNewElementRegion(index) + pushMergeElementRegions(rep,
+// index) twice for the same element, which popHistoryOnce cannot rewind
+// (the second MergeElementRegions pop tries to removeElement an element
+// the first pop already removed, tripping "Failed to erase?!"). Rather
+// than silently de-duplicate, singleRegion treats a duplicate as a caller
+// bug and asserts. Only observable with assertions enabled.
+#ifndef NDEBUG
+TEST(IsolationHistoryDeathTest, SingleRegionDuplicateIndexAsserts) {
   llvm::BumpPtrAllocator allocator;
   IsolationHistory::Factory historyFactory(allocator);
   SILLocation loc = SILLocation::invalid();
 
-  // Element 1 listed twice — caller bug, but the public API takes ArrayRef
-  // and asserts nothing about uniqueness.
-  auto p = Partition::singleRegion(loc, {Element(0), Element(1), Element(1)},
-                                   historyFactory.get());
-
-  llvm::SmallVector<IsolationHistory, 4> joins;
-  // Will assert in removeElement on the second Merge(0,[1]) pop pre-fix.
-  while (p.popHistory(joins))
-    continue;
-  EXPECT_FALSE(p.hasHistory());
+  // Element 1 listed twice — caller bug.
+  EXPECT_DEATH(Partition::singleRegion(loc,
+                                       {Element(0), Element(1), Element(1)},
+                                       historyFactory.get()),
+               "does not support duplicate indices");
 }
+#endif
 
 // separateRegions pushes a single boundary and one AddNewRegionForElement
 // per index — sanity check that we don't accidentally synthesize a merge,

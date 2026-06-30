@@ -257,19 +257,23 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
                                   IsolationHistory inputHistory) {
   Partition p(inputHistory);
   if (!indices.empty()) {
-    // De-duplicate indices: pushing AddNewRegionForElement / merge nodes
+    // Sort so the lowest element is our region representative. Callers must
+    // pass distinct elements: pushing AddNewRegionForElement / merge nodes
     // for the same element more than once is unrecoverable in popHistory
-    // (the second pop's removeElement asserts because the first pop
-    // already extracted the element). Callers may pass duplicates without
-    // realizing it; absorb that here rather than crashing on rewind.
-    SmallVector<Element, 8> uniqueIndices;
-    for (Element idx : indices)
-      uniqueIndices.push_back(idx);
-    sortUnique(uniqueIndices);
+    // (the second pop's removeElement asserts because the first pop already
+    // extracted the element), so a duplicate is a caller bug we trap here
+    // rather than silently absorb.
+#ifndef NDEBUG
+    SmallVector<Element, 8> sortedIndices(indices.begin(), indices.end());
+    llvm::sort(sortedIndices);
+    assert(std::adjacent_find(sortedIndices.begin(), sortedIndices.end()) ==
+               sortedIndices.end() &&
+           "Partition::singleRegion does not support duplicate indices");
+#endif
 
     // Lowest element is our region representative and the value that our
     // region takes.
-    Element repElement = uniqueIndices[0];
+    Element repElement = sortedIndices[0];
     Region repElementRegion = Region(repElement);
     p.nextAvailableRegionNum = Region(repElementRegion + 1);
 
@@ -280,7 +284,7 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
     // First create a region for repElement. We are going to merge each other
     // element into its region one at a time.
     p.pushNewElementRegion(repElement);
-    for (Element index : indices) {
+    for (Element index : sortedIndices) {
       p.elementToRegionMap.insert_or_assign(index, repElementRegion);
       if (index == repElement)
         continue;
