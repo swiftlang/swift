@@ -468,8 +468,10 @@ private:
     printDocumentationComment(PD);
 
     if (outputLang == OutputLanguageMode::Cxx) {
-      ClangExistentialTypePrinter(os, owningPrinter.outOfLineDefinitionsOS)
-          .printExistentialTypeDecl(PD, owningPrinter);
+      if (!PD->isObjC()) {
+        ClangExistentialTypePrinter(os, owningPrinter.outOfLineDefinitionsOS)
+            .printExistentialTypeDecl(PD, owningPrinter);
+      }
       return;
     }
 

@@ -76,6 +76,29 @@ public func bestRenderable(_ a: any Renderable, _ b: any Renderable) -> any Rend
     return a.render() >= b.render() ? a : b
 }
 
+// --- @objc protocol: emitted as @protocol in ObjC section, no C++ wrapper ---
+
+import Foundation
+
+@objc public protocol Paintable {
+    func paint() -> Int
+}
+
+public class Wall: NSObject, Paintable {
+    var area: Int
+    public init(area: Int) { self.area = area; super.init() }
+    public func paint() -> Int { return area * 2 }
+}
+
+public func paintTwice(_ p: any Paintable) -> Int {
+    return p.paint() + p.paint()
+}
+
+// The @objc protocol appears as @protocol in the ObjC section.
+// CHECK-LABEL: @protocol Paintable
+// CHECK-NEXT:  - (NSInteger)paint SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT:  @end
+
 // CHECK-LABEL: namespace Protocols
 
 // --- Protocol with primary associated type: Container<Element> ---
@@ -294,6 +317,12 @@ public func bestRenderable(_ a: any Renderable, _ b: any Renderable) -> any Rend
 // CHECK-LABEL: swift::Int nestedContainer(const Container<Container<Drawable>>& c)
 // CHECK:         _impl::_impl_Container::getOpaquePointer(c)
 
+// --- @objc protocol: no C++ existential wrapper, function uses id<Paintable> ---
+
+// The function taking 'any Paintable' uses id<Paintable> in the thunk.
+// CHECK-LABEL: paintTwice(id <Paintable> _Nonnull p)
+// CHECK:         $s9Protocols10paintTwiceySiAA9Paintable_pF
+
 // CHECK-LABEL: swift::Int renderTwice(const Renderable& r)
 // CHECK:         swift_interop_passDirect_Protocols_void_ptr_0_8_void_ptr_8_16(_impl::_impl_Renderable::getOpaquePointer(r))
 
@@ -312,3 +341,8 @@ public func bestRenderable(_ a: any Renderable, _ b: any Renderable) -> any Rend
 // CHECK-NEXT:    swift::_impl::swift_retain(_value);
 // CHECK-NEXT:    _witnessTable = reinterpret_cast<const void *>(_impl::$s9Protocols6CanvasCAA10RenderableAAWP);
 // CHECK-NEXT:  }
+
+// The @objc protocol must NOT get a SwiftExistentialType wrapper class
+// anywhere in the generated header.
+// CHECK-NOT: class{{.*}}Paintable{{.*}}SwiftExistentialType
+// CHECK-NOT: class{{.*}}Paintable{{.*}}SwiftClassExistentialType
