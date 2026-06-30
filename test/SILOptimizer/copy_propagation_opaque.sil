@@ -141,6 +141,7 @@ bb3(%11 : @owned $T):
 //
 // The non-consuming use now uses the original value.
 // CHECK-DEBUG-NEXT:   debug_value [[INSTANCE]] : $T
+// CHECK-OPT-NEXT:   debug_value undef : $T
 // CHECK-NEXT:   debug_value [[ADDR]] : $*T, expr op_deref
 //
 // The original destroy is deleted with optimizations enabled.
@@ -178,6 +179,7 @@ bb0(%addr : $*T):
 // The original copy is deleted in both cases.
 // CHECK-DEBUG-NEXT:   debug_value [[INSTANCE]] : $T
 // CHECK-DEBUG-NEXT:   destroy_value [[INSTANCE]] : $T
+// CHECK-OPT-NEXT:   debug_value undef : $T
 // CHECK-NEXT:   br bb3
 //
 // CHECK: bb3:
