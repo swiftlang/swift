@@ -701,7 +701,7 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
   while (!worklist.empty() && !originatingLoc) {
     const auto *node = worklist.pop_back_val();
 
-    for (; node; node = node->getParent()) {
+    for (; node; node = node->getNext()) {
       switch (node->getKind()) {
       case Node::MergeElementRegions: {
         Element rep = node->getFirstArgAsElement();

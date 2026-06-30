@@ -1096,7 +1096,7 @@ void IsolationHistory::print(ASTContext &ctx, llvm::raw_ostream &os) const {
   }
 
   unsigned eltNo = 1;
-  for (auto *iter = head; iter; iter = iter->parent) {
+  for (auto *iter = head; iter; iter = iter->getNext()) {
     os << "Node Number: " << eltNo++ << '\n';
     iter->print(ctx, os);
     os << '\n';
@@ -1140,7 +1140,7 @@ void IsolationHistory::Node::print(ASTContext &ctx, llvm::raw_ostream &os,
     break;
   case SequenceBoundary:
     os << "SequenceBoundary\n" << prefix << "Value: ";
-    getHistoryBoundaryInfo()->print(os);
+    getHistoryBoundaryLoc()->print(os);
     break;
   }
 }
