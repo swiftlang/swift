@@ -139,7 +139,7 @@ extension Span where Element: ~Copyable {
     )
 
     let span = unsafe Span(
-      _unchecked: buffer.baseAddress._unsafelyUnwrappedUnchecked,
+      _unchecked: UnsafeRawPointer(buffer.baseAddress),
       count: buffer.count
     )
 
