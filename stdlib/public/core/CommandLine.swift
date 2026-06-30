@@ -149,7 +149,7 @@ extension CommandLine {
   ///   disk while it is running. If the current executable file is moved, the
   ///   value of this property is not updated to its new path.
   @_alwaysEmitIntoClient
-  public static var executablePath: String? { // NOTE: can't be AEIC and stored!
+  public static var executablePath: FilePath? { // NOTE: can't be AEIC and stored!
     // _NSGetExecutablePath() returns non-zero if the provided buffer is too
     // small and updates its *bufsize argument to the required value. Call it
     // once to get the buffer size before allocating.
@@ -160,7 +160,7 @@ extension CommandLine {
       capacity: Int(byteCount)
     ) { buffer in
       if (unsafe 0 == _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
-        return unsafe String(validatingCString: buffer.baseAddress!)
+        return unsafe FilePath(codeUnits: buffer.dropLast().span)
       }
       return nil
     }
@@ -181,7 +181,7 @@ extension CommandLine {
   /// - Important: On some systems, it is possible to move an executable file on
   ///   disk while it is running. If the current executable file is moved, the
   ///   value of this property is not updated to its new path.
-  public static let executablePath: String? = {
+  public static let executablePath: FilePath? = {
 #if os(WASI) || hasFeature(Embedded)
     // Not supported on WASI because the platform does not provide this
     // information within the WebAssembly VM. Not supported on Embedded Swift
@@ -195,9 +195,11 @@ extension CommandLine {
         return
       }
 #if os(Windows)
-      result = unsafe String.decodeCString(path, as: UTF16.self)?.result
+      let buffer = unsafe UnsafeBufferPointer(start: path, count: wcslen(path))
+      result = unsafe FilePath(codeUnits: buffer.span)
 #else
-      result = unsafe String(validatingCString: path)
+      let buffer = unsafe UnsafeBufferPointer(start: path, count: strlen(path))
+      result = unsafe FilePath(codeUnits: buffer.span)
 #endif
     }
 
