@@ -802,110 +802,181 @@ static AllowedBindingKind flipBindingKind(AllowedBindingKind kind) {
   }
 }
 
+void BindingSet::inferTransitiveKeyPathBindingFrom(
+    const PotentialBinding &binding, TypeVariableType *keyPathTy) {
+  auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
+
+  auto inferredRootKind = AllowedBindingKind::Exact;
+  Type inferredRootTy;
+  if (bindingTy->isKnownKeyPathType()) {
+    // AnyKeyPath doesn't have a root type.
+    if (bindingTy->isAnyKeyPath())
+      return;
+
+    auto *BGT = bindingTy->castTo<BoundGenericType>();
+    inferredRootTy = BGT->getGenericArgs()[0];
+
+    // The generic argument of a keypath type is invariant.
+    inferredRootKind = AllowedBindingKind::Exact;
+  } else if (auto *fnType = bindingTy->getAs<FunctionType>()) {
+    // If we're going to perform a key path to function conversion, infer the
+    // root type from the function type.
+    if (fnType->getNumParams() != 1) {
+      // Looks like an invalid function conversion, will be diagnosed later.
+      return;
+    }
+
+    inferredRootTy = fnType->getParams()[0].getParameterType();
+
+    // The parameter of a function type is contravariant.
+    inferredRootKind = flipBindingKind(binding.Kind);
+  } else {
+    // Something else is going on, perhaps the code is invalid, bail out.
+    return;
+  }
+
+  // If contextual root is not yet resolved, let's try to see if
+  // there are any bindings in its set.
+  if (auto *contextualRootVar = inferredRootTy->getAs<TypeVariableType>()) {
+    auto &contextualRootNode = CS.getConstraintGraph()[contextualRootVar];
+    if (!contextualRootNode.hasBindingSet())
+      return;
+
+    const auto &contextualRootBindings = contextualRootNode.getBindingSet();
+
+    // Don't infer if root is not yet fully resolved.
+    if (contextualRootBindings.isDelayed())
+      return;
+
+    // Look at all of the inferred root type's bindings, and copy
+    // them over to our binding set.
+    for (const auto &binding : contextualRootBindings.Bindings) {
+      AllowedBindingKind newKind;
+
+      // Only consider bindings with the correct variance.
+
+      // If we're looking at an exact binding, add a new binding with the
+      // variance of the binding we're using to look through.
+      if (binding.Kind == AllowedBindingKind::Exact)
+        newKind = inferredRootKind;
+      // If the binding we're using to look through is exact, preserve the
+      // variance.
+      else if (inferredRootKind == AllowedBindingKind::Exact)
+        newKind = binding.Kind;
+      // If the binding we're using to look through has the same variance as
+      // the binding we're looking at, add it and preserve its variance.
+      else if (inferredRootKind == binding.Kind)
+        newKind = inferredRootKind;
+      // Skip the binding if it has the opposite variance of the one we're
+      // looking through.
+      else
+        continue;
+
+      auto newBinding = binding.withSameSource(binding.BindingType, newKind);
+      addBinding(newBinding.asTransitiveFrom(contextualRootVar));
+    }
+
+    // Make a note that the key path root is transitively adjacent
+    // to contextual root type variable and all of its variables.
+    // This is important for ranking.
+    AdjacentVars.insert(contextualRootVar);
+    AdjacentVars.insert(contextualRootBindings.AdjacentVars.begin(),
+                        contextualRootBindings.AdjacentVars.end());
+  } else {
+    // We have a concrete root type. Add a binding for it to our binding set.
+    auto newBinding = binding.withSameSource(inferredRootTy, inferredRootKind);
+    addBinding(newBinding.asTransitiveFrom(keyPathTy));
+  }
+
+  // Note the fact that we modified the binding set.
+  markDirty();
+}
+
+/// Infers bindings for a key path root type from the bindings of
+/// the key path type.
+///
+/// The setup is this. Suppose we have:
+///
+///   $T0 keypath $T1 -> $T2
+///   KeyPath<X, Y> conv $T0
+///
+/// where $T0 is the keypath type, $T1 is the root type and $T2 is
+/// the value type, and further suppose we're currently computing
+/// bindings for $T1.
+///
+/// In this situation, we can infer a potential binding of $T1 to X.
+///
+/// A generalization is when the root type X is actually another
+/// type variable $T3:
+///
+///   $T0 keypath $T1 -> $T2
+///   KeyPath<$T3, Y> conv $T0
+///
+/// In this case, we copy bindings from $T3 to $T1.
 void BindingSet::inferTransitiveKeyPathBindings() {
-  // If the current type variable represents a key path root type
-  // let's try to transitively infer its type through bindings of
-  // a key path type.
-  if (TypeVar->getImpl().isKeyPathRoot()) {
-    auto *locator = TypeVar->getImpl().getLocator();
-    if (auto *keyPathTy =
-            CS.getType(locator->getAnchor())->getAs<TypeVariableType>()) {
-      auto &keyPathNode = CS.getConstraintGraph()[keyPathTy];
-      if (keyPathNode.hasBindingSet()) {
-        const auto &keyPathBindings = keyPathNode.getBindingSet();
+  if (!TypeVar->getImpl().isKeyPathRoot())
+    return;
 
-        // Look through all of the keypath type's bindings.
-        for (auto &binding : keyPathBindings.Bindings) {
-          auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
+  auto *locator = TypeVar->getImpl().getLocator();
+  auto *keyPathTy =
+      CS.getType(locator->getAnchor())->getAs<TypeVariableType>();
+  if (!keyPathTy)
+    return;
 
-          auto inferredRootKind = AllowedBindingKind::Exact;
-          Type inferredRootTy;
-          if (bindingTy->isKnownKeyPathType()) {
-            // AnyKeyPath doesn't have a root type.
-            if (bindingTy->isAnyKeyPath())
-              continue;
+  const auto &keyPathNode = CS.getConstraintGraph()[keyPathTy];
 
-            auto *BGT = bindingTy->castTo<BoundGenericType>();
-            inferredRootTy = BGT->getGenericArgs()[0];
+  // If it doesn't have a binding set, it was fixed to a concrete type, and
+  // we're about to solve the relevant constraints anyway, so don't attempt
+  // anything below.
+  if (!keyPathNode.hasBindingSet())
+    return;
 
-            // The generic argument of a keypath type is invariant.
-            inferredRootKind = AllowedBindingKind::Exact;
-          } else if (auto *fnType = bindingTy->getAs<FunctionType>()) {
-            if (fnType->getNumParams() == 1) {
-              inferredRootTy = fnType->getParams()[0].getParameterType();
+  const auto &keyPathBindings = keyPathNode.getBindingSet();
 
-              // The parameter of a function type is contravariant.
-              inferredRootKind = flipBindingKind(binding.Kind);
-            }
-          }
+  // Check if the key path type has bindings at all.
+  if (!keyPathBindings.Bindings.empty()) {
+    // If so, look through all of the keypath type's bindings.
+    for (auto &binding : keyPathBindings.Bindings)
+      inferTransitiveKeyPathBindingFrom(binding, keyPathTy);
 
-          if (inferredRootTy) {
-            // If contextual root is not yet resolved, let's try to see if
-            // there are any bindings in its set.
-            if (auto *contextualRootVar = inferredRootTy->getAs<TypeVariableType>()) {
-              auto &contextualRootNode = CS.getConstraintGraph()[contextualRootVar];
-              if (contextualRootNode.hasBindingSet()) {
-                const auto &contextualRootBindings = contextualRootNode.getBindingSet();
+    return;
+  }
 
-                // Don't infer if root is not yet fully resolved.
-                if (contextualRootBindings.isDelayed())
-                  continue;
+  // If not, attempt a more advanced analysis to cope with
+  // cases such as [\A.foo, \.bar]. Here, the setup is this:
+  //
+  // KeyPath<A, Foo> conv $T0
+  // $T1 conv $T0
+  //
+  // Where $T0 is the type of the array, and $T1 is the key
+  // path type of \.bar. To infer the root type of \.bar,
+  // we check if it is a subtype of another type variable.
+  // If so, we repeat the above with this type variable
+  // instead.
+  const auto &keyPathPotentialBindings = keyPathNode.getPotentialBindings();
 
-                // Look at all of the inferred root type's bindings, and copy
-                // them over to our binding set.
-                for (const auto &binding : contextualRootBindings.Bindings) {
-                  AllowedBindingKind newKind;
+  // We can only reason about the case of just one adjacent conversion
+  // constraint.
+  if (keyPathPotentialBindings.SubtypeOf.size() != 1)
+    return;
 
-                  // Only consider bindings with the correct variance.
+  auto pair = keyPathPotentialBindings.SubtypeOf[0];
+  auto *superKeyPathTy = pair.first;
 
-                  // If we're looking at an exact binding, add a new binding
-                  // with the variance of the binding we're using to look
-                  // through.
-                  if (binding.Kind == AllowedBindingKind::Exact)
-                    newKind = inferredRootKind;
-                  // If the binding we're using to look through is exact,
-                  // preserve the variance.
-                  else if (inferredRootKind == AllowedBindingKind::Exact)
-                    newKind = binding.Kind;
-                  // If the binding we're using to look through has the
-                  // same variance as the binding we're looking at, add
-                  // it and preserve its variance.
-                  else if (inferredRootKind == binding.Kind)
-                    newKind = inferredRootKind;
-                  // Skip the binding if it has the opposite variance of
-                  // the one we're looking through.
-                  else
-                    continue;
+  const auto &superKeyPathNode = CS.getConstraintGraph()[superKeyPathTy];
+  if (!superKeyPathNode.hasBindingSet())
+    return;
 
-                  auto newBinding = binding.withSameSource(
-                      binding.BindingType, newKind);
-                  addBinding(newBinding.asTransitiveFrom(contextualRootVar));
-                }
-
-                // Make a note that the key path root is transitively adjacent
-                // to contextual root type variable and all of its variables.
-                // This is important for ranking.
-                AdjacentVars.insert(contextualRootVar);
-                AdjacentVars.insert(contextualRootBindings.AdjacentVars.begin(),
-                                    contextualRootBindings.AdjacentVars.end());
-
-                // Note the fact that we modified the binding set.
-                markDirty();
-              }
-            } else {
-
-              // We have a concrete root type. Add a binding for it to
-              // our binding set.
-              auto newBinding = binding.withSameSource(
-                  inferredRootTy, inferredRootKind);
-              addBinding(newBinding.asTransitiveFrom(keyPathTy));
-
-              // Note the fact that we modified the binding set.
-              markDirty();
-            }
-          }
-        }
-      }
+  const auto &superKeyPathBindings = superKeyPathNode.getBindingSet();
+  for (auto &binding : superKeyPathBindings.Bindings) {
+    // FIXME: Remove the check.
+    //
+    // The 'if' statement makes this analysis a bit more conservative to
+    // work around the issue with duplicate solutions, that will persist
+    // until more bindings are promoted properly.
+    if (binding.Kind == AllowedBindingKind::Exact ||
+        binding.Kind == AllowedBindingKind::Supertypes) {
+      inferTransitiveKeyPathBindingFrom(binding, superKeyPathTy);
     }
   }
 }
@@ -1116,9 +1187,6 @@ bool BindingSet::finalizeKeyPathBindings() {
       for (const auto &binding : Bindings) {
         auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
 
-        assert(bindingTy->isKnownKeyPathType() ||
-               bindingTy->is<FunctionType>());
-
         // Functions don't have capability so we can simply add them.
         if (auto *fnType = bindingTy->getAs<FunctionType>()) {
           auto extInfo = fnType->getExtInfo();
@@ -1131,9 +1199,11 @@ bool BindingSet::finalizeKeyPathBindings() {
 
           updatedBindings.push_back(binding.withType(fnType));
           isContextualTypeReadOnly = true;
-        } else if (!(bindingTy->isWritableKeyPath() ||
-                     bindingTy->isReferenceWritableKeyPath())) {
-          isContextualTypeReadOnly = true;
+        } else if (bindingTy->isKnownKeyPathType()) {
+          if (!bindingTy->isWritableKeyPath() &&
+              !bindingTy->isReferenceWritableKeyPath()) {
+            isContextualTypeReadOnly = true;
+          }
         }
       }
 
@@ -2419,16 +2489,26 @@ bool swift::constraints::inference::checkTypeOfBinding(
   }
 
   {
-    auto objType = type->getWithoutSpecifierType();
+    auto objectTy = type->getWithoutSpecifierType();
 
-    // If the type is a type variable itself, don't permit the binding.
-    if (objType->is<TypeVariableType>())
+    // We don't allow binding type variables to other type variables, or
+    // to type variables wrapped in lvalue types.
+    if (objectTy->is<TypeVariableType>())
       return false;
+
+    // If the type is a one-element tuple containing a type variable,
+    // don't try binding it, instead wait until the pack is expanded.
+    if (auto *tupleTy = objectTy->getAs<TupleType>()) {
+      if (tupleTy->getNumElements() == 1 &&
+          tupleTy->getElementType(0)->isTypeVariableOrMember()) {
+        return false;
+      }
+    }
 
     // Don't bind to a dependent member type, even if it's currently
     // wrapped in any number of optionals, because binding producer
     // might unwrap and try to attempt it directly later.
-    if (objType->lookThroughAllOptionalTypes()->is<DependentMemberType>())
+    if (objectTy->lookThroughAllOptionalTypes()->is<DependentMemberType>())
       return false;
   }
 
@@ -2673,51 +2753,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     return std::nullopt;
   }
 
-  if (TypeVar->getImpl().isKeyPathType()) {
-    auto objectTy = type->lookThroughAllOptionalTypes();
-
-    // If contextual type is an existential with a superclass
-    // constraint, let's try to infer a key path type from it.
-    if (kind == AllowedBindingKind::Subtypes) {
-      if (type->isExistentialType()) {
-        auto layout = type->getExistentialLayout();
-        if (auto superclass = layout.explicitSuperclass) {
-          if (superclass->isKnownKeyPathType()) {
-            type = superclass;
-            objectTy = superclass;
-          }
-        }
-      }
-    }
-
-    if (!(objectTy->isKnownKeyPathType() || objectTy->is<AnyFunctionType>())) {
-      DEBUG_BAILOUT("Bad key path type (1)");
-      return std::nullopt;
-    }
-  }
-
-  if (TypeVar->getImpl().isKeyPathSubscriptIndex()) {
-    // Key path subscript index can only be a r-value non-optional
-    // type that is a subtype of a known KeyPath type.
-    type = type->getRValueType()->lookThroughAllOptionalTypes();
-
-    // If argument to a key path subscript is an existential,
-    // we can erase it to superclass (if any) here and solver
-    // will perform the opening if supertype turns out to be
-    // a valid key path type of its subtype.
-    if (kind == AllowedBindingKind::Supertypes) {
-      if (type->isExistentialType()) {
-        auto layout = type->getExistentialLayout();
-        if (auto superclass = layout.explicitSuperclass) {
-          type = superclass;
-        } else if (!CS.shouldAttemptFixes()) {
-          DEBUG_BAILOUT("Bad key path type (2)");
-          return std::nullopt;
-        }
-      }
-    }
-  }
-
   // Situations like `v.<member> = { ... }` where member is overloaded.
   // We need to wait until member is resolved otherwise there is a risk
   // of losing some of the contextual attributes important for the closure
@@ -2808,23 +2843,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     return std::nullopt;
   }
 
-  // If our binding choice is a function type and we're attempting
-  // to bind to a type variable that is the result of opening a
-  // generic parameter, strip the noescape bit so that we only allow
-  // bindings of escaping functions in this position. We do this
-  // because within the generic function we have no indication of
-  // whether the parameter is a function type and if so whether it
-  // should be allowed to escape. As a result we allow anything
-  // passed in to escape.
-  if (auto *fnTy = type->getAs<AnyFunctionType>()) {
-    // Since inference now happens during constraint generation,
-    // this hack should be allowed in both `Solving`
-    // (during non-diagnostic mode) and `ConstraintGeneration` phases.
-    if (isGenericParameter(TypeVar) && !CS.inSalvageMode()) {
-      type = fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape(false));
-    }
-  }
-
   // Check whether we can perform this binding.
   if (!checkTypeOfBinding(TypeVar, type)) {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
@@ -2899,6 +2917,57 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     }
 
     return std::nullopt;
+  }
+
+  if (TypeVar->getImpl().isKeyPathType()) {
+    // If contextual type is an existential with a superclass
+    // constraint, let's try to infer a key path type from it.
+    if (kind == AllowedBindingKind::Subtypes) {
+      if (type->isExistentialType()) {
+        auto layout = type->getExistentialLayout();
+        if (auto superclass = layout.explicitSuperclass) {
+          if (superclass->isKnownKeyPathType()) {
+            type = superclass;
+          }
+        }
+      }
+    }
+  }
+
+  if (TypeVar->getImpl().isKeyPathSubscriptIndex()) {
+    // Key path subscript index can only be a r-value non-optional
+    // type that is a subtype of a known KeyPath type.
+    type = type->getRValueType();
+
+    // If argument to a key path subscript is an existential,
+    // we can erase it to superclass (if any) here and solver
+    // will perform the opening if supertype turns out to be
+    // a valid key path type of its subtype.
+    if (kind == AllowedBindingKind::Supertypes) {
+      if (type->isExistentialType()) {
+        auto layout = type->getExistentialLayout();
+        if (auto superclass = layout.explicitSuperclass) {
+          type = superclass;
+        }
+      }
+    }
+  }
+
+  // If our binding choice is a function type and we're attempting
+  // to bind to a type variable that is the result of opening a
+  // generic parameter, strip the noescape bit so that we only allow
+  // bindings of escaping functions in this position. We do this
+  // because within the generic function we have no indication of
+  // whether the parameter is a function type and if so whether it
+  // should be allowed to escape. As a result we allow anything
+  // passed in to escape.
+  if (auto *fnTy = type->getAs<AnyFunctionType>()) {
+    // Since inference now happens during constraint generation,
+    // this hack should be allowed in both `Solving`
+    // (during non-diagnostic mode) and `ConstraintGeneration` phases.
+    if (isGenericParameter(TypeVar) && !CS.inSalvageMode()) {
+      type = fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape(false));
+    }
   }
 
   // Make sure we aren't trying to equate type variables with different
@@ -3252,6 +3321,49 @@ void PotentialBindings::reset() {
   AssociatedCodeCompletionToken = ASTNode();
 }
 
+void PotentialBindings::printVars(llvm::raw_ostream &out, unsigned indent,
+                                  bool showVia) const {
+  auto printVars = [&](ArrayRef<std::pair<TypeVariableType *, Constraint *>> pairs) {
+    interleave(
+        pairs,
+        [&](std::pair<TypeVariableType *, Constraint *> pair) {
+          out << pair.first->getString(PrintOptions::forDebugging());
+          if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
+            out << " (fixed)";
+          if (showVia) {
+            out << " via ";
+            pair.second->print(out, &CS.getASTContext().SourceMgr, indent,
+                               /*skipLocator=*/true);
+          }
+        },
+        [&out]() { out << ", "; });
+  };
+
+  if (!AdjacentVars.empty()) {
+    out << "[adjacent to: ";
+    printVars(AdjacentVars);
+    out << "] ";
+  }
+
+  if (!SupertypeOf.empty()) {
+    out << "[supertype of: ";
+    printVars(SupertypeOf);
+    out << "] ";
+  }
+
+  if (!SubtypeOf.empty()) {
+    out << "[subtype of: ";
+    printVars(SubtypeOf);
+    out << "] ";
+  }
+
+  if (!EquivalentTo.empty()) {
+    out << "[equivalent to: ";
+    printVars(SubtypeOf);
+    out << "] ";
+  }
+}
+
 void PotentialBindings::dump(llvm::raw_ostream &out, unsigned indent) const {
   if (TypeVar) {
     out << "Potential bindings for ";
@@ -3273,27 +3385,7 @@ void PotentialBindings::dump(llvm::raw_ostream &out, unsigned indent) const {
       [&out]() { out << ", "; });
   out << "] ";
 
-  if (!AdjacentVars.empty()) {
-    out << "[adjacent to: ";
-    SmallVector<std::pair<TypeVariableType *, Constraint *>> adjacentVars(
-        AdjacentVars.begin(), AdjacentVars.end());
-    llvm::sort(adjacentVars,
-               [](auto lhs, auto rhs) {
-                   return lhs.first->getID() < rhs.first->getID();
-               });
-    interleave(
-        adjacentVars,
-        [&](std::pair<TypeVariableType *, Constraint *> pair) {
-          out << pair.first->getString(PrintOptions::forDebugging());
-          if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
-            out << " (fixed)";
-          out << " via ";
-          pair.second->print(out, &CS.getASTContext().SourceMgr, indent,
-                             /*skipLocator=*/true);
-        },
-        [&out]() { out << ", "; });
-    out << "] ";
-  }
+  printVars(out, indent, /*skipVia=*/false);
 }
 
 void BindingSet::forEachLiteralRequirement(

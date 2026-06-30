@@ -13022,16 +13022,25 @@ ConstraintSystem::simplifyKeyPathConstraint(
     if (contextualTy->isPlaceholder())
       return true;
 
+    if (contextualTy->is<ArchetypeType>()) {
+      contextualTy = contextualTy->getSuperclass();
+      if (!contextualTy)
+        return true;
+    }
+
     // Situations like `any KeyPath<...> & Sendable`.
     if (contextualTy->isExistentialType()) {
-      contextualTy = contextualTy->getExistentialLayout().explicitSuperclass;
-      assert(contextualTy);
+      contextualTy = contextualTy->getSuperclass();
+      if (!contextualTy)
+        return true;
     }
 
     if (auto bgt = contextualTy->getAs<BoundGenericType>()) {
       // We can get root and value from a concrete key path type.
-      assert(bgt->isKeyPath() || bgt->isWritableKeyPath() ||
-             bgt->isReferenceWritableKeyPath());
+      if (!(bgt->isKeyPath() || bgt->isWritableKeyPath() ||
+            bgt->isReferenceWritableKeyPath())) {
+        return true;
+      }
 
       contextualRootTy = bgt->getGenericArgs()[0];
       contextualValueTy = bgt->getGenericArgs()[1];
@@ -13154,7 +13163,8 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
                                         ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
   keyPathTy = getFixedTypeRecursive(keyPathTy, flags, /*wantRValue=*/true);
-  
+  valueTy = getFixedTypeRecursive(valueTy, flags, /*wantRValue=*/false);
+
   auto unsolved = [&]() -> SolutionKind {
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(Constraint::create(*this,
@@ -13169,6 +13179,17 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   // key path application.
   if (locator.endsWith<LocatorPathElt::KeyPathDynamicMember>())
     return SolutionKind::Error;
+
+  if (keyPathTy->is<ArchetypeType>()) {
+    if (auto superclassTy = keyPathTy->getSuperclass())
+      keyPathTy = superclassTy;
+  }
+
+  // Situations like `any KeyPath<...> & Sendable`.
+  if (keyPathTy->isExistentialType()) {
+    if (auto superclassTy = keyPathTy->getSuperclass())
+      keyPathTy = superclassTy;
+  }
 
   if (keyPathTy->isAnyKeyPath()) {
     // Read-only keypath, whose projected value is upcast to `Any?`.
@@ -13226,6 +13247,9 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       return SolutionKind::Error;
     auto kpValueTy = bgt->getGenericArgs()[1];
 
+    bool isKnownRValue = !valueTy->isTypeVariableOrMember() &&
+                         !valueTy->is<LValueType>();
+
     /// Solve for an rvalue base.
     auto solveRValue = [&]() -> ConstraintSystem::SolutionKind {
       // An rvalue base can be converted to a supertype.
@@ -13244,7 +13268,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       return matchTypes(LValueType::get(kpValueTy), valueTy,
                         ConstraintKind::Bind, subflags, locator);
     };
-  
+
     if (bgt->isKeyPath()) {
       // Read-only keypath.
       if (!matchRoot(ConstraintKind::Conversion))
@@ -13253,23 +13277,45 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       return solveRValue();
     }
     if (bgt->isWritableKeyPath()) {
+      kpRootTy = getFixedTypeRecursive(kpRootTy, flags, /*wantRValueType=*/true);
+
+      // We might not know if the value is ultimately going to be used as an
+      // lvalue or rvalue yet, but this determines whether we can convert the
+      // base. To avoid introducing a disjunction, just guess if the keypath
+      // root type is already bound, and conservatively assume we will not
+      // convert the base if the keypath root type is not bound.
+      if (!kpRootTy->isTypeVariableOrMember()) {
+        auto result = isLikelyExactMatch(rootTy->getRValueType(), kpRootTy);
+        if (result && !*result) {
+          // Proceed as in the read-only case.
+          if (!matchRoot(ConstraintKind::Conversion))
+            return SolutionKind::Error;
+
+          return solveRValue();
+        }
+      }
+
       // Writable keypath. The result can be an lvalue if the root was.
       // We can't convert the base without giving up lvalue-ness, though.
       if (!matchRoot(ConstraintKind::Equal))
         return SolutionKind::Error;
 
+      if (isKnownRValue)
+        return solveRValue();
       if (rootTy->is<LValueType>())
         return solveLValue();
       if (rootTy->isTypeVariableOrMember())
-        // We don't know whether the value is an lvalue yet.
         return solveUnknown();
+
       return solveRValue();
     }
     if (bgt->isReferenceWritableKeyPath()) {
       if (!matchRoot(ConstraintKind::Conversion))
         return SolutionKind::Error;
 
-      // Reference-writable keypath. The result can always be an lvalue.
+      if (isKnownRValue)
+        return solveRValue();
+
       return solveLValue();
     }
     // Otherwise, we don't have a key path type at all.

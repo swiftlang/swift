@@ -2,10 +2,13 @@
 // RUN: not --crash %target-typecheck-verify-swift -verify-ignore-unrelated -DSALVAGE
 
 // The next two sets of examples cause difficulties because our
-// subtype lattice is not distributive. We cannot always compute
-// an accurate upper bound, because of existential types; if
-// we pick the wrong upper bound too early, certain expressions
-// will fail.
+// subtype lattice is not actually a lattice; existentials fail
+// to satisfy the absorbtion laws. In other words, given two
+// concrete types, we cannot always compute an accurate upper
+// bound, because we don't know what protocol conformances they
+// might have in common; all we can fall back on is their
+// superclass. So if we bind the join type too soon, certain
+// expressions will fail.
 
 protocol Command {
   var name: String { get }
@@ -62,12 +65,12 @@ do {
   func perform4<S: Sequence>(_: S) where S.Element == Any.Type? {}
   perform4([Undo.self, Cut.self, Copy.self])
 
-  let _: [Int: any Command] = Dictionary(
+  let _: [String: any Command] = Dictionary(
     uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
   // expected-error@-1 {{value of type 'Any' has no member 'name'}}
   // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
 
-  let _: [Int: (any Command)?] = Dictionary(
+  let _: [String: (any Command)?] = Dictionary(
     uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
   // expected-error@-1 {{value of type 'Any' has no member 'name}}
   // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
@@ -147,6 +150,40 @@ do {
   let _: Dictionary<Double, String> = .init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
   let _: Dictionary<Int, StaticString> = .init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
   let _: Dictionary<Double, StaticString> = .init(uniqueKeysWithValues: [(10, "hello"), (20, "world")])
+}
+
+// Another contentsOf: funny case.
+do {
+  let x = ""
+  var s1: [(a: String, b: String)] = []
+  s1.append(contentsOf: [(x, "")])
+  s1.append(contentsOf: [(x, ""), (x, "")])
+  s1.append(contentsOf: [(x, ""), (x, ""), (x, "")])
+
+  var s2: [(a: String, b: Int?)] = []
+  s2.append(contentsOf: [(x, 3)])
+  s2.append(contentsOf: [(x, 3), (x, 4)])
+  s2.append(contentsOf: [(x, 3), (x, 4), (x, 4)])
+
+  var s3: [(a: String?, b: Int)] = []
+  s3.append(contentsOf: [(x, 3)])
+  s3.append(contentsOf: [(x, 3), (x, 4)])
+  s3.append(contentsOf: [(x, 3), (x, 4), (x, 4)])
+}
+
+do {
+  struct S {
+    let a = 0.0
+    let b = 0.0
+    let c = 0.0
+    let d = 0.0
+
+    var customMirror: Mirror {
+      Mirror(self, children: [("a", a), ("b", b), ("c", c), ("d", d)],
+             displayStyle: .struct,
+             ancestorRepresentation: .suppressed)
+    }
+  }
 }
 
 // Tests for a special form of inference where we have both a
