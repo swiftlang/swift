@@ -354,17 +354,19 @@ ModularizationError::diagnose(const ModuleFile *MF,
   // decls moving between both modules.
   if (errorKind == Kind::DeclMoved ||
       errorKind == Kind::DeclKindChanged) {
-    StringRef foundModuleName = foundModule->getName().str();
-    StringRef expectedModuleName = expectedModule->getName().str();
-    if (foundModuleName != expectedModuleName &&
-        (foundModuleName.starts_with(expectedModuleName) ||
-         expectedModuleName.starts_with(foundModuleName)) &&
-        (expectedUnderlying ||
-         expectedModule->findUnderlyingClangModule())) {
-      std::string name = path.getFullName();
-      ctx.Diags.diagnose(loc,
-                         diag::modularization_issue_related_modules,
-                         declIsType, name);
+    if (foundModule) {
+      StringRef foundModuleName = foundModule->getName().str();
+      StringRef expectedModuleName = expectedModule->getName().str();
+      if (foundModuleName != expectedModuleName &&
+          (foundModuleName.starts_with(expectedModuleName) ||
+           expectedModuleName.starts_with(foundModuleName)) &&
+          (expectedUnderlying ||
+           expectedModule->findUnderlyingClangModule())) {
+        std::string name = path.getFullName();
+        ctx.Diags.diagnose(loc,
+                           diag::modularization_issue_related_modules,
+                           declIsType, name);
+      }
     }
   }
 
