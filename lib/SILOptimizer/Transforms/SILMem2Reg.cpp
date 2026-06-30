@@ -2326,11 +2326,6 @@ namespace {
 
 class SILMem2Reg : public SILFunctionTransform {
   void run() override {
-#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
-    // This pass relies on complete lifetimes.
-    LLVM_DEBUG(llvm::dbgs() << "SILMem2Reg disabled in C++-only Swift compiler\n");
-    return;
-#endif //!SWIFT_ENABLE_SWIFT_IN_SWIFT
 
     SILFunction *f = getFunction();
 
