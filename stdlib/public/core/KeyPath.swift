@@ -523,6 +523,24 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
           nil)
       }
 
+      if unsafe _fastPath(buffer.isSingleComponent) {
+        let (rawComponent, _) = unsafe buffer.next()
+
+        unsafe p = unsafe rawComponent._projectMutableAddress(p,
+          from: Root.self,
+          to: Value.self,
+          isRoot: true,
+          keepAlive: &keepAlive
+        )
+
+        // TODO: With coroutines, it would be better to yield here, so that
+        // we don't need the hack of the keepAlive reference to manage closing
+        // accesses.
+        let typedPointer = unsafe p.assumingMemoryBound(to: Value.self)
+        return unsafe (pointer: UnsafeMutablePointer(mutating: typedPointer),
+                owner: keepAlive)
+      }
+
       while true {
         let (rawComponent, optNextType) = unsafe buffer.next()
         let nextType = optNextType ?? Value.self
@@ -572,6 +590,21 @@ public class ReferenceWritableKeyPath<
       // Project out the reference prefix.
       let maxSize = unsafe buffer.maxSize
       let roundedMaxSize = 1 &<< (Int.bitWidth &- maxSize.leadingZeroBitCount)
+
+      if unsafe buffer.isSingleComponent {
+        let (rawComponent, _) = unsafe buffer.next()
+        var base = origBase
+        let p = withUnsafeBytes(of: &base) { baseBytes in
+          return unsafe rawComponent._projectMutableAddress(
+            baseBytes.baseAddress.unsafelyUnwrapped,
+            from: Root.self,
+            to: Value.self,
+            isRoot: true,
+            keepAlive: &keepAlive
+          ).assumingMemoryBound(to: Value.self)
+        }
+        return unsafe UnsafeMutablePointer(mutating: p)
+      }
 
       // 16 is the max alignment allowed on practically every platform we deploy
       // to.
