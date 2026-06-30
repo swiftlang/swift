@@ -1154,7 +1154,8 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     }
     if isSizedBy {
       if let pointeeType = getPointeeType(type) {
-        return "\(baseAddress).assumingMemoryBound(to: \(pointeeType).self)"
+        let unwrap = oldTypeIsAnyOptional ? "?" : "" // already unwrapped with "!" otherwise
+        return "\(baseAddress)\(raw: unwrap).assumingMemoryBound(to: \(pointeeType).self)"
       }
     }
     return baseAddress
