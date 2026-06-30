@@ -287,3 +287,48 @@ func onMain() async {
 
   _ = Nested.useGlobal()
 }
+
+// Synthesized init needs to match the superclass isolation.
+class SubKlass: Klass {
+  // Implicit allocating init
+  // CHECK: // SubKlass.__allocating_init()
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [exact_self_class] [ossa] @$s16assume_mainactor8SubKlassCACycfC : $@convention(method) (@thick SubKlass.Type) -> @owned SubKlass {
+
+  // Implicit designated init
+  // CHECK: // SubKlass.init()
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor8SubKlassCACycfc : $@convention(method) (@owned SubKlass) -> @owned SubKlass {
+}
+
+class NonisolatedBase {
+  nonisolated func method() {}
+  nonisolated var value: Int { get { 0 } set {} }
+  nonisolated subscript(i: Int) -> Int { get { 0 } set {} }
+}
+
+// Overridden methods must not be MainActor!
+class OverrideSub: NonisolatedBase {
+  // CHECK: // OverrideSub.method()
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor11OverrideSubC6methodyyF : $@convention(method) (@guaranteed OverrideSub) -> () {
+  override func method() {}
+
+  // CHECK: // OverrideSub.value.getter
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor11OverrideSubC5valueSivg : $@convention(method) (@guaranteed OverrideSub) -> Int {
+
+  // CHECK: // OverrideSub.value.setter
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor11OverrideSubC5valueSivs : $@convention(method) (Int, @guaranteed OverrideSub) -> () {
+  override var value: Int { get { 0 } set {} }
+
+  // CHECK: // OverrideSub.subscript.getter
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor11OverrideSubCyS2icig : $@convention(method) (Int, @guaranteed OverrideSub) -> Int {
+
+  // CHECK: // OverrideSub.subscript.setter
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor11OverrideSubCyS2icis : $@convention(method) (Int, Int, @guaranteed OverrideSub) -> () {
+  override subscript(i: Int) -> Int { get { 0 } set {} }
+}
