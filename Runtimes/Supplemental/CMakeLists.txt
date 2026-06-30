@@ -85,6 +85,18 @@ if(SwiftRuntime_ENABLE_distributed)
       ${COMMON_OPTIONS})
 endif()
 
+# COM
+if(SwiftRuntime_ENABLE_com)
+  ExternalProject_Add(COM
+    PREFIX "COM"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/COM"
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    INSTALL_COMMAND ""
+    # To ensure incremental builds work as expected
+    BUILD_ALWAYS 1
+    CMAKE_ARGS
+      ${COMMON_OPTIONS})
+endif()
 
 # Differentiation
 if(SwiftRuntime_ENABLE_differentiation)
