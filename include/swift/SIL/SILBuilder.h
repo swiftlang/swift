@@ -53,7 +53,7 @@ class SILBuilderContext {
 
   /// Allow the SIL module conventions to be overridden within the builder.
   /// This supports passes that lower SIL to a new stage.
-  SILModuleConventions silConv = SILModuleConventions(Module);
+  SILAddressConventions silConv = SILAddressConventions(Module);
 
   /// If this pointer is non-null, then any inserted instruction is
   /// recorded in this list.
@@ -72,7 +72,7 @@ public:
   // Allow a pass to override the current SIL module conventions. This should
   // only be done by a pass responsible for lowering SIL to a new stage
   // (e.g. AddressLowering).
-  void setSILConventions(SILModuleConventions silConv) {
+  void setSILConventions(SILAddressConventions silConv) {
     this->silConv = silConv;
   }
 
@@ -195,7 +195,7 @@ public:
   // Allow a pass to override the current SIL module conventions. This should
   // only be done by a pass responsible for lowering SIL to a new stage
   // (e.g. AddressLowering).
-  void setSILConventions(SILModuleConventions silConv) { C.silConv = silConv; }
+  void setSILConventions(SILAddressConventions silConv) { C.silConv = silConv; }
 
   SILFunction &getFunction() const {
     ASSERT(F && "cannot create this instruction without a function context");
@@ -3388,7 +3388,7 @@ private:
   bool isLoadableOrOpaque(SILType Ty) {
     auto &M = C.Module;
 
-    if (!SILModuleConventions(M).useLoweredAddresses())
+    if (!SILAddressConventions(M).useLoweredAddresses())
       return true;
 
     return getTypeProperties(Ty).isLoadable();

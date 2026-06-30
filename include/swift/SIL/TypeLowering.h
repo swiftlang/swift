@@ -879,7 +879,7 @@ public:
                                  SILModule &M) {
     const TypeLowering &ti = getTypeLowering(t, forExpansion);
     assert(
-        (ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) &&
+        (ti.isLoadable() || !SILAddressConventions(M).useLoweredAddresses()) &&
         "unexpected address-only type");
     return ti.getLoweredType();
   }

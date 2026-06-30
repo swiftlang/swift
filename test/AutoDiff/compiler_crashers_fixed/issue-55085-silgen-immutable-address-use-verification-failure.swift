@@ -46,7 +46,7 @@ func loadableOriginal<T: AdditiveArithmetic>(_ loadable: LoadableOriginal<T>) ->
   return T.zero
 }
 
-// swift/include/swift/SIL/TypeLowering.h:845: swift::SILType swift::Lowering::TypeConverter::getLoweredLoadableType(swift::Type, swift::TypeExpansionContext, swift::SILModule &): Assertion `(ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) && "unexpected address-only type"' failed.
+// swift/include/swift/SIL/TypeLowering.h:845: swift::SILType swift::Lowering::TypeConverter::getLoweredLoadableType(swift::Type, swift::TypeExpansionContext, swift::SILModule &): Assertion `(ti.isLoadable() || !SILAddressConventions(M).useLoweredAddresses()) && "unexpected address-only type"' failed.
 // Stack dump:
 // ...
 // 2.      While evaluating request ExecuteSILPipelineRequest(Run pipelines { Guaranteed Passes } on SIL for main.main)

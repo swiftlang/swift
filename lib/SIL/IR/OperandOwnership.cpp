@@ -22,7 +22,7 @@ using namespace swift;
 
 /// Return true if all OperandOwnership invariants hold.
 bool swift::checkOperandOwnershipInvariants(const Operand *operand,
-                                            SILModuleConventions *silConv) {
+                                            SILAddressConventions *silConv) {
   OperandOwnership opOwnership = operand->getOperandOwnership(silConv);
   if (opOwnership == OperandOwnership::Borrow) {
     // Must be a valid BorrowingOperand.
@@ -42,7 +42,7 @@ class OperandOwnershipClassifier
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
   // Allow module conventions to be overridden while lowering between canonical
   // and lowered SIL stages.
-  SILModuleConventions silConv;
+  SILAddressConventions silConv;
 
   const Operand &op;
 
@@ -54,7 +54,7 @@ public:
   /// should be the subobject and Value should be the parent object. An example
   /// of where one would want to do this is in the case of value projections
   /// like struct_extract.
-  OperandOwnershipClassifier(SILModuleConventions silConv, const Operand &op)
+  OperandOwnershipClassifier(SILAddressConventions silConv, const Operand &op)
       : mod(silConv.getModule()), silConv(silConv), op(op) {}
 
   SILValue getValue() const { return op.get(); }
@@ -1140,7 +1140,7 @@ OperandOwnership OperandOwnershipClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //===----------------------------------------------------------------------===//
 
 OperandOwnership
-Operand::getOperandOwnership(SILModuleConventions *silConv) const {
+Operand::getOperandOwnership(SILAddressConventions *silConv) const {
   // A type-dependent operand is a NonUse (as opposed to say an
   // InstantaneousUse) because it does not require liveness.
   if (isTypeDependent())
@@ -1161,8 +1161,8 @@ Operand::getOperandOwnership(SILModuleConventions *silConv) const {
       return OperandOwnership(OperandOwnership::InstantaneousUse);
     }
   }
-  SILModuleConventions overrideConv =
-      silConv ? *silConv : SILModuleConventions(getUser()->getModule());
+  SILAddressConventions overrideConv =
+      silConv ? *silConv : SILAddressConventions(getUser()->getModule());
   OperandOwnershipClassifier classifier(overrideConv, *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }

@@ -2789,7 +2789,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
     Thunk->setOwnershipEliminated();
   }
 
-  if (!SILModuleConventions(M).useLoweredAddresses()) {
+  if (!SILAddressConventions(M).useLoweredAddresses()) {
     for (auto SpecArg : SpecializedFunc->getArguments()) {
       auto *NewArg = EntryBB->createFunctionArgument(SpecArg->getType(),
                                                      SpecArg->getDecl());

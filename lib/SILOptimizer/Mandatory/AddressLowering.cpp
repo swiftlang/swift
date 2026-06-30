@@ -175,7 +175,7 @@ using llvm::SmallSetVector;
 static SILFunctionConventions getLoweredFnConv(SILFunction *function) {
   return SILFunctionConventions(
       function->getLoweredFunctionType(),
-      SILModuleConventions::getLoweredAddressConventions(
+      SILAddressConventions::getLoweredAddressConventions(
           function->getModule()));
 }
 
@@ -184,7 +184,7 @@ static SILFunctionConventions getLoweredFnConv(SILFunction *function) {
 static SILFunctionConventions getLoweredCallConv(ApplySite call) {
   return SILFunctionConventions(
       call.getSubstCalleeType(),
-      SILModuleConventions::getLoweredAddressConventions(call.getModule()));
+      SILAddressConventions::getLoweredAddressConventions(call.getModule()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -648,7 +648,7 @@ protected:
                         SILInstruction *originalInst) const {
     SILBuilder builder(originalInst->getParent(), insertPt);
     builder.setSILConventions(
-        SILModuleConventions::getLoweredAddressConventions(
+        SILAddressConventions::getLoweredAddressConventions(
             builder.getModule()));
     builder.setCurrentDebugScope(originalInst->getDebugScope());
     return builder;
@@ -656,7 +656,7 @@ protected:
 
   void prepareBuilder(SILBuilder &builder) {
     builder.setSILConventions(
-      SILModuleConventions::getLoweredAddressConventions(
+      SILAddressConventions::getLoweredAddressConventions(
         builder.getModule()));
   };
 };
