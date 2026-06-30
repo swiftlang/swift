@@ -1,10 +1,14 @@
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: swift_feature_SafeInteropWrappersNullAsEmptySpan
+// REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature Lifetimes -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -strict-memory-safety -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness \
+// Mirrors sized-by-noescape.swift but exercises the legacy opt-in
+// wrapper shape: with `SafeInteropWrappers` but without
+// `SafeInteropWrappersNullAsEmptySpan`, `_Nullable` pointer
+// parameters/returns propagate as Optional in the wrapper.
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness \
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -eager-macro-checking
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by __noescape parameters.
@@ -123,15 +127,15 @@ void nonnull(int len, const void * __sized_by(len) __noescape _Nonnull p);
 
 // expected-expansion@+13:75{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func nullable(_ p: RawSpan) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.byteCount)!|}}
-//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func nullable(_ p: RawSpan?) {|}}
+//   expected-remark@3{{macro content: |    let len = Int32(exactly: p?.byteCount ?? 0)!|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p?.withUnsafeBytes {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe nullable(len, _pPtr.baseAddress)|}}
+//   expected-remark@10{{macro content: |    return unsafe nullable(len, _pPtr?.baseAddress)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void nullable(int len, const void * __sized_by(len) __noescape _Nullable p);
@@ -200,8 +204,8 @@ module Test {
 }
 
 //--- test.swift
-// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature Lifetimes -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 05bd6791d09186997b95b5462e006b826415e4b6050e8b665fad72a7bfa12d17
+// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -enable-experimental-feature SafeInteropWrappers -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature Lifetimes -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
+// GENERATED-HASH: 95f68132be402dc5cff4ab6ea91d2e55d83a3268cb7f4169471b977e4bc1ccf4
 import Test
 
 
@@ -281,7 +285,7 @@ func call_doublebytesized(_ _doublebytesized_param0: UnsafeMutablePointer<UInt16
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: RawSpan) {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: RawSpan?) {
   return nullable(p)
 }
 
