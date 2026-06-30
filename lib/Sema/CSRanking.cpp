@@ -238,6 +238,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DeclViaFunctionResult:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
     return sameDecl(x.getDecl(), y.getDecl());
@@ -1244,18 +1245,20 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       identical = false;
       
       // A declaration found directly beats any declaration found via dynamic
-      // lookup, bridging, or optional unwrapping.
+      // lookup, bridging, optional unwrapping, or function-result lookup.
       if ((choice1.getKind() == OverloadChoiceKind::Decl) &&
           (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic ||
            choice2.getKind() == OverloadChoiceKind::DeclViaBridge ||
-           choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional)) {
+           choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional ||
+           choice2.getKind() == OverloadChoiceKind::DeclViaFunctionResult)) {
         score1 += weight;
         continue;
       }
 
       if ((choice1.getKind() == OverloadChoiceKind::DeclViaDynamic ||
            choice1.getKind() == OverloadChoiceKind::DeclViaBridge ||
-           choice1.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) &&
+           choice1.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional ||
+           choice1.getKind() == OverloadChoiceKind::DeclViaFunctionResult) &&
           choice2.getKind() == OverloadChoiceKind::Decl) {
         score2 += weight;
         continue;
@@ -1302,6 +1305,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    case OverloadChoiceKind::DeclViaFunctionResult:
     case OverloadChoiceKind::DynamicMemberLookup:
     case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       break;

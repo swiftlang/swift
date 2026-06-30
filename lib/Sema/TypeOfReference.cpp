@@ -2175,6 +2175,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DeclViaFunctionResult:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
   case OverloadChoiceKind::KeyPathApplication:
@@ -2381,6 +2382,7 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DeclViaFunctionResult:
   case OverloadChoiceKind::TupleIndex:
   case OverloadChoiceKind::MaterializePack:
   case OverloadChoiceKind::ExtractFunctionIsolation:
@@ -2961,6 +2963,7 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DeclViaFunctionResult:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
     Type openedType, thrownErrorType;
@@ -3280,6 +3283,13 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
 
   if (choice.isFallbackMemberOnUnwrappedBase()) {
     increaseScore(SK_UnresolvedMemberViaOptional, locator);
+  }
+
+  // A member found by looking through a function-typed context to its return
+  // type is strictly lower priority than any member found directly, so that a
+  // direct candidate always wins when one exists.
+  if (choice.getKind() == OverloadChoiceKind::DeclViaFunctionResult) {
+    increaseScore(SK_UnresolvedMemberViaFunctionResult, locator);
   }
 }
 

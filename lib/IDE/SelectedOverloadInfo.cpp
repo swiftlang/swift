@@ -32,7 +32,8 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaBridge:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional: {
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DeclViaFunctionResult: {
     Result.BaseTy = SelectedOverload->choice.getBaseType();
     if (Result.BaseTy) {
       Result.BaseTy = S.simplifyType(Result.BaseTy)->getRValueType();

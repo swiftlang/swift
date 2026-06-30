@@ -54,6 +54,10 @@ enum class OverloadChoiceKind : int {
   /// The overload choice selects a particular declaration that
   /// was found by unwrapping an optional context type.
   DeclViaUnwrappedOptional,
+  /// The overload choice selects a particular declaration that was found by
+  /// looking through a function-typed context '(P...) -> R' to a static
+  /// member (e.g. an enum case with a payload) of the return type 'R'.
+  DeclViaFunctionResult,
   /// The overload choice materializes a pack from a tuple.
   MaterializePack,
   /// The overload choice extracts the isolation of a dynamically isolated
@@ -93,6 +97,10 @@ class OverloadChoice {
     /// is a backup one, which should be picked only if members
     /// found directly on `Optional` do not match.
     IsFallbackDeclViaUnwrappedOptional = 0x03,
+    /// Indicates that this declaration was resolved by looking through a
+    /// function-typed context to a static member of its return type,
+    /// turning a "Decl" kind into "DeclViaFunctionResult".
+    IsDeclViaFunctionResult = 0x04,
     /// Indicates that this declaration was dynamic, turning a
     /// "Decl" kind into "DeclViaDynamic" kind.
     IsDeclViaDynamic = 0x07,
@@ -147,6 +155,7 @@ public:
            kind != OverloadChoiceKind::DeclViaDynamic &&
            kind != OverloadChoiceKind::DeclViaBridge &&
            kind != OverloadChoiceKind::DeclViaUnwrappedOptional &&
+           kind != OverloadChoiceKind::DeclViaFunctionResult &&
            "wrong constructor for decl");
   }
 
@@ -220,6 +229,21 @@ public:
     return result;
   }
 
+  /// Retrieve an overload choice for a declaration that was found by looking
+  /// through a function-typed context '(P...) -> R' to a static member of the
+  /// return type 'R'.
+  ///
+  /// \param base The metatype of the return type 'R'.
+  static OverloadChoice getDeclViaFunctionResult(Type base, ValueDecl *value,
+                                                 FunctionRefInfo functionRefInfo) {
+    OverloadChoice result;
+    result.BaseAndDeclKind.setPointer(base);
+    result.BaseAndDeclKind.setInt(IsDeclViaFunctionResult);
+    result.DeclOrKind = value;
+    result.TheFunctionRefInfo = functionRefInfo;
+    return result;
+  }
+
   /// Retrieve an overload choice for a declaration that was found via
   /// dynamic member lookup. The `ValueDecl` is a `subscript(dynamicMember:...)`
   /// method.
@@ -255,6 +279,8 @@ public:
       case IsDeclViaUnwrappedOptional:
       case IsFallbackDeclViaUnwrappedOptional:
         return OverloadChoiceKind::DeclViaUnwrappedOptional;
+      case IsDeclViaFunctionResult:
+        return OverloadChoiceKind::DeclViaFunctionResult;
       default: return OverloadChoiceKind::Decl;
       }
     }
@@ -271,6 +297,7 @@ public:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    case OverloadChoiceKind::DeclViaFunctionResult:
     case OverloadChoiceKind::DynamicMemberLookup:
     case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       return true;
