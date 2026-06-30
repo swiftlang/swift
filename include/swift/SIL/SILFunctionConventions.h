@@ -12,7 +12,7 @@
 ///
 /// \file
 ///
-/// This file defines the SILModuleConventions and SILFunctionConventions
+/// This file defines the SILAddressConventions and SILFunctionConventions
 /// classes.  These interfaces are used to determine when SIL can represent
 /// values of a given lowered type by value and when they must be represented by
 /// address. This is influenced by a SILModule-wide "lowered address" convention,
@@ -46,7 +46,7 @@ struct delay_template_expansion {
 /// Transient wrapper for SILParameterInfo and SILResultInfo conventions. This
 /// abstraction helps handle the transition from canonical SIL conventions to
 /// lowered SIL conventions.
-class SILModuleConventions {
+class SILAddressConventions {
   friend SILParameterInfo;
   friend SILResultInfo;
   friend SILFunctionConventions;
@@ -83,20 +83,20 @@ public:
 
   static bool isReturnedIndirectlyInSIL(SILType type, SILModule &M);
 
-  static SILModuleConventions getLoweredAddressConventions(SILModule &M) {
-    return SILModuleConventions(M, true);
+  static SILAddressConventions getLoweredAddressConventions(SILModule &M) {
+    return SILAddressConventions(M, true);
   }
 
 private:
   SILModule *M;
   bool loweredAddresses;
   
-  SILModuleConventions(SILModule &M, bool loweredAddresses)
+  SILAddressConventions(SILModule &M, bool loweredAddresses)
     : M(&M), loweredAddresses(loweredAddresses)
   {}
   
 public:
-  SILModuleConventions(SILModule &M);
+  SILAddressConventions(SILModule &M);
 
   SILFunctionConventions getFunctionConventions(CanSILFunctionType funcTy);
   
@@ -162,18 +162,18 @@ public:
 /// conventions.
 class SILFunctionConventions {
 public:
-  SILModuleConventions silConv;
+  SILAddressConventions silConv;
   CanSILFunctionType funcTy;
 
   SILFunctionConventions(CanSILFunctionType funcTy, SILModule &M)
       : silConv(M), funcTy(funcTy) {}
 
   SILFunctionConventions(CanSILFunctionType funcTy,
-                         SILModuleConventions silConv)
+                         SILAddressConventions silConv)
       : silConv(silConv), funcTy(funcTy) {}
 
   //===--------------------------------------------------------------------===//
-  // SILModuleConventions API for convenience.
+  // SILAddressConventions API for convenience.
   //===--------------------------------------------------------------------===//
 
   bool useLoweredAddresses() const { return silConv.useLoweredAddresses(); }
@@ -649,17 +649,17 @@ SILFunctionConventions::isNoReturn(TypeExpansionContext context) const {
 }
 
 inline SILFunctionConventions
-SILModuleConventions::getFunctionConventions(CanSILFunctionType funcTy) {
+SILAddressConventions::getFunctionConventions(CanSILFunctionType funcTy) {
   return SILFunctionConventions(funcTy, *this);
 }
 
-inline bool SILModuleConventions::isTypeIndirectForIndirectParamConvention(
+inline bool SILAddressConventions::isTypeIndirectForIndirectParamConvention(
     CanType paramTy, bool loweredAddresses) {
   return (loweredAddresses || paramTy->isOpenedExistentialWithError() ||
           paramTy->hasAnyPack());
 }
 
-inline bool SILModuleConventions::isIndirectSILParam(SILParameterInfo param,
+inline bool SILAddressConventions::isIndirectSILParam(SILParameterInfo param,
                                                      bool loweredAddresses) {
   switch (param.getConvention()) {
   case ParameterConvention::Direct_Unowned:
@@ -684,12 +684,12 @@ inline bool SILModuleConventions::isIndirectSILParam(SILParameterInfo param,
   llvm_unreachable("covered switch isn't covered?!");
 }
 
-inline bool SILModuleConventions::isIndirectSILYield(SILYieldInfo yield,
+inline bool SILAddressConventions::isIndirectSILYield(SILYieldInfo yield,
                                                      bool loweredAddresses) {
   return isIndirectSILParam(yield, loweredAddresses);
 }
 
-inline bool SILModuleConventions::isIndirectSILResult(SILResultInfo result,
+inline bool SILAddressConventions::isIndirectSILResult(SILResultInfo result,
                                                       bool loweredAddresses) {
   switch (result.getConvention()) {
   case ResultConvention::Indirect:
@@ -710,24 +710,24 @@ inline bool SILModuleConventions::isIndirectSILResult(SILResultInfo result,
   llvm_unreachable("Unhandled ResultConvention in switch.");
 }
 
-inline SILType SILModuleConventions::getSILParamInterfaceType(
+inline SILType SILAddressConventions::getSILParamInterfaceType(
                                                      SILParameterInfo param,
                                                      bool loweredAddresses) {
-  return SILModuleConventions::isIndirectSILParam(param,loweredAddresses)
+  return SILAddressConventions::isIndirectSILParam(param,loweredAddresses)
              ? SILType::getPrimitiveAddressType(param.getInterfaceType())
              : SILType::getPrimitiveObjectType(param.getInterfaceType());
 }
 
-inline SILType SILModuleConventions::getSILYieldInterfaceType(
+inline SILType SILAddressConventions::getSILYieldInterfaceType(
                                                      SILYieldInfo yield,
                                                      bool loweredAddresses) {
   return getSILParamInterfaceType(yield, loweredAddresses);
 }
 
 inline SILType
-SILModuleConventions::getSILResultInterfaceType(SILResultInfo result,
+SILAddressConventions::getSILResultInterfaceType(SILResultInfo result,
                                                 bool loweredAddresses) {
-  return SILModuleConventions::isIndirectSILResult(result, loweredAddresses) ||
+  return SILAddressConventions::isIndirectSILResult(result, loweredAddresses) ||
                  result.isAddressResult(loweredAddresses)
              ? SILType::getPrimitiveAddressType(result.getInterfaceType())
              : SILType::getPrimitiveObjectType(result.getInterfaceType());
@@ -735,12 +735,12 @@ SILModuleConventions::getSILResultInterfaceType(SILResultInfo result,
 
 inline SILType
 SILParameterInfo::getSILStorageInterfaceType() const {
-  return SILModuleConventions::getSILParamInterfaceType(*this, true);
+  return SILAddressConventions::getSILParamInterfaceType(*this, true);
 }
 
 inline SILType
 SILResultInfo::getSILStorageInterfaceType() const {
-  return SILModuleConventions::getSILResultInterfaceType(*this, true);
+  return SILAddressConventions::getSILResultInterfaceType(*this, true);
 }
 
 inline SILType

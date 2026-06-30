@@ -776,7 +776,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 
     // Put the value into memory if necessary.
     assert(v.getOwnershipKind() == OwnershipKind::None || v.hasCleanup());
-    SILModuleConventions silConv(SGF.SGM.M);
+    SILAddressConventions silConv(SGF.SGM.M);
     // bridgeAnything always takes an indirect argument as @in.
     // Since we don't have the SIL type here, check the current SIL stage/mode
     // to determine the convention.

@@ -951,7 +951,7 @@ public:
 
   /// Verify that all operands of this instruction have compatible ownership
   /// with this instruction.
-  void verifyOperandOwnership(SILModuleConventions *silConv = nullptr) const;
+  void verifyOperandOwnership(SILAddressConventions *silConv = nullptr) const;
 
   /// Verify that this instruction and its associated debug information follow
   /// all SIL debug info invariants.
@@ -3362,7 +3362,7 @@ class ApplyInst final
   create(SILDebugLocation debugLoc, SILValue callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
          ApplyOptions options,
-         std::optional<SILModuleConventions> moduleConventions,
+         std::optional<SILAddressConventions> moduleConventions,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing,
@@ -3493,7 +3493,7 @@ class BeginApplyInst final
   create(SILDebugLocation debugLoc, SILValue callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
          ApplyOptions options,
-         std::optional<SILModuleConventions> moduleConventions,
+         std::optional<SILAddressConventions> moduleConventions,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing,

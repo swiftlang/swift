@@ -1275,7 +1275,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
                      .substGenericArgs(Apply.getModule(), NewCallSubs, context)
                      .getAs<SILFunctionType>();
   SILFunctionConventions conv(substTy,
-                              SILModuleConventions(Apply.getModule()));
+                              SILAddressConventions(Apply.getModule()));
   bool canUpdateArgs = true;
   bool madeUpdate = false;
   for (unsigned index = 0; index < conv.getNumSILArguments(); ++index) {

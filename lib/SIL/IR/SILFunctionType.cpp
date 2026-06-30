@@ -185,7 +185,7 @@ SILFunctionType::getDirectFormalResultsType(SILModule &M,
                                             TypeExpansionContext context) {
   CanType type;
 
-  if (hasAddressResult(SILModuleConventions(M).useLoweredAddresses())) {
+  if (hasAddressResult(SILAddressConventions(M).useLoweredAddresses())) {
     assert(getNumDirectFormalResults() == 1);
     return SILType::getPrimitiveAddressType(
         getSingleDirectFormalResult().getReturnValueType(M, this, context));

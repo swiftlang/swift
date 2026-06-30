@@ -848,7 +848,7 @@ ApplyInst::ApplyInst(SILDebugLocation loc, SILValue callee,
 ApplyInst *
 ApplyInst::create(SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
                   ArrayRef<SILValue> args, ApplyOptions options,
-                  std::optional<SILModuleConventions> moduleConventions,
+                  std::optional<SILAddressConventions> moduleConventions,
                   SILFunction &parentFunction,
                   const GenericSpecializationInformation *specializationInfo,
                   std::optional<ApplyIsolationCrossing> isolationCrossing,
@@ -861,7 +861,7 @@ ApplyInst::create(SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
   SILFunctionConventions conv(
       substCalleeTy, moduleConventions.has_value()
                          ? moduleConventions.value()
-                         : SILModuleConventions(parentFunction.getModule()));
+                         : SILAddressConventions(parentFunction.getModule()));
   SILType result =
       conv.getSILResultType(parentFunction.getTypeExpansionContext());
 
@@ -898,7 +898,7 @@ BeginApplyInst::BeginApplyInst(
 BeginApplyInst *BeginApplyInst::create(
     SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
     ArrayRef<SILValue> args, ApplyOptions options,
-    std::optional<SILModuleConventions> moduleConventions,
+    std::optional<SILAddressConventions> moduleConventions,
     SILFunction &parentFunction,
     const GenericSpecializationInformation *specializationInfo,
     std::optional<ApplyIsolationCrossing> isolationCrossing,
@@ -911,7 +911,7 @@ BeginApplyInst *BeginApplyInst::create(
   SILFunctionConventions conv(
       substCalleeType, moduleConventions.has_value()
                            ? moduleConventions.value()
-                           : SILModuleConventions(parentFunction.getModule()));
+                           : SILAddressConventions(parentFunction.getModule()));
 
   SmallVector<SILType, 8> resultTypes;
   SmallVector<ValueOwnershipKind, 8> resultOwnerships;
@@ -925,7 +925,7 @@ BeginApplyInst *BeginApplyInst::create(
         parentFunction, yieldType, argConvention,
         moduleConventions.has_value()
             ? moduleConventions.value()
-            : SILModuleConventions(parentFunction.getModule())));
+            : SILAddressConventions(parentFunction.getModule())));
   }
 
   auto tokenTy = SILType::getSILTokenType(parentFunction.getASTContext());
