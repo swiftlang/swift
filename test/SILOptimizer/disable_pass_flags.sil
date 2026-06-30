@@ -6,7 +6,6 @@
 // RUN: %target-sil-opt -sil-combine %s -sil-disable-pass=simplify-begin_cow_mutation -sil-disable-pass-only-function=test | %FileCheck %s --check-prefix=CHECK_DISABLED
 // RUN: %target-sil-opt -sil-combine %s -sil-disable-pass=simplify-begin_cow_mutation -sil-disable-pass-only-function=other | %FileCheck %s --check-prefix=CHECK_ENABLED
 
-// REQUIRES: swift_in_compiler
 
 import Builtin
 

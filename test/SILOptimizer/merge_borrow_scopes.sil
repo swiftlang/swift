@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt %s -merge-borrow-scopes | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -parse-as-library -emit-sil %s -o /dev/null -verify
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_CompileTimeValuesPreview
 
 // TODO: this should only emit one error per bad compile-time expression, not two

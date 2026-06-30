@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-async-demotion -target %target-swift-5.1-abi-triple -module-name main -O -emit-sil -primary-file %s | %FileCheck %s --implicit-check-not hop_to_executor
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: concurrency
 
 // for now, check for the expected number of hops after the pass:

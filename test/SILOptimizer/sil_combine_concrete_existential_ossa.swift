@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -sil-verify-all -Xllvm -sil-disable-pass=function-signature-opts %s | %FileCheck %s
 // RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -Xllvm -sil-verify-force-analysis-around-pass=devirtualizer -Xllvm -sil-disable-pass=function-signature-opts %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 //===----------------------------------------------------------------------===//
 // testReturnSelf: Call to a protocol extension method with

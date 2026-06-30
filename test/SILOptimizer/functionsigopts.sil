@@ -1,7 +1,6 @@
 // RUN: %target-sil-opt -sil-print-types -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts -enable-experimental-feature Lifetimes %s | %FileCheck %s
 // RUN: %target-sil-opt -sil-print-types -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts -enable-experimental-feature Lifetimes %s | %FileCheck -check-prefix=CHECK-NEGATIVE %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 import Builtin

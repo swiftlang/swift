@@ -3,8 +3,6 @@
 // Use this testfile to check if the `swift-frontend -sil-passpipeline-dumper` option works.
 // RUN: %swift_frontend_plain -sil-passpipeline-dumper -Onone | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
-
 // CHECK: ---
 // CHECK: name:            Non-Diagnostic Mandatory Optimizations
 // CHECK: passes:          [ "for-each-loop-unroll", "mandatory-arc-opts", "onone-prespecializer",

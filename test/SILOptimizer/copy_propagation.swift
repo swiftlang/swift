@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend -primary-file %s -Onone -enable-copy-propagation \
 // RUN:    -sil-verify-all -module-name=test -emit-sil | %FileCheck %s --check-prefix ONONE
 
-// REQUIRES: swift_in_compiler
 
 class C {}
 

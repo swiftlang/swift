@@ -1,6 +1,5 @@
 // RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 //CHECK: [readonly] [ossa] @func1
 @_effects(readonly) @_silgen_name("func1") func func1() { }

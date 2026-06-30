@@ -10,13 +10,11 @@
 // RUN: %target-run-simple-swift(-disable-availability-checking -Xllvm -sil-disable-pass=deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: embedded_stdlib
 // REQUIRES: swift_feature_Embedded
 

@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -parse-as-library -target %target-future-triple -O -module-name=test %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s
-// REQUIRES: swift_in_compiler
 
 @globalActor actor AnotherActor: GlobalActor {
   static let shared = AnotherActor()

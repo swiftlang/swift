@@ -4,7 +4,6 @@
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types  -enable-builtin-module -Onone %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop -o %t/builtins.sil
 // RUN: %FileCheck -input-file %t/builtins.sil -check-prefix=CANONICAL %s
 
-// REQUIRES: swift_in_compiler
 
 import Builtin
 

@@ -22,7 +22,6 @@
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/Root.o %t/ClientA.o %t/ClientB.o %t/Application.o %target-embedded-posix-shim -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
 
