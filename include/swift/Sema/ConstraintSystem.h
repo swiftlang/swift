@@ -1952,6 +1952,14 @@ public:
   ConstraintLocator *
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
 
+  /// Retrieve the type variable that represents the originating hole in the
+  /// equivalence class for a given type variable.
+  TypeVariableType *getHoleTypeVar(TypeVariableType *tv);
+
+  /// Retrieve the locator for the hole that represents the originating hole in
+  /// the equivalence class for a given type variable.
+  ConstraintLocator *getHoleLocator(TypeVariableType *tv);
+
   /// Lookup and return parent associated with given expression.
   Expr *getParentExpr(Expr *expr) {
     if (auto result = getExprDepthAndParent(expr))

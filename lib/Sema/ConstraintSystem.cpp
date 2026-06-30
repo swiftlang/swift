@@ -900,6 +900,31 @@ void ConstraintSystem::restoreType(const KeyPathExpr *KP, unsigned I, Type T) {
   }
 }
 
+TypeVariableType *ConstraintSystem::getHoleTypeVar(TypeVariableType *tv) {
+  if (!tv->getImpl().isNonRepresentativeHole())
+    return tv;
+
+  // If we have a non-representative hole, the hole type var is given by
+  // a member of its equivalence class. Pick the the one with the lowest ID to
+  // ensure consistency.
+  TypeVariableType *candidate = nullptr;
+  for (auto equiv : CG[tv].getEquivalenceClass()) {
+    auto &impl = equiv->getImpl();
+    if (equiv == tv || !impl.canBindToHole() || impl.isNonRepresentativeHole())
+      continue;
+
+    if (!candidate || candidate->getID() > equiv->getID())
+      candidate = equiv;
+  }
+  ASSERT(candidate &&
+         "Non-representative hole ought to have hole in its equivalence class");
+  return candidate;
+}
+
+ConstraintLocator *ConstraintSystem::getHoleLocator(TypeVariableType *tv) {
+  return getHoleTypeVar(tv)->getImpl().getLocator();
+}
+
 std::pair<Type, ExistentialArchetypeType *>
 ConstraintSystem::openAnyExistentialType(Type type,
                                          ConstraintLocator *locator) {
