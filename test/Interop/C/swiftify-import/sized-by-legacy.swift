@@ -117,12 +117,11 @@ typedef opaque_t *opaqueptr_t;
 // }}
 void opaqueptr(int len, opaqueptr_t __sized_by(len) p);
 
-// expected-expansion@+8:48{{
+// expected-expansion@+7:48{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func charsized(_ _charsized_param0: UnsafeMutableRawBufferPointer) {|}}
 //   expected-remark@3{{macro content: |    let _charsized_param1 = Int32(exactly: _charsized_param0.count)!|}}
-//   expected-error@4{{value of optional type 'UnsafeMutableRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeMutableRawPointer'}}
-//   expected-remark@4{{macro content: |    return unsafe charsized(_charsized_param0.baseAddress.assumingMemoryBound(to: CChar.self), _charsized_param1)|}}
+//   expected-remark@4{{macro content: |    return unsafe charsized(_charsized_param0.baseAddress?.assumingMemoryBound(to: CChar.self), _charsized_param1)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void charsized(char *__sized_by(size), int size);
@@ -138,12 +137,11 @@ uint8_t *__sized_by(size) bytesized(int size);
 void doublebytesized(uint16_t *__sized_by(size), int size);
 
 typedef uint8_t * bytesizedptr_t;
-// expected-expansion@+8:66{{
+// expected-expansion@+7:66{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func aliasedBytesized(_ p: UnsafeMutableRawBufferPointer) {|}}
 //   expected-remark@3{{macro content: |    let size = Int32(exactly: p.count)!|}}
-//   expected-error@4{{value of optional type 'UnsafeMutableRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeMutableRawPointer'}}
-//   expected-remark@4{{macro content: |    return unsafe aliasedBytesized(p.baseAddress.assumingMemoryBound(to: UInt8.self), size)|}}
+//   expected-remark@4{{macro content: |    return unsafe aliasedBytesized(p.baseAddress?.assumingMemoryBound(to: UInt8.self), size)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void aliasedBytesized(bytesizedptr_t __sized_by(size) p, int size);
