@@ -1,4 +1,5 @@
-// RUN: %target-swift-emit-ir %s -module-name=main -enable-experimental-feature Embedded | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -module-name=main -enable-experimental-feature Embedded -solver-disable-enumerate-supertypes | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -module-name=main -enable-experimental-feature Embedded -solver-enable-enumerate-supertypes | %FileCheck %s
 
 // REQUIRES: swift_feature_Embedded
 

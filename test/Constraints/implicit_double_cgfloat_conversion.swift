@@ -460,3 +460,18 @@ func test_joins_requiring_optional_to_optional_conversion(_ x1: Double, _ x2: CG
   if y2 != x1 {}
   if y2 != x2 {}
 }
+
+// Unapplied references to operators
+func test_unapplied_1(_ x: [CGFloat], y: Double) {
+  let _ = x.reduce(0, +) / y
+  let _ = x.reduce(0, *) / y
+  let _ = x.reduce(0, -) / y
+  let _ = x.reduce(0, /) / y
+}
+
+func test_unapplied_2(_ x: [Double], y: CGFloat) {
+  let _ = x.reduce(0, +) / y
+  let _ = x.reduce(0, *) / y
+  let _ = x.reduce(0, -) / y
+  let _ = x.reduce(0, /) / y
+}
