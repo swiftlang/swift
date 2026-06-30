@@ -67,8 +67,6 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
 
         super().setUp()
 
-        self.call(self.update_checkout_base_args + ["--clone"])
-
     def get_branch(self, *, rev_scheme_name: str, repo_name: str):
         return self.config["branch-schemes"][rev_scheme_name]["repos"][repo_name]
 
@@ -206,6 +204,7 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         self.assertEqual(expected_head, actual_head)
 
     def test_checkout_stale_pr_merge_ref(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
         repo_name = "repo1"
         rev_scheme = "main"
         pr_id = 1
@@ -228,7 +227,81 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
             repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
         )
 
+    def test_checkout_stale_pr_merge_ref_shallow_clone(self):
+        self.call(self.update_checkout_base_args + ["--clone", "--skip-history"])
+        repo_name = "repo1"
+        rev_scheme = "main"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--scheme",
+                rev_scheme,
+                "--github-comment",
+                f"""
+                https://github.com/apple/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )
+
+    def test_checkout_stale_pr_merge_ref_during_clone(self):
+        repo_name = "repo1"
+        rev_scheme = "main"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--clone",
+                "--scheme",
+                rev_scheme,
+                "--github-comment",
+                f"""
+                https://github.com/apple/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )
+
+    def test_checkout_stale_pr_merge_ref_during_shallow_clone(self):
+        repo_name = "repo1"
+        rev_scheme = "main"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--clone",
+                "--skip-history",
+                "--scheme",
+                rev_scheme,
+                "--github-comment",
+                f"""
+                https://github.com/apple/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )
+
     def test_checkout_stale_pr_merge_ref_other_rev_scheme(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
         repo_name = "repo1"
         rev_scheme = "rebranch"
         pr_id = 1
@@ -252,6 +325,7 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         )
 
     def test_checkout_stale_pr_merge_ref_swift(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
         repo_name = "swift"
         rev_scheme = "main"
         pr_id = 1
@@ -275,6 +349,7 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         )
 
     def test_checkout_stale_pr_merge_ref_conflict_with_base_branch(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
         rev_scheme = "main"
         pr_id = 1
         self.set_up_pr_merge_ref(
@@ -311,6 +386,7 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         self.assertEqual(status_output.strip(), "")
 
     def test_checkout_multiple_stale_pr_merge_ref(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
         pr1_id = 1
         pr2_id = 2
         repo1_name = "repo1"
@@ -343,6 +419,7 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         )
 
     def test_checkout_up_to_date_pr_merge_ref(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
         repo_name = "repo1"
         rev_scheme = "main"
         pr_id = 1
@@ -364,6 +441,7 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         self.verify_head_for_up_to_date_pr_merge_ref(repo_name=repo_name, pr_id=pr_id)
 
     def test_checkout_stale_pr_merge_ref_idempotency(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
         repo_name = "repo1"
         rev_scheme = "main"
         pr_id = 1
