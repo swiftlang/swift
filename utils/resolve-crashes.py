@@ -4,14 +4,15 @@
 # where some compiler crashers have been fixed, and move them into the
 # "fixed" testsuite, removing the "--crash" in the process.
 
-import os
 import re
+import shlex
+import subprocess
 import sys
 
 
 def execute_cmd(cmd):
     print(cmd)
-    os.system(cmd)
+    subprocess.run(shlex.split(cmd))
 
 
 # The regular expression we use to match compiler-crasher lines.
