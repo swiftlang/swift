@@ -1,7 +1,6 @@
 // RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -sil-combine -sil-print-generic-specialization-info | %FileCheck %s
 // RUN: %target-swift-frontend -O %s -emit-ir
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: objc_codegen
 
 // These tests exercise the same SILCombine optimization as

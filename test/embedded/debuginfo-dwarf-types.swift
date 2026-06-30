@@ -8,7 +8,6 @@
 // RUN: %target-swift-frontend -O -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s --check-prefix=CHECK-GNONE
 // RUN: %target-swift-frontend -Osize -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s --check-prefix=CHECK-GNONE
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 

@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=tuple_pack_element_addr | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 import Swift
 import Builtin

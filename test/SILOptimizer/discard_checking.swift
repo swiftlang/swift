@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-sil -sil-verify-all -verify %s -target %target-swift-5.1-abi-triple
 
 // REQUIRES: concurrency
-// REQUIRES: swift_in_compiler
 
 enum Color {
   case red, green, blue, none

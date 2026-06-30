@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -O -c -parse-as-library -module-name repro %s -o %t.o
 
-// REQUIRES: swift_in_compiler
 
 // https://github.com/swiftlang/swift/issues/89255
 // SIL ownership verifier rejects the optimized SIL for a simple inout-Substring

@@ -6,7 +6,6 @@
 // Mandatory copy propagation does not handles borrows yet.
 
 // REQUIRES: asserts
-// REQUIRES: swift_in_compiler
 
 // arm64e checks that there is a sound Swift stdlib but the test compiles itself
 // as `-module Swift` and so that verification fails. (in some ptrauth

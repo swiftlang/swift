@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -O -emit-sil -parse-as-library -sil-verify-all %s | grep -v debug_value | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
-// REQUIRES: swift_in_compiler
 
 // String literals are not completely constant folded in SIL for ptrsize=32 which fails `deadClassInstance()`.
 // This is no problem as LLVM can complete the constant folding.

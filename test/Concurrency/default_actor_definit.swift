@@ -3,7 +3,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s  -target %target-swift-5.1-abi-triple -strict-concurrency=complete | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: swift_in_compiler
 
 actor A {
   var x: String = "Hello"

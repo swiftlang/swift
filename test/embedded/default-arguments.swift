@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded -o /dev/null
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 

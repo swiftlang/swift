@@ -17,7 +17,6 @@
 // RUN: %target-run %t/a.out | %FileCheck %t/Main.swift
 
 // REQUIRES: executable_test
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 //--- MyModule.swift

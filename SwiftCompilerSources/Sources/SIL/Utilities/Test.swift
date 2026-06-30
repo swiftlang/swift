@@ -56,7 +56,6 @@
 // 1) A test test/SILOptimizer/interesting_functionality_unit.sil runs the
 //    TestRunner pass:
 //     // RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
-//     // REQUIRES: swift_in_compiler
 // 2) A function in interesting_functionality_unit.sil contains the
 //    specify_test instruction.
 //      sil @f : $() -> () {

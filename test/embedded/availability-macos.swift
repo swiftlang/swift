@@ -5,7 +5,6 @@
 // RUN: %target-typecheck-verify-swift -target arm64-apple-macos15 -enable-experimental-feature Embedded
 // RUN: %target-typecheck-verify-swift -target x86_64-apple-macos14 -enable-experimental-feature Embedded -target-min-inlining-version min
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: OS=macosx
 // REQUIRES: concurrency

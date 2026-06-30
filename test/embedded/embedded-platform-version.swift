@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature Embedded %target-embedded-posix-shim -import-bridging-header %S/../../stdlib/public/EmbeddedPlatform/swift/EmbeddedPlatform.h -wmo)
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1

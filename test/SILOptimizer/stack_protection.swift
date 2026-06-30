@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -module-name=test -emit-sil %s -O | %FileCheck %s --check-prefix=CHECK --check-prefix=DEFAULT
 // RUN: %target-swift-frontend -module-name=test -enable-move-inout-stack-protector -emit-sil %s -O -enable-stack-protector | %FileCheck %s --check-prefix=CHECK --check-prefix=MOVE
 
-// REQUIRES: swift_in_compiler
 
 @_silgen_name("potentiallyBadCFunction")
 func potentiallyBadCFunction(_ arg: UnsafePointer<Int>)

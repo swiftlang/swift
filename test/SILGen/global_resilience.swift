@@ -3,7 +3,6 @@
 // RUN: %target-swift-emit-silgen -I %t -enable-library-evolution -parse-as-library %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -I %t -O -enable-library-evolution -parse-as-library %s | %FileCheck --check-prefix=CHECK-OPT %s
 
-// REQUIRES: swift_in_compiler
 
 import resilient_global
 
