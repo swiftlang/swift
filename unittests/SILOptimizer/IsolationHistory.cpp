@@ -412,6 +412,45 @@ TEST(IsolationHistory, SingleRegionParentChainShape) {
   EXPECT_EQ(node->getNext(), nullptr);
 }
 
+// Callers are NOT required to pass indices in ascending order (e.g.
+// RegionAnalysis builds the joined-argument list in function-argument order,
+// but the element IDs are assigned at first-encounter and can be interleaved
+// by the pre-dataflow scan). singleRegion must still pick the *minimum*
+// element as the region representative, because is_canonical_correct requires
+// the region label to be <= every element in the region. Using indices[0]
+// instead of the minimum would trip that assertion whenever indices[0] is not
+// the smallest element. Here indices[0] == 3 but the rep must be 0.
+TEST(IsolationHistory, SingleRegionUnsortedRepIsMinimum) {
+  llvm::BumpPtrAllocator allocator;
+  IsolationHistory::Factory historyFactory(allocator);
+
+  SILLocation loc = SILLocation::invalid();
+  auto p = Partition::singleRegion(
+      loc, {Element(3), Element(1), Element(2), Element(0)},
+      historyFactory.get());
+
+  // All four elements are tracked and land in the same region, whose label is
+  // the minimum element (0) — not indices[0] (3).
+  PartitionTester tester(p);
+  for (Element e : {Element(0), Element(1), Element(2), Element(3)}) {
+    ASSERT_TRUE(p.isTrackingElement(e))
+        << "Element " << unsigned(e) << " was not tracked";
+    EXPECT_EQ(tester.getRegion(unsigned(e)), 0u)
+        << "Element " << unsigned(e)
+        << " should be in the region labelled by the minimum element (0)";
+  }
+
+  // Every merge node must name the minimum element (0) as its rep, regardless
+  // of the order indices were passed in.
+  for (const IsolationHistory::Node *n = p.getIsolationHistory().getHead(); n;
+       n = n->getNext()) {
+    if (n->getKind() != IsolationHistory::Node::MergeElementRegions)
+      continue;
+    EXPECT_EQ(n->getFirstArgAsElement(), Element(0))
+        << "singleRegion must merge peers into the minimum element's region";
+  }
+}
+
 // Partition::singleRegion requires distinct indices. A repeated element
 // would push pushNewElementRegion(index) + pushMergeElementRegions(rep,
 // index) twice for the same element, which popHistoryOnce cannot rewind

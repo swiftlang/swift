@@ -256,24 +256,37 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
 Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
                                   IsolationHistory inputHistory) {
   Partition p(inputHistory);
-  if (!indices.empty()) {
-    // Sort so the lowest element is our region representative. Callers must
-    // pass distinct elements: pushing AddNewRegionForElement / merge nodes
-    // for the same element more than once is unrecoverable in popHistory
-    // (the second pop's removeElement asserts because the first pop already
-    // extracted the element), so a duplicate is a caller bug we trap here
-    // rather than silently absorb.
+  if (indices.empty()) {
+    assert(p.is_canonical_correct());
+    return p;
+  }
+  
+    // Callers must pass distinct elements: pushing AddNewRegionForElement /
+    // merge nodes for the same element more than once is unrecoverable in
+    // popHistory (the second pop's removeElement asserts because the first pop
+    // already extracted the element), so a duplicate is a caller bug we trap
+    // here rather than silently absorb.
 #ifndef NDEBUG
     SmallVector<Element, 8> sortedIndices(indices.begin(), indices.end());
     llvm::sort(sortedIndices);
-    assert(std::adjacent_find(sortedIndices.begin(), sortedIndices.end()) ==
-               sortedIndices.end() &&
-           "Partition::singleRegion does not support duplicate indices");
+    auto dup = std::adjacent_find(sortedIndices.begin(), sortedIndices.end());
+    if (dup != sortedIndices.end()) {
+      llvm::errs() << "Partition::singleRegion does not support duplicate "
+                      "indices, but element "
+                   << unsigned(*dup) << " appears more than once in {";
+      llvm::interleaveComma(indices, llvm::errs(),
+                            [](Element e) { llvm::errs() << unsigned(e); });
+      llvm::errs() << "}\n";
+      llvm_unreachable("Partition::singleRegion given duplicate indices");
+    }
 #endif
 
-    // Lowest element is our region representative and the value that our
-    // region takes.
-    Element repElement = sortedIndices[0];
+    // The lowest element is our region representative and the value that our
+    // region takes. Canonicality requires the region label to be <= every
+    // element in the region (see is_canonical_correct), so we must use the
+    // minimum element here rather than indices[0]: callers are not required to
+    // pass indices in sorted order.
+    Element repElement = *llvm::min_element(indices);
     Region repElementRegion = Region(repElement);
     p.nextAvailableRegionNum = Region(repElementRegion + 1);
 
@@ -284,15 +297,16 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
     // First create a region for repElement. We are going to merge each other
     // element into its region one at a time.
     p.pushNewElementRegion(repElement);
-    for (Element index : sortedIndices) {
+    for (Element index : indices) {
+      // Map every element (including repElement) into the region;
+      // pushNewElementRegion only records history, it does not populate
+      // elementToRegionMap.
       p.elementToRegionMap.insert_or_assign(index, repElementRegion);
       if (index == repElement)
         continue;
-
       p.pushNewElementRegion(index);
       p.pushMergeElementRegions(repElement, index);
     }
-  }
 
   assert(p.is_canonical_correct());
   return p;
