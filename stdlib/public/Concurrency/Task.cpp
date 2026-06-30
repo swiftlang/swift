@@ -92,6 +92,7 @@ bool swift::_swift_concurrency_debug_supportsPriorityEscalation =
 // ************************* PLEASE UPDATE DEBUG.H DOCS ***************************************
 // * When changing this version number you MUST document the change in `Concurrency/Debug.h`. *
 // ********************************************************************************************
+[[gnu::used, gnu::retain]]
 uint32_t swift::_swift_concurrency_debug_internal_layout_version = 2;
 
 void FutureFragment::destroy() {
