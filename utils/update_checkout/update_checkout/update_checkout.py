@@ -141,6 +141,18 @@ def get_branch_for_repo(
             # at the time GitHub created it. Depth=2 makes X visible locally.
             Git.run(
                 repo_path,
+                ["rev-parse", "--is-shallow-repository"],
+                echo=True,
+                prefix=prefix,
+            )
+            Git.run(
+                repo_path,
+                ["log", "--oneline", f"origin/{scheme_branch}"],
+                echo=True,
+                prefix=prefix,
+            )
+            Git.run(
+                repo_path,
                 [
                     "fetch",
                     "origin",
@@ -153,6 +165,31 @@ def get_branch_for_repo(
                     "--depth", "2",
                     f"pull/{pr_id}/merge:{repo_branch}",
                 ],
+                echo=True,
+                prefix=prefix,
+            )
+            Git.run(
+                repo_path,
+                ["rev-parse", f"{repo_branch}^1"],
+                echo=True,
+                prefix=prefix,
+            )
+            Git.run(
+                repo_path,
+                ["merge-base", repo_branch, f"origin/{scheme_branch}"],
+                echo=True,
+                prefix=prefix,
+                allow_non_zero_exit=True,
+            )
+            Git.run(
+                repo_path,
+                ["log", "--oneline", repo_branch],
+                echo=True,
+                prefix=prefix,
+            )
+            Git.run(
+                repo_path,
+                ["log", "--oneline", f"origin/{scheme_branch}"],
                 echo=True,
                 prefix=prefix,
             )
@@ -175,6 +212,26 @@ def get_branch_for_repo(
                 echo=True,
                 prefix=prefix,
             )
+            Git.run(
+                repo_path,
+                ["merge-base", repo_branch, f"origin/{scheme_branch}"],
+                echo=True,
+                prefix=prefix,
+                allow_non_zero_exit=True,
+            )
+            Git.run(
+                repo_path,
+                ["log", "--oneline", repo_branch],
+                echo=True,
+                prefix=prefix,
+            )
+            Git.run(
+                repo_path,
+                ["log", "--oneline", f"origin/{scheme_branch}"],
+                echo=True,
+                prefix=prefix,
+            )
+
             # Check out repo_branch and merge the base branch into it.
             # GitHub cannot be trusted to keep PR merge branches up-to-date.
             Git.run(repo_path, ["checkout", repo_branch], echo=True, prefix=prefix)
