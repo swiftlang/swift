@@ -433,17 +433,17 @@ TEST(IsolationHistoryDeathTest, SingleRegionDuplicateIndexAsserts) {
 }
 #endif
 
-// separateRegions pushes a single boundary and one AddNewRegionForElement
-// per index — sanity check that we don't accidentally synthesize a merge,
-// that every input element is tracked afterwards, and that each lives in
-// a distinct region.
+// makePartitionWithSeparateRegions pushes a single boundary and one
+// AddNewRegionForElement per index — sanity check that we don't accidentally
+// synthesize a merge, that every input element is tracked afterwards, and
+// that each lives in a distinct region.
 TEST(IsolationHistory, SeparateRegionsShape) {
   llvm::BumpPtrAllocator allocator;
   IsolationHistory::Factory historyFactory(allocator);
 
   SILLocation loc = SILLocation::invalid();
-  auto p = Partition::separateRegions(loc, {Element(0), Element(1), Element(2)},
-                                      historyFactory.get());
+  auto p = makePartitionWithSeparateRegions(
+      loc, {Element(0), Element(1), Element(2)}, historyFactory.get());
 
   auto counts = HistoryNodeCounts::from(p.getIsolationHistory());
   EXPECT_EQ(counts.sequenceBoundary, 1u);
@@ -452,10 +452,10 @@ TEST(IsolationHistory, SeparateRegionsShape) {
 
   for (Element e : {Element(0), Element(1), Element(2)})
     EXPECT_TRUE(p.isTrackingElement(e))
-        << "Element " << unsigned(e) << " was not tracked by separateRegions";
+        << "Element " << unsigned(e) << " was not tracked";
 
   // Each element must land in a distinct region — that's the whole
-  // contract of separateRegions vs singleRegion.
+  // point of separate regions vs singleRegion.
   PartitionTester tester(p);
   unsigned r0 = tester.getRegion(0);
   unsigned r1 = tester.getRegion(1);
@@ -465,18 +465,17 @@ TEST(IsolationHistory, SeparateRegionsShape) {
   EXPECT_NE(r1, r2);
 }
 
-// popHistory drains a separateRegions-built partition back to having no
-// element mappings. Unlike singleRegion, separateRegions's push pattern is
-// the same shape (one AddNew per element) regardless of N — no merge nodes
-// to interact with — so the round-trip works on today's tree (with
-// distinct indices).
+// popHistory drains a separate-regions partition back to having no element
+// mappings. Unlike singleRegion, the per-element push pattern is the same
+// shape (one AddNew per element) regardless of N — no merge nodes to interact
+// with — so the round-trip works on today's tree (with distinct indices).
 TEST(IsolationHistory, SeparateRegionsRoundTrip) {
   llvm::BumpPtrAllocator allocator;
   IsolationHistory::Factory historyFactory(allocator);
 
   SILLocation loc = SILLocation::invalid();
-  auto p = Partition::separateRegions(loc, {Element(0), Element(1), Element(2)},
-                                      historyFactory.get());
+  auto p = makePartitionWithSeparateRegions(
+      loc, {Element(0), Element(1), Element(2)}, historyFactory.get());
 
   llvm::SmallVector<IsolationHistory, 4> joins;
   while (p.popHistory(joins))
@@ -487,29 +486,6 @@ TEST(IsolationHistory, SeparateRegionsRoundTrip) {
   for (Element e : {Element(0), Element(1), Element(2)})
     EXPECT_FALSE(p.isTrackingElement(e))
         << "Element " << unsigned(e) << " was not removed by popHistory";
-}
-
-// Same bug as SingleRegionDuplicateIndexCrashOnPop, in
-// Partition::separateRegions: the per-iteration push pattern (one
-// AddNewRegionForElement per loop iteration) records duplicate
-// AddNewRegionForElement nodes. Pop fires the
-// `iter != elementToRegionMap.end()` assert in popHistoryOnce's
-// AddNewRegionForElement undo on the second AddNew(1) pop because the
-// first already erased element 1.
-TEST(IsolationHistory, SeparateRegionsDuplicateIndexCrashOnPop) {
-  llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
-  SILLocation loc = SILLocation::invalid();
-
-  auto p = Partition::separateRegions(loc, {Element(1), Element(1)},
-                                      historyFactory.get());
-
-  llvm::SmallVector<IsolationHistory, 4> joins;
-  // Asserts in AddNewRegionForElement undo on the second AddNew(1) pop
-  // pre-fix.
-  while (p.popHistory(joins))
-    continue;
-  EXPECT_FALSE(p.hasHistory());
 }
 
 // Each MergeElementRegions node pre-existing in the joined predecessors
@@ -532,7 +508,7 @@ TEST(IsolationHistory, JoinPreservesAncestorBoundaryForExistingMerges) {
   fst.trackNewElement(Element(2));
 
   // snd: 0, 1, 2 are each in their own region.
-  Partition snd = Partition::separateRegions(
+  Partition snd = makePartitionWithSeparateRegions(
       loc, {Element(0), Element(1), Element(2)}, historyFactory.get());
 
   // Both predecessors carry their own per-instruction boundaries.

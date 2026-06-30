@@ -1002,11 +1002,6 @@ public:
   static Partition singleRegion(SILLocation loc, ArrayRef<Element> indices,
                                 IsolationHistory inputHistory);
 
-  /// Return a new Partition that has each element of \p indices in their own
-  /// region.
-  static Partition separateRegions(SILLocation loc, ArrayRef<Element> indices,
-                                   IsolationHistory inputHistory);
-
   /// Test two partititons for equality by first putting them in canonical form
   /// then comparing for exact equality.
   ///

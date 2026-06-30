@@ -40,6 +40,25 @@ struct Partition::PartitionTester {
   auto end() const { return p.elementToRegionMap.end(); }
 };
 
+/// Build a Partition with each element of \p indices in its own region.
+///
+/// This is the synonym for the former Partition::separateRegions factory,
+/// which was removed because it had no production callers: a single history
+/// sequence boundary followed by one trackNewElement per index is exactly the
+/// operation sequence that factory performed. Callers must pass distinct
+/// indices.
+inline Partition makePartitionWithSeparateRegions(
+    SILLocation loc, llvm::ArrayRef<PartitionPrimitives::Element> indices,
+    IsolationHistory history) {
+  Partition p(history);
+  if (indices.empty())
+    return p;
+  p.pushHistorySequenceBoundary(loc);
+  for (PartitionPrimitives::Element index : indices)
+    p.trackNewElement(index);
+  return p;
+}
+
 /// A no-op PartitionOpEvaluator used by tests that drive Partition state
 /// through PartitionOp sequences without caring about isolation info,
 /// source locations, or send-error reporting. Provides just enough hooks

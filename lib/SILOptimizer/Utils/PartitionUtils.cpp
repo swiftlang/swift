@@ -298,33 +298,6 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
   return p;
 }
 
-Partition Partition::separateRegions(SILLocation loc, ArrayRef<Element> indices,
-                                     IsolationHistory inputHistory) {
-  Partition p(inputHistory);
-  if (indices.empty())
-    return p;
-
-  // De-duplicate indices: see comment in singleRegion for why duplicates
-  // are unrecoverable in popHistory.
-  SmallVector<Element, 8> uniqueIndices;
-  for (Element idx : indices)
-    uniqueIndices.push_back(idx);
-  sortUnique(uniqueIndices);
-
-  // Place all operations in one history sequence.
-  p.pushHistorySequenceBoundary(loc);
-
-  auto maxIndex = Element(0);
-  for (Element index : uniqueIndices) {
-    p.elementToRegionMap.insert_or_assign(index, Region(index));
-    p.pushNewElementRegion(index);
-    maxIndex = Element(std::max(maxIndex, index));
-  }
-  p.nextAvailableRegionNum = Region(maxIndex + 1);
-  assert(p.is_canonical_correct());
-  return p;
-}
-
 void Partition::markSent(Element val, SendingOperandSet *sendingOperandSet) {
   // First see if our val is tracked. If it is not tracked, insert it and mark
   // its new region as sent.
