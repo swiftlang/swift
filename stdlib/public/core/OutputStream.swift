@@ -304,7 +304,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
     isDebugPrint: Bool
 ) {
   func printTypeName(_ type: Any.Type) {
-    // Print type names without qualification, unless we're debugPrint'ing.
+    // Print type names without qualification, unless we're debugPrinting.
     target.write(_typeName(type, qualified: isDebugPrint))
   }
 
