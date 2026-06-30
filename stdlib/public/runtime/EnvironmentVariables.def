@@ -95,8 +95,9 @@ VARIABLE(SWIFT_DEBUG_ENABLE_PROTOCOL_CONFORMANCES_LOOKUP_LOG,
 VARIABLE(SWIFT_BINARY_COMPATIBILITY_VERSION, uint32, 0,
         "Set the binary compatibility level of the Swift Standard Library")
 
-VARIABLE(SWIFT_DEBUG_FAILED_TYPE_LOOKUP, boolean, false,
-         "Enable warnings when we fail to look up a type by name.")
+VARIABLE(SWIFT_DEBUG_FAILED_TYPE_LOOKUP, boolean, true,
+         "Enable warnings when we fail to look up a type by name in a compiler "
+         "generated type lookup call.")
 
 VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_METADATA, boolean, true,
          "Enable use of metadata in prespecializations library.")

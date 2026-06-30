@@ -356,7 +356,7 @@ public enum _DebuggerSupport {
     }
 
     guard let type =
-      unsafe _getTypeByMangledNameInContext(
+      unsafe _getTypeByMangledNameInContextQuiet(
         mangledTypeName,
         UInt(mangledTypeName.count),
         genericContext: nil,
