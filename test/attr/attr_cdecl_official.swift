@@ -65,6 +65,9 @@ enum SwiftEnum { case A, B }
 @c(CEnumStringRawType) enum CEnumStringRawType: String { case A, B }
 // expected-error @-1 {{'@c' enum raw type 'String' is not an integer type}}
 
+@c enum CEnumGeneric<T>: CInt { case A, B }
+// expected-error @-1 {{enum cannot be marked '@c' because it is generic}}
+
 @c(swiftStruct)
 func swiftStruct(x: SwiftStruct) {}
 // expected-error @-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
