@@ -3222,3 +3222,91 @@ public enum BorrowMutateMacro: AccessorMacro {
     }
 }
 
+private func verbatimCode(_ args: LabeledExprListSyntax?) throws -> String {
+  guard let literal = args?.first?.expression.as(StringLiteralExprSyntax.self),
+        let value = literal.representedLiteralValue
+  else {
+    throw CustomError.message("Macro requires a string literal")
+  }
+  return value
+}
+
+private func verbatimCode(_ node: AttributeSyntax) throws -> String {
+  guard case let .argumentList(args) = node.arguments else {
+    throw CustomError.message("Macro requires a string literal")
+  }
+  return try verbatimCode(args)
+}
+
+public struct PeerThatEmitsCodeMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    ["\(raw: try verbatimCode(node))"]
+  }
+}
+
+public struct MemberThatEmitsCodeMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    ["\(raw: try verbatimCode(node))"]
+  }
+}
+
+public struct ExtensionThatEmitsCodeMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax = "extension \(type) { \(raw: try verbatimCode(node)) }"
+    return [ext.cast(ExtensionDeclSyntax.self)]
+  }
+}
+
+public struct DeclarationThatEmitsCodeMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    ["\(raw: try verbatimCode(node.arguments))"]
+  }
+}
+
+public struct AccessorThatEmitsCodeMacro: AccessorMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingAccessorsOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    ["\(raw: try verbatimCode(node))"]
+  }
+}
+
+public struct ExpressionThatEmitsCodeMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    "\(raw: try verbatimCode(node.arguments))"
+  }
+}
+
+public struct MemberAttributeThatAddsPeerMacro: MemberAttributeMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [AttributeSyntax] {
+    guard member.is(FunctionDeclSyntax.self) else { return [] }
+    return ["@PeerThatEmitsCode(\(literal: try verbatimCode(node)))"]
+  }
+}
