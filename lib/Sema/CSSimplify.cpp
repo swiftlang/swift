@@ -40,6 +40,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/Constraint.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
@@ -6846,6 +6847,9 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
+    if (hasAnyRestriction())
+      return false;
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       return true;
@@ -6856,6 +6860,12 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(
             CollectionElementContextualMismatch::create(
                 *this, lhs, rhs, getConstraintLocator(anchor, path)));
+        return true;
+      }
+      if (path.back().is<LocatorPathElt::ApplyArgToParam>()) {
+        conversionsOrFixes.push_back(
+            AllowArgumentMismatch::create(*this, lhs, rhs,
+                                          getConstraintLocator(anchor, path)));
         return true;
       }
     }
@@ -14646,6 +14656,27 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
           llvm::PointerIntPair<Type, 3, unsigned> baseType2) -> SolutionKind {
     if (restriction != ConversionRestrictionKind::PointerToPointer)
       increaseScore(ScoreKind::SK_ValueToPointerConversion, locator);
+
+    // Since this match doesn't add any custom path elements, let's drop
+    // `OptionalInjection` to avoid confusing generic argument matching.
+    // This is important, for example, in situations like
+    // `inout T` -> `UnsafePointer<U>?` in argument positions,
+    // `inout T` would be "injected" into optional by unwrapping `UnsafePointer`
+    // so the only match that matters here is pointers and their
+    // `Pointee` generic parameters.
+    if (shouldAttemptFixes()) {
+      if (locator.endsWith<LocatorPathElt::OptionalInjection>()) {
+        SmallVector<LocatorPathElt, 2> path;
+        auto anchor = locator.getLocatorParts(path);
+
+        while (!path.empty() &&
+               path.back().is<LocatorPathElt::OptionalInjection>()) {
+          path.pop_back();
+        }
+
+        locator = getConstraintLocator(anchor, path);
+      }
+    }
 
     auto result =
         matchTypes(baseType1.getPointer(), baseType2.getPointer(),
