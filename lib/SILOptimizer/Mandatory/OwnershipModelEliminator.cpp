@@ -415,7 +415,8 @@ bool OwnershipModelEliminatorVisitor::visitApplyInst(ApplyInst *ai) {
 
   // Insert destroy_addr for @in_cxx arguments.
   auto fnTy = callee->getType().castTo<SILFunctionType>();
-  SILFunctionConventions fnConv(fnTy, ai->getModule());
+  SILFunctionConventions fnConv(
+      fnTy, SILAddressConventions::forFunction(*ai->getFunction()));
   bool changed = false;
 
   for (int i = fnConv.getSILArgIndexOfFirstParam(),

@@ -418,6 +418,7 @@ namespace {
 
 /// Verify invariants on a key path component.
 void verifyKeyPathComponent(SILModule &M,
+                            const SILFunction *F,
                             TypeExpansionContext typeExpansionContext,
                             SerializedKind_t serializedKind,
                             llvm::function_ref<void(bool, StringRef)> require,
@@ -666,7 +667,8 @@ void verifyKeyPathComponent(SILModule &M,
         // object type until AddressLowering rewrites it. Accept that
         // intermediate shape.
         require(contextType == operandType ||
-                    (!M.useLoweredAddresses() &&
+                    (!SILAddressConventions::forFunctionOrRawSIL(F, M)
+                          .useLoweredAddresses() &&
                      (contextType.isAddress() && operandType.isObject() &&
                       contextType.getObjectType() == operandType)),
                 "operand must match type required by pattern");
@@ -2291,7 +2293,7 @@ public:
             "substituted callee type does not match substitutions");
 
     // Check that the arguments and result match.
-    SILFunctionConventions substConv(substTy, F.getModule());
+    SILFunctionConventions substConv(substTy, fnConv.silConv);
     require(site.getNumArguments() == substConv.getNumSILArguments(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = site.getNumArguments(); i < size; ++i) {
@@ -2338,7 +2340,7 @@ public:
   void checkApplyInst(ApplyInst *AI) {
     checkFullApplySite(AI);
 
-    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), fnConv.silConv);
     requireSameType(
         AI->getType(), calleeConv.getSILResultType(F.getTypeExpansionContext()),
         "type of apply instruction doesn't match function result type");
@@ -2365,7 +2367,7 @@ public:
   void checkTryApplyInst(TryApplyInst *AI) {
     checkFullApplySite(AI);
 
-    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), fnConv.silConv);
 
     require(!calleeConv.funcTy->isCoroutine(),
             "cannot call coroutine with normal apply");
@@ -2405,7 +2407,7 @@ public:
   void checkBeginApplyInst(BeginApplyInst *AI) {
     checkFullApplySite(AI);
 
-    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), fnConv.silConv);
     auto yieldResults = AI->getYieldedValues();
     auto yields = calleeConv.getYields();
     require(yields.size() == yieldResults.size(),
@@ -2451,7 +2453,7 @@ public:
             "operand of end_apply must be a begin_apply");
 
     BeginApplyInst *bai = AI->getBeginApply();
-    SILFunctionConventions calleeConv(bai->getSubstCalleeType(), F.getModule());
+    SILFunctionConventions calleeConv(bai->getSubstCalleeType(), fnConv.silConv);
 
     requireSameType(
       AI->getType(), calleeConv.getSILResultType(F.getTypeExpansionContext()),
@@ -2536,7 +2538,7 @@ public:
             "result of partial_apply should take as many inputs as were not "
             "applied by the instruction");
 
-    SILFunctionConventions substConv(substTy, F.getModule());
+    SILFunctionConventions substConv(substTy, fnConv.silConv);
     unsigned appliedArgStartIdx =
         substConv.getNumSILArguments() - PAI->getNumArguments();
     for (auto p : llvm::enumerate(PAI->getArguments())) {
@@ -3506,7 +3508,8 @@ public:
     // and `initialValue`.
     {
       CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
-      SILFunctionConventions initConv(initTy, AI->getModule());
+      SILFunctionConventions initConv(
+          initTy, SILAddressConventions::forFunction(F));
 
       require(initConv.getResults().size() ==
                   AI->getNumInitializedProperties(),
@@ -3520,7 +3523,8 @@ public:
     // Check setter - it's a partially applied reference which takes
     // `initialValue`.
     CanSILFunctionType setterTy = setterFn->getType().castTo<SILFunctionType>();
-    SILFunctionConventions setterConv(setterTy, AI->getModule());
+    SILFunctionConventions setterConv(
+        setterTy, SILAddressConventions::forFunction(F));
     require(setterConv.getNumIndirectSILResults() == 0,
             "set function has indirect results");
     checkAssignByWrapperArgs(Src->getType(), setterConv);
@@ -3754,21 +3758,21 @@ public:
   }
 
   void checkUnownedCopyValueInst(UnownedCopyValueInst *I) {
-    require(!F.getModule().useLoweredAddresses(),
+    require(!F.hasLoweredAddresses(),
             "unowned_copy_value is only valid in opaque values");
     require(I->getType().isAddressOnly(F),
             "unowned_copy_value must produce an address-only value");
   }
 
   void checkWeakCopyValueInst(WeakCopyValueInst *I) {
-    require(!F.getModule().useLoweredAddresses(),
+    require(!F.hasLoweredAddresses(),
             "weak_copy_value is only valid in opaque values");
     require(I->getType().isAddressOnly(F),
             "weak_copy_value must produce an address-only value");
   }
 
   void checkStrongCopyWeakValueInst(StrongCopyWeakValueInst *I) {
-    require(!F.getModule().useLoweredAddresses(),
+    require(!F.hasLoweredAddresses(),
             "strong_copy_weak_value is only valid in opaque values");
     require(I->getOperand()->getType().isAddressOnly(F),
             "strong_copy_weak_value requires an address-only operand");
@@ -4070,7 +4074,7 @@ public:
   }
 
   void checkTupleAddrConstructorInst(TupleAddrConstructorInst *taci) {
-    require(F.getModule().useLoweredAddresses(),
+    require(F.hasLoweredAddresses(),
             "tuple_addr_constructor is invalid in opaque values");
     require(taci->getNumElements() > 0,
             "Cannot be applied to tuples that do not contain any real "
@@ -4488,7 +4492,8 @@ public:
   }
 
   SILType getMethodSelfType(CanSILFunctionType ft) {
-    SILFunctionConventions fnConv(ft, F.getModule());
+    SILFunctionConventions fnConv(ft,
+                                  SILAddressConventions::forFunction(F));
     return fnConv.getSILType(ft->getParameters().back(),
                              F.getTypeExpansionContext());
   }
@@ -5187,8 +5192,8 @@ public:
     auto fromCanTy = fromTy.getASTType();
     auto toCanTy = toTy.getASTType();
 
-    require(canSILUseScalarCheckedCastInstructions(F.getModule(),
-                                                   fromCanTy, toCanTy),
+    require(canSILUseScalarCheckedCastInstructions(
+                F.getModule(), F.hasLoweredAddresses(), fromCanTy, toCanTy),
             "invalid value checked cast src or dest types");
 
     // Peel off metatypes. If two types are checked-cast-able, so are their
@@ -6302,7 +6307,7 @@ public:
           break;
         }
       
-        verifyKeyPathComponent(F.getModule(),
+        verifyKeyPathComponent(F.getModule(), &F,
                                F.getTypeExpansionContext(),
                                F.getSerializedKind(),
           [&](bool reqt, StringRef message) { _require(reqt, message); },
@@ -6849,7 +6854,7 @@ public:
   }
 
   void checkTuplePackExtractInst(TuplePackExtractInst *i) {
-    require(!F.getModule().useLoweredAddresses(),
+    require(!F.hasLoweredAddresses(),
             "tuple_pack_extract is only valid in opaque values");
     auto index = requireValueKind<AnyPackIndexInst>(
         i->getIndex(),
@@ -6919,8 +6924,12 @@ public:
         return;
       }
 
+      // Use the function's own conventions (fnConv carries its per-function
+      // lowered-addresses state) so an already-lowered function verifies against
+      // address-form ownership even while the module stage is still Raw.
       auto ownershipkind = ValueOwnershipKind(
-          F, mappedTy, fnConv.getSILArgumentConvention(bbarg->getIndex()));
+          F, mappedTy, fnConv.getSILArgumentConvention(bbarg->getIndex()),
+          fnConv.silConv);
 
       if (bbarg->getOwnershipKind() != ownershipkind) {
         llvm::errs() << what << " ownership kind mismatch!\n";
@@ -7707,7 +7716,7 @@ void SILProperty::verify(const SILModule &M) const {
         TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
             ResilienceExpansion::Maximal);
     auto baseTy = getBaseType();
-    verifyKeyPathComponent(const_cast<SILModule&>(M),
+    verifyKeyPathComponent(const_cast<SILModule&>(M), /*F=*/nullptr,
                            typeExpansionContext,
                            getSerializedKind(),
                            require,

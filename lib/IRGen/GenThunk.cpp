@@ -140,7 +140,7 @@ void IRGenThunk::prepareArguments() {
     witnessMetadata.SelfMetadata = original.takeLast();
   }
 
-  SILFunctionConventions conv(origTy, IGF.getSILModule());
+  SILFunctionConventions conv(origTy, IGF.IGM.silConv);
 
   if (origTy->hasErrorResult()) {
     typedErrorIndirectErrorSlot = nullptr;
@@ -342,7 +342,7 @@ void IRGenThunk::emit() {
   Explosion result;
 
   // Determine if the result is returned indirectly.
-  SILFunctionConventions conv(origTy, IGF.getSILModule());
+  SILFunctionConventions conv(origTy, IGF.IGM.silConv);
   SILType directResultType = conv.getSILResultType(expansionContext);
   auto &directResultTL = IGF.IGM.getTypeInfo(directResultType);
   auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);

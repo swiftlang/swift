@@ -52,8 +52,8 @@ using namespace Lowering;
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
                                DeclContext *DC, bool IsEmittingTopLevelCode)
-    : SGM(SGM), F(F), silConv(SGM.M), FunctionDC(DC),
-      StartOfPostmatter(F.end()), B(*this),
+    : SGM(SGM), F(F), silConv(SILAddressConventions::forFunction(F)),
+      FunctionDC(DC), StartOfPostmatter(F.end()), B(*this),
       SF(DC ? DC->getParentSourceFile() : nullptr), Cleanups(*this),
       StatsTracer(SGM.M.getASTContext().Stats, "SILGen-function", &F),
       IsEmittingTopLevelCode(IsEmittingTopLevelCode) {
@@ -677,7 +677,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       case CaptureKind::Immutable:
       case CaptureKind::StorageAddress: {
         auto ty = getLoweredType(type);
-        if (SGM.M.useLoweredAddresses())
+        if (!SGM.M.usesOpaqueValues())
           ty = ty.getAddressType();
         capturedArgs.push_back(emitUndef(ty));
         break;
@@ -702,7 +702,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     // expansion context without opaque archetype substitution.
     auto getAddressValue = [&](SILValue entryValue, bool forceCopy,
                                bool forLValue) -> SILValue {
-      if (!SGM.M.useLoweredAddresses() && !forLValue && !isPack) {
+      if (SGM.M.usesOpaqueValues() && !forLValue && !isPack) {
         // In opaque values mode, addresses aren't used except by lvalues.
         auto &lowering = getTypeLowering(entryValue->getType());
         if (entryValue->getType().isAddress()) {
@@ -731,7 +731,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           }
           return entryValue;
         }
-      } else if (SGM.M.useLoweredAddresses() &&
+      } else if (!SGM.M.usesOpaqueValues() &&
                  SGM.Types
                      .getTypeLowering(
                          valueType, TypeExpansionContext::
@@ -1271,7 +1271,8 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     auto UIApplicationMainFn =
         builder.getOrCreateFunction(mainClass, mainRef, NotForDefinition);
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
-    SILFunctionConventions fnConv(fnTy, SGM.M);
+    SILFunctionConventions fnConv(fnTy,
+                                  SILAddressConventions::forFunction(F));
 
     // Get the class name as a string using NSStringFromClass.
     CanType mainClassTy = mainClass->getDeclaredInterfaceType()
@@ -1903,7 +1904,8 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
                                       getTypeExpansionContext());
   };
 
-  SILFunctionConventions setterConv(getSetterType(setterFRef), SGM.M);
+  SILFunctionConventions setterConv(
+      getSetterType(setterFRef), SILAddressConventions::forFunction(F));
 
   // Emit captures for the setter
   SmallVector<SILValue, 4> capturedArgs;
@@ -2001,7 +2003,8 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   // Check whether value is supposed to be passed indirectly and
   // materialize if required.
   {
-    SILFunctionConventions initConv(initTy, SGM.M);
+    SILFunctionConventions initConv(
+        initTy, SILAddressConventions::forFunction(F));
 
     auto newValueArgIdx = initConv.getSILArgIndexOfFirstParam();
     auto newValueParamInfo = initConv.getParamInfoForSILArg(newValueArgIdx);

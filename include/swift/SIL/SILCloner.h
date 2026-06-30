@@ -691,6 +691,13 @@ protected:
   /// overridden.
   void postFixUp(SILFunction *F) {}
 
+  /// Whether cloning produces a whole new function that is a clone of the
+  /// source, so the clone is in the same lowered-address form as the source.
+  ///
+  /// The inliner overrides this to false: it splices a callee into an existing
+  /// caller, whose lowered-address form is its own and must not be overwritten.
+  bool isWholeFunctionClone() const { return true; }
+
 private:
   /// MARK: SILCloner implementation details hidden from CRTP extensions.
 
@@ -1100,6 +1107,11 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::commonFixUp(SILFunction *F) {
   // Call any cleanup specific to the CRTP extensions.
   asImpl().preFixUp(F);
+
+  // A whole-function clone is in the same lowered-address form as its source.
+  // Copy it so the clone's conventions and verification observe the right form.
+  if (asImpl().isWholeFunctionClone() && !getBuilder().isInsertingIntoGlobal())
+    getBuilder().getFunction().setHasLoweredAddresses(F->hasLoweredAddresses());
 
   // If our source function is in ossa form, but the function into which we are
   // cloning is not in ossa, after we clone, eliminate default arguments.

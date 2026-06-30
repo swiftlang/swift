@@ -322,8 +322,9 @@ StringRef OwnershipKind::asString() const {
 
 ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
                                        SILArgumentConvention Convention)
-    : ValueOwnershipKind(F, Type, Convention,
-                         SILAddressConventions(F.getModule())) {}
+    : ValueOwnershipKind(
+          F, Type, Convention,
+          SILAddressConventions::forFunction(F)) {}
 
 ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
                                        SILArgumentConvention Convention,

@@ -1600,7 +1600,8 @@ namespace {
             SGF.SGM.M, Substitutions, SGF.getTypeExpansionContext());
       }
 
-      SILFunctionConventions accessorConv(accessorTy, SGF.SGM.M);
+      SILFunctionConventions accessorConv(
+          accessorTy, SILAddressConventions::forFunction(SGF.F));
 
       // FIXME: This should use CallEmission instead of doing everything
       // manually.

@@ -40,7 +40,9 @@ extension Context {
 
   public var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
 
-  public var moduleHasLoweredAddresses: Bool { _bridged.moduleHasLoweredAddresses() }
+  /// True if -enable-sil-opaque-values was passed. Address-only types are
+  /// represented as opaque SSA values in Raw SIL rather than as raw addresses.
+  public var usesOpaqueValues: Bool { _bridged.usesOpaqueValues() }
 
   public func lookupDeinit(ofNominal: NominalTypeDecl) -> Function? {
     _bridged.lookUpNominalDeinitFunction(ofNominal.bridged).function

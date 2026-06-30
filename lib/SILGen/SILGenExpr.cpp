@@ -3670,7 +3670,7 @@ static PreparedArguments loadIndexValuesForKeyPathComponent(
       // The index argument arrives as an `Indirect_In_Guaranteed` parameter,
       // so a non-address shape is only possible when SIL operates on opaque
       // values rather than addresses.
-      assert(!SGF.SGM.M.useLoweredAddresses());
+      assert(!SGF.useLoweredAddresses());
       if (indexes.size() > 1)
         elt = SGF.B.createTupleExtract(loc, elt, i);
       value = ManagedValue::forBorrowedRValue(elt).copy(SGF, loc);
@@ -3715,7 +3715,7 @@ static void emitReturn(SILGenFunction &subSGF, CanType methodType,
     resultSubst = subSGF.emitSubstToOrigValue(
         loc, resultSubst, AbstractionPattern::getOpaque(), methodType);
 
-  if (subSGF.F.getModule().useLoweredAddresses()) {
+  if (subSGF.useLoweredAddresses()) {
     resultSubst.forwardInto(subSGF, loc, resultArg);
     scope.pop();
     subSGF.B.createReturn(loc, subSGF.emitEmptyTuple(loc));
@@ -3839,7 +3839,7 @@ static void emitKeyPathThunk(
     baseArgTy = genericEnv->mapTypeIntoEnvironment(SGM.M, baseArgTy);
   }
   if (!lowerValueArg) {
-    if (SGM.M.useLoweredAddresses()) {
+    if (!SGM.M.usesOpaqueValues()) {
       resultArg = entry->createFunctionArgument(resultArgTy);
     }
   } else {

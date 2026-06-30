@@ -1526,8 +1526,7 @@ void swift::insertDestroyOfCapturedArguments(
   assert(pai->isOnStack());
 
   ApplySite site(pai);
-  SILFunctionConventions calleeConv(site.getSubstCalleeType(),
-                                    pai->getModule());
+  SILFunctionConventions calleeConv = site.getSubstCalleeConv();
   auto loc = CleanupLocation(origLoc);
   for (auto &arg : pai->getArgumentOperands()) {
     SILValue argValue = getValueToDestroy(arg.get());
@@ -1553,8 +1552,7 @@ void swift::insertDeallocOfCapturedArguments(
   assert(pai->isOnStack());
 
   ApplySite site(pai);
-  SILFunctionConventions calleeConv(site.getSubstCalleeType(),
-                                    pai->getModule());
+  SILFunctionConventions calleeConv = site.getSubstCalleeConv();
   for (auto &arg : pai->getArgumentOperands()) {
     unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
     assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());

@@ -610,7 +610,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
 
     // Load error from the slot to emit an early return if necessary.
     {
-      SILFunctionConventions conv(decoder.getMethodType(), IGM.getSILModule());
+      SILFunctionConventions conv(decoder.getMethodType(), IGM.silConv);
       SILType errorType =
           conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
 
@@ -828,7 +828,9 @@ void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
 
 void DistributedAccessor::emit() {
   auto targetTy = Target.getType();
-  SILFunctionConventions targetConv(targetTy, IGF.getSILModule());
+  SILFunctionConventions targetConv(
+      targetTy,
+      IGF.IGM.silConv);
   TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
 
   auto params = IGF.collectParameters();
@@ -1144,12 +1146,16 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
 }
 
 SILType DistributedAccessor::getResultType() const {
-  SILFunctionConventions conv(AccessorType, IGF.getSILModule());
+  SILFunctionConventions conv(
+      AccessorType,
+      IGF.IGM.silConv);
   return conv.getSILResultType(IGM.getMaximalTypeExpansionContext());
 }
 
 SILType DistributedAccessor::getErrorType() const {
-  SILFunctionConventions conv(AccessorType, IGF.getSILModule());
+  SILFunctionConventions conv(
+      AccessorType,
+      IGF.IGM.silConv);
   return conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
 }
 

@@ -466,8 +466,7 @@ EnumElementDecl *SILType::getEnumElement(int caseIndex) const {
 }
 
 bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
-  SILModule &M = F.getModule();
-  return isLoadable(F) || !SILAddressConventions(M).useLoweredAddresses();
+  return isLoadable(F) || !F.hasLoweredAddresses();
 }
 
 bool SILType::isAddressOnly(const SILFunction &F) const {
@@ -666,8 +665,9 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
   switch (getConvention()) {
   case ResultConvention::Indirect:
   case ResultConvention::Pack:
-    return SILAddressConventions(M).isSILIndirect(*this) ? OwnershipKind::None
-                                                        : OwnershipKind::Owned;
+    return SILAddressConventions::forFunction(F).isSILIndirect(*this)
+               ? OwnershipKind::None
+               : OwnershipKind::Owned;
   case ResultConvention::Autoreleased:
   case ResultConvention::Owned:
     return OwnershipKind::Owned;
@@ -682,7 +682,8 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
       return OwnershipKind::None;
     return OwnershipKind::Unowned;
   case ResultConvention::GuaranteedAddress:
-    return isAddressResult(SILAddressConventions(M).loweredAddresses)
+    return isAddressResult(
+               SILAddressConventions::forFunction(F).useLoweredAddresses())
                ? OwnershipKind::None
                : OwnershipKind::Guaranteed;
   case ResultConvention::Inout:
@@ -694,31 +695,22 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
   llvm_unreachable("Unhandled ResultConvention in switch.");
 }
 
-SILAddressConventions::SILAddressConventions(SILModule &M)
-    : M(&M), loweredAddresses(M.useLoweredAddresses()) {}
-
 bool SILAddressConventions::isReturnedIndirectlyInSIL(SILType type,
-                                                     SILModule &M) {
-  if (SILAddressConventions(M).loweredAddresses) {
-    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
+                                                     const SILFunction &F) {
+  if (F.hasLoweredAddresses()) {
+    return F.getModule()
+        .Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
   return false;
 }
 
-bool SILAddressConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
-  if (SILAddressConventions(M).loweredAddresses) {
-    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
-        .isAddressOnly();
-  }
-
-  return false;
-}
-
-bool SILAddressConventions::isThrownIndirectlyInSIL(SILType type, SILModule &M) {
-  if (SILAddressConventions(M).loweredAddresses) {
-    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
+bool SILAddressConventions::isThrownIndirectlyInSIL(SILType type,
+                                                   const SILFunction &F) {
+  if (F.hasLoweredAddresses()) {
+    return F.getModule()
+        .Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 

@@ -345,13 +345,11 @@ FORWARDING_OWNERSHIP_INST(UncheckedOwnership)
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitEnumInst(EnumInst *I) {
-  if (!I->getModule().useLoweredAddresses() && I->getType().isAddressOnly(*I->getFunction())) {
-    // During address lowering, an address-only enum instruction will eventually
-    // be lowered to inject_enum_addr/init_enum_data_addr, initializing a
-    // non-trivial storage location.  So prior to AddressLowering (in opaque
-    // values mode) such an enum instruction produces a non-trivial value,
-    // without regard to whether it is in a trivial case.  Otherwise, non-trivial
-    // storage would fail to be destroy_addr'd.
+  if (!I->getFunction()->hasLoweredAddresses() && I->getType().isAddressOnly(*I->getFunction())) {
+    // Before AddressLowering (in opaque values mode), an address-only enum is
+    // later lowered to inject_enum_addr/init_enum_data_addr, initializing
+    // non-trivial storage. So it produces a non-trivial value regardless of
+    // case; otherwise that storage would fail to be destroy_addr'd.
     assert(!I->getType().isTrivial(*I->getFunction()));
     // An enum instruction is representation changing, so its address-only
     // operand must be owned.
@@ -403,7 +401,10 @@ static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
   if (isTrivial)
     return OwnershipKind::None;
 
-  SILFunctionConventions fnConv(fai.getSubstCalleeType(), f->getModule());
+  // Per-function conventions (via getSubstCalleeConv): an already-lowered
+  // function's apply has its formally-indirect results as address arguments
+  // with no direct result, even while the module stage is still Raw.
+  SILFunctionConventions fnConv = fai.getSubstCalleeConv();
   auto results = fnConv.getDirectSILResults();
   // No results => None.
   if (results.empty())

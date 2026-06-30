@@ -91,9 +91,11 @@ bool emitSuccessfulIndirectUnconditionalCast(
 bool emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, SILLocation loc,
                                              SILDynamicCastInst dynamicCast);
 
-/// Can the given cast be performed by the scalar checked-cast instructions in
-/// the current SIL stage, or do we need to use the indirect instructions?
+/// Can the given cast be performed by the scalar checked-cast instructions for
+/// a function with the given lowered-address state, or do we need to use the
+/// indirect instructions?
 bool canSILUseScalarCheckedCastInstructions(SILModule &M,
+                                            bool loweredAddresses,
                                             CanType sourceType,
                                             CanType targetType);
 
@@ -465,7 +467,8 @@ public:
 
   bool canSILUseScalarCheckedCastInstructions() const {
     return swift::canSILUseScalarCheckedCastInstructions(
-        getModule(), getSourceFormalType(), getTargetFormalType());
+        getModule(), getFunction()->hasLoweredAddresses(),
+        getSourceFormalType(), getTargetFormalType());
   }
 
   CheckedCastInstOptions getCheckedCastOptions() const {

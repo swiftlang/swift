@@ -768,7 +768,8 @@ SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
 
 void AccessEnforcementSelection::handleApply(ApplySite apply) {
   auto calleeTy = apply.getOrigCalleeType();
-  SILFunctionConventions calleeConv(calleeTy, *getModule());
+  SILFunctionConventions calleeConv(
+      calleeTy, SILAddressConventions::forFunction(*apply.getFunction()));
 
   for (Operand &oper : apply.getArgumentOperands()) {
     AddressCapture capture(oper);
