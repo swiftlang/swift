@@ -2391,6 +2391,7 @@ namespace {
       // opaque for code generation purposes.
       properties.setAddressOnly();
       properties.setInfinite();
+      properties.setNonTrivial();
       return handleAddressOnly(type, properties);
     }
 
