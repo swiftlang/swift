@@ -3140,6 +3140,14 @@ BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, Brid
   return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(), swift::MarkDependenceKind(kind))};
 }
 
+BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base,
+                                                        BridgedValue::Ownership ownership,
+                                                        BridgedInstruction::MarkDependenceKind kind) const {
+  return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(),
+                                           BridgedValue::unbridge(ownership),
+                                           swift::MarkDependenceKind(kind))};
+}
+
 BridgedInstruction BridgedBuilder::createMarkDependenceAddr(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {
   return {unbridged().createMarkDependenceAddr(
       regularLoc(), value.getSILValue(), base.getSILValue(),

@@ -838,6 +838,13 @@ public struct Builder {
     return notifyNew(markDependence.getAs(MarkDependenceInst.self))
   }
 
+  public func createMarkDependence(value: Value, base: Value, ownership: Ownership,
+                                   kind: MarkDependenceKind) -> MarkDependenceInst {
+    let markDependence = bridged.createMarkDependence(value.bridged, base.bridged, ownership._bridged,
+                                                      BridgedInstruction.MarkDependenceKind(rawValue: kind.rawValue)!)
+    return notifyNew(markDependence.getAs(MarkDependenceInst.self))
+  }
+
   public func createMarkDependenceAddr(value: Value, base: Value, kind: MarkDependenceKind) -> MarkDependenceAddrInst {
     let markDependence = bridged.createMarkDependenceAddr(
       value.bridged, base.bridged, BridgedInstruction.MarkDependenceKind(rawValue: kind.rawValue)!)
