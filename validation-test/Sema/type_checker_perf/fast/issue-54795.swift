@@ -8,10 +8,28 @@
 
 import SwiftUI
 
+// Stand-in for SwiftUI's `@State`, which became a macro in recent SDKs and would
+// otherwise require the SwiftUIMacros plugin. This test exercises type-checking
+// performance, not `@State` itself; the box reproduces `@State`'s nonmutating
+// setter and `Binding` projected value.
+@propertyWrapper
+struct FakeState<Value> {
+  final class Box { var value: Value; init(_ value: Value) { self.value = value } }
+  private let box: Box
+  init(wrappedValue: Value) { box = Box(wrappedValue) }
+  var wrappedValue: Value {
+    get { box.value }
+    nonmutating set { box.value = newValue }
+  }
+  var projectedValue: Binding<Value> {
+    Binding(get: { box.value }, set: { box.value = $0 })
+  }
+}
+
 struct Breathe: View {
     static private let colors: [Color] = [Color(#colorLiteral(red: 0.3529411765, green: 0.662745098, blue: 0.6745098039, alpha: 1)), Color(#colorLiteral(red: 0.4078431373, green: 0.7450980392, blue: 0.6549019608, alpha: 1)), Color(#colorLiteral(red: 0.4666666667, green: 0.8196078431, blue: 0.631372549, alpha: 1)), Color(#colorLiteral(red: 0.5179253817, green: 0.8318992257, blue: 0.6992306113, alpha: 1)), Color(#colorLiteral(red: 0.4078431373, green: 0.7333333333, blue: 0.6509803922, alpha: 1)), Color(#colorLiteral(red: 0.3568627451, green: 0.6666666667, blue: 0.6745098039, alpha: 1))]
 
-    @State private var leafSize: CGFloat = 50
+    @FakeState private var leafSize: CGFloat = 50
 
     var body: some View {
         ZStack {

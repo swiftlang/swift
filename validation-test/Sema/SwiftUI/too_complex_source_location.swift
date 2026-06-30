@@ -13,12 +13,21 @@
 
 import SwiftUI
 
-struct ContentView: View {
-    @State var selection = ""
+// A trivial stand-in for `@State` that avoids depending on the SwiftUI macro
+// plugin. This test only exercises a type-checking pattern, not `@State`
+// itself; all it needs is a `Binding` projected value for the `Picker`.
+@propertyWrapper
+struct FakeState<T> {
+  var wrappedValue: T
+  var projectedValue: Binding<T> { .constant(wrappedValue) }
+}
 
-    @State var a: Int?
-    @State var b: Int?
-    @State var c: Int?
+struct ContentView: View {
+    @FakeState var selection = ""
+
+    @FakeState var a: Int?
+    @FakeState var b: Int?
+    @FakeState var c: Int?
 
     var body: some View {
         ScrollView {
