@@ -2147,6 +2147,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_performance_hacks,
                    Opts.SolverEnablePerformanceHacks);
 
+  Opts.SolverEnableEnumerateSupertypes =
+      Args.hasFlag(OPT_solver_enable_enumerate_supertypes,
+                   OPT_solver_disable_enumerate_supertypes,
+                   Opts.SolverEnableEnumerateSupertypes);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 

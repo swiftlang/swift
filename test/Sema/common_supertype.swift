@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -solver-disable-enumerate-supertypes
 
 class A {}
 class B: A {}
@@ -31,7 +31,7 @@ func testClass1(x: C, y: E) -> Exactly<B> {
 }
 
 func testClass2(x: E, y: F) {
-  _ = test(x, y) // expected-error {{conflicting arguments to generic parameter 'T' ('E' vs. 'F' vs. 'D' vs. 'B' vs. 'A')}}
+  _ = test(x, y) // expected-error {{conflicting arguments to generic parameter 'T' ('E' vs. 'F')}}
 }
 
 func testClass3(x: A, y: AnyObject) -> Exactly<AnyObject> {

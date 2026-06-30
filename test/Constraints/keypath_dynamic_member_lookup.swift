@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -Xllvm -sil-disable-pass=simplification %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -Xllvm -sil-disable-pass=simplification -solver-disable-enumerate-supertypes %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -Xllvm -sil-disable-pass=simplification -solver-enable-enumerate-supertypes %s | %FileCheck %s
 
 struct Point {
   let x: Int

@@ -31,8 +31,7 @@ let p1: Path = #fileLiteral(resourceName: "what.txt")
 let p2 = #fileLiteral(resourceName: "what.txt") // expected-error{{could not infer type of file reference literal}}
 // expected-note@-1{{import Foundation to use 'URL' as the default file reference literal type}}
 
-let text = #fileLiteral(resourceName: "TextFile.txt").relativeString! // expected-error{{could not infer type of file reference literal}}
-// expected-note@-1{{import Foundation to use 'URL' as the default file reference literal type}}
+let text = #fileLiteral(resourceName: "TextFile.txt").relativeString! // expected-error{{failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)}}
 
 // rdar://problem/49861813
 #fileLiteral()

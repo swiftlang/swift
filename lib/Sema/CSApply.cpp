@@ -2365,6 +2365,17 @@ namespace {
             llvm_unreachable("unknown key path class!");
           }
         } else {
+          if (keyPathTy->is<ArchetypeType>()) {
+            keyPathTy = keyPathTy->getSuperclass();
+            ASSERT(keyPathTy);
+          }
+
+          // Situations like `any KeyPath<...> & Sendable`.
+          if (keyPathTy->isExistentialType()) {
+            keyPathTy = keyPathTy->getSuperclass();
+            ASSERT(keyPathTy);
+          }
+
           auto keyPathBGT = keyPathTy->castTo<BoundGenericType>();
           baseTy = keyPathBGT->getGenericArgs()[0];
 
