@@ -217,8 +217,6 @@ LEGACY_PASS(AccessMarkerElimination, "access-marker-elim",
      "Access Marker Elimination.")
 LEGACY_PASS(AddressLowering, "address-lowering",
      "SIL Address Lowering")
-LEGACY_PASS(LegacyAllocBoxToStack, "legacy-allocbox-to-stack",
-     "Stack Promotion of Box Objects")
 LEGACY_PASS(ArrayCountPropagation, "array-count-propagation",
      "Array Count Propagation")
 LEGACY_PASS(BasicInstructionPropertyDumper, "basic-instruction-property-dump",

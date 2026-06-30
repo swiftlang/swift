@@ -324,7 +324,7 @@ static bool isOutOfLifetime(SILInstruction *inst, SSAPrunedLiveness &liveness) {
   // impossible that a use of the object is not a potential load. So we would
   // always see a potential load if the lifetime of the object goes beyond the
   // store_weak.
-  return !liveness.isWithinBoundary(inst, /*deadEndBlocks=*/nullptr);
+  return !liveness.isWithinBoundary(inst);
 }
 
 /// Reports a warning if the stored object \p storedObj is never loaded within

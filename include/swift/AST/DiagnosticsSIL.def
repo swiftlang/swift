@@ -824,11 +824,6 @@ ERROR(builtin_get_function_isolation_bad_argument, none,
       "function type",
       ())
 
-ERROR(box_to_stack_cannot_promote_box_to_stack_due_to_escape_alloc, none,
-      "Can not promote value from heap to stack due to value escaping", ())
-NOTE(box_to_stack_cannot_promote_box_to_stack_due_to_escape_location, none,
-     "value escapes here", ())
-
 WARNING(semantic_function_improper_nesting, none, "'@_semantics' function calls non-'@_semantics' function with nested '@_semantics' calls", ())
 
 // SDK mismatch diagnostics
