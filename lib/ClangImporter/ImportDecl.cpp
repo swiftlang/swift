@@ -4635,9 +4635,25 @@ namespace {
         if (result)
           return result;
       }
+
+      // First, import this CXXMethodDecl as we would any regular C/C++ function
       auto *method = cast_or_null<ValueDecl>(VisitFunctionDecl(decl));
       if (!method)
         return nullptr;
+
+      // VisitFunctionDecl() might return a FuncDecl that was already
+      // fully-imported from a CXXMethodDecl due to circular importing.
+      // In that case, the fully-imported result should already be cached.
+      if (auto known =
+              Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
+          known != Impl.ImportedDecls.end()) {
+        // Skip VisitCXXMethodDecl post-processing (which is not idempotent)
+        // and return the already-cached result.
+        return known->second;
+      }
+
+      // Post-VisitFunctionDecl(), perform special handling that is specific
+      // to importing CXXMethodDecls...
 
       // For regular methods (not operators, constructors, etc.), if the return
       // type is an uninstantiated templated class, instantiate it now and
