@@ -153,7 +153,7 @@ extension DistributedActor {
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
   @available(SwiftStdlib 5.9, *)
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'distributed actor' instead")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated func assumeIsolated<T : Sendable>(
       _ operation: (isolated Self) throws -> T,
       file: StaticString = #fileID, line: UInt = #line

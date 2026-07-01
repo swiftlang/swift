@@ -356,7 +356,7 @@ extension Array {
   }
 
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("array.make_mutable")
   @_effects(notEscaping self.**)
   internal mutating func _makeMutableAndUniqueUnchecked() {
@@ -370,7 +370,7 @@ extension Array {
   ///
   /// After a call to `_endMutation` the buffer must not be mutated until a call
   /// to `_makeMutableAndUnique`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("array.end_mutation")
   @_effects(notEscaping self.**)
   internal mutating func _endMutation() {
@@ -415,7 +415,7 @@ extension Array {
   /// `0 ≤ index < count`.
   ///
   /// - Precondition: The buffer must be uniquely referenced and native.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("array.check_subscript")
   @_effects(notEscaping self.**)
   internal func _checkSubscript_mutating(_ index: Int) {
@@ -1089,7 +1089,7 @@ extension Array: RangeReplaceableCollection {
   /// If a new buffer needs to be allocated and `growForAppend` is true,
   /// the new capacity is calculated using `_growArrayCapacity`, but at least
   /// kept at `minimumCapacity`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _reserveCapacityImpl(
     minimumCapacity: Int, growForAppend: Bool
   ) {
@@ -1112,7 +1112,7 @@ extension Array: RangeReplaceableCollection {
   /// The `minimumCapacity` is the lower bound for the new capacity.
   /// If `growForAppend` is true, the new capacity is calculated using
   /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _createNewBuffer(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) {
@@ -1535,7 +1535,7 @@ extension Array {
   /// Implementation for:
   /// Array(unsafeUninitializedCapacity:initializingWith:)
   /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init<E: Error>(
     _unsafeUninitializedCapacity: Int,
     initializingWithTypedThrowsInitializer initializer: (
@@ -1592,7 +1592,7 @@ extension Array {
   ///       - initializedCount: The count of initialized elements in the array,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
-  @_alwaysEmitIntoClient @inlinable
+  @export(implementation)
   public init<E: Error>(
     unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
@@ -1631,7 +1631,7 @@ extension Array {
   ///     - Parameters:
   ///       - span: An `OutputSpan` covering uninitialized memory with
   ///         space for the specified number of elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init<E: Error>(
     capacity: Int,
     initializingWith initializer: (
@@ -1662,7 +1662,7 @@ extension Array {
   ///     - Parameters:
   ///       - span: An `OutputSpan` covering uninitialized memory with
   ///         space for the specified number of additional elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func append<E: Error>(
     addingCapacity uninitializedCount: Int,
     initializingWith initializer: (
@@ -1737,7 +1737,7 @@ extension Array {
   ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
@@ -1757,7 +1757,7 @@ extension Array {
   @available(SwiftStdlib 6.2, *)
   public var span: Span<Element> {
     @_lifetime(borrow self)
-    @_alwaysEmitIntoClient
+    @export(implementation)
     borrowing get {
 #if _runtime(_ObjC)
       if _slowPath(!_buffer._isNative) {
@@ -1844,7 +1844,7 @@ extension Array {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
   @_effects(notEscaping self.value**)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
@@ -1881,7 +1881,7 @@ extension Array {
   /// - Complexity: O(1) when the array's storage is uniquely referenced,
   ///   O(*n*) otherwise.
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
     mutating get {
@@ -2139,7 +2139,7 @@ extension Array {
   // This allows us to test the `_copyContents` implementation in
   // `_ArrayBuffer`. (It's like `_copyToContiguousArray` but it always makes a
   // copy.)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func _copyToNewArray() -> [Element] {
     unsafe Array(unsafeUninitializedCapacity: self.count) { buffer, count in
       var (it, c) = unsafe self._buffer._copyContents(initializing: buffer)
@@ -2311,7 +2311,7 @@ extension Array {
   /// but not all equal arrays are identical.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     unsafe self._buffer.identity == other._buffer.identity
   }

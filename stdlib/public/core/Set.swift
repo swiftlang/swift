@@ -222,7 +222,7 @@ extension Set: ExpressibleByArrayLiteral {
     self.init(_nonEmptyArrayLiteral: elements)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(_nonEmptyArrayLiteral elements: [Element]) {
     let native = _NativeSet<Element>(capacity: elements.count)
     for element in elements {
@@ -297,7 +297,7 @@ extension Set {
   ///   and returns a Boolean value indicating whether the element should be
   ///   included in the returned set.
   /// - Returns: A set of the elements that `isIncluded` allows.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(swift, introduced: 4.0)
   public consuming func filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool
@@ -1709,7 +1709,7 @@ extension Set {
   /// with `==`, but not all equal sets are considered identical.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func isTriviallyIdentical(to other: Self) -> Bool {
 #if _runtime(_ObjC)
     if

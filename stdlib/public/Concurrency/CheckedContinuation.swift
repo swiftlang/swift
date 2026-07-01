@@ -214,7 +214,7 @@ extension CheckedContinuation {
   /// After `resume` enqueues the task, control immediately returns to
   /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func resume<Er: Error>(with result: __shared sending Result<T, Er>) where E == Error {
     switch result {
       case .success(let val):
@@ -238,7 +238,7 @@ extension CheckedContinuation {
   /// After `resume` enqueues the task, control immediately returns to
   /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func resume(with result: __shared sending Result<T, E>) {
     switch result {
       case .success(let val):
@@ -258,7 +258,7 @@ extension CheckedContinuation {
   /// After `resume` enqueues the task, control immediately returns to
   /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func resume() where T == Void {
     self.resume(returning: ())
   }
@@ -290,8 +290,7 @@ extension CheckedContinuation {
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
-@inlinable
-@_alwaysEmitIntoClient
+@export(implementation)
 @available(SwiftStdlib 5.1, *)
 // ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
 // @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit actor parameter
@@ -378,8 +377,7 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
-@inlinable
-@_alwaysEmitIntoClient
+@export(implementation)
 @available(SwiftStdlib 5.1, *)
 // ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
 // @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit actor parameter
@@ -404,8 +402,7 @@ public nonisolated(nonsending) func withCheckedThrowingContinuation<T, E>(
   }
 }
 
-@inlinable
-@_alwaysEmitIntoClient
+@export(implementation)
 @available(SwiftStdlib 5.1, *)
 // ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
 // @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit actor parameter
@@ -467,7 +464,7 @@ public func _unsafeInheritExecutor_withCheckedThrowingContinuation<T>(
 
 // Intrinsics used by SILGen to create, resume, or fail checked continuations.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _createCheckedContinuation<T>(
   _ continuation: __owned UnsafeContinuation<T, Never>
 ) -> CheckedContinuation<T, Never> {
@@ -475,7 +472,7 @@ internal func _createCheckedContinuation<T>(
 }
 
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _createCheckedThrowingContinuation<T>(
   _ continuation: __owned UnsafeContinuation<T, Error>
 ) -> CheckedContinuation<T, Error> {
@@ -483,7 +480,7 @@ internal func _createCheckedThrowingContinuation<T>(
 }
 
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _resumeCheckedContinuation<T>(
   _ continuation: CheckedContinuation<T, Never>,
   _ value: sending T
@@ -492,7 +489,7 @@ internal func _resumeCheckedContinuation<T>(
 }
 
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _resumeCheckedThrowingContinuation<T>(
   _ continuation: CheckedContinuation<T, Error>,
   _ value: sending T
@@ -501,7 +498,7 @@ internal func _resumeCheckedThrowingContinuation<T>(
 }
 
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _resumeCheckedThrowingContinuationWithError<T>(
   _ continuation: CheckedContinuation<T, Error>,
   _ error: consuming Error

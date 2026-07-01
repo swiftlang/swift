@@ -166,7 +166,7 @@ internal func _getTypeByMangledNameInContextQuiet(
   -> Any.Type?
 
 /// Prevents performance diagnostics in the passed closure.
-@_alwaysEmitIntoClient
+@export(implementation)
 @_semantics("no_performance_analysis")
 @unsafe
 public func _unsafePerformance<T>(_ c: () -> T) -> T {
@@ -176,8 +176,7 @@ public func _unsafePerformance<T>(_ c: () -> T) -> T {
 // Helper function that exploits a bug in rethrows checking to
 // allow us to call rethrows functions from generic typed-throws functions
 // and vice-versa.
-@usableFromInline
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(__always)
 func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
   try fn()

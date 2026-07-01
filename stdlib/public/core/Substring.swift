@@ -97,14 +97,14 @@ public struct Substring: Sendable {
   @usableFromInline
   internal var _slice: Slice<String>
 
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal init(_unchecked slice: Slice<String>) {
     self._slice = slice
     _invariantCheck()
   }
 
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal init(_unchecked guts: _StringGuts, bounds: Range<Index>) {
     self.init(_unchecked: Slice(base: String(guts), bounds: bounds))
@@ -132,7 +132,7 @@ public struct Substring: Sendable {
 
 extension Substring {
   /// Returns the underlying string from which this substring was derived.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var base: String { return _slice._base }
 
   @inlinable @inline(__always)
@@ -141,7 +141,7 @@ extension Substring {
   @inlinable @inline(__always)
   internal var _offsetRange: Range<Int> { _slice._bounds._encodedOffsetRange }
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal var _bounds: Range<Index> { _slice._bounds }
 }
 
@@ -517,7 +517,7 @@ extension Substring: StringProtocol {
   ///   `withCString(_:)` method. The pointer argument is valid only for the
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient // (Primarily @inlinable) specialization
+  @export(implementation) // (Primarily @inlinable) specialization
   @safe
   public func withCString<Result, E: Error>(
     _ body: (UnsafePointer<CChar>) throws(E) -> Result) throws(E) -> Result {
@@ -557,7 +557,7 @@ extension Substring: StringProtocol {
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient // (Primarily @inlinable) specialization
+  @export(implementation) // (Primarily @inlinable) specialization
   @safe
   public func withCString<Result, TargetEncoding: _UnicodeEncoding, E: Error>(
     encodedAs targetEncoding: TargetEncoding.Type,
@@ -674,13 +674,13 @@ extension Substring {
       _slice = Slice(base: base, bounds: _bounds)
     }
 
-    @_alwaysEmitIntoClient @inline(__always)
+    @export(implementation) @inline(__always)
     internal var _wholeGuts: _StringGuts { _slice._base._guts }
 
-    @_alwaysEmitIntoClient @inline(__always)
+    @export(implementation) @inline(__always)
     internal var _base: String.UTF8View { _slice._base }
 
-    @_alwaysEmitIntoClient @inline(__always)
+    @export(implementation) @inline(__always)
     internal var _bounds: Range<Index> { _slice._bounds }
   }
 }
@@ -739,8 +739,7 @@ extension Substring.UTF8View: BidirectionalCollection {
     return _base.distance(from: start, to: end)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -885,7 +884,7 @@ extension Substring.UTF8View {
   ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var _span: Span<UTF8.CodeUnit>? {
-    @_alwaysEmitIntoClient @inline(__always)
+    @export(implementation) @inline(__always)
     @_lifetime(borrow self)
     borrowing get {
       span
@@ -1010,13 +1009,13 @@ extension Substring {
       _slice = Slice(base: base, bounds: _bounds)
     }
 
-    @_alwaysEmitIntoClient @inline(__always)
+    @export(implementation) @inline(__always)
     internal var _wholeGuts: _StringGuts { _slice._base._guts }
 
-    @_alwaysEmitIntoClient @inline(__always)
+    @export(implementation) @inline(__always)
     internal var _base: String.UTF16View { _slice._base }
 
-    @_alwaysEmitIntoClient @inline(__always)
+    @export(implementation) @inline(__always)
     internal var _bounds: Range<Index> { _slice._bounds }
   }
 }
@@ -1171,7 +1170,7 @@ extension Substring {
     internal var _slice: Slice<String.UnicodeScalarView>
 
     /// Creates an instance that slices `base` at `_bounds`.
-    @_alwaysEmitIntoClient
+    @export(implementation)
     internal init(
       _unchecked base: String.UnicodeScalarView, bounds: Range<Index>
     ) {
@@ -1193,23 +1192,23 @@ extension Substring {
 }
 
 extension Substring.UnicodeScalarView {
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal var _wholeGuts: _StringGuts { _slice._base._guts }
 
   @inline(__always)
   internal var _offsetRange: Range<Int> { _slice._bounds._encodedOffsetRange }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal var _bounds: Range<Index> { _slice._bounds }
 }
 
 extension Substring.UnicodeScalarView {
   #if !INTERNAL_CHECKS_ENABLED
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal func _invariantCheck() {}
   #else
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
     _internalInvariant(endIndex <= _wholeGuts.endIndex)
@@ -1414,7 +1413,7 @@ extension Substring {
     return String(self).uppercased()
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool
   ) throws(E) -> String {

@@ -22,7 +22,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1) as amortized over many invocations on the same array.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func append(_ item: consuming Element) {
     _ensureFreeCapacity(1)
     _storage.append(item)
@@ -52,7 +52,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`uninitializedCount`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func append<E: Error>(
     addingCount newItemCount: Int,
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
@@ -79,7 +79,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`count` + `items.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func append(
     moving items: UnsafeMutableBufferPointer<Element>
   ) {
@@ -99,7 +99,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`items.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func append(
     moving items: inout OutputSpan<Element>
   ) {
@@ -123,7 +123,7 @@ extension UniqueArray where Element: Copyable {
   /// - Complexity: O(`newElements.count`) when amortized over many
   ///     invocations on the same array.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func append(
     copying newElements: UnsafeBufferPointer<Element>
   ) {
@@ -144,7 +144,7 @@ extension UniqueArray where Element: Copyable {
   /// - Complexity: O(`newElements.count`) when amortized over many
   ///     invocations on the same array.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func append(
     copying newElements: UnsafeMutableBufferPointer<Element>
   ) {
@@ -163,7 +163,7 @@ extension UniqueArray where Element: Copyable {
   /// - Complexity: O(`newElements.count`) when amortized over many
   ///     invocations on the same array.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func append(copying newElements: Span<Element>) {
     _ensureFreeCapacity(newElements.count)
     _storage.append(copying: newElements)
@@ -183,7 +183,7 @@ extension UniqueArray where Element: Copyable {
   /// - Complexity: O(*m*), where *m* is the length of `newElements`, when
   ///     amortized over many invocations over the same array.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func append(copying newElements: some Sequence<Element>) {
     let done: Void? = newElements.withContiguousStorageIfAvailable { buffer in
       _ensureFreeCapacity(buffer.count)
