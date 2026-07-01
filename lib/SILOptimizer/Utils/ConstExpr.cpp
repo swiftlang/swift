@@ -1244,6 +1244,13 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
   if (it != calculatedValues.end())
     return it->second;
 
+  // SILUndef represents an undefined value (e.g. an uninitialized slot). Return
+  // a non-fatal "unknown" value so that aggregate constructions (struct, tuple)
+  // that include undef operands can proceed with partially-known results.
+  if (isa<SILUndef>(value))
+    return getUnknown(evaluator, value,
+                      UnknownReason::ReturnedByUnevaluatedInstruction);
+
   if (!recursivelyComputeValueIfNotInState) {
     return getUnknown(evaluator, value, UnknownReason::UntrackedSILValue);
   }
@@ -1678,7 +1685,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       isa<ReleaseValueInst>(inst) || isa<StrongRetainInst>(inst) ||
       isa<StrongReleaseInst>(inst) || isa<DestroyValueInst>(inst) ||
       isa<EndBorrowInst>(inst) || isa<DebugStepInst>(inst) ||
-      isa<ExtendLifetimeInst>(inst) ||
+      isa<ExtendLifetimeInst>(inst) || isa<EndLifetimeInst>(inst) ||
       // Skip instrumentation
       isInstrumentation(inst))
     return std::nullopt;
