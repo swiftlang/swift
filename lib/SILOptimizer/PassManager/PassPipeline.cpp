@@ -88,6 +88,7 @@ static void addModulePrinterPipeline(SILPassPipelinePlan &plan,
 static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Debug Serialization");
   P.addAddressLowering();
+  P.addKillInvalidDebugValues();
   P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
 }
@@ -354,6 +355,7 @@ SILPassPipelinePlan SILPassPipelinePlan::getOwnershipEliminatorPassPipeline(
   SILPassPipelinePlan P(Options);
   P.startPipeline("Ownership Model Eliminator");
   P.addAddressLowering();
+  P.addKillInvalidDebugValues();
   P.addOwnershipModelEliminator();
   return P;
 }
@@ -921,6 +923,7 @@ SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
   // Lower thunks.
   P.addThunkLowering();
   P.addLowerHopToActor(); // FIXME: earlier for more opportunities?
+  P.addKillInvalidDebugValues();
   P.addOwnershipModelEliminator();
   P.addAlwaysEmitConformanceMetadataPreservation();
   P.addIRGenPrepare();
@@ -1025,6 +1028,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // Perform optimizations that specialize.
   addClosureSpecializePassPipeline(P);
 
+  P.addKillInvalidDebugValues();
   P.addOwnershipModelEliminator();
 
   // Run another iteration of the SSA optimizations to optimize the
@@ -1094,6 +1098,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   if (P.Options.StopOptimizationBeforeLoweringOwnership)
     return P;
 
+  P.addKillInvalidDebugValues();
   P.addOwnershipModelEliminator();
 
   // Finally perform some small transforms.
