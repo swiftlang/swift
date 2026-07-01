@@ -3124,9 +3124,16 @@ namespace {
       // like this to be the smallest possible nesting level of
       // optional types, e.g. T? over T??; otherwise we don't really
       // have a preference.
-      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                           TVO_PrefersSubtypeBinding |
-                                           TVO_CanBindToNoEscape);
+      unsigned options = TVO_PrefersSubtypeBinding | TVO_CanBindToNoEscape;
+
+      // In completion mode we don't care about fixes, let's allow
+      // the result of an optional chain to be bound to a hole to
+      // for a solution for situations like `a?<#token#>.b`.
+      if (CS.isForCodeCompletion())
+        options |= TVO_CanBindToHole;
+
+      auto valueTy =
+          CS.createTypeVariable(CS.getConstraintLocator(expr), options);
 
       Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
       if (!optTy)
