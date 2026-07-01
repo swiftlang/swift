@@ -124,6 +124,18 @@ func simdConformancesC(
   fullyInhabited(l)
 }
 
+func simd3Conformances(
+  _ a: SIMD3<UInt8>, _ b: SIMD3<UInt16>, _ c: SIMD3<UInt32>,
+  _ d: SIMD3<UInt64>, _ e: SIMD3<Float32>, _ f: SIMD3<Float64>
+) {
+  fromBytes(a)
+  fromBytes(b)
+  fromBytes(c)
+  fromBytes(d)
+  fromBytes(e)
+  fromBytes(f)
+}
+
 // Range types (ConvertibleToBytes only)
 
 func rangeConformances(
@@ -206,4 +218,9 @@ func rangeNotFromBytes(_ a: Range<Int>, _ b: ClosedRange<Int>) {
 
 func objectIdentifierNotFromBytes(_ a: ObjectIdentifier) {
   fromBytes(a) // expected-error {{global function 'fromBytes' requires that 'ObjectIdentifier' conform to 'ConvertibleFromBytes'}}
+}
+
+func simd3NotToBytes(_ a: SIMD3<Int>) {
+  toBytes(a) // expected-error {{global function 'toBytes' requires that 'SIMD3<Int>' conform to 'ConvertibleToBytes'}}
+             // expected-note@-221 {{where 'T' = 'SIMD3<Int>'}}
 }
