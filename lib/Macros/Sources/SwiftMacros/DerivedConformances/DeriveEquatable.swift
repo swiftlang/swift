@@ -20,29 +20,18 @@ public struct DeriveEquatableMacro: DeclarationMacro {
 
   let info: NominalTypeInfo
   let isResilient: Bool
-  let reachability: [Bool]?
 
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    let (typeInfo, isResilient, reachability) = try node.arguments.expect(
+    let (typeInfo, isResilient) = try node.arguments.expect(
       .init(name: nil, parser: NominalTypeInfo.fromStringLit),
-      .boolArg("isResilient"),
-      .boolArg("reachability").toArray().toOptional()
+      .boolArg("isResilient")
     )
 
-    if case .enumLike(let enumInfo) = typeInfo.kind, !enumInfo.isUninhabited() {
-      guard let reachability, reachability.count == enumInfo.cases.count else {
-        throw DeriveEquatableError.missingOrMismatchedReachability(
-          caseCount: enumInfo.cases.count,
-          got: reachability
-        )
-      }
-    }
-
     return [
-      Self(info: typeInfo, isResilient: isResilient, reachability: reachability).deriveEquatable()
+      Self(info: typeInfo, isResilient: isResilient).deriveEquatable()
     ]
   }
 
@@ -78,7 +67,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
       """
   }
 
-  /// Name of the generated function: plain `==` when in a resilient module, otherwise a 
+  /// Name of the generated function: plain `==` when in a resilient module, otherwise a
   /// derived name.
   func getFunctionName() -> TokenSyntax {
     if isResilient {
@@ -98,8 +87,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
     case .enumLike(let enumInfo) where enumInfo.isUninhabited():
       Self.getUninhabitedBody()
     case .enumLike(let enumInfo):
-      // Validated non-nil and length-matched in `expansion(of:in:)`.
-      Self.getEnumBody(enumInfo, reachability!)
+      Self.getEnumBody(enumInfo)
     case .structLike(let structInfo):
       Self.getStructBody(structInfo)
     }
@@ -124,12 +112,11 @@ public struct DeriveEquatableMacro: DeclarationMacro {
   /// `a == b` for an enum, picking the cheapest valid strategy for its shape.
   static func getEnumBody(
     _ enumInfo: EnumTypeInfo,
-    _ reachable: [Bool]
   ) -> CodeBlockItemListSyntax {
     if enumInfo.hasNoAssociatedValues() {
-      return getNoAssociatedValuesBody(enumInfo, reachable)
+      return getNoAssociatedValuesBody(enumInfo)
     }
-    return getHasAssociatedValuesBody(enumInfo, reachable)
+    return getHasAssociatedValuesBody(enumInfo)
   }
 
   /// Body for an uninhabited enum: there are no cases to compare.
@@ -138,94 +125,26 @@ public struct DeriveEquatableMacro: DeclarationMacro {
     """
   }
 
-  /// A trap used for cases statically known to be unreachable at this call
-  /// site (e.g. pruned by availability).
-  static func getUnreachableStatement() -> CodeBlockItemSyntax {
-    """
-    fatalError("Unavailable code reached")
-    """
-  }
-
-  /// Builds a `switch` over `scrutinee` that assigns a dense `Int`
-  /// discriminant (skipping unreachable cases) into `discrName`.
-  static func getDiscriminant(
-    _ enumInfo: EnumTypeInfo,
-    _ reachable: [Bool],
-    scrutinee: String,
-    discrName: String
-  ) -> CodeBlockItemListSyntax {
-    var nextDiscriminant = 0
-    var cases: [String] = []
-    for (idx, caseInfo) in enumInfo.cases.enumerated() {
-      if reachable[idx] {
-        cases.append(
-          """
-          case .\(caseInfo.name): 
-            \(discrName) = \(nextDiscriminant)
-          """
-        )
-        nextDiscriminant += 1
-      } else {
-        cases.append(
-          """
-          case .\(caseInfo.name):
-            \(getUnreachableStatement())
-          """
-        )
-      }
-    }
-
-    return
-      """
-      var \(raw: discrName): Int
-      switch \(raw: scrutinee) {
-      \(raw: cases.joined(separator: "\n"))
-      }
-      """
-  }
-
   /// `a == b` for an enum with no associated values: compare discriminants.
   static func getNoAssociatedValuesBody(
     _ enumInfo: EnumTypeInfo,
-    _ reachable: [Bool]
   ) -> CodeBlockItemListSyntax {
-    var items = getDiscriminant(enumInfo, reachable, scrutinee: "a", discrName: "index_a")
-    items += getDiscriminant(enumInfo, reachable, scrutinee: "b", discrName: "index_b")
+    var items = getDiscriminant(enumInfo, scrutinee: "a", discrName: "index_a")
+    items += getDiscriminant(enumInfo, scrutinee: "b", discrName: "index_b")
     items += ["return index_a == index_b"]
     return items
-  }
-
-  /// Pattern matching one enum case, optionally binding its associated
-  /// values with the given variable prefix. Unreachable cases bind nothing,
-  /// since their payload is never inspected.
-  static func getEnumElementPayloadPattern(
-    _ caseInfo: EnumCaseInfo,
-    varPrefix: String,
-    isReachable: Bool
-  ) -> PatternSyntax {
-    if caseInfo.associatedValueLabels.isEmpty || !isReachable {
-      return ".\(raw: caseInfo.name)"
-    }
-
-    let vars: [String] = caseInfo.associatedValueLabels.enumerated().map { i, name in
-      let prefix = name.map { "\($0): " } ?? ""
-      return "\(prefix)let \(varPrefix)\(i)"
-    }
-
-    return ".\(raw: caseInfo.name)(\(raw: vars.joined(separator: ", ")))"
   }
 
   /// `a == b` for an enum with associated values: match `(a, b)` against
   /// each case pairwise and compare bound payloads.
   static func getHasAssociatedValuesBody(
     _ enumInfo: EnumTypeInfo,
-    _ reachable: [Bool]
   ) -> CodeBlockItemListSyntax {
     var cases: [SwitchCaseSyntax] = []
-    for (idx, caseInfo) in enumInfo.cases.enumerated() {
+    for caseInfo in enumInfo.cases {
       var stmtsInCase: [CodeBlockItemSyntax] = []
 
-      if reachable[idx] {
+      if caseInfo.isReachable {
         for i in 0..<caseInfo.associatedValueLabels.count {
           stmtsInCase.append(
             """
@@ -240,8 +159,8 @@ public struct DeriveEquatableMacro: DeclarationMacro {
         stmtsInCase.append(getUnreachableStatement())
       }
 
-      let lPat = getEnumElementPayloadPattern(caseInfo, varPrefix: "l", isReachable: reachable[idx])
-      let rPat = getEnumElementPayloadPattern(caseInfo, varPrefix: "r", isReachable: reachable[idx])
+      let lPat = getEnumElementPayloadPattern(caseInfo, varPrefix: "l")
+      let rPat = getEnumElementPayloadPattern(caseInfo, varPrefix: "r")
 
       cases.append(
         """
@@ -271,13 +190,6 @@ public struct DeriveEquatableMacro: DeclarationMacro {
   }
 }
 
-/// Errors thrown while expanding `DeriveEquatableMacro`.
-enum DeriveEquatableError: Error {
-  /// The enum being derived has cases but no usable `reachability` array,
-  /// or its length doesn't match the case count.
-  case missingOrMismatchedReachability(caseCount: Int, got: [Bool]?)
-}
-
 extension EnumTypeInfo {
   /// True if no case in this enum carries associated values.
   func hasNoAssociatedValues() -> Bool {
@@ -288,4 +200,68 @@ extension EnumTypeInfo {
   func isUninhabited() -> Bool {
     cases.isEmpty
   }
+}
+
+/// Builds a `switch` over `scrutinee` that assigns a dense `Int`
+/// discriminant (skipping unreachable cases) into `discrName`.
+func getDiscriminant(
+  _ enumInfo: EnumTypeInfo,
+  scrutinee: String,
+  discrName: String
+) -> CodeBlockItemListSyntax {
+  var nextDiscriminant = 0
+  var cases: [String] = []
+  for caseInfo in enumInfo.cases {
+    if caseInfo.isReachable {
+      cases.append(
+        """
+        case .\(caseInfo.name): 
+          \(discrName) = \(nextDiscriminant)
+        """
+      )
+      nextDiscriminant += 1
+    } else {
+      cases.append(
+        """
+        case .\(caseInfo.name):
+          \(getUnreachableStatement())
+        """
+      )
+    }
+  }
+
+  return
+    """
+    var \(raw: discrName): Int
+    switch \(raw: scrutinee) {
+    \(raw: cases.joined(separator: "\n"))
+    }
+    """
+}
+
+/// Pattern matching one enum case, optionally binding its associated
+/// values with the given variable prefix. Unreachable cases bind nothing,
+/// since their payload is never inspected.
+func getEnumElementPayloadPattern(
+  _ caseInfo: EnumCaseInfo,
+  varPrefix: String,
+) -> PatternSyntax {
+  if caseInfo.associatedValueLabels.isEmpty || !caseInfo.isReachable {
+    return ".\(raw: caseInfo.name)"
+  }
+
+  let vars: [String] = caseInfo.associatedValueLabels.enumerated().map { i, name in
+    let prefix = name.map { "\($0): " } ?? ""
+    return "\(prefix)let \(varPrefix)\(i)"
+  }
+
+  return ".\(raw: caseInfo.name)(\(raw: vars.joined(separator: ", ")))"
+}
+
+/// A trap used for cases statically known to be unreachable at this call
+/// site (e.g. pruned by availability).
+func getUnreachableStatement() -> CodeBlockItemSyntax {
+  """
+  fatalError("Unavailable code reached")
+  """
 }
