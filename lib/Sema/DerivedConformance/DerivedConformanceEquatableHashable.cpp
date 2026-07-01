@@ -445,23 +445,7 @@ static ValueDecl *deriveEquatableViaMacro(DerivedConformance &derived,
   auto os = llvm::raw_string_ostream(code);
   os << "#_deriveEquatable(" << QuotedString(getNominalTypeInfoString(derived))
      << ", isResilient: "
-     << (parentDC->getParentModule()->isResilient() ? "true" : "false")
-     << ", reachability: ";
-  if (auto *ed = dyn_cast<EnumDecl>(derived.Nominal)) {
-    os << "[";
-    llvm::interleaveComma(ed->getAllElements(), os, [&](auto elt) {
-      // A case only needs to be marked unreachable if the enclosing enum is
-      // itself still reachable. If the whole enum is unreachable, there's no
-      // need for per-case unreachability checks.
-      bool markReachable = !elt->isUnreachableAtRuntime() ||
-                           elt->getParentEnum()->isUnreachableAtRuntime();
-      os << (markReachable ? "true" : "false");
-    });
-    os << "]";
-  } else {
-    os << "nil";
-  }
-  os << ")";
+     << (parentDC->getParentModule()->isResilient() ? "true" : "false") << ")";
   auto *witness = deriveRequirementViaMacro(derived, requirement, os.str());
   return witness;
 }
