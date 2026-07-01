@@ -10561,6 +10561,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         // type. Whether each candidate's unapplied type is actually compatible
         // with the function type is determined later by the surrounding
         // conversion constraints.
+        //
+        // Note: we intentionally do *not* pre-filter to only function-shaped
+        // members here. In a chained implicit member expression (SE-0287) the
+        // leading dot may name a plain value member of the return type that a
+        // later element of the chain then turns into the function type -- e.g.
+        // '.a.asFunction', where 'a' has no payload. Dropping non-function
+        // members would reject such chains, so candidate viability is left to
+        // the solver.
         for (const auto &choice : resultLookup.ViableCandidates) {
           if (choice.getKind() != OverloadChoiceKind::Decl)
             continue;
