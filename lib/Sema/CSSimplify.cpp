@@ -4273,7 +4273,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         // Subtype relation to AnyObject also allows class-bound
         // existentials that are not @objc and therefore carry
         // witness tables.
-        if (!type1->isClassExistentialType() && !type1->mayHaveSuperclass()) {
+        if (!type1->isClassExistentialType() &&
+            !type1->satisfiesClassConstraint()) {
           if (shouldAttemptFixes()) {
             llvm::SmallVector<LocatorPathElt, 4> path;
             if (auto anchor = locator.getLocatorParts(path)) {
@@ -8135,10 +8136,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     //
     // Class and protocol metatypes are interoperable with certain Objective-C
     // runtime classes, but only when ObjC interop is enabled.
-
-    // Foreign reference types do *not* conform to AnyObject.
-    if (type1->isForeignReferenceType() && type2->isAnyObject())
-      return getTypeMatchFailure(locator);
 
     if (getASTContext().LangOpts.EnableObjCInterop) {
       // These conversions are between concrete types that don't need further
