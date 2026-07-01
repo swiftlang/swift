@@ -90,3 +90,30 @@ let _: Int = picked
 // directly against 'X'.
 func takesX(_: X) {}
 takesX(.a)
+
+// Chained implicit member expressions (SE-0287).
+//
+// The look-through applies at the *leading* dot of a chain, whose base is the
+// whole chain's contextual type. So a chain can begin from a member of the
+// return type even when the surrounding context is a function type, then be
+// transformed into that function type by ordinary member accesses.
+enum Y {
+  case a
+  case b(Int)
+  var asFunction: (Int) -> Y { { Y.b($0) } }
+}
+
+// Leading dot resolved via the return type ('Y.a'), then chained to the
+// function-typed context.
+let chained: (Int) -> Y = .a.asFunction
+
+// A function-result member can itself lead a chain; '.self' is one of the few
+// members a function value offers.
+let chainedSelf: (Int) -> Y = .b.self
+
+// Existing (non-function) implicit member chains are unaffected.
+struct Color {
+  static var red: Color { Color() }
+  func withAlpha(_ a: Double) -> Color { self }
+}
+let color: Color = .red.withAlpha(0.5)
