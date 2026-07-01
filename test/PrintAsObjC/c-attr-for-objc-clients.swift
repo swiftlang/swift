@@ -1,7 +1,7 @@
 /// Similar test to cdecl-official but gated to objc-interop compatibility
 
 // RUN: %empty-directory(%t)
-// RUN: split-file %S/cdecl-official.swift %t --leading-lines
+// RUN: split-file %S/c-attr.swift %t --leading-lines
 
 /// Generate cdecl.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
