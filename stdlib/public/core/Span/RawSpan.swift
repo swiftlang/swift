@@ -1003,7 +1003,10 @@ extension RawSpan {
 
 #if !SPAN_COMPATIBILITY_STUB
 @available(SwiftStdlib 6.4, *)
-extension RawSpan: BorrowingSequence {
+extension RawSpan: Iterable {
+  @available(SwiftStdlib 6.4, *)
+  public typealias Failure = Never
+
   @available(SwiftStdlib 6.4, *)
   @inlinable
   @lifetime(borrow self)
