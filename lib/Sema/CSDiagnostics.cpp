@@ -9819,3 +9819,19 @@ bool DisallowedIsolatedConformance::diagnoseAsError() {
 
   return true;
 }
+
+bool NonClassBaseInDynamicMemberLookup::diagnoseAsError() {
+  emitDiagnostic(diag::keypath_dynamic_member_lookup_expects_class_base,
+                 BaseType, Member);
+
+  auto *loc = getLocator();
+  auto *memberLoc =
+      getConstraintLocator(loc->getAnchor(), loc->getPath().drop_back());
+
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(memberLoc)) {
+    emitDiagnostic(diag::keypath_dynamic_member_lookup_expects_class_base_note,
+                   overload->choice.getBaseType());
+  }
+
+  return true;
+}

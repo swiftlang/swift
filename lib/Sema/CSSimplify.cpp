@@ -11372,7 +11372,8 @@ static ConstraintFix *fixMemberRef(
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
       return TreatRValueAsLValue::create(cs, cs.getConstraintLocator(locator));
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
-      break;
+      return IgnoreClassRequirementForDynamicMemberLookup::create(
+          cs, baseTy, choice.getDecl(), cs.getConstraintLocator(locator));
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
       return AllowAnyObjectKeyPathRoot::create(cs, locator);
 
@@ -16007,6 +16008,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TooManyDynamicMemberLookups:
   case FixKind::IgnoreNonMetatypeDynamicType:
   case FixKind::IgnoreIsolatedConformance:
+  case FixKind::IgnoreClassRequirementForDynamicMemberLookup:
     llvm_unreachable("handled elsewhere");
   }
 
