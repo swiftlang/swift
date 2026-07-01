@@ -8433,10 +8433,18 @@ public:
   /// instance method.
   bool isObjCInstanceMethod() const;
 
+  /// Whether this is a top-level (module-scope) function with @objc (SE-0495).
+  bool isObjCGlobalFunction() const;
+
   /// Get the foreign language targeted by a @c-style attribute, if any.
   /// Used to abstract away the change in meaning of @c vs @_cdecl while
   /// formalizing the attribute.
   std::optional<ForeignLanguage> getCDeclKind() const;
+
+  /// Whether this function's signature includes types that require Objective-C
+  /// bridging (e.g. String <-> NSString). Used by @objc global functions to
+  /// decide between the @c single-symbol model and the @_cdecl thunk model.
+  bool signatureRequiresObjCBridging() const;
 
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.
