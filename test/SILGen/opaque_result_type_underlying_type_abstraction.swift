@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -disable-availability-checking %s
+
 // RUN: %target-swift-emit-silgen -disable-availability-checking %s | %FileCheck %s
 
 // CHECK-LABEL: sil {{.*}}9withTuple

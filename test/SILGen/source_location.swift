@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -module-name source_location -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo %s | %FileCheck %s
 

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-function-isolation-info %s -swift-version 6 -target %target-swift-5.1-abi-triple | %FileCheck %s
 
 // REQUIRES: concurrency

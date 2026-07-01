@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk) -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -enable-objc-interop -import-objc-header %S/Inputs/block_property_in_objc_class.h %s
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -enable-objc-interop -import-objc-header %S/Inputs/block_property_in_objc_class.h %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s32lying_about_optional_return_objc0C37ChainingForeignFunctionTypeProperties{{[_0-9a-zA-Z]*}}F

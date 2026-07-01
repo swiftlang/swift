@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -verify -import-objc-header %S/Inputs/objc_init_iuo_override.h %s
 // RUN: %target-swift-emit-silgen -verify -import-objc-header %S/Inputs/objc_init_iuo_override.h %s
 // REQUIRES: objc_interop
 

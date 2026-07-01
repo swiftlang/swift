@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s | %FileCheck %s -check-prefix=SILGEN

@@ -1,5 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -module-name ResilientTypes -emit-module-path %t/ResilientTypes.swiftmodule -enable-library-evolution %S/Inputs/builtin_borrow_ResilientTypes.swift
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature RawLayout -I %t %s
+
 // RUN: %target-swift-emit-silgen -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature RawLayout -I %t %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature RawLayout -I %t %s | %FileCheck --check-prefix=CHECK-POST-CLEANUP %s
 

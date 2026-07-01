@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen -disable-availability-checking -module-name main %s | %FileCheck %s
 
 func generic<T, U>(_ f: @escaping (T) -> U) -> (T) -> U { return f }

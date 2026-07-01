@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name Swift -parse-stdlib %s
 // RUN: %target-swift-emit-silgen -module-name Swift -parse-stdlib %s | %FileCheck %s
 
 struct Int {}
