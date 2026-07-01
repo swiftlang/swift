@@ -4647,6 +4647,7 @@ namespace {
       if (auto known =
               Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
           known != Impl.ImportedDecls.end()) {
+        ASSERT(known->second == method && "returning different");
         // Skip VisitCXXMethodDecl post-processing (which is not idempotent)
         // and return the already-cached result.
         return known->second;
