@@ -613,20 +613,38 @@ public:
 
 // These definitions are way down here so it can call into
 // NodeAdder
-ASTScopeImpl *ScopeCreator::addToScopeTreeAndReturnInsertionPoint(
-    ASTNode n, ASTScopeImpl *parent, std::optional<SourceLoc> endLoc) {
+
+/// Whether \p n should be skipped entirely when building the scope tree. Most
+/// implicit decls don't get scopes, with two exceptions documented below.
+static bool shouldIgnoreNodeInScopeTree(ASTNode n, ASTScopeImpl *parent) {
   if (!n)
-    return parent;
+    return true;
+
+  auto *d = n.dyn_cast<Decl *>();
+  if (!d || !d->isImplicit())
+    return false;
 
   // HACK: LLDB creates implicit pattern bindings that... contain user
   // expressions. We need to actually honor lookups through those bindings
   // in case they contain closures that bind additional variables in further
   // scopes.
-  if (auto *d = n.dyn_cast<Decl *>())
-    if (d->isImplicit())
-      if (!isa<PatternBindingDecl>(d)
-          || !cast<PatternBindingDecl>(d)->isDebuggerBinding())
-        return parent;
+  auto *pbDecl = dyn_cast<PatternBindingDecl>(d);
+  if (pbDecl && pbDecl->isDebuggerBinding())
+    return false;
+
+  // Nodes expanded from synthetic macros are marked implicit but they still
+  // need scopes so that lookup can find the names they introduce.
+  auto *enclosing = parent->getSourceFile()->getEnclosingSourceFile();
+  if (enclosing && enclosing->Kind == SourceFileKind::SyntheticMacro)
+    return false;
+
+  return true;
+}
+
+ASTScopeImpl *ScopeCreator::addToScopeTreeAndReturnInsertionPoint(
+    ASTNode n, ASTScopeImpl *parent, std::optional<SourceLoc> endLoc) {
+  if (shouldIgnoreNodeInScopeTree(n, parent))
+    return parent;
 
   NodeAdder adder(endLoc);
   if (auto *p = n.dyn_cast<Decl *>())
