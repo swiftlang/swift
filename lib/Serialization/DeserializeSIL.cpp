@@ -653,6 +653,12 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
   SILSerializationFunctionBuilder builder(SILMod);
   fn = builder.createDeclaration(name, type,
                                  RegularLocation(sourceLoc));
+  // This declaration stands in for a function whose body we could not
+  // deserialize (e.g. it referenced a Clang declaration broken by a context
+  // change). It has no body, so give it external linkage; otherwise the
+  // `didDeserialize` linkage update below would try to externalize a private
+  // definition and assert.
+  fn->setLinkage(SILLinkage::PublicExternal);
   // The function is not really de-serialized, but it's important to call
   // `didDeserialize` on every new function. Otherwise some Analysis might miss
   // `notifyAddedOrModifiedFunction` notifications.
@@ -890,7 +896,15 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
 
   ValueDecl *clangNodeOwner = nullptr;
   if (clangNodeOwnerID != 0) {
-    clangNodeOwner = dyn_cast_or_null<ValueDecl>(MF->getDecl(clangNodeOwnerID));
+    auto clangNodeOwnerOrErr = MF->getDeclChecked(clangNodeOwnerID);
+    if (!clangNodeOwnerOrErr) {
+      // Emit the diagnostic (e.g. a modularization issue such as a referenced
+      // Clang declaration changing kind) without aborting, then fail this SIL
+      // function read so the caller can recover.
+      MF->diagnoseAndConsumeFatal(clangNodeOwnerOrErr.takeError());
+      return MF->createFatalError();
+    }
+    clangNodeOwner = dyn_cast_or_null<ValueDecl>(clangNodeOwnerOrErr.get());
     if (!clangNodeOwner)
       return MF->diagnoseFatal("invalid clang node owner for SILFunction");
   }
