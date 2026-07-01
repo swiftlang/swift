@@ -2430,12 +2430,16 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
 
   // Import the underlying result type.
   if (clangDecl) {
-    if (auto recordType = returnType->getAsCXXRecordDecl()) {
+    if (auto recordDecl = returnType->getAsCXXRecordDecl()) {
       if (auto *vd = evaluateOrDefault(
               SwiftContext.evaluator,
-              CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
+              CxxRecordAsSwiftType({recordDecl, SwiftContext}), nullptr)) {
         if (auto *cd = dyn_cast<ClassDecl>(vd)) {
           Type t = ClassType::get(cd, Type(), SwiftContext);
+          return ImportedType(t, /*implicitlyUnwraps=*/false);
+        }
+        if (auto *pd = dyn_cast<ProtocolDecl>(vd)) {
+          Type t = ExistentialType::get(pd->getDeclaredInterfaceType());
           return ImportedType(t, /*implicitlyUnwraps=*/false);
         }
       }
@@ -2493,6 +2497,22 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   returnType = desugarIfBoundsAttributed(returnType);
 
   ImportedType importedType = importer::findOptionSetEnum(returnType, *this);
+
+  // Check if the return type is a Swift type round-tripped through C++.
+  if (!importedType) {
+    if (auto recordDecl = returnType->getAsCXXRecordDecl()) {
+      if (auto *vd = evaluateOrDefault(
+              SwiftContext.evaluator,
+              CxxRecordAsSwiftType({recordDecl, SwiftContext}), nullptr)) {
+        if (auto *cd = dyn_cast<ClassDecl>(vd)) {
+          importedType = {ClassType::get(cd, Type(), SwiftContext), false};
+        } else if (auto *pd = dyn_cast<ProtocolDecl>(vd)) {
+          importedType = {ExistentialType::get(pd->getDeclaredInterfaceType()),
+                          false};
+        }
+      }
+    }
+  }
 
   if (auto templateType =
           dyn_cast<clang::TemplateTypeParmType>(returnType)) {
@@ -2714,6 +2734,9 @@ ClangImporter::Implementation::importParameterType(
         if (auto *cd = dyn_cast<ClassDecl>(vd)) {
 
           swiftParamTy = ClassType::get(cd, Type(), SwiftContext);
+        }
+        if (auto *pd = dyn_cast<ProtocolDecl>(vd)) {
+          swiftParamTy = ExistentialType::get(pd->getDeclaredInterfaceType());
         }
       }
     }

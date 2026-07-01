@@ -8392,6 +8392,28 @@ static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
+static bool isSwiftExistentialType(const clang::CXXRecordDecl *decl) {
+  auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
+  if (!essAttr || essAttr->getLanguage() != "Swift" ||
+      essAttr->getDefinedIn().empty() || essAttr->getUSR().empty())
+    return false;
+
+  auto baseDecl = decl;
+  do {
+    if (baseDecl->getNumBases() != 1)
+      return false;
+    auto baseClassSpecifier = *baseDecl->bases_begin();
+    auto Ty = baseClassSpecifier.getType();
+    auto nextBaseDecl = Ty->getAsCXXRecordDecl();
+    if (!nextBaseDecl)
+      return false;
+    baseDecl = nextBaseDecl;
+  } while (baseDecl->getName() != "SwiftExistentialType" &&
+           baseDecl->getName() != "SwiftClassExistentialType");
+
+  return true;
+}
+
 CxxRecordSemanticsKind
 CxxRecordSemantics::evaluate(Evaluator &evaluator,
                              CxxRecordSemanticsDescriptor desc) const {
@@ -8408,6 +8430,9 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   if (isSwiftClassType(cxxDecl))
     return CxxRecordSemanticsKind::SwiftClassType;
 
+  if (isSwiftExistentialType(cxxDecl))
+    return CxxRecordSemanticsKind::SwiftExistentialType;
+
   if (hasIteratorAPIAttr(cxxDecl) || hasIteratorCategory(cxxDecl)) {
     return CxxRecordSemanticsKind::Iterator;
   }
@@ -8421,14 +8446,15 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(desc.decl);
   if (!cxxDecl)
     return nullptr;
-  if (!isSwiftClassType(cxxDecl))
+  bool isClass = isSwiftClassType(cxxDecl);
+  bool isExistential = !isClass && isSwiftExistentialType(cxxDecl);
+  if (!isClass && !isExistential)
     return nullptr;
 
   SmallVector<ValueDecl *, 1> results;
   auto *essaAttr = cxxDecl->getAttr<clang::ExternalSourceSymbolAttr>();
   auto *mod = desc.ctx.getModuleByName(essaAttr->getDefinedIn());
   if (!mod) {
-    // TODO: warn about missing 'import'.
     return nullptr;
   }
   // FIXME: Support renamed declarations.
@@ -8437,7 +8463,9 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
   mod->lookupValue(desc.ctx.getIdentifier(swiftName), NLKind::UnqualifiedLookup,
                    results);
   if (results.size() == 1) {
-    if (isa<ClassDecl>(results[0]))
+    if (isClass && isa<ClassDecl>(results[0]))
+      return results[0];
+    if (isExistential && isa<ProtocolDecl>(results[0]))
       return results[0];
   }
   return nullptr;
@@ -8686,7 +8714,8 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
             method->getReturnType().getCanonicalType())) {
       if (auto cxxRecordReturnType =
               dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
-        if (isSwiftClassType(cxxRecordReturnType))
+        if (isSwiftClassType(cxxRecordReturnType) ||
+            isSwiftExistentialType(cxxRecordReturnType))
           return true;
 
         if (hasIteratorAPIAttr(cxxRecordReturnType) ||
