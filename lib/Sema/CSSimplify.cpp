@@ -4342,7 +4342,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         // If the path ends at `optional payload` it means that this
         // check is part of an implicit value-to-optional conversion,
         // and it could be safely dropped.
-        if (!path.empty() && path.back().is<LocatorPathElt::OptionalInjection>())
+        while (!path.empty() &&
+               path.back().is<LocatorPathElt::OptionalInjection>())
           path.pop_back();
 
         // Determine whether this conformance mismatch is
@@ -4404,27 +4405,44 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           if (last.is<LocatorPathElt::InstanceType>())
             return SolutionKind::Error;
 
+          // Fail here and let the generic argument matching handle the failure
+          // because we need to present complete types in the diagnostic and
+          // point to the mismatching location(s).
+          if (last.is<LocatorPathElt::GenericArgument>())
+            return SolutionKind::Error;
+
+          if (last.is<LocatorPathElt::CoercionOperand>()) {
+            auto *fix = ContextualMismatch::create(
+                *this, type1, type2, getConstraintLocator(anchor, path));
+            if (recordFix(fix))
+              return SolutionKind::Error;
+            break;
+          }
+
+          if (last.is<LocatorPathElt::ContextualType>() ||
+              last.is<LocatorPathElt::EnumPatternImplicitCastMatch>() ||
+              last.is<LocatorPathElt::SequenceElementType>()) {
+            auto proto = protoDecl->getDeclaredInterfaceType();
+            auto *fix = MissingConformance::forContextual(
+                *this, type1, proto, getConstraintLocator(anchor, path));
+
+            if (recordFix(fix))
+              return SolutionKind::Error;
+
+            break;
+          }
         } else { // There are no elements in the path
-          if (!(isExpr<AssignExpr>(anchor) || isExpr<CoerceExpr>(anchor)))
-            return SolutionKind::Error;
-        }
-
-        if (isExpr<CoerceExpr>(anchor)) {
-          auto *fix = ContextualMismatch::create(
-              *this, type1, type2, getConstraintLocator(anchor, path));
-          if (recordFix(fix))
-            return SolutionKind::Error;
-          break;
-        }
-
-        auto proto = protoDecl->getDeclaredInterfaceType();
-        auto *fix = MissingConformance::forContextual(
-            *this, type1, proto, getConstraintLocator(anchor, path));
-
-        if (recordFix(fix))
+          if (isExpr<AssignExpr>(anchor)) {
+            auto *fix = ContextualMismatch::create(
+                *this, type1, type2, getConstraintLocator(anchor, path));
+            if (recordFix(fix))
+              return SolutionKind::Error;
+            break;
+          }
           return SolutionKind::Error;
+        }
 
-        break;
+        return SolutionKind::Error;
       }
     }
   }
