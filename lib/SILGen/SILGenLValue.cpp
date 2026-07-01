@@ -1577,7 +1577,8 @@ namespace {
         ActorIso(copied.ActorIso) {}
 
     AccessorDecl *getAccessorDecl() const {
-      return cast<AccessorDecl>(Accessor.getFuncDecl());
+      // Always use the original accessor, even if this is a distributed thunk.
+      return cast<AccessorDecl>(Accessor.getOriginalDecl());
     }
 
     ManagedValue emitValueForAssignOrInit(SILGenFunction &SGF, SILLocation loc,
@@ -4500,8 +4501,8 @@ void LValue::addMemberVarComponent(
     void emitUsingDistributedThunk() {
       auto *var = cast<VarDecl>(Storage);
       SILDeclRef accessor(var->getAccessor(AccessorKind::Get),
-                          SILDeclRef::Kind::Func,
-                          /*isForeign=*/false, /*isDistributed=*/true);
+                          SILDeclRef::Kind::DistributedThunk,
+                          /*isForeign=*/false);
 
       auto typeData = getLogicalStorageTypeData(
           SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);

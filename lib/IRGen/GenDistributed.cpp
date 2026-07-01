@@ -217,7 +217,7 @@ public:
       auto *requirement = cast<AbstractFunctionDecl *>(target);
       Type = IGF.IGM.getSILTypes().getConstantFunctionType(
           IGF.IGM.getMaximalTypeExpansionContext(),
-          SILDeclRef(requirement).asDistributed());
+          SILDeclRef(requirement).asDistributedThunk());
     }
   }
 
@@ -998,7 +998,7 @@ FunctionPointer AccessorTarget::getPointerToTarget(llvm::Value *actorSelf) {
 
   auto *requirementDecl = cast<AbstractFunctionDecl *>(Target);
   auto *protocol = requirementDecl->getDeclContext()->getSelfProtocolDecl();
-  SILDeclRef requirementRef = SILDeclRef(requirementDecl).asDistributed();
+  SILDeclRef requirementRef = SILDeclRef(requirementDecl).asDistributedThunk();
 
   if (!IGM.isResilient(protocol, ResilienceExpansion::Maximal)) {
     auto *witness = getWitnessMetadata(actorSelf);

@@ -722,7 +722,7 @@ public:
       if (auto func = constant->getFuncDecl()) {
         if (SGF.shouldReplaceConstantForApplyWithDistributedThunk(func)) {
           auto thunk = func->getDistributedThunk();
-          constant = SILDeclRef(thunk).asDistributed();
+          constant = SILDeclRef(thunk).asDistributedThunk();
         }
       }
 
@@ -793,7 +793,7 @@ public:
           // If we're calling cross-actor, we must always use a distributed thunk
           if (!isSameActorIsolated(func, SGF.FunctionDC)) {
             /// We must adjust the constant to use a distributed thunk.
-            constant = constant->asDistributed();
+            constant = constant->asDistributedThunk();
           }
         }
       }
@@ -811,7 +811,7 @@ public:
     case Kind::WitnessMethod: {
       if (auto func = constant->getFuncDecl()) {
         if (SGF.shouldReplaceConstantForApplyWithDistributedThunk(func)) {
-          constant = constant->asDistributed();
+          constant = constant->asDistributedThunk();
         }
       }
 
@@ -1174,7 +1174,7 @@ public:
 
     SILDeclRef constant = SILDeclRef(afd);
     if (auto distributedThunk = afd->getDistributedThunk()) {
-      constant = SILDeclRef(distributedThunk).asDistributed();
+      constant = SILDeclRef(distributedThunk).asDistributedThunk();
     } else {
       constant = constant.asForeign(requiresForeignEntryPoint(afd));
     }
@@ -1203,7 +1203,7 @@ public:
     // A call to a `distributed` function may need to go through a thunk.
     if (callSite && callSite->shouldApplyDistributedThunk()) {
       if (auto distributedThunk = afd->getDistributedThunk())
-        return SILDeclRef(distributedThunk).asDistributed();
+        return SILDeclRef(distributedThunk).asDistributedThunk();
     }
 
     // A call to `@backDeployed` function may need to go through a thunk.

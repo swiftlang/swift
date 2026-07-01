@@ -3547,7 +3547,8 @@ static CanSILFunctionType getNativeSILFunctionType(
       return getSILFunctionTypeForConventions(DefaultInitializerConventions());
     case SILDeclRef::Kind::Allocator:
       return getSILFunctionTypeForConventions(DefaultAllocatorConventions());
-    case SILDeclRef::Kind::Func: {
+    case SILDeclRef::Kind::Func:
+    case SILDeclRef::Kind::DistributedThunk: {
       // If we have a setter, use the special setter convention. This ensures
       // that we take normal parameters at +1.
       if (constant) {
@@ -4490,6 +4491,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
   case SILDeclRef::Kind::EntryPoint:
   case SILDeclRef::Kind::AsyncEntryPoint:
+  case SILDeclRef::Kind::DistributedThunk:
     llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
@@ -4829,6 +4831,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Func:
+    case SILDeclRef::Kind::DistributedThunk:
       if (c.getDecl()->getDeclContext()->isTypeContext())
         return SILFunctionTypeRepresentation::Method;
       return SILFunctionTypeRepresentation::Thin;
@@ -5214,6 +5217,7 @@ CanAnyFunctionType TypeConverter::getBridgedFunctionType(
 static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   switch (declRef.kind) {
   case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::DistributedThunk:
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::Initializer:
     return (declRef.hasDecl()

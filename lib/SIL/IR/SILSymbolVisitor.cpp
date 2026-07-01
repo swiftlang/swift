@@ -512,7 +512,7 @@ public:
 
       // Record the 'distributed_thunk'
       if (auto distributedThunk = AFD->getDistributedThunk()) {
-        auto thunk = SILDeclRef(distributedThunk).asDistributed();
+        auto thunk = SILDeclRef(distributedThunk).asDistributedThunk();
         addFunction(thunk);
         addAsyncFunctionPointer(thunk);
       }
