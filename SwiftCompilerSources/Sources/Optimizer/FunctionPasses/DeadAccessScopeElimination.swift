@@ -12,9 +12,11 @@
 
 import SIL
 
-/// Eliminates dead access scopes if they are not conflicting with other scopes.
+/// Eliminates unnecessary access scopes in two cases.
 ///
-/// Removes:
+/// **Case 1: Dead access scopes**
+///
+/// Removes `begin_access`/`end_access` pairs where the result of `begin_access` has no real uses:
 /// ```
 ///   %2 = begin_access [modify] [dynamic] %1
 ///   ...                                       // no uses of %2
@@ -47,7 +49,7 @@ import SIL
 /// In this case the scope `%3` is not removed because it's important to get an access violation
 /// error at runtime before the undefined value `%x` is used.
 ///
-/// This pass considers potential conflicting access scopes in called functions.
+/// For dead scopes, this pass considers potential conflicting access scopes in called functions.
 /// But it does not consider potential conflicting access in callers (because it can't!).
 /// However, optimizations, like redundant-load-elimination, can only do such transformations if
 /// the outer access scope is within the function, e.g.
@@ -59,6 +61,24 @@ import SIL
 ///   %y = load %3     // cannot be propagated because it cannot be proved that %1 is the same address as %0
 ///   end_access %3
 /// ```
+///
+/// **Case 2: Dynamic accesses on locally allocated class instances**
+///
+/// Removes dynamic access scopes when the accessed address is derived from a locally allocated
+/// class instance (an `alloc_ref` in the same function):
+///
+/// ```
+///   %obj  = alloc_ref $MyClass
+///   %addr = ref_element_addr %obj : $MyClass, #MyClass.x
+///   %2    = begin_access [modify] [dynamic] %addr
+///   store %val to %2        // %2 has a use, so the scope is not "dead"
+///   end_access %2
+/// ```
+///
+/// Because the class instance is allocated locally, no caller can hold a reference to it, and
+/// therefore no conflicting access can originate from any caller. Combined with the ordinary
+/// intra-function conflict check, this means the exclusivity check is provably unnecessary and the
+/// scope can be eliminated by replacing `begin_access` with its address operand.
 ///
 /// All those checks are only done for dynamic access scopes, because they matter for runtime
 /// exclusivity checking. Dead static scopes are removed unconditionally.
@@ -100,7 +120,13 @@ let deadAccessScopeElimination = FunctionPass(name: "dead-access-scope-eliminati
   }
 
   for deadBeginAccess in removableScopes {
-    context.erase(instructionIncludingAllUsers: deadBeginAccess)
+    if deadBeginAccess.isDead {
+      context.erase(instructionIncludingAllUsers: deadBeginAccess)
+    } else {
+      assert(deadBeginAccess.isFromLocallyAllocatedClass)
+      context.erase(instructions: deadBeginAccess.uses.users(ofType: EndAccessInst.self))
+      deadBeginAccess.replace(with: deadBeginAccess.address, context)
+    }
   }
 }
 
@@ -112,7 +138,7 @@ private func process(instruction: Instruction,
   switch instruction {
 
   case let beginAccess as BeginAccessInst:
-    if beginAccess.isDead {
+    if beginAccess.isDead || beginAccess.isFromLocallyAllocatedClass {
       // Might be removed again later if it turns out to be in a conflicting scope.
       removableScopes.insert(beginAccess)
     }
@@ -244,4 +270,20 @@ private extension Instruction {
 
 private extension BeginAccessInst {
   var isDead: Bool { users.allSatisfy({ $0.isIncidentalUse }) }
+
+  var isFromLocallyAllocatedClass: Bool {
+    var walker = CheckAllocRefRootWalker()
+    return walker.visitAccessStorageRoots(of: address.accessPath)
+  }
+}
+
+private struct CheckAllocRefRootWalker : ValueUseDefWalker {
+  var walkUpCache = WalkerCache<SmallProjectionPath>()
+
+  mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
+    if value is AllocRefInstBase {
+      return .continueWalk
+    }
+    return .abortWalk
+  }
 }
