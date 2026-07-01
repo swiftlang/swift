@@ -57,10 +57,13 @@ bb0(%0 : @owned $C):
 // the closure's `mark_dependence` on its capture.)
 
 // The specialized function takes the capture @guaranteed (never @owned) and contains no
-// retain, so it remains [readonly]-safe.
+// retain, so it remains [readonly]-safe. The closure is re-formed inside the specialized
+// function, so its `mark_dependence` is re-materialized on the @guaranteed capture argument.
 // CHECK-LABEL: sil private [readonly] [ossa] @$s20takesReadOnlyClosure{{.*}}Tf1c_n : $@convention(thin) (@guaranteed Storage) -> Val {
-// CHECK-NOT: @owned
-// CHECK-NOT: copy_value
+// CHECK:       [[PA:%[0-9]+]] = partial_apply [callee_guaranteed] [on_stack] {{%[0-9]+}}(%0)
+// CHECK:       mark_dependence [[PA]] on %0
+// CHECK-NOT:   @owned
+// CHECK-NOT:   copy_value
 // CHECK-LABEL: } // end sil function '$s20takesReadOnlyClosure{{.*}}Tf1c_n'
 sil private [readonly] [ossa] @takesReadOnlyClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Val) -> Val) -> Val {
 bb0(%2 : @guaranteed $@noescape @callee_guaranteed (Val) -> Val):
