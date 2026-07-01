@@ -72,8 +72,8 @@ void shared(int len, int * __counted_by_or_null(len) __noescape p1, int * __coun
 // expected-expansion@+15:92{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: inout MutableSpan<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != len - offset {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != (len - offset) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\((len - offset)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@7{{macro content: |        unsafe $0|}}
@@ -198,8 +198,8 @@ void pointerName(int len, int * __counted_by_or_null(len) _Nullable pointerName 
 // expected-expansion@+15:91{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_lenName_param2: copy _lenName_param2) @_disfavoredOverload public func lenName(_ _lenName_param0: Int32, _ _lenName_param1: Int32, _ _lenName_param2: inout MutableSpan<Int32>?) {|}}
-//   expected-remark@3{{macro content: |    if let __lenName_param2Count = _lenName_param2?.count, __lenName_param2Count != _lenName_param0 * _lenName_param1 {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in lenName: expected \\(_lenName_param0 * _lenName_param1) but got \\(__lenName_param2Count)")|}}
+//   expected-remark@3{{macro content: |    if let __lenName_param2Count = _lenName_param2?.count, __lenName_param2Count != (_lenName_param0 * _lenName_param1) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in lenName: expected \\((_lenName_param0 * _lenName_param1)) but got \\(__lenName_param2Count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    let __lenName_param2Ptr = _lenName_param2?.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@7{{macro content: |        unsafe $0|}}

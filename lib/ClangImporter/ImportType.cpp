@@ -45,6 +45,7 @@
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/ExprCXX.h"
+#include "clang/AST/Type.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/Builtins.h"
 #include "clang/Lex/Preprocessor.h"
@@ -52,6 +53,7 @@
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
+#include <optional>
 
 using namespace swift;
 using namespace importer;
@@ -79,6 +81,121 @@ bool ClangImporter::Implementation::isOverAligned(
 bool ClangImporter::Implementation::isOverAligned(clang::QualType type) const {
   auto align = getClangASTContext().getTypeAlignInChars(type);
   return align > clang::CharUnits::fromQuantity(MaximumAlignment);
+}
+
+std::optional<StringRef>
+importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
+  switch (type->getKind()) {
+  case clang::BuiltinType::Void:
+    return std::nullopt;
+
+    // Builtin kinds with a Swift stdlib equivalent.
+#define MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)                               \
+  case clang::BuiltinType::CLANG_KIND:                                         \
+    return StringRef(#SWIFT_NAME);
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+
+  // Types that cannot be mapped into Swift, and probably won't ever be.
+  case clang::BuiltinType::Dependent:
+  case clang::BuiltinType::ARCUnbridgedCast:
+  case clang::BuiltinType::BoundMember:
+  case clang::BuiltinType::BuiltinFn:
+  case clang::BuiltinType::IncompleteMatrixIdx:
+  case clang::BuiltinType::Overload:
+  case clang::BuiltinType::PseudoObject:
+  case clang::BuiltinType::UnknownAny:
+  case clang::BuiltinType::UnresolvedTemplate:
+    return std::nullopt;
+
+  // FIXME: Types that can be mapped, but aren't yet.
+  case clang::BuiltinType::ShortAccum:
+  case clang::BuiltinType::Accum:
+  case clang::BuiltinType::LongAccum:
+  case clang::BuiltinType::UShortAccum:
+  case clang::BuiltinType::UAccum:
+  case clang::BuiltinType::ULongAccum:
+  case clang::BuiltinType::ShortFract:
+  case clang::BuiltinType::Fract:
+  case clang::BuiltinType::LongFract:
+  case clang::BuiltinType::UShortFract:
+  case clang::BuiltinType::UFract:
+  case clang::BuiltinType::ULongFract:
+  case clang::BuiltinType::SatShortAccum:
+  case clang::BuiltinType::SatAccum:
+  case clang::BuiltinType::SatLongAccum:
+  case clang::BuiltinType::SatUShortAccum:
+  case clang::BuiltinType::SatUAccum:
+  case clang::BuiltinType::SatULongAccum:
+  case clang::BuiltinType::SatShortFract:
+  case clang::BuiltinType::SatFract:
+  case clang::BuiltinType::SatLongFract:
+  case clang::BuiltinType::SatUShortFract:
+  case clang::BuiltinType::SatUFract:
+  case clang::BuiltinType::SatULongFract:
+  case clang::BuiltinType::BFloat16:
+  case clang::BuiltinType::Float128:
+  case clang::BuiltinType::NullPtr:
+  case clang::BuiltinType::Ibm128:
+    return std::nullopt;
+
+  // Objective-C types that aren't mapped directly; rather, pointers to
+  // these types will be mapped.
+  case clang::BuiltinType::ObjCClass:
+  case clang::BuiltinType::ObjCId:
+  case clang::BuiltinType::ObjCSel:
+    return std::nullopt;
+
+  // OpenMP types that don't have Swift equivalents.
+  case clang::BuiltinType::ArraySection:
+  case clang::BuiltinType::OMPArrayShaping:
+  case clang::BuiltinType::OMPIterator:
+    return std::nullopt;
+
+  // OpenCL builtin types that don't have Swift equivalents.
+  case clang::BuiltinType::OCLClkEvent:
+  case clang::BuiltinType::OCLEvent:
+  case clang::BuiltinType::OCLSampler:
+  case clang::BuiltinType::OCLQueue:
+  case clang::BuiltinType::OCLReserveID:
+#define IMAGE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/OpenCLImageTypes.def"
+#define EXT_OPAQUE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/OpenCLExtensionTypes.def"
+    return std::nullopt;
+
+    // ARM SVE builtin types that don't have Swift equivalents.
+#define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/AArch64ACLETypes.def"
+    return std::nullopt;
+
+    // PPC SVE builtin types that don't have Swift equivalents.
+#define PPC_VECTOR_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/PPCTypes.def"
+    return std::nullopt;
+
+    // RISC-V V builtin types that don't have Swift equivalents.
+#define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/RISCVVTypes.def"
+    return std::nullopt;
+
+    // WASM builtin types that don't have Swift equivalents.
+#define WASM_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/WebAssemblyReferenceTypes.def"
+    return std::nullopt;
+
+    // AMDGPU builtin types that don't have Swift equivalents.
+#define AMDGPU_TYPE(Name, Id, SingletonId, Width, Align)                       \
+  case clang::BuiltinType::Id:
+#include "clang/Basic/AMDGPUTypes.def"
+    return std::nullopt;
+
+    // HLSL intangible builtin types that don't have Swift equivalents.
+#define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLIntangibleTypes.def"
+    return std::nullopt;
+  }
+
+  llvm_unreachable("Invalid BuiltinType.");
 }
 
 namespace {
@@ -268,120 +385,34 @@ namespace {
       return T;
     }
 
-    ImportResult VisitBuiltinType(const clang::BuiltinType *type) {
-      switch (type->getKind()) {
-      case clang::BuiltinType::Void:
-        return { Type(), ImportHint::Void };
-
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)             \
-      case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
-        return unwrapCType(Impl.getNamedSwiftType(Impl.getStdlibModule(), \
-                                        #SWIFT_TYPE_NAME));
-#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)       \
-      case clang::BuiltinType::CLANG_BUILTIN_KIND:                        \
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), #SWIFT_TYPE_NAME);
+    constexpr bool isCCharBuiltinType(clang::BuiltinType::Kind kind) {
+      switch (kind) {
+      default:
+        return false;
+#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)
+        /* Intentionally empty; fallback to default label. */
+#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)          \
+    case clang::BuiltinType::CLANG_BUILTIN_KIND:
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
-
-      // Types that cannot be mapped into Swift, and probably won't ever be.
-      case clang::BuiltinType::Dependent:
-      case clang::BuiltinType::ARCUnbridgedCast:
-      case clang::BuiltinType::BoundMember:
-      case clang::BuiltinType::BuiltinFn:
-      case clang::BuiltinType::IncompleteMatrixIdx:
-      case clang::BuiltinType::Overload:
-      case clang::BuiltinType::PseudoObject:
-      case clang::BuiltinType::UnknownAny:
-      case clang::BuiltinType::UnresolvedTemplate:
-        return Type();
-
-      // FIXME: Types that can be mapped, but aren't yet.
-      case clang::BuiltinType::ShortAccum:
-      case clang::BuiltinType::Accum:
-      case clang::BuiltinType::LongAccum:
-      case clang::BuiltinType::UShortAccum:
-      case clang::BuiltinType::UAccum:
-      case clang::BuiltinType::ULongAccum:
-      case clang::BuiltinType::ShortFract:
-      case clang::BuiltinType::Fract:
-      case clang::BuiltinType::LongFract:
-      case clang::BuiltinType::UShortFract:
-      case clang::BuiltinType::UFract:
-      case clang::BuiltinType::ULongFract:
-      case clang::BuiltinType::SatShortAccum:
-      case clang::BuiltinType::SatAccum:
-      case clang::BuiltinType::SatLongAccum:
-      case clang::BuiltinType::SatUShortAccum:
-      case clang::BuiltinType::SatUAccum:
-      case clang::BuiltinType::SatULongAccum:
-      case clang::BuiltinType::SatShortFract:
-      case clang::BuiltinType::SatFract:
-      case clang::BuiltinType::SatLongFract:
-      case clang::BuiltinType::SatUShortFract:
-      case clang::BuiltinType::SatUFract:
-      case clang::BuiltinType::SatULongFract:
-      case clang::BuiltinType::BFloat16:
-      case clang::BuiltinType::Float128:
-      case clang::BuiltinType::NullPtr:
-      case clang::BuiltinType::Ibm128:
-        return Type();
-
-      // Objective-C types that aren't mapped directly; rather, pointers to
-      // these types will be mapped.
-      case clang::BuiltinType::ObjCClass:
-      case clang::BuiltinType::ObjCId:
-      case clang::BuiltinType::ObjCSel:
-        return Type();
-
-      // OpenMP types that don't have Swift equivalents.
-      case clang::BuiltinType::ArraySection:
-      case clang::BuiltinType::OMPArrayShaping:
-      case clang::BuiltinType::OMPIterator:
-        return Type();
-
-      // OpenCL builtin types that don't have Swift equivalents.
-      case clang::BuiltinType::OCLClkEvent:
-      case clang::BuiltinType::OCLEvent:
-      case clang::BuiltinType::OCLSampler:
-      case clang::BuiltinType::OCLQueue:
-      case clang::BuiltinType::OCLReserveID:
-#define IMAGE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
-#include "clang/Basic/OpenCLImageTypes.def"
-#define EXT_OPAQUE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
-#include "clang/Basic/OpenCLExtensionTypes.def"
-        return Type();
-
-      // ARM SVE builtin types that don't have Swift equivalents.
-#define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
-#include "clang/Basic/AArch64ACLETypes.def"
-        return Type();
-
-      // PPC SVE builtin types that don't have Swift equivalents.
-#define PPC_VECTOR_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
-#include "clang/Basic/PPCTypes.def"
-        return Type();
-
-      // RISC-V V builtin types that don't have Swift equivalents.
-#define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
-#include "clang/Basic/RISCVVTypes.def"
-        return Type();
-
-#define WASM_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
-#include "clang/Basic/WebAssemblyReferenceTypes.def"
-        return Type();
-
-      // AMDGPU builtin types that don't have Swift equivalents.
-#define AMDGPU_TYPE(Name, Id, SingletonId, Width, Align)                       \
-      case clang::BuiltinType::Id:
-#include "clang/Basic/AMDGPUTypes.def"
-        return Type();
-
-      // HLSL intangible builtin types that don't have Swift equivalents.
-#define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
-#include "clang/Basic/HLSLIntangibleTypes.def"
-        return Type();
+        return true;
       }
+    }
 
-      llvm_unreachable("Invalid BuiltinType.");
+    ImportResult VisitBuiltinType(const clang::BuiltinType *type) {
+      const clang::BuiltinType::Kind kind = type->getKind();
+      if (kind == clang::BuiltinType::Void)
+        return {Type(), ImportHint::Void};
+
+      std::optional<StringRef> swiftTypeName = getBuiltinTypeSwiftName(type);
+      if (!swiftTypeName)
+        return Type();
+
+      Type swiftType =
+          Impl.getNamedSwiftType(Impl.getStdlibModule(), *swiftTypeName);
+      // FIXME: stop unwrapping typealiases
+      if (!isCCharBuiltinType(kind))
+        swiftType = unwrapCType(swiftType);
+      return swiftType;
     }
 
     ImportResult VisitBitIntType(const clang::BitIntType *type) {

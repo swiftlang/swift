@@ -47,14 +47,12 @@ struct TemplateInstantiationNamePrinter
       return "Void";
     case clang::BuiltinType::NullPtr:
       return "__cxxNullPtrT";
-
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)                  \
-    case clang::BuiltinType::CLANG_BUILTIN_KIND:                               \
-      return #SWIFT_TYPE_NAME;
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
     default:
       break;
     }
+
+    if (std::optional<StringRef> swiftName = getBuiltinTypeSwiftName(type))
+      return swiftName->str();
 
     return VisitType(type);
   }
