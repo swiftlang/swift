@@ -894,6 +894,12 @@ bool CompilerInstance::setUpModuleLoaders() {
     return true;
   }
 
+  // If memory statistics were requested, start tracking per-module materialized
+  // decl counts now, before any significant deserialization occurs.
+  if (FEOpts.CompilerDebuggingOpts.PrintClangStats ||
+      !FEOpts.StatsOutputDir.empty())
+    clangImporter->enableMemoryStatistics();
+
   // Configure ModuleInterfaceChecker for the ASTContext.
   auto const &Clang = clangImporter->getClangInstance();
   std::string ModuleCachePath = ModuleCachePathFromInvocation.empty()
