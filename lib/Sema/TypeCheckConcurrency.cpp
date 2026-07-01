@@ -6275,6 +6275,11 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       if (getIsolationFromAttributes(value))
         return {};
 
+      // An overriding declaration inherits the isolation of the declaration
+      // it overrides, inferring MainActor would break overrides of nonisolated.
+      if (value->getOverriddenDeclOrSuperDeinit())
+        return {};
+
       if (auto *nominal = dyn_cast<NominalTypeDecl>(value)) {
         // Actors cannot infer isolation.
         if (nominal->isAnyActor())
