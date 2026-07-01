@@ -84,35 +84,68 @@ static inline __swift_uint32_t _swift_stdlib_futex_wake(
 #endif // defined(__linux__)
 
 #if defined(__FreeBSD__)
-#include <errno.h>
 #include <stddef.h>
 #include <sys/types.h>
+#include <sys/thr.h>
 #include <sys/umtx.h>
 
-// Plain-futex wait using UMTX_OP_WAIT_UINT_PRIVATE: sleeps if *addr == expected.
-// Returns 0 on success (woken by UMTX_OP_WAKE_PRIVATE), or the errno value.
-// EBUSY (16) means the value changed before we slept (analogous to Linux EAGAIN).
-// EINTR (4) means interrupted by a signal.
-static inline __swift_uint32_t _swift_stdlib_futex_wait(
-    __swift_uint32_t *addr, __swift_uint32_t expected) {
-  int ret = _umtx_op(addr, UMTX_OP_WAIT_UINT_PRIVATE,
-                     (unsigned long)expected, NULL, NULL);
-  if (ret == 0) {
-    return 0;
+// Current thread's kernel LWP id, cached; used as the umutex owner value.
+static inline __swift_uint32_t _swift_stdlib_gettid(void) {
+  static __thread __swift_uint32_t tid = 0;
+  if (tid == 0) {
+    long t = 0;
+    thr_self(&t);
+    tid = (__swift_uint32_t)t;
   }
-  return (__swift_uint32_t)errno;
+  return tid;
 }
 
-// Plain-futex wake using UMTX_OP_WAKE_PRIVATE: wakes up to `count` waiters.
-// Returns the number woken on success, or errno on failure.
-static inline __swift_uint32_t _swift_stdlib_futex_wake(
-    __swift_uint32_t *addr, __swift_uint32_t count) {
-  long ret = _umtx_op(addr, UMTX_OP_WAKE_PRIVATE,
-                      (unsigned long)count, NULL, NULL);
-  if (ret >= 0) {
-    return (__swift_uint32_t)ret;
+// Lock a FreeBSD umutex, following libthr's normal-mutex protocol:
+//   * uncontended: CAS m_owner UNOWNED -> tid in userspace;
+//   * contended: loop — re-acquire when the word becomes unowned (preserving the
+//     UMUTEX_CONTESTED bit), otherwise wait in the kernel with UMTX_OP_MUTEX_WAIT
+//     until the owner changes.
+// (Calling UMTX_OP_MUTEX_LOCK directly, or a bare CAS without this loop, drops
+//  wakeups and deadlocks under contention on aarch64.)
+static inline void _swift_stdlib_umutex_lock(struct umutex *mutex) {
+  volatile __swift_uint32_t *owner = (volatile __swift_uint32_t *)&mutex->m_owner;
+  __swift_uint32_t id = _swift_stdlib_gettid();
+  __swift_uint32_t expected = UMUTEX_UNOWNED;
+  if (__atomic_compare_exchange_n(owner, &expected, id, 0,
+                                  __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+    return;
   }
-  return (__swift_uint32_t)errno;
+  for (;;) {
+    __swift_uint32_t cur = __atomic_load_n(owner, __ATOMIC_RELAXED);
+    if ((cur & ~UMUTEX_CONTESTED) == UMUTEX_UNOWNED) {
+      __swift_uint32_t e = cur;
+      if (__atomic_compare_exchange_n(owner, &e, id | cur, 0,
+                                      __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+        return;
+      }
+    } else {
+      _umtx_op(mutex, UMTX_OP_MUTEX_WAIT, 0, NULL, NULL);
+    }
+  }
+}
+
+static inline __swift_bool _swift_stdlib_umutex_trylock(struct umutex *mutex) {
+  volatile __swift_uint32_t *owner = (volatile __swift_uint32_t *)&mutex->m_owner;
+  __swift_uint32_t expected = UMUTEX_UNOWNED;
+  return __atomic_compare_exchange_n(owner, &expected, _swift_stdlib_gettid(), 0,
+                                     __ATOMIC_ACQUIRE, __ATOMIC_RELAXED) ? 1 : 0;
+}
+
+// Unlock: uncontended fast release (CAS m_owner tid -> UNOWNED); if the mutex is
+// contended (CONTESTED bit set), hand off through the kernel so a waiter is woken.
+static inline void _swift_stdlib_umutex_unlock(struct umutex *mutex) {
+  volatile __swift_uint32_t *owner = (volatile __swift_uint32_t *)&mutex->m_owner;
+  __swift_uint32_t expected = _swift_stdlib_gettid();
+  if (__atomic_compare_exchange_n(owner, &expected, UMUTEX_UNOWNED, 0,
+                                  __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
+    return;
+  }
+  _umtx_op(mutex, UMTX_OP_MUTEX_UNLOCK, 0, NULL, NULL);
 }
 
 #endif // defined(__FreeBSD__)
