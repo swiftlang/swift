@@ -299,10 +299,6 @@ struct SILDeclRef {
   bool hasAutoClosureExpr() const;
   bool hasFuncDecl() const;
 
-  /// The AST node that originated this SILDeclRef, without any decl ref kind
-  /// specific substitutions done by `getDecl()`.
-  ValueDecl *getOriginalDecl() const { return loc.dyn_cast<ValueDecl *>(); }
-
   ValueDecl *getDecl() const;
   AbstractClosureExpr *getAbstractClosureExpr() const {
     return loc.dyn_cast<AbstractClosureExpr *>();
@@ -463,17 +459,8 @@ struct SILDeclRef {
                       defaultArgIndex, isAsyncLetClosure,
                       cast<AutoDiffDerivativeFunctionIdentifier *>(pointer));
   }
-  /// Returns the distributed entry point corresponding to the same decl.
-  SILDeclRef asDistributedThunk(bool distributed = true) const {
-    Kind newKind = distributed ? Kind::DistributedThunk
-                               : (kind == Kind::DistributedThunk ? Kind::Func
-                                                                 : kind);
-    return SILDeclRef(loc.getOpaqueValue(), newKind,
-                      /*foreign=*/false,
-                      /*knownToBeLocal=*/false, isRuntimeAccessible,
-                      backDeploymentKind, defaultArgIndex, isAsyncLetClosure,
-                      cast<AutoDiffDerivativeFunctionIdentifier *>(pointer));
-  }
+  /// Returns a SILDeclRef pointing to the corresponding 'distributed_thunk' of the current loc.
+  SILDeclRef getDistributedThunkDeclRef() const;
 
   /// Returns the distributed known-to-be-local entry point corresponding to
   /// the same decl.
@@ -661,20 +648,12 @@ struct SILDeclRef {
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
-  /// Produces a SILDeclRef from an opaque value.
   explicit SILDeclRef(void *opaqueLoc, Kind kind, bool isForeign,
                       bool isKnownToBeLocal,
                       bool isRuntimeAccessible,
                       BackDeploymentKind backDeploymentKind,
                       unsigned defaultArgIndex, bool isAsyncLetClosure,
-                      AutoDiffDerivativeFunctionIdentifier *derivativeId)
-      : loc(Loc::getFromOpaqueValue(opaqueLoc)), kind(kind),
-        isForeign(isForeign),
-        isKnownToBeLocal(isKnownToBeLocal),
-        isRuntimeAccessible(isRuntimeAccessible),
-        backDeploymentKind(backDeploymentKind),
-        defaultArgIndex(defaultArgIndex), isAsyncLetClosure(isAsyncLetClosure),
-        pointer(derivativeId) {}
+                      AutoDiffDerivativeFunctionIdentifier *derivativeId);
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILDeclRef C) {

@@ -4620,9 +4620,7 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
   }
 
   case AccessStrategy::DispatchToDistributedThunk: {
-    auto thunkRef = SILDeclRef(cast<VarDecl>(storage)->getDistributedThunk(),
-                               SILDeclRef::Kind::DistributedThunk,
-                               /*isForeign=*/false);
+    auto thunkRef = SILDeclRef(storage->getAccessor(AccessorKind::Get)).getDistributedThunkDeclRef();
     return SGM.getFunction(thunkRef, NotForDefinition);
   }
   }

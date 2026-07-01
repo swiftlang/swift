@@ -198,12 +198,10 @@ private:
     if (!AFD)
       return;
 
-    auto thunk = AFD->getDistributedThunk();
-    if (!thunk)
+    if (!AFD->getDistributedThunk())
       return;
 
-    SILDeclRef declRef(thunk, kind);
-    asDerived().addMethod(declRef.asDistributedThunk());
+    asDerived().addMethod(SILDeclRef(AFD, kind).getDistributedThunkDeclRef());
   }
 };
 
