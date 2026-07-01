@@ -31,6 +31,11 @@
 #include <uuid/uuid.h>
 #endif
 
+#if defined(__EMSCRIPTEN__)
+static inline void uuid_generate_random(uuid_t out) { uuid_generate(out); }
+static inline void uuid_generate_time(uuid_t out) { uuid_generate(out); }
+#endif
+
 using namespace swift;
 
 swift::UUID::UUID(FromRandom_t) {
