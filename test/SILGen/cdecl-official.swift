@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-emit-silgen %s -module-name cdecl > %t/out.sil

@@ -14,6 +14,9 @@
 // RUN: %target-run %t/main %t/%target-library-name(Lib) | %FileCheck %s
 
 /// Ensure the client has the optimization we're testing here.
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-frontend -typecheck -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values %t/Lib.swiftmodule
+
 // RUN: %target-swift-frontend -typecheck -emit-silgen %t/Lib.swiftmodule > %t/Lib.sil
 // RUN: %FileCheck --check-prefix CHECK-OPTIMIZED --input-file %t/Lib.sil %s
 // CHECK-OPTIMIZED: _getErrorEmbeddedNSError

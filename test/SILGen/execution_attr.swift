@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s  | %FileCheck -check-prefix CHECK -check-prefix DISABLED %s
 // RUN: %target-swift-emit-silgen %s -enable-upcoming-feature NonisolatedNonsendingByDefault | %FileCheck -check-prefix CHECK -check-prefix ENABLED %s
 

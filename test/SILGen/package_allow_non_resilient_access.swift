@@ -12,6 +12,7 @@
 // CHECK-ON: ALLOW_NON_RESILIENT_ACCESS
 
 /// By default, Client accesses decls in Utils resiliently.
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %t/Client.swift -I %t -module-name Client -package-name mypkg
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg | %FileCheck %s --check-prefixes=CHECK,CHECK-DEFAULT
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -enable-library-evolution | %FileCheck %s --check-prefixes=CHECK,CHECK-DEFAULT
 

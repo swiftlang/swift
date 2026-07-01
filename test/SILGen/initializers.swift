@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -module-name failable_initializers
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -module-name failable_initializers | %FileCheck %s
 
 // High-level tests that silgen properly emits code for failable and throwing

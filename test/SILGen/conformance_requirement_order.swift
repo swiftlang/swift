@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %s -module-name Horse -D LIB -emit-module-path %t/Horse.swiftmodule
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -module-name main -I %t -module-alias SwiftHorse=Horse
 // RUN: %target-swift-emit-silgen %s -module-name main -I %t -module-alias SwiftHorse=Horse | %FileCheck %s
 
 #if LIB

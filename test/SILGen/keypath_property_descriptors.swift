@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s | %FileCheck --check-prefix=CHECK --check-prefix=NONRESILIENT %s
 // RUN: %target-swift-emit-silgen -enable-library-evolution %s | %FileCheck --check-prefix=CHECK --check-prefix=RESILIENT %s
 // RUN: %target-swift-emit-silgen -enable-private-imports %s | %FileCheck --check-prefix=PRIVATEIMPORTS %s

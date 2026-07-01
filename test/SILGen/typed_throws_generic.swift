@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -swift-version 5 -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows
+
 // RUN: %target-swift-emit-silgen -swift-version 5 -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
 
 // REQUIRES: swift_feature_FullTypedThrows

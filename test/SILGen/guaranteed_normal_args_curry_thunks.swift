@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -parse-as-library -module-name Swift -parse-stdlib %s
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name Swift -parse-stdlib %s
 
 // This test checks specific codegen related to converting curry thunks to
