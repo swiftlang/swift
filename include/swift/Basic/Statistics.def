@@ -92,6 +92,35 @@ FRONTEND_STATISTIC(Frontend, WallClockMicroseconds)
 /// Maximum number of bytes allocated via malloc.
 FRONTEND_STATISTIC(Frontend, MaxMallocUsage)
 
+/// Convenience sum of the accounted Clang memory: clang ASTContext
+/// bump-allocator + side tables + malloc-backed loaded-module buffers. Excludes
+/// mmap-backed .pcm buffers, which are file-backed/demand-paged and not
+/// necessarily resident.
+FRONTEND_STATISTIC(ClangImporter, ClangTotalBytes)
+
+/// Total bytes held by the Swift ASTContext (all arenas, including the solver).
+FRONTEND_STATISTIC(AST, SwiftASTContextBytes)
+
+/// Bytes held by the single shared Clang ASTContext (bump allocator + side
+/// tables). Covers all imported Clang modules together; cannot be split per
+/// module because they share one ASTContext.
+FRONTEND_STATISTIC(ClangImporter, ClangASTContextBytes)
+
+/// In-memory bytes of mmap-backed loaded-module (.pcm) buffers. Informational:
+/// mapped, not necessarily resident; excluded from ClangTotalBytes.
+FRONTEND_STATISTIC(ClangImporter, ClangModuleBufferBytesMMap)
+
+/// In-memory bytes of malloc-backed loaded-module (.pcm) buffers (resident heap).
+FRONTEND_STATISTIC(ClangImporter, ClangModuleBufferBytesMalloc)
+
+/// Number of Clang modules loaded by the importer's ASTReader.
+FRONTEND_STATISTIC(ClangImporter, NumLoadedClangModules)
+
+/// Number of Clang decls actually deserialized (materialized) into the shared
+/// ASTContext, summed across modules. Per-module breakdown is emitted separately
+/// (clang-module-memory.json / -print-clang-stats).
+FRONTEND_STATISTIC(ClangImporter, NumMaterializedClangDecls)
+
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)
 
