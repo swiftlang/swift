@@ -17,7 +17,9 @@ struct TupleBuilder<Context> {
 
 
 func test<B, V, T: P, U>(_: KeyPath<B, T>, _: V, @TupleBuilder<B> a: () -> U) where V == T.V, V: Equatable {}
+// expected-note@-1 {{found this candidate}}
 func test<B, V, T: P, U>(_: KeyPath<B, T>, _: V.V, @TupleBuilder<B> a: () -> U) where V == T.V, V: ExpressibleByNilLiteral, V.V: Equatable {}
+// expected-note@-1 {{found this candidate}}
 
 enum E: String, P, ExpressibleByNilLiteral {
   typealias V = Self
@@ -39,7 +41,6 @@ struct S : Element {
   init() { fatalError() }
 }
 
-// FIXME(diagnostics): This diagnostic is wrong. The problem is that `test` is ambiguous and should be diagnosed pre-salvage.
-test(\.value, .empty) { // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
+test(\.value, .empty) { // expected-error {{ambiguous use of 'test(_:_:a:)'}}
   S()
 }
