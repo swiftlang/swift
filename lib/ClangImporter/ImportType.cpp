@@ -923,6 +923,16 @@ namespace {
         return Visit(type->getLocallyUnqualifiedSingleStepDesugaredType());
       }
 
+      if (const clang::TypedefNameDecl *D = type->getDecl()) {
+        if (D->isImplicit() && D->getDeclName().isIdentifier() &&
+            D->getName().contains(' ')) {
+          // When clang encounters a bounds attribute (e.g. `__single`) applied to
+          // a typedef type (`foo_t`) it uses a hack where it synthesizes a new
+          // typedef with the name `foo_t __single`, including the space.
+          return Visit(type->getLocallyUnqualifiedSingleStepDesugaredType());
+        }
+      }
+
       // Import the underlying declaration.
       auto decl = dyn_cast_or_null<TypeDecl>(
           Impl.importDecl(type->getDecl(), Impl.CurrentVersion));
