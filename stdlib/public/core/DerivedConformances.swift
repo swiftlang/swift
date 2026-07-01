@@ -11,5 +11,5 @@
 //===----------------------------------------------------------------------===//
 
 @freestanding(declaration, names: arbitrary)
-public macro _deriveEquatable(_ infos: String, isResilient: Bool, reachability: [Bool]?) =
+public macro _deriveEquatable(_ infos: String, isResilient: Bool) =
   #externalMacro(module: "SwiftMacros", type: "DeriveEquatableMacro")
