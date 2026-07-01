@@ -11,6 +11,9 @@
 
 // REQUIRES: objc_interop
 
+// TheColor is iOS-only; tvOS-derives-from-iOS inference does not extend to visionOS.
+// UNSUPPORTED: OS=xros
+
 import CAssoc
 
 extension TheColor {

@@ -12,6 +12,10 @@
 // REQUIRES: concurrency_runtime
 // REQUIRES: swift_feature_CoroutineAccessors
 
+// visionOS enters RuntimeVersions.def at 5.10/1.0, so Swift 5.7 is always-available
+// and the pre-5.7 back-deploy layout is never emitted here.
+// UNSUPPORTED: OS=xros
+
 // CHECK-LABEL: %swift.back_deploy.task.pre_57 = type {
 //                  object header
 // CHECK-SAME:      %swift.refcounted
