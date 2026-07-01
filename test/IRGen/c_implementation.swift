@@ -23,15 +23,15 @@ public func fn() {
 /// implFunc(_:)
 // CHECK-LABEL: define{{.*}} void @implFunc
 
-// CHECK-NOT: define{{.*}} swiftcc void @"$s20cdecl_implementation8implFuncyys5Int32VF"
+// CHECK-NOT: define{{.*}} swiftcc void @"$s16c_implementation8implFuncyys5Int32VF"
 
 /// inplFuncCName(_:)
 // CHECK-LABEL: define{{.*}} void @"\01_implFuncAsmName"
 
-// CHECK-NOT: define{{.*}} swiftcc void @"$s20cdecl_implementation13implFuncCNameyys5Int32VF"
+// CHECK-NOT: define{{.*}} swiftcc void @"$s16c_implementation13implFuncCNameyys5Int32VF"
 
 /// fn()
-// CHECK-LABEL: define{{.*}} swiftcc void @"$s20cdecl_implementation2fnyyF"
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s16c_implementation2fnyyF"
 // CHECK:   call void @implFunc
 // CHECK:   call void @"\01_implFuncAsmName"
 // CHECK:   call void @implFuncRenamed_C
