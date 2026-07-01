@@ -5,6 +5,24 @@
 import SwiftUI
 import Foundation
 
+// Stand-in for SwiftUI's `@State`, which became a macro in recent SDKs and would
+// otherwise require the SwiftUIMacros plugin. This test exercises type-checking
+// performance, not `@State` itself; the box reproduces `@State`'s nonmutating
+// setter and `Binding` projected value.
+@propertyWrapper
+struct FakeState<Value> {
+  final class Box { var value: Value; init(_ value: Value) { self.value = value } }
+  private let box: Box
+  init(wrappedValue: Value) { box = Box(wrappedValue) }
+  var wrappedValue: Value {
+    get { box.value }
+    nonmutating set { box.value = newValue }
+  }
+  var projectedValue: Binding<Value> {
+    Binding(get: { box.value }, set: { box.value = $0 })
+  }
+}
+
 struct Value: Identifiable {
   var id: UUID
   var name: String
@@ -17,7 +35,7 @@ struct MySettingsView: View {
 
 struct MyView: View {
   var data: [Value]
-  @State var selection: String?
+  @FakeState var selection: String?
 
   var body: some View {
     List(selection: Binding(get: {
