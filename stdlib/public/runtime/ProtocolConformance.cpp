@@ -569,6 +569,31 @@ namespace {
     }
   };
 
+  // Relative witness tables use signed pointers. When we're storing those
+  // signed pointers in a signed field, we need to authenticate first to avoid
+  // mixing the two signatures together.
+  static const WitnessTable *
+  authRelativeWitnessTableForCache(const WitnessTable *witness) {
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES && SWIFT_PTRAUTH
+    if (witness && !(reinterpret_cast<uintptr_t>(witness) & 0x1))
+      witness = swift_auth_data_non_address(
+          witness,
+          SpecialPointerAuthDiscriminators::RelativeProtocolWitnessTable);
+#endif
+    return witness;
+  }
+
+  static const WitnessTable *
+  resignRelativeWitnessTableFromCache(const WitnessTable *witness) {
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES && SWIFT_PTRAUTH
+    if (witness && !(reinterpret_cast<uintptr_t>(witness) & 0x1))
+      witness = swift_sign_data_non_address(
+          witness,
+          SpecialPointerAuthDiscriminators::RelativeProtocolWitnessTable);
+#endif
+    return witness;
+  }
+
   struct ConformanceCacheEntry {
   public:
     /// Storage used when we have global actor isolation on the conformance.
@@ -613,7 +638,8 @@ namespace {
     ConformanceCacheEntry(const Metadata *type, const ProtocolDescriptor *proto,
                           ConformanceLookupResult result,
                           std::atomic<ExtendedStorage *> &storageHead)
-        : TypeOrDescriptor(type), Witness(result.witnessTable) {
+        : TypeOrDescriptor(type),
+          Witness(authRelativeWitnessTableForCache(result.witnessTable)) {
       if (!result.globalActorIsolationType) {
         ProtoOrStorage = proto;
         return;
@@ -621,10 +647,10 @@ namespace {
 
       // Allocate extended storage.
       void *memory = malloc(sizeof(ExtendedStorage));
-      auto storage = new (memory) ExtendedStorage{
-        proto, result.globalActorIsolationType,
-        result.globalActorIsolationWitnessTable
-      };
+      auto storage = new (memory)
+          ExtendedStorage{proto, result.globalActorIsolationType,
+                          authRelativeWitnessTableForCache(
+                              result.globalActorIsolationWitnessTable)};
 
       ProtoOrStorage = storage;
 
@@ -691,17 +717,21 @@ namespace {
 
     /// Get the cached witness table, or null if we cached failure.
     const WitnessTable *getWitnessTable() const {
-      return Witness;
+      return resignRelativeWitnessTableFromCache(Witness);
     }
 
     ConformanceLookupResult getResult() const {
-      if (ProtoOrStorage.is<const ProtocolDescriptor *>())
-        return ConformanceLookupResult { Witness, nullptr, nullptr };
+      if (ProtoOrStorage.is<const ProtocolDescriptor *>()) {
+        return ConformanceLookupResult{
+            resignRelativeWitnessTableFromCache(Witness), nullptr, nullptr};
+      }
 
       if (auto storage = ProtoOrStorage.dyn_cast<ExtendedStorage *>()) {
         return ConformanceLookupResult(
-            Witness, storage->globalActorIsolationType,
-            storage->globalActorIsolationWitnessTable);
+            resignRelativeWitnessTableFromCache(Witness),
+            storage->globalActorIsolationType,
+            resignRelativeWitnessTableFromCache(
+                storage->globalActorIsolationWitnessTable));
       }
 
       return nullptr;
