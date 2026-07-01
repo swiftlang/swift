@@ -1797,6 +1797,13 @@ ERROR(too_many_dynamic_member_lookups,none,
       "dynamic member lookups",
       (DeclNameRef))
 
+ERROR(keypath_dynamic_member_lookup_expects_class_base,none,
+      "cannot reference %kind1 on %0 through key path dynamic member lookup",
+      (Type, ValueDecl *))
+NOTE(keypath_dynamic_member_lookup_expects_class_base_note, none,
+     "'subscript(dynamicMember:)' declared in %0 uses 'ReferenceWritableKeyPath'"
+     " which only supports classes", (Type))
+
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
       (Type))
