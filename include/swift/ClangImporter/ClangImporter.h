@@ -591,6 +591,50 @@ public:
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;
 
+  /// Per-module memory information for a single loaded Clang module.
+  struct ClangModuleMemoryInfo {
+    std::string moduleName;
+    /// In-memory size of the serialized module (.pcm) buffer. This is the
+    /// serialized bitstream, not the deserialized AST.
+    uint64_t inMemoryBufferBytes = 0;
+    /// Whether the buffer is mmap-backed (file-backed/demand-paged) rather than
+    /// malloc-backed (resident heap).
+    bool bufferIsMMapped = false;
+    /// Total entities serialized in the module on disk (upper bound).
+    uint64_t onDiskDecls = 0;
+    uint64_t onDiskTypes = 0;
+    uint64_t onDiskIdentifiers = 0;
+    uint64_t onDiskMacros = 0;
+    /// Decls actually deserialized (materialized) into the shared ASTContext.
+    /// Only populated when a stats reporter is active (see DeclRead listener).
+    uint64_t materializedDecls = 0;
+  };
+
+  /// Aggregate Clang memory statistics plus a per-module breakdown. All imported
+  /// modules share a single ASTContext, so the deserialized-AST byte figure is
+  /// aggregate; per-module data is buffer bytes + entity counts.
+  struct ClangMemoryStats {
+    /// Bytes held by the shared Clang ASTContext (bump allocator + side tables).
+    uint64_t astContextBytes = 0;
+    /// In-memory bytes of mmap-backed loaded-module buffers (informational).
+    uint64_t moduleBufferMMapBytes = 0;
+    /// In-memory bytes of malloc-backed loaded-module buffers (resident heap).
+    uint64_t moduleBufferMallocBytes = 0;
+    uint64_t numLoadedModules = 0;
+    uint64_t numMaterializedDecls = 0;
+    std::vector<ClangModuleMemoryInfo> perModule;
+  };
+
+  /// Collect Clang memory statistics for the importer's main instance.
+  ClangMemoryStats getClangMemoryStats() const;
+
+  /// Enable per-module materialized-decl tracking by the deserialization
+  /// listener. Should be called soon after importer creation; decls deserialized
+  /// before this call (e.g. while setting up a bridging header) are not counted,
+  /// but module-import deserialization (the bulk) is. Off by default to avoid
+  /// per-decl overhead in builds that don't request memory statistics.
+  void enableMemoryStatistics();
+
   /// Dump Swift lookup tables.
   void dumpSwiftLookupTables() const override;
 
