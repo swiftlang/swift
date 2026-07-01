@@ -346,7 +346,7 @@ void SILDeclRef::print(raw_ostream &OS) const {
     OS << "<file>";
     break;
   case LocKind::Decl: {
-    if (kind != Kind::Func) {
+    if (kind != Kind::Func && kind != Kind::DistributedThunk) {
       printValueDecl(getDecl(), OS);
       break;
     }
@@ -356,11 +356,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
       printValueDecl(getDecl(), OS);
       if (isDistributed()) {
         OS << "!distributed";
-        OS << "(" << getDecl() << ")";
       }
       if (isDistributedThunk()) {
         OS << "!distributed_thunk";
-        OS << "(" << getDecl() << ")";
       }
       isDot = false;
       break;
@@ -369,11 +367,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     printValueDecl(accessor->getStorage(), OS);
     if (isDistributed()) {
       OS << "!distributed";
-      OS << "(" << getDecl() << ")";
     }
     if (isDistributedThunk()) {
       OS << "!distributed_thunk";
-      OS << "(" << getDecl() << ")";
     }
     switch (accessor->getAccessorKind()) {
     case AccessorKind::WillSet:
@@ -469,6 +465,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     break;
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     OS << "!projectedvalueinit";
+    break;
+  case SILDeclRef::Kind::DistributedThunk:
+    // Already handled in the LocKind::Decl branch above.
     break;
   }
 

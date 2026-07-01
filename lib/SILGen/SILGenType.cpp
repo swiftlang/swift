@@ -760,7 +760,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
     // we may not have a thunk if we're in a protocol?
     if (auto thunk = witnessRef.getFuncDecl()->getDistributedThunk()) {
       auto thunkDeclRef = SILDeclRef(thunk, SILDeclRef::Kind::Func);
-      witnessRef = thunkDeclRef.asDistributed();
+      witnessRef = thunkDeclRef.asDistributedThunk();
     }
   }
 
