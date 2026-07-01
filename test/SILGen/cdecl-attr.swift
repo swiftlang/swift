@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -module-name cdecl -enable-sil-opaque-values %s
+// RUN: %target-swift-emit-silgen -module-name cdecl %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [thunk] [asmname "pear"] [ossa] @$s5cdecl5apple{{[_0-9a-zA-Z]*}}FTo : $@convention(c)
 // CHECK:         function_ref @$s5cdecl5apple{{[_0-9a-zA-Z]*}}F

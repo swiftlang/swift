@@ -1567,8 +1567,14 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     if (!Ext->getSelfClassDecl())
       error = diag::objc_extension_not_class;
   } else if (auto ED = dyn_cast<EnumDecl>(D)) {
-    if (ED->isGenericContext())
-      error = diag::objc_enum_generic;
+    // @objc (and @c) enums cannot be generic.
+    if (ED->isGenericContext()) {
+      diagnoseAndRemoveAttr(attr, diag::objc_enum_generic, ED,
+                            getObjCDiagnosticAttrKind(reason))
+          .limitBehavior(behavior);
+      reason.describe(D);
+      return;
+    }
   } else if (auto EED = dyn_cast<EnumElementDecl>(D)) {
     auto ED = EED->getParentEnum();
     if (!ED->getAttrs().hasAttribute<ObjCAttr>())
@@ -2439,6 +2445,16 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   if (isa<EnumDecl>(D) && attr->Underscored) {
     diagnose(attr->getLocation(), diag::attr_only_one_decl_kind,
              attr, "func");
+  }
+
+  // @c (and @objc) enums cannot be generic.
+  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+    if (ED->isGenericContext()) {
+      unsigned reasonKind = attr->Underscored
+                                ? unsigned(ObjCReason::ExplicitlyUnderscoreCDecl)
+                                : unsigned(ObjCReason::ExplicitlyCDecl);
+      diagnoseAndRemoveAttr(attr, diag::objc_enum_generic, ED, reasonKind);
+    }
   }
 
   // Reject using both @c and @objc on the same decl.
