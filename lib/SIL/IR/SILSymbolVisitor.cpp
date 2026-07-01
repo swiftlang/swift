@@ -738,10 +738,15 @@ public:
     if (CD->getParent()->getSelfClassDecl()) {
       // Class constructors come in two forms, allocating and non-allocating.
       // The default ValueDecl handling gives the allocating one, so we have to
-      // manually include the non-allocating one.
-      addFunction(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
-      if (CD->hasAsync()) {
-        addAsyncFunctionPointer(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+      // manually include the non-allocating one. Only designated and @objc
+      // convenience inits have a separate initializing entry point; non-@objc
+      // convenience inits are lowered as a single allocating entry point (see
+      // SILGenModule::emitConstructor).
+      if (CD->isDesignatedInit() || CD->isObjC()) {
+        addFunction(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+        if (CD->hasAsync()) {
+          addAsyncFunctionPointer(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+        }
       }
     }
 
