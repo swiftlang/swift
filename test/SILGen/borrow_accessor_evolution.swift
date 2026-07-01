@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN:%target-swift-frontend -emit-silgen %s -verify  -enable-library-evolution | %FileCheck %s
 // RUN:%target-swift-frontend -c -Xllvm -sil-print-after=SILGenCleanup  %s -verify  -enable-library-evolution 2>&1 | %FileCheck --check-prefixes=CHECK-SILGEN-CLEANUP %s
 

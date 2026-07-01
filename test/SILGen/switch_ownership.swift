@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name switch %s | %FileCheck %s
 //
 // A temporary file for testing switch code around ownership. Once SILGenPattern

@@ -7,6 +7,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(MagicIdentifierFileSwift6)) -module-name MagicIdentifierFileSwift6 -emit-module-path %t/MagicIdentifierFileSwift6.swiftmodule -emit-module-interface-path %t/MagicIdentifierFileSwift6.swiftinterface -swift-version 5 -enable-experimental-concise-pound-file -enable-library-evolution %S/Inputs/MagicIdentifierFileSwift.swift
 
 // Test in Swift 5 mode:
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -I %t -module-name Foo %/s
 // RUN: %target-swift-emit-silgen -I %t -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,ABSOLUTE %s
 
 // Test in "Swift 6" mode:

@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-library-evolution -module-name NewModule -emit-module-path %t/NewModule.swiftmodule -emit-module %S/Inputs/library_evolution_property_originally_defined_in_current_module_NewModule.swift
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos12 -I %t -module-name OldModule -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -target %target-cpu-apple-macos12 -I %t -module-name OldModule -emit-silgen %s | %FileCheck %s
 
 // REQUIRES: OS=macosx

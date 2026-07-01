@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-sil %s -target %target-cpu-apple-macosx10.15 -verify
 // RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx10.15 | %FileCheck %s
 

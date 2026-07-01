@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %t/Overlay.swift -I %t -import-objc-header %t/MyOptions.h -unavailable-decl-optimization=none
 // RUN: %target-swift-emit-silgen %t/Overlay.swift -I %t -import-objc-header %t/MyOptions.h -unavailable-decl-optimization=none | %FileCheck %t/Overlay.swift
 // RUN: %target-swift-emit-silgen %t/Overlay.swift -I %t -import-objc-header %t/MyOptions.h -unavailable-decl-optimization=stub | %FileCheck %t/Overlay.swift
 // RUN: %target-swift-emit-silgen %t/Overlay.swift -I %t -import-objc-header %t/MyOptions.h -unavailable-decl-optimization=complete | %FileCheck %t/Overlay.swift

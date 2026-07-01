@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -swift-version 4 -enable-upcoming-feature ImmutableWeakCaptures %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 4 -enable-upcoming-feature ImmutableWeakCaptures %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -swift-version 4 -O -enable-upcoming-feature ImmutableWeakCaptures %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: %target-swift-emit-ir -swift-version 4 -enable-upcoming-feature ImmutableWeakCaptures %s -disable-objc-attr-requires-foundation-module -enable-objc-interop

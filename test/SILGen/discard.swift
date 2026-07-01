@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -module-name test %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -module-name test %s | %FileCheck %s --enable-var-scope
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -module-name test -sil-verify-all %s | %FileCheck %s --check-prefix CHECK-SIL --enable-var-scope
 

@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableTypes -module-name main %s
+
 // RUN: %target-swift-emit-silgen -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableTypes -module-name main %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -verify -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableTypes -module-name main %s
 
