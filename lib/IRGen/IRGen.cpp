@@ -1615,7 +1615,6 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     SILMod.reset(nullptr);
   };
 #if LLVM_ENABLE_THREADS
-  // Execute this task in parallel to the embedding of bitcode.
   auto Thread = std::thread(SILModuleRelease);
   // Wait for the thread to terminate.
   SWIFT_DEFER { Thread.join(); };
