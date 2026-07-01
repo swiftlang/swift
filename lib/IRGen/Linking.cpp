@@ -627,7 +627,7 @@ SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
 SILDeclRef LinkEntity::getSILDeclRef() const {
   auto ref = SILDeclRef(const_cast<ValueDecl *>(getDecl()), getSILDeclRefKind());
   if (getKind() == Kind::DistributedAccessor)
-    return ref.asDistributedThunk();
+    return ref.getDistributedThunkDeclRef();
   return ref;
 }
 

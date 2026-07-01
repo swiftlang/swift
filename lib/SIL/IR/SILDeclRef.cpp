@@ -132,6 +132,22 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return false;
 }
 
+/// Best effort assert that a `Kind::DistributedThunk` SILDeclRef is
+/// being constructed with `vd` pointing at a distributed_thunk, not the
+/// original 'distributed' decl.
+static void assertDistributedThunkLoc(ValueDecl *vd, SILDeclRef::Kind kind) {
+#ifndef NDEBUG
+  if (kind != SILDeclRef::Kind::DistributedThunk)
+    return;
+  auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(vd);
+  if (!afd)
+    return;
+  auto *thunk = afd->getDistributedThunk();
+  assert((!thunk || thunk == afd) &&
+         "SILDeclRef with DistributedThunk kind must be a distributed_thunk");
+#endif
+}
+
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
                        bool isKnownToBeLocal,
                        bool isRuntimeAccessible,
@@ -142,7 +158,25 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
       isKnownToBeLocal(isKnownToBeLocal),
       isRuntimeAccessible(isRuntimeAccessible),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
-      isAsyncLetClosure(0), pointer(derivativeId) {}
+      isAsyncLetClosure(0), pointer(derivativeId) {
+  assertDistributedThunkLoc(vd, kind);
+}
+
+SILDeclRef::SILDeclRef(void *opaqueLoc, Kind kind, bool isForeign,
+                       bool isKnownToBeLocal,
+                       bool isRuntimeAccessible,
+                       BackDeploymentKind backDeploymentKind,
+                       unsigned defaultArgIndex, bool isAsyncLetClosure,
+                       AutoDiffDerivativeFunctionIdentifier *derivativeId)
+    : loc(Loc::getFromOpaqueValue(opaqueLoc)), kind(kind),
+      isForeign(isForeign),
+      isKnownToBeLocal(isKnownToBeLocal),
+      isRuntimeAccessible(isRuntimeAccessible),
+      backDeploymentKind(backDeploymentKind),
+      defaultArgIndex(defaultArgIndex), isAsyncLetClosure(isAsyncLetClosure),
+      pointer(derivativeId) {
+  assertDistributedThunkLoc(loc.dyn_cast<ValueDecl *>(), kind);
+}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
                        bool asDistributedKnownToBeLocal)
@@ -205,12 +239,29 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
   pointer = prespecializedSig.getPointer();
 }
 
-ValueDecl *SILDeclRef::getDecl() const {
-  if (kind == Kind::DistributedThunk) {
-    if (auto *thunk = getDistributedThunk())
-      return thunk;
+SILDeclRef SILDeclRef::getDistributedThunkDeclRef() const {
+  auto opaqueLoc = loc.getOpaqueValue();
+
+  // Make sure the new 'loc' is a distributed thunk.
+  // If we're in a decl that as a distributed thunk, get it and store it as the new loc.
+  // If it already is the right decl, this still just works.
+  if (auto *afd =
+          dyn_cast_or_null<AbstractFunctionDecl>(loc.dyn_cast<ValueDecl *>())) {
+    auto *thunk = afd->getDistributedThunk();
+    assert(thunk && "decl has no synthesized distributed thunk to point at, "
+                    "this is a mistake in the compiler in how asDistributed() is used");
+    opaqueLoc = Loc(thunk).getOpaqueValue();
   }
-  return getOriginalDecl();
+
+  return SILDeclRef(opaqueLoc, Kind::DistributedThunk,
+                    /*foreign=*/false,
+                    /*knownToBeLocal=*/false, isRuntimeAccessible,
+                    backDeploymentKind, defaultArgIndex, isAsyncLetClosure,
+                    cast<AutoDiffDerivativeFunctionIdentifier *>(pointer));
+}
+
+ValueDecl *SILDeclRef::getDecl() const {
+  return loc.dyn_cast<ValueDecl *>();
 }
 
 std::optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
@@ -1302,28 +1353,14 @@ bool SILDeclRef::isDistributedThunk() const {
 FuncDecl *SILDeclRef::getDistributedThunk() const {
   if (!isDistributedThunk())
     return nullptr;
-  auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(getOriginalDecl());
-  if (!afd)
-    return nullptr;
-  return afd->getDistributedThunk();
+  // With `kind == Kind::DistributedThunk`, `loc` is the synthesized thunk
+  // itself (normalized at construction time).
+  return dyn_cast_or_null<FuncDecl>(loc.dyn_cast<ValueDecl *>());
 }
 
 bool SILDeclRef::isDistributed() const {
-  if (!hasFuncDecl())
-    return false;
-
-  // For a distributed thunk ref, look at the *original* decl -- the
-  // synthesized thunk itself is not marked `distributed`.
-  if (auto *afd =
-          dyn_cast_or_null<AbstractFunctionDecl>(getOriginalDecl())) {
-    if (afd->isDistributed())
-      return true;
-  }
-
-  if (auto decl = getFuncDecl()) {
+  if (auto decl = getFuncDecl())
     return decl->isDistributed();
-  }
-
   return false;
 }
 

@@ -1515,6 +1515,10 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         break;
       } else if (Id.str() == "distributed_thunk") {
         Kind = SILDeclRef::Kind::DistributedThunk;
+        if (auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(VD)) {
+          if (auto *thunk = afd->getDistributedThunk())
+            VD = thunk;
+        }
         consumeOptionalDeclPointerPayload(P); // ignore payload of legacy `!distributed_thunk(0x...)`
         ParseState = 1;
         break;

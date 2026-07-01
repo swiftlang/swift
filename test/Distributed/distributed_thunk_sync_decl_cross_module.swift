@@ -9,7 +9,6 @@
 
 // Reproduces a SILFunction type mismatch uncovered by DistributedCluster.
 // This happens only for a synchronous distributed var decl, across modules.
-// rdar://180980491
 
 import Distributed
 import FakeDistributedActorSystems
