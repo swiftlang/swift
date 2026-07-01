@@ -3491,6 +3491,14 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
+      // Skip existential wrapper template specializations (PAT protocols).
+      auto cxxRecordSemanticsKind = evaluateOrDefault(
+          Impl.SwiftContext.evaluator,
+          CxxRecordSemantics({decl, Impl.SwiftContext}), {});
+      if (cxxRecordSemanticsKind == CxxRecordSemanticsKind::SwiftClassType ||
+          cxxRecordSemanticsKind == CxxRecordSemanticsKind::SwiftExistentialType)
+        return nullptr;
+
       // Importing std::conditional substantially increases compile times when
       // building with libstdc++, i.e. on most Linux distros.
       if (decl->isInStdNamespace() && decl->getIdentifier() &&
@@ -5153,6 +5161,15 @@ namespace {
     }
 
     Decl *VisitClassTemplateDecl(const clang::ClassTemplateDecl *decl) {
+      // Skip existential wrapper class templates (PAT protocols).
+      auto *templatedDecl = decl->getTemplatedDecl();
+      auto cxxRecordSemanticsKind = evaluateOrDefault(
+          Impl.SwiftContext.evaluator,
+          CxxRecordSemantics({templatedDecl, Impl.SwiftContext}), {});
+      if (cxxRecordSemanticsKind == CxxRecordSemanticsKind::SwiftClassType ||
+          cxxRecordSemanticsKind == CxxRecordSemanticsKind::SwiftExistentialType)
+        return nullptr;
+
       ImportedName importedName;
       std::tie(importedName, std::ignore) = importFullName(decl);
       auto name = importedName.getBaseIdentifier(Impl.SwiftContext);

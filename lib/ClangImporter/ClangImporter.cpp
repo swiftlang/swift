@@ -8392,13 +8392,31 @@ static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
+/// Get the ExternalSourceSymbolAttr from a CXXRecordDecl, looking through
+/// ClassTemplateSpecializationDecl to the primary template if needed.
+static const clang::ExternalSourceSymbolAttr *
+getSwiftSourceSymbolAttr(const clang::CXXRecordDecl *decl) {
+  if (auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>())
+    return essAttr;
+  if (auto specDecl =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
+    auto *templatedDecl = specDecl->getSpecializedTemplate()->getTemplatedDecl();
+    return templatedDecl->getAttr<clang::ExternalSourceSymbolAttr>();
+  }
+  return nullptr;
+}
+
 static bool isSwiftExistentialType(const clang::CXXRecordDecl *decl) {
-  auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
+  auto essAttr = getSwiftSourceSymbolAttr(decl);
   if (!essAttr || essAttr->getLanguage() != "Swift" ||
       essAttr->getDefinedIn().empty() || essAttr->getUSR().empty())
     return false;
 
-  auto baseDecl = decl;
+  const clang::CXXRecordDecl *baseDecl = decl;
+  if (auto specDecl =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(decl))
+    baseDecl = specDecl->getSpecializedTemplate()->getTemplatedDecl();
+
   do {
     if (baseDecl->getNumBases() != 1)
       return false;
@@ -8452,13 +8470,17 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
     return nullptr;
 
   SmallVector<ValueDecl *, 1> results;
-  auto *essaAttr = cxxDecl->getAttr<clang::ExternalSourceSymbolAttr>();
+  auto *essaAttr = getSwiftSourceSymbolAttr(cxxDecl);
   auto *mod = desc.ctx.getModuleByName(essaAttr->getDefinedIn());
   if (!mod) {
     return nullptr;
   }
   // FIXME: Support renamed declarations.
-  auto swiftName = cxxDecl->getName();
+  // For template specializations, get the name from the primary template.
+  StringRef swiftName = cxxDecl->getName();
+  if (auto specDecl =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(cxxDecl))
+    swiftName = specDecl->getSpecializedTemplate()->getTemplatedDecl()->getName();
   // FIXME: handle nested Swift types once they're supported.
   mod->lookupValue(desc.ctx.getIdentifier(swiftName), NLKind::UnqualifiedLookup,
                    results);

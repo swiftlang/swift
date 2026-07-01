@@ -13,6 +13,7 @@
 #ifndef FIRSTPASS
 #include "swiftMod.h"
 
+// --- Non-PAT protocol round-trip ---
 SwiftMod::Drawable createDrawable();
 
 void passDrawable(const SwiftMod::Drawable& d);
@@ -23,6 +24,27 @@ SwiftMod::Drawable bestDrawable(const SwiftMod::Drawable& a,
 // INTERFACE: func createDrawable() -> any Drawable
 // INTERFACE: func passDrawable(_ d: any Drawable)
 // INTERFACE: func bestDrawable(_ a: any Drawable, _ b: any Drawable) -> any Drawable
+
+// --- PAT protocol round-trip ---
+SwiftMod::Container<swift::Int> createIntContainer();
+
+void passIntContainer(const SwiftMod::Container<swift::Int>& c);
+
+SwiftMod::Container<swift::Int> firstIntContainer(
+    const SwiftMod::Container<swift::Int>& a,
+    const SwiftMod::Container<swift::Int>& b);
+
+// Default template arg (swift::Any) => unconstrained existential
+SwiftMod::Container<> createAnyContainer();
+
+// Nested existential PAT arg
+SwiftMod::Container<SwiftMod::Drawable> createDrawableContainer();
+
+// INTERFACE: func createIntContainer() -> any Container<Int>
+// INTERFACE: func passIntContainer(_ c: any Container<Int>)
+// INTERFACE: func firstIntContainer(_ a: any Container<Int>, _ b: any Container<Int>) -> any Container<Int>
+// INTERFACE: func createAnyContainer() -> any Container
+// INTERFACE: func createDrawableContainer() -> any Container<any Drawable>
 
 #endif
 
@@ -37,6 +59,11 @@ import SwiftToCxxTest
 
 public protocol Drawable {
     func draw() -> Int
+}
+
+public protocol Container<Element> {
+    associatedtype Element
+    func count() -> Int
 }
 
 public struct Circle: Drawable {
