@@ -4415,6 +4415,10 @@ static const clang::Decl *findClangMethod(ValueDecl *method) {
 
     if (auto overridden = methodFn->getOverriddenDecl())
       return findClangMethod(overridden);
+
+    if (auto *implementedDecl = method->getImplementedObjCDecl())
+      if (auto *implementedFunction = implementedDecl->getClangDecl())
+        return implementedFunction;
   }
 
   if (auto *constructor = dyn_cast<ConstructorDecl>(method)) {
