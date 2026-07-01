@@ -2465,6 +2465,10 @@ bool TypeBase::mayHaveSuperclass() {
 }
 
 bool TypeBase::satisfiesClassConstraint() {
+  // Foreign reference types are imported as ClassDecls but are not Swift
+  // ref-counted objects, so they do not satisfy AnyObject.
+  if (isForeignReferenceType())
+    return false;
   return mayHaveSuperclass() || isObjCExistentialType();
 }
 
