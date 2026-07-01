@@ -11487,10 +11487,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // If the base type of this member lookup is a "hole" there is no
   // reason to perform a lookup because it wouldn't return any results.
   if (shouldAttemptFixes()) {
-    auto markMemberTypeAsPotentialHole = [&](Type memberTy) {
-      recordAnyTypeVarAsPotentialHole(simplifyType(memberTy));
-    };
-
     // If this is an unresolved member ref e.g. `.foo` and its contextual base
     // type has been determined to be a "hole", let's mark the resulting member
     // type as a potential hole and continue solving.
@@ -11542,14 +11538,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             return SolutionKind::Error;
         }
 
-        markMemberTypeAsPotentialHole(memberTy);
+        recordTypeVariablesAsHoles(memberTy);
         return SolutionKind::Solved;
       }
     } else if (kind == ConstraintKind::ValueMember &&
                baseObjTy->getMetatypeInstanceType()->isPlaceholder()) {
       // If base type is a "hole" there is no reason to record any
       // more "member not found" fixes for chained member references.
-      markMemberTypeAsPotentialHole(memberTy);
+      recordTypeVariablesAsHoles(memberTy);
       return SolutionKind::Solved;
     }
   }

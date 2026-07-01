@@ -1175,8 +1175,7 @@ func rdar76058892() {
   func experiment(arr: [S]?) {
     test { // expected-error {{contextual closure type '() -> String' expects 0 arguments, but 1 was used in closure body}}
       if let arr = arr {
-        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}} // expected-error {{generic parameter 'T' could not be inferred}}
-        // expected-error@-1 {{generic parameter 'E' could not be inferred}}
+        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}}
       }
     }
   }
