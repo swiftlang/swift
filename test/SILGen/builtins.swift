@@ -941,8 +941,7 @@ func once(control: Builtin.RawPointer) {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins19valueToBridgeObjectyBbSuF : $@convention(thin) (UInt) -> @owned Builtin.BridgeObject {
 // CHECK: bb0([[UINT:%.*]] : $UInt):
 // CHECK:   [[BI:%.*]] = struct_extract [[UINT]] : $UInt, #UInt._value
-// CHECK:   [[CAST:%.*]] = value_to_bridge_object [[BI]]
-// CHECK:   [[RET:%.*]] = copy_value [[CAST]] : $Builtin.BridgeObject
+// CHECK:   [[RET:%.*]] = value_to_bridge_object [[BI]]
 // CHECK:   return [[RET]] : $Builtin.BridgeObject
 // CHECK: } // end sil function '$s8builtins19valueToBridgeObjectyBbSuF'
 func valueToBridgeObject(_ x: UInt) -> Builtin.BridgeObject {
