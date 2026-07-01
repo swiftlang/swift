@@ -166,3 +166,31 @@ bb0(%0 : @guaranteed $(String, Int)):
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @undef_trivial :
+// CHECK-NOT:     destructure_tuple
+// CHECK:         fix_lifetime undef : $Int
+// CHECK:         fix_lifetime undef : $Int
+// CHECK:       } // end sil function 'undef_trivial'
+sil [ossa] @undef_trivial : $@convention(thin) () -> () {
+bb0:
+  (%0, %1) = destructure_tuple undef : $(Int, Int)
+  fix_lifetime %0 : $Int
+  fix_lifetime %1 : $Int
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @undef_nontrivial :
+// CHECK-NOT:     destructure_tuple
+// CHECK:         destroy_value undef : $String
+// CHECK:         fix_lifetime undef : $Int
+// CHECK:       } // end sil function 'undef_nontrivial'
+sil [ossa] @undef_nontrivial : $@convention(thin) () -> () {
+bb0:
+  (%0, %1) = destructure_tuple undef : $(String, Int)
+  destroy_value %0 : $String
+  fix_lifetime %1 : $Int
+  %r = tuple ()
+  return %r : $()
+}
+
