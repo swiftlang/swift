@@ -25,6 +25,7 @@ sil_scope 1 { loc "test.swift":1:1 parent @test_salvage_struct_element_addr : $@
 sil_scope 2 { loc "test.swift":10:1 parent @test_salvage_tuple_element_addr : $@convention(thin) (@in_guaranteed (Int64, Int64)) -> () }
 sil_scope 3 { loc "test.swift":20:1 parent @test_salvage_ref_element_addr : $@convention(thin) (@guaranteed MyClass) -> () }
 sil_scope 4 { loc "test.swift":30:1 parent @test_salvage_vector_base_addr : $@convention(thin) (@in_guaranteed Builtin.FixedArray<4, Int64>) -> () }
+sil_scope 5 { loc "test.swift":40:1 parent @test_salvage_ref_tail_addr : $@convention(thin) (@guaranteed MyClass) -> () }
 
 // CHECK-LABEL: sil @test_salvage_struct_element_addr
 // CHECK:       bb0([[ADDR:%[0-9]+]] : $*MyStruct):
@@ -94,6 +95,24 @@ sil @test_salvage_vector_base_addr : $@convention(thin) (@in_guaranteed Builtin.
 bb0(%0 : $*Builtin.FixedArray<4, Int64>):
   %1 = vector_base_addr %0 : $*Builtin.FixedArray<4, Int64>
   debug_value %1 : $*Int64, let, name "base", expr op_deref, loc "test.swift":30:1, scope 4
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_salvage_ref_tail_addr
+// CHECK:       bb0(%0 : $MyClass):
+// CHECK:         debug_value %0 : $MyClass, let, name "tail_elt", transform {
+// CHECK:           bb0(%0 : $MyClass):
+// CHECK:             %1 = ref_tail_addr %0 : $MyClass, $Int64
+// CHECK:             %2 = load %1 : $*Int64
+// CHECK:             return %2 : $Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_salvage_ref_tail_addr'
+sil @test_salvage_ref_tail_addr : $@convention(thin) (@guaranteed MyClass) -> () {
+bb0(%0 : $MyClass):
+  %1 = ref_tail_addr %0 : $MyClass, $Int64
+  debug_value %1 : $*Int64, let, name "tail_elt", expr op_deref, loc "test.swift":40:1, scope 5
   %r = tuple ()
   return %r : $()
 }
