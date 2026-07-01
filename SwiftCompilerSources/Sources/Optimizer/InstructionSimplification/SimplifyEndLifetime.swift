@@ -14,6 +14,12 @@ import SIL
 
 extension EndLifetimeInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
+    // end_lifetime of undef is a no-op.
+    if operand.value is Undef {
+      context.erase(instruction: self)
+      return
+    }
+
     tryRemoveForwardingInstruction(context)
   }
 

@@ -263,3 +263,14 @@ bb0(%0 : @owned $D):
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @test_undef :
+// CHECK:       bb0:
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'test_undef'
+sil [ossa] @test_undef : $@convention(thin) () -> () {
+bb0:
+  end_lifetime undef : $C
+  %r = tuple ()
+  return %r
+}
+
