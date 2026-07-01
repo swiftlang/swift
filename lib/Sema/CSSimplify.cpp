@@ -10562,13 +10562,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         // with the function type is determined later by the surrounding
         // conversion constraints.
         //
-        // Note: we intentionally do *not* pre-filter to only function-shaped
-        // members here. In a chained implicit member expression (SE-0287) the
-        // leading dot may name a plain value member of the return type that a
-        // later element of the chain then turns into the function type -- e.g.
-        // '.a.asFunction', where 'a' has no payload. Dropping non-function
-        // members would reject such chains, so candidate viability is left to
-        // the solver.
+        // We intentionally do *not* pre-filter to only function-shaped members
+        // here. In a chained implicit member expression (SE-0287) the leading
+        // dot may name a plain value member of the return type that a later
+        // element turns into the function type (e.g. '.a.asFunction', where 'a'
+        // has no payload), so dropping non-function members would reject valid
+        // chains. Filtering only terminal (non-chain) positions was measured to
+        // remove no viable candidates -- it only drops losers that the solver's
+        // score cutoff and disjunction-favoring already prune -- so it isn't
+        // worth the added machinery.
         for (const auto &choice : resultLookup.ViableCandidates) {
           if (choice.getKind() != OverloadChoiceKind::Decl)
             continue;
