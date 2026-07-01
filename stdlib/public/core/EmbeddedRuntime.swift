@@ -926,6 +926,17 @@ func _embeddedReportExclusivityViolation(
   Builtin.int_trap()
 }
 
+private func intToFloatChunkFactor<T: ExpressibleByFloatLiteral>() -> T {
+#if _pointerBitWidth(_64)
+  return 0x1p64
+#elseif _pointerBitWidth(_32)
+  return 0x1p32
+#else
+#warning("Unsupported platform")
+  fatalError()
+#endif
+}
+
 // IntegerLiteral-to-FloatingPoint conversion
 
 /// Convert a `Builtin.IntegerLiteral` value to a binary floating-point type.
@@ -951,8 +962,7 @@ public func _swift_intToFloat32(
 
   // Multi-chunk: lower chunks contribute as unsigned digits in base
   // 2^bitsPerChunk; only the top chunk carries the sign.
-  let chunkFactor: Float = bitsPerChunk == 64 ? 0x1p64 : 0x1p32
-
+  let chunkFactor: Float = intToFloatChunkFactor()
   var result = Float(unsafe data[0])
   var scale = chunkFactor
   for i in 1 ..< numChunks - 1 {
@@ -975,8 +985,7 @@ public func _swift_intToFloat64(
     return Double(Int(bitPattern: unsafe data[0]))
   }
 
-  let chunkFactor: Double = bitsPerChunk == 64 ? 0x1p64 : 0x1p32
-
+  let chunkFactor: Double = intToFloatChunkFactor()
   var result = Double(unsafe data[0])
   var scale = chunkFactor
   for i in 1 ..< numChunks - 1 {
