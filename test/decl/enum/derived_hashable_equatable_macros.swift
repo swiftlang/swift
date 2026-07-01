@@ -158,7 +158,7 @@ enum HasAssociatedValuesAndUnavailableElement: Hashable {
   // CHECK-NEXT:        return false
   // CHECK-NEXT:      }
   // CHECK-NEXT:      return true
-  // CHECK-NEXT:    case (.b(_), .b(_)):
+  // CHECK-NEXT:    case (.b, .b):
   // CHECK-NEXT:      fatalError({{.*}})
   // CHECK-NEXT:    default:
   // CHECK-NEXT:      return false
