@@ -207,11 +207,11 @@ extension SIMD${n}: BitwiseCopyable
 extension SIMD${n}: ConvertibleToBytes
   where Scalar: ConvertibleToBytes,
         Scalar.SIMD${storageN}Storage: BitwiseCopyable { }
+% end # if n != 3
 
 extension SIMD${n}: ConvertibleFromBytes
   where Scalar: ConvertibleFromBytes,
         Scalar.SIMD${storageN}Storage: BitwiseCopyable { }
-% end # if n != 3
 %end
 
 extension SIMD3 {
