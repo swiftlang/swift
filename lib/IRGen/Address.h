@@ -173,13 +173,28 @@ public:
   /// The address of an object of type T.
   Address Addr;
 
+#if __SIZEOF_POINTER__ == 4
+  // On 32-bit targets (e.g. wasm32) llvm::Value* exposes only 2 low bits — too few
+  // to pack the 3-bit Kind via PointerIntPair — so store the extra-info pointer and
+  // the Kind in separate fields. 64-bit targets keep the packed representation.
+  llvm::Value *ExtraInfo;
+  Kind TheKind;
+#else
   llvm::PointerIntPair<llvm::Value*, 3, Kind> ExtraInfoAndKind;
+#endif
 
 public:
+#if __SIZEOF_POINTER__ == 4
+  StackAddress() : ExtraInfo(nullptr), TheKind(StaticAlloca) {}
+
+  explicit StackAddress(Address address, Kind kind, llvm::Value *extraInfo = nullptr)
+    : Addr(address), ExtraInfo(extraInfo), TheKind(kind) {}
+#else
   StackAddress() : ExtraInfoAndKind(nullptr, StaticAlloca) {}
 
   explicit StackAddress(Address address, Kind kind, llvm::Value *extraInfo = nullptr)
     : Addr(address), ExtraInfoAndKind(extraInfo, kind) {}
+#endif
 
   /// Return a StackAddress with the address changed in some superficial way.
   StackAddress withAddress(Address addr) const {
@@ -189,13 +204,22 @@ public:
   llvm::Value *getAddressPointer() const { return Addr.getAddress(); }
   Alignment getAlignment() const { return Addr.getAlignment(); }
   Address getAddress() const { return Addr; }
+#if __SIZEOF_POINTER__ == 4
+  Kind getKind() const { return TheKind; }
+  llvm::Value *getExtraInfo() const { return ExtraInfo; }
+#else
   Kind getKind() const { return ExtraInfoAndKind.getInt(); }
   llvm::Value *getExtraInfo() const { return ExtraInfoAndKind.getPointer(); }
+#endif
 
   bool isValid() const { return Addr.isValid(); }
 
   bool operator==(StackAddress RHS) const {
+#if __SIZEOF_POINTER__ == 4
+    return Addr == RHS.Addr && ExtraInfo == RHS.ExtraInfo && TheKind == RHS.TheKind;
+#else
     return Addr == RHS.Addr && ExtraInfoAndKind == RHS.ExtraInfoAndKind;
+#endif
   }
   bool operator!=(StackAddress RHS) const { return !(*this == RHS); }
 };
