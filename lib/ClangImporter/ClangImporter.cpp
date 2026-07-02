@@ -1474,12 +1474,11 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   return CI;
 }
 
-std::unique_ptr<ClangImporter>
-ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
-                      StringRef swiftPCHHash, std::string casidForPCH,
-                      DependencyTracker *tracker, bool ignoreFileMapping,
-                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
-                      std::shared_ptr<llvm::cas::ActionCache> Cache) {
+std::unique_ptr<ClangImporter> ClangImporter::create(
+    ASTContext &ctx, const IRGenOptions *IRGenOpts, StringRef swiftPCHHash,
+    std::string casidForPCH, DependencyTracker *tracker, bool ignoreFileMapping,
+    bool needCodeGenTargetOpts, std::shared_ptr<llvm::cas::ObjectStore> CAS,
+    std::shared_ptr<llvm::cas::ActionCache> Cache) {
   std::unique_ptr<ClangImporter> importer{new ClangImporter(ctx, tracker)};
   auto &importerOpts = ctx.ClangImporterOpts;
 
@@ -1593,7 +1592,7 @@ ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
   clangDiags.setFatalsAsError(ctx.Diags.getShowDiagnosticsAfterFatalError());
 
   // Use Clang to configure/save options for Swift IRGen/CodeGen
-  if (ctx.LangOpts.ClangTarget.has_value()) {
+  if (ctx.LangOpts.ClangTarget.has_value() && needCodeGenTargetOpts) {
     // If '-clang-target' is set, create a mock invocation with the Swift triple
     // to configure CodeGen and Target options for Swift compilation.
     auto swiftTargetClangInvocation = importer->createClangInvocation(

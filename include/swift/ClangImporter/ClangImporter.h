@@ -213,6 +213,7 @@ public:
   create(ASTContext &ctx, const IRGenOptions *IRGenOpts = nullptr,
          StringRef swiftPCHHash = "", std::string casidForPCH = "",
          DependencyTracker *tracker = nullptr, bool ignoreFileMapping = false,
+         bool needCodeGenTargetOpts = true,
          std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr,
          std::shared_ptr<llvm::cas::ActionCache> Cache = nullptr);
 

@@ -882,13 +882,17 @@ bool CompilerInstance::setUpModuleLoaders() {
           IgnoreSourceInfoFile);
   }
 
+  bool needTargetCodeGenOpts =
+      FrontendOptions::doesActionGenerateSIL(FEOpts.RequestedAction);
+
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
   std::unique_ptr<ClangImporter> clangImporter = ClangImporter::create(
       *Context, &Invocation.getIRGenOptions(), Invocation.getPCHHash(),
       CASIDForPCH, getDependencyTracker(), /*ignoreFileMapping=*/false,
-      getSharedCASInstance(), getSharedCacheInstance());
+      /*needCodeGenTargetOpts=*/needTargetCodeGenOpts, getSharedCASInstance(),
+      getSharedCacheInstance());
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;
