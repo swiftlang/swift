@@ -14,9 +14,11 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 #include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -942,9 +944,69 @@ bool SILPerformanceInliner::isProfitableToInline(
   }
 
   if (AI.getFunction()->isThunk()) {
-    // Only inline trivial functions into thunks (which will not increase the
-    // code size).
-    if (CalleeCost > TrivialFunctionThreshold) {
+    // By default only inline trivial callees into thunks so the thunk
+    // doesn't grow. For native-to-foreign (@objc) thunks specifically,
+    // when the body has no indirect dispatch path, no external visibility,
+    // and only this thunk as its direct caller, inlining followed by
+    // DCE'ing the original is an exact code-size wash and lets the thunk
+    // become a leaf. Because of the wash, no body-size ceiling is needed.
+    //
+    // The body must have no indirect dispatch path that would keep it
+    // alive after we inline into the thunk. We need both that all callees
+    // through the body's decl are statically knowable (covers `final`,
+    // `static`, `private`/`fileprivate`, and WMO-internal cases) and that
+    // it isn't overridden anywhere; otherwise a vtable or witness entry
+    // could keep the body alive even with no direct callers. (The @objc
+    // dispatch table holds the thunk, not the body, so it doesn't matter
+    // here.)
+    //
+    // Externally-visible bodies are also excluded: even with no in-module
+    // direct or indirect callers, an exported symbol can't be DCE'd, so
+    // the wash assumption breaks (we'd grow the thunk and keep the
+    // original).
+    //
+    // We restrict to ObjCMethod thunks rather than thunks in general
+    // because other thunk kinds (FSO/Method, witness, reabstraction)
+    // have callers that benefit from the wrapper staying as a separate
+    // dispatch hop, and broadening the relaxation would cascade through
+    // chains of thunks.
+    //
+    // We use hasOnlyCompleteDirectCallerSets() rather than the simpler
+    // foundAllCallers() because the latter is conservative: it relies on
+    // canBeCalledIndirectly(Method)==true, which is unconditional even
+    // for methods that have no real indirect dispatch path (see TODO at
+    // CallerAnalysis.cpp:36). The statically-knowable + not-overridden
+    // check above is the precise replacement.
+    int ThunkCostLimit = TrivialFunctionThreshold;
+    if (CalleeCost > ThunkCostLimit &&
+        AI.getFunction()->getRepresentation() ==
+            SILFunctionTypeRepresentation::ObjCMethod &&
+        !Callee->isPossiblyUsedExternally() &&
+        !Callee->isAvailableExternally()) {
+      auto declRef = Callee->getDeclRef();
+      auto *afd = declRef.getAbstractFunctionDecl();
+      if (afd && !afd->isOverridden() &&
+          calleesAreStaticallyKnowable(Callee->getModule(), declRef)) {
+        auto *CA = pm->getAnalysis<CallerAnalysis>();
+        const auto &CalleeInfo = CA->getFunctionInfo(Callee);
+        auto Callers = CalleeInfo.getAllReferencingCallers();
+        if (CalleeInfo.hasOnlyCompleteDirectCallerSets() &&
+            llvm::hasSingleElement(Callers)) {
+          const auto &state = Callers.begin()->second;
+          // Sole caller must perform a full apply (the one we're
+          // considering) and must not partially apply, since a partial
+          // apply would let the function reference escape and prevent
+          // DCE of the original.
+          if (state.hasFullApply &&
+              !state.getNumPartiallyAppliedArguments().has_value()) {
+            assert(Callers.begin()->first == AI.getFunction() &&
+                   "lone direct caller of Callee must be the thunk we're in");
+            ThunkCostLimit = std::numeric_limits<int>::max();
+          }
+        }
+      }
+    }
+    if (CalleeCost > ThunkCostLimit) {
       return false;
     }
 
