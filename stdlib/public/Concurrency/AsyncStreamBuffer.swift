@@ -114,7 +114,7 @@ fileprivate struct Disconnected<Value: ~Copyable>: ~Copyable, @unchecked Sendabl
 /// The state machine is single-consumer–based. However, instead of crashing on concurrent iteration,
 /// the consumer that “loses” the race to `next()` is enqueued in a **FIFO queue** and **eventually resumed**.
 ///
-/// Furthermore, when the stream reaches its terminal state and an onTermination closure is set,
+/// Furthermore, when the stream reaches its terminal state and an `onTermination` closure is set,
 /// the closure is invoked **exactly once, after which it is cleared**.
 ///
 /// Once the stream has reached its terminal state, all subsequent consumers will **immediately return nil**,
@@ -633,56 +633,124 @@ extension _AsyncStreamStorage {
   }
 }
 
-final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
-  var _value: Contents
-  private init(_doNotCallMe: ()) {
-    fatalError("_AsyncStreamCriticalStorage must be initialized by create")
-  }
+/// The state machine backing the unfolding variant of `Async{Throwing}Stream`.
+///
+/// States:
+///
+///   - `producing`: The stream is active and invokes the `produce` closure to produce the next element on consumer demand.
+///   - `terminated`: The stream is in a terminal state and **immediately returns `nil`** on consumer demand.
+///
+/// Transitions:
+///
+/// ```text
+/// Current State   Possible Next State
+/// -------------   -------------------
+/// producing     ->  terminated
+/// terminated    ->  terminated
+/// ```
+///
+/// Behavior:
+/// The state machine is single-consumer–based and invokes the `produce` closure in response to demand.
+/// However, on concurrent iteration, `produce` is invoked concurrently.
+///
+/// The stream reaches its terminal state either when **`produce` returns nil** or
+/// when the **task of an active consumer is cancelled**.
+///
+/// Furthermore, when the stream reaches its terminal state **due to task cancellation** and an `onCancel` closure was set,
+/// the closure is invoked **exactly once, after which it is cleared**.
+@safe
+final class _AsyncStreamUnfoldingStorage<Element, Failure: Error>: @unchecked Sendable {
+  typealias Produce = @Sendable () async throws(Failure) -> Element? // TODO: This needs to have `nonisolated(nonsending)` in order to execute on the caller's actor
+  typealias OnCancel = (@Sendable () -> Void)?
 
-  private func lock() {
-    let ptr =
-      unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
-    unsafe _lock(ptr)
-  }
-
-  private func unlock() {
-    let ptr =
-      unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
-    unsafe _unlock(ptr)
-  }
-
-  var value: Contents {
-    get {
-      lock()
-      let contents = _value
-      unlock()
-      return contents
-    }
-
-    set {
-      lock()
-      withExtendedLifetime(_value) {
-        _value = newValue
-        unlock()
-      }
-    }
-  }
-
-  static func create(_ initial: Contents) -> _AsyncStreamCriticalStorage {
-    let minimumCapacity = _lockWordCount()
-    let storage = unsafe Builtin.allocWithTailElems_1(
-      _AsyncStreamCriticalStorage.self,
-      minimumCapacity._builtinWordValue,
-      UnsafeRawPointer.self
+  enum State {
+    case producing(
+      produce: Produce,
+      onCancel: OnCancel
     )
 
-    let state =
-      unsafe UnsafeMutablePointer<Contents>(Builtin.addressof(&storage._value))
-    unsafe state.initialize(to: initial)
-    let ptr = unsafe UnsafeRawPointer(
-      Builtin.projectTailElems(storage, UnsafeRawPointer.self))
-    unsafe _lockInit(ptr)
-    return storage
+    case terminated
+  }
+
+  private let lock: UnsafeMutableRawPointer
+  private var state: State
+
+  init(
+    produce: @escaping Produce,
+    onCancel: OnCancel
+  ) {
+    unsafe self.lock = unsafe UnsafeMutableRawPointer.allocate(
+      byteCount: _lockWordCount() * MemoryLayout<UnsafeRawPointer>.stride,
+      alignment: MemoryLayout<UnsafeRawPointer>.alignment
+    )
+    unsafe _lockInit(self.lock)
+
+    self.state = .producing(
+      produce: produce,
+      onCancel: onCancel
+    )
+  }
+
+  deinit {
+    unsafe self.lock.deallocate()
+  }
+}
+
+extension _AsyncStreamUnfoldingStorage {
+  nonisolated(nonsending) func next() async throws(Failure) -> Element? {
+    let state = withLock { state in
+      return state
+    }
+
+    guard
+      case .producing(let produce, _) = state
+    else { return nil }
+
+    do {
+      switch try await produce() {
+      case .some(let element):
+        return element
+
+      case .none:
+        withLock { state in
+          state = .terminated
+        }
+        return nil
+      }
+    } catch {
+      withLock { state in
+        state = .terminated
+      }
+      throw error
+    }
+  }
+
+  func terminate() {
+    let onCancel = withLock { state in
+      switch state {
+      case .producing(_, let onCancel):
+        state = .terminated
+        return onCancel
+
+      case .terminated:
+        return nil
+      }
+    }
+
+    onCancel?()
+  }
+}
+
+extension _AsyncStreamUnfoldingStorage {
+  @safe
+  private func withLock<Value>(
+    _ body: (inout State) -> Value
+  ) -> Value {
+    unsafe _lock(self.lock)
+
+    defer { unsafe _unlock(self.lock) }
+
+    return body(&self.state)
   }
 }
 #endif
