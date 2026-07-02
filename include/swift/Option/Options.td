@@ -1305,6 +1305,10 @@ def dwarf_version : Joined<["-"], "dwarf-version=">,
   HelpText<"DWARF debug info version to produce if requested">,
   MetaVarName<"<version>">;
 
+def split_dwarf_output : Separate<["-"], "split-dwarf-output">,
+  Flags<[FrontendOption]>, MetaVarName<"<path>">,
+  HelpText<"Emit split DWARF debug info to a .dwo file at the given path">;
+
 def prefix_serialized_debugging_options : Flag<["-"], "prefix-serialized-debugging-options">,
   Flags<[FrontendOption]>,
   HelpText<"Apply debug prefix mappings to serialized debug info in Swiftmodule files">;
