@@ -110,7 +110,17 @@ endif()
 
 install(TARGETS swift-inspect
   DESTINATION bin)
+if(MSVC)
+  install(FILES $<TARGET_FILE_DIR:swift-inspect>/$<TARGET_FILE_BASE_NAME:swift-inspect>.pdb
+    DESTINATION bin
+    OPTIONAL)
+endif()
 if(WIN32)
   install(TARGETS SwiftInspectClient
     RUNTIME DESTINATION bin)
+  if(MSVC)
+    install(FILES $<TARGET_FILE_DIR:SwiftInspectClient>/$<TARGET_FILE_BASE_NAME:SwiftInspectClient>.pdb
+      DESTINATION bin
+      OPTIONAL)
+  endif()
 endif()
