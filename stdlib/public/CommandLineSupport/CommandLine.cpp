@@ -141,6 +141,11 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 #else
     argv[argc] = strdup(arg);
 #endif
+    if (!argv[argc]) {
+      swift::fatalError(0,
+        "Fatal error: Could not allocate space to duplicate "
+        " argument string: %d\n", errno);
+    }
     argc += 1;
   });
 
