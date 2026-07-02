@@ -25,6 +25,12 @@ roots:
       - name: module.modulemap
         type: file
         external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/winsdk_shared.modulemap"
+  - name: "@WindowsSdkDir@/Include/@WindowsSDKVersion@/winrt"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/WinRT.modulemap"
   - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/ucrt"
     type: directory
     contents:
@@ -55,4 +61,5 @@ install(FILES
   vcruntime.modulemap
   winsdk_um.modulemap
   winsdk_shared.modulemap
+  WinRT.modulemap
   DESTINATION ${CMAKE_INSTALL_DATAROOTDIR})
