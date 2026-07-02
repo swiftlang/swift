@@ -1841,7 +1841,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                       getSILType(MF->getType(ListOfValues[1]),
                                  (SILValueCategory)TyCategory, Fn));
 
-    auto PoisonRefs = PoisonRefs_t(Attr & 0x1);
+    bool hasReconstructionBlock = Attr & 0x1;
     auto UsesMoveableValDebugInfo =
         UsesMoveableValueDebugInfo_t((Attr >> 1) & 0x1);
     auto HasTrace = (Attr >> 2) & 0x1;
@@ -1924,13 +1924,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     }
 
     ResultInst =
-        Builder.createDebugValue(Loc, Value, DebugVar, PoisonRefs,
+        Builder.createDebugValue(Loc, Value, DebugVar,
                                  UsesMoveableValDebugInfo, HasTrace, !HasLoc);
 
     // If the serialized debug_value has a reconstruction block, add it to
     // the worklist. The matching SIL_DEBUG_RECONSTRUCTION_BLOCK records
     // appear after all regular blocks.
-    bool hasReconstructionBlock = (Attr >> 11) & 0x1;
     if (hasReconstructionBlock)
       DebugBBWorklist.push_back(cast<DebugValueInst>(ResultInst));
 
@@ -2967,14 +2966,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   case SILInstructionKind::DestroyValueInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
-    PoisonRefs_t poisonRefs = PoisonRefs_t(Attr & 0x1);
-    IsDeadEnd_t isDeadEnd = IsDeadEnd_t((Attr >> 1) & 0x1);
+    IsDeadEnd_t isDeadEnd = IsDeadEnd_t(Attr & 0x1);
     ResultInst = Builder.createDestroyValue(
         Loc,
         getLocalValue(
             Builder.maybeGetFunction(), ValID,
             getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn)),
-        poisonRefs, isDeadEnd);
+        isDeadEnd);
     break;
   }
 

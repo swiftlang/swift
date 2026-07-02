@@ -86,7 +86,7 @@ static SILInstruction *endOSSALifetime(SILValue value,
     if (nonDestroyingEnd && !isDeadEnd) {
       return builder.createEndLifetime(loc, value);
     } else {
-      return builder.createDestroyValue(loc, value, DontPoisonRefs, isDeadEnd);
+      return builder.createDestroyValue(loc, value, isDeadEnd);
     }
   }
   if (auto scopedAddress = ScopedAddressValue(value)) {
