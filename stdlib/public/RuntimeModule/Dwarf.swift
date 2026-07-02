@@ -690,8 +690,6 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         } else {
           throw DwarfError.unsupportedVersion(version)
         }
-
-        dieBounds = Bounds(base: cursor.pos, size: next - cursor.pos)
       } else {
         if version >= 2 && version <= 4 {
           // .3 debug_abbrev_offset
@@ -711,8 +709,6 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         } else {
           throw DwarfError.unsupportedVersion(version)
         }
-
-        dieBounds = Bounds(base: cursor.pos, size: next - cursor.pos)
       }
 
       if unitType == .DW_UT_skeleton || unitType == .DW_UT_split_compile {
@@ -729,6 +725,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
           let _ = try cursor.read(as: UInt32.self)
         }
       }
+
+      dieBounds = Bounds(base: cursor.pos, size: next - cursor.pos)
 
       let abbrevs = try readAbbrevs(at: abbrevOffset)
 
@@ -1925,7 +1923,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         swift_reportWarning(0,
                             """
                               swift-runtime: warning: unable to fetch inline \
-                              frame data for DWARF unit \(name): \(error)
+                              frame data for DWARF unit \(name): \(error)\n
                               """)
       }
     }
