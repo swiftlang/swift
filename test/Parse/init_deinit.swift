@@ -117,3 +117,12 @@ func barFunc() {
     return
   } ()
 }
+
+// deinit in an extension of a noncopyable type should give a specific error
+struct NoncopyableStruct: ~Copyable {
+  var x: Int
+}
+
+extension NoncopyableStruct {
+  deinit {} // expected-error {{deinitializer must be declared directly in noncopyable type 'NoncopyableStruct' (not in an extension)}}
+}
