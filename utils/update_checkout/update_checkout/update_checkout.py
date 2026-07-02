@@ -161,7 +161,9 @@ def get_pr_branch(
                 "--exit-code",
                 "--heads",
                 "origin",
-                base_branch,
+                # Important for disambiguation. Just 'base_branch' matches
+                # both 'base_branch' and '*/base_branch'.
+                f"refs/heads/{base_branch}",
             ],
             echo=True,
             prefix=prefix,

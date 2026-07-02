@@ -464,3 +464,44 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         self.verify_head_for_stale_pr_merge_ref(
             repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
         )
+
+    # Make sure we do check PR merge ref staleness against
+    # 'refs/heads/base_branch', and not some other 'refs/heads/*/base_branch'.
+    # This failure mode can occur when 'git-ls-remote' is asked to enumerate
+    # refs matching just 'base_branch' instead of 'refs/heads/base_branch'.
+    def test_no_branch_ambiguity_in_staleness_check(self):
+        repo_name = "repo1"
+        rev_scheme = "main"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+
+        # To simulate the scenario described above, create a branch that, if
+        # mistaken for the actual base branch, would cause update-checkout to
+        # conclude that the merge ref is up to date.
+        base_branch = self.get_branch(rev_scheme_name=rev_scheme, repo_name=repo_name)
+        not_base_branch = f"foo/{base_branch}"
+        repo_path = os.path.join(self.local_path, repo_name)
+        self.call(
+            ["git", "branch", not_base_branch, f"pull/{pr_id}/merge^1"], cwd=repo_path
+        )
+        self.call(["git", "push", "origin", not_base_branch], cwd=repo_path)
+
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--clone",
+                "--scheme",
+                rev_scheme,
+                "--github-comment",
+                f"""
+                https://github.com/apple/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        # Check that update-checkout took the path for a stale merge ref.
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )
