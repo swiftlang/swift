@@ -754,7 +754,8 @@ function(add_swift_host_library name)
 
   add_library(${name} ${libkind} ${ASHL_SOURCES})
 
-  target_link_directories(${name} PUBLIC "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+  #target_link_directories(${name} PUBLIC "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+  target_link_directories(${name} PRIVATE "$<BUILD_INTERFACE:${CMAKE_LIBRARY_OUTPUT_DIRECTORY}>")
 
   # Respect LLVM_COMMON_DEPENDS if it is set.
   #
@@ -862,6 +863,7 @@ function(add_swift_host_library name)
   add_dependencies(dev ${name})
   if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     swift_install_in_component(TARGETS ${name}
+      EXPORT SwiftTargets
       ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
       LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
       RUNTIME DESTINATION bin COMPONENT dev)
@@ -1055,6 +1057,7 @@ function(add_swift_host_tool executable)
   if(NOT ASHT_SWIFT_COMPONENT STREQUAL "no_component")
     add_dependencies(${ASHT_SWIFT_COMPONENT} ${executable})
     swift_install_in_component(TARGETS ${executable}
+                               EXPORT SwiftTargets
                                RUNTIME
                                  DESTINATION bin
                                  COMPONENT ${ASHT_SWIFT_COMPONENT}

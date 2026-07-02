@@ -334,7 +334,21 @@ function(add_swift_compiler_modules_library name)
     target_link_options(${name} PUBLIC ${public_link_flags})
   endif()
 
-  set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+  if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
+    swift_install_in_component(TARGETS ${name}
+      EXPORT SwiftTargets
+      ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+      LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+      RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+      COMPONENT dev)
+  endif()
+  
+  swift_is_installing_component("compiler" _installing_compiler_modules)
+    if(_installing_compiler_modules)
+      set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
+    else()
+      set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+    endif()
 endfunction()
 
 
