@@ -470,10 +470,11 @@ func ffpo(_ value: ForPattern?) {
 func oldThing() {}
 
 @available(iOS, introduced: 14.0)
+@available(visionOS, introduced: 1.0)
 func newThing() {}
 
 func newThingClient() {
-    if #available(iOS 14.0, *) {
+    if #available(iOS 14.0, visionOS 1.0, *) {
         newThing()
     } else {
         oldThing()
