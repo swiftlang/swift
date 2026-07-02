@@ -1912,12 +1912,12 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       attr->setCategoryNameInvalid();
     }
 
-    // FIXME: if (AFD->getCDeclName().empty())
-
     if (!AFD->getImplementedObjCDecl()) {
+      StringRef name = AFD->getCDeclName();
+      if (name.empty())
+        name = AFD->getNameStr();
       diagnose(attr->getLocation(),
-               diag::attr_objc_implementation_func_not_found,
-               AFD->getCDeclName(), AFD);
+               diag::attr_objc_implementation_func_not_found, name, AFD);
     }
   }
 }

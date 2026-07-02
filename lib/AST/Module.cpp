@@ -569,7 +569,7 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   populateAuxiliaryDeclCache();
   DeclName keyName = MacroDecl::isUniqueMacroName(Name.getBaseName())
     ? UniqueMacroNamePlaceholder
-    : Name;
+    : Name.getBaseName();
   auto auxDecls = TopLevelAuxiliaryDecls.find(keyName);
 
   // Check macro expansions that could produce this name.
