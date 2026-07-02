@@ -1,0 +1,51 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -debug-reconstruction-block-simplification %s | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct MyStruct {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+  init(x: Int64, y: Int64)
+}
+
+sil_scope 1 { loc "test.swift":1:6 parent @test_struct_extract_simplification : $@convention(thin) (Int64) -> () }
+
+// CHECK-LABEL: sil {{.+}} @test_struct_extract_simplification
+// The struct+struct_extract pair should be folded away, leaving just the argument passed through.
+// CHECK: debug_value %0 : $Int64, let, name "val", type $MyStruct, transform {
+// CHECK:   bb0(%0 : $Int64):
+// CHECK:     return %0 : $Int64
+// CHECK:   }
+sil hidden @test_struct_extract_simplification : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  debug_value %0 : $Int64, let, name "val", type $MyStruct, transform {
+  bb0(%0 : $Int64):
+    %1 = struct $MyStruct (%0 : $Int64, %0 : $Int64)
+    %2 = struct_extract %1 : $MyStruct, #MyStruct.x
+    return %2 : $Int64
+  }, loc "test.swift":2:7, scope 1
+  %r = tuple ()
+  return %r : $(), loc "test.swift":3:3, scope 1
+}
+
+sil_scope 2 { loc "test.swift":5:6 parent @test_tuple_extract_simplification : $@convention(thin) (Int64) -> () }
+
+// CHECK-LABEL: sil {{.+}} @test_tuple_extract_simplification
+// The tuple+tuple_extract pair should be folded away.
+// CHECK: debug_value %0 : $Int64, let, name "tval", type $(Int64, Int64), transform {
+// CHECK:   bb0(%0 : $Int64):
+// CHECK:     return %0 : $Int64
+// CHECK:   }
+sil hidden @test_tuple_extract_simplification : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  debug_value %0 : $Int64, let, name "tval", type $(Int64, Int64), transform {
+  bb0(%0 : $Int64):
+    %1 = tuple (%0 : $Int64, %0 : $Int64)
+    %2 = tuple_extract %1 : $(Int64, Int64), 0
+    return %2 : $Int64
+  }, loc "test.swift":6:7, scope 2
+  %r = tuple ()
+  return %r : $(), loc "test.swift":7:3, scope 2
+}

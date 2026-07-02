@@ -12,7 +12,7 @@
 
 import SIL
 
-extension UncheckedEnumDataInst : OnoneSimplifiable, SILCombineSimplifiable {
+extension UncheckedEnumDataInst : OnoneSimplifiable, SILCombineSimplifiable, DebugReconstructionBlockSimplifiable {
   func simplify(_ context: SimplifyContext) {
     guard let enumInst = self.enum as? EnumInst else {
       return
