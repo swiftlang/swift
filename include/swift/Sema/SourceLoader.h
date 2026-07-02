@@ -59,7 +59,8 @@ public:
   virtual bool
   canImportModule(ImportPath::Module named, SourceLoc loc,
                   ModuleVersionInfo *versionInfo,
-                  bool isTestableDependencyLookup = false) override;
+                  bool isTestableDependencyLookup,
+                  bool isSourceCanImport) override;
 
   /// Import a module with the given module path.
   ///

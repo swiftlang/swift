@@ -2316,7 +2316,8 @@ bool ExplicitSwiftModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
     std::string *cacheKey, bool IsCanImportLookup,
-    bool isTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule) {
+    bool isTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule,
+    bool isSourceCanImport) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -2401,7 +2402,7 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
 
 bool ExplicitSwiftModuleLoader::canImportModule(
     ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
-    bool isTestableDependencyLookup) {
+    bool isTestableDependencyLookup, bool isSourceCanImport) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -2709,7 +2710,8 @@ bool ExplicitCASModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
     std::string *CacheKey, bool IsCanImportLookup,
-    bool IsTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule) {
+    bool IsTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule,
+    bool isSourceCanImport) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -2774,7 +2776,7 @@ std::error_code ExplicitCASModuleLoader::findModuleFilesInDirectory(
 
 bool ExplicitCASModuleLoader::canImportModule(
     ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
-    bool isTestableDependencyLookup) {
+    bool isTestableDependencyLookup, bool isSourceCanImport) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
