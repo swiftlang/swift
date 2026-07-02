@@ -23,6 +23,7 @@
 #include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Version.h"
+#include "swift/Frontend/CachingUtils.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
@@ -31,6 +32,7 @@
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/CAS/CASFileSystem.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
@@ -39,6 +41,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/SandboxingFileSystem.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/TargetParser/Triple.h"
@@ -840,6 +843,10 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   }
 
   Opts.ImportModuleFromCAS |= Args.hasArg(OPT_module_import_from_cas);
+
+  if (auto *A = Args.getLastArg(OPT_scanner_cas_fs))
+    Opts.DepscanCASFileSystemRootID = A->getValue();
+  Opts.CASFSEscapePaths = Args.getAllArgValues(OPT_cas_fs_escape);
 
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_root))
     Opts.ClangIncludeTree = A->getValue();
@@ -4573,4 +4580,147 @@ CompilerInvocation::setUpInputForSILTool(
     getFrontendOptions().InputMode = FrontendOptions::ParseInputMode::SIL;
   }
   return fileBufOrErr;
+}
+
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+CompilerInvocation::createVirtualFileSystemOverlays(
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS,
+    std::shared_ptr<llvm::cas::ObjectStore> CAS,
+    std::shared_ptr<llvm::cas::ActionCache> Cache,
+    std::optional<std::string> &CASIDForPCH,
+    DiagnosticEngine &Diagnostics) const {
+  auto CurFS = std::move(BaseFS);
+
+  const auto &CASOpts = getCASOptions();
+  if (CASOpts.EnableCaching && !CASOpts.HasImmutableFileSystem &&
+      FrontendOptions::supportCompilationCaching(
+          getFrontendOptions().RequestedAction)) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
+    return nullptr;
+  }
+
+  if (!CASOpts.DepscanCASFileSystemRootID.empty() &&
+      getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::ScanDependencies) {
+    if (CASOpts.requireCASFS()) {
+      Diagnostics.diagnose(
+          SourceLoc(), diag::error_option_incompatible, "-scanner-cas-fs",
+          "-clang-include-tree-root | -clang-include-tree-filelist | "
+          "-input-file-key | -bridging-header-pch-key");
+      return nullptr;
+    }
+
+    auto reportError =
+        [&](llvm::Error E) -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
+                           toString(std::move(E)));
+      return nullptr;
+    };
+
+    auto ID = CAS->parseID(CASOpts.DepscanCASFileSystemRootID);
+    if (!ID)
+      return reportError(ID.takeError());
+    auto CASFS = llvm::cas::createCASFileSystem(CAS, *ID);
+    if (!CASFS)
+      return reportError(CASFS.takeError());
+
+    if (!CASOpts.CASFSEscapePaths.empty()) {
+      SmallVector<StringRef, 4> EscapePaths;
+      for (const auto &Path : CASOpts.CASFSEscapePaths) {
+        EscapePaths.push_back(Path);
+      }
+      auto SandboxFS =
+          llvm::vfs::createSandboxingFileSystem(CurFS, EscapePaths);
+      if (!SandboxFS) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
+                             toString(SandboxFS.takeError()));
+        return nullptr;
+      }
+      auto OverlayFS = llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
+          std::move(*CASFS));
+      OverlayFS->pushOverlay(std::move(*SandboxFS));
+      CurFS = std::move(OverlayFS);
+    } else {
+      CurFS = std::move(*CASFS);
+    }
+  }
+
+  if (CASOpts.requireCASFS()) {
+    if (CASOpts.HasImmutableFileSystem) {
+      // Set up CASFS as BaseFS.
+      auto FS = createCASFileSystem(*CAS, CASOpts.ClangIncludeTree,
+                                    CASOpts.ClangIncludeTreeFileList);
+      if (!FS) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
+                             toString(FS.takeError()));
+        return nullptr;
+      }
+      CurFS = std::move(*FS);
+    }
+
+    // If we need to load any files from CAS, try load it now and overlay it.
+    llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> MemFS =
+        new llvm::vfs::InMemoryFileSystem();
+    const auto &ClangOpts = getClangImporterOptions();
+
+    if (!CASOpts.BridgingHeaderPCHCacheKey.empty()) {
+      auto Proxy = loadCachedCompileResultProxy(
+          *CAS, *Cache, CASOpts.BridgingHeaderPCHCacheKey,
+          file_types::ID::TY_PCH);
+
+      if (!Proxy) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas, "loading pch file",
+                             llvm::toString(Proxy.takeError()));
+        return nullptr;
+      }
+      if (!*Proxy) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
+                             ClangOpts.getPCHInputPath());
+        return nullptr;
+      }
+      MemFS->addFile(ClangOpts.getPCHInputPath(), 0,
+                     (*Proxy)->getMemoryBuffer());
+      CASIDForPCH = (*Proxy)->getID().toString();
+    }
+    if (!CASOpts.InputFileKey.empty()) {
+      if (getFrontendOptions().InputsAndOutputs.getAllInputs().size() != 1)
+        Diagnostics.diagnose(SourceLoc(),
+                             diag::error_wrong_input_num_for_input_file_key);
+      else {
+        auto InputPath =
+            getFrontendOptions().InputsAndOutputs.getFilenameOfFirstInput();
+        auto Type = file_types::lookupTypeFromFilename(
+            llvm::sys::path::filename(InputPath));
+        if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
+                *CAS, *Cache, Diagnostics, CASOpts.InputFileKey, Type,
+                InputPath))
+          MemFS->addFile(InputPath, 0, std::move(loadedBuffer));
+        else
+          Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
+                               InputPath);
+      }
+    }
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
+        new llvm::vfs::OverlayFileSystem(MemFS);
+    OverlayVFS->pushOverlay(CurFS);
+    CurFS = std::move(OverlayVFS);
+  }
+
+  auto ExpectedOverlay = getSearchPathOptions().makeOverlayFileSystem(CurFS);
+  if (!ExpectedOverlay) {
+    llvm::handleAllErrors(
+        ExpectedOverlay.takeError(), [&](const llvm::FileError &FE) {
+          if (FE.convertToErrorCode() == std::errc::no_such_file_or_directory) {
+            Diagnostics.diagnose(SourceLoc(), diag::cannot_open_file,
+                                 FE.getFileName(), FE.messageWithoutFileInfo());
+          } else {
+            Diagnostics.diagnose(SourceLoc(), diag::invalid_vfs_overlay_file,
+                                 FE.getFileName());
+          }
+        });
+    return nullptr;
+  }
+
+  CurFS = std::move(*ExpectedOverlay);
+  return CurFS;
 }
