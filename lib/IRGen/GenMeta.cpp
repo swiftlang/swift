@@ -7677,6 +7677,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::TaskExecutor:
   case KnownProtocolKind::ExecutorFactory:
+  case KnownProtocolKind::SchedulingExecutor:
+  case KnownProtocolKind::Clock:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:

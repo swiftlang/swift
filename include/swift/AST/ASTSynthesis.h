@@ -55,6 +55,10 @@ enum SingletonTypeSynthesizer {
   _swiftInt,               // Swift.Int
   _serialExecutor,         // the '_Concurrency.SerialExecutor' protocol
   _taskExecutor,           // the '_Concurrency.TaskExecutor' protocol
+  _schedulingExecutor,     // the '_Concurrency.SchedulingExecutor' protocol
+  _fireTime,               // the '_Concurrency.FireTime' enum
+  _jobCancellationToken,   // the '_Concurrency.JobCancellationToken' struct
+  _clock,                  // the '_Concurrency.Clock' protocol
   _actor,                  // the '_Concurrency.Actor' protocol
   _distributedActor,       // the 'Distributed.DistributedActor' protocol
   _unsafeRawBufferPointer, // UnsafeRawBufferPointer
@@ -86,6 +90,16 @@ inline Type synthesizeType(SynthesisContext &SC,
     } else {
       return nullptr;
     }
+  case _schedulingExecutor:
+    return SC.Context.getProtocol(KnownProtocolKind::SchedulingExecutor)
+        ->getDeclaredInterfaceType();
+  case _fireTime:
+    return SC.Context.getFireTimeType();
+  case _jobCancellationToken:
+    return SC.Context.getJobCancellationTokenType();
+  case _clock:
+    return SC.Context.getProtocol(KnownProtocolKind::Clock)
+        ->getDeclaredInterfaceType();
   case _actor:
     return SC.Context.getProtocol(KnownProtocolKind::Actor)
       ->getDeclaredInterfaceType();
@@ -353,7 +367,7 @@ ParamDecl *synthesizeParamDecl(SynthesisContext &SC, const S &s,
 template <class S>
 FunctionType::Param synthesizeParamType(SynthesisContext &SC, const S &s) {
   auto type = synthesizeType(SC, s);
-  return type;
+  return FunctionType::Param(type);
 }
 
 /// Parameter specifiers.
@@ -368,6 +382,10 @@ constexpr SpecifiedParamSynthesizer<G> _owned(G sub) {
 template <class G>
 constexpr SpecifiedParamSynthesizer<G> _consuming(G sub) {
   return {ParamSpecifier::Consuming, sub};
+}
+template <class G>
+constexpr SpecifiedParamSynthesizer<G> _borrowing(G sub) {
+  return {ParamSpecifier::Borrowing, sub};
 }
 template <class G>
 constexpr SpecifiedParamSynthesizer<G> _inout(G sub) {
@@ -408,7 +426,7 @@ FunctionType::Param synthesizeParamType(SynthesisContext &SC,
   auto param = synthesizeParamType(SC, s.sub);
   auto flags = param.getParameterFlags();
   if (s.specifier != ParamSpecifier::Default)
-    flags = flags.withValueOwnership(s.specifier);
+    flags = flags.withOwnershipSpecifier(s.specifier);
   return param.withFlags(flags);
 }
 

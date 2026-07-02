@@ -212,3 +212,46 @@ extension ContinuousClock.Instant: InstantProtocol {
     rhs.duration(to: lhs)
   }
 }
+
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 9999, *)
+extension ContinuousClock: EnqueueingClock {
+
+  public func run(
+    _ job: consuming ExecutorJob,
+    run at: FireTime<Self>,
+    tolerance: Duration?,
+    onCancellation behavior: CancellationBehavior
+  ) -> JobCancellationToken {
+    guard let executor = Task<Never,Never>.currentSchedulingExecutor else {
+      fatalError("no scheduling executor is available for job \(job.id)")
+    }
+
+    return executor.enqueue(job, run: at,
+                            clock: self,
+                            tolerance: tolerance,
+                            onCancellation: behavior)
+  }
+
+  public func enqueue(
+    _ job: consuming ExecutorJob,
+    on executor: some Executor,
+    run at: FireTime<Self>,
+    tolerance: Duration?,
+    onCancellation behavior: CancellationBehavior
+  ) -> JobCancellationToken {
+    if let schedulingExecutor = executor.asSchedulingExecutor {
+      return schedulingExecutor.enqueue(job, run: at,
+                                        clock: self,
+                                        tolerance: tolerance,
+                                        onCancellation: behavior)
+    } else {
+      let trampoline = job.createTrampoline(to: executor)
+      return run(trampoline, run: at, tolerance: tolerance,
+                 onCancellation: behavior)
+    }
+  }
+
+}
+#endif

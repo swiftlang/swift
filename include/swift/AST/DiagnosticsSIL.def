@@ -1301,6 +1301,8 @@ GROUPED_NOTE(regionbasedisolation_chain_value_exposed_to_isolated_named,
 // Concurrency related diagnostics
 ERROR(executor_factory_must_conform, none,
       "the DefaultExecutorFactory does not conform to 'ExecutorFactory'", ())
+ERROR(cannot_find_schedule_task_resumption, none,
+      "the _scheduleTaskResumption function could not be found", ())
 
 //===----------------------------------------------------------------------===//
 //                           MARK: Misc Diagnostics

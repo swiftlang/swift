@@ -43,6 +43,83 @@ public protocol Clock<Duration>: Sendable {
 #endif
 }
 
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 9999, *)
+public protocol EnqueueingClock<Duration> : Clock<Duration> {
+  /// Run the given job on an unspecified executor at some point
+  /// after the given instant.
+  ///
+  /// Parameters:
+  ///
+  /// - job:         The job we wish to run
+  /// - at instant:  The time at which we would like it to run.
+  /// - tolerance:   The ideal maximum delay we are willing to tolerate.
+  /// - onCancellation:
+  ///                The selected cancellation behavior.
+  ///
+  /// Returns a ``JobCancellationToken`` that can be used to
+  /// cancel the job before it runs.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
+  @available(StdlibDeploymentTarget 9999, *)
+  func run(_ job: consuming ExecutorJob,
+           run: FireTime<Self>, tolerance: Duration?,
+           onCancellation: CancellationBehavior)
+    -> JobCancellationToken
+
+  /// Enqueue the given job on the specified executor at some point after the
+  /// given instant.
+  ///
+  /// The default implementation uses the `run` method to trigger a job that
+  /// does `executor.enqueue(job)`.  If a particular `Clock` knows that the
+  /// executor it has been asked to use is the same one that it will run jobs
+  /// on, it can short-circuit this behaviour and directly use `run` with
+  /// the original job.
+  ///
+  /// Parameters:
+  ///
+  /// - job:         The job we wish to run
+  /// - on executor: The executor on which we would like it to run.
+  /// - run:         The time at which we would like it to run.
+  /// - tolerance:   The ideal maximum delay we are willing to tolerate.
+  /// - onCancellation:
+  ///                The selected cancellation behavior.
+  ///
+  /// Returns a ``JobCancellationToken`` that can be used to
+  /// cancel the job before it runs.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
+  @available(StdlibDeploymentTarget 9999, *)
+  func enqueue(_ job: consuming ExecutorJob,
+               on executor: some Executor,
+               run: FireTime<Self>, tolerance: Duration?,
+               onCancellation: CancellationBehavior)
+    -> JobCancellationToken
+}
+
+@available(StdlibDeploymentTarget 9999, *)
+extension EnqueueingClock {
+  // The default implementation works by creating a trampoline and calling
+  // the run() method.
+  #if !os(Windows)
+  @_weakLinked
+  #endif
+  @available(StdlibDeploymentTarget 9999, *)
+  public func enqueue(_ job: consuming ExecutorJob,
+                      on executor: some Executor,
+                      run at: FireTime<Self>, tolerance: Duration?,
+                      onCancellation behavior: CancellationBehavior)
+  -> JobCancellationToken {
+    let trampoline = job.createTrampoline(to: executor)
+    return run(trampoline, run: at, tolerance: tolerance,
+               onCancellation: behavior)
+  }
+}
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
 @available(StdlibDeploymentTarget 5.7, *)
 extension Clock {
   /// Measure the elapsed time to execute a closure.

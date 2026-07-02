@@ -300,7 +300,7 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
 
     if (task->_private()._status().compare_exchange_weak(
             oldStatus, newStatus,
-            /*success*/ std::memory_order_relaxed,
+            /*success*/ std::memory_order_acquire,
             /*failure*/ std::memory_order_relaxed)) {
       newStatus.traceStatusChanged(task, oldStatus, false);
       return;

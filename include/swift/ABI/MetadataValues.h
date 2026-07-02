@@ -2696,11 +2696,12 @@ enum class JobKind : size_t {
   /// Job kinds >= 192 are private to the implementation.
   First_Reserved = 192,
 
-  DefaultActorInline = First_Reserved,
-  DefaultActorSeparate,
-  DefaultActorOverride,
-  NullaryContinuation,
-  IsolatedDeinit,
+  DefaultActorInline    = 192,
+  DefaultActorSeparate  = 193,
+  DefaultActorOverride  = 194,
+  NullaryContinuation   = 195,
+  IsolatedDeinit        = 196,
+  ScheduledContinuation = 197,
 };
 
 /// The priority of a job.  Higher priorities are larger values.
