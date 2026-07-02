@@ -5613,8 +5613,24 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
   // begin_borrow instructions added for move-only self argument.
   if (selfArgMV.getValue()->getType().isMoveOnly() &&
       selfArgMV.getValue()->getType().isObject()) {
-    uncurriedArgs.back() = ManagedValue::forBorrowedObjectRValue(
+    selfArgMV = ManagedValue::forBorrowedObjectRValue(
         lookThroughMoveOnlyCheckerPattern(selfArgMV.getValue()));
+  }
+
+  // Under opaque values a borrow/mutate accessor's self parameter is lowered to
+  // a by-value object (a @guaranteed self for a borrow accessor), but the base
+  // can still be an address, e.g., the begin_access of an inout base.
+  // Load it so the argument matches the accessor's self convention.
+  if (!SGF.silConv.useLoweredAddresses() && selfArgMV.getType().isAddress()) {
+    SILFunctionConventions substConv(calleeTypeInfo.substFnType,
+                                     SGF.getModule());
+    auto selfParamTy = substConv.getSILType(
+        calleeTypeInfo.substFnType->getSelfParameter(),
+        SGF.getTypeExpansionContext());
+    if (selfParamTy.isObject()) {
+      selfArgMV =
+          SGF.emitManagedLoadBorrow(uncurriedLoc.value(), selfArgMV.getValue());
+    }
   }
 
   if (fnValue.getFunction()->getConventions().hasGuaranteedResult()) {
@@ -5622,12 +5638,15 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
       // unchecked_ownership is used to silence the ownership verifier for
       // returning a value produced within a load_borrow scope. SILGenCleanup
       // eliminates it and introduces return_borrow appropriately.
-      uncurriedArgs.back() =
+      selfArgMV =
           ManagedValue::forForwardedRValue(
               SGF, SGF.B.createUncheckedOwnership(uncurriedLoc.value(),
                                                   selfArgMV.getValue()));
     }
   }
+
+  // Write-back the self arg.
+  uncurriedArgs.back() = selfArgMV;
 
   auto value = SGF.applyBorrowMutateAccessor(
       uncurriedLoc.value(), fnValue, callee.getSubstitutions(),
