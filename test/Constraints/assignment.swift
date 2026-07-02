@@ -101,3 +101,61 @@ func testFunctionAssignsWithOptionals(fn: @escaping () -> () -> Void) {
   let _: (() -> () -> Super)? = b
   let _: (() -> () -> Super)?? = b
 }
+
+final class NestedAssignmentA {
+  var x: Int?
+}
+
+func testNestedAssignmentWithOptionalChaining(a: NestedAssignmentA?) {
+  a?.x = a?.x = 1 // expected-error {{cannot assign value of type '()' to type 'Int'}}
+}
+
+final class NestedAssignmentC {}
+
+final class NestedAssignmentB {
+  var x: NestedAssignmentC?
+}
+
+final class NestedAssignmentContainer {
+  var a: NestedAssignmentB?
+}
+
+func testNestedAssignmentThroughMemberChain(
+    b: NestedAssignmentContainer,
+    c: NestedAssignmentC
+) {
+  b.a?.x = b.a?.x = c // expected-error {{cannot assign value of type '()' to type 'NestedAssignmentC'}}
+}
+
+struct NestedAssignmentS {
+  var x: Int?
+}
+
+func testNestedAssignmentWithInOutOptional(
+    s: inout NestedAssignmentS?
+) {
+  s?.x = s?.x = 1 // expected-error {{cannot assign value of type '()' to type 'Int'}}
+}
+
+final class NestedAssignmentParenA {}
+final class NestedAssignmentParenB {
+  var x: NestedAssignmentParenA?
+}
+final class NestedAssignmentParenContainer {
+  var a: NestedAssignmentParenB?
+}
+func testNestedAssignmentWithParenthesizedInnerAssign(
+    b: NestedAssignmentParenContainer,
+    c: NestedAssignmentParenA
+) {
+  b.a?.x = (b.a?.x = c) // expected-error {{cannot assign value of type '()' to type 'NestedAssignmentParenA'}}
+}
+
+final class NestedAssignmentLegalA {
+  var x: Int?
+}
+func testOptionalChainedAssignmentWithOptionalRHSIsLegal(
+    a: NestedAssignmentLegalA?
+) {
+  a?.x = a?.x
+}
