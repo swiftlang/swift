@@ -10,8 +10,7 @@ protocol P {
 // Definition of isolated conformances
 // ----------------------------------------------------------------------------
 
-// expected-warning@+3{{conformance of 'CWithNonIsolated' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
-// expected-note@+2{{isolate this conformance to the main actor with '@MainActor'}}{{25-25=@MainActor }}
+// expected-warning@+2{{conformance of 'CWithNonIsolated' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
 @MainActor
 class CWithNonIsolated: P {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{25-25=@preconcurrency }}
@@ -28,8 +27,7 @@ do {
     protocol Q { func f() }
   }
   do {
-    // expected-warning@+3 {{conformance of 'S' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
-    // expected-note@+2 {{isolate this conformance to the main actor with '@MainActor'}}{{26-26=@MainActor }}
+    // expected-warning@+2 {{conformance of 'S' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
     // expected-note@+1 {{turn data races into runtime errors with '@preconcurrency'}}{{26-26=@preconcurrency }}
     @MainActor struct S: Nested.P {
       func f() {} // expected-note {{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
@@ -37,19 +35,16 @@ do {
     }
   }
   do {
-    // Attribute inserted *before* '@unsafe'.
     @MainActor struct S: @unsafe Nested.P {
     // expected-warning@-1 {{conformance of 'S' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
-    // expected-note@-2 {{isolate this conformance to the main actor with '@MainActor'}}{{26-26=@MainActor }}
-    // expected-note@-3 {{turn data races into runtime errors with '@preconcurrency'}}{{26-26=@preconcurrency }}
+    // expected-note@-2 {{turn data races into runtime errors with '@preconcurrency'}}{{26-26=@preconcurrency }}
       func f() {} // expected-note {{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
       // expected-note@-1 {{mark instance method 'f()' 'nonisolated'}}{{7-7=nonisolated }}
     }
   }
   do {
-    // expected-warning@+4 {{conformance of 'S' to protocol 'Q' crosses into main actor-isolated code and can cause data races}}
-    // expected-warning@+3 {{conformance of 'S' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
-    // expected-note@+2 2 {{isolate this conformance to the main actor with '@MainActor'}}{{26-26=@MainActor }}
+    // expected-warning@+3 {{conformance of 'S' to protocol 'Q' crosses into main actor-isolated code and can cause data races}}
+    // expected-warning@+2 {{conformance of 'S' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
     // expected-note@+1 2 {{turn data races into runtime errors with '@preconcurrency'}}{{26-26=@preconcurrency }}
     @MainActor struct S: Nested.P & Nested.Q {
       func f() {} // expected-note 2 {{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
@@ -58,8 +53,7 @@ do {
   }
   do {
     // FIXME: We shouldn't be applying nonisolated to both protocols.
-    // expected-warning@+3 {{conformance of 'S' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
-    // expected-note@+2 {{isolate this conformance to the main actor with '@MainActor'}}{{26-26=@MainActor }}
+    // expected-warning@+2 {{conformance of 'S' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
     // expected-note@+1 {{turn data races into runtime errors with '@preconcurrency'}}{{26-26=@preconcurrency }}
     @MainActor struct S: Nested.P & EmptyP  {
       func f() {} // expected-note {{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
@@ -106,7 +100,6 @@ protocol Q {
 @MainActor
 struct SMissingIsolation: Q {
   // expected-note@-1{{conformance depends on main actor-isolated conformance of 'C' to protocol 'P'}}
-  // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
   typealias A = C
 }
 
@@ -118,7 +111,6 @@ struct PWrapper<T: P>: P {
 @MainActor
 struct SMissingIsolationViaWrapper: Q {
   // expected-note@-1{{conformance depends on main actor-isolated conformance of 'C' to protocol 'P'}}
-  // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}{{37-37=@MainActor }}
   typealias A = PWrapper<C>
 }
 
@@ -260,8 +252,7 @@ protocol Distinguishable {
   var id: Self.ID { get }
 }
 
-// expected-warning@+4{{conformance of 'MyDistinguishable' to protocol 'Distinguishable' crosses into main actor-isolated code and can cause data races}}
-// expected-note@+3{{isolate this conformance to the main actor with '@MainActor'}}{{26-26=@MainActor }}
+// expected-warning@+3{{conformance of 'MyDistinguishable' to protocol 'Distinguishable' crosses into main actor-isolated code and can cause data races}}
 // expected-note@+2{{turn data races into runtime errors with '@preconcurrency'}}{{26-26=@preconcurrency }}
 @MainActor
 class MyDistinguishable: Distinguishable {
@@ -275,11 +266,9 @@ protocol HasMutableVar {
   var val: Self.Val { get set }
 }
 
-// expected-warning@+7{{conformance of 'ImmutableWithSeparateMutable' to protocol 'Distinguishable' crosses into main actor-isolated code and can cause data races}}
-// expected-note@+6{{isolate this conformance to the main actor with '@MainActor'}}
-// expected-note@+5{{turn data races into runtime errors with '@preconcurrency'}}
-// expected-warning@+4{{conformance of 'ImmutableWithSeparateMutable' to protocol 'HasMutableVar' crosses into main actor-isolated code and can cause data races}}
-// expected-note@+3{{isolate this conformance to the main actor with '@MainActor'}}
+// expected-warning@+5{{conformance of 'ImmutableWithSeparateMutable' to protocol 'Distinguishable' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+4{{turn data races into runtime errors with '@preconcurrency'}}
+// expected-warning@+3{{conformance of 'ImmutableWithSeparateMutable' to protocol 'HasMutableVar' crosses into main actor-isolated code and can cause data races}}
 // expected-note@+2{{turn data races into runtime errors with '@preconcurrency'}}
 @MainActor
 class ImmutableWithSeparateMutable: Distinguishable, HasMutableVar {
@@ -293,8 +282,7 @@ protocol MixedMutability {
   var count: Int { get set }
 }
 
-// expected-warning@+4{{conformance of 'MixedMutabilityWitness' to protocol 'MixedMutability' crosses into main actor-isolated code and can cause data races}}
-// expected-note@+3{{isolate this conformance to the main actor with '@MainActor'}}
+// expected-warning@+3{{conformance of 'MixedMutabilityWitness' to protocol 'MixedMutability' crosses into main actor-isolated code and can cause data races}}
 // expected-note@+2{{turn data races into runtime errors with '@preconcurrency'}}
 @MainActor
 class MixedMutabilityWitness: MixedMutability {
@@ -308,8 +296,7 @@ protocol MultipleReadOnly {
   var second: Int { get }
 }
 
-// expected-warning@+4{{conformance of 'MultipleReadOnlyWitness' to protocol 'MultipleReadOnly' crosses into main actor-isolated code and can cause data races}}
-// expected-note@+3{{isolate this conformance to the main actor with '@MainActor'}}
+// expected-warning@+3{{conformance of 'MultipleReadOnlyWitness' to protocol 'MultipleReadOnly' crosses into main actor-isolated code and can cause data races}}
 // expected-note@+2{{turn data races into runtime errors with '@preconcurrency'}}
 @MainActor
 class MultipleReadOnlyWitness: MultipleReadOnly {
@@ -320,8 +307,7 @@ class MultipleReadOnlyWitness: MultipleReadOnly {
   var third = true
 }
 
-// expected-warning@+4{{conformance of 'ComputedWitness' to protocol 'Distinguishable' crosses into main actor-isolated code and can cause data races}}
-// expected-note@+3{{isolate this conformance to the main actor with '@MainActor'}}
+// expected-warning@+3{{conformance of 'ComputedWitness' to protocol 'Distinguishable' crosses into main actor-isolated code and can cause data races}}
 // expected-note@+2{{turn data races into runtime errors with '@preconcurrency'}}
 @MainActor
 class ComputedWitness: Distinguishable {
@@ -334,16 +320,14 @@ struct Wrapped<Value> {
   var wrappedValue: Value
 }
 
-// expected-warning@+4{{conformance of 'WrappedWitness' to protocol 'Distinguishable' crosses into main actor-isolated code and can cause data races}}
-// expected-note@+3{{isolate this conformance to the main actor with '@MainActor'}}
+// expected-warning@+3{{conformance of 'WrappedWitness' to protocol 'Distinguishable' crosses into main actor-isolated code and can cause data races}}
 // expected-note@+2{{turn data races into runtime errors with '@preconcurrency'}}
 @MainActor
 class WrappedWitness: Distinguishable {
   @Wrapped var id: String = "wrapped" // expected-note{{main actor-isolated property 'id' cannot satisfy nonisolated requirement}}
 }
 
-// expected-warning@+4{{conformance of 'ComputedGetSetWitness' to protocol 'HasMutableVar' crosses into main actor-isolated code and can cause data races}}
-// expected-note@+3{{isolate this conformance to the main actor with '@MainActor'}}
+// expected-warning@+3{{conformance of 'ComputedGetSetWitness' to protocol 'HasMutableVar' crosses into main actor-isolated code and can cause data races}}
 // expected-note@+2{{turn data races into runtime errors with '@preconcurrency'}}
 @MainActor
 class ComputedGetSetWitness: HasMutableVar {
@@ -352,4 +336,29 @@ class ComputedGetSetWitness: HasMutableVar {
     get { 42 }
     set { }
   }
+}
+
+// https://github.com/swiftlang/swift/issues/87776
+// The '@MainActor' suggestion on a conformance is suppressed when the
+// nominal already carries '@MainActor', since the inserted attribute would
+// either duplicate the nominal's isolation or, for explicit 'nonisolated'
+// conformances, conflict with it.
+// expected-warning@+2{{conformance of 'Issue87776' to protocol 'Identifiable' crosses into main actor-isolated code and can cause data races}}
+@MainActor
+class Issue87776: Identifiable {
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{19-19=@preconcurrency }}
+  var id: String = ""
+  // expected-note@-1{{main actor-isolated property 'id' cannot satisfy nonisolated requirement}}
+  // expected-note@-2{{change property 'id' to a 'nonisolated let' constant}}{{3-6=nonisolated let}}
+}
+
+// Same suppression for an explicit 'nonisolated' conformance on a '@MainActor'
+// nominal: inserting '@MainActor' next to 'nonisolated' would be contradictory.
+// expected-warning@+2{{conformance of 'Issue87776Nonisolated' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+@MainActor
+class Issue87776Nonisolated: nonisolated P {
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{30-30=@preconcurrency }}
+  func f() {}
+  // expected-note@-1{{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+  // expected-note@-2{{mark instance method 'f()' 'nonisolated'}}{{3-3=nonisolated }}
 }
