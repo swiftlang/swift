@@ -6932,6 +6932,11 @@ ASTContext::getClangTypeForIRGen(Type ty) {
   return getClangTypeConverter().convert(ty).getTypePtrOrNull();
 }
 
+void ASTContext::registerClangTypeForIRGen(Type swiftType,
+                                           clang::QualType clangType) {
+  getClangTypeConverter().registerMapping(swiftType, clangType);
+}
+
 GenericParamList *ASTContext::getSelfGenericParamList(DeclContext *dc) const {
   auto *theParamList = getImpl().SelfGenericParamList;
   if (theParamList)

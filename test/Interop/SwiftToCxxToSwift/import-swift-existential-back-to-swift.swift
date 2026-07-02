@@ -46,6 +46,17 @@ SwiftMod::Container<SwiftMod::Drawable> createDrawableContainer();
 // INTERFACE: func createAnyContainer() -> any Container
 // INTERFACE: func createDrawableContainer() -> any Container<any Drawable>
 
+// --- Class-bound protocol round-trip ---
+SwiftMod::Renderable createRenderable();
+
+void passRenderable(const SwiftMod::Renderable& r);
+
+SwiftMod::Renderable passThroughRenderable(const SwiftMod::Renderable& r);
+
+// INTERFACE: func createRenderable() -> any Renderable
+// INTERFACE: func passRenderable(_ r: any Renderable)
+// INTERFACE: func passThroughRenderable(_ r: any Renderable) -> any Renderable
+
 #endif
 
 //--- module.modulemap
@@ -61,6 +72,10 @@ public protocol Drawable {
     func draw() -> Int
 }
 
+public protocol Renderable: AnyObject {
+    func render() -> Int
+}
+
 public protocol Container<Element> {
     associatedtype Element
     func count() -> Int
@@ -70,6 +85,12 @@ public struct Circle: Drawable {
     var radius: Int
     public init(radius: Int) { self.radius = radius }
     public func draw() -> Int { return radius * radius }
+}
+
+public class Canvas: Renderable {
+    var size: Int
+    public init(_ size: Int) { self.size = size }
+    public func render() -> Int { return size * 2 }
 }
 
 // expected-no-diagnostics
