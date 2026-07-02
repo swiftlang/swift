@@ -19,6 +19,7 @@
 #include "GenericRequirement.h"
 #include "IRGen.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "MetadataLayout.h"
 #include "NativeConventionSchema.h"
 
@@ -26,13 +27,17 @@
 //        updated to take a different approach.
 #include "../SILGen/SILGen.h"
 
+#include "IRGenMangler.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/IRGen/HiddenTypeIRABIDetails.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "clang/CodeGen/ModuleBuilder.h"
@@ -87,6 +92,28 @@ getPrimitiveTypeFromLLVMType(ASTContext &ctx, const llvm::Type *type) {
 namespace swift {
 
 class IRABIDetailsProviderImpl {
+  static bool isTypeKnownToBeABIAccessible(
+      const NominalTypeDecl *TD) {
+    switch (TD->getEffectiveAccess()) {
+    case AccessLevel::Public:
+    case AccessLevel::Open:
+      return true;
+    // For now we treat package visibility as equivalent to internal
+    // to ensure that we do not generate code that relies upon ABI of
+    // package visibility symbols across package boundaries. In the future,
+    // we may be able to do better by detecting if the module being compiled
+    // at the moment and a given package visibility hidden type reside in the
+    // same package, so we can rely upon its ABI.
+    case AccessLevel::Package:
+    case AccessLevel::Internal:
+    case AccessLevel::FilePrivate:
+    case AccessLevel::Private:
+      return false;
+    }
+
+    llvm_unreachable("Unhandled access level in switch.");
+  }
+
 public:
   IRABIDetailsProviderImpl(ModuleDecl &mod, const IRGenOptions &opts)
       : typeConverter(mod, /*addressLowered=*/true),
@@ -102,6 +129,53 @@ public:
     return IRABIDetailsProvider::SizeAndAlignment{
         fixedTI->getFixedSize().getValue(),
         fixedTI->getFixedAlignment().getValue()};
+  }
+
+  irgen::HiddenTypeIRABIInfo *
+  getHiddenTypeIRABIInfoForDecl(const NominalTypeDecl *TD) {
+    auto &ctx = TD->getASTContext();
+    IRGenMangler mangler(ctx);
+
+    if (auto *structDecl = dyn_cast<StructDecl>(TD)) {
+      assert(structDecl->canBeCopyable() &&
+             "move-only hidden structs are not supported yet");
+    }
+
+    auto declaredType = TD->getDeclaredTypeInContext()->getCanonicalType();
+    auto metadataAccessStrategy = getTypeMetadataAccessStrategy(declaredType);
+    // TODO: In order to access metadata for hidden type, we currently emit a call to a
+    // metadata accessor function we derive from the mangled name of the hidden type.
+    // Apparently not all types should have their metadata fetched in this manner,
+    // and some have no unique accessible metadata accessor function. The role of visibility
+    // isn't yet clear either. How does the visibility of this unique accessor interact with 
+    // ABI accessibility of the type?
+    assert(metadataAccessStrategy ==
+               MetadataAccessStrategy::PublicUniqueAccessor &&
+           "hidden concrete type metadata access currently requires a public "
+           "unique accessor");
+
+
+    auto *TI = &IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
+    auto *abiInfo = TI->getHiddenTypeIRABIInfo(ctx);
+    if (!abiInfo)
+      return nullptr;
+
+    abiInfo->setMangledTypeName(
+        mangler.mangleMangledTypeName(TD->getDeclaredType()));
+
+    auto props = typeConverter.getTypeProperties(
+        TD->getDeclaredTypeInContext(), TypeExpansionContext::minimal());
+    abiInfo->setSILTypeProperties(props);
+    if (auto *structInfo = dyn_cast<irgen::HiddenStructTypeIRABIInfo>(abiInfo)) {
+      if (structInfo->getKind() == irgen::HiddenTypeIRABIInfo::Kind::NonFixedStruct)
+        structInfo->IsKnownABIAccessible = isTypeKnownToBeABIAccessible(TD);
+    }
+    if (auto *resilientInfo =
+            dyn_cast<irgen::HiddenResilientStructTypeIRABIInfo>(abiInfo)) {
+      resilientInfo->IsKnownABIAccessible =
+          isTypeKnownToBeABIAccessible(TD);
+    }
+    return abiInfo;
   }
 
   IRABIDetailsProvider::FunctionABISignature
@@ -473,6 +547,11 @@ IRABIDetailsProvider::~IRABIDetailsProvider() {}
 std::optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
+}
+
+irgen::HiddenTypeIRABIInfo *
+IRABIDetailsProvider::getHiddenTypeIRABIInfo(const NominalTypeDecl *TD) {
+  return impl->getHiddenTypeIRABIInfoForDecl(TD);
 }
 
 std::optional<LoweredFunctionSignature>

@@ -233,6 +233,12 @@ namespace irgen {
   /// metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, CanType theType);
 
+  class HiddenReferenceTypeIRABIInfo;
+
+  const TypeInfo *createReferenceTypeInfoFromABIInfo(
+      IRGenModule &IGM,
+      const HiddenReferenceTypeIRABIInfo &abiInfo);
+
 } // end namespace irgen
 } // end namespace swift
 

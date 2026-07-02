@@ -28,6 +28,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/IRGen/HiddenTypeIRABIDetails.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVMExtras.h"
@@ -646,6 +647,12 @@ namespace {
                                     getTrivialSILTypeProperties(isSensitive));
     }
 
+    RetTy visitHiddenTypeLayoutInfoType(CanHiddenTypeLayoutInfoType type,
+                                AbstractionPattern origType,
+                                IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("must be implemented by derived class");
+    }
+
     // Dependent types can be lowered according to their corresponding
     // abstraction pattern.
 
@@ -1014,6 +1021,21 @@ namespace {
       // Consult the type properties.
       auto props = TC.getTypeProperties(origType, type, Expansion);
       return handleClassificationFromLowering(type, props, isSensitive);
+    }
+
+    SILTypeProperties
+    visitHiddenTypeLayoutInfoType(CanHiddenTypeLayoutInfoType type,
+                                  AbstractionPattern origType,
+                                  IsTypeExpansionSensitive_t isSensitive) {
+      auto *abiInfo = type->getDecl()->getABIInfo();
+      assert(abiInfo && "HiddenTypeLayoutInfoType should have ABI info");
+
+      if (isa<irgen::HiddenReferenceTypeIRABIInfo>(abiInfo)) {
+        return getReferenceSILTypeProperties(isSensitive);
+      }
+
+      return mergeIsTypeExpansionSensitive(isSensitive,
+                                           abiInfo->getSILTypeProperties());
     }
 
   private:
@@ -2741,6 +2763,30 @@ namespace {
                                                                     properties);
     }
 
+    TypeLowering *
+    visitHiddenTypeLayoutInfoType(CanHiddenTypeLayoutInfoType type,
+                                  AbstractionPattern origType,
+                                  IsTypeExpansionSensitive_t isSensitive) {
+      auto *abiInfo = type->getDecl()->getABIInfo();
+      assert(abiInfo && "HiddenTypeLayoutInfoType should have ABI info");
+
+      auto properties = mergeIsTypeExpansionSensitive(
+          isSensitive, abiInfo->getSILTypeProperties());
+      switch (abiInfo->getKind()) {
+      case irgen::HiddenTypeIRABIInfo::Kind::LoadableStruct:
+        if (abiInfo->getSILTypeProperties().isTrivial())
+          return handleTrivial(type, properties);
+        return new (TC) MiscNontrivialTypeLowering(type, properties, Expansion);
+      case irgen::HiddenTypeIRABIInfo::Kind::AddressOnlyStruct:
+        return handleAddressOnly(type, properties);
+      case irgen::HiddenTypeIRABIInfo::Kind::ReferenceType:
+        return handleReference(type, properties);
+      case irgen::HiddenTypeIRABIInfo::Kind::ResilientStruct:
+      case irgen::HiddenTypeIRABIInfo::Kind::NonFixedStruct:
+        return handleAddressOnly(type, properties);
+      }
+    }
+
     // WARNING: when the specification of trivial types changes, also update
     // the isValueTrivial() API used by SILCombine.
     TypeLowering *visitAnyEnumType(CanType enumType,
@@ -3547,6 +3593,12 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             // top-level -> justified to be trivial and non-conformant  -> false
             // leaf      -> must not be responsible for non-conformance -> true
             return !isTopLevel;
+          }
+
+          if (isa<HiddenTypeLayoutInfoType>(ty)) {
+            // HiddenTypes are not automatically provided a synthesized BitwiseCopyable
+            // conformance, so it is expected that they lack the conformance even if trivial.
+            return false;
           }
 
           // ReferenceStorageTypes with unmanaged ownership do not themselves

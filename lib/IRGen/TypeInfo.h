@@ -38,6 +38,11 @@ namespace llvm {
 }
 
 namespace swift {
+  class ASTContext;
+
+namespace irgen {
+  class HiddenTypeIRABIInfo;
+} // end namespace irgen
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
   class SILType;
@@ -102,7 +107,7 @@ protected:
     uint64_t OpaqueBits;
 
     SWIFT_INLINE_BITFIELD_BASE(TypeInfo,
-                             bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+1+1+3+1+1,
+                             bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+1+1+4+1+1,
       /// The kind of supplemental API this type has, if any.
       Kind : bitmax(NumSpecialTypeInfoKindBits,8),
 
@@ -125,7 +130,7 @@ protected:
       /// distinguishing between different TypeInfos that all implement the same
       /// kind of type.
       /// FIXME -- Create TypeInfoNodes.def and get rid of this field.
-      SubclassKind : 3,
+      SubclassKind : 4,
 
       /// Whether this type can be assumed to have a fixed size from all
       /// resilience domains.
@@ -151,7 +156,7 @@ protected:
   } Bits;
   // clang-format on
 
-  enum { InvalidSubclassKind = 0x7 };
+  enum { InvalidSubclassKind = 0xF };
 
   TypeInfo(llvm::Type *Type, Alignment A, IsTriviallyDestroyable_t pod,
            IsBitwiseTakable_t bitwiseTakable,
@@ -629,6 +634,14 @@ public:
 
   void callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
                            Atomicity atomicity) const;
+
+  /// Produce a HiddenTypeIRABIInfo capturing the ABI layout of this TypeInfo,
+  /// suitable for serialization into a swiftmodule so that client modules
+  /// can reconstruct a TypeInfo without seeing the full type definition.
+  /// Returns nullptr if conversion is not supported for this TypeInfo.
+  virtual irgen::HiddenTypeIRABIInfo *getHiddenTypeIRABIInfo(ASTContext &ctx) const {
+    return nullptr;
+  }
 };
 
 } // end namespace irgen

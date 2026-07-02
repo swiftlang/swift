@@ -122,6 +122,11 @@ case TypeKind::Id:
     case TypeKind::Meet:
       return t;
 
+    case TypeKind::HiddenTypeLayoutInfo:
+      // TODO: When HiddenTypeLayoutInfoType carries generic args or a
+      // parent type, we need to transform those components here.
+      return t;
+
     // BuiltinGenericType subclasses
     case TypeKind::BuiltinBorrow:
     case TypeKind::BuiltinFixedArray: {

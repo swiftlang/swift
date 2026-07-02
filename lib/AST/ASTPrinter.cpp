@@ -3427,6 +3427,10 @@ void PrintAST::visitUsingDecl(UsingDecl *decl) {
   }
 }
 
+void PrintAST::visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *decl) {
+  Printer << "/* hidden type layout */";
+}
+
 void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
   PrintOptions::OverrideScope scope(Options);
   OVERRIDE_PRINT_OPTION(scope, FullyQualifiedTypesIfAmbiguous,
@@ -6678,6 +6682,11 @@ public:
     } else {
       Printer << "_";
     }
+  }
+
+  void visitHiddenTypeLayoutInfoType(HiddenTypeLayoutInfoType *T,
+                             NonRecursivePrintOptions nrOptions) {
+    Printer << "<<hidden layout type>>";
   }
 
   void visitErrorUnionType(ErrorUnionType *T,

@@ -103,6 +103,13 @@ bool areCompatible(const llvm::Triple &moduleTarget,
 } // namespace serialization
 } // namespace swift
 
+void ModuleFile::populateHiddenTypeFallbackMap(std::shared_ptr<const ModuleFileSharedCore> core) {
+  auto fallbackData = core->HiddenTypeFallbackTableData;
+  for (unsigned i = 0; i + 1 < fallbackData.size(); i += 2)
+    HiddenTypeFallbackMap[static_cast<uint32_t>(fallbackData[i])] =
+        static_cast<uint32_t>(fallbackData[i + 1]);
+}
+
 ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
     : Core(core) {
   assert(!core->hasError());
@@ -133,6 +140,9 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(GenericEnvironments, core->GenericEnvironments);
   allocateBuffer(SubstitutionMaps, core->SubstitutionMaps);
   allocateBuffer(Identifiers, core->Identifiers);
+  allocateBuffer(HiddenTypeLayoutInfoDecls, core->HiddenTypeLayoutInfoDecls);
+
+  populateHiddenTypeFallbackMap(core);
 }
 
 bool ModuleFile::allowCompilerErrors() const {

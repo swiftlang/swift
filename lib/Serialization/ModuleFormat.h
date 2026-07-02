@@ -58,8 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR =
-    1007; // per-argument SILLocations on apply
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1011; // add hidden resilient struct record
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2704,6 +2703,34 @@ namespace decls_block {
                                            BCFixed<3>,  // threading model
                                            BCBlob>;     // IID/CLSID
 
+  // Layout information added in future commits
+  using HiddenStructTypeLayoutDescriptorLayout = BCRecordLayout<
+    HIDDEN_STRUCT_TYPE,
+    BCFixed<3>,        // type info kind
+    BCFixed<1>,        // isCopyable
+    BCFixed<1>,        // isKnownABIAccessible
+    BCVBR<16>,         // SILTypeProperties raw flags
+    IdentifierIDField, // mangled type name
+    DeclIDField,       // parent decl
+    BCArray<TypeIDField> // field type IDs
+  >;
+
+  using HiddenReferenceTypeLayoutDescriptorLayout = BCRecordLayout<
+    HIDDEN_REFERENCE_TYPE,
+    BCFixed<8>,        // reference counting kind
+    BCVBR<16>,         // SILTypeProperties raw flags
+    IdentifierIDField,  // mangled type name
+    DeclIDField       // parent decl
+  >;
+
+  using HiddenResilientStructTypeLayoutDescriptorLayout = BCRecordLayout<
+    HIDDEN_RESILIENT_STRUCT_TYPE,
+    BCFixed<1>,        // isCopyable
+    BCFixed<1>,        // isKnownABIAccessible
+    BCVBR<16>,         // SILTypeProperties raw flags
+    IdentifierIDField,  // mangled type name
+    DeclIDField       // parent decl
+  >;
   // clang-format on
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT
@@ -2806,7 +2833,10 @@ namespace index_block {
     SUBSTITUTION_MAP_OFFSETS,
     CLANG_TYPE_OFFSETS,
     EXPORTED_PRESPECIALIZATION_DECLS,
-    LastRecordKind = EXPORTED_PRESPECIALIZATION_DECLS,
+
+    HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS,
+    HIDDEN_TYPE_FALLBACK_TABLE,
+    LastRecordKind = HIDDEN_TYPE_FALLBACK_TABLE,
   };
 
   constexpr const unsigned RecordIDFieldWidth = 5;

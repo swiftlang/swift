@@ -65,6 +65,10 @@ class PointerAuthQualifier;
 } // end namespace clang
 
 namespace swift {
+namespace irgen {
+  class HiddenTypeIRABIInfo;
+  class HiddenStructTypeIRABIInfo;
+} // end namespace irgen
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
   class ApplyExpr;
@@ -10030,6 +10034,68 @@ public:
   }
   static bool classof(const FreestandingMacroExpansion *expansion) {
     return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Decl;
+  }
+};
+
+
+/// Represents one piece of a serialized cross-reference path, allowing
+/// HiddenTypeLayoutInfoDecl to re-emit an XREF to the original type.
+struct XRefTypePathPiece {
+  Identifier Name;
+  bool InProtocolExt;
+  bool ImportedFromClang;
+};
+
+/// Represents a type which can't be resolved as its defining module is not available,
+/// but for which we still have layout information. This is expected to happen when
+/// a module @_implementationOnly imports a type, and that type contributes to the module's ABI.
+///
+/// Clients still need to be able to manipulate the type in memory, but may not have access
+/// to its complete definition. These are created when XREF resolution fails and a fallback
+/// hidden representation is included in the module.
+class HiddenTypeLayoutInfoDecl final : public TypeDecl {
+  friend class Decl;
+
+  irgen::HiddenTypeIRABIInfo *ABIInfo = nullptr;
+  TypeDecl *ParentDecl = nullptr;
+
+  /// The original module name from the failed XREF, used to re-emit
+  /// an XREF during transitive re-serialization.
+  Identifier OriginalModuleName;
+
+  /// The original XREF path pieces from the failed XREF.
+  ArrayRef<XRefTypePathPiece> OriginalXRefPath;
+
+  HiddenTypeLayoutInfoDecl(DeclContext *DC)
+      : TypeDecl(DeclKind::HiddenTypeLayoutInfo, DC, Identifier(), SourceLoc(), {}) {
+    setImplicit();
+  }
+
+  SourceLoc getLocFromSource() const { return SourceLoc(); }
+
+public:
+  static HiddenTypeLayoutInfoDecl *create(ASTContext &ctx, DeclContext *DC);
+
+  irgen::HiddenTypeIRABIInfo *getABIInfo() const { return ABIInfo; }
+  void setABIInfo(irgen::HiddenTypeIRABIInfo *info) { ABIInfo = info; }
+
+  TypeDecl *getParentDecl() const { return ParentDecl; }
+  void setParentDecl(TypeDecl *parent) { ParentDecl = parent; }
+
+  Identifier getOriginalModuleName() const { return OriginalModuleName; }
+  void setOriginalModuleName(Identifier name) { OriginalModuleName = name; }
+
+  ArrayRef<XRefTypePathPiece> getOriginalXRefPath() const {
+    return OriginalXRefPath;
+  }
+  void setOriginalXRefPath(ASTContext &ctx, ArrayRef<XRefTypePathPiece> path);
+
+  bool hasOriginalXRefInfo() const { return !OriginalModuleName.empty(); }
+
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::HiddenTypeLayoutInfo;
   }
 };
 

@@ -828,6 +828,7 @@ public:
     case DeclKind::Macro:
     case DeclKind::MacroExpansion:
     case DeclKind::Using:
+    case DeclKind::HiddenTypeLayoutInfo:
       return false;
     case DeclKind::Missing:
       llvm_unreachable("missing decl should not show up here");
@@ -941,6 +942,7 @@ public:
   UNINTERESTING_DECL(TopLevelCode)
   UNINTERESTING_DECL(Value)
   UNINTERESTING_DECL(Using)
+  UNINTERESTING_DECL(HiddenTypeLayoutInfo)
 
 #undef UNINTERESTING_DECL
 };
