@@ -2202,11 +2202,25 @@ namespace {
       unsigned extraInhabitantCount = getFixedExtraInhabitantCount(IGF.IGM);
       if (!tagBits ||
           ElementsWithNoPayload.size() != extraInhabitantCount + 1) {
-        payloadResult = payload.emitCompare(
-            IGF,
-            extraInhabitantCount == 0 ? APInt::getAllOnes(PayloadBitCount)
-                                      : ti.getFixedExtraInhabitantMask(IGF.IGM),
-            payloadTag);
+        // When the no-payload case is represented using an extra inhabitant of
+        // the payload, only the bits that actually carry the extra-inhabitant
+        // discriminator are significant; the remaining payload bits may hold
+        // arbitrary garbage (e.g. a value produced by the runtime value
+        // witness, which only sets the spare bits). Mask the comparison to the
+        // payload's extra-inhabitant mask in that case. The all-ones
+        // (whole-value) mask is only correct when the payload has no extra
+        // inhabitants of its own -- it must not be selected merely because
+        // *this* enum has exhausted its own residual extra inhabitants (which
+        // can happen for deeply nested optionals), since the no-payload case is
+        // still extra-inhabitant encoded.
+        unsigned payloadExtraInhabitantCount =
+            ti.getFixedExtraInhabitantCount(IGF.IGM);
+        payloadResult =
+            payload.emitCompare(IGF,
+                                payloadExtraInhabitantCount == 0
+                                    ? APInt::getAllOnes(PayloadBitCount)
+                                    : ti.getFixedExtraInhabitantMask(IGF.IGM),
+                                payloadTag);
       }
 
       // If any tag bits are present, they must match.
