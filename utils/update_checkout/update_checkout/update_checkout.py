@@ -177,10 +177,11 @@ def get_branch_for_repo(
 
 
 def update_single_repository(pool_args: UpdateArguments):
-    verbose = pool_args.verbose
+    args = pool_args.args
+    verbose = args.verbose
     repo_name = pool_args.repo_name
 
-    repo_path = pool_args.source_root.joinpath(repo_name)
+    repo_path = args.source_root.joinpath(repo_name)
     if not repo_path.is_dir() or repo_path.is_symlink():
         return
 
@@ -190,15 +191,15 @@ def update_single_repository(pool_args: UpdateArguments):
             print(f"{prefix}Updating '{repo_path}'")
 
         fetch_extra_args = []
-        if pool_args.skip_history:
+        if args.skip_history:
             fetch_extra_args.extend(["--depth", "1"])
-        if pool_args.partial_clone:
+        if args.partial_clone:
             fetch_extra_args.extend(["--filter", "blob:none"])
 
         cross_repo = False
         checkout_target = None
-        if pool_args.tag:
-            checkout_target = confirm_tag_in_repo(repo_path, pool_args.tag, repo_name)
+        if args.tag:
+            checkout_target = confirm_tag_in_repo(repo_path, args.tag, repo_name)
         elif pool_args.scheme_name:
             checkout_target, cross_repo = get_branch_for_repo(
                 repo_path,
@@ -218,21 +219,21 @@ def update_single_repository(pool_args: UpdateArguments):
         #   changes rather than discarding them)
         # 2. delete ignored files
         # 3. abort an ongoing rebase
-        if pool_args.clean or pool_args.stash:
+        if args.clean or args.stash:
 
-            def run_for_repo_and_each_submodule_rec(args: List[str]):
-                Git.run(repo_path, args, echo=verbose, prefix=prefix)
+            def run_for_repo_and_each_submodule_rec(cmd: List[str]):
+                Git.run(repo_path, cmd, echo=verbose, prefix=prefix)
                 Git.run(
                     repo_path,
-                    ["submodule", "foreach", "--recursive", "git"] + args,
+                    ["submodule", "foreach", "--recursive", "git"] + cmd,
                     echo=verbose,
                     prefix=prefix,
                 )
 
-            if pool_args.stash:
+            if args.stash:
                 # Stash tracked and untracked changes.
                 run_for_repo_and_each_submodule_rec(["stash", "-u"])
-            elif pool_args.clean:
+            elif args.clean:
                 # Delete tracked changes.
                 run_for_repo_and_each_submodule_rec(["reset", "--hard", "HEAD"])
 
@@ -351,7 +352,7 @@ def update_single_repository(pool_args: UpdateArguments):
 
         # If we were asked to reset to the specified branch, do the hard
         # reset and return.
-        if checkout_target and pool_args.reset_to_remote and not cross_repo:
+        if checkout_target and args.reset_to_remote and not cross_repo:
             full_target = full_target_name(repo_path, "origin", checkout_target)
             Git.run(
                 repo_path, ["reset", "--hard", full_target], echo=verbose, prefix=prefix
@@ -550,10 +551,12 @@ def update_all_repositories(
     scheme_name: str,
     scheme_map: Optional[Dict[str, Any]],
     cross_repos_pr: Dict[str, str],
+    extra_skip_repository_list: Optional[List[str]] = None,
 ) -> Tuple[List[SkippedReason], List[Union[Exception, None]]]:
     skipped_repositories = []
     pool_args: List[UpdateArguments] = []
     timestamp = get_timestamp_to_match(args.match_timestamp, args.source_root)
+    extra_skip = set(extra_skip_repository_list or [])
     for repo_name in config["repos"].keys():
         if repo_name in args.skip_repository_list:
             skipped_repositories.append(
@@ -562,6 +565,9 @@ def update_all_repositories(
                     "requested by user",
                 )
             )
+            continue
+
+        if repo_name in extra_skip:
             continue
 
         # If the repository is not listed in the branch-scheme, skip it.
@@ -577,21 +583,14 @@ def update_all_repositories(
             continue
 
         my_args = UpdateArguments(
-            source_root=args.source_root,
+            args=args,
             config=config,
             repo_name=repo_name,
             scheme_name=scheme_name,
             scheme_map=scheme_map,
-            tag=args.tag,
             timestamp=timestamp,
-            reset_to_remote=args.reset_to_remote,
-            clean=args.clean,
-            stash=args.stash,
             cross_repos_pr=cross_repos_pr,
-            skip_history=args.skip_history,
-            partial_clone=args.partial_clone,
             output_prefix="Updating",
-            verbose=args.verbose,
         )
         pool_args.append(my_args)
 
@@ -612,7 +611,7 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
     args = pool_args.args
     repo_name = pool_args.repo_name
     repo_branch = pool_args.repo_branch
-    verbose = pool_args.verbose
+    verbose = args.verbose
     skip_tags = args.skip_tags
     remote = pool_args.remote
 
@@ -788,7 +787,6 @@ def obtain_all_additional_swift_sources(
 
         new_args = AdditionalSwiftSourcesArguments(
             args=args,
-            source_root=args.source_root,
             repo_name=repo_name,
             repo_info=repo_info,
             repo_branch=repo_branch,
@@ -796,7 +794,6 @@ def obtain_all_additional_swift_sources(
             scheme_name=scheme_name,
             skip_repository_list=skip_repository_list,
             output_prefix="Cloning",
-            verbose=args.verbose,
         )
 
         if args.use_submodules:
@@ -1038,32 +1035,34 @@ def main() -> int:
             SkippedReason.print_skipped_repositories(skipped_repositories, "clone")
 
         swift_repo_path = args.source_root.joinpath("swift")
-        if "swift" not in skip_repo_list and swift_repo_path.exists():
-            # Check if `swift` repo itself needs to switch to a cross-repo branch.
-            branch_name, cross_repo = get_branch_for_repo(
-                swift_repo_path,
-                config,
-                "swift",
-                scheme_name,
-                scheme_map,
-                cross_repos_pr,
+        swift_updated = False
+        if (
+            "swift" not in skip_repo_list
+            and "swift" not in args.skip_repository_list
+            and swift_repo_path.exists()
+        ):
+            print("Updating 'swift' first")
+            timestamp = get_timestamp_to_match(args.match_timestamp, args.source_root)
+            swift_pool_args = UpdateArguments(
+                args=args,
+                config=config,
+                repo_name="swift",
+                scheme_name=scheme_name,
+                scheme_map=scheme_map,
+                timestamp=timestamp,
+                cross_repos_pr=cross_repos_pr,
+                output_prefix="Updating",
             )
+            update_single_repository(swift_pool_args)
+            swift_updated = True
 
-            if cross_repo:
-                Git.run(
-                    swift_repo_path,
-                    ["checkout", branch_name],
-                    echo=True,
-                    prefix=output_prefix("swift"),
-                )
-
-                # Re-read the config after checkout.
-                config = {}
-                for config_path in args.configs:
-                    with open(config_path) as f:
-                        config = merge_config(config, json.load(f))
-                validate_config(config)
-                scheme_map = get_scheme_map(config, scheme_name)
+            # Re-read the config now that the swift checkout may have changed.
+            config = {}
+            for config_path in args.configs:
+                with open(config_path) as f:
+                    config = merge_config(config, json.load(f))
+            validate_config(config)
+            scheme_map = get_scheme_map(config, scheme_name)
 
         if args.dump_hashes:
             dump_repo_hashes(args, config)
@@ -1076,7 +1075,12 @@ def main() -> int:
         _check_missing_clones(args=args, config=config, scheme_map=scheme_map)
 
         skipped_repositories, update_results = update_all_repositories(
-            args, config, scheme_name, scheme_map, cross_repos_pr
+            args,
+            config,
+            scheme_name,
+            scheme_map,
+            cross_repos_pr,
+            extra_skip_repository_list=["swift"] if swift_updated else None,
         )
         SkippedReason.print_skipped_repositories(skipped_repositories, "update")
 

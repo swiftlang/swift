@@ -2,6 +2,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
+from update_checkout.cli_arguments import CliArguments
 from update_checkout.update_checkout import UpdateArguments
 from update_checkout.git_command import is_any_repository_locked
 
@@ -10,21 +11,14 @@ FAKE_PATH = Path("/fake_path")
 
 def _update_arguments_with_fake_path(repo_name: str, path: Path) -> UpdateArguments:
     return UpdateArguments(
+        args=CliArguments(source_root=path),
         repo_name=repo_name,
-        source_root=path,
         config={},
         scheme_name="",
         scheme_map=None,
-        tag="",
         timestamp=None,
-        reset_to_remote=False,
-        clean=False,
-        stash=False,
         cross_repos_pr={},
-        skip_history=False,
-        partial_clone=False,
         output_prefix="",
-        verbose=False,
     )
 
 

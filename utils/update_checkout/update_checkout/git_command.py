@@ -155,7 +155,7 @@ def is_any_repository_locked(pool_args: List[RunnerArguments]) -> Set[str]:
         Set[str]: The names of the locked repositories if any.
     """
 
-    repos = [(x.source_root, x.repo_name) for x in pool_args]
+    repos = [(x.args.source_root, x.repo_name) for x in pool_args]
     locked_repositories = set()
     for source_root, repo_name in repos:
         dot_git_path = source_root.joinpath(repo_name, ".git")
