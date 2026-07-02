@@ -1436,6 +1436,7 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::Enum:
   case ImportTypeKind::RecordField:
+  case ImportTypeKind::RecordFieldWithReferenceSemantics:
     return false;
   case ImportTypeKind::Result:
   case ImportTypeKind::AuditedResult:
@@ -1463,6 +1464,7 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::Result:
   case ImportTypeKind::Enum:
   case ImportTypeKind::RecordField:
+  case ImportTypeKind::RecordFieldWithReferenceSemantics:
     return false;
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::AuditedResult:
@@ -1775,7 +1777,8 @@ static ImportedType adjustTypeForConcreteImport(
   if (importKind == ImportTypeKind::Enum && importedType->isUnicodeScalar())
     importedType = impl.SwiftContext.getUInt32Type();
 
-  if (importKind == ImportTypeKind::RecordField &&
+  if ((importKind == ImportTypeKind::RecordField ||
+       importKind == ImportTypeKind::RecordFieldWithReferenceSemantics) &&
       !importedType->isForeignReferenceType()) {
     switch (objCLifetime) {
       // Wrap retainable struct fields in Unmanaged.
@@ -1787,16 +1790,19 @@ static ImportedType adjustTypeForConcreteImport(
           importedType = getUnmanagedType(impl, importedType);
         }
         break;
-      // FIXME: Eventually we might get C++-like support for strong pointers in
-      // structs, at which point we should really be checking the lifetime
-      // qualifiers.
       case clang::Qualifiers::OCL_Strong:
-        if (!impl.SwiftContext.LangOpts.EnableCXXInterop) {
+        if (!impl.SwiftContext.LangOpts.EnableCXXInterop &&
+            !impl.SwiftContext.LangOpts.hasFeature(
+                Feature::ImportCStructsWithArcFields)) {
           return {Type(), false};
         }
         break;
       case clang::Qualifiers::OCL_Weak:
-        return {Type(), false};
+        if (!impl.SwiftContext.LangOpts.hasFeature(
+                Feature::ImportCStructsWithArcFields)) {
+          return {Type(), false};
+        }
+        break;
       case clang::Qualifiers::OCL_Autoreleasing:
         llvm_unreachable("invalid Objective-C lifetime");
     }
