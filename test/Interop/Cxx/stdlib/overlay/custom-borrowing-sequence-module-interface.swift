@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=CustomBorrowingSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -module-cache-path %t -I %swift_src_root/lib/ClangImporter/SwiftBridging -enable-experimental-feature BorrowingSequence | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomBorrowingSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -module-cache-path %t -enable-experimental-feature BorrowingSequence | %FileCheck %s
 
 // REQUIRES: swift_feature_BorrowingSequence
 
