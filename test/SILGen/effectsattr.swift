@@ -1,6 +1,3 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -parse-stdlib %s
-
 // RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s
 
 
@@ -37,4 +34,3 @@ struct Mystr<T> {
   @_effects(escaping s.value** -> t.sf.value**)
   @_silgen_name("func7") func func7<T>(_ t: inout Mystr<T>, _ s: T) -> T { }
 }
-
