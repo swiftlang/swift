@@ -51,14 +51,11 @@ bb0(%0 : @owned $C):
 // =============================================================================
 // rdar://105887096: do not insert a retain inside a read-only function.
 //
-// A non-escaping (on-stack) closure passed to a [readonly] function can be specialized:
-// the closure's captures are passed as @guaranteed arguments, so no retain/copy is
-// introduced and the [readonly] effect is preserved. (This is reached by looking through
-// the closure's `mark_dependence` on its capture.)
+// A non-escaping (on-stack) closure can be specialized even for a [readonly] callee: its
+// captures are passed as @guaranteed arguments, so no retain is introduced.
 
-// The specialized function takes the capture @guaranteed (never @owned) and contains no
-// retain, so it remains [readonly]-safe. The closure is re-formed inside the specialized
-// function, so its `mark_dependence` is re-materialized on the @guaranteed capture argument.
+// The capture stays @guaranteed (never @owned) and the re-formed closure's mark_dependence
+// is re-materialized on the capture argument.
 // CHECK-LABEL: sil private [readonly] [ossa] @$s20takesReadOnlyClosure{{.*}}Tf1c_n : $@convention(thin) (@guaranteed Storage) -> Val {
 // CHECK:       [[PA:%[0-9]+]] = partial_apply [callee_guaranteed] [on_stack] {{%[0-9]+}}(%0)
 // CHECK:       mark_dependence [[PA]] on %0
@@ -78,11 +75,15 @@ bb0(%0 : $Val, %1 : @closureCapture @guaranteed $Storage):
   return %46 : $Val
 }
 
-// The closure is replaced by a direct call to the specialized function, passing the
-// capture @guaranteed (no @owned Storage, so no retain at the call site either).
+// The apply is rewritten to a direct call passing the capture @guaranteed; the dead closure
+// and its mark_dependence are deleted.
 // CHECK-LABEL: sil [ossa] @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
 // CHECK-NOT: @owned Storage
+// CHECK-NOT: partial_apply
+// CHECK-NOT: mark_dependence
 // CHECK: apply %{{.*}} : $@convention(thin) (@guaranteed Storage) -> Val
+// CHECK-NOT: partial_apply
+// CHECK-NOT: mark_dependence
 // CHECK-LABEL: } // end sil function 'testPassReadOnlyClosure'
 sil [ossa] @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
 bb0(%0 : @guaranteed $Storage):
