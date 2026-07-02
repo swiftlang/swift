@@ -147,7 +147,7 @@ internal final class _ContiguousArrayStorage<
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
     _internalInvariant(_isBridgedVerbatimToObjectiveC(Element.self))
-    let count = countAndCapacity.count
+    let count = unsafe countAndCapacity.count
     let elements = unsafe UnsafeRawPointer(_elementPointer)
       .assumingMemoryBound(to: AnyObject.self)
     defer { _fixLifetime(self) }
@@ -252,7 +252,7 @@ internal final class _ContiguousArrayStorage<
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> Void
   ) rethrows {
     if _isBridgedVerbatimToObjectiveC(Element.self) {
-      let count = countAndCapacity.count
+      let count = unsafe countAndCapacity.count
       let elements = unsafe UnsafeRawPointer(_elementPointer)
         .assumingMemoryBound(to: AnyObject.self)
       defer { _fixLifetime(self) }
@@ -267,7 +267,7 @@ internal final class _ContiguousArrayStorage<
     _internalInvariant(
       !_isBridgedVerbatimToObjectiveC(Element.self),
       "Verbatim bridging should be handled separately")
-    let count = countAndCapacity.count
+    let count = unsafe countAndCapacity.count
     let result = _BridgingBuffer(count)
     let resultPtr = unsafe result.baseAddress
     let p = unsafe _elementPointer
@@ -414,7 +414,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
 
     // We can initialize by assignment because _ArrayBody is a trivial type,
     // i.e. contains no references.
-    _storage.countAndCapacity = _ArrayBody(
+    unsafe _storage.countAndCapacity = _ArrayBody(
       count: count,
       capacity: capacity,
       elementTypeIsBridgedVerbatim: verbatim)
@@ -643,7 +643,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @inlinable
   internal var count: Int {
     get {
-      return _storage.countAndCapacity.count
+      return unsafe _storage.countAndCapacity.count
     }
     nonmutating set {
       _internalInvariant(newValue >= 0)
@@ -652,7 +652,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
         newValue <= mutableCapacity,
         "Can't grow an array buffer past its capacity")
 
-      mutableStorage.countAndCapacity.count = newValue
+      unsafe mutableStorage.countAndCapacity.count = newValue
     }
   }
   
@@ -662,7 +662,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal var immutableCount: Int {
-    return immutableStorage.countAndCapacity.count
+    return unsafe immutableStorage.countAndCapacity.count
   }
 
   /// The number of elements of the buffer.
@@ -672,7 +672,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   internal var mutableCount: Int {
     @inline(__always)
     get {
-      return mutableOrEmptyStorage.countAndCapacity.count
+      return unsafe mutableOrEmptyStorage.countAndCapacity.count
     }
     @inline(__always)
     nonmutating set {
@@ -682,7 +682,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
         newValue <= mutableCapacity,
         "Can't grow an array buffer past its capacity")
 
-      mutableStorage.countAndCapacity.count = newValue
+      unsafe mutableStorage.countAndCapacity.count = newValue
     }
   }
 
@@ -719,7 +719,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// Use `immutableCapacity` or `mutableCapacity` instead.
   @inlinable
   internal var capacity: Int {
-    return _storage.countAndCapacity.capacity
+    return unsafe _storage.countAndCapacity.capacity
   }
 
   /// The number of elements the buffer can store without reallocation.
@@ -728,7 +728,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal var immutableCapacity: Int {
-    return immutableStorage.countAndCapacity.capacity
+    return unsafe immutableStorage.countAndCapacity.capacity
   }
 
   /// The number of elements the buffer can store without reallocation.
@@ -737,7 +737,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal var mutableCapacity: Int {
-    return mutableOrEmptyStorage.countAndCapacity.capacity
+    return unsafe mutableOrEmptyStorage.countAndCapacity.capacity
   }
 
   /// Copy the elements in `bounds` from this buffer into uninitialized
