@@ -474,7 +474,7 @@ func oldThing() {}
 func newThing() {}
 
 func newThingClient() {
-    if #available(iOS 14.0, visionOS 1.0, *) {
+    if #available(iOS 14.0, *) {
         newThing()
     } else {
         oldThing()
