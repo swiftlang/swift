@@ -364,10 +364,15 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
     //   %3 = partial_apply %2(%1)      // re-abstraction
     //   apply %f(%3)
     // ```
-    if partialApply.isPartialApplyOfThunk,
-       let argumentClosure = findSpecializableClosure(of: partialApply.arguments[0], &visited, &capturedDependencies)
-    {
-      return argumentClosure
+    if partialApply.isPartialApplyOfThunk {
+      // Keep the recorded dependencies only if the thunk's argument provides the root closure;
+      // otherwise the thunk's partial_apply itself is tried as the root, below.
+      var argumentDependencies = [CapturedDependency]()
+      if let argumentClosure = findSpecializableClosure(of: partialApply.arguments[0], &visited,
+                                                        &argumentDependencies) {
+        capturedDependencies.append(contentsOf: argumentDependencies)
+        return argumentClosure
+      }
     }
     guard let callee = partialApply.referencedFunction,
           !partialApply.hasSubstitutions,
@@ -440,7 +445,8 @@ private struct SpecializationInfo {
   // appears multiple times in `closureArguments`, it's only added a single time here.
   let rootClosures: [PartialApplyInst]
 
-  // `mark_dependence`s whose base is a root-closure capture, redirected onto the capture's cast in `uniqueCaptureArguments`.
+  // `mark_dependence`s whose base is a root-closure capture. The base is redirected onto the
+  // capture's cast in `uniqueCaptureArguments`.
   let capturedDependencies: [CapturedDependency]
 
   // The function to specialize
@@ -767,7 +773,8 @@ private struct SpecializationInfo {
         let cast = builder.createUncheckedValueCast(from: capturedValue, to: capturedValue.type)
         argOp.set(to: cast, context)
 
-        // Redirect the mark_dependence base onto the same cast, so it stays unique alongside its capture.
+        // Redirect the mark_dependence base onto the same cast: the cloner only maps the cast to
+        // the capture argument, and a shared base must follow its own closure's capture.
         for dependency in capturedDependencies
         where dependency.closure == closure && dependency.markDependence.base == capturedValue {
           dependency.markDependence.baseOperand.set(to: cast, context)

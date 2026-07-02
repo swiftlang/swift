@@ -1035,7 +1035,15 @@ deadMarkDependenceUser(SILInstruction *inst,
     return false;
   deleteInsts.push_back(inst);
   for (auto *use : cast<SingleValueInstruction>(inst)->getUses()) {
-    if (!deadMarkDependenceUser(use->getUser(), deleteInsts))
+    SILInstruction *user = use->getUser();
+    // In OSSA, destroys of the closure are on the forwarded mark_dependence
+    // value; accept them like the destroys of the partial_apply itself.
+    if (isa<DeallocStackInst>(user) || isa<DebugValueInst>(user) ||
+        isa<DestroyValueInst>(user)) {
+      deleteInsts.push_back(user);
+      continue;
+    }
+    if (!deadMarkDependenceUser(user, deleteInsts))
       return false;
   }
   return true;
@@ -1155,7 +1163,8 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     return false;
 
   // A stack allocated partial apply does not have any release users. Delete it
-  // if the only users are the dealloc_stack and mark_dependence instructions.
+  // if the only users are dealloc_stack, debug_value and destroy_value
+  // instructions, either directly or forwarded through mark_dependence.
   if (pa && pa->isOnStack()) {
     SmallVector<SILInstruction *, 8> deleteInsts;
     for (auto *use : pa->getUses()) {

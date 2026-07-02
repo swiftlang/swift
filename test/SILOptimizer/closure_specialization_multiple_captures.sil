@@ -1,8 +1,7 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -closure-specialization %s | %FileCheck %s
 
-// A value captured more than once by a non-escaping closure must still be specialized.
-// `uniqueCaptureArguments` gives each capture its own identity cast and redirects the
-// `mark_dependence` base onto that cast, so cloning maps each captured value exactly once.
+// A value captured more than once, with a mark_dependence on it, must still be specialized:
+// uniqueCaptureArguments redirects the mark_dependence base onto the capture's identity cast.
 
 import Builtin
 
@@ -18,7 +17,7 @@ bb0(%0 : @guaranteed $@noescape @callee_guaranteed (Val) -> Val):
 }
 
 // %0 is captured twice; the specialized function takes it as two @guaranteed arguments and
-// re-materializes the `mark_dependence` on the first one.
+// re-materializes the mark_dependence on the first one.
 // CHECK-LABEL: sil {{.*}}@$s12takesClosure{{.*}}Tf1c_n : $@convention(thin) (@guaranteed Storage, @guaranteed Storage) -> Val {
 // CHECK:       [[PA:%[0-9]+]] = partial_apply [callee_guaranteed] [on_stack] {{%[0-9]+}}(%0, %1)
 // CHECK:       mark_dependence [[PA]] on %0
@@ -29,11 +28,14 @@ bb0(%0 : $Val, %1 : @closureCapture @guaranteed $Storage, %2 : @closureCapture @
   return %r : $Val
 }
 
-// The closure is specialized away: a direct call passing the capture twice, with no residual
-// `partial_apply` / `mark_dependence` at the call site.
+// The apply is rewritten to a direct call passing the capture twice; the dead closure and its
+// mark_dependence are deleted.
 // CHECK-LABEL: sil [ossa] @testMultiplyCaptured : $@convention(method) (@guaranteed Storage) -> Val {
+// CHECK-NOT:   partial_apply
+// CHECK-NOT:   mark_dependence
 // CHECK:       [[F:%[0-9]+]] = function_ref @$s12takesClosure{{.*}}Tf1c_n
 // CHECK:       apply [[F]](%0, %0)
+// CHECK-NOT:   partial_apply
 // CHECK-NOT:   mark_dependence
 // CHECK-LABEL: } // end sil function 'testMultiplyCaptured'
 sil [ossa] @testMultiplyCaptured : $@convention(method) (@guaranteed Storage) -> Val {
