@@ -3,11 +3,9 @@
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
 // RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
-// RUN:     -enable-experimental-feature BorrowingForLoop \
 // RUN:     -enable-experimental-feature BorrowingSequence \
 // RUN:     %s | %FileCheck %s
 
-// REQUIRES: swift_feature_BorrowingForLoop
 // REQUIRES: swift_feature_BorrowingSequence
 
 struct NoncopyableInt: ~Copyable {
