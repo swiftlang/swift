@@ -10015,10 +10015,10 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
   auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
   auto isBorrowing =
-      shouldUseBorrowingSequence(ctx, seqTy, isAsync, anchor.getStartLoc(), DC);
+      shouldUseIterable(ctx, seqTy, isAsync, anchor.getStartLoc(), DC);
 
   if (isBorrowing) {
-    seqProto = ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
+    seqProto = ctx.getProtocol(KnownProtocolKind::Iterable);
   }
 
   auto *contextualLoc = getConstraintLocator(
