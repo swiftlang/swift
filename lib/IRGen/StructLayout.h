@@ -100,13 +100,17 @@ public:
     /// The element is an object lacking a fixed size but located at
     /// offset zero.  This is necessary because LLVM forbids even a
     /// 'gep 0' on an unsized type.
-    InitialNonFixedSize
+    InitialNonFixedSize,
+
+    /// The element has fixed offset and size, but doesn't store anything,
+    /// e.g. empty C++ struct
+    Hollow
 
     // IncompleteKind comes here
   };
 
 private:
-  enum : unsigned { IncompleteKind  = unsigned(Kind::InitialNonFixedSize) + 1 };
+  enum : unsigned { IncompleteKind = unsigned(Kind::Hollow) + 1 };
 
   /// The swift type information for this element's layout.
   const TypeInfo *Type;
@@ -199,6 +203,17 @@ public:
     Index = nonFixedElementIndex;
   }
 
+  void completeHollow(IsTriviallyDestroyable_t isTriviallyDestroyable,
+                      Size byteOffset, unsigned structIndex) {
+    TheKind = unsigned(Kind::Hollow);
+    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
+    ByteOffset = byteOffset.getValue();
+    ByteOffsetForLayout = ByteOffset;
+    Index = structIndex;
+
+    ASSERT(getByteOffset() == byteOffset);
+  }
+
   const TypeInfo &getType() const { return *Type; }
 
   Kind getKind() const {
@@ -210,6 +225,14 @@ public:
   bool isEmpty() const {
     return getKind() == Kind::Empty ||
            getKind() == Kind::EmptyTailAllocatedCType;
+  }
+
+  /// Is this element known to be empty, or to contribute nothing to the
+  /// explosion/schema of the Element
+  bool isEmptyOrHollow() const {
+    return getKind() == Kind::Empty ||
+           getKind() == Kind::EmptyTailAllocatedCType ||
+           getKind() == Kind::Hollow;
   }
 
   /// Is this element known to be POD?
@@ -224,6 +247,7 @@ public:
     case Kind::Empty:
     case Kind::EmptyTailAllocatedCType:
     case Kind::Fixed:
+    case Kind::Hollow:
       return true;
 
     // FIXME: InitialNonFixedSize should go in the above, but I'm being
@@ -255,7 +279,8 @@ public:
   /// Given that this element has a fixed offset, return the index in
   /// the LLVM struct.
   unsigned getStructIndex() const {
-    assert(isCompleted() && getKind() == Kind::Fixed);
+    assert(isCompleted() &&
+           (getKind() == Kind::Fixed || getKind() == Kind::Hollow));
     return Index;
   }
 

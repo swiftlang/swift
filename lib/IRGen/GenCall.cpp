@@ -56,6 +56,7 @@
 #include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenProto.h"
+#include "GenStruct.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -2783,6 +2784,11 @@ irgen::getCoroFunctionValues(IRGenFunction &IGF,
   return {fn, size, typeID};
 }
 
+static void
+emitClangRecordCallResult(IRGenFunction &IGF, const LoadableTypeInfo &recordTI,
+                          llvm::Value *result, Address indirectReturn,
+                          bool convertDirectToIndirectReturn, Explosion &out);
+
 namespace {
 
 class SyncCallEmission final : public CallEmission {
@@ -3098,6 +3104,11 @@ public:
     if (expectedNativeResultType->isVoidTy())
       return;
     if (result->getType() != expectedNativeResultType) {
+      if (auto *recordTI = getAsLoadableCXXRecord(IGF.IGM, resultType)) {
+        emitClangRecordCallResult(IGF, *recordTI, result, indirectReturnAddress,
+                                  convertDirectToIndirectReturn, out);
+        return;
+      }
       result =
           IGF.coerceValue(result, expectedNativeResultType, IGF.IGM.DataLayout);
     }
@@ -4800,6 +4811,34 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
                          [](auto i) { return i; });
     out = nativeSchema.mapFromNative(IGF.IGM, IGF, resultExplosion, resultType);
   }
+}
+
+static void
+emitClangRecordCallResult(IRGenFunction &IGF, const LoadableTypeInfo &recordTI,
+                          llvm::Value *result, Address indirectReturn,
+                          bool convertDirectToIndirectReturn, Explosion &out) {
+  auto *returnTy = result->getType();
+
+  if (convertDirectToIndirectReturn) {
+    Address indirectAddr =
+        IGF.Builder.CreateElementBitCast(indirectReturn, returnTy);
+    IGF.Builder.CreateStore(result, indirectAddr);
+    return;
+  }
+
+  auto *storageTy = recordTI.getStorageType();
+  StackAddress temporary =
+      allocateForCoercion(IGF, returnTy, storageTy, "clang.record.return");
+
+  Address coercionAddr =
+      IGF.Builder.CreateElementBitCast(temporary.getAddress(), returnTy);
+  IGF.Builder.CreateStore(result, coercionAddr);
+
+  Address storageAddr =
+      IGF.Builder.CreateElementBitCast(temporary.getAddress(), storageTy);
+  recordTI.loadAsTake(IGF, storageAddr, out);
+
+  IGF.emitDeallocateStaticAlloca(temporary);
 }
 
 void CallEmission::setKeyPathAccessorArguments(Explosion &in, bool isOutlined,
