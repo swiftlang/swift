@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend  -I %t/Inputs -emit-sil -verify %t/globals.swift -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -diagnostic-style llvm
+// RUN: %target-swift-frontend  -I %t/Inputs -emit-sil -verify %t/escaping_scopes.swift -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -diagnostic-style llvm
 
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_Lifetimes
@@ -217,6 +217,41 @@ NonEscapableHasAnonUnionNonEscapable makeNonEscapableHasAnonUnionNonEscapable(
     return result;
 }
 
+// Non-trivial owner: field access opens a formal access scope.
+struct NonTrivialOwner {
+    int data;
+    NonTrivialOwner() : data(0) {}
+    NonTrivialOwner(const NonTrivialOwner &other) : data(other.data) {}
+    View handOutView() const [[clang::lifetimebound]] {
+        return View(&data);
+    }
+};
+
+// Transitive: a value type whose field is itself an owner.
+struct OwnerBox {
+    NonTrivialOwner field;
+};
+
+class SharedTrivialOwner {
+public:
+    Owner field;
+} SWIFT_SHARED_REFERENCE(retainSharedTrivialOwner, releaseSharedTrivialOwner);
+inline void retainSharedTrivialOwner(SharedTrivialOwner *) {}
+inline void releaseSharedTrivialOwner(SharedTrivialOwner *) {}
+
+class SharedOwner {
+public:
+    NonTrivialOwner field;
+} SWIFT_SHARED_REFERENCE(retainSharedOwner, releaseSharedOwner);
+inline void retainSharedOwner(SharedOwner *) {}
+inline void releaseSharedOwner(SharedOwner *) {}
+
+class SharedOwnerBox {
+public:
+    OwnerBox field;
+} SWIFT_SHARED_REFERENCE(retainSharedOwnerBox, releaseSharedOwnerBox);
+inline void retainSharedOwnerBox(SharedOwnerBox *) {}
+inline void releaseSharedOwnerBox(SharedOwnerBox *) {}
 
 // CHECK: sil {{.*}}[clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil {{.*}}[clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
@@ -278,7 +313,7 @@ func anonymousUnionsAndStructs(_ v: borrowing View) {
     let _ = makeNonEscapableHasAnonUnionNonEscapable(o)
 }
 
-//--- globals.swift
+//--- escaping_scopes.swift
 
 import Test
 
@@ -316,5 +351,66 @@ func viaFieldFreeFunc() -> View {
   return getView(globalWrapper.o)
   // expected-error @-1 {{lifetime-dependent value escapes its scope}}
   // expected-note @-2 {{it depends on this scoped access to variable 'globalWrapper'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+final class SwiftBoxTrivial { var field = Owner(data: 0) }
+final class SwiftBoxOwner { var field = NonTrivialOwner() }
+final class SwiftBoxNested { var field = OwnerBox() }
+
+// Foreign reference type base, trivial field.
+@available(macOS 13.3, *)
+@_lifetime(borrow x)
+func frtTrivialField(x: SharedTrivialOwner) -> View {
+  return x.field.handOutView()
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'field'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// Foreign reference type base, non-trivial field.
+@available(macOS 13.3, *)
+@_lifetime(borrow x)
+func frtField(x: SharedOwner) -> View {
+  return x.field.handOutView()
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'field'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// Foreign reference type base, transitive field access.
+@available(macOS 13.3, *)
+@_lifetime(borrow x)
+func frtTransitiveField(x: SharedOwnerBox) -> View {
+  return x.field.field.handOutView()
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'field'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// Swift class base, trivial field.
+@_lifetime(borrow b)
+func classTrivialField(b: SwiftBoxTrivial) -> View {
+  return b.field.handOutView()
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'field'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// Swift class base, non-trivial field.
+@_lifetime(borrow b)
+func classField(b: SwiftBoxOwner) -> View {
+  return b.field.handOutView()
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'field'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// Swift class base, transitive field access.
+@_lifetime(borrow b)
+func classTransitiveField(b: SwiftBoxNested) -> View {
+  return b.field.field.handOutView()
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'field'}}
   // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
 }
