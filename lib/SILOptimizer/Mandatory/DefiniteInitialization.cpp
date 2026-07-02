@@ -35,7 +35,6 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
@@ -43,9 +42,6 @@
 
 using namespace swift;
 using namespace ownership;
-
-STATISTIC(NumInstScansDuringLivenessQueries,
-          "# of instructions scanned while computing `getLivenessAtInst()`");
 
 llvm::cl::opt<bool> TriggerUnreachableOnFailure(
     "sil-di-assert-on-failure", llvm::cl::init(false),
@@ -286,6 +282,10 @@ namespace {
     /// plus the information merged-in from the predecessor blocks.
     std::optional<DIKind> OutSelfInitialized;
 
+    /// For each element, the earliest instruction that defines it within this
+    /// block.
+    SmallVector<SILInstruction *, 0> EarliestDefs;
+
     LiveOutBlockState() { init(0); }
 
     void init(unsigned NumElements) {
@@ -415,6 +415,8 @@ namespace {
     /// This is a map of uses that are not loads (i.e., they are Stores,
     /// InOutUses, and Escapes), to their entry in Uses.
     llvm::SmallDenseMap<SILInstruction*, SmallVector<unsigned, 1>, 16> NonLoadUses;
+
+    std::optional<InstructionIndices> InstIndices;
 
     /// This is true when there is an ambiguous store, which may be an init or
     /// assign, depending on the CFG path.
@@ -611,6 +613,38 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   // locally inferred by the loop above.  Mark any unset elements as not
   // available.
   MemBBInfo.setUnknownToNotAvailable();
+
+  // Build per-block earliest-definition indices for all blocks with non-load
+  // uses. This enables O(1) lookups in getLivenessAtInst.
+  InstIndices.emplace(&F);
+  {
+    unsigned NumElements = TheMemory.getNumElements();
+    for (auto &BB : F) {
+      auto &BBInfo = getBlockInfo(&BB);
+      if (!BBInfo.HasNonLoadUse)
+        continue;
+
+      BBInfo.EarliestDefs.assign(NumElements, nullptr);
+
+      for (auto &I : BB) {
+        auto It = NonLoadUses.find(&I);
+        if (It == NonLoadUses.end())
+          continue;
+
+        // For each element this instruction defines, record it as the earliest
+        // definition if we haven't seen one yet.
+        for (unsigned UseIdx : It->second) {
+          auto &TheUse = Uses[UseIdx];
+          for (unsigned Elt = TheUse.FirstElement,
+                        End = TheUse.FirstElement + TheUse.NumElements;
+               Elt != End; ++Elt) {
+            if (!BBInfo.EarliestDefs[Elt])
+              BBInfo.EarliestDefs[Elt] = &I;
+          }
+        }
+      }
+    }
+  }
 
   // Finally, check if we need to emit compatibility diagnostics for cross-module
   // non-delegating struct initializers.
@@ -3658,43 +3692,46 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
   SmallBitVector NeededElements(TheMemory.getNumElements());
   NeededElements.set(FirstElt, FirstElt+NumElts);
   
-  // If there is a store in the current block, scan the block to see if the
-  // store is before or after the load.  If it is before, it may produce some of
-  // the elements we are looking for.
-  if (getBlockInfo(InstBB).HasNonLoadUse) {
-    for (auto BBI = Inst->getIterator(), E = InstBB->begin(); BBI != E;) {
-      ++NumInstScansDuringLivenessQueries;
-      --BBI;
-      SILInstruction *TheInst = &*BBI;
+  auto &BBInfo = getBlockInfo(InstBB);
+  if (BBInfo.HasNonLoadUse) {
+    unsigned InstPos = InstIndices->get(Inst);
 
-      // If we found the allocation itself, then we are loading something that
-      // is not defined at all yet.  Scan no further.
-      if (TheInst == TheMemory.getUninitializedValue()) {
-        // The result is perfectly decided locally.
+    // For TheMemory's block, check if Inst is at or before the defining
+    // instruction. If so, all needed elements are uninitialized.
+    if (InstBB == TheMemory.getParentBlock()) {
+      unsigned MemPos = InstIndices->get(TheMemory.getUninitializedValue());
+      if (InstPos <= MemPos) {
         for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i)
           Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
         return Result;
       }
+    }
 
-      // If this instruction is unrelated to the memory, ignore it.
-      auto It = NonLoadUses.find(TheInst);
-      if (It == NonLoadUses.end())
+    // For each needed element, check if its earliest definition in this block
+    // is before Inst.
+    auto &EarliestDefs = BBInfo.EarliestDefs;
+    for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i) {
+      if (!NeededElements[i])
         continue;
-
-      // Check to see which tuple elements this instruction defines.  Clear them
-      // from the set we're scanning from.
-      for (unsigned TheUse : It->second) {
-        auto &TheInstUse = Uses[TheUse];
-        NeededElements.reset(TheInstUse.FirstElement,
-                             TheInstUse.FirstElement+TheInstUse.NumElements);
+      if (auto *EarliestDef = EarliestDefs[i]) {
+        if (InstIndices->get(EarliestDef) < InstPos)
+          NeededElements.reset(i);
       }
+    }
 
-      // If that satisfied all of the elements we're looking for, then we're
-      // done.  Otherwise, keep going.
-      if (NeededElements.none()) {
-        Result.changeUnsetElementsTo(DIKind::Yes);
-        return Result;
-      }
+    // If that satisfied all of the elements we're looking for, then we're
+    // done.  Otherwise, keep going.
+    if (NeededElements.none()) {
+      Result.changeUnsetElementsTo(DIKind::Yes);
+      return Result;
+    }
+
+    // For TheMemory's block, remaining needed elements have no definition
+    // before Inst, so they are uninitialized.
+    if (InstBB == TheMemory.getParentBlock()) {
+      for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i)
+        Result.set(i, NeededElements[i] ? DIKind::No : DIKind::Yes);
+      return Result;
     }
   }
 
