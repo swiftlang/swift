@@ -5456,9 +5456,11 @@ void PrintAST::visitTypeJoinExpr(TypeJoinExpr *expr) {
 }
 
 void PrintAST::visitAssignExpr(AssignExpr *expr) {
-  visit(expr->getDest());
+  if (auto dest = expr->getDest())
+    visit(dest);
   Printer << " = ";
-  visit(expr->getSrc());
+  if (auto src = expr->getSrc())
+    visit(src);
 }
 
 void PrintAST::visitBinaryExpr(BinaryExpr *expr) {
