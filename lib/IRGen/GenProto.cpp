@@ -1136,12 +1136,14 @@ static bool isDependentConformance(
     if (assocConformance.isInvalid())
       return false;
 
-    if (assocConformance.isAbstract() ||
-        isDependentConformance(IGM,
-                               assocConformance.getConcrete()
-                                 ->getRootConformance(),
-                               isResilient,
-                               visited))
+    if (assocConformance.isAbstract())
+      return true;
+
+    auto *assocRoot = assocConformance.getConcrete()->getRootConformance();
+    if (isDependentConformance(
+            IGM, assocRoot,
+            IGM.isResilientConformance(assocRoot, /*disableOptimizations=*/true),
+            visited))
       return true;
   }
 
