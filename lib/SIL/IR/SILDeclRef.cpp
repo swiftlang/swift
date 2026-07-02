@@ -1321,6 +1321,15 @@ bool SILDeclRef::isDistributedThunk() const {
     return false;
   return kind == Kind::Func;
 }
+
+FuncDecl *SILDeclRef::getDistributedThunk() const {
+  if (!isDistributedThunk())
+    return nullptr;
+  if (auto *afd = getAbstractFunctionDecl())
+    return afd->getDistributedThunk();
+  return nullptr;
+}
+
 bool SILDeclRef::isDistributed() const {
   if (!hasFuncDecl())
     return false;

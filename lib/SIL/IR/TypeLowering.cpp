@@ -4361,6 +4361,12 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   }
 
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
+
+  // If the value is a distributed thunk, its isolation must be computed
+  // off the 'distributed_thunk', not the original decl.
+  if (auto *thunk = c.getDistributedThunk())
+    vd = thunk;
+
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     CanAnyFunctionType funcTy;
