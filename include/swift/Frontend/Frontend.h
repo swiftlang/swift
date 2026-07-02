@@ -505,6 +505,17 @@ public:
   /// if not in that mode.
   std::string getAPIDescriptorPathForWholeModule() const;
 
+  /// Create the file system by loading and validating all VFS overlay YAML
+  /// files. If the process of validating VFS files failed, or the overlay
+  /// file system could not be initialized, this function returns null. Else it
+  /// returns the VFS.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  createVirtualFileSystemOverlays(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS,
+      std::shared_ptr<llvm::cas::ObjectStore> CAS,
+      std::shared_ptr<llvm::cas::ActionCache> Cache,
+      std::optional<std::string> &CASIDForPCH, DiagnosticEngine &Diag) const;
+
 public:
   /// Given the current configuration of this frontend invocation, a set of
   /// supplementary output paths, and a module, compute the appropriate set of
