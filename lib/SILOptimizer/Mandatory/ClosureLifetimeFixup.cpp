@@ -693,8 +693,8 @@ static SILValue tryRewriteToPartialApplyStack(
     saveDeleteInst(noImplicitCopyWrapperToDelete.pop_back_val());
 
   ApplySite site(newPA);
-  SILFunctionConventions calleeConv(site.getSubstCalleeType(),
-                                      newPA->getModule());
+  // Per-function conventions, matching site.getCalleeArgIndex() below.
+  SILFunctionConventions calleeConv = site.getSubstCalleeConv();
 
   // Since we create temporary allocation for in_guaranteed captures during SILGen,
   // the dealloc_stack of it can occur before the apply due to conversion scopes.

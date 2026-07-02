@@ -318,9 +318,7 @@ Lowering::TypeConverter &CompilerInstance::getSILTypes() {
   if (auto *tc = TheSILTypes.get())
     return *tc;
 
-  auto *tc = new Lowering::TypeConverter(
-      *getMainModule(),
-      /*loweredAddresses=*/!Context->SILOpts.EnableSILOpaqueValues);
+  auto *tc = new Lowering::TypeConverter(*getMainModule());
   TheSILTypes.reset(tc);
   return *tc;
 }

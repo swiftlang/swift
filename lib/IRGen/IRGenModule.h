@@ -715,7 +715,7 @@ public:
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
   const IRGenOptions &getOptions() const { return IRGen.Opts; }
-  SILModuleConventions silConv;
+  const SILAddressConventions silConv;
   ModuleDecl *ObjCModule = nullptr;
   ModuleDecl *ClangImporterModule = nullptr;
   std::unique_ptr<llvm::raw_fd_ostream> RemarkStream;

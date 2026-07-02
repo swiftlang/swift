@@ -219,7 +219,9 @@ public:
   }
   /// Get the conventions of the callee without the applied substitutions.
   SILFunctionConventions getOrigCalleeConv() const {
-    return SILFunctionConventions(getOrigCalleeType(), getModule());
+    return SILFunctionConventions(
+        getOrigCalleeType(),
+        SILAddressConventions::forFunction(*getFunction()));
   }
 
   /// Get the type of the callee with the applied substitutions.
@@ -235,7 +237,9 @@ public:
 
   /// Get the conventions of the callee with the applied substitutions.
   SILFunctionConventions getSubstCalleeConv() const {
-    return SILFunctionConventions(getSubstCalleeType(), getModule());
+    return SILFunctionConventions(
+        getSubstCalleeType(),
+        SILAddressConventions::forFunction(*getFunction()));
   }
 
   bool isAsync() const {

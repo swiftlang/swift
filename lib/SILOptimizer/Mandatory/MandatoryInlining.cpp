@@ -538,8 +538,8 @@ static void collectPartiallyAppliedArguments(
     SmallVectorImpl<ParameterConvention> &CapturedArgConventions,
     SmallVectorImpl<SILValue> &FullArgs) {
   ApplySite Site(PAI);
-  SILFunctionConventions CalleeConv(Site.getSubstCalleeType(),
-                                    PAI->getModule());
+  // Per-function conventions, matching Site.getCalleeArgIndex() below.
+  SILFunctionConventions CalleeConv = Site.getSubstCalleeConv();
   for (auto &Arg : PAI->getArgumentOperands()) {
     unsigned CalleeArgumentIndex = Site.getCalleeArgIndex(Arg);
     assert(CalleeArgumentIndex >= CalleeConv.getSILArgIndexOfFirstParam());

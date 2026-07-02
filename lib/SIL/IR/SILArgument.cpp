@@ -105,7 +105,7 @@ SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
 
   // Handle the common case of a function with no pack results.
   if (funcTy->getNumPackResults() == 0) {
-    assert(silConv.loweredAddresses);
+    assert(silConv.useLoweredAddresses());
     return SILArgumentConvention::Indirect_Out;
   }
 
@@ -115,7 +115,7 @@ SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
   for (auto result : getIndirectSILResults()) {
     if (index == 0) {
       if (result.getConvention() == ResultConvention::Indirect) {
-        assert(silConv.loweredAddresses);
+        assert(silConv.useLoweredAddresses());
         return SILArgumentConvention::Indirect_Out;
       } else {
         assert(result.getConvention() == ResultConvention::Pack);

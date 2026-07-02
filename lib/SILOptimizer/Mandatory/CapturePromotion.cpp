@@ -953,7 +953,8 @@ bool isPartialApplyNonEscapingUser(Operand *currentOp, PartialApplyInst *pai,
   SILModule &mod = pai->getModule();
   SILFunction *f = pai->getFunction();
   auto closureType = pai->getType().castTo<SILFunctionType>();
-  SILFunctionConventions closureConv(closureType, mod);
+  SILFunctionConventions closureConv(
+      closureType, SILAddressConventions::forFunction(*f));
 
   // Calculate the index into the closure's argument list of the captured
   // box pointer (the captured address is always the immediately following
@@ -1088,7 +1089,9 @@ public:
 
   bool visitApplyInst(ApplyInst *ai) {
     auto argIndex = currentOp.get()->getOperandNumber() - 1;
-    SILFunctionConventions substConv(ai->getSubstCalleeType(), ai->getModule());
+    SILFunctionConventions substConv(
+        ai->getSubstCalleeType(),
+        SILAddressConventions::forFunction(*ai->getFunction()));
     auto convention = substConv.getSILArgumentConvention(argIndex);
     if (!convention.isIndirectConvention()) {
       LLVM_DEBUG(llvm::dbgs()
@@ -1518,9 +1521,11 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   if (pai->hasSubstitutions())
     substCalleeFunctionTy = calleeFunctionTy->substGenericArgs(
         mod, pai->getSubstitutionMap(), TypeExpansionContext(*f));
-  SILFunctionConventions calleeConv(substCalleeFunctionTy, mod);
+  SILAddressConventions silConv = SILAddressConventions::forFunction(*f);
+  SILFunctionConventions calleeConv(substCalleeFunctionTy, silConv);
   auto calleePInfo = substCalleeFunctionTy->getParameters();
-  SILFunctionConventions paConv(pai->getType().castTo<SILFunctionType>(), mod);
+  SILFunctionConventions paConv(pai->getType().castTo<SILFunctionType>(),
+                                silConv);
   unsigned firstIndex = paConv.getNumSILArguments();
   unsigned opNo = 1;
   unsigned opCount = pai->getNumOperands() - pai->getNumTypeDependentOperands();

@@ -180,7 +180,8 @@ emitApplyWithRethrow(SILBuilder &Builder, SILLocation Loc, SILValue FuncRef,
                      ArrayRef<SILValue> CallArgs,
                      ArrayRef<unsigned> CallArgIndicesThatNeedEndBorrow) {
   auto &F = Builder.getFunction();
-  SILFunctionConventions fnConv(CanSILFuncTy, Builder.getModule());
+  SILFunctionConventions fnConv(CanSILFuncTy,
+                                SILAddressConventions::forFunction(F));
 
   SILBasicBlock *ErrorBB = F.createBasicBlock();
   SILBasicBlock *NormalBB = F.createBasicBlock();
@@ -259,8 +260,9 @@ static SILValue emitInvocation(SILBuilder &Builder,
   }
 
   auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
-  SILFunctionConventions fnConv(CalleeSILSubstFnTy.castTo<SILFunctionType>(),
-                                Builder.getModule());
+  SILFunctionConventions fnConv(
+      CalleeSILSubstFnTy.castTo<SILFunctionType>(),
+      SILAddressConventions::forFunction(Builder.getFunction()));
 
   bool isNonThrowing = false;
   // It is a function whose type claims it is throwing, but
@@ -313,7 +315,8 @@ public:
   EagerDispatch(SILFunction *GenericFunc,
                 const ReabstractionInfo &ReInfo)
       : GenericFunc(GenericFunc), ReInfo(ReInfo),
-        substConv(ReInfo.getSubstitutedType(), GenericFunc->getModule()),
+        substConv(ReInfo.getSubstitutedType(),
+                  SILAddressConventions::forFunction(*GenericFunc)),
         Builder(*GenericFunc), Loc(GenericFunc->getLocation()) {
     Builder.setCurrentDebugScope(GenericFunc->getDebugScope());
     IsClassF = Builder.getModule().loadFunction(
@@ -652,8 +655,9 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
 SILValue EagerDispatch::emitArgumentCast(CanSILFunctionType CalleeSubstFnTy,
                                          SILFunctionArgument *OrigArg,
                                          unsigned Idx) {
-  SILFunctionConventions substConv(CalleeSubstFnTy,
-                                   Builder.getModule());
+  SILFunctionConventions substConv(
+      CalleeSubstFnTy,
+      SILAddressConventions::forFunction(Builder.getFunction()));
   auto CastTy =
       substConv.getSILArgumentType(Idx, Builder.getTypeExpansionContext());
   assert(CastTy.isAddress()

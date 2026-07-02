@@ -806,7 +806,7 @@ bool BridgedFunction::isImplicit() const {
 
 bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(); }
 
-bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->getModule().useLoweredAddresses(); }
+bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->hasLoweredAddresses(); }
 
 BridgedCanType BridgedFunction::getLoweredFunctionType() const {
   return getFunction()->getLoweredFunctionType();
@@ -3303,8 +3303,8 @@ bool BridgedContext::moduleIsSerialized() const {
   return context->getModule()->isSerialized();
 }
 
-bool BridgedContext::moduleHasLoweredAddresses() const {
-  return context->getModule()->useLoweredAddresses();
+bool BridgedContext::usesOpaqueValues() const {
+  return context->getModule()->usesOpaqueValues();
 }
 
 BridgedDeclObj BridgedContext::getCurrentModuleContext() const {

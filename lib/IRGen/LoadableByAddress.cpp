@@ -2838,8 +2838,6 @@ void LoadableByAddress::recreateSingleApply(
   GenericEnvironment *genEnv = getSubstGenericEnvironment(origSILFunctionType);
   CanSILFunctionType newSILFunctionType = MapperCache.getNewSILFunctionType(
       genEnv, origSILFunctionType, *currIRMod);
-  SILFunctionConventions newSILFunctionConventions(newSILFunctionType,
-                                                   *getModule());
   SmallVector<SILValue, 8> callArgs;
   SILBuilderWithScope applyBuilder(applyInst);
   // If we turned a direct result into an indirect parameter
