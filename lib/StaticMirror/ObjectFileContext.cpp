@@ -616,7 +616,13 @@ std::unique_ptr<ReflectionContextHolder> makeReflectionContextForMetadataReader(
   auto context = new ReflectionContext(reader);
   auto &builder = context->getBuilder();
   for (unsigned i = 0, e = reader->getImages().size(); i < e; ++i) {
-    context->addImage(reader->getImageStartAddress(i));
+    // Create a file buffer for the image in case anything needs to slice the file contents directly
+    StringRef fileData = reader->getImages()[i].TheImage.getObjectFile()->getData();
+
+    llvm::sys::MemoryBlock memBlock(const_cast<void*>(static_cast<const void*>(fileData.data())),
+                                      fileData.size());
+
+    context->addImage(reader->getImageStartAddress(i), {}, memBlock);
   }
 
   ReflectionContextHolder *holder = new ReflectionContextHolder{
