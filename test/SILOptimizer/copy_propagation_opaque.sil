@@ -167,7 +167,7 @@ bb0(%addr : $*T):
 // CHECK: bb0([[BIT:%[^,]+]] : $Builtin.Int1):
 // CHECK: [[INSTANCE:%[^,]+]] = apply
 // CHECK-OPT-NEXT:   destroy_value [[INSTANCE]] : $T
-// CHECK-ONONE-NEXT: destroy_value [poison] [[INSTANCE]] : $T
+// CHECK-ONONE-NEXT: destroy_value [[INSTANCE]] : $T
 // CHECK-DEBUG-NEXT: cond_br [[BIT]], bb2, bb1
 //
 // CHECK: bb1:
