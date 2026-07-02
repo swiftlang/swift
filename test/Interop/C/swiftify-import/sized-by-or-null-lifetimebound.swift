@@ -172,7 +172,7 @@ opaque_t * __sized_by_or_null(len) opaque(int len, int len2, opaque_t * p __size
 // }}
 const void * __sized_by_or_null(len) nonsizedLifetime(int len, const void * p __lifetimebound);
 
-// expected-experimental-expansion@+19:73{{
+// expected-experimental-expansion@+18:73{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func bytesized(_ p: RawSpan) -> MutableRawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let size = Int32(exactly: p.byteCount)!|}}
@@ -182,8 +182,7 @@ const void * __sized_by_or_null(len) nonsizedLifetime(int len, const void * p __
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeMutablePointer<UInt8>? = unsafe bytesized(size, _pPtr.baseAddress.assumingMemoryBound(to: UInt8.self))|}}
-//   expected-experimental-error@10{{value of optional type 'UnsafeRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeRawPointer'}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeMutablePointer<UInt8>? = unsafe bytesized(size, _pPtr.baseAddress?.assumingMemoryBound(to: UInt8.self))|}}
 //   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
 //   expected-experimental-remark@12{{macro content: |      precondition(size == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
 //   expected-experimental-remark@13{{macro content: |      return MutableRawSpan()|}}
@@ -193,7 +192,7 @@ const void * __sized_by_or_null(len) nonsizedLifetime(int len, const void * p __
 // }}
 uint8_t *__sized_by_or_null(size)  bytesized(int size, const uint8_t * p __sized_by_or_null(size) __lifetimebound);
 
-// expected-experimental-expansion@+19:101{{
+// expected-experimental-expansion@+18:101{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func charsized(_ p: inout MutableRawSpan) -> MutableRawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let size = Int32(exactly: p.byteCount)!|}}
@@ -203,8 +202,7 @@ uint8_t *__sized_by_or_null(size)  bytesized(int size, const uint8_t * p __sized
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeMutablePointer<CChar>? = unsafe charsized(_pPtr.baseAddress.assumingMemoryBound(to: CChar.self), size)|}}
-//   expected-experimental-error@10{{value of optional type 'UnsafeMutableRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeMutableRawPointer'}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeMutablePointer<CChar>? = unsafe charsized(_pPtr.baseAddress?.assumingMemoryBound(to: CChar.self), size)|}}
 //   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
 //   expected-experimental-remark@12{{macro content: |      precondition(size == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
 //   expected-experimental-remark@13{{macro content: |      return MutableRawSpan()|}}
