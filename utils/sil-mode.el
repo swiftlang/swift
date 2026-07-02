@@ -262,11 +262,23 @@
 
 (unless sil-mode-map
   (setq sil-mode-map (make-sparse-keymap))
+  (define-key sil-mode-map (kbd "C-c C-d") 'sil-mode-demangle)
   (define-key sil-mode-map "\t" 'tab-to-tab-stop)
   (define-key sil-mode-map "\es" 'center-line)
   (define-key sil-mode-map "\eS" 'center-paragraph))
 
 ;;; Helper functions
+
+(defun sil-mode-demangle ()
+  "Demangle the symbol at point, or the region if active."
+  (interactive)
+  (let ((region
+          (if (use-region-p)
+            (car (region-bounds))
+            (bounds-of-thing-at-point 'symbol))))
+    (shell-command-on-region (car region) (cdr region)
+      "swift demangle"
+      "*Swift Demangle*")))
 
 ;; ViewCFG Integration
 ;;
