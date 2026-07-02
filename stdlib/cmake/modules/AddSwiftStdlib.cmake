@@ -3590,7 +3590,7 @@ function(embedded_amend_archive_commands_on_darwin_host target triple)
   # is built by a separate CMake invocation, thus allowing to set the archiver
   # properly in the toolchain file.
   if(SWIFT_HOST_VARIANT STREQUAL "macosx" AND SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS)
-    if(triple MATCHES "-elf$" OR triple MATCHES "-eabi$" OR triple MATCHES "-wasm$")
+    if(triple MATCHES "-elf$" OR triple MATCHES "-eabi$" OR triple MATCHES "-wasm$" OR triple MATCHES "-uefi$")
       # There is no way to change the archive commands only for a few targets, so
       # we resort going double work (and assume the previous commands exit successfully)
       add_custom_command(TARGET ${target}
