@@ -5470,7 +5470,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
   }
 
   // Use the enum's signature for the box type.
-  auto boundEnum = enumType.getRawASTType();
+  auto boundEnum = enumType.getASTType();
 
   // Lower the enum element's argument in the box's context.
   auto eltIntfTy = elt->getPayloadInterfaceType();
