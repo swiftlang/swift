@@ -3602,8 +3602,11 @@ function Build-ZLib([Hashtable] $Platform,
     -Platform $Platform `
     -CCompiler $CCompiler `
     -Defines @{
-      BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
+      ZLIB_BUILD_MINIZIP = "NO";
+      ZLIB_BUILD_SHARED = "NO";
+      ZLIB_BUILD_STATIC = "YES";
+      ZLIB_BUILD_TESTING = "NO";
     }
 }
 
