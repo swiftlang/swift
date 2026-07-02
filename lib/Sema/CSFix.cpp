@@ -2900,3 +2900,18 @@ bool IgnoreIsolatedConformance::diagnose(const Solution &solution,
   DisallowedIsolatedConformance failure(solution, conformance, getLocator());
   return failure.diagnose(asNote);
 }
+
+IgnoreClassRequirementForDynamicMemberLookup *
+IgnoreClassRequirementForDynamicMemberLookup::create(
+    ConstraintSystem &cs, Type baseTy, ValueDecl *member,
+    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreClassRequirementForDynamicMemberLookup(cs, baseTy, member, locator);
+}
+
+bool IgnoreClassRequirementForDynamicMemberLookup::diagnose(
+    const Solution &solution, bool asNote) const {
+  NonClassBaseInDynamicMemberLookup failure(solution, BaseType, Member,
+                                            getLocator());
+  return failure.diagnose(asNote);
+}
