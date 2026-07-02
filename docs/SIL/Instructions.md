@@ -4491,10 +4491,36 @@ address type.
 
 The `strict` flag indicates whether the returned address adheres to
 strict aliasing. If true, then the type of each memory access dependent
-on this address must be consistent with the memory's bound type. A
-memory access from an address that is not strict cannot have its address
-substituted with a strict address, even if other nearby memory accesses
-at the same location are strict.
+on this address must be consistent with the memory's bound type.
+`UnsafeRawPointer` access omits the `strict` flag so that the same location may
+be accessed as different types, such as:
+```
+public func f(i: inout Int) -> UInt {
+  withUnsafeMutableBytes(of: &i) {
+    $0.storeBytes(of: 3, as: Int.self)
+    return $0.load(as: UInt.self) // returns '3'
+  }
+}
+```
+A `pointer_to_address` without `strict` may be substituted with a
+strictly aliased address of the same type:
+```
+%1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
+%2 = address_to_pointer %1 : $*T to $Builtin.RawPointer
+%3 = pointer_to_address %2 : $Builtin.RawPointer to $*T
+use(%3)
+```
+can be optimized as:
+```
+%1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
+use(%1)
+```
+This optimization cannot introduce undefined behavior because it only applies to
+addresses that have the same type as a strictly aliased address. Newly strict
+uses of the address will continue to potentially alias with other non-strict
+addresses. If this optimization applies to more than one address, then those
+addresses will continue to alias even under strict rules because they have the
+same type.
 
 The `invariant` flag is set if loading from the returned address always
 produces the same value.
