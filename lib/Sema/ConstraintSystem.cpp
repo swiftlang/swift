@@ -2067,6 +2067,12 @@ SolutionResult ConstraintSystem::salvage() {
     // but we should not record any more changes from this point on.
     state.Trail.close();
 
+    if (isDebugMode()) {
+      llvm::errs() << "While salvaging, we have " << viable.size() << " viable solutions\n";
+      for(auto &s : viable)
+        s.dump();
+    }
+
     // If we hit a threshold, we're done.
     if (isTooComplex(viable))
       return SolutionResult::forTooComplex(getTooComplexRange());
