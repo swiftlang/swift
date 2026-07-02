@@ -27,7 +27,9 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/QuotedString.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -433,27 +435,49 @@ bool DerivedConformance::canDeriveEquatable(DeclContext *DC,
   return canDeriveConformance(DC, type, equatableProto);
 }
 
+/// Builds and expands a `#_deriveEquatable(...)` macro call to derive the
+/// `==` witness for (`Equatable`) `requirement`, in place of the legacy
+/// AST-building path.
+static ValueDecl *deriveEquatableViaMacro(DerivedConformance &derived,
+                                          ValueDecl *requirement) {
+  auto *parentDC = derived.getConformanceContext();
+  std::string code;
+  auto os = llvm::raw_string_ostream(code);
+  os << "#_deriveEquatable(" << QuotedString(getNominalTypeInfoString(derived))
+     << ", isResilient: "
+     << (parentDC->getParentModule()->isResilient() ? "true" : "false") << ")";
+  auto *witness = deriveRequirementViaMacro(derived, requirement, os.str());
+  return witness;
+}
+
 ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
 
   // Build the necessary decl.
-  if (requirement->getBaseName() == "==") {
-    if (auto ed = dyn_cast<EnumDecl>(Nominal)) {
-      auto bodySynthesizer =
-          !ed->hasCases()
-              ? &deriveBodyEquatable_enum_uninhabited_eq
-              : ed->hasOnlyCasesWithoutAssociatedValues()
-                    ? &deriveBodyEquatable_enum_noAssociatedValues_eq
-                    : &deriveBodyEquatable_enum_hasAssociatedValues_eq;
-      return deriveEquatable_eq(*this, bodySynthesizer);
-    } else if (isa<StructDecl>(Nominal))
-      return deriveEquatable_eq(*this, &deriveBodyEquatable_struct_eq);
-    else
-      llvm_unreachable("todo");
+  if (requirement->getBaseName() != "==") {
+    requirement->diagnose(diag::broken_equatable_requirement);
+    return nullptr;
   }
-  requirement->diagnose(diag::broken_equatable_requirement);
-  return nullptr;
+
+  if (requirement->getASTContext().LangOpts.hasFeature(
+          Feature::DeriveConformancesViaMacros)) {
+    return deriveEquatableViaMacro(*this, requirement);
+  }
+
+  if (auto ed = dyn_cast<EnumDecl>(Nominal)) {
+    auto bodySynthesizer =
+        !ed->hasCases() ? &deriveBodyEquatable_enum_uninhabited_eq
+        : ed->hasOnlyCasesWithoutAssociatedValues()
+            ? &deriveBodyEquatable_enum_noAssociatedValues_eq
+            : &deriveBodyEquatable_enum_hasAssociatedValues_eq;
+    return deriveEquatable_eq(*this, bodySynthesizer);
+  }
+
+  if (isa<StructDecl>(Nominal))
+    return deriveEquatable_eq(*this, &deriveBodyEquatable_struct_eq);
+
+  ABORT("Equatable derivation only supports struct and enums.");
 }
 
 void DerivedConformance::tryDiagnoseFailedEquatableDerivation(
