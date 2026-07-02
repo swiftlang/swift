@@ -28,6 +28,17 @@ if(NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT OR NOT SWIFT_BUILD_
   set(swift_cxxstdlib_dependencies _Builtin_float)
 endif()
 
+# If we have a shared build folder, we need to depend on libc++
+# generation to be able to build the libc++ module.
+#
+# libc++ is built via LLVM_ENABLE_RUNTIMES, i.e. in a nested CMake sub-build, so
+# its own `cxx` target is never visible in this scope. Mirror what
+# lldb/test/CMakeLists.txt does and depend on the top-level `runtimes` instead.
+set(_cxxstdlib_extra_deps "")
+if(LLVM_ENABLE_RUNTIMES AND "libcxx" IN_LIST LLVM_ENABLE_RUNTIMES)
+  list(APPEND _cxxstdlib_extra_deps runtimes)
+endif()
+
 #
 # C++ Standard Library Overlay.
 #
@@ -73,4 +84,4 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     INSTALL_IN_COMPONENT compiler
     INSTALL_BINARY_SWIFTMODULE NON_DARWIN_ONLY
     INSTALL_WITH_SHARED
-    DEPENDS libstdcxx-modulemap libcxxshim_modulemap CxxStdlib-apinotes)
+    DEPENDS libstdcxx-modulemap libcxxshim_modulemap CxxStdlib-apinotes ${_cxxstdlib_extra_deps})
