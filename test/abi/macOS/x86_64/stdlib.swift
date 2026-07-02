@@ -1339,3 +1339,5 @@ Added: _$ss11UniqueArrayVsRi_zrlE16debugDescriptionSSvg
 Added: _swift_releaseReturningCount
 Added: _swift_retainReturningCount
 
+// SE-NNNN: CommandLine.executablePath
+Added: _$ss11CommandLineO14executablePathSSSgvpZMV
