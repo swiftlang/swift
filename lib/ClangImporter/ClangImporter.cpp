@@ -9540,3 +9540,10 @@ NominalType *swift::stripInlineNamespaces(NominalType *outer,
 
   return inner;
 }
+
+// cached copy of C++ [::std] namespace, accounting for the case that [::std]
+// doesn't exists.
+const clang::NamespaceDecl *
+ClangImporter::Implementation::getCxxStdNamespace() {
+  return *(stdNS ? stdNS : (stdNS = getClangSema().getStdNamespace()));
+}

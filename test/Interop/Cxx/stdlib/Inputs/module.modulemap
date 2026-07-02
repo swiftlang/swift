@@ -143,6 +143,10 @@ module IteratorCycleUnrelatedOperator {
 
 module StdCoroutine {
   header "std-coroutine.h"
+}
+
+module StdHash {
+  header "std-hash.h"
   requires cplusplus
   export *
 }

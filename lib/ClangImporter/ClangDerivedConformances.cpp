@@ -15,6 +15,8 @@
 #include "ImporterImpl.h"
 #include "SwiftLookupTable.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -24,11 +26,13 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
+#include "swift/Localization/LocalizationFormat.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/CXXInheritance.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/DeclarationName.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Sema/DelayedDiagnostic.h"
@@ -1602,9 +1606,318 @@ static void conformToCxxSpan(ClangImporter::Implementation &impl,
   decl->addMember(importedConstructor);
 }
 
+// Synthesize a [operator op(T, T)] for [T], where [T = classDecl]. The compiler
+// should have already found the default constructor and [the operator()] for
+// [fobjDecl], both of which are passed in as arguments.
+static bool synthesizeOperatorWithCxxFunctionObject(
+    ClangImporter::Implementation &impl, const clang::CXXRecordDecl *classDecl,
+    const clang::CXXRecordDecl *fobjDecl,
+    clang::CXXConstructorDecl *ctorDecl, // why not const??
+    const clang::CXXMethodDecl *methodDecl,
+    clang::BinaryOperatorKind operatorKind) {
+  auto &clangCtx = impl.getClangASTContext();
+  auto &clangSema = impl.getClangSema();
+
+  /// 2. constructor the operator
+  clang::OverloadedOperatorKind opKind =
+      clang::BinaryOperator::getOverloadedOperator(operatorKind);
+  const char *opSpelling = clang::getOperatorSpelling(opKind);
+  auto declName = clang::DeclarationName(&clangCtx.Idents.get(opSpelling));
+
+  // Determine the Clang decl context where the new operator function will be
+  // created. We use the translation unit as the decl context of the new
+  // operator, otherwise, the operator might get imported as a static member
+  // function of a different type (e.g. an operator declared inside of a C++
+  // namespace would get imported as a member function of a Swift enum), which
+  // would make the operator un-discoverable to Swift name lookup.
+  auto declContext =
+      const_cast<clang::CXXRecordDecl *>(classDecl)->getDeclContext();
+  while (!declContext->isTranslationUnit()) {
+    declContext = declContext->getParent();
+  }
+
+  // copying the type information
+  clang::QualType returnTy = methodDecl->getReturnType();
+  clang::QualType lhsTy = clangCtx.getTypeDeclType(classDecl),
+                  rhsTy = clangCtx.getTypeDeclType(classDecl);
+  clang::FunctionProtoType::ExtProtoInfo epi;
+  if (const auto *protoTy =
+          methodDecl->getType()->getAs<clang::FunctionProtoType>()) {
+    epi = protoTy->getExtProtoInfo();
+  } else {
+    ASSERT(false && "unexpected error when copying ExtProtoInfo");
+  }
+
+  auto opTy = clangCtx.getFunctionType(returnTy, {lhsTy, rhsTy}, epi);
+  // create a [returnTy operator op(T, T)] function.
+  auto opDecl = clang::FunctionDecl::Create(
+      clangCtx, declContext, clang::SourceLocation(), clang::SourceLocation(),
+      declName, opTy, clangCtx.getTrivialTypeSourceInfo(returnTy),
+      clang::StorageClass::SC_Static);
+  opDecl->setImplicit();
+  opDecl->setImplicitlyInline();
+  // If this is a static member function of a class, it needs to be public.
+  opDecl->setAccess(clang::AccessSpecifier::AS_public);
+
+  // insert the parameter for the [opDecl]
+  auto lhsParamId = nullptr;
+  auto lhsTyInfo = clangCtx.getTrivialTypeSourceInfo(lhsTy);
+  auto lhsParamDecl = clang::ParmVarDecl::Create(
+      clangCtx, opDecl, clang::SourceLocation(), clang::SourceLocation(),
+      lhsParamId, lhsTy, lhsTyInfo, clang::StorageClass::SC_None,
+      /*DefArg*/ nullptr);
+  auto lhsParamRefExpr = new (clangCtx) clang::DeclRefExpr(
+      clangCtx, lhsParamDecl, false, lhsTy, clang::ExprValueKind::VK_LValue,
+      clang::SourceLocation());
+
+  auto rhsParamId = nullptr;
+  auto rhsTyInfo = clangCtx.getTrivialTypeSourceInfo(rhsTy);
+  auto rhsParamDecl = clang::ParmVarDecl::Create(
+      clangCtx, opDecl, clang::SourceLocation(), clang::SourceLocation(),
+      rhsParamId, rhsTy, rhsTyInfo, clang::StorageClass::SC_None, nullptr);
+  auto rhsParamRefExpr = new (clangCtx) clang::DeclRefExpr(
+      clangCtx, rhsParamDecl, false, rhsTy, clang::ExprValueKind::VK_LValue,
+      clang::SourceLocation());
+
+  opDecl->setParams({lhsParamDecl, rhsParamDecl});
+
+  /// 3. build the constructor call
+  clang::SourceLocation funcLoc = fobjDecl->getLocation();
+  clang::ExprResult synthCtorExprResult = clangSema.BuildCXXConstructExpr(
+      funcLoc, clangCtx.getTypeDeclType(fobjDecl), ctorDecl,
+      /*Elidable=*/false, {},
+      /*HadMultipleCandidates=*/false,
+      /*IsListInitialization=*/false,
+      /*IsStdInitListInitialization=*/false,
+      /*RequiresZeroInit=*/false, clang::CXXConstructionKind::Complete,
+      clang::SourceRange(funcLoc, funcLoc));
+
+  ASSERT(!synthCtorExprResult.isInvalid() &&
+         "Unable to synthesize constructor expression");
+  clang::Expr *synthCtorExpr = synthCtorExprResult.get();
+
+  /// 4. build the [operator()] call
+  SmallVector<clang::Expr *, 2> args = {lhsParamRefExpr, rhsParamRefExpr};
+  auto call =
+      clangSema.BuildCallExpr(nullptr, synthCtorExpr, clang::SourceLocation(),
+                              args, clang::SourceLocation());
+  ASSERT(call.isUsable() && "operator() call is not usable");
+
+  auto opBody = clang::ReturnStmt::Create(clangCtx, clang::SourceLocation(),
+                                          call.get(), nullptr);
+  opDecl->setBody(opBody);
+
+  impl.synthesizedAndAlwaysVisibleDecls.insert(opDecl);
+  auto lookupTable1 = impl.findLookupTable(classDecl);
+  addEntryToLookupTable(*lookupTable1, opDecl, impl.getNameImporter());
+  auto owningModule = importer::getClangOwningModule(classDecl, clangCtx);
+  auto lookupTable2 = impl.findLookupTable(owningModule);
+  if (lookupTable1 != lookupTable2)
+    addEntryToLookupTable(*lookupTable2, opDecl, impl.getNameImporter());
+  return true;
+}
+
+// This function takes a C++ record [clangDecl], and finds the method of the
+// specified type, ignoring exception spec.
+static clang::CXXMethodDecl *
+lookupCxxMethodByType(ClangImporter::Implementation &impl,
+                      const clang::CXXRecordDecl *clangDecl,
+                      clang::DeclarationName methodName,
+                      clang::QualType methodTy) {
+  clang::Sema &clangSema = impl.getClangSema();
+  clang::ASTContext &Ctx = impl.getClangASTContext();
+  if (auto *clangDef = clangDecl->getDefinition()) {
+    clang::LookupResult result(clangSema, methodName, clang::SourceLocation(),
+                               clang::Sema::LookupOrdinaryName);
+    clangSema.LookupQualifiedName(result, clangDef);
+
+    for (clang::NamedDecl *namedDecl : result)
+      if (auto *candidate = llvm::dyn_cast<clang::CXXMethodDecl>(namedDecl))
+        if (!candidate->isDeleted() &&
+            Ctx.hasSameFunctionTypeIgnoringExceptionSpec(candidate->getType(),
+                                                         methodTy))
+          return candidate;
+  }
+
+  return nullptr;
+}
+
+// This function looks up a C++ template struct that is supposed to be a
+// function object.
+static clang::ClassTemplateSpecializationDecl *
+lookupAndSpecializeCxxFunctionObject(ClangImporter::Implementation &impl,
+                                     const clang::CXXRecordDecl *clangDecl,
+                                     std::string name) {
+  clang::ASTContext &Ctx = impl.getClangASTContext();
+  if (auto *stdNS = impl.getCxxStdNamespace()) {
+    clang::DeclarationName declName =
+        Ctx.DeclarationNames.getIdentifier(&Ctx.Idents.get(name));
+
+    clang::ClassTemplateDecl *tmplDecl =
+        stdNS->lookup(declName).find_first<clang::ClassTemplateDecl>();
+
+    if (!tmplDecl)
+      return nullptr;
+
+    // find specialization of the shape [std::name<clangDecl>]
+    void *insertPos = nullptr;
+    auto *fobjDecl = tmplDecl->findSpecialization(
+        {clang::TemplateArgument(Ctx.getTypeDeclType(clangDecl))}, insertPos);
+    if (!fobjDecl)
+      return nullptr;
+
+    // instantiate specialization for a complete definition
+    if (!fobjDecl->hasDefinition())
+      if (impl.getClangSema().InstantiateClassTemplateSpecialization(
+              clangDecl->getLocation(), fobjDecl,
+              clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+              false, false))
+        return nullptr;
+
+    return fobjDecl;
+  }
+
+  return nullptr;
+}
+
+// Attempt at decoupling the std::equal_to<> conformance from std::hash<>
+// conformance. Because we don't want unnecessary importation, the actual import
+// is delayed as a thunk.
+static std::optional<std::function<void ()>> conformToEquatableIfNeeded(
+    ClangImporter::Implementation &impl, SwiftDeclSynthesizer &synthesizer,
+    NominalTypeDecl *decl, const clang::CXXRecordDecl *clangDecl) {
+  clang::ClassTemplateSpecializationDecl *stdETDecl = nullptr;
+  clang::CXXConstructorDecl *ctorDecl = nullptr;
+  clang::CXXMethodDecl *opDecl = nullptr;
+
+  // since operator==() is prioritized over std::equal_to, we can save some
+  // search here.
+  if (! getEqualEqualOperator(decl)) {
+    clang::ASTContext &Ctx = impl.getClangASTContext();
+    stdETDecl =
+        lookupAndSpecializeCxxFunctionObject(impl, clangDecl, "equal_to");
+
+    // check that either [std::equal_to<>] exists or [operator== ()] exists.
+    if (!stdETDecl)
+      return {};
+
+    // lookup default constructor
+    clang::QualType ctorTy = Ctx.getFunctionType(
+      Ctx.VoidTy, {}, clang::FunctionProtoType::ExtProtoInfo());
+    clang::DeclarationName ctorName =
+        Ctx.DeclarationNames.getCXXConstructorName(
+            Ctx.getCanonicalType(Ctx.getTypeDeclType(stdETDecl)));
+    ctorDecl = dyn_cast_or_null<clang::CXXConstructorDecl>(lookupCxxMethodByType(impl, stdETDecl, ctorName, ctorTy));
+    if (!ctorDecl)
+      return {};
+
+    // lookup operator()
+    // construct [const T&]
+    clang::QualType recordTy = Ctx.getTypeDeclType(clangDecl);
+
+    clang::QualType constRecordTy = recordTy.withConst();
+    clang::QualType constRefTy = Ctx.getLValueReferenceType(constRecordTy);
+
+    // constant method
+    clang::FunctionProtoType::ExtProtoInfo epi;
+    epi.TypeQuals.addConst();
+    clang::QualType opTy = Ctx.getFunctionType(Ctx.BoolTy, {constRefTy, constRefTy}, epi);
+    clang::DeclarationName opName =
+        Ctx.DeclarationNames.getCXXOperatorName(clang::OO_Call);
+    opDecl = lookupCxxMethodByType(impl, stdETDecl, opName, opTy);
+    if (!opDecl)
+      return {};
+  }
+
+  // we have two possible sources for [==(_:_:)]
+  // 1. [std::equal_to<T>]
+  // 2. [operator==(T, T)]
+  // The current implementation prioritize 2 over 1, which as the following
+  // effects,
+  // - the behavior of [==(_:_:)] operator in Swift will match that of
+  // [operator==(T, T)] in C++, if both exist,
+  // - the behavior of unordered containers (such as [Set]) in Swift will not
+  // match their equivalences ([unordered_set]) in C++, if the C++ type has a
+  // custom [std::equal_to<T>] specialization that does not agree with
+  // [operator==(T, T)]
+  if (stdETDecl && getEqualEqualOperator(decl))
+    impl.diagnose(HeaderLoc{clangDecl->getLocation()},
+                  diag::mismatched_equatable_semantics, decl);
+
+  return [&impl, decl, stdETDecl, ctorDecl, opDecl, clangDecl] {
+    if (!getEqualEqualOperator(decl))
+      synthesizeOperatorWithCxxFunctionObject(impl, clangDecl, stdETDecl,
+                                              ctorDecl, opDecl,
+                                              clang::BinaryOperatorKind::BO_EQ);
+
+    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::Equatable});
+    return;
+  };
+}
+
+static void conformToHashableIfNeeded(ClangImporter::Implementation &impl,
+                                      SwiftDeclSynthesizer &synthesizer,
+                                      NominalTypeDecl *decl,
+                                      const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to Hashable", decl);
+
+  clang::ASTContext &Ctx = impl.getClangASTContext();
+  auto *stdHashDecl = lookupAndSpecializeCxxFunctionObject(impl, clangDecl, "hash");
+  // we bail if [std::hash<>] doesn't exist
+  if (!stdHashDecl)
+    return;
+
+  // we won't need the constructor or [operator()] until much later, but we
+  // search for them here so that later synthesizer is guaranteed to succeed.
+  // lookup default constructor
+  clang::QualType ctorTy = Ctx.getFunctionType(
+      Ctx.VoidTy, {}, clang::FunctionProtoType::ExtProtoInfo());
+  clang::DeclarationName ctorName = Ctx.DeclarationNames.getCXXConstructorName(
+      Ctx.getCanonicalType(Ctx.getTypeDeclType(stdHashDecl)));
+  auto *ctorDecl = dyn_cast_or_null<clang::CXXConstructorDecl>(
+      lookupCxxMethodByType(impl, stdHashDecl, ctorName, ctorTy));
+
+  if (!ctorDecl)
+    return;
+
+  // lookup [operator()]
+  // construct [const T&]
+  clang::QualType recordTy = Ctx.getTypeDeclType(clangDecl);
+  clang::QualType constRecordTy = recordTy.withConst();
+  clang::QualType constRefTy = Ctx.getLValueReferenceType(constRecordTy);
+  // constant method
+  clang::FunctionProtoType::ExtProtoInfo epi;
+  epi.TypeQuals.addConst();
+  clang::QualType opTy = Ctx.getFunctionType(Ctx.getSizeType(), {constRefTy}, epi);
+  clang::DeclarationName opName =
+    Ctx.DeclarationNames.getCXXOperatorName(clang::OO_Call);
+  auto *opDecl = lookupCxxMethodByType(impl, stdHashDecl, opName, opTy);
+  if (!opDecl)
+    return;
+
+  auto *stdHash = impl.importDecl(stdHashDecl, impl.CurrentVersion);
+  if (!stdHash)
+    return;
+
+  if (auto conformToEquatable =
+          conformToEquatableIfNeeded(impl, synthesizer, decl, clangDecl)) {
+    (*conformToEquatable)();
+
+    if (auto *stdHashStruct = dyn_cast<StructDecl>(stdHash)) {
+      FuncDecl *hashFunc = synthesizer.makeHashFunc(decl, stdHashStruct);
+      decl->addMember(hashFunc);
+    } else {
+      ASSERT(false);
+      return;
+    }
+
+    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::Hashable});
+  }
+}
+
 void swift::deriveAutomaticCxxConformances(
-    ClangImporter::Implementation &Impl, NominalTypeDecl *result,
-    const clang::CXXRecordDecl *clangDecl) {
+    ClangImporter::Implementation &Impl, SwiftDeclSynthesizer &synthesizer,
+    NominalTypeDecl *result, const clang::CXXRecordDecl *clangDecl) {
 
   ASSERT(result && clangDecl && "this should not be called with nullptrs");
 
@@ -1624,7 +1937,7 @@ void swift::deriveAutomaticCxxConformances(
   conformToCxxIteratorIfNeeded(Impl, result, clangDecl);
   conformToCxxSequenceIfNeeded(Impl, result, clangDecl);
   conformToCxxConvertibleToBoolIfNeeded(Impl, result);
-
+  conformToHashableIfNeeded(Impl, synthesizer, result, clangDecl);
   // CxxStdlib conformances: these should only apply to known C++ stdlib types,
   // which we determine by name and membership in the std namespace.
   if (!clangDecl->getIdentifier() || !clangDecl->isInStdNamespace())

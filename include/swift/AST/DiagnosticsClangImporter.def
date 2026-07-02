@@ -455,6 +455,11 @@ ERROR(conflicting_swift_attrs, none,
 ERROR(repeating_swift_attrs, none, "multiple %0 annotations found on %1",
       (StringRef, const clang::NamedDecl *))
 
+WARNING(mismatched_equatable_semantics, none,
+        "imported C++ module exposes both equal operator and std::equal_to<>"
+        "for %0, prioritizing the equal operator. ",
+        (const NominalTypeDecl *))
+
 NOTE(annotation_here, none, "%0 annotation found here", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
