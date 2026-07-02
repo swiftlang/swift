@@ -3,10 +3,10 @@
 // UNSUPPORTED: OS=windows-msvc
 
 // RUN: %swiftc_driver -sdk "" -sdk "" -driver-print-jobs -target x86_64-apple-ios13.1-macabi -sdk %S/../Inputs/clang-importer-sdk %s | %FileCheck -check-prefix=IOS13-MACABI %s
-// IOS13-MACABI: bin/swift
+// IOS13-MACABI: /swift
 // IOS13-MACABI: -target x86_64-apple-ios13.1-macabi
 
-// IOS13-MACABI: bin/ld
+// IOS13-MACABI: /ld
 // IOS13-MACABI-DAG: -L [[MACCATALYST_STDLIB_PATH:[^ ]+/lib/swift/maccatalyst]]
 // IOS13-MACABI-DAG: -L [[MACOSX_STDLIB_PATH:[^ ]+/lib/swift/macosx]]
 // IOS13-MACABI-DAG: -L [[MACCATALYST_SDK_STDLIB_PATH:[^ ]+/clang-importer-sdk/System/iOSSupport/usr/lib/swift]]
@@ -23,7 +23,7 @@
 // IOS12-MACABI: bin/swift
 // IOS12-MACABI: -target x86_64-apple-ios12.0-macabi
 
-// IOS12-MACABI: bin/ld
+// IOS12-MACABI: /ld
 // IOS12-MACABI-DAG: -L [[MACCATALYST_STDLIB_PATH:[^ ]+/lib/swift/maccatalyst]]
 // IOS12-MACABI-DAG: -L [[MACOSX_STDLIB_PATH:[^ ]+/lib/swift/macosx]]
 // IOS12-MACABI-DAG: -L [[MACCATALYST_SDK_STDLIB_PATH:[^ ]+/clang-importer-sdk/System/iOSSupport/usr/lib/swift]]
@@ -47,7 +47,7 @@
 // ZIPPERED-VARIANT-LIBRARY: bin/swift
 // ZIPPERED-VARIANT-LIBRARY: -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi
 
-// ZIPPERED-VARIANT-LIBRARY: bin/ld
+// ZIPPERED-VARIANT-LIBRARY: /ld
 // ZIPPERED-VARIANT-LIBRARY: -platform_version macos 10.14.0 0.0.0 -platform_version mac-catalyst 13.1.0 0.0.0
 
 // Make sure we pass the -target-variant when creating the pre-compiled header.
@@ -57,7 +57,7 @@
 // ZIPPERED_VARIANT-PCH:  -emit-pch
 // ZIPPERED-VARIANT-PCH: bin/swift
 // ZIPPERED-VARIANT-PCH: -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi
-// ZIPPERED-VARIANT-PCH: bin/ld
+// ZIPPERED-VARIANT-PCH: /ld
 // ZIPPERED-VARIANT-PCH: -platform_version macos 10.14.0 0.0.0 -platform_version mac-catalyst 13.1.0 0.0.0
 
 // Test using 'reverse' target-variant to build zippered outputs when the primary
@@ -71,7 +71,7 @@
 // REVERSE-ZIPPERED-VARIANT-LIBRARY: bin/swift
 // REVERSE-ZIPPERED-VARIANT-LIBRARY: -target x86_64-apple-ios13.1-macabi -target-variant x86_64-apple-macosx10.14
 
-// REVERSE-ZIPPERED-VARIANT-LIBRARY: bin/ld
+// REVERSE-ZIPPERED-VARIANT-LIBRARY: /ld
 // REVERSE-ZIPPERED-VARIANT-LIBRARY: -platform_version mac-catalyst 13.1.0 0.0.0 -platform_version macos 10.14.0
 
 // Make sure we pass the -target-variant when creating the pre-compiled header.
@@ -81,7 +81,7 @@
 // REVERSE-ZIPPERED_VARIANT-PCH:  -emit-pch
 // REVERSE-ZIPPERED-VARIANT-PCH: bin/swift
 // REVERSE-ZIPPERED-VARIANT-PCH: -target x86_64-apple-ios13.1-macabi -target-variant x86_64-apple-macosx10.14
-// REVERSE-ZIPPERED-VARIANT-PCH: bin/ld
+// REVERSE-ZIPPERED-VARIANT-PCH: /ld
 // REVERSE-ZIPPERED-VARIANT-PCH: -platform_version mac-catalyst 13.1.0 0.0.0 -platform_version macos 10.14.0 0.0.0
 
 // RUN: not %swiftc_driver -sdk "" -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.0 %s 2>&1 | %FileCheck --check-prefix=UNSUPPORTED-TARGET-VARIANT %s
@@ -96,7 +96,7 @@
 // IOS13-NO-MACABI: bin/swift
 // IOS13-NO-MACABI: -target arm64-apple-ios13.0
 
-// IOS13-NO-MACABI: bin/ld
+// IOS13-NO-MACABI: /ld
 // IOS13-NO-MACABI-DAG: -L {{[^ ]+/lib/swift/iphoneos}}
 // IOS13-NO-MACABI-DAG: -L {{[^ ]+/clang-importer-sdk/usr/lib/swift}}
 // IOS13-NO-MACABI-DAG: -platform_version ios 13.0.0
@@ -121,4 +121,3 @@
 // MACOS_10_15_4_REVERSE_ZIPPERED: -target-variant-sdk-version 10.15.4
 // MACOS_10_15_4_REVERSE_ZIPPERED: -platform_version mac-catalyst 13.1.0 13.4.0
 // MACOS_10_15_4_REVERSE_ZIPPERED: -platform_version macos 10.14.0 10.15.4
-
