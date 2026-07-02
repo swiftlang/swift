@@ -17,7 +17,7 @@ import StdlibCollectionUnittest
 var SliceTests = TestSuite("Collection")
 
 let prefix: [Int] = [-9999, -9998, -9997, -9996, -9995]
-let suffix: [Int] = []
+let suffix: [Int] = [-9994, -9993, -9992]
 
 func makeCollection(elements: [OpaqueValue<Int>])
   -> Slice<MinimalCollection<OpaqueValue<Int>>> {

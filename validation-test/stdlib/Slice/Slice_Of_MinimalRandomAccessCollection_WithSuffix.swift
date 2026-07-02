@@ -17,7 +17,7 @@ import StdlibCollectionUnittest
 var SliceTests = TestSuite("Collection")
 
 let prefix: [Int] = []
-let suffix: [Int] = []
+let suffix: [Int] = [ -9999, -9998, -9997]
 
 func makeCollection(elements: [OpaqueValue<Int>])
   -> Slice<MinimalRandomAccessCollection<OpaqueValue<Int>>> {
