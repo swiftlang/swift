@@ -1038,6 +1038,11 @@ public:
     return Instance->getCodeGenOpts();
   }
 
+  /// Retrieve the Clang parser, if available.
+  clang::Parser *getClangParser() const {
+    return Parser.get();
+  }
+
   importer::ClangSourceBufferImporter &getBufferImporterForDiagnostics() {
     return BuffersForDiagnostics;
   }

@@ -1,0 +1,4 @@
+module ConstexprMacros {
+  header "constexpr-macros.h"
+  requires cplusplus
+}

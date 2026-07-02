@@ -8,11 +8,9 @@
 //--- cmodule.h
 #import <CoreGraphics/CoreGraphics.h>
 #define intLiteralCGFloat ((CGFloat)0)
-// expected-note@-1 {{invalid numeric literal}}
-// expected-note@-2 {{macro 'intLiteralCGFloat' unavailable (cannot import)}}
+// expected-note@-1 {{macro 'intLiteralCGFloat' unavailable (cannot import)}}
 #define floatLiteralCGFloat ((CGFloat)0.0)
-// expected-note@-1 {{invalid numeric literal}}
-// expected-note@-2 {{macro 'floatLiteralCGFloat' unavailable (cannot import)}}
+// expected-note@-1 {{macro 'floatLiteralCGFloat' unavailable (cannot import)}}
 
 //--- module.modulemap
 module CModule [system] {

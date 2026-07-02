@@ -30,10 +30,9 @@ import CModule
 // Make sure we can import these constants.
 print(usesUnderscoreBoolAlias)
 print(usesBoolAlias)
+print(usesUnderscoreBool)
+print(usesBool)
 
 //--- invalid.swift
 import CModule
-
-// FIXME: These ought to work too
-print(usesUnderscoreBool) // expected-error {{cannot find 'usesUnderscoreBool' in scope}}
-print(usesBool) // expected-error {{cannot find 'usesBool' in scope}}
+// No macros are expected to fail import currently.
