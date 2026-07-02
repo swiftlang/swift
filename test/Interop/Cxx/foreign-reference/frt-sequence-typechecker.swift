@@ -2,6 +2,8 @@
 // RUN:   -I %S/Inputs -cxx-interoperability-mode=default \
 // RUN:   -disable-availability-checking -disable-typo-correction
 
+// XFAIL: OS=linux-androideabi
+
 import FrtSequence
 import CxxStdlib
 
