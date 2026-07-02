@@ -264,6 +264,76 @@ protected:
     return;
   }
 
+  void visitCheckedCastBranchInst(CheckedCastBranchInst *inst) {
+    CanType sourceType = getOpASTType(inst->getSourceFormalType());
+    CanType targetType = getOpASTType(inst->getTargetFormalType());
+
+    auto &M = getBuilder().getFunction().getModule();
+    if (canSILUseScalarCheckedCastInstructions(M, sourceType, targetType)) {
+      super::visitCheckedCastBranchInst(inst);
+      return;
+    }
+
+    // The substituted types require an address-based cast. Convert
+    // checked_cast_br to checked_cast_addr_br.
+    SILLocation loc = getOpLocation(inst->getLoc());
+    SILValue op = getOpValue(inst->getOperand());
+    SILType targetLoweredType = getOpType(inst->getTargetLoweredType());
+    SILBasicBlock *succBB = getOpBasicBlock(inst->getSuccessBB());
+    SILBasicBlock *failBB = getOpBasicBlock(inst->getFailureBB());
+    SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
+    B.setCurrentDebugScope(super::getOpScope(inst->getDebugScope()));
+
+    bool isTrivial = op->getType().isTrivial(B.getFunction());
+
+    // Allocate temporaries for source and destination.
+    auto *srcTemp = B.createAllocStack(loc, op->getType().getObjectType());
+    auto *destTemp = B.createAllocStack(loc, targetLoweredType.getObjectType());
+
+    // Store the source value into the source temporary.
+    B.emitStoreValueOperation(loc, op, srcTemp,
+                              isTrivial ? StoreOwnershipQualifier::Trivial
+                                        : StoreOwnershipQualifier::Init);
+
+    // Create new success and failure blocks that load from the temporaries
+    // and branch to the original targets.
+    auto *newSuccBB = B.getFunction().createBasicBlockBefore(succBB);
+    auto *newFailBB = B.getFunction().createBasicBlockBefore(failBB);
+
+    B.createCheckedCastAddrBranch(
+        loc, inst->getCheckedCastOptions(), CastConsumptionKind::TakeOnSuccess,
+        srcTemp, sourceType, destTemp, targetType, newSuccBB, newFailBB);
+
+    // Emit the success block.
+    B.setInsertionPoint(newSuccBB);
+    SILValue result = B.emitLoadValueOperation(
+        loc, destTemp,
+        isTrivial ? LoadOwnershipQualifier::Trivial
+                  : LoadOwnershipQualifier::Take);
+    B.createDeallocStack(loc, destTemp);
+    B.createDeallocStack(loc, srcTemp);
+    B.createBranch(loc, succBB, {result});
+
+    // Emit the failure block.
+    B.setInsertionPoint(newFailBB);
+    // For non-trivial types, load the unconsumed source value back from
+    // the source temporary to pass it to the failure block.
+    SILValue failValue;
+    if (isTrivial) {
+      failValue = op;
+    } else {
+      failValue = B.emitLoadValueOperation(loc, srcTemp,
+                                           LoadOwnershipQualifier::Take);
+    }
+    B.createDeallocStack(loc, destTemp);
+    B.createDeallocStack(loc, srcTemp);
+    if (B.hasOwnership()) {
+      B.createBranch(loc, failBB, {failValue});
+    } else {
+      B.createBranch(loc, failBB);
+    }
+  }
+
   void visitUpcastInst(UpcastInst *Upcast) {
     // If the type substituted type of the operand type and result types match
     // there is no need for an upcast and we can just use the operand.
