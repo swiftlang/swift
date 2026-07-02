@@ -25,6 +25,7 @@ import signal
 import subprocess
 import sys
 import time
+import subprocess
 
 from build_swift.build_swift import argparse
 from build_swift.build_swift import defaults
@@ -748,6 +749,15 @@ def main_preset():
     shell.call_without_sleeping(build_script_args)
     return 0
 
+def dump_current_checkout():
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(base_path, "update-checkout")
+    print(20 * "=", "begin current checkout", flush=True)
+    subprocess.run(
+     [file_path, "--dump-hashes"],
+     cwd=base_path
+    )
+    print(os.linesep + 20 * "=", "end current checkout")
 
 # -----------------------------------------------------------------------------
 # Main (normal)
@@ -1081,6 +1091,7 @@ def main_normal():
 # -----------------------------------------------------------------------------
 
 def main():
+    dump_current_checkout()
     if not SWIFT_SOURCE_ROOT:
         fatal_error(
             "could not infer source root directory " +
