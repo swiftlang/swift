@@ -171,7 +171,7 @@
                 "swift-corelibs-xctest": "main",
                 "swift-corelibs-foundation": "main",
                 "swift-foundation-icu": "main",
-                "swift-foundation": "main",
+                "swift-foundation": "release/6.4.x",
                 "swift-corelibs-libdispatch": "main",
                 "swift-corelibs-blocksruntime": "main",
                 "swift-integration-tests": "main",
