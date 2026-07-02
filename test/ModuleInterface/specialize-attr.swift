@@ -13,7 +13,7 @@ public func specialize<T>(_ t: T) {}
 @_specialize(exported: true, availability: macOS 12, *; where T == Int)
 public func specializeWithAvailability<T>(_ t: T) {}
 
-// CHECK: @_specialize(exported: true, kind: full, availability: macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, visionOS 1.0, *; where T == Swift::Int)
+// CHECK: @_specialize(exported: true, kind: full, availability: macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *; where T == Swift::Int)
 // CHECK: public func specializeWithStdlibAvailability<T>(value: T) async
 @_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
 public func specializeWithStdlibAvailability<T>(value: T) async {}

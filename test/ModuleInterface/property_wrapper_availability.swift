@@ -60,47 +60,47 @@ public struct UnavailableWrapper<T> {
 
 // CHECK: public struct HasWrappers {
 public struct HasWrappers {
-  // CHECK:      @available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, visionOS 1.0, *)
+  // CHECK:      @available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
   // CHECK-NEXT: @Library::ConditionallyAvailableWrapper<Swift::Int> @_projectedValueProperty($conditionallyAvailable) public var conditionallyAvailable: Swift::Int {
   // CHECK-NEXT:   get
-  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, visionOS 1.0, *)
+  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
   // CHECK-NEXT:   set
-  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, visionOS 1.0, *)
+  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
   // CHECK-NEXT:   _modify
   // CHECK-NEXT: }
-  // CHECK-NEXT: @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, visionOS 1.0, *)
+  // CHECK-NEXT: @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
   // CHECK-NEXT: public var $conditionallyAvailable: Swift::Int {
   // CHECK-NEXT:   get
   // CHECK-NEXT: }
   @available(SwiftStdlib 5.2, *)
   @ConditionallyAvailableWrapper public var conditionallyAvailable: Int
 
-  // CHECK:      @available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, visionOS 1.0, *)
+  // CHECK:      @available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
   // CHECK-NEXT: @Library::ConditionallyAvailableMutableProjectionWrapper<Swift::Int> @_projectedValueProperty($mutableProjection) public var mutableProjection: Swift::Int {
   // CHECK-NEXT:   get
-  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, visionOS 1.0, *)
+  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
   // CHECK-NEXT:   set
-  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, visionOS 1.0, *)
+  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
   // CHECK-NEXT:   _modify
   // CHECK-NEXT: }
-  // CHECK-NEXT: @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, visionOS 1.0, *)
+  // CHECK-NEXT: @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
   // CHECK-NEXT: public var $mutableProjection: Swift::Int {
   // CHECK-NEXT:   get
-  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, visionOS 1.0, *)
+  // CHECK-NEXT:   @available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
   // CHECK-NEXT:   set
   // CHECK-NEXT: }
   @available(SwiftStdlib 5.2, *)
   @ConditionallyAvailableMutableProjectionWrapper public var mutableProjection: Int
 
-  // CHECK:      @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, visionOS 1.0, *)
+  // CHECK:      @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
   // CHECK-NEXT: @Library::StricterProjectionWrapper<Swift::Int> @_projectedValueProperty($stricterProjection) public var stricterProjection: Swift::Int {
   // CHECK-NEXT:   get
-  // CHECK-NEXT:   @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, visionOS 1.0, *)
+  // CHECK-NEXT:   @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
   // CHECK-NEXT:   set
-  // CHECK-NEXT:   @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, visionOS 1.0, *)
+  // CHECK-NEXT:   @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
   // CHECK-NEXT:   _modify
   // CHECK-NEXT: }
-  // CHECK-NEXT: @available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
+  // CHECK-NEXT: @available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)
   // CHECK-NEXT: public var $stricterProjection: Swift::Int {
   // CHECK-NEXT:   get
   // CHECK-NEXT: }
