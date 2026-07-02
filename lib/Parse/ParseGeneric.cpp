@@ -319,7 +319,11 @@ ParserStatus Parser::parseGenericWhereClause(
     // identifier if we're dealing with a same-type constraint.
     //
     // Note: This can be a value type, e.g. '123 == N' or 'N == 123'.
-    ParserResult<TypeRepr> FirstType = parseTypeOrValue();
+    // Only integer literals are supported as values in where clauses;
+    // full literal expressions are not yet supported here.
+    ParserResult<TypeRepr> FirstType = canParseGenericValueLiteral()
+        ? parseGenericValueLiteral()
+        : parseType();
 
     if (FirstType.hasCodeCompletion()) {
       Status.setHasCodeCompletionAndIsError();
@@ -383,7 +387,11 @@ ParserStatus Parser::parseGenericWhereClause(
       // Parse the second type.
       //
       // Note: This can be a value type, e.g. '123 == N' or 'N == 123'.
-      ParserResult<TypeRepr> SecondType = parseTypeOrValue();
+      // Only integer literals are supported as values in where clauses;
+      // full literal expressions are not yet supported here.
+      ParserResult<TypeRepr> SecondType = canParseGenericValueLiteral()
+          ? parseGenericValueLiteral()
+          : parseType();
       Status |= SecondType;
       if (SecondType.isNull())
         SecondType = makeParserResult(ErrorTypeRepr::create(Context, PreviousLoc));

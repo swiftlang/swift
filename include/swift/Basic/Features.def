@@ -297,6 +297,8 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(CAttribute, 495, "@c attribute")
 
 BASELINE_LANGUAGE_FEATURE(AnyAppleOSAvailability, 0, "Support `anyAppleOS` availability")
 
+BASELINE_LANGUAGE_FEATURE(LiteralExpressions, 0, "Support unparenthesized literal expressions")
+
 //===----------------------------------------------------------------------===//
 // MARK: - Swift 6 features
 //===----------------------------------------------------------------------===//
@@ -559,9 +561,6 @@ EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 /// Allow declaration of compile-time values bypassing
 /// syntactic legality checking
 EXPERIMENTAL_FEATURE(CompileTimeValuesPreview, false)
-
-/// Allow use of literal expressions as literals
-EXPERIMENTAL_FEATURE(LiteralExpressions, true)
 
 /// Allow function body macros applied to closures.
 EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)

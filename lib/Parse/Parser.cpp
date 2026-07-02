@@ -810,6 +810,23 @@ SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
   }
 }
 
+void Parser::skipUntilGreaterOrComma() {
+  // Track nested '<'/'>' depth so that nested generic types are skipped as a
+  // unit rather than stopping at the inner '>'.
+  unsigned depth = 0;
+  while (Tok.isNot(tok::eof, tok::pound_endif, tok::pound_else,
+                   tok::pound_elseif, tok::r_paren, tok::r_brace,
+                   tok::r_square, tok::l_brace, tok::semi)) {
+    if (depth == 0 && (startsWithGreater(Tok) || Tok.is(tok::comma)))
+      break;
+    if (startsWithLess(Tok))
+      ++depth;
+    else if (startsWithGreater(Tok))
+      --depth;
+    skipSingle();
+  }
+}
+
 void Parser::skipUntilDeclRBrace() {
   while (Tok.isNot(tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif,
@@ -873,6 +890,15 @@ bool Parser::skipUntilTokenOrEndOfLine(tok T1, tok T2) {
     skipSingle();
 
   return Tok.isAny(T1, T2) && !Tok.isAtStartOfLine();
+}
+
+bool Parser::skipUntilOfOrEndOfLine() {
+  while (!Tok.isContextualKeyword("of") && !Tok.isAtStartOfLine() &&
+         Tok.isNot(tok::eof, tok::r_paren, tok::r_brace, tok::r_square,
+                   tok::l_brace, tok::semi))
+    skipSingle();
+
+  return Tok.isContextualKeyword("of") && !Tok.isAtStartOfLine();
 }
 
 bool Parser::parseEndIfDirective(SourceLoc &Loc) {

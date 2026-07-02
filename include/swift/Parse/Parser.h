@@ -625,6 +625,9 @@ public:
   /// composition.
   SourceLoc skipUntilGreaterInTypeList(bool protocolComposition = false);
 
+  void skipUntilGreaterOrComma();
+  bool skipUntilOfOrEndOfLine();
+
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
   void skipUntilDeclRBrace();
 
@@ -1415,10 +1418,10 @@ public:
   ParserResult<TypeRepr> parseTypeSimple(
       Diag<> MessageID, ParseTypeReason reason);
 
-  ParserResult<TypeRepr> parseTypeOrValue();
+  ParserResult<TypeRepr> parseGenericArgument();
   ParserResult<TypeRepr>
-  parseTypeOrValue(Diag<> MessageID,
-                   ParseTypeReason reason = ParseTypeReason::Unspecified);
+  parseGenericArgument(Diag<> MessageID,
+                       ParseTypeReason reason = ParseTypeReason::Unspecified);
 
   /// Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
@@ -1739,7 +1742,7 @@ public:
   /// generic parameter list. If the parse fails, or the closing '>' is not
   /// followed by one of the above tokens, then this function returns false,
   /// and the expression will parse with the '<' as an operator.
-  bool canParseAsGenericArgumentList();
+  bool canParseAsGenericArgumentList(bool isGenericArgTypeExpr = false);
 
   bool canParseTypeSimple();
   bool canParseTypeSimpleOrComposition();
@@ -1793,15 +1796,21 @@ public:
   ParserResult<Expr> parseExprArrow();
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
-                                       bool isForConditionalDirective = false);
+                                       bool isForConditionalDirective,
+                                       bool isGenericArgTypeExpr);
   ParserResult<Expr> parseExprSequenceElement(Diag<> ID,
-                                              bool isExprBasic);
+                                              bool isExprBasic,
+                                              bool isGenericArgTypeExpr);
   ParserResult<Expr> parseExprPostfixSuffix(ParserResult<Expr> inner,
                                             bool isExprBasic,
-                                            bool periodHasKeyPathBehavior);
-  ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
-  ParserResult<Expr> parseExprPrimary(Diag<> ID, bool isExprBasic);
-  ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
+                                            bool periodHasKeyPathBehavior,
+                                            bool isGenericArgTypeExpr);
+  ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic,
+                                      bool isGenericArgTypeExpr);
+  ParserResult<Expr> parseExprPrimary(Diag<> ID, bool isExprBasic,
+                                      bool isGenericArgTypeExpr = false);
+  ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic,
+                                    bool isGenericArgTypeExpr);
   ParserResult<Expr> parseExprKeyPathObjC();
   ParserResult<Expr> parseExprKeyPath();
   ParserResult<Expr> parseExprSelector();
@@ -1910,7 +1919,8 @@ public:
       DiagRef diag);
 
   ParserResult<Expr> parseExprIdentifier(bool allowKeyword,
-                                         bool allowModuleSelector = true);
+                                         bool allowModuleSelector = true,
+                                         bool isGenericArgTypeExpr = false);
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
 
@@ -2084,6 +2094,8 @@ public:
   ParserStatus
   parseProtocolOrAssociatedTypeWhereClause(TrailingWhereClause *&trailingWhere,
                                            bool isProtocol);
+
+  bool isGenericArgumentExpressionDelimiter();
 
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing
