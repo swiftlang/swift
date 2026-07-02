@@ -330,7 +330,6 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
     StringRef printedValueCopy(context.AllocateCopy(printedValue));
     if (value.getKind() == clang::APValue::Int) {
       // Check if "type" is Bool or a C++ enum with an underlying type of Bool.
-      // NOTE: This must match the condition in `importNumericLiteral`.
       if (isBoolOrBoolEnumType(type)) {
         auto *boolExpr = new (context)
             BooleanLiteralExpr(value.getInt().getBoolValue(), SourceLoc(),
@@ -341,17 +340,35 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
 
         expr = boolExpr;
       } else {
+        auto *intDecl = literalType->getAnyNominal();
+        // The resolved literal type may not be a primitive integer — for
+        // example, when a `swift_wrapper(struct)` is layered on a typedef
+        // whose underlying type is itself imported as a wrapper struct
+        // (rather than a primitive integer). In that case there is no
+        // `ExpressibleByBuiltinIntegerLiteral` conformance to look up.
+        // Bail out and let the caller import the constant as an external
+        // declaration instead of asserting.
+        auto initRef = context.getIntBuiltinInitDecl(intDecl);
+        if (!initRef)
+          return nullptr;
+
         auto *intExpr =
             new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
                                              /*Implicit=*/true);
 
-        auto *intDecl = literalType->getAnyNominal();
-        intExpr->setBuiltinInitializer(context.getIntBuiltinInitDecl(intDecl));
+        intExpr->setBuiltinInitializer(initRef);
         intExpr->setType(literalType);
 
         expr = intExpr;
       }
     } else {
+      auto *floatDecl = literalType->getAnyNominal();
+      // See the integer case above: the resolved literal type may not have
+      // an `ExpressibleByBuiltinFloatLiteral` conformance.
+      auto initRef = context.getFloatBuiltinInitDecl(floatDecl);
+      if (!initRef)
+        return nullptr;
+
       auto *floatExpr =
           new (context) FloatLiteralExpr(printedValueCopy, SourceLoc(),
                                          /*Implicit=*/true);
@@ -359,9 +376,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
       auto maxFloatTypeDecl = context.get_MaxBuiltinFloatTypeDecl();
       floatExpr->setBuiltinType(maxFloatTypeDecl->getUnderlyingType());
 
-      auto *floatDecl = literalType->getAnyNominal();
-      floatExpr->setBuiltinInitializer(
-          context.getFloatBuiltinInitDecl(floatDecl));
+      floatExpr->setBuiltinInitializer(initRef);
       floatExpr->setType(literalType);
 
       expr = floatExpr;
