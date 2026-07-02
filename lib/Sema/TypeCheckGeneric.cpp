@@ -969,6 +969,11 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // Self or its associated types will infer default requirements in
     // ordinary extensions of that protocol, so the signature can differ there.
     if (auto *proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
+      // The synthesized COM `IID` extension has no generic signature: its
+      // member lives on the protocol metatype and cannot reference `Self`.
+      if (isCOMInterfaceIDExtension(ext))
+        return nullptr;
+
       if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
           proto->getInverseRequirements().empty()) {
         return extendedNominal->getGenericSignatureOfContext();

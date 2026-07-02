@@ -531,6 +531,11 @@ swift::isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member) {
     return ExistentialMemberAccessLimitation::None;
   }
 
+  // The synthesized COM `IID` lives on the protocol metatype and does not
+  // reference `Self`, so it is always available on the existential.
+  if (isCOMInterfaceIDMember(member))
+    return ExistentialMemberAccessLimitation::None;
+
   auto &ctx = member->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(baseTy);
 

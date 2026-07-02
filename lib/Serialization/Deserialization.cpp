@@ -5512,7 +5512,11 @@ public:
     }
 
 #ifndef NDEBUG
-    if (outerParams) {
+    // The synthesized COM `IID` extension is a protocol extension, so it keeps
+    // its `Self` parameter list for name lookup, but it is deliberately given
+    // no generic signature (its member lives on the protocol metatype).  That
+    // intentional mismatch would trip the check below, so skip it.
+    if (outerParams && !isCOMInterfaceIDExtension(extension)) {
       unsigned paramCount = 0;
       for (auto *paramList = outerParams;
            paramList != nullptr;

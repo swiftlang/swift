@@ -672,6 +672,12 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     if (!isPlausibleTypo(refKind, corrections.WrittenName, decl))
       return;
 
+    // The synthesized COM `IID` is not a plausible correction on a conforming
+    // type; it is only available on the protocol metatype.
+    if (isCOMInterfaceIDMember(decl) && baseTypeOrNull &&
+        !baseTypeOrNull->isExistentialType())
+      return;
+
     const auto candidateName = decl->getName();
 
     // Don't waste time computing edit distances that are more than
