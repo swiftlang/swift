@@ -511,8 +511,8 @@ public:
       // Distributed functions emit a number of thunks that we need to replicate here.
 
       // Record the 'distributed_thunk'
-      if (auto distributedThunk = AFD->getDistributedThunk()) {
-        auto thunk = SILDeclRef(distributedThunk).asDistributed();
+      if (AFD->getDistributedThunk()) {
+        auto thunk = SILDeclRef(AFD).getDistributedThunkDeclRef();
         addFunction(thunk);
         addAsyncFunctionPointer(thunk);
       }

@@ -507,7 +507,8 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
   }
   case Kind::DistributedThunkAsyncFunctionPointer: {
     std::string Result = getSILDeclRef().mangle();
-    Result.append("TE");
+    assert(StringRef(Result).ends_with("TE") &&
+           "expected distributed thunk mangling ending with 'TE'");
     Result.append("Tu");
     return Result;
   }
@@ -626,7 +627,7 @@ SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
 SILDeclRef LinkEntity::getSILDeclRef() const {
   auto ref = SILDeclRef(const_cast<ValueDecl *>(getDecl()), getSILDeclRefKind());
   if (getKind() == Kind::DistributedAccessor)
-    return ref.asDistributed();
+    return ref.getDistributedThunkDeclRef();
   return ref;
 }
 
