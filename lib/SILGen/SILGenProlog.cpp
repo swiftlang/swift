@@ -625,7 +625,7 @@ public:
       if (emitIntoTemporary)
         return temporary->getManagedAddress();
 
-      // Otherwise, signal that we emitted into the provided intialization.
+      // Otherwise, signal that we emitted into the provided initialization.
       return ManagedValue::forInContext();
     }
 
