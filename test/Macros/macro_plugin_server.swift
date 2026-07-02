@@ -89,7 +89,7 @@
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[{"fixIts":[],"highlights":[{{{.*}}}],"message":"type 'MacroDefinition.TypeDoesNotExist' could not be found in library plugin '{{.*}}MacroDefinition.{{dylib|so|dll}}'","notes":[],"position":{{{.*}}},"severity":"error"}]}}
 // CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"notMacro","typeName":"NotMacroStruct"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{{({.+})}},"source":"#notMacro()"}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[{"fixIts":[],"highlights":[{{{.*}}}],"message":"type 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '{{.*}}MacroDefinition.{{dylib|so|dll}}'","notes":[],"position":{{{.*}}},"severity":"error"}]}}
-// CHECK-NEXT: ->(plugin:[[#PID2]]) {{$}}
+// CHECK-NOT: ->(plugin:[[#PID2]]) {{$}}
 
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 @freestanding(expression) macro evil(_ value: Int) -> String = #externalMacro(module: "EvilMacros", type: "CrashingMacro")

@@ -66,6 +66,12 @@ llvm::Error InProcessPlugins::sendMessage(llvm::StringRef message) {
   assert(receivedResponse.empty() &&
          "sendMessage() called before consuming previous response?");
 
+  // Empty messages are a stream-level termination signal for pipe-backed
+  // executable plugins. The in-process plugin server handles one complete
+  // request per call, so there is no stream to tear down.
+  if (message.empty())
+    return llvm::Error::success();
+
   if (shouldDumpMessaging()) {
     llvm::dbgs() << "->(plugin:0) " << message << '\n';
   }
@@ -170,16 +176,6 @@ PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox) {
 
   storage = std::move(plugin);
   return storage.get();
-}
-
-LoadedExecutablePlugin::~LoadedExecutablePlugin() {
-  if (Process) {
-    // If the process is alive, send an empty message as the termination signal.
-    // The plugin should exit itself when receiving it.
-    if (auto error = sendMessage(""))
-      llvm::consumeError(std::move(error));
-    Process.reset();
-  }
 }
 
 llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
