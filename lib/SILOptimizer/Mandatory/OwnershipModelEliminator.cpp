@@ -29,6 +29,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -943,6 +944,9 @@ struct OwnershipModelEliminator : SILModuleTransform {
     for (SILFunction &f : *getModule()) {
       if (!f.hasOwnership())
         continue;
+
+      PrettyStackTraceSILFunction stackTrace(
+          "running ownership model elimination on", &f);
 
       // Verify here to make sure ownership is correct before we strip.
       {
