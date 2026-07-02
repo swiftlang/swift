@@ -202,9 +202,143 @@ import Swift
 %   TASK_CREATE_FN = 'Builtin.createTask'
 % end
 
+%{
+# Per-variant unique helper name. Both the Copyable-only public wrapper
+# (preserved ABI at the original availability) and the noncopyable public
+# wrapper (gated at SwiftStdlib 6.5) delegate to it.
+HELPER_NAME = (
+  '_addTaskImpl_'
+  + TYPE
+  + ('_AUC' if IS_ADD_UNLESS_CANCELLED else '')
+  + ('_X' if HAS_TASK_EXECUTOR else '')
+)
+
+# Forwarding argument list for wrapper -> helper.
+def addtask_helper_args():
+  names = []
+  for p in adjust_params_for_group_kind(PARAMS):
+    head = p.split(':')[0]
+    tokens = [t for t in head.strip().split() if not t.startswith('@')]
+    if len(tokens) >= 2:
+      label, local = tokens[-2], tokens[-1]
+    else:
+      label = local = tokens[-1]
+    names.append(f'{label}: {local}')
+  return ', '.join(names)
+}%
+
 % if IFDEF:
 #if ${IFDEF}
 % end
+
+% # Internal helper carrying the shared addTask body. Both the Copyable-only
+% # public wrapper (preserved ABI at the original availability) and the
+% # noncopyable public wrapper (gated at SwiftStdlib 6.5) delegate to this
+% # helper. Discarding task groups have no ChildTaskResult and the
+% # unavailable task-to-thread variant has no body, so we skip emission.
+% if not IS_DISCARDING and not IS_IMPL_UNAVAILABLE:
+% if HAS_TASK_EXECUTOR:
+@available(SwiftStdlib 6.0, *)
+% else:
+@available(SwiftStdlib 5.1, *)
+% end
+extension ${TYPE} where ChildTaskResult: ~Copyable {
+  @_alwaysEmitIntoClient
+  internal mutating func ${HELPER_NAME}(
+    ${",\n    ".join(adjust_params_for_group_kind(PARAMS))}
+  ) ${ARROW_RETURN_TYPE}{
+    % if IS_ADD_UNLESS_CANCELLED:
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
+
+    guard canAdd else {
+      return false
+    }
+    % end # IS_ADD_UNLESS_CANCELLED
+
+    let flags = taskCreateFlags(
+      priority: ${'priority' if HAS_TASK_PRIORITY else 'nil'},
+      isChildTask: true,
+      copyTaskLocals: false,
+      inheritContext: false,
+      % if IS_TASK_TO_THREAD_MODEL:
+      enqueueJob: false,
+      % else:
+      enqueueJob: true,
+      % end
+      % if IS_ADD_UNLESS_CANCELLED:
+      % # In this case, we already added the pending task count before we create the task
+      % # so we must not add to the pending counter again.
+      addPendingGroupTaskUnconditionally: false,
+      % else:
+      addPendingGroupTaskUnconditionally: true,
+      % end
+      isDiscardingTask: false,
+      isSynchronousStart: false
+    )
+
+    let builtinSerialExecutor =
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
+    var task: Builtin.NativeObject?
+
+    % # These #if conditionals are in specific order because if we have the "latest one",
+    % # we definitely have the prior ones, as we always keep adding parameters.
+    % if HAS_TASK_NAME:
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      task =
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          ${TASK_CREATE_FN}(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            taskGroup: _group,
+            % if HAS_TASK_EXECUTOR:
+            initialTaskExecutorConsuming: taskExecutor,
+            % end
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+    }
+    #endif // $BuiltinCreateAsyncTaskName
+    % end # HAS_TASK_NAME
+
+    % if HAS_TASK_EXECUTOR:
+    if task == nil, let taskExecutor {
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task = ${TASK_CREATE_FN}(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        taskGroup: _group,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+      #else
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+      task = ${TASK_CREATE_FN}(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        taskGroup: _group,
+        initialTaskExecutor: executorBuiltin,
+        operation: operation).0
+      #endif
+    }
+    % end
+
+    if task == nil {
+      task = ${TASK_CREATE_FN}(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        taskGroup: _group,
+        operation: operation).0
+    }
+
+    assert(task != nil, "Expected task to be created!")
+    % if IS_ADD_UNLESS_CANCELLED:
+    return true // task successfully enqueued
+    % end
+  }
+}
+% end # not IS_DISCARDING and not IS_IMPL_UNAVAILABLE
 
 % if HAS_TASK_EXECUTOR:
 @available(SwiftStdlib 6.0, *)
@@ -212,6 +346,12 @@ import Swift
 @available(SwiftStdlib 5.9, *)
 % else:
 @available(SwiftStdlib 5.1, *)
+% end
+% if not IS_DISCARDING:
+% # Generate the original Copyable-only wrapping extension at the original
+% # availability so the shipped ABI is preserved. The body below works
+% # identically for Copyable ChildTaskResult; a separate noncopyable overload
+% # is emitted at SwiftStdlib 6.5 at the end of this variant.
 % end
 extension ${TYPE} {
 
@@ -254,7 +394,8 @@ extension ${TYPE} {
   ) ${ARROW_RETURN_TYPE}{
     % if IS_IMPL_UNAVAILABLE:
     fatalError("Unavailable in task-to-thread concurrency model")
-    % else: # !IS_IMPL_UNAVAILABLE
+    % elif IS_DISCARDING:
+    % # Discarding groups have no shared helper; inline body retained.
     % if IS_ADD_UNLESS_CANCELLED:
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
@@ -270,7 +411,6 @@ extension ${TYPE} {
       copyTaskLocals: false,
       inheritContext: false,
       % if IS_TASK_TO_THREAD_MODEL:
-      // task-to-thread model; don't enqueue as we'll run inline
       enqueueJob: false,
       % else:
       enqueueJob: true,
@@ -313,7 +453,6 @@ extension ${TYPE} {
     % end # HAS_TASK_NAME
 
     % if HAS_TASK_EXECUTOR:
-    // Task name was not set, or task name createTask is unavailable
     if task == nil, let taskExecutor {
       #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
       task = ${TASK_CREATE_FN}(
@@ -323,7 +462,6 @@ extension ${TYPE} {
         initialTaskExecutorConsuming: taskExecutor,
         operation: operation).0
       #else
-      // legacy branch for the non-consuming task executor
       let executorBuiltin: Builtin.Executor =
         taskExecutor.asUnownedTaskExecutor().executor
 
@@ -337,7 +475,6 @@ extension ${TYPE} {
     }
     % end
 
-    % # The baseline fallback, if no other create calls could be used
     if task == nil {
       task = ${TASK_CREATE_FN}(
         flags: flags,
@@ -346,19 +483,51 @@ extension ${TYPE} {
         operation: operation).0
     }
 
-    // Assert that we did create the task, but there's no need to store it,
-    // as it was added to the group itself.
     assert(task != nil, "Expected task to be created!")
     % if IS_ADD_UNLESS_CANCELLED:
     return true // task successfully enqueued
     % end
-    % end # !IS_IMPL_UNAVAILABLE
+    % else: # non-discarding, non-unavailable: delegate to helper
+    % if IS_ADD_UNLESS_CANCELLED:
+    return self.${HELPER_NAME}(${addtask_helper_args()})
+    % else:
+    self.${HELPER_NAME}(${addtask_helper_args()})
+    % end
+    % end
   }
 
 }
 % if IFDEF:
 #endif
 % end
+
+% # Noncopyable overload, gated at SwiftStdlib 6.5. Construction of a
+% # TaskGroup<NC>/ThrowingTaskGroup<NC> child task is the only way to put a
+% # noncopyable value into the group's future-wait machinery, so gating it
+% # here keeps the (otherwise-trap-on-old-runtime) wait paths unreachable
+% # by construction on older runtimes. Discarding groups have no child
+% # result, so no noncopyable overload is required.
+% if not IS_DISCARDING and not IS_IMPL_UNAVAILABLE:
+% if IFDEF:
+#if ${IFDEF}
+% end
+@available(SwiftStdlib 6.5, *)
+extension ${TYPE} where ChildTaskResult: ~Copyable {
+  @inlinable
+  public mutating func ${METHOD_NAME}( // ${TYPE}/${METHOD_NAME}
+    ${",\n    ".join(adjust_params_for_group_kind(PARAMS))}
+  ) ${ARROW_RETURN_TYPE}{
+    % if IS_ADD_UNLESS_CANCELLED:
+    return self.${HELPER_NAME}(${addtask_helper_args()})
+    % else:
+    self.${HELPER_NAME}(${addtask_helper_args()})
+    % end
+  }
+}
+% if IFDEF:
+#endif
+% end
+% end # not IS_DISCARDING and not IS_IMPL_UNAVAILABLE
 
 % end
 % end

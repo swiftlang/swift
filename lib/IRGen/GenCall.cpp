@@ -179,6 +179,8 @@ FunctionPointerKind::getStaticAsyncContextSize(IRGenModule &IGM) const {
   switch (getSpecialKind()) {
   case SpecialKind::TaskFutureWaitThrowing:
   case SpecialKind::TaskFutureWait:
+  case SpecialKind::TaskFutureWaitTake:
+  case SpecialKind::TaskFutureWaitTakeThrowing:
   case SpecialKind::AsyncLetWait:
   case SpecialKind::AsyncLetWaitThrowing:
   case SpecialKind::AsyncLetGet:

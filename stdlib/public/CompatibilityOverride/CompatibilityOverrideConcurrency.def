@@ -180,6 +180,27 @@ OVERRIDE_TASK(task_future_wait_throwing, void,
                AsyncContext *callContext),
               (result, callerContext, task, resumeFunction, callContext))
 
+// Take-flavored variants. Used when the awaited Success is `~Copyable`: the
+// runtime moves the result out of the future fragment instead of copying it,
+// and traps if a take is attempted twice. Routed at compile time by the
+// `_taskFutureTake[Throwing]` Swift hooks.
+OVERRIDE_TASK(task_future_wait_take, void, SWIFT_EXPORT_FROM(swift_Concurrency),
+              SWIFT_CC(swiftasync), swift::,
+              (OpaqueValue *result,
+               SWIFT_ASYNC_CONTEXT AsyncContext *callerContext, AsyncTask *task,
+               TaskContinuationFunction *resumeFunction,
+               AsyncContext *callContext),
+              (result, callerContext, task, resumeFunction, callContext))
+
+OVERRIDE_TASK(task_future_wait_take_throwing, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+              swift::,
+              (OpaqueValue *result,
+               SWIFT_ASYNC_CONTEXT AsyncContext *callerContext, AsyncTask *task,
+               ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+               AsyncContext *callContext),
+              (result, callerContext, task, resumeFunction, callContext))
+
 OVERRIDE_TASK(continuation_resume, void, SWIFT_EXPORT_FROM(swift_Concurrency),
               SWIFT_CC(swift), swift::,
               (AsyncTask *continuation),

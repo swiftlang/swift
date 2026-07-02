@@ -180,6 +180,8 @@ namespace irgen {
     enum class SpecialKind {
       TaskFutureWait,
       TaskFutureWaitThrowing,
+      TaskFutureWaitTake,
+      TaskFutureWaitTakeThrowing,
       AsyncLetWait,
       AsyncLetWaitThrowing,
       AsyncLetGet,
@@ -261,6 +263,8 @@ namespace irgen {
       switch (getSpecialKind()) {
       case SpecialKind::TaskFutureWaitThrowing:
       case SpecialKind::TaskFutureWait:
+      case SpecialKind::TaskFutureWaitTake:
+      case SpecialKind::TaskFutureWaitTakeThrowing:
       case SpecialKind::AsyncLetWait:
       case SpecialKind::AsyncLetWaitThrowing:
       case SpecialKind::AsyncLetGet:
@@ -293,6 +297,8 @@ namespace irgen {
       switch (getSpecialKind()) {
       case SpecialKind::TaskFutureWaitThrowing:
       case SpecialKind::TaskFutureWait:
+      case SpecialKind::TaskFutureWaitTake:
+      case SpecialKind::TaskFutureWaitTakeThrowing:
       case SpecialKind::AsyncLetWait:
       case SpecialKind::AsyncLetWaitThrowing:
       case SpecialKind::AsyncLetGet:

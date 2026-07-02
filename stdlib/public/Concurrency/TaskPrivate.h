@@ -341,10 +341,23 @@ public:
   OpaqueValue *successResultPointer;
   void *_reserved;
 
-  void fillWithSuccess(AsyncTask::FutureFragment *future) {
+  void fillWithSuccess(AsyncTask::FutureFragment *future, bool wantsTake) {
     OpaqueValue *src = future->getStoragePtr();
     OpaqueValue *result = successResultPointer;
-    future->getResultType().vw_initializeWithCopy(result, src);
+    if (wantsTake) {
+      if (!future->tryClaimResult()) {
+        swift_Concurrency_fatalError(
+          0, "Task result was moved out by a prior take()");
+      }
+      future->getResultType().vw_initializeWithTake(result, src);
+    } else {
+      // FIXME: races with a concurrent take — see resultMovedOut FIXME.
+      if (SWIFT_UNLIKELY(future->wasResultMovedOut())) {
+        swift_Concurrency_fatalError(
+          0, "Task result was moved out by a prior take()");
+      }
+      future->getResultType().vw_initializeWithCopy(result, src);
+    }
   }
 
   void fillWithError(AsyncTask::FutureFragment *future) {
