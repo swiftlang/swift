@@ -581,6 +581,7 @@ extension String {
   ///
   ///     print(String(describing: p))
   ///     // Prints "(21, 30)"
+  @_disfavoredOverload
   public init<Subject>(describing instance: Subject) {
     self.init()
     _print_unlocked(instance, &self)
@@ -639,6 +640,17 @@ extension String {
 
   /// Creates a string representing the given value.
   ///
+  /// This overload borrows a noncopyable or nonescapable `instance` instead of
+  /// consuming it. See `init(describing:)` for the full discussion.
+  @_alwaysEmitIntoClient @_disfavoredOverload
+  public init<
+    Subject: CustomStringConvertible & ~Copyable & ~Escapable
+  >(describing instance: borrowing Subject) {
+    self = instance.description
+  }
+
+  /// Creates a string representing the given value.
+  ///
   /// Use this initializer to convert an instance of any type to its preferred
   /// representation as a `String` instance. The initializer creates the
   /// string representation of `instance` in one of the following ways,
@@ -678,6 +690,18 @@ extension String {
   ///     // Prints "(21, 30)"
   @inlinable
   public init<Subject: TextOutputStreamable>(describing instance: Subject) {
+    self.init()
+    instance.write(to: &self)
+  }
+
+  /// Creates a string representing the given value.
+  ///
+  /// This overload borrows a noncopyable or nonescapable `instance` instead of
+  /// consuming it. See `init(describing:)` for the full discussion.
+  @_alwaysEmitIntoClient @_disfavoredOverload
+  public init<
+    Subject: TextOutputStreamable & ~Copyable & ~Escapable
+  >(describing instance: borrowing Subject) {
     self.init()
     instance.write(to: &self)
   }
@@ -724,6 +748,18 @@ extension String {
   @inlinable
   public init<Subject>(describing instance: Subject)
     where Subject: CustomStringConvertible & TextOutputStreamable
+  {
+    self = instance.description
+  }
+
+  /// Creates a string representing the given value.
+  ///
+  /// This overload borrows a noncopyable or nonescapable `instance` instead of
+  /// consuming it. See `init(describing:)` for the full discussion.
+  @_alwaysEmitIntoClient @_disfavoredOverload
+  public init<
+    Subject: CustomStringConvertible & TextOutputStreamable & ~Copyable & ~Escapable
+  >(describing instance: borrowing Subject)
   {
     self = instance.description
   }
@@ -775,6 +811,7 @@ extension String {
   ///
   ///     print(String(reflecting: p))
   ///     // Prints "Point(x: 21, y: 30)"
+  @_disfavoredOverload
   public init<Subject>(reflecting subject: Subject) {
     self.init()
     _debugPrint_unlocked(subject, &self)

@@ -138,6 +138,36 @@ public func expectPrinted<T>(
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 
+@_disfavoredOverload
+public func expectPrinted<T: CustomStringConvertible & ~Copyable & ~Escapable>(
+  expectedOneOf patterns: [String], _ object: borrowing T,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) {
+  let actual = String(describing: object)
+  if !patterns.contains(actual) {
+    expectationFailure(
+      "expected: any of \(String(reflecting: patterns))\n"
+      + "actual: \(String(reflecting: actual))",
+      trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  }
+}
+
+@_disfavoredOverload
+public func expectPrinted<T: CustomStringConvertible & ~Copyable & ~Escapable>(
+  _ expected: String, _ object: borrowing T,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) {
+  expectPrinted(expectedOneOf: [expected], object, message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+}
+
 public func expectDebugPrinted<T>(
   expectedOneOf patterns: [String], _ object: T,
   _ message: @autoclosure () -> String = "",
