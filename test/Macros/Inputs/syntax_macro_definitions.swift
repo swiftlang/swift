@@ -513,6 +513,79 @@ extension AccessorBlockSyntax {
   }
 }
 
+public struct LazyMacro {}
+
+extension LazyMacro: AccessorMacro, Macro {
+  public static func expansion(
+    of node: SwiftSyntax.AttributeSyntax,
+    providingAccessorsOf declaration: some SwiftSyntax.DeclSyntaxProtocol,
+    in context: some SwiftSyntaxMacros.MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    guard
+      let varDecl = declaration.as(VariableDeclSyntax.self),
+      let binding = varDecl.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.trimmed,
+      let initializer: ExprSyntax = binding.initializer?.value.trimmed
+    else {
+      return []
+    }
+
+    return [
+      """
+
+        mutating get {
+          if let value = _\(identifier).wrappedValue {
+            return value
+          }
+          let newValue = \(initializer)
+          _\(identifier).wrappedValue = newValue
+          return newValue
+        }
+      """,
+      """
+
+        set {
+          _\(identifier).wrappedValue = newValue
+        }
+      """,
+    ]
+  }
+}
+
+public struct EagerMacro {}
+
+extension EagerMacro: AccessorMacro, Macro {
+  public static func expansion(
+    of node: SwiftSyntax.AttributeSyntax,
+    providingAccessorsOf declaration: some SwiftSyntax.DeclSyntaxProtocol,
+    in context: some SwiftSyntaxMacros.MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    guard
+      let varDecl = declaration.as(VariableDeclSyntax.self),
+      let binding = varDecl.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.trimmed
+    else {
+      return []
+    }
+
+    return [
+      """
+
+        @storageRestrictions(initializes: _\(identifier))
+        init(initialValue) {
+          _\(identifier) = .init(storage: initialValue)
+        }
+      """,
+      """
+
+        get {
+          _\(identifier).wrappedValue
+        }
+      """,
+    ]
+  }
+}
+
 public struct PropertyWrapperSkipsComputedMacro {}
 
 extension PropertyWrapperSkipsComputedMacro: AccessorMacro, Macro {

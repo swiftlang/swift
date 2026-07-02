@@ -25,6 +25,14 @@ macro myPropertyWrapper() =
 macro myPropertyWrapperSkipsComputed() =
     #externalMacro(module: "MacroDefinition", type: "PropertyWrapperSkipsComputedMacro")
 
+@attached(accessor, names: named(get), named(set))
+macro Lazy() =
+    #externalMacro(module: "MacroDefinition", type: "LazyMacro")
+
+@attached(accessor, names: named(get), named(init))
+macro Eager() =
+    #externalMacro(module: "MacroDefinition", type: "EagerMacro")
+
 struct Date { }
 
 struct MyWrapperThingy<T> {
@@ -47,6 +55,8 @@ struct MyStruct {
   var _name: MyWrapperThingy<String> = .init(storage: "Hello")
   var _birthDate: MyWrapperThingy<Date?> = .init(storage: nil)
   var _favoriteColor: MyWrapperThingy<String> = .init(storage: "Blue")
+  var _expensiveToInitialize: MyWrapperThingy<String?> = .init(storage: nil)
+  var _bestVegetable: MyWrapperThingy<String> = .init(storage: "Broccoli")
 
   @myPropertyWrapper
   var name: String
@@ -77,6 +87,24 @@ struct MyStruct {
   var favoriteColor: String {
     didSet { fatalError("Boom") }
   }
+  
+  @Lazy
+  var expensiveToInitialize = favoriteColor
+  // CHECK-DUMP: @__swiftmacro_15accessor_macros8MyStructV21expensiveToInitialize4LazyfMa_.swift
+  // CHECK-DUMP: mutating get {
+  // CHECK-DUMP:   if let value = _expensiveToInitialize.wrappedValue {
+  // CHECK-DUMP:     return value
+  // CHECK-DUMP:   }
+  // CHECK-DUMP:   let newValue = favoriteColor
+  // CHECK-DUMP:   _expensiveToInitialize.wrappedValue = newValue
+  // CHECK-DUMP:   return newValue
+  // CHECK-DUMP: }
+  // CHECK-DUMP: set {
+  // CHECK-DUMP:   _expensiveToInitialize.wrappedValue = newValue
+  // CHECK-DUMP: }
+  
+  @Eager
+  var bestVegetable: String = "Broccoli"
 }
 
 // Test that the fake-property-wrapper-introduced accessors execute properly at
@@ -86,15 +114,31 @@ var ms = MyStruct()
 // CHECK: Getting value Hello
 _ = ms.name
 
+// CHECK-NEXT: Getting value nil
+// CHECK-NEXT: Getting value Blue
+// CHECK-NEXT: Setting value Optional("Blue")
+_ = ms.expensiveToInitialize
+
+// CHECK-NEXT: Getting value Optional("Blue")
+_ = ms.expensiveToInitialize
+
+// CHECK-NEXT: Getting value Broccoli
+_ = ms.bestVegetable
+
 // CHECK-NEXT: Setting value World
 ms.name = "World"
 
 // CHECK-NEXT: Setting value Yellow
 ms.favoriteColor = "Yellow"
 
+// CHECK-NEXT: Setting value Optional("Avocado")
+ms.expensiveToInitialize = "Avocado"
+
 #if TEST_DIAGNOSTICS
 struct MyBrokenStruct {
   var _birthDate: MyWrapperThingy<Date?> = .init(storage: nil)
+  var _notLazy: MyWrapperThingy<String>
+  let initialValueForNotLazy = "self is not available when initializing `notLazy`!"
 
   // expected-note@+1 2{{in expansion of macro 'myPropertyWrapper' on property 'birthDate' here}}
   @myPropertyWrapper
@@ -117,6 +161,10 @@ struct MyBrokenStruct {
     set { fatalError("Boom") }
     // expected-note @-1{{previous definition of setter here}}
   }
+  
+  // expected-error@+2{{cannot use instance member 'initialValueForNotLazy' within property initializer; property initializers run before 'self' is available}}
+  @Eager
+  var notLazy = initialValueForNotLazy
 }
 
 // expected-error@+1{{'accessor' macro cannot be attached to struct ('CannotHaveAccessors')}}
