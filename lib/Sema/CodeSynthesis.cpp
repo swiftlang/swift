@@ -1440,24 +1440,6 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   case ImplicitMemberAction::ResolveImplicitInit:
     TypeChecker::addImplicitConstructors(target);
     break;
-  case ImplicitMemberAction::ResolveCodingKeys: {
-    // CodingKeys is a special type which may be synthesized as part of
-    // Encodable/Decodable conformance. If the target conforms to either
-    // protocol and would derive conformance to either, the type may be
-    // synthesized.
-    // If the target conforms to either and the conformance has not yet been
-    // evaluated, then we should do that here.
-    //
-    // Try to synthesize Decodable first. If that fails, try to synthesize
-    // Encodable. If either succeeds and CodingKeys should have been
-    // synthesized, it will be synthesized.
-    auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
-    auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-    if (!evaluateTargetConformanceTo(decodableProto)) {
-      (void)evaluateTargetConformanceTo(encodableProto);
-    }
-  }
-    break;
   case ImplicitMemberAction::ResolveEncodable: {
     // encode(to:) may be synthesized as part of derived conformance to the
     // Encodable protocol.
@@ -1477,6 +1459,57 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     (void)evaluateTargetConformanceTo(decodableProto);
     break;
   }
+  }
+  return std::make_tuple<>();
+}
+
+evaluator::SideEffect
+SynthesizeCodingKeysRequest::evaluate(Evaluator &evaluator,
+                                      NominalTypeDecl *target) const {
+  ASSERT(!isa<ProtocolDecl>(target));
+
+  auto &Context = target->getASTContext();
+
+  // If the user has already defined CodingKeys explicitly, there is nothing
+  // to synthesize. Skipping conformance evaluation here is what makes the
+  // request safe to invoke from member lookup paths that may execute while
+  // StoredPropertiesRequest is active (e.g. resolving CodingKeys.foo inside
+  // a property wrapper initializer).
+  if (!target->lookupDirect(DeclName(Context.Id_CodingKeys)).empty())
+    return std::make_tuple<>();
+
+  // Checks whether the target conforms to the given protocol and, if the
+  // conformance is incomplete, forces it. CodingKeys is synthesized as a
+  // side effect of Codable conformance derivation.
+  auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
+    if (!protocol)
+      return false;
+
+    auto targetType = target->getDeclaredInterfaceType();
+    auto ref = lookupConformance(targetType, protocol);
+    if (ref.isInvalid()) {
+      return false;
+    }
+
+    if (auto *conformance = dyn_cast<NormalProtocolConformance>(
+            ref.getConcrete()->getRootConformance())) {
+      evaluateOrDefault(evaluator,
+                        ResolveTypeWitnessesRequest{conformance},
+                        evaluator::SideEffect());
+
+      if (!evaluator.hasActiveRequest(ResolveValueWitnessesRequest{conformance})) {
+        conformance->resolveValueWitnesses();
+      }
+    }
+
+    return true;
+  };
+
+  // Try Decodable first; fall back to Encodable.
+  auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
+  auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
+  if (!evaluateTargetConformanceTo(decodableProto)) {
+    (void)evaluateTargetConformanceTo(encodableProto);
   }
   return std::make_tuple<>();
 }

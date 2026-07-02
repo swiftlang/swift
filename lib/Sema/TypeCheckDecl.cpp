@@ -2942,8 +2942,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     // Force it into existence.
     (void) evaluateOrDefault(
       ctx.evaluator,
-      ResolveImplicitMemberRequest{nominal,
-                 ImplicitMemberAction::ResolveCodingKeys},
+      SynthesizeCodingKeysRequest{nominal},
       {});
 
     // Synthesize distributed actor 'id' and 'actorSystem' if needed.
