@@ -2,11 +2,6 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-// FIXME: wasi-wasm32 traps in Result<T, any Error>'s value-witness copy
-// after returning from the new Result.init(catching:) async.
-// XFAIL: OS=wasip1 || OS=emscripten
-// https://github.com/swiftlang/swift/issues/89155
-
 import StdlibUnittest
 import Swift
 
