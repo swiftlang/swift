@@ -109,7 +109,7 @@ internal struct _SliceBuffer<Element>
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal func getSubscriptBaseAddress() -> UnsafeMutablePointer<Element> {
 #if $BuiltinMarkDependence
@@ -351,7 +351,7 @@ internal struct _SliceBuffer<Element>
   ///
   /// - Warning: It's a requirement to call `beginCOWMutation` before the buffer
   ///   is mutated.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func beginCOWMutation() -> Bool {
     if !_hasNativeBuffer {
       return false
@@ -371,7 +371,7 @@ internal struct _SliceBuffer<Element>
   ///
   /// - Warning: After a call to `endCOWMutation` the buffer must not be mutated
   ///   until the next call of `beginCOWMutation`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal mutating func endCOWMutation() {
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
@@ -455,7 +455,7 @@ internal struct _SliceBuffer<Element>
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -478,7 +478,7 @@ internal struct _SliceBuffer<Element>
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func withUnsafeMutableBufferPointer<R, E>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -523,7 +523,7 @@ extension _SliceBuffer {
 }
 
 extension _SliceBuffer {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func isTriviallyIdentical(to other: Self) -> Bool {
 #if $Embedded
     if

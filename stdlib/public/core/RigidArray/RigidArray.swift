@@ -58,13 +58,13 @@ internal struct _RigidArray<Element: ~Copyable>: ~Copyable {
   @usableFromInline
   internal var _count: Int
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   deinit {
     unsafe _storage.extracting(0 ..< _count).deinitialize()
     unsafe _storage.deallocate()
   }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(_storage: UnsafeMutableBufferPointer<Element>, count: Int) {
     unsafe self._storage = _storage
     self._count = count
@@ -80,7 +80,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var capacity: Int {
     _assumeNonNegative(unsafe _storage.count)
@@ -91,7 +91,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var freeCapacity: Int {
     _assumeNonNegative(capacity &- count)
@@ -103,7 +103,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var isFull: Bool {
     freeCapacity == 0
@@ -112,12 +112,12 @@ extension _RigidArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var _items: UnsafeMutableBufferPointer<Element> {
     unsafe _storage.extracting(Range(uncheckedBounds: (0, _count)))
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var _freeSpace: UnsafeMutableBufferPointer<Element> {
     unsafe _storage.extracting(Range(uncheckedBounds: (_count, capacity)))
   }
@@ -129,7 +129,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var span: Span<Element> {
     @_lifetime(borrow self)
@@ -144,7 +144,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
@@ -154,13 +154,13 @@ extension _RigidArray where Element: ~Copyable {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow self)
   internal func _span(in range: Range<Int>) -> Span<Element> {
     span.extracting(range)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   internal mutating func _mutableSpan(
     in range: Range<Int>
@@ -190,7 +190,7 @@ extension _RigidArray where Element: ~Copyable {
   /// - Complexity: Adds O(1) overhead to the complexity of the function
   ///    argument.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func edit<E: Error, R: ~Copyable>(
     _ body: (inout OutputSpan<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -204,7 +204,7 @@ extension _RigidArray where Element: ~Copyable {
 
   // FIXME: Stop using and remove this in favor of `edit`
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _unsafeEdit<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutableBufferPointer<Element>, inout Int) throws(E) -> R
   ) throws(E) -> R {
@@ -215,14 +215,14 @@ extension _RigidArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _contiguousSubrange(following index: inout Int) -> Range<Int> {
     _precondition(index >= 0 && index <= _count, "Index out of bounds")
     defer { index = _count }
     return unsafe Range(uncheckedBounds: (index, _count))
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _contiguousSubrange(preceding index: inout Int) -> Range<Int> {
     _precondition(index >= 0 && index <= _count, "Index out of bounds")
     defer { index = 0 }
@@ -244,7 +244,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func setCapacity(_ newCapacity: Int) {
     guard newCapacity != capacity else { return }
     let newStorage: UnsafeMutableBufferPointer<Element> = .allocate(
@@ -264,7 +264,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func reserveCapacity(_ n: Int) {
     guard capacity < n else { return }
     setCapacity(n)
@@ -278,7 +278,7 @@ extension _RigidArray {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func clone() -> Self {
     clone(capacity: self.count)
   }
@@ -291,7 +291,7 @@ extension _RigidArray {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func clone(capacity: Int) -> Self {
     _precondition(capacity >= count, "RigidArray capacity overflow")
     var result = Self(capacity: capacity)
@@ -304,7 +304,7 @@ extension _RigidArray {
 
 @available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _closeGap(
     at index: Int, count: Int
   ) {
@@ -318,7 +318,7 @@ extension _RigidArray where Element: ~Copyable {
   }
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _openGap(
     at index: Int, count: Int
   ) -> UnsafeMutableBufferPointer<Element> {
@@ -342,7 +342,7 @@ extension _RigidArray where Element: ~Copyable {
   /// - Returns: A buffer pointer addressing the newly opened gap, to be
   ///     initialized by the caller.
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _resizeGap(
     in subrange: Range<Int>, to newItemCount: Int
   ) -> UnsafeMutableBufferPointer<Element> {

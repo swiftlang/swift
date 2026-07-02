@@ -110,7 +110,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     return _uncheckedIndex(after: i)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal func _uncheckedIndex(after i: Index) -> Index {
     // TODO(String performance): isASCII fast-path
@@ -134,7 +134,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     return _uncheckedIndex(before: i)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal func _uncheckedIndex(before i: Index) -> Index {
     // TODO(String performance): isASCII fast-path
@@ -171,7 +171,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     return _guts.errorCorrectedScalar(startingAt: i._encodedOffset).0
   }
 
-  @_alwaysEmitIntoClient // Swift 5.1 bug fix
+  @export(implementation) // Swift 5.1 bug fix
   public func distance(from start: Index, to end: Index) -> Int {
     let start = _guts.validateInclusiveScalarIndex(start)
     let end = _guts.validateInclusiveScalarIndex(end)
@@ -192,7 +192,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     return count
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
     var i = _guts.validateInclusiveScalarIndex(i)
 
@@ -210,7 +210,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     return i
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {

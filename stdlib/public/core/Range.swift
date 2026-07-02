@@ -161,7 +161,7 @@ public struct Range<Bound: Comparable> {
   // This works around _debugPrecondition() impacting the performance of
   // optimized code. (rdar://72246338)
   @unsafe
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
@@ -1074,7 +1074,7 @@ extension Range {
   ///   range; otherwise, `false`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func contains(_ other: Range<Bound>) -> Bool {
     other.isEmpty ||
@@ -1102,7 +1102,7 @@ extension Range {
   ///   otherwise, `false`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func contains(_ other: ClosedRange<Bound>) -> Bool {
     lowerBound <= other.lowerBound && upperBound > other.upperBound
@@ -1126,7 +1126,7 @@ extension PartialRangeFrom: Sendable where Bound: Sendable { }
 extension PartialRangeFrom.Iterator: Sendable where Bound: Sendable { }
 
 extension Range where Bound == String.Index {
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   internal var _encodedOffsetRange: Range<Int> {
     _internalInvariant(
       (lowerBound._canBeUTF8 && upperBound._canBeUTF8)

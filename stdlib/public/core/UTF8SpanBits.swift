@@ -26,7 +26,7 @@ extension UTF8Span {
   /// non-ASCII content.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var isKnownASCII: Bool {
     0 != _countAndFlags & Self._asciiBit
   }
@@ -53,20 +53,20 @@ extension UTF8Span {
   /// always checked at initialization time and is set by `checkForNFC`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var isKnownNFC: Bool {
     0 != _countAndFlags & Self._nfcBit
   }
 
   // Set the isKnownASCII bit to true (also isNFC)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   internal mutating func _setIsASCII() {
     self._countAndFlags |= Self._asciiBit | Self._nfcBit
   }
 
   // Set the isKnownNFC bit to true (also isNFC)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   internal mutating func _setIsNFC() {
     self._countAndFlags |= Self._nfcBit
@@ -116,22 +116,22 @@ extension UTF8Span {
 
 @available(SwiftStdlib 6.2, *)
 extension UTF8Span {
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal static var _asciiBit: UInt64 {
     0x8000_0000_0000_0000
   }
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal static var _nfcBit: UInt64 {
     0x4000_0000_0000_0000
   }
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal static var _countMask: UInt64 {
     0x00FF_FFFF_FFFF_FFFF
   }
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal static var _flagsMask: UInt64 {
     0xFF00_0000_0000_0000
   }
@@ -139,7 +139,7 @@ extension UTF8Span {
   /// The number of UTF-8 code units in the span.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var count: Int {
     Int(truncatingIfNeeded: _countAndFlags & Self._countMask)
   }

@@ -71,7 +71,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   ///   - operation: the operation to be run immediately upon entering the task.
   /// - Returns: A reference to the unstructured task which may be awaited on.
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @discardableResult
   public static func ${METHOD_NAME}(
     name: String? = nil,
@@ -256,7 +256,7 @@ extension ${GROUP_TYPE} {
   ///   otherwise `false`.
   % end
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func ${METHOD_NAME}( // in ${GROUP_TYPE}
     name: String? = nil,
     priority: TaskPriority? = nil,

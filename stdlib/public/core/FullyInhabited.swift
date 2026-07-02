@@ -50,7 +50,7 @@ public typealias FullyInhabited = ConvertibleToBytes & ConvertibleFromBytes
 ///   - original: The instance to cast to `type`.
 ///   - type: The type to cast `original` to.
 /// - Returns: A new instance of type `U`, cast from `original`.
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 public func bitCast<T, U>(
   _ original: T, to type: U.Type

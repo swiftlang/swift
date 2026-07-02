@@ -467,12 +467,12 @@ extension String {
     return String._copying(substring)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never) // slow-path
   internal static func _copying(_ str: String) -> String {
     return String._copying(str[...])
   }
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never) // slow-path
   internal static func _copying(_ str: Substring) -> String {
     if _fastPath(str._wholeGuts.isFastUTF8) {

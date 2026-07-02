@@ -54,7 +54,7 @@ public struct WordPair {
   /// - Parameter first: The first word to use in the pair.
   /// - Parameter second: The second word to use in the pair.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init(first: UInt, second: UInt) {
     self.first = first
@@ -89,7 +89,7 @@ extension WordPair: AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming WordPair
@@ -126,7 +126,7 @@ extension WordPair: AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -160,7 +160,7 @@ extension WordPair: Equatable {
   /// - Parameter rhs: The second value to compare.
   /// - Returns: True if both values were equal, or false if they were unequal.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func ==(lhs: WordPair, rhs: WordPair) -> Bool {
     lhs.first == rhs.first && lhs.second == rhs.second
@@ -175,7 +175,7 @@ extension WordPair: Hashable {
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func hash(into hasher: inout Hasher) {
     hasher.combine(first)
@@ -186,7 +186,7 @@ extension WordPair: Hashable {
 @available(SwiftStdlib 6.1, *)
 extension WordPair: Comparable {
   @available(SwiftStdlib 6.1, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func <(lhs: WordPair, rhs: WordPair) -> Bool {
     (lhs.first, lhs.second) < (rhs.first, rhs.second)

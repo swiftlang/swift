@@ -71,7 +71,7 @@ public struct ClosedRange<Bound: Comparable> {
   // This works around _debugPrecondition() impacting the performance of
   // optimized code. (rdar://72246338)
   @unsafe
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
@@ -357,7 +357,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger
   ///   closed range; otherwise, `false`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func contains(_ other: Range<Bound>) -> Bool {
     if other.isEmpty { return true }
     let otherInclusiveUpper = other.upperBound.advanced(by: -1)
@@ -383,7 +383,7 @@ extension ClosedRange {
   ///   otherwise, `false`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func contains(_ other: ClosedRange<Bound>) -> Bool {
     lowerBound <= other.lowerBound && upperBound >= other.upperBound
