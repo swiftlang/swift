@@ -9927,3 +9927,11 @@ bool DisallowedIsolatedConformance::diagnoseAsError() {
 
   return true;
 }
+
+bool DisallowedIsolatedConformanceInSendableExistential::diagnoseAsError() {
+  emitDiagnostic(diag::isolated_conformance_in_sendable_existential,
+                 conformance->getType(),
+                 conformance->getProtocol()->getName(),
+                 conformance->getIsolation());
+  return true;
+}

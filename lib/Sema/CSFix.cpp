@@ -2900,3 +2900,18 @@ bool IgnoreIsolatedConformance::diagnose(const Solution &solution,
   DisallowedIsolatedConformance failure(solution, conformance, getLocator());
   return failure.diagnose(asNote);
 }
+
+IgnoreIsolatedConformanceInSendableExistential *
+IgnoreIsolatedConformanceInSendableExistential::create(
+    ConstraintSystem &cs, ConstraintLocator *locator,
+    ProtocolConformance *conformance) {
+  return new (cs.getAllocator())
+      IgnoreIsolatedConformanceInSendableExistential(cs, locator, conformance);
+}
+
+bool IgnoreIsolatedConformanceInSendableExistential::diagnose(
+    const Solution &solution, bool asNote) const {
+  DisallowedIsolatedConformanceInSendableExistential failure(
+      solution, conformance, getLocator());
+  return failure.diagnose(asNote);
+}

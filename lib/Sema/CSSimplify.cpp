@@ -4174,6 +4174,19 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
 }
 
+static ProtocolConformanceRef findFirstConcreteIsolatedConformance(
+  ProtocolConformanceRef conformance) {
+  ProtocolConformanceRef isolatedConformance;
+  conformance.forEachIsolatedConformance([&](ProtocolConformanceRef conf) {
+    if (!conf.isConcrete())
+      return false;
+
+    isolatedConformance = conf;
+    return true;
+  });
+  return isolatedConformance;
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
                                         ConstraintKind kind,
@@ -4323,10 +4336,45 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
       return result;
   }
 
+  auto &C = getASTContext();
+  auto *sendableProto = C.getProtocol(KnownProtocolKind::Sendable);
+  bool existentialIsSendable = sendableProto && llvm::any_of(
+      layout.getProtocols(), [sendableProto](ProtocolDecl *proto) {
+        return proto == sendableProto || proto->inheritsFrom(sendableProto);
+      });
+
   for (auto *protoDecl : layout.getProtocols()) {
     switch (simplifyConformsToConstraint(type1, protoDecl, kind, locator,
                                          subflags)) {
-      case SolutionKind::Solved:
+      case SolutionKind::Solved: {
+        // Check if an isolated conformance is escaping into a Sendable existential.
+        // This would allow it to be used from another isolation context, so we need to prevent that.
+        if (existentialIsSendable) {
+          // Existential (any P) to e.g. any (P & Sendable) is already checked structurally
+          if (type1->isExistentialType())
+            break;
+
+          // Marker protocols can't have isolated conformances
+          if (protoDecl->isMarkerProtocol())
+            break;
+
+          if (auto conformance = lookupConformance(type1, protoDecl)) {
+            if (ProtocolConformanceRef isolatedConformance =
+                findFirstConcreteIsolatedConformance(conformance)) {
+              if (!shouldAttemptFixes())
+                return getTypeMatchFailure(locator);
+
+              auto fix =
+                  IgnoreIsolatedConformanceInSendableExistential::create(
+                      *this, getConstraintLocator(locator),
+                      isolatedConformance.getConcrete());
+              if (recordFix(fix))
+                return getTypeMatchFailure(locator);
+            }
+          }
+        }
+        break;
+      }
       case SolutionKind::Unsolved:
         break;
 
@@ -16059,6 +16107,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TooManyDynamicMemberLookups:
   case FixKind::IgnoreNonMetatypeDynamicType:
   case FixKind::IgnoreIsolatedConformance:
+  case FixKind::IgnoreIsolatedConformanceInSendableExistential:
     llvm_unreachable("handled elsewhere");
   }
 
