@@ -230,6 +230,26 @@ public struct InlineInt: BitwiseCopyable {
   }
 }
 
+// Noncopyable, vends nonescapable P.
+struct NCParent: ~Copyable {
+    var view: NEView { NEView(parent: self) }
+}
+
+// Nonescapable, bound to O.
+struct NEView: ~Escapable {
+    @_lifetime(borrow parent)
+    init(parent: borrowing NCParent) {}
+
+    func getNC() -> NC { NC(x: 0) }
+}
+
+// Noncopyable, but escapable. You get one from a non-escapable, but then not lifetime-bound.
+struct NC: ~Copyable {
+  x: Int
+}
+
+func consumeParent(_: consuming NCParent) {}
+
 // =============================================================================
 // Indirect ~Escapable results
 // =============================================================================
@@ -539,4 +559,17 @@ struct TestBuiltinBorrowInit<T: ~Copyable & ~Escapable>: ~Escapable {
   init(_ target: borrowing T) {
     self.ref = Builtin.makeBorrow(target)
   }
+}
+
+// =============================================================================
+// Move-only consume lifetime
+// =============================================================================
+
+// consumeParent should end the lifetime of the parent and the view. This requires AllocBoxToStack on parent so that the
+// move-checker can shrink its lifetime.
+func testNonCopyableParent() {
+  let parent = NCParent()
+  let nc = parent.view.getNC()
+  _ = consumeParent(parent)
+  _ = consume nc
 }

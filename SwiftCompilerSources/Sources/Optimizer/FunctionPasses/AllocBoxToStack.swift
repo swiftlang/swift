@@ -156,7 +156,13 @@ private func canPromote(allocBox: AllocBoxInst) -> (promotableArguments: [Functi
       // Note: all instructions which are handled here must also be handled in `FunctionSpecializations.rewriteUses`!
       switch use.instruction {
       case is StrongRetainInst, is StrongReleaseInst, is ProjectBoxInst, is DestroyValueInst,
-           is EndBorrowInst, is DebugValueInst, is DeallocStackInst:
+           is EndBorrowInst, is DebugValueInst, is DeallocStackInst, is MarkDependenceAddrInst:
+        break
+      case let mdi as MarkDependenceInst:
+        if mdi.valueOperand == use {
+          worklist.pushIfNotVisited(mdi)
+        }
+        // If the use is the base operand, it can be ignored.
         break
       case let deallocBox as DeallocBoxInst where deallocBox.parentFunction == allocBox.parentFunction:
         break
@@ -234,6 +240,21 @@ private struct FunctionSpecializations {
       switch user {
       case is StrongRetainInst, is StrongReleaseInst, is DestroyValueInst, is EndBorrowInst, is DeallocBoxInst:
         context.erase(instruction: user)
+      case let mdi as MarkDependenceInst:
+        if mdi.valueOperand == use {
+          convert(markDependenceInst: mdi, address: stack, context)
+          mdi.replace(with: box, context)
+          // Users of the original mark_dependence will be replaced with the stack address in subsequent iterations.
+          break
+        }
+        // Replace the MarkDependenceInst base operand, which can be either a value or an address.
+        mdi.baseOperand.set(to: stack, context)
+        break
+      case let mdai as MarkDependenceAddrInst:
+        assert(mdai.baseOperand == use)
+        // Replace the MarkDependenceAddrInst base operand, which can be either a value or an address.
+        mdai.baseOperand.set(to: stack, context)
+        break
       case let projectBox as ProjectBoxInst:
         assert(projectBox.fieldIndex == 0, "only single-field boxes are handled")
         if isMandatory {
@@ -255,6 +276,13 @@ private struct FunctionSpecializations {
         fatalError("unhandled box user")
       }
     }
+  }
+
+  /// Replace `mark_dependence` with `mark_dependence_addr`
+  private func convert(markDependenceInst: MarkDependenceInst, address: Value, _ context: FunctionPassContext) {
+    let builder = Builder(before: markDependenceInst, context)
+    _ = builder.createMarkDependenceAddr(value: address, base: markDependenceInst.base,
+                                         kind: markDependenceInst.dependenceKind)
   }
 
   /// Replaces `apply` with a new apply of the specialized callee.

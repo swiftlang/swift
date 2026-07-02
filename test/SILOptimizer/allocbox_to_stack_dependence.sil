@@ -1,0 +1,127 @@
+// RUN: %target-sil-opt -sil-print-types %s -mandatory-allocbox-to-stack -enable-experimental-feature Lifetimes | %FileCheck %s
+
+// REQUIRES: swift_feature_Lifetimes
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+struct A {}
+
+struct B: ~Escapable {}
+
+sil @makeB : $@convention(thin) (@in_guaranteed A) -> @lifetime(borrow 0) @owned B
+sil @useB : $@convention(thin) (@guaranteed B) -> ()
+sil @makeBAddress : $@convention(thin) (@in_guaranteed A) -> @lifetime(borrow 0) @out B
+sil @useBAddress : $@convention(thin) (@in_guaranteed B) -> ()
+sil @makeA : $@convention(thin) () -> @owned A
+sil @useA : $@convention(thin) (@in_guaranteed B) -> ()
+sil @makeAAddress : $@convention(thin) () -> @out A
+
+// CHECK-LABEL: sil hidden [ossa] @testDependenceBaseToValue :
+// CHECK:   [[STK:%.*]] = alloc_stack
+// CHECK:   [[B:%.*]] = apply
+// CHECK:   [[MD:%.*]] = mark_dependence [unresolved] [[B]] : $B on [[STK]] : $*A
+// CHECK:   apply {{.*}}([[MD]])
+// CHECK-LABEL: } // end sil function 'testDependenceBaseToValue'
+sil hidden [ossa] @testDependenceBaseToValue : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ let A }, let
+  %1 = begin_borrow [lexical] [var_decl] %0
+  %2 = project_box %1, 0
+  %a = struct $A ()
+  store %a to [trivial] %2
+  %f = function_ref @makeB : $@convention(thin) (@in_guaranteed A) -> @lifetime(borrow 0) @owned B
+  %b = apply %f(%2) : $@convention(thin) (@in_guaranteed A) -> @lifetime(borrow 0) @owned B
+  %md = mark_dependence [unresolved] %b on %1
+  %g = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  %r1 = apply %g(%md) : $@convention(thin) (@guaranteed B) -> ()
+  destroy_value %md
+  end_borrow %1
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testDependenceBaseToAddress :
+// CHECK:   [[STK:%.*]] = alloc_stack {{.*}} $A
+// CHECK:   [[OUT:%.*]] = alloc_stack $B
+// CHECK:   apply {{.*}}([[OUT]], [[STK]])
+// CHECK:   mark_dependence_addr [unresolved] [[OUT]] : $*B on [[STK]] : $*A
+// CHECK:   apply {{.*}}([[OUT]])
+// CHECK-LABEL: } // end sil function 'testDependenceBaseToAddress'
+sil hidden [ossa] @testDependenceBaseToAddress : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ let A }, let
+  %1 = begin_borrow [lexical] [var_decl] %0
+  %2 = project_box %1, 0
+  %a = struct $A ()
+  store %a to [trivial] %2
+  %out = alloc_stack $B
+  %f = function_ref @makeBAddress : $@convention(thin) (@in_guaranteed A) -> @lifetime(borrow 0) @out B
+  %c = apply %f(%out, %2) : $@convention(thin) (@in_guaranteed A) -> @lifetime(borrow 0) @out B
+  mark_dependence_addr [unresolved] %out on %1
+  %g = function_ref @useBAddress : $@convention(thin) (@in_guaranteed B) -> ()
+  %r1 = apply %g(%out) : $@convention(thin) (@in_guaranteed B) -> ()
+  destroy_addr %out
+  dealloc_stack %out
+  end_borrow %1
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testDependenceValueOnValue :
+// CHECK:   [[STK:%.*]] = alloc_stack {{.*}} $B
+// CHECK:   [[A:%.*]] = apply
+// CHECK:   mark_dependence_addr [unresolved] [[STK]] : $*B on [[A]] : $A
+// CHECK:   apply {{.*}}([[STK]])
+// CHECK-LABEL: } // end sil function 'testDependenceValueOnValue'
+sil hidden [ossa] @testDependenceValueOnValue : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ let B }, let
+  %1 = begin_borrow [lexical] [var_decl] %0
+  %2 = project_box %1, 0
+  %b = struct $B ()
+  store %b to [trivial] %2
+  %f = function_ref @makeA : $@convention(thin) () -> @owned A
+  %a = apply %f() : $@convention(thin) () -> @owned A
+  %md = mark_dependence [unresolved] %1 on %a
+  %pb = project_box %md, 0
+  %g = function_ref @useA : $@convention(thin) (@in_guaranteed B) -> ()
+  %r1 = apply %g(%pb) : $@convention(thin) (@in_guaranteed B) -> ()
+  end_borrow %1
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testDependenceValueOnAddress :
+// CHECK:   [[STK:%.*]] = alloc_stack {{.*}} $B
+// CHECK:   [[AOUT:%.*]] = alloc_stack $A
+// CHECK:   apply {{.*}}([[AOUT]])
+// CHECK:   mark_dependence_addr [unresolved] [[STK]] : $*B on [[AOUT]] : $*A
+// CHECK:   apply {{.*}}([[STK]])
+// CHECK-LABEL: } // end sil function 'testDependenceValueOnAddress'
+sil hidden [ossa] @testDependenceValueOnAddress : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ let B }, let
+  %1 = begin_borrow [lexical] [var_decl] %0
+  %2 = project_box %1, 0
+  %b = struct $B ()
+  store %b to [trivial] %2
+  %aout = alloc_stack $A
+  %f = function_ref @makeAAddress : $@convention(thin) () -> @out A
+  %c = apply %f(%aout) : $@convention(thin) () -> @out A
+  %md = mark_dependence [unresolved] %1 on %aout
+  %pb = project_box %md, 0
+  %g = function_ref @useA : $@convention(thin) (@in_guaranteed B) -> ()
+  %r1 = apply %g(%pb) : $@convention(thin) (@in_guaranteed B) -> ()
+  end_borrow %1
+  destroy_addr %aout
+  dealloc_stack %aout
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
