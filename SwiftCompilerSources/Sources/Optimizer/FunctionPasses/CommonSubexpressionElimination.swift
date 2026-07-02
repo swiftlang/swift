@@ -315,6 +315,19 @@ private func tryCSEReplace(
   with availInst: Instruction,
   _ context: FunctionPassContext
 ) {
+  if let availFwd = availInst as? ForwardingInstruction,
+    let instFwd = inst as? ForwardingInstruction,
+    availFwd.forwardingOwnership != instFwd.forwardingOwnership
+  {
+    guard
+      availFwd.forwardingOwnership == .none
+        || instFwd.forwardingOwnership == .none
+    else {
+      // This should never occur. This check is here as a precaution.
+      return
+    }
+    availFwd.setForwardingOwnership(to: .none, context)
+  }
   for (result, availResult) in zip(inst.results, availInst.results) {
     result.uses.replaceAll(with: availResult, context)
   }
