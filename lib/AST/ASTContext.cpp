@@ -6588,6 +6588,22 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
       // or UInt to a C type.
       addTrivial(getIdentifier("Int"), stdlib);
       addTrivial(getIdentifier("UInt"), stdlib);
+
+      // Register Unicode.Scalar as foreign-representable on all platforms;
+      // PrintAsClang currently prints it as 'char32_t' but no C typealias above
+      // maps to it (CChar32 is UInt32, CWideChar is UInt16 on Windows).
+      if (auto *unicodeEnum =
+              dyn_cast_or_null<EnumDecl>(findUnderlyingTypeInModule(
+                  *this, getIdentifier("Unicode"), stdlib))) {
+        for (auto *result :
+             unicodeEnum->lookupDirect(getIdentifier("Scalar"))) {
+          if (auto *scalarDecl = dyn_cast<StructDecl>(result)) {
+            getImpl().ForeignRepresentableCache.insert(
+                {scalarDecl, ForeignRepresentationInfo::forTrivial()});
+            break;
+          }
+        }
+      }
     }
 
     if (auto darwin = getLoadedModule(Id_Darwin)) {

@@ -1129,7 +1129,7 @@ namespace {
 
         // Import the underlying integer type.
         auto result = Visit(clangDecl->getIntegerType());
-        // Unicode.Scalar (from char32_t or wchar_t) doesn't conform to
+        // Unicode.Scalar (from wchar_t) doesn't conform to
         // _ExpressibleByBuiltinIntegerLiteral, which is required for enum
         // constant values. Use UInt32 instead.
         if (result.AbstractType && result.AbstractType->isUnicodeScalar())
@@ -1769,7 +1769,7 @@ static ImportedType adjustTypeForConcreteImport(
 
   assert(importedType);
 
-  // When Unicode.Scalar (from char32_t or wchar_t) is used as an enum's
+  // When Unicode.Scalar (from wchar_t) is used as an enum's
   // underlying type, import as UInt32 instead. Unicode.Scalar doesn't conform
   // to _ExpressibleByBuiltinIntegerLiteral, which is required for enum cases.
   if (importKind == ImportTypeKind::Enum && importedType->isUnicodeScalar())

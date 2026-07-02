@@ -2252,6 +2252,12 @@ ERROR(c_func_unsupported_specifier, none,
       (StringRef, DeclName, const ValueDecl *))
 ERROR(c_unsupported_type, none, "%0 cannot be represented in C",
       (Type))
+WARNING(c_unicode_scalar_param_unsound, none,
+        "'Unicode.Scalar' parameter %0 will be exposed as 'char32_t', which "
+        "can hold values that are not valid Unicode scalars",
+        (DeclName))
+NOTE(c_unicode_scalar_param_unsound_fixit, none,
+     "use 'UInt32' and validate with 'Unicode.Scalar.init(_:)'", ())
 ERROR(c_func_async,none,
       "async functions cannot be represented in C", ())
 ERROR(c_func_throws,none,
