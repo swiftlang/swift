@@ -64,7 +64,9 @@
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/FrontendTool/Dependencies.h"
 #include "swift/IRGen/TBDGen.h"
+#if SWIFT_BUILD_IMMEDIATE_MODE
 #include "swift/Immediate/Immediate.h"
+#endif
 #include "swift/Index/IndexRecord.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
@@ -1502,11 +1504,13 @@ static bool performAction(CompilerInstance &Instance, int &ReturnValue,
                                   return Instance.getASTContext().hadError();
                                 });
   case FrontendOptions::ActionType::Immediate: {
+#if SWIFT_BUILD_IMMEDIATE_MODE
     const auto &Ctx = Instance.getASTContext();
     if (Ctx.LangOpts.hasFeature(Feature::LazyImmediate)) {
       ReturnValue = RunImmediatelyFromAST(Instance);
       return Ctx.hadError();
     }
+#endif
     return withSemanticAnalysis(
         Instance, observer, [&](CompilerInstance &Instance) {
           assert(FrontendOptions::doesActionGenerateSIL(opts.RequestedAction) &&
@@ -1991,6 +1995,7 @@ generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
       parallelIROutputFilenames, &HashGlobal, casBackend, cacheKeyForJob);
 }
 
+#if SWIFT_BUILD_IMMEDIATE_MODE
 static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
                                                 std::unique_ptr<SILModule> &&SM,
                                                 ModuleOrSourceFile MSF,
@@ -2013,6 +2018,7 @@ static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
                      std::move(SM));
   return Instance.getASTContext().hadError();
 }
+#endif
 
 static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
                                 ModuleOrSourceFile MSF,
@@ -2362,9 +2368,17 @@ static bool performCompileStepsPostSILGen(
   if (Action == FrontendOptions::ActionType::DumpTypeInfo)
     return performDumpTypeInfo(IRGenOpts, *SM);
 
+#if SWIFT_BUILD_IMMEDIATE_MODE
   if (Action == FrontendOptions::ActionType::Immediate)
     return processCommandLineAndRunImmediately(
         Instance, std::move(SM), MSF, observer, ReturnValue);
+#else
+  if (Action == FrontendOptions::ActionType::Immediate) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::error_immediate_mode_unsupported_build);
+    return true;
+  }
+#endif
 
   StringRef OutputFilename = PSPs.OutputFilename;
   std::vector<std::string> ParallelOutputFilenames =
