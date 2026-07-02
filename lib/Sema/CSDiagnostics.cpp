@@ -3656,8 +3656,12 @@ bool ContextualFailure::tryProtocolConformanceFixIt() const {
     }
   }
 
-  assert(!missingProtoTypeStrings.empty() &&
-         "type already conforms to all the protocols?");
+  if (missingProtoTypeStrings.empty()) {
+    // This can happen if a type is declared as implementing all the
+    // protocols, but where the conformance to one or more protocols is
+    // invalid.
+    return false;
+  }
 
   // Combine all protocol names together, separated by commas.
   std::string protoString = llvm::join(missingProtoTypeStrings, ", ");
