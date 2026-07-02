@@ -154,6 +154,17 @@ public func _getTypeByMangledNameInContext(
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
 
+/// A variant of `_getTypeByMangledNameInContext` that never logs lookup
+/// failures, for probing callers that treat a `nil` result as an expected
+/// outcome rather than an error.
+@_silgen_name("swift_getTypeByMangledNameInContextQuiet")
+internal func _getTypeByMangledNameInContextQuiet(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt,
+  genericContext: UnsafeRawPointer?,
+  genericArguments: UnsafeRawPointer?)
+  -> Any.Type?
+
 /// Prevents performance diagnostics in the passed closure.
 @_alwaysEmitIntoClient
 @_semantics("no_performance_analysis")
