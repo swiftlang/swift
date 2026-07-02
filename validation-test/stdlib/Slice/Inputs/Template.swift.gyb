@@ -47,7 +47,7 @@ def all_tests():
     ]:
       test.name = 'Slice_Of_' + test.base + '_' + name + '.swift'
       test.prefix = prefix
-      test.suffix
+      test.suffix = suffix
       yield test
 
 def test_methods(test):
