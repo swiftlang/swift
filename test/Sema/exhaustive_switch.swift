@@ -1516,3 +1516,175 @@ do {
     case nil?: break
   }
 }
+
+// https://github.com/swiftlang/swift/issues/88463
+
+do {
+  enum Foo {
+    case bar(Bar)
+  }
+  enum Bar {}
+  func foo(foo: Foo) {
+    switch foo {  // type is "effectively uninhabited" so should not warn
+    case .bar:
+      break
+    }
+  }
+
+  func foo2(foo: Foo) {
+    switch foo {} // type is "effectively uninhabited" so should not warn
+  }
+
+  // Further edge cases:
+
+  enum EffectivelyUninhabEnum1 {
+    case one(Never)
+    case two(MyNever)
+  }
+
+  enum EffectivelyUninhabEnum2 {
+    case one(EffectivelyUninhabEnum1)
+    case two((EffectivelyUninhabEnum1, EffectivelyUninhabEnum1))
+    indirect case three(EffectivelyUninhabEnum2)
+  }
+
+  enum MixedUninhabitedEnum {
+    case inhab_one
+    case inhab_two(Int)
+    case uninhab_one(Never)
+    case uninab_two(MyNever)
+    case uninhab_three(EffectivelyUninhabEnum2)
+  }
+
+  func test_mixed_uninhabited(_ mixed: MixedUninhabitedEnum) {
+    switch mixed {
+      case .inhab_one, .inhab_two: break
+      // remaining cases effectively uninhabited
+    }
+  }
+
+  func test_effective_uninhabited_tuple(_ tup: (EffectivelyUninhabEnum1, EffectivelyUninhabEnum2)) {
+    switch tup {}
+  }
+
+  func test_mixed_uninhabited_tuple(_ tup: (Int, MixedUninhabitedEnum)) {
+    switch tup {}
+    // expected-error @-1 {{switch must be exhaustive}}
+    // expected-note @-2 {{add missing case: '(_, _)'}}
+
+    switch tup {
+      // expected-error @-1 {{switch must be exhaustive}}
+      // expected-note @-2 {{add missing case: '(_, .inhab_two(_))'}}
+      case (_, .inhab_one): break
+    }
+
+    switch tup {
+      case (_, .inhab_one): break
+      case (_, .inhab_two): break
+    }
+  }
+
+  // Generic enums: substitution can make a type effectively uninhabited.
+  enum GenericWrapper<T> {
+    case value(T)
+  }
+
+  func test_generic_uninhabited(_ x: GenericWrapper<Never>) {
+    switch x {} // effectively uninhabited via Never substitution
+  }
+
+  func test_generic_inhabited(_ x: GenericWrapper<Int>) {
+    switch x {}
+    // expected-error @-1 {{switch must be exhaustive}}
+    // expected-note @-2 {{add missing case: '.value(_)'}}
+  }
+
+  func test_generic_nested_uninhabited(_ x: GenericWrapper<GenericWrapper<Never>>) {
+    switch x {} // nested generic, still effectively uninhabited
+  }
+
+  // Multi-payload case where one payload is uninhabited.
+  enum MultiPayload {
+    case pair(Never, Int)
+  }
+
+  func test_multi_payload_uninhabited(_ x: MultiPayload) {
+    switch x {} // uninhabited: Never makes the case unconstructible
+  }
+
+  // Mutual recursion: neither type has a base case.
+  enum MutualA {
+    indirect case a(MutualB)
+  }
+  enum MutualB {
+    indirect case b(MutualA)
+  }
+
+  func test_mutual_recursion(_ a: MutualA) {
+    switch a {} // mutually recursive with no base case
+  }
+
+  func test_mutual_recursion_b(_ b: MutualB) {
+    switch b {} // symmetric case
+  }
+
+  // Indirect enum with no base case.
+  enum InfiniteTree { // expected-warning {{enum containing only recursive cases is impossible to instantiate}}
+    indirect case node(InfiniteTree)
+  }
+
+  func test_indirect_no_base_case(_ x: InfiniteTree) {
+    switch x {} // no base case, not constructible
+  }
+
+  // Indirect enum with a base case must still be exhaustive.
+  enum FiniteTree {
+    case leaf
+    indirect case node(FiniteTree, FiniteTree)
+  }
+
+  func test_indirect_with_base_case(_ x: FiniteTree) {
+    switch x {}
+    // expected-error @-1 {{switch must be exhaustive}}
+    // expected-note @-2 {{add missing case: '.leaf'}}
+    // expected-note @-3 {{add missing case: '.node(_, _)'}}
+    // expected-note @-4 {{add missing cases}}
+  }
+
+  // Optional of an effectively-uninhabited type: Optional itself is still
+  // inhabited via .none.
+  func test_optional_of_uninhabited(_ x: Foo?) {
+    switch x {}
+    // expected-error @-1 {{switch must be exhaustive}}
+    // expected-note @-2 {{add missing case: '.none'}}
+
+    switch x {
+    case .none: break
+    } // .some(Foo) is effectively uninhabited, so this is exhaustive
+  }
+
+  // Struct wrapping an uninhabited type. We only traverse tuples and enums so structs
+  // should not be considered "effectively uninhabited" (even if they really are).
+  struct NeverBox {
+    var value: Never
+  }
+  enum StructPayload {
+    case boxed(NeverBox)
+  }
+
+  func test_struct_payload(_ x: StructPayload) {
+    switch x {}
+    // expected-error @-1 {{switch must be exhaustive}}
+    // expected-note @-2 {{add missing case: '.boxed(_)'}}
+  }
+
+  enum OnlyUnavailableInhabited {
+    @available(*, unavailable)
+    case available_one
+    case unavailable_payload(Never)
+  }
+
+  func test_only_unavailable_inhabited(_ x: OnlyUnavailableInhabited) {
+    switch x {} // only non-unavailable case has Never payload
+  }
+}

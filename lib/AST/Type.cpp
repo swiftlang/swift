@@ -43,6 +43,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Defer.h"
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
@@ -124,15 +125,71 @@ bool TypeBase::isUninhabited() {
   return false;
 }
 
-bool TypeBase::isStructurallyUninhabited() {
-  if (isUninhabited()) return true;
-  
+static bool
+computeIsStructurallyUninhabited(Type T,
+                                 SmallPtrSetImpl<TypeBase *> &visitingSet) {
+  if (T->isUninhabited())
+    return true;
+
   // Tuples of uninhabited types are uninhabited
-  if (auto *TTy = getAs<TupleType>())
+  if (auto *TTy = T->getAs<TupleType>()) {
     for (auto eltTy : TTy->getElementTypes())
-      if (eltTy->isStructurallyUninhabited())
+      if (computeIsStructurallyUninhabited(eltTy, visitingSet))
         return true;
+    return false;
+  }
+
+  // An enum is structurally uninhabited iff every available case has at least
+  // one structurally uninhabited associated value.
+  if (auto *enumDecl = T->getEnumOrBoundGenericEnum()) {
+    // Conservatively treat @objc enums that were imported by clang as always
+    // potentially being inhabited.
+    // TODO: is this appropriate and/or the right test?
+    if (enumDecl->isObjC() && enumDecl->hasClangNode())
+      return false;
+
+    // TODO: is this assertion correct?
+    // Guard against recursion through indirect enums. If we cycle back to a
+    // type, there's presumably no way to construct the case containing the
+    // cycle, so treat it as uninhabited.
+    auto *canTyPtr = T->getCanonicalType().getPointer();
+    if (!visitingSet.insert(canTyPtr).second)
+      return true;
+    SWIFT_DEFER { visitingSet.erase(canTyPtr); };
+
+    for (auto *enumEltDecl : enumDecl->getAllElements()) {
+      // TODO: is this the appropriate treatment of unavailable cases?
+      if (enumEltDecl->isUnavailable())
+        continue;
+
+      // A case with no associated values is always constructible.
+      if (!enumEltDecl->hasAssociatedValues())
+        return false;
+
+      bool anyPayloadUninhabited = false;
+      for (auto &param : enumEltDecl->getCaseConstructorParams()) {
+        auto payloadTy =
+            T->getTypeOfMember(enumEltDecl, param.getParameterType());
+        if (computeIsStructurallyUninhabited(payloadTy, visitingSet)) {
+          anyPayloadUninhabited = true;
+          break;
+        }
+      }
+
+      // If no payload was uninhabited, the case is constructible.
+      if (!anyPayloadUninhabited)
+        return false;
+    }
+
+    return true;
+  }
+
   return false;
+}
+
+bool TypeBase::isStructurallyUninhabited() {
+  SmallPtrSet<TypeBase *, 4> visitingSet;
+  return computeIsStructurallyUninhabited(this, visitingSet);
 }
 
 bool TypeBase::isAny() {
