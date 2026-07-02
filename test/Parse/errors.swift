@@ -25,14 +25,14 @@ func one() {
   do {
   } catch where true { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
     let error2 = error
-  } catch {
+  } catch _ {
   }
   
   // <rdar://problem/20985280> QoI: improve diagnostic on improper pattern match on type
   do {
     throw opaque_error()
   } catch MSV { // expected-error {{'is' keyword required to pattern match against type name}} {{11-11=is }}
-  } catch {
+  } catch _ {
   }
 
   do {
@@ -53,14 +53,14 @@ func one() {
 #if compiler(>=10)
     throw opaque_error()
 #endif
-  } catch {    // don't warn, #if code should be scanned.
+  } catch _ {    // don't warn, #if code should be scanned.
   }
 
   do {
 #if false
     throw opaque_error()
 #endif
-  } catch {    // don't warn, #if code should be scanned.
+  } catch _ {    // don't warn, #if code should be scanned.
   }
   
   do {
