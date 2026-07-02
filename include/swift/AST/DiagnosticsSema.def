@@ -6345,8 +6345,19 @@ GROUPED_ERROR(inverse_requires_any,ExistentialAny,none,
               "constraint that suppresses conformance requires 'any'", ())
 
 ERROR(nonisolated_mutable_storage,none,
-      "'nonisolated' cannot be applied to mutable stored properties",
-      ())
+     "'nonisolated' can not be applied to mutable stored property %0 "
+     "of %kind1",
+     (const VarDecl *, const NominalTypeDecl *))
+ERROR(nonisolated_mutable_storage_no_nominal,none,
+     "'nonisolated' can not be applied to mutable stored property %0",
+     (const VarDecl *))
+ERROR(nonisolated_lazy_storage,none,
+     "'nonisolated' can not be applied to 'lazy' stored property %0",
+     (const VarDecl *))
+ERROR(nonisolated_wrapped_storage,none,
+     "'nonisolated' can not be applied to stored property %0 with a "
+     "property wrapper",
+     (const VarDecl *))
 NOTE(nonisolated_mutable_storage_note,none,
      "convert %0 to a 'let' constant or consider declaring it "
      "'nonisolated(unsafe)' if manually managing concurrency safety",
