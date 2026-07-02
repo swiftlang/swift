@@ -600,7 +600,7 @@ extension InlineArray where Element: ~Copyable {
         let span = Span<Element>()
         return unsafe _overrideLifetime(span, borrowing: self)
       }
-      let span = unsafe Span(_unsafeStart: _protectedAddress, count: count)
+      let span = unsafe Span(_unchecked: _protectedAddress, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
@@ -621,7 +621,7 @@ extension InlineArray where Element: ~Copyable {
         return unsafe _overrideLifetime(span, mutating: &self)
       }
       let span = unsafe MutableSpan(
-        _unsafeStart: _protectedMutableAddress,
+        _unchecked: _protectedMutableAddress,
         count: count
       )
       return unsafe _overrideLifetime(span, mutating: &self)

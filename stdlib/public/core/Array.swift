@@ -1764,13 +1764,13 @@ extension Array {
         let buffer = _buffer.getOrAllocateAssociatedObjectBuffer()
         let pointer = unsafe buffer.firstElementAddress
         let count = buffer.immutableCount
-        let span = unsafe Span(_unsafeStart: pointer, count: count)
+        let span = unsafe Span(_unchecked: pointer, count: count)
         return unsafe _overrideLifetime(span, borrowing: self)
       }
 #endif
       let pointer = unsafe _buffer.firstElementAddress
       let count = _buffer.immutableCount
-      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      let span = unsafe Span(_unchecked: pointer, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
@@ -1896,7 +1896,7 @@ extension Array {
 #endif
       let pointer = unsafe _buffer.firstElementAddress
       let count = _buffer.mutableCount
-      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      let span = unsafe MutableSpan(_unchecked: pointer, count: count)
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }

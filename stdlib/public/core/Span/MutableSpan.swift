@@ -54,6 +54,18 @@ public struct MutableSpan<Element: ~Copyable>
     unsafe _pointer = start
     _count = count
   }
+
+  @unsafe
+  @_alwaysEmitIntoClient
+  @_lifetime(borrow start)
+  @_transparent
+  internal init(
+    _unchecked start: UnsafeMutablePointer<Element>,
+    count: Int
+  ) {
+    unsafe _pointer = UnsafeMutableRawPointer(start)
+    _count = count
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -81,10 +93,10 @@ extension MutableSpan where Element: ~Copyable {
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
     _precondition(
-      ((Int(bitPattern: buffer.baseAddress) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
+      buffer._isWellAligned(),
       "baseAddress must be properly aligned to access Element"
     )
+
     let ms = unsafe MutableSpan<Element>(_unchecked: buffer)
     self = unsafe _overrideLifetime(ms, borrowing: buffer)
   }
