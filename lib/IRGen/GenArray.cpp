@@ -19,6 +19,7 @@
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "NonFixedTypeInfo.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 
 using namespace swift;
 using namespace irgen;
@@ -726,13 +727,27 @@ TypeConverter::convertBuiltinFixedArrayType(BuiltinFixedArrayType *T) {
   if (!fixedSize.has_value() || !elementTI.isFixedSize()) {
     return new NonFixedArrayTypeInfo(IGM.OpaqueTy, elementTI);
   }
-  
+
+  // The FixedTypeInfo Size field is 32 bits wide, so a fixed array whose
+  // total byte size exceeds UINT32_MAX cannot be represented. Without an
+  // early diagnostic, IRGen would either silently truncate the size, or
+  // (in `getArraySpareBits`) allocate a multi-gigabyte APInt to back the
+  // spare-bits vector and take time proportional to the array's byte size.
+  auto &fixedElementTI = cast<FixedTypeInfo>(elementTI);
+  uint64_t stride = fixedElementTI.getFixedStride().getValue();
+  uint64_t totalBytes = 0;
+  bool overflow = __builtin_mul_overflow(*fixedSize, stride, &totalBytes);
+  if (overflow || totalBytes > std::numeric_limits<uint32_t>::max()) {
+    IGM.Context.Diags.diagnose(SourceLoc(),
+                               diag::fixed_array_size_overflow, T);
+    return &getEmptyTypeInfo();
+  }
+
   if (*fixedSize <= BuiltinFixedArrayType::MaximumLoadableSize) {
     if (auto *loadableTI = dyn_cast<LoadableTypeInfo>(&elementTI)) {
       return new LoadableArrayTypeInfo(fixedSize.value(), *loadableTI);
     }
   }
-  
-  return new FixedArrayTypeInfo(fixedSize.value(),
-                                *cast<FixedTypeInfo>(&elementTI));
+
+  return new FixedArrayTypeInfo(fixedSize.value(), fixedElementTI);
 }
