@@ -70,6 +70,38 @@ bool _swift_concurrency_debug_supportsPriorityEscalation;
 SWIFT_EXPORT_FROM(swift_Concurrency)
 uint32_t _swift_concurrency_debug_internal_layout_version;
 
+/// Identifies how the runtime stores the currently executing AsyncTask.
+/// Debuggers use this to decide how to locate the current task on a thread.
+///
+/// The values are part of the debug ABI — once published, a value must
+/// never be reused for a different storage strategy. New strategies get a
+/// new value; bump _swift_concurrency_debug_internal_layout_version when
+/// adding one.
+enum class _concurrency_current_task_storage_kind : uint8_t {
+  /// The task pointer lives in TLS at offset 0 of the runtime's internal
+  /// current-task variable, which the debugger locates via debug info.
+  cxx_thread_local = 1,
+
+  /// The task pointer lives at offset 0 of the runtime's internal current-task
+  /// variable (no TLS resolution). Used by single-threaded /
+  /// SWIFT_THREADING_NONE builds where `SWIFT_THREAD_LOCAL` expands to nothing.
+  global = 2,
+
+  /// Pthread thread-specific data with a *reserved* (compile-time constant)
+  /// key. Used on Darwin. The key value should be inferred by the debugger.
+  pthread_reserved_key = 3,
+
+  /// Pthread thread-specific data with a *dynamically-allocated* key. Support
+  /// for this may require writing the key value in a yet-to-be-defined global
+  /// variable.
+  pthread_allocated_key = 4,
+};
+
+/// The storage strategy this runtime uses for the currently executing
+/// AsyncTask.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const _concurrency_current_task_storage_kind
+    _swift_concurrency_debug_currentTaskStorageKind;
 } // namespace swift
 
 #endif
