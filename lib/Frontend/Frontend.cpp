@@ -48,6 +48,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
+#include "llvm/Support/TimeProfiler.h"
 #include "clang/AST/ASTContext.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -397,10 +398,23 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 
 void CompilerInstance::setupStatsReporter() {
   const auto &Invoke = getInvocation();
-  const std::string &StatsOutputDir =
-      Invoke.getFrontendOptions().StatsOutputDir;
-  if (StatsOutputDir.empty())
+  const auto &FEOpts = Invoke.getFrontendOptions();
+  const std::string &StatsOutputDir = FEOpts.StatsOutputDir;
+  bool hasTimeTrace = !FEOpts.TimeTracePath.empty();
+
+  if (StatsOutputDir.empty() && !hasTimeTrace)
     return;
+
+  // In -emit-pcm mode with direct clang CC1 module build, the compiler
+  // instance may not have a fully set up ASTContext. Only initialize the
+  // time trace profiler directly in that case.
+  if (!hasASTContext()) {
+    if (hasTimeTrace) {
+      llvm::timeTraceProfilerInitialize(FEOpts.TimeTraceGranularity,
+                                        "swift-frontend");
+    }
+    return;
+  }
 
   auto silOptModeArgStr = [](OptimizationMode mode) -> StringRef {
     switch (mode) {
@@ -421,7 +435,6 @@ void CompilerInstance::setupStatsReporter() {
     return nullptr;
   };
 
-  const auto &FEOpts = Invoke.getFrontendOptions();
   const auto &LangOpts = Invoke.getLangOptions();
   const auto &SILOpts = Invoke.getSILOptions();
   const std::string &OutFile =
@@ -435,16 +448,21 @@ void CompilerInstance::setupStatsReporter() {
       silOptModeArgStr(SILOpts.OptMode),
       StatsOutputDir,
       &getSourceMgr(),
-      getClangSourceManager(getASTContext()),
-      Invoke.getFrontendOptions().FineGrainedTimers,
-      Invoke.getFrontendOptions().TraceStats,
-      Invoke.getFrontendOptions().ProfileEvents,
-      Invoke.getFrontendOptions().ProfileEntities,
-      Invoke.getFrontendOptions().PrintZeroStats);
+      StatsOutputDir.empty() ? nullptr
+                             : getClangSourceManager(getASTContext()),
+      FEOpts.FineGrainedTimers,
+      FEOpts.TraceStats,
+      FEOpts.ProfileEvents,
+      FEOpts.ProfileEntities,
+      FEOpts.PrintZeroStats,
+      FEOpts.TimeTracePath,
+      FEOpts.TimeTraceGranularity);
   // Hand the stats reporter down to the ASTContext so the rest of the compiler
   // can use it.
-  getASTContext().setStatsReporter(Reporter.get());
-  Diagnostics.setStatsReporter(Reporter.get());
+  if (hasASTContext()) {
+    getASTContext().setStatsReporter(Reporter.get());
+    Diagnostics.setStatsReporter(Reporter.get());
+  }
   Stats = std::move(Reporter);
 }
 

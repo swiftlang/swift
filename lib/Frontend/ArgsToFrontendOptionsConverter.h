@@ -35,6 +35,7 @@ private:
   void handleDebugCrashGroupArguments();
 
   void computeDebugTimeOptions();
+  void computeTimeTraceOptions();
   bool computeFallbackModuleName();
   bool computeModuleName();
   bool computeModuleAliases();

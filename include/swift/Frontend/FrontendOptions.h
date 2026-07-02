@@ -285,6 +285,12 @@ public:
   /// entity.
   bool ProfileEntities = false;
 
+  /// Path to write the time trace JSON output.
+  std::string TimeTracePath;
+
+  /// Minimum time granularity for trace events (microseconds). Default 500.
+  unsigned TimeTraceGranularity = 500;
+
   /// Emit parseable-output directly from the frontend, instead of relying
   /// the driver to emit it. This is used in context where frontend jobs are executed by
   /// clients other than the driver.

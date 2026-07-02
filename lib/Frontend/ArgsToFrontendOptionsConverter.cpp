@@ -198,6 +198,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     Args.hasArg(OPT_downgrade_typecheck_interface_error);
   computePrintStatsOptions();
   computeDebugTimeOptions();
+  computeTimeTraceOptions();
   computeTBDOptions();
 
   Opts.CompilerDebuggingOpts.DumpAvailabilityScopes |=
@@ -523,6 +524,22 @@ void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
     if (Args.getLastArg(OPT_profile_stats_entities)) {
       Opts.ProfileEntities = true;
     }
+  }
+}
+
+void ArgsToFrontendOptionsConverter::computeTimeTraceOptions() {
+  using namespace options;
+  if (const Arg *A = Args.getLastArg(OPT_emit_time_trace_path)) {
+    Opts.TimeTracePath = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_time_trace_granularity)) {
+    unsigned Val;
+    if (StringRef(A->getValue()).getAsInteger(10, Val))
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    else
+      Opts.TimeTraceGranularity = Val;
   }
 }
 
