@@ -592,6 +592,9 @@ extension String {
   // also preserve source compatibility for clients which accidentally  
   // used init(stringInterpolationSegment:) through constructs like 
   // myArray.map(String.init).
+  //
+  // Unfortunately they create ambiguity by being parallel to each
+  // other, so many overloads are required.
 
   /// Creates a string representing the given value.
   ///
@@ -633,7 +636,10 @@ extension String {
   ///     print(String(describing: p))
   ///     // Prints "(21, 30)"
   @inlinable
-  public init<Subject: CustomStringConvertible>(describing instance: Subject) {
+  @_preInverseGenerics
+  public init<Subject: CustomStringConvertible & ~Copyable>(
+    describing instance: borrowing Subject
+  ) {
     self = instance.description
   }
 
@@ -677,7 +683,10 @@ extension String {
   ///     print(String(describing: p))
   ///     // Prints "(21, 30)"
   @inlinable
-  public init<Subject: TextOutputStreamable>(describing instance: Subject) {
+  @_preInverseGenerics
+  public init<Subject: TextOutputStreamable & ~Copyable>(
+    describing instance: borrowing Subject
+  ) {
     self.init()
     instance.write(to: &self)
   }
@@ -722,9 +731,10 @@ extension String {
   ///     print(String(describing: p))
   ///     // Prints "(21, 30)"
   @inlinable
-  public init<Subject>(describing instance: Subject)
-    where Subject: CustomStringConvertible & TextOutputStreamable
-  {
+  @_preInverseGenerics
+  public init<Subject: CustomStringConvertible & TextOutputStreamable & ~Copyable>(
+    describing instance: borrowing Subject
+  ) {
     self = instance.description
   }
 }
