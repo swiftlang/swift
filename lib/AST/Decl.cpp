@@ -8250,6 +8250,58 @@ getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
   return std::nullopt;
 }
 
+/// If \p storage is a Swift-side `@_objcImplementation` member implementing
+/// an imported ObjC `@property`, return that clang property declaration.
+/// This lets selector synthesis honor `@property (getter=...)` /
+/// `@property (setter=...)` custom selector names declared in the header
+static const clang::ObjCPropertyDecl *
+findImplementedClangObjCProperty(const AbstractStorageDecl *storage) {
+  if (storage->hasClangNode())
+    return nullptr;
+  auto *VD = dyn_cast<VarDecl>(storage);
+  if (!VD || !VD->isObjCMemberImplementation())
+    return nullptr;
+  auto *ext = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+  if (!ext)
+    return nullptr;
+  // Walk every imported interface (the class's main `@interface`, any class
+  // extensions, and any named categories like `@_objcImplementation(Cat)`).
+  // `getAllImplementedObjCDecls()` returns either the imported `ClassDecl`
+  // (a NominalTypeDecl) for the class body or an `ExtensionDecl` for an
+  // imported category, so we walk members through `IterableDeclContext`.
+  auto candName = VD->getName();
+  for (auto *interface : ext->getAllImplementedObjCDecls()) {
+    auto *idc = dyn_cast<IterableDeclContext>(interface);
+    if (!idc)
+      continue;
+    for (auto *member : idc->getMembers()) {
+      auto *otherVar = dyn_cast<VarDecl>(member);
+      if (!otherVar || otherVar->getName() != candName)
+        continue;
+      if (auto *prop = dyn_cast_or_null<clang::ObjCPropertyDecl>(
+              otherVar->getClangDecl()))
+        return prop;
+    }
+  }
+  return nullptr;
+}
+
+/// Translate a clang ObjC selector into a Swift `ObjCSelector`.
+static ObjCSelector
+importClangSelector(ASTContext &ctx, clang::Selector clangSel) {
+  unsigned numArgs = clangSel.getNumArgs();
+  unsigned numPieces = std::max<unsigned>(numArgs, 1);
+  SmallVector<Identifier, 2> pieces;
+  pieces.reserve(numPieces);
+  for (unsigned i = 0; i != numPieces; ++i) {
+    Identifier piece;
+    if (auto *id = clangSel.getIdentifierInfoForSlot(i))
+      piece = ctx.getIdentifier(id->getName());
+    pieces.push_back(piece);
+  }
+  return ObjCSelector(ctx, numArgs, pieces);
+}
+
 ObjCSelector
 AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
    auto abiRole = ABIRoleInfo(this);
@@ -8263,8 +8315,17 @@ AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
         return *name;
   }
 
-  // Subscripts use a specific selector.
   auto &ctx = getASTContext();
+
+  // For an @_objcImplementation member implementing an imported ObjC
+  // property, prefer the clang-declared getter selector over any
+  // Swift-name-derived default. This honors `@property (getter=...)`
+  if (preferredName.empty()) {
+    if (auto *clangProp = findImplementedClangObjCProperty(this))
+      return importClangSelector(ctx, clangProp->getGetterName());
+  }
+
+  // Subscripts use a specific selector.
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
     switch (SD->getObjCSubscriptKind()) {
     case ObjCSubscriptKind::Indexed:
@@ -8298,8 +8359,20 @@ AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
     return *name;
   }
 
-  // Subscripts use a specific selector.
   auto &ctx = getASTContext();
+
+  // For an @_objcImplementation member implementing an imported ObjC
+  // property, prefer the clang-declared setter selector over any
+  // Swift-name-derived default. This honors `@property (setter=...)` and
+  // also the conventional setter selector that pairs with
+  // `@property (getter=...)` (e.g. `setEnabled:` for
+  // `@property (getter=isEnabled) BOOL enabled;`)
+  if (preferredName.empty()) {
+    if (auto *clangProp = findImplementedClangObjCProperty(this))
+      return importClangSelector(ctx, clangProp->getSetterName());
+  }
+
+  // Subscripts use a specific selector.
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
     switch (SD->getObjCSubscriptKind()) {
     case ObjCSubscriptKind::Indexed:
