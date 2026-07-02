@@ -3622,13 +3622,18 @@ void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr)
     return;
   }
 
-  (void)attr->getSpecializedSignature(FD);
-
   // Force resolution of interface types written in requirements here to check
   // that generic types satisfy generic requirements, and so on.
   WhereClauseOwner(FD, attr)
       .visitRequirements(TypeResolutionStage::Interface,
                          [](Requirement, RequirementRepr *) { return false; });
+
+  if (FD->getASTContext().hadError())
+    return;
+
+  auto specializedSig = attr->getSpecializedSignature(FD);
+  if (!specializedSig)
+    return;
 }
 
 GenericSignature
@@ -3643,6 +3648,9 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
   if (!genericSig)
     return nullptr;
 
+  if (Ctx.hadError())
+    return nullptr;
+
   InferredGenericSignatureRequest request{
       genericSig.getPointer(),
       /*genericParams=*/nullptr,
@@ -3653,9 +3661,21 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
       /*forExtension=*/nullptr,
       ExpandDefaults};
 
-  auto specializedSig = evaluateOrDefault(Ctx.evaluator, request,
-                                          GenericSignatureWithError())
-      .getPointer();
+  auto specializedSigWithError = evaluateOrDefault(
+      Ctx.evaluator, request, GenericSignatureWithError());
+  auto specializedSig = specializedSigWithError.getPointer();
+  if (!specializedSig)
+    return nullptr;
+
+  auto errors = specializedSigWithError.getInt();
+  if (errors.contains(GenericSignatureErrorFlags::HasInvalidRequirements) ||
+      errors.contains(GenericSignatureErrorFlags::CompletionFailed) ||
+      errors.contains(GenericSignatureErrorFlags::CircularReference))
+    return nullptr;
+
+  if (llvm::any_of(specializedSig.getRequirements(),
+                   [](Requirement req) { return req.hasError(); }))
+    return nullptr;
 
   // Check the validity of provided requirements.
   checkSpecializeAttrRequirements(attr, genericSig, specializedSig, Ctx);
