@@ -985,19 +985,20 @@ public:
     }
   }
 
-  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
-                          ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override {
+  PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                    TypeDecl *CtorTyRef,
+                                    ExtensionDecl *ExtTyRef, Type T,
+                                    ReferenceMetaData Data) override {
     if (Data.isImplicit)
-      return true;
+      return Action::Continue();
 
     if (isa<VarDecl>(D) && D->hasName() &&
         D->getName() == D->getASTContext().Id_self)
-      return true;
+      return Action::Continue();
 
     // Do not annotate references to unavailable decls.
     if (D->isUnavailable())
-      return true;
+      return Action::Continue();
 
     CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
         D->getASTContext().SourceMgr, Range);
@@ -1008,18 +1009,18 @@ public:
       // If a 'nil' literal occurs in a swift-case statement, it gets replaced
       // by a reference to 'Optional.none' in the AST. We want to continue
       // highlighting 'nil' as a keyword and not as an enum element.
-      return true;
+      return Action::Continue();
     }
 
     if (CtorTyRef)
       D = CtorTyRef;
     annotate(D, /*IsRef=*/true, CharRange);
-    return true;
+    return Action::Continue();
   }
 
-  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
-                               ReferenceMetaData Data,
-                               bool IsOpenBracket) override {
+  PostWalkAction visitSubscriptReference(ValueDecl *D, SourceRange Range,
+                                         ReferenceMetaData Data,
+                                         bool IsOpenBracket) override {
     // We should treat both open and close brackets equally
     return visitDeclReference(D, Range, nullptr, nullptr, Type(), Data);
   }
