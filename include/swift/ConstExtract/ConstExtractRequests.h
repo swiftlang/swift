@@ -65,16 +65,23 @@ public:
 #undef SWIFT_TYPEID_ZONE
 #undef SWIFT_TYPEID_HEADER
 
-// Set up reporting of evaluated requests.
-template<typename Request>
+// Set up reporting of evaluated and cache-hit requests.
+template <typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
+template <typename Request>
+void reportCachedRequest(UnifiedStatsReporter &stats, const Request &request);
 
 #define SWIFT_REQUEST(Zone, RequestType, Sig, Caching, LocOptions)             \
   template <>                                                                  \
   inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,              \
                                      const RequestType &request) {             \
     ++stats.getFrontendCounters().RequestType;                                 \
+  }                                                                            \
+  template <>                                                                  \
+  inline void reportCachedRequest(UnifiedStatsReporter &stats,                 \
+                                  const RequestType &request) {                \
+    ++stats.getFrontendCounters().RequestType##CacheHit;                       \
   }
 #include "swift/ConstExtract/ConstExtractTypeIDZone.def"
 #undef SWIFT_REQUEST
