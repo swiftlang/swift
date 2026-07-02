@@ -78,6 +78,10 @@ public:
                                                uint64_t pointerValue) const;
 
   remote::RemoteAbsolutePointer getDynamicSymbol(uint64_t Addr) const;
+
+  /// Lookup the virtual address of the given symbol in this image's symbol
+  /// table.
+  std::optional<uint64_t> getSymbolAddress(StringRef name) const;
 };
 
 /// MemoryReader that reads from the on-disk representation of an executable
@@ -134,6 +138,11 @@ public:
 
   remote::RemoteAbsolutePointer
   getDynamicSymbol(reflection::RemoteAddress Addr) override;
+
+  /// Lookup the name in an image at a given start address
+  reflection::RemoteAddress
+  getSymbolAddress(reflection::RemoteAddress ImageStart,
+                   const std::string &name) override;
 };
 
 using ReflectionContextOwner = std::unique_ptr<void, void (*)(void *)>;
