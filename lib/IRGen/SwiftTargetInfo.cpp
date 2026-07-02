@@ -49,14 +49,6 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
   }
   setToMask(target.IsObjCPointerBit, 64, SWIFT_ABI_ARM64_IS_OBJC_BIT);
 
-  // Non-embedded Darwin reserves the low 4GB of address space.
-  if (triple.isOSDarwin() &&
-      !IGM.getSwiftModule()->getASTContext().LangOpts.hasFeature(
-          Feature::Embedded)) {
-    target.LeastValidPointerValue =
-      SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER;
-  }
-
   // arm64 has no special objc_msgSend variants, not even stret.
   target.ObjCUseStret = false;
 
@@ -116,13 +108,6 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
   } else {
     setToMask(target.ObjCPointerReservedBits, 64,
               SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK);
-  }
-
-  if (triple.isOSDarwin() &&
-      !IGM.getSwiftModule()->getASTContext().LangOpts.hasFeature(
-          Feature::Embedded)) {
-    target.LeastValidPointerValue =
-      SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER;
   }
 
   // x86-64 has every objc_msgSend variant known to humankind.
@@ -195,8 +180,6 @@ static void configureSystemZ(IRGenModule &IGM, const llvm::Triple &triple,
 /// Configures target-specific information for wasm32 platforms.
 static void configureWasm32(IRGenModule &IGM, const llvm::Triple &triple,
                             SwiftTargetInfo &target) {
-  target.LeastValidPointerValue =
-    SWIFT_ABI_WASM32_LEAST_VALID_POINTER;
 }
 
 /// Configure a default target.
@@ -279,8 +262,9 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
     break;
   }
 
-  if (IGM.getOptions().CustomLeastValidPointerValue != 0)
-    target.LeastValidPointerValue = IGM.getOptions().CustomLeastValidPointerValue;
+  target.LeastValidPointerValue = getLeastValidPointerValueForTriple(
+      triple, IGM.Context.LangOpts,
+      IGM.getOptions().CustomLeastValidPointerValue);
 
   return target;
 }
