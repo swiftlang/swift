@@ -15,6 +15,7 @@
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangClassType.h"
+#include "PrintClangExistentialType.h"
 #include "PrintClangFunction.h"
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
@@ -465,6 +466,14 @@ private:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     printDocumentationComment(PD);
+
+    if (outputLang == OutputLanguageMode::Cxx) {
+      if (!PD->isObjC()) {
+        ClangExistentialTypePrinter(os, owningPrinter.outOfLineDefinitionsOS)
+            .printExistentialTypeDecl(PD, owningPrinter);
+      }
+      return;
+    }
 
     StringRef customName = getNameForObjC(PD, CustomNamesOnly);
     if (customName.empty()) {

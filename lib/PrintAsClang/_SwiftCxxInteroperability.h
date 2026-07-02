@@ -93,6 +93,24 @@ extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
 
 extern "C" void swift_release(void *_Nonnull) noexcept;
 
+extern "C" SWIFT_CALL void *_Nonnull swift_getObjectType(
+    void *_Nonnull object) noexcept;
+
+struct SwiftBoxPair {
+  void *_Nonnull object;
+  void *_Nonnull buffer;
+};
+extern "C" SWIFT_CALL SwiftBoxPair swift_allocBox(
+    void *_Nonnull type) noexcept;
+
+extern "C" void *_Nonnull swift_projectBox(
+    void *_Nonnull object) noexcept;
+
+extern "C" const void *_Nonnull swift_getWitnessTable(
+    const void *_Nonnull conformanceDescriptor,
+    const void *_Nonnull type,
+    const void *_Nullable const *_Nullable instantiationArgs) noexcept;
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreserved-identifier"
 
@@ -237,7 +255,174 @@ public:
   }
 };
 
+// Forward declaration -- defined in the generated scaffolding after
+// the ValueWitnessTable struct.
+struct ValueWitnessTable;
+
+/// Base class for C++ wrappers of Swift protocol existentials.
+///
+/// Owns the existential buffer and type metadata. Provides
+/// VWT-delegated copy/move/destroy. Protocol-specific subclasses
+/// add witness table pointer(s) and protocol requirement methods.
+///
+/// Layout: [buffer: 3 * sizeof(void*)] [type metadata pointer]
+/// Subclasses append witness table pointers after _type.
+///
+/// Not virtual -- derived witness table pointers are trivial
+/// (const void*) with no destructor work, so the base destructor
+/// handles everything.
+class SwiftExistentialType {
+  // Get the VWT from the stored type metadata.
+  // Defined out-of-line in the generated scaffolding (needs
+  // ValueWitnessTable to be complete and arm64e ptrauth).
+  SWIFT_INLINE_PRIVATE_HELPER const ValueWitnessTable *_Nonnull
+  _getVWT() const noexcept;
+
+  // Destroy the contained value and deallocate any outline storage.
+  // Defined out-of-line in the generated scaffolding.
+  SWIFT_INLINE_PRIVATE_HELPER void _destroyValue() noexcept;
+
+public:
+  // Defined out-of-line in the generated scaffolding (needs VWT).
+  SWIFT_INLINE_THUNK SwiftExistentialType(
+      const SwiftExistentialType &other) noexcept;
+  SWIFT_INLINE_THUNK SwiftExistentialType(
+      SwiftExistentialType &&other) noexcept;
+  SWIFT_INLINE_THUNK SwiftExistentialType &
+  operator=(const SwiftExistentialType &other) noexcept;
+  SWIFT_INLINE_THUNK SwiftExistentialType &
+  operator=(SwiftExistentialType &&other) noexcept;
+  SWIFT_INLINE_THUNK ~SwiftExistentialType() noexcept;
+
+protected:
+  struct uninit_t {};
+  SWIFT_INLINE_THUNK SwiftExistentialType(uninit_t) noexcept {}
+
+  /// Copy the existential value (buffer + type metadata) from another
+  /// existential into this one. Used by conversion methods that construct
+  /// a base-protocol wrapper from a derived-protocol wrapper.
+  /// Defined out-of-line in the generated scaffolding (needs VWT).
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _initializeWithCopy(const SwiftExistentialType &src) noexcept;
+
+  /// Initialize this existential container from a concrete value.
+  /// _type must already be set before calling this method.
+  /// Handles both inline and out-of-line value storage.
+  /// Defined out-of-line in the generated scaffolding (needs VWT).
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _initializeWithValue(const void *_Nonnull src) noexcept;
+
+  /// Project the contained value for passing to witness functions.
+  /// Defined out-of-line in the generated scaffolding (needs VWT).
+  SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
+  _projectValue() const noexcept;
+
+  template <size_t EntryOffset, uint16_t PtrAuthDisc, typename FnTy>
+  SWIFT_INLINE_PRIVATE_HELPER FnTy _loadWitness(
+      const void *_Nonnull wt) const {
+    struct slot {
+      FnTy __ptrauth_swift_protocol_witness_function_pointer(PtrAuthDisc) fn;
+    };
+    auto *s = reinterpret_cast<const slot *>(
+        reinterpret_cast<const void *const *>(wt) + EntryOffset);
+    return s->fn;
+  }
+
+  void *_Nonnull _buffer[3];
+  void *_Nonnull _type;
+};
+
+/// Base class for class-constrained protocol existential wrappers.
+/// Layout: [class pointer] -- no value buffer, no stored type metadata.
+/// Type metadata is recovered from the object's isa pointer at runtime.
+/// Copy/destroy uses reference counting instead of VWT indirection.
+class SwiftClassExistentialType {
+public:
+  SWIFT_INLINE_THUNK SwiftClassExistentialType(
+      const SwiftClassExistentialType &other) noexcept
+      : _value(other._value) {
+    swift_retain(_value);
+  }
+  SWIFT_INLINE_THUNK SwiftClassExistentialType(
+      SwiftClassExistentialType &&other) noexcept
+      : _value(other._value) {
+    swift_retain(_value);
+  }
+  SWIFT_INLINE_THUNK SwiftClassExistentialType &
+  operator=(const SwiftClassExistentialType &other) noexcept {
+    if (this != &other) {
+      auto *old = _value;
+      _value = other._value;
+      swift_retain(_value);
+      swift_release(old);
+    }
+    return *this;
+  }
+  SWIFT_INLINE_THUNK SwiftClassExistentialType &
+  operator=(SwiftClassExistentialType &&other) noexcept {
+    if (this != &other) {
+      auto *old = _value;
+      _value = other._value;
+      swift_retain(_value);
+      swift_release(old);
+    }
+    return *this;
+  }
+  SWIFT_INLINE_THUNK ~SwiftClassExistentialType() noexcept {
+    swift_release(_value);
+  }
+
+protected:
+  struct uninit_t {};
+  SWIFT_INLINE_THUNK SwiftClassExistentialType(uninit_t) noexcept
+      : _value(nullptr) {}
+
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _initializeWithCopy(const SwiftClassExistentialType &src) noexcept {
+    _value = src._value;
+    swift_retain(_value);
+  }
+
+  SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
+  _projectValue() const noexcept { return _value; }
+
+  SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
+  _getType() const noexcept { return swift_getObjectType(_value); }
+
+  template <size_t EntryOffset, uint16_t PtrAuthDisc, typename FnTy>
+  SWIFT_INLINE_PRIVATE_HELPER FnTy _loadWitness(
+      const void *_Nonnull wt) const {
+    struct slot {
+      FnTy __ptrauth_swift_protocol_witness_function_pointer(PtrAuthDisc) fn;
+    };
+    auto *s = reinterpret_cast<const slot *>(
+        reinterpret_cast<const void *const *>(wt) + EntryOffset);
+    return s->fn;
+  }
+
+  void *_Nonnull _value;
+};
+
 } // namespace _impl
+
+/// Swift's Any type -- a zero-witness-table existential container.
+/// Holds any Swift value with type metadata for lifecycle operations.
+/// C++ code cannot inspect the contained value but can pass it back
+/// to Swift APIs for unboxing. Marker protocols inherit from this.
+class Any : public _impl::SwiftExistentialType {
+protected:
+  SWIFT_INLINE_THUNK Any() noexcept : SwiftExistentialType(uninit_t{}) {}
+};
+
+/// Primary conformance record templates for stdlib protocols.
+/// Per-module specializations are emitted by PrintAsClang for each
+/// same-module (type, protocol) conformance. An empty primary template
+/// means "T does not conform"; a specialization with a getWitnessTable()
+/// static method means "T conforms" and lazily resolves the witness
+/// table via swift_getWitnessTable at first call.
+template<typename T> struct EquatableConformance {};
+template<typename T> struct HashableConformance {};
+template<typename T> struct ComparableConformance {};
 
 /// Swift's Int type.
 using Int = ptrdiff_t;
@@ -311,9 +496,157 @@ private:
 
 } // namespace _impl
 
+/// Scaffolded existential wrapper for Swift.Equatable.
+/// ABI-frozen witness table layout. No methods -- Self-constrained
+/// requirements (==) are dispatched via EquatableConformance<T>.
+class Equatable final : public _impl::SwiftExistentialType {
+public:
+#ifdef __cpp_concepts
+  template<typename T>
+      requires requires { EquatableConformance<T>::getWitnessTable(); }
+  SWIFT_INLINE_THUNK Equatable(const T& value) noexcept
+      : SwiftExistentialType(uninit_t{}) {
+    _type = TypeMetadataTrait<T>::getTypeMetadata();
+    _initializeWithValue(_impl::getOpaquePointer(value));
+    _witnessTable = EquatableConformance<T>::getWitnessTable();
+  }
+#endif
+private:
+  SWIFT_INLINE_THUNK Equatable() noexcept
+      : SwiftExistentialType(uninit_t{}) {}
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-private-field"
+  const void *_Nonnull _witnessTable;
+#pragma clang diagnostic pop
+};
+
+/// Scaffolded existential wrapper for Swift.Hashable.
+class Hashable final : public _impl::SwiftExistentialType {
+public:
+#ifdef __cpp_concepts
+  template<typename T>
+      requires requires { HashableConformance<T>::getWitnessTable(); }
+  SWIFT_INLINE_THUNK Hashable(const T& value) noexcept
+      : SwiftExistentialType(uninit_t{}) {
+    _type = TypeMetadataTrait<T>::getTypeMetadata();
+    _initializeWithValue(_impl::getOpaquePointer(value));
+    _witnessTable = HashableConformance<T>::getWitnessTable();
+  }
+#endif
+private:
+  SWIFT_INLINE_THUNK Hashable() noexcept
+      : SwiftExistentialType(uninit_t{}) {}
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-private-field"
+  const void *_Nonnull _witnessTable;
+#pragma clang diagnostic pop
+};
+
+/// Scaffolded existential wrapper for Swift.Comparable.
+class Comparable final : public _impl::SwiftExistentialType {
+public:
+#ifdef __cpp_concepts
+  template<typename T>
+      requires requires { ComparableConformance<T>::getWitnessTable(); }
+  SWIFT_INLINE_THUNK Comparable(const T& value) noexcept
+      : SwiftExistentialType(uninit_t{}) {
+    _type = TypeMetadataTrait<T>::getTypeMetadata();
+    _initializeWithValue(_impl::getOpaquePointer(value));
+    _witnessTable = ComparableConformance<T>::getWitnessTable();
+  }
+#endif
+private:
+  SWIFT_INLINE_THUNK Comparable() noexcept
+      : SwiftExistentialType(uninit_t{}) {}
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-private-field"
+  const void *_Nonnull _witnessTable;
+#pragma clang diagnostic pop
+};
+
+#ifdef __cpp_concepts
+
+namespace _impl {
+
+template <size_t EntryOffset, uint16_t PtrAuthDisc, typename FnTy>
+SWIFT_INLINE_PRIVATE_HELPER FnTy _loadWitnessFromTable(
+    const void *_Nonnull wt) {
+  struct slot {
+    FnTy __ptrauth_swift_protocol_witness_function_pointer(PtrAuthDisc) fn;
+  };
+  auto *s = reinterpret_cast<const slot *>(
+      reinterpret_cast<const void *const *>(wt) + EntryOffset);
+  return s->fn;
+}
+
+} // namespace _impl
+#endif // __cpp_concepts
+
 #pragma clang diagnostic pop
 
 } // namespace swift SWIFT_PRIVATE_ATTR
 #endif
+
+#ifdef __cpp_concepts
+
+/// Free operator== for any Swift type with an Equatable conformance record.
+/// Dispatches through the Equatable witness table at offset 1 (==).
+template<typename T>
+    requires requires { swift::EquatableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator==(const T& lhs, const T& rhs) noexcept {
+  struct _w { _w() = delete; static SWIFT_CALL bool call(
+      const void * _Nonnull, const void * _Nonnull,
+      SWIFT_CONTEXT const void * _Nonnull,
+      const void * _Nonnull, const void * _Nonnull); };
+  auto *wt = swift::EquatableConformance<T>::getWitnessTable();
+  auto fn = swift::_impl::_loadWitnessFromTable<1, 38891, decltype(&_w::call)>(wt);
+  auto *metadata = swift::TypeMetadataTrait<T>::getTypeMetadata();
+  return fn(swift::_impl::getOpaquePointer(lhs),
+            swift::_impl::getOpaquePointer(rhs),
+            metadata, metadata, wt);
+}
+
+template<typename T>
+    requires requires { swift::EquatableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator!=(const T& lhs, const T& rhs) noexcept {
+  return !(lhs == rhs);
+}
+
+/// Free operator< for any Swift type with a Comparable conformance record.
+/// Dispatches through the Comparable witness table at offset 2 (<).
+template<typename T>
+    requires requires { swift::ComparableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator<(const T& lhs, const T& rhs) noexcept {
+  struct _w { _w() = delete; static SWIFT_CALL bool call(
+      const void * _Nonnull, const void * _Nonnull,
+      SWIFT_CONTEXT const void * _Nonnull,
+      const void * _Nonnull, const void * _Nonnull); };
+  auto *wt = swift::ComparableConformance<T>::getWitnessTable();
+  auto fn = swift::_impl::_loadWitnessFromTable<2, 59511, decltype(&_w::call)>(wt);
+  auto *metadata = swift::TypeMetadataTrait<T>::getTypeMetadata();
+  return fn(swift::_impl::getOpaquePointer(lhs),
+            swift::_impl::getOpaquePointer(rhs),
+            metadata, metadata, wt);
+}
+
+template<typename T>
+    requires requires { swift::ComparableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator<=(const T& lhs, const T& rhs) noexcept {
+  return !(rhs < lhs);
+}
+
+template<typename T>
+    requires requires { swift::ComparableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator>(const T& lhs, const T& rhs) noexcept {
+  return rhs < lhs;
+}
+
+template<typename T>
+    requires requires { swift::ComparableConformance<T>::getWitnessTable(); }
+SWIFT_INLINE_THUNK bool operator>=(const T& lhs, const T& rhs) noexcept {
+  return !(lhs < rhs);
+}
+
+#endif // __cpp_concepts
 
 #endif // SWIFT_CXX_INTEROPERABILITY_H

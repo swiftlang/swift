@@ -87,6 +87,11 @@ static void writePtrauthPrologue(raw_ostream &os, ASTContext &ctx) {
                 os << "# ifndef __ptrauth_swift_class_method_pointer\n";
                 os << "#  define __ptrauth_swift_class_method_pointer(x)\n";
                 os << "# endif\n";
+                os << "# ifndef "
+                      "__ptrauth_swift_protocol_witness_function_pointer\n";
+                os << "#  define "
+                      "__ptrauth_swift_protocol_witness_function_pointer(x)\n";
+                os << "# endif\n";
               });
           os << "#endif\n";
         });

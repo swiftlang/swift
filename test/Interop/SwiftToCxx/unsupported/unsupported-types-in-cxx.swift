@@ -12,6 +12,10 @@ public func takesVoid(_ x: ()) {}
 
 // CHECK:     takeFloat
 
+public protocol TestProtocol {}
+
+// CHECK: class{{.*}} TestProtocol final : public swift::_impl::SwiftExistentialType {
+
 public enum MoveOnlyEnum: ~Copyable {
     case a
 }
@@ -23,10 +27,6 @@ public struct MoveOnlyStruct: ~Copyable {
 }
 
 // CHECK: class MoveOnlyStruct { } SWIFT_UNAVAILABLE_MSG("noncopyable struct 'MoveOnlyStruct' can not yet be represented in C++");
-
-public protocol TestProtocol {}
-
-// CHECK: class TestProtocol { } SWIFT_UNAVAILABLE_MSG("protocol 'TestProtocol' can not yet be represented in C++");
 
 // CHECK: // Unavailable in C++: Swift global function 'takesTuple(_:)'. Parameter 'x' of type '(Float, Float)' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'takesVoid(_:)'. Parameter 'x' of type '()' is not representable in C++.

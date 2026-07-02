@@ -3425,6 +3425,7 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
 
   case CxxRecordSemanticsKind::Iterator:
   case CxxRecordSemanticsKind::SwiftClassType:
+  case CxxRecordSemanticsKind::SwiftExistentialType:
     return nullptr;
   }
 }

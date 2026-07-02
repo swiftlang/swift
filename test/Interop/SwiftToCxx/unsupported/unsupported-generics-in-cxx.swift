@@ -66,7 +66,8 @@ public func makeQueryResult() -> QueryResult<UInt32> { .init(glyphIDs: []) }
 // CHECK: class SWIFT_SYMBOL("s:5Decls6Class1C") Class1 : public swift::_impl::RefCountedClass {
 // CHECK: 'index1' cannot be printed
 
-// CHECK: namespace Decls SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Decls") {
+// CHECK: class{{.*}} Proto final : public swift::_impl::SwiftExistentialType {
+
 // CHECK: namespace Decls SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Decls") {
 // CHECK: SWIFT_INLINE_THUNK void supportedFunc(const T_0_0& x) noexcept SWIFT_SYMBOL("s:5Decls13supportedFuncyyxlF") {
 
@@ -75,8 +76,6 @@ public func makeQueryResult() -> QueryResult<UInt32> { .init(glyphIDs: []) }
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif // __cpp_concepts
 // CHECK-NEXT: class GlyphIndex { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'GlyphIndex' can not yet be represented in C++");
-
-// CHECK: class Proto { } SWIFT_UNAVAILABLE_MSG("protocol 'Proto' can not yet be represented in C++");
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
