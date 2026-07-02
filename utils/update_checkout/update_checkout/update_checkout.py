@@ -96,6 +96,169 @@ def output_prefix(repo_name: str):
     return f"[{repo_name}] ".ljust(40)
 
 
+def get_pr_branch(
+    *,
+    repo_path: Path,
+    repo_name: str,
+    pr_id: str,
+    base_branch: str,
+):
+    prefix = output_prefix(repo_name)
+    is_shallow_repository = Git.is_shallow(repo_path=repo_path)
+    pr_merge_ref_name = f"pull/{pr_id}/merge"
+    local_pr_merge_ref = f"refs/remotes/origin/{pr_merge_ref_name}"
+
+    # 1. Fetch the PR merge ref.
+    Git.run(
+        repo_path,
+        [
+            "fetch",
+            "origin",
+            # Overwrite the ref if it already exists.
+            "--force",
+            # If we omitted the depth and the local repository was shallow, this
+            # command would effectively (and wastefully) unshallow it, so do
+            # not fetch more than necessary.
+            #
+            # If it happens that we need to update the PR merge ref, its parent
+            # commits are enough history to find a merge base between it and the
+            # PR base branch.
+            "--depth=2",
+            f"refs/{pr_merge_ref_name}:{local_pr_merge_ref}",
+        ],
+        echo=True,
+        prefix=prefix,
+    )
+
+    # 2. Check out a dedicated branch at the PR merge ref, hard-resetting the
+    #    branch if it's already checked out or exists.
+    pr_branch = "ci_pr_{0}".format(pr_id)
+    Git.run(
+        repo_path,
+        ["checkout", "--force", "-B", pr_branch, local_pr_merge_ref],
+        echo=True,
+        prefix=prefix,
+    )
+
+    # A PR merge ref is up to date if its first parent matches the remote tip
+    # of the PR base branch.
+    def is_pr_merge_ref_up_to_date():
+        # The PR merge ref's first parent is the base branch tip at the time
+        # GitHub last computed the ref. If that still matches the current remote
+        # base branch tip, the merge ref is up to date and we can skip the
+        # re-merge.
+        base_parent_object_id, _, _ = Git.run(
+            repo_path,
+            ["rev-parse", f"{local_pr_merge_ref}^1"],
+            echo=True,
+            prefix=prefix,
+        )
+        remote_base_branch_object_id_and_ref, _, _ = Git.run(
+            repo_path,
+            [
+                "ls-remote",
+                # This command should fail if no matching refs are found.
+                "--exit-code",
+                "--heads",
+                "origin",
+                # Important for disambiguation. Just 'base_branch' matches
+                # both 'base_branch' and '*/base_branch'.
+                f"refs/heads/{base_branch}",
+            ],
+            echo=True,
+            prefix=prefix,
+        )
+
+        remote_base_branch_object_id, _ = remote_base_branch_object_id_and_ref.split()
+
+        return base_parent_object_id == remote_base_branch_object_id
+
+    # 3. Check whether the merge ref is stale. If up to date, that's it.
+    if is_pr_merge_ref_up_to_date():
+        return pr_branch
+
+    # The PR merge ref is out of date. This path exists because GitHub is not
+    # consistent in keeping PR merge refs up to date.
+    #
+    # 4. If the local repository is non-shallow, fetch the base branch.
+    #    Otherwise, fetch and deepen the base branch incrementally until we
+    #    find a merge base and until a certain limit.
+    deepen_increment = 100
+    max_iterations = 10
+    for _ in range(max_iterations):
+        Git.run(
+            repo_path,
+            [
+                "fetch",
+                "origin",
+                # This matters only when the local repository is shallow, and
+                # has no effect otherwise.
+                f"--deepen={deepen_increment}",
+                base_branch,
+            ],
+            echo=True,
+            prefix=prefix,
+        )
+
+        # If the local repository is non-shallow, we should never be missing a
+        # merge base after the above fetch.
+        if not is_shallow_repository:
+            break
+
+        def merge_base_exists():
+            # Exit code 0 means true, 1 means false. Errors are signaled
+            # by other exit codes.
+            try:
+                Git.run(
+                    repo_path,
+                    ["merge-base", local_pr_merge_ref, f"origin/{base_branch}"],
+                    echo=True,
+                    prefix=prefix,
+                )
+                return True
+            except GitException as e:
+                if e.returncode == 1:
+                    return False
+                else:
+                    raise  # Pass the error up the chain.
+
+        # Do we have a merge base between .
+        if merge_base_exists():
+            break
+    else:
+        # This is probably a shallow repository, and the PR merge ref is
+        # WAY behind. Give up and ask them to rebase. This seems better than
+        # to waste traffic on unshallowing a potentially huge repository
+        # like llvm-project on a machine where the checkout is regularly
+        # wiped clean.
+        raise RuntimeError(
+            f"Could not find a merge-base between {local_pr_merge_ref} "
+            f"and origin/{base_branch} after deepening by "
+            f"{max_iterations * deepen_increment} commits. The PR may be "
+            f"too far behind the base branch; please rebase."
+        )
+
+    # 5. Merge in the freshly fetched base branch.
+    try:
+        Git.run(
+            repo_path,
+            ["merge", f"origin/{base_branch}", "--no-edit"],
+            echo=True,
+            prefix=prefix,
+        )
+    except Exception:
+        # If the merge fails, odds are there's a conflict. Either way
+        # we do not want to proceed. Abort the merge (ignoring errors) to leave
+        # a clean working directory behind, and fail with the merge error.
+        try:
+            Git.run(repo_path, ["merge", "--abort"], echo=True, prefix=prefix)
+        except Exception:
+            pass
+        raise
+
+    return pr_branch
+
+
 def get_branch_for_repo(
     repo_path: Path,
     config: Dict[str, Any],
@@ -126,50 +289,14 @@ def get_branch_for_repo(
         scheme_branch = scheme_map[repo_name]
         remote_repo_id = config["repos"][repo_name]["remote"]["id"]
         if remote_repo_id in cross_repos_pr:
-            prefix = output_prefix(repo_name)
             cross_repo = True
             pr_id = cross_repos_pr[remote_repo_id]
-            repo_branch = "ci_pr_{0}".format(pr_id)
-
-            # Fetch the PR merge branch into repo_branch, and also fetch the
-            # scheme branch, which ought to match the PR base branch.
-            Git.run(
-                repo_path,
-                [
-                    "fetch",
-                    "origin",
-                    # If repo_branch exists, overwrite it.
-                    "--force",
-                    # If repo_branch exists and is checked out, this will
-                    # prevent Git from refusing the fetch.
-                    "--update-head-ok",
-                    "--tags",
-                    f"pull/{pr_id}/merge:{repo_branch}",
-                    scheme_branch,
-                ],
-                echo=True,
-                prefix=prefix,
+            repo_branch = get_pr_branch(
+                repo_path=repo_path,
+                repo_name=repo_name,
+                pr_id=pr_id,
+                base_branch=scheme_branch,
             )
-            # Check out repo_branch and merge the base branch into it.
-            # GitHub cannot be trusted to keep PR merge branches up-to-date.
-            Git.run(repo_path, ["checkout", repo_branch], echo=True, prefix=prefix)
-            try:
-                Git.run(
-                    repo_path,
-                    ["merge", f"origin/{scheme_branch}", "--no-edit"],
-                    echo=True,
-                    prefix=prefix,
-                )
-            except Exception as e:
-                # If the merge fails, odds are there's a conflict. Either way
-                # we do not want to proceed. Abort the merge to leave a clean
-                # working directory behind, ignoring errors, and fail with the
-                # merge error.
-                try:
-                    Git.run(repo_path, ["merge", "--abort"], echo=True, prefix=prefix)
-                except:
-                    pass
-                raise e
         else:
             repo_branch = scheme_branch
 
