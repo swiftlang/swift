@@ -142,9 +142,7 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
     llvm_unreachable("constructor cannot have erased isolation");
 
   case ActorIsolation::GlobalActor:
-    return ctor->getASTContext().LangOpts.hasFeature(
-               Feature::FlowIsolationGlobalActor) &&
-           ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    return ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
                StrictConcurrency::Complete &&
            !ctor->hasAsync();
   case ActorIsolation::ActorInstance:
@@ -8885,13 +8883,10 @@ ActorReferenceResult ActorReferenceResult::Builder::build() {
   // type is Sendable. Note that if the init is a nonisolated actor init,
   // Sendable checking is already performed on arguments at the call-site.
   if (auto *init = dyn_cast<ConstructorDecl>(fromDC)) {
-    // When the FlowIsolationGlobalActor feature is enabled under complete
-    // strict concurrency, we allow users to initialize global actor
-    // non-Sendable types in initializers more aggressively by deferring the
-    // check to the SIL-level flow-isolation pass.
-    if (fromDC->getASTContext().LangOpts.hasFeature(
-            Feature::FlowIsolationGlobalActor) &&
-        fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    // Under complete strict concurrency, we allow users to initialize global
+    // actor non-Sendable types in initializers more aggressively by deferring
+    // the check to the SIL-level flow-isolation pass.
+    if (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete &&
         referencedActor && referencedActor->isSelf() &&
         checkedByFlowIsolation(fromDC, *referencedActor, decl, declRefLoc,
