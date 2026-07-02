@@ -720,6 +720,14 @@ public:
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
           Receiver) override;
 
+  void collectInferredIsolations(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, std::optional<unsigned> Offset,
+      std::optional<unsigned> Length, bool CancelOnSubsequentRequest,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<InferredIsolationsInFile> &)>
+          Receiver) override;
+
   void collectVariableTypes(
       StringRef PrimaryFilePath, StringRef InputBufferName,
       ArrayRef<const char *> Args, std::optional<unsigned> Offset,
