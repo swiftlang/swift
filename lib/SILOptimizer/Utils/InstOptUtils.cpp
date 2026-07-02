@@ -39,6 +39,7 @@
 #include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
@@ -1917,6 +1918,7 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
       });
 }
 
+
 /// Clone a nullary instruction (with no operands) into each debug value's
 /// reconstruction block, replacing the block argument.
 /// This uses the TrivialCloner, so its restrictions apply.
@@ -1958,6 +1960,111 @@ static void salvageUnaryInst(SingleValueInstruction *SVI) {
         debugBB->replacePhiArgument(0, operand->getType(), OwnershipKind::None);
     cloned->setOperand(0, newArg);
     DbgInst->setOperand(operand);
+  }
+}
+
+static bool isNullaryLiteral(SILValue v) {
+  return isa<IntegerLiteralInst>(v) || isa<FloatLiteralInst>(v);
+}
+
+/// Clone a binary instruction into each debug value's reconstruction block.
+/// Because debug BBs support only one phi argument, at least one operand must
+/// be a nullary literal (IntegerLiteralInst or FloatLiteralInst) that can be
+/// cloned directly into the block.
+static void salvageBinaryInst(SingleValueInstruction *SVI) {
+  assert(SVI->getNumOperands() == 2);
+  SILValue lhs = SVI->getOperand(0);
+  SILValue rhs = SVI->getOperand(1);
+
+  bool lhsNullary = isNullaryLiteral(lhs);
+  bool rhsNullary = isNullaryLiteral(rhs);
+
+  SmallVector<Operand *, 4> debugUses(getDebugUses(SVI));
+  for (Operand *U : debugUses) {
+    auto *DbgInst = cast<DebugValueInst>(U->getUser());
+
+    if (!lhsNullary && !rhsNullary) {
+      // Debug values cannot currently have multiple operands.
+      DbgInst->killOperand();
+      continue;
+    }
+
+    SILBasicBlock *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
+    SILArgument *oldArg = debugBB->getArgument(0);
+
+    auto *cloned = cast<SingleValueInstruction>(SVI->clone(&*debugBB->begin()));
+    oldArg->replaceAllUsesWith(cloned);
+
+    SILValue clonedLhs;
+    SILValue clonedRhs;
+    if (lhsNullary)
+      clonedLhs = cast<SingleValueInstruction>(lhs)->clone(&*debugBB->begin());
+    if (rhsNullary)
+      clonedRhs = cast<SingleValueInstruction>(rhs)->clone(&*debugBB->begin());
+
+    if (lhsNullary && rhsNullary) {
+      // Both nullary, no operand remains.
+      cloned->setOperand(0, clonedLhs);
+      cloned->setOperand(1, clonedRhs);
+      DbgInst->killOperand();
+    } else if (rhsNullary) {
+      auto *newArg =
+          debugBB->replacePhiArgument(0, lhs->getType(), OwnershipKind::None);
+      cloned->setOperand(0, newArg);
+      cloned->setOperand(1, clonedRhs);
+      DbgInst->setOperand(lhs);
+    } else {
+      auto *newArg =
+          debugBB->replacePhiArgument(0, rhs->getType(), OwnershipKind::None);
+      cloned->setOperand(0, clonedLhs);
+      cloned->setOperand(1, newArg);
+      DbgInst->setOperand(rhs);
+    }
+  }
+}
+
+/// Salvage a checked truncation from Builtin.IntLiteral by constant folding
+/// the builtin and cloning the result into debug reconstruction blocks.
+/// These builtins create branches at IRGen which are not supported in debug BBs.
+static void salvageCheckedTruncFromLiteral(BuiltinInst *builtin) {
+  // Constant fold the builtin. This produces a tuple (result, overflow) of
+  // integer literals inserted before the builtin. Returns nullptr on overflow
+  // or if the operand is not a constant.
+  std::optional<bool> ResultsInError;
+  SILValue folded = constantFoldBuiltin(builtin, ResultsInError);
+  if (!folded)
+    return;
+
+  auto *tupleFolded = cast<SingleValueInstruction>(folded);
+
+  // Redirect debug uses from the builtin to the folded tuple, then salvage
+  // the tuple as a binary instruction (both operands are integer literals).
+  SmallVector<Operand *, 4> debugUses(getDebugUses(builtin));
+  for (Operand *U : debugUses)
+    U->set(folded);
+
+  salvageBinaryInst(tupleFolded);
+
+  // Erase the temporary folded instructions from the real function.
+  SmallVector<SingleValueInstruction *, 2> tupleOperands;
+  for (auto &op : tupleFolded->getAllOperands())
+    if (auto *inst = dyn_cast<SingleValueInstruction>(op.get()))
+      tupleOperands.push_back(inst);
+  tupleFolded->eraseFromParent();
+  for (auto *inst : tupleOperands)
+    if (inst->use_empty())
+      inst->eraseFromParent();
+}
+
+/// Salvage debug info for identity-like instructions (copy_value, move_value).
+/// Just repoints debug uses to the operand.
+static void salvageIdentityInst(SingleValueInstruction *SVI) {
+  assert(SVI->getNumOperands() >= 1 &&
+         "salvageIdentityInst expects an operand");
+  SmallVector<Operand *, 4> debugUses(getDebugUses(SVI));
+  for (Operand *U : debugUses) {
+    auto *DbgInst = cast<DebugValueInst>(U->getUser());
+    DbgInst->setOperand(SVI->getOperand(0));
   }
 }
 
@@ -2245,6 +2352,38 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       isa<RefElementAddrInst>(I) || isa<VectorBaseAddrInst>(I) ||
       isa<RefTailAddrInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<IndexAddrInst>(I) || isa<IndexRawPointerInst>(I))
+    salvageBinaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<CopyValueInst>(I) || isa<MoveValueInst>(I))
+    salvageIdentityInst(cast<SingleValueInstruction>(I));
+
+  if (auto *builtin = dyn_cast<BuiltinInst>(I)) {
+    // Only salvage side-effects free SIL builtins.
+    BuiltinInfo info = builtin->getBuiltinInfo();
+    if (info.ID != BuiltinValueKind::None && info.isReadNone()) {
+      if ((info.ID == BuiltinValueKind::SToSCheckedTrunc ||
+           info.ID == BuiltinValueKind::UToUCheckedTrunc ||
+           info.ID == BuiltinValueKind::SToUCheckedTrunc) &&
+          info.Types[0]->is<BuiltinIntegerLiteralType>())
+        return salvageCheckedTruncFromLiteral(builtin);
+
+      // assumeNonNegative and assumeAlignment just returns its first operand
+      if (info.ID == BuiltinValueKind::AssumeNonNegative ||
+          info.ID == BuiltinValueKind::AssumeAlignment)
+        return salvageIdentityInst(builtin);
+      // or, and, xor, cmp_* builtins:
+      if (builtin->getNumOperands() == 2)
+        return salvageBinaryInst(builtin);
+      // (z/s)extOrBitcast, truncOrBitcast, ptrtoint, inttoptr
+      if (builtin->getNumOperands() == 1)
+        return salvageUnaryInst(builtin);
+      // zeroInitializer
+      if (builtin->getNumOperands() == 0)
+        return salvageNullaryInst(builtin);
+    }
+  }
 }
 
 void swift::salvageLoadDebugInfo(LoadOperation load) {
