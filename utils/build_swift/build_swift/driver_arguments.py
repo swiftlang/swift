@@ -757,8 +757,7 @@ def create_argument_parser():
            default=None,
            help='The targets to compile or cross-compile the Swift standard '
                 'library for. %(default)s by default.'
-                ' Comma separated list: {}'.format(
-                    ' '.join(StdlibDeploymentTarget.get_target_names())))
+                f' Comma separated list: {" ".join(StdlibDeploymentTarget.get_target_names())}')
 
     option('--build-stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
@@ -1582,8 +1581,7 @@ def create_argument_parser():
            default=android.adb.commands.DEVICE_TEMP_DIR,
            help='Path on an Android device to which built Swift stdlib '
                 'products will be deployed. If running host tests, specify '
-                'the "{}" directory.'.format(
-                    android.adb.commands.DEVICE_TEMP_DIR))
+                f'the "{android.adb.commands.DEVICE_TEMP_DIR}" directory.')
 
     option('--android-arch', store,
            choices=['armv7', 'aarch64', 'x86_64'],
