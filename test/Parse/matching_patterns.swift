@@ -414,3 +414,16 @@ func testNonBinding6(y: [Int], z: Int) -> Int {
     0
   }
 }
+
+// Fix-it: suggest removing quotes when a string literal is typed where a
+// pattern is expected and the contents form a valid identifier.
+var "status": Int = 0 // expected-error {{expected pattern}} {{5-13=status}}
+let "foo" = 1 // expected-error {{expected pattern}} {{5-10=foo}}
+
+// No fix-it when the contents are not a valid identifier.
+var "has space": Int = 0 // expected-error {{expected pattern}}
+var "1digit": Int = 0 // expected-error {{expected pattern}}
+var "": Int = 0 // expected-error {{expected pattern}}
+
+// No fix-it for raw string literals.
+var #"status"#: Int = 0 // expected-error {{expected pattern}}
