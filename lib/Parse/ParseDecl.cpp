@@ -8219,6 +8219,12 @@ struct Parser::ParsedAccessors {
       return Mutate;
     return nullptr;
   }
+
+  bool hasNonObservingAccessor() const {
+    return Get || DistributedGet || Set || Read || YieldingBorrow || 
+           Modify || YieldingMutate || Address || MutableAddress || 
+           Init || Borrow || Mutate;
+  }
 };
 
 static ParserStatus parseAccessorIntroducer(Parser &P,
@@ -8818,8 +8824,7 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
     return nullptr;
 
   if (!typedPattern) {
-    if (accessors.Get || accessors.Set || accessors.Address ||
-        accessors.MutableAddress) {
+    if (accessors.hasNonObservingAccessor()) {
       SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
         pattern->getBoundName().getLength());
       diagnose(pattern->getLoc(), diag::computed_property_missing_type)
