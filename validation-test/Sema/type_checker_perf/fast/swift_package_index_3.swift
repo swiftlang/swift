@@ -1,7 +1,5 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=50000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=5000
 // REQUIRES: tools-release,no_asan
-
-// Valid expression, type checks with default limits but slow
 
 extension String {
   func replacingOccurrences(of: String, with: String) -> String { return "" }
@@ -11,7 +9,7 @@ extension String {
 func getProperties(
     from ics: String
 ) -> [(name: String, value: String)] {
-    return ics // expected-error {{the compiler is unable to type-check this expression in reasonable time}}
+    return ics
         .replacingOccurrences(of: "\r\n ", with: "")
         .components(separatedBy: "\r\n")
         .map { $0.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: true) }

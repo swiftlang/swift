@@ -310,3 +310,17 @@ func test_invalid_inout_with_restrictions(lhs: inout any BinaryInteger, rhs: any
   var other: (any BinaryInteger)? = nil
   other = &rhs // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 }
+
+// In this expression we produce an lvalue supertype binding.
+//
+// FIXME: We need more examples of this so that we can properly exercise type join
+// support for lvalues.
+do {
+  class Chain {
+    var next: Chain?
+  }
+
+  func f(chain: Chain) {
+    _ = (chain.next?.next)?.next?.next
+  }
+}
