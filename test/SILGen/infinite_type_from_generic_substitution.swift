@@ -1,6 +1,3 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -verify %s
-
 // RUN: %target-swift-emit-sil -verify %s
 
 protocol P {
