@@ -625,3 +625,60 @@ func testNonSendableCaptures(ns: NonSendableKlass, a: isolated MyActor) {
     let _ = ns
   }
 }
+
+// Regression tests for https://github.com/swiftlang/swift/issues/89736
+
+enum GH_89736 {
+  // Verbatim repro:
+
+  protocol FooDelegate: AnyObject {
+    func fooDelegateMethod()
+  }
+
+  final class Foo {
+      weak var delegate: (any FooDelegate)?
+
+      func useDelegate() {
+          delegate?.fooDelegateMethod()
+      }
+  }
+
+  @MainActor
+  final class Bar: @MainActor FooDelegate {
+
+      // @MainActor
+      func fooDelegateMethod() {
+          // ❗️ This method is unexpectedly called from outside MainActor.
+          // `MainActor.assertIsolated()` would fail here.
+      }
+  }
+
+  @MainActor
+  func useFoo() async {
+      let foo = Foo()
+      let bar = Bar()
+      foo.delegate = bar // expected-note {{isolated conformance to protocol 'FooDelegate' can be introduced here}}
+
+      // ❗️ `foo` should not be sent, but there is no diagnostic.
+      await sendAndUseDelegate(foo) // expected-warning {{sending 'foo' risks causing data races}}
+      // expected-note @-1 {{main actor-isolated 'foo' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}
+  }
+
+  @MainActor
+  func sendAndUseDelegate(_ foo: sending Foo) async {
+      await Task.detached {
+          foo.useDelegate()
+      }.value
+  }
+
+  // Reduced repro:
+
+  @MainActor
+  func bug(ns: NonSendableKlass) {
+    sendToMain(ns) // expected-warning {{sending 'ns' risks causing data races}}
+    // expected-note @-1 {{main actor-isolated 'ns' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}
+  }
+
+  @MainActor
+  func sendToMain(_ ns: sending NonSendableKlass) {}
+}
