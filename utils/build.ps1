@@ -174,7 +174,7 @@ param
   # Android SDK Options
   [switch] $Android = $false,
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
-  [string] $AndroidNDKVersion = "r28c",
+  [string] $AndroidNDKVersion = "r30",
   [ValidateRange(21, 36)]
   [int] $AndroidAPILevel = 23,
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
@@ -474,6 +474,11 @@ $KnownNDKs = @{
     SHA256 = "6bec98ac2354d8a919760889a1a41d020132e5e8cfa1b1fe51610a72c36a466b"
     ClangVersion = 19
   }
+  r30 = @{
+    URL = "https://dl.google.com/android/repository/android-ndk-r30-beta1-windows.zip"
+    SHA256 = "7c7666550238eaca4037cfa51e87b7bc2bb849d16a4ee07fb92c36d70883eab1"
+    ClangVersion = 21
+  }
 }
 
 $KnownSyft = @{
@@ -718,7 +723,7 @@ function Get-AndroidNDK {
 }
 
 function Get-AndroidNDKPath {
-  return Join-Path -Path $BinaryCache -ChildPath "android-ndk-$AndroidNDKVersion"
+  return Join-Path -Path $BinaryCache -ChildPath "android-ndk-$AndroidNDKVersion-beta1"
 }
 
 function Get-FlexExecutable {
@@ -1678,8 +1683,8 @@ function Get-Dependencies {
 
     if ($Android) {
       $NDK = Get-AndroidNDK
-      DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
-      Expand-ZipFile "android-ndk-$AndroidNDKVersion-windows.zip" -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+      DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-beta1-windows.zip" $NDK.SHA256
+      Expand-ZipFile "android-ndk-$AndroidNDKVersion-beta1-windows.zip" -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
       Write-Success "Android NDK $AndroidNDKVersion"
     }
 
@@ -2927,6 +2932,9 @@ function Build-Compilers([Hashtable] $Platform,
                          [string]    $DispatchPackage  = $null,
                          [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake") {
   New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore | Out-Null
+  Copy-Item -Force `
+    -Path "$SourceCache\swift\__mbstate_t.h" `
+    -Destination "$(Get-AndroidNDKPath)\toolchains\llvm\prebuilt\$($BuildPlatform.OS.ToString().ToLowerInvariant())-$($BuildPlatform.Architecture.LLVMName)\sysroot\usr\include\c++\v1\"
 
   Invoke-IsolatingEnvVars {
     if ($SwiftCompiler -and $SwiftCompiler.Executable -eq $Compilers.Pinned.Swift.Executable) {
