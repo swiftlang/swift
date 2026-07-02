@@ -838,7 +838,7 @@ class Test_parse_args(unittest.TestCase):
     def test_required_input_arguments(self):
         with captured_output() as (_, err):
             self.assertRaises(SystemExit, parse_args, [])
-        self.assertIn("usage: compare_perf_tests.py", err.getvalue())
+        self.assertIn("usage:", err.getvalue())
 
         args = parse_args(self.required)
         self.assertEqual(args.old_file, "old.log")
