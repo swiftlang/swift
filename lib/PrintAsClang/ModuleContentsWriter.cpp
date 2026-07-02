@@ -583,6 +583,9 @@ public:
   }
 
   void forwardDeclareCxxValueTypeIfNeeded(const NominalTypeDecl *NTD) {
+    // Empty enums are exported as namespaces; no class forward declaration.
+    if (printer.isEmptyEnum(NTD))
+      return;
     forwardDeclare(NTD, [&]() {
       ClangValueTypePrinter::forwardDeclType(os, NTD, printer);
     });
@@ -1125,10 +1128,12 @@ public:
           emitStubComment();
           continue;
         }
-        auto representation = cxx_translation::getDeclRepresentation(
-            vd, [this](const NominalTypeDecl *decl) {
-              return printer.isZeroSized(decl);
-            });
+        auto customReasonIt =
+            emissionScope.additionalUnrepresentableDeclarations.find(vd);
+        bool hasCustomReason =
+            customReasonIt !=
+                emissionScope.additionalUnrepresentableDeclarations.end() &&
+            !customReasonIt->second.empty();
         if (nmtd->hasGenericParamList()) {
           auto genericSignature =
               nmtd->getGenericSignature().getCanonicalSignature();
@@ -1138,20 +1143,28 @@ public:
         ClangSyntaxPrinter(nmtd->getASTContext(), os).printBaseName(vd);
         os << " { } SWIFT_UNAVAILABLE_MSG(\"";
 
-        auto diag =
-            representation.isUnsupported() && representation.error.has_value()
-                ? cxx_translation::diagnoseRepresenationError(
-                      *representation.error, const_cast<ValueDecl *>(vd))
-                : Diagnostic(
-                      vd->isStdlibDecl() ? diag::unexposed_other_decl_in_cxx
-                                         : diag::unsupported_other_decl_in_cxx,
-                      const_cast<ValueDecl *>(vd));
-        // Emit a specific unavailable message when we know why a decl can't be
-        // exposed, or a generic message otherwise.
-        auto diagString =
-            M.getASTContext().Diags.getFormatStringForDiagnostic(diag.getID());
-        DiagnosticEngine::formatDiagnosticText(os, diagString, diag.getArgs(),
-                                               DiagnosticFormatOptions());
+        if (hasCustomReason) {
+          os << customReasonIt->second;
+        } else {
+          auto representation = cxx_translation::getDeclRepresentation(
+              vd, [this](const NominalTypeDecl *decl) {
+                return printer.isZeroSized(decl);
+              });
+          auto diag =
+              representation.isUnsupported() && representation.error.has_value()
+                  ? cxx_translation::diagnoseRepresenationError(
+                        *representation.error, const_cast<ValueDecl *>(vd))
+                  : Diagnostic(vd->isStdlibDecl()
+                                   ? diag::unexposed_other_decl_in_cxx
+                                   : diag::unsupported_other_decl_in_cxx,
+                               const_cast<ValueDecl *>(vd));
+          // Emit a specific unavailable message when we know why a decl can't
+          // be exposed, or a generic message otherwise.
+          auto diagString =
+              M.getASTContext().Diags.getFormatStringForDiagnostic(diag.getID());
+          DiagnosticEngine::formatDiagnosticText(os, diagString, diag.getArgs(),
+                                                 DiagnosticFormatOptions());
+        }
         os << "\");\n";
         continue;
       }
