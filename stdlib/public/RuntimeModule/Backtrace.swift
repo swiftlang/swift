@@ -33,7 +33,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   ///
   /// This is used as an opaque type; if you have some Address, you
   /// can ask if it's NULL, and you can attempt to convert it to a
-  /// ``FixedWidthInteger``.
+  /// `FixedWidthInteger`.
   ///
   /// This is intentionally _not_ a pointer, because you shouldn't be
   /// dereferencing them; they may refer to some other process, for

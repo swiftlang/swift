@@ -330,7 +330,7 @@ extension RawSpan {
   /// Creates a `RawSpan` over the memory represented by a `Span<Element>`
   ///
   /// - Parameters:
-  ///   - unsafeElements: An existing `Span<Element>`, from which this
+  ///   - span: An existing `Span<Element>`, from which this
   ///     `RawSpan` will inherit its lifetime.
   @_alwaysEmitIntoClient
   @unsafe
@@ -349,7 +349,7 @@ extension RawSpan {
   /// Creates a `RawSpan` over the memory represented by a `Span<Element>`.
   ///
   /// - Parameters:
-  ///   - elements: An existing `Span<Element>`, from which this `RawSpan` will
+  ///   - span: An existing `Span<Element>`, from which this `RawSpan` will
   ///     inherit its lifetime.
   @_alwaysEmitIntoClient
   @_lifetime(copy span)

@@ -415,7 +415,7 @@ extension String.UTF16View: BidirectionalCollection {
   ///     print("First character's UTF-16 code unit: \(greeting.utf16[i])")
   ///     // Prints "First character's UTF-16 code unit: 72"
   ///
-  /// - Parameter position: A valid index of the view. `position` must be
+  /// - Parameter idx: A valid index of the view. `idx` must be
   ///   less than the view's end index.
   @inlinable @inline(__always)
   public subscript(idx: Index) -> UTF16.CodeUnit {
