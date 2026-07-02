@@ -1,0 +1,60 @@
+set(CMAKE_Swift_COMPILATION_MODE wholemodule)
+
+include(CMakeWorkarounds)
+project(SwiftCore
+  LANGUAGES Swift
+  VERSION ${SWIFT_RUNTIME_VERSION})
+
+list(PREPEND CMAKE_MODULE_PATH
+  "${CMAKE_SOURCE_DIR}/cmake/modules/embedded"
+  "${CMAKE_SOURCE_DIR}/../cmake/modules/embedded")
+
+if(NOT PROJECT_IS_TOP_LEVEL)
+  message(FATAL_ERROR "Swift Core must build as a standalone project")
+endif()
+
+set(SwiftCore_SWIFTC_SOURCE_DIR
+  "${PROJECT_SOURCE_DIR}/../../"
+  CACHE FILEPATH "Path to the root source directory of the Swift compiler")
+
+include(PlatformInfo)
+include(gyb)
+include(AvailabilityMacros)
+
+option(SwiftCore_ENABLE_RUNTIME_FUNCTION_COUNTERS "Enable runtime function counter support" OFF)
+option(SwiftCore_ENABLE_VECTOR_TYPES "Enable vector support" OFF)
+
+add_compile_options(
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependenceMutableAccessors>"
+
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Macros>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature FreestandingMacros>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BitwiseCopyable>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature ValueGenerics>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableParameters>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>"
+
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-upcoming-feature MemberImportVisibility>"
+)
+
+add_compile_options(
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Embedded>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-parse-stdlib>"
+)
+
+add_compile_definitions(
+  INTERNAL_CHECKS_ENABLED
+  $<$<BOOL:SwiftCore_ENABLE_RUNTIME_FUNCTION_COUNTERS>:SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS>
+)
+
+add_subdirectory(core)
+
+# vim:set et sw=2 ts=2 sts=2 ft=cmake tw=80:
