@@ -165,6 +165,11 @@ SEMANTICS_ATTR(DELETE_IF_UNUSED, "sil.optimizer.delete_if_unused")
 SEMANTICS_ATTR(USE_FRAME_POINTER, "use_frame_pointer")
 
 SEMANTICS_ATTR(FIXED_STORAGE_CHECK_INDEX, "fixed_storage.check_index")
+// Like `fixed_storage.check_index` but validates against `capacity`, which
+// must be an invariant property of the storage. The callee must depend only
+// on `let` fields of self, so the optimizer may merge successive checks
+// across mutations of `self`.
+SEMANTICS_ATTR(FIXED_STORAGE_CHECK_CAPACITY, "fixed_storage.check_capacity")
 SEMANTICS_ATTR(FIXED_STORAGE_GET_COUNT, "fixed_storage.get_count")
 
 SEMANTICS_ATTR(NO_SIL_VERIFICATION, "sil.verify_none")

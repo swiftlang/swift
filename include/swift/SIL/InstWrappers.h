@@ -387,7 +387,17 @@ public:
   bool visitForwardedValues(function_ref<bool(SILValue)> visitor);
 };
 
-enum class FixedStorageSemanticsCallKind { None, CheckIndex, GetCount };
+enum class FixedStorageSemanticsCallKind {
+  None,
+  CheckIndex,
+  /// Check that an index is in `0..<capacity`. Distinct from `CheckIndex`
+  /// because `capacity` is required to be invariant for the lifetime of the
+  /// storage. The callee must depend only on `let` fields of self, so
+  /// successive checks across mutations of `self` may be merged and the self
+  /// argument can be substituted across them.
+  CheckCapacity,
+  GetCount
+};
 
 struct FixedStorageSemanticsCall {
   ApplyInst *apply = nullptr;
@@ -406,6 +416,10 @@ struct FixedStorageSemanticsCall {
       if (attr == "fixed_storage.check_index") {
         apply = applyInst;
         kind = FixedStorageSemanticsCallKind::CheckIndex;
+        break;
+      } else if (attr == "fixed_storage.check_capacity") {
+        apply = applyInst;
+        kind = FixedStorageSemanticsCallKind::CheckCapacity;
         break;
       } else if (attr == "fixed_storage.get_count") {
         apply = applyInst;
