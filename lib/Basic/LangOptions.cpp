@@ -100,6 +100,8 @@ static const SupportedConditionalValue SupportedConditionalCompilationArches[] =
   "powerpc",
   "powerpc64",
   "powerpc64le",
+  "mipsel",
+  "mips64el",
   "s390x",
   "wasm32",
   "riscv32",
@@ -620,6 +622,12 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::ArchType::ppc64le:
     addPlatformConditionValue(PlatformConditionKind::Arch, "powerpc64le");
+    break;
+  case llvm::Triple::ArchType::mipsel:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "mipsel");
+    break;
+  case llvm::Triple::ArchType::mips64el:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "mips64el");
     break;
   case llvm::Triple::ArchType::x86:
     addPlatformConditionValue(PlatformConditionKind::Arch, "i386");
