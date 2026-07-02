@@ -2604,7 +2604,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_explicit_swift_module_map))
     Opts.ExplicitSwiftModuleMapPath = A->getValue();
-  for (auto A : Args.getAllArgValues(options::OPT_swift_module_file)) {
+  for (auto A : Args.getAllArgValues(options::OPT_swift_module_file_EQ)) {
     if (validateSwiftModuleFileArgumentAndAdd(A, Diags,
                                               Opts.ExplicitSwiftModuleInputs))
       return true;
