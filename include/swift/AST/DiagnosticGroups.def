@@ -117,6 +117,7 @@ GROUP(UselessAvailabilityCheck,none,"useless-availability-check")
 GROUP(UselessConditionalStatement,none,"useless-conditional-statement")
 GROUP(WeakMutability,none,"weak-mutability")
 GROUP(OldSuppressedAssociatedTypes,none,"old-suppressed-associatedtypes")
+GROUP(StrictExhaustiveSwitches,DefaultIgnoreWarnings,"strict-exhaustive-switches")
 
 GROUP_LINK(PerformanceHints,ExistentialType)
 GROUP_LINK(PerformanceHints,ReturnTypeImplicitCopy)
