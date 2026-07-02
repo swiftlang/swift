@@ -37,9 +37,9 @@ func repeating${n}x${bits}(_ scalar: ${scalar}) -> SIMD${n}<${scalar}> {
 %   if bits == 16:
 #endif
 %   end
-// CHECK${arch}: repeating${n}x${bits}{{.*}} {
+// CHECK${arch}: define {{.*}} @"{{.*}}repeating${n}x${bits}{{.*}}"({{(ptr noalias sret\(.+\) captures\(none\) %0, )?}}{{(.+)}} [[ARG:%[0-9]+]])
 // CHECK${arch}: entry:
-// CHECK${arch}: [[TMP:%[0-9]+]] = insertelement <${n} x ${llvm}> {{.*}} ${llvm} %0, i32 0
+// CHECK${arch}: [[TMP:%[0-9]+]] = insertelement <${n} x ${llvm}> {{.*}} ${llvm} [[ARG]], i32 0
 // CHECK${arch}-NEXT: [[REP:%[0-9]+]] = shufflevector <${n} x ${llvm}> [[TMP]], <${n} x ${llvm}> {{.*}}, <${n} x i32> zeroinitializer
 
 %  end
