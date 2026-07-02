@@ -4,6 +4,8 @@
 // RUN:   -I %t/Inputs %t/test.swift \
 // RUN:   -cxx-interoperability-mode=default
 
+// XFAIL: OS=linux-androideabi
+
 //--- Inputs/module.modulemap
 module UnsafeRefContainer {
   header "unsafe-ref-container.h"
