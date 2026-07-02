@@ -1,6 +1,3 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-library-evolution %s
-
 // RUN: %target-swift-emit-silgen -enable-library-evolution %s | %FileCheck %s
 @_silgen_name("use")
 public func use<T: ~Copyable>(_: borrowing T)
@@ -178,4 +175,3 @@ func testNondestructiveBecauseGenericInstanceL(foo: borrowing Bar<AnyObject>) {
 		use(x)
 	}
 }
-
