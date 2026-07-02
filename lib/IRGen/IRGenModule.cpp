@@ -482,12 +482,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   ObjCClassStructTy = llvm::StructType::create(getLLVMContext(), "objc_class");
 
+  // Use pointer types for all fields, including class_ro (the 5th field).
+  // This matches Clang's ClassnfABITy and allows addSignedPointer to work
+  // correctly for arm64e ptrauth signing.
   llvm::Type *objcClassElts[] = {
     ObjCClassPtrTy,
     ObjCClassPtrTy,
     OpaquePtrTy,
     OpaquePtrTy,
-    IntPtrTy
+    OpaquePtrTy  // class_ro - use pointer type like Clang, not IntPtrTy
   };
   ObjCClassStructTy->setBody(objcClassElts);
 

@@ -2833,8 +2833,22 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   
   // Store the block header.
   auto layout = IGF.IGM.DataLayout.getStructLayout(IGF.IGM.ObjCBlockStructTy);
-  IGF.Builder.CreateStore(NSConcreteStackBlock,
-                          IGF.Builder.CreateStructGEP(headerAddr, 0, layout));
+  // Sign the block isa (__NSConcreteStackBlock) with the ObjCIsaPointers
+  // schema (DA key, disc 0x6AE1, addr-diversified). Without this, the isa is
+  // stored unsigned. On arm64e, objc_msgSend authenticates all isa pointers
+  // with autda(DA, blend(addr, 0x6AE1)). Clang signs block isa in
+  // CGBlocks.cpp via EmitPointerAuthObjCISA; Swift IRGen must do the same.
+  auto isaAddr = IGF.Builder.CreateStructGEP(headerAddr, 0, layout);
+  if (auto &schema = IGF.getOptions().PointerAuth.ObjCIsaPointers) {
+    auto isaAuthInfo = PointerAuthInfo::emit(IGF, schema,
+                                             isaAddr.getAddress(),
+                                             PointerAuthEntity());
+    llvm::Value *signedIsa = emitPointerAuthSign(IGF, NSConcreteStackBlock,
+                                                 isaAuthInfo);
+    IGF.Builder.CreateStore(signedIsa, isaAddr);
+  } else {
+    IGF.Builder.CreateStore(NSConcreteStackBlock, isaAddr);
+  }
   IGF.Builder.CreateStore(flagsVal,
                           IGF.Builder.CreateStructGEP(headerAddr, 1, layout));
   IGF.Builder.CreateStore(reserved,
