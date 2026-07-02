@@ -6698,7 +6698,13 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     if (var->isLazyStorageProperty()) {
       if (auto originalVar = var->getOriginalVarForBackingStorage()) {
         auto inferred = getInferredActorIsolation(originalVar);
-        return {inferredIsolation(inferred.isolation), inferred.source};
+        auto isolation = inferred.isolation;
+        // Lazy backing storage should not inherit nonisolated-family isolation
+        // from the visible lazy property.
+        if (isolation.isNonisolatedOrConcurrent())
+          isolation = ActorIsolation::forUnspecified().withPreconcurrency(
+              isolation.preconcurrency());
+        return {inferredIsolation(isolation), inferred.source};
       }
     }
   }
