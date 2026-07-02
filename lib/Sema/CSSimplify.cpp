@@ -6780,6 +6780,26 @@ bool ConstraintSystem::repairFailures(
     if (repairByTreatingRValueAsLValue(lhs, rhs))
       break;
 
+    // When both sides are bound generics of the same kind, a mismatch is
+    // structural, so record it as a generic-argument mismatch to enable
+    // backtracking solution to surface a fix that the conflicting-arguments
+    // diagnosis recognises.
+    // Without this, the alternate disjunct produces an `IgnoreContextualType`
+    // fix that hides the underlying conflict in a tenary expressions such as
+    // `f(c ? .a : .b)` when the branches resolve to conflicting specializations.
+    if (auto bound1 = lhs->getAs<BoundGenericType>()) {
+      if (auto bound2 = rhs->getAs<BoundGenericType>()) {
+        if (bound1->getDecl() == bound2->getDecl()) {
+          SmallVector<unsigned, 2> mismatches;
+          for (unsigned i = 0, n = bound1->getGenericArgs().size(); i != n; ++i)
+            mismatches.push_back(i);
+          conversionsOrFixes.push_back(GenericArgumentsMismatch::create(
+              *this, lhs, rhs, mismatches, getConstraintLocator(locator)));
+          break;
+        }
+      }
+    }
+
     // If there is a type mismatch here it's contextual e.g.,
     // `let x: E = .foo(42)`, where `.foo` is a member of `E`
     // but produces an incorrect type.
