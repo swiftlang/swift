@@ -1698,6 +1698,34 @@ public struct EmptyPeerMacro: PeerMacro {
   }
 }
 
+public struct EmptyExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    return []
+  }
+}
+
+/// Adds a conditional conformance to the invertible protocol `Copyable`, i.e.
+/// `extension <T>: Copyable where T: Copyable {}`.
+public struct ConditionalCopyableMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let ext: DeclSyntax =
+      "extension \(type.trimmed): Copyable where T: Copyable {}"
+    return [ext.cast(ExtensionDeclSyntax.self)]
+  }
+}
+
 public struct EquatableMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
