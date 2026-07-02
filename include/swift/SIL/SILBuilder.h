@@ -1092,7 +1092,6 @@ public:
 
   DebugValueInst *createDebugValue(
       SILLocation Loc, SILValue src, SILDebugVariable Var,
-      PoisonRefs_t poisonRefs = DontPoisonRefs,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
 
@@ -1484,7 +1483,6 @@ public:
   }
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand,
-                                       PoisonRefs_t poisonRefs = DontPoisonRefs,
                                        IsDeadEnd_t isDeadEnd = IsntDeadEnd) {
     ASSERT(getFunction().hasOwnership());
     ASSERT(isLoadableOrOpaque(operand->getType()));
@@ -1492,7 +1490,7 @@ public:
            "Should not be passing trivial values to this api. Use instead "
            "emitDestroyValueOperation");
     return insert(new (getModule()) DestroyValueInst(
-        getSILDebugLocation(Loc), operand, poisonRefs, isDeadEnd));
+        getSILDebugLocation(Loc), operand, isDeadEnd));
   }
 
   MoveValueInst *createMoveValue(
