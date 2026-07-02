@@ -41,6 +41,12 @@ extension ContinuousClock.Instant: Codable {
 }
 #endif
 
+@available(SwiftStdlib 6.5, *)
+@_unavailableInEmbedded
+extension ContinuousClock: Identifiable {
+  public var id: SystemClockID { .continuous }
+}
+
 @available(StdlibDeploymentTarget 5.7, *)
 extension Duration {
   internal init(_seconds s: Int64, nanoseconds n: Int64) {

@@ -494,6 +494,17 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     _taskGroupCancelAll(group: _group)
   }
 
+  /// Cancel all of the remaining tasks in the group, recording the reason
+  /// on each affected child task. This allows handlers to distinguish a
+  /// deadline-driven cancellation from an explicit cancellation request.
+  ///
+  /// Subsequent calls to `cancelAll(reason:)` have no effect after the
+  /// group is already cancelled.
+  @available(SwiftStdlib 6.5, *)
+  public func cancelAll(reason: CancellationError.Reason) {
+    _taskGroupCancelAllWithReason(group: _group, reason: reason._rawValue)
+  }
+
   /// A Boolean value that indicates whether the group was canceled.
   ///
   /// To cancel a group, call the `TaskGroup.cancelAll()` method.
@@ -850,6 +861,14 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - SeeAlso: `ThrowingTaskGroup.isCancelled`
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
+  }
+
+  /// Cancel all of the remaining tasks in the group, recording the reason
+  /// on each affected child task. See `TaskGroup.cancelAll(reason:)` for the
+  /// semantics shared between all task group variants.
+  @available(SwiftStdlib 6.5, *)
+  public func cancelAll(reason: CancellationError.Reason) {
+    _taskGroupCancelAllWithReason(group: _group, reason: reason._rawValue)
   }
 
   /// A Boolean value that indicates whether the group was canceled.

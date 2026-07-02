@@ -107,11 +107,27 @@ AsyncTask *_swift_task_setCurrent(AsyncTask *newTask);
 /// task's status record lock.
 void _swift_taskGroup_cancel(TaskGroup *group);
 
+/// Cancel the task group and all the child tasks that belong to `group`,
+/// recording the given cancellation reason on each child task.
+///
+/// The caller must guarantee that this is called while holding the owning
+/// task's status record lock.
+void _swift_taskGroup_cancelWithReason(TaskGroup *group,
+                                       swift_task_cancellation_reason reason);
+
 /// Cancel the task group and all the child tasks that belong to `group`.
 ///
 /// The caller must guarantee that this is called from the owning task.
 void _swift_taskGroup_cancel_unlocked(TaskGroup *group,
                                                  AsyncTask *owningTask);
+
+/// Cancel the task group and all the child tasks that belong to `group`,
+/// recording the given cancellation reason on each child task.
+///
+/// The caller must guarantee that this is called from the owning task.
+void _swift_taskGroup_cancelWithReason_unlocked(
+    TaskGroup *group, AsyncTask *owningTask,
+    swift_task_cancellation_reason reason);
 
 /// Remove the given task from the given task group.
 ///
@@ -441,12 +457,20 @@ public:
 ///     AsyncTask::PrivateStorage. The additional alignment requirements are
 ///     enforced by static asserts below.
 class alignas(2 * sizeof(void*)) ActiveTaskStatus {
+public:
+  /// The reason a task is cancelled. Stored in two adjacent bits of the
+  /// flags word, allowing three states with one encoding reserved for
+  /// future use.
+  enum class CancellationReason : uint8_t {
+    None = 0,
+    TaskCancelled = 1,
+    DeadlineExpired = 2,
+  };
+
+private:
   enum : uint32_t {
     /// The max priority of the task. This is always >= basePriority in the task
     PriorityMask = 0xFF,
-
-    /// Has the task been cancelled?
-    IsCancelled = 0x100,
 
     /// Whether the task status is "locked", meaning that further
     /// accesses need to wait on the task status record lock. This is separate
@@ -493,8 +517,16 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// use the task executor preference when we'd otherwise be running on
     /// the generic global pool.
     HasTaskExecutorPreference = 0x8000,
-    
+
     HasActiveTaskCancellationShield = 0x10000,
+
+    /// Two adjacent bits encoding the cancellation reason. A value of 0
+    /// indicates the task is not cancelled, 1 indicates a normal task
+    /// cancellation, and 2 indicates the task was cancelled because a
+    /// deadline expired. The fourth encoding (3) is reserved for future
+    /// use. This replaces what was previously a single IsCancelled bit.
+    CancellationReasonShift = 17,
+    CancellationReasonMask = 0x3u << CancellationReasonShift, // 0x60000
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -544,19 +576,37 @@ public:
       : Flags(uintptr_t(priority)), Record(nullptr) {}
 #endif
 
+  /// Returns the cancellation reason. This does not take cancellation
+  /// shields into account; while a shield is active the task is still
+  /// recorded as cancelled but observers should treat the task as not
+  /// cancelled. Use isCancelled() for the shield-aware check.
+  CancellationReason getCancellationReason() const {
+    return static_cast<CancellationReason>(
+        (Flags & CancellationReasonMask) >> CancellationReasonShift);
+  }
+
   /// Is the task currently cancelled?
   /// This does take into account cancellation shields, i.e. while a shield is active this function will always return 'false'.
-  bool isCancelled(bool ignoreShield = false) const { 
-    return (Flags & IsCancelled) && (ignoreShield || !(Flags & HasActiveTaskCancellationShield)); 
+  bool isCancelled(bool ignoreShield = false) const {
+    return (Flags & CancellationReasonMask) &&
+           (ignoreShield || !(Flags & HasActiveTaskCancellationShield));
   }
-  bool isCancelledIgnoringShield() const { return Flags & IsCancelled; }
-  ActiveTaskStatus withCancelled() const {
+  bool isCancelledIgnoringShield() const {
+    return (Flags & CancellationReasonMask) != 0;
+  }
+  ActiveTaskStatus withCancellationReason(CancellationReason reason) const {
+    uint32_t reasonBits = (static_cast<uint32_t>(reason) << CancellationReasonShift)
+                          & CancellationReasonMask;
+    uint32_t newFlags = (Flags & ~CancellationReasonMask) | reasonBits;
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(Record, Flags | IsCancelled, ExecutionLock);
+    return ActiveTaskStatus(Record, newFlags, ExecutionLock);
 #else
-    return ActiveTaskStatus(Record, Flags | IsCancelled);
+    return ActiveTaskStatus(Record, newFlags);
 #endif
-  }  
+  }
+  ActiveTaskStatus withCancelled() const {
+    return withCancellationReason(CancellationReason::TaskCancelled);
+  }
   
   bool hasCancellationShield() const { return Flags & HasActiveTaskCancellationShield; }
   ActiveTaskStatus withCancellationShield() const {

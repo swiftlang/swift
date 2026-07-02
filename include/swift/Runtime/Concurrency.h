@@ -140,6 +140,29 @@ void swift_job_deallocate(Job *job, void *ptr);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancel(AsyncTask *task);
 
+/// The reason a task is being cancelled. Mirrors
+/// ActiveTaskStatus::CancellationReason so it can be passed across the
+/// runtime ABI without exposing the private header.
+enum swift_task_cancellation_reason : uint8_t {
+  swift_task_cancellation_reason_TaskCancelled = 1,
+  swift_task_cancellation_reason_DeadlineExpired = 2,
+};
+
+/// Cancel a task with a specific cancellation reason. The reason is
+/// recorded in the task's status and observable via
+/// swift_task_getCancellationReason. If the task is already cancelled the
+/// reason is left unchanged.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_cancelWithReason(AsyncTask *task,
+                                 swift_task_cancellation_reason reason);
+
+/// Returns the cancellation reason recorded for the task, or 0 if the task
+/// is not currently cancelled. Cancellation shields are NOT taken into
+/// account here; the caller is responsible for combining this with
+/// swift_task_isCancelled when the shielded view of cancellation is desired.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+uint8_t swift_task_getCancellationReason(AsyncTask *task);
+
 /// Cancel all the child tasks that belong to the `group`.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancel_group_child_tasks(TaskGroup *group);
@@ -296,6 +319,12 @@ bool swift_taskGroup_addPending(TaskGroup *group, bool unconditionally);
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_taskGroup_cancelAll(TaskGroup *group);
+
+/// Cancel all tasks in the group, recording the cancellation reason on
+/// each child task. See swift_task_cancellation_reason.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskGroup_cancelAllWithReason(TaskGroup *group,
+                                         swift_task_cancellation_reason reason);
 
 /// Check ONLY if the group was explicitly cancelled, e.g. by `cancelAll`.
 ///
