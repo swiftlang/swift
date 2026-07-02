@@ -166,6 +166,14 @@ extension Span where Element: ~Copyable {
     // lifetime of 'pointer'. Make the dependence explicit.
     self = unsafe _overrideLifetime(span, borrowing: pointer)
   }
+
+  @_alwaysEmitIntoClient
+  @lifetime(borrow value)
+  public init(_ value: borrowing @_addressable Element) {
+    let address = Builtin.unprotectedAddressOfBorrow(value)
+    let span = unsafe Span(_unchecked: .init(address), count: 1)
+    self = unsafe _overrideLifetime(span, borrowing: value)
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)

@@ -677,6 +677,25 @@ suite.test("initialize from raw memory")
   expectEqual(first, 0x07060504)
 }
 
+suite.test("SpanInitFromValue")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.2, *) else { expectTrue(false); return }
+
+  let inline: InlineArray<5, UInt8> = [UInt8.zero, 1, 2, 3, 4]
+
+  let span = Span(inline)
+  let bytes = span.bytes
+  for o in bytes.byteOffsets {
+    let b = bytes.unsafeLoad(fromByteOffset: o, as: UInt8.self)
+    let i = inline[o]
+    expectEqual(b, i)
+  }
+
+  let s = "A very long string, indeed not a smol one."
+  let strSpan = Span(s)
+  expectEqual(strSpan.count, 1)
+}
+
 private func send(_: some Sendable & ~Escapable) {}
 
 private struct NCSendable: ~Copyable, Sendable {}
