@@ -15830,6 +15830,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch) {
       if (type2->isAny() || type2->isAnyHashable())
         ++impact;
+
+      if (simplifyType(type2)->isVoid())
+        impact += 4;
     }
 
     if (recordFix(fix, impact))
