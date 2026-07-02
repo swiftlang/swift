@@ -1771,6 +1771,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (!parsedName || parsedName.isOperator())
       return result;
 
+    // swift_name can't rename a declaration to `deinit`; forming a FuncDecl
+    // with that special name asserts. Ignore it and import under the original
+    // name.
+    if (parsedName.BaseNameKind == DeclBaseName::Kind::Destructor) {
+      skipCustomName = true;
+      result.info.hasInvalidCustomName = true;
+    }
+
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
     // convention for factory methods), make sure that it can be

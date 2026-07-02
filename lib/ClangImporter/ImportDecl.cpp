@@ -4339,6 +4339,14 @@ namespace {
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
+      // If we ignored an invalid custom Swift name (e.g. a rename to
+      // `deinit`), diagnose that now.
+      if (importedName.hasInvalidCustomName() && isActiveSwiftVersion()) {
+        if (auto customName = NameImporter::findCustomName(decl, getVersion()))
+          result->diagnose(diag::invalid_swift_name_for_decl, *customName,
+                           result);
+      }
+
       return result;
     }
 
