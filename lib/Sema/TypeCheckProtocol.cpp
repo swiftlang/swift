@@ -7683,6 +7683,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
         findAssociatedTypeDefault(assocType);
     if (!defaultAssocType)
       continue;
+    ASSERT(defaultedAssocDecl);
 
     Type defaultAssocTypeInContext =
       proto->mapTypeIntoEnvironment(defaultAssocType);
@@ -7695,10 +7696,10 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       proto->diagnose(diag::assoc_type_default_conformance_failed,
                       defaultAssocType, assocType,
                       req.getFirstType(), req.getSecondType());
-      defaultedAssocDecl
-          ->diagnose(diag::assoc_type_default_here, assocType, defaultAssocType)
-          .highlight(defaultedAssocDecl->getDefaultDefinitionTypeRepr()
-                         ->getSourceRange());
+      auto diag = defaultedAssocDecl->diagnose(
+          diag::assoc_type_default_here, assocType, defaultAssocType);
+      if (auto *typeRepr = defaultedAssocDecl->getDefaultDefinitionTypeRepr())
+        diag.highlight(typeRepr->getSourceRange());
 
       continue;
     }
