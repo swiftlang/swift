@@ -126,14 +126,14 @@ func acceptSendingAnyObjectR(_ s: sending AnyObject & R) { }
 @MainActor func passSendingExistential<T: P, U: AnyObject & P , V: R, W: AnyObject & R>(
   t: sending T, u: sending U, v: sending V, w: sending W
 ) {
-  acceptSendingP(S()) // expected-warning{{sending value of non-Sendable type 'S' risks causing data races}}
-  // expected-note@-1{{Passing main actor-isolated value of non-Sendable type 'S' as a 'sending' parameter to global function 'acceptSendingP' risks causing races}}
+  acceptSendingP(S()) // expected-warning{{sending value risks causing data races}}
+  // expected-note@-1{{passing main actor-isolated value as a 'sending' parameter to global function 'acceptSendingP' risks causing races inbetween main actor-isolated uses and uses reachable from 'acceptSendingP'}}
   // expected-note@-2{{isolated conformance to protocol 'P' can be introduced here}}
-  acceptSendingP(SC()) // expected-warning{{sending value of non-Sendable type 'SC'}}
-  // expected-note@-1{{Passing main actor-isolated value of non-Sendable type 'SC' as a 'sending' parameter to global function 'acceptSendingP' risks causing races}}' risks causing data races}}
+  acceptSendingP(SC()) // expected-warning{{sending value risks causing data races}}
+  // expected-note@-1{{passing main actor-isolated value as a 'sending' parameter to global function 'acceptSendingP' risks causing races inbetween main actor-isolated uses and uses reachable from 'acceptSendingP'}}
   // expected-note@-2{{isolated conformance to protocol 'P' can be introduced here}}
-  acceptSendingAnyObjectP(SC()) // expected-warning{{sending value of non-Sendable type 'SC' risks causing data races}}
-  // expected-note@-1{{Passing main actor-isolated value of non-Sendable type 'SC' as a 'sending' parameter to global function 'acceptSendingAnyObjectP' risks causing races}}' risks causing data races}}
+  acceptSendingAnyObjectP(SC()) // expected-warning{{sending value risks causing data races}}
+  // expected-note@-1{{passing main actor-isolated value as a 'sending' parameter to global function 'acceptSendingAnyObjectP' risks causing races inbetween main actor-isolated uses and uses reachable from 'acceptSendingAnyObjectP'}}
   // expected-note@-2{{isolated conformance to protocol 'P' can be introduced here}}
   acceptSendingP(t) // expected-warning{{sending 't' risks causing data races}}
   // expected-note@-1{{main actor-isolated 't' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}

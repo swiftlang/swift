@@ -200,8 +200,8 @@ struct Clock {
 // We used to crash when inferring the type for the diagnostic below.
 @MainActor func testIndirectParametersHandledCorrectly() async {
   let c = Clock()
-  let _: Int = await c.measure { // expected-ni-warning {{sending value of non-Sendable type '() async -> Int' risks causing data races}}
-    // expected-ni-note @-1 {{sending main actor-isolated value of non-Sendable type '() async -> Int' to @concurrent instance method 'measure' risks causing races in between main actor-isolated and @concurrent uses}}
+  let _: Int = await c.measure { // expected-ni-warning {{sending closure risks causing data races}}
+    // expected-ni-note @-1 {{sending main actor-isolated closure to @concurrent instance method 'measure' risks causing races in between main actor-isolated and @concurrent uses}}
     try! await c.sleep()
   }
 }
