@@ -1205,10 +1205,12 @@ bb8:
 
 // Test recursively visiting a guaranteed borrow that is copied within
 // the borrow scope and used by a debug_value.
-// The copy_value will be deleted when processing the struct.
+// The copy_value will be deleted when processing the struct. Its attached
+// debug_value will be salvaged to use the original value.
 //
 // CHECK-LABEL: sil [ossa] @testCopiedDebugValue : $@convention(method) (@guaranteed String) -> @owned String.UTF16View {
 // CHECK: [[DS:%.*]] = destructure_struct %0 : $String
+// CHECK-NEXT:  debug_value [[DS]] : $_StringGuts, let, name "guts"
 // CHECK-NEXT:  [[ST:%.*]] = struct $String.UTF16View ([[DS]] : $_StringGuts)
 // CHECK-NEXT:  [[CP:%.*]] = copy_value [[ST]] : $String.UTF16View
 // CHECK-NEXT:  return [[CP]] : $String.UTF16View
