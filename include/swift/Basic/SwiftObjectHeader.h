@@ -25,7 +25,11 @@
 struct SwiftObjectHeader : BridgedSwiftObject {
   SwiftObjectHeader(SwiftMetatype metatype) {
     this->metatype = metatype;
+#if __SIZEOF_POINTER__ == 4
+    this->refCounts = ~(uint32_t)0;
+#else
     this->refCounts = ~(uint64_t)0;
+#endif
   }
 
   bool isBridged() const { return metatype != nullptr; }

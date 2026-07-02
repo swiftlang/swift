@@ -22,7 +22,16 @@
 #include "llvm/ADT/FoldingSet.h"
 
 namespace swift {
-class AbstractConformance final : public llvm::FoldingSetNode {
+// ProtocolConformanceRef stores this in a 3-member PointerUnion whose
+// discriminator lives in the low bits per
+// PointerLikeTypeTraits<AbstractConformance *>::NumLowBitsAvailable
+// (== TypeAlignInBits, i.e. 8-byte alignment). This class is just three
+// pointers, so its *natural* alignment is 8 only where pointers are 8 bytes;
+// on 32-bit hosts (e.g. wasm32) it is 4, which is too few low bits and
+// corrupts the union's tag. Force the alignment the traits already promise.
+// No-op on 64-bit, where the class is already 8-byte aligned.
+class alignas(1 << TypeAlignInBits) AbstractConformance final
+    : public llvm::FoldingSetNode {
   Type conformingType;
   ProtocolDecl *requirement;
 
