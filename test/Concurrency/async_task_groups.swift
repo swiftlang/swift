@@ -193,7 +193,7 @@ extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendab
       var i = self.startIndex
       var submitted = 0
 
-      func submitNext() async throws {
+      nonisolated(nonsending) func submitNext() async throws {
         // The reason that we emit an error here is b/c we capture the var box
         // to i and that is task isolated. This is the region isolation version
         // of the 'escaping closure captures non-escaping parameter' error.

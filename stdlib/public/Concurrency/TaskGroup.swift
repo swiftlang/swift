@@ -46,8 +46,35 @@ import Swift
 ///
 /// - SeeAlso: ``TaskGroup``
 @available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+public nonisolated(nonsending) func withTaskGroup<ChildTaskResult, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
+  returning returnType: GroupResult.Type = GroupResult.self,
+  body: nonisolated(nonsending) (inout TaskGroup<ChildTaskResult>) async -> GroupResult
+) async -> GroupResult {
+  #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
+
+  let _group = Builtin.createTaskGroup(ChildTaskResult.self)
+  var group = TaskGroup<ChildTaskResult>(group: _group)
+
+  // Run the withTaskGroup body.
+  let result = await body(&group)
+
+  await group.awaitAllRemainingTasks()
+
+  Builtin.destroyTaskGroup(_group)
+  return result
+
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
+}
+
+@available(SwiftStdlib 5.1, *)
 @backDeployed(before: SwiftStdlib 6.0)
 @inlinable
+@_disfavoredOverload
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
 public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
@@ -170,8 +197,44 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 /// - SeeAlso: ``ThrowingTaskGroup``
 /// - SeeAlso: ``ThrowingDiscardingTaskGroup``
 @available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+public nonisolated(nonsending) func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
+  returning returnType: GroupResult.Type = GroupResult.self,
+  body: nonisolated(nonsending) (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
+) async rethrows -> GroupResult {
+  #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
+
+  let _group = Builtin.createTaskGroup(ChildTaskResult.self)
+  var group = ThrowingTaskGroup<ChildTaskResult, Error>(group: _group)
+
+  do {
+    // Run the withTaskGroup body.
+    let result = try await body(&group)
+
+    await group.awaitAllRemainingTasks()
+    Builtin.destroyTaskGroup(_group)
+
+    return result
+  } catch {
+    group.cancelAll()
+
+    await group.awaitAllRemainingTasks()
+    Builtin.destroyTaskGroup(_group)
+
+    throw error
+  }
+
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
+}
+
+@available(SwiftStdlib 5.1, *)
 @backDeployed(before: SwiftStdlib 6.0)
 @inlinable
+@_disfavoredOverload
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
