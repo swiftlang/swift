@@ -299,3 +299,12 @@ func testInvalidProjectionInAmbiguousContext() {
     ambiguous()
   }
 }
+
+// https://github.com/swiftlang/swift/issues/87479
+@propertyWrapper
+struct MissingWrappedValue { // expected-error {{property wrapper type 'MissingWrappedValue' does not contain a non-static property named 'wrappedValue'}}
+}
+
+let _: (Int) -> Int = { (@MissingWrappedValue value) in
+  value
+}
