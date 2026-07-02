@@ -5,12 +5,12 @@
 // This test case checks that ClangImporter can import declarations using various bounds attributes,
 // rather than being marked unavailable because of an unknown type.
 
-// CHECK:      func a(_ p: UnsafeMutablePointer<Int{{[0-9]+}}>!, _ len: Int{{[0-9]+}}) -> UnsafeMutablePointer<Int{{[0-9]+}}>!
-// CHECK-NEXT: func b(_ p: UnsafeMutablePointer<CChar>!, _ len: Int{{[0-9]+}}) -> UnsafeMutablePointer<CChar>!
-// CHECK-NEXT: func c(_ p: UnsafeMutablePointer<CChar>!, _ len: Int{{[0-9]+}}) -> UnsafeMutablePointer<CChar>!
-// CHECK-NEXT: func d(_ p: UnsafeMutableRawPointer!, _ len: Int{{[0-9]+}}) -> UnsafeMutableRawPointer!
-// CHECK-NEXT: func e(_ p: UnsafeMutablePointer<Int{{[0-9]+}}>!, _ len: Int{{[0-9]+}}) -> UnsafeMutablePointer<Int{{[0-9]+}}>!
-// CHECK-NEXT: func f(_ p: UnsafeMutablePointer<Int{{[0-9]+}}>!, _ end: UnsafeMutablePointer<Int{{[0-9]+}}>!) -> UnsafeMutablePointer<Int{{[0-9]+}}>!
+// CHECK:      func a(_ p: UnsafeMutablePointer<CInt>!, _ len: CInt) -> UnsafeMutablePointer<CInt>!
+// CHECK-NEXT: func b(_ p: UnsafeMutablePointer<CChar>!, _ len: CInt) -> UnsafeMutablePointer<CChar>!
+// CHECK-NEXT: func c(_ p: UnsafeMutablePointer<CChar>!, _ len: CInt) -> UnsafeMutablePointer<CChar>!
+// CHECK-NEXT: func d(_ p: UnsafeMutableRawPointer!, _ len: CInt) -> UnsafeMutableRawPointer!
+// CHECK-NEXT: func e(_ p: UnsafeMutablePointer<CInt>!, _ len: CInt) -> UnsafeMutablePointer<CInt>!
+// CHECK-NEXT: func f(_ p: UnsafeMutablePointer<CInt>!, _ end: UnsafeMutablePointer<CInt>!) -> UnsafeMutablePointer<CInt>!
 // CHECK-NEXT: func g(_ p: UnsafeMutableRawPointer!, _ end: UnsafeMutableRawPointer!) -> UnsafeMutableRawPointer!
 // CHECK-NEXT: func h(_ p: UnsafeMutablePointer<CChar>!) -> UnsafeMutablePointer<CChar>!
 // CHECK-NEXT: func i(_ p: UnsafePointer<CChar>!) -> UnsafePointer<CChar>!
@@ -22,16 +22,16 @@
 // BOUNDS-SAFETY-NEXT: func n(_ p: UnsafeMutablePointer<CChar>!) -> UnsafeMutablePointer<CChar>!
 // BOUNDS-SAFETY-NEXT: func o(_ p: UnsafeMutableRawPointer!) -> UnsafeMutableRawPointer!
 
-// C-ONLY-NEXT: func p(_ len: Int{{[0-9]+}}, _ p: UnsafeMutablePointer<Int{{[0-9]+}}>!)
+// C-ONLY-NEXT: func p(_ len: CInt, _ p: UnsafeMutablePointer<CInt>!)
 
-// CHECK-NEXT: func q(_ p: UnsafeMutablePointer<Int{{[0-9]+}}>!, _ len: Int{{[0-9]+}})
-// CHECK-NEXT: func r(_ p: UnsafeMutablePointer<UnsafeMutablePointer<Int{{[0-9]+}}>?>!, _ len: UnsafeMutablePointer<Int{{[0-9]+}}>!)
+// CHECK-NEXT: func q(_ p: UnsafeMutablePointer<CInt>!, _ len: CInt)
+// CHECK-NEXT: func r(_ p: UnsafeMutablePointer<UnsafeMutablePointer<CInt>?>!, _ len: UnsafeMutablePointer<CInt>!)
 // CHECK-NEXT: func s(_ p: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>!) -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>!
 // CHECK-NEXT: func t(_ p: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>!) -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>!
-// CHECK-NEXT: var len1: Int{{[0-9]+}} { get }
-// CHECK-NEXT: func u(_ p: UnsafeMutablePointer<Int{{[0-9]+}}>!) -> UnsafeMutablePointer<Int{{[0-9]+}}>!
-// CHECK-NEXT: var len2: Int{{[0-9]+}}
-// CHECK-NEXT: func v(_ p: UnsafeMutablePointer<Int{{[0-9]+}}>!) -> UnsafeMutablePointer<Int{{[0-9]+}}>!
+// CHECK-NEXT: var len1: CInt { get }
+// CHECK-NEXT: func u(_ p: UnsafeMutablePointer<CInt>!) -> UnsafeMutablePointer<CInt>!
+// CHECK-NEXT: var len2: CInt
+// CHECK-NEXT: func v(_ p: UnsafeMutablePointer<CInt>!) -> UnsafeMutablePointer<CInt>!
 
 
 // RUN: %target-swift-frontend -disable-safe-interop-wrappers -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -D C_ONLY

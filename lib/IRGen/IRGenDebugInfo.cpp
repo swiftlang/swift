@@ -59,6 +59,7 @@
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTReader.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Config/config.h"
@@ -76,6 +77,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include "llvm/WindowsDriver/MSVCPaths.h"
 
 #define DEBUG_TYPE "debug-info"
 
@@ -2604,6 +2606,52 @@ private:
     }
   }
 
+  /// Anchor DW_TAG_typedef DIEs for the stdlib C-interop typealiases (CChar,
+  /// CInt, CDouble, CWideChar, ...). LLDB can encounter these via DWARF
+  /// references on fields of clang-imported types, even when the Swift source
+  /// never names them. Most Swift programs use most of these types, so it's
+  /// not worth trying to figure out a minimal required set; just emit them all.
+  void anchorClangInteropTypeAliases() {
+    if (Opts.DebugInfoLevel < IRGenDebugInfoLevel::ASTTypes)
+      return;
+
+    SmallVector<ImportedModule, 8> ModuleWideImports;
+    IGM.getSwiftModule()->getImportedModules(
+        ModuleWideImports, ModuleDecl::getImportFilterLocal());
+    const bool importsAnyClangModule =
+        llvm::any_of(ModuleWideImports, [](ImportedModule M) {
+          return M.importedModule->findUnderlyingClangModule() != nullptr;
+        });
+    if (!importsAnyClangModule)
+      return;
+
+    ASTContext &Ctx = IGM.Context;
+    ModuleDecl *Stdlib = Ctx.getStdlibModule();
+    if (!Stdlib)
+      return;
+
+    auto anchorAlias = [&](StringRef Name) {
+      SmallVector<ValueDecl *, 1> Results;
+      Stdlib->lookupMember(Results, Stdlib, Ctx.getIdentifier(Name),
+                           Identifier());
+      if (Results.size() != 1)
+        return;
+      auto *AliasDecl = cast<TypeAliasDecl>(Results.front());
+      Type Underlying = AliasDecl->getUnderlyingType();
+      auto *AliasTy = TypeAliasType::get(AliasDecl, /*parent=*/Type(),
+                                         /*genericArgs=*/{}, Underlying);
+      auto AliasDbgTy = DebugTypeInfo::getFromTypeInfo(
+          AliasTy, IGM.getTypeInfoForUnlowered(AliasTy), IGM);
+      llvm::DIType *TypeDef = getOrCreateType(AliasDbgTy);
+      DBuilder.retainType(TypeDef);
+      // This is needed to prevent dsymutil from considering the type unused.
+      DBuilder.createImportedDeclaration(TheCU, TypeDef, MainFile, 0);
+    };
+#define MAP_BUILTIN_TYPE(CLANG, SWIFT) anchorAlias(#SWIFT);
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+#undef MAP_BUILTIN_TYPE
+  }
+
   /// A TypeWalker that finds if a given type's mangling is affected by an
   /// @_originallyDefinedIn annotation.
   struct OriginallyDefinedInFinder : public TypeWalker {
@@ -3095,6 +3143,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
     OS << '"';
   }
   createSpecialStlibBuiltinTypes();
+  anchorClangInteropTypeAliases();
 }
 
 void IRGenDebugInfoImpl::finalize() {

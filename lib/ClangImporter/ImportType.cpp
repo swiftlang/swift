@@ -385,19 +385,6 @@ namespace {
       return T;
     }
 
-    constexpr bool isCCharBuiltinType(clang::BuiltinType::Kind kind) {
-      switch (kind) {
-      default:
-        return false;
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)
-        /* Intentionally empty; fallback to default label. */
-#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)          \
-    case clang::BuiltinType::CLANG_BUILTIN_KIND:
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
-        return true;
-      }
-    }
-
     ImportResult VisitBuiltinType(const clang::BuiltinType *type) {
       const clang::BuiltinType::Kind kind = type->getKind();
       if (kind == clang::BuiltinType::Void)
@@ -407,12 +394,7 @@ namespace {
       if (!swiftTypeName)
         return Type();
 
-      Type swiftType =
-          Impl.getNamedSwiftType(Impl.getStdlibModule(), *swiftTypeName);
-      // FIXME: stop unwrapping typealiases
-      if (!isCCharBuiltinType(kind))
-        swiftType = unwrapCType(swiftType);
-      return swiftType;
+      return Impl.getNamedSwiftType(Impl.getStdlibModule(), *swiftTypeName);
     }
 
     ImportResult VisitBitIntType(const clang::BitIntType *type) {
