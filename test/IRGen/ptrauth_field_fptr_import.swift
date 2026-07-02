@@ -9,10 +9,10 @@ import PointerAuth
 
 // CHECK: define hidden swiftcc i32 @"$s25ptrauth_field_fptr_import05test_B8_fn_reads5Int32VyF"() #0 {
 // CHECK: [[LD:%.*]] = load i64, ptr @ptr_to_secure_struct, align 8
-// CHECK: 2:                                                ; preds = %entry
+// CHECK: [[LABEL1:%.*]]:
 // CHECK:   [[CAST0:%.*]] = inttoptr i64 [[LD]] to ptr
-// CHECK:   br label %9
-// CHECK: 9:
+// CHECK:   br label [[LABEL2:%.*]]
+// CHECK: [[LABEL2]]:
 // CHECK:   [[SECURESTRUCT:%.*]] = phi ptr [ [[CAST0]], {{.*}} ]
 // CHECK:   %.secure_func_ptr = getelementptr inbounds{{.*}} %TSo12SecureStructV, ptr [[SECURESTRUCT]], i32 0, i32 0
 // CHECK:   [[PTR:%.*]] = load ptr, ptr %.secure_func_ptr, align 8
