@@ -669,7 +669,14 @@ public:
       Visitor.addNominalTypeDescriptor(NTD);
 
       // Generic types do not get metadata directly, only through the function.
-      if (!NTD->isGenericContext()) {
+      // Classes with resilient ancestry also do not get a static metadata
+      // address point; IRGen emits a metadata pattern via the Resilient
+      // strategy in that case.
+      bool hasResilientAncestry = false;
+      if (auto *CD = dyn_cast<ClassDecl>(NTD))
+        hasResilientAncestry = CD->checkAncestry(AncestryFlags::ResilientOther);
+
+      if (!NTD->isGenericContext() && !hasResilientAncestry) {
         Visitor.addTypeMetadataAddress(declaredType);
       }
     }
