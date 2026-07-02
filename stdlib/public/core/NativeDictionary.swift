@@ -619,10 +619,10 @@ extension _NativeDictionary {
     unsafe (_values + a.offset).moveInitialize(from: _values + b.offset, count: 1)
     unsafe (_values + b.offset).initialize(to: value)
   }
-  
+
   @_alwaysEmitIntoClient
   internal func extractDictionary(
-    using bitset: _UnsafeBitset, 
+    using bitset: _UnsafeBitset,
     count: Int
   ) -> _NativeDictionary<Key, Value> {
     var count = count
@@ -769,6 +769,22 @@ extension _NativeDictionary { // High-level operations
       let key = unsafe self.uncheckedKey(at: bucket)
       let value = unsafe self.uncheckedValue(at: bucket)
       try result._insert(at: bucket, key: key, value: transform(value))
+    }
+    return result
+  }
+
+  @_alwaysEmitIntoClient
+  internal func mapKeyedValues<T, E>(
+    _ transform: (Key, Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
+    let resultStorage = unsafe _DictionaryStorage<Key, T>.copy(original: _storage)
+    unsafe _internalInvariant(resultStorage._seed == _storage._seed)
+    let result = unsafe _NativeDictionary<Key, T>(resultStorage)
+    for unsafe bucket in unsafe hashTable {
+      let key = unsafe self.uncheckedKey(at: bucket)
+      let old = unsafe self.uncheckedValue(at: bucket)
+      let new = try transform(key, old)
+      result._insert(at: bucket, key: key, value: new)
     }
     return result
   }

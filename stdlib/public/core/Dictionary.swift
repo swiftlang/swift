@@ -677,7 +677,7 @@ extension Dictionary {
 
 extension Dictionary: Collection {
   public typealias SubSequence = Slice<Dictionary>
-  
+
   /// The position of the first element in a nonempty dictionary.
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
@@ -973,6 +973,22 @@ extension Dictionary {
     return try Dictionary<Key, T>(_native: _variant.mapValues(transform))
   }
 
+  /// Returns a new dictionary containing the keys of this dictionary with the
+  /// values transformed by the given closure.
+  ///
+  /// - Parameter transform: A closure that transforms a value. `transform`
+  ///   accepts each key and value of the dictionary as its arguments and returns
+  ///   a transformed value of the same or of a different type.
+  /// - Returns: A new dictionary containing the keys and transformed values of
+  ///   this dictionary.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the dictionary.
+  @_alwaysEmitIntoClient
+  public func mapKeyedValues<T, E>(
+    _ transform: (Key, Value) throws(E) -> T
+  ) throws(E) -> Dictionary<Key, T> {
+    return try Dictionary<Key, T>(_native: _variant.mapKeyedValues(transform))
+  }
 #if !$Embedded
   // ABI-only entrypoint for the rethrows version of mapValues, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
@@ -1025,6 +1041,33 @@ extension Dictionary {
       try self.reduce(into: _NativeDictionary<Key, T>()) { (result, element) in
       if let value = try transform(element.value) {
         result.insertNew(key: element.key, value: value)
+      }
+    }
+    return Dictionary<Key, T>(_native: result)
+  }
+  /// Returns a new dictionary containing only the key-value pairs that have
+  /// non-`nil` values as the result of transformation by the given closure.
+  ///
+  /// Use this method to receive a dictionary with non-optional values when
+  /// your transformation produces optional values.
+  ///
+  /// - Parameter transform: A closure that transforms a value. `transform`
+  ///   accepts each key-value pair of the dictionary as its parameter and
+  ///   returns an optional transformed value of the same or of a different type.
+  /// - Returns: A dictionary containing the keys and non-`nil` transformed
+  ///   values of this dictionary.
+  ///
+  /// - Complexity: O(*m* + *n*), where *n* is the length of the original
+  ///   dictionary and *m* is the length of the resulting dictionary.
+  @_alwaysEmitIntoClient
+  public func compactMapKeyedValues<T, E>(
+    _ transform: (Key, Value) throws(E) -> T?
+  ) throws(E) -> Dictionary<Key, T> {
+    // cannot call reduce here, does not support typed throws
+    var result: _NativeDictionary<Key, T> = .init()
+    for (key, original): (Key, Value) in self {
+      if let value = try transform(key, original) {
+        result.insertNew(key: key, value: value)
       }
     }
     return Dictionary<Key, T>(_native: result)
@@ -1706,7 +1749,7 @@ extension Dictionary.Keys {
     }
     hasher.combine(commutativeHash)
   }
-  
+
   @_alwaysEmitIntoClient
   public var hashValue: Int { // Prevent compiler from synthesizing hashValue.
     var hasher = Hasher()
@@ -1866,7 +1909,7 @@ extension Collection {
     if self.isEmpty {
       return "[:]"
     }
-    
+
     var result = "["
     var first = true
     for (k, v) in self {
@@ -2344,7 +2387,7 @@ extension Dictionary {
   /// print(c.isTriviallyIdentical(to: d))
   /// // Prints true
   /// ```
-  /// 
+  ///
   /// Comparing dictionaries this way includes comparing (normally) hidden
   /// implementation details such as the memory location of any underlying
   /// dictionary storage object. Therefore, identical dictionaries are
