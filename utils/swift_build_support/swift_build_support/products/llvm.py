@@ -454,6 +454,9 @@ class LLVM(cmake_product.CMakeProduct):
 
         self._handle_cxx_headers(host_target, platform)
 
+        # Use `cmake-file-api` in case it is available.
+        self._write_runtime_cmake_file_api_queries(builtins_runtimes_target_for_darwin)
+
         self.build_with_cmake(build_targets, self.args.llvm_build_variant, [],
                               build_llvm=build)
 
@@ -516,6 +519,20 @@ class LLVM(cmake_product.CMakeProduct):
               'clang build directory ({}).'.format(
                   host_cxx_headers_dir, built_cxx_include_dir), flush=True)
         shell.call(['ln', '-s', '-f', host_cxx_headers_dir, built_cxx_include_dir])
+
+    def _write_runtime_cmake_file_api_queries(self, builtins_runtimes_target_for_darwin):
+        if system() == "Darwin":
+            sub_build_names = [
+                f"builtins-{builtins_runtimes_target_for_darwin}",
+                f"runtimes-{builtins_runtimes_target_for_darwin}",
+            ]
+        else:
+            sub_build_names = ["builtins", "runtimes"]
+
+        runtimes_base = os.path.join(self.build_dir, "runtimes")
+        for sub_build in sub_build_names:
+            self.write_cmake_file_api_query(
+                os.path.join(runtimes_base, f"{sub_build}-bins"))
 
     def should_test(self, host_target):
         """should_test() -> Bool
