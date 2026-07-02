@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -Xcc -std=c++20 2>&1 -disable-availability-checking -enable-experimental-feature BorrowingSequence
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -Xcc -std=c++20 -disable-availability-checking -enable-experimental-feature BorrowingSequence %if OS_FAMILY=darwin %{ -verify-additional-prefix darwin- %}
 // REQUIRES: std_span
 // REQUIRES: swift_feature_BorrowingSequence
 
@@ -30,7 +30,8 @@ takesSpan(s1)
 
 let s2 = makeSpanOfNonCopyable()
 for _ in s2 {}
-// expected-error@-1 {{for-in loop requires 'SpanOfNonCopyable'}} to conform to 'Sequence'
+// expected-darwin-error@-1 {{conform to 'BorrowingSequence', which is only available in}}
+// expected-darwin-note@-2 {{add 'if #available' version check}}
 takesSequence(s2)
 // expected-error@-1 {{global function 'takesSequence' requires that 'SpanOfNonCopyable'}} conform to 'Sequence'
 takesBorrowingSequence(s2)
