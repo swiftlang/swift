@@ -275,10 +275,8 @@ extension Task where Failure == ${FAILURE_TYPE} {
   ///   - name: Human readable name of the task.
   % end
   % if HAS_TASK_EXECUTOR:
-  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///      Explicitly passing `nil` as the executor preference is equivalent to no preference,
-  ///      and effectively means to inherit the outer context's executor preference.
-  ///      You can also pass the ``globalConcurrentExecutor`` global executor explicitly.
+  ///   - taskExecutor: The preferred task executor for this task and any child
+  ///      tasks it creates. Explicitly passing `nil` means no preference.
   % end
   ///   - priority: The priority of the operation task.
   % if IS_DETACHED:
