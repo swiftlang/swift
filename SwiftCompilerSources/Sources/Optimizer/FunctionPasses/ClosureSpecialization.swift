@@ -293,19 +293,22 @@ private func isCalleeSpecializable(of apply: ApplySite) -> Bool {
 private func analyzeArguments(of apply: ApplySite, _ context: FunctionPassContext) -> SpecializationInfo? {
   var argumentsToSpecialize = [(Operand, Closure)]()
   var rootClosures = [PartialApplyInst]()
+  var capturedDependencies = [CapturedDependency]()
   var rootClosuresAdded = InstructionSet(context)
   defer { rootClosuresAdded.deinitialize() }
 
   for argOp in apply.argumentOperands {
     var visited = ValueSet(context)
     defer { visited.deinitialize() }
-    if let closure = findSpecializableClosure(of: argOp.value, &visited),
+    var argumentDependencies = [CapturedDependency]()
+    if let closure = findSpecializableClosure(of: argOp.value, &visited, &argumentDependencies),
        // Ok, we know that we can perform the optimization but not whether or not the optimization
        // is profitable. Check if the closure is actually called in the callee (or in a function
        // called by the callee). This opens optimization opportunities, like inlining.
        isClosureApplied(apply.calleeArgument(of: argOp, in: apply.referencedFunction!)!)
     {
       argumentsToSpecialize.append((argOp, closure))
+      capturedDependencies.append(contentsOf: argumentDependencies)
       if let partialApply = closure as? PartialApplyInst,
          rootClosuresAdded.insert(partialApply)
       {
@@ -316,11 +319,13 @@ private func analyzeArguments(of apply: ApplySite, _ context: FunctionPassContex
   if argumentsToSpecialize.isEmpty {
     return nil
   }
-  return SpecializationInfo(apply: apply, closureArguments: argumentsToSpecialize, rootClosures: rootClosures)
+  return SpecializationInfo(apply: apply, closureArguments: argumentsToSpecialize, rootClosures: rootClosures,
+                            capturedDependencies: capturedDependencies)
 }
 
 // Walks down the use-def chain of a function argument, recursively, to find a rootClosure.
-private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet) -> Closure? {
+private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet,
+                                      _ capturedDependencies: inout [CapturedDependency]) -> Closure? {
   visited.insert(value)
 
   let specializationLevelLimit = 2
@@ -330,18 +335,23 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
        is ConvertEscapeToNoEscapeInst,
        is MoveValueInst,
        is CopyValueInst:
-    return findSpecializableClosure(of: (value as! UnaryInstruction).operand.value, &visited)
+    return findSpecializableClosure(of: (value as! UnaryInstruction).operand.value, &visited, &capturedDependencies)
 
   case let mdi as MarkDependenceInst:
     guard mdi.value.type.isNoEscapeFunction, mdi.value.type.isThickFunction else {
       return nil
     }
-    guard let operandClosure = findSpecializableClosure(of: mdi.value, &visited) else {
+    guard let operandClosure = findSpecializableClosure(of: mdi.value, &visited, &capturedDependencies) else {
       return nil
     }
-    // Make sure that the mark_dependence's base is part of the use-def chain and will therefore be cloned as well.
+    // A base not in the closure's use-def chain must be a root-closure capture; record it for `uniqueCaptureArguments`.
     if !visited.contains(mdi.base) {
-      return nil
+      guard let rootClosure = operandClosure as? PartialApplyInst,
+            rootClosure.arguments.contains(where: { $0 == mdi.base })
+      else {
+        return nil
+      }
+      capturedDependencies.append((closure: rootClosure, markDependence: mdi))
     }
     return operandClosure
 
@@ -355,7 +365,7 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
     //   apply %f(%3)
     // ```
     if partialApply.isPartialApplyOfThunk,
-       let argumentClosure = findSpecializableClosure(of: partialApply.arguments[0], &visited)
+       let argumentClosure = findSpecializableClosure(of: partialApply.arguments[0], &visited, &capturedDependencies)
     {
       return argumentClosure
     }
@@ -405,6 +415,9 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
 /// Either a `partial_apply` or a `thin_to_thick_function`
 private typealias Closure = SingleValueInstruction
 
+/// A `mark_dependence` whose base is a root-closure capture, paired with that capturing closure.
+private typealias CapturedDependency = (closure: PartialApplyInst, markDependence: MarkDependenceInst)
+
 /// Information about the function to be specialized and for which closure arguments.
 private struct SpecializationInfo {
 
@@ -426,6 +439,9 @@ private struct SpecializationInfo {
   // All rootClosures of `closureArguments` which are `partial_apply`s, and uniqued: if a rootClosure
   // appears multiple times in `closureArguments`, it's only added a single time here.
   let rootClosures: [PartialApplyInst]
+
+  // `mark_dependence`s whose base is a root-closure capture, redirected onto the capture's cast in `uniqueCaptureArguments`.
+  let capturedDependencies: [CapturedDependency]
 
   // The function to specialize
   var callee: Function { apply.referencedFunction! }
@@ -747,8 +763,15 @@ private struct SpecializationInfo {
     //
     for closure in rootClosures {
       for argOp in closure.argumentOperands {
-        let cast = builder.createUncheckedValueCast(from: argOp.value, to: argOp.value.type)
+        let capturedValue = argOp.value
+        let cast = builder.createUncheckedValueCast(from: capturedValue, to: capturedValue.type)
         argOp.set(to: cast, context)
+
+        // Redirect the mark_dependence base onto the same cast, so it stays unique alongside its capture.
+        for dependency in capturedDependencies
+        where dependency.closure == closure && dependency.markDependence.base == capturedValue {
+          dependency.markDependence.baseOperand.set(to: cast, context)
+        }
       }
     }
   }
