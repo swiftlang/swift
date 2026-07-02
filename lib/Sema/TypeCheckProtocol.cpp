@@ -3277,9 +3277,19 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
                    req->isObjC());
     break;
 
-  case MatchKind::ThrowsConflict:
-    diags.diagnose(match.Witness, diag::protocol_witness_throws_conflict);
+  case MatchKind::ThrowsConflict: {
+    auto witness = match.Witness;
+    auto diag = diags.diagnose(witness, diag::protocol_witness_throws_conflict);
+    if (auto FD = dyn_cast<AbstractFunctionDecl>(witness))
+      if (auto thrownTypeRepr = FD->getThrownTypeRepr()) {
+        auto &SM = module->getASTContext().SourceMgr;
+        SourceLoc rParenLoc = Lexer::getLocForEndOfToken(SM, thrownTypeRepr->getEndLoc());
+        diag.fixItRemove(SourceRange(FD->getThrowsLoc(), rParenLoc));
+      } else {
+        diag.fixItRemove(FD->getThrowsLoc());
+      }
     break;
+  }
 
   case MatchKind::OptionalityConflict: {
     auto &adjustments = match.OptionalAdjustments;

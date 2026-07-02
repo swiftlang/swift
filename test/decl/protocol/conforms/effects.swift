@@ -8,7 +8,7 @@ protocol P {
 
 struct S {
     func perform<E: Error>(_ body: () throws(E) -> Void) throws(E) -> Void {
-    // expected-note@-1 {{candidate throws, but protocol does not allow it}}
+    // expected-note@-1 {{candidate throws, but protocol does not allow it}}{{58-68=}}
         try body()
     }
 }
