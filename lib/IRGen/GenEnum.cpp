@@ -5236,16 +5236,14 @@ namespace {
 
     void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                      SILType T) const override {
-      if (CopyDestroyKind != Normal) {
-        return;
-      }
-
-      for (auto &payloadCasePair : ElementsWithPayload) {
-        SILType payloadT = T.getEnumElementType(
-            payloadCasePair.decl, collector.IGF.getSILModule(),
-            collector.IGF.IGM.getMaximalTypeExpansionContext());
-        auto &payloadTI = *payloadCasePair.ti;
-        payloadTI.collectMetadataForOutlining(collector, payloadT);
+      if (CopyDestroyKind == Normal) {
+        for (auto &payloadCasePair : ElementsWithPayload) {
+          SILType payloadT = T.getEnumElementType(
+              payloadCasePair.decl, collector.IGF.getSILModule(),
+              collector.IGF.IGM.getMaximalTypeExpansionContext());
+          auto &payloadTI = *payloadCasePair.ti;
+          payloadTI.collectMetadataForOutlining(collector, payloadT);
+        }
       }
       collector.collectTypeMetadata(T);
     }
