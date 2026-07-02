@@ -109,7 +109,6 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
-  Opts.FrontendParseableOutput |= Args.hasArg(OPT_frontend_parseable_output);
   Opts.ExplicitInterfaceBuild |= Args.hasArg(OPT_explicit_interface_module_build);
 
   Opts.EmitClangHeaderWithNonModularIncludes |=
