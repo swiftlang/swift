@@ -981,6 +981,30 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
         return nullptr;
 
       implyingConf = origImplyingConf->getRootNormalConformance();
+
+      // If a protocol implies Sendable on a class whose superclass is
+      // already Sendable, form an inherited conformance instead of a
+      // normal one. The superclass's implicit Sendable (e.g. from
+      // @MainActor) may not have been in the conformance table when
+      // inherited conformances were collected, so the table has only
+      // the implied entry. Fixing up here keeps isInherited correct
+      // for downstream diagnostics.
+      if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+        if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
+          if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
+            Type superclassTy = type->getSuperclassForDecl(superclassDecl);
+            if (superclassTy) {
+              auto superConf = swift::lookupConformance(
+                  superclassTy, protocol, /*allowMissing=*/false);
+              if (superConf.isConcrete()) {
+                entry->Conformance = ctx.getInheritedConformance(
+                    type, superConf.getConcrete());
+                return cast<ProtocolConformance *>(entry->Conformance);
+              }
+            }
+          }
+        }
+      }
     }
 
     TypeRepr *inheritedTypeRepr = nullptr;
