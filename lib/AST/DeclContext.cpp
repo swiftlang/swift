@@ -1425,6 +1425,12 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
 bool IterableDeclContext::wasDeserialized() const {
   const DeclContext *DC = getAsGenericContext();
   if (auto F = dyn_cast<FileUnit>(DC->getModuleScopeContext())) {
+    // Files loaded from the AST cache (.swiftast) are deserialized even though
+    // they are still SourceFile objects (not SerializedASTFile). Without this,
+    // loadNamedMembers asserts because it expects deserialized IDCs to have
+    // been loaded from a .swiftmodule.
+    if (auto *SF = dyn_cast<SourceFile>(F))
+      return SF->LoadedFromAstCache;
     return F->getKind() == FileUnitKind::SerializedAST;
   }
   return false;
