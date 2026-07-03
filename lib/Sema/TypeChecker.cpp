@@ -269,6 +269,9 @@ void swift::bindExtensions(ModuleDecl &mod) {
 }
 
 void swift::performTypeChecking(SourceFile &SF) {
+  // If this file was loaded from AST cache, it's already type-checked.
+  if (SF.ASTStage == SourceFile::TypeChecked)
+    return;
   if (SF.getASTContext().TypeCheckerOpts.EnableLazyTypecheck) {
     // Skip eager type checking. Instead, let later stages of compilation drive
     // type checking as needed through request evaluation.
@@ -400,11 +403,14 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   // to playground log them.
   if (!Ctx.hadError() && Ctx.LangOpts.PlaygroundTransform)
     performPlaygroundTransform(*SF, Ctx.LangOpts.PlaygroundOptions);
-
   return std::make_tuple<>();
 }
 
+
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
+  if (SF.ASTStage == SourceFile::TypeChecked)
+    return; // Cached file: ObjC conflict diagnostics suppressed
+
   auto &Ctx = SF.getASTContext();
   FrontendStatsTracer tracer(Ctx.Stats,
                              "perform-whole-module-type-checking");
@@ -429,6 +435,8 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
 }
 
 void swift::loadDerivativeConfigurations(SourceFile &SF) {
+  if (SF.ASTStage == SourceFile::TypeChecked)
+    return; // Cached file: @derivative configs may be stale
   if (!isDifferentiableProgrammingEnabled(SF))
     return;
 

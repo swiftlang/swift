@@ -180,6 +180,16 @@ public:
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.
   unsigned BadFileDescriptorRetryCount = 0;
+
+  /// Directory for per-file type-checked AST cache (.swiftast files).
+  /// Empty if AST caching is not enabled.
+  std::string ExperimentalASTCacheDir;
+
+  /// Whether to verify AST cache correctness by compiling twice.
+  bool VerifyASTCache = false;
+
+  /// Whether to print debug remarks about AST cache hits/misses.
+  bool DebugASTCache = false;
   enum class ActionType {
     NoneAction,        ///< No specific action
     Parse,             ///< Parse only

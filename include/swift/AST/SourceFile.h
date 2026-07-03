@@ -76,6 +76,7 @@ using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
 /// generation.
 class SourceFile final : public FileUnit {
   friend class ParseSourceFileRequest;
+  friend class SnapshotDeserializer;
 
 public:
   /// Flags that direct how the source file is parsed.
@@ -289,6 +290,13 @@ public:
 
   /// Retrieves an immutable view of the list of top-level items in this file.
   ArrayRef<ASTNode> getTopLevelItems() const;
+  /// Set the list of top-level items (used by AST cache deserialization).
+  void setTopLevelItems(ArrayRef<ASTNode> items) {
+    if (!Items)
+      Items = std::vector<ASTNode>();
+    Items->clear();
+    Items->insert(Items->begin(), items.begin(), items.end());
+  }
 
   /// Retrieves an immutable view of the list of top-level decls in this file.
   ///
@@ -384,6 +392,10 @@ public:
   /// Only files that have been fully processed (i.e. type-checked) will be
   /// forwarded on to IRGen.
   ASTStage_t ASTStage = Unprocessed;
+
+  /// Whether this source file was loaded from an AST cache (.swiftast) file.
+  /// Used for debugging and verification.
+  bool LoadedFromAstCache = false;
 
   /// Virtual file paths declared by \c #sourceLocation(file:) declarations in
   /// this source file.
@@ -621,6 +633,9 @@ public:
 
   Identifier getDiscriminatorForPrivateDecl(const Decl *D) const override;
   Identifier getPrivateDiscriminator(bool createIfMissing = false) const;
+  void setPrivateDiscriminatorForCache(Identifier discriminator) {
+    PrivateDiscriminator = discriminator;
+  }
   std::optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
 
@@ -682,6 +697,13 @@ public:
 
   /// Retrieve the source text buffer.
   StringRef getBuffer() const;
+
+  /// Load the type-checked AST for this file from a .swiftast cache file.
+  /// Populates Items, Imports, and other fields from the deserialized
+  /// bitstream. Sets ASTStage = TypeChecked. Returns false on any
+  /// deserialization error (caller should fall back to parsing).
+  /// Implemented by SnapshotDeserializer (friend).
+  bool loadFromCache(ASTContext &Ctx, llvm::MemoryBuffer &cacheBuffer);
 
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();

@@ -68,6 +68,15 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
     Opts.IndexStorePath = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_experimental_ast_cache)) {
+    Opts.ExperimentalASTCacheDir = A->getValue();
+  }
+  if (Args.hasArg(OPT_verify_ast_cache)) {
+    Opts.VerifyASTCache = true;
+  }
+  if (Args.hasArg(OPT_debug_ast_cache)) {
+    Opts.DebugASTCache = true;
+  }
   if (const Arg *A = Args.getLastArg(OPT_prebuilt_module_cache_path)) {
     Opts.PrebuiltModuleCachePath = A->getValue();
   }

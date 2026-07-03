@@ -298,7 +298,7 @@ void swift::performImportResolution(ModuleDecl *M) {
 /// Import resolution operates on a parsed but otherwise unvalidated AST.
 void swift::performImportResolution(SourceFile &SF) {
   // If we've already performed import resolution, bail.
-  if (SF.ASTStage == SourceFile::ImportsResolved)
+  if (SF.ASTStage >= SourceFile::ImportsResolved)
     return;
 
   FrontendStatsTracer tracer(SF.getASTContext().Stats,

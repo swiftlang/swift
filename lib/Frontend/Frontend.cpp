@@ -26,6 +26,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/PluginLoader.h"
+#include "swift/AST/TypeCheckedSnapshot.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
@@ -1646,6 +1647,13 @@ bool CompilerInstance::performParseAndResolveImportsOnly() {
 }
 
 void CompilerInstance::performSema() {
+  // Load cached ASTs before parsing. For files with valid cache hits,
+  // this populates SourceFile::Items and sets ASTStage = TypeChecked,
+  // bypassing parsing and type-checking entirely.
+  if (!Invocation.getFrontendOptions().ExperimentalASTCacheDir.empty()) {
+    loadASTCache();
+  }
+
   performParseAndResolveImportsOnly();
 
   FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
@@ -1656,6 +1664,11 @@ void CompilerInstance::performSema() {
   });
 
   finishTypeChecking();
+
+  // Save type-checked ASTs to cache after type-checking completes.
+  if (!Invocation.getFrontendOptions().ExperimentalASTCacheDir.empty()) {
+    saveASTCache();
+  }
 }
 
 bool CompilerInstance::loadStdlibIfNeeded() {
@@ -1826,6 +1839,11 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
       frontendOpts.ReuseFrontendForMultipleCompilations) {
     opts |= ParsingFlags::EnableInterfaceHash;
   }
+
+  // Enable interface hash for all files when AST caching is active,
+  // not just primaries. This is needed for cache key validation.
+  if (!frontendOpts.ExperimentalASTCacheDir.empty())
+    opts |= ParsingFlags::EnableInterfaceHash;
   const auto &LangOpts = Invocation.getLangOptions();
   if (action == ActionType::Immediate &&
       LangOpts.hasFeature(Feature::LazyImmediate)) {
@@ -2125,4 +2143,129 @@ swift::computeAbstractStructLayout(const StructDecl *decl,
   result.typeLayout.isOpaque = anyOpaque;
 
   return result;
+}
+
+// MARK: - AST Cache
+
+void CompilerInstance::loadASTCache() {
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  if (frontendOpts.ExperimentalASTCacheDir.empty())
+    return;
+
+  auto *mainModule = getMainModule();
+  if (!mainModule)
+    return;
+
+  for (auto *file : mainModule->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
+    // Compute the .swiftast cache path for this file
+    // Path format: <cache_dir>/<module_name>/<filename>.swiftast
+    SmallString<256> cachePath;
+    llvm::sys::path::append(cachePath, frontendOpts.ExperimentalASTCacheDir);
+    llvm::sys::path::append(cachePath, mainModule->getName().str());
+    auto filename = SF->getFilename();
+    if (filename.empty())
+      continue;
+    // Use just the filename stem, not the full path
+    auto basename = llvm::sys::path::filename(filename);
+    auto stem = basename;
+    if (stem.ends_with(".swift")) {
+      stem = stem.drop_back(6);
+    }
+    SmallString<64> cacheFileName = stem;
+    cacheFileName += ".swiftast";
+    llvm::sys::path::append(cachePath, cacheFileName);
+
+    // Check if the cache file exists
+    auto bufOrErr = llvm::MemoryBuffer::getFile(cachePath);
+    if (!bufOrErr) {
+      if (frontendOpts.DebugASTCache) {
+        llvm::errs() << "AST cache: MISS (no cache file) for "
+                     << filename << "\n";
+      }
+      continue;
+    }
+
+    // Try to load from cache
+    // The deserialization is handled by SnapshotDeserializer which
+    // creates a ModuleFile from the bitstream and populates SourceFile fields.
+    bool loaded = SF->loadFromCache(SF->getASTContext(), **bufOrErr);
+
+    if (loaded) {
+      if (frontendOpts.DebugASTCache) {
+        llvm::errs() << "AST cache: HIT for " << filename << "\n";
+      }
+    } else {
+      if (frontendOpts.DebugASTCache) {
+        llvm::errs() << "AST cache: MISS (invalid) for " << filename << "\n";
+      }
+    }
+  }
+}
+
+void CompilerInstance::saveASTCache() {
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  if (frontendOpts.ExperimentalASTCacheDir.empty())
+    return;
+
+  auto *mainModule = getMainModule();
+  if (!mainModule)
+    return;
+
+  // Create the cache directory if it doesn't exist
+  SmallString<256> cacheDir;
+  llvm::sys::path::append(cacheDir, frontendOpts.ExperimentalASTCacheDir);
+  llvm::sys::path::append(cacheDir, mainModule->getName().str());
+  std::error_code ec = llvm::sys::fs::create_directories(cacheDir);
+  if (ec) {
+    llvm::errs() << "AST cache: could not create cache directory: "
+                 << cacheDir << ": " << ec.message() << "\n";
+    return;
+  }
+
+  for (auto *file : mainModule->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
+    // Skip files that haven't been type-checked
+    if (SF->ASTStage != SourceFile::TypeChecked)
+      continue;
+
+    // Skip files that were loaded from cache (no need to re-serialize)
+    if (SF->LoadedFromAstCache)
+      continue;
+
+    // Compute the .swiftast cache path
+    SmallString<256> cachePath;
+    llvm::sys::path::append(cachePath, frontendOpts.ExperimentalASTCacheDir);
+    llvm::sys::path::append(cachePath, mainModule->getName().str());
+    auto filename = SF->getFilename();
+    if (filename.empty())
+      continue;
+    // Use just the filename stem, not the full path
+    auto basename = llvm::sys::path::filename(filename);
+    auto stem = basename;
+    if (stem.ends_with(".swift")) {
+      stem = stem.drop_back(6);
+    }
+    SmallString<64> cacheFileName = stem;
+    cacheFileName += ".swiftast";
+    llvm::sys::path::append(cachePath, cacheFileName);
+
+    // Serialize the type-checked AST to .swiftast
+    bool saved = writeTypeCheckedSnapshot(SF->getASTContext(), *SF, cachePath);
+    if (!saved) {
+      llvm::errs() << "AST cache: could not write cache file for "
+                   << filename << "\n";
+      continue;
+    }
+
+    if (frontendOpts.DebugASTCache) {
+      llvm::errs() << "AST cache: SAVED for " << filename << "\n";
+    }
+  }
 }
