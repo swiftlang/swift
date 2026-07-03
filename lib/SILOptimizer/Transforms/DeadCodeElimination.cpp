@@ -28,6 +28,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
@@ -635,6 +636,22 @@ void DCE::endLifetimeOfLiveValue(Operand *op, SILInstruction *insertPt) {
 bool DCE::removeDead() {
   bool Changed = false;
 
+  // Salvage debug info before erasing dead instructions. Collect all dead
+  // non-debug instructions, then salvage in reverse order (uses before defs)
+  // so that reconstruction blocks can reference operands still alive.
+  SmallVector<SILInstruction *, 16> toSalvage;
+  for (auto &bb : *F) {
+    for (auto &inst : bb) {
+      if (LiveInstructions.contains(&inst) || isa<BranchInst>(&inst))
+        continue;
+      if (isa<TermInst>(&inst) || isa<DebugValueInst>(&inst))
+        continue;
+      toSalvage.push_back(&inst);
+    }
+  }
+  for (auto *inst : llvm::reverse(toSalvage))
+    salvageDebugInfo(inst);
+
   for (auto &BB : *F) {
     for (unsigned i = 0; i < BB.getArguments().size();) {
       auto *arg = BB.getArgument(i);
@@ -707,6 +724,12 @@ bool DCE::removeDead() {
       auto *Inst = &*I;
       ++I;
       if (LiveInstructions.contains(Inst) || isa<BranchInst>(Inst))
+        continue;
+
+      // Debug values have either already been rewritten by salvageDebugInfo,
+      // or replaceAllUsesOfAllResultsWithUndef will replace the deleted use
+      // with an undef, killing it. They should not be deleted.
+      if (isa<DebugValueInst>(Inst))
         continue;
 
       // We want to replace dead terminators with unconditional branches to
