@@ -1223,8 +1223,10 @@ void IterableDeclContext::addParsedMembers() const {
     // Skip for source files loaded from the AST cache — their members were
     // deserialized, not parsed, so calling getParsedMembers() would trigger
     // a circular ParseMembersRequest.
-    if (getAsGenericContext()->getParentSourceFile()->LoadedFromAstCache)
+    if (getAsGenericContext()->getParentSourceFile()->LoadedFromAstCache) {
+      const_cast<IterableDeclContext *>(this)->AddedParsedMembers = 1;
       return;
+    }
     // Retrieve the parsed members. Even if we've already added the parsed
     // members to this context, this call is important for recording the
     // dependency edge.

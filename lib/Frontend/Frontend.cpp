@@ -2225,7 +2225,7 @@ void CompilerInstance::loadASTCache() {
       if (SF->LoadedFromAstCache) {
         SF->ASTStage = SourceFile::Unprocessed;
         SF->LoadedFromAstCache = false;
-        SF->setTopLevelItems({});
+        SF->clearTopLevelItems();
       }
     }
   }
@@ -2262,6 +2262,9 @@ void CompilerInstance::saveASTCache() {
 
     // Skip files that were loaded from cache (no need to re-serialize)
     if (SF->LoadedFromAstCache)
+      continue;
+    // Skip script-mode files (C4: TopLevelCodeDecl is not serialized)
+    if (SF->isScriptMode())
       continue;
 
     // Compute the .swiftast cache path
