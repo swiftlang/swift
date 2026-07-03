@@ -71,6 +71,14 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_experimental_ast_cache)) {
     Opts.ExperimentalASTCacheDir = A->getValue();
   }
+  // Also support SWIFT_AST_CACHE_DIR environment variable as a fallback.
+  // This allows enabling AST caching without modifying the command line,
+  // which is necessary when the driver doesn't support -Xfrontend passthrough.
+  if (Opts.ExperimentalASTCacheDir.empty()) {
+    if (auto envCacheDir = llvm::sys::Process::GetEnv("SWIFT_AST_CACHE_DIR")) {
+      Opts.ExperimentalASTCacheDir = *envCacheDir;
+    }
+  }
   if (Args.hasArg(OPT_verify_ast_cache)) {
     Opts.VerifyASTCache = true;
   }
