@@ -7366,6 +7366,10 @@ public:
   void visitSILBasicBlock(SILBasicBlock *BB) {
     SILInstructionVisitor::visitSILBasicBlock(BB);
     verifyDebugScopeHoles(BB);
+
+    for (SILInstruction &inst : *BB) {
+      inst.verifyOperandOwnership(&fnConv.silConv);
+    }
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {
