@@ -8380,6 +8380,15 @@ Expected<Type> DESERIALIZE_TYPE(ERROR_TYPE)(ModuleFile &MF,
                        MF.getAssociatedModule()->getNameStr());
   }
 
+  // When allowing compiler errors (e.g. AST cache deserialization), return the
+  // original type if it exists and doesn't contain errors, otherwise return
+  // Void (TheEmptyTupleType). This prevents ErrorType from reaching SIL lowering,
+  // which asserts that parameter/result types must not contain error types.
+  if (MF.allowCompilerErrors()) {
+    if (origTy && !origTy->hasError())
+      return origTy;
+    return Type(ctx.TheEmptyTupleType);
+  }
   if (!origTy)
     return ErrorType::get(ctx);
   return ErrorType::get(origTy);
