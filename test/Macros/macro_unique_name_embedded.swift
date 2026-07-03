@@ -10,7 +10,7 @@
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroPlugin) -module-name=MacroPlugin %t/MacroPlugin.swift -g -no-toolchain-stdlib-rpath
 
 // RUN: %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroPlugin) -module-name TestModule %t/TestModule.swift \
-// RUN:   -enable-experimental-feature Embedded -wmo -target arm64-apple-macos14
+// RUN:   -enable-experimental-feature Embedded -wmo -target %target-cpu-apple-macos14
 
 //--- MacroPlugin.swift
 import SwiftSyntax
