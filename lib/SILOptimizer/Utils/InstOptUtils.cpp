@@ -2317,7 +2317,8 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   if (isa<AddressToPointerInst>(I) || isa<PointerToAddressInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
 
-  if (isa<UpcastInst>(I) || isa<UncheckedRefCastInst>(I))
+  if (isa<UpcastInst>(I) || isa<UncheckedRefCastInst>(I) ||
+      isa<ConvertEscapeToNoEscapeInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
 
   if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I) ||
