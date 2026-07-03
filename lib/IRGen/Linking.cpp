@@ -952,8 +952,23 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::DynamicallyReplaceableFunctionVariable:
     return getSILFunction()->getEffectiveSymbolLinkage();
-  case Kind::DynamicallyReplaceableFunctionVariableAST:
-    return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
+  case Kind::DynamicallyReplaceableFunctionVariableAST: {
+    // Match the SIL-level linkage IRGen uses for the actual variable
+    // emission, which applies the class-member scope transform. Otherwise
+    // the AST-level linkage claims the entity is public when IRGen emits it
+    // with hidden linkage (e.g. dynamic methods of a resilient class).
+    auto silLinkage = getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
+    auto *afd = cast<AbstractFunctionDecl>(const_cast<ValueDecl *>(getDecl()));
+    SILDeclRef declRef;
+    if (auto *ctor = dyn_cast<ConstructorDecl>(afd)) {
+      declRef = SILDeclRef(ctor, isAllocator() ? SILDeclRef::Kind::Allocator
+                                               : SILDeclRef::Kind::Initializer);
+    } else {
+      declRef = SILDeclRef(afd);
+    }
+    return effectiveLinkageForClassMember(silLinkage,
+                                          declRef.getSubclassScope());
+  }
 
   case Kind::SILGlobalVariable:
   case Kind::ReadOnlyGlobalObject:
