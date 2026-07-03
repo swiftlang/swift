@@ -225,8 +225,8 @@ private func createEndCOWMutationIfNeeded(lifetimeDep: LifetimeDependence, _ con
       return
   }
 
-  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.dependentValue.parentFunction, context) &&
-    lifetimeDep.parentValue.type.mayHaveOptimizedCOWType(in: lifetimeDep.dependentValue.parentFunction) else {
+  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.function, context) &&
+    lifetimeDep.parentValue.type.mayHaveOptimizedCOWType(in: lifetimeDep.function) else {
     return
   }
 
