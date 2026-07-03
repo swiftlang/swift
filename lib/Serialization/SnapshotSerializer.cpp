@@ -62,16 +62,23 @@ public:
     populateImportMetadata(key);
 
     // 4. Serialize the AST to a bitstream using the existing Serializer
-    std::string bitstreamData;
-    {
-      llvm::raw_string_ostream bitstreamOS(bitstreamData);
-      SerializationOptions opts;
-      // Serialize only the source file (not the whole module)
-      serialization::writeToStream(
-          bitstreamOS, ModuleOrSourceFile(const_cast<SourceFile *>(&SF)),
-          /*SILModule*/ nullptr, opts,
-          /*DepGraph*/ nullptr);
-    }
+ std::string bitstreamData;
+ {
+   llvm::raw_string_ostream bitstreamOS(bitstreamData);
+ SerializationOptions opts;
+ // Serialize only the source file (not the whole module)
+ // Allow compiler errors so the serializer skips invalid types instead
+ // of crashing (e.g. when a type references an unresolved ObjC bridging
+ // header type in whole-module compilation).
+ auto &langOpts = const_cast<LangOptions &>(ctx.LangOpts);
+ bool savedAllowErrors = langOpts.AllowModuleWithCompilerErrors;
+ langOpts.AllowModuleWithCompilerErrors = true;
+ serialization::writeToStream(
+ bitstreamOS, ModuleOrSourceFile(const_cast<SourceFile *>(&SF)),
+ /*SILModule*/ nullptr, opts,
+ /*DepGraph*/ nullptr);
+ langOpts.AllowModuleWithCompilerErrors = savedAllowErrors;
+ }
 
     // 5. Serialize the .swiftdeps content to YAML
     // For the PoC, we don't serialize the dependency graph.
