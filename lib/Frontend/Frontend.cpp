@@ -2162,20 +2162,25 @@ void CompilerInstance::loadASTCache() {
       continue;
 
     // Compute the .swiftast cache path for this file
-    // Path format: <cache_dir>/<module_name>/<filename>.swiftast
+    // Path format: <cache_dir>/<module_name>/<stem>-<pathHash>.swiftast
+    // The path hash prevents collisions between files with the same basename
+    // in different directories.
     SmallString<256> cachePath;
     llvm::sys::path::append(cachePath, frontendOpts.ExperimentalASTCacheDir);
     llvm::sys::path::append(cachePath, mainModule->getName().str());
     auto filename = SF->getFilename();
     if (filename.empty())
       continue;
-    // Use just the filename stem, not the full path
     auto basename = llvm::sys::path::filename(filename);
     auto stem = basename;
     if (stem.ends_with(".swift")) {
       stem = stem.drop_back(6);
     }
+    // Hash the full path to disambiguate same-basename files
+    auto pathHash = llvm::hash_value(filename);
     SmallString<64> cacheFileName = stem;
+    cacheFileName += "-";
+    cacheFileName += llvm::utohexstr(pathHash, /*Lowercase=*/true);
     cacheFileName += ".swiftast";
     llvm::sys::path::append(cachePath, cacheFileName);
 
@@ -2246,17 +2251,18 @@ void CompilerInstance::saveASTCache() {
     auto filename = SF->getFilename();
     if (filename.empty())
       continue;
-    // Use just the filename stem, not the full path
     auto basename = llvm::sys::path::filename(filename);
     auto stem = basename;
     if (stem.ends_with(".swift")) {
       stem = stem.drop_back(6);
     }
+    // Hash the full path to disambiguate same-basename files
+    auto pathHash = llvm::hash_value(filename);
     SmallString<64> cacheFileName = stem;
+    cacheFileName += "-";
+    cacheFileName += llvm::utohexstr(pathHash, /*Lowercase=*/true);
     cacheFileName += ".swiftast";
     llvm::sys::path::append(cachePath, cacheFileName);
-
-    // Serialize the type-checked AST to .swiftast
     bool saved = writeTypeCheckedSnapshot(SF->getASTContext(), *SF, cachePath);
     if (!saved) {
       llvm::errs() << "AST cache: could not write cache file for "

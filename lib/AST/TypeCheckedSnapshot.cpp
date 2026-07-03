@@ -61,8 +61,11 @@ ASTCacheKey swift::computeASTCacheKey(ASTContext &ctx, const SourceFile &SF) {
   auto buffer = sourceMgr.getEntireTextForBuffer(bufferID);
   key.sourceFileHash = sha256Hex(buffer);
 
-  // Language options hash
-  key.langOptsHash = static_cast<uint32_t>(ctx.LangOpts.getModuleScanningHashComponents());
+  // Language options hash is intentionally NOT included in cache validation.
+  // LangOpts fields change between save (post-typecheck) and load (pre-parse)
+  // phases, making this hash unstable. See https://github.com/apple/swift/issues/...
+  // The compiler version hash already covers toolchain identity.
+  key.langOptsHash = 0;
 
   // For the PoC, we compute imported modules hash, macro plugins hash,
   // and cross-import overlays hash from the frontend options.
@@ -100,9 +103,7 @@ bool swift::validateASTCache(ASTContext &ctx, const SourceFile &SF,
   if (cachedKey.sourceFileHash != currentKey.sourceFileHash)
     return false;
 
-  // Check language options hash
-  if (cachedKey.langOptsHash != currentKey.langOptsHash)
-    return false;
+  // Language options hash is intentionally skipped (see computeASTCacheKey).
 
   // Check imported modules hash
   if (cachedKey.importedModulesHash != currentKey.importedModulesHash)
