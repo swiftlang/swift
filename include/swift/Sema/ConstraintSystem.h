@@ -3134,13 +3134,6 @@ public:
                                               Type initializerType,
                                               Type propertyType);
 
-  /// Propagate constraints in an effort to enforce local
-  /// consistency to reduce the time to solve the system.
-  ///
-  /// \returns true if the system is known to be inconsistent (have no
-  /// solutions).
-  bool propagateConstraints();
-
   /// The result of attempting to resolve a constraint or set of
   /// constraints.
   enum class SolutionKind : char {
