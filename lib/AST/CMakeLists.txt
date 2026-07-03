@@ -132,6 +132,7 @@ add_swift_host_library(swiftAST STATIC
   SwiftNameTranslation.cpp
   Type.cpp
   TypeCheckRequests.cpp
+  TypeCheckedSnapshot.cpp
   TypeDeclFinder.cpp
   TypeRepr.cpp
   TypeSubstitution.cpp

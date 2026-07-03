@@ -1799,6 +1799,22 @@ def disable_incremental_file_hashing :
   HelpText<"Disable hashing of input and dependency file data "
            "that can prevent unnecessary invalidation">;
 
+def experimental_ast_cache : Separate<["-"], "experimental-ast-cache">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable per-file type-checked AST caching (experimental). "
+           "<dir> specifies where .swiftast cache files are stored. "
+           "Warning: cached builds suppress diagnostics from unchanged files.">,
+  MetaVarName<"<dir>">;
+
+def verify_ast_cache : Flag<["-"], "verify-ast-cache">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Verify AST cache correctness by compiling twice (cached and non-cached) "
+           "and comparing outputs. For development/debugging only.">;
+
+def debug_ast_cache : Flag<["-"], "debug-ast-cache">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Print debug remarks about AST cache hits and misses.">;
+
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;

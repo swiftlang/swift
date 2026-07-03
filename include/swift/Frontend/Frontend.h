@@ -832,6 +832,13 @@ public:
   /// be processed.
   bool performParseAndResolveImportsOnly();
 
+  /// Load per-file type-checked ASTs from the .swiftast cache.
+  /// Called before performParseAndResolveImportsOnly() in performSema().
+  void loadASTCache();
+
+  /// Save type-checked ASTs to the .swiftast cache after type-checking.
+  void saveASTCache();
+
   /// Performs mandatory, diagnostic, and optimization passes over the SIL.
   /// \param silModule The SIL module that was generated during SILGen.
   /// \returns true if any errors occurred.
