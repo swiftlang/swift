@@ -448,10 +448,13 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
 void ConformanceLookupTable::registerProtocolConformances(
        DeclContext *dc,
        ArrayRef<ProtocolConformance*> conformances) {
-  // If this declaration context came from source, there's nothing to
-  // do here.
-  assert(!dc->getParentSourceFile() &&
-         !dc->getParentModule()->isBuiltinModule());
+  // If this declaration context came from source, there's nothing to do here.
+  // This includes deserialized decls that were re-associated with a SourceFile
+  // via the AST cache (their DeclContext is the SourceFile, so
+  // getParentSourceFile() returns non-null, but their conformances were
+  // loaded by the ModuleFile deserializer).
+  if (dc->getParentSourceFile() || dc->getParentModule()->isBuiltinModule())
+    return;
 
   // Add entries for each loaded conformance.
   for (auto conformance : conformances) {

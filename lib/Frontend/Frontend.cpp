@@ -2156,56 +2156,94 @@ void CompilerInstance::loadASTCache() {
   if (!mainModule)
     return;
 
-  for (auto *file : mainModule->getFiles()) {
-    auto *SF = dyn_cast<SourceFile>(file);
-    if (!SF)
-      continue;
+  // C2: Two-pass approach to avoid mixed cached/uncached state.
+  // Pass 1: Check if cache files exist for ALL source files.
+  // If any file is missing a cache entry, skip caching entirely for the
+  // whole module — this avoids the silent-wrong-diagnostics problem where
+  // whole-module passes (ObjC conflict checks, derivative configs) run on
+  // a subset of files.
 
-    // Compute the .swiftast cache path for this file
-    // Path format: <cache_dir>/<module_name>/<stem>-<pathHash>.swiftast
-    // The path hash prevents collisions between files with the same basename
-    // in different directories.
+  // Helper to compute the cache path for a source file.
+  auto computeCachePath = [&](const SourceFile *SF) -> SmallString<256> {
     SmallString<256> cachePath;
     llvm::sys::path::append(cachePath, frontendOpts.ExperimentalASTCacheDir);
     llvm::sys::path::append(cachePath, mainModule->getName().str());
     auto filename = SF->getFilename();
-    if (filename.empty())
-      continue;
     auto basename = llvm::sys::path::filename(filename);
     auto stem = basename;
-    if (stem.ends_with(".swift")) {
+    if (stem.ends_with(".swift"))
       stem = stem.drop_back(6);
-    }
-    // Hash the full path to disambiguate same-basename files
     auto pathHash = llvm::hash_value(filename);
     SmallString<64> cacheFileName = stem;
     cacheFileName += "-";
     cacheFileName += llvm::utohexstr(pathHash, /*Lowercase=*/true);
     cacheFileName += ".swiftast";
     llvm::sys::path::append(cachePath, cacheFileName);
+    return cachePath;
+  };
 
-    // Check if the cache file exists
+  // Pass 1: Check cache file existence for all source files.
+  // Script-mode files are excluded (C4 — TopLevelCodeDecl not serializable).
+  SmallVector<SourceFile *, 32> cacheableFiles;
+  bool allCacheFilesExist = true;
+  for (auto *file : mainModule->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+    if (SF->getFilename().empty())
+      continue;
+    if (SF->isScriptMode())
+      continue; // Script-mode files are not cacheable (C4)
+    cacheableFiles.push_back(SF);
+
+    auto cachePath = computeCachePath(SF);
     auto bufOrErr = llvm::MemoryBuffer::getFile(cachePath);
     if (!bufOrErr) {
       if (frontendOpts.DebugASTCache) {
         llvm::errs() << "AST cache: MISS (no cache file) for "
-                     << filename << "\n";
+                     << SF->getFilename() << "\n";
       }
+      allCacheFilesExist = false;
+    }
+  }
+
+  // If not all cache files exist, skip caching for the whole module.
+  if (!allCacheFilesExist)
+    return;
+
+  // Pass 2: Load cache for all files. If any load fails, clear all cached
+  // state so normal parsing/type-checking runs for all files.
+  bool allLoaded = true;
+  for (auto *SF : cacheableFiles) {
+    auto cachePath = computeCachePath(SF);
+    auto bufOrErr = llvm::MemoryBuffer::getFile(cachePath);
+    if (!bufOrErr) {
+      allLoaded = false;
       continue;
     }
 
-    // Try to load from cache
-    // The deserialization is handled by SnapshotDeserializer which
-    // creates a ModuleFile from the bitstream and populates SourceFile fields.
     bool loaded = SF->loadFromCache(SF->getASTContext(), **bufOrErr);
 
     if (loaded) {
       if (frontendOpts.DebugASTCache) {
-        llvm::errs() << "AST cache: HIT for " << filename << "\n";
+        llvm::errs() << "AST cache: HIT for " << SF->getFilename() << "\n";
       }
     } else {
       if (frontendOpts.DebugASTCache) {
-        llvm::errs() << "AST cache: MISS (invalid) for " << filename << "\n";
+        llvm::errs() << "AST cache: MISS (invalid) for "
+                     << SF->getFilename() << "\n";
+      }
+      allLoaded = false;
+    }
+  }
+
+  // If any file failed to load, clear all cached state to avoid mixed state.
+  if (!allLoaded) {
+    for (auto *SF : cacheableFiles) {
+      if (SF->LoadedFromAstCache) {
+        SF->ASTStage = SourceFile::Unprocessed;
+        SF->LoadedFromAstCache = false;
+        SF->setTopLevelItems({});
       }
     }
   }

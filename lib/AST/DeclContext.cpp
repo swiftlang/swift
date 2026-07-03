@@ -1101,8 +1101,9 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
 #ifndef NDEBUG
   // Assert that new declarations are always added in source order.
   auto checkSourceRange = [&](Decl *prev, Decl *next) {
-    // SKip these checks for imported and deserialized decls.
-    if (!member->getDeclContext()->getParentSourceFile())
+    // Skip these checks for imported and deserialized decls.
+    auto *parentSF = member->getDeclContext()->getParentSourceFile();
+    if (!parentSF || parentSF->LoadedFromAstCache)
       return;
 
     auto shouldSkip = [](Decl *d) {
@@ -1219,6 +1220,11 @@ bool IterableDeclContext::hasUnparsedMembers() const {
 void IterableDeclContext::addParsedMembers() const {
   // For contexts within a source file, get the list of parsed members.
   if (getAsGenericContext()->getParentSourceFile()) {
+    // Skip for source files loaded from the AST cache — their members were
+    // deserialized, not parsed, so calling getParsedMembers() would trigger
+    // a circular ParseMembersRequest.
+    if (getAsGenericContext()->getParentSourceFile()->LoadedFromAstCache)
+      return;
     // Retrieve the parsed members. Even if we've already added the parsed
     // members to this context, this call is important for recording the
     // dependency edge.

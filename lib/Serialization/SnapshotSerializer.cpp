@@ -47,6 +47,11 @@ public:
 
   /// Serialize the type-checked AST to a .swiftast file.
   bool serialize(StringRef outputPath) {
+    // C4: Script-mode files are not cacheable (TopLevelCodeDecl is not
+    // serialized by the stock serializer, so caching would silently drop
+    // top-level executable code).
+    if (SF.isScriptMode())
+      return false;
     // 1. Force type-checking of all delayed function bodies
     const_cast<SourceFile &>(SF).typeCheckDelayedFunctions();
 

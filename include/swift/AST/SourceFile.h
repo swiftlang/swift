@@ -35,6 +35,7 @@ class Token;
 class UsingDecl;
 class AvailableAttr;
 enum class DefaultIsolation : uint8_t;
+class ModuleFile;
 
 /// The set of `using ...` defaults declared at the top of a source file.
 struct FileDefaults {
@@ -396,6 +397,10 @@ public:
   /// Whether this source file was loaded from an AST cache (.swiftast) file.
   /// Used for debugging and verification.
   bool LoadedFromAstCache = false;
+  /// The ModuleFile backing this cached source file, if loaded from .swiftast.
+  /// Owned by the SourceFile (cleaned up via ASTContext::addCleanup).
+  ModuleFile *CachedModuleFile = nullptr;
+
 
   /// Virtual file paths declared by \c #sourceLocation(file:) declarations in
   /// this source file.

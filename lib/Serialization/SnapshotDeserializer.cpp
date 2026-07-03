@@ -1,6 +1,6 @@
-//===--- SnapshotDeserializer.cpp - Deserialize .swiftast into SourceFile ===//
+//===--- SnapshotDeserializer.cpp - Deserialize .swiftast into SourceFile ---===//
 //
-// This source code is part of the Swift.org open source project
+// This source file is part of the Swift.org open source project
 //
 // Copyright (c) 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
@@ -45,6 +45,12 @@ public:
   /// Returns true on success, false on failure (caller should fall back to
   /// parsing).
   bool deserialize(const llvm::MemoryBuffer &cacheBuffer) {
+    // C4: Script-mode files are not cacheable (TopLevelCodeDecl is not
+    // serialized by the stock serializer, so caching would silently drop
+    // top-level executable code).
+    if (SF.isScriptMode())
+      return false;
+
     // 1. Parse the cache key header from the buffer
     ASTCacheKey key;
     size_t offset = 0;
@@ -74,12 +80,8 @@ public:
     if (!deserializeBitstream(bitstreamData, key)) {
       return false;
     }
-    // 6. Populate Imports from cache header
-    if (!populateImports(key.importsBlob)) {
-      return false;
-    }
 
-    // 7. Set remaining fields
+    // 6. Set remaining fields
     SF.ASTStage = SourceFile::TypeChecked;
     SF.LoadedFromAstCache = true;
 
@@ -134,19 +136,49 @@ private:
       itemNodes.push_back(ASTNode(D));
     }
     SF.setTopLevelItems(itemNodes);
+    // Mark deserialized IterableDeclContexts as having already had their
+    // parsed members added. Without this, addParsedMembers() sees
+    // getParentSourceFile() != null and triggers ParseMembersRequest, which
+    // tries to re-parse from source and crashes (invalid source ranges for
+    // deserialized decls). SerializedASTFile decls avoid this because their
+    // getParentSourceFile() returns null.
+    for (auto *D : decls) {
+      if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+        const_cast<IterableDeclContext *>(IDC)->setAddedParsedMembersForCache();
+      }
+    }
+
+    // C3: Populate Imports from the ModuleFile's loaded dependencies.
+    // associateWithFileContext calls loadDependenciesForFileContext which
+    // loads the ModuleFile's Dependencies. We read them via getImportedModules
+    // and wrap each in a default AttributedImport (preserving module pointers
+    // but dropping import attributes like access level, implementation-only, etc).
+    // This is sufficient for SIL lowering which needs to resolve external
+    // references via ModuleDecl::getImportedModules.
+    {
+      SmallVector<ImportedModule, 8> moduleResults;
+      mf->getImportedModules(moduleResults, ModuleDecl::getImportFilterAll());
+      SmallVector<AttributedImport<ImportedModule>, 8> attributedImports;
+      for (auto &mod : moduleResults) {
+        attributedImports.push_back(AttributedImport<ImportedModule>(mod));
+      }
+      SF.setImports(attributedImports);
+    }
 
     // Set the private discriminator from the cache key
     if (!key.privateDiscriminator.empty()) {
       SF.setPrivateDiscriminatorForCache(
           ctx.getIdentifier(key.privateDiscriminator));
     }
-    // Keep the ModuleFile alive by storing it in the SourceFile.
-    // This prevents the deserialized Decls from being freed.
-    // TODO: Store the ModuleFile in SourceFile as a unique_ptr member.
-    // For now, we leak it intentionally — the ASTContext owns the Decls
-    // and the ModuleFile's core is shared_ptr so it will live as long as
-    // the Decls reference it.
-    (void)mf.release();
+
+    // C1: Store the ModuleFile in the SourceFile to keep it alive.
+    // The ASTContext arena doesn't call destructors, so we register a cleanup
+    // to delete the ModuleFile when the ASTContext is destroyed.
+    SF.CachedModuleFile = mf.release();
+    ctx.addCleanup([sf = &SF]() {
+      delete sf->CachedModuleFile;
+      sf->CachedModuleFile = nullptr;
+    });
 
     return true;
   }
@@ -203,33 +235,6 @@ private:
     }
     str.assign(data.data() + offset, len);
     offset += len;
-    return true;
-  }
-
-  bool populateImports(StringRef importsBlob) {
-    if (importsBlob.empty()) {
-      // No imports in the cache header — set empty imports
-      SF.setImports({});
-      return true;
-    }
-
-    // Parse the imports blob: one module name per line
-    SmallVector<AttributedImport<ImportedModule>, 4> imports;
-    auto lines = llvm::split(importsBlob, '\n');
-    for (auto line : lines) {
-      if (line.empty()) continue;
-
-      // Resolve the module name to a ModuleDecl*
-      auto *mod = ctx.getModuleByName(line);
-      if (!mod) {
-        // Module not found — cache miss, fall back to parsing
-        return false;
-      }
-      ImportedModule importedMod(mod);
-      imports.push_back(AttributedImport<ImportedModule>(importedMod));
-    }
-
-    SF.setImports(imports);
     return true;
   }
 };
