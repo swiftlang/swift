@@ -10719,7 +10719,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
             instanceTy->isAnyObject()
                 ? candidate
                 : OverloadChoice::getDecl(instanceTy, decl,
-                                          FunctionRefInfo::singleBaseNameApply());
+                                          functionRefInfo);
 
         const bool invalidMethodRef = isa<FuncDecl>(decl) && !hasInstanceMethods;
         const bool invalidMemberRef = !isa<FuncDecl>(decl) && !hasInstanceMembers;
