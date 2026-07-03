@@ -322,6 +322,11 @@ public struct Builder {
     return notifyNew(cast.getAs(UncheckedValueCastInst.self))
   }
 
+  public func createUncheckedTrivialBitCast(from value: Value, to type: Type) -> UncheckedTrivialBitCastInst {
+    let cast = bridged.createUncheckedTrivialBitCast(value.bridged, type.bridged)
+    return notifyNew(cast.getAs(UncheckedTrivialBitCastInst.self))
+  }
+
   public func createUpcast(from value: Value, to type: Type) -> UpcastInst {
     let cast = bridged.createUpcast(value.bridged, type.bridged)
     return notifyNew(cast.getAs(UpcastInst.self))

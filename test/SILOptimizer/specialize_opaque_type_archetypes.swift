@@ -415,7 +415,7 @@ struct PAEM : P4EM {
 }
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$s1A2PAVAA2P4A2aDP4testyyFTW
-// CHECK:   [[V:%.*]] = load %0 : $*PA
+// CHECK:   [[V:%.*]] = struct $PA ()
 // CHECK:   [[F:%.*]] = function_ref @$s1A2PAV4testyyF
 // CHECK:   apply [[F]]([[V]])
 

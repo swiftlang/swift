@@ -34,6 +34,18 @@ struct AO {
   let a: AnyObject
 }
 
+struct Pair {
+  let c: C
+  let i: Int
+}
+
+struct GenStruct<T> {
+  let t: T
+}
+
+struct EmptyNC : ~Copyable {
+}
+
 sil_global hidden [let] @gb : $B
 sil_global hidden [let] @gb2 : $(B, Int64)
 
@@ -586,5 +598,112 @@ bb0(%0 : $*AnyObject):
   destroy_value %2
   %6 = tuple ()
   return %6
+}
+
+// CHECK-LABEL: sil [ossa] @load_trivial_from_store_borrow :
+// CHECK-NOT:     load
+// CHECK:         return %0
+// CHECK:       } // end sil function 'load_trivial_from_store_borrow'
+sil [ossa] @load_trivial_from_store_borrow : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  %2 = store_borrow %0 to %1
+  %3 = load [trivial] %2
+  end_borrow %2
+  dealloc_stack %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @load_copy_from_store_borrow :
+// CHECK-NOT:     load
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         return [[C]]
+// CHECK:       } // end sil function 'load_copy_from_store_borrow'
+sil [ossa] @load_copy_from_store_borrow : $@convention(thin) (@guaranteed C) -> @owned C {
+bb0(%0 : @guaranteed $C):
+  %1 = alloc_stack $C
+  %2 = store_borrow %0 to %1
+  %3 = load [copy] %2
+  end_borrow %2
+  dealloc_stack %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @load_projected_copy_from_store_borrow :
+// CHECK-NOT:     load
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK:         [[S:%.*]] = struct_extract [[B]]
+// CHECK:         [[C:%.*]] = copy_value [[S]]
+// CHECK:         return [[C]]
+// CHECK:       } // end sil function 'load_projected_copy_from_store_borrow'
+sil [ossa] @load_projected_copy_from_store_borrow : $@convention(thin) (@owned AO) -> @owned AnyObject {
+bb0(%0 : @owned $AO):
+  %1 = alloc_stack $AO
+  %2 = store_borrow %0 to %1
+  %3 = struct_element_addr %2, #AO.a
+  %4 = load [copy] %3
+  end_borrow %2
+  dealloc_stack %1
+  destroy_value %0
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @load_empty :
+// CHECK:         %1 = tuple ()
+// CHECK:         %2 = tuple ()
+// CHECK:         %3 = struct $GenStruct<()> (%2 : $())
+// CHECK:         %4 = tuple (%1 : $(), %3 : $GenStruct<()>)
+// CHECK:         %5 = struct $GenStruct<((), GenStruct<()>)> (%4 : $((), GenStruct<()>))
+// CHECK:         return %5
+// CHECK:       } // end sil function 'load_empty'
+sil [ossa] @load_empty : $@convention(thin) (@inout GenStruct<((), GenStruct<()>)>) -> GenStruct<((), GenStruct<()>)> {
+bb0(%0 : $*GenStruct<((), GenStruct<()>)>):
+  %1 = load [trivial] %0
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @load_empty_nc :
+// CHECK:         %1 = load [take] %0
+// CHECK:         return %1
+// CHECK:       } // end sil function 'load_empty_nc'
+sil [ossa] @load_empty_nc : $@convention(thin) (@in EmptyNC) -> @owned EmptyNC {
+bb0(%0 : $*EmptyNC):
+  %1 = load [take] %0
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @trivial_load_of_addr_cast :
+// CHECK:       bb0(%0 : $*Builtin.Int64):
+// CHECK-NEXT:    [[L:%.*]] = load [trivial] %0 : $*Builtin.Int64
+// CHECK-NEXT:    [[C:%.*]] = unchecked_trivial_bit_cast [[L]] : $Builtin.Int64 to $Int64
+// CHECK-NEXT:    return [[C]] : $Int64
+// CHECK:       } // end sil function 'trivial_load_of_addr_cast'
+sil [ossa] @trivial_load_of_addr_cast : $@convention(thin) (@inout Builtin.Int64) -> Int64 {
+bb0(%0 : $*Builtin.Int64):
+  %1 = unchecked_addr_cast %0 : $*Builtin.Int64 to $*Int64
+  %2 = load [trivial] %1 : $*Int64
+  return %2 : $Int64
+}
+
+// Different sizes: Builtin.Int64 (8 bytes) to Builtin.Int8 (1 byte) — don't optimize.
+// CHECK-LABEL: sil [ossa] @dont_trivial_load_of_addr_cast_different_sizes :
+// CHECK:         %1 = unchecked_addr_cast %0 : $*Builtin.Int64 to $*Builtin.Int8
+// CHECK:       } // end sil function 'dont_trivial_load_of_addr_cast_different_sizes'
+sil [ossa] @dont_trivial_load_of_addr_cast_different_sizes : $@convention(thin) (@inout Builtin.Int64) -> Builtin.Int8 {
+bb0(%0 : $*Builtin.Int64):
+  %1 = unchecked_addr_cast %0 : $*Builtin.Int64 to $*Builtin.Int8
+  %2 = load [trivial] %1 : $*Builtin.Int8
+  return %2 : $Builtin.Int8
+}
+
+// Non-trivial source type: class B — don't optimize.
+// CHECK-LABEL: sil [ossa] @dont_trivial_load_of_addr_cast_nontrivial_source :
+// CHECK:         %1 = unchecked_addr_cast %0 : $*B to $*Builtin.Int64
+// CHECK:       } // end sil function 'dont_trivial_load_of_addr_cast_nontrivial_source'
+sil [ossa] @dont_trivial_load_of_addr_cast_nontrivial_source : $@convention(thin) (@inout B) -> Builtin.Int64 {
+bb0(%0 : $*B):
+  %1 = unchecked_addr_cast %0 : $*B to $*Builtin.Int64
+  %2 = load [trivial] %1 : $*Builtin.Int64
+  return %2 : $Builtin.Int64
 }
 
