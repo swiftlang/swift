@@ -395,6 +395,43 @@ suite.test("InlineArray/collect-via-iterable")
   expectEqual(collected, [10, 20, 30, 40])
 }
 
+suite.test("InlineArray/collect-via-iterable-then-print")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let inline: [4 of Int] = [10, 20, 30, 40]
+  let collected = inline.collectViaBorrowing()
+  expectEqual(collected, [10, 20, 30, 40])
+  print(inline)
+}
+
+suite.test("InlineArray/collect-via-concrete-iterator")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let inline: [4 of Int] = [10, 20, 30, 40]
+  let collected = inline.collectConcrete()
+  expectEqual(collected, [10, 20, 30, 40])
+}
+
+suite.test("InlineArray/collect-via-span")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let inline: [4 of Int] = [10, 20, 30, 40]
+  let collected = inline.collectViaSpan()
+  expectEqual(collected, [10, 20, 30, 40])
+}
+
+suite.test("InlineArray/collect-via-span-generic")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let inline: [4 of Int] = [10, 20, 30, 40]
+  let collected = inline.collectViaSpanProvider()
+  expectEqual(collected, [10, 20, 30, 40])
+}
+
 suite.test("InlineArray/makeBorrowingIterator-partial")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
@@ -893,6 +930,75 @@ extension Iterable where Self: ~Copyable & ~Escapable, Element: Copyable {
     return result
   }
 }
+
+@available(SwiftStdlib 6.4, *)
+extension InlineArray where Element: Copyable {
+  func collectConcrete() -> [Element] {
+    var borrowIterator = makeBorrowingIterator()
+    withUnsafeBytes(of: &borrowIterator) { ptr in
+      print("address of borrowingIterator:", ptr)
+    }
+    var result: [Element] = []
+    while true {
+      var span = borrowIterator.nextSpan(maxCount: .max)
+      withUnsafeBytes(of: &span) { ptr in
+        print("address of span:", ptr)
+      }
+      span.withUnsafeBufferPointer { ptr in
+        print("address of span elements:", ptr.baseAddress)
+      }
+      if span.isEmpty { break }
+      for i in span.indices {
+        result.append(span[i])
+      }
+    }
+    return result
+  }
+  
+  func collectViaSpan() -> [Element] {
+    var result: [Element] = []
+    var span = self.span
+    withUnsafeBytes(of: &span) { ptr in
+      print("address of span:", ptr)
+    }
+    span.withUnsafeBufferPointer { ptr in
+      print("address of span elements:", ptr.baseAddress)
+    }
+    for i in span.indices {
+      result.append(span[i])
+    }
+    return result
+  }
+}
+
+protocol SpanProvider<Element>: ~Copyable, ~Escapable {
+  associatedtype Element: ~Copyable
+  
+  var span: Span<Element> {
+    @_lifetime(borrow self)
+    get
+  }
+}
+
+extension SpanProvider where Element: Copyable {
+  func collectViaSpanProvider() -> [Element] {
+    var result: [Element] = []
+    var span = self.span
+    withUnsafeBytes(of: &span) { ptr in
+      print("address of span:", ptr)
+    }
+    span.withUnsafeBufferPointer { ptr in
+      print("address of span elements:", ptr.baseAddress)
+    }
+    for i in span.indices {
+      result.append(span[i])
+    }
+    return result
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension InlineArray: SpanProvider where Element: ~Copyable {}
 
 @available(SwiftStdlib 6.4, *)
 extension Iterable where Self: ~Escapable & ~Copyable, Element: Equatable & ~Copyable {
