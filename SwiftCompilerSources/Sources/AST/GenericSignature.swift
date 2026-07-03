@@ -41,6 +41,12 @@ public struct GenericSignature: CustomStringConvertible, NoReflectionChildren {
   }
 }
 
+extension GenericSignature: Equatable {
+  public static func == (lhs: GenericSignature, rhs: GenericSignature) -> Bool {
+    lhs.bridged.impl == rhs.bridged.impl
+  }
+}
+
 public struct CanonicalGenericSignature {
   public let bridged: BridgedCanGenericSignature
 
@@ -52,5 +58,25 @@ public struct CanonicalGenericSignature {
 
   public var genericSignature: GenericSignature {
     GenericSignature(bridged: bridged.getGenericSignature())
+  }
+}
+
+/// The generic environment that a local (opened existential) archetype lives in.
+public struct GenericEnvironment {
+  public let bridged: BridgedGenericEnvironment
+
+  public init(bridged: BridgedGenericEnvironment) {
+    self.bridged = bridged
+  }
+
+  public var genericSignature: GenericSignature {
+    GenericSignature(bridged: bridged.getGenericSignature())
+  }
+
+  /// True if `self` and `other` have identical local-archetype requirements
+  /// (conformances, superclass, layout constraint) and can therefore be
+  /// safely remapped onto one another, e.g. by `Cloner`.
+  public func hasEqualGenericSignature(to other: GenericEnvironment) -> Bool {
+    genericSignature == other.genericSignature
   }
 }

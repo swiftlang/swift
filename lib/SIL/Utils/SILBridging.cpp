@@ -659,6 +659,14 @@ class BridgedClonerImpl : public SILCloner<BridgedClonerImpl> {
   friend class SILCloner<BridgedClonerImpl>;
 
   bool hasFixedLocation;
+
+  /// When true, operands, successor blocks, and locations/scopes are reused
+  /// unchanged (only local archetypes registered via
+  /// `registerLocalArchetypeRemapping` are remapped). Used for cloning
+  /// instructions one at a time within the same function, as opposed to
+  /// cloning a whole region.
+  bool identityMapping = false;
+
   union {
     SILDebugLocation fixedLocation;
     ScopeCloner scopeCloner;
@@ -684,12 +692,29 @@ public:
       hasFixedLocation(false),
       scopeCloner(ScopeCloner(emptyFunction)) {}
 
+  BridgedClonerImpl(SILFunction &function, bool identityMapping)
+      : SILCloner<BridgedClonerImpl>(function), hasFixedLocation(true),
+        identityMapping(identityMapping),
+        fixedLocation(ArtificialUnreachableLocation(), nullptr) {}
+
   ~BridgedClonerImpl() {
     if (hasFixedLocation) {
       fixedLocation.~SILDebugLocation();
     } else {
       scopeCloner.~ScopeCloner();
     }
+  }
+
+  SILValue getMappedValue(SILValue value) {
+    if (identityMapping)
+      return value;
+    return SILCloner<BridgedClonerImpl>::getMappedValue(value);
+  }
+
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *block) {
+    if (identityMapping)
+      return block;
+    return SILCloner<BridgedClonerImpl>::remapBasicBlock(block);
   }
 
   SILValue getClonedValue(SILValue v) {
@@ -704,12 +729,14 @@ public:
   }
 
   SILLocation remapLocation(SILLocation loc) {
-    if (hasFixedLocation)
-      return fixedLocation.getLocation();
-    return loc;
+    if (identityMapping || !hasFixedLocation)
+      return loc;
+    return fixedLocation.getLocation();
   }
 
   const SILDebugScope *remapScope(const SILDebugScope *DS) {
+    if (identityMapping)
+      return DS;
     if (hasFixedLocation)
       return fixedLocation.getScope();
     return scopeCloner.getOrCreateClonedScope(DS);
@@ -765,6 +792,13 @@ BridgedCloner::BridgedCloner(BridgedFunction emptyFunction, BridgedContext conte
   context.context->notifyNewCloner();
 }
 
+BridgedCloner::BridgedCloner(BridgedFunction function, BridgedContext context,
+                             bool forLocalArchetypeRemapping)
+    : cloner(new BridgedClonerImpl(*function.getFunction(),
+                                   forLocalArchetypeRemapping)) {
+  context.context->notifyNewCloner();
+}
+
 void BridgedCloner::destroy(BridgedContext context) {
   delete cloner;
   cloner = nullptr;
@@ -798,6 +832,19 @@ BridgedInstruction BridgedCloner::clone(BridgedInstruction inst) const {
 void BridgedCloner::setInsertionBlockIfNotSet(BridgedBasicBlock block) const {
   if (!cloner->getBuilder().hasValidInsertionPoint())
     cloner->getBuilder().setInsertionPoint(block.unbridged());
+}
+
+void BridgedCloner::setInsertionPoint(BridgedInstruction beforeInst) const {
+  cloner->getBuilder().setInsertionPoint(beforeInst.unbridged());
+}
+
+void BridgedCloner::registerLocalArchetypeRemapping(
+    BridgedGenericEnvironment from, BridgedGenericEnvironment to) const {
+  cloner->registerLocalArchetypeRemapping(from.unbridged(), to.unbridged());
+}
+
+BridgedType BridgedCloner::getOpType(BridgedType type) const {
+  return cloner->getOpType(type.unbridged());
 }
 
 BridgedBasicBlock BridgedCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
