@@ -1,10 +1,14 @@
-// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 
 class C {}
+
+struct S {
+  let c: C
+}
 
 enum FakeOptional<T> {
 case none
@@ -71,3 +75,223 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+sil @make_c : $@convention(thin) (@guaranteed C) -> @owned C
+
+sil @write_to_addr : $@convention(thin) (@inout C) -> ()
+
+// CHECK-LABEL: sil [ossa] @extend_begin_borrow :
+// CHECK:         %1 = begin_borrow %0
+// CHECK:         %3 = apply
+// CHECK:         %4 = tuple ()
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    destroy_value %3
+// CHECK:       } // end sil function 'extend_begin_borrow'
+sil [ossa] @extend_begin_borrow : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "extend_borrow_scope %1 %3 true"
+  %1 = begin_borrow %0
+  %2 = function_ref @make_c : $@convention(thin) (@guaranteed C) -> @owned C
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> @owned C
+  end_borrow %1
+  %4 = tuple ()
+  destroy_value %3
+  destroy_value %0
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @no_extend_needed :
+// CHECK:         destroy_value %3
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       } // end sil function 'no_extend_needed'
+sil [ossa] @no_extend_needed : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "extend_borrow_scope %1 %3 true"
+  %1 = begin_borrow %0
+  %2 = function_ref @make_c : $@convention(thin) (@guaranteed C) -> @owned C
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> @owned C
+  destroy_value %3
+  end_borrow %1
+  destroy_value %0
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @extend_begin_borrow_fail :
+// CHECK:         end_borrow %1
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value %3
+// CHECK:       } // end sil function 'extend_begin_borrow_fail'
+sil [ossa] @extend_begin_borrow_fail : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "extend_borrow_scope %1 %3 false"
+  %1 = begin_borrow %0
+  %2 = function_ref @make_c : $@convention(thin) (@guaranteed C) -> @owned C
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> @owned C
+  end_borrow %1
+  destroy_value %0
+  destroy_value %3
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @extend_function_arg :
+// CHECK:       } // end sil function 'extend_function_arg'
+sil [ossa] @extend_function_arg : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  specify_test "extend_borrow_scope %0 %2 true"
+  %1 = function_ref @make_c : $@convention(thin) (@guaranteed C) -> @owned C
+  %2 = apply %1(%0) : $@convention(thin) (@guaranteed C) -> @owned C
+  destroy_value %2
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @extend_load_borrow :
+// CHECK:         %1 = load_borrow %0
+// CHECK:         %3 = apply
+// CHECK:         %4 = tuple ()
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    destroy_value %3
+// CHECK:       } // end sil function 'extend_load_borrow'
+sil [ossa] @extend_load_borrow : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  specify_test "extend_borrow_scope %1 %3 true"
+  %1 = load_borrow %0
+  %2 = function_ref @make_c : $@convention(thin) (@guaranteed C) -> @owned C
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> @owned C
+  end_borrow %1
+  %4 = tuple ()
+  destroy_value %3
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @extend_load_borrow_fail :
+// CHECK:         apply 
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       } // end sil function 'extend_load_borrow_fail'
+sil [ossa] @extend_load_borrow_fail : $@convention(thin) (@inout C) -> () {
+bb0(%0 : $*C):
+  specify_test "extend_borrow_scope %1 %3 false"
+  %1 = load_borrow %0
+  %2 = function_ref @make_c : $@convention(thin) (@guaranteed C) -> @owned C
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> @owned C
+  end_borrow %1
+  %4 = function_ref @write_to_addr : $@convention(thin) (@inout C) -> ()
+  apply %4(%0) : $@convention(thin) (@inout C) -> ()
+  destroy_value %3
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @dont_extend_nested_borrow_scopes :
+// CHECK:       } // end sil function 'dont_extend_nested_borrow_scopes'
+sil [ossa] @dont_extend_nested_borrow_scopes : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  specify_test "extend_borrow_scope %3 %5 false"
+  %1 = begin_borrow %0
+  %2 = struct $S (%1)
+  %3 = begin_borrow %2
+  %5 = apply undef(%3) : $@convention(thin) (@guaranteed S) -> @owned C
+  end_borrow %3
+  end_borrow %1
+  %7 = tuple ()
+  destroy_value %5
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @extend_begin_borrow_multi_block1 :
+// CHECK:       bb1:
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    destroy_value %3
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %3
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       } // end sil function 'extend_begin_borrow_multi_block1'
+sil [ossa] @extend_begin_borrow_multi_block1 : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "extend_borrow_scope %1 %3 true"
+  %1 = begin_borrow %0
+  %2 = function_ref @make_c : $@convention(thin) (@guaranteed C) -> @owned C
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> @owned C
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %1
+  debug_step
+  destroy_value %3
+  br bb3
+
+bb2:
+  destroy_value %3
+  end_borrow %1
+  br bb3
+
+bb3:
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @extend_begin_borrow_multi_block2 :
+// CHECK:       bb1:
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    destroy_value %3
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    destroy_value %3
+// CHECK:       } // end sil function 'extend_begin_borrow_multi_block2'
+sil [ossa] @extend_begin_borrow_multi_block2 : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "extend_borrow_scope %1 %3 true"
+  %1 = begin_borrow %0
+  %2 = function_ref @make_c : $@convention(thin) (@guaranteed C) -> @owned C
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> @owned C
+  end_borrow %1
+  cond_br undef, bb1, bb2
+
+bb1:
+  debug_step
+  destroy_value %3
+  br bb3
+
+bb2:
+  destroy_value %3
+  br bb3
+
+bb3:
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @extend_begin_borrow_multi_block_with_liverange_exit :
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    fix_lifetime %2
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       } // end sil function 'extend_begin_borrow_multi_block_with_liverange_exit'
+sil [ossa] @extend_begin_borrow_multi_block_with_liverange_exit : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "extend_borrow_scope %1 %2 true"
+  %1 = begin_borrow %0
+  %2 = integer_literal $Builtin.Int32, 0
+  end_borrow %1
+  cond_br undef, bb1, bb2
+
+bb1:
+  fix_lifetime %2
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
