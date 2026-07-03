@@ -3,17 +3,19 @@
 // Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 
-// RUN: %enable-cow-checking %target-run-simple-swift
-// REQUIRES: executable_test
-// REQUIRES: optimized_stdlib
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 
 
-let tests = TestSuite("Array_MutableRandomAccessCollectionVal")
+let tests = TestSuite("ArraySliceWithNonZeroStartIndex_MutableRandomAccessCollectionVal")
 
 
+func ArraySliceWithNonZeroStartIndex<T>(_ elements: [T]) -> ArraySlice<T> {
+  var r = ArraySlice<T>(_startIndex: 1000)
+  r.append(contentsOf: elements)
+  expectEqual(1000, r.startIndex)
+  return r
+}
 
 do {
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
@@ -22,19 +24,19 @@ do {
 
   // Test MutableCollectionType conformance with value type elements.
   tests.addMutableRandomAccessCollectionTests(
-    "Array.",
+    "ArraySliceWithNonZeroStartIndex.",
     makeCollection: { (elements: [OpaqueValue<Int>]) in
-      return Array(elements)
+      return ArraySliceWithNonZeroStartIndex(elements)
     },
     wrapValue: identity,
     extractValue: identity,
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-      return Array(elements)
+      return ArraySliceWithNonZeroStartIndex(elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
     makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
-      return Array(elements)
+      return ArraySliceWithNonZeroStartIndex(elements)
     },
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
@@ -46,4 +48,3 @@ do {
 } // do
 
 runAllTests()
-

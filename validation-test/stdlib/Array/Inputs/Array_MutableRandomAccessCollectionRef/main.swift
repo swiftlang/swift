@@ -3,44 +3,40 @@
 // Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 
-// RUN: %enable-cow-checking %target-run-simple-swift
-// REQUIRES: executable_test
-// REQUIRES: optimized_stdlib
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 
 
-let tests = TestSuite("ArraySliceWithNonZeroStartIndex_MutableRandomAccessCollectionVal")
+let tests = TestSuite("Array_MutableRandomAccessCollectionRef")
 
 
-func ArraySliceWithNonZeroStartIndex<T>(_ elements: [T]) -> ArraySlice<T> {
-  var r = ArraySlice<T>(_startIndex: 1000)
-  r.append(contentsOf: elements)
-  expectEqual(1000, r.startIndex)
-  return r
-}
 
 do {
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .none
 
 
-  // Test MutableCollectionType conformance with value type elements.
+  // Test MutableCollectionType conformance with reference type elements.
   tests.addMutableRandomAccessCollectionTests(
-    "ArraySliceWithNonZeroStartIndex.",
-    makeCollection: { (elements: [OpaqueValue<Int>]) in
-      return ArraySliceWithNonZeroStartIndex(elements)
+    "Array.",
+    makeCollection: { (elements: [LifetimeTracked]) in
+      return Array(elements)
     },
-    wrapValue: identity,
-    extractValue: identity,
+    wrapValue: { (element: OpaqueValue<Int>) in
+      LifetimeTracked(element.value, identity: element.identity)
+    },
+    extractValue: { (element: LifetimeTracked) in
+      OpaqueValue(element.value, identity: element.identity)
+    },
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-      return ArraySliceWithNonZeroStartIndex(elements)
+      // FIXME: use LifetimeTracked.
+      return Array(elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
     makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
-      return ArraySliceWithNonZeroStartIndex(elements)
+      // FIXME: use LifetimeTracked.
+      return Array(elements)
     },
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
@@ -52,4 +48,3 @@ do {
 } // do
 
 runAllTests()
-

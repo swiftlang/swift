@@ -3,15 +3,11 @@
 // Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 
-// RUN: %enable-cow-checking %target-run-simple-swift
-// REQUIRES: executable_test
-// REQUIRES: optimized_stdlib
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 
 
-let tests = TestSuite("ArraySlice_MutableRandomAccessCollectionVal")
+let tests = TestSuite("Array_MutableRandomAccessCollectionVal")
 
 
 
@@ -22,19 +18,19 @@ do {
 
   // Test MutableCollectionType conformance with value type elements.
   tests.addMutableRandomAccessCollectionTests(
-    "ArraySlice.",
+    "Array.",
     makeCollection: { (elements: [OpaqueValue<Int>]) in
-      return ArraySlice(elements)
+      return Array(elements)
     },
     wrapValue: identity,
     extractValue: identity,
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-      return ArraySlice(elements)
+      return Array(elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
     makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
-      return ArraySlice(elements)
+      return Array(elements)
     },
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
@@ -46,4 +42,3 @@ do {
 } // do
 
 runAllTests()
-

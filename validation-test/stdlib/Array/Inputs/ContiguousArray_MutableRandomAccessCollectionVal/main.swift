@@ -3,15 +3,11 @@
 // Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 
-// RUN: %enable-cow-checking %target-run-simple-swift
-// REQUIRES: executable_test
-// REQUIRES: optimized_stdlib
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 
 
-let tests = TestSuite("ArraySlice_MutableRandomAccessCollectionRef")
+let tests = TestSuite("ContiguousArray_MutableRandomAccessCollectionVal")
 
 
 
@@ -20,27 +16,21 @@ do {
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .none
 
 
-  // Test MutableCollectionType conformance with reference type elements.
+  // Test MutableCollectionType conformance with value type elements.
   tests.addMutableRandomAccessCollectionTests(
-    "ArraySlice.",
-    makeCollection: { (elements: [LifetimeTracked]) in
-      return ArraySlice(elements)
+    "ContiguousArray.",
+    makeCollection: { (elements: [OpaqueValue<Int>]) in
+      return ContiguousArray(elements)
     },
-    wrapValue: { (element: OpaqueValue<Int>) in
-      LifetimeTracked(element.value, identity: element.identity)
-    },
-    extractValue: { (element: LifetimeTracked) in
-      OpaqueValue(element.value, identity: element.identity)
-    },
+    wrapValue: identity,
+    extractValue: identity,
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-      // FIXME: use LifetimeTracked.
-      return ArraySlice(elements)
+      return ContiguousArray(elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
     makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
-      // FIXME: use LifetimeTracked.
-      return ArraySlice(elements)
+      return ContiguousArray(elements)
     },
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
@@ -52,4 +42,3 @@ do {
 } // do
 
 runAllTests()
-
