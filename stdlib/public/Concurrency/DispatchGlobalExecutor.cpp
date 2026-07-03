@@ -71,14 +71,24 @@ static constexpr dispatch_qos_class_t DispatchQOSClassUtility
   = (dispatch_qos_class_t)0x11;
 static constexpr dispatch_qos_class_t DispatchQOSClassBackground
   = (dispatch_qos_class_t)0x09;
-/* static constexpr dispatch_qos_class_t DispatchQOSClassUnspecified
-  = (dispatch_qos_class_t)0x00;
-*/
 
 static constexpr size_t DispatchQOSClassCount = 5;
 
-static inline int cacheIndexForQOS(dispatch_qos_class_t priority) {
-  switch (priority) {
+static inline dispatch_qos_class_t qosClassFromPriority(SwiftJobPriority priority) {
+  if (priority > SwiftUserInitiatedJobPriority)
+    return DispatchQOSClassUserInteractive;
+  else if (priority > SwiftDefaultJobPriority)
+    return DispatchQOSClassUserInitiated;
+  else if (priority > SwiftUtilityJobPriority)
+    return DispatchQOSClassDefault;
+  else if (priority > SwiftBackgroundJobPriority)
+    return DispatchQOSClassUtility;
+  else
+    return DispatchQOSClassBackground;
+}
+
+static inline size_t cacheIndexForQOS(dispatch_qos_class_t qos) {
+  switch (qos) {
   case DispatchQOSClassUserInteractive:
     return 0;
   case DispatchQOSClassUserInitiated:
@@ -92,19 +102,6 @@ static inline int cacheIndexForQOS(dispatch_qos_class_t priority) {
   default:
     return 2; /* Return DispatchQOSClassDefault index */
   }
-}
-
-static inline dispatch_qos_class_t qosClassFromPriority(size_t priority) {
-  if (priority > DispatchQOSClassUserInitiated)
-    return DispatchQOSClassUserInteractive;
-  else if (priority > DispatchQOSClassDefault)
-    return DispatchQOSClassUserInitiated;
-  else if (priority > DispatchQOSClassUtility)
-    return DispatchQOSClassDefault;
-  else if (priority > DispatchQOSClassBackground)
-    return DispatchQOSClassUtility;
-  else
-    return DispatchQOSClassBackground;
 }
 
 /// The function passed to dispatch_async_f to execute a job.
@@ -189,11 +186,11 @@ extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
 #endif
 
 static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
-  // Map an arbitrary priority value to a predefined
-  // `dispatch_qos_class_t` value.
+  // Map an arbitrary priority value to an appropriate
+  // `dispatch_qos_class_t` constant.
   auto qos = qosClassFromPriority(priority);
 
-  // Map `dispatch_qos_class_t` value to a cache index.
+  // Map `dispatch_qos_class_t` to its corresponding cache index.
   auto qosIndex = cacheIndexForQOS(qos);
 
 #ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
