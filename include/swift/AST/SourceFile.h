@@ -298,6 +298,9 @@ public:
     Items->clear();
     Items->insert(Items->begin(), items.begin(), items.end());
   }
+  /// Clear the top-level items, resetting to the un-parsed state.
+  /// Used by AST cache fallback when a cache load fails mid-module.
+  void clearTopLevelItems() { Items.reset(); }
 
   /// Retrieves an immutable view of the list of top-level decls in this file.
   ///
