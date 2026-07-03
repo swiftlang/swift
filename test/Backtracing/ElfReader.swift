@@ -7,6 +7,7 @@
 
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: backtracing
+// REQUIRES: executable_test
 
 @_spi(ElfTest) import Runtime
 #if canImport(Darwin)
