@@ -26,6 +26,8 @@ sil_scope 2 { loc "test.swift":10:1 parent @test_salvage_tuple_element_addr : $@
 sil_scope 3 { loc "test.swift":20:1 parent @test_salvage_ref_element_addr : $@convention(thin) (@guaranteed MyClass) -> () }
 sil_scope 4 { loc "test.swift":30:1 parent @test_salvage_vector_base_addr : $@convention(thin) (@in_guaranteed Builtin.FixedArray<4, Int64>) -> () }
 sil_scope 5 { loc "test.swift":40:1 parent @test_salvage_ref_tail_addr : $@convention(thin) (@guaranteed MyClass) -> () }
+sil_scope 6 { loc "test.swift":50:1 parent @test_salvage_index_addr : $@convention(thin) (@in_guaranteed Int64) -> () }
+sil_scope 7 { loc "test.swift":60:1 parent @test_salvage_index_raw_pointer : $@convention(thin) (Builtin.RawPointer) -> () }
 
 // CHECK-LABEL: sil @test_salvage_struct_element_addr
 // CHECK:       bb0([[ADDR:%[0-9]+]] : $*MyStruct):
@@ -113,6 +115,45 @@ sil @test_salvage_ref_tail_addr : $@convention(thin) (@guaranteed MyClass) -> ()
 bb0(%0 : $MyClass):
   %1 = ref_tail_addr %0 : $MyClass, $Int64
   debug_value %1 : $*Int64, let, name "tail_elt", expr op_deref, loc "test.swift":40:1, scope 5
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_salvage_index_addr
+// CHECK:       bb0(%0 : $*Int64):
+// CHECK:         debug_value %0 : $*Int64, let, name "elt2", transform {
+// CHECK:           bb0(%0 : $*Int64):
+// CHECK:             %1 = integer_literal $Builtin.Word, 2
+// CHECK:             %2 = index_addr %0 : $*Int64, %1 : $Builtin.Word
+// CHECK:             %3 = load %2 : $*Int64
+// CHECK:             return %3 : $Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_salvage_index_addr'
+sil @test_salvage_index_addr : $@convention(thin) (@in_guaranteed Int64) -> () {
+bb0(%0 : $*Int64):
+  %idx = integer_literal $Builtin.Word, 2
+  %1 = index_addr %0 : $*Int64, %idx : $Builtin.Word
+  debug_value %1 : $*Int64, let, name "elt2", expr op_deref, loc "test.swift":50:1, scope 6
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_salvage_index_raw_pointer
+// CHECK:       bb0(%0 : $Builtin.RawPointer):
+// CHECK:         debug_value %0 : $Builtin.RawPointer, let, name "offset_ptr", transform {
+// CHECK:           bb0(%0 : $Builtin.RawPointer):
+// CHECK:             %1 = integer_literal $Builtin.Word, 8
+// CHECK:             %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
+// CHECK:             return %2 : $Builtin.RawPointer
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_salvage_index_raw_pointer'
+sil @test_salvage_index_raw_pointer : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %idx = integer_literal $Builtin.Word, 8
+  %1 = index_raw_pointer %0 : $Builtin.RawPointer, %idx : $Builtin.Word
+  debug_value %1 : $Builtin.RawPointer, let, name "offset_ptr", loc "test.swift":60:1, scope 7
   %r = tuple ()
   return %r : $()
 }
