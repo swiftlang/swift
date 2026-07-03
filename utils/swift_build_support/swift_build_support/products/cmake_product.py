@@ -23,6 +23,13 @@ class CMakeProduct(product.Product):
     def is_verbose(self):
         return self.args.verbose_build
 
+    @staticmethod
+    def write_cmake_file_api_query(build_dir):
+        query_dir = os.path.join(build_dir, ".cmake", "api", "v1", "query")
+        os.makedirs(query_dir, exist_ok=True)
+        open(os.path.join(query_dir, "codemodel-v2"), "a").close()
+        open(os.path.join(query_dir, "cache-v2"), "a").close()
+
     def build_with_cmake(self, build_targets, build_type, build_args,
                          prefer_native_toolchain=False, 
                          ignore_extra_cmake_options=False, build_llvm=True):
@@ -52,11 +59,7 @@ class CMakeProduct(product.Product):
                 os.makedirs(self.build_dir)
 
             # Use `cmake-file-api` in case it is available.
-            query_dir = os.path.join(self.build_dir, ".cmake", "api", "v1", "query")
-            if not os.path.exists(query_dir):
-                os.makedirs(query_dir)
-            open(os.path.join(query_dir, "codemodel-v2"), 'a').close()
-            open(os.path.join(query_dir, "cache-v2"), 'a').close()
+            self.write_cmake_file_api_query(self.build_dir)
 
             env = None
             if self.toolchain.distcc:
