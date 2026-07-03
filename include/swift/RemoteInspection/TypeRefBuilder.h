@@ -33,6 +33,7 @@
 #include <ostream>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace swift {
@@ -259,6 +260,8 @@ struct ReflectionInfo {
   AssociatedTypeSection AssociatedType;
   BuiltinTypeSection Builtin;
   CaptureSection Capture;
+  GenericSection TypeMetadata;
+  GenericSection TypeMetadata2;
   GenericSection TypeReference;
   GenericSection ReflectionString;
   GenericSection Conformance;
@@ -831,6 +834,296 @@ public:
 
     template <template <typename Runtime> class ObjCInteropKind,
               unsigned PointerSize>
+    void dumpTypeMetadataSection(std::ostream &stream) {
+      using Runtime = External<RuntimeTarget<PointerSize>>;
+      using Record = TargetTypeMetadataRecord<Runtime>;
+
+      // Sometimes the compiler emits multiple records pointing to the same
+      // descriptor. Track what we've seen in a set and don't dump the same
+      // thing more than once.
+      std::unordered_set<uint64_t> dumpedDescriptors;
+
+      for (const auto &reflectionInfo : ReflectionInfos) {
+        for (const auto &section :
+             {reflectionInfo.TypeMetadata, reflectionInfo.TypeMetadata2}) {
+          if (section.size() == 0)
+            break;
+
+          auto begin = section.startAddress();
+          auto end = section.endAddress();
+
+          auto size = end.getAddressData() - begin.getAddressData();
+          if (size % sizeof(Record) != 0) {
+            stream << "Typeref section size " << size
+                   << " is not evenly divisible by record size "
+                   << sizeof(Record) << " - section is invalid.\n";
+            break;
+          }
+
+          for (auto addr = begin; addr != end;
+               addr = addr.atByteOffset(sizeof(Record))) {
+            auto index = (addr.getAddressData() - begin.getAddressData()) /
+                         sizeof(Record);
+            auto *record =
+                reinterpret_cast<const Record *>(addr.getLocalBuffer());
+
+            // The record may be a direct or indirect relative pointer. Resolve
+            // the address from the record.
+            remote::RemoteAddress descriptorAddress{nullptr};
+            if (auto *directPtr = record->getDirectPointer()) {
+              descriptorAddress = remote::RemoteAddress(
+                  addr.atByteOffset(directPtr->getOffset()).getAddressData());
+            } else if (auto indirectPtr = record->getIndirectPointer()) {
+              // We won't try to handle indirect pointers. They'll point to
+              // descriptors in other images and we don't care to dump those.
+              // They'll be included in that image's types if we dump that
+              // image's types directly.
+              continue;
+            }
+
+            if (!descriptorAddress) {
+              stream << "Unable to resolve descriptor at index " << index
+                     << ".\n";
+              continue;
+            }
+
+            // Check if we've seen it already.
+            if (dumpedDescriptors.find(descriptorAddress.getAddressData()) !=
+                dumpedDescriptors.end())
+              continue;
+            dumpedDescriptors.insert(descriptorAddress.getAddressData());
+
+            // Dump the descriptor we found.
+            dumpContextDescriptor<ObjCInteropKind, PointerSize>(
+                descriptorAddress, index, stream);
+          }
+        }
+      }
+    }
+
+    template <template <typename Runtime> class ObjCInteropKind,
+              unsigned PointerSize>
+    void dumpContextDescriptor(remote::RemoteAddress descriptorAddress,
+                               unsigned index, std::ostream &stream) {
+      using Runtime = External<ObjCInteropKind<RuntimeTarget<PointerSize>>>;
+
+      // Read the flags to find out what kind of thing this is.
+      auto result = Builder.OpaqueByteReader(descriptorAddress,
+                                             sizeof(ContextDescriptorFlags));
+      if (!result) {
+        stream << "Unable to read descriptor flags at index " << index
+               << ", descriptor address 0x" << std::hex
+               << descriptorAddress.getAddressData() << ".\n\n";
+        return;
+      }
+      auto flagsPtr = result.get();
+      auto flags = *reinterpret_cast<const ContextDescriptorFlags *>(flagsPtr);
+
+      // Helper to read trailing objects. Returns a unique_ptr<void> and a raw
+      // pointer matching the type of `start` whose lifetime is tied to the
+      // unique_ptr.
+      auto readTrailingObjects = [&](const auto *start, unsigned count) {
+        auto size = count * sizeof(*start);
+        auto delta = (uint64_t)start - (uint64_t)flagsPtr;
+        auto address = descriptorAddress.getAddressData() + delta;
+        auto result =
+            Builder.OpaqueByteReader(remote::RemoteAddress(address), size);
+        auto resultPtr = reinterpret_cast<decltype(start)>(result.get());
+        return std::make_pair(std::move(result), resultPtr);
+      };
+
+      auto nameReader =
+          QualifiedContextNameReader<ObjCInteropKind, PointerSize>(
+              Builder.OpaqueByteReader, Builder.OpaqueStringReader,
+              Builder.OpaquePointerReader, Builder.OpaqueDynamicSymbolResolver);
+      std::string name = "<unable to read name>";
+      auto maybeName = nameReader.readFullyQualifiedTypeName(
+          descriptorAddress.getAddressData());
+      if (maybeName)
+        name = *maybeName;
+
+      // Helper for dumping generic contexts.
+      auto dumpGenericContext = [&](auto descriptor) {
+        if (!descriptor->isGeneric())
+          return;
+
+        auto &genericContextInitial = descriptor->getFullGenericContextHeader();
+        auto [ptr, genericContext] =
+            readTrailingObjects(&genericContextInitial, 1);
+        if (!genericContext) {
+          stream << "  Unable to read generic context.\n";
+          return;
+        }
+
+        stream << "  generic parameters: " << genericContext->Base.NumParams
+               << "\n";
+        stream << "  generic requirements: "
+               << genericContext->Base.NumRequirements << "\n";
+        stream << "  key arguments: " << genericContext->Base.NumKeyArguments
+               << "\n";
+        if (genericContext->Base.Flags.hasTypePacks())
+          stream << "  has type packs: true\n";
+        if (genericContext->Base.Flags.hasConditionalInvertedProtocols())
+          stream << "  has conditional inverted protocols: true\n";
+      };
+
+      // Helper for dumping inverted protocols.
+      auto dumpInvertedProtocols = [&](auto descriptor) {
+        if (!descriptor->hasInvertibleProtocols())
+          return;
+
+        const InvertibleProtocolSet &protosInitial =
+            descriptor->getInvertedProtocols();
+        auto [ptr, protos] = readTrailingObjects(&protosInitial, 1);
+        if (!protos) {
+          stream << "  Unable to read invertible protocols.\n";
+          return;
+        }
+
+        stream << "  invertible protocols: ";
+
+        bool didPrint = false;
+#define INVERTIBLE_PROTOCOL(Name, Bit)                                         \
+  if (protos->contains##Name()) {                                              \
+    if (didPrint)                                                              \
+      stream << ", ";                                                          \
+    didPrint = true;                                                           \
+    stream << "~" << #Name;                                                    \
+  }
+#include "swift/ABI/InvertibleProtocols.def"
+        if (protos->hasUnknownProtocols()) {
+          if (didPrint)
+            stream << ", ";
+          stream << "and unknown protocols, raw bits 0x" << std::hex
+                 << protos->rawBits();
+        }
+        stream << "\n";
+      };
+
+      // Helper for dumping initialization info.
+      auto dumpInitialization = [&](auto descriptor) {
+        if (descriptor->hasForeignMetadataInitialization())
+          stream << "  has foreign metadata initialization: true\n";
+        if (descriptor->hasSingletonMetadataInitialization())
+          stream << "  has singleton metadata initialization: true\n";
+      };
+
+      // Helper for dumping canonical prespecializations.
+      auto dumpCanonicalMetadataPrespecializations = [&](auto descriptor) {
+        if (!descriptor->hasCanonicalMetadataPrespecializations())
+          return;
+
+        auto &countInitial =
+            descriptor->getCanonicalMetadataPrespecializationsCount();
+        auto [ptr, countPtr] = readTrailingObjects(&countInitial, 1);
+        stream << "  canonical metadata prespecializations: " << countPtr->count
+               << "\n";
+      };
+
+      // Get the descriptor kind and dump the contents accordingly.
+      switch (auto kind = flags.getKind()) {
+      case ContextDescriptorKind::Class: {
+        stream << "class " << name << ":\n";
+
+        using Descriptor = TargetClassDescriptor<Runtime>;
+        auto result =
+            Builder.OpaqueByteReader(descriptorAddress, sizeof(Descriptor));
+        if (!result) {
+          stream << "  Unable to read class descriptor.\n";
+          return;
+        }
+
+        auto descriptor = reinterpret_cast<const Descriptor *>(result.get());
+
+        if (descriptor->SuperclassType) {
+          auto superclassTypeFieldOffset =
+              (uint64_t)&descriptor->SuperclassType - (uint64_t)descriptor;
+          auto superclassTypeFieldAddress =
+              descriptorAddress.getAddressData() + superclassTypeFieldOffset;
+          auto superclassTypeAddress =
+              superclassTypeFieldAddress +
+              (uint64_t)(int64_t)descriptor->SuperclassType;
+          auto superclassTypeRef = readTypeRef(superclassTypeAddress);
+          auto demangled = Builder.demangleTypeRef(superclassTypeRef);
+          auto name = Demangle::nodeToString(demangled);
+          stream << "  superclass: " << name << "\n";
+        }
+
+        stream << "  immediate members: " << descriptor->NumImmediateMembers
+               << "\n";
+        stream << "  fields: " << descriptor->NumFields << "\n";
+        if (descriptor->isActor())
+          stream << "  is actor: true\n";
+        if (descriptor->isDefaultActor())
+          stream << "  is default actor: true\n";
+        if (descriptor->hasVTable())
+          stream << "  has vtable: true\n";
+        if (descriptor->hasOverrideTable())
+          stream << "  has override table: true\n";
+        if (descriptor->hasResilientSuperclass())
+          stream << "  has resilient superclass: true\n";
+        dumpGenericContext(descriptor);
+        dumpInvertedProtocols(descriptor);
+        dumpInitialization(descriptor);
+        dumpCanonicalMetadataPrespecializations(descriptor);
+
+        break;
+      }
+
+      case ContextDescriptorKind::Enum: {
+        stream << "enum " << name << ":\n";
+
+        using Descriptor = TargetEnumDescriptor<Runtime>;
+        auto result =
+            Builder.OpaqueByteReader(descriptorAddress, sizeof(Descriptor));
+        if (!result) {
+          stream << "  Unable to read enum descriptor.\n";
+          return;
+        }
+
+        auto descriptor = reinterpret_cast<const Descriptor *>(result.get());
+
+        stream << "  payload cases: " << descriptor->getNumPayloadCases()
+               << "\n";
+        stream << "  empty cases: " << descriptor->getNumEmptyCases() << "\n";
+        dumpGenericContext(descriptor);
+        dumpInvertedProtocols(descriptor);
+        dumpInitialization(descriptor);
+        dumpCanonicalMetadataPrespecializations(descriptor);
+        break;
+      }
+
+      case ContextDescriptorKind::Struct: {
+        stream << "struct " << name << ":\n";
+
+        using Descriptor = TargetStructDescriptor<Runtime>;
+        auto result =
+            Builder.OpaqueByteReader(descriptorAddress, sizeof(Descriptor));
+        if (!result) {
+          stream << "  Unable to read enum descriptor.\n";
+          return;
+        }
+
+        auto descriptor = reinterpret_cast<const Descriptor *>(result.get());
+
+        stream << "  fields: " << descriptor->NumFields << "\n";
+        dumpGenericContext(descriptor);
+        dumpInvertedProtocols(descriptor);
+        dumpInitialization(descriptor);
+        dumpCanonicalMetadataPrespecializations(descriptor);
+        break;
+      }
+
+      default:
+        stream << "unhandled kind " << (unsigned)kind << " " << name << ".\n";
+        break;
+      }
+
+      stream << "\n";
+    }
+
+    template <template <typename Runtime> class ObjCInteropKind,
+              unsigned PointerSize>
     void dumpAllSections(std::ostream &stream) {
       stream << "FIELDS:\n";
       stream << "=======\n";
@@ -855,6 +1148,10 @@ public:
       stream << "MULTI-PAYLOAD ENUM DESCRIPTORS:\n";
       stream << "===============================\n";
       dumpMultiPayloadEnumSection(stream);
+      stream << "\n";
+      stream << "TYPES:\n";
+      stream << "===============================\n";
+      dumpTypeMetadataSection<ObjCInteropKind, PointerSize>(stream);
       stream << "\n";
     }
   };

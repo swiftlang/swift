@@ -360,6 +360,10 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::builtin));
     auto CaptureSec = findMachOSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::capture));
+    auto TypeMdSec = findMachOSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::typemd));
+    auto TypeMd2Sec = findMachOSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::typemd2));
     auto TypeRefMdSec = findMachOSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref));
     auto ReflStrMdSec = findMachOSectionByName(
@@ -373,6 +377,8 @@ public:
         AssocTySec.first == nullptr &&
         BuiltinTySec.first == nullptr &&
         CaptureSec.first == nullptr &&
+        TypeMdSec.first == nullptr &&
+        TypeMd2Sec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
         ConformMdSec.first == nullptr &&
@@ -383,6 +389,8 @@ public:
                            {AssocTySec.first, AssocTySec.second},
                            {BuiltinTySec.first, BuiltinTySec.second},
                            {CaptureSec.first, CaptureSec.second},
+                           {TypeMdSec.first, TypeMdSec.second},
+                           {TypeMd2Sec.first, TypeMd2Sec.second},
                            {TypeRefMdSec.first, TypeRefMdSec.second},
                            {ReflStrMdSec.first, ReflStrMdSec.second},
                            {ConformMdSec.first, ConformMdSec.second},
@@ -482,6 +490,10 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::builtin));
     auto CaptureSec = findCOFFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::capture));
+    auto TypeMdSec = findCOFFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::typemd));
+    auto TypeMd2Sec = findCOFFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::typemd2));
     auto TypeRefMdSec = findCOFFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref));
     auto ReflStrMdSec = findCOFFSectionByName(
@@ -495,6 +507,8 @@ public:
         AssocTySec.first == nullptr &&
         BuiltinTySec.first == nullptr &&
         CaptureSec.first == nullptr &&
+        TypeMdSec.first == nullptr &&
+        TypeMd2Sec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
         ConformMdSec.first == nullptr &&
@@ -505,6 +519,8 @@ public:
                            {AssocTySec.first, AssocTySec.second},
                            {BuiltinTySec.first, BuiltinTySec.second},
                            {CaptureSec.first, CaptureSec.second},
+                           {TypeMdSec.first, TypeMdSec.second},
+                           {TypeMd2Sec.first, TypeMd2Sec.second},
                            {TypeRefMdSec.first, TypeRefMdSec.second},
                            {ReflStrMdSec.first, ReflStrMdSec.second},
                            {ConformMdSec.first, ConformMdSec.second},
@@ -719,6 +735,10 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::builtin), true);
     auto CaptureSec = findELFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::capture), true);
+    auto TypeMdSec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::typemd), true);
+    auto TypeMd2Sec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::typemd2), true);
     auto TypeRefMdSec = findELFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref), true);
     auto ReflStrMdSec = findELFSectionByName(
@@ -736,12 +756,15 @@ public:
     // We succeed if at least one of the sections is present in the
     // ELF executable.
     if (FieldMdSec.first || AssocTySec.first || BuiltinTySec.first ||
-        CaptureSec.first || TypeRefMdSec.first || ReflStrMdSec.first ||
-        ConformMdSec.first || MPEnumMdSec.first) {
+        CaptureSec.first || TypeMdSec.first || TypeMd2Sec.first ||
+        TypeRefMdSec.first || ReflStrMdSec.first || ConformMdSec.first ||
+        MPEnumMdSec.first) {
       ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
                              {AssocTySec.first, AssocTySec.second},
                              {BuiltinTySec.first, BuiltinTySec.second},
                              {CaptureSec.first, CaptureSec.second},
+                             {TypeMdSec.first, TypeMdSec.second},
+                             {TypeMd2Sec.first, TypeMd2Sec.second},
                              {TypeRefMdSec.first, TypeRefMdSec.second},
                              {ReflStrMdSec.first, ReflStrMdSec.second},
                              {ConformMdSec.first, ConformMdSec.second},
@@ -762,6 +785,10 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::builtin), false);
     CaptureSec = findELFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::capture), false);
+    TypeMdSec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::typemd), false);
+    TypeMd2Sec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::typemd2), false);
     TypeRefMdSec = findELFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref), false);
     ReflStrMdSec = findELFSectionByName(
@@ -775,12 +802,15 @@ public:
       return {};
 
     if (FieldMdSec.first || AssocTySec.first || BuiltinTySec.first ||
-        CaptureSec.first || TypeRefMdSec.first || ReflStrMdSec.first ||
-        ConformMdSec.first || MPEnumMdSec.first) {
+        CaptureSec.first || TypeMdSec.first || TypeMd2Sec.first ||
+        TypeRefMdSec.first || ReflStrMdSec.first || ConformMdSec.first ||
+        MPEnumMdSec.first) {
       ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
                              {AssocTySec.first, AssocTySec.second},
                              {BuiltinTySec.first, BuiltinTySec.second},
                              {CaptureSec.first, CaptureSec.second},
+                             {TypeMdSec.first, TypeMdSec.second},
+                             {TypeMd2Sec.first, TypeMd2Sec.second},
                              {TypeRefMdSec.first, TypeRefMdSec.second},
                              {ReflStrMdSec.first, ReflStrMdSec.second},
                              {ConformMdSec.first, ConformMdSec.second},
@@ -1196,6 +1226,7 @@ public:
     auto Sections = {
         ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
         ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
+        ReflectionSectionKind::typemd,  ReflectionSectionKind::typemd2,
         ReflectionSectionKind::typeref, ReflectionSectionKind::reflstr,
         ReflectionSectionKind::conform, ReflectionSectionKind::mpenum};
 
@@ -1224,6 +1255,8 @@ public:
                            {Pairs[5].first, Pairs[5].second},
                            {Pairs[6].first, Pairs[6].second},
                            {Pairs[7].first, Pairs[7].second},
+                           {Pairs[8].first, Pairs[8].second},
+                           {Pairs[9].first, Pairs[9].second},
                            PotentialModuleNames};
     return addReflectionInfo(Info);
   }
