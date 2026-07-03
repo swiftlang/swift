@@ -90,8 +90,15 @@ public:
 
 private:
   bool deserializeBitstream(StringRef bitstreamData,
-                             const ASTCacheKey &key) {
-    // Create a MemoryBuffer from the bitstream data
+                           const ASTCacheKey &key) {
+ // The cached AST may have been serialized with AllowModuleWithCompilerErrors
+ // (e.g. when types had errors due to whole-module compilation). Enable it
+ // during deserialization so the deserializer skips invalid types instead
+ // of crashing.
+ auto &langOpts = const_cast<LangOptions &>(ctx.LangOpts);
+ bool savedAllowErrors = langOpts.AllowModuleWithCompilerErrors;
+ langOpts.AllowModuleWithCompilerErrors = true;
+
     auto bitstreamBuf = llvm::MemoryBuffer::getMemBufferCopy(
         bitstreamData, "cached_ast.swiftmodule");
     if (!bitstreamBuf) {
@@ -180,6 +187,7 @@ private:
       sf->CachedModuleFile = nullptr;
     });
 
+ langOpts.AllowModuleWithCompilerErrors = savedAllowErrors;
     return true;
   }
 
