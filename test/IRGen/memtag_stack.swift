@@ -1,4 +1,5 @@
 // REQUIRES: CODEGENERATOR=AArch64
+// REQUIRES: SWIFT_STDLIB_ARCH=arm64
 // REQUIRES: OS=macosx
 
 // RUN: %swift -emit-ir -sanitize=memtag-stack -parse-as-library -target arm64-apple-macosx10.9 %s | %FileCheck %s
