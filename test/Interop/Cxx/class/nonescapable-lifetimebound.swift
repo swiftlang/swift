@@ -359,7 +359,7 @@ final class SwiftBoxOwner { var field = NonTrivialOwner() }
 final class SwiftBoxNested { var field = OwnerBox() }
 
 // Foreign reference type base, trivial field.
-@available(macOS 13.3, *)
+@available(SwiftStdlib 5.8, *)
 @_lifetime(borrow x)
 func frtTrivialField(x: SharedTrivialOwner) -> View {
   return x.field.handOutView()
@@ -369,7 +369,7 @@ func frtTrivialField(x: SharedTrivialOwner) -> View {
 }
 
 // Foreign reference type base, non-trivial field.
-@available(macOS 13.3, *)
+@available(SwiftStdlib 5.8, *)
 @_lifetime(borrow x)
 func frtField(x: SharedOwner) -> View {
   return x.field.handOutView()
@@ -379,7 +379,7 @@ func frtField(x: SharedOwner) -> View {
 }
 
 // Foreign reference type base, transitive field access.
-@available(macOS 13.3, *)
+@available(SwiftStdlib 5.8, *)
 @_lifetime(borrow x)
 func frtTransitiveField(x: SharedOwnerBox) -> View {
   return x.field.field.handOutView()
