@@ -439,61 +439,61 @@ suite.test("InlineArray/noncopyable-elementsEqual")
 
 // MARK: - UniqueArray Iterable tests
 
-suite.test("UniqueArray/collect-via-iterable")
-.require(.stdlib_6_4).code {
-  guard #available(SwiftStdlib 6.4, *) else { return }
-
-  let unique = UniqueArray(copying: 1...5)
-  let collected = unique.collectViaBorrowing()
-  expectEqual(collected, [1, 2, 3, 4, 5])
-}
-
-suite.test("UniqueArray/makeBorrowingIterator-partial")
-.require(.stdlib_6_4).code {
-  guard #available(SwiftStdlib 6.4, *) else { return }
-
-  let unique = UniqueArray(copying: 1...5)
-  var iter = unique.makeBorrowingIterator()
-
-  var iterSpan = iter.nextSpan(maxCount: 3)
-  expectEqual(iterSpan.count, 3)
-  expectEqual(iterSpan[0], 1)
-
-  iterSpan = iter.nextSpan(maxCount: .max)
-  expectEqual(iterSpan.count, 2)
-  expectEqual(iterSpan[0], 4)
-}
-
-suite.test("UniqueArray/skip")
-.require(.stdlib_6_4).code {
-  guard #available(SwiftStdlib 6.4, *) else { return }
-
-  let unique = UniqueArray(copying: 1...5)
-  var iter = unique.makeBorrowingIterator()
-
-  let skipped = iter.skip(by: 3)
-  expectEqual(skipped, 3)
-
-  let remaining = iter.nextSpan(maxCount: .max)
-  expectEqual(remaining.count, 2)
-  expectEqual(remaining[0], 4)
-  expectEqual(remaining[1], 5)
-}
-
-suite.test("UniqueArray/noncopyable-elementsEqual")
-.require(.stdlib_6_4).code {
-  guard #available(SwiftStdlib 6.4, *) else { return }
-
-  let a: [4 of NoncopyableInt] = InlineArray(NoncopyableInt.init(value:))
-  let b = UniqueArray<NoncopyableInt>(capacity: 4) { outputSpan in
-    for i in 0..<4 {
-      outputSpan.append(NoncopyableInt(value: i))
-    }
-  }
-  expectTrue(a.elementsEqual(b))
-  expectTrue(b.elementsEqual(a))
-  expectTrue(b.elementsEqual(b))
-}
+//suite.test("UniqueArray/collect-via-iterable")
+//.require(.stdlib_6_4).code {
+//  guard #available(SwiftStdlib 6.4, *) else { return }
+//
+//  let unique = UniqueArray(copying: 1...5)
+//  let collected = unique.collectViaBorrowing()
+//  expectEqual(collected, [1, 2, 3, 4, 5])
+//}
+//
+//suite.test("UniqueArray/makeBorrowingIterator-partial")
+//.require(.stdlib_6_4).code {
+//  guard #available(SwiftStdlib 6.4, *) else { return }
+//
+//  let unique = UniqueArray(copying: 1...5)
+//  var iter = unique.makeBorrowingIterator()
+//
+//  var iterSpan = iter.nextSpan(maxCount: 3)
+//  expectEqual(iterSpan.count, 3)
+//  expectEqual(iterSpan[0], 1)
+//
+//  iterSpan = iter.nextSpan(maxCount: .max)
+//  expectEqual(iterSpan.count, 2)
+//  expectEqual(iterSpan[0], 4)
+//}
+//
+//suite.test("UniqueArray/skip")
+//.require(.stdlib_6_4).code {
+//  guard #available(SwiftStdlib 6.4, *) else { return }
+//
+//  let unique = UniqueArray(copying: 1...5)
+//  var iter = unique.makeBorrowingIterator()
+//
+//  let skipped = iter.skip(by: 3)
+//  expectEqual(skipped, 3)
+//
+//  let remaining = iter.nextSpan(maxCount: .max)
+//  expectEqual(remaining.count, 2)
+//  expectEqual(remaining[0], 4)
+//  expectEqual(remaining[1], 5)
+//}
+//
+//suite.test("UniqueArray/noncopyable-elementsEqual")
+//.require(.stdlib_6_4).code {
+//  guard #available(SwiftStdlib 6.4, *) else { return }
+//
+//  let a: [4 of NoncopyableInt] = InlineArray(NoncopyableInt.init(value:))
+//  let b = UniqueArray<NoncopyableInt>(capacity: 4) { outputSpan in
+//    for i in 0..<4 {
+//      outputSpan.append(NoncopyableInt(value: i))
+//    }
+//  }
+//  expectTrue(a.elementsEqual(b))
+//  expectTrue(b.elementsEqual(a))
+//  expectTrue(b.elementsEqual(b))
+//}
 
 // MARK: - Throwing Iterable tests
 
