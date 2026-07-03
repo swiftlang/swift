@@ -68,6 +68,21 @@ bb0:
   return %8 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @original_value_has_none_ownership :
+// CHECK:         %3 = upcast
+// CHECK:         %5 = unchecked_ref_cast %3
+// CHECK:       } // end sil function 'original_value_has_none_ownership'
+sil [ossa] @original_value_has_none_ownership: $@convention(thin) (Builtin.Int64) -> @owned X {
+bb0(%0 : $Builtin.Int64):
+  %1 = value_to_bridge_object %0
+  %2 = unchecked_ref_cast %1 to $X
+  %3 = upcast %2 to $B, forwarding: @owned
+  fix_lifetime %3
+  %4 = unchecked_ref_cast %3 to $X
+  return %4
+}
+
+
 sil_vtable X {
 }
 

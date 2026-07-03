@@ -14,17 +14,23 @@ import SIL
 
 extension DestructureTupleInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
+    if replaceWithUndefs(context) {
+      return
+    }
     foldWithAggregateConstruction(context)
   }
 }
 
 extension DestructureStructInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
+    if replaceWithUndefs(context) {
+      return
+    }
     foldWithAggregateConstruction(context)
   }
 }
 
-private protocol DestructureInstruction : MultipleValueInstruction {
+private protocol DestructureInstruction : MultipleValueInstruction, UnaryInstruction {
   func createExtract(of aggregate: Value, elementIndex: Int, using builder: Builder) -> Value
 }
 
@@ -47,6 +53,27 @@ extension StructInst: ConstructureInstruction {}
 
 private extension DestructureInstruction {
   var aggregate: Value { operands[0].value }
+
+  // Replaces a destructure of an undef operand with per-element undefs.
+  //
+  // ```
+  //   (%0, %1) = destructure_tuple undef : $(Int, String)
+  // ```
+  // ->
+  // ```
+  //   // uses of %0 replaced with undef : $Int
+  //   // uses of %1 replaced with undef : $String
+  // ```
+  func replaceWithUndefs(_ context: SimplifyContext) -> Bool {
+    guard operand.value is Undef else {
+      return false
+    }
+    for result in results {
+      result.uses.replaceAll(with: Undef.get(type: result.type, context), context)
+    }
+    context.erase(instruction: self)
+    return true
+  }
 
   func foldWithAggregateConstruction(_ context: SimplifyContext) {
 

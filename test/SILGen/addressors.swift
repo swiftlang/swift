@@ -267,7 +267,7 @@ func test_d(_ array: inout D) -> Int32 {
   take_int_inout(&array[1])
 
 // CHECK:   [[READ:%.*]] = begin_access [read] [static] [[ARRAY]] : $*D
-// CHECK:   [[T0:%.*]] = load [[READ]]
+// CHECK:   [[T0:%.*]] = struct $D ()
 // CHECK:   [[T1:%.*]] = function_ref @$s10addressors1DVys5Int32VAEcig
 // CHECK:   [[T2:%.*]] = apply [[T1]]({{%.*}}, [[T0]])
 // CHECK:   return [[T2]]
