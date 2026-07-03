@@ -56,6 +56,7 @@ config.shared_linker_flags = r'''@CMAKE_SHARED_LINKER_FLAGS@'''
 
 # --- Darwin ---
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
+config.darwin_supported_archs = "@SWIFT_STDLIB_DARWIN_ARCHS@"
 
 # --- android ---
 config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
