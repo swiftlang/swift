@@ -6,7 +6,7 @@
 // RUN: %target-swift-frontend -experimental-ast-cache %t.cache -debug-ast-cache \
 // RUN:   -module-name testmod -typecheck %t.swift 2>&1 | FileCheck %s --check-prefix=SECOND
 // Modify the file and verify cache miss.
-// RUN: sed -i '' 's/42/99/' %t.swift
+// RUN: sed -i.bak 's/42/99/' %t.swift && rm %t.swift.bak
 // RUN: %target-swift-frontend -experimental-ast-cache %t.cache -debug-ast-cache \
 // RUN:   -module-name testmod -typecheck %t.swift 2>&1 | FileCheck %s --check-prefix=THIRD
 
