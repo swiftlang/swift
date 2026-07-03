@@ -120,13 +120,13 @@ private extension UnaryInstruction {
 
   }
 
-  func tryReplaceSource(withOperandOf inst: SingleValueInstruction, _ context: SimplifyContext) -> Bool {
+  private func tryReplaceSource(withOperandOf inst: SingleValueInstruction, _ context: SimplifyContext) -> Bool {
     let singleUse = context.preserveDebugInfo ? inst.uses.singleUse : inst.uses.ignoreDebugUses.singleUse
     let canEraseInst = singleUse?.instruction == self
     let replacement = inst.operands[0].value
 
     if parentFunction.hasOwnership {
-      if !canEraseInst && replacement.ownership == .owned {
+      if !canEraseInst && (replacement.ownership == .owned || inst.ownership == .owned) {
         // We cannot add more uses to `replacement` without inserting a copy.
         return false
       }
