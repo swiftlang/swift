@@ -125,6 +125,11 @@ public struct CanonicalType: TypeProperties, CustomStringConvertible, NoReflecti
   public func subst(with substitutionMap: SubstitutionMap) -> CanonicalType {
     return rawType.subst(with: substitutionMap).canonical
   }
+
+  /// True if this type involves a local archetype defined in `environment`.
+  public func hasLocalArchetype(from environment: GenericEnvironment) -> Bool {
+    bridged.hasLocalArchetypeFromEnvironment(environment.bridged)
+  }
 }
 
 /// Implements the common members of `AST.Type`, `AST.CanonicalType` and `SIL.Type`.

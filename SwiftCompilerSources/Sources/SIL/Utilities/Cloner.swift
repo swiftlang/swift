@@ -195,3 +195,42 @@ public struct TypeSubstitutionCloner<Context: MutatingContext> {
     bridged.cloneFunctionBody()
   }
 }
+
+/// Clones instructions one at a time within the same function, remapping references to one
+/// local (opened existential) archetype's generic environment to another, already-existing one.
+///
+/// Unlike `Cloner`, this does not clone a region: operands of the cloned instruction that are
+/// not themselves being cloned are reused unchanged.
+public struct LocalArchetypeCloner<Context: MutatingContext> {
+  private var bridged: BridgedLocalArchetypeCloner
+  public let context: Context
+
+  public init(in function: Function, _ context: Context) {
+    self.bridged = BridgedLocalArchetypeCloner(function.bridged, context._bridged)
+    self.context = context
+  }
+
+  public mutating func deinitialize() {
+    bridged.destroy(context._bridged)
+  }
+
+  public func registerLocalArchetypeRemapping(from: GenericEnvironment, to: GenericEnvironment) {
+    bridged.registerLocalArchetypeRemapping(from.bridged, to.bridged)
+  }
+
+  public func setInsertionPoint(before instruction: Instruction) {
+    bridged.setInsertionPoint(instruction.bridged)
+  }
+
+  public mutating func clone(instruction: Instruction) -> Instruction {
+    let cloned = bridged.clone(instruction.bridged).instruction
+    context.notifyInstructionChanged(cloned)
+    context.notifyInstructionsChanged()
+    return cloned
+  }
+
+  /// Returns `type` with its local archetypes substituted according to the registered remappings.
+  public func getOpType(_ type: Type) -> Type {
+    bridged.getOpType(type.bridged).type
+  }
+}

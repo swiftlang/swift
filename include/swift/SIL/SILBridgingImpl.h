@@ -352,6 +352,10 @@ bool BridgedType::isAddress() const {
   return unbridged().isAddress();
 }
 
+bool BridgedType::hasOpenedExistential() const {
+  return unbridged().hasOpenedExistential();
+}
+
 BridgedType BridgedType::mapTypeOutOfEnvironment() const {
   return unbridged().mapTypeOutOfEnvironment();
 }
@@ -1346,6 +1350,10 @@ bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
   }
 }
 
+BridgedGenericEnvironment BridgedInstruction::OpenExistentialRefInst_getDefinedGenericEnvironment() const {
+  return {getAs<swift::OpenExistentialRefInst>()->getDefinedOpenedArchetype()->getGenericEnvironment()};
+}
+
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
   return {getAs<swift::GlobalAccessInst>()->getReferencedGlobal()};
 }
@@ -2158,6 +2166,15 @@ BridgedArgument BridgedBasicBlock::insertFunctionArgument(SwiftInt atPosition, B
   return {unbridged()->insertFunctionArgument((unsigned)atPosition, type.unbridged(),
                                               BridgedValue::unbridge(ownership),
                                               decl.getAs<swift::ValueDecl>())};
+}
+
+BridgedArgument
+BridgedBasicBlock::replacePhiArgumentAndReplaceAllUses(SwiftInt index, BridgedType type,
+                                                       BridgedValue::Ownership ownership,
+                                                       OptionalBridgedDeclObj decl) const {
+  return {unbridged()->replacePhiArgumentAndReplaceAllUses(
+      (unsigned)index, type.unbridged(), BridgedValue::unbridge(ownership),
+      decl.getAs<swift::ValueDecl>())};
 }
 
 void BridgedBasicBlock::eraseArgument(SwiftInt index) const {

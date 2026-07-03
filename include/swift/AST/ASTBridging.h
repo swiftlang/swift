@@ -60,6 +60,7 @@ class DiagnosticEngine;
 enum class DifferentiabilityKind : uint8_t;
 class Fingerprint;
 class Identifier;
+class GenericEnvironment;
 class IfConfigClauseRangeInfo;
 class GenericSignature;
 class GenericSignatureImpl;
@@ -94,6 +95,7 @@ class BridgedLangOptions;
 struct BridgedSubstitutionMap;
 struct BridgedGenericSignature;
 struct BridgedCanGenericSignature;
+struct BridgedGenericEnvironment;
 struct BridgedConformance;
 class BridgedParameterList;
 
@@ -3185,6 +3187,7 @@ public:
   BRIDGED_INLINE BridgedCanType(swift::CanType ty);
   BRIDGED_INLINE swift::CanType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getRawType() const;
+  BRIDGED_INLINE bool hasLocalArchetypeFromEnvironment(BridgedGenericEnvironment env) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanGenericSignature
   SILFunctionType_getSubstGenericSignature() const;
 };
@@ -3267,6 +3270,17 @@ struct BridgedFingerprint {
   uint64_t v2;
 
   BRIDGED_INLINE swift::Fingerprint unbridged() const;
+};
+
+struct BridgedGenericEnvironment {
+  swift::GenericEnvironment * _Nonnull env;
+
+  BRIDGED_INLINE swift::GenericEnvironment * _Nonnull unbridged() const;
+
+  /// True if `self` and `other` share the same (uniqued) generic signature,
+  /// i.e. their local archetypes have identical requirements (conformances,
+  /// superclass, layout constraint) and can be safely remapped onto one another.
+  BRIDGED_INLINE bool hasEqualGenericSignature(BridgedGenericEnvironment other) const;
 };
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedPoundKeyword : uint8_t {

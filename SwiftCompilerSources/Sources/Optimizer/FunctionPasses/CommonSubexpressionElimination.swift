@@ -167,9 +167,20 @@ private func processBlock(
       }
       if let ai = inst as? ApplyInst, isOptimizableLazyPropertyGetter(ai) {
         lazyPropertyGetters.append(ai)
-      } else {
-        tryCSEReplace(inst: inst, with: availInst, context)
+        continue
       }
+      if let openExistential = inst as? OpenExistentialRefInst {
+        guard
+          processOpenExistentialRef(
+            openExistential, into: availInst as! OpenExistentialRefInst,
+            map, runsOnHighLevelSil, context
+          )
+        else {
+          map.insert(ref)
+          continue
+        }
+      }
+      tryCSEReplace(inst: inst, with: availInst, context)
       continue
     }
 
@@ -334,6 +345,115 @@ private func tryCSEReplace(
   context.erase(instruction: inst)
 }
 
+/// Update SIL basic block's arguments types which refer to opened
+/// archetypes. Replace such types by performing type substitutions
+/// according to the provided type substitution map.
+private func updateBasicBlockArgTypes(
+  _ block: BasicBlock,
+  _ cloner: LocalArchetypeCloner<FunctionPassContext>,
+  _ usersToHandle: inout InstructionWorklist,
+  _ context: FunctionPassContext
+) {
+  for index in 0..<block.arguments.count {
+    let arg = block.arguments[index]
+    if !arg.type.hasOpenedExistential {
+      continue
+    }
+    // Try to apply the archetype remapping to this argument's type. If it
+    // produces a different type, use it as the argument's new type.
+    let oldArgType = arg.type
+    let newArgType = cloner.getOpType(oldArgType)
+    if newArgType == oldArgType {
+      continue
+    }
+    let newArg = block.replacePhiArgumentAndReplaceAllUses(
+      at: index, type: newArgType, ownership: arg.ownership, decl: arg.decl, context
+    )
+    usersToHandle.pushIfNotVisited(contentsOf: newArg.uses.users)
+  }
+}
+
+/// Handles CSE of guaranteed `open_existential_ref` instructions.
+///
+/// Returns true if uses of open_existential_ref can
+/// be replaced by a dominating instruction.
+private func processOpenExistentialRef(
+  _ inst: OpenExistentialRefInst,
+  into dominating: OpenExistentialRefInst,
+  _ map: ScopedHashMap,
+  _ runsOnHighLevelSil: Bool,
+  _ context: FunctionPassContext
+) -> Bool {
+  var usersToHandle = InstructionWorklist(context)
+  defer { usersToHandle.deinitialize() }
+
+  // Collect all direct users that may contain opened archetypes that need to
+  // be replaced.
+  for use in inst.uses {
+    let user = use.instruction
+    if !user.typeDependentOperands.isEmpty,
+      let ref = InstructionReference(
+        inst: user, runsOnHighLevelSil: runsOnHighLevelSil, calleeAnalysis: context.calleeAnalysis
+      ),
+      map.lookup(ref) != nil
+    {
+      return false
+    }
+    usersToHandle.pushIfNotVisited(user)
+  }
+
+  let oldEnv = inst.definedGenericEnvironment
+  let newEnv = dominating.definedGenericEnvironment
+
+  // Use a cloner. It makes copying the instruction and remapping of opened
+  // archetypes trivial.
+  var cloner = LocalArchetypeCloner(in: inst.parentFunction, context)
+  defer { cloner.deinitialize() }
+  cloner.registerLocalArchetypeRemapping(from: oldEnv, to: newEnv)
+
+  // Now clone each candidate and replace the opened archetype by the
+  // dominating one.
+  while let user = usersToHandle.pop() {
+    if let term = user as? TermInst {
+      // The current use of the opened archetype is a terminator instruction.
+      // Check if any of the successor blocks use this opened archetype in
+      // the types of their arguments, and if so, replace those uses too.
+      for successor in term.successors where !successor.arguments.isEmpty {
+        updateBasicBlockArgTypes(successor, cloner, &usersToHandle, context)
+      }
+    }
+
+    // Compute if this candidate depends on the old opened archetype. It
+    // always does if it has any type-dependent operands.
+    var dependsOnOldOpenedArchetype = !user.typeDependentOperands.isEmpty
+
+    // Look for dependencies propagated via the candidate's results.
+    for result in user.results where !result.uses.isEmpty && result.type.hasOpenedExistential {
+      // Check if the result type depends on this specific opened existential.
+      if result.type.canonicalType.hasLocalArchetype(from: oldEnv) {
+        dependsOnOldOpenedArchetype = true
+        // The users of this candidate are new candidates.
+        usersToHandle.pushIfNotVisited(contentsOf: result.uses.users)
+      }
+    }
+
+    // No need to clone if there is no dependency on the old opened archetype.
+    if !dependsOnOldOpenedArchetype {
+      continue
+    }
+
+    cloner.setInsertionPoint(before: user)
+    let newInst = cloner.clone(instruction: user)
+    // Result types of this candidate's users may be using this archetype.
+    // Thus, we need to try to replace it there too.
+    for (origResult, newResult) in zip(user.results, newInst.results) {
+      origResult.uses.replaceAll(with: newResult, context)
+    }
+    context.erase(instruction: user)
+  }
+  return true
+}
+
 // -----------------------------------------------------------------------
 // getHash — eligibility check and hash computation in one pass
 // -----------------------------------------------------------------------
@@ -397,6 +517,18 @@ private func getHash(
     }
     hasher.combine(ObjectIdentifier(ExistentialMetatypeInst.self))
     hasher.combine(emi.type)
+
+  // Two `open_existential_ref`s of the same existential each define their
+  // own nominally-distinct opened archetype, so unlike the cases above we
+  // cannot hash/compare `x.type`. Merging them rewrites the type of every user
+  // that depends on the specific archetype, which is only attempted for
+  // guaranteed results.
+  case let x as OpenExistentialRefInst:
+    guard x.parentFunction.hasOwnership, x.ownership == .guaranteed else {
+      return nil
+    }
+    hasher.combine(ObjectIdentifier(OpenExistentialRefInst.self))
+    hasher.combine(x.existential.hashable)
 
   // These instructions all use the same hash pattern: kind + result type + operands.
   case let x as UpcastInst: hashTypeOps(x)
@@ -658,6 +790,18 @@ struct InstructionReference: Hashable {
   static func == (lhs: Self, rhs: Self) -> Bool {
     if let lv = lhs.inst as? TypeValueInst, let rv = rhs.inst as? TypeValueInst {
       return lv.type == rv.type && lv.paramType == rv.paramType
+    }
+    // `isIdenticalTo` requires exactly equal result types, but two
+    // `open_existential_ref`s of the same existential always define
+    // distinct opened archetypes as their result type.
+    // Compare the opened existential and, since the two opened archetypes are
+    // nominally distinct, their generic signature (conformances, superclass,
+    // layout constraint) — two opens of the same existential can still be
+    // opened to different constraint sets, and only equal signatures can be
+    // remapped onto one another.
+    if let lo = lhs.inst as? OpenExistentialRefInst, let ro = rhs.inst as? OpenExistentialRefInst {
+      return lo.existential === ro.existential
+        && lo.definedGenericEnvironment.hasEqualGenericSignature(to: ro.definedGenericEnvironment)
     }
     return lhs.inst.isIdenticalTo(rhs.inst)
   }

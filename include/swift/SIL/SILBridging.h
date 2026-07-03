@@ -64,6 +64,7 @@ class SILLoopInfo;
 class SILLoop;
 class BridgedClonerImpl;
 class BridgedTypeSubstClonerImpl;
+class BridgedLocalArchetypeClonerImpl;
 class SILDebugLocation;
 class NominalTypeDecl;
 class VarDecl;
@@ -283,6 +284,7 @@ struct BridgedType {
   BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool isNull() const;
   BRIDGED_INLINE bool isAddress() const;
+  BRIDGED_INLINE bool hasOpenedExistential() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getAddressType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getObjectType() const;
   BRIDGED_INLINE bool isTrivial(BridgedFunction f) const;
@@ -826,6 +828,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType InitExistentialAddrInst_getFormalConcreteType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialMetatypeInst_getConformances() const;
   BRIDGED_INLINE bool OpenExistentialAddr_isImmutable() const;
+  BRIDGED_INLINE BridgedGenericEnvironment OpenExistentialRefInst_getDefinedGenericEnvironment() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar GlobalAccessInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar AllocGlobalInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction FunctionRefBaseInst_getReferencedFunction() const;
@@ -1078,6 +1081,10 @@ struct BridgedBasicBlock {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArgument insertFunctionArgument(SwiftInt atPosition, BridgedType type,
                                                                             BridgedValue::Ownership ownership,
                                                                             OptionalBridgedDeclObj decl) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArgument
+  replacePhiArgumentAndReplaceAllUses(SwiftInt index, BridgedType type,
+                                      BridgedValue::Ownership ownership,
+                                      OptionalBridgedDeclObj decl) const;
   BRIDGED_INLINE void eraseArgument(SwiftInt index) const;
   BRIDGED_INLINE void moveAllInstructionsToBegin(BridgedBasicBlock dest) const;
   BRIDGED_INLINE void moveAllInstructionsToEnd(BridgedBasicBlock dest) const;
@@ -1694,6 +1701,22 @@ struct BridgedTypeSubstCloner {
   void cloneFunctionBody() const;
   SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
   SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
+};
+
+/// A cloner for cloning instructions within the same function while
+/// remapping references to one opened/local archetype's generic environment
+/// to another (already existing) one. Operands not local to the cloned
+/// instruction are reused unchanged, i.e. this does not clone a region.
+struct BridgedLocalArchetypeCloner {
+  swift::BridgedLocalArchetypeClonerImpl * _Nonnull cloner;
+
+  BridgedLocalArchetypeCloner(BridgedFunction function, BridgedContext context);
+  void destroy(BridgedContext context);
+  void registerLocalArchetypeRemapping(BridgedGenericEnvironment from,
+                                       BridgedGenericEnvironment to) const;
+  void setInsertionPoint(BridgedInstruction beforeInst) const;
+  BridgedInstruction clone(BridgedInstruction inst) const;
+  SWIFT_IMPORT_UNSAFE BridgedType getOpType(BridgedType type) const;
 };
 
 struct BridgedVerifier {

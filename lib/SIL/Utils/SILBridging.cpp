@@ -843,6 +843,71 @@ BridgedValue BridgedTypeSubstCloner::getClonedValue(BridgedValue v) {
 }
 
 //===----------------------------------------------------------------------===//
+//                        BridgedLocalArchetypeCloner
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// A cloner for cloning instructions within the same function, only
+/// remapping the local archetypes registered via
+/// `registerLocalArchetypeRemapping`. Operands are reused unchanged (this
+/// does not clone a region, only a single instruction at a time).
+class BridgedLocalArchetypeClonerImpl : public SILCloner<BridgedLocalArchetypeClonerImpl> {
+  friend class SILInstructionVisitor<BridgedLocalArchetypeClonerImpl>;
+  friend class SILCloner<BridgedLocalArchetypeClonerImpl>;
+
+  SILInstruction *result = nullptr;
+
+public:
+  BridgedLocalArchetypeClonerImpl(SILFunction &f) : SILCloner(f) {}
+
+  SILValue getMappedValue(SILValue value) { return value; }
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *block) { return block; }
+
+  SILInstruction *cloneInst(SILInstruction *inst) {
+    result = nullptr;
+    visit(inst);
+    ASSERT(result && "instruction not cloned");
+    return result;
+  }
+
+  void postProcess(SILInstruction *orig, SILInstruction *cloned) {
+    result = cloned;
+    SILCloner<BridgedLocalArchetypeClonerImpl>::postProcess(orig, cloned);
+  }
+};
+
+} // namespace swift
+
+BridgedLocalArchetypeCloner::BridgedLocalArchetypeCloner(BridgedFunction function, BridgedContext context)
+  : cloner(new BridgedLocalArchetypeClonerImpl(*function.getFunction())) {
+  context.context->notifyNewCloner();
+}
+
+void BridgedLocalArchetypeCloner::destroy(BridgedContext context) {
+  delete cloner;
+  cloner = nullptr;
+  context.context->notifyClonerDestroyed();
+}
+
+void BridgedLocalArchetypeCloner::registerLocalArchetypeRemapping(BridgedGenericEnvironment from,
+                                                                   BridgedGenericEnvironment to) const {
+  cloner->registerLocalArchetypeRemapping(from.unbridged(), to.unbridged());
+}
+
+void BridgedLocalArchetypeCloner::setInsertionPoint(BridgedInstruction beforeInst) const {
+  cloner->getBuilder().setInsertionPoint(beforeInst.unbridged());
+}
+
+BridgedInstruction BridgedLocalArchetypeCloner::clone(BridgedInstruction inst) const {
+  return {cloner->cloneInst(inst.unbridged())->asSILNode()};
+}
+
+BridgedType BridgedLocalArchetypeCloner::getOpType(BridgedType type) const {
+  return cloner->getOpType(type.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
 //                               BridgedContext
 //===----------------------------------------------------------------------===//
 

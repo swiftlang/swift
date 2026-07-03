@@ -1058,6 +1058,11 @@ class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction, InitExi
 final public
 class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {
   public var existential: Value { operand.value }
+
+  /// The generic environment that this instruction's opened archetype lives in.
+  public var definedGenericEnvironment: GenericEnvironment {
+    GenericEnvironment(bridged: bridged.OpenExistentialRefInst_getDefinedGenericEnvironment())
+  }
 }
 
 final public

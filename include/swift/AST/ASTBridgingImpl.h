@@ -872,6 +872,10 @@ BridgedASTType BridgedCanType::getRawType() const {
   return {type};
 }
 
+bool BridgedCanType::hasLocalArchetypeFromEnvironment(BridgedGenericEnvironment env) const {
+  return unbridged()->hasLocalArchetypeFromEnvironment(env.unbridged());
+}
+
 BridgedCanGenericSignature
 BridgedCanType::SILFunctionType_getSubstGenericSignature() const {
   return {swift::CanSILFunctionType(llvm::cast<swift::SILFunctionType>(type))
@@ -1082,6 +1086,19 @@ swift::CanGenericSignature BridgedCanGenericSignature::unbridged() const {
 BridgedGenericSignature
 BridgedCanGenericSignature::getGenericSignature() const {
   return BridgedGenericSignature{impl};
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedGenericEnvironment
+//===----------------------------------------------------------------------===//
+
+swift::GenericEnvironment * _Nonnull BridgedGenericEnvironment::unbridged() const {
+  return env;
+}
+
+bool BridgedGenericEnvironment::hasEqualGenericSignature(BridgedGenericEnvironment other) const {
+  return unbridged()->getGenericSignature().getPointer()
+      == other.unbridged()->getGenericSignature().getPointer();
 }
 
 //===----------------------------------------------------------------------===//

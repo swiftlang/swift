@@ -947,6 +947,53 @@ bb0(%0 : @guaranteed $Proto & Ping):
   return %12 : $Ping
 }
 
+// Check that CSE merges two guaranteed open_existential_ref that open the
+// same existential to the same constraints: only one open_existential_ref
+// survives, and the second's users (which reference its distinct opened
+// archetype) are rewritten via LocalArchetypeCloner to use the first's.
+// CHECK-LABEL: sil [ossa] @cse_open_existential_ref_guaranteed :
+// CHECK: [[OPEN:%.*]] = open_existential_ref %0
+// CHECK: witness_method {{.*}}, #Proto.doThis : {{.*}}, [[OPEN]]
+// CHECK: apply {{%.*}}<{{.*}}>([[OPEN]])
+// CHECK-NOT: open_existential_ref
+// CHECK: witness_method {{.*}}, #Proto.doThat : {{.*}}, [[OPEN]]
+// CHECK: apply {{%.*}}<{{.*}}>([[OPEN]])
+// CHECK-LABEL: } // end sil function 'cse_open_existential_ref_guaranteed'
+sil [ossa] @cse_open_existential_ref_guaranteed : $@convention(thin) (@guaranteed Proto) -> () {
+bb0(%0 : @guaranteed $Proto):
+  %1 = open_existential_ref %0 : $Proto to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self
+  %2 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self, #Proto.doThis, %1 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %3 = apply %2<@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %4 = open_existential_ref %0 : $Proto to $@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self
+  %5 = witness_method $@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self, #Proto.doThat, %4 : $@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %6 = apply %5<@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Check that CSE does not merge open_existential_ref when its result is
+// @owned (not @guaranteed). In OSSA, replacing an owned result would require
+// inserting ownership-fixup copies (OwnershipRAUW), which this pass
+// deliberately avoids -- see the ownership guard in getHash.
+// CHECK-LABEL: sil [ossa] @dont_cse_open_existential_ref_owned :
+// CHECK: open_existential_ref
+// CHECK: open_existential_ref
+// CHECK-LABEL: } // end sil function 'dont_cse_open_existential_ref_owned'
+sil [ossa] @dont_cse_open_existential_ref_owned : $@convention(thin) (@owned Proto) -> () {
+bb0(%0 : @owned $Proto):
+  %1 = copy_value %0 : $Proto
+  %2 = open_existential_ref %0 : $Proto to $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self
+  %3 = witness_method $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self, #Proto.doThis, %2 : $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %4 = apply %3<@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self>(%2) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  destroy_value %2 : $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self
+  %6 = open_existential_ref %1 : $Proto to $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self
+  %7 = witness_method $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self, #Proto.doThat, %6 : $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %8 = apply %7<@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self>(%6) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  destroy_value %6 : $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self
+  %10 = tuple ()
+  return %10 : $()
+}
+
 sil [ossa] [global_init] @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
 
 // CHECK-LABEL: sil [ossa] @cse_global_init :

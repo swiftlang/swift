@@ -28,6 +28,9 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   public var isAddress: Bool { bridged.isAddress() }
   public var isObject: Bool { !isAddress }
 
+  /// True if this type mentions an opened existential archetype.
+  public var hasOpenedExistential: Bool { bridged.hasOpenedExistential() }
+
   public var addressType: Type { bridged.getAddressType().type }
   public var objectType: Type { bridged.getObjectType().type }
 

@@ -77,6 +77,19 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
     return bridged.insertPhiArgument(atPosition, type.bridged, ownership._bridged).argument
   }
 
+  /// Replaces the type of the phi argument at `index` with `type`, rewiring all of its uses
+  /// to the new argument. The argument must not be in the entry block.
+  public func replacePhiArgumentAndReplaceAllUses(
+    at index: Int, type: Type, ownership: Ownership, decl: ValueDecl? = nil,
+    _ context: some MutatingContext
+  ) -> Argument {
+    context.notifyInstructionsChanged()
+    return bridged.replacePhiArgumentAndReplaceAllUses(
+      index, type.bridged, ownership._bridged,
+      (decl as Decl?).bridged
+    ).argument
+  }
+
   public func eraseArgument(at index: Int, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.eraseArgument(index)
