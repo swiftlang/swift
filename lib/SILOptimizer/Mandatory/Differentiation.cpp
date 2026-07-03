@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILOptimizer/Differentiation/Common.h"
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/AST/ASTMangler.h"
@@ -46,6 +45,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
@@ -138,6 +138,10 @@ private:
   /// SingleCurryThunk or DoubleCurryThunk kind, get the SILFunction
   /// corresponding to the function being wrapped in the thunk.
   SILFunction *getUnwrappedCurryThunkFunction(SILFunction *originalFn);
+
+  bool emitDefaultDerivative(SILDifferentiabilityWitness *origWitness,
+                             SILDifferentiabilityWitness *defaultWitness,
+                             SILFunction *vjp);
 
 public:
   /// Construct an `DifferentiationTransformer` for the given module.
@@ -552,7 +556,6 @@ DifferentiationTransformer::createPrivateDifferentiabilityWitness(
     CanSILFunctionType originalFnTy, SILFunction *originalFn,
     IndexSubset *desiredParameterIndices, IndexSubset *desiredResultIndices,
     SILValue original, DifferentiationInvoker invoker) {
-
   // Check non-differentiable cases before creating a new private
   // differentiability witness.
 
@@ -1097,6 +1100,121 @@ static void emitFatalError(ADContext &context, SILFunction *f,
   f->setNeedCompleteLifetimes(false);
 }
 
+static SILDifferentiabilityWitness *
+getDefaultDerivative(SILDifferentiabilityWitness *witness) {
+  auto originalFn = witness->getOriginalFunction();
+
+  if (auto *originalAFD = findAbstractFunctionDecl(originalFn)) {
+    for (auto *requirementDecl :
+         originalAFD->getSatisfiedProtocolRequirements()) {
+      SILDeclRef requirementDeclRef(requirementDecl);
+      IndexSubset *minimalASTParamIndices = nullptr;
+      auto minimalConfig = findMinimalDerivativeConfiguration(
+          requirementDeclRef.getAbstractFunctionDecl(),
+          witness->getParameterIndices(), minimalASTParamIndices);
+      if (!minimalConfig)
+        continue;
+
+      auto *minimalWitness = witness->getModule().loadDifferentiabilityWitness(
+          {requirementDeclRef.mangle(), DifferentiabilityKind::Reverse,
+           *minimalConfig});
+      if (minimalWitness && minimalWitness->isDefault())
+        return minimalWitness;
+    }
+  }
+
+  return nullptr;
+}
+
+static SubstitutionMap getRequirementToWitnessThunkSubs(SILFunction *witness) {
+  auto *witnessAFD = findAbstractFunctionDecl(witness);
+  assert(witnessAFD && "expected AST functions");
+
+  auto *NTD = witnessAFD->getDeclContext()->getSelfNominalTypeDecl();
+  if (!NTD)
+    return {};
+
+  for (auto *conf : NTD->getAllConformances()) {
+    if (conf->isInvalid())
+      continue;
+
+    auto root = conf->getRootConformance();
+    SmallVector<Witness, 1> wts;
+    root->forEachValueWitness([&](ValueDecl *decl, Witness wt) {
+      if (wt.getDecl() == witnessAFD)
+        wts.push_back(wt);
+    });
+
+    if (!wts.empty())
+      return wts.front().getRequirementToWitnessThunkSubs();
+  }
+
+  return {};
+}
+
+bool DifferentiationTransformer::emitDefaultDerivative(
+    SILDifferentiabilityWitness *origWitness,
+    SILDifferentiabilityWitness *defaultWitness, SILFunction *vjp) {
+  auto loc = vjp->getLocation();
+  auto &module = vjp->getModule();
+
+  auto originalFn = origWitness->getOriginalFunction();
+  auto wtThunkSubMap = getRequirementToWitnessThunkSubs(originalFn);
+
+  if (!wtThunkSubMap)
+    return false;
+
+  auto sm = SubstitutionMap::get(
+      defaultWitness->getDerivativeGenericSignature(),
+      QuerySubstitutionMap{wtThunkSubMap}, LookUpConformanceInModule());
+
+  auto *entry = vjp->createBasicBlock();
+  createEntryArguments(vjp);
+  SILBuilder builder(entry);
+  SILOptFunctionBuilder fb(context.getTransform());
+
+  auto *defaultDerivRef =
+      builder.createFunctionRef(loc, defaultWitness->getVJP());
+  SILValue defaultDeriv = builder.createPartialApply(
+      loc, defaultDerivRef, sm, {}, ParameterConvention::Direct_Guaranteed);
+
+  auto fromType = defaultDeriv->getType().getAs<SILFunctionType>();
+  auto toType =
+      vjp->getLoweredFunctionType()
+          ->getWithRepresentation(SILFunctionTypeRepresentation::Thick)
+          ->substGenericArgs(module, vjp->getForwardingSubstitutionMap(),
+                             vjp->getTypeExpansionContext());
+  auto unsubstFromType = fromType->getUnsubstitutedType(module);
+  auto unsubstToType = toType->getUnsubstitutedType(module);
+
+  auto *thunk = getOrCreateReabstractionThunk(
+      fb, module, vjp->getLocation(), vjp, unsubstFromType, unsubstToType);
+  if (fromType != unsubstFromType)
+    defaultDeriv = builder.createConvertFunction(
+        loc, defaultDeriv, SILType::getPrimitiveObjectType(unsubstFromType),
+        /*withoutActuallyEscaping*/ false);
+
+  auto *thunkRef = builder.createFunctionRef(loc, thunk);
+  SmallVector<SILValue, 4> args(vjp->getArguments());
+  args.push_back(defaultDeriv);
+
+  auto vjpResult = builder.createApply(
+      loc, thunkRef, vjp->getForwardingSubstitutionMap(), args);
+  builder.emitDestroyValueOperation(loc, defaultDeriv);
+  builder.createReturn(loc, vjpResult);
+
+#ifndef NDEBUG
+  vjp->verify();
+#endif
+
+  auto *pm = &context.getPassManager();
+  pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(vjp);
+  completeAllLifetimes(pm, vjp);
+  pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
+
+  return true;
+}
+
 /// Returns true on error.
 bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     SILDifferentiabilityWitness *witness, DifferentiationInvoker invoker,
@@ -1193,6 +1311,13 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     auto *vjp = createEmptyVJP(context, witness, serializeFunctions);
     witness->setVJP(vjp);
     context.recordGeneratedFunction(vjp);
+
+    // See, if we can delegate to default derivative
+    if (auto *defaultWitness = getDefaultDerivative(witness)) {
+      if (emitDefaultDerivative(witness, defaultWitness, vjp))
+        return false;
+    }
+
     // Emit VJP function.
     VJPCloner cloner(context, witness, vjp, invoker);
     return cloner.run();

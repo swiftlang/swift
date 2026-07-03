@@ -102,6 +102,31 @@ static void forwardFunctionArgumentsConvertingOwnership(
       valuesToCleanup.push_back(arg);
       continue;
     }
+    // Handle metatype conversion
+    if (auto fromMeta = toParam.getInterfaceType()->getAs<MetatypeType>()) {
+      auto toMeta = fromParam.getInterfaceType()->castTo<MetatypeType>();
+      auto wasRepr = fromMeta->getRepresentation();
+      auto willBeRepr = toMeta->getRepresentation();
+      auto expectedType =
+          SILType::getPrimitiveObjectType(toMeta->getCanonicalType());
+      if ((wasRepr == MetatypeRepresentation::Thick &&
+           willBeRepr == MetatypeRepresentation::Thin) ||
+          (wasRepr == MetatypeRepresentation::Thin &&
+           willBeRepr == MetatypeRepresentation::Thick)) {
+        // If we have a thin-to-thick abstraction change, cook up new a metatype
+        // value out of nothing -- thin metatypes carry no runtime state.
+        auto newMeta = builder.createMetatype(loc, expectedType);
+        forwardedArgs.push_back(newMeta);
+        continue;
+      } else if (fromMeta != toMeta) {
+        // Otherwise, we have a metatype subtype conversion of thick metatypes.
+        assert(wasRepr == willBeRepr && "Unhandled metatype conversion");
+        auto up = builder.createUpcast(loc, arg, expectedType);
+        forwardedArgs.push_back(up);
+        continue;
+      }
+    }
+
     // Otherwise, simply forward the argument.
     forwardedArgs.push_back(arg);
   }

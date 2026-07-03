@@ -42,10 +42,7 @@ func requirementNoDefaultS1(p : S1, x : Float) -> Float {
 }
 
 DefaultDerivativesTests.testWithLeakChecking("RequirementNoDefaultStaticType") {
-  // FIXME: Not yet supported: the derivative is not inherited
-  // https://github.com/swiftlang/swift/issues/87705
-  // expectEqual(42.0, gradient(at: 100500) { requirementNoDefaultS1(p: S1(4), x: $0) })
-  expectEqual(12.0, gradient(at: 100500) { requirementNoDefaultS1(p: S1(4), x: $0) })
+  expectEqual(42.0, gradient(at: 100500) { requirementNoDefaultS1(p: S1(4), x: $0) })
 }
 
 protocol P2 {
@@ -108,10 +105,7 @@ func requirementWithDefaultS3(p : S3, x : Float) -> Float {
 }
 
 DefaultDerivativesTests.testWithLeakChecking("RequirementWithDefaultStaticType2") {
-  // FIXME: Not yet supported: the derivative is not inherited
-  // https://github.com/swiftlang/swift/issues/87705
-  // expectEqual(43.0, gradient(at: 100500) { requirementWithDefaultS3(p: S3(8), x: $0) })
-  expectEqual(14.0, gradient(at: 100500) { requirementWithDefaultS3(p: S3(8), x: $0) })
+  expectEqual(43.0, gradient(at: 100500) { requirementWithDefaultS3(p: S3(8), x: $0) })
 }
 
 runAllTests()
