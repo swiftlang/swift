@@ -1961,6 +1961,66 @@ static void salvageUnaryInst(SingleValueInstruction *SVI) {
   }
 }
 
+static bool isNullaryLiteral(SILValue v) {
+  return isa<IntegerLiteralInst>(v) || isa<FloatLiteralInst>(v);
+}
+
+/// Clone a binary instruction into each debug value's reconstruction block.
+/// Because debug BBs support only one phi argument, at least one operand must
+/// be a nullary literal (IntegerLiteralInst or FloatLiteralInst) that can be
+/// cloned directly into the block.
+static void salvageBinaryInst(SingleValueInstruction *SVI) {
+  assert(SVI->getNumOperands() == 2);
+  SILValue lhs = SVI->getOperand(0);
+  SILValue rhs = SVI->getOperand(1);
+
+  bool lhsNullary = isNullaryLiteral(lhs);
+  bool rhsNullary = isNullaryLiteral(rhs);
+
+  SmallVector<Operand *, 4> debugUses(getDebugUses(SVI));
+  for (Operand *U : debugUses) {
+    auto *DbgInst = cast<DebugValueInst>(U->getUser());
+
+    if (!lhsNullary && !rhsNullary) {
+      // Debug values cannot currently have multiple operands.
+      DbgInst->killOperand();
+      continue;
+    }
+
+    SILBasicBlock *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
+    SILArgument *oldArg = debugBB->getArgument(0);
+
+    auto *cloned = cast<SingleValueInstruction>(SVI->clone(&*debugBB->begin()));
+    oldArg->replaceAllUsesWith(cloned);
+
+    SILValue clonedLhs;
+    SILValue clonedRhs;
+    if (lhsNullary)
+      clonedLhs = cast<SingleValueInstruction>(lhs)->clone(&*debugBB->begin());
+    if (rhsNullary)
+      clonedRhs = cast<SingleValueInstruction>(rhs)->clone(&*debugBB->begin());
+
+    if (lhsNullary && rhsNullary) {
+      // Both nullary, no operand remains.
+      cloned->setOperand(0, clonedLhs);
+      cloned->setOperand(1, clonedRhs);
+      DbgInst->killOperand();
+    } else if (rhsNullary) {
+      auto *newArg =
+          debugBB->replacePhiArgument(0, lhs->getType(), OwnershipKind::None);
+      cloned->setOperand(0, newArg);
+      cloned->setOperand(1, clonedRhs);
+      DbgInst->setOperand(lhs);
+    } else {
+      auto *newArg =
+          debugBB->replacePhiArgument(0, rhs->getType(), OwnershipKind::None);
+      cloned->setOperand(0, clonedLhs);
+      cloned->setOperand(1, newArg);
+      DbgInst->setOperand(rhs);
+    }
+  }
+}
+
 /// Salvage debug info for destructure_struct / destructure_tuple instructions.
 ///
 /// These are multi-value instructions. For each result that has debug uses,
@@ -2245,6 +2305,9 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       isa<RefElementAddrInst>(I) || isa<VectorBaseAddrInst>(I) ||
       isa<RefTailAddrInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<IndexAddrInst>(I) || isa<IndexRawPointerInst>(I))
+    salvageBinaryInst(cast<SingleValueInstruction>(I));
 }
 
 void swift::salvageLoadDebugInfo(LoadOperation load) {
