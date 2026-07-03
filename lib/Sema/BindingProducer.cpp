@@ -691,7 +691,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto result =
       cs.matchTypes(TypeVar, type, ConstraintKind::Bind, options, srcLocator);
 
-  if (result.isFailure()) {
+  if (result == ConstraintSystem::SolutionKind::Error) {
     if (cs.isDebugMode()) {
       PrintOptions PO = PrintOptions::forDebugging();
 
