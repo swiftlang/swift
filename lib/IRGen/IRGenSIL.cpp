@@ -7319,6 +7319,12 @@ void IRGenSILFunction::visitBeginUnpairedAccessInst(
     return;
 
   case SILAccessEnforcement::Dynamic: {
+    // In Embedded Swift, suppress the swift_beginAccess call if dynamic
+    // exclusivity is not enabled.
+    if (getSILModule().getOptions().EmbeddedSwift &&
+        !getSILModule().getOptions().EnforceExclusivityDynamic)
+      return;
+
     llvm::Value *scratch = getLoweredAddress(access->getBuffer()).getAddress();
 
     llvm::Value *pointer =
@@ -7445,6 +7451,12 @@ void IRGenSILFunction::visitEndUnpairedAccessInst(EndUnpairedAccessInst *i) {
     return;
 
   case SILAccessEnforcement::Dynamic: {
+    // In Embedded Swift, suppress the swift_endAccess call if dynamic
+    // exclusivity is not enabled.
+    if (getSILModule().getOptions().EmbeddedSwift &&
+        !getSILModule().getOptions().EnforceExclusivityDynamic)
+      return;
+
     auto scratch = getLoweredAddress(i->getBuffer()).getAddress();
 
     auto call =
