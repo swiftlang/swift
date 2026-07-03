@@ -873,9 +873,18 @@ extension Iterable where Self: ~Copyable & ~Escapable, Element: ~Copyable, Failu
 extension Iterable where Self: ~Copyable & ~Escapable, Element: Copyable {
   func collectViaBorrowing() throws(Failure) -> [Element] {
     var borrowIterator = makeBorrowingIterator()
+    withUnsafeBytes(of: &borrowIterator) { ptr in
+      print("address of borrowingIterator:", ptr)
+    }
     var result: [Element] = []
     while true {
-      let span = try borrowIterator.nextSpan(maxCount: .max)
+      var span = try borrowIterator.nextSpan(maxCount: .max)
+      withUnsafeBytes(of: &span) { ptr in
+        print("address of span:", ptr)
+      }
+      span.withUnsafeBufferPointer { ptr in
+        print("address of span elements:", ptr.baseAddress)
+      }
       if span.isEmpty { break }
       for i in span.indices {
         result.append(span[i])
