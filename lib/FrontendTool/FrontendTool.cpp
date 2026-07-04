@@ -616,16 +616,23 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
     return;
 
   for (auto *SF : Instance.getPrimarySourceFiles()) {
-    // AST cache: skip reference dependency generation for cached files.
-    // getInterfaceHashIncludingTypeMembers() crashes on deserialized decls
-    // with incomplete body fingerprints.
-    if (SF->LoadedFromAstCache)
-      continue;
-
     const std::string &referenceDependenciesFilePath =
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
     if (referenceDependenciesFilePath.empty()) {
+      continue;
+    }
+
+    // AST cache: For cached files, write an empty (but valid) swiftdeps file.
+    // The normal dependency graph construction walks deserialized decls which
+    // may crash. An empty graph means the driver treats the file as having no
+    // incremental dependencies — acceptable since cached files shouldn't be
+    // recompiled based on dependency changes.
+    if (SF->LoadedFromAstCache) {
+      fine_grained_dependencies::SourceFileDepGraph emptyGraph;
+      fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
+          Instance.getDiags(), Instance.getOutputBackend(),
+          referenceDependenciesFilePath, emptyGraph);
       continue;
     }
 

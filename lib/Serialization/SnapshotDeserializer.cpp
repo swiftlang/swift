@@ -131,6 +131,13 @@ private:
     // Create a ModuleFile from the core
     auto mf = std::make_unique<ModuleFile>(core);
 
+    // Pre-populate Items with an empty vector to prevent ParseSourceFileRequest
+    // from re-parsing the source file if getTopLevelItems() is called during
+    // decl deserialization (e.g., via loadDependenciesForFileContext or
+    // handleInherited triggering type resolution). The real items are set
+    // below via setTopLevelItems().
+    SF.setTopLevelItems({});
+
     // Associate the ModuleFile with this SourceFile (which is a FileUnit)
     auto status = mf->associateWithFileContext(
         &SF, SourceLoc(), /*recoverFromIncompatibility*/ false);

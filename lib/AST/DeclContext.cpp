@@ -1207,9 +1207,19 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   if (AddedParsedMembers)
     return false;
 
-  if (!getAsGenericContext()->getParentSourceFile()) {
+  auto *sf = getAsGenericContext()->getParentSourceFile();
+  if (!sf) {
     // There will never be any parsed members to add, so set the flag to say
     // we are done so we can short-circuit next time.
+    const_cast<IterableDeclContext *>(this)->AddedParsedMembers = 1;
+    return false;
+  }
+
+  // Source files loaded from the AST cache have their members deserialized,
+  // not parsed. This includes extensions that are loaded lazily through
+  // loadExtensions() rather than through getTopLevelDecls(). For such decls,
+  // there are no unparsed members to wait for.
+  if (sf->LoadedFromAstCache) {
     const_cast<IterableDeclContext *>(this)->AddedParsedMembers = 1;
     return false;
   }
