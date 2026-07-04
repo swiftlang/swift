@@ -8,6 +8,8 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: backtracing
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 @_spi(ElfTest) import Runtime
 #if canImport(Darwin)
