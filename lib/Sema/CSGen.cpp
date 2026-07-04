@@ -4370,7 +4370,7 @@ void ConstraintSystem::removePropertyWrapper(Expr *anchor) {
   }
 }
 
-ConstraintSystem::TypeMatchResult
+ConstraintSystem::SolutionKind
 ConstraintSystem::applyPropertyWrapperToParameter(
     Type wrapperType,
     Type paramType,
@@ -4382,16 +4382,16 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     PreparedOverloadBuilder *preparedOverload) {
   Expr *anchor = getAsExpr(calleeLocator->getAnchor());
 
-  auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> TypeMatchResult {
+  auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> SolutionKind {
     if (!shouldAttemptFixes())
-      return getTypeMatchFailure(locator);
+      return SolutionKind::Error;
 
     recordAnyTypeVarAsPotentialHole(paramType);
 
     if (recordFix(fix, /*impact=*/FixImpact::Mismatch, preparedOverload))
-      return getTypeMatchFailure(locator);
+      return SolutionKind::Error;
 
-    return getTypeMatchSuccess();
+    return SolutionKind::Solved;
   };
 
   // Incorrect use of projected value argument
@@ -4444,10 +4444,10 @@ ConstraintSystem::applyPropertyWrapperToParameter(
                          { wrapperType, PropertyWrapperInitKind::WrappedValue },
                          preparedOverload);
   } else {
-    return getTypeMatchFailure(locator);
+    return SolutionKind::Error;
   }
 
-  return getTypeMatchSuccess();
+  return SolutionKind::Solved;
 }
 
 struct ResolvedMemberResult::Implementation {
