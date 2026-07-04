@@ -91,11 +91,19 @@ class AlwaysEmitConformanceMetadataPreservation : public SILModuleTransform {
     SmallVector<Decl *> TopLevelDecls;
     if (M.getSwiftModule()->isMainModule()) {
       if (M.isWholeModule()) {
-        for (const auto File : M.getSwiftModule()->getFiles())
-          File->getTopLevelDecls(TopLevelDecls);
-      } else {
-        for (const auto Primary : M.getSwiftModule()->getPrimarySourceFiles()) {
-          Primary->getTopLevelDecls(TopLevelDecls);
+      for (const auto File : M.getSwiftModule()->getFiles()) {
+        // AST cache: skip cached files — walking their decls triggers lazy
+        // member loading which crashes on deserialization errors.
+        if (auto *SF = dyn_cast<SourceFile>(File))
+          if (SF->LoadedFromAstCache)
+            continue;
+        File->getTopLevelDecls(TopLevelDecls);
+      }
+    } else {
+      for (const auto Primary : M.getSwiftModule()->getPrimarySourceFiles()) {
+        if (Primary->LoadedFromAstCache)
+          continue;
+        Primary->getTopLevelDecls(TopLevelDecls);
 	  // Visit macro expanded extensions
 	  if (auto *synthesizedPrimary = Primary->getSynthesizedFile())
 	    synthesizedPrimary->getTopLevelDecls(TopLevelDecls);

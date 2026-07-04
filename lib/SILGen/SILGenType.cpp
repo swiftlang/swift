@@ -1446,6 +1446,14 @@ public:
   void emitType() {
     PrettyStackTraceDecl("silgen emitType", theType);
 
+    // AST cache: skip SIL emission for deserialized nominal types. Method
+    // bodies and vtable entries are not serialized in .swiftast files, so
+    // emitting SIL for deserialized types produces MissingMemberDecl entries
+    // that trigger assertions in vtable/witness table emission.
+    auto *SF = theType->getParentSourceFile();
+    if (SF && SF->LoadedFromAstCache)
+      return;
+
     SGM.emitLazyConformancesForType(theType);
 
     for (Decl *member : theType->getABIMembers()) {
@@ -1488,12 +1496,7 @@ public:
       return;
     }
 
-    // AST cache: skip witness table emission for deserialized nominal types.
-    // Conformance table emission for deserialized decls can trigger lazy
-    // loading which re-enters name lookup cycles.
-    auto *SF = theType->getParentSourceFile();
-    if (SF && SF->LoadedFromAstCache)
-      return;
+
 
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.

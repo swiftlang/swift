@@ -3822,6 +3822,14 @@ NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
 NominalTypeDecl *
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                                  const ExtensionDecl *ext) const {
+  // AST cache: deserialized extensions already have ExtendedNominal set
+  // during deserialization (Deserialization.cpp:5498). Return it directly
+  // instead of calling computeExtendedNominal(), which requires an
+  // ExtendedTypeRepr that isn't serialized for deserialized decls.
+  auto *SF = ext->getParentSourceFile();
+  if (SF && SF->LoadedFromAstCache) {
+    return ext->ExtendedNominal.getPointer();
+  }
   ASSERT(ext->canNeverBeBound() && "Should have been bound by bindExtensions");
   return ext->computeExtendedNominal();
 }

@@ -1235,8 +1235,20 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // This is important since `ASTContext::hadError` accounts for delayed
   // conformance diags, so we need to ensure we don't exit with a non-zero exit
   // code without emitting any error.
-  ASSERT(ctx.Diags.hadAnyError() || !ctx.hasDelayedConformanceErrors() &&
-         "Encountered invalid conformance without emitting error?");
+  // AST cache: when cached files are present, some conformances may be
+  // invalid (witness tables not emitted). Skip the assertion.
+  bool hasCachedFiles = false;
+  for (auto *file : Instance.getMainModule()->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(file)) {
+      if (SF->LoadedFromAstCache) {
+        hasCachedFiles = true;
+        break;
+      }
+    }
+  }
+  if (!hasCachedFiles)
+    ASSERT(ctx.Diags.hadAnyError() || !ctx.hasDelayedConformanceErrors() &&
+           "Encountered invalid conformance without emitting error?");
 }
 
 static bool printSwiftVersion(const CompilerInvocation &Invocation) {

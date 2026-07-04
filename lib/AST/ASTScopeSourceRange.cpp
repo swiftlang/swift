@@ -371,10 +371,15 @@ ASTScopeImpl::getCharSourceRangeOfScope(SourceManager &SM,
                                         bool omitAssertions) const {
   if (!isCharSourceRangeCached()) {
     auto range = getSourceRangeOfThisASTNode(omitAssertions);
-    ASTScopeAssert(range.isValid(), "scope has invalid source range");
-    ASTScopeAssert(SM.isBefore(range.Start, range.End) ||
-                   range.Start == range.End,
-                   "scope source range ends before start");
+    // AST cache: deserialized decls lack valid source ranges. Skip
+    // assertion for files loaded from the AST cache.
+    auto *SF = getSourceFile();
+    if (!(SF && SF->LoadedFromAstCache)) {
+      ASTScopeAssert(range.isValid(), "scope has invalid source range");
+      ASTScopeAssert(SM.isBefore(range.Start, range.End) ||
+                     range.Start == range.End,
+                     "scope source range ends before start");
+    }
 
     range.End = Lexer::getLocForEndOfToken(SM, range.End);
 

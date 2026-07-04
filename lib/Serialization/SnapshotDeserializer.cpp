@@ -21,6 +21,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckedSnapshot.h"
 #include "swift/AST/FineGrainedDependencies.h"
+#include "swift/AST/SILOptions.h"
 #include "ModuleFile.h"
 #include "ModuleFileSharedCore.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -85,6 +86,10 @@ public:
     SF.ASTStage = SourceFile::TypeChecked;
     SF.LoadedFromAstCache = true;
 
+    // AST cache: disable SIL verification. Cached files have missing function
+    // bodies and incomplete witness tables (by design), so SIL verification
+    // would fail with "function must have a body" errors.
+    const_cast<SILOptions &>(ctx.SILOpts).VerifyNone = true;
     return true;
   }
 

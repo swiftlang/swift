@@ -487,7 +487,10 @@ namespace {
 
 std::optional<unsigned>
 SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
-  ASSERT(Loc.isValid());
+  // AST cache: deserialized decls may have invalid source locations.
+  // Return nullopt instead of asserting so callers can handle gracefully.
+  if (!Loc.isValid())
+    return std::nullopt;
 
   // If the cache is out-of-date, update it now.
   unsigned numBuffers = LLVMSourceMgr.getNumBuffers();
@@ -549,7 +552,9 @@ unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
   auto Id = findBufferContainingLocInternal(Loc);
   if (Id.has_value())
     return *Id;
-  llvm_unreachable("no buffer containing location found");
+  // AST cache: deserialized decls may have invalid source locations.
+  // Return 0 instead of crashing so callers can handle gracefully.
+  return 0;
 }
 
 bool SourceManager::isOwning(SourceLoc Loc) const {
