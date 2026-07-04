@@ -12187,6 +12187,28 @@ void ConstraintSystem::removeIsolatedParam(ParamDecl *param) {
   ASSERT(erased);
 }
 
+void ConstraintSystem::recordInferredParamSpecifier(ParamDecl *param,
+                                                    ParamSpecifier specifier) {
+  bool inserted = inferredParamSpecifiers.insert({param, specifier}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedInferredParamSpecifier(param));
+}
+
+void ConstraintSystem::removeInferredParamSpecifier(ParamDecl *param) {
+  bool erased = inferredParamSpecifiers.erase(param);
+  ASSERT(erased);
+}
+
+std::optional<ParamSpecifier>
+ConstraintSystem::getInferredParamSpecifier(const ParamDecl *param) const {
+  auto known = inferredParamSpecifiers.find(param);
+  if (known == inferredParamSpecifiers.end())
+    return std::nullopt;
+  return known->second;
+}
+
 void ConstraintSystem::recordPreconcurrencyClosure(
     const ClosureExpr *closure) {
   bool inserted = preconcurrencyClosures.insert(closure).second;
@@ -12356,6 +12378,9 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                                     .withIsolated(contextualParam->isIsolated())
                                     .withSending(contextualParam->isSending())
                                     .withOwnershipSpecifier(paramOwnership));
+
+        if (paramOwnership != ParamSpecifier::Default)
+          recordInferredParamSpecifier(paramDecl, paramOwnership);
       }
     }
 
