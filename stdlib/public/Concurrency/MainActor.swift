@@ -106,7 +106,7 @@ extension MainActor {
   ///
   /// If the current context is not running on the actor's serial executor, or
   /// if the actor is a reference to a remote actor, this method will crash
-  /// with a fatal error (similar to ``preconditionIsolated()``).
+  /// with a fatal error (similar to ``preconditionIsolated(_:file:line:)``).
   ///
   /// This method can only be used from synchronous functions, as asynchronous
   /// functions should instead perform a normal method call to the actor, which
