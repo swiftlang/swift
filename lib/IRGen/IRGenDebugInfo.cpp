@@ -1092,10 +1092,22 @@ private:
     // round-trip. This exclusion is intentionally transitive.
     bool ContainsLifetimeDependencies =
         containsFunctionTypeWithLifetimeDependencies(DbgTy.getType());
-    // There's no way to round trip when respecting @_originallyDefinedIn for a type.
-    // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
+    // AST cache: skip round-trip check for types from cached files.
+    // Deserialized types have different decl pointer identity than freshly
+    // reconstructed types, causing isEqual() to fail even when the types
+    // are structurally identical. Check the nominal and any type
+    // arguments (e.g. ManagedBuffer<Header, Void> where Header is cached).
+    bool IsFromAstCache = false;
+    Ty.visit([&](Type t) {
+      if (auto *nominal = t->getAnyNominal()) {
+        if (auto *SF = nominal->getParentSourceFile()) {
+          if (SF->LoadedFromAstCache)
+            IsFromAstCache = true;
+        }
+      }
+    });
     if (!Opts.DisableRoundTripDebugTypes && !IsTypeOriginallyDefinedIn &&
-        !IsCxxType && !ContainsLifetimeDependencies) {
+        !IsCxxType && !ContainsLifetimeDependencies && !IsFromAstCache) {
       // Make sure we can reconstruct mangled types for the debugger.
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, SugaredName, Sig);

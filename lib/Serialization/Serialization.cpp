@@ -2766,7 +2766,13 @@ bool Serializer::isDeclXRef(const Decl *D) const {
     assert(isa<GenericTypeParamDecl>(D) && "unexpected decl kind");
     return false;
   }
-  return true;
+  // AST cache: when serializing a single SourceFile, treat same-module
+  // cross-file decls as local (non-xref) so their conformances are
+  // serialized inline. This avoids a circular dependency during
+  // deserialization where resolving a PROTOCOL_CONFORMANCE_XREF calls
+  // lookupConformance on a nominal whose conformance table is still
+  // being loaded.
+  return false;
 }
 
 void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding,

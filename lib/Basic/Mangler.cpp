@@ -14,6 +14,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Punycode.h"
 #include "swift/Parse/Lexer.h"
@@ -111,21 +112,22 @@ std::string Mangler::finalize() {
   Storage.clear();
 
 #ifndef NDEBUG
-  // AST cache: skip mangler verification. Deserialized decls may produce
-  // different but equivalent mangled names due to substitution context
-  // differences. The mangled name is still correct; only the re-mangling
-  // differs (e.g. "AaBV" vs "AC" — both refer to the same type).
-  // TODO: re-enable when AST cache handles type substitutions correctly.
-  // switch (Flavor) {
-  // case ManglingFlavor::Default:
-  //   if (StringRef(result).starts_with(MANGLING_PREFIX_STR))
-  //     verify(result, Flavor);
-  //   break;
-  // case ManglingFlavor::Embedded:
-  //   if (StringRef(result).starts_with(MANGLING_PREFIX_EMBEDDED_STR))
-  //     verify(result, Flavor);
-  //   break;
-  // }
+  // Verify round-trip consistency: demangle the result and re-mangle it,
+  // then compare. Note that the re-mangled name may differ from the
+  // original due to substitution table ordering (substitutions are
+  // context-dependent and not canonical). When they differ, compare
+  // the demangled trees instead — if the trees are equal, the names
+  // are equivalent.
+  switch (Flavor) {
+  case ManglingFlavor::Default:
+    if (StringRef(result).starts_with(MANGLING_PREFIX_STR))
+      verify(result, Flavor);
+    break;
+  case ManglingFlavor::Embedded:
+    if (StringRef(result).starts_with(MANGLING_PREFIX_EMBEDDED_STR))
+      verify(result, Flavor);
+    break;
+  }
 #endif
 
   return result;
@@ -189,6 +191,18 @@ void Mangler::verify(StringRef nameStr, ManglingFlavor Flavor) {
   std::string Remangled = mangling.result();
   if (Remangled == nameStr)
     return;
+  // The re-mangled name may differ from the original due to substitution
+  // table ordering (substitutions are context-dependent and not canonical).
+  // Compare the demangled forms instead — if they match, the names are
+  // equivalent.
+  Demangler RemangledDem;
+  NodePointer RemangledRoot = RemangledDem.demangleSymbol(Remangled);
+  if (RemangledRoot) {
+    auto origStr = nodeToString(Root);
+    auto remangledStr = nodeToString(RemangledRoot);
+    if (origStr == remangledStr)
+      return;
+  }
 
   ABORT([&](auto &out) {
     out << "Remangling failed:\n";

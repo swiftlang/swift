@@ -1005,6 +1005,11 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
     nominal->lookupConformance(proto, conformances);
     if (!conformances.empty())
       return conformances.front();
+    // AST cache: conformance lookup will fail for same-module xrefs when
+    // the nominal's conformance table hasn't been fully loaded yet. This
+    // is expected — the isDeclXRef fix in Serialization.cpp ensures
+    // same-module conformances are serialized inline, so this path should
+    // only be hit for genuine cross-module xrefs.
   }
 
   auto error = llvm::make_error<ConformanceXRefError>(
