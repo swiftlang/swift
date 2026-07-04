@@ -1126,7 +1126,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
-  ///   - buffer: The buffer temporarily bound to instances of `T`.
+  ///     - term buffer: The buffer temporarily bound to instances of `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient @_transparent
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(

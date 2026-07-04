@@ -57,7 +57,7 @@ extension UniqueArray where Element: ~Copyable {
   /// All the elements following the specified position are moved to close the
   /// gap.
   ///
-  /// - Parameter i: The position of the element to remove. `index` must be
+  /// - Parameter index: The position of the element to remove. `index` must be
   ///   a valid index of the array that is not equal to the end index.
   /// - Returns: The removed element.
   ///

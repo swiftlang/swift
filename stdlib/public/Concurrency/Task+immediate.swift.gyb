@@ -55,9 +55,9 @@ extension Task where Failure == ${FAILURE_TYPE} {
   /// Other than the execution semantics discussed above, the created task
   /// is semantically equivalent to a task created using
   % if IS_DETACHED:
-  /// the ``Task/detached`` function.
+  /// the `Task/detached(name:priority:operation:)` function.
   % else:
-  /// the ``Task/init`` initializer.
+  /// the `Task/init(name:priority:operation:)` initializer.
   % end
   ///
   /// - Parameters:
@@ -239,7 +239,7 @@ extension ${GROUP_TYPE} {
   ///
   /// Other than the execution semantics discussed above, the created task
   /// is semantically equivalent to its basic version which can be
-  /// created using ``${GROUP_TYPE}/addTask``.
+  /// created using ``${GROUP_TYPE}/addTask(priority:operation:)``.
   ///
   /// - Parameters:
   ///   - name: Human readable name of this task.
