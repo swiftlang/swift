@@ -139,7 +139,9 @@ extension String.Index {
 
   /// Creates a new index at the specified UTF-16 code unit offset
   ///
-  /// - Parameter offset: An offset in UTF-16 code units.
+  /// - Parameters:
+  ///   - offset: An offset in UTF-16 code units.
+  ///   - s: The string.
   public init<S: StringProtocol>(utf16Offset offset: Int, in s: S) {
     let (start, end) = (s.utf16.startIndex, s.utf16.endIndex)
     guard offset >= 0,

@@ -301,7 +301,7 @@ extension Actor {
   ///
   /// If the current context is not running on the actor's serial executor, or
   /// if the actor is a reference to a remote actor, this method will crash
-  /// with a fatal error (similar to ``preconditionIsolated()``).
+  /// with a fatal error (similar to ``preconditionIsolated(_:file:line:)``).
   ///
   /// Note that this check is performed against the passed in actor's serial
   /// executor, meaning that if another actor uses the same serial executor--by

@@ -32,7 +32,7 @@ public struct Ref<Value: ~Copyable>: Copyable, ~Escapable {
   /// 'unsafeAddress' as the reference based on the borrowed lifetime of the
   /// given 'owner' argument.
   ///
-  /// - Parameter unsafeAddress: The address to use to reference an instance of
+  /// - Parameter pointer: The address to use to reference an instance of
   ///                            type `Value`.
   /// - Parameter owner: The owning instance that this `Ref` instance's
   ///                    lifetime is based on.

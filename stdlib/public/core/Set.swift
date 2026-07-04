@@ -623,7 +623,7 @@ extension Set: SetAlgebra {
 
   /// Removes all members from the set.
   ///
-  /// - Parameter keepingCapacity: If `true`, the set's buffer capacity is
+  /// - Parameter keepCapacity: If `true`, the set's buffer capacity is
   ///   preserved; if `false`, the underlying buffer is released. The
   ///   default is `false`.
   @inlinable
