@@ -39,6 +39,12 @@ using namespace ast_scope;
 
 static SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *);
 
+// AST cache: skip source range verification for cached files because
+// deserialized decls have invalid source ranges.
+static bool shouldSkipScopeVerification(const ASTScopeImpl *scope) {
+  auto *SF = scope->getSourceFile();
+  return SF && SF->LoadedFromAstCache;
+}
 void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
                                                      const ASTContext &ctx) const {
   // Ignore attributes on extensions, currently they exist outside of the
@@ -54,6 +60,10 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
     if (auto *PBD = dyn_cast<PatternBindingDecl>(d))
       if (PBD->isDebuggerBinding())
         return;
+  // AST cache: skip verification for cached files — deserialized decls have
+  // invalid source ranges that would fail containment checks.
+  if (shouldSkipScopeVerification(this))
+    return;
   
   auto &sourceMgr = ctx.SourceMgr;
 

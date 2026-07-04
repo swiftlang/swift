@@ -820,9 +820,14 @@ ArrayRef<unsigned> SourceManager::getAncestors(
 static bool isBeforeInSource(
     const SourceManager &sourceMgr, SourceLoc firstLoc, SourceLoc secondLoc,
     bool allowEqual) {
-  // If the two locations are in the same source buffer, compare their pointers.
+  // AST cache: deserialized decls may have invalid source locations.
+  // If either buffer ID is 0 (invalid), return false to avoid crashing
+  // in ancestor comparison.
   unsigned firstBufferID = sourceMgr.findBufferContainingLoc(firstLoc);
   unsigned secondBufferID = sourceMgr.findBufferContainingLoc(secondLoc);
+  if (firstBufferID == 0 || secondBufferID == 0) {
+    return false;
+  }
   if (firstBufferID == secondBufferID) {
     return sourceMgr.isBeforeInBuffer(firstLoc, secondLoc) ||
         (allowEqual && firstLoc == secondLoc);
