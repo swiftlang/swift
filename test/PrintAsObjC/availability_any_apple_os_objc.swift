@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -emit-objc-header-path %t/anyAppleOS.h -target %target-cpu-apple-macos26 -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -emit-objc-header-path %t/anyAppleOS.h -target arm64-apple-macos26 -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/anyAppleOS.h
 
 // REQUIRES: objc_interop
+// REQUIRES: SWIFT_STDLIB_ARCH=arm64
 
 import Foundation
 
