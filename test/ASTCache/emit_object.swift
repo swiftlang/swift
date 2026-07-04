@@ -11,12 +11,12 @@
 
 // WARM: AST cache: HIT
 
-// Test that SIL lowering works from a cached AST (C1 fix).
+// Test that SIL lowering works from a cached AST (Crash 1 fix).
 // The cached AST is loaded and SIL lowering runs without crashing,
 // producing a valid Mach-O object file.
-// Note: The object file may differ from the cold build because synthesized
-// accessor bodies (getter/setter) are not re-synthesized from cached decls.
-// This is a known limitation.
+// Note: The object file may differ from the cold build because function bodies
+// are not emitted for deserialized decls (BodyKind::Deserialized is skipped in
+// shouldEmitFunctionBody). This is a known limitation.
 struct Calculator {
   var value: Double
 

@@ -9917,8 +9917,15 @@ void ParamDecl::setDefaultArgumentInitContext(
   assert((!oldContext || oldContext == initContext) &&
          "Cannot change init context after setting");
 
+  // AST cache: deserialized params call setDefaultArgumentKind without
+  // calling setDefaultExpr, so StoredDefaultArgument may not be allocated.
+  // Allocate it here so we can cache the init context. Mirrors the lazy
+  // allocation in setDefaultExprType().
   auto *defaultInfo = DefaultValueAndFlags.getPointer();
-  assert(defaultInfo);
+  if (!defaultInfo) {
+    defaultInfo = getASTContext().Allocate<StoredDefaultArgument>();
+    DefaultValueAndFlags.setPointer(defaultInfo);
+  }
   defaultInfo->InitContextAndIsTypeChecked.setPointer(initContext);
 }
 
