@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -Xllvm -sil-disable-pass=simplification -solver-disable-enumerate-supertypes %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -Xllvm -sil-disable-pass=simplification -solver-enable-enumerate-supertypes %s | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -DDIAGS
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -Xllvm -sil-disable-pass=simplification -solver-disable-enumerate-supertypes %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -Xllvm -sil-disable-pass=simplification -solver-enable-enumerate-supertypes %s | %FileCheck %s
 
 struct Point {
   let x: Int
@@ -652,6 +653,46 @@ struct SingleLens<T> {
 
 func testRecursiveSingleSubscript(_ x: SingleLens<SingleLens<SingleLens<SingleLens<[Int]>>>>) {
   _ = x[0]
+}
+
+@dynamicMemberLookup
+struct MetaLens<T> {
+  static subscript<U>(dynamicMember keyPath: KeyPath<T, U>) -> U { fatalError() }
+}
+
+func testOptionalBase(_ x: Lens<[Int]>?, _ y: Lens<Int>?, _ z: Int?, _ m: MetaLens<[Int]>.Type?, _ i: Lens<[Int]>!) {
+#if DIAGS
+  // Make sure we tell the user to unwrap the optional since we know Lens has a
+  // subscript.
+  _ = x[0]
+  // expected-error@-1 {{value of optional type 'Lens<[Int]>?' must be unwrapped to refer to member 'subscript' of wrapped base type 'Lens<[Int]>'}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'subscript' only for non-'nil' base values}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+
+  // The dynamic member won't match here, but the unwrap fix is still better than
+  // "no subscripts".
+  _ = y[0]
+  // expected-error@-1 {{value of optional type 'Lens<Int>?' must be unwrapped to refer to member 'subscript' of wrapped base type 'Lens<Int>'}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'subscript' only for non-'nil' base values}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+
+  _ = m[0]
+  // expected-error@-1 {{value of optional type 'MetaLens<[Int]>.Type?' must be unwrapped to refer to member 'subscript' of wrapped base type 'MetaLens<[Int]>.Type'}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'subscript' only for non-'nil' base values}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+
+  // No candidates at all.
+  _ = z[0] // expected-error {{value of type 'Int?' has no subscripts}}
+#endif
+
+  _ = x?[0]
+  _ = x![0]
+  _ = m?[0]
+  _ = m![0]
+
+  _ = i[0]
+  _ = i?[0]
+  _ = i![0]
 }
 
 // Make sure that coerceCallArguments doesn't crash when arity of the subscript doesn't match
