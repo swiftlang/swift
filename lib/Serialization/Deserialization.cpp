@@ -34,6 +34,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
@@ -2400,6 +2401,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     std::optional<std::pair<Type, Type>> mismatchingTypes;
     bool isType = false;
 
+    std::optional<ValueDecl*> matchBeforeFiltering = std::nullopt;
     if (recordID == XREF_TYPE_PATH_PIECE ||
         recordID == XREF_VALUE_PATH_PIECE) {
       auto &ctx = getContext();
@@ -2441,7 +2443,6 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                        values);
         }
 
-        std::optional<ValueDecl*> matchBeforeFiltering = std::nullopt;
         if (!values.empty()) {
           matchBeforeFiltering = values[0];
         }
@@ -2509,6 +2510,19 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                     diag::modularization_issue_worked_around);
       }
     } else {
+      // AST cache recovery: when loading from a cached .swiftast file,
+      // DeclKindChanged errors are false positives — WMO type-checking
+      // produces different DeclKind/type signatures than per-file, so
+      // the post-filter match fails but the pre-filter match is correct.
+      if (FileContext) {
+        auto *SF = cast<FileUnit>(FileContext)->getParentSourceFile();
+        if (SF && SF->LoadedFromAstCache &&
+            errorKind == ModularizationError::Kind::DeclKindChanged &&
+            matchBeforeFiltering.has_value()) {
+          llvm::consumeError(std::move(error));
+          return *matchBeforeFiltering;
+        }
+      }
       return std::move(error);
     }
   }
@@ -2732,6 +2746,15 @@ giveUpFastPath:
             mismatchingTypes = std::make_pair(expectedTy, foundTy);
         }
 
+        // AST cache recovery: when loading from a cached .swiftast file,
+        if (FileContext) {
+          auto *SF = cast<FileUnit>(FileContext)->getParentSourceFile();
+          if (SF && SF->LoadedFromAstCache &&
+              errorKind == ModularizationError::Kind::DeclKindChanged &&
+              matchBeforeFiltering.has_value()) {
+            return *matchBeforeFiltering;
+          }
+        }
         return llvm::make_error<ModularizationError>(
             isType, errorKind, baseModule, this,
             /*foundIn*/nullptr, pathTrace, mismatchingTypes);

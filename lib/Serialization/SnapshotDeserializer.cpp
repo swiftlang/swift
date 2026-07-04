@@ -162,17 +162,38 @@ private:
 
     // C3: Populate Imports from the ModuleFile's loaded dependencies.
     // associateWithFileContext calls loadDependenciesForFileContext which
-    // loads the ModuleFile's Dependencies. We read them via getImportedModules
-    // and wrap each in a default AttributedImport (preserving module pointers
-    // but dropping import attributes like access level, implementation-only, etc).
-    // This is sufficient for SIL lowering which needs to resolve external
-    // references via ModuleDecl::getImportedModules.
+    // loads the ModuleFile's Dependencies. We iterate over getDependencies()
+    // to preserve import attributes (@_exported, @_implementationOnly, @_spi)
+    // that getImportedModules() would drop.
     {
-      SmallVector<ImportedModule, 8> moduleResults;
-      mf->getImportedModules(moduleResults, ModuleDecl::getImportFilterAll());
       SmallVector<AttributedImport<ImportedModule>, 8> attributedImports;
-      for (auto &mod : moduleResults) {
-        attributedImports.push_back(AttributedImport<ImportedModule>(mod));
+      for (auto &dep : mf->getDependencies()) {
+        if (!dep.isLoaded())
+          continue;
+
+        ImportOptions options;
+        if (dep.isExported())
+          options |= ImportFlags::Exported;
+        if (dep.isImplementationOnly())
+          options |= ImportFlags::ImplementationOnly;
+        if (!dep.spiGroups.empty())
+          options |= ImportFlags::SPIAccessControl;
+
+        AccessLevel accessLevel;
+        if (dep.isExported())
+          accessLevel = AccessLevel::Public;
+        else if (dep.isPackageOnly())
+          accessLevel = AccessLevel::Package;
+        else if (dep.isInternalOrBelow())
+          accessLevel = AccessLevel::Internal;
+        else
+          accessLevel = AccessLevel::Public;
+
+        attributedImports.push_back(AttributedImport<ImportedModule>(
+            *dep.Import, SourceLoc(), options, /*sourceFileArg*/ {},
+            ArrayRef<Identifier>(dep.spiGroups), /*preconcurrencyRange*/ {},
+            /*docVisibility*/ std::nullopt,
+            /*accessLevel*/ accessLevel));
       }
       SF.setImports(attributedImports);
     }
@@ -262,4 +283,9 @@ bool SourceFile::loadFromCache(ASTContext &Ctx,
   return deserializer.deserialize(cacheBuffer);
 }
 
+
+void SourceFile::clearCachedModuleFile() {
+  delete CachedModuleFile;
+  CachedModuleFile = nullptr;
+}
 } // namespace swift

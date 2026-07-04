@@ -2223,6 +2223,7 @@ void CompilerInstance::loadASTCache() {
   if (!allLoaded) {
     for (auto *SF : cacheableFiles) {
       if (SF->LoadedFromAstCache) {
+        SF->clearCachedModuleFile();
         SF->ASTStage = SourceFile::Unprocessed;
         SF->LoadedFromAstCache = false;
         SF->clearTopLevelItems();

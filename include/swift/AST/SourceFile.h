@@ -406,6 +406,9 @@ public:
   /// The ModuleFile backing this cached source file, if loaded from .swiftast.
   /// Owned by the SourceFile (cleaned up via ASTContext::addCleanup).
   ModuleFile *CachedModuleFile = nullptr;
+  /// Delete the CachedModuleFile (if any) and set it to nullptr.
+  /// Used when falling back from cached to normal compilation.
+  void clearCachedModuleFile();
 
 
   /// Virtual file paths declared by \c #sourceLocation(file:) declarations in
