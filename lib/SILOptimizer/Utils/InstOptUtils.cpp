@@ -1923,7 +1923,7 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
 static void salvageNullaryInst(SingleValueInstruction *inst) {
   assert(inst->getNumOperands() == 0 &&
          "salvageNullaryInst expects a single operand");
-  SmallVector<Operand *, 4> debugUses(getDebugUses(inst));
+  SmallVector<Operand *> debugUses(getDebugUses(inst));
   for (Operand *U : debugUses) {
     auto *DbgInst = cast<DebugValueInst>(U->getUser());
     SILBasicBlock *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
@@ -1939,7 +1939,7 @@ static void salvageNullaryInst(SingleValueInstruction *inst) {
 static void salvageUnaryInst(SingleValueInstruction *SVI) {
   assert(SVI->getNumOperands() == 1 &&
          "salvageUnaryInst expects a single operand");
-  SmallVector<Operand *, 4> debugUses(getDebugUses(SVI));
+  SmallVector<Operand *> debugUses(getDebugUses(SVI));
   for (Operand *U : debugUses) {
     auto *DbgInst = cast<DebugValueInst>(U->getUser());
     SILBasicBlock *debugBB =
@@ -1977,7 +1977,7 @@ static void salvageBinaryInst(SingleValueInstruction *SVI) {
   bool lhsNullary = isNullaryLiteral(lhs);
   bool rhsNullary = isNullaryLiteral(rhs);
 
-  SmallVector<Operand *, 4> debugUses(getDebugUses(SVI));
+  SmallVector<Operand *> debugUses(getDebugUses(SVI));
   for (Operand *U : debugUses) {
     auto *DbgInst = cast<DebugValueInst>(U->getUser());
 
@@ -2021,6 +2021,16 @@ static void salvageBinaryInst(SingleValueInstruction *SVI) {
   }
 }
 
+/// Salvage debug info for identity-like instructions (copy_value, move_value).
+/// Just repoints debug uses to the operand.
+static void salvageIdentityInst(SingleValueInstruction *SVI) {
+  SmallVector<Operand *> debugUses(getDebugUses(SVI));
+  for (Operand *U : debugUses) {
+    auto *DbgInst = cast<DebugValueInst>(U->getUser());
+    DbgInst->setOperand(SVI->getOperand(0));
+  }
+}
+
 /// Salvage debug info for destructure_struct / destructure_tuple instructions.
 ///
 /// These are multi-value instructions. For each result that has debug uses,
@@ -2032,7 +2042,7 @@ static void salvageDestructureInst(SILInstruction *I) {
   SILValue structOrTupleOperand = I->getOperand(0);
 
   for (auto [i, result] : llvm::enumerate(I->getResults())) {
-    SmallVector<Operand *, 4> debugUses(getDebugUses(result));
+    SmallVector<Operand *> debugUses(getDebugUses(result));
     for (Operand *U : debugUses) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
       SILBasicBlock *debugBB =
@@ -2185,7 +2195,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       // Empty structs cannot use fragments, as they have no fields.
       salvageNullaryInst(STI);
     } else {
-      SmallVector<Operand *, 4> debugUses(getDebugUses(STVal));
+      SmallVector<Operand *> debugUses(getDebugUses(STVal));
       for (Operand *U : debugUses) {
         auto *DbgInst = cast<DebugValueInst>(U->getUser());
         auto VarInfo = DbgInst->getCompleteVarInfo();
@@ -2238,7 +2248,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       // Empty tuple: clone into a debug BB and set operand to undef.
       salvageNullaryInst(TTI);
     } else {
-      SmallVector<Operand *, 4> debugUses(getDebugUses(TTVal));
+      SmallVector<Operand *> debugUses(getDebugUses(TTVal));
       for (Operand *U : debugUses) {
         auto *DbgInst = cast<DebugValueInst>(U->getUser());
         auto VarInfo = DbgInst->getCompleteVarInfo();
@@ -2308,11 +2318,14 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 
   if (isa<IndexAddrInst>(I) || isa<IndexRawPointerInst>(I))
     salvageBinaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<CopyValueInst>(I) || isa<MoveValueInst>(I))
+    salvageIdentityInst(cast<SingleValueInstruction>(I));
 }
 
 void swift::salvageLoadDebugInfo(LoadOperation load) {
   // The use list is mutated during iteration.
-  SmallVector<Operand *, 4> debugUses(getDebugUses(load.getLoadInst()));
+  SmallVector<Operand *> debugUses(getDebugUses(load.getLoadInst()));
   for (Operand *debugUse : debugUses) {
     // Update the debug_value to use the loaded address.
     auto *debugInst = cast<DebugValueInst>(debugUse->getUser());
