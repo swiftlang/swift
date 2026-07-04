@@ -200,6 +200,15 @@ BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
     assert(!ext->canNeverBeBound() &&
            "Only extensions that can ever be bound get here.");
+    // AST cache: deserialized extensions are already bound (setExtendedNominal
+    // was called during deserialization at Deserialization.cpp:5498). Skip
+    // re-binding to avoid computeExtendedNominal() returning null (no
+    // ExtendedTypeRepr for deserialized decls) and corrupting the binding via
+    // setExtendedNominal(nullptr) at the end of this function. This also
+    // prevents double addExtension() registration (deserializer already
+    // registered at Deserialization.cpp:5510-5512).
+    if (ext->hasBeenBound())
+      return true;
     if (auto nominal = ext->computeExtendedNominal(excludeMacroExpansions)) {
       ext->setExtendedNominal(nominal);
       nominal->addExtension(ext);

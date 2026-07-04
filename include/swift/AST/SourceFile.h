@@ -301,6 +301,9 @@ public:
   /// Clear the top-level items, resetting to the un-parsed state.
   /// Used by AST cache fallback when a cache load fails mid-module.
   void clearTopLevelItems() { Items.reset(); }
+  /// Used by AST cache fallback to clear imports so re-processing doesn't
+  /// assert in setImports ("Already computed imports").
+  void clearImportsForCache() { Imports.reset(); }
 
   /// Retrieves an immutable view of the list of top-level decls in this file.
   ///

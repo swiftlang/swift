@@ -2226,6 +2226,9 @@ void CompilerInstance::loadASTCache() {
         SF->ASTStage = SourceFile::Unprocessed;
         SF->LoadedFromAstCache = false;
         SF->clearTopLevelItems();
+        // Clear imports so performImportResolution doesn't assert
+        // on "Already computed imports" when re-processing the file.
+        SF->clearImportsForCache();
       }
     }
   }

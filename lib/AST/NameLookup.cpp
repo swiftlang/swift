@@ -4319,7 +4319,12 @@ swift::getDirectlyInheritedNominalTypeDecls(
   if (!protoDecl)
     return result;
 
-  assert(!protoDecl->wasDeserialized() && "Use getInheritedProtocols()");
+  // AST cache: deserialized protocols already have their inherited protocols
+  // set during deserialization. SynthesizedProtocolAttrs and where clauses
+  // are source-level constructs that don't exist for deserialized decls, so
+  // return early.
+  if (protoDecl->wasDeserialized())
+    return result;
 
   // Check for SynthesizedProtocolAttrs on the protocol. ClangImporter uses
   // these to add `Sendable` conformances to protocols without modifying the

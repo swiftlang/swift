@@ -616,6 +616,12 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
     return;
 
   for (auto *SF : Instance.getPrimarySourceFiles()) {
+    // AST cache: skip reference dependency generation for cached files.
+    // getInterfaceHashIncludingTypeMembers() crashes on deserialized decls
+    // with incomplete body fingerprints.
+    if (SF->LoadedFromAstCache)
+      continue;
+
     const std::string &referenceDependenciesFilePath =
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());

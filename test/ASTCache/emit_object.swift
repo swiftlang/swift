@@ -4,7 +4,7 @@
 // RUN:   -module-name testmod -parse-as-library -emit-object -o %t.cold.o %s 2>&1 | FileCheck %s --check-prefix=COLD
 // RUN: %target-swift-frontend -experimental-ast-cache %t.cache -debug-ast-cache \
 // RUN:   -module-name testmod -parse-as-library -emit-object -o %t.warm.o %s 2>&1 | FileCheck %s --check-prefix=WARM
-// RUN: diff %t.cold.o %t.warm.o 2>&1 | count 0 || (echo "Object files differ (expected — accessor synthesis differs)" && true)
+// RUN: diff %t.cold.o %t.warm.o 2>&1 | count 0 || (echo "Object files differ (expected — function bodies skipped for deserialized decls)" && true)
 
 // COLD: AST cache: MISS (no cache file)
 // COLD: AST cache: SAVED

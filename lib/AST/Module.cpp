@@ -304,13 +304,18 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
     }
 
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-      bool onlyOperatorsArg =
-          (!NTD->hasUnparsedMembers() || NTD->maybeHasOperatorDeclarations());
-      bool onlyDerivativesArg =
-          (!NTD->hasUnparsedMembers() || NTD->maybeHasDerivativeDeclarations());
-      if (onlyOperatorsArg || onlyDerivativesArg) {
-        addToUnqualifiedLookupCache(NTD->getMembers(), onlyOperatorsArg,
-                                    onlyDerivativesArg);
+      // AST cache: skip loading members for deserialized decls during cache
+      // population. Loading members triggers cross-reference resolution which
+      // triggers name lookup which re-enters SourceLookupCache — a cycle.
+      if (!NTD->wasDeserialized()) {
+        bool onlyOperatorsArg =
+            (!NTD->hasUnparsedMembers() || NTD->maybeHasOperatorDeclarations());
+        bool onlyDerivativesArg =
+            (!NTD->hasUnparsedMembers() || NTD->maybeHasDerivativeDeclarations());
+        if (onlyOperatorsArg || onlyDerivativesArg) {
+          addToUnqualifiedLookupCache(NTD->getMembers(), onlyOperatorsArg,
+                                      onlyDerivativesArg);
+        }
       }
     }
 
@@ -324,13 +329,17 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
         MayHaveAuxiliaryDecls.push_back(ED);
       }
 
-      bool onlyOperatorsArg =
-          (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations());
-      bool onlyDerivativesArg =
-          (!ED->hasUnparsedMembers() || ED->maybeHasDerivativeDeclarations());
-      if (onlyOperatorsArg || onlyDerivativesArg) {
-        addToUnqualifiedLookupCache(ED->getMembers(), onlyOperatorsArg,
-                                    onlyDerivativesArg);
+      // AST cache: skip loading members for deserialized extensions (same
+      // cycle prevention as NominalTypeDecl above).
+      if (!ED->wasDeserialized()) {
+        bool onlyOperatorsArg =
+            (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations());
+        bool onlyDerivativesArg =
+            (!ED->hasUnparsedMembers() || ED->maybeHasDerivativeDeclarations());
+        if (onlyOperatorsArg || onlyDerivativesArg) {
+          addToUnqualifiedLookupCache(ED->getMembers(), onlyOperatorsArg,
+                                      onlyDerivativesArg);
+        }
       }
     }
 

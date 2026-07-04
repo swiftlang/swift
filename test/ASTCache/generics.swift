@@ -9,9 +9,11 @@
 // COLD: AST cache: SAVED
 // WARM: AST cache: HIT
 
-// Test that SIL lowering works from a cached AST with generic constructors (Crash 4).
-// Generic constructors trigger SILFunctionType construction which can encounter
-// ErrorType in parameter types during deserialization.
+// Test that SIL lowering works from a cached AST with generic constructors.
+// Generic constructors trigger SILFunctionType construction. In the full
+// hybrid toolchain build, this exercises the ErrorType replacement in
+// getTypeChecked() (Crash 4). This test validates the basic path doesn't
+// crash; the ErrorType path is exercised by the swift-nio benchmark.
 struct Wrapper<T> {
   var value: T
 

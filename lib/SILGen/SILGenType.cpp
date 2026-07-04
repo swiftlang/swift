@@ -1488,6 +1488,13 @@ public:
       return;
     }
 
+    // AST cache: skip witness table emission for deserialized nominal types.
+    // Conformance table emission for deserialized decls can trigger lazy
+    // loading which re-enters name lookup cycles.
+    auto *SF = theType->getParentSourceFile();
+    if (SF && SF->LoadedFromAstCache)
+      return;
+
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
@@ -1656,7 +1663,15 @@ public:
         visit(dd);
     }
 
-    if (!isa<ProtocolDecl>(e->getExtendedNominal())) {
+    // AST cache: deserialized extensions may have null ExtendedNominal.
+    // Conformance table emission for deserialized decls can trigger lazy
+    // loading which re-enters name lookup cycles. Skip for cached files.
+    auto *extNom = e->getExtendedNominal();
+    auto *SF = e->getParentSourceFile();
+    if (!extNom || (SF && SF->LoadedFromAstCache))
+      return;
+
+    if (!isa<ProtocolDecl>(extNom)) {
       // Emit witness tables for protocol conformances introduced by the
       // extension.
       for (auto *conformance : e->getLocalConformances(
