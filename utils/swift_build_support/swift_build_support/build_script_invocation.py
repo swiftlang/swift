@@ -734,6 +734,11 @@ class BuildScriptInvocation(object):
         builder.add_product(products.EmscriptenSwiftSDK,
                             is_enabled=self.args.build_emscriptenstdlib)
 
+        builder.add_product(products.EmscriptenHostLLVM,
+                            is_enabled=self.args.build_emscripten_host_llvm)
+        builder.add_product(products.EmscriptenHostSwift,
+                            is_enabled=self.args.build_emscripten_host_swift)
+
         builder.add_product(products.SwiftFoundationTests,
                             is_enabled=self.args.build_foundation)
         builder.add_product(products.FoundationTests,
