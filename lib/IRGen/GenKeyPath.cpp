@@ -567,6 +567,9 @@ getInitializerForComputedComponent(IRGenModule &IGM,
 static llvm::Constant *
 emitMetadataTypeRefForKeyPath(IRGenModule &IGM, CanType type,
                               CanGenericSignature sig) {
+  if (IGM.isEmbeddedWithExistentials())
+    return IGM.getAddrOfTypeMetadata(type);
+
   // Produce a mangled name for the type.
   auto constant = IGM.getTypeRef(type, sig, MangledTypeRefRole::Metadata).first;
   

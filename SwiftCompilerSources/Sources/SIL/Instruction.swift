@@ -1349,6 +1349,10 @@ final public class KeyPathInst : SingleValueInstruction {
     bridged.KeyPathInst_hasPattern()
   }
 
+  public var supportedInEmbeddedSwift: Bool {
+    bridged.KeyPathInst_getNumComponents() <= 1 && !type.hasArchetype
+  }
+
   public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
     var results = BridgedInstruction.KeyPathFunctionResults()
     for componentIdx in 0..<bridged.KeyPathInst_getNumComponents() {
