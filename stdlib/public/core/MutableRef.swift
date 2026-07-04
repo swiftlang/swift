@@ -33,8 +33,8 @@ public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
   /// 'unsafeAddress' as the mutable reference based on the mutating lifetime of
   /// the given 'owner' argument.
   ///
-  /// - Parameter unsafeAddress: The address to use to mutably reference an
-  ///                            instance of type `Value`.
+  /// - Parameter pointer: The address to use to mutably reference an
+  ///                      instance of type `Value`.
   /// - Parameter owner: The owning instance that this `MutableRef` instance's
   ///                    lifetime is based on.
   @available(SwiftStdlib 6.4, *)

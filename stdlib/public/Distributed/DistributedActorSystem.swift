@@ -91,11 +91,11 @@ import _Concurrency
 /// It can be as small as an integer based identifier, or as large as a series of key-value pairs identifying the actor.
 ///
 /// The actor system must retain a mapping from the ``ActorID`` to the specific actor _instance_ which it is given in
-/// ``actorReady(_:)`` in order to implement the ``resolve(id:using:)`` method, which is how incoming and outgoing remote calls are made possible.
+/// ``actorReady(_:)`` in order to implement the ``resolve(id:as:)`` method, which is how incoming and outgoing remote calls are made possible.
 ///
 /// Users have no control over this assignment, nor are they allowed to set the `id` property explicitly.
-/// The ``DistributedActor/id`` is used to implement the distributed actor's ``Hashable``, ``Equatable``,
-/// and even ``Codable`` conformance (which is synthesized if and only if the ``ActorID`` is ``Codable`` itself).
+/// The ``DistributedActor/id`` is used to implement the distributed actor's `Hashable`, `Equatable`,
+/// and even `Codable` conformance (which is synthesized if and only if the ``ActorID`` is `Codable` itself).
 ///
 /// > Tip: Take note that throwing or failable initializers complicate this somewhat. Thankfully, the compiler
 /// > will always emit the right code such that every ``assignID(_:)`` is balanced with a ``resignID(_:)`` call,
@@ -108,7 +108,7 @@ import _Concurrency
 /// Manually invoking `assignID` and `resignID` is generally not recommended but isn't strictly a programmer error,
 /// and it is up to the actor system to decide how to deal with such calls.
 ///
-/// Once the ``distributed actor`` deinitializes, a call to ``resignID(_:)`` will be made. Generally this is made from
+/// Once the `distributed actor` deinitializes, a call to ``resignID(_:)`` will be made. Generally this is made from
 /// the distributed actor's `deinit`, however in the case of throwing initializers it may also happen during such failed
 /// init, in order to release the ID that is no longer used.
 ///
@@ -133,7 +133,7 @@ import _Concurrency
 /// > Note: Generally due to actor initializer isolation rules, users will need to make their initializers `async`
 /// in order to write code that safely performs extra actions after it has fully initialized.
 ///
-/// The ``actorReady(_)`` call on the actor system is a signal to the actor system that this actor _instance_ is now ready
+/// The ``actorReady(_:)`` call on the actor system is a signal to the actor system that this actor _instance_ is now ready
 /// and may be resolved and interacted with via the actor system. Generally, a distributed actor system implementation
 /// will _weakly retain_ the actors it has readied, because retaining them strongly would mean that they will never be
 /// deallocated (and thus never resign their ID's).
@@ -177,7 +177,7 @@ import _Concurrency
 /// into some form of wire envelope, and send it over the network (or process boundary) using some
 /// transport mechanism of their choice. As they do so, they need to suspend the `remoteCall` function,
 /// and resume it once a reply to the call arrives. Unless the transport layer is also async/await aware,
-/// this will often require making use of a ``CheckedContinuation``.
+/// this will often require making use of a `CheckedContinuation`.
 ///
 /// While implementing remote calls please keep in mind any potential failure scenarios that may occur,
 /// such as message loss, connection failures and similar issues. Such situations should all be
@@ -201,9 +201,9 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// The type ID that will be assigned to any distributed actor managed by this actor system.
   ///
   /// ### A note on Codable IDs
-  /// If this type is ``Codable``, then any `distributed actor` using this `ActorID` as its ``DistributedActor/ID``
-  /// will gain a synthesized ``Codable`` conformance which is implemented by encoding the `ID`.
-  /// The decoding counter part of the ``Codable`` conformance is implemented by decoding the `ID` and passing it to
+  /// If this type is `Codable`, then any `distributed actor` using this `ActorID` as its ``DistributedActor/id``
+  /// will gain a synthesized `Codable` conformance which is implemented by encoding the `ID`.
+  /// The decoding counter part of the `Codable` conformance is implemented by decoding the `ID` and passing it to
   /// the ``DistributedActor/resolve(id:using:)`` method.
   associatedtype ActorID: Sendable & Hashable
 
@@ -791,14 +791,14 @@ public struct RemoteCallArgument<Value> {
 /// by the Swift runtime to decode arguments of the invocation.
 ///
 /// ### Decoding DistributedActor arguments using Codable
-/// When using an actor system where ``ActorID`` is ``Codable``, every distributed actor using that system
-/// is also implicitly ``Codable`` (see ``DistributedActorSystem``). Such distributed actors are encoded
-/// as their ``ActorID`` stored in an ``Encoder/singleValueContainer``. When ``Codable`` is being used
-/// by such a system, the ``decodeNextArgument`` method will be using ``Decoder`` to
+/// When using an actor system where `ActorID` is `Codable`, every distributed actor using that system
+/// is also implicitly `Codable` (see ``DistributedActorSystem``). Such distributed actors are encoded
+/// as their `ActorID` stored in an `Encoder.singlevaluecontainer()`. When `Codable` is being used
+/// by such a system, the ``decodeNextArgument()`` method will be using `Decoder` to
 /// decode the incoming values, which may themselves be distributed actors.
 ///
-/// An actor system must be provided to the ``Decoder`` in order for a distributed actor's ``Decodable/init(from:)``
-/// to be able to return the instance of the actor. Specifically, the decoded``ActorID`` is passed to the actor system's `resolve(id:as:)` method in order to 
+/// An actor system must be provided to the `Decoder` in order for a distributed actor's `Decodable.init(from:)`
+/// to be able to return the instance of the actor. Specifically, the decoded `ActorID` is passed to the actor system's `resolve(id:as:)` method in order to
 /// return either a local instance identified by this ID, or creating a remote actor reference.
 /// Thus, you must set the actor system the decoding is performed for, on the decoder's `userInfo`, as follows:
 ///
@@ -859,7 +859,7 @@ public protocol DistributedTargetInvocationDecoder<SerializationRequirement> {
 /// Protocol a distributed invocation execution's result handler.
 ///
 /// An instance conforming to this type must be passed when invoking
-/// ``executeDistributedTarget(on:target:invocationDecoder:handler:)`` while handling an incoming distributed call.
+/// ``DistributedActorSystem/executeDistributedTarget(on:target:invocationDecoder:handler:)`` while handling an incoming distributed call.
 ///
 /// The handler will then be invoked with the return value (or error) that the invoked target returned (or threw).
 @available(SwiftStdlib 5.7, *)
