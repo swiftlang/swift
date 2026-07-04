@@ -8498,6 +8498,13 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   }
 #endif
 
+  // Replace ErrorType with Void when allowCompilerErrors() is true (AST cache).
+  // This catches ErrorType from all type deserialization paths, not just
+  // DESERIALIZE_TYPE(ERROR_TYPE). Mirrors the fix at line 8407-8410.
+  if (allowCompilerErrors() && typeOrOffset.get()->hasError()) {
+    typeOrOffset = Type(getContext().TheEmptyTupleType);
+  }
+
   return typeOrOffset.get();
 }
 
