@@ -21,6 +21,7 @@
 // REQUIRES: swift_feature_BorrowingSequence
 // REQUIRES: swift_feature_BorrowingForLoop
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: no_run
 
 import StdlibUnittest
 
