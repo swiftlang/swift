@@ -622,6 +622,18 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
     else()
       message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${ASRLF_BOOTSTRAPPING_MODE}'")
     endif()
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "EMSCRIPTEN")
+    if(NOT SWIFT_PATH_TO_SWIFT_SDK)
+      message(FATAL_ERROR "SWIFT_PATH_TO_SWIFT_SDK must point at the prebuilt "
+        "Emscripten Swift stdlib when building a wasm host compiler; without it "
+        "the Swift runtime link path would resolve to '/lib/swift/...' and mislink.")
+    endif()
+    set(host_lib_arch_dir
+        "${SWIFT_PATH_TO_SWIFT_SDK}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
+    target_link_libraries(${target} PRIVATE
+        "${host_lib_arch_dir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
+    target_link_libraries(${target} PRIVATE "${host_lib_arch_dir}/libswiftCore.a")
+    target_link_directories(${target} PRIVATE ${host_lib_arch_dir})
   else()
     target_link_directories(${target} PRIVATE
       ${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH})
