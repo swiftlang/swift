@@ -133,10 +133,10 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = idc->getDecl()->getASTContext();
   auto fileUnit
     = dyn_cast<FileUnit>(idc->getAsGenericContext()->getModuleScopeContext());
-  if (!sf) {
-    // If there is no parent source file, this is a deserialized or synthesized
-    // declaration context, in which case `getMembers()` has all of the members.
-    // Filter out the implicitly-generated ones.
+  if (!sf || sf->LoadedFromAstCache) {
+    // If there is no parent source file, or the source file was loaded from
+    // the AST cache, this is a deserialized or synthesized declaration context.
+    // `getMembers()` already has all of the members; filter out implicit ones.
     SmallVector<Decl *, 4> members;
     for (auto decl : idc->getMembers()) {
       if (!decl->isImplicit()) {

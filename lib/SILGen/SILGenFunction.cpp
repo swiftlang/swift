@@ -1796,6 +1796,8 @@ InitializationPtr SILGenFunction::getSingleValueStmtInit(Expr *E) {
 }
 
 void SILGenFunction::emitProfilerIncrement(ASTNode Node) {
+  if (!Node)
+    return;
   emitProfilerIncrement(ProfileCounterRef::node(Node));
 }
 

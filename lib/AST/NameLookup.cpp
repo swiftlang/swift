@@ -3823,6 +3823,14 @@ NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
 NominalTypeDecl *
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                                  const ExtensionDecl *ext) const {
+  // AST cache: deserialized extensions already have ExtendedNominal set
+  // during deserialization (Deserialization.cpp:5498). Return it directly
+  // instead of calling computeExtendedNominal(), which requires an
+  // ExtendedTypeRepr that isn't serialized for deserialized decls.
+  auto *SF = ext->getParentSourceFile();
+  if (SF && SF->LoadedFromAstCache) {
+    return ext->ExtendedNominal.getPointer();
+  }
   ASSERT(ext->canNeverBeBound() && "Should have been bound by bindExtensions");
   return ext->computeExtendedNominal();
 }
@@ -4320,7 +4328,12 @@ swift::getDirectlyInheritedNominalTypeDecls(
   if (!protoDecl)
     return result;
 
-  assert(!protoDecl->wasDeserialized() && "Use getInheritedProtocols()");
+  // AST cache: deserialized protocols already have their inherited protocols
+  // set during deserialization. SynthesizedProtocolAttrs and where clauses
+  // are source-level constructs that don't exist for deserialized decls, so
+  // return early.
+  if (protoDecl->wasDeserialized())
+    return result;
 
   // Check for SynthesizedProtocolAttrs on the protocol. ClangImporter uses
   // these to add `Sendable` conformances to protocols without modifying the

@@ -1101,8 +1101,9 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
 #ifndef NDEBUG
   // Assert that new declarations are always added in source order.
   auto checkSourceRange = [&](Decl *prev, Decl *next) {
-    // SKip these checks for imported and deserialized decls.
-    if (!member->getDeclContext()->getParentSourceFile())
+    // Skip these checks for imported and deserialized decls.
+    auto *parentSF = member->getDeclContext()->getParentSourceFile();
+    if (!parentSF || parentSF->LoadedFromAstCache)
       return;
 
     auto shouldSkip = [](Decl *d) {
@@ -1206,9 +1207,19 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   if (AddedParsedMembers)
     return false;
 
-  if (!getAsGenericContext()->getParentSourceFile()) {
+  auto *sf = getAsGenericContext()->getParentSourceFile();
+  if (!sf) {
     // There will never be any parsed members to add, so set the flag to say
     // we are done so we can short-circuit next time.
+    const_cast<IterableDeclContext *>(this)->AddedParsedMembers = 1;
+    return false;
+  }
+
+  // Source files loaded from the AST cache have their members deserialized,
+  // not parsed. This includes extensions that are loaded lazily through
+  // loadExtensions() rather than through getTopLevelDecls(). For such decls,
+  // there are no unparsed members to wait for.
+  if (sf->LoadedFromAstCache) {
     const_cast<IterableDeclContext *>(this)->AddedParsedMembers = 1;
     return false;
   }
@@ -1219,6 +1230,13 @@ bool IterableDeclContext::hasUnparsedMembers() const {
 void IterableDeclContext::addParsedMembers() const {
   // For contexts within a source file, get the list of parsed members.
   if (getAsGenericContext()->getParentSourceFile()) {
+    // Skip for source files loaded from the AST cache — their members were
+    // deserialized, not parsed, so calling getParsedMembers() would trigger
+    // a circular ParseMembersRequest.
+    if (getAsGenericContext()->getParentSourceFile()->LoadedFromAstCache) {
+      const_cast<IterableDeclContext *>(this)->AddedParsedMembers = 1;
+      return;
+    }
     // Retrieve the parsed members. Even if we've already added the parsed
     // members to this context, this call is important for recording the
     // dependency edge.
@@ -1417,6 +1435,12 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
 bool IterableDeclContext::wasDeserialized() const {
   const DeclContext *DC = getAsGenericContext();
   if (auto F = dyn_cast<FileUnit>(DC->getModuleScopeContext())) {
+    // Files loaded from the AST cache (.swiftast) are deserialized even though
+    // they are still SourceFile objects (not SerializedASTFile). Without this,
+    // loadNamedMembers asserts because it expects deserialized IDCs to have
+    // been loaded from a .swiftmodule.
+    if (auto *SF = dyn_cast<SourceFile>(F))
+      return SF->LoadedFromAstCache;
     return F->getKind() == FileUnitKind::SerializedAST;
   }
   return false;

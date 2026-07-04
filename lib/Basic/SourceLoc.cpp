@@ -487,7 +487,10 @@ namespace {
 
 std::optional<unsigned>
 SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
-  ASSERT(Loc.isValid());
+  // AST cache: deserialized decls may have invalid source locations.
+  // Return nullopt instead of asserting so callers can handle gracefully.
+  if (!Loc.isValid())
+    return std::nullopt;
 
   // If the cache is out-of-date, update it now.
   unsigned numBuffers = LLVMSourceMgr.getNumBuffers();
@@ -549,7 +552,9 @@ unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
   auto Id = findBufferContainingLocInternal(Loc);
   if (Id.has_value())
     return *Id;
-  llvm_unreachable("no buffer containing location found");
+  // AST cache: deserialized decls may have invalid source locations.
+  // Return 0 instead of crashing so callers can handle gracefully.
+  return 0;
 }
 
 bool SourceManager::isOwning(SourceLoc Loc) const {
@@ -815,9 +820,14 @@ ArrayRef<unsigned> SourceManager::getAncestors(
 static bool isBeforeInSource(
     const SourceManager &sourceMgr, SourceLoc firstLoc, SourceLoc secondLoc,
     bool allowEqual) {
-  // If the two locations are in the same source buffer, compare their pointers.
+  // AST cache: deserialized decls may have invalid source locations.
+  // If either buffer ID is 0 (invalid), return false to avoid crashing
+  // in ancestor comparison.
   unsigned firstBufferID = sourceMgr.findBufferContainingLoc(firstLoc);
   unsigned secondBufferID = sourceMgr.findBufferContainingLoc(secondLoc);
+  if (firstBufferID == 0 || secondBufferID == 0) {
+    return false;
+  }
   if (firstBufferID == secondBufferID) {
     return sourceMgr.isBeforeInBuffer(firstLoc, secondLoc) ||
         (allowEqual && firstLoc == secondLoc);

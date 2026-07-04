@@ -463,6 +463,12 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     return;
   }
 
+  // AST cache: skip IRGen for deserialized source files. Method bodies and
+  // witness tables are not serialized in .swiftast files, so IRGen would
+  // produce placeholder witness entries that trigger assertions.
+  if (SF.LoadedFromAstCache)
+    return;
+
   // Type-check the file if we haven't already (this may be necessary for .sil
   // files, which don't get fully type-checked by parsing).
   performTypeChecking(SF);

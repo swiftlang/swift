@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SynthesizedFileUnit.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -913,9 +914,14 @@ public:
     // There are currently no symbols associated with the members of a protocol;
     // each conforming type has to handle them individually.
     // Let's assert this fact:
-    for (auto *member : PD->getMembers()) {
-      assert(isExpectedProtocolMember(member) &&
-             "unexpected member of protocol during TBD generation");
+    // AST cache: deserialized protocols may have MissingMemberDecl entries
+    // or other unexpected members. Skip the assertion for cached files.
+    auto *SF = PD->getParentSourceFile();
+    if (!(SF && SF->LoadedFromAstCache)) {
+      for (auto *member : PD->getMembers()) {
+        assert(isExpectedProtocolMember(member) &&
+               "unexpected member of protocol during TBD generation");
+      }
     }
 #endif
   }

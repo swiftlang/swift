@@ -896,6 +896,10 @@ public:
   bool hasUnparsedMembers() const;
 
   void setDeserializedMembers(bool deserialized) { DeserializedMembers = deserialized; }
+  /// Mark that parsed members have already been added to this context.
+  /// Used by AST cache deserialization to prevent re-parsing of
+  /// deserialized decls whose DeclContext is a SourceFile.
+  void setAddedParsedMembersForCache() { AddedParsedMembers = 1; }
   bool didDeserializeMembers() const { return DeserializedMembers; }
 
   void setHasDeserializeMemberError(bool hasError) { HasDeserializeMemberError = hasError; }

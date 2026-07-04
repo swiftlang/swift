@@ -1659,9 +1659,17 @@ IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
   switch (lookupKind) {
     case ConformanceLookupKind::All:
     case ConformanceLookupKind::NonInherited: {
-      // Look for a Sendable conformance globally. If it is synthesized
-      // and matches this declaration context, use it.
       auto dc = getAsGenericContext();
+      // AST cache: skip synthesized conformance lookup for deserialized
+      // decls. findSynthesizedConformances calls lookupConformance, which
+      // triggers conformance table preparation that crashes for cached
+      // files (incomplete conformance tables). The synthesized conformances
+      // (Sendable, Copyable, etc.) are already in the conformance table.
+      if (dc) {
+        auto *SF = dc->getParentSourceFile();
+        if (SF && SF->LoadedFromAstCache)
+          break;
+      }
 
       SmallPtrSet<ProtocolConformance *, 4> known;
       for (auto conformance : findSynthesizedConformances(dc)) {
@@ -1675,7 +1683,6 @@ IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
       }
       break;
     }
-
     case ConformanceLookupKind::NonStructural:
     case ConformanceLookupKind::OnlyExplicit:
       break;

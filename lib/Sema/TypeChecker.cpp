@@ -200,6 +200,15 @@ BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
     assert(!ext->canNeverBeBound() &&
            "Only extensions that can ever be bound get here.");
+    // AST cache: deserialized extensions are already bound (setExtendedNominal
+    // was called during deserialization at Deserialization.cpp:5498). Skip
+    // re-binding to avoid computeExtendedNominal() returning null (no
+    // ExtendedTypeRepr for deserialized decls) and corrupting the binding via
+    // setExtendedNominal(nullptr) at the end of this function. This also
+    // prevents double addExtension() registration (deserializer already
+    // registered at Deserialization.cpp:5510-5512).
+    if (ext->hasBeenBound())
+      return true;
     if (auto nominal = ext->computeExtendedNominal(excludeMacroExpansions)) {
       ext->setExtendedNominal(nominal);
       nominal->addExtension(ext);
@@ -269,6 +278,9 @@ void swift::bindExtensions(ModuleDecl &mod) {
 }
 
 void swift::performTypeChecking(SourceFile &SF) {
+  // If this file was loaded from AST cache, it's already type-checked.
+  if (SF.ASTStage == SourceFile::TypeChecked)
+    return;
   if (SF.getASTContext().TypeCheckerOpts.EnableLazyTypecheck) {
     // Skip eager type checking. Instead, let later stages of compilation drive
     // type checking as needed through request evaluation.
@@ -400,11 +412,14 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   // to playground log them.
   if (!Ctx.hadError() && Ctx.LangOpts.PlaygroundTransform)
     performPlaygroundTransform(*SF, Ctx.LangOpts.PlaygroundOptions);
-
   return std::make_tuple<>();
 }
 
+
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
+  if (SF.ASTStage == SourceFile::TypeChecked)
+    return; // Cached file: ObjC conflict diagnostics suppressed
+
   auto &Ctx = SF.getASTContext();
   FrontendStatsTracer tracer(Ctx.Stats,
                              "perform-whole-module-type-checking");
@@ -429,6 +444,8 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
 }
 
 void swift::loadDerivativeConfigurations(SourceFile &SF) {
+  if (SF.ASTStage == SourceFile::TypeChecked)
+    return; // Cached file: @derivative configs may be stale
   if (!isDifferentiableProgrammingEnabled(SF))
     return;
 

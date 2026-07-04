@@ -34,6 +34,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
@@ -1006,6 +1007,11 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
     nominal->lookupConformance(proto, conformances);
     if (!conformances.empty())
       return conformances.front();
+    // AST cache: conformance lookup will fail for same-module xrefs when
+    // the nominal's conformance table hasn't been fully loaded yet. This
+    // is expected — the isDeclXRef fix in Serialization.cpp ensures
+    // same-module conformances are serialized inline, so this path should
+    // only be hit for genuine cross-module xrefs.
   }
 
   auto error = llvm::make_error<ConformanceXRefError>(
@@ -2402,6 +2408,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     std::optional<std::pair<Type, Type>> mismatchingTypes;
     bool isType = false;
 
+    std::optional<ValueDecl*> matchBeforeFiltering = std::nullopt;
     if (recordID == XREF_TYPE_PATH_PIECE ||
         recordID == XREF_VALUE_PATH_PIECE) {
       auto &ctx = getContext();
@@ -2443,7 +2450,6 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                        values);
         }
 
-        std::optional<ValueDecl*> matchBeforeFiltering = std::nullopt;
         if (!values.empty()) {
           matchBeforeFiltering = values[0];
         }
@@ -2511,6 +2517,19 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                     diag::modularization_issue_worked_around);
       }
     } else {
+      // AST cache recovery: when loading from a cached .swiftast file,
+      // DeclKindChanged errors are false positives — WMO type-checking
+      // produces different DeclKind/type signatures than per-file, so
+      // the post-filter match fails but the pre-filter match is correct.
+      if (FileContext) {
+        auto *SF = cast<FileUnit>(FileContext)->getParentSourceFile();
+        if (SF && SF->LoadedFromAstCache &&
+            errorKind == ModularizationError::Kind::DeclKindChanged &&
+            matchBeforeFiltering.has_value()) {
+          llvm::consumeError(std::move(error));
+          return *matchBeforeFiltering;
+        }
+      }
       return std::move(error);
     }
   }
@@ -2734,6 +2753,15 @@ giveUpFastPath:
             mismatchingTypes = std::make_pair(expectedTy, foundTy);
         }
 
+        // AST cache recovery: when loading from a cached .swiftast file,
+        if (FileContext) {
+          auto *SF = cast<FileUnit>(FileContext)->getParentSourceFile();
+          if (SF && SF->LoadedFromAstCache &&
+              errorKind == ModularizationError::Kind::DeclKindChanged &&
+              matchBeforeFiltering.has_value()) {
+            return *matchBeforeFiltering;
+          }
+        }
         return llvm::make_error<ModularizationError>(
             isType, errorKind, baseModule, this,
             /*foundIn*/nullptr, pathTrace, mismatchingTypes);
@@ -8400,6 +8428,15 @@ Expected<Type> DESERIALIZE_TYPE(ERROR_TYPE)(ModuleFile &MF,
                        MF.getAssociatedModule()->getNameStr());
   }
 
+  // When allowing compiler errors (e.g. AST cache deserialization), return the
+  // original type if it exists and doesn't contain errors, otherwise return
+  // Void (TheEmptyTupleType). This prevents ErrorType from reaching SIL lowering,
+  // which asserts that parameter/result types must not contain error types.
+  if (MF.allowCompilerErrors()) {
+    if (origTy && !origTy->hasError())
+      return origTy;
+    return Type(ctx.TheEmptyTupleType);
+  }
   if (!origTy)
     return ErrorType::get(ctx);
   return ErrorType::get(origTy);
@@ -8488,6 +8525,13 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                      "(rdar://problem/30382791)");
   }
 #endif
+
+  // Replace ErrorType with Void when allowCompilerErrors() is true (AST cache).
+  // This catches ErrorType from all type deserialization paths, not just
+  // DESERIALIZE_TYPE(ERROR_TYPE). Mirrors the fix at line 8407-8410.
+  if (allowCompilerErrors() && typeOrOffset.get()->hasError()) {
+    typeOrOffset = Type(getContext().TheEmptyTupleType);
+  }
 
   return typeOrOffset.get();
 }

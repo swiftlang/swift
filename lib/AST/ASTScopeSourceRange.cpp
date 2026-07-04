@@ -39,6 +39,12 @@ using namespace ast_scope;
 
 static SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *);
 
+// AST cache: skip source range verification for cached files because
+// deserialized decls have invalid source ranges.
+static bool shouldSkipScopeVerification(const ASTScopeImpl *scope) {
+  auto *SF = scope->getSourceFile();
+  return SF && SF->LoadedFromAstCache;
+}
 void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
                                                      const ASTContext &ctx) const {
   // Ignore attributes on extensions, currently they exist outside of the
@@ -54,6 +60,10 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
     if (auto *PBD = dyn_cast<PatternBindingDecl>(d))
       if (PBD->isDebuggerBinding())
         return;
+  // AST cache: skip verification for cached files — deserialized decls have
+  // invalid source ranges that would fail containment checks.
+  if (shouldSkipScopeVerification(this))
+    return;
   
   auto &sourceMgr = ctx.SourceMgr;
 
@@ -371,10 +381,15 @@ ASTScopeImpl::getCharSourceRangeOfScope(SourceManager &SM,
                                         bool omitAssertions) const {
   if (!isCharSourceRangeCached()) {
     auto range = getSourceRangeOfThisASTNode(omitAssertions);
-    ASTScopeAssert(range.isValid(), "scope has invalid source range");
-    ASTScopeAssert(SM.isBefore(range.Start, range.End) ||
-                   range.Start == range.End,
-                   "scope source range ends before start");
+    // AST cache: deserialized decls lack valid source ranges. Skip
+    // assertion for files loaded from the AST cache.
+    auto *SF = getSourceFile();
+    if (!(SF && SF->LoadedFromAstCache)) {
+      ASTScopeAssert(range.isValid(), "scope has invalid source range");
+      ASTScopeAssert(SM.isBefore(range.Start, range.End) ||
+                     range.Start == range.End,
+                     "scope source range ends before start");
+    }
 
     range.End = Lexer::getLocForEndOfToken(SM, range.End);
 

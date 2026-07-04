@@ -773,6 +773,20 @@ LookupConformanceRequest::evaluate(Evaluator &evaluator,
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
+    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) &&
+               !nominal->suppressesConformance(KnownProtocolKind::Copyable) &&
+               nominal->getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+      // AST cache: conformance tables on deserialized nominals are not
+      // populated, so lookupConformance fails for Copyable with no implicit
+      // fallback (unlike Sendable/BitwiseCopyable). Synthesize a conformance
+      // directly. Use suppressesConformance() (reads ~Copyable syntax) rather
+      // than isNoncopyable() (triggers computeInvertibleConformances, which
+      // re-enters this crash path). Only when AllowModuleWithCompilerErrors
+      // is set (AST cache mode) to avoid affecting normal compilation.
+      conformances.clear();
+      conformances.push_back(
+          ctx.getBuiltinConformance(type, protocol,
+                                     BuiltinConformanceKind::Synthesized));
     } else {
       // Was unable to infer the missing conformance.
       return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);

@@ -723,6 +723,14 @@ static bool shouldEmitFunctionBody(const AbstractFunctionDecl *AFD) {
   if (!AFD->hasBody())
     return false;
 
+  // AST cache: deserialized decls have BodyKind::Deserialized with a null body.
+  // Skip emission entirely — calling getTypecheckedBody() would trigger the
+  // parse+typecheck pipeline, and emitStmt(null) crashes. This is the chokepoint
+  // that prevents emitOrDelayFunction for functions, constructors, destructors,
+  // and accessors with deserialized bodies.
+  if (AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Deserialized)
+    return false;
+
   if (AFD->isBodySkipped())
     return false;
 
@@ -1067,6 +1075,11 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     assert(param);
 
     auto *initDC = param->getDefaultArgumentInitContext();
+    // AST cache: deserialized params may have no DefaultArgumentInitContext
+    // because StoredDefaultArgument was never allocated. Skip emission rather
+    // than constructing a SILGenFunction with a null DeclContext.
+    if (!initDC)
+      break;
 
     switch (param->getDefaultArgumentKind()) {
     case DefaultArgumentKind::Normal: {

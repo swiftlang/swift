@@ -253,8 +253,10 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
   SmallVector<VarDecl *, 4> results;
 
   // Unless we're in a source file we don't have to do anything
-  // special to lower lazy properties and property wrappers.
-  if (isInSourceFile(implDecl))
+  // special to lower lazy properties and property wrappers. For deserialized
+  // decls (AST cache), properties were already lowered during the cold build;
+  // skip this to avoid triggering name lookup cycles during SIL lowering.
+  if (isInSourceFile(implDecl) && !decl->wasDeserialized())
     computeLoweredStoredProperties(decl, implDecl);
 
   enumerateStoredPropertiesAndMissing(decl, implDecl,
@@ -279,8 +281,9 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
   SmallVector<Decl *, 4> results;
 
   // Unless we're in a source file we don't have to do anything
-  // special to lower lazy properties and property wrappers.
-  if (isInSourceFile(implDecl))
+  // special to lower lazy properties and property wrappers. For deserialized
+  // decls (AST cache), properties were already lowered during the cold build.
+  if (isInSourceFile(implDecl) && !decl->wasDeserialized())
     computeLoweredStoredProperties(decl, implDecl);
 
   enumerateStoredPropertiesAndMissing(decl, implDecl,

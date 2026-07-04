@@ -35,6 +35,7 @@ class Token;
 class UsingDecl;
 class AvailableAttr;
 enum class DefaultIsolation : uint8_t;
+class ModuleFile;
 
 /// The set of `using ...` defaults declared at the top of a source file.
 struct FileDefaults {
@@ -76,6 +77,7 @@ using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
 /// generation.
 class SourceFile final : public FileUnit {
   friend class ParseSourceFileRequest;
+  friend class SnapshotDeserializer;
 
 public:
   /// Flags that direct how the source file is parsed.
@@ -289,6 +291,19 @@ public:
 
   /// Retrieves an immutable view of the list of top-level items in this file.
   ArrayRef<ASTNode> getTopLevelItems() const;
+  /// Set the list of top-level items (used by AST cache deserialization).
+  void setTopLevelItems(ArrayRef<ASTNode> items) {
+    if (!Items)
+      Items = std::vector<ASTNode>();
+    Items->clear();
+    Items->insert(Items->begin(), items.begin(), items.end());
+  }
+  /// Clear the top-level items, resetting to the un-parsed state.
+  /// Used by AST cache fallback when a cache load fails mid-module.
+  void clearTopLevelItems() { Items.reset(); }
+  /// Used by AST cache fallback to clear imports so re-processing doesn't
+  /// assert in setImports ("Already computed imports").
+  void clearImportsForCache() { Imports.reset(); }
 
   /// Retrieves an immutable view of the list of top-level decls in this file.
   ///
@@ -384,6 +399,17 @@ public:
   /// Only files that have been fully processed (i.e. type-checked) will be
   /// forwarded on to IRGen.
   ASTStage_t ASTStage = Unprocessed;
+
+  /// Whether this source file was loaded from an AST cache (.swiftast) file.
+  /// Used for debugging and verification.
+  bool LoadedFromAstCache = false;
+  /// The ModuleFile backing this cached source file, if loaded from .swiftast.
+  /// Owned by the SourceFile (cleaned up via ASTContext::addCleanup).
+  ModuleFile *CachedModuleFile = nullptr;
+  /// Delete the CachedModuleFile (if any) and set it to nullptr.
+  /// Used when falling back from cached to normal compilation.
+  void clearCachedModuleFile();
+
 
   /// Virtual file paths declared by \c #sourceLocation(file:) declarations in
   /// this source file.
@@ -621,6 +647,9 @@ public:
 
   Identifier getDiscriminatorForPrivateDecl(const Decl *D) const override;
   Identifier getPrivateDiscriminator(bool createIfMissing = false) const;
+  void setPrivateDiscriminatorForCache(Identifier discriminator) {
+    PrivateDiscriminator = discriminator;
+  }
   std::optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
 
@@ -682,6 +711,13 @@ public:
 
   /// Retrieve the source text buffer.
   StringRef getBuffer() const;
+
+  /// Load the type-checked AST for this file from a .swiftast cache file.
+  /// Populates Items, Imports, and other fields from the deserialized
+  /// bitstream. Sets ASTStage = TypeChecked. Returns false on any
+  /// deserialization error (caller should fall back to parsing).
+  /// Implemented by SnapshotDeserializer (friend).
+  bool loadFromCache(ASTContext &Ctx, llvm::MemoryBuffer &cacheBuffer);
 
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
