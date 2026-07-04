@@ -34,14 +34,20 @@ import Swift
 /// `finish(throwing:)` method, which causes the iterator's `next()` method to
 /// throw the error to the awaiting call point. The continuation is `Sendable`,
 /// which permits calling it from concurrent contexts external to the iteration
-/// of the `AsyncThrowingStream`. When you iterate the stream concurrently,
-/// each element you provide to the `yield(_:)` method is delivered to only a single consumer.
+/// of the `AsyncThrowingStream`.
+///
+/// ### Backpressure
 ///
 /// An arbitrary source of elements can produce elements faster than they are
 /// consumed by a caller iterating over them. Because of this, `AsyncThrowingStream`
 /// defines a buffering behavior, allowing the stream to buffer a specific
 /// number of oldest or newest elements. By default, the buffer limit is
 /// `Int.max`, which means it's unbounded.
+///
+/// ### Concurrent Iteration
+///
+/// When you iterate the stream concurrently, each element you provide
+/// to the `yield(_:)` method is delivered to only a single consumer.
 ///
 /// ### Adapting Existing Code to Use Streams
 ///
@@ -298,21 +304,23 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///   `AsyncThrowingStream.Continuation` instance that it uses to provide
   ///   elements to the stream and terminate the stream when finished.
   ///
-  /// The `AsyncStream.Continuation` received by the `build` closure is
+  /// The `AsyncThrowingStream.Continuation` received by the `build` closure is
   /// appropriate for use in concurrent contexts. It is thread safe to send and
   /// finish; all calls to the continuation are serialized. However, calling
   /// this from multiple concurrent contexts could result in out-of-order
   /// delivery.
   ///
-  /// The following example shows an `AsyncStream` created with this
+  /// The following example shows an `AsyncThrowingStream` created with this
   /// initializer that produces 100 random numbers on a one-second interval,
   /// calling `yield(_:)` to deliver each element to the awaiting call point.
   /// When the `for` loop exits, the stream finishes by calling the
-  /// continuation's `finish()` method. If the random number is divisible by 5
+  /// continuation's `finish(throwing:)` method. If the random number is divisible by 5
   /// with no remainder, the stream throws a `MyRandomNumberError`.
   ///
-  ///     let stream = AsyncThrowingStream<Int, Error>(Int.self,
-  ///                                                  bufferingPolicy: .bufferingNewest(5)) { continuation in
+  ///     let stream = AsyncThrowingStream<Int, Error>(
+  ///         Int.self,
+  ///         bufferingPolicy: .bufferingNewest(5)
+  ///     ) { continuation in
   ///         Task.detached {
   ///             for _ in 0..<100 {
   ///                 await Task.sleep(1 * 1_000_000_000)
@@ -409,11 +417,6 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
 @available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream: AsyncSequence {
   /// The asynchronous iterator for iterating an asynchronous stream.
-  ///
-  /// This type is not `Sendable`. Don't use it from multiple
-  /// concurrent contexts. It is a programmer error to invoke `next()` from a
-  /// concurrent context that contends with another such call, which
-  /// results in a call to `fatalError()`.
   public struct Iterator: AsyncIteratorProtocol {
     let context: _Context
 
@@ -421,10 +424,6 @@ extension AsyncThrowingStream: AsyncSequence {
     ///
     /// When `next()` returns `nil`, this signifies the end of the
     /// `AsyncThrowingStream`.
-    ///
-    /// It is a programmer error to invoke `next()` from a concurrent context
-    /// that contends with another such call, which results in a call to
-    ///  `fatalError()`.
     ///
     /// If you cancel the task this iterator is running in while `next()` is
     /// awaiting a value, the `AsyncThrowingStream` terminates. In this case,
@@ -438,10 +437,6 @@ extension AsyncThrowingStream: AsyncSequence {
     ///
     /// When `next()` returns `nil`, this signifies the end of the
     /// `AsyncThrowingStream`.
-    ///
-    /// It is a programmer error to invoke `next()` from a concurrent
-    /// context that contends with another such call, which results in a call to
-    /// `fatalError()`.
     ///
     /// If you cancel the task this iterator is running in while `next()`
     /// is awaiting a value, the `AsyncThrowingStream` terminates. In this case,
