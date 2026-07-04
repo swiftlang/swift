@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir %s -enforce-exclusivity=checked -enable-experimental-feature Embedded -disable-experimental-feature EmbeddedDynamicExclusivity -module-name exclusivity_builtins -parse-stdlib -parse-as-library  -enforce-exclusivity=unchecked | %FileCheck %s
 
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedDynamicExclusivity
 
 @_silgen_name("marker1")
 func marker1() -> ()
