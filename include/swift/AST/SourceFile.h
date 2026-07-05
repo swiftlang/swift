@@ -298,12 +298,6 @@ public:
     Items->clear();
     Items->insert(Items->begin(), items.begin(), items.end());
   }
-  /// Clear the top-level items, resetting to the un-parsed state.
-  /// Used by AST cache fallback when a cache load fails mid-module.
-  void clearTopLevelItems() { Items.reset(); }
-  /// Used by AST cache fallback to clear imports so re-processing doesn't
-  /// assert in setImports ("Already computed imports").
-  void clearImportsForCache() { Imports.reset(); }
 
   /// Retrieves an immutable view of the list of top-level decls in this file.
   ///
@@ -406,11 +400,6 @@ public:
   /// The ModuleFile backing this cached source file, if loaded from .swiftast.
   /// Owned by the SourceFile (cleaned up via ASTContext::addCleanup).
   ModuleFile *CachedModuleFile = nullptr;
-  /// Delete the CachedModuleFile (if any) and set it to nullptr.
-  /// Used when falling back from cached to normal compilation.
-  void clearCachedModuleFile();
-
-
   /// Virtual file paths declared by \c #sourceLocation(file:) declarations in
   /// this source file.
   llvm::SmallVector<Located<StringRef>, 0> VirtualFilePaths;

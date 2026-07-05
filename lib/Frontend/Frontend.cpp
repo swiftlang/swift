@@ -2164,10 +2164,12 @@ void CompilerInstance::loadASTCache() {
     return cachePath;
   };
 
-  // Pass 1: Check cache file existence for all source files.
-  // Script-mode files are excluded (C4 — TopLevelCodeDecl not serializable).
+  // Load each source file's cache independently. If a file's cache is
+  // missing or invalid, it falls back to parsing from source. HIT files
+  // use the deserialized type-checked AST directly. Each file's cache is
+  // validated independently (source hash + compiler version hash), so a
+  // stale cache for one file doesn't affect others.
   SmallVector<SourceFile *, 32> cacheableFiles;
-  bool allCacheFilesExist = true;
   for (auto *file : mainModule->getFiles()) {
     auto *SF = dyn_cast<SourceFile>(file);
     if (!SF)
@@ -2177,7 +2179,9 @@ void CompilerInstance::loadASTCache() {
     if (SF->isScriptMode())
       continue; // Script-mode files are not cacheable (C4)
     cacheableFiles.push_back(SF);
+  }
 
+  for (auto *SF : cacheableFiles) {
     auto cachePath = computeCachePath(SF);
     auto bufOrErr = llvm::MemoryBuffer::getFile(cachePath);
     if (!bufOrErr) {
@@ -2185,22 +2189,6 @@ void CompilerInstance::loadASTCache() {
         llvm::errs() << "AST cache: MISS (no cache file) for "
                      << SF->getFilename() << "\n";
       }
-      allCacheFilesExist = false;
-    }
-  }
-
-  // If not all cache files exist, skip caching for the whole module.
-  if (!allCacheFilesExist)
-    return;
-
-  // Pass 2: Load cache for all files. If any load fails, clear all cached
-  // state so normal parsing/type-checking runs for all files.
-  bool allLoaded = true;
-  for (auto *SF : cacheableFiles) {
-    auto cachePath = computeCachePath(SF);
-    auto bufOrErr = llvm::MemoryBuffer::getFile(cachePath);
-    if (!bufOrErr) {
-      allLoaded = false;
       continue;
     }
 
@@ -2214,22 +2202,6 @@ void CompilerInstance::loadASTCache() {
       if (frontendOpts.DebugASTCache) {
         llvm::errs() << "AST cache: MISS (invalid) for "
                      << SF->getFilename() << "\n";
-      }
-      allLoaded = false;
-    }
-  }
-
-  // If any file failed to load, clear all cached state to avoid mixed state.
-  if (!allLoaded) {
-    for (auto *SF : cacheableFiles) {
-      if (SF->LoadedFromAstCache) {
-        SF->clearCachedModuleFile();
-        SF->ASTStage = SourceFile::Unprocessed;
-        SF->LoadedFromAstCache = false;
-        SF->clearTopLevelItems();
-        // Clear imports so performImportResolution doesn't assert
-        // on "Already computed imports" when re-processing the file.
-        SF->clearImportsForCache();
       }
     }
   }

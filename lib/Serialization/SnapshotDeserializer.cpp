@@ -98,10 +98,12 @@ private:
                            const ASTCacheKey &key) {
  // The cached AST may have been serialized with AllowModuleWithCompilerErrors
  // (e.g. when types had errors due to whole-module compilation). Enable it
- // during deserialization so the deserializer skips invalid types instead
- // of crashing.
+ // for the entire compilation — we cannot restore the previous value because
+ // lazy member loading (loadAllMembers/loadStorageMembers) triggers
+ // deserialization at any point during SILGen/IRGen, long after this function
+ // returns. If AllowModuleWithCompilerErrors is false during lazy loading,
+ // the deserializer hits llvm_unreachable on ErrorType.
  auto &langOpts = const_cast<LangOptions &>(ctx.LangOpts);
- bool savedAllowErrors = langOpts.AllowModuleWithCompilerErrors;
  langOpts.AllowModuleWithCompilerErrors = true;
 
     auto bitstreamBuf = llvm::MemoryBuffer::getMemBufferCopy(
@@ -219,8 +221,6 @@ private:
       delete sf->CachedModuleFile;
       sf->CachedModuleFile = nullptr;
     });
-
- langOpts.AllowModuleWithCompilerErrors = savedAllowErrors;
     return true;
   }
 
@@ -290,9 +290,4 @@ bool SourceFile::loadFromCache(ASTContext &Ctx,
   return deserializer.deserialize(cacheBuffer);
 }
 
-
-void SourceFile::clearCachedModuleFile() {
-  delete CachedModuleFile;
-  CachedModuleFile = nullptr;
-}
 } // namespace swift

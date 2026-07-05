@@ -2112,12 +2112,17 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
       return llvm::Error::success();
     };
 
+  // If we emitted any errors while performing the end-of-pipeline actions, bail.
+  // When AllowModuleWithCompilerErrors is set (e.g. AST cache mode), errors
+  // from deserialization are expected and should not prevent code generation.
+  // This check must come before freeASTContextIfPossible, which may free
+  // the ASTContext.
+  if (!Instance.getASTContext().LangOpts.AllowModuleWithCompilerErrors &&
+      Instance.getDiags().hadAnyError())
+    return true;
+
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
-
-  // If we emitted any errors while performing the end-of-pipeline actions, bail.
-  if (Instance.getDiags().hadAnyError())
-    return true;
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
@@ -2228,7 +2233,6 @@ static bool performCompileStepsPostSILGen(
   // Perform optimizations and mandatory/diagnostic passes.
   if (Instance.performSILProcessing(SM.get()))
     return true;
-
   if (observer)
     observer->performedSILProcessing(*SM);
 
@@ -2277,8 +2281,6 @@ static bool performCompileStepsPostSILGen(
          "All actions not requiring IRGen must have been handled!");
   assert(Action != FrontendOptions::ActionType::REPL &&
          "REPL mode must be handled immediately after Instance->performSema()");
-
-  // Check if we had any errors; if we did, don't proceed to IRGen.
   if (Context.hadError())
     return !opts.AllowModuleWithCompilerErrors;
 
