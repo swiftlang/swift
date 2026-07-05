@@ -5518,9 +5518,96 @@ public:
     extension->setGenericSignature(MF.getGenericSignature(genericSigID));
 
     auto extendedType = MF.getType(extendedTypeID);
+    // Note: ExtendedTypeRequest is cached later, after dedup, so it can be
+    // rebuilt if the nominal is a duplicate.
+    auto nominal = dyn_cast_or_null<NominalTypeDecl>(MF.getDecl(extendedNominalID));
+    // Per-file AST cache: MF.getDecl(extendedNominalID) may create a duplicate
+    // of a nominal that was already loaded from another cache file. Check the
+    // registry first, and fall back to searching already-loaded SourceFiles.
+    if (nominal && nominal->getParentSourceFile() &&
+        nominal->getParentSourceFile()->LoadedFromAstCache) {
+      auto &astCtx = ctx;
+      Identifier parentName;
+      uint8_t parentKind = 0;
+      // Determine parent context for registry key.
+      // For top-level nominals, parent is SourceFile (empty key).
+      // For nominals nested in other nominals, parent is the parent nominal.
+      // For nominals in extensions, walk up to find the top-level nominal.
+      auto *parentDC = nominal->getDeclContext();
+      if (auto *parentNTD = dyn_cast_or_null<NominalTypeDecl>(parentDC)) {
+        parentName = parentNTD->getName();
+        parentKind = static_cast<uint8_t>(parentNTD->getKind());
+      } else if (auto *parentExt = dyn_cast_or_null<ExtensionDecl>(parentDC)) {
+        // Walk up through extension to find the extended nominal
+        if (auto *extNom = parentExt->getExtendedNominal()) {
+          parentName = extNom->getName();
+          parentKind = static_cast<uint8_t>(extNom->getKind());
+        }
+      }
+      // Check registry for existing nominal
+      auto existing = astCtx.lookupCachedNominalDecl(
+          nominal->getName(), static_cast<uint8_t>(nominal->getKind()),
+          parentName, parentKind);
+      if (existing && existing != nominal) {
+        nominal = existing;
+        // Rebuild extendedType with the real nominal
+        if (auto *nomType = dyn_cast_or_null<NominalType>(extendedType.getPointer())) {
+          if (nomType->getDecl() != nominal) {
+            extendedType = NominalType::get(nominal, nomType->getParent(), ctx);
+          }
+        }
+      } else if (!existing) {
+        // Not in registry — try to find the real nominal by searching
+        // already-loaded SourceFiles' extensions (force-loading members).
+        // This handles the case where the nominal is a member of an extension
+        // in a previously-loaded cache file, but hasn't been registered yet
+        // because getDeclChecked only registers when the decl is deserialized.
+        auto *module = nominal->getModuleContext();
+        NominalTypeDecl *foundNominal = nullptr;
+        for (auto *file : module->getFiles()) {
+          auto *SF = dyn_cast<SourceFile>(file);
+          if (!SF || !SF->LoadedFromAstCache ||
+              SF == nominal->getParentSourceFile())
+            continue;
+          for (auto item : SF->getTopLevelItems()) {
+            auto *D = item.dyn_cast<Decl *>();
+            if (!D) continue;
+            if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
+              auto *extNom = ext->getExtendedNominal();
+              if (!extNom) continue;
+              // Check if this extension's extended nominal matches the parent
+              if (extNom->getName() != parentName) continue;
+              // Search this extension's members for the nominal
+              for (auto *member : ext->getMembers()) {
+                if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
+                  if (NTD->getName() == nominal->getName() &&
+                      NTD->getKind() == nominal->getKind() &&
+                      NTD != nominal) {
+                    foundNominal = NTD;
+                    break;
+                  }
+                }
+              }
+              if (foundNominal) break;
+            }
+          }
+          if (foundNominal) break;
+        }
+        if (foundNominal) {
+          nominal = foundNominal;
+          if (auto *nomType = dyn_cast_or_null<NominalType>(extendedType.getPointer())) {
+            if (nomType->getDecl() != nominal) {
+              extendedType = NominalType::get(nominal, nomType->getParent(), ctx);
+            }
+          }
+        } else {
+          // Register this nominal as the canonical one
+          astCtx.registerCachedNominalDecl(nominal, parentName, parentKind);
+        }
+      }
+    }
     ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
                               std::move(extendedType));
-    auto nominal = dyn_cast_or_null<NominalTypeDecl>(MF.getDecl(extendedNominalID));
     extension->setExtendedNominal(nominal);
 
     if (isImplicit)
@@ -5813,6 +5900,34 @@ ModuleFile::getDeclChecked(
     if (!matchAttributes(declOrOffset.get()->getAttrs()))
       return llvm::make_error<DeclAttributesDidNotMatch>();
   }
+
+  // Per-file AST cache: register NominalTypeDecls from cached SourceFiles
+  // in the registry. This is used by deserializeExtension to find the real
+  // nominal when an extension references a nominal from another file.
+  // Note: we only REGISTER here, not dedup. The dedup happens in
+  // deserializeExtension to avoid DeclContext mismatch assertions.
+  if (auto *NTD = dyn_cast_or_null<NominalTypeDecl>(declOrOffset.get())) {
+    auto *SF = NTD->getParentSourceFile();
+    if (SF && SF->LoadedFromAstCache) {
+      auto &ctx = getContext();
+      Identifier parentName;
+      uint8_t parentKind = 0;
+      auto *parentDC = NTD->getDeclContext();
+      if (auto *parentNTD = dyn_cast_or_null<NominalTypeDecl>(parentDC)) {
+        // Nested inside another nominal
+        parentName = parentNTD->getName();
+        parentKind = static_cast<uint8_t>(parentNTD->getKind());
+      } else if (isa<SourceFile>(parentDC)) {
+        // Top-level nominal — parentName and parentKind stay 0
+      } else {
+        // Parent is ExtensionDecl or other — don't register
+        // (members of extensions are handled by deserializeExtension's fallback)
+        goto skip_register;
+      }
+      ctx.registerCachedNominalDecl(NTD, parentName, parentKind);
+    }
+  }
+  skip_register: ;
 
   // Tag every deserialized ValueDecl coming out of getDeclChecked with its ID.
   assert(declOrOffset.isComplete());

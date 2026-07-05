@@ -266,6 +266,9 @@ private:
 
   /// SILLayouts referenced by this module.
   MutableArrayRef<Serialized<SILLayout *>> SILLayouts;
+  /// Per-ModuleFile flag for AST cache: allow compiler errors during
+  /// deserialization without leaking into global LangOpts.
+  bool AllowCompilerErrorsForCache = false;
 
   /// Types referenced by this module.
   MutableArrayRef<Serialized<Type>> Types;
@@ -693,6 +696,14 @@ public:
   /// Whether currently allowing modules with compiler errors (ie.
   /// '-experimental-allow-module-with-compiler-errors' is currently enabled).
   bool allowCompilerErrors() const;
+
+  /// Set whether this ModuleFile should allow compiler errors during
+  /// deserialization. Used by AST cache to handle ErrorTypes in cached files
+  /// without leaking AllowModuleWithCompilerErrors into the global LangOpts,
+  /// which would allow errors in primary (source-compiled) files.
+  void setAllowCompilerErrorsForCache(bool value) {
+    AllowCompilerErrorsForCache = value;
+  }
 
   /// Allow recovering from errors that could be unsafe when compiling
   /// the binary. Useful for the debugger and IDE support tools.

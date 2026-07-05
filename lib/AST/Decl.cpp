@@ -6244,6 +6244,35 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   addedExtension(extension);
 }
 
+void NominalTypeDecl::moveExtension(ExtensionDecl *extension) {
+  // Reset the extension's linked-list state so it can be re-added.
+  extension->NextExtension.setPointer(nullptr);
+  extension->NextExtension.setInt(false);
+  addExtension(extension);
+}
+
+void NominalTypeDecl::removeExtension(ExtensionDecl *extension) {
+  // Remove from the linked list
+  if (FirstExtension == extension) {
+    FirstExtension = extension->NextExtension.getPointer();
+    if (LastExtension == extension)
+      LastExtension = nullptr;
+    extension->NextExtension.setPointer(nullptr);
+    extension->NextExtension.setInt(false);
+    return;
+  }
+  ExtensionDecl *prev = FirstExtension;
+  while (prev && prev->NextExtension.getPointer() != extension)
+    prev = prev->NextExtension.getPointer();
+  if (prev) {
+    prev->NextExtension.setPointer(extension->NextExtension.getPointer());
+    if (LastExtension == extension)
+      LastExtension = prev;
+    extension->NextExtension.setPointer(nullptr);
+    extension->NextExtension.setInt(false);
+  }
+}
+
 ArrayRef<VarDecl *> NominalTypeDecl::getStoredProperties() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<NominalTypeDecl *>(this);

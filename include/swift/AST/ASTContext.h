@@ -479,6 +479,19 @@ private:
   /// The boolean in the value indicates whether or not the entry is keyed by an alias vs real name,
   /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
   mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
+  /// Per-file AST cache: registry of NominalTypeDecls that have already been
+  /// deserialized, keyed by (name, kind, parent SourceFile). When a nominal is
+  /// deserialized from a .swiftast cache file, we check this registry to avoid
+  /// creating duplicate decls when the same nominal is referenced from
+  /// multiple cache files (e.g. via extensions). This prevents the "duplicate
+  /// NominalTypeDecl" problem where extensions are registered on the wrong
+  /// copy of a nominal.
+  /// Key: (name, DeclKind, parent SourceFile) — parent SourceFile identifies
+  /// the "context" the nominal was declared in (top-level file or extension).
+  /// Value: the first (real) NominalTypeDecl created for this key.
+  mutable llvm::DenseMap<std::tuple<Identifier, uint8_t, Identifier, uint8_t>,
+                         NominalTypeDecl *>
+      CachedNominalDeclRegistry;
 
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
@@ -607,6 +620,23 @@ public:
       new (storage.data() + i) Output(transform(input[i]));
     return storage;
   }
+  /// Per-file AST cache: Look up an existing deserialized NominalTypeDecl by
+  /// (name, kind, parentName, parentKind). Returns the existing decl if one
+  /// was already registered, or nullptr otherwise. Used during deserialization
+  /// to avoid creating duplicate nominals when the same type is referenced
+  /// from multiple cache files.
+  /// \p kind and \p parentKind are DeclKind values cast to uint8_t.
+  NominalTypeDecl *
+  lookupCachedNominalDecl(Identifier name, uint8_t kind,
+                          Identifier parentName, uint8_t parentKind) const;
+
+  /// Per-file AST cache: Register a NominalTypeDecl as the canonical decl
+  /// for (name, kind, parentName, parentKind). Should be called when a nominal
+  /// is first deserialized from a .swiftast cache file. Subsequent lookups for
+  /// the same key will return this decl, preventing duplicates.
+  /// \p parentKind is a DeclKind value cast to uint8_t.
+  void registerCachedNominalDecl(NominalTypeDecl *decl,
+                                 Identifier parentName, uint8_t parentKind) const;
 
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);

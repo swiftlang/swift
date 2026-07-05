@@ -4561,6 +4561,12 @@ public:
 
   /// Add a new extension to this nominal type.
   void addExtension(ExtensionDecl *extension);
+  /// Move an extension from another nominal's extension list to this one.
+  /// Used by per-file AST cache deduplication to fix extensions registered
+  /// on duplicate nominals.
+  void moveExtension(ExtensionDecl *extension);
+  /// Remove an extension from this nominal type's extension list.
+  void removeExtension(ExtensionDecl *extension);
 
   /// Add a member to this decl's lookup table.
   ///

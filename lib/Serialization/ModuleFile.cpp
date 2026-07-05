@@ -136,7 +136,8 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
 }
 
 bool ModuleFile::allowCompilerErrors() const {
-  return getContext().LangOpts.AllowModuleWithCompilerErrors;
+  return AllowCompilerErrorsForCache ||
+         getContext().LangOpts.AllowModuleWithCompilerErrors;
 }
 
 bool ModuleFile::enableExtendedDeserializationRecovery() const {

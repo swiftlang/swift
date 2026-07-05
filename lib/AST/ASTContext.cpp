@@ -1017,6 +1017,26 @@ void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
     evaluator.setStatsReporter(stats);
 }
 
+NominalTypeDecl *
+ASTContext::lookupCachedNominalDecl(Identifier name, uint8_t kind,
+                                    Identifier parentName,
+                                    uint8_t parentKind) const {
+  auto it = CachedNominalDeclRegistry.find(
+      std::make_tuple(name, kind, parentName, parentKind));
+  if (it != CachedNominalDeclRegistry.end())
+    return it->second;
+  return nullptr;
+}
+
+void ASTContext::registerCachedNominalDecl(NominalTypeDecl *decl,
+                                           Identifier parentName,
+                                           uint8_t parentKind) const {
+  auto key = std::make_tuple(decl->getName(),
+                             static_cast<uint8_t>(decl->getKind()),
+                             parentName, parentKind);
+  CachedNominalDeclRegistry.try_emplace(key, decl);
+}
+
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the
 /// specified string.
 Identifier ASTContext::getIdentifier(StringRef Str) const {

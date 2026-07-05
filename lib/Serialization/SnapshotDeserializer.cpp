@@ -78,13 +78,18 @@ public:
       return false;
     }
 
+    // Set LoadedFromAstCache before deserialization so that
+    // IterableDeclContext::wasDeserialized() returns true during
+    // getDeclChecked() (which is called from getTopLevelDecls() inside
+    // deserializeBitstream). Without this, the DeclID is never set on
+    // deserialized ExtensionDecls, causing loadNamedMembers() to fail
+    // to find extension members.
+    SF.LoadedFromAstCache = true;
+    SF.ASTStage = SourceFile::TypeChecked;
+
     if (!deserializeBitstream(bitstreamData, key)) {
       return false;
     }
-
-    // 6. Set remaining fields
-    SF.ASTStage = SourceFile::TypeChecked;
-    SF.LoadedFromAstCache = true;
 
     // AST cache: disable SIL verification. Cached files have missing function
     // bodies and incomplete witness tables (by design), so SIL verification
@@ -96,15 +101,14 @@ public:
 private:
   bool deserializeBitstream(StringRef bitstreamData,
                            const ASTCacheKey &key) {
- // The cached AST may have been serialized with AllowModuleWithCompilerErrors
- // (e.g. when types had errors due to whole-module compilation). Enable it
- // for the entire compilation — we cannot restore the previous value because
- // lazy member loading (loadAllMembers/loadStorageMembers) triggers
- // deserialization at any point during SILGen/IRGen, long after this function
- // returns. If AllowModuleWithCompilerErrors is false during lazy loading,
- // the deserializer hits llvm_unreachable on ErrorType.
- auto &langOpts = const_cast<LangOptions &>(ctx.LangOpts);
- langOpts.AllowModuleWithCompilerErrors = true;
+    // The cached AST may have been serialized with AllowModuleWithCompilerErrors
+    // (e.g. when types had errors due to whole-module compilation). We enable
+    // per-ModuleFile error recovery via setAllowCompilerErrorsForCache() below,
+    // NOT via LangOpts.AllowModuleWithCompilerErrors. The global flag would leak
+    // into the type-checker and allow errors in primary (source-compiled) files,
+    // causing incorrect types to be produced and serialized into the cache.
+    // The per-ModuleFile flag ensures only deserialization from cache files
+    // allows errors, not type-checking of primary files.
 
     auto bitstreamBuf = llvm::MemoryBuffer::getMemBufferCopy(
         bitstreamData, "cached_ast.swiftmodule");
@@ -133,6 +137,9 @@ private:
     // Create a ModuleFile from the core
     auto mf = std::make_unique<ModuleFile>(core);
 
+    // Enable per-ModuleFile compiler error recovery for AST cache files.
+    // This handles ErrorTypes in cached files without leaking into LangOpts.
+    mf->setAllowCompilerErrorsForCache(true);
     // Pre-populate Items with an empty vector to prevent ParseSourceFileRequest
     // from re-parsing the source file if getTopLevelItems() is called during
     // decl deserialization (e.g., via loadDependenciesForFileContext or

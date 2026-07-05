@@ -835,6 +835,9 @@ public:
   /// Load per-file type-checked ASTs from the .swiftast cache.
   /// Called before performParseAndResolveImportsOnly() in performSema().
   void loadASTCache();
+  /// Deduplicate extensions registered on duplicate nominals.
+  /// Called after performParseAndResolveImportsOnly() so parsed files' decls are available.
+  void dedupExtensions();
 
   /// Save type-checked ASTs to the .swiftast cache after type-checking.
   void saveASTCache();

@@ -61,24 +61,26 @@ public:
     // 3. Populate import metadata in the key
     populateImportMetadata(key);
 
-    // 4. Serialize the AST to a bitstream using the existing Serializer
- std::string bitstreamData;
- {
-   llvm::raw_string_ostream bitstreamOS(bitstreamData);
- SerializationOptions opts;
- // Serialize only the source file (not the whole module)
- // Allow compiler errors so the serializer skips invalid types instead
- // of crashing (e.g. when a type references an unresolved ObjC bridging
- // header type in whole-module compilation).
- auto &langOpts = const_cast<LangOptions &>(ctx.LangOpts);
- bool savedAllowErrors = langOpts.AllowModuleWithCompilerErrors;
- langOpts.AllowModuleWithCompilerErrors = true;
- serialization::writeToStream(
- bitstreamOS, ModuleOrSourceFile(const_cast<SourceFile *>(&SF)),
- /*SILModule*/ nullptr, opts,
- /*DepGraph*/ nullptr);
- langOpts.AllowModuleWithCompilerErrors = savedAllowErrors;
- }
+    // 4. Serialize the AST to a bitstream using the existing Serializer.
+    // Allow compiler errors to prevent the serializer from aborting on
+    // ErrorTypes. The saveASTCache() caller already checks for invalid decls
+    // and skips files that have them, but ErrorTypes might exist in places
+    // not covered by the invalid bit (e.g., type alias underlying types).
+    // The serializer writes ERROR_FLAG for invalid decls and ErrorType records
+    // for ErrorTypes, which the deserializer handles via setAllowCompilerErrorsForCache.
+    std::string bitstreamData;
+    {
+      llvm::raw_string_ostream bitstreamOS(bitstreamData);
+      SerializationOptions opts;
+      auto &langOpts = const_cast<LangOptions &>(ctx.LangOpts);
+      bool savedAllowErrors = langOpts.AllowModuleWithCompilerErrors;
+      langOpts.AllowModuleWithCompilerErrors = true;
+      serialization::writeToStream(
+          bitstreamOS, ModuleOrSourceFile(const_cast<SourceFile *>(&SF)),
+          /*SILModule*/ nullptr, opts,
+          /*DepGraph*/ nullptr);
+      langOpts.AllowModuleWithCompilerErrors = savedAllowErrors;
+    }
 
     // 5. Serialize the .swiftdeps content to YAML
     // For the PoC, we don't serialize the dependency graph.

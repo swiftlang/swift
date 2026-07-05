@@ -640,7 +640,7 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
 
 DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
   assert((!D || !isDeclXRef(D) || isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
-          isa<PrecedenceGroupDecl>(D)) &&
+          isa<PrecedenceGroupDecl>(D) || isa<ExtensionDecl>(D)) &&
          "cannot cross-reference this decl");
 
   assert((!D || allowTypeAliasXRef || !isa<TypeAliasDecl>(D) ||
