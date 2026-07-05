@@ -5964,7 +5964,7 @@ ModuleFile::getDeclChecked(
         // (members of extensions are handled by deserializeExtension's fallback)
         goto skip_register;
       }
-      ctx.registerCachedNominalDecl(NTD, parentName, parentKind);
+      ctx.registerCachedNominalDecl(NTD, parentName, parentKind, true);
     }
   }
   skip_register: ;

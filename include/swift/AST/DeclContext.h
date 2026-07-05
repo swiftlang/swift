@@ -1004,6 +1004,10 @@ public:
   /// Add a member in the right place to preserve source order. This should
   /// only be called from the code completion delayed parsing path.
   void addMemberPreservingSourceOrder(Decl *member);
+  /// Remove a member from this context's member list.
+  /// Used by per-file AST cache dedup to remove duplicate deserialized members.
+  /// The member must already be in the list. Does NOT call removedMember.
+  void removeMember(Decl *member);
 
   /// Whether there are lazy members to load.
   bool hasLazyMembers() const {

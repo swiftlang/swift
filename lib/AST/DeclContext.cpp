@@ -1093,6 +1093,34 @@ void IterableDeclContext::addMember(Decl *member, Decl *hint, bool insertAtHead)
   }
 }
 
+void IterableDeclContext::removeMember(Decl *member) {
+  assert(!hasLazyMembers() && "cannot remove from lazy member list");
+
+  auto *head = FirstDeclAndLazyMembers.getPointer();
+  if (!head) return;
+
+  // Head case.
+  if (head == member) {
+    FirstDeclAndLazyMembers.setPointer(member->NextDecl);
+    if (LastDeclAndKind.getPointer() == member)
+      LastDeclAndKind.setPointer(member->NextDecl);
+    member->NextDecl = nullptr;
+    return;
+  }
+
+  // Traverse to find predecessor.
+  Decl *prev = head;
+  while (prev->NextDecl && prev->NextDecl != member)
+    prev = prev->NextDecl;
+
+  if (prev->NextDecl == member) {
+    prev->NextDecl = member->NextDecl;
+    if (LastDeclAndKind.getPointer() == member)
+      LastDeclAndKind.setPointer(prev);
+    member->NextDecl = nullptr;
+  }
+}
+
 void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
                                             bool insertAtHead) const {
   assert(!isa<AccessorDecl>(member) && "Accessors should not be added here");
