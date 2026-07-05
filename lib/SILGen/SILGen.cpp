@@ -629,6 +629,22 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   auto fn = M.lookUpFunction(functionName);
   if (fn) return fn;
 
+  // In embedded Swift the projection entry points are provided by
+  // `_read`/`_modify` accessors on `KeyPath`/`WritableKeyPath`/
+  // `ReferenceWritableKeyPath` (see KeyPath.swift).  Those accessors are
+  // class methods, so we must (a) emit our external declaration with
+  // `@convention(method)` so the SIL deserializer accepts the accessor as the
+  // body, and (b) pass `Root` as `@in_guaranteed` even for the writable
+  // modify variant since Swift subscripts cannot take `inout` parameters.
+  //
+  // In non-embedded Swift the entry points are thin coroutines implemented in
+  // the C++ runtime (see stdlib/public/runtime/KeyPaths.cpp) whose ABI is
+  // fixed, so we keep `@convention(thin)` and the original base convention.
+  bool isEmbedded = getASTContext().LangOpts.hasFeature(Feature::Embedded);
+  if (isEmbedded && typeKind == KPTK_WritableKeyPath && !isReadAccess) {
+    isBaseInout = false;
+  }
+
   auto sig = keyPathDecl->getGenericSignature().getCanonicalSignature();
   auto rootType = sig.getGenericParams()[0]->getCanonicalType();
   auto valueType = sig.getGenericParams()[1]->getCanonicalType();
@@ -652,7 +668,11 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                     : ParameterConvention::Indirect_In_Guaranteed },
   };
 
-  auto extInfo = SILFunctionType::ExtInfo::getThin();
+  auto extInfo =
+      isEmbedded
+          ? SILFunctionType::ExtInfo::getThin().withRepresentation(
+                SILFunctionTypeRepresentation::Method)
+          : SILFunctionType::ExtInfo::getThin();
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,

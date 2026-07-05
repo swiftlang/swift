@@ -2562,6 +2562,23 @@ func _getAtKeyPath<Root, Value>(
   return keyPath._projectReadOnly(from: root)
 }
 
+// SILGen emits calls to `swift_readAtKeyPath`, `swift_modifyAtWritableKeyPath`
+// and `swift_modifyAtReferenceWritableKeyPath` for key path subscript accesses
+// (see `getKeyPathProjectionCoroutine` in lib/SILGen/SILGen.cpp).
+//
+// In non-embedded Swift these are thin yield-once coroutine ramp functions
+// whose ABI is fixed; they live in the C++ runtime (see
+// stdlib/public/runtime/KeyPaths.cpp) and call back into the Swift `_impl`
+// helpers below.
+//
+// In embedded Swift the C++ runtime is not compiled in.  Instead, the entry
+// points are provided directly by `_read`/`_modify` accessors on
+// `KeyPath`/`WritableKeyPath`/`ReferenceWritableKeyPath`, emitted with
+// `@convention(method)`; SILGen selects that convention when the `Embedded`
+// feature is enabled.
+
+#if !hasFeature(Embedded)
+
 // The release that ends the access scope is guaranteed to happen
 // immediately at the end_apply call because the continuation is a
 // runtime call with a manual release (access scopes cannot be extended).
@@ -2592,6 +2609,71 @@ func _modifyAtReferenceWritableKeyPath_impl<Root, Value>(
 ) -> (UnsafeMutablePointer<Value>, AnyObject?) {
   return unsafe keyPath._projectMutableAddress(from: root)
 }
+
+#else // hasFeature(Embedded)
+
+extension KeyPath {
+  @unsafe
+  @usableFromInline
+  internal subscript(_borrowedProjection root: Root) -> Value {
+    @_silgen_name("swift_readAtKeyPath")
+    _read {
+      yield _projectReadOnly(from: root)
+    }
+  }
+}
+
+extension WritableKeyPath {
+  @unsafe
+  @usableFromInline
+  internal subscript(_mutableProjection root: Root) -> Value {
+    get { return _projectReadOnly(from: root) }
+    // FIXME: Unlike the non-embedded C++ ramp function's opaque
+    // continuation, this accessor's `.resume` is Swift-visible IR.
+    // The ARC optimizer can hoist `owner`'s release past `end_apply`,
+    // which in turn extends the exclusivity access scope. This needs
+    // to be solved (e.g. via an opaque release barrier) before the
+    // `EmbeddedDynamicExclusivity` feature can be safely combined
+    // with keypath-driven modifies through class-stored properties.
+    @_silgen_name("swift_modifyAtWritableKeyPath")
+    _modify {
+      if type(of: self).kind == .reference {
+        let refKP = unsafe _unsafeUncheckedDowncast(
+          self, to: ReferenceWritableKeyPath<Root, Value>.self)
+        let (addr, owner) = unsafe refKP._projectMutableAddress(from: root)
+        defer { _fixLifetime(owner) }
+        yield unsafe &addr.pointee
+      } else {
+        let (addr, owner) = unsafe _withUnprotectedUnsafePointer(to: root) {
+          unsafe _projectMutableAddress(from: $0)
+        }
+        defer { _fixLifetime(owner) }
+        yield unsafe &addr.pointee
+      }
+    }
+  }
+}
+
+extension ReferenceWritableKeyPath {
+  @unsafe
+  @usableFromInline
+  internal subscript(_referenceMutableProjection root: Root) -> Value {
+    get { return _projectReadOnly(from: root) }
+    // FIXME: Same caveat as `WritableKeyPath._mutableProjection` above:
+    // `owner`'s release lives in a Swift-visible `.resume` and can be
+    // extended past `end_apply` by ARC, extending the access scope.
+    // Needs an opaque release barrier before `EmbeddedDynamicExclusivity`
+    // combined with keypath modify chains can be trusted.
+    @_silgen_name("swift_modifyAtReferenceWritableKeyPath")
+    _modify {
+      let (addr, owner) = unsafe _projectMutableAddress(from: root)
+      defer { _fixLifetime(owner) }
+      yield unsafe &addr.pointee
+    }
+  }
+}
+
+#endif
 
 @_silgen_name("swift_setAtWritableKeyPath")
 public // COMPILER_INTRINSIC
