@@ -14,6 +14,10 @@
 // UNSUPPORTED: back_deployment_concurrency
 // UNSUPPORTED: use_os_stdlib
 
+// Bare `dispatch_assert_queue` symbol is hidden on visionOS 1.0
+// (only `$V2` is exported).
+// UNSUPPORTED: OS=xros
+
 // Just a runtime test as a sanity check.
 
 import StdlibUnittest
