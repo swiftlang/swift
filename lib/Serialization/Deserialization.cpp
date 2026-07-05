@@ -5959,9 +5959,15 @@ ModuleFile::getDeclChecked(
         parentKind = static_cast<uint8_t>(parentNTD->getKind());
       } else if (isa<SourceFile>(parentDC)) {
         // Top-level nominal — parentName and parentKind stay 0
+      } else if (auto *parentExt = dyn_cast_or_null<ExtensionDecl>(parentDC)) {
+        // Member of an extension — register with the extended nominal's info
+        if (auto *extNom = parentExt->getExtendedNominal()) {
+          parentName = extNom->getName();
+          parentKind = static_cast<uint8_t>(extNom->getKind());
+        } else {
+          goto skip_register;
+        }
       } else {
-        // Parent is ExtensionDecl or other — don't register
-        // (members of extensions are handled by deserializeExtension's fallback)
         goto skip_register;
       }
       ctx.registerCachedNominalDecl(NTD, parentName, parentKind, true);
@@ -7580,10 +7586,8 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
           nominal->getName(), static_cast<uint8_t>(nominal->getKind()),
           parentName, parentKind);
       if (existing && existing != nominal) {
-        // Also try the fallback: search already-loaded SourceFiles for the
-        // real nominal (in case it wasn't registered by getDeclChecked
-        // because it's a member of an extension)
         nominal = existing;
+        ctx.registerCachedNominalDecl(nominal, parentName, parentKind, true);
       } else if (!existing) {
         // Fallback: search already-loaded SourceFiles' extensions
         auto *module = nominal->getModuleContext();
@@ -7616,8 +7620,9 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
         }
         if (foundNominal) {
           nominal = foundNominal;
+          ctx.registerCachedNominalDecl(nominal, parentName, parentKind, true);
         } else {
-          ctx.registerCachedNominalDecl(nominal, parentName, parentKind);
+          ctx.registerCachedNominalDecl(nominal, parentName, parentKind, true);
         }
       }
     }

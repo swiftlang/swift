@@ -3057,6 +3057,7 @@ protected:
 
   // MemberLookupTable borrows a bit from this type
   friend class MemberLookupTable;
+  friend class NominalTypeDecl;
   bool isAlreadyInLookupTable() {
     return Bits.ValueDecl.AlreadyInLookupTable;
   }
@@ -4432,6 +4433,13 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   /// Prepare the lookup table to make it ready for lookups.
   /// Does nothing when called more than once.
   void prepareLookupTable();
+
+  /// Clear the member lookup table so it will be rebuilt on next access.
+  /// Used by per-file AST cache dedup to invalidate stale entries after
+  /// removeMember().
+public:
+  void clearLookupTable();
+private:
 
   /// Note that we have added a member into the iterable declaration context,
   /// so that it can also be added to the lookup table (if needed).

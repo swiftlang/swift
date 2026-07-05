@@ -66,6 +66,7 @@
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/TargetParser/Triple.h"
 #include <llvm/ADT/StringExtras.h>
+#include <functional>
 
 using namespace swift;
 
@@ -2425,14 +2426,17 @@ void CompilerInstance::dedupExtensions() {
     }
     for (auto *ext : toRemove)
       nominal->removeExtension(ext);
+    if (!toRemove.empty())
+      nominal->clearLookupTable();
   }
   // Dedup direct members of nominals. With isDeclXRef=false, cached files
   // serialize referenced NominalTypeDecls inline. These become direct members
   // of the extended nominal (not extension members). removeExtension can't
   // remove them. Walk each nominal's members and remove duplicate
   // NominalTypeDecls (same name+kind), preferring parsed over cached.
-  for (auto &entry : realNominals) {
-    auto *nominal = entry.second;
+  // Recurse into nested nominals to handle arbitrary nesting depth.
+  std::function<void(NominalTypeDecl *)> dedupDirectMembers;
+  dedupDirectMembers = [&](NominalTypeDecl *nominal) {
     // Force-load all members so we can iterate them.
     nominal->getMembers();
     // Collect parsed member names (from non-cached source files).
@@ -2440,9 +2444,8 @@ void CompilerInstance::dedupExtensions() {
     for (auto *member : nominal->getMembers()) {
       auto *SF = member->getDeclContext()->getParentSourceFile();
       if (SF && !SF->LoadedFromAstCache) {
-        if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
+        if (auto *NTD = dyn_cast<NominalTypeDecl>(member))
           parsedMemberNames.insert({NTD->getKind(), NTD->getName()});
-        }
       }
     }
     // Remove cached duplicate direct members.
@@ -2466,7 +2469,22 @@ void CompilerInstance::dedupExtensions() {
     }
     for (auto *member : toRemoveDirect)
       nominal->removeMember(member);
-  }
+    // Clear the lookup table so stale entries (pointing to removed members)
+    // are invalidated. The table will be rebuilt on next access.
+    if (!toRemoveDirect.empty())
+      nominal->clearLookupTable();
+    // Re-register surviving NominalTypeDecl members so the registry points
+    // to the kept (not removed) decl. Recurse into nested nominals.
+    for (auto *member : nominal->getMembers()) {
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
+        astCtx.registerCachedNominalDecl(NTD, nominal->getName(),
+            static_cast<uint8_t>(nominal->getKind()), true);
+        dedupDirectMembers(NTD);
+      }
+    }
+  };
+  for (auto &entry : realNominals)
+    dedupDirectMembers(entry.second);
   // Register NominalTypeDecls that are members of extensions in the registry,
   // so computeNominalType can redirect duplicate types to the real nominal.
   // Parsed extensions are registered first (force=true, highest priority).

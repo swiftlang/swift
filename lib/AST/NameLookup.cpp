@@ -2174,6 +2174,20 @@ void NominalTypeDecl::prepareLookupTable() {
   LookupTable.setInt(true);
 }
 
+void NominalTypeDecl::clearLookupTable() {
+  // Reset the lookup table so it will be rebuilt on next access.
+  // The old table is arena-allocated and will be cleaned up with the ASTContext.
+  LookupTable.setPointer(nullptr);
+  LookupTable.setInt(false);
+  // Clear AlreadyInLookupTable on all current members so they can be re-added
+  // when the table is rebuilt.
+  for (auto *member : getMembers()) {
+    if (auto *VD = dyn_cast<ValueDecl>(member))
+      VD->setAlreadyInLookupTable(false);
+  }
+}
+
+
 static TinyPtrVector<ValueDecl *> maybeFilterOutUnwantedDecls(
       TinyPtrVector<ValueDecl *> decls,
       DeclName name,
