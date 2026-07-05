@@ -512,12 +512,12 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
 // CHECK-NEXT: load
 // CHECK-NEXT: return
 // CHECK: } // end sil function 'a2p_p2a_reinterpret_cast_word_raw_pointer1'
-sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer1 : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
+sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer1 : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int8 {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int32
-  %4 = load [trivial] %3 : $*Int32
-  return %4 : $Int32
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int8
+  %4 = load [trivial] %3 : $*Int8
+  return %4 : $Int8
 }
 
 sil @useInt : $@convention(thin) (Int32) -> ()
