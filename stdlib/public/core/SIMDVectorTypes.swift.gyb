@@ -167,9 +167,8 @@ extension SIMD${n} where Scalar: FixedWidthInteger {
 @_unavailableInEmbedded
 extension SIMD${n}: CustomDebugStringConvertible {
   public var debugDescription: String {
-    return "SIMD${n}<\(Scalar.self)>(${', '.join(map(lambda c:
-                       '\\(self['+ str(c) + '])',
-                       range(n)))})"
+    return "SIMD${n}<\(Scalar.self)>("
+      + indices.map({ "\(self[$0])" }).joined(separator: ", ") + ")"
   }
 }
 
