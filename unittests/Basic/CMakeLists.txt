@@ -29,6 +29,7 @@ add_swift_unittest(SwiftBasicTests
   OwnedStringTest.cpp
   MultiMapCacheTest.cpp
   PointerIntEnumTest.cpp
+  PointerIntPairTest.cpp
   PrefixMapTest.cpp
   RangeTest.cpp
   SmallMapTest.cpp

@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/PointerIntPair.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
@@ -286,93 +287,39 @@ static StringRef getNameForStatus(AllocationStatus status) {
 }
 
 class ActiveAllocation {
-#if __SIZEOF_POINTER__ == 4
-  // On wasm32, SILInstruction* exposes only 2 low bits (4-byte pointers, and
-  // SILInstruction itself is not over-aligned) — too few to pack the 3-bit
-  // AllocationStatus via PointerIntPair. Store the pointer and the status in separate
-  // fields. Other targets keep the packed representation unchanged.
-  SILInstruction *theValue;
-  AllocationStatus theStatus;
-#else
-  llvm::PointerIntPair<SILInstruction*, 3, AllocationStatus> valueAndStatus;
-#endif
+  swift::PointerIntPair<SILInstruction*, 3, AllocationStatus> valueAndStatus;
 
 public:
-#if __SIZEOF_POINTER__ == 4
-  explicit ActiveAllocation(SILInstruction *value)
-    : theValue(value), theStatus(AllocationStatus::Allocated) {}
-#else
   explicit ActiveAllocation(SILInstruction *value)
     : valueAndStatus(value, AllocationStatus::Allocated) {}
-#endif
 
-  SILInstruction *getValue() const {
-#if __SIZEOF_POINTER__ == 4
-    return theValue;
-#else
-    return valueAndStatus.getPointer();
-#endif
-  }
-
-  AllocationStatus getStatus() const {
-#if __SIZEOF_POINTER__ == 4
-    return theStatus;
-#else
-    return valueAndStatus.getInt();
-#endif
-  }
+  SILInstruction *getValue() const { return valueAndStatus.getPointer(); }
+  AllocationStatus getStatus() const { return valueAndStatus.getInt(); }
 
   void setPending() {
     assert(getStatus() == AllocationStatus::Allocated);
-#if __SIZEOF_POINTER__ == 4
-    theStatus = AllocationStatus::Pending;
-#else
     valueAndStatus.setInt(AllocationStatus::Pending);
-#endif
   }
-
   void setNonNested() {
     assert(getStatus() == AllocationStatus::Allocated);
-#if __SIZEOF_POINTER__ == 4
-    theStatus = AllocationStatus::AllocatedAndNonNested;
-#else
     valueAndStatus.setInt(AllocationStatus::AllocatedAndNonNested);
-#endif
   }
-
   void setDeallocated(bool expectPending) {
     assert(expectPending
              ? getStatus() == AllocationStatus::Pending
              : (getStatus() == AllocationStatus::Allocated ||
                 getStatus() == AllocationStatus::AllocatedAndNonNested));
-#if __SIZEOF_POINTER__ == 4
-    theStatus = AllocationStatus::Deallocated;
-#else
     valueAndStatus.setInt(AllocationStatus::Deallocated);
-#endif
   }
-
   void setUndeallocatable() {
-#if __SIZEOF_POINTER__ == 4
-    theStatus = AllocationStatus::Undeallocatable;
-#else
     valueAndStatus.setInt(AllocationStatus::Undeallocatable);
-#endif
   }
 
   bool operator==(const ActiveAllocation &other) const {
-#if __SIZEOF_POINTER__ == 4
-    return theValue == other.theValue && theStatus == other.theStatus;
-#else
     return valueAndStatus == other.valueAndStatus;
-#endif
   }
   bool operator!=(const ActiveAllocation &other) const {
-#if __SIZEOF_POINTER__ == 4
-    return theValue != other.theValue || theStatus != other.theStatus;
-#else
     return valueAndStatus != other.valueAndStatus;
-#endif
   }
 };
 

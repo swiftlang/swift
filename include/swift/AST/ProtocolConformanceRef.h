@@ -42,7 +42,7 @@ public:
   static inline swift::AbstractConformance *getFromVoidPointer(void *ptr) {
     return (swift::AbstractConformance *)ptr;
   }
-  enum { NumLowBitsAvailable = swift::TypeAlignInBits };
+  enum { NumLowBitsAvailable = swift::ConformanceAlignInBits };
 };
 }
 
