@@ -2148,6 +2148,7 @@ internal struct RawKeyPathComponent {
       )
 
     case .optionalChain:
+#if !hasFeature(Embedded)
       _internalInvariant(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
       _internalInvariant(_isOptional(LeafValue.self),
@@ -2174,8 +2175,12 @@ internal struct RawKeyPathComponent {
           tag._value
         )
       }
+#else
+      fatalError("Embedded Swift does not allow optionals in key paths")
+#endif
 
     case .optionalForce:
+#if !hasFeature(Embedded)
       _internalInvariant(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
 
@@ -2190,8 +2195,12 @@ internal struct RawKeyPathComponent {
       }
 
       _preconditionFailure("unwrapped nil optional")
+#else
+      fatalError("Embedded Swift does not allow optionals in key paths")
+#endif
 
     case .optionalWrap:
+#if !hasFeature(Embedded)
       _internalInvariant(NewValue.self == Optional<CurValue>.self,
                    "should be wrapping optional value")
 
@@ -2201,6 +2210,9 @@ internal struct RawKeyPathComponent {
       Builtin.injectEnumTag(&new, tag._value)
 
       unsafe pointer.initialize(to: new)
+#else
+      fatalError("Embedded Swift does not allow optionals in key paths")
+#endif
     }
   }
 
