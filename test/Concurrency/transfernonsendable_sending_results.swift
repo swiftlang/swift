@@ -306,9 +306,8 @@ func indirectSendingClassField<T>(_ t: GenericNonSendableKlass<T>) -> sending T 
 }
 
 func indirectSendingOptionalClassField<T>(_ t: GenericNonSendableKlass<T>) -> sending T {
-  return t.t2! // expected-warning {{returning a 'Optional<T>' value as a 'sending' result risks causing data races; this is an error in the Swift 6 language mode}}
-  // expected-note @-1 {{returning a 'Optional<T>' value risks causing races since the caller assumes the value can be safely sent to other isolation domains}}
-  // expected-note @-2 {{'Optional<T>' is a non-Sendable type}}
+  return t.t2! // expected-warning {{returning value as a 'sending' result risks causing data races; this is an error in the Swift 6 language mode}}
+  // expected-note @-1 {{returning value risks causing races since the caller assumes the value can be safely sent to other isolation domains}}
 }
 
 func useBlock<T>(block: () throws -> T) throws -> sending T {

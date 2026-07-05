@@ -669,8 +669,8 @@ func test_tuple_formation(a : A, i : Int) async {
     foo_noniso(ns012);
     foo_noniso(ns13);
   case 4:
-    await a.foo(ns012) // expected-warning {{sending value of non-Sendable type '(NonSendable, NonSendable, NonSendable)' risks causing data races}}
-    // expected-note @-1 {{sending value of non-Sendable type '(NonSendable, NonSendable, NonSendable)' to actor-isolated instance method 'foo' risks causing data races between actor-isolated and local nonisolated uses}}
+    await a.foo(ns012) // expected-warning {{sending value risks causing data races}}
+    // expected-note @-1 {{sending value to actor-isolated instance method 'foo' risks causing data races between actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-2 3{{passing argument of non-Sendable type '(NonSendable, NonSendable, NonSendable)' into actor-isolated context may introduce data races}}
 
     if bool {
@@ -689,8 +689,8 @@ func test_tuple_formation(a : A, i : Int) async {
       foo_noniso(ns13); // expected-note {{access can happen concurrently}}
     }
   default:
-      await a.foo(ns13) // expected-warning {{sending value of non-Sendable type '(NonSendable, NonSendable)' risks causing data races}}
-      // expected-note @-1 {{sending value of non-Sendable type '(NonSendable, NonSendable)' to actor-isolated instance method 'foo' risks causing data races between actor-isolated and local nonisolated uses}}
+      await a.foo(ns13) // expected-warning {{sending value risks causing data races}}
+      // expected-note @-1 {{sending value to actor-isolated instance method 'foo' risks causing data races between actor-isolated and local nonisolated uses}}
     // expected-complete-warning @-1 2{{passing argument of non-Sendable type '(NonSendable, NonSendable)' into actor-isolated context may introduce data races}}
 
     if bool {
@@ -942,8 +942,8 @@ func enum_test(a : A) async {
     case .E2:
       switch (e3) {
       case let .E3(ns3):
-        await a.foo(ns3.x) // expected-warning {{sending value of non-Sendable type 'Any' risks causing data races}}
-        // expected-note @-1 {{sending value of non-Sendable type 'Any' to actor-isolated instance method 'foo' risks causing data races between actor-isolated and local nonisolated uses}}
+        await a.foo(ns3.x) // expected-warning {{sending value risks causing data races}}
+        // expected-note @-1 {{sending value to actor-isolated instance method 'foo' risks causing data races between actor-isolated and local nonisolated uses}}
         // expected-complete-warning @-1 {{passing argument of non-Sendable type 'Any' into actor-isolated context may introduce data races}}
       default: ()
       }

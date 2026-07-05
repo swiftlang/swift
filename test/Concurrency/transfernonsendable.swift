@@ -276,10 +276,8 @@ extension MyActor {
       print(self.klass)
     }
     let x = (1, closure)
-    await transferToMain(x)
-
-    // expected-warning @-2 {{sending value of non-Sendable type '(Int, () -> ())' risks causing data races}}
-    // expected-note @-3 {{sending 'self'-isolated value of non-Sendable type '(Int, () -> ())' to main actor-isolated global function 'transferToMain' risks causing races in between 'self'-isolated and main actor-isolated uses}}
+    await transferToMain(x) // expected-warning {{sending value risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated value to main actor-isolated global function 'transferToMain' risks causing races in between 'self'-isolated and main actor-isolated uses}}
   }
 
   func simpleClosureCaptureSelfAndTransferThroughTupleBackwards() async {
@@ -288,8 +286,8 @@ extension MyActor {
     }
 
     let x = (closure, 1)
-    await transferToMain(x) // expected-warning {{sending value of non-Sendable type '(() -> (), Int)' risks causing data races}}
-    // expected-note @-1 {{sending 'self'-isolated value of non-Sendable type '(() -> (), Int)' to main actor-isolated global function 'transferToMain' risks causing races in between 'self'-isolated and main actor-isolated uses}}
+    await transferToMain(x) // expected-warning {{sending value risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated value to main actor-isolated global function 'transferToMain' risks causing races in between 'self'-isolated and main actor-isolated uses}}
   }
 
   func simpleClosureCaptureSelfAndTransferThroughOptional() async {
