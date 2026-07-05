@@ -572,6 +572,19 @@ extension __CocoaDictionary {
     return result
   }
 
+  @_alwaysEmitIntoClient
+  internal func mapKeyedValues<Key: Hashable, Value, T, E>(
+    _ transform: (Key, Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
+    var result = _NativeDictionary<Key, T>(capacity: self.count)
+    for (cocoaKey, cocoaValue) in self {
+      let key = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
+      let old = _forceBridgeFromObjectiveC(cocoaValue, Value.self)
+      let new = try transform(key, old)
+      result.insertNew(key: key, value: new)
+    }
+    return result
+  }
 #if !$Embedded
   // ABI-only entrypoint for the rethrows version of mapValues, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
