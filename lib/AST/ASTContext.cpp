@@ -1030,11 +1030,16 @@ ASTContext::lookupCachedNominalDecl(Identifier name, uint8_t kind,
 
 void ASTContext::registerCachedNominalDecl(NominalTypeDecl *decl,
                                            Identifier parentName,
-                                           uint8_t parentKind) const {
+                                           uint8_t parentKind,
+                                           bool force) const {
   auto key = std::make_tuple(decl->getName(),
                              static_cast<uint8_t>(decl->getKind()),
                              parentName, parentKind);
-  CachedNominalDeclRegistry.try_emplace(key, decl);
+  if (force) {
+    CachedNominalDeclRegistry.insert_or_assign(key, decl);
+  } else {
+    CachedNominalDeclRegistry.try_emplace(key, decl);
+  }
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the

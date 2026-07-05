@@ -636,7 +636,8 @@ public:
   /// the same key will return this decl, preventing duplicates.
   /// \p parentKind is a DeclKind value cast to uint8_t.
   void registerCachedNominalDecl(NominalTypeDecl *decl,
-                                 Identifier parentName, uint8_t parentKind) const;
+                                 Identifier parentName, uint8_t parentKind,
+                                 bool force = false) const;
 
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);

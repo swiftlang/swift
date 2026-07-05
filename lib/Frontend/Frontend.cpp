@@ -2220,6 +2220,23 @@ void CompilerInstance::dedupExtensions() {
     if (auto *SF = dyn_cast<SourceFile>(file))
       cacheableFiles.push_back(SF);
   }
+  // Register all top-level NominalTypeDecls from ALL SourceFiles (including
+  // parsed ones) in the registry. This ensures that computeNominalType can
+  // find the real nominal when called on a duplicate from a cached file.
+  // Parsed files overwrite cached files (first-registered wins, but parsed
+  // files are registered after cached files, so we force-overwrite).
+  auto &astCtx = mainModule.getASTContext();
+  for (auto *SF : cacheableFiles) {
+    for (auto item : SF->getTopLevelItems()) {
+      auto *D = item.dyn_cast<Decl *>();
+      if (!D) continue;
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+        // Force-register: overwrite any cached duplicate so that
+        // computeNominalType returns types pointing to the real nominal
+        astCtx.registerCachedNominalDecl(NTD, Identifier(), 0, true);
+      }
+    }
+  }
   // Each .swiftast file contains copies of all same-module decls it references.
   // This creates duplicate NominalTypeDecls. After loading all cache files,
   // build a map of (kind, name) -> first-seen nominal, then for each extension
@@ -2360,16 +2377,37 @@ void CompilerInstance::dedupExtensions() {
   }
   // Remove duplicate extensions: if two extensions on the same nominal
   // define members with the same name+kind, the later one is a duplicate.
-  // Keep the first (from the earliest-loaded SourceFile).
+  // Parsed extensions take priority over cached extensions (parsed extensions
+  // are the real source of truth). Only remove CACHED extensions that
+  // duplicate members from parsed extensions.
   for (auto &entry : realNominals) {
     auto *nominal = entry.second;
-    llvm::DenseSet<std::pair<DeclKind, Identifier>> seenMemberNames;
-    SmallVector<ExtensionDecl *, 4> toRemove;
+    // First pass: collect member names from parsed (non-cached) extensions
+    llvm::DenseSet<std::pair<DeclKind, Identifier>> parsedMemberNames;
     for (auto *ext : nominal->getExtensions()) {
+      auto *SF = ext->getParentSourceFile();
+      if (SF && !SF->LoadedFromAstCache) {
+        for (auto *member : ext->getMembers()) {
+          if (auto *NTD = dyn_cast<NominalTypeDecl>(member))
+            parsedMemberNames.insert({NTD->getKind(), NTD->getName()});
+        }
+      }
+    }
+    // Second pass: remove cached extensions whose members duplicate parsed
+    // ones or earlier-seen members. Parsed extensions take priority.
+    SmallVector<ExtensionDecl *, 4> toRemove;
+    llvm::DenseSet<std::pair<DeclKind, Identifier>> seenMemberNames;
+    for (auto *ext : nominal->getExtensions()) {
+      auto *SF = ext->getParentSourceFile();
+      bool isCached = SF && SF->LoadedFromAstCache;
       bool isDup = false;
       for (auto *member : ext->getMembers()) {
         if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
           auto key = std::make_pair(NTD->getKind(), NTD->getName());
+          if (isCached && parsedMemberNames.count(key)) {
+            isDup = true;
+            break;
+          }
           if (seenMemberNames.count(key)) {
             isDup = true;
             break;

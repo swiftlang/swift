@@ -6137,6 +6137,31 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   // Special case the Builtin.TheTupleType singleton.
   if (isa<BuiltinTupleDecl>(decl))
     return ctx.getBuiltinTupleType();
+  // Per-file AST cache: if this nominal is a duplicate from a cached file,
+  // redirect to the real nominal from the registry. This ensures all type
+  // objects use the same decl pointer, preventing type mismatches.
+  if (auto *SF = decl->getParentSourceFile()) {
+    if (SF->LoadedFromAstCache) {
+      Identifier parentName;
+      uint8_t parentKind = 0;
+      auto *parentDC = decl->getDeclContext();
+      if (auto *parentNTD = dyn_cast_or_null<NominalTypeDecl>(parentDC)) {
+        parentName = parentNTD->getName();
+        parentKind = static_cast<uint8_t>(parentNTD->getKind());
+      } else if (auto *parentExt = dyn_cast_or_null<ExtensionDecl>(parentDC)) {
+        if (auto *extNom = parentExt->getExtendedNominal()) {
+          parentName = extNom->getName();
+          parentKind = static_cast<uint8_t>(extNom->getKind());
+        }
+      }
+      auto realDecl = ctx.lookupCachedNominalDecl(
+          decl->getName(), static_cast<uint8_t>(decl->getKind()),
+          parentName, parentKind);
+      if (realDecl && realDecl != decl) {
+        decl = realDecl;
+      }
+    }
+  }
 
   // If `decl` is a nested type, find the parent type.
   Type ParentTy;

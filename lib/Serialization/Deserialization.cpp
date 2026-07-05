@@ -5553,7 +5553,26 @@ public:
         // Rebuild extendedType with the real nominal
         if (auto *nomType = dyn_cast_or_null<NominalType>(extendedType.getPointer())) {
           if (nomType->getDecl() != nominal) {
-            extendedType = NominalType::get(nominal, nomType->getParent(), ctx);
+            // Also dedup the parent type if it references a duplicate nominal
+            Type parentType = nomType->getParent();
+            if (parentType) {
+              if (auto *parentNom = parentType->getAs<NominalType>()) {
+                auto *parentDecl = parentNom->getDecl();
+                if (auto *parentSF = parentDecl->getParentSourceFile()) {
+                  if (parentSF->LoadedFromAstCache) {
+                    auto realParent = astCtx.lookupCachedNominalDecl(
+                        parentDecl->getName(),
+                        static_cast<uint8_t>(parentDecl->getKind()),
+                        Identifier(), 0);
+                    if (realParent && realParent != parentDecl) {
+                      parentType = NominalType::get(realParent,
+                                                     parentNom->getParent(), ctx);
+                    }
+                  }
+                }
+              }
+            }
+            extendedType = NominalType::get(nominal, parentType, ctx);
           }
         }
       } else if (!existing) {
@@ -5595,9 +5614,30 @@ public:
         }
         if (foundNominal) {
           nominal = foundNominal;
+          // Register the found nominal so computeNominalType can find it
+          astCtx.registerCachedNominalDecl(nominal, parentName, parentKind);
           if (auto *nomType = dyn_cast_or_null<NominalType>(extendedType.getPointer())) {
             if (nomType->getDecl() != nominal) {
-              extendedType = NominalType::get(nominal, nomType->getParent(), ctx);
+              // Also dedup the parent type if it references a duplicate nominal
+              Type parentType = nomType->getParent();
+              if (parentType) {
+                if (auto *parentNom = parentType->getAs<NominalType>()) {
+                  auto *parentDecl = parentNom->getDecl();
+                  if (auto *parentSF = parentDecl->getParentSourceFile()) {
+                    if (parentSF->LoadedFromAstCache) {
+                      auto realParent = astCtx.lookupCachedNominalDecl(
+                          parentDecl->getName(),
+                          static_cast<uint8_t>(parentDecl->getKind()),
+                          Identifier(), 0);
+                      if (realParent && realParent != parentDecl) {
+                        parentType = NominalType::get(realParent,
+                                                       parentNom->getParent(), ctx);
+                      }
+                    }
+                  }
+                }
+              }
+              extendedType = NominalType::get(nominal, parentType, ctx);
             }
           }
         } else {
@@ -7514,6 +7554,73 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
     tinyTrace.addValue(fullName.getBaseIdentifier());
     return llvm::make_error<XRefError>("declaration is not a nominal type",
                                        tinyTrace, fullName);
+  }
+
+  // Per-file AST cache: dedup the nominal. MF.getDeclChecked may have
+  // created a duplicate of a nominal that was already loaded from another
+  // cache file. Check the registry and use the real one if found.
+  // This fixes cached type references (e.g. typealias _Word = Outer._Word)
+  // that would otherwise reference the duplicate nominal.
+  if (auto *SF = nominal->getParentSourceFile()) {
+    if (SF->LoadedFromAstCache) {
+      auto &ctx = MF.getContext();
+      Identifier parentName;
+      uint8_t parentKind = 0;
+      auto *parentDC = nominal->getDeclContext();
+      if (auto *parentNTD = dyn_cast_or_null<NominalTypeDecl>(parentDC)) {
+        parentName = parentNTD->getName();
+        parentKind = static_cast<uint8_t>(parentNTD->getKind());
+      } else if (auto *parentExt = dyn_cast_or_null<ExtensionDecl>(parentDC)) {
+        if (auto *extNom = parentExt->getExtendedNominal()) {
+          parentName = extNom->getName();
+          parentKind = static_cast<uint8_t>(extNom->getKind());
+        }
+      }
+      auto existing = ctx.lookupCachedNominalDecl(
+          nominal->getName(), static_cast<uint8_t>(nominal->getKind()),
+          parentName, parentKind);
+      if (existing && existing != nominal) {
+        // Also try the fallback: search already-loaded SourceFiles for the
+        // real nominal (in case it wasn't registered by getDeclChecked
+        // because it's a member of an extension)
+        nominal = existing;
+      } else if (!existing) {
+        // Fallback: search already-loaded SourceFiles' extensions
+        auto *module = nominal->getModuleContext();
+        NominalTypeDecl *foundNominal = nullptr;
+        for (auto *file : module->getFiles()) {
+          auto *SF2 = dyn_cast<SourceFile>(file);
+          if (!SF2 || !SF2->LoadedFromAstCache ||
+              SF2 == nominal->getParentSourceFile())
+            continue;
+          for (auto item : SF2->getTopLevelItems()) {
+            auto *D = item.dyn_cast<Decl *>();
+            if (!D) continue;
+            if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
+              auto *extNom = ext->getExtendedNominal();
+              if (!extNom || extNom->getName() != parentName) continue;
+              for (auto *member : ext->getMembers()) {
+                if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
+                  if (NTD->getName() == nominal->getName() &&
+                      NTD->getKind() == nominal->getKind() &&
+                      NTD != nominal) {
+                    foundNominal = NTD;
+                    break;
+                  }
+                }
+              }
+              if (foundNominal) break;
+            }
+          }
+          if (foundNominal) break;
+        }
+        if (foundNominal) {
+          nominal = foundNominal;
+        } else {
+          ctx.registerCachedNominalDecl(nominal, parentName, parentKind);
+        }
+      }
+    }
   }
   return NominalType::get(nominal, parentTy.get(), MF.getContext());
 }
