@@ -1334,6 +1334,10 @@ GROUPED_WARNING(cannot_find_module_version,ModuleVersionMissing,none,
         "cannot find user version number for%select{| Clang}1 module '%0';"
         " version number ignored", (StringRef, bool))
 
+NOTE(cannot_find_module_version_use_underlying,none,
+     "the underlying Clang module '%0' has version %1; use "
+     "'_underlyingVersion' to check it", (StringRef, llvm::VersionTuple))
+
 GROUPED_WARNING(canimport_missing_module,CanImportMissingModule,none,
         "cannot find module '%0' for canImport check; the directive will"
         " evaluate to false", (StringRef))

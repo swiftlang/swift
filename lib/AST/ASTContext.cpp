@@ -2812,8 +2812,9 @@ bool ASTContext::canImportModuleImpl(
       !(isSourceCanImport && !version.empty()))
     return false;
 
-  auto missingVersion = [this, &loc, &ModuleName, &isUnderlyingVersion,
-                         isSourceCanImport]() -> bool {
+  auto missingVersion =
+      [this, &loc, &ModuleName, &isUnderlyingVersion, isSourceCanImport](
+          const llvm::VersionTuple &underlyingClangVersion) -> bool {
     // The module version could not be parsed from the preferred source for
     // this query. Diagnose (only for source-level `#if canImport` queries) and
     // return `true` to indicate that the unversioned module will satisfy the
@@ -2823,8 +2824,18 @@ bool ASTContext::canImportModuleImpl(
       auto diagLoc = mID.Loc;
       if (mID.Loc.isInvalid())
         diagLoc = loc;
-      Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
-                     isUnderlyingVersion);
+      Diags.diagnoseWithNotes(
+          Diags.diagnose(diagLoc, diag::cannot_find_module_version,
+                         mID.Item.str(), isUnderlyingVersion),
+          [&]() {
+            // A `_version` query has no user version to compare against, but
+            // the underlying Clang module does carry one. Attach a note that
+            // points the user at `_underlyingVersion`, which can check it.
+            if (!isUnderlyingVersion && !underlyingClangVersion.empty())
+              Diags.diagnose(diagLoc,
+                             diag::cannot_find_module_version_use_underlying,
+                             mID.Item.str(), underlyingClangVersion);
+          });
     }
     return true;
   };
@@ -2843,7 +2854,7 @@ bool ASTContext::canImportModuleImpl(
     if (!foundComparisonVersion.empty())
       return version <= foundComparisonVersion;
     else
-      return missingVersion();
+      return missingVersion(Found->second.UnderlyingVersion);
   }
 
   // When looking up a module, each module importer will report back
@@ -2948,7 +2959,7 @@ bool ASTContext::canImportModuleImpl(
   const auto &queryVersion =
       isUnderlyingVersion ? underlyingVersionInfo : versionInfo;
   if (queryVersion.getVersion().empty())
-    return missingVersion();
+    return missingVersion(underlyingVersionInfo.getVersion());
 
   return version <= queryVersion.getVersion();
 }
