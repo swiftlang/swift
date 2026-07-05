@@ -557,8 +557,8 @@ private:
   /// because it reads from the cursor, it is not possible to reset the cursor
   /// after reading. Nothing should ever follow an XREF record except
   /// XREF_PATH_PIECE records.
-  llvm::Expected<Decl *> resolveCrossReference(serialization::ModuleID MID,
-                                               uint32_t pathLen);
+  virtual llvm::Expected<Decl *> resolveCrossReference(serialization::ModuleID MID,
+                                                        uint32_t pathLen);
 
   struct AccessorRecord {
     SmallVector<serialization::DeclID, 8> IDs;
@@ -577,9 +577,7 @@ public:
   explicit ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core);
 
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
-  ~ModuleFile();
-
-  /// The name of the module.
+  virtual ~ModuleFile();
   StringRef getName() const {
     return Core->Name;
   }

@@ -17,6 +17,8 @@
 namespace swift {
 
 class SILModule;
+class ASTContext;
+class SourceFile;
 
 namespace serialization {
 
@@ -33,6 +35,12 @@ void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
 /// Serialize module source info to the given stream.
 void writeSourceInfoToStream(raw_ostream &os, ModuleOrSourceFile DC);
 
+/// Serialize a SourceFile's AST to a .swiftast cache file using the AST cache
+/// serializer (with isDeclXRef=true for cross-file decls). Writes the same
+/// container format as writeTypeCheckedSnapshot (ASTCacheKey header +
+/// bitstream + swiftdeps YAML).
+bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
+                       StringRef outputPath);
 } // end namespace serialization
 } // end namespace swift
 

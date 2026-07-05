@@ -2228,6 +2228,37 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       pathTrace.addType(filterTy);
     }
 
+    // AST cache fast path: for same-module cross-references in cached files,
+    // resolve the first path piece (always a top-level nominal) via the
+    // CachedNominalDeclRegistry instead of lookupQualified. lookupQualified
+    // triggers ParseSourceFileRequest on parsed-but-not-yet-type-checked files,
+    // crashing the compiler. The registry is fully populated by loadASTCache
+    // before any type resolution occurs.
+    if (isType && FileContext && baseModule == getAssociatedModule()) {
+      auto *SF = cast<FileUnit>(FileContext)->getParentSourceFile();
+      if (SF && SF->LoadedFromAstCache && !privateDiscriminator) {
+        // Try each nominal kind. Registry key: (name, kind, parentName=0, parentKind=0).
+        for (uint8_t kind : {(uint8_t)DeclKind::Struct,
+                             (uint8_t)DeclKind::Class,
+                             (uint8_t)DeclKind::Enum,
+                             (uint8_t)DeclKind::Protocol}) {
+          if (auto *found = getContext().lookupCachedNominalDecl(
+                  name.getIdentifier(), kind, Identifier(), 0)) {
+            values.push_back(found);
+            break;
+          }
+        }
+        if (!values.empty())
+          break; // skip lookupQualified — proceed to remaining path pieces
+        // Registry miss: fall through to lookupQualified. This is safe when
+        // the referenced type is in a source file (not cached) — lookupQualified
+        // will find it after parsing. For cross-file refs between cached files,
+        // the registry should find it (both files' nominals are registered by
+        // loadASTCache before type checking). If the registry misses because the
+        // other cache file hasn't been loaded yet, lookupQualified may produce
+        // ErrorType (handled by setAllowCompilerErrorsForCache).
+      }
+    }
     if (privateDiscriminator) {
       baseModule->lookupMember(values, baseModule, name,
                                getIdentifier(privateDiscriminator));

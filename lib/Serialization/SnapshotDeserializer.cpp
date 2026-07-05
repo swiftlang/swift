@@ -176,6 +176,18 @@ private:
       }
     }
 
+    // Eagerly register all top-level NominalTypeDecls in the
+    // CachedNominalDeclRegistry. This ensures the registry is populated
+    // BEFORE any cross-file xref resolution happens (resolveCrossReference).
+    // Without this, xref resolution via lookupQualified returns deserialized
+    // decls that trigger assertions (e.g., !PD->wasDeserialized() in
+    // InheritedProtocolsRequest).
+    for (auto *D : decls) {
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+        ctx.registerCachedNominalDecl(NTD, Identifier(), 0, true);
+      }
+    }
+
     // C3: Populate Imports from the ModuleFile's loaded dependencies.
     // associateWithFileContext calls loadDependenciesForFileContext which
     // loads the ModuleFile's Dependencies. We iterate over getDependencies()

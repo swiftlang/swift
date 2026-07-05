@@ -4,19 +4,18 @@
 // RUN: echo 'struct Container { var items: [Item] }' > %t/b.swift
 // RUN: %target-swift-frontend -experimental-ast-cache %t.cache -debug-ast-cache \
 // RUN:   -module-name testmod -parse-as-library -whole-module-optimization \
-// RUN:   -typecheck %t/a.swift %t/b.swift 2>&1 | FileCheck %s --check-prefix=COLD
+// RUN:   -typecheck %t/a.swift %t/b.swift 2>&1 | %FileCheck %s --check-prefix=COLD
 // RUN: %target-swift-frontend -experimental-ast-cache %t.cache -debug-ast-cache \
 // RUN:   -module-name testmod -parse-as-library -whole-module-optimization \
-// RUN:   -typecheck %t/a.swift %t/b.swift 2>&1 | FileCheck %s --check-prefix=WARM
+// RUN:   -typecheck %t/a.swift %t/b.swift 2>&1 | %FileCheck %s --check-prefix=WARM
 
 // Negative test: non-cached WMO build with a genuinely missing decl must
 // still report the error (no false recovery from LoadedFromAstCache branch,
 // which only fires when LoadedFromAstCache == true).
-// RUN: echo 'struct Bad { var x: NonexistentType }' > %t/bad.swift
-// RUN: %target-swift-frontend -module-name badmod -parse-as-library \
-// RUN:   -whole-module-optimization -typecheck %t/bad.swift 2>&1 \
-// RUN:   | FileCheck %s --check-prefix=NEGATIVE
+// RUN: printf 'struct Bad { var x: NonexistentType }\n' > %t/bad.swift
+// RUN: not %target-swift-frontend -module-name badmod -parse-as-library -whole-module-optimization -typecheck %t/bad.swift 2>&1 | %FileCheck %s --check-prefix=NEGATIVE
 
+// NEGATIVE: error: cannot find type
 // COLD-DAG: AST cache: MISS (no cache file) for {{.*}}a.swift
 // COLD-DAG: AST cache: MISS (no cache file) for {{.*}}b.swift
 // COLD-DAG: AST cache: SAVED for {{.*}}a.swift
@@ -25,7 +24,6 @@
 // WARM-DAG: AST cache: HIT for {{.*}}a.swift
 // WARM-DAG: AST cache: HIT for {{.*}}b.swift
 
-// NEGATIVE: error: cannot find type
 
 // Test BUG-1 fix: WMO cross-reference crash. When a cached .swiftast file
 // has cross-references to same-module types, WMO type-checking may produce

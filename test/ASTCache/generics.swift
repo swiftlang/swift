@@ -1,9 +1,9 @@
 // RUN: rm -rf %t.cache
 // RUN: mkdir -p %t.cache
 // RUN: %target-swift-frontend -experimental-ast-cache %t.cache -debug-ast-cache \
-// RUN:   -module-name testmod -parse-as-library -emit-object -o %t.cold.o %s 2>&1 | FileCheck %s --check-prefix=COLD
+// RUN:   -module-name testmod -parse-as-library -emit-object -o %t.cold.o %s 2>&1 | %FileCheck %s --check-prefix=COLD
 // RUN: %target-swift-frontend -experimental-ast-cache %t.cache -debug-ast-cache \
-// RUN:   -module-name testmod -parse-as-library -emit-object -o %t.warm.o %s 2>&1 | FileCheck %s --check-prefix=WARM
+// RUN:   -module-name testmod -parse-as-library -emit-object -o %t.warm.o %s 2>&1 | %FileCheck %s --check-prefix=WARM
 
 // COLD: AST cache: MISS (no cache file)
 // COLD: AST cache: SAVED

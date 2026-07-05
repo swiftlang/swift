@@ -46,6 +46,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/Serialization/ScanningLoaders.h"
+#include "swift/Serialization/Serialization.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -2561,6 +2562,10 @@ void CompilerInstance::saveASTCache() {
     // Skip script-mode files (C4: TopLevelCodeDecl is not serialized)
     if (SF->isScriptMode())
       continue;
+    // Skip files that had compile errors. ErrorTypes in cached ASTs cause
+    // deserialization crashes when loaded by subsequent builds.
+    if (getASTContext().Diags.hadAnyError())
+      continue;
 
     // Skip files with invalid decls. In batch mode (SwiftPM), each batch
     // type-checks only its primary files. Cross-file references to non-primary
@@ -2606,7 +2611,8 @@ void CompilerInstance::saveASTCache() {
     cacheFileName += llvm::utohexstr(pathHash, /*Lowercase=*/true);
     cacheFileName += ".swiftast";
     llvm::sys::path::append(cachePath, cacheFileName);
-    bool saved = writeTypeCheckedSnapshot(SF->getASTContext(), *SF, cachePath);
+    bool saved = serialization::writeASTCacheFile(
+        SF->getASTContext(), *SF, cachePath);
     if (!saved) {
       llvm::errs() << "AST cache: could not write cache file for "
                    << filename << "\n";

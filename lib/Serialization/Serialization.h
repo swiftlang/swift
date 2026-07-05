@@ -35,6 +35,8 @@ namespace clang {
 
 namespace swift {
   class SILModule;
+  class ASTContext;
+  class SourceFile;
 
   namespace fine_grained_dependencies {
     class SourceFileDepGraph;
@@ -76,6 +78,10 @@ public:
   SerializerBase(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC);
 
   ASTContext &getASTContext() const;
+
+  /// Virtual destructor — Serializer has virtual methods and is subclassed
+  /// by ASTCacheSerializer.
+  virtual ~SerializerBase() = default;
 };
 
 class Serializer : public SerializerBase {
@@ -310,7 +316,7 @@ public:
   // iterable decl context. It is keyed by that context's decl ID.
   using DeclFingerprintsTable = llvm::MapVector<uint32_t, Fingerprint>;
 
-private:
+protected:
   /// A map from identifiers to methods and properties with the given name.
   ///
   /// This is used for id-style lookup.
@@ -344,16 +350,26 @@ private:
   void writeInputBlock();
 
   /// Check if a decl is cross-referenced.
-  bool isDeclXRef(const Decl *D) const;
+  ///
+  /// Virtual so ASTCacheSerializer can override to route same-module
+  /// cross-file decls through writeCrossReference (instead of inlining
+  /// them as copies, which creates duplicate NominalTypeDecls).
+  virtual bool isDeclXRef(const Decl *D) const;
 
   /// Check if a decl should be skipped during serialization.
   bool shouldSkipDecl(const Decl *D) const;
 
   /// Writes a reference to a decl in another module.
-  void writeCrossReference(const DeclContext *DC, uint32_t pathLen = 1);
+  ///
+  /// Virtual so ASTCacheSerializer can override to emit CrossFileDeclRef
+  /// records instead of the standard xref path pieces.
+  virtual void writeCrossReference(const DeclContext *DC, uint32_t pathLen = 1);
 
   /// Writes a reference to a decl in another module.
-  void writeCrossReference(const Decl *D);
+  ///
+  /// Virtual so ASTCacheSerializer can override to emit CrossFileDeclRef
+  /// records instead of the standard xref path pieces.
+  virtual void writeCrossReference(const Decl *D);
 
   /// Writes the given decl.
   void writeASTBlockEntity(const Decl *D);
@@ -607,7 +623,6 @@ private:
   /// true if the type should be skipped.
   bool skipTypeIfInvalid(Type ty, SourceLoc loc);
 };
-
 } // end namespace serialization
 } // end namespace swift
 #endif

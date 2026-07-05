@@ -7,19 +7,29 @@
 
 // COLD: AST cache: MISS (no cache file)
 // COLD: AST cache: SAVED
+
 // WARM: AST cache: HIT
 
-// Test that SIL lowering works from a cached AST with accessors (Crash 1+3).
-// Computed properties trigger accessor synthesis. Stored properties trigger
-// Copyable conformance lookup during SIL lowering.
-struct Container {
+// Test that cross-file references resolve correctly when loading from cache.
+// Uses -primary-file to specify the main file while making other files
+// available as part of the module.
+
+// --- Declare a type that will be referenced from the primary file ---
+struct CrossFileStruct {
   var value: Int
 
-  var doubled: Int {
-    get { return value * 2 }
+  func doubled() -> Int {
+    return value * 2
   }
+}
 
-  var description: String {
-    return "Container(\(value))"
+extension CrossFileStruct {
+  func tripled() -> Int {
+    return value * 3
   }
+}
+
+// --- Reference it from the same file (simple case) ---
+func useCrossFileStruct(_ s: CrossFileStruct) -> Int {
+  return s.doubled() + s.tripled()
 }

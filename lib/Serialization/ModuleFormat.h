@@ -916,7 +916,76 @@ enum BlockID {
   /// This is part of a stable format and should not be renumbered.
   INCREMENTAL_INFORMATION_BLOCK_ID =
       fine_grained_dependencies::INCREMENTAL_INFORMATION_BLOCK_ID,
+
+  /// AST cache blocks (per-file .swiftast format).
+  ///
+  /// These use high values (256+) to avoid collision with the stable
+  /// swiftmodule format. The AST cache format is NOT stable — it is
+  /// invalidated by compiler-version hash and source-file hash.
+  ASTCACHE_HEADER_BLOCK_ID = 256,
+  ASTCACHE_DECL_TABLE_BLOCK_ID,
+  ASTCACHE_TYPE_TABLE_BLOCK_ID,
+  ASTCACHE_CONFORMANCE_BLOCK_ID,
+  ASTCACHE_IDENTIFIER_BLOCK_ID,
+  ASTCACHE_INDEX_BLOCK_ID,
 };
+
+/// Reference to a decl, either local (same file) or cross-file (same module,
+/// different file). Replaces the inline-copy serialization (isDeclXRef=false)
+/// and the lookupQualified-based cross-reference resolution.
+struct CrossFileDeclRef {
+  /// 0 = local (declared in this file), 1 = cross-file (another file in module)
+  uint8_t kind;
+  /// SHA-256 first 4 bytes of the owning source file (0 if local)
+  uint32_t fileHash;
+  /// Number of path components from module root to the decl
+  uint16_t pathLen;
+
+  static constexpr uint8_t KIND_LOCAL = 0;
+  static constexpr uint8_t KIND_CROSS_FILE = 1;
+};
+
+/// The record types within the AST cache header block.
+///
+/// \sa ASTCACHE_HEADER_BLOCK_ID
+namespace astcache_header_block {
+  enum {
+    MAGIC = 1,
+    FORMAT_VERSION,
+    COMPILER_VERSION_HASH,
+    SOURCE_FILE_HASH,
+    IMPORTED_MODULES_HASH,
+    MACRO_PLUGINS_HASH,
+    CROSS_IMPORT_OVERLAYS_HASH,
+    DEPENDENCY_PROVIDES_HASH,
+    PRIVATE_DISCRIMINATOR,
+    IMPORTS_BLOB,
+    OVERLAYS_BLOB,
+  };
+}
+
+/// The record types within the AST cache decl table block.
+///
+/// \sa ASTCACHE_DECL_TABLE_BLOCK_ID
+namespace astcache_decl_table_block {
+  enum RecordKind : uint16_t {
+    /// Decl record: {DeclID, DeclKind, ParentDeclRef, ...decl-specific fields}
+    /// Reuses the same per-decl-kind layout as decls_block (STRUCT_DECL, etc.)
+    DECL = 1,
+    /// CrossFileDeclRef record: {kind, fileHash, pathLen, pathComponents...}
+    CROSS_FILE_DECL_REF,
+  };
+}
+
+/// The record types within the AST cache index block.
+///
+/// \sa ASTCACHE_INDEX_BLOCK_ID
+namespace astcache_index_block {
+  enum RecordKind {
+    /// DeclID to bitstream offset mapping for lazy member loading
+    DECL_OFFSETS = 1,
+  };
+}
 
 /// The record types within the control block.
 ///
@@ -1381,8 +1450,8 @@ namespace decls_block {
 
   TYPE_LAYOUT(DependentMemberTypeLayout,
     DEPENDENT_MEMBER_TYPE,
-    TypeIDField, // base type
-    DeclIDField  // associated type decl
+    TypeIDField,        // base type
+    DeclIDField         // associated type decl
   );
   TYPE_LAYOUT(NominalTypeLayout,
     NOMINAL_TYPE,

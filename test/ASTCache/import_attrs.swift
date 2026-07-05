@@ -4,9 +4,9 @@
 // RUN: %target-swift-frontend -emit-module -module-name testlib -parse-as-library \
 // RUN:   -emit-module-path %t/testlib.swiftmodule %t/lib.swift
 // RUN: %target-swift-frontend -experimental-ast-cache %t.cache -debug-ast-cache \
-// RUN:   -module-name testmod -parse-as-library -I %t -typecheck %s 2>&1 | FileCheck %s --check-prefix=COLD
+// RUN:   -module-name testmod -parse-as-library -I %t -typecheck %s 2>&1 | %FileCheck %s --check-prefix=COLD
 // RUN: %target-swift-frontend -experimental-ast-cache %t.cache -debug-ast-cache \
-// RUN:   -module-name testmod -parse-as-library -I %t -typecheck %s 2>&1 | FileCheck %s --check-prefix=WARM
+// RUN:   -module-name testmod -parse-as-library -I %t -typecheck %s 2>&1 | %FileCheck %s --check-prefix=WARM
 
 // Negative test: importing testlib WITHOUT @_spi and referencing HiddenStruct
 // must fail. This run does NOT use -experimental-ast-cache, so there is no
@@ -16,7 +16,7 @@
 // RUN: echo 'func bad() -> Int { return HiddenStruct(value: 1).value }' >> %t/no_spi.swift
 // RUN: not %target-swift-frontend -module-name negmod -parse-as-library \
 // RUN:   -I %t -typecheck %t/no_spi.swift 2>&1 \
-// RUN:   | FileCheck %s --check-prefix=NEGATIVE
+// RUN:   | %FileCheck %s --check-prefix=NEGATIVE
 
 // COLD: AST cache: MISS (no cache file)
 // COLD: AST cache: SAVED

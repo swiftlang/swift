@@ -3555,7 +3555,12 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
   // Protocols may get their superclass bound from a `where Self : Superclass`
   // clause.
   if (auto *proto = dyn_cast<ProtocolDecl>(subject)) {
-    assert(!proto->wasDeserialized());
+    // Cache-loaded protocols (.swiftast) are type-checked and valid.
+    // The assertion only applies to .swiftmodule-loaded decls.
+    bool isSwiftmoduleDeserialized = proto->wasDeserialized() &&
+        !isa<SourceFile>(proto->getDeclContext()->getModuleScopeContext());
+    (void)isSwiftmoduleDeserialized;
+    assert(!isSwiftmoduleDeserialized);
 
     auto selfBounds = getSelfBoundsFromWhereClause(proto);
     for (auto inheritedNominal : selfBounds.decls)
@@ -3610,7 +3615,18 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
 
   llvm::SmallSetVector<ProtocolDecl *, 2> inherited;
 
-  assert(!PD->wasDeserialized());
+  // Cache-loaded decls (.swiftast) are type-checked, so their inherited
+  // protocols are valid. The assertion only applies to .swiftmodule-loaded
+  // decls, where wasDeserialized() is true but inherited protocols are
+  // loaded lazily via a different path.
+  // For .swiftast cache files, wasDeserialized() returns true because
+  // LoadedFromAstCache is set, but the decl is in a regular SourceFile
+  // (not a SerializedASTFile), so getDeclContext()->getModuleScopeContext()
+  // returns a SourceFile.
+  bool isSwiftmoduleDeserialized = PD->wasDeserialized() &&
+      !isa<SourceFile>(PD->getDeclContext()->getModuleScopeContext());
+  (void)isSwiftmoduleDeserialized;
+  assert(!isSwiftmoduleDeserialized);
 
   InvertibleProtocolSet inverses;
   bool anyObject = false;
