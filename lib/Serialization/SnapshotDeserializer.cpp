@@ -537,6 +537,103 @@ private:
         }
       }
     }
+    // Reconstruct TrailingWhereClause for extensions from whereClausesBlob.
+    // The serializer stores the source text of each extension's where clause.
+    // We re-parse it with a minimal parser to reconstruct the RequirementRepr
+    // nodes that ASTDumper renders as "where_requirements".
+    if (!key.whereClausesBlob.empty()) {
+      const char *wdata = key.whereClausesBlob.data();
+      size_t wremaining = key.whereClausesBlob.size();
+      auto readWStr = [&]() -> StringRef {
+        if (wremaining < 4) return {};
+        uint32_t len;
+        memcpy(&len, wdata, 4);
+        wdata += 4;
+        wremaining -= 4;
+        if (len == 0 || wremaining < len) return {};
+        StringRef text(wdata, len);
+        wdata += len;
+        wremaining -= len;
+        return text;
+      };
+      for (auto *D : decls) {
+        if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+          StringRef whereText = readWStr();
+          if (whereText.empty())
+            continue;
+          // Re-parse the where clause text by creating a synthetic buffer
+          // and using the parser's where-clause parsing.
+          std::string wrapped = whereText.str();
+          auto wBufID = ctx.SourceMgr.addMemBufferCopy(wrapped);
+          Parser parser(wBufID, SF, /*SIL*/ nullptr);
+          if (parser.Tok.is(tok::NUM_TOKENS))
+            parser.consumeTokenWithoutFeedingReceiver();
+          // The text starts with 'where' keyword — parseGenericWhereClause
+          // consumes it itself.
+          if (!parser.Tok.is(tok::kw_where))
+            continue;
+          SmallVector<RequirementRepr, 4> requirements;
+          SourceLoc whereLoc, endLoc;
+          auto status = parser.parseGenericWhereClause(whereLoc, endLoc, requirements);
+          (void)status;
+          if (!requirements.empty()) {
+            // Bind TypeRepr nodes to their decls so the dumper shows
+            // "bind" instead of "unbound". Walk each requirement's TypeRepr
+            // and resolve generic param names to the extension's generic params.
+            auto *genericParams = ED->getGenericParams();
+            auto bindTypeRepr = [&](TypeRepr *TR) {
+              if (auto *UITR = dyn_cast_or_null<UnqualifiedIdentTypeRepr>(TR)) {
+                if (!UITR->isBound()) {
+                  auto name = UITR->getNameRef().getBaseIdentifier();
+                  // Try to find a generic param with this name.
+                  if (genericParams) {
+                    for (auto *param : *genericParams) {
+                      if (param->getName() == name) {
+                        UITR->setValue(param, ED);
+                        return;
+                      }
+                    }
+                  }
+                  // Try known protocols.
+                  for (auto kp : {
+                    KnownProtocolKind::Equatable,
+                    KnownProtocolKind::Hashable,
+                    KnownProtocolKind::Comparable,
+                    KnownProtocolKind::Sendable,
+                    KnownProtocolKind::Copyable,
+                    KnownProtocolKind::Escapable,
+                    KnownProtocolKind::BitwiseCopyable,
+                  }) {
+                    if (auto *proto = ctx.getProtocol(kp)) {
+                      if (proto->getName() == name) {
+                        UITR->setValue(proto, ED);
+                        return;
+                      }
+                    }
+                  }
+                  // Try the extended nominal.
+                  if (auto *nominal = ED->getExtendedNominal()) {
+                    if (nominal->getName() == name) {
+                      UITR->setValue(nominal, ED);
+                      return;
+                    }
+                  }
+                }
+              }
+            };
+            for (auto &req : requirements) {
+              if (req.getKind() == RequirementReprKind::TypeConstraint) {
+                bindTypeRepr(req.getSubjectRepr());
+                bindTypeRepr(req.getConstraintRepr());
+              }
+            }
+            auto *twc = TrailingWhereClause::create(ctx, whereLoc, endLoc,
+                                                     requirements);
+            ED->setTrailingWhereClause(twc);
+          }
+        }
+      }
+    }
 
     // C1: Store the ModuleFile in the SourceFile to keep it alive.
     // The ASTContext arena doesn't call destructors, so we register a cleanup
@@ -584,6 +681,7 @@ private:
     if (!readString(buf, key.privateDiscriminator, offset)) return false;
     if (!readString(buf, key.overlaysBlob, offset)) return false;
     if (!readString(buf, key.declRangesBlob, offset)) return false;
+    if (!readString(buf, key.whereClausesBlob, offset)) return false;
 
     return true;
   }

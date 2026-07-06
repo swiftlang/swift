@@ -68,6 +68,10 @@ struct ASTCacheKey {
   /// Serialized decl source ranges: (startOffset, endOffset) pairs for each
   /// top-level decl and nested member, in serialization order.
   std::string declRangesBlob;
+  /// Serialized trailing where clause source text for extensions, keyed by
+ /// extension index. Format: (uint32_t textLength, char[textLength]) per
+ /// extension that has a where clause, in top-level decl order.
+ std::string whereClausesBlob;
 
   /// Check if this cache key is valid for the given source file.
   bool isValid(ASTContext &ctx, const SourceFile &SF,

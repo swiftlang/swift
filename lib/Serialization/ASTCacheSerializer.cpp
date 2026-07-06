@@ -22,6 +22,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/GenericParamList.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/AST/TypeCheckedSnapshot.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
@@ -203,6 +205,37 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
         }
       }
     }
+    // Collect trailing where clause source text for extensions.
+    // The deserializer re-parses this to reconstruct TrailingWhereClause.
+    if (bufferID != 0) {
+      llvm::raw_string_ostream whereOS(key.whereClausesBlob);
+      for (auto item : const_cast<SourceFile &>(SF).getTopLevelItems()) {
+        if (auto *D = item.dyn_cast<Decl *>()) {
+          if (isa<ImportDecl>(D))
+            continue;
+          if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+            if (auto *TWC = ED->getTrailingWhereClause()) {
+              auto range = TWC->getSourceRange();
+              if (range.isValid()) {
+                // Extract the source text from the original source buffer.
+                auto charRange = Lexer::getCharSourceRangeFromSourceRange(
+                    sourceMgr, range);
+                StringRef text = sourceMgr.extractText(charRange, bufferID);
+                uint32_t len = static_cast<uint32_t>(text.size());
+                whereOS.write(reinterpret_cast<const char *>(&len), 4);
+                whereOS << text;
+              } else {
+                uint32_t zero = 0;
+                whereOS.write(reinterpret_cast<const char *>(&zero), 4);
+              }
+            } else {
+              uint32_t zero = 0;
+              whereOS.write(reinterpret_cast<const char *>(&zero), 4);
+            }
+          }
+        }
+      }
+    }
   }
 
   // 3. Write the .swiftast container (same format as SnapshotSerializer)
@@ -250,6 +283,7 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
   writeString(key.privateDiscriminator);
   writeString(key.overlaysBlob);
   writeString(key.declRangesBlob);
+  writeString(key.whereClausesBlob);
   // Write bitstream (length-prefixed)
   writeString(bitstreamData);
 
