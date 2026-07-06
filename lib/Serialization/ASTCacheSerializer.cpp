@@ -189,8 +189,15 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
               writeDeclRange(member);
               // Walk accessors of storage decls (not in getMembers()).
               if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
-                for (auto *accessor : ASD->getAllAccessors())
+                for (auto *accessor : ASD->getAllAccessors()) {
                   writeDeclRange(accessor);
+                  // Walk accessor params.
+                  if (auto *accParams = accessor->getParameters()) {
+                    writeRange(accParams->getSourceRange());
+                    for (auto *param : *accParams)
+                      writeDeclRange(param);
+                  }
+                }
               }
               // Walk params of function decls.
               if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member)) {
@@ -198,16 +205,6 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
                   writeRange(params->getSourceRange());
                   for (auto *param : *params)
                     writeDeclRange(param);
-                }
-                // Walk accessors' params too.
-                if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
-                  for (auto *accessor : ASD->getAllAccessors()) {
-                    if (auto *accParams = accessor->getParameters()) {
-                      writeRange(accParams->getSourceRange());
-                      for (auto *param : *accParams)
-                        writeDeclRange(param);
-                    }
-                  }
                 }
               }
             }

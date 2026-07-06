@@ -523,8 +523,17 @@ private:
               setDeclRange(member);
               // Walk accessors of storage decls (not in getMembers()).
               if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
-                for (auto *accessor : ASD->getAllAccessors())
+                for (auto *accessor : ASD->getAllAccessors()) {
                   setDeclRange(accessor);
+                  // Walk accessor params.
+                  if (auto *accParams = accessor->getParameters()) {
+                    if (auto R = readRange(); R.isValid()) {
+                      accParams->setSourceLocs(R.Start, R.End);
+                    }
+                    for (auto *param : *accParams)
+                      setDeclRange(param);
+                  }
+                }
               }
               // Walk params of function decls.
               if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member)) {
@@ -534,18 +543,6 @@ private:
                   }
                   for (auto *param : *params)
                     setDeclRange(param);
-                }
-                // Walk accessors' params too.
-                if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
-                  for (auto *accessor : ASD->getAllAccessors()) {
-                    if (auto *accParams = accessor->getParameters()) {
-                      if (auto R = readRange(); R.isValid()) {
-                        accParams->setSourceLocs(R.Start, R.End);
-                      }
-                      for (auto *param : *accParams)
-                        setDeclRange(param);
-                    }
-                  }
                 }
               }
             }
