@@ -269,11 +269,6 @@ BridgedDeclObj BridgedPassContext::getModuleDecl() const {
 
 // SIL modifications
 
-bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) const {
-  return swift::eliminateDeadAllocations(f.getFunction(),
-                                         this->getDomTree().di);
-}
-
 OptionalBridgedFunction BridgedPassContext::getFirstFunctionInModule() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   if (mod->getFunctions().empty())

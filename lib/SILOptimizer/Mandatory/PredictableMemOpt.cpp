@@ -2455,7 +2455,7 @@ static AllocationInst *getOptimizableAllocation(SILInstruction *i) {
   return alloc;
 }
 
-bool swift::eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo) {
+static bool eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo) {
   if (!fn->hasOwnership()) {
     return false;
   }
