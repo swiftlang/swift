@@ -582,3 +582,19 @@ bb3:
   %11 = tuple ()
   return %11
 }
+
+// CHECK-LABEL: sil public_external [ossa] @dont_optimize_deserialized_functions :
+// CHECK:         fix_lifetime
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'dont_optimize_deserialized_functions'
+sil public_external [ossa] @dont_optimize_deserialized_functions : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  fix_lifetime %0
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
