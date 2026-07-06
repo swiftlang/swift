@@ -345,9 +345,7 @@ private extension LoadingInstruction {
 }
 
 private func replace(load: LoadingInstruction, with availableValues: [AvailableValue], _ context: FunctionPassContext) {
-  let ownership = load.ownership
-  var ssaUpdater = SSAUpdater(function: load.parentFunction,
-                              type: load.type, ownership: ownership, context)
+  var ssaUpdater = SSAUpdater(type: load.type, ownership: load.ownership, context)
 
   for availableValue in availableValues.replaceCopyAddrsWithLoadsAndStores(context) {
     let block = availableValue.instruction.parentBlock

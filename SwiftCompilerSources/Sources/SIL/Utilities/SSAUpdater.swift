@@ -16,9 +16,9 @@ import SILBridging
 public struct SSAUpdater<Context: MutatingContext> {
   let context: Context
 
-  public init(function: Function, type: Type, ownership: Ownership, _ context: Context) {
+  public init(type: Type, ownership: Ownership, _ context: Context) {
     self.context = context
-    context._bridged.SSAUpdater_initialize(function.bridged, type.bridged, ownership._bridged)
+    context._bridged.SSAUpdater_initialize(type.bridged, ownership._bridged)
   }
 
   public mutating func addAvailableValue(_ value: Value, in block: BasicBlock) {

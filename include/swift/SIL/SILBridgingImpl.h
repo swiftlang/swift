@@ -3527,9 +3527,8 @@ OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef na
   return {context->lookupStdlibFunction(name.unbridged())};
 }
 
-void BridgedContext::SSAUpdater_initialize(BridgedFunction function, BridgedType type,
-                                           BridgedValue::Ownership ownership) const {
-  context->initializeSSAUpdater(function.getFunction(), type.unbridged(), BridgedValue::unbridge(ownership));
+void BridgedContext::SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const {
+  context->initializeSSAUpdater(context->getFunction(), type.unbridged(), BridgedValue::unbridge(ownership));
 }
 
 void BridgedContext::SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {

@@ -774,7 +774,6 @@ private extension MovableInstructions {
     let phiOwnership: Ownership = firstStore.parentFunction.hasOwnership ? (firstStore.source.type.isTrivial(in: firstStore.parentFunction) ? .none : .owned) : .none
 
     var ssaUpdater = SSAUpdater(
-      function: firstStore.parentFunction,
       type: firstStore.destination.type.objectType,
       ownership: phiOwnership,
       context
