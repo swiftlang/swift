@@ -21,7 +21,7 @@ public protocol BorrowingIterProto<Element>: ~Copyable, ~Escapable {
   associatedtype Element: ~Copyable
 
   @_lifetime(&self)
-  mutating func nextSpan(maximumCount: Int) -> Span<Element>
+  mutating func nextSpan(maxCount: Int) -> Span<Element>
 }
 
 // An iterator that not permit any iteration via IterProto...
@@ -57,7 +57,7 @@ public struct OldIteratorAdapter<Iter: IterProto>: BorrowingIterProto where Iter
   }
 
   @_lifetime(&self)
-  public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
+  public mutating func nextSpan(maxCount: Int) -> Span<Element> {
     if let elm = iter.next() {
       // FIXME: Hack to return a Span<Element> that can leak memory if iteration stops early!
       // Need a `deinit` to clean that last one up, but this struct should remain Copyable.
@@ -200,7 +200,7 @@ extension Seq where Self: ~Copyable, Self.Element: ~Copyable {
   borrowing func forborrow(_ f: (borrowing Self.Element) -> Void) {
     var iter = makeBorrowingIter()
      while true {
-      let span = iter.nextSpan(maximumCount: 32)
+      let span = iter.nextSpan(maxCount: 32)
       if span.count <= 0 { break }
       for i in 0..<span.count {
         f(span[i])
@@ -248,7 +248,7 @@ func forborrow2<S, E>(_ seq: borrowing S, _ f: (borrowing E) -> Void)
   where S: Seq, S: ~Copyable, E: ~Copyable, S.Element == E {
   var iter = seq.makeBorrowingIter()
    while true {
-    let span = iter.nextSpan(maximumCount: 32)
+    let span = iter.nextSpan(maxCount: 32)
     if span.count <= 0 { break }
     for i in 0..<span.count {
       f(span[i])
@@ -276,7 +276,7 @@ public struct SpanIterator<Element: ~Copyable>: BorrowingIterProto, ~Escapable {
   }
 
   @_lifetime(&self)
-  public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
+  public mutating func nextSpan(maxCount: Int) -> Span<Element> {
     if didProvide { return Span() }
     didProvide = true
     return span

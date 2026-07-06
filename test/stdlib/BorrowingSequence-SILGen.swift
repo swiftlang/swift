@@ -10,15 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature BorrowingSequence -enable-experimental-feature BorrowingForLoop -enable-experimental-feature Lifetimes)
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
+// RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
+// RUN:     -enable-experimental-feature BorrowingForLoop \
+// RUN:     -enable-experimental-feature BorrowingSequence \
+// RUN:     -enable-experimental-feature Lifetimes \
+// RUN:     2>&1 \
+// RUN:     %s | %FileCheck %s --dump-input=always
 
-// REQUIRES: executable_test
-// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 // REQUIRES: swift_feature_BorrowingSequence
 // REQUIRES: swift_feature_BorrowingForLoop
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: no_run
 
 import StdlibUnittest
+
+// CHECK: nope!
 
 var suite = TestSuite("Iterable Tests")
 defer { runAllTests() }
@@ -386,111 +393,58 @@ suite.test("BorrowingIteratorAdapter/skip-past-end")
 
 // MARK: - InlineArray Iterable tests
 
-//suite.test("InlineArray/collect-via-iterable")
-//.require(.stdlib_6_4).code {
-//  guard #available(SwiftStdlib 6.4, *) else { return }
-//
-//  let inline: [4 of Int] = [10, 20, 30, 40]
-//  let collected = inline.collectViaBorrowing()
-//  expectEqual(collected, [10, 20, 30, 40])
-//}
-//
-//suite.test("InlineArray/collect-via-iterable-then-print")
-//.require(.stdlib_6_4).code {
-//  guard #available(SwiftStdlib 6.4, *) else { return }
-//
-//  let inline: [4 of Int] = [10, 20, 30, 40]
-//  let collected = inline.collectViaBorrowing()
-//  expectEqual(collected, [10, 20, 30, 40])
-//  print(inline)
-//}
-//
-//suite.test("InlineArray/collect-via-concrete-iterator")
-//.require(.stdlib_6_4).code {
-//  guard #available(SwiftStdlib 6.4, *) else { return }
-//
-//  let inline: [4 of Int] = [10, 20, 30, 40]
-//  let collected = inline.collectConcrete()
-//  expectEqual(collected, [10, 20, 30, 40])
-//}
-//
-//suite.test("InlineArray/collect-via-span")
-//.require(.stdlib_6_4).code {
-//  guard #available(SwiftStdlib 6.4, *) else { return }
-//
-//  let inline: [4 of Int] = [10, 20, 30, 40]
-//  let collected = inline.collectViaSpan()
-//  expectEqual(collected, [10, 20, 30, 40])
-//}
-//
-//suite.test("InlineArray/collect-via-span-generic")
-//.require(.stdlib_6_4).code {
-//  guard #available(SwiftStdlib 6.4, *) else { return }
-//
-//  let inline: [4 of Int] = [10, 20, 30, 40]
-//  let collected = inline.collectViaSpanProvider()
-//  expectEqual(collected, [10, 20, 30, 40])
-//}
-//
-//suite.test("InlineArray/makeBorrowingIterator-partial")
-//.require(.stdlib_6_4).code {
-//  guard #available(SwiftStdlib 6.4, *) else { return }
-//
-//  let inline: [5 of Int] = [1, 2, 3, 4, 5]
-//  var iter = inline.makeBorrowingIterator()
-//
-//  var iterSpan = iter.nextSpan(maxCount: 3)
-//  expectEqual(iterSpan.count, 3)
-//  expectEqual(iterSpan[0], 1)
-//
-//  iterSpan = iter.nextSpan(maxCount: .max)
-//  expectEqual(iterSpan.count, 2)
-//  expectEqual(iterSpan[0], 4)
-//}
-//
-//suite.test("InlineArray/skip")
-//.require(.stdlib_6_4).code {
-//  guard #available(SwiftStdlib 6.4, *) else { return }
-//
-//  let inline: [6 of Int] = [10, 20, 30, 40, 50, 60]
-//  var iter = inline.makeBorrowingIterator()
-//
-//  let skipped = iter.skip(by: 4)
-//  expectEqual(skipped, 4)
-//
-//  let remaining = iter.nextSpan(maxCount: .max)
-//  expectEqual(remaining.count, 2)
-//  expectEqual(remaining[0], 50)
-//  expectEqual(remaining[1], 60)
-//}
-//
-//suite.test("InlineArray/noncopyable-elementsEqual")
-//.require(.stdlib_6_4).code {
-//  guard #available(SwiftStdlib 6.4, *) else { return }
-//
-//  let a: [4 of NoncopyableInt] = InlineArray(NoncopyableInt.init(value:))
-//  let b: [4 of NoncopyableInt] = InlineArray(NoncopyableInt.init(value:))
-//  expectTrue(a.elementsEqual(b))
-//  expectTrue(a.elementsEqual(a))
-//}
-
-// MARK: - UniqueArray Iterable tests
-
-suite.test("UniqueArray/collect-via-iterable")
+suite.test("InlineArray/collect-via-iterable")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
-  let unique = UniqueArray(copying: 1...5)
-  let collected = unique.collectViaBorrowing()
-  expectEqual(collected, [1, 2, 3, 4, 5])
+  let inline: [4 of Int] = [10, 20, 30, 40]
+  let collected = inline.collectViaBorrowing()
+  expectEqual(collected, [10, 20, 30, 40])
 }
 
-suite.test("UniqueArray/makeBorrowingIterator-partial")
+suite.test("InlineArray/collect-via-iterable-then-print")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
-  let unique = UniqueArray(copying: 1...5)
-  var iter = unique.makeBorrowingIterator()
+  let inline: [4 of Int] = [10, 20, 30, 40]
+  let collected = inline.collectViaBorrowing()
+  expectEqual(collected, [10, 20, 30, 40])
+  print(inline)
+}
+
+suite.test("InlineArray/collect-via-concrete-iterator")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let inline: [4 of Int] = [10, 20, 30, 40]
+  let collected = inline.collectConcrete()
+  expectEqual(collected, [10, 20, 30, 40])
+}
+
+suite.test("InlineArray/collect-via-span")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let inline: [4 of Int] = [10, 20, 30, 40]
+  let collected = inline.collectViaSpan()
+  expectEqual(collected, [10, 20, 30, 40])
+}
+
+suite.test("InlineArray/collect-via-span-generic")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let inline: [4 of Int] = [10, 20, 30, 40]
+  let collected = inline.collectViaSpanProvider()
+  expectEqual(collected, [10, 20, 30, 40])
+}
+
+suite.test("InlineArray/makeBorrowingIterator-partial")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let inline: [5 of Int] = [1, 2, 3, 4, 5]
+  var iter = inline.makeBorrowingIterator()
 
   var iterSpan = iter.nextSpan(maxCount: 3)
   expectEqual(iterSpan.count, 3)
@@ -501,36 +455,89 @@ suite.test("UniqueArray/makeBorrowingIterator-partial")
   expectEqual(iterSpan[0], 4)
 }
 
-suite.test("UniqueArray/skip")
+suite.test("InlineArray/skip")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
-  let unique = UniqueArray(copying: 1...5)
-  var iter = unique.makeBorrowingIterator()
+  let inline: [6 of Int] = [10, 20, 30, 40, 50, 60]
+  var iter = inline.makeBorrowingIterator()
 
-  let skipped = iter.skip(by: 3)
-  expectEqual(skipped, 3)
+  let skipped = iter.skip(by: 4)
+  expectEqual(skipped, 4)
 
   let remaining = iter.nextSpan(maxCount: .max)
   expectEqual(remaining.count, 2)
-  expectEqual(remaining[0], 4)
-  expectEqual(remaining[1], 5)
+  expectEqual(remaining[0], 50)
+  expectEqual(remaining[1], 60)
 }
 
-suite.test("UniqueArray/noncopyable-elementsEqual")
+suite.test("InlineArray/noncopyable-elementsEqual")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let a: [4 of NoncopyableInt] = InlineArray(NoncopyableInt.init(value:))
-  let b = UniqueArray<NoncopyableInt>(capacity: 4) { outputSpan in
-    for i in 0..<4 {
-      outputSpan.append(NoncopyableInt(value: i))
-    }
-  }
+  let b: [4 of NoncopyableInt] = InlineArray(NoncopyableInt.init(value:))
   expectTrue(a.elementsEqual(b))
-  expectTrue(b.elementsEqual(a))
-  expectTrue(b.elementsEqual(b))
+  expectTrue(a.elementsEqual(a))
 }
+
+// MARK: - UniqueArray Iterable tests
+
+//suite.test("UniqueArray/collect-via-iterable")
+//.require(.stdlib_6_4).code {
+//  guard #available(SwiftStdlib 6.4, *) else { return }
+//
+//  let unique = UniqueArray(copying: 1...5)
+//  let collected = unique.collectViaBorrowing()
+//  expectEqual(collected, [1, 2, 3, 4, 5])
+//}
+//
+//suite.test("UniqueArray/makeBorrowingIterator-partial")
+//.require(.stdlib_6_4).code {
+//  guard #available(SwiftStdlib 6.4, *) else { return }
+//
+//  let unique = UniqueArray(copying: 1...5)
+//  var iter = unique.makeBorrowingIterator()
+//
+//  var iterSpan = iter.nextSpan(maxCount: 3)
+//  expectEqual(iterSpan.count, 3)
+//  expectEqual(iterSpan[0], 1)
+//
+//  iterSpan = iter.nextSpan(maxCount: .max)
+//  expectEqual(iterSpan.count, 2)
+//  expectEqual(iterSpan[0], 4)
+//}
+//
+//suite.test("UniqueArray/skip")
+//.require(.stdlib_6_4).code {
+//  guard #available(SwiftStdlib 6.4, *) else { return }
+//
+//  let unique = UniqueArray(copying: 1...5)
+//  var iter = unique.makeBorrowingIterator()
+//
+//  let skipped = iter.skip(by: 3)
+//  expectEqual(skipped, 3)
+//
+//  let remaining = iter.nextSpan(maxCount: .max)
+//  expectEqual(remaining.count, 2)
+//  expectEqual(remaining[0], 4)
+//  expectEqual(remaining[1], 5)
+//}
+//
+//suite.test("UniqueArray/noncopyable-elementsEqual")
+//.require(.stdlib_6_4).code {
+//  guard #available(SwiftStdlib 6.4, *) else { return }
+//
+//  let a: [4 of NoncopyableInt] = InlineArray(NoncopyableInt.init(value:))
+//  let b = UniqueArray<NoncopyableInt>(capacity: 4) { outputSpan in
+//    for i in 0..<4 {
+//      outputSpan.append(NoncopyableInt(value: i))
+//    }
+//  }
+//  expectTrue(a.elementsEqual(b))
+//  expectTrue(b.elementsEqual(a))
+//  expectTrue(b.elementsEqual(b))
+//}
 
 // MARK: - Throwing Iterable tests
 
@@ -908,6 +915,7 @@ extension Iterable where Self: ~Copyable & ~Escapable, Element: ~Copyable, Failu
 
 @available(SwiftStdlib 6.4, *)
 extension Iterable where Self: ~Copyable & ~Escapable, Element: Copyable {
+  @_silgen_name("collectViaBorrowing")
   func collectViaBorrowing() throws(Failure) -> [Element] {
     var borrowIterator = makeBorrowingIterator()
     withUnsafeBytes(of: &borrowIterator) { ptr in

@@ -9,14 +9,14 @@
 
 // Tests for the availability check in DesugarForEachStmt.
 //
-// BorrowingSequence is @available(SwiftStdlib 6.4, *). When a for-in loop
-// over a BorrowingSequence-conforming type appears in a context whose
+// Iterable is @available(SwiftStdlib 6.4, *). When a for-in loop
+// over a Iterable-conforming type appears in a context whose
 // availability does not cover SwiftStdlib 6.4, the compiler signals that.
 
 // Without @available(SwiftStdlib 6.4, *) on the enclosing function, the
 // availability context does not cover SwiftStdlib 6.4.
 func testForLoopOverSpanWithoutAvailability(_ seq: Span<Int>) {
-  for x in seq { // expected-error {{for-in loop requires 'Span<Int>' to conform to 'BorrowingSequence', which is only available in macOS 27.0 or newer}}
+  for x in seq { // expected-error {{for-in loop requires 'Span<Int>' to conform to 'Iterable', which is only available in macOS 27.0 or newer}}
   // expected-note@-2 {{add '@available' attribute to enclosing global function}}
   // expected-note@-2 {{add 'if #available' version check}}
     _ = x
@@ -24,7 +24,7 @@ func testForLoopOverSpanWithoutAvailability(_ seq: Span<Int>) {
 }
 
 // With @available(SwiftStdlib 6.4, *), the availability context covers the
-// protocol, and the loop desugars via the BorrowingSequence path.
+// protocol, and the loop desugars via the Iterable path.
 @available(SwiftStdlib 6.4, *)
 func testForLoopOverSpanWithAvailability(_ seq: Span<Int>) {
   for x in seq {
@@ -44,9 +44,9 @@ func testForLoopInsideAvailabilityGuard() {
   }
 }
 
-// A type that unconditionally conforms to Sequence but whose BorrowingSequence
+// A type that unconditionally conforms to Sequence but whose Iterable
 // conformance is only available under SwiftStdlib 6.4. In a context without
-// that availability, the BorrowingSequence conformance is unavailable.
+// that availability, the Iterable conformance is unavailable.
 // The loop uses Sequence.
 struct BorrowingFallbackWithSequence: Sequence {
   typealias Element = Int
@@ -54,7 +54,7 @@ struct BorrowingFallbackWithSequence: Sequence {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingFallbackWithSequence: BorrowingSequence {
+extension BorrowingFallbackWithSequence: Iterable {
   typealias BorrowingIterator = BorrowingIteratorAdapter<IndexingIterator<[Int]>>
 }
 
@@ -64,13 +64,13 @@ func testInvalidBorrowingWithSequence(seq: BorrowingFallbackWithSequence) {
   }
 }
 
-// A type whose only sequence conformance is BorrowingSequence, available under
+// A type whose only sequence conformance is Iterable, available under
 // SwiftStdlib 6.4. In a context without that availability, the compiler falls
 // emits an error.
 struct BorrowingFallbackNoSequence {}
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingFallbackNoSequence: BorrowingSequence {
+extension BorrowingFallbackNoSequence: Iterable {
   typealias Element = Int
   typealias BorrowingIterator = BorrowingIteratorAdapter<IndexingIterator<[Int]>>
   func makeBorrowingIterator() -> BorrowingIteratorAdapter<IndexingIterator<[Int]>> {
@@ -79,7 +79,7 @@ extension BorrowingFallbackNoSequence: BorrowingSequence {
 }
 
 func testInvalidBorrowingNoSequence(seq: BorrowingFallbackNoSequence) {
-  for x in seq { // expected-error {{for-in loop requires 'BorrowingFallbackNoSequence' to conform to 'BorrowingSequence', which is only available in macOS 27.0 or newer}}
+  for x in seq { // expected-error {{for-in loop requires 'BorrowingFallbackNoSequence' to conform to 'Iterable', which is only available in macOS 27.0 or newer}}
   // expected-note@-2 {{add '@available' attribute to enclosing global function}}
   // expected-note@-2 {{add 'if #available' version check}}
     _ = x

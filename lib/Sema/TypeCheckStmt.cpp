@@ -3701,7 +3701,7 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
   return ctx.getAsyncIteratorNext();
 }
 
-bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
+bool swift::shouldUseIterable(ASTContext &ctx, Type seqTy,
                                        bool isAsync, SourceLoc loc,
                                        DeclContext *dc) {
   if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
@@ -3713,18 +3713,18 @@ bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
   }
 
   auto *borrowingSeqProto =
-      ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
+      ctx.getProtocol(KnownProtocolKind::Iterable);
   if (!borrowingSeqProto) {
     return false;
   }
 
-  // Always prefer conformance to Sequence over BorrowingSequence when
+  // Always prefer conformance to Sequence over Iterable when
   // both are available.
   if (lookupConformance(seqTy, ctx.getProtocol(KnownProtocolKind::Sequence))) {
     return false;
   }
 
-  // Fall back to Sequence if no conformance to BorrowingSequence is found.
+  // Fall back to Sequence if no conformance to Iterable is found.
   // This ensures that we maintain Sequence as the minimal required
   // conformance.
   auto seqConformanceRef = lookupConformance(seqTy, borrowingSeqProto);
@@ -3767,13 +3767,13 @@ public:
         (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
       return nullptr;
 
-    isBorrowing = shouldUseBorrowingSequence(ctx, seqType, isAsync,
+    isBorrowing = shouldUseIterable(ctx, seqType, isAsync,
                                              sequence->getStartLoc(), dc);
 
     sequenceProto =
         isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
                 : (isBorrowing
-                       ? ctx.getProtocol(KnownProtocolKind::BorrowingSequence)
+                       ? ctx.getProtocol(KnownProtocolKind::Iterable)
                        : ctx.getProtocol(KnownProtocolKind::Sequence));
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
@@ -3851,7 +3851,7 @@ private:
   }
 
   Expr *buildNextSpanCall(DeclRefExpr *makeIteratorVarRef) {
-    // For borrowing: call nextSpan(maximumCount: Int.max)
+    // For borrowing: call nextSpan(maxCount: Int.max)
     auto *nextSpanFn = ctx.getBorrowingIteratorNextSpan();
     auto associatedType =
         sequenceProto->getAssociatedType(ctx.Id_BorrowingIterator);
@@ -3868,9 +3868,9 @@ private:
     auto *intRef = TypeExpr::createImplicit(ctx.getIntType(), ctx);
     auto *maxRef = UnresolvedDotExpr::createImplicit(ctx, intRef, ctx.Id_max);
 
-    // Create argument: maximumCount: Int.max
+    // Create argument: maxCount: Int.max
     auto *args =
-        ArgumentList::forImplicitSingle(ctx, ctx.Id_maximumCount, maxRef);
+        ArgumentList::forImplicitSingle(ctx, ctx.Id_maxCount, maxRef);
 
     return CallExpr::createImplicit(ctx, nextSpanRef, args);
   }
@@ -3949,7 +3949,7 @@ private:
     // that in a special variable which is going to be used by SILGen.
     FuncDecl *makeIterator =
         isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                : (isBorrowing ? ctx.getBorrowingSequenceMakeBorrowingIterator()
+                : (isBorrowing ? ctx.getIterableMakeBorrowingIterator()
                                : ctx.getSequenceMakeIterator());
 
     ConcreteDeclRef witness;
