@@ -75,6 +75,7 @@ public:
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
+  void setSourceLocs(SourceLoc L, SourceLoc R) { LParenLoc = L; RParenLoc = R; }
   
   typedef MutableArrayRef<ParamDecl*>::iterator iterator;
   typedef ArrayRef<ParamDecl*>::iterator const_iterator;

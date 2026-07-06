@@ -504,6 +504,16 @@ private:
         };
         for (auto *D : decls) {
           setDeclRange(D);
+        // Walk params of top-level function decls (not inside an IDC).
+        if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+          if (auto *params = AFD->getParameters()) {
+            if (auto R = readRange(); R.isValid()) {
+              params->setSourceLocs(R.Start, R.End);
+            }
+            for (auto *param : *params)
+              setDeclRange(param);
+          }
+        }
           if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
             for (auto *member : IDC->getMembers()) {
               // Skip EnumCaseDecl — it's reconstructed by the deserializer
@@ -519,8 +529,9 @@ private:
               // Walk params of function decls.
               if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member)) {
                 if (auto *params = AFD->getParameters()) {
-                  if (auto R = readRange(); R.isValid())
-                    ctx.setCachedParamListSourceRange(params, R);
+                  if (auto R = readRange(); R.isValid()) {
+                    params->setSourceLocs(R.Start, R.End);
+                  }
                   for (auto *param : *params)
                     setDeclRange(param);
                 }
@@ -528,8 +539,9 @@ private:
                 if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
                   for (auto *accessor : ASD->getAllAccessors()) {
                     if (auto *accParams = accessor->getParameters()) {
-                      if (auto R = readRange(); R.isValid())
-                        ctx.setCachedParamListSourceRange(accParams, R);
+                      if (auto R = readRange(); R.isValid()) {
+                        accParams->setSourceLocs(R.Start, R.End);
+                      }
                       for (auto *param : *accParams)
                         setDeclRange(param);
                     }

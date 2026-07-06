@@ -172,6 +172,14 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
           if (isa<ImportDecl>(D))
             continue;
           writeDeclRange(D);
+          // Walk params of top-level function decls (not inside an IDC).
+          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+            if (auto *params = AFD->getParameters()) {
+              writeRange(params->getSourceRange());
+              for (auto *param : *params)
+                writeDeclRange(param);
+            }
+          }
           if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
             for (auto *member : IDC->getMembers()) {
               // Skip EnumCaseDecl — it's a parser-internal grouping node
