@@ -12,6 +12,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/ArgumentList.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/SourceFile.h"
@@ -45,6 +46,13 @@ enum class ExprKindTag : uint8_t {
 enum class StmtKindTag : uint8_t {
   Return = 1,
   Brace = 2,
+  Yield = 3,
+  Switch = 4,
+  Case = 5,
+};
+
+enum class DeclKindTag : uint8_t {
+  PatternBinding = 1,
 };
 
 //===----------------------------------------------------------------------===//
@@ -198,6 +206,51 @@ void BodySerializer::serializeStmt(Stmt *S) {
       serializeASTNode(elem);
     break;
   }
+  case StmtKind::Yield: {
+    writeUInt8(static_cast<uint8_t>(StmtKindTag::Yield));
+    auto *YS = cast<YieldStmt>(S);
+    writeUInt8(YS->isImplicit() ? 1 : 0);
+    auto yields = YS->getYields();
+    writeUInt32(static_cast<uint32_t>(yields.size()));
+    for (auto *yield : yields)
+      serializeExpr(yield);
+    break;
+  }
+  case StmtKind::Switch: {
+    writeUInt8(static_cast<uint8_t>(StmtKindTag::Switch));
+    auto *SS = cast<SwitchStmt>(S);
+    writeUInt8(SS->isImplicit() ? 1 : 0);
+    serializeExpr(SS->getSubjectExpr());
+    auto cases = SS->getCases();
+    writeUInt32(static_cast<uint32_t>(cases.size()));
+    for (auto *CS : cases)
+      serializeStmt(CS);
+    break;
+  }
+  case StmtKind::Case: {
+    writeUInt8(static_cast<uint8_t>(StmtKindTag::Case));
+    auto *CS = cast<CaseStmt>(S);
+    writeUInt8(CS->isImplicit() ? 1 : 0);
+    // Serialize label items: just the guard expr (if any). Patterns are
+    // skipped — they produce ErrorExpr fallbacks on deserialization but
+    // won't crash.
+    auto labels = CS->getCaseLabelItems();
+    writeUInt8(static_cast<uint8_t>(labels.size()));
+    for (auto &label : labels) {
+      auto *guard = const_cast<CaseLabelItem &>(label).getGuardExpr();
+      writeUInt8(guard ? 1 : 0);
+      if (guard)
+        serializeExpr(guard);
+    }
+    // Body
+    if (auto *body = CS->getBody()) {
+      writeUInt8(1);
+      serializeStmt(body);
+    } else {
+      writeUInt8(0);
+    }
+    break;
+  }
   default:
     writeUInt8(0);
     break;
@@ -205,7 +258,25 @@ void BodySerializer::serializeStmt(Stmt *S) {
 }
 
 void BodySerializer::serializeDecl(Decl *D) {
-  writeUInt8(0); // TODO: handle local decls
+  if (!D) {
+    writeUInt8(0);
+    return;
+  }
+
+  switch (D->getKind()) {
+  case DeclKind::PatternBinding: {
+    writeUInt8(static_cast<uint8_t>(DeclKindTag::PatternBinding));
+    auto *PBD = cast<PatternBindingDecl>(D);
+    auto numEntries = PBD->getNumPatternEntries();
+    writeUInt32(static_cast<uint32_t>(numEntries));
+    for (unsigned i = 0; i < numEntries; i++)
+      serializeExpr(PBD->getInit(i));
+    break;
+  }
+  default:
+    writeUInt8(0);
+    break;
+  }
 }
 
 void BodySerializer::serializeASTNode(ASTNode node) {
@@ -443,9 +514,72 @@ Stmt *BodyDeserializer::deserializeStmt() {
   case StmtKindTag::Brace: {
     uint32_t numElements = readUInt32();
     SmallVector<ASTNode, 4> elements;
-    for (uint32_t i = 0; i < numElements; i++)
-      elements.push_back(deserializeASTNode());
+    for (uint32_t i = 0; i < numElements; i++) {
+      auto node = deserializeASTNode();
+      if (node.isNull()) {
+        auto *err = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
+        elements.push_back(ASTNode(err));
+      } else {
+        elements.push_back(node);
+      }
+    }
     return BraceStmt::create(Ctx, SourceLoc(), elements, SourceLoc(), false);
+  }
+  case StmtKindTag::Yield: {
+    readUInt8(); // isImplicit
+    uint32_t numYields = readUInt32();
+    SmallVector<Expr*, 4> yields;
+    for (uint32_t i = 0; i < numYields; i++) {
+      auto *yield = deserializeExpr();
+      if (!yield)
+        yield = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
+      yields.push_back(yield);
+    }
+    return YieldStmt::create(Ctx, SourceLoc(), SourceLoc(), yields,
+                             SourceLoc(), /*implicit=*/true);
+  }
+  case StmtKindTag::Switch: {
+    readUInt8(); // isImplicit
+    Expr *subject = deserializeExpr();
+    if (!subject)
+      subject = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
+    uint32_t numCases = readUInt32();
+    SmallVector<CaseStmt*, 4> cases;
+    for (uint32_t i = 0; i < numCases; i++) {
+      auto *CS = dyn_cast_or_null<CaseStmt>(deserializeStmt());
+      if (CS)
+        cases.push_back(CS);
+    }
+    auto *SS = SwitchStmt::createImplicit(LabeledStmtInfo(), subject, cases,
+                                          Ctx);
+    for (auto *CS : cases)
+      CS->setParentStmt(SS);
+    return SS;
+  }
+  case StmtKindTag::Case: {
+    readUInt8(); // isImplicit
+    uint8_t numLabels = readUInt8();
+    SmallVector<CaseLabelItem, 2> labelItems;
+    for (uint8_t i = 0; i < numLabels; i++) {
+      bool hasGuard = readUInt8() != 0;
+      Expr *guard = hasGuard ? deserializeExpr() : nullptr;
+      labelItems.push_back(
+          CaseLabelItem(AnyPattern::createImplicit(Ctx), SourceLoc(), guard));
+    }
+    // CaseStmt requires at least one label item.
+    if (labelItems.empty()) {
+      labelItems.push_back(CaseLabelItem::getDefault(AnyPattern::createImplicit(Ctx)));
+    }
+    bool hasBody = readUInt8() != 0;
+    BraceStmt *body = hasBody
+                           ? dyn_cast_or_null<BraceStmt>(deserializeStmt())
+                           : nullptr;
+    if (!body) {
+      body = BraceStmt::create(Ctx, SourceLoc(), {}, SourceLoc(), false);
+    }
+    auto *CS = CaseStmt::createImplicit(Ctx, CaseParentKind::Switch,
+                                        labelItems, body);
+    return CS;
   }
   default:
     return nullptr;
@@ -453,8 +587,21 @@ Stmt *BodyDeserializer::deserializeStmt() {
 }
 
 Decl *BodyDeserializer::deserializeDecl() {
-  readUInt8();
-  return nullptr;
+  uint8_t tag = readUInt8();
+
+  switch (static_cast<DeclKindTag>(tag)) {
+  case DeclKindTag::PatternBinding: {
+    uint32_t numEntries = readUInt32();
+    for (uint32_t i = 0; i < numEntries; i++)
+      deserializeExpr(); // read and discard init exprs
+    // Return nullptr — the body will have an ErrorExpr fallback but won't
+    // crash. Creating a real PatternBindingDecl requires patterns and a
+    // DeclContext that we don't have here.
+    return nullptr;
+  }
+  default:
+    return nullptr;
+  }
 }
 
 ASTNode BodyDeserializer::deserializeASTNode() {
