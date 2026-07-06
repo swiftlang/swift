@@ -1449,6 +1449,8 @@ BodyASTDeserializer::deserializeAllBodies(ArrayRef<uint8_t> bitstreamData) {
           unsigned recordID = maybeRecordID.get();
 
           if (recordID == astcache_body_block::BODY) {
+            fprintf(stderr, "DEBUG: BODY record, scratch.size()=%zu, scratch[0]=%llu, scratch[1]=%llu\n",
+                    scratch.size(), (unsigned long long)scratch[0], (unsigned long long)scratch[1]);
             if (scratch.size() >= 2) {
               funcDeclID = static_cast<serialization::DeclID>(scratch[0]);
               rootStmtID = static_cast<uint32_t>(scratch[1]);
@@ -1467,7 +1469,8 @@ BodyASTDeserializer::deserializeAllBodies(ArrayRef<uint8_t> bitstreamData) {
         }
 
         // Look up the root BraceStmt.
-        if (rootStmtID > 0 && rootStmtID <= StmtTable.size()) {
+        if (funcDeclID > 0 && rootStmtID > 0 &&
+            rootStmtID <= StmtTable.size()) {
           if (auto *BS = dyn_cast_or_null<BraceStmt>(StmtTable[rootStmtID - 1]))
             result[funcDeclID] = BS;
         }
