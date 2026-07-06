@@ -157,7 +157,7 @@ static LookupResult lookupMembers(DeclContext *DC, Type ty, DeclNameRef name,
 
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
-  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+  NLOptions lookupOptions = defaultMemberLookupOptions;
   return TypeChecker::lookupMember(DC, ty, name, UseLoc, lookupOptions);
 }
 

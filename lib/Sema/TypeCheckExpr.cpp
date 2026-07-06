@@ -534,7 +534,7 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
   auto lookup = TypeChecker::lookupUnqualified(
       dc->getModuleScopeContext(),
       nameRef, SourceLoc(),
-      defaultUnqualifiedLookupOptions | NameLookupFlags::ExcludeMacroExpansions
+      defaultUnqualifiedLookupOptions | NLFlags::ExcludeMacroExpansions
   );
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)

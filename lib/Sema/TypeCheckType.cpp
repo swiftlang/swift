@@ -658,7 +658,7 @@ private:
   /// that correction failed.
   NeverNullType diagnoseUnknownType(Type parentType, SourceRange parentRange,
                                     DeclRefTypeRepr *repr,
-                                    NameLookupOptions lookupOptions,
+                                    NLOptions lookupOptions,
                                     TypeResolutionOptions options);
 
   void maybeDiagnoseBadConformanceRef(Type parentTy, SourceLoc loc,
@@ -1997,7 +1997,7 @@ static std::string getDeclNameFromContext(DeclContext *dc,
 NeverNullType
 TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
                                   DeclRefTypeRepr *repr,
-                                  NameLookupOptions lookupOptions,
+                                  NLOptions lookupOptions,
                                   TypeResolutionOptions options) {
   assert(parentType || isa<UnqualifiedIdentTypeRepr>(repr));
 
@@ -2050,8 +2050,7 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
     }
 
     // Try ignoring access control.
-    NameLookupOptions relookupOptions = lookupOptions;
-    relookupOptions |= NameLookupFlags::IgnoreAccessControl;
+    NLOptions relookupOptions = lookupOptions | NLFlags::IgnoreAccessControl;
     auto inaccessibleResults = TypeChecker::lookupUnqualifiedType(
         dc, repr->getNameRef(), repr->getLoc(), relookupOptions);
     if (!inaccessibleResults.empty()) {
@@ -2161,8 +2160,7 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
   }
 
   // Try ignoring access control.
-  NameLookupOptions relookupOptions = lookupOptions;
-  relookupOptions |= NameLookupFlags::IgnoreAccessControl;
+  NLOptions relookupOptions = lookupOptions | NLFlags::IgnoreAccessControl;
   auto inaccessibleMembers = TypeChecker::lookupMemberType(
       dc, parentType, repr->getNameRef(),
       repr->getLoc(), relookupOptions);
@@ -2350,9 +2348,9 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
     }
   }
 
-  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  NLOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
-    lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
+    lookupOptions |= NLFlags::IncludeUsableFromInline;
   auto globals =
       TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(), lookupOptions);
 
@@ -2361,7 +2359,7 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
   bool didIgnoreMissingImports = false;
   if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
                                           /*allowMigration=*/true)) {
-    lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    lookupOptions |= NLFlags::IgnoreMissingImports;
     globals = TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(),
                                                  lookupOptions);
     didIgnoreMissingImports = true;
@@ -2599,9 +2597,9 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
   // Phase 1: Find and bind the type declaration.
 
   // Look for member types with the given name.
-  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+  NLOptions lookupOptions = defaultMemberLookupOptions;
   if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
-    lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
+    lookupOptions |= NLFlags::IncludeUsableFromInline;
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers()) {
     memberTypes = TypeChecker::lookupMemberType(
@@ -2610,7 +2608,7 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
     // If no members were found, try ignoring missing imports.
     if (!memberTypes && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
                                                 /*allowMigration=*/true)) {
-      lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+      lookupOptions |= NLFlags::IgnoreMissingImports;
       memberTypes = TypeChecker::lookupMemberType(
           DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
 

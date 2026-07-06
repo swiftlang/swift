@@ -82,6 +82,15 @@ enum class NLFlags : unsigned {
   /// not the API.
   ABIProviding = 1 << 11,
 
+  // TODO: Include all of the possible members to give a solver a
+  //       chance to diagnose name shadowing which requires explicit
+  //       name/module qualifier to access top-level name.
+  //       See: https://github.com/swiftlang/swift/pull/29024
+  //
+  /// This lookup should include results from outside the innermost scope with
+  /// results.
+  IncludeOuterResults   = 1 << 12,
+
   /// The default set of options used for qualified name lookup.
   ///
   /// FIXME: Eventually, add ProtocolMembers to this, once all of the
@@ -98,6 +107,10 @@ using NLOptions = OptionSet<NLFlags>;
 inline bool operator==(NLOptions lhs, NLOptions rhs) {
   return lhs.containsOnly(rhs);
 }
+
+// inline NLOptions operator|(NLFlags flag1, NLFlags flag2) {
+//   return NLOptions(flag1) | flag2;
+// }
 
 #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 

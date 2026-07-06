@@ -2182,7 +2182,7 @@ void swift::introduceUnsafeInheritExecutorReplacements(
   Identifier newIdentifier = ctx.getIdentifier(
       ("_unsafeInheritExecutor_" + baseName.getIdentifier().str()).str());
 
-  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  NLOptions lookupOptions = defaultUnqualifiedLookupOptions;
   LookupResult lookup = TypeChecker::lookupUnqualified(
       const_cast<DeclContext *>(dc), DeclNameRef(newIdentifier), loc,
       lookupOptions);
@@ -4268,7 +4268,7 @@ namespace {
                                                     SourceLoc loc) {
       Identifier name =
           ctx.getIdentifier("_unsafeInheritExecutor_withUnsafeContinuation");
-      NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+      NLOptions lookupOptions = defaultUnqualifiedLookupOptions;
       LookupResult lookup = TypeChecker::lookupUnqualified(
           dc, DeclNameRef(name), loc, lookupOptions);
       return !lookup.empty();

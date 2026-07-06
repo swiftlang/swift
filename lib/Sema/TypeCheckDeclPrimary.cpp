@@ -1602,7 +1602,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       auto result =
           TypeChecker::lookupMember(superclassDecl, superclassType, initFrom,
                                     classDecl->getLoc(),
-                                    NameLookupFlags::IgnoreAccessControl);
+                                    NLFlags::IgnoreAccessControl);
 
       if (!result.empty() && !result.front().getValueDecl()->isImplicit())
         diagDest = result.front().getValueDecl();
