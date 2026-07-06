@@ -16,6 +16,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/Type.h"
 
 using namespace swift;
@@ -285,7 +286,8 @@ Expr *BodyDeserializer::deserializeExpr() {
   switch (static_cast<ExprKindTag>(tag)) {
   case ExprKindTag::DeclRef: {
     auto *decl = readDeclRef();
-    if (!decl) return nullptr;
+    if (!decl)
+      return new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
     return new (Ctx) DeclRefExpr(ConcreteDeclRef(decl), DeclNameLoc(),
                                 /*Implicit=*/true, AccessSemantics::Ordinary,
                                 ty);
@@ -293,7 +295,10 @@ Expr *BodyDeserializer::deserializeExpr() {
   case ExprKindTag::MemberRef: {
     auto *base = deserializeExpr();
     auto *member = readDeclRef();
-    if (!base || !member) return nullptr;
+    if (!member)
+      return new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
+    if (!base)
+      base = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
     return new (Ctx) MemberRefExpr(base, SourceLoc(),
                                    ConcreteDeclRef(member), DeclNameLoc(),
                                    /*Implicit=*/true);
@@ -306,16 +311,19 @@ Expr *BodyDeserializer::deserializeExpr() {
   case ExprKindTag::Binary: {
     auto *lhs = deserializeExpr();
     auto *rhs = deserializeExpr();
-    if (!lhs || !rhs) return nullptr;
+    if (!lhs) lhs = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
+    if (!rhs) rhs = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
     return BinaryExpr::create(Ctx, lhs, nullptr, rhs, /*implicit=*/true, ty);
   }
   case ExprKindTag::Call: {
     auto *fn = deserializeExpr();
+    if (!fn) fn = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
     uint32_t numArgs = readUInt32();
     SmallVector<Expr*, 4> argExprs;
     for (uint32_t i = 0; i < numArgs; i++) {
       auto *argExpr = deserializeExpr();
-      if (!argExpr) return nullptr;
+      if (!argExpr)
+        argExpr = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
       argExprs.push_back(argExpr);
     }
     auto *argList = ArgumentList::forImplicitUnlabeled(Ctx, argExprs);
@@ -324,25 +332,28 @@ Expr *BodyDeserializer::deserializeExpr() {
   case ExprKindTag::Assign: {
     auto *dest = deserializeExpr();
     auto *src = deserializeExpr();
-    if (!dest || !src) return nullptr;
+    if (!dest) dest = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
+    if (!src) src = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
     return new (Ctx) AssignExpr(dest, SourceLoc(), src, /*Implicit=*/true);
   }
   case ExprKindTag::InOut: {
     auto *sub = deserializeExpr();
-    if (!sub) return nullptr;
+    if (!sub)
+      sub = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
     return new (Ctx) InOutExpr(SourceLoc(), sub, Type(), /*isImplicit=*/true);
   }
   case ExprKindTag::DotSyntaxCall: {
     auto *fn = deserializeExpr();
     auto *base = deserializeExpr();
-    if (!fn || !base) return nullptr;
+    if (!fn) fn = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
+    if (!base) base = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
     return DotSyntaxCallExpr::create(Ctx, fn, SourceLoc(),
                                      Argument::unlabeled(base), ty);
   }
   case ExprKindTag::Type:
     return TypeExpr::createImplicit(ty, Ctx);
   default:
-    return nullptr;
+    return new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
   }
 }
 
