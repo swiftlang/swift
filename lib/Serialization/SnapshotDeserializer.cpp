@@ -779,9 +779,14 @@ private:
     if (!key.bodyBlob.empty()) {
       serialization::BodyDeserializer bodyDeser(key.bodyBlob, ctx, nullptr);
       auto deserializeBody = [&](AbstractFunctionDecl *AFD) {
-        if (AFD->getBodyKind() != AbstractFunctionDecl::BodyKind::Deserialized)
-          return;
+        // Read a body entry for every function to stay aligned with the
+        // serializer (which writes one entry per function).
         bodyDeser.setDeclContext(AFD);
+        if (AFD->getBodyKind() != AbstractFunctionDecl::BodyKind::Deserialized) {
+          // Still need to consume the entry to stay aligned.
+          (void)bodyDeser.deserializeBody();
+          return;
+        }
         if (auto *body = bodyDeser.deserializeBody()) {
           AFD->setBody(body, AbstractFunctionDecl::BodyKind::Parsed);
           ctx.evaluator.cacheOutput(ParseAbstractFunctionBodyRequest{AFD},
@@ -789,6 +794,8 @@ private:
         }
       };
       for (auto *D : decls) {
+        if (isa<ImportDecl>(D))
+          continue;
         if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
           deserializeBody(AFD);
         if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {

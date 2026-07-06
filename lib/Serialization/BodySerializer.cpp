@@ -351,6 +351,8 @@ Expr *BodyDeserializer::deserializeExpr() {
                                      Argument::unlabeled(base), ty);
   }
   case ExprKindTag::Type:
+    if (!ty || ty->hasError())
+      return new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
     return TypeExpr::createImplicit(ty, Ctx);
   default:
     return new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
