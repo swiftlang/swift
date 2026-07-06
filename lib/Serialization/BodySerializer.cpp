@@ -225,9 +225,10 @@ void BodySerializer::serializeASTNode(ASTNode node) {
 
 void BodySerializer::serializeBody(BraceStmt *body) {
   if (!body) {
-    writeUInt32(0);
+    writeUInt8(0); // hasBody = false
     return;
   }
+  writeUInt8(1); // hasBody = true
   writeUInt32(body->getNumElements());
   for (auto &elem : body->getElements())
     serializeASTNode(elem);
@@ -465,16 +466,23 @@ ASTNode BodyDeserializer::deserializeASTNode() {
   default: return ASTNode();
   }
 }
-
 BraceStmt *BodyDeserializer::deserializeBody() {
+  uint8_t hasBody = readUInt8();
+  if (!hasBody) return nullptr;
+
   uint32_t numElements = readUInt32();
-  if (numElements == 0) return nullptr;
 
   SmallVector<ASTNode, 4> elements;
   for (uint32_t i = 0; i < numElements; i++) {
     auto node = deserializeASTNode();
-    if (node.isNull()) return nullptr;
-    elements.push_back(node);
+    if (node.isNull()) {
+      // Push an ErrorExpr to maintain element count; the body still
+      // has the correct structure even if some nodes failed to deserialize.
+      auto *err = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
+      elements.push_back(ASTNode(err));
+    } else {
+      elements.push_back(node);
+    }
   }
   return BraceStmt::create(Ctx, SourceLoc(), elements, SourceLoc(), false);
 }
