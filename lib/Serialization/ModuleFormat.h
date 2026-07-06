@@ -928,6 +928,10 @@ enum BlockID {
   ASTCACHE_CONFORMANCE_BLOCK_ID,
   ASTCACHE_IDENTIFIER_BLOCK_ID,
   ASTCACHE_INDEX_BLOCK_ID,
+  /// Body AST block: serializes type-checked function bodies (expression
+  /// and statement trees) using the same TypeID/DeclID/IdentifierID tables
+  /// as the rest of the bitstream. Cache-only, not in .swiftmodule.
+  ASTCACHE_BODY_BLOCK_ID,
 };
 
 /// Reference to a decl, either local (same file) or cross-file (same module,
@@ -984,6 +988,55 @@ namespace astcache_index_block {
   enum RecordKind {
     /// DeclID to bitstream offset mapping for lazy member loading
     DECL_OFFSETS = 1,
+  };
+}
+
+/// The record types within the AST cache body block.
+///
+/// \sa ASTCACHE_BODY_BLOCK_ID
+namespace astcache_body_block {
+  enum RecordKind : uint16_t {
+    /// Body record: associates a function decl with its serialized body.
+    /// Fields: DeclID (the function), ExprID/StmtID (root of body tree).
+    BODY = 1,
+
+    /// Expression record: {ExprID, ExprKind, TypeID, Implicit, ...fields}
+    EXPR_NODE = 2,
+
+    /// Statement record: {StmtID, StmtKind, Implicit, ...fields}
+    STMT_NODE = 3,
+
+    /// Local decl record: serializes local decls (ParamDecl, VarDecl)
+    /// that are created during type-checking and don't have DeclIDs
+    /// in the main decl table.
+    LOCAL_DECL = 4,
+  };
+
+  /// Expression kinds serialized in the body block.
+  enum ExprKind : uint8_t {
+    Expr_Error = 0,
+    Expr_DeclRef = 1,
+    Expr_IntegerLiteral = 2,
+    Expr_MemberRef = 3,
+    Expr_Binary = 4,
+    Expr_Call = 5,
+    Expr_Assign = 6,
+    Expr_InOut = 7,
+    Expr_DotSyntaxCall = 8,
+    Expr_Type = 9,
+    Expr_Tuple = 10,
+    Expr_Paren = 11,
+    Expr_UnresolvedDot = 12,
+  };
+
+  /// Statement kinds serialized in the body block.
+  enum StmtKind : uint8_t {
+    Stmt_Error = 0,
+    Stmt_Brace = 1,
+    Stmt_Return = 2,
+    Stmt_Yield = 3,
+    Stmt_Switch = 4,
+    Stmt_Case = 5,
   };
 }
 

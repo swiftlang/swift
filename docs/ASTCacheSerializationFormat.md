@@ -477,6 +477,42 @@ The `value_mismatch` pointer ID diffs (61) are a dump rendering artifact:
   dump, and `ImportDecl` insertion shifts the numbering. Structural pointer ID
   normalization in the compare script could address this.
 
+## 8.2. Decision: serialize full function body AST in the bitstream
+
+**Date:** 2026-07-06
+
+**Background:** A custom `bodyBlob` binary format was attempted to serialize
+type-checked function bodies (BraceStmt with expression trees). After ~25
+commits, the approach was abandoned because:
+
+1. It was a parallel serialization format that reimplemented what the
+   bitstream already does for decls and types, but worse — each expression
+   kind needed its own serialization path for types, decl refs, substitution
+   maps, source ranges, and flags. With ~10 AST node subsystems to cover
+   and no shared infrastructure, it could never achieve full fidelity.
+2. The `ErrorExpr` placeholders it produced for unresolved decls/types
+   crashed SILGen during `-emit-object` warm builds ("expression kind
+   should not survive to SILgen").
+3. 169 diffs remained after extensive effort, with no clear path to zero.
+
+**Decision:** Extend the bitstream serialization itself to write expression
+and statement AST nodes. The existing `Serializer` base class already
+serializes decls, types, and signatures with full fidelity — that's why
+non-body diffs were driven to zero. But it has NO expression or statement
+serialization at all (no `writeExpr`, no `visitStmt`). The
+`Serializer::writeStmtRef` method exists but always writes null.
+
+The plan is to extend the `ASTCacheSerializer` to serialize function bodies
+as bitstream records, using the same `writeType`, `addDeclRef`,
+`SubstitutionMap` serialization, etc. that the existing infrastructure
+provides. This gives full fidelity because every type and decl reference
+in the body resolves through the same tables used for the rest of the AST.
+
+**Key constraint:** The `.swiftmodule` format must not break. New record
+types for expressions/statements must be appended to the enum, just as
+`DEPENDENT_MEMBER_NAMED_TYPE` was. Existing `.swiftmodule` readers never
+encounter these records.
+
 ## 9. Key source files
 
 | File | Role |

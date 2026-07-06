@@ -225,6 +225,13 @@ TRAILING_INFO(CONDITIONAL_SUBSTITUTION_COND)
 
 OTHER(LIFETIME_DEPENDENCE, 161)
 TRAILING_INFO(INHERITED_PROTOCOLS)
+// Body AST nodes (cache-only, not in .swiftmodule). Appended at the end
+// so existing .swiftmodule readers never encounter these records.
+// Use values 500+ to avoid collision with DECL_ATTR (180+CODE, max code 175).
+OTHER(EXPR_NODE, 500)
+OTHER(STMT_NODE, 501)
+OTHER(BODY, 502)
+OTHER(LOCAL_DECL, 503)
 
 #ifndef DECL_ATTR
 #define DECL_ATTR(NAME, CLASS, REQS, BEHAVIORS, CODE) RECORD_VAL(CLASS##_DECL_ATTR, 180+CODE)
