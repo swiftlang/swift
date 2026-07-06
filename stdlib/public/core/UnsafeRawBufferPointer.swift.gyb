@@ -102,7 +102,7 @@ public struct Unsafe${Mutable}RawBufferPointer {
 
   // This works around _debugPrecondition() impacting the performance of
   // optimized code. (rdar://72246338)
-  @_alwaysEmitIntoClient @_transparent
+  @export(implementation) @_transparent
   internal init(
     @_nonEphemeral _uncheckedStart start: Unsafe${Mutable}RawPointer?,
     count: Int
@@ -131,7 +131,7 @@ public struct Unsafe${Mutable}RawBufferPointer {
   }
 
   @safe @_transparent
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(_empty: ()) {
     unsafe _position = nil
     unsafe _end = nil
@@ -212,7 +212,7 @@ extension Unsafe${Mutable}RawBufferPointer: @unsafe Sequence {
   ///
   /// - Returns: an iterator over any remaining elements of `self` and the
   ///   number of elements copied.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func _copyContents(
     initializing destination: UnsafeMutableBufferPointer<UInt8>
   ) -> (Iterator, UnsafeMutableBufferPointer<UInt8>.Index) {
@@ -259,7 +259,7 @@ extension Unsafe${Mutable}RawBufferPointer: @unsafe ${Mutable}Collection {
     return unsafe Indices(uncheckedBounds: (startIndex, endIndex))
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(always)
   @safe
   public func _checkBounds(_ bounds: Range<Index>) -> Bool {
@@ -468,7 +468,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow self)
   public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0,
@@ -481,7 +481,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     return unsafe _overrideLifetime(value, borrowing: self)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -527,7 +527,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   - type: The type to use for the newly constructed instance. The memory
   ///     must be initialized to a value of a type that is layout compatible
   ///     with `type`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0349_UnsafeMutableRawBufferPointer_storeBytes")
   public func storeBytes<T>(
@@ -898,7 +898,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: A typed buffer referencing the initialized elements.
   ///     The returned buffer references memory starting at the same
   ///     base address as this buffer, and its count is equal to `source.count`
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func initializeMemory<C: Collection>(
     as type: C.Element.Type,
     fromContentsOf source: C
@@ -986,7 +986,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     The returned buffer references memory starting at the same
   ///     base address as this buffer, and its count is equal to `source.count`.
   @discardableResult
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func moveInitializeMemory<T: ~Copyable>(
     as type: T.Type,
     fromContentsOf source: UnsafeMutableBufferPointer<T>
@@ -1038,7 +1038,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     The returned buffer references memory starting at the same
   ///     base address as this buffer, and its count is equal to `source.count`.
   @discardableResult
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func moveInitializeMemory<T>(
     as type: T.Type,
     fromContentsOf source: Slice<UnsafeMutableBufferPointer<T>>
@@ -1128,7 +1128,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
   ///     - term buffer: The buffer temporarily bound to instances of `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient @_transparent
+  @export(implementation) @_transparent
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws(E) -> Result
@@ -1165,7 +1165,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter to: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
-  @_alwaysEmitIntoClient @_transparent
+  @export(implementation) @_transparent
   public func assumingMemoryBound<T: ~Copyable>(
     to: T.Type
   ) -> Unsafe${Mutable}BufferPointer<T> {
@@ -1180,7 +1180,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 
 %  if Mutable:
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
@@ -1198,7 +1198,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 
 %  end
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -1219,7 +1219,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets within this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public func extracting(_ bounds: Range<Int>) -> Self {
     _precondition(_checkBounds(bounds), "Byte offset out of range")
@@ -1239,7 +1239,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets within this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public func extracting(_ bounds: some RangeExpression<Int>) -> Self {
     extracting(bounds.relative(to: unsafe Range(uncheckedBounds: (0, count))))
@@ -1248,7 +1248,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// Extracts and returns a copy of the entire buffer.
   ///
   /// - Returns: The same buffer as `self`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public func extracting(_ bounds: UnboundedRange) -> Self {
     unsafe self
@@ -1265,7 +1265,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets within this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func extracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = unsafe baseAddress?.advanced(by: bounds.lowerBound)
     return unsafe Self(_uncheckedStart: newStart, count: bounds.count)
@@ -1282,7 +1282,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets within this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func extracting(unchecked bounds: ClosedRange<Int>) -> Self {
     let range = unsafe Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
@@ -1299,7 +1299,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A buffer pointer with at most `maxLength` bytes.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public func extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
@@ -1316,7 +1316,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   `k` must be greater than or equal to zero.
   /// - Returns: A buffer pointer leaving off the specified number of trailing
   ///   bytes.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public func extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
@@ -1334,7 +1334,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A buffer pointer with at most `maxLength` bytes.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public func extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
@@ -1351,7 +1351,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter k: The number of bytes to drop from the beginning of the
   ///   buffer. `k` must be greater than or equal to zero.
   /// - Returns: A buffer pointer starting after the specified number of bytes.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public func extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
@@ -1380,7 +1380,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var bytes: RawSpan {
     @_lifetime(borrow self)
     @_transparent
@@ -1406,7 +1406,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var mutableBytes: MutableRawSpan {
     @_lifetime(borrow self)
     @_transparent
@@ -1422,7 +1422,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// memory region.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public func isTriviallyIdentical(to other: Self) -> Bool {
     unsafe (self._position == other._position) && (self._end == other._end)
@@ -1483,7 +1483,7 @@ extension Unsafe${Mutable}RawBufferPointer: ConvertibleToBytes {}
 ///     function. The buffer pointer argument is valid only for the duration
 ///     of the closure's execution.
 /// - Returns: The return value, if any, of the `body` closure.
-@_alwaysEmitIntoClient
+@export(implementation)
 @safe
 public func withUnsafeMutableBytes<T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable>(
   of value: inout T,
@@ -1516,7 +1516,7 @@ func __abi_se0413_withUnsafeMutableBytes<T, Result>(
 ///
 /// This function is similar to `withUnsafeMutableBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
-@_alwaysEmitIntoClient
+@export(implementation)
 public func _withUnprotectedUnsafeMutableBytes<
   T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable
 >(
@@ -1555,7 +1555,7 @@ public func _withUnprotectedUnsafeMutableBytes<
 ///     If you want to mutate a value by writing through a pointer, use
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
-@_alwaysEmitIntoClient
+@export(implementation)
 @safe
 public func withUnsafeBytes<T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable>(
   of value: inout T,
@@ -1587,7 +1587,7 @@ func __abi_se0413_withUnsafeBytes<T, Result>(
 ///
 /// This function is similar to `withUnsafeBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
-@_alwaysEmitIntoClient
+@export(implementation)
 public func _withUnprotectedUnsafeBytes<
   T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable
 >(
@@ -1626,7 +1626,7 @@ public func _withUnprotectedUnsafeBytes<
 // FIXME: Support `T: ~Copyable & ~Escapable` when we have an _overrideLifetime
 // that returns a borrowed value. This requires compiler support for emitting
 // tracking Builtin.Borrow<T> as ~Escapable.
-@_alwaysEmitIntoClient
+@export(implementation)
 @safe
 public func withUnsafeBytes<
   T: ~Copyable, E: Error, Result: ~Copyable
@@ -1663,7 +1663,7 @@ func __abi_se0413_withUnsafeBytes<T, Result>(
 // FIXME: Support `T: ~Copyable & ~Escapable` when we have an _overrideLifetime
 // that returns a borrowed value. This requires compiler support for emitting
 // tracking Builtin.Borrow<T> as ~Escapable.
-@_alwaysEmitIntoClient
+@export(implementation)
 public func _withUnprotectedUnsafeBytes<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(

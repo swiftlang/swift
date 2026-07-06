@@ -422,7 +422,7 @@ internal func _internalInvariant(
 }
 
 // Only perform the invariant check on Swift 5.1 and later
-@_alwaysEmitIntoClient // Swift 5.1
+@export(implementation) // Swift 5.1
 @_transparent
 internal func _internalInvariant_5_1(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),

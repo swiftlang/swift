@@ -118,7 +118,7 @@ extension _ArrayBuffer {
   ///
   /// - Warning: It's a requirement to call `beginCOWMutation` before the buffer
   ///   is mutated.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func beginCOWMutation() -> Bool {
     let isUnique: Bool
     if !_isClassOrObjCExistential(Element.self) {
@@ -137,7 +137,7 @@ extension _ArrayBuffer {
   }
 
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
-   @_alwaysEmitIntoClient
+   @export(implementation)
   internal mutating func beginCOWMutationUnchecked() -> Bool {
     let isUnique: Bool
     if !_isClassOrObjCExistential(Element.self) {
@@ -157,7 +157,7 @@ extension _ArrayBuffer {
   ///
   /// - Warning: After a call to `endCOWMutation` the buffer must not be mutated
   ///   until the next call of `beginCOWMutation`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal mutating func endCOWMutation() {
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
@@ -178,7 +178,7 @@ extension _ArrayBuffer {
   /// this buffer.
   ///
   /// This buffer is consumed, i.e. it's released.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never)
   @_semantics("optimize.sil.specialize.owned2guarantee.never")
   internal __consuming func _consumeAndCreateNew() -> _ArrayBuffer {
@@ -198,7 +198,7 @@ extension _ArrayBuffer {
   /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
   ///
   /// This buffer is consumed, i.e. it's released.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never)
   @_semantics("optimize.sil.specialize.owned2guarantee.never")
   internal __consuming func _consumeAndCreateNew(
@@ -376,7 +376,7 @@ extension _ArrayBuffer {
   /// A mutable pointer to the first element.
   ///
   /// - Precondition: the buffer must be mutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var mutableFirstElementAddress: UnsafeMutablePointer<Element> {
     _internalInvariant(_isNative, "must be a native buffer")
     return unsafe _native.mutableFirstElementAddress
@@ -407,7 +407,7 @@ extension _ArrayBuffer {
   /// The number of elements of the buffer.
   ///
   /// - Precondition: The buffer must be immutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var immutableCount: Int {
     return _fastPath(_isNative) ? _native.immutableCount : _nonNative.endIndex
   }
@@ -415,7 +415,7 @@ extension _ArrayBuffer {
   /// The number of elements of the buffer.
   ///
   /// - Precondition: The buffer must be mutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var mutableCount: Int {
     @inline(__always)
     get {
@@ -477,7 +477,7 @@ extension _ArrayBuffer {
   /// `0 ≤ index < count`.
   ///
   /// - Precondition: The buffer must be mutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _checkValidSubscriptMutating(_ index: Int) {
     _native._checkValidSubscriptMutating(index)
   }
@@ -495,7 +495,7 @@ extension _ArrayBuffer {
   /// The number of elements the buffer can store without reallocation.
   ///
   /// - Precondition: The buffer must be immutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var immutableCapacity: Int {
     return _fastPath(_isNative) ? _native.immutableCapacity : _nonNative.count
   }
@@ -503,7 +503,7 @@ extension _ArrayBuffer {
   /// The number of elements the buffer can store without reallocation.
   ///
   /// - Precondition: The buffer must be mutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var mutableCapacity: Int {
     _internalInvariant(_isNative, "attempting to get mutating-capacity of non-native buffer")
     return _native.mutableCapacity
@@ -582,13 +582,13 @@ extension _ArrayBuffer {
     }
   }
 
-  @inlinable @_alwaysEmitIntoClient
+  @export(implementation)
   static var associationKey: UnsafeRawPointer {
     //We never dereference this, we just need an address to use as a unique key
     unsafe UnsafeRawPointer(Builtin.addressof(&_swiftEmptyArrayStorage))
   }
   
-  @inlinable @_alwaysEmitIntoClient
+  @export(implementation)
   internal func getAssociatedBuffer() -> _ContiguousArrayBuffer<Element>? {
     let getter = unsafe unsafeBitCast(
       getGetAssociatedObjectPtr(),
@@ -608,7 +608,7 @@ extension _ArrayBuffer {
     return nil
   }
   
-  @inlinable @_alwaysEmitIntoClient
+  @export(implementation)
   internal func setAssociatedBuffer(_ buffer: _ContiguousArrayBuffer<Element>) {
     let setter = unsafe unsafeBitCast(getSetAssociatedObjectPtr(), to: (@convention(c)(
       AnyObject,
@@ -624,7 +624,7 @@ extension _ArrayBuffer {
     )
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func getOrAllocateAssociatedObjectBuffer(
   ) -> _ContiguousArrayBuffer<Element> {
     let unwrapped: _ContiguousArrayBuffer<Element>
@@ -650,7 +650,7 @@ extension _ArrayBuffer {
     return unwrapped
   }
 
-  @_alwaysEmitIntoClient @inline(never)
+  @export(implementation) @inline(never)
   @safe
   internal func withUnsafeBufferPointer_nonNative<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
@@ -681,7 +681,7 @@ extension _ArrayBuffer {
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   internal func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
@@ -708,7 +708,7 @@ extension _ArrayBuffer {
   /// over the underlying contiguous storage.
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   internal mutating func withUnsafeMutableBufferPointer<R, E>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R

@@ -70,7 +70,7 @@ func _deallocateUninitializedArray<Element>(
 }
 
 #if !INTERNAL_CHECKS_ENABLED
-@_alwaysEmitIntoClient
+@export(implementation)
 @_semantics("array.finalize_intrinsic")
 @_effects(readnone)
 @_effects(escaping array.value** => return.value**)
@@ -86,7 +86,7 @@ func _finalizeUninitializedArray<Element>(
 #else
 // When asserts are enabled, _endCOWMutation writes to _native.isImmutable
 // So we cannot have @_effects(readnone)
-@_alwaysEmitIntoClient
+@export(implementation)
 @_semantics("array.finalize_intrinsic")
 public // COMPILER_INTRINSIC
 func _finalizeUninitializedArray<Element>(
@@ -180,7 +180,7 @@ internal func _growArrayCapacity(_ capacity: Int) -> Int {
   return capacity * 2
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _growArrayCapacity(
   oldCapacity: Int, minimumCapacity: Int, growForAppend: Bool
 ) -> Int {

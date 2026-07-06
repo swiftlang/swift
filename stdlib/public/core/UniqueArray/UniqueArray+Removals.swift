@@ -16,7 +16,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(*n*), where *n* is the original count of the array.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func removeAll() {
     _storage.removeAll()
   }
@@ -30,7 +30,7 @@ extension UniqueArray where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @discardableResult
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func removeLast() -> Element {
     _storage.removeLast()
   }
@@ -47,7 +47,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`k`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func removeLast(_ k: Int) {
     _storage.removeLast(k)
   }
@@ -64,7 +64,7 @@ extension UniqueArray where Element: ~Copyable {
   /// - Complexity: O(`self.count`)
   @available(SwiftStdlib 6.4, *)
   @discardableResult
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func remove(at index: Int) -> Element {
     _storage.remove(at: index)
   }
@@ -79,7 +79,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`self.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func removeSubrange(_  bounds: Range<Int>) {
     _storage.removeSubrange(bounds)
   }
@@ -91,7 +91,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`self.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func removeSubrange(_  bounds: some RangeExpression<Int>) {
     // FIXME: Remove this in favor of a standard algorithm.
     removeSubrange(bounds.relative(to: indices))
@@ -107,7 +107,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func popLast() -> Element? {
     if isEmpty { return nil }
     return removeLast()

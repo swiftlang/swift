@@ -156,7 +156,7 @@ extension _StringGuts {
   }
 
   @inline(never) // slow-path
-  @_alwaysEmitIntoClient // Swift 5.1
+  @export(implementation) // Swift 5.1
   @_effects(releasenone)
   internal func scalarAlignSlow(_ idx: Index) -> Index {
     _internalInvariant_5_1(!idx._isScalarAligned)
@@ -213,7 +213,7 @@ extension _StringGuts {
     return self.withFastUTF8 { unsafe _decodeScalar($0, startingAt: i).0 }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal func isOnUnicodeScalarBoundary(_ offset: Int) -> Bool {
     isOnUnicodeScalarBoundary(String.Index(_encodedOffset: offset))

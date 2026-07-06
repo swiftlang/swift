@@ -127,12 +127,12 @@ public protocol AdditiveArithmetic: Equatable {
 }
 
 extension AdditiveArithmetic {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func +=(lhs: inout Self, rhs: Self) {
     lhs = lhs + rhs
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func -=(lhs: inout Self, rhs: Self) {
     lhs = lhs - rhs
   }
@@ -2584,7 +2584,7 @@ extension FixedWidthInteger {
   // surely be improved on even for Int64, but that is mostly an optimization
   // problem; the basic algorithm here gives the compiler all the information
   // that it needs to generate efficient code.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func multipliedFullWidth(by other: Self) -> (high: Self, low: Magnitude) {
     // We define a utility function for splitting an integer into high and low
     // halves. Note that the low part is always unsigned, while the high part
@@ -3154,7 +3154,7 @@ extension FixedWidthInteger {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal static func _truncatingInit<T: BinaryInteger>(_ source: T) -> Self {
     let neg = source < (0 as T)
     var result: Self = neg ? ~0 : 0
@@ -3457,7 +3457,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
   @_transparent
   public static var min: Self { return 0 }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func dividingFullWidth(
     _ dividend: (high: Self, low: Magnitude)
   ) -> (quotient: Self, remainder: Self) {
@@ -3686,7 +3686,7 @@ extension SignedInteger where Self: FixedWidthInteger {
     return self % other == 0
   }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func dividingFullWidth(
     _ dividend: (high: Self, low: Magnitude)
   ) -> (quotient: Self, remainder: Self) {

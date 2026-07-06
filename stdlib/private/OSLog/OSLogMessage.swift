@@ -26,7 +26,7 @@ public var maxOSLogArgumentCount: UInt8 { return 48 }
 // Note that this is marked transparent instead of @inline(__always) as it is
 // used in optimize(none) functions.
 @_transparent
-@_alwaysEmitIntoClient
+@export(implementation)
 internal var logBitsPerByte: Int { return 3 }
 
 /// Represents a string interpolation passed to the log APIs.
@@ -307,7 +307,7 @@ internal struct OSLogArguments {
 
 /// Serialize a UInt8 value at the buffer location pointed to by `bufferPosition`,
 /// and increment the `bufferPosition` with the byte size of the serialized value.
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(__always)
 internal func serialize(
   _ value: UInt8,
@@ -322,7 +322,7 @@ internal func serialize(
 // are used to hold onto NSObjects and Strings that are interpolated in the log
 // message until the end of the log call.
 
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(__always)
 internal func createStorage<T>(
   capacity: Int,
@@ -334,7 +334,7 @@ internal func createStorage<T>(
       UnsafeMutablePointer<T>.allocate(capacity: capacity)
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(__always)
 internal func initializeAndAdvance<T>(
   _ storageOpt: inout ObjectStorage<T>,
@@ -347,7 +347,7 @@ internal func initializeAndAdvance<T>(
   }
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(__always)
 internal func destroyStorage<T>(_ storageOpt: ObjectStorage<T>, count: Int) {
   // This if statement should get optimized away.

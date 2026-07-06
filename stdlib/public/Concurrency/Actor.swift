@@ -109,7 +109,7 @@ public macro isolation<T>() -> T = Builtin.IsolationMacro
 #endif
 
 #if $IsolatedAny
-@_alwaysEmitIntoClient
+@export(implementation)
 @available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "Use `.isolation` on @isolated(any) closure values instead.")
 public func extractIsolation<each Arg, Result>(

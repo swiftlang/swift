@@ -103,8 +103,7 @@ public struct UnownedJob: Sendable {
   }
 
   /// Deprecated API to run a job on a specific executor.
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   @available(*, deprecated, renamed: "ExecutorJob.runSynchronously(on:)")
   public func _runSynchronously(on executor: UnownedSerialExecutor) {
     unsafe _swiftJobRun(self, executor)
@@ -120,8 +119,7 @@ public struct UnownedJob: Sendable {
   /// and should be the same executor as the one semantically calling the `runSynchronously` method.
   ///
   /// - Parameter executor: the executor this job will be semantically running on.
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public func runSynchronously(on executor: UnownedSerialExecutor) {
     unsafe _swiftJobRun(self, executor)
   }
@@ -143,8 +141,7 @@ public struct UnownedJob: Sendable {
   /// - Parameter executor: the task executor this job will be run on.
   @_unavailableInEmbedded
   @available(StdlibDeploymentTarget 6.0, *)
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public func runSynchronously(on executor: UnownedTaskExecutor) {
     unsafe _swiftJobRunOnTaskExecutor(self, executor)
   }
@@ -172,8 +169,7 @@ public struct UnownedJob: Sendable {
   /// - SeeAlso: ``runSynchronously(on:)-(UnownedTaskExecutor)``
   @_unavailableInEmbedded
   @available(StdlibDeploymentTarget 6.0, *)
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
                                taskExecutor: UnownedTaskExecutor) {
     unsafe _swiftJobRunOnTaskExecutor(self, serialExecutor, taskExecutor)
@@ -269,8 +265,7 @@ extension Job {
   /// as a job can only ever be run once, and must not be accessed after it has been run.
   ///
   /// - Parameter executor: the executor this job will be semantically running on.
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
     unsafe _swiftJobRun(UnownedJob(self), executor)
   }
@@ -399,8 +394,7 @@ extension ExecutorJob {
   /// as a job can only ever be run once, and must not be accessed after it has been run.
   ///
   /// - Parameter executor: the executor this job will be semantically running on.
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
     unsafe _swiftJobRun(UnownedJob(self), executor)
   }
@@ -424,8 +418,7 @@ extension ExecutorJob {
   /// - SeeAlso: ``runSynchronously(isolatedTo:taskExecutor:)``
   @_unavailableInEmbedded
   @available(StdlibDeploymentTarget 6.0, *)
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   __consuming public func runSynchronously(on executor: UnownedTaskExecutor) {
     unsafe _swiftJobRunOnTaskExecutor(UnownedJob(self), executor)
   }
@@ -448,8 +441,7 @@ extension ExecutorJob {
   /// - SeeAlso: ``runSynchronously(on:)-(UnownedTaskExecutor)``
   @_unavailableInEmbedded
   @available(StdlibDeploymentTarget 6.0, *)
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   __consuming public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
                                taskExecutor: UnownedTaskExecutor) {
     unsafe _swiftJobRunOnTaskExecutor(UnownedJob(self), serialExecutor, taskExecutor)
@@ -695,7 +687,7 @@ extension JobPriority: Comparable {
 public struct UnsafeContinuation<T, E: Error>: Sendable {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(_ context: Builtin.RawUnsafeContinuation) {
     unsafe self.context = context
   }
@@ -713,7 +705,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   /// control immediately returns to the caller.
   /// The task continues executing
   /// when its executor schedules it.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func resume(returning value: sending T) where E == Never {
     #if compiler(>=5.5) && $BuiltinContinuation
     unsafe Builtin.resumeNonThrowingContinuationReturning(context, value)
@@ -735,7 +727,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   /// control immediately returns to the caller.
   /// The task continues executing
   /// when its executor schedules it.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func resume(returning value: sending T) {
     #if compiler(>=5.5) && $BuiltinContinuation
     unsafe Builtin.resumeThrowingContinuationReturning(context, value)
@@ -757,7 +749,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   /// control immediately returns to the caller.
   /// The task continues executing
   /// when its executor schedules it.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func resume(throwing error: consuming E) {
     #if compiler(>=5.5) && $BuiltinContinuation
     unsafe Builtin.resumeThrowingContinuationThrowing(context, error)
@@ -785,7 +777,7 @@ extension UnsafeContinuation {
   /// control immediately returns to the caller.
   /// The task continues executing
   /// when its executor schedules it.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func resume<Er: Error>(with result: __shared sending Result<T, Er>) where E == Error {
     switch result {
       case .success(let val):
@@ -811,7 +803,7 @@ extension UnsafeContinuation {
   /// control immediately returns to the caller.
   /// The task continues executing
   /// when its executor schedules it.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func resume(with result: __shared sending Result<T, E>) {
     switch result {
       case .success(let val):
@@ -831,7 +823,7 @@ extension UnsafeContinuation {
   /// control immediately returns to the caller.
   /// The task continues executing
   /// when its executor schedules it.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func resume() where T == Void {
     unsafe self.resume(returning: ())
   }
@@ -841,7 +833,7 @@ extension UnsafeContinuation {
 
 // Intrinsics used by SILGen to resume or fail continuations.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _resumeUnsafeContinuation<T>(
   _ continuation: UnsafeContinuation<T, Never>,
   _ value: sending T
@@ -850,7 +842,7 @@ internal func _resumeUnsafeContinuation<T>(
 }
 
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _resumeUnsafeThrowingContinuation<T>(
   _ continuation: UnsafeContinuation<T, Error>,
   _ value: sending T
@@ -859,7 +851,7 @@ internal func _resumeUnsafeThrowingContinuation<T>(
 }
 
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 internal func _resumeUnsafeThrowingContinuationWithError<T>(
   _ continuation: UnsafeContinuation<T, Error>,
   _ error: consuming Error
@@ -894,7 +886,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @unsafe
 public nonisolated(nonsending) func withUnsafeContinuation<T>(
   _ fn: (UnsafeContinuation<T, Never>) -> Void
@@ -907,7 +899,7 @@ public nonisolated(nonsending) func withUnsafeContinuation<T>(
 /// Source-compatibility overload; replaced by
 /// ``withUnsafeContinuation(_:)``.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @unsafe
 @_disfavoredOverload
 @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
@@ -946,7 +938,7 @@ public func withUnsafeContinuation<T>( // source-compatibility overload
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @unsafe
 public nonisolated(nonsending) func withUnsafeThrowingContinuation<T, E>(
   _ fn: (UnsafeContinuation<T, E>) -> Void
@@ -961,7 +953,7 @@ public nonisolated(nonsending) func withUnsafeThrowingContinuation<T, E>(
 }
 
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @unsafe
 public nonisolated(nonsending) func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeContinuation<T, Error>) -> Void
@@ -974,7 +966,7 @@ public nonisolated(nonsending) func withUnsafeThrowingContinuation<T>(
 /// Source-compatibility overload; replaced by
 /// ``withUnsafeThrowingContinuation(_:)-((UnsafeContinuation<T,E>)->Void)``.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @unsafe
 @_disfavoredOverload
 @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
@@ -991,7 +983,7 @@ public func withUnsafeThrowingContinuation<T>( // source-compatibility overload
 // in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
 // to the type checker.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @_unsafeInheritExecutor
 public func _unsafeInheritExecutor_withUnsafeContinuation<T>(
   _ fn: (UnsafeContinuation<T, Never>) -> Void
@@ -1005,7 +997,7 @@ public func _unsafeInheritExecutor_withUnsafeContinuation<T>(
 // in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
 // to the type checker.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @_unsafeInheritExecutor
 public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeContinuation<T, Error>) -> Void
@@ -1017,7 +1009,7 @@ public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T>(
 
 /// A hack to mark an SDK that supports swift_continuation_await.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 public func _abiEnableAwaitContinuation() {
   fatalError("never use this function")
 }

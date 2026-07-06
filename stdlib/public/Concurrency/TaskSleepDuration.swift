@@ -235,7 +235,7 @@ extension Task where Success == Never, Failure == Never {
   ///       try await Task.sleep(for: .seconds(3))
   ///
   @available(SwiftStdlib 5.7, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func sleep<C: Clock>(
     for duration: C.Instant.Duration,
     tolerance: C.Instant.Duration? = nil,
@@ -260,7 +260,7 @@ extension Task where Success == Never, Failure == Never {
   }
   @available(SwiftStdlib 5.7, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func sleep<C: Clock>(
     for duration: C.Instant.Duration,
     tolerance: C.Instant.Duration? = nil,

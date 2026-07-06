@@ -75,7 +75,7 @@ public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
 extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   /// Returns a span over the next group of elements that are ready to by visited,
   /// up to the specifed maximum.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   @_lifetime(self: copy self)
   @_transparent
@@ -83,7 +83,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
     nextSpan(maximumCount: Int.max)
   }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   public mutating func skip(by offset: Int) -> Int {
     var remainder = offset
@@ -114,7 +114,7 @@ public struct SpanIterator<Element>: BorrowingIteratorProtocol, ~Copyable, ~Esca
     _count = elements.count
   }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   @_lifetime(self: copy self)
   @_transparent
@@ -127,7 +127,7 @@ public struct SpanIterator<Element>: BorrowingIteratorProtocol, ~Copyable, ~Esca
     return _span.extracting(droppingFirst: _start).extracting(first: c)
   }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   public mutating func skip(by offset: Int) -> Int {
     let c = Swift.min(offset, _count)

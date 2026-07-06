@@ -216,7 +216,7 @@ extension SIMD${n}: ConvertibleFromBytes
 
 extension SIMD3 {
   /// A three-element vector created by appending a scalar to a two-element vector.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(_ xy: SIMD2<Scalar>, _ z: Scalar) {
     self.init(xy.x, xy.y, z)
   }
@@ -224,7 +224,7 @@ extension SIMD3 {
 
 extension SIMD4 {
   /// A four-element vector created by appending a scalar to a three-element vector.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(_ xyz: SIMD3<Scalar>, _ w: Scalar) {
     self.init(xyz.x, xyz.y, xyz.z, w)
   }
@@ -257,7 +257,7 @@ extension ${Self}: SIMDScalar {
       _value = Builtin.zeroInitializer()
     }
     
-    @_alwaysEmitIntoClient
+    @export(implementation)
     internal init(_ _builtin: Builtin.Vec${n}x${BuiltinName}) {
       _value = _builtin
     }
@@ -311,7 +311,7 @@ extension ${Self} : SIMDScalar {
       _value = Builtin.zeroInitializer()
     }
     
-    @_alwaysEmitIntoClient
+    @export(implementation)
     internal init(_ _builtin: Builtin.Vec${n}xFPIEEE${bits}) {
       _value = _builtin
     }

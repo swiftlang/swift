@@ -75,7 +75,7 @@ extension ContiguousArray {
   }
 
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUniqueUnchecked() {
     if _slowPath(!_buffer.beginCOWMutationUnchecked()) {
@@ -88,7 +88,7 @@ extension ContiguousArray {
   ///
   /// After a call to `_endMutation` the buffer must not be mutated until a call
   /// to `_makeMutableAndUnique`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("array.end_mutation")
   internal mutating func _endMutation() {
     _buffer.endCOWMutation()
@@ -106,7 +106,7 @@ extension ContiguousArray {
   /// `0 ≤ index < count`.
   ///
   /// - Precondition: The buffer must be uniquely referenced and native.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("array.check_subscript")
   internal func _checkSubscript_mutating(_ index: Int) {
     _buffer._checkValidSubscriptMutating(index)
@@ -703,7 +703,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// Reserves enough space to store `minimumCapacity` elements.
   /// If a new buffer needs to be allocated and `growForAppend` is true,
   /// the new capacity is calculated using `_growArrayCapacity`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _reserveCapacityImpl(
     minimumCapacity: Int, growForAppend: Bool
   ) {
@@ -725,7 +725,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// The `minimumCapacity` is the lower bound for the new capacity.
   /// If `growForAppend` is true, the new capacity is calculated using
   /// `_growArrayCapacity`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never)
   internal mutating func _createNewBuffer(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
@@ -1106,7 +1106,7 @@ extension ContiguousArray {
   ///       - initializedCount: The count of initialized elements in the array,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
-  @_alwaysEmitIntoClient @inlinable
+  @export(implementation)
   public init<E>(
     unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
@@ -1159,7 +1159,7 @@ extension ContiguousArray {
   ///     - Parameters:
   ///       - span: An `OutputSpan` covering uninitialized memory with
   ///         space for the specified number of elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init<E: Error>(
     capacity: Int,
     initializingWith initializer: (
@@ -1206,7 +1206,7 @@ extension ContiguousArray {
   ///     - Parameters:
   ///       - span: An `OutputSpan` covering uninitialized memory with
   ///         space for the specified number of additional elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func append<E: Error>(
     addingCapacity uninitializedCount: Int,
     initializingWith initializer: (
@@ -1281,7 +1281,7 @@ extension ContiguousArray {
   ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
@@ -1298,7 +1298,7 @@ extension ContiguousArray {
   /// - Returns: A `Span` over the elements of this array.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var span: Span<Element> {
     @_lifetime(borrow self)
     borrowing get {
@@ -1360,7 +1360,7 @@ extension ContiguousArray {
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
@@ -1400,7 +1400,7 @@ extension ContiguousArray {
   ///
   /// - Complexity: O(1) when the array's storage is uniquely referenced,
   ///   O(*n*) otherwise.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
     mutating get {
@@ -1692,7 +1692,7 @@ extension ContiguousArray {
   /// identical.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     unsafe self._buffer.identity == other._buffer.identity
   }

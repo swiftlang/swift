@@ -145,7 +145,7 @@ public struct Task<Success: Sendable, Failure: Error>: Sendable {
   @available(SwiftStdlib 5.1, *)
   internal let _task: Builtin.NativeObject
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(_ task: Builtin.NativeObject) {
     self._task = task
   }
@@ -168,7 +168,7 @@ extension Task {
   ///
   /// - Returns: The task's result.
   public var value: Success {
-    @_alwaysEmitIntoClient
+    @export(implementation)
     // This name is slightly different purely to avoid a clash with
     // the original property and keep the mangling concise.
     @_silgen_name("$sScT6_valuexvg")
@@ -332,7 +332,7 @@ public struct TaskPriority: RawRepresentable, Sendable {
 
   public static let high: TaskPriority = .init(rawValue: 0x19)
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var medium: TaskPriority {
     .init(rawValue: 0x15)
   }
@@ -562,7 +562,7 @@ struct JobFlags {
 
 /// Form task creation flags for use with the createAsyncTask builtins.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 func taskCreateFlags(
   priority: TaskPriority?, isChildTask: Bool, copyTaskLocals: Bool,
   inheritContext: Bool, enqueueJob: Bool,
@@ -883,7 +883,7 @@ public struct UnsafeCurrentTask {
 
   /// Check if the task is cancelled, optionally ignoring active cancellation shields.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _isCancelled(ignoreTaskCancellationShield: Bool) -> Bool {
     let flags: UInt64 = ignoreTaskCancellationShield ? 0x1 : 0x0
     return unsafe _taskIsCancelledWithFlags(_rawTask, flags: flags)
@@ -938,9 +938,9 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var hasActiveCancellationShield: Bool {
-    @_alwaysEmitIntoClient
+    @export(implementation)
     get {
       unsafe _taskHasActiveCancellationShield(_rawTask)
     }
@@ -1233,8 +1233,7 @@ extension Task where Failure == Never {
 @available(SwiftStdlib 5.8, *)
 extension Task where Failure == Error {
   @available(SwiftStdlib 5.8, *)
-  @_alwaysEmitIntoClient
-  @usableFromInline
+  @export(implementation)
   internal static func _runInlineHelper<T>(
     body: () async -> Result<T, Error>,
     rescue: (Result<T, Error>) throws -> T
@@ -1273,8 +1272,7 @@ extension Task where Failure == Error {
 /// Intrinsic used by SILGen to launch a task for bridging a Swift async method
 /// which was called through its ObjC-exported completion-handler-based API.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
-@usableFromInline
+@export(implementation)
 internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
 #if compiler(>=5.6)
   Task(operation: body)

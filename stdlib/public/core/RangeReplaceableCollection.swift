@@ -763,7 +763,7 @@ extension RangeReplaceableCollection {
   // `RangeExpression` would call itself in an infinite recursion
   // due to the absence of a better option.
   @available(*, unavailable)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Index>,
     with newElements: C
@@ -1111,7 +1111,7 @@ extension RangeReplaceableCollection {
   /// - Returns: A collection of the elements that `isIncluded` allowed.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(swift, introduced: 4.0)
   public consuming func filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool

@@ -450,13 +450,13 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   }
 
   /// Wait for all of the group's remaining tasks to complete.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated(nonsending) mutating func waitForAll() async {
     await awaitAllRemainingTasks(isolation: #isolation)
   }
 
   /// Wait for all of the group's remaining tasks to complete.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async {
     await awaitAllRemainingTasks(isolation: isolation)
@@ -647,7 +647,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// - Throws: The *first* error that was thrown by a child task during draining all the tasks.
   ///           This first error is stored until all other tasks have completed, and is re-thrown afterwards.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated(nonsending) mutating func waitForAll() async throws {
     var firstError: Error? = nil
 
@@ -668,7 +668,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async throws {
     var firstError: Error? = nil
@@ -808,12 +808,12 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///   containing the error that the child task threw.
   ///
   /// - SeeAlso: `next()`
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated(nonsending) mutating func nextResult() async -> Result<ChildTaskResult, Failure>? {
     return try! await nextResultForABI()
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func nextResult(isolation: isolated (any Actor)? = #isolation) async -> Result<ChildTaskResult, Failure>? {
     return try! await nextResultForABI()
@@ -1183,7 +1183,7 @@ struct TaskGroupFlags {
 
 /// Form task creation flags for use with the createAsyncTask builtins.
 @available(SwiftStdlib 5.8, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 func taskGroupCreateFlags(
         discardResults: Bool) -> Int {
   var bits = 0

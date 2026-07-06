@@ -392,7 +392,7 @@ extension UnsafeRawPointer {
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
@@ -488,7 +488,7 @@ extension UnsafeRawPointer {
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
   @_transparent
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow self)
   public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0,
@@ -519,8 +519,7 @@ extension UnsafeRawPointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -559,8 +558,7 @@ extension UnsafeRawPointer {
   /// - Parameters:
   ///   - type: the type to be stored at the returned address.
   /// - Returns: a pointer properly aligned to store a value of type `T`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func alignedUp<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
@@ -577,8 +575,7 @@ extension UnsafeRawPointer {
   /// - Parameters:
   ///   - type: the type to be stored at the returned address.
   /// - Returns: a pointer properly aligned to store a value of type `T`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func alignedDown<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
@@ -595,8 +592,7 @@ extension UnsafeRawPointer {
   ///   - alignment: the alignment of the returned pointer, in bytes.
   ///     `alignment` must be a whole power of 2.
   /// - Returns: a pointer aligned to `alignment`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func alignedUp(toMultipleOf alignment: Int) -> Self {
     let mask = UInt(alignment._builtinWordValue) &- 1
     _debugPrecondition(
@@ -618,8 +614,7 @@ extension UnsafeRawPointer {
   ///   - alignment: the alignment of the returned pointer, in bytes.
   ///     `alignment` must be a whole power of 2.
   /// - Returns: a pointer aligned to `alignment`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func alignedDown(toMultipleOf alignment: Int) -> Self {
     let mask = UInt(alignment._builtinWordValue) &- 1
     _debugPrecondition(
@@ -1011,7 +1006,7 @@ extension UnsafeMutableRawPointer {
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
@@ -1075,7 +1070,7 @@ extension UnsafeMutableRawPointer {
   ///   - value: The value used to initialize this memory.
   /// - Returns: A typed pointer to the memory referenced by this raw pointer.
   @discardableResult
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func initializeMemory<T: ~Copyable>(
     as type: T.Type, to value: consuming T
   ) -> UnsafeMutablePointer<T> {
@@ -1330,7 +1325,7 @@ extension UnsafeMutableRawPointer {
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
   @_transparent
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow self)
   public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0,
@@ -1361,8 +1356,7 @@ extension UnsafeMutableRawPointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -1419,7 +1413,7 @@ extension UnsafeMutableRawPointer {
   ///     nonnegative. The default is zero.
   ///   - type: The type of `value`.
   @_transparent
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func storeBytes<T: BitwiseCopyable & ~Escapable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
@@ -1463,7 +1457,7 @@ extension UnsafeMutableRawPointer {
   ///     nonnegative. The default is zero.
   ///   - type: The type of `value`.
   @_transparent
-  @_alwaysEmitIntoClient
+  @export(implementation)
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0349_UnsafeMutableRawPointer_storeBytes")
   public func storeBytes<T>(
@@ -1499,7 +1493,7 @@ extension UnsafeMutableRawPointer {
   }
 
   // This is the implementation of `storeBytes` from SwiftStdlib 5.6
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _legacy_se0349_storeBytes_internal<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
@@ -1565,8 +1559,7 @@ extension UnsafeMutableRawPointer {
   /// - Parameters:
   ///   - type: the type to be stored at the returned address.
   /// - Returns: a pointer properly aligned to store a value of type `T`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func alignedUp<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
@@ -1583,8 +1576,7 @@ extension UnsafeMutableRawPointer {
   /// - Parameters:
   ///   - type: the type to be stored at the returned address.
   /// - Returns: a pointer properly aligned to store a value of type `T`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func alignedDown<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
@@ -1601,8 +1593,7 @@ extension UnsafeMutableRawPointer {
   ///   - alignment: the alignment of the returned pointer, in bytes.
   ///     `alignment` must be a whole power of 2.
   /// - Returns: a pointer aligned to `alignment`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func alignedUp(toMultipleOf alignment: Int) -> Self {
     let mask = UInt(alignment._builtinWordValue) &- 1
     _debugPrecondition(
@@ -1624,8 +1615,7 @@ extension UnsafeMutableRawPointer {
   ///   - alignment: the alignment of the returned pointer, in bytes.
   ///     `alignment` must be a whole power of 2.
   /// - Returns: a pointer aligned to `alignment`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func alignedDown(toMultipleOf alignment: Int) -> Self {
     let mask = UInt(alignment._builtinWordValue) &- 1
     _debugPrecondition(

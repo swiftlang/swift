@@ -683,8 +683,7 @@ extension Sequence {
   ///   sequence.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func map<T, E>(
     _ transform: (Element) throws(E) -> T
   ) throws(E) -> [T] {
@@ -736,7 +735,7 @@ extension Sequence {
   /// - Returns: An array of the elements that `isIncluded` allowed.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public __consuming func filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool
   ) throws(E) -> [Element] {
@@ -761,7 +760,7 @@ extension Sequence {
   }
 #endif // !hasFeature(Embedded)
 
-  @_alwaysEmitIntoClient  @_transparent
+  @export(implementation) @_transparent
   public func _filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool
   ) throws(E) -> [Element] {
@@ -1266,7 +1265,7 @@ extension Sequence {
     return unsafe _copySequenceContents(initializing: buffer)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal __consuming func _copySequenceContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
