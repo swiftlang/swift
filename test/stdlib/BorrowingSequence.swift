@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature BorrowingSequence -enable-experimental-feature BorrowingForLoop -enable-experimental-feature Lifetimes)
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature BorrowingSequence -enable-experimental-feature BorrowingForLoop -enable-experimental-feature Lifetimes -O -Xllvm -sil-print-function=collectViaBorrowing)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
@@ -908,6 +908,8 @@ extension Iterable where Self: ~Copyable & ~Escapable, Element: ~Copyable, Failu
 
 @available(SwiftStdlib 6.4, *)
 extension Iterable where Self: ~Copyable & ~Escapable, Element: Copyable {
+  @_silgen_name("collectViaBorrowing")
+  @inline(never)
   func collectViaBorrowing() throws(Failure) -> [Element] {
     var borrowIterator = makeBorrowingIterator()
     withUnsafeBytes(of: &borrowIterator) { ptr in
