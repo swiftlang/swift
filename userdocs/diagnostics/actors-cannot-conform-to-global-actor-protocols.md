@@ -1,4 +1,4 @@
-# Actors can't conform to global actor protocols
+# Actors can't conform to global actor protocols (ActorConformanceToGlobalActorProtocol)
 
 Adding a protocol conformance to an actor will emit a compiler error if that protocol requires a global actor isolation. For example:
 

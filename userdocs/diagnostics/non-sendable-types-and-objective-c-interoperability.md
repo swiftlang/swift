@@ -1,4 +1,4 @@
-# Non-sendable types and Objective-C interoperability
+# Non-sendable types and Objective-C interoperability (NonSendableObjCInterop)
 
 Actor-isolated methods that are `async` can be exposed to Objective-C using `@objc`. These methods are imported into Objective-C with a completion handler parameter. When Objective-C code calls any of these methods, a detached task that calls the `async` Swift method will be created, executed in the concurrency domain of the actor, and eventually forward the results to the completion handler.
 

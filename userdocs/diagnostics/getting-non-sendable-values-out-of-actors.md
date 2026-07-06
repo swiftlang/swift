@@ -1,4 +1,4 @@
-# Getting non-sendable values out of actors
+# Getting non-sendable values out of actors (NonSendableExitingActor)
 
 When an actor is used to protect a non-sendable value, the compiler will enforce that the non-sendable value remains in the actor's isolation domain. Accessing an actor's property of non-sendable type from a different concurrency region will be diagnosed when complete concurrency checking is enabled:
 

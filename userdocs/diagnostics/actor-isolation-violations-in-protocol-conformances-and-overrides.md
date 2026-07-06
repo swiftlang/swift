@@ -1,4 +1,4 @@
-# Actor isolation violations in protocol conformances and overrides
+# Actor isolation violations in protocol conformances and overrides (NonSendableInConformanceOrOverride)
 
 When adding an `async` method to conform to a protocol or override a method from a superclass, the implementation can specify a different actor isolation than the protocol or superclass. When the method is called, the caller will suspend, and the function will later be resumed in the concurrency domain specified in the implementation. This also applies to `get async` accessors required by protocols.
 
