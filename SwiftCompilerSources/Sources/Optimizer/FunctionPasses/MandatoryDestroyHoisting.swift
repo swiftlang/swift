@@ -268,6 +268,9 @@ private extension Stack where Element == Instruction {
       {
         return .continueWalk
       }
+      if $0.instruction is DebugValueInst {
+        return .continueWalk
+      }
       users.append($0.instruction)
       return .continueWalk
     }

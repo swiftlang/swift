@@ -530,6 +530,32 @@ bb0(%0 : @owned $C):
 
 protocol P: AnyObject {}
 
+// Debug value instructions may exist after a destroy_value (to be cleaned up later,
+// by the kill-invalid-debug-values pass)
+// Those instructions should not extend the liverange of the value.
+
+// CHECK-LABEL: sil [ossa] @switch_enum_payload_only_debug_uses :
+// CHECK:       bb1([[PAYLOAD:%[0-9]+]] : @owned $String):
+// CHECK-NEXT:    destroy_value [[PAYLOAD]]
+// CHECK-NEXT:    debug_value [[PAYLOAD]]
+// CHECK:       } // end sil function 'switch_enum_payload_only_debug_uses'
+sil [ossa] @switch_enum_payload_only_debug_uses : $@convention(thin) (@owned Optional<String>) -> () {
+bb0(%0 : @owned $Optional<String>):
+  switch_enum %0, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%2 : @owned $String):
+  destroy_value %2
+  debug_value %2, let, name "x"
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: sil [ossa] @type_dependent_operand_outside_liverange :
 // CHECK:       bb2:
 // CHECK-NEXT:    destroy_value %2
