@@ -422,23 +422,23 @@ AST cache: HIT for Sources/_NIODataStructures/Heap.swift
 round-trip verification action (serialize → deserialize → JSON-diff); see the
 plan in `local://ast-cache-format-plan.md`, Steps 10–13.
 
-## 8.1. Remaining verify-ast-cache diffs (123 on rich test file)
+## 8.1. Remaining verify-ast-cache diffs (111 on rich test file)
 
-The strict `compare()` in the verify script reports 123 diffs. Categories:
+The strict `compare()` in the verify script reports 111 diffs (down from 123).
+Categories:
 
-| Category | Count | Root cause | Fix approach |
-|----------|-------|-----------|-------------|
-| `range`/`loc` | 46 | Source locations not in decl record layouts (only `SwiftAttrAttr` serializes them via `writeSourceLocation`) | Serialize source ranges in a side block (like existing `DECL_LOCS_BLOCK_ID` from `.swiftsourceinfo`), restore during deserialization |
-| `value_mismatch` (pointer IDs) | 61 | `decl_context` pointer IDs off-by-one — `ImportDecl` insertion shifts numbering. `ASTDumper` assigns `replaced-pointer-N` in first-seen order during JSON dump | Dump rendering artifact; could be fixed by structural pointer ID normalization or by not inserting ImportDecl |
-| `body` | 13 | Cache stores body *text* (source string via `InlinableBodyTextLayout`), not body *AST* (`brace_stmt` nodes). `ASTDumper` renders `body` as AST structure | Either serialize full body AST (large) or re-parse body text into AST during deserialization |
-| `implicit` on patterns | 7 | Deserializer uses `createImplicit` for all patterns (`NamedPattern::createImplicit`, `TypedPattern::createImplicit`, etc.) — swiftmodule design assumes patterns are reconstructed, not parsed | Add `isImplicit` field to pattern record layouts, or use non-implicit `create` methods during deserialization |
-| `where_requirements` | 1 | `getTrailingWhereClause()` returns parsed where clause, not serialized. Generic signature IS serialized but dumper shows them as separate fields | Reconstruct `TrailingWhereClause` from generic signature requirements, or serialize it |
-| `generic_signature` | 1 | Protocol generic signature rendering difference | Force-evaluate `getGenericSignature()` during deserialization |
-| Synthesized conformances | ~6 | `source_kind: 'synthesized'` vs `'explicit'` — deserializer marks synthesized conformances as explicit | Fix deserialization path to preserve `source_kind` |
-| `attrs` ordering | 2 | `has_storage_attr` vs `usable_from_inline_attr` swapped — synthesized attribute added at different position | Control attribute insertion order during deserialization |
-| `accessors` array length | 3 | Missing accessor in deserialized (e.g., `final_attr` on getter) | Force-load all accessors during deserialization |
+| Category | Count | Root cause | Status |
+|----------|-------|-----------|--------|
+| `range`/`loc` | 46 | Source locations not in decl record layouts (only `SwiftAttrAttr` serializes them via `writeSourceLocation`) | **Dropped** — needs `DECL_LOCS_BLOCK_ID` side block |
+| `value_mismatch` (pointer IDs) | 61 | `decl_context` pointer IDs off-by-one — `ImportDecl` insertion shifts numbering. `ASTDumper` assigns `replaced-pointer-N` in first-seen order during JSON dump | **Dropped** — dump rendering artifact |
+| `body` | 15 | Cache stores body *text* (source string via `InlinableBodyTextLayout`), not body *AST* (`brace_stmt` nodes). `ASTDumper` renders `body` as AST structure | **Dropped** — `ParseAbstractFunctionBodyRequest` returns `{}` for `BodyKind::Deserialized`; re-parsing via `parseAbstractFunctionBodyDelayed` requires `BodyKind::Unparsed` and a valid source range |
+| `where_requirements` | 1 | `getTrailingWhereClause()` returns parsed where clause, not serialized. Generic signature IS serialized but includes inferred requirements (Copyable, Escapable) not in source where clause | **Dropped** — needs bitstream serialization of `TrailingWhereClause` |
+| `implicit` on attrs | 2 | `has_storage_attr` vs `usable_from_inline_attr` swapped — synthesized attribute added at different position | **Dropped** — ordering depends on implicit vs explicit attrs |
+| `accessors` array length | 1 | Missing/extra accessor in deserialized (`transparent_attr` propagated to accessor incorrectly) | **Dropped** — separate accessor attr propagation issue |
 
-### Fixes already applied (reduced from 200 → 123)
+### Fixes applied
+
+**Phase 1 (200 → 123):**
 
 | Fix | Diffs cleared | How |
 |-----|-------|-----|
@@ -448,18 +448,34 @@ The strict `compare()` in the verify script reports 123 diffs. Categories:
 | `enum_case_decl` reconstruction | ~20 cascade | Group consecutive `EnumElementDecl`s, insert `EnumCaseDecl` wrapper before each group, keep elements as direct members too |
 | `import_decl` array alignment | ~10 | Reconstruct `ImportDecl` nodes from `importsBlob` during deserialization |
 
+**Phase 2 (123 → 111) — TDD with lit tests and C++ unit tests:**
+
+| Fix | Diffs cleared | How | Tests |
+|-----|-------|-----|-------|
+| `implicit` on patterns | 6 | Added `Pattern::clearImplicit()` (`Pattern.h:138`); recursively clears implicit flag on patterns within non-implicit PBDs in `Deserialization.cpp:4856`. Walker descends ParenPattern/TypedPattern/BindingPattern/TuplePattern. Synthesized (implicit) PBDs keep their patterns implicit | `test/ASTCache/pattern_implicit.swift`; `unittests/AST/PatternImplicitTests.cpp` (4 tests) |
+| `generic_signature` | 1 | Force-compute `getGenericSignature()` on deserialized protocols in `SnapshotDeserializer.cpp:210` so ASTDumper renders `generic_signature` instead of `parsed_generic_params` | `test/ASTCache/generic_signature.swift`; `unittests/AST/GenericSignatureTests.cpp` (2 tests) |
+| Synthesized conformances (`source_kind`) | 6 | Mark conformances as `Synthesized` when their protocol is not in the explicit inherits list (`SnapshotDeserializer.cpp:213`). Handles both `NominalTypeDecl` and `ExtensionDecl` inherits via `getInherited().getResolvedType(i)` | `test/ASTCache/synthesized_conformance.swift` |
+
 ### What's NOT fixable without extending the bitstream
 
-The `range`, `body`, and `implicit` categories (66 diffs total) require
-additional data in the cache bitstream that the swiftmodule format doesn't
-store. The infrastructure exists:
+The `range`, `body`, and `where_requirements` categories (62 diffs total)
+require additional data in the cache bitstream that the swiftmodule format
+doesn't store. The infrastructure exists:
 
 - **`DECL_LOCS_BLOCK_ID`** (line 912 of `ModuleFormat.h`) — existing source
   location block from `.swiftsourceinfo`, could be added to the cache bitstream
 - **`InlinableBodyTextLayout`** — body text is already stored; re-parsing it
-  into AST would produce the `brace_stmt` nodes the dumper expects
-- **Pattern record layouts** — adding an `isImplicit` bit to each pattern
-  layout would let the deserializer use non-implicit constructors
+  into AST would produce the `brace_stmt` nodes the dumper expects, but
+  `ParseAbstractFunctionBodyRequest` returns `{}` for `BodyKind::Deserialized`
+  and the request evaluator caches this empty result
+- **Pattern record layouts** — the `implicit` fix (Phase 2) works around
+  this by clearing implicit on non-implicit PBDs; the remaining 2 attr
+  implicit diffs are attribute ordering issues
+
+The `value_mismatch` pointer ID diffs (61) are a dump rendering artifact:
+  `ASTDumper` assigns `replaced-pointer-N` in first-seen order during the JSON
+  dump, and `ImportDecl` insertion shifts the numbering. Structural pointer ID
+  normalization in the compare script could address this.
 
 ## 9. Key source files
 
@@ -467,6 +483,8 @@ store. The infrastructure exists:
 |------|------|
 | `include/swift/AST/TypeCheckedSnapshot.h` | `ASTCacheKey`, `SWIFTAST_MAGIC`, `SWIFTAST_FORMAT_VERSION` |
 | `include/swift/AST/SourceFile.h` | `clearCacheForFailedLoad()`, `LoadedFromAstCache`, `CachedModuleFile` |
+| `include/swift/AST/Pattern.h` | `Pattern::clearImplicit()` (Phase 2 fix for pattern implicit-flag diffs) |
+| `include/swift/AST/ProtocolConformance.h` | `NormalProtocolConformance::setSourceKindAndImplyingConformance()` (Phase 2 fix for synthesized conformance diffs) |
 | `lib/Serialization/ASTCacheSerializer.cpp` | `ASTCacheSerializer` (`isDeclXRef`, `useNameBasedDependentMemberType`), `writeASTCacheFile` |
 | `lib/Serialization/Serialization.h` | `Serializer` virtuals: `isDeclXRef`, `useNameBasedDependentMemberType`, `writeCrossReference` |
 | `lib/Serialization/Serialization.cpp` | `visitDependentMemberType` branch, abbreviation registration |
@@ -475,3 +493,35 @@ store. The infrastructure exists:
 | `lib/Serialization/Deserialization.cpp` | `DESERIALIZE_TYPE(DEPENDENT_MEMBER_NAMED_TYPE)`; `resolveCrossReference` registry fast-path |
 | `lib/Serialization/SnapshotDeserializer.cpp` | `deserializeBitstream` (eager registry + associated-type load), `parseCacheHeader` |
 | `lib/Frontend/Frontend.cpp` | `loadASTCache` (two-pass), `saveASTCache` |
+
+## 10. Test files
+
+### Lit tests (`test/ASTCache/`)
+
+| File | Tests |
+|------|-------|
+| `basic.swift` | Cache MISS → SAVED → HIT cycle |
+| `roundtrip.swift` | `-verify-ast-cache` invariant test (expects 0 diffs; currently fails due to remaining diffs) |
+| `pattern_implicit.swift` | Pattern implicit-flag preservation (non-implicit PBDs + synthesized Hashable PBDs) |
+| `generic_signature.swift` | Protocol generic signature force-computation |
+| `synthesized_conformance.swift` | Synthesized vs explicit conformance source_kind |
+| `cross_file_ref.swift` | Cross-file nominal resolution via registry |
+| `protocol_cross_file.swift` | Cross-file protocol xref + associated types |
+| `generic_cross_file.swift` | Cross-file generic type references |
+| `extensions.swift` | Extension member serialization |
+| `accessors.swift` | Accessor serialization |
+| `wmo_crossref.swift` | WMO mode cross-references |
+| `mixed_cache.swift` | Mixed cached + source-parsed files |
+| `import_attrs.swift` | Import attribute preservation |
+| `invalidation.swift` | Cache invalidation on source change |
+| `default_args.swift` | Default argument serialization |
+| `emit_object.swift` | `-emit-object` with cached AST |
+| `fibonacci.swift` | Complex function bodies |
+| `generics.swift` | Generic type serialization |
+
+### Unit tests (`unittests/AST/`)
+
+| File | Tests |
+|------|-------|
+| `PatternImplicitTests.cpp` | `Pattern::clearImplicit()` behavior: clears on named pattern, non-recursive, setImplicit re-arms, no-op on non-implicit (4 tests) |
+| `GenericSignatureTests.cpp` | `GenericContext::hasComputedGenericSignature()`: false before set, true after (2 tests) |
