@@ -502,6 +502,53 @@ extension String.UTF16View {
   public __consuming func makeIterator() -> Iterator {
     return Iterator(_guts)
   }
+
+  public __consuming func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Unicode.UTF16.CodeUnit>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Unicode.UTF16.CodeUnit>.Index) {
+    guard unsafe buffer.baseAddress != nil else {
+      _preconditionFailure(
+        "Attempt to copy string contents into nil buffer pointer")
+    }
+    let count = self.count
+    guard buffer.count >= count else {
+      _preconditionFailure(
+        "Insufficient space to copy string contents")
+    }
+
+    if _fastPath(_guts.isFastUTF8) {
+      unsafe _nativeCopy(
+        into: unsafe UnsafeMutableBufferPointer(
+          start: buffer.baseAddress,
+          count: count
+        ),
+        offsetRange: 0 ..< count
+      )
+      // Everything was copied; the "remaining" iterator is empty.
+      return ("".utf16.makeIterator(), count)
+    }
+
+#if _runtime(_ObjC)
+    // Foreign (bridged) strings can't use `_nativeCopy`, but can use ObjC
+    _guts._object.withCocoaObject { ns in
+      unsafe _cocoaStringCopyCharacters(
+        from: ns,
+        range: 0 ..< count,
+        into: buffer.baseAddress._unsafelyUnwrappedUnchecked
+      )
+    }
+    return ("".utf16.makeIterator(), count)
+#else
+    // No foreign strings without the ObjC runtime, but just in case...
+    var it = self.makeIterator()
+    var written = 0
+    while written < count {
+      unsafe buffer[written] = it.next()!
+      written &+= 1
+    }
+    return (it, written)
+#endif
+  }
 }
 
 
