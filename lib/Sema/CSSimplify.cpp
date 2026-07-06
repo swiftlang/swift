@@ -5019,7 +5019,8 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   // `let _: Bool = try? foo()` and `foo()` produces `Int`
   // we should diagnose it as type mismatch instead of missing unwrap.
   bool possibleContextualMismatch = [&]() {
-    if (!locator.endsWith<LocatorPathElt::ContextualType>())
+    if (!(locator.endsWith<LocatorPathElt::ContextualType>() ||
+          locator.endsWith<LocatorPathElt::Condition>()))
       return false;
 
     // If the contextual type is optional as well, it's definitely a
