@@ -1027,6 +1027,87 @@ namespace astcache_body_block {
     Expr_Tuple = 10,
     Expr_Paren = 11,
     Expr_UnresolvedDot = 12,
+    // Literals
+    Expr_NilLiteral = 13,
+    Expr_FloatLiteral = 14,
+    Expr_BooleanLiteral = 15,
+    Expr_StringLiteral = 16,
+    Expr_MagicIdentifierLiteral = 17,
+    // Identity wrappers (Expr_Paren = 11 already exists above)
+    Expr_DotSelf = 18,
+    Expr_Await = 19,
+    Expr_Unsafe = 20,
+    Expr_Borrow = 21,
+    // Other simple
+    Expr_Copy = 22,
+    Expr_Consume = 23,
+    Expr_ForceValue = 24,
+    Expr_BindOptional = 25,
+    Expr_OptionalEvaluation = 26,
+    Expr_TupleElement = 27,
+    // Ternary
+    Expr_Ternary = 28,
+    // Conversion expression kinds (range 50-88, claimed by Conversions agent).
+    // ImplicitConversionExpr subclasses (50-83): each wraps a subExpr + type.
+    Expr_Load = 50,
+    Expr_ABISafeConversion = 51,
+    Expr_DestructureTuple = 52,
+    Expr_FunctionConversion = 53,
+    Expr_CovariantFunctionConversion = 54,
+    Expr_CovariantReturnConversion = 55,
+    Expr_MetatypeConversion = 56,
+    Expr_CollectionUpcastConversion = 57,
+    Expr_Erasure = 58,
+    Expr_AnyHashableErasure = 59,
+    Expr_BridgeToObjC = 60,
+    Expr_BridgeFromObjC = 61,
+    Expr_ConditionalBridgeFromObjC = 62,
+    Expr_DerivedToBase = 63,
+    Expr_ArchetypeToSuper = 64,
+    Expr_InjectIntoOptional = 65,
+    Expr_ClassMetatypeToObject = 66,
+    Expr_ExistentialMetatypeToObject = 67,
+    Expr_ProtocolMetatypeToObject = 68,
+    Expr_InOutToPointer = 69,
+    Expr_ArrayToPointer = 70,
+    Expr_StringToPointer = 71,
+    Expr_PointerToPointer = 72,
+    Expr_ForeignObjectConversion = 73,
+    Expr_UnevaluatedInstance = 74,
+    Expr_UnderlyingToOpaque = 75,
+    Expr_Unreachable = 76,
+    Expr_DifferentiableFunction = 77,
+    Expr_LinearFunction = 78,
+    Expr_DifferentiableFunctionExtractOriginal = 79,
+    Expr_LinearFunctionExtractOriginal = 80,
+    Expr_LinearToDifferentiableFunction = 81,
+    Expr_ActorIsolationErasure = 82,
+    Expr_UnsafeCast = 83,
+    // ExplicitCastExpr subclasses (85-88): subExpr + targetTypeID + castKind.
+    Expr_ForcedCheckedCast = 85,
+    Expr_ConditionalCheckedCast = 86,
+    Expr_Is = 87,
+    Expr_Coerce = 88,
+    // CollectionsAndClosures (100-118)
+    Expr_Array = 100,
+    Expr_Dictionary = 101,
+    Expr_KeyPathApplication = 102,
+    Expr_Closure = 103,
+    Expr_AutoClosure = 104,
+    Expr_CaptureList = 105,
+    Expr_Subscript = 106,
+    Expr_DynamicMemberRef = 107,
+    Expr_DynamicSubscript = 108,
+    Expr_PrefixUnary = 109,
+    Expr_PostfixUnary = 110,
+    Expr_EnumIsCase = 111,
+    Expr_DiscardAssignment = 112,
+    Expr_VarargExpansion = 113,
+    Expr_OpenExistential = 114,
+    Expr_OpaqueValue = 115,
+    Expr_DefaultArgument = 116,
+    Expr_MakeTemporarilyEscapable = 117,
+    Expr_DynamicType = 118,
   };
 
   /// Statement kinds serialized in the body block.
@@ -1037,6 +1118,27 @@ namespace astcache_body_block {
     Stmt_Yield = 3,
     Stmt_Switch = 4,
     Stmt_Case = 5,
+    // Simple statements
+    Stmt_Break = 6,
+    Stmt_Continue = 7,
+    Stmt_Fallthrough = 8,
+    Stmt_Fail = 9,
+    Stmt_Throw = 10,
+    Stmt_Discard = 11,
+    // Control flow
+    Stmt_Then = 12,
+    Stmt_Defer = 13,
+    Stmt_If = 14,
+    Stmt_Guard = 15,
+    Stmt_While = 16,
+    Stmt_RepeatWhile = 17,
+    Stmt_ForEach = 18,
+    // Do/catch
+    Stmt_Do = 19,
+    Stmt_DoCatch = 20,
+    // Other
+    Stmt_PoundAssert = 21,
+    Stmt_Opaque = 22,
   };
 }
 
@@ -1764,6 +1866,16 @@ namespace decls_block {
   TYPE_LAYOUT(HiddenTypeLayout,
     HIDDEN_TYPE,
     BCBlob        // mangled name of the original (hidden) type
+  );
+
+  TYPE_LAYOUT(LValueTypeLayout,
+    LVALUE_TYPE,
+    TypeIDField // object type
+  );
+
+  TYPE_LAYOUT(InOutTypeLayout,
+    INOUT_TYPE,
+    TypeIDField // object type
   );
 
   using TypeAliasLayout = BCRecordLayout<

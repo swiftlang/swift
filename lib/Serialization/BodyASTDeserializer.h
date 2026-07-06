@@ -28,6 +28,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "ModuleFormat.h"
 #include <functional>
 #include "llvm/ADT/DenseMap.h"
@@ -49,6 +51,13 @@ class BodyASTDeserializer {
   /// Callback: resolve an IdentifierID to an Identifier.
   std::function<Identifier(serialization::IdentifierID)> ResolveIdentifier;
 
+  /// Callback: resolve a ProtocolConformanceID to a ProtocolConformanceRef.
+  std::function<ProtocolConformanceRef(serialization::ProtocolConformanceID)>
+      ResolveConformance;
+
+  /// Callback: resolve a SubstitutionMapID to a SubstitutionMap.
+  std::function<SubstitutionMap(serialization::SubstitutionMapID)>
+      ResolveSubstitutionMap;
   /// Maps ExprID → reconstructed Expr*.
   std::vector<Expr *> ExprTable;
 
@@ -78,10 +87,16 @@ public:
       ASTContext &ctx,
       std::function<Type(serialization::TypeID)> resolveType,
       std::function<Decl *(serialization::DeclID)> resolveDecl,
-      std::function<Identifier(serialization::IdentifierID)> resolveIdentifier)
+      std::function<Identifier(serialization::IdentifierID)> resolveIdentifier,
+      std::function<ProtocolConformanceRef(serialization::ProtocolConformanceID)>
+          resolveConformance = nullptr,
+      std::function<SubstitutionMap(serialization::SubstitutionMapID)>
+          resolveSubstitutionMap = nullptr)
       : Ctx(ctx), ResolveType(std::move(resolveType)),
         ResolveDecl(std::move(resolveDecl)),
-        ResolveIdentifier(std::move(resolveIdentifier)) {}
+        ResolveIdentifier(std::move(resolveIdentifier)),
+        ResolveConformance(std::move(resolveConformance)),
+        ResolveSubstitutionMap(std::move(resolveSubstitutionMap)) {}
 
   /// Deserializes a body block from the given bitstream data.
   /// Returns the root BraceStmt (or nullptr on error).

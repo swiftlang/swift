@@ -5509,6 +5509,9 @@ class IsExpr final : public CheckedCastExpr {
 public:
   static IsExpr *create(ASTContext &ctx, SourceLoc isLoc, TypeRepr *tyRepr);
 
+  /// Create an implicit 'is' expression for deserialization.
+  static IsExpr *createImplicit(ASTContext &ctx, Expr *sub, Type castTy);
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Is;
   }

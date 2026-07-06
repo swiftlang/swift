@@ -1872,6 +1872,14 @@ IsExpr *IsExpr::create(ASTContext &ctx, SourceLoc isLoc, TypeRepr *tyRepr) {
   return new (ctx) IsExpr(nullptr, isLoc, new (ctx) TypeExpr(tyRepr));
 }
 
+IsExpr *IsExpr::createImplicit(ASTContext &ctx, Expr *sub, Type castTy) {
+  auto *const expr = new (ctx)
+      IsExpr(sub, SourceLoc(), TypeExpr::createImplicit(castTy, ctx));
+  expr->setType(ctx.getBoolType());
+  expr->setImplicit();
+  return expr;
+}
+
 CoerceExpr *CoerceExpr::create(ASTContext &ctx, SourceLoc asLoc,
                                TypeRepr *tyRepr) {
   return new (ctx) CoerceExpr(nullptr, asLoc, new (ctx) TypeExpr(tyRepr));

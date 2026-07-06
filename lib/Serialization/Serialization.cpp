@@ -5836,14 +5836,26 @@ public:
     }
 
   UNSUPPORTED_TYPE(Module)
-  UNSUPPORTED_TYPE(InOut)
-  UNSUPPORTED_TYPE(LValue)
   UNSUPPORTED_TYPE(TypeVariable)
   UNSUPPORTED_TYPE(ErrorUnion)
   UNSUPPORTED_TYPE(Join)
   UNSUPPORTED_TYPE(Meet)
 
 #undef UNSUPPORTED_TYPE
+
+  void visitLValueType(const LValueType *ty) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[LValueTypeLayout::Code];
+    LValueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                 S.addTypeRef(ty->getObjectType()));
+  }
+
+  void visitInOutType(const InOutType *ty) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[InOutTypeLayout::Code];
+    InOutTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                S.addTypeRef(ty->getObjectType()));
+  }
 
   void visitLocatableType(const LocatableType *LT) {
     visit(LT->getSinglyDesugaredType());
@@ -6654,6 +6666,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<IntegerTypeLayout>();
   registerDeclTypeAbbr<HiddenTypeLayout>();
   registerDeclTypeAbbr<InlineArrayTypeLayout>();
+  registerDeclTypeAbbr<LValueTypeLayout>();
+  registerDeclTypeAbbr<InOutTypeLayout>();
 
   registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();

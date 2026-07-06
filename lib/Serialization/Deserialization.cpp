@@ -8756,6 +8756,36 @@ Expected<Type> DESERIALIZE_TYPE(HIDDEN_TYPE)(ModuleFile &MF,
 
   return HiddenType::get(ctx, blobData, MF.getAssociatedModule());
 }
+
+Expected<Type> DESERIALIZE_TYPE(LVALUE_TYPE)(ModuleFile &MF,
+                                             SmallVectorImpl<uint64_t> &scratch,
+                                             StringRef blobData) {
+  TypeID objectID;
+  decls_block::LValueTypeLayout::readRecord(scratch, objectID);
+
+  auto objectOrError = MF.getTypeChecked(objectID);
+  if (!objectOrError) {
+    return objectOrError.takeError();
+  }
+  auto objectType = objectOrError.get()->getCanonicalType();
+
+  return LValueType::get(objectType);
+}
+
+Expected<Type> DESERIALIZE_TYPE(INOUT_TYPE)(ModuleFile &MF,
+                                            SmallVectorImpl<uint64_t> &scratch,
+                                            StringRef blobData) {
+  TypeID objectID;
+  decls_block::InOutTypeLayout::readRecord(scratch, objectID);
+
+  auto objectOrError = MF.getTypeChecked(objectID);
+  if (!objectOrError) {
+    return objectOrError.takeError();
+  }
+  auto objectType = objectOrError.get()->getCanonicalType();
+
+  return InOutType::get(objectType);
+}
 } // namespace decls_block
 } // namespace serialization
 }
