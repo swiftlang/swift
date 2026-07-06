@@ -1508,8 +1508,12 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         IsObjC = true;
         break;
       } else if (Id.str() == "distributed") {
-        // No need to store isDistributed=true, this is computed off the decl.
-        assert(Result.isDistributed() && "Parsed SILDeclRef has '!distributed' but referred to decl is not distributed!");
+        // No need to store isDistributed=true; this is computed off the decl.
+        #ifndef NDEBUG
+        auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(VD);
+        assert((!afd || afd->isDistributed()) &&
+               "Parsed SILDeclRef has '!distributed' but referred to decl is not distributed!");
+        #endif
         consumeOptionalDeclPointerPayload(P); // ignore payload of legacy `!distributed(0x...)`
         ParseState = 1;
         break;
