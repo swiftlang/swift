@@ -108,10 +108,6 @@ inline bool operator==(NLOptions lhs, NLOptions rhs) {
   return lhs.containsOnly(rhs);
 }
 
-// inline NLOptions operator|(NLFlags flag1, NLFlags flag2) {
-//   return NLOptions(flag1) | flag2;
-// }
-
 #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
 inline llvm::hash_code hash_value(NLOptions options) {

@@ -48,6 +48,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/MacroDefinition.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
