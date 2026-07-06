@@ -506,11 +506,16 @@ extension String.UTF16View {
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Unicode.UTF16.CodeUnit>
   ) -> (Iterator, UnsafeMutableBufferPointer<Unicode.UTF16.CodeUnit>.Index) {
+    let count = self.count
+    // An empty view needs no storage, so tolerate a nil/empty destination
+    // (e.g. `Array`'s zero-capacity buffer) rather than trapping on it.
+    guard count > 0 else {
+      return ("".utf16.makeIterator(), 0)
+    }
     guard unsafe buffer.baseAddress != nil else {
       _preconditionFailure(
         "Attempt to copy string contents into nil buffer pointer")
     }
-    let count = self.count
     guard buffer.count >= count else {
       _preconditionFailure(
         "Insufficient space to copy string contents")
@@ -539,14 +544,7 @@ extension String.UTF16View {
     }
     return ("".utf16.makeIterator(), count)
 #else
-    // No foreign strings without the ObjC runtime, but just in case...
-    var it = self.makeIterator()
-    var written = 0
-    while written < count {
-      unsafe buffer[written] = it.next()!
-      written &+= 1
-    }
-    return (it, written)
+    fatalError("No foreign strings on non-ObjC platforms in this version of Swift")
 #endif
   }
 }
