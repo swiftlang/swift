@@ -26,7 +26,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/AST/TypeCheckedSnapshot.h"
 #include "swift/Serialization/SerializationOptions.h"
-#include "BodySerializer.h"
+#include "BodyASTSerializer.h"
 #include "swift/Subsystems.h"
 #include "llvm/Bitcode/BitcodeConvenience.h"
 #include "llvm/Support/FileSystem.h"
@@ -74,7 +74,8 @@ public:
 
   /// Serialize the SourceFile to the given stream using the overridden
   /// isDeclXRef to route same-module cross-file decls through writeCrossReference.
-  void writeToStream(raw_ostream &os, ModuleOrSourceFile DC) {
+  void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                      ArrayRef<AbstractFunctionDecl*> allFuncs) {
     writeBlockInfoBlock();
     {
       BCBlockRAII moduleBlock(Out, MODULE_BLOCK_ID, 2);
@@ -83,6 +84,18 @@ public:
       writeSIL(nullptr);
       writeAST(DC);
       writeHiddenTypeLayoutsBlock();
+      // Serialize function bodies to the body block.
+      BodyASTSerializer bodySer(*this);
+      for (auto *AFD : allFuncs) {
+        auto kind = AFD->getBodyKind();
+        if (kind == AbstractFunctionDecl::BodyKind::TypeChecked ||
+            kind == AbstractFunctionDecl::BodyKind::Synthesize ||
+            kind == AbstractFunctionDecl::BodyKind::None) {
+          auto *body = AFD->getBody(/*canSynthesize=*/true);
+          DeclID funcDeclID = addDeclRef(AFD);
+          bodySer.serializeBody(funcDeclID, body);
+        }
+      }
     }
     SerializerBase::writeToStream(os);
   }
@@ -177,7 +190,7 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
     ASTCacheSerializer serializer(
         ModuleOrSourceFile(const_cast<SourceFile *>(&SF)), opts);
     serializer.writeToStream(bitstreamOS,
-        ModuleOrSourceFile(const_cast<SourceFile *>(&SF)));
+        ModuleOrSourceFile(const_cast<SourceFile *>(&SF)), allFuncs);
 
     langOpts.AllowModuleWithCompilerErrors = savedAllowErrors;
     langOpts.AllowModuleWithCompilerErrors = savedAllowErrors;
@@ -286,23 +299,6 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
         }
       }
     }
-    // Serialize function body AST to bodyBlob.
-    // Write a body entry for EVERY collected function so the deserializer
-    // stays aligned (null entries for non-TypeChecked functions).
-    {
-      BodySerializer bodySer(key.bodyBlob);
-      for (auto *AFD : allFuncs) {
-        auto kind = AFD->getBodyKind();
-        if (kind == AbstractFunctionDecl::BodyKind::TypeChecked ||
-            kind == AbstractFunctionDecl::BodyKind::Synthesize ||
-            kind == AbstractFunctionDecl::BodyKind::None) {
-          auto *body = AFD->getBody(/*canSynthesize=*/true);
-          bodySer.serializeBody(body);
-        } else {
-          bodySer.serializeBody(nullptr);
-        }
-      }
-    }
   }
 
   // 3. Write the .swiftast container (same format as SnapshotSerializer)
@@ -351,7 +347,6 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
   writeString(key.overlaysBlob);
   writeString(key.declRangesBlob);
   writeString(key.whereClausesBlob);
-  writeString(key.bodyBlob);
   // Write bitstream (length-prefixed)
   writeString(bitstreamData);
 

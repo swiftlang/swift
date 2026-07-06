@@ -30,8 +30,7 @@
 #include "swift/AST/Type.h"
 #include "ModuleFormat.h"
 #include <functional>
-#include <map>
-#include <vector>
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 
@@ -87,6 +86,12 @@ public:
   /// Deserializes a body block from the given bitstream data.
   /// Returns the root BraceStmt (or nullptr on error).
   BraceStmt *deserializeBody(ArrayRef<uint8_t> bitstreamData);
+
+  /// Deserializes ALL body blocks from the given bitstream data.
+  /// Returns a map from DeclID → root BraceStmt.
+  /// Each body block has its own ExprID/StmtID space (cleared per block).
+  llvm::DenseMap<serialization::DeclID, BraceStmt *>
+  deserializeAllBodies(ArrayRef<uint8_t> bitstreamData);
 
   /// Returns the number of EXPR_NODE records deserialized.
   size_t getNumExprs() const { return ExprTable.size(); }

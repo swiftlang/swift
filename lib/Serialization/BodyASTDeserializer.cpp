@@ -407,3 +407,102 @@ BraceStmt *BodyASTDeserializer::deserializeBody(ArrayRef<uint8_t> bitstreamData)
   }
   return nullptr;
 }
+
+llvm::DenseMap<serialization::DeclID, BraceStmt *>
+BodyASTDeserializer::deserializeAllBodies(ArrayRef<uint8_t> bitstreamData) {
+  llvm::DenseMap<serialization::DeclID, BraceStmt *> result;
+
+  ArrayRef<uint8_t> data = bitstreamData;
+  if (data.size() >= 4 && data[0] == 0xE2 && data[1] == 0x9C &&
+      data[2] == 0xA8 && data[3] == 0x0E) {
+    data = data.slice(4);
+  }
+
+  llvm::BitstreamCursor cursor(data);
+
+  while (!cursor.AtEndOfStream()) {
+    llvm::Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance();
+    if (!maybeEntry) {
+      consumeError(maybeEntry.takeError());
+      break;
+    }
+    llvm::BitstreamEntry entry = maybeEntry.get();
+
+    if (entry.Kind == llvm::BitstreamEntry::SubBlock) {
+      if (entry.ID == ASTCACHE_BODY_BLOCK_ID) {
+        if (llvm::Error Err = cursor.EnterSubBlock(ASTCACHE_BODY_BLOCK_ID)) {
+          consumeError(std::move(Err));
+          break;
+        }
+
+        // Read records within this body block.
+        SmallVector<uint64_t, 64> scratch;
+        uint32_t rootStmtID = 0;
+        serialization::DeclID funcDeclID = 0;
+
+        // Clear tables for this body's ExprID/StmtID space.
+        ExprTable.clear();
+        StmtTable.clear();
+
+        while (true) {
+          llvm::Expected<llvm::BitstreamEntry> maybeE =
+              cursor.advance(llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
+          if (!maybeE) {
+            consumeError(maybeE.takeError());
+            break;
+          }
+          llvm::BitstreamEntry e = maybeE.get();
+
+          if (e.Kind == llvm::BitstreamEntry::EndBlock)
+            break;
+          if (e.Kind != llvm::BitstreamEntry::Record)
+            break;
+
+          scratch.clear();
+          llvm::Expected<unsigned> maybeRecordID =
+              cursor.readRecord(e.ID, scratch);
+          if (!maybeRecordID) {
+            consumeError(maybeRecordID.takeError());
+            break;
+          }
+          unsigned recordID = maybeRecordID.get();
+
+          if (recordID == astcache_body_block::BODY) {
+            if (scratch.size() >= 2) {
+              funcDeclID = static_cast<serialization::DeclID>(scratch[0]);
+              rootStmtID = static_cast<uint32_t>(scratch[1]);
+            }
+          } else if (recordID == astcache_body_block::EXPR_NODE) {
+            if (scratch.size() >= 1) {
+              uint32_t exprID = static_cast<uint32_t>(scratch[0]);
+              deserializeExpr(scratch, exprID);
+            }
+          } else if (recordID == astcache_body_block::STMT_NODE) {
+            if (scratch.size() >= 1) {
+              uint32_t stmtID = static_cast<uint32_t>(scratch[0]);
+              deserializeStmt(scratch, stmtID);
+            }
+          }
+        }
+
+        // Look up the root BraceStmt.
+        if (rootStmtID > 0 && rootStmtID <= StmtTable.size()) {
+          if (auto *BS = dyn_cast_or_null<BraceStmt>(StmtTable[rootStmtID - 1]))
+            result[funcDeclID] = BS;
+        }
+        continue;
+      }
+      // Skip other sub-blocks.
+      if (llvm::Error Err = cursor.SkipBlock()) {
+        consumeError(std::move(Err));
+        break;
+      }
+      continue;
+    }
+    if (entry.Kind == llvm::BitstreamEntry::Error)
+      break;
+    // Skip records and end blocks.
+  }
+
+  return result;
+}

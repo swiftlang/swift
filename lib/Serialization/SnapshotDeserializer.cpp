@@ -36,6 +36,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "BodyASTDeserializer.h"
 #include "BodySerializer.h"
 
 #include "llvm/Support/MemoryBuffer.h"
@@ -773,41 +774,45 @@ private:
         }
       }
     }
-    // Deserialize function bodies from bodyBlob.
-    // The bodyBlob stores the type-checked body AST for each function.
-    // We reconstruct the BraceStmt and cache it so getBody() returns it.
-    if (!key.bodyBlob.empty()) {
-      serialization::BodyDeserializer bodyDeser(key.bodyBlob, ctx, nullptr);
-      auto deserializeBody = [&](AbstractFunctionDecl *AFD) {
-        bodyDeser.setDeclContext(AFD);
+
+    // Deserialize function bodies from the bitstream body block.
+    // The body block contains type-checked body AST nodes serialized via
+    {
+      auto bitstreamData8 = llvm::ArrayRef<uint8_t>(
+          reinterpret_cast<const uint8_t *>(bitstreamData.data()),
+          bitstreamData.size());
+      serialization::BodyASTDeserializer bodyDeser(
+          ctx,
+          /*resolveType=*/[&](serialization::TypeID tid) -> Type {
+            return mf->getType(tid);
+          },
+          /*resolveDecl=*/[&](serialization::DeclID did) -> Decl * {
+            auto expected = mf->getDeclChecked(did);
+            if (expected)
+              return expected.get();
+            consumeError(expected.takeError());
+            return nullptr;
+          },
+          /*resolveIdentifier=*/
+          [&](serialization::IdentifierID iid) -> Identifier {
+            return mf->getIdentifier(iid);
+          });
+      auto bodies = bodyDeser.deserializeAllBodies(bitstreamData8);
+      // Resolve each body's DeclID to an AbstractFunctionDecl and set its body.
+      for (auto &kv : bodies) {
+        auto *D = mf->getDecl(kv.first);
+        if (!D) continue;
+        auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
+        if (!AFD) continue;
         auto kind = AFD->getBodyKind();
-        // Read the body entry regardless of kind (for alignment).
-        auto *body = bodyDeser.deserializeBody();
+        auto *body = kv.second;
         // Only set the body for BodyKind::None functions (no body text
         // from bitstream). For Deserialized functions, the body text is
-        // re-parsed by ParseAbstractFunctionBodyRequest::evaluate, which
-        // works for both -verify-ast-cache (JSON dump) and -emit-object
-        // (SILGen). Setting bodyBlob bodies with ErrorExpr placeholders
-        // would crash SILGen.
+        // re-parsed by ParseAbstractFunctionBodyRequest::evaluate.
         if (body && kind == AbstractFunctionDecl::BodyKind::None) {
           AFD->setBody(body, AbstractFunctionDecl::BodyKind::Parsed);
           ctx.evaluator.cacheOutput(ParseAbstractFunctionBodyRequest{AFD},
                                     BodyAndFingerprint(body, std::nullopt));
-        }
-      };
-      for (auto *D : decls) {
-        if (isa<ImportDecl>(D))
-          continue;
-        if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
-          deserializeBody(AFD);
-        if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
-          for (auto *member : IDC->getAllMembers()) {
-            if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member))
-              deserializeBody(AFD);
-            if (auto *ASD = dyn_cast<AbstractStorageDecl>(member))
-              for (auto *acc : ASD->getAllAccessors())
-                deserializeBody(acc);
-          }
         }
       }
     }
@@ -854,7 +859,6 @@ private:
     if (!readString(buf, key.macroPluginsHash, offset)) return false;
     if (!readString(buf, key.crossImportOverlaysHash, offset)) return false;
     if (!readString(buf, key.dependencyProvidesHash, offset)) return false;
-    if (!readString(buf, key.importsBlob, offset)) return false;
     if (!readString(buf, key.privateDiscriminator, offset)) return false;
     if (!readString(buf, key.overlaysBlob, offset)) return false;
     if (!readString(buf, key.declRangesBlob, offset)) return false;
