@@ -2153,6 +2153,11 @@ NOTE(objc_implementation_init_turn_required_to_convenience, none,
      "initializer",
      ())
 
+WARNING(objc_implementation_missing_inherited_init,none,
+        "'@objc @implementation' extension does not implement %kind0 inherited "
+        "from its superclass; invoking it from Objective-C will trap at runtime",
+        (const ValueDecl *))
+
 // Fallback diagnostic; super-general by nature.
 ERROR(objc_implementation_member_requires_vtable, none,
       "%kind0 is not valid in an '@objc @implementation' extension because it "
