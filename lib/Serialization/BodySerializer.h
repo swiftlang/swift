@@ -22,6 +22,8 @@
 #include <string>
 
 namespace swift {
+class DeclContext;
+
 namespace serialization {
 
 class BodySerializer {
@@ -44,6 +46,7 @@ class BodyDeserializer {
   const char *Data;
   size_t Remaining;
   class ASTContext &Ctx;
+  class DeclContext *DC;
   uint32_t readUInt32();
   uint8_t readUInt8();
   StringRef readString();
@@ -54,8 +57,8 @@ class BodyDeserializer {
   Decl *deserializeDecl();
   ASTNode deserializeASTNode();
 public:
-  BodyDeserializer(StringRef blob, ASTContext &ctx)
-      : Data(blob.data()), Remaining(blob.size()), Ctx(ctx) {}
+  BodyDeserializer(StringRef blob, ASTContext &ctx, DeclContext *dc)
+      : Data(blob.data()), Remaining(blob.size()), Ctx(ctx), DC(dc) {}
   BraceStmt *deserializeBody();
 };
 

@@ -8,11 +8,12 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===----------------------------------------------------------------------===//
-
 #include "BodySerializer.h"
-#include "swift/AST/ASTWalker.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTDemangler.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ArgumentList.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
@@ -247,14 +248,27 @@ StringRef BodyDeserializer::readString() {
 Type BodyDeserializer::readType() {
   StringRef mangled = readString();
   if (mangled.empty()) return Type();
-  // TODO: demangle and resolve type
-  return Type();
+  return Demangle::getTypeForMangling(Ctx, mangled);
 }
 
 ValueDecl *BodyDeserializer::readDeclRef() {
   StringRef name = readString();
   if (name.empty()) return nullptr;
-  // TODO: resolve decl by name
+  // Try to find the decl by name in the function's decl context.
+  // This is a simplified resolution — full USR-based resolution would
+  // be more robust.
+  auto ident = Ctx.getIdentifier(name);
+  if (!DC) return nullptr;
+  // Check if it's a parameter of the function.
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+    if (auto *params = AFD->getParameters()) {
+      for (auto *param : *params) {
+        if (param->getBaseIdentifier() == ident)
+          return param;
+      }
+    }
+  }
+  // TODO: look up in enclosing decl context (struct/class members, etc.)
   return nullptr;
 }
 
