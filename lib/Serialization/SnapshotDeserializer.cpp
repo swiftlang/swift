@@ -16,15 +16,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/GenericParamList.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckedSnapshot.h"
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/AST/TypeRepr.h"
 #include "ModuleFile.h"
 #include "ModuleFileSharedCore.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include <functional>
 
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -199,6 +205,9 @@ private:
         // Eagerly compute the requirement signature so that dumpJSON
         // emits "requirement_signature" instead of "uncomputed_requirement_signature".
         (void)PD->getRequirementSignature();
+        // Force-compute the generic signature so that dumpJSON emits
+        // "generic_signature" instead of "parsed_generic_params".
+        (void)PD->getGenericSignature();
       }
     }
     // Eagerly set the interface type and specifier on implicit self decls
