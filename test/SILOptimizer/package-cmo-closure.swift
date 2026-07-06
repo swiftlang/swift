@@ -9,6 +9,7 @@
 // RUN: %target-sil-opt -sil-print-types %t/Lib.swiftmodule -sil-verify-all -o %t/Lib.sil
 // RUN: %FileCheck %s --check-prefix=CHECK < %t/Lib.sil
 
+// REQUIRES: swift_in_compiler
 
 public struct Something {
   public init() {}

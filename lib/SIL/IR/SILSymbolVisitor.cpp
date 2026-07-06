@@ -511,8 +511,8 @@ public:
       // Distributed functions emit a number of thunks that we need to replicate here.
 
       // Record the 'distributed_thunk'
-      if (AFD->getDistributedThunk()) {
-        auto thunk = SILDeclRef(AFD).getDistributedThunkDeclRef();
+      if (auto distributedThunk = AFD->getDistributedThunk()) {
+        auto thunk = SILDeclRef(distributedThunk).asDistributed();
         addFunction(thunk);
         addAsyncFunctionPointer(thunk);
       }
@@ -669,14 +669,7 @@ public:
       Visitor.addNominalTypeDescriptor(NTD);
 
       // Generic types do not get metadata directly, only through the function.
-      // Classes with resilient ancestry also do not get a static metadata
-      // address point; IRGen emits a metadata pattern via the Resilient
-      // strategy in that case.
-      bool hasResilientAncestry = false;
-      if (auto *CD = dyn_cast<ClassDecl>(NTD))
-        hasResilientAncestry = CD->checkAncestry(AncestryFlags::ResilientOther);
-
-      if (!NTD->isGenericContext() && !hasResilientAncestry) {
+      if (!NTD->isGenericContext()) {
         Visitor.addTypeMetadataAddress(declaredType);
       }
     }
@@ -745,15 +738,10 @@ public:
     if (CD->getParent()->getSelfClassDecl()) {
       // Class constructors come in two forms, allocating and non-allocating.
       // The default ValueDecl handling gives the allocating one, so we have to
-      // manually include the non-allocating one. Only designated and @objc
-      // convenience inits have a separate initializing entry point; non-@objc
-      // convenience inits are lowered as a single allocating entry point (see
-      // SILGenModule::emitConstructor).
-      if (CD->isDesignatedInit() || CD->isObjC()) {
-        addFunction(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
-        if (CD->hasAsync()) {
-          addAsyncFunctionPointer(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
-        }
+      // manually include the non-allocating one.
+      addFunction(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+      if (CD->hasAsync()) {
+        addAsyncFunctionPointer(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
       }
     }
 

@@ -12,6 +12,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_BuiltinModule
 // UNSUPPORTED: CPU=wasm32

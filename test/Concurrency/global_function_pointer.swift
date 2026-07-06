@@ -6,6 +6,7 @@
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
+// REQUIRES: swift_in_compiler
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime

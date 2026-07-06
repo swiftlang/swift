@@ -203,10 +203,12 @@ private:
     if (!AFD)
       return;
 
-    if (!AFD->getDistributedThunk())
+    auto thunk = AFD->getDistributedThunk();
+    if (!thunk)
       return;
 
-    asDerived().addMethod(SILDeclRef(AFD, kind).getDistributedThunkDeclRef());
+    SILDeclRef declRef(thunk, kind);
+    asDerived().addMethod(declRef.asDistributed());
   }
 };
 

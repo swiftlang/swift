@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability -solver-enable-enumerate-supertypes
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability -solver-disable-enumerate-supertypes
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability

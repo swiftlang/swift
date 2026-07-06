@@ -1,5 +1,4 @@
 add_swift_unittest(SwiftSILOptimizerTests
-  IsolationHistory.cpp
   PartitionUtilsTest.cpp
 )
 

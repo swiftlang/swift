@@ -1,6 +1,7 @@
 // **Copied from test/embedded/availability.swift**
 // RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature ParserASTGen
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_ParserASTGen
 

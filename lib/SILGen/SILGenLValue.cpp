@@ -1577,12 +1577,7 @@ namespace {
         ActorIso(copied.ActorIso) {}
 
     AccessorDecl *getAccessorDecl() const {
-      auto *fd = cast<AccessorDecl>(Accessor.getFuncDecl());
-      // For a distributed thunk, `fd` is the synthesized `DistributedGet`
-      // accessor; the LValue path needs the original getter (Get / Set / ...).
-      if (fd->getAccessorKind() == AccessorKind::DistributedGet)
-        fd = fd->getStorage()->getAccessor(AccessorKind::Get);
-      return fd;
+      return cast<AccessorDecl>(Accessor.getFuncDecl());
     }
 
     ManagedValue emitValueForAssignOrInit(SILGenFunction &SGF, SILLocation loc,
@@ -4504,9 +4499,9 @@ void LValue::addMemberVarComponent(
 
     void emitUsingDistributedThunk() {
       auto *var = cast<VarDecl>(Storage);
-      SILDeclRef accessor(var->getDistributedThunk(),
-                          SILDeclRef::Kind::DistributedThunk,
-                          /*isForeign=*/false);
+      SILDeclRef accessor(var->getAccessor(AccessorKind::Get),
+                          SILDeclRef::Kind::Func,
+                          /*isForeign=*/false, /*isDistributed=*/true);
 
       auto typeData = getLogicalStorageTypeData(
           SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, FormalRValueType);

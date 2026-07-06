@@ -757,7 +757,8 @@ public:
       : BridgeFun(nullptr), BridgeCall(nullptr), OptionalResult(nullptr),
         ReleaseAfterBridge(nullptr), ReleaseArgAfterCall(nullptr), Idx(0) {}
 
-  static BridgedArgument match(unsigned ArgIdx, SILValue Arg, ApplyInst *AI);
+  static BridgedArgument match(unsigned ArgIdx, SILValue Arg, ApplyInst *AI,
+                               DeadEndBlocks *deBlocks);
 
   operator bool() const { return BridgeFun != nullptr; }
   SILValue bridgedValue() { return BridgedValue; }
@@ -825,7 +826,8 @@ static SILInstruction *findReleaseOf(SILValue releasedValue,
   return nullptr;
 }
 
-BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg, ApplyInst *AI) {
+BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
+                                       ApplyInst *AI, DeadEndBlocks *deBlocks) {
   // Match
   // %15 = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
   // %16 = apply %15(%14) : $@convention(method) (@guaranteed String) -> @owned NSString
@@ -914,7 +916,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg, ApplyInst 
 
   if (hasOwnership && !BridgedValueRelease) {
     SmallVector<Operand *> newUses{&AI->getOperandRef(ArgIdx)};
-    if (!areUsesWithinValueLifetime(BridgedValue, newUses)) {
+    if (!areUsesWithinValueLifetime(BridgedValue, newUses, deBlocks)) {
       return BridgedArgument();
     }
   }
@@ -1218,7 +1220,7 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
       continue;
 
     auto BridgedArg =
-        BridgedArgument::match(CurIdx, Param.get(), BridgedCall);
+        BridgedArgument::match(CurIdx, Param.get(), BridgedCall, deBlocks);
     if (!BridgedArg)
       continue;
 

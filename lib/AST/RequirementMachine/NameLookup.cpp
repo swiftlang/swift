@@ -49,7 +49,7 @@ swift::rewriting::lookupConcreteNestedType(
   SmallVector<ValueDecl *, 2> foundMembers;
   decl->getParentModule()->lookupQualified(
       decl, DeclNameRef(name), decl->getLoc(),
-      {NLFlags::QualifiedDefault, NLFlags::OnlyTypes, NLFlags::ProtocolMembers},
+      NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers,
       foundMembers);
   for (auto member : foundMembers)
     concreteDecls.push_back(cast<TypeDecl>(member));

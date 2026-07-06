@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -verify -disable-availability-checking %s
 // RUN: %target-swift-emit-silgen -verify -disable-availability-checking %s
 
 func consume<V>(_ value: V) {}

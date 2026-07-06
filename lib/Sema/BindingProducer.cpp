@@ -17,14 +17,15 @@
 #include "swift/Sema/BindingProducer.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintSystem.h"
-#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 
 using namespace swift;
 using namespace constraints;
 using namespace inference;
 
-/// FIXME: Remove this.
+// Given a possibly-Optional type, return the direct superclass of the
+// (underlying) type wrapped in the same number of optional levels as
+// type.
 static Type getOptionalSuperclass(Type type) {
   int optionalLevels = 0;
   while (auto underlying = type->getOptionalObjectType()) {
@@ -79,7 +80,10 @@ static Type getOptionalSuperclass(Type type) {
   return superclass;
 }
 
-/// FIXME: Remove this.
+/// Enumerates all of the 'direct' supertypes of the given type.
+///
+/// The direct supertype S of a type T is a supertype of T (e.g., T < S)
+/// such that there is no type U where T < U and U < S.
 static SmallVector<Type, 4> enumerateDirectSupertypes(Type type) {
   SmallVector<Type, 4> result;
 
@@ -285,6 +289,19 @@ bool TypeVarBindingProducer::computeNext() {
       }
     }
 
+    if (getLocator()->directlyAt<ForceValueExpr>() &&
+        TypeVar->getImpl().canBindToLValue() &&
+        !binding.BindingType->is<LValueType>()) {
+      // Result of force unwrap is always connected to its base
+      // optional type via `OptionalObject` constraint which
+      // preserves l-valueness, so in case where object type got
+      // inferred before optional type (because it got the
+      // type from context e.g. parameter type of a function call),
+      // we need to test type with and without l-value after
+      // delaying bindings for as long as possible.
+      addNewBinding(binding.withType(LValueType::get(binding.BindingType)));
+    }
+
     // There is a tailored fix for optional key path root references,
     // let's not create ambiguity by attempting unwrap when it's
     // not allowed.
@@ -295,8 +312,6 @@ bool TypeVarBindingProducer::computeNext() {
     // Allow solving for T even for a binding kind where that's invalid
     // if fixes are allowed, because that gives us the opportunity to
     // match T? values to the T binding by adding an unwrap fix.
-    //
-    // FIXME: Remove this.
     if (binding.Kind == BindingKind::Subtypes || CS.shouldAttemptFixes()) {
       // If we were unsuccessful solving for T?, try solving for T.
       if (auto objTy = type->getOptionalObjectType()) {
@@ -341,7 +356,6 @@ bool TypeVarBindingProducer::computeNext() {
       }
     }
 
-    // FIXME: Remove this.
     auto srcLocator = binding.getLocator();
     if (srcLocator &&
         (srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
@@ -376,17 +390,15 @@ bool TypeVarBindingProducer::computeNext() {
         addNewBinding(binding.withSameSource(voidType, BindingKind::Exact));
       }
 
-      if (CS.getASTContext().TypeCheckerOpts.SolverEnableEnumerateSupertypes) {
-        for (auto supertype : enumerateDirectSupertypes(type)) {
-          // If we're not allowed to try this binding, skip it.
-          if (checkTypeOfBinding(TypeVar, supertype)) {
-            // A key path type cannot be bound to type-erased key path variants.
-            if (TypeVar->getImpl().isKeyPathType() &&
-                isTypeErasedKeyPathType(supertype))
-              continue;
+      for (auto supertype : enumerateDirectSupertypes(type)) {
+        // If we're not allowed to try this binding, skip it.
+        if (checkTypeOfBinding(TypeVar, supertype)) {
+          // A key path type cannot be bound to type-erased key path variants.
+          if (TypeVar->getImpl().isKeyPathType() &&
+              isTypeErasedKeyPathType(supertype))
+            continue;
 
-            addNewBinding(binding.withType(supertype));
-          }
+          addNewBinding(binding.withType(supertype));
         }
       }
     }
@@ -656,9 +668,6 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
-  if (type->hasJoinOrMeet())
-    type = openTypeJoinsAndMeets(cs, type, dstLocator);
-
   // If type variable has been marked as a possible hole due to
   // e.g. reference to a missing member. Let's propagate that
   // information to the object type of the optional type it's
@@ -690,9 +699,8 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   auto result =
       cs.matchTypes(TypeVar, type, ConstraintKind::Bind, options, srcLocator);
-  ASSERT(result != ConstraintSystem::SolutionKind::Unsolved);
 
-  if (result == ConstraintSystem::SolutionKind::Error) {
+  if (result.isFailure()) {
     if (cs.isDebugMode()) {
       PrintOptions PO = PrintOptions::forDebugging();
 

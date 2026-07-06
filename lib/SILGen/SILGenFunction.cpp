@@ -183,7 +183,6 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
 DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   switch (ref.kind) {
   case SILDeclRef::Kind::Func:
-  case SILDeclRef::Kind::DistributedThunk:
     if (auto closure = ref.getAbstractClosureExpr())
       return getMagicFunctionName(closure);
     return getMagicFunctionName(cast<FuncDecl>(ref.getDecl()));
@@ -1253,7 +1252,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     SmallVector<ValueDecl *, 2> results;
     UIKit->lookupQualified(UIKit,
                            DeclNameRef(ctx.getIdentifier("UIApplicationMain")),
-                           SourceLoc(), NLFlags::QualifiedDefault,
+                           SourceLoc(), NL_QualifiedDefault,
                            results);
 
     // As the comment above alludes, using a qualified lookup into UIKit is

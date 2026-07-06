@@ -25,7 +25,6 @@
 #include "swift/AST/GenericTypeParamKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LayoutConstraintKind.h"
-#include "swift/AST/LookupKinds.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/WarningGroupBehavior.h"
@@ -936,22 +935,6 @@ BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, swift::PlatformKind platform,
     BridgedVersionTuple cVersion);
-
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCOMThreadingModel {
-  BridgedCOMThreadingModelSingle,
-  BridgedCOMThreadingModelApartment,
-  BridgedCOMThreadingModelFree,
-  BridgedCOMThreadingModelBoth,
-  BridgedCOMThreadingModelNeutral,
-};
-
-SWIFT_NAME("BridgedCOMAttr.createParsed(_:atLoc:range:interface:implementation:threading:)")
-BridgedCOMAttr BridgedCOMAttr_createParsed(BridgedASTContext context,
-                                           swift::SourceLoc location,
-                                           swift::SourceRange range,
-                                           BridgedStringRef interface,
-                                           BridgedStringRef implementation,
-                                           BridgedCOMThreadingModel threading);
 
 SWIFT_NAME("BridgedCDeclAttr.createParsed(_:atLoc:range:name:underscored:)")
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,

@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -import-objc-header %S/Inputs/external-associated-type-conformance.h %s
 // RUN: %target-swift-emit-silgen -import-objc-header %S/Inputs/external-associated-type-conformance.h %s | %FileCheck %s
 // REQUIRES: objc_interop
 

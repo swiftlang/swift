@@ -391,6 +391,7 @@ extension UnsafeRawPointer {
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
@@ -440,7 +441,7 @@ extension UnsafeRawPointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance is memory-managed and unassociated
   ///   with the value in the memory referenced by this pointer.
-  @_transparent
+  @inlinable
   @_preInverseGenerics
   @_lifetime(borrow self)
   public func load<T: ~Escapable>(
@@ -487,7 +488,7 @@ extension UnsafeRawPointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
-  @_transparent
+  @inlinable
   @_alwaysEmitIntoClient
   @_lifetime(borrow self)
   public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
@@ -1010,6 +1011,7 @@ extension UnsafeMutableRawPointer {
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
@@ -1281,7 +1283,7 @@ extension UnsafeMutableRawPointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance is memory-managed and unassociated
   ///   with the value in the memory referenced by this pointer.
-  @_transparent
+  @inlinable
   @_preInverseGenerics
   @_lifetime(borrow self)
   public func load<T: ~Escapable>(
@@ -1329,7 +1331,7 @@ extension UnsafeMutableRawPointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
-  @_transparent
+  @inlinable
   @_alwaysEmitIntoClient
   @_lifetime(borrow self)
   public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
@@ -1418,7 +1420,7 @@ extension UnsafeMutableRawPointer {
   ///   - offset: The offset from this pointer, in bytes. `offset` must be
   ///     nonnegative. The default is zero.
   ///   - type: The type of `value`.
-  @_transparent
+  @inlinable
   @_alwaysEmitIntoClient
   public func storeBytes<T: BitwiseCopyable & ~Escapable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
@@ -1462,7 +1464,7 @@ extension UnsafeMutableRawPointer {
   ///   - offset: The offset from this pointer, in bytes. `offset` must be
   ///     nonnegative. The default is zero.
   ///   - type: The type of `value`.
-  @_transparent
+  @inlinable
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0349_UnsafeMutableRawPointer_storeBytes")
@@ -1475,6 +1477,7 @@ extension UnsafeMutableRawPointer {
     )
 
     withUnsafePointer(to: value) { source in
+      // FIXME: to be replaced by _memcpy when conversions are implemented.
       unsafe Builtin.int_memcpy_RawPointer_RawPointer_Int64(
         (self + offset)._rawValue,
         source._rawValue,

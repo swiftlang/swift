@@ -1,6 +1,3 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -target %target-swift-5.9-abi-triple
-
 // RUN: %target-swift-emit-silgen %s -target %target-swift-5.9-abi-triple | %FileCheck %s
 
 typealias A<each T, U, V> = (repeat (each T, U, V))

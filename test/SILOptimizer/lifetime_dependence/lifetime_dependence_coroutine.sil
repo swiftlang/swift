@@ -3,6 +3,7 @@
 // RUN:   -sil-print-types \
 // RUN:   -enable-experimental-feature Lifetimes | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 import Swift

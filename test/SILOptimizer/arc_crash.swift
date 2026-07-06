@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -O %s -parse-as-library -Xllvm -sil-print-types -emit-sil -enforce-exclusivity=none -Xllvm -sil-disable-pass=function-signature-opts | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 
 // Test ARC optimizations on source level tests that have been
 // miscompiled and crash (e.g. because of use-after-free).

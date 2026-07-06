@@ -9,4 +9,3 @@
 // RUN:   relative_path/A.swiftmodule/arm64-apple-macos.swiftinterface -o out/A.swiftmodule -I out
 
 // REQUIRES: OS=macosx
-// REQUIRES: SWIFT_STDLIB_ARCH=arm64

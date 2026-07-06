@@ -57,13 +57,6 @@ module signal_h [system] {
 }
 % end
 
-% if CMAKE_SDK == "OPENBSD":
-module unistd_h [system] {
-  header "unistd.h"
-  export *
-}
-% end
-
 module CUUID [system] {
   header "uuid/uuid.h"
   link "uuid"

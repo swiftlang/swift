@@ -1,3 +1,4 @@
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 // RUN: %empty-directory(%t)

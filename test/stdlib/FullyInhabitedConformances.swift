@@ -62,80 +62,6 @@ func collectionOfOneConformances(
   fullyInhabited(b)
 }
 
-// Concrete SIMD types
-
-func simdConformancesA(
-  _ a: SIMD2<UInt8>, _ b: SIMD4<UInt8>, _ c: SIMD8<UInt8>,
-  _ d: SIMD16<UInt8>, _ e: SIMD32<UInt8>, _ f: SIMD64<UInt8>,
-  _ g: SIMD2<UInt16>, _ h: SIMD4<UInt16>, _ i: SIMD8<UInt16>,
-  _ j: SIMD16<UInt16>, _ k: SIMD32<UInt16>, _ l: SIMD64<UInt16>
-) {
-  fullyInhabited(a)
-  fullyInhabited(b)
-  fullyInhabited(c)
-  fullyInhabited(d)
-  fullyInhabited(e)
-  fullyInhabited(f)
-  fullyInhabited(g)
-  fullyInhabited(h)
-  fullyInhabited(i)
-  fullyInhabited(j)
-  fullyInhabited(k)
-  fullyInhabited(l)
-}
-
-func simdConformancesB(
-  _ a: SIMD2<UInt32>, _ b: SIMD4<UInt32>, _ c: SIMD8<UInt32>,
-  _ d: SIMD16<UInt32>, _ e: SIMD32<UInt32>, _ f: SIMD64<UInt32>,
-  _ g: SIMD2<UInt64>, _ h: SIMD4<UInt64>, _ i: SIMD8<UInt64>,
-  _ j: SIMD16<UInt64>, _ k: SIMD32<UInt64>, _ l: SIMD64<UInt64>
-) {
-  fullyInhabited(a)
-  fullyInhabited(b)
-  fullyInhabited(c)
-  fullyInhabited(d)
-  fullyInhabited(e)
-  fullyInhabited(f)
-  fullyInhabited(g)
-  fullyInhabited(h)
-  fullyInhabited(i)
-  fullyInhabited(j)
-  fullyInhabited(k)
-  fullyInhabited(l)
-}
-
-func simdConformancesC(
-  _ a: SIMD2<Float32>, _ b: SIMD4<Float32>, _ c: SIMD8<Float32>,
-  _ d: SIMD16<Float32>, _ e: SIMD32<Float32>, _ f: SIMD64<Float32>,
-  _ g: SIMD2<Float64>, _ h: SIMD4<Float64>, _ i: SIMD8<Float64>,
-  _ j: SIMD16<Float64>, _ k: SIMD32<Float64>, _ l: SIMD64<Float64>
-) {
-  fullyInhabited(a)
-  fullyInhabited(b)
-  fullyInhabited(c)
-  fullyInhabited(d)
-  fullyInhabited(e)
-  fullyInhabited(f)
-  fullyInhabited(g)
-  fullyInhabited(h)
-  fullyInhabited(i)
-  fullyInhabited(j)
-  fullyInhabited(k)
-  fullyInhabited(l)
-}
-
-func simd3Conformances(
-  _ a: SIMD3<UInt8>, _ b: SIMD3<UInt16>, _ c: SIMD3<UInt32>,
-  _ d: SIMD3<UInt64>, _ e: SIMD3<Float32>, _ f: SIMD3<Float64>
-) {
-  fromBytes(a)
-  fromBytes(b)
-  fromBytes(c)
-  fromBytes(d)
-  fromBytes(e)
-  fromBytes(f)
-}
-
 // Range types (ConvertibleToBytes only)
 
 func rangeConformances(
@@ -218,9 +144,4 @@ func rangeNotFromBytes(_ a: Range<Int>, _ b: ClosedRange<Int>) {
 
 func objectIdentifierNotFromBytes(_ a: ObjectIdentifier) {
   fromBytes(a) // expected-error {{global function 'fromBytes' requires that 'ObjectIdentifier' conform to 'ConvertibleFromBytes'}}
-}
-
-func simd3NotToBytes(_ a: SIMD3<Int>) {
-  toBytes(a) // expected-error {{global function 'toBytes' requires that 'SIMD3<Int>' conform to 'ConvertibleToBytes'}}
-             // expected-note@-221 {{where 'T' = 'SIMD3<Int>'}}
 }

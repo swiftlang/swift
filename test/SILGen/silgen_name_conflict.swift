@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -enable-experimental-feature Extern -verify
 // RUN: %target-swift-emit-silgen %s -enable-experimental-feature Extern -verify
 
 // REQUIRES: swift_feature_Extern

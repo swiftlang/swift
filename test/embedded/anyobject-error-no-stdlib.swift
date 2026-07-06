@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-ir -parse-stdlib %s -enable-experimental-feature Embedded -verify -wmo
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 public enum Never {}

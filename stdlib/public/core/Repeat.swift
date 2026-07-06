@@ -100,7 +100,7 @@ extension Repeated: RandomAccessCollection {
 ///
 /// - Parameters:
 ///   - element: The element to repeat.
-///   - n: The number of times to repeat `element`.
+///   - count: The number of times to repeat `element`.
 /// - Returns: A collection that contains `count` elements that are all
 ///   `element`.
 @inlinable // trivial-implementation

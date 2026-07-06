@@ -1,5 +1,4 @@
 
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -parse-stdlib -parse-as-library -module-name Swift %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
 
 enum Optional<T> {

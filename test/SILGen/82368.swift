@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -disable-availability-checking -verify %s
 // RUN: %target-swift-emit-silgen -disable-availability-checking -verify %s
 
 struct A {

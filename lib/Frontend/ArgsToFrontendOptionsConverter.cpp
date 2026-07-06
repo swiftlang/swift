@@ -481,14 +481,12 @@ void ArgsToFrontendOptionsConverter::handleDebugCrashGroupArguments() {
       debugFailWithAssertion();
     } else if (Opt.matches(OPT_debug_crash_immediately)) {
       debugFailWithCrash();
-    } else if (Opt.matches(OPT_debug_assert_after_type_checking) ||
-               Opt.matches(OPT_debug_assert_after_parse)) {
+    } else if (Opt.matches(OPT_debug_assert_after_parse)) {
       // Set in FrontendOptions
-      Opts.CrashMode = FrontendOptions::DebugCrashMode::AssertAfterTypeChecking;
-    } else if (Opt.matches(OPT_debug_crash_after_type_checking) ||
-               Opt.matches(OPT_debug_crash_after_parse)) {
+      Opts.CrashMode = FrontendOptions::DebugCrashMode::AssertAfterParse;
+    } else if (Opt.matches(OPT_debug_crash_after_parse)) {
       // Set in FrontendOptions
-      Opts.CrashMode = FrontendOptions::DebugCrashMode::CrashAfterTypeChecking;
+      Opts.CrashMode = FrontendOptions::DebugCrashMode::CrashAfterParse;
     } else {
       llvm_unreachable("Unknown debug_crash_Group option!");
     }
@@ -670,8 +668,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitSIL;
   if (Opt.matches(OPT_emit_silgen))
     return FrontendOptions::ActionType::EmitSILGen;
-  if (Opt.matches(OPT_emit_silgen_ossa))
-    return FrontendOptions::ActionType::EmitSILGenOSSA;
   if (Opt.matches(OPT_emit_lowered_sil))
     return FrontendOptions::ActionType::EmitLoweredSIL;
   if (Opt.matches(OPT_emit_sib))

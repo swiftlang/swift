@@ -2588,7 +2588,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     superclassDecl->synthesizeSemanticMembersIfNeeded(
         DeclBaseName::createConstructor());
 
-    NLOptions subOptions = NLFlags::QualifiedDefault;
+    NLOptions subOptions = NL_QualifiedDefault;
 
     SmallVector<ValueDecl *, 4> lookupResults;
     fromCtor->lookupQualified(superclassDecl,
@@ -3778,12 +3778,10 @@ public:
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
-    if (!ctx.LangOpts.DisableAvailabilityChecking) {
-      if (auto constraint = seqConformanceRef.getAvailabilityConstraint(
-              dc, stmt->getForLoc())) {
-        emitDiagnosticsForUnavailableConformance(seqType, constraint.value());
-        return nullptr;
-      }
+    if (auto constraint = seqConformanceRef.getAvailabilityConstraint(
+            dc, stmt->getForLoc())) {
+      emitDiagnosticsForUnavailableConformance(seqType, constraint.value());
+      return nullptr;
     }
 
     buildMakeIteratorVar();

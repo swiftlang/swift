@@ -142,7 +142,9 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
     llvm_unreachable("constructor cannot have erased isolation");
 
   case ActorIsolation::GlobalActor:
-    return ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    return ctor->getASTContext().LangOpts.hasFeature(
+               Feature::FlowIsolationGlobalActor) &&
+           ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
                StrictConcurrency::Complete &&
            !ctor->hasAsync();
   case ActorIsolation::ActorInstance:
@@ -315,7 +317,7 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
   SmallVector<ValueDecl *, 4> decls;
   nominal->lookupQualified(
       nominal, DeclNameRef(ctx.Id_shared),
-      nominal->getLoc(), NLFlags::QualifiedDefault, decls);
+      nominal->getLoc(), NL_QualifiedDefault, decls);
   for (auto decl : decls) {
     auto var = dyn_cast<VarDecl>(decl);
     if (!var)
@@ -6273,11 +6275,6 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       if (getIsolationFromAttributes(value))
         return {};
 
-      // An overriding declaration inherits the isolation of the declaration
-      // it overrides, inferring MainActor would break overrides of nonisolated.
-      if (value->getOverriddenDeclOrSuperDeinit())
-        return {};
-
       if (auto *nominal = dyn_cast<NominalTypeDecl>(value)) {
         // Actors cannot infer isolation.
         if (nominal->isAnyActor())
@@ -7653,23 +7650,13 @@ bool swift::checkSendableConformance(
       conformanceDC->getOutermostParentSourceFile() !=
       nominal->getOutermostParentSourceFile()) {
     if (!(nominal->hasClangNode() && wasImplied)) {
-      InFlightDiagnostic outsideSourceFileDiag = conformanceDecl
-          ->diagnose(diag::concurrent_value_outside_source_file, nominal);
+      conformanceDecl
+          ->diagnose(diag::concurrent_value_outside_source_file, nominal)
+          .limitBehaviorWithPreconcurrency(
+              behavior, impliedByPreconcurrencyProtocol, LanguageMode::v6);
 
-      // TODO: Remove this staging (and suppress the conformance) once people
-      // have had a chance to adopt...
-      if (isGlobalActorIsolated) {
-        // This branch was being skipped for global actor isolated tests
-        // until 6.4 so we can't emit this as an error for isolated decls.
-        outsideSourceFileDiag.limitBehaviorWithPreconcurrency(
-            behavior, impliedByPreconcurrencyProtocol, LanguageMode::future);
-      } else {
-        outsideSourceFileDiag.limitBehaviorWithPreconcurrency(
-            behavior, impliedByPreconcurrencyProtocol, LanguageMode::v6);
-
-        if (behavior == DiagnosticBehavior::Unspecified)
-          return true;
-      }
+      if (behavior == DiagnosticBehavior::Unspecified)
+        return true;
     }
   }
 
@@ -7697,13 +7684,7 @@ bool swift::checkSendableConformance(
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         // `NSObject` is permitted as a superclass for Objective-C interop.
         // TODO: can `NSObject` be `Sendable` or `~Sendable` instead?
-        // Synthesizing a Sendable conformance for global-actor-isolated
-        // classes with non-Sendable superclasses was a mistake, but we
-        // maintain it for source compatibility. When the conformance
-        // is implicit (the user never wrote Sendable), skip the
-        // diagnostic entirely.
-        if (!superclassDecl->isNSObject() &&
-            !(isGlobalActorIsolated && isImplicitSendableCheck(check))) {
+        if (!superclassDecl->isNSObject()) {
           // Inheritance checking for global-actor-isolated classes was
           // historically skipped, so we need to downgrade this to a warning to
           // stage it in.
@@ -8883,10 +8864,13 @@ ActorReferenceResult ActorReferenceResult::Builder::build() {
   // type is Sendable. Note that if the init is a nonisolated actor init,
   // Sendable checking is already performed on arguments at the call-site.
   if (auto *init = dyn_cast<ConstructorDecl>(fromDC)) {
-    // Under complete strict concurrency, we allow users to initialize global
-    // actor non-Sendable types in initializers more aggressively by deferring
-    // the check to the SIL-level flow-isolation pass.
-    if (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    // When the FlowIsolationGlobalActor feature is enabled under complete
+    // strict concurrency, we allow users to initialize global actor
+    // non-Sendable types in initializers more aggressively by deferring the
+    // check to the SIL-level flow-isolation pass.
+    if (fromDC->getASTContext().LangOpts.hasFeature(
+            Feature::FlowIsolationGlobalActor) &&
+        fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete &&
         referencedActor && referencedActor->isSelf() &&
         checkedByFlowIsolation(fromDC, *referencedActor, decl, declRefLoc,

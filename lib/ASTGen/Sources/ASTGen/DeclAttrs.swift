@@ -138,8 +138,6 @@ extension ASTGenVisitor {
         return self.generateBackDeployedAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
       case .CDecl:
         return handle(self.generateCDeclAttr(attribute: node)?.asDeclAttribute)
-      case .COM:
-        return handle(self.generateCOMAttr(attribute: node)?.asDeclAttribute)
       case .Derivative:
         return handle(self.generateDerivativeAttr(attribute: node)?.asDeclAttribute)
       case .Differentiable:
@@ -676,85 +674,6 @@ extension ASTGenVisitor {
     case .argumentList(let node): // Multiple arguments e.g. 'wrt: (self, 2)'
       return  node.arguments.lazy.map(self.generate(differentiabilityArgument:)).bridgedArray(in: self)
     }
-  }
-
-  /// E.g.:
-  ///   ```
-  ///   @com
-  ///   @com(interface: "...")
-  ///   @com(implementation: "...")
-  ///   @com(implementation: "...", threading: "...")
-  ///   ```
-  func generateCOMAttr(attribute node: AttributeSyntax) -> BridgedCOMAttr? {
-    let location = generateSourceLoc(node.atSign)
-    let range = generateAttrSourceRange(node)
-
-    if node.arguments == nil {
-      return .createParsed(ctx, atLoc: location, range: range, interface: "",
-                           implementation: BridgedStringRef(), threading:
-                           .apartment)
-    }
-
-    typealias Result =
-        (interface: BridgedStringRef,
-         implementation: BridgedStringRef,
-         threading: BridgedCOMThreadingModel)
-
-    guard let parsed =
-        generateWithLabeledExprListArguments(attribute: node, { arguments -> Result? in
-          var interface: BridgedStringRef = ""
-          var implementation: BridgedStringRef = BridgedStringRef()
-          var threading: BridgedCOMThreadingModel? = .apartment
-
-          for argument in arguments {
-            switch argument.label?.rawText {
-            case let label where label == "interface":
-              guard let value =
-                  generateConsumingSimpleStringLiteralAttrOption(args: &arguments,
-                                                                 label: label) else {
-                    // TODO: diagnose
-                    return nil
-                  }
-              interface = value
-            case let label where label == "implementation":
-              guard let value =
-                  generateConsumingSimpleStringLiteralAttrOption(args: &arguments,
-                                                                 label: label) else {
-                    // TODO: diagnose
-                    return nil
-                  }
-              implementation = value
-            case "threading":
-              // Consume the labelled argument manually.
-              arguments.removeFirst()
-              threading =
-                  switch argument.expression.as(MemberAccessExprSyntax.self)?
-                            .declName.baseName.rawText {
-                  case "single"?: .single
-                  case "apartment"?, "sta"?: .apartment
-                  case "free"?, "mta"?: .free
-                  case "both"?: .both
-                  case "neutral"?: .neutral
-                  default: nil
-                  }
-            default:
-              // TODO: diagnose
-              return nil
-            }
-          }
-
-          // TODO: diagnose
-          guard let threading else { return nil }
-          return Result(interface: interface, implementation: implementation,
-                        threading: threading)
-        }) else {
-      return nil
-    }
-
-    return .createParsed(ctx, atLoc: location, range: range,
-                         interface: parsed.interface,
-                         implementation: parsed.implementation,
-                         threading: parsed.threading)
   }
 
   /// E.g.

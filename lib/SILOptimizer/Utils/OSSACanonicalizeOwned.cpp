@@ -219,7 +219,6 @@ bool OSSACanonicalizeOwned::computeCanonicalLiveness() {
         return false;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
-      case OperandOwnership::DebugUse:
         liveness->updateForUse(user, /*lifetimeEnding*/ false);
         break;
       case OperandOwnership::ForwardingConsume:
@@ -344,7 +343,7 @@ void OSSACanonicalizeOwned::extendLivenessToDeadEnds() {
   SSAPrunedLiveness completeLiveness(*liveness, &discoveredBlocks);
 
   for (auto destroy : destroys) {
-    if (liveness->isWithinBoundary(destroy))
+    if (liveness->isWithinBoundary(destroy, /*deadEndBlocks=*/nullptr))
       continue;
     completeLiveness.updateForUse(destroy, /*lifetimeEnding*/ true);
   }
@@ -710,7 +709,7 @@ void OSSACanonicalizeOwned::visitExtendedUnconsumedBoundary(
 
 #ifndef NDEBUG
   for (auto *consume : consumes) {
-    assert(!liveness->isWithinBoundary(consume));
+    assert(!liveness->isWithinBoundary(consume, /*deadEndBlocks=*/nullptr));
   }
 #endif
 
@@ -1367,11 +1366,13 @@ void OSSACanonicalizeOwned::rewriteCopies(
       liveness->updateForUse(destroy, /*lifetimeEnding=*/true);
     }
     for (auto *dvi : debugValues) {
-      if (liveness->isWithinBoundary(dvi)) {
+      if (liveness->isWithinBoundary(
+              dvi,
+              deadEndBlocksAnalysis->get(getCurrentDef()->getFunction()))) {
         continue;
       }
-      LLVM_DEBUG(llvm::dbgs() << "  Killing debug_value: " << *dvi);
-      dvi->killOperand();
+      LLVM_DEBUG(llvm::dbgs() << "  Removing debug_value: " << *dvi);
+      deleter.forceDelete(dvi);
     }
   }
 
@@ -1413,6 +1414,14 @@ bool OSSACanonicalizeOwned::computeLiveness() {
     clear();
     return false;
   }
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
+  if (respectsDeadEnds() && hasAnyDeadEnds()) {
+    if (respectsDeinitBarriers()) {
+      extendLexicalLivenessToDeadEnds();
+    }
+    extendLivenessToDeadEnds();
+  }
+#endif
   if (respectsDeinitBarriers()) {
     extendLivenessToDeinitBarriers();
   }

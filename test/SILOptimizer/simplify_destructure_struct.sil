@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=destructure_struct | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplification -simplify-instruction=destructure_struct | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-O
 
+// REQUIRES: swift_in_compiler
 
 import Swift
 import Builtin
@@ -169,33 +170,5 @@ bb0(%0 : @guaranteed $S):
   fix_lifetime %2
   %r = tuple ()
   return %r
-}
-
-// CHECK-LABEL: sil [ossa] @undef_trivial_struct :
-// CHECK-NOT:     destructure_struct
-// CHECK:         fix_lifetime undef : $Int
-// CHECK:         fix_lifetime undef : $Int
-// CHECK:       } // end sil function 'undef_trivial_struct'
-sil [ossa] @undef_trivial_struct : $@convention(thin) () -> () {
-bb0:
-  (%0, %1) = destructure_struct undef : $TrivialS
-  fix_lifetime %0 : $Int
-  fix_lifetime %1 : $Int
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: sil [ossa] @undef_nontrivial_struct :
-// CHECK-NOT:     destructure_struct
-// CHECK:         destroy_value undef : $String
-// CHECK:         fix_lifetime undef : $Int
-// CHECK:       } // end sil function 'undef_nontrivial_struct'
-sil [ossa] @undef_nontrivial_struct : $@convention(thin) () -> () {
-bb0:
-  (%0, %1) = destructure_struct undef : $S
-  destroy_value %0 : $String
-  fix_lifetime %1 : $Int
-  %r = tuple ()
-  return %r : $()
 }
 

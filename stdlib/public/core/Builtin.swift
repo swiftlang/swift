@@ -1118,7 +1118,6 @@ func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
   Builtin.unreachable()
 }
 
-@_unavailableInEmbedded
 @_alwaysEmitIntoClient
 @_transparent
 @_semantics("typechecker._openExistential(_:do:)")
@@ -1135,7 +1134,6 @@ public func _openExistential<ExistentialType, ContainedType, ResultType, Failure
   Builtin.unreachable()
 }
 
-#if !hasFeature(Embedded)
 @usableFromInline
 @_silgen_name("$ss16_openExistential_2doq0_x_q0_q_KXEtKr1_lF")
 func __abi_openExistential<ExistentialType, ContainedType, ResultType>(
@@ -1150,7 +1148,6 @@ func __abi_openExistential<ExistentialType, ContainedType, ResultType>(
      as StaticString).utf8Start._rawValue)
   Builtin.unreachable()
 }
-#endif
 
 /// Given a string that is constructed from a string literal, return a pointer
 /// to the global string table location that contains the string literal.

@@ -354,19 +354,17 @@ ModularizationError::diagnose(const ModuleFile *MF,
   // decls moving between both modules.
   if (errorKind == Kind::DeclMoved ||
       errorKind == Kind::DeclKindChanged) {
-    if (foundModule) {
-      StringRef foundModuleName = foundModule->getName().str();
-      StringRef expectedModuleName = expectedModule->getName().str();
-      if (foundModuleName != expectedModuleName &&
-          (foundModuleName.starts_with(expectedModuleName) ||
-           expectedModuleName.starts_with(foundModuleName)) &&
-          (expectedUnderlying ||
-           expectedModule->findUnderlyingClangModule())) {
-        std::string name = path.getFullName();
-        ctx.Diags.diagnose(loc,
-                           diag::modularization_issue_related_modules,
-                           declIsType, name);
-      }
+    StringRef foundModuleName = foundModule->getName().str();
+    StringRef expectedModuleName = expectedModule->getName().str();
+    if (foundModuleName != expectedModuleName &&
+        (foundModuleName.starts_with(expectedModuleName) ||
+         expectedModuleName.starts_with(foundModuleName)) &&
+        (expectedUnderlying ||
+         expectedModule->findUnderlyingClangModule())) {
+      std::string name = path.getFullName();
+      ctx.Diags.diagnose(loc,
+                         diag::modularization_issue_related_modules,
+                         declIsType, name);
     }
   }
 
@@ -2229,7 +2227,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                getIdentifier(privateDiscriminator));
     } else {
       baseModule->lookupQualified(baseModule, DeclNameRef(name),
-                                  SourceLoc(), NLFlags::RemoveOverridden,
+                                  SourceLoc(), NL_RemoveOverridden,
                                   values);
     }
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
@@ -2439,7 +2437,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                    getIdentifier(privateDiscriminator));
         } else {
           otherModule->lookupQualified(otherModule, DeclNameRef(name),
-                                       SourceLoc(), NLFlags::RemoveOverridden,
+                                       SourceLoc(), NL_RemoveOverridden,
                                        values);
         }
 
@@ -6579,24 +6577,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         }
         }
         Attr = new (ctx) ExternAttr(moduleName, declName, (ExternKind)rawKind, isImplicit);
-        break;
-      }
-
-      case decls_block::COM_DECL_ATTR: {
-        bool implicit;
-        bool interface;
-        unsigned model;
-
-        serialization::decls_block::COMDeclAttrLayout::readRecord(
-            scratch, implicit, interface, model);
-
-        StringRef iid = interface ? blobData : "";
-        std::optional<StringRef> clsid =
-            !interface && !blobData.empty() ? std::optional<StringRef>(blobData)
-                                            : std::nullopt;
-        Attr = new (ctx) COMAttr(SourceLoc(), SourceRange(), iid, clsid,
-                                 model ? static_cast<COMThreadingModel>(model - 1)
-                                       : COMThreadingModel::Apartment, implicit);
         break;
       }
 

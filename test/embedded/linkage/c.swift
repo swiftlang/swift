@@ -1,5 +1,6 @@
 // Check that C functions are exported as needed.
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
 // UNSUPPORTED: CPU=wasm32

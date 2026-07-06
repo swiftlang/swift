@@ -1062,13 +1062,39 @@ class NotSendable {}
         await task.value
       }
 
+      tests.test("unfolding init onCancel called once") {
+        nonisolated(unsafe) var counter = 0
+
+        let stream = AsyncStream<Int>(
+          unfolding: { @MainActor in
+            return nil
+          },
+          onCancel: { @Sendable in
+            counter += 1
+          }
+        )
+
+        var iterator = stream.makeAsyncIterator()
+
+        let task = Task { @MainActor in
+          withUnsafeCurrentTask { $0?.cancel() }
+
+          _ = await iterator.next(isolation: #isolation)
+          _ = await iterator.next(isolation: #isolation)
+
+          expectEqual(counter, 1) // Should equal one. onCancel is called once and then cleared
+        }
+
+        await task.value
+      }
+
       tests.test("unfolding init throwing throws from closure") {
         var counter = 0
         let thrownError = SomeError()
         let stream = AsyncThrowingStream<Int, Error>(unfolding: { @MainActor in
           counter += 1
-          if counter == 3 { throw thrownError }
-          return counter < 3 ? counter : nil
+          if counter >= 3 { throw thrownError }
+          return counter
         })
         var iterator = stream.makeAsyncIterator()
         do {

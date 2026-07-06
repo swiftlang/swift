@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen-ossa %s
+// RUN: %target-swift-emit-silgen %s
 
 enum CustomError: Error {
     case error

@@ -4,6 +4,7 @@
 // RUN:   -verify \
 // RUN:   -enable-experimental-feature LifetimeDependence
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
 
 // Test that lifetime dependence diagnostics continues to older (early

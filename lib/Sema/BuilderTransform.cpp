@@ -988,7 +988,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
     auto result = cs.matchResultBuilder(
         func, builderType, resultContextType, resultConstraintKind,
         /*contextualType=*/Type(), cs.getConstraintLocator(func->getBody()));
-    if (!result || (*result == ConstraintSystem::SolutionKind::Error))
+    if (!result || result->isFailure())
       return nullptr;
   }
 
@@ -1097,7 +1097,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   return nullptr;
 }
 
-std::optional<ConstraintSystem::SolutionKind>
+std::optional<ConstraintSystem::TypeMatchResult>
 ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
                                      Type bodyResultType,
                                      ConstraintKind bodyResultConstraintKind,
@@ -1114,7 +1114,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
         IgnoreInvalidResultBuilderBody::create(
             *this, getConstraintLocator(fn.getAbstractClosureExpr())),
         FixImpact::InvalidAST);
-    return SolutionKind::Solved;
+    return getTypeMatchSuccess();
   }
 
   // We have already pre-checked the result builder body. Technically, we
@@ -1132,9 +1132,9 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
                         *this, builderType,
                         getConstraintLocator(fn.getAbstractClosureExpr())),
                     FixImpact::InvalidAST))
-        return SolutionKind::Error;
+        return getTypeMatchFailure(locator);
 
-      return SolutionKind::Solved;
+      return getTypeMatchSuccess();
     }
 
     // If the body has a return statement, suppress the transform but
@@ -1156,7 +1156,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
 
       // If we aren't supposed to attempt fixes, fail.
       if (!shouldAttemptFixes()) {
-        return SolutionKind::Error;
+        return getTypeMatchFailure(locator);
       }
 
       // Record the first unhandled construct as a fix.
@@ -1164,7 +1164,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
               SkipUnhandledConstructInResultBuilder::create(
                   *this, unsupported, builder, getConstraintLocator(locator)),
               /*impact=*/FixImpact::InvalidAST * 10)) {
-        return SolutionKind::Error;
+        return getTypeMatchFailure(locator);
       }
 
       // If we're solving for code completion and the body contains the code
@@ -1179,7 +1179,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
         recordTypeVariablesAsHoles(getClosureType(closure));
       }
 
-      return SolutionKind::Solved;
+      return getTypeMatchSuccess();
     }
 
     transformedBody = std::make_pair(transform.getBuilderSelf(), body);
@@ -1210,9 +1210,9 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   recordResultBuilderTransform(fn, std::move(transformInfo));
 
   if (generateConstraints(fn, transformInfo.transformedBody))
-    return SolutionKind::Error;
+    return getTypeMatchFailure(locator);
 
-  return SolutionKind::Solved;
+  return getTypeMatchSuccess();
 }
 
 void ConstraintSystem::recordResultBuilderTransform(AnyFunctionRef fn,
@@ -1321,7 +1321,7 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
   dc->lookupQualified(
       builderType, DeclNameRef(fnName),
       builderType->getAnyNominal()->getLoc(),
-      {NLFlags::QualifiedDefault, NLFlags::ProtocolMembers, NLFlags::IgnoreMissingImports},
+      NL_QualifiedDefault | NL_ProtocolMembers | NL_IgnoreMissingImports,
       foundDecls);
   for (auto decl : foundDecls) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {

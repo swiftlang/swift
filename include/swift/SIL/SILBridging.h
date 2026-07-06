@@ -399,7 +399,6 @@ struct BridgedOperand {
     TrivialUse,
     InstantaneousUse,
     UnownedInstantaneousUse,
-    DebugUse,
     ForwardingUnowned,
     PointerEscape,
     BitwiseEscape,
@@ -582,7 +581,6 @@ struct BridgedFunction {
   BRIDGED_INLINE bool hasValidLinkageForFragileRef(SerializedKind) const;
   BRIDGED_INLINE ThunkKind isThunk() const;
   BRIDGED_INLINE void setThunk(ThunkKind) const;
-  BRIDGED_INLINE bool isWithoutActuallyEscapingThunk() const;
   BRIDGED_INLINE bool needsStackProtection() const;
   BRIDGED_INLINE bool shouldOptimize() const;
   BRIDGED_INLINE bool isReferencedInModule() const;
@@ -1333,8 +1331,6 @@ struct BridgedBuilder{
                                                                                 BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedValueCast(BridgedValue op,
                                                                                  BridgedType type) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedTrivialBitCast(BridgedValue op,
-                                                                                      BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUpcast(BridgedValue op, BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCheckedCastAddrBranch(
       BridgedValue source, BridgedCanType sourceFormalType,

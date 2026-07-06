@@ -98,6 +98,7 @@ bool computeGuaranteedBoundary(SILValue value,
 class GuaranteedOwnershipExtension {
   // --- context
   InstructionDeleter &deleter;
+  DeadEndBlocks &deBlocks;
 
   // --- analysis state
   SmallVector<SILBasicBlock *> guaranteedLivenessBlocks;
@@ -107,8 +108,9 @@ class GuaranteedOwnershipExtension {
   BeginBorrowInst *beginBorrow = nullptr;
 
 public:
-  GuaranteedOwnershipExtension(InstructionDeleter &deleter, SILFunction *function)
-    : deleter(deleter),
+  GuaranteedOwnershipExtension(InstructionDeleter &deleter,
+                               DeadEndBlocks &deBlocks, SILFunction *function)
+    : deleter(deleter), deBlocks(deBlocks),
       guaranteedLiveness(function, &guaranteedLivenessBlocks),
       ownedLifetime(function, &ownedLifetimeBlocks)
   {}
@@ -311,7 +313,8 @@ bool areUsesWithinLexicalValueLifetime(SILValue, ArrayRef<Operand *>);
 
 /// Whether the provided uses lie within the current liveness of the
 /// specified value.
-bool areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses);
+bool areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
+                                DeadEndBlocks *deBlocks);
 
 /// A utility composed ontop of OwnershipFixupContext that knows how to replace
 /// a single use of a value with another value with a different ownership. We
@@ -358,6 +361,7 @@ private:
 /// Extend the store_borrow \p sbi's scope such that it encloses \p newUsers.
 bool extendStoreBorrow(StoreBorrowInst *sbi,
                        SmallVectorImpl<Operand *> &newUses,
+                       DeadEndBlocks *deadEndBlocks,
                        InstModCallbacks callbacks = InstModCallbacks());
 
 /// Updates the reborrow flags and the borrowed-from instructions for all

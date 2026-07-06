@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-stdlib -enable-experimental-feature Embedded
 // RUN: %target-swift-frontend -emit-ir     -I %t                      %t/Main.swift     -parse-stdlib -enable-experimental-feature Embedded | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 // BEGIN MyModule.swift

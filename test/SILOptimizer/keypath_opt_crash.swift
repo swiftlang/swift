@@ -1,7 +1,5 @@
-// RUN: %target-swift-frontend -O -emit-sil %s -solver-disable-enumerate-supertypes | %FileCheck %s
-// RUN: %target-swift-frontend -O -emit-sil -enable-sil-opaque-values %s -solver-disable-enumerate-supertypes | %FileCheck %s
-// RUN: %target-swift-frontend -O -emit-sil %s -solver-enable-enumerate-supertypes | %FileCheck %s
-// RUN: %target-swift-frontend -O -emit-sil -enable-sil-opaque-values %s -solver-enable-enumerate-supertypes | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -enable-sil-opaque-values %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

@@ -5,6 +5,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts
+// REQUIRES: swift_in_compiler
 
 #if _runtime(_ObjC)
 import Foundation

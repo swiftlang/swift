@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -verify %s
 // RUN: %target-swift-emit-silgen -verify %s
 
 struct Inner: ~Copyable {}

@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-experimental-feature AddressableTypes %s
 // RUN: %target-swift-emit-silgen -enable-experimental-feature AddressableTypes %s
 
 // REQUIRES: swift_feature_AddressableTypes

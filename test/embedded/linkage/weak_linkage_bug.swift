@@ -19,6 +19,7 @@
 // RUN:  %FileCheck %s --check-prefix=VTABLE-D < %t/D.ll
 
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_CoroutineAccessors

@@ -357,7 +357,6 @@ extension FunctionConvention {
     let bridged: BridgedLifetimeDependenceInfo
     let paramCount: Int
     let hasSelfParam: Bool
-    let hasCaptures: Bool
 
     init(bridged: BridgedLifetimeDependenceInfo, parameterCount: Int,
          hasSelfParameter: Bool) {
@@ -365,7 +364,6 @@ extension FunctionConvention {
       self.bridged = bridged
       self.paramCount = parameterCount
       self.hasSelfParam = hasSelfParameter
-      self.hasCaptures = bridged.hasCaptures
     }
 
     public var startIndex: Int { 0 }
@@ -396,10 +394,8 @@ extension FunctionConvention {
     }
 
     public var description: String {
-      String(taking: bridged.getDebugDescription()) + """
-        paramCount: \(paramCount) self: \(hasSelfParam) \
-        hasCaptures: \(hasCaptures)
-        """
+      String(taking: bridged.getDebugDescription()) +
+        "\nparamCount: \(paramCount) self: \(hasSelfParam)"
     }
   }
 }

@@ -12,10 +12,6 @@
 
 // UNSUPPORTED: freestanding
 
-// Bare `dispatch_assert_queue` symbol is hidden on visionOS 1.0
-// (only `$V2` is exported).
-// UNSUPPORTED: OS=xros
-
 import StdlibUnittest
 
 ////////////////////////

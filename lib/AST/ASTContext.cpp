@@ -1424,7 +1424,7 @@ DECLTYPE *ASTContext::get##NAME##Decl() const { \
        * and the Clang module it imports. */ \
       SmallVector<ValueDecl *, 1> decls; \
       M->lookupQualified(M, DeclNameRef(getIdentifier(#NAME)), SourceLoc(), \
-                         (NLFlags::OnlyTypes), decls); \
+                         NL_OnlyTypes, decls); \
       if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
         auto decl = cast<DECLTYPE>(decls[0]); \
         if (isa<ProtocolDecl>(decl) \
@@ -1767,7 +1767,7 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
                 {Id_regexString, Id_version});
   SmallVector<ValueDecl *, 1> results;
   spModule->lookupQualified(getRegexType(), DeclNameRef(name),
-                            SourceLoc(), NLFlags::IncludeUsableFromInline,
+                            SourceLoc(), NL_IncludeUsableFromInline,
                             results);
   assert(results.size() == 1);
   auto *foundDecl = cast<ConstructorDecl>(results[0]);
@@ -1792,7 +1792,7 @@ static ConcreteDeclRef getCGFloatOrDoubleInitDecl(
   // control. But there is only going to be one overload that exactly
   // with no label and the right argument type.
   toDecl->lookupQualified(toDecl, initRef, SourceLoc(),
-                          NLFlags::QualifiedDefault, candidates);
+                          NL_QualifiedDefault, candidates);
 
   for (auto *candidate : candidates) {
     auto *ctor = cast<ConstructorDecl>(candidate);
@@ -2813,9 +2813,8 @@ bool ASTContext::canImportModuleImpl(
       !(isSourceCanImport && !version.empty()))
     return false;
 
-  auto missingVersion =
-      [this, &loc, &ModuleName, &isUnderlyingVersion, isSourceCanImport](
-          const llvm::VersionTuple &underlyingClangVersion) -> bool {
+  auto missingVersion = [this, &loc, &ModuleName, &isUnderlyingVersion,
+                         isSourceCanImport]() -> bool {
     // The module version could not be parsed from the preferred source for
     // this query. Diagnose (only for source-level `#if canImport` queries) and
     // return `true` to indicate that the unversioned module will satisfy the
@@ -2825,18 +2824,8 @@ bool ASTContext::canImportModuleImpl(
       auto diagLoc = mID.Loc;
       if (mID.Loc.isInvalid())
         diagLoc = loc;
-      Diags.diagnoseWithNotes(
-          Diags.diagnose(diagLoc, diag::cannot_find_module_version,
-                         mID.Item.str(), isUnderlyingVersion),
-          [&]() {
-            // A `_version` query has no user version to compare against, but
-            // the underlying Clang module does carry one. Attach a note that
-            // points the user at `_underlyingVersion`, which can check it.
-            if (!isUnderlyingVersion && !underlyingClangVersion.empty())
-              Diags.diagnose(diagLoc,
-                             diag::cannot_find_module_version_use_underlying,
-                             mID.Item.str(), underlyingClangVersion);
-          });
+      Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
+                     isUnderlyingVersion);
     }
     return true;
   };
@@ -2855,7 +2844,7 @@ bool ASTContext::canImportModuleImpl(
     if (!foundComparisonVersion.empty())
       return version <= foundComparisonVersion;
     else
-      return missingVersion(Found->second.UnderlyingVersion);
+      return missingVersion();
   }
 
   // When looking up a module, each module importer will report back
@@ -2960,7 +2949,7 @@ bool ASTContext::canImportModuleImpl(
   const auto &queryVersion =
       isUnderlyingVersion ? underlyingVersionInfo : versionInfo;
   if (queryVersion.getVersion().empty())
-    return missingVersion(underlyingVersionInfo.getVersion());
+    return missingVersion();
 
   return version <= queryVersion.getVersion();
 }

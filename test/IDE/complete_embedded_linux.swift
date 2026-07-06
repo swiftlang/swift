@@ -1,3 +1,4 @@
+// REQUIRES: swift_in_compiler
 // REQUIRES: OS=linux-gnu
 // REQUIRES: embedded_stdlib
 // REQUIRES: swift_feature_Embedded

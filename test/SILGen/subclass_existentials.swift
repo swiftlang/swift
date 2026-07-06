@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name subclass_existentials -Xllvm -sil-full-demangle -parse-as-library -primary-file %s -verify | %FileCheck %s
 // RUN: %target-swift-emit-ir -module-name subclass_existentials -parse-as-library -primary-file %s

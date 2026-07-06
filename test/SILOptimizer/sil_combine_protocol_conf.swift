@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -O -wmo -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 
 // case 1: class protocol -- should optimize
 internal protocol SomeProtocol : class {

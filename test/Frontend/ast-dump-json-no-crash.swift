@@ -470,7 +470,6 @@ func ffpo(_ value: ForPattern?) {
 func oldThing() {}
 
 @available(iOS, introduced: 14.0)
-@available(visionOS, introduced: 1.0)
 func newThing() {}
 
 func newThingClient() {

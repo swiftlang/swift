@@ -524,11 +524,8 @@ void decodeRequirement(
           constraintNode->getNumChildren() != 1)
         return;
 
-      auto protocolKindNode = child->getChild(1);
-      if (!protocolKindNode->hasIndex())
-        return;
       auto protocolKind =
-          static_cast<InvertibleProtocolKind>(protocolKindNode->getIndex());
+          static_cast<InvertibleProtocolKind>(child->getChild(1)->getIndex());
       inverseRequirements.push_back(
           Builder.createInverseRequirement(subjectType, protocolKind));
       continue;
@@ -578,16 +575,11 @@ void decodeRequirement(
           kind != LayoutConstraintKind::TrivialStride) {
         layout = Builder.getLayoutConstraint(*kind);
       } else {
-        if (child->getNumChildren() < 3 || !child->getChild(2)->hasIndex())
-          return;
         auto size = child->getChild(2)->getIndex();
         auto alignment = 0;
 
-        if (child->getNumChildren() == 4) {
-          if (!child->getChild(3)->hasIndex())
-            return;
+        if (child->getNumChildren() == 4)
           alignment = child->getChild(3)->getIndex();
-        }
 
         layout =
             Builder.getLayoutConstraintWithSizeAlign(*kind, size, alignment);
@@ -986,17 +978,8 @@ protected:
       return Builder.createDynamicSelfType(selfType.getType());
     }
     case NodeKind::DependentGenericParamType: {
-      if (Node->getNumChildren() < 2)
-        return MAKE_NODE_TYPE_ERROR(Node,
-                                    "fewer children (%zu) than required (2)",
-                                    Node->getNumChildren());
-      auto depthNode = Node->getChild(0);
-      auto indexNode = Node->getChild(1);
-      if (!depthNode->hasIndex() || !indexNode->hasIndex())
-        return MAKE_NODE_TYPE_ERROR0(
-            Node, "depth and index nodes must carry an index payload");
-      auto depth = depthNode->getIndex();
-      auto index = indexNode->getIndex();
+      auto depth = Node->getChild(0)->getIndex();
+      auto index = Node->getChild(1)->getIndex();
       return TypeLookupErrorOr<BuiltType>(
           Builder.createGenericTypeParameterType(depth, index),
           /*ignoreValueCheck*/ true);
@@ -1478,7 +1461,7 @@ protected:
 
       bool pushedGenericParams = false;
 
-      if (Node->getNumChildren() > 2) {
+      if (Node->getNumChildren() > 1) {
         auto *substNode = Node->getChild(2);
         if (substNode->getKind() != NodeKind::TypeList)
           return MAKE_NODE_TYPE_ERROR0(substNode, "expected type list");
@@ -1505,20 +1488,7 @@ protected:
         llvm::SmallVector<std::pair<unsigned, unsigned>> parameterPacks;
         for (auto &child : *dependentGenericSignatureNode) {
           if (child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker) {
-            if (child->getNumChildren() < 1)
-              return MAKE_NODE_TYPE_ERROR0(child, "expected one child node");
-            auto *typeNode = child->getChild(0);
-            if (typeNode->getNumChildren() < 1)
-              return MAKE_NODE_TYPE_ERROR0(typeNode, "expected one child node");
-            auto *marker = typeNode->getChild(0);
-            if (marker->getNumChildren() < 2)
-              return MAKE_NODE_TYPE_ERROR(
-                  marker, "fewer children (%zu) than required (2)",
-                  marker->getNumChildren());
-            if (!marker->getChild(0)->hasIndex() ||
-                !marker->getChild(1)->hasIndex())
-              return MAKE_NODE_TYPE_ERROR0(marker,
-                                           "child nodes must have indexes");
+            auto *marker = child->getChild(0)->getChild(0);
             parameterPacks.emplace_back(marker->getChild(0)->getIndex(),
                                         marker->getChild(1)->getIndex());
           }

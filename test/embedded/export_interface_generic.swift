@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
 

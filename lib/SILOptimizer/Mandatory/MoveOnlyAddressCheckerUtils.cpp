@@ -1792,7 +1792,6 @@ struct CopiedLoadBorrowEliminationVisitor
       auto *nextUse = useWorklist.pop_back_val();
       switch (nextUse->getOperandOwnership()) {
       case OperandOwnership::NonUse:
-      case OperandOwnership::DebugUse:
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
         continue;
@@ -2208,7 +2207,9 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     liveness->initializeDef(bai);
     liveness->computeSimple();
     for (auto *consumingUse : li->getConsumingUses()) {
-      if (!liveness->isWithinBoundary(consumingUse->getUser())) {
+      if (!liveness->isWithinBoundary(
+              consumingUse->getUser(),
+              moveChecker.deba->get(consumingUse->getFunction()))) {
         diagnosticEmitter.emitAddressExclusivityHazardDiagnostic(
             markedValue, consumingUse->getUser());
         emittedError = true;

@@ -3116,7 +3116,7 @@ public:
                                   LinearLiveness::DoNotIncludeExtensions);
     linearLiveness.compute();
     auto &liveness = linearLiveness.getLiveness();
-    require(!liveness.isWithinBoundary(I),
+    require(!liveness.isWithinBoundary(I, /*deadEndBlocks=*/nullptr),
             "extend_lifetime use within unextended linear liveness boundary!?");
     PrunedLivenessBoundary boundary;
     liveness.computeBoundary(boundary);
@@ -3212,7 +3212,8 @@ public:
       if (scopedAddress.isScopeEndingUse(use)) {
         continue;
       }
-      if (!scopedAddressLiveness->isWithinBoundary(user)) {
+      if (!scopedAddressLiveness->isWithinBoundary(user,
+                                                   /*deadEndBlocks=*/nullptr)) {
         llvm::errs() << "User found outside scope: " << *user;
         return false;
       }
@@ -3434,7 +3435,8 @@ public:
               scopedAddress, &scopedAddressLiveness, DEBlocks.get()),
             "Ill formed store_borrow scope");
 
-    require(!success || !hasOtherStoreBorrowsInLifetime(SI, &scopedAddressLiveness),
+    require(!success || !hasOtherStoreBorrowsInLifetime(
+              SI, &scopedAddressLiveness, DEBlocks.get()),
             "A store_borrow cannot be nested within another "
             "store_borrow to its destination");
 
@@ -7366,10 +7368,6 @@ public:
   void visitSILBasicBlock(SILBasicBlock *BB) {
     SILInstructionVisitor::visitSILBasicBlock(BB);
     verifyDebugScopeHoles(BB);
-
-    for (SILInstruction &inst : *BB) {
-      inst.verifyOperandOwnership(&fnConv.silConv);
-    }
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {

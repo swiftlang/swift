@@ -1,5 +1,4 @@
 
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name address_only_types -parse-as-library -parse-stdlib %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name address_only_types -parse-as-library -parse-stdlib %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }

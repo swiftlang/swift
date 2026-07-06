@@ -40,7 +40,6 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"
-#include "clang/AST/Type.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -73,9 +72,6 @@ class ParmVarDecl;
 class Parser;
 class QualType;
 class TypedefNameDecl;
-namespace serialization {
-class ModuleFile;
-} // namespace serialization
 } // namespace clang
 
 namespace swift {
@@ -580,20 +576,6 @@ public:
 
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
-
-  /// Per-module count of Clang decls actually deserialized (materialized) into
-  /// the shared ASTContext, keyed by the owning serialized module. Populated by
-  /// the deserialization listener's DeclRead callback only when
-  /// \c CollectMemoryStats is set; used to attribute in-RAM AST cost per module
-  /// (the deserialized AST bytes themselves live in one shared allocator and
-  /// cannot be split).
-  llvm::DenseMap<const clang::serialization::ModuleFile *, uint64_t>
-      MaterializedDeclsPerModule;
-
-  /// When set, the deserialization listener records per-module materialized decl
-  /// counts. Enabled by \c -stats-output-dir or \c -print-clang-stats; off by
-  /// default to avoid per-decl overhead in normal builds.
-  bool CollectMemoryStats = false;
 
   /// The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
@@ -1905,12 +1887,6 @@ public:
   void addOptionSetTypealiases(NominalTypeDecl *nominal) const;
 
   void swiftify(AbstractFunctionDecl *MappedDecl);
-
-  /// Tracks whether we have already warned the user that the loaded
-  /// _SwiftifyImport macro plugin lacks the `nullableAsEmptySpan`
-  /// parameter required by the `SafeInteropWrappersNullAsEmptySpan` feature.
-  /// Used to avoid emitting the same warning once per imported function.
-  bool DiagnosedMissingNullableAsEmptySpanParam = false;
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

@@ -2427,7 +2427,7 @@ bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
     classTy = classTy.getLoweredInstanceTypeOfMetatype(cm->getFunction());
 
   CanType astType = classTy.getASTType();
-  if (!astType->isSpecialized() || astType->hasPrimaryArchetype())
+  if (!astType->isSpecialized())
     return false;
 
   SubstitutionMap subs = astType->getContextSubstitutionMap();

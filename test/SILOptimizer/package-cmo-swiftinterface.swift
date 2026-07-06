@@ -33,6 +33,7 @@
 // RUN: %FileCheck %s --check-prefixes=CHECK-PKG-INTERFACE,CHECK-INTERFACE < %t/Lib.package.swiftinterface
 // RUN: %FileCheck %s --check-prefix=CHECK-INTERFACE < %t/Lib.swiftinterface
 
+// REQUIRES: swift_in_compiler
 
 // CHECK-NOT: @usableFromInline
 final class InternalKlass: PkgKlass {

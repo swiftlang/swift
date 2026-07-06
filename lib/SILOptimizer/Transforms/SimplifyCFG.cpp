@@ -3189,12 +3189,10 @@ bool ArgumentSplitter::createNewArguments() {
   // and have them point directly at the argument.
   simplifyUsers(Agg);
 
-  // If we only had such users of Agg and Agg is dead now, rewrite debug values
-  // and remove it.
-  if (onlyHaveDebugUses(Agg)) {
-    salvageDebugInfo(Agg);
+  // If we only had such users of Agg and Agg is dead now (ignoring debug
+  // instructions), remove it.
+  if (onlyHaveDebugUses(Agg))
     eraseFromParentWithDebugInsts(Agg);
-  }
 
   return true;
 }
@@ -3322,6 +3320,12 @@ static bool splitBBArguments(SILFunction &Fn) {
 }
 
 bool SimplifyCFG::run() {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+  // This pass results in verification failures when Swift sources are not
+  // enabled.
+  LLVM_DEBUG(llvm::dbgs() << "SimplifyCFG disabled in C++-only Swift compiler\n");
+  return false;
+#endif //!SWIFT_ENABLE_SWIFT_IN_SWIFT
   LLVM_DEBUG(llvm::dbgs() << "### Run SimplifyCFG on " << Fn.getName() << '\n');
 
   // Disable some expensive optimizations if the function is huge.

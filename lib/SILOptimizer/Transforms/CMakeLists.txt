@@ -4,6 +4,7 @@ target_sources(swiftSILOptimizer PRIVATE
   AccessEnforcementOpts.cpp
   AccessEnforcementReleaseSinking.cpp 
   AccessEnforcementWMO.cpp
+  AllocBoxToStack.cpp
   ArrayCountPropagation.cpp
   COWOpts.cpp
   ConditionForwarding.cpp

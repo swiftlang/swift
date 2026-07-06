@@ -499,15 +499,15 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   if (!moduleToLookIn)
     return;
 
-  NLOptions nlOptions = NLFlags::UnqualifiedDefault;
+  auto nlOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::IncludeUsableFromInline))
-    nlOptions |= NLFlags::IncludeUsableFromInline;
+    nlOptions |= NL_IncludeUsableFromInline;
   if (options.contains(Flags::ExcludeMacroExpansions))
-    nlOptions |= NLFlags::ExcludeMacroExpansions;
+    nlOptions |= NL_ExcludeMacroExpansions;
   if (options.contains(Flags::ABIProviding))
-    nlOptions |= NLFlags::ABIProviding;
+    nlOptions |= NL_ABIProviding;
   if (options.contains(Flags::IgnoreAccessControl))
-    nlOptions |= NLFlags::IgnoreAccessControl;
+    nlOptions |= NL_IgnoreAccessControl;
 
   lookupInModule(moduleToLookIn, Name.getFullName(), Name.hasModuleSelector(),
                  CurModuleResults, NLKind::UnqualifiedLookup, resolutionKind,
@@ -624,19 +624,19 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     const UnqualifiedLookupOptions options,
     const bool isOriginallyTypeLookup,
     const bool isOriginallyMacroLookup) {
-  NLOptions baseNLOptions = NLFlags::UnqualifiedDefault;
+  NLOptions baseNLOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::AllowProtocolMembers))
-    baseNLOptions |= NLFlags::ProtocolMembers;
+    baseNLOptions |= NL_ProtocolMembers;
   if (isOriginallyTypeLookup)
-    baseNLOptions |= NLFlags::OnlyTypes;
+    baseNLOptions |= NL_OnlyTypes;
   if (isOriginallyMacroLookup)
-    baseNLOptions |= NLFlags::OnlyMacros;
+    baseNLOptions |= NL_OnlyMacros;
   if (options.contains(Flags::IgnoreAccessControl))
-    baseNLOptions |= NLFlags::IgnoreAccessControl;
+    baseNLOptions |= NL_IgnoreAccessControl;
   if (options.contains(Flags::IgnoreMissingImports))
-    baseNLOptions |= NLFlags::IgnoreMissingImports;
+    baseNLOptions |= NL_IgnoreMissingImports;
   if (options.contains(Flags::ABIProviding))
-    baseNLOptions |= NLFlags::ABIProviding;
+    baseNLOptions |= NL_ABIProviding;
   return baseNLOptions;
 }
 

@@ -34,7 +34,6 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LayoutConstraint.h"
-#include "swift/AST/LookupKinds.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -101,6 +100,7 @@ namespace swift {
   class MacroDefinition;
   class ModuleDecl;
   class NamedPattern;
+  enum NLOptions : unsigned;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
@@ -4893,7 +4893,7 @@ public:
 
   SourceLoc getStartLoc() const { return EnumLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange::combine(EnumLoc, getBraces().End);
+    return SourceRange(EnumLoc, getBraces().End);
   }
 
 public:
@@ -5097,7 +5097,7 @@ public:
 
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange::combine(StructLoc, getBraces().End);
+    return SourceRange(StructLoc, getBraces().End);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -5253,7 +5253,7 @@ public:
 
   SourceLoc getStartLoc() const { return ClassLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange::combine(ClassLoc, getBraces().End);
+    return SourceRange(ClassLoc, getBraces().End);
   }
 
   /// Determine whether the member area of this class's metadata (which consists
@@ -5741,7 +5741,7 @@ public:
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange::combine(ProtocolLoc, getBraces().End);
+    return SourceRange(ProtocolLoc, getBraces().End);
   }
 
   /// True if this protocol can only be conformed to by class types.

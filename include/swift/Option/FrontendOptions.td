@@ -588,18 +588,12 @@ def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-typ
 
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
-def debug_assert_after_type_checking : Flag<["-"], "debug-assert-after-type-checking">,
-  DebugCrashOpt, HelpText<"Force an assertion failure after type checking">;
 def debug_assert_after_parse : Flag<["-"], "debug-assert-after-parse">,
-  DebugCrashOpt, Flags<[HelpHidden]>,
-  HelpText<"Deprecated alias for -debug-assert-after-type-checking">;
+  DebugCrashOpt, HelpText<"Force an assertion failure after parsing">;
 def debug_crash_immediately : Flag<["-"], "debug-crash-immediately">,
   DebugCrashOpt, HelpText<"Force a crash immediately">;
-def debug_crash_after_type_checking : Flag<["-"], "debug-crash-after-type-checking">,
-  DebugCrashOpt, HelpText<"Force a crash after type checking">;
 def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
-  DebugCrashOpt, Flags<[HelpHidden]>,
-  HelpText<"Deprecated alias for -debug-crash-after-type-checking">;
+  DebugCrashOpt, HelpText<"Force a crash after parsing">;
 
 def debug_test_dependency_scan_cache_serialization: Flag<["-"], "test-dependency-scan-cache-serialization">,
    HelpText<"After performing a dependency scan, serialize and then deserialize the scanner's internal state.">;
@@ -996,14 +990,8 @@ def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-h
            "subsumed by subsequent improvements">;
 
 def solver_enable_performance_hacks : Flag<["-"], "solver-enable-performance-hacks">,
-  HelpText<"Enable various constraint solver performance optimizations that have been "
+  HelpText<"Enble various constraint solver performance optimizations that have been "
            "subsumed by subsequent improvements">;
-
-def solver_disable_enumerate_supertypes : Flag<["-"], "solver-disable-enumerate-supertypes">,
-  HelpText<"Disable an inefficient form of inference in the solver, which allows certain optimizations">;
-
-def solver_enable_enumerate_supertypes : Flag<["-"], "solver-enable-enumerate-supertypes">,
-  HelpText<"Enable an inefficient form of inference in the solver, which prevents certain optimizations">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;

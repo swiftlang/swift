@@ -1068,10 +1068,6 @@ namespace swift {
     /// Enable experimental optimization to skip contradictory disjunction
     /// choices.
     bool SolverPruneDisjunctions = true;
-
-    /// Enable an inefficient form of inference, which will sometimes prevent
-    /// exact binding promotion from taking place.
-    bool SolverEnableEnumerateSupertypes = true;
   };
 
   /// Options for controlling the behavior of the Clang importer.

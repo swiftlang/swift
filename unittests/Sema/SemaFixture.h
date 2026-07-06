@@ -53,7 +53,6 @@ public:
 
   SemaTestBase() : Diags(SourceMgr) {
     LangOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
-    TypeCheckerOpts.SolverEnableEnumerateSupertypes = false;
 
     llvm::SmallString<128> libDir(SWIFTLIB_DIR);
     llvm::sys::path::append(libDir, getPlatformNameForTriple(LangOpts.Target));

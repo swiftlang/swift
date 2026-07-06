@@ -5,6 +5,7 @@
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 import Builtin

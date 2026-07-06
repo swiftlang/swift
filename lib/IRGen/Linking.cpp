@@ -507,8 +507,7 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
   }
   case Kind::DistributedThunkAsyncFunctionPointer: {
     std::string Result = getSILDeclRef().mangle();
-    assert(StringRef(Result).ends_with("TE") &&
-           "expected distributed thunk mangling ending with 'TE'");
+    Result.append("TE");
     Result.append("Tu");
     return Result;
   }
@@ -627,7 +626,7 @@ SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
 SILDeclRef LinkEntity::getSILDeclRef() const {
   auto ref = SILDeclRef(const_cast<ValueDecl *>(getDecl()), getSILDeclRefKind());
   if (getKind() == Kind::DistributedAccessor)
-    return ref.getDistributedThunkDeclRef();
+    return ref.asDistributed();
   return ref;
 }
 
@@ -952,23 +951,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::DynamicallyReplaceableFunctionVariable:
     return getSILFunction()->getEffectiveSymbolLinkage();
-  case Kind::DynamicallyReplaceableFunctionVariableAST: {
-    // Match the SIL-level linkage IRGen uses for the actual variable
-    // emission, which applies the class-member scope transform. Otherwise
-    // the AST-level linkage claims the entity is public when IRGen emits it
-    // with hidden linkage (e.g. dynamic methods of a resilient class).
-    auto silLinkage = getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
-    auto *afd = cast<AbstractFunctionDecl>(const_cast<ValueDecl *>(getDecl()));
-    SILDeclRef declRef;
-    if (auto *ctor = dyn_cast<ConstructorDecl>(afd)) {
-      declRef = SILDeclRef(ctor, isAllocator() ? SILDeclRef::Kind::Allocator
-                                               : SILDeclRef::Kind::Initializer);
-    } else {
-      declRef = SILDeclRef(afd);
-    }
-    return effectiveLinkageForClassMember(silLinkage,
-                                          declRef.getSubclassScope());
-  }
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
+    return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
   case Kind::SILGlobalVariable:
   case Kind::ReadOnlyGlobalObject:

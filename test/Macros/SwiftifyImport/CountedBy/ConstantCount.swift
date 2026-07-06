@@ -8,55 +8,55 @@
 // RUN: %diff %t/expansions.out %t/expansions.expected
 
 //--- test.swift
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 public func plain(_ ptr: UnsafePointer<CInt>) {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 public func opt(_ ptr: UnsafePointer<CInt>?) {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 public func mut(_ ptr: UnsafeMutablePointer<CInt>) {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 public func mutOpt(_ ptr: UnsafeMutablePointer<CInt>?) {}
 
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .nonescaping(pointer: .param(1)), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .nonescaping(pointer: .param(1)))
 public func noescape(_ ptr: UnsafePointer<CInt>) {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .nonescaping(pointer: .param(1)), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .nonescaping(pointer: .param(1)))
 public func noescapeOpt(_ ptr: UnsafePointer<CInt>?) {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .nonescaping(pointer: .param(1)), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .nonescaping(pointer: .param(1)))
 public func noescapeMut(_ ptr: UnsafeMutablePointer<CInt>) {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .nonescaping(pointer: .param(1)), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), .nonescaping(pointer: .param(1)))
 public func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) {}
 
 
-@_SwiftifyImport(.countedBy(pointer: .return, count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .return, count: "37"))
 public func plainReturn() -> UnsafePointer<CInt> {}
 
-@_SwiftifyImport(.countedBy(pointer: .return, count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .return, count: "37"))
 public func optReturn() -> UnsafePointer<CInt>? {}
 
-@_SwiftifyImport(.countedBy(pointer: .return, count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .return, count: "37"))
 public func mutReturn() -> UnsafeMutablePointer<CInt> {}
 
-@_SwiftifyImport(.countedBy(pointer: .return, count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .return, count: "37"))
 public func mutOptReturn() -> UnsafeMutablePointer<CInt>? {}
 
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 public func escape(_ ptr: UnsafePointer<CInt>) -> UnsafePointer<CInt> {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 public func escapeOpt(_ ptr: UnsafePointer<CInt>?) -> UnsafePointer<CInt>? {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 public func escapeMut(_ ptr: UnsafeMutablePointer<CInt>) -> UnsafeMutablePointer<CInt> {}
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "37"))
 public func escapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<CInt>? {}
 
 //--- expansions.expected

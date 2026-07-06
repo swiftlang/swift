@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -sil-verify-all -temp-lvalue-elimination %s | %FileCheck %s
 sil_stage canonical
 
+// REQUIRES: swift_in_compiler
 
 import Builtin
 

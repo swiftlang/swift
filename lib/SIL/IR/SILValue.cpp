@@ -563,8 +563,6 @@ StringRef OperandOwnership::asString() const {
     return "instantaneous";
   case OperandOwnership::UnownedInstantaneousUse:
     return "unowned-instantaneous";
-  case OperandOwnership::DebugUse:
-    return "debug-use";
   case OperandOwnership::ForwardingUnowned:
     return "forwarding-unowned";
   case OperandOwnership::PointerEscape:

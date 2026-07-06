@@ -4381,11 +4381,9 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return cast<AnyFunctionType>(derivativeFnTy->getCanonicalType());
   }
 
-  auto *vd = c.getDecl();
-
+  auto *vd = c.loc.dyn_cast<ValueDecl *>();
   switch (c.kind) {
-  case SILDeclRef::Kind::Func:
-  case SILDeclRef::Kind::DistributedThunk: {
+  case SILDeclRef::Kind::Func: {
     CanAnyFunctionType funcTy;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
@@ -4473,7 +4471,6 @@ TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
   /// Get the function generic params, including outer params.
   switch (c.kind) {
   case SILDeclRef::Kind::Func:
-  case SILDeclRef::Kind::DistributedThunk:
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::Initializer:
   case SILDeclRef::Kind::Destroyer:

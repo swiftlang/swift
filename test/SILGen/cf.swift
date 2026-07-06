@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -Xllvm -sil-print-types -module-name cf -enable-objc-interop -import-cf-types -sdk %S/Inputs %s -o -
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name cf -enable-objc-interop -import-cf-types -sdk %S/Inputs %s -o - | %FileCheck %s
 
 import CoreCooling

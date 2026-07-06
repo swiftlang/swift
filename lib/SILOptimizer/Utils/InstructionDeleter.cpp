@@ -434,9 +434,8 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
   while (!deadInsts.empty()) {
     for (auto inst : deadInsts) {
       // Call the callback before we mutate the to be deleted instruction in any
-      // way, and salvage debug info while it's meaningful.
+      // way.
       callbacks.notifyWillBeDeleted(inst);
-      salvageDebugInfo(inst);
 
       // Check if any of the operands will become dead as well.
       MutableArrayRef<Operand> operands = inst->getAllOperands();

@@ -1759,12 +1759,6 @@ public:
                                             CanType inputTy,
                                             SILType resultTy);
 
-  ManagedValue emitDoubleToCGFloat(SILLocation loc,
-                                   SILValue doubleValue, SGFContext C);
-
-  ManagedValue emitCGFloatToDouble(SILLocation loc,
-                                   SILValue cgfloatValue, SGFContext C);
-
   ManagedValue manageOpaqueValue(ManagedValue value,
                                  SILLocation loc,
                                  SGFContext C);

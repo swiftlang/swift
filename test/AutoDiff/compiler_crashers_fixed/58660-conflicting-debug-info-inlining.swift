@@ -1,6 +1,7 @@
 // RUN: %target-build-swift %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O -g %s | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 // UNSUPPORTED: OS=linux-gnu
 
 // Issue #58660: Specifically-shaped differentiable functions yield "conflicting debug info for argument" assertion failure

@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 
 //CHECK: [readonly] [ossa] @func1
 @_effects(readonly) @_silgen_name("func1") func func1() { }
@@ -34,3 +35,4 @@ struct Mystr<T> {
   @_effects(escaping s.value** -> t.sf.value**)
   @_silgen_name("func7") func func7<T>(_ t: inout Mystr<T>, _ s: T) -> T { }
 }
+

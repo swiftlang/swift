@@ -505,6 +505,10 @@ computeDeclRuntimeAvailability(const Decl *decl) {
       continue;
 
     llvm::erase_if(unavailableDomains, [domain](auto unavailableDomain) {
+      // Unavailability in '*' cannot be superseded by an @available attribute
+      // for a more specific availability domain.
+      if (unavailableDomain.isUniversal())
+        return false;
       return unavailableDomain.contains(domain);
     });
   }

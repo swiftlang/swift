@@ -153,6 +153,7 @@ addImplicitCodingKeys(NominalTypeDecl *target,
   auto anchorLoc = target->getStartLoc();
   auto *enumDecl = new (C) EnumDecl(anchorLoc, codingKeysEnumIdentifier,
                                     SourceLoc(), inherited, nullptr, target);
+  enumDecl->setBraces(anchorLoc);
   enumDecl->setImplicit();
   enumDecl->setSynthesized();
   enumDecl->setAccess(AccessLevel::Private);

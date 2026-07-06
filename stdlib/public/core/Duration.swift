@@ -46,6 +46,10 @@ public struct Duration: Sendable {
     self._high = _high
   }
 
+  internal init(_attoseconds: _Int128) {
+    self.init(_high: _attoseconds.high, low: _attoseconds.low)
+  }
+
   /// Construct a `Duration` by adding attoseconds to a seconds value.
   ///
   /// This is useful for when an external decomposed components of a `Duration`
@@ -74,7 +78,11 @@ public struct Duration: Sendable {
   ///                           `Duration` value.
   public init(secondsComponent: Int64, attosecondsComponent: Int64) {
     self = Duration.seconds(secondsComponent) +
-           Duration(attoseconds: Int128(attosecondsComponent))
+           Duration(_attoseconds: _Int128(attosecondsComponent))
+  }
+
+  internal var _attoseconds: _Int128 {
+    _Int128(high: _high, low: _low)
   }
 }
 
@@ -86,12 +94,12 @@ extension Duration {
   /// attoseconds value will not exceed 1e18 or be lower than -1e18.
   @available(StdlibDeploymentTarget 5.7, *)
   public var components: (seconds: Int64, attoseconds: Int64) {
-    let (seconds, attoseconds) = attoseconds.dividedBy1e18()
+    let (seconds, attoseconds) = _attoseconds.dividedBy1e18()
     return (Int64(seconds), Int64(attoseconds))
   }
 }
 
-@available(StdlibDeploymentTarget 6.0, *)
+@available(SwiftStdlib 6.0, *)
 extension Duration {
   /// The number of attoseconds represented by this `Duration`.
   ///
@@ -100,7 +108,7 @@ extension Duration {
   ///
   ///     let d = Duration.seconds(1)
   ///     print(d.attoseconds) // 1_000_000_000_000_000_000
-  @available(StdlibDeploymentTarget 6.0, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   public var attoseconds: Int128 {
     Int128(_low: _low, _high: _high)
@@ -114,7 +122,7 @@ extension Duration {
   ///     print(d) // 1.0 seconds
   ///
   /// - Parameter attoseconds: The total duration expressed in attoseconds.
-  @available(StdlibDeploymentTarget 6.0, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   public init(attoseconds: Int128) {
     self.init(_high: attoseconds._high, low: attoseconds._low)
@@ -147,12 +155,12 @@ extension Duration {
     // never rounded if `scale` is representable as Double.
     let integralPart = duration.rounded(.towardZero)
     let fractionalPart = duration - integralPart
-    self.init(attoseconds:
+    self.init(_attoseconds:
       // This term may trap due to overflow, but it cannot round, so if the
       // input `seconds` is an exact integer, we get an exact integer result.
-      Int128(integralPart).multiplied(by: scale) +
+      _Int128(integralPart).multiplied(by: scale) +
       // This term may round, but cannot overflow.
-      Int128((fractionalPart * Double(scale)).rounded())
+      _Int128((fractionalPart * Double(scale)).rounded())
     )
   }
 
@@ -278,7 +286,7 @@ extension Duration: Codable {
 extension Duration: Hashable {
   @available(StdlibDeploymentTarget 5.7, *)
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(attoseconds)
+    hasher.combine(_attoseconds)
   }
 }
 
@@ -286,7 +294,7 @@ extension Duration: Hashable {
 extension Duration: Equatable {
   @available(StdlibDeploymentTarget 5.7, *)
   public static func == (_ lhs: Duration, _ rhs: Duration) -> Bool {
-    return lhs.attoseconds == rhs.attoseconds
+    return lhs._attoseconds == rhs._attoseconds
   }
 }
 
@@ -294,23 +302,23 @@ extension Duration: Equatable {
 extension Duration: Comparable {
   @available(StdlibDeploymentTarget 5.7, *)
   public static func < (_ lhs: Duration, _ rhs: Duration) -> Bool {
-    return lhs.attoseconds < rhs.attoseconds
+    return lhs._attoseconds < rhs._attoseconds
   }
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
 extension Duration: AdditiveArithmetic {
   @available(StdlibDeploymentTarget 5.7, *)
-  public static var zero: Duration { Duration(attoseconds: 0) }
+  public static var zero: Duration { Duration(_attoseconds: 0) }
 
   @available(StdlibDeploymentTarget 5.7, *)
   public static func + (_ lhs: Duration, _ rhs: Duration) -> Duration {
-    return Duration(attoseconds: lhs.attoseconds + rhs.attoseconds)
+    return Duration(_attoseconds: lhs._attoseconds + rhs._attoseconds)
   }
 
   @available(StdlibDeploymentTarget 5.7, *)
   public static func - (_ lhs: Duration, _ rhs: Duration) -> Duration {
-    return Duration(attoseconds: lhs.attoseconds - rhs.attoseconds)
+    return Duration(_attoseconds: lhs._attoseconds - rhs._attoseconds)
   }
 
   @available(StdlibDeploymentTarget 5.7, *)
@@ -328,7 +336,8 @@ extension Duration: AdditiveArithmetic {
 extension Duration {
   @available(StdlibDeploymentTarget 5.7, *)
   public static func / (_ lhs: Duration, _ rhs: Double) -> Duration {
-    Duration(attoseconds: Int128(Double(lhs.attoseconds) / rhs))
+    return Duration(_attoseconds:
+      _Int128(Double(lhs._attoseconds) / rhs))
   }
 
   @available(StdlibDeploymentTarget 5.7, *)
@@ -340,7 +349,7 @@ extension Duration {
   public static func / <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
-    Duration(attoseconds: lhs.attoseconds / Int128(rhs))
+    Duration(_attoseconds: lhs._attoseconds / _Int128(rhs))
   }
 
   @available(StdlibDeploymentTarget 5.7, *)
@@ -350,19 +359,19 @@ extension Duration {
 
   @available(StdlibDeploymentTarget 5.7, *)
   public static func / (_ lhs: Duration, _ rhs: Duration) -> Double {
-    Double(lhs.attoseconds) / Double(rhs.attoseconds)
+    Double(lhs._attoseconds) / Double(rhs._attoseconds)
   }
 
   @available(StdlibDeploymentTarget 5.7, *)
   public static func * (_ lhs: Duration, _ rhs: Double) -> Duration {
-    Duration(attoseconds: Int128(Double(lhs.attoseconds) * rhs))
+    Duration(_attoseconds: _Int128(Double(lhs._attoseconds) * rhs))
   }
 
   @available(StdlibDeploymentTarget 5.7, *)
   public static func * <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
-    Duration(attoseconds: lhs.attoseconds * Int128(rhs))
+    Duration(_attoseconds: lhs._attoseconds * _Int128(rhs))
   }
 
   @available(StdlibDeploymentTarget 5.7, *)
@@ -376,7 +385,7 @@ extension Duration {
 extension Duration: CustomStringConvertible {
   @available(StdlibDeploymentTarget 5.7, *)
   public var description: String {
-    return (Double(attoseconds) / 1e18).description + " seconds"
+    return (Double(_attoseconds) / 1e18).description + " seconds"
   }
 }
 
@@ -385,26 +394,3 @@ extension Duration: DurationProtocol { }
 
 @available(StdlibDeploymentTarget 5.7, *)
 extension Duration: ConvertibleToBytes, ConvertibleFromBytes {}
-
-@available(StdlibDeploymentTarget 6.0, *)
-extension Int128 {
-  internal func multiplied(by other: UInt64) -> Self {
-    // Mathematically this is just self * Int128(other), but the optimizer
-    // doesn't quite get all the invariants it needs to optimize that as well
-    // as we can.
-    let tail = _low.multipliedFullWidth(by: other)
-    let wide = (self &>> 64) &* Int128(other) &+ Int128(tail.high)
-    let head = Int64(bitPattern: wide._low)
-    precondition(head &>> 63 == Int64(wide._high))
-    return Int128(_low: tail.low, _high: head)
-  }
-  
-  internal func dividedBy1e18() -> (quotient: Self, remainder: Self) {
-    let m = Int128(_low: 8336148766501648893, _high: 664613997892457936)
-    var q = self.multipliedFullWidth(by: m).high
-    q &>>= 55
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000000000000000000 as Int128)
-    return (q, r)
-  }
-}

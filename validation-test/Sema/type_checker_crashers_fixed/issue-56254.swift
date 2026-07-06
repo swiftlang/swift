@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-disable-enumerate-supertypes
+// RUN: %target-typecheck-verify-swift
 
 // https://github.com/apple/swift/issues/56254
 
@@ -41,6 +41,4 @@ struct DefaultsAdapter<KeyStore: DefaultsKeyStore> {
 
 
 var Defaults = DefaultsAdapter<DefaultsKeys>()
-Defaults[\.missingKey] = ""
-// expected-error@-1 {{missing argument label 'keyPath:' in subscript}}
-// expected-error@-2 {{cannot assign value of type 'String' to subscript of type 'Never'}}
+Defaults[\.missingKey] = "" // expected-error {{}}

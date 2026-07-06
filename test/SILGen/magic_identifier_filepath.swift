@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // Check that we generate the right strings.
 // RUN: %target-swift-emit-silgen -module-name Foo %/s | %FileCheck %s
 

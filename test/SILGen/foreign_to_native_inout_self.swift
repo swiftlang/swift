@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -import-objc-header %S/Inputs/foreign_to_native_inout_self_helper.h
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -import-objc-header %S/Inputs/foreign_to_native_inout_self_helper.h | %FileCheck %s
 
 protocol FakeIterator {

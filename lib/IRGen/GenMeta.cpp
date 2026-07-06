@@ -1033,7 +1033,7 @@ namespace {
               entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
         if (entry.getFunction().isDistributedThunk()) {
           flags = flags.withIsAsync(true);
-          declRef = declRef.getDistributedThunkDeclRef();
+          declRef = declRef.asDistributed();
         }
         addDiscriminator(flags, schema, declRef);
       }
@@ -3632,36 +3632,17 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
   auto rawLayout = T.getRawLayout();
   auto likeTypeLayout = emitTypeLayoutRef(IGF, likeType, collector);
   auto structLayoutflags = StructLayoutFlags::Swift5Algorithm;
-  llvm::Value *rawLayoutFlags = IGM.getSize(Size(0));
+  auto rawLayoutFlags = (RawLayoutFlags) 0;
 
-  if (rawLayout->shouldMoveAsLikeType()) {
-    rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
-                      IGM.getSize(Size((uint8_t) RawLayoutFlags::MovesAsLike)));
-
-    // PODness comes directly from the like type if we 'movesAsLike'. A custom
-    // deinit on the raw layout type however automatically forces non-pod.
-    if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
-      rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
-                          IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
-    } else {
-      auto &likeTypeInfo = IGM.getTypeInfo(likeType);
-      auto isPOD = likeTypeInfo.getIsTriviallyDestroyable(IGF, likeType);
-      auto isNonPODFlags = IGF.Builder.CreateOr(rawLayoutFlags,
-                            IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
-      rawLayoutFlags = IGF.Builder.CreateSelect(isPOD, rawLayoutFlags, isNonPODFlags);
-    }
-  } else if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
-    rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
-                            IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
-  }
+  if (rawLayout->shouldMoveAsLikeType())
+    rawLayoutFlags |= RawLayoutFlags::MovesAsLike;
 
   // If we don't have a count, then we're the 'like:' variant so just pass some
   // 0 to the runtime call.
   if (!count) {
     count = IGM.getSize(Size(0));
   } else {
-    rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
-                          IGM.getSize(Size((uint8_t) RawLayoutFlags::IsArray)));
+    rawLayoutFlags |= RawLayoutFlags::IsArray;
   }
 
   // Call swift_initRawStructMetadata2().
@@ -3670,7 +3651,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
                           IGM.getSize(Size(uintptr_t(structLayoutflags))),
                           likeTypeLayout,
                           count,
-                          rawLayoutFlags});
+                          IGM.getSize(Size(uintptr_t(rawLayoutFlags)))});
 }
 
 static void emitInitializeValueMetadata(IRGenFunction &IGF,
@@ -7983,23 +7964,9 @@ GenericArgumentMetadata irgen::addGenericRequirements(
                                            /*key argument*/false,
                                            isPackRequirement,
                                            isValueRequirement);
-      // Pass along the generic signature so that, if the runtime demangler is
-      // too old to understand this type's mangled name and we fall back to a
-      // dangling metadata-accessor function, the accessor can map the
-      // type-parameter-dependent type into a generic environment and bind it
-      // from the generic requirements buffer at runtime.
-      //
-      // Use the CanType overload rather than the Type overload: the latter
-      // reduces the type against the signature, which would collapse the RHS
-      // of a same-type requirement onto its equivalence-class representative
-      // (e.g. `T.A == T.B` would be recorded as `T.A == T.A`) and corrupt the
-      // requirement. We want the original RHS, just mangled with the signature
-      // available for the dangling-accessor fallback.
       auto typeName =
-          IGM.getTypeRef(requirement.getSecondType()->getCanonicalType(),
-                         sig.getCanonicalSignature(),
-                         MangledTypeRefRole::Metadata)
-              .first;
+          IGM.getTypeRef(requirement.getSecondType(), nullptr,
+                         MangledTypeRefRole::Metadata).first;
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),

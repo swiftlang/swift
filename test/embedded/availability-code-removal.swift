@@ -11,6 +11,7 @@
 // RUN: %target-swift-frontend -emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -wmo | %FileCheck %s --check-prefix CHECK-EMBEDDED
 // RUN: %target-swift-frontend -emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo | %FileCheck %s --check-prefix CHECK-EMBEDDED
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 public protocol Player {}

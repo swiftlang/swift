@@ -41,6 +41,7 @@
 // RUN: -I %t/artifacts/ObjcBuilds -L %t/artifacts/ObjcBuilds \
 // RUN: -lMyCore -lObjCAPI -Rmodule-loading
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: objc_interop
 
 

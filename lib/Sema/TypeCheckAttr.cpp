@@ -417,7 +417,6 @@ public:
   void visitAvailableAttr(AvailableAttr *attr);
 
   void visitCDeclAttr(CDeclAttr *attr);
-  void visitCOMAttr(COMAttr *attr);
   void visitExposeAttr(ExposeAttr *attr);
   void visitExternAttr(ExternAttr *attr);
   void visitUsedAttr(UsedAttr *attr);
@@ -1567,14 +1566,8 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     if (!Ext->getSelfClassDecl())
       error = diag::objc_extension_not_class;
   } else if (auto ED = dyn_cast<EnumDecl>(D)) {
-    // @objc (and @c) enums cannot be generic.
-    if (ED->isGenericContext()) {
-      diagnoseAndRemoveAttr(attr, diag::objc_enum_generic, ED,
-                            getObjCDiagnosticAttrKind(reason))
-          .limitBehavior(behavior);
-      reason.describe(D);
-      return;
-    }
+    if (ED->isGenericContext())
+      error = diag::objc_enum_generic;
   } else if (auto EED = dyn_cast<EnumElementDecl>(D)) {
     auto ED = EED->getParentEnum();
     if (!ED->getAttrs().hasAttribute<ObjCAttr>())
@@ -2447,62 +2440,10 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
              attr, "func");
   }
 
-  // @c (and @objc) enums cannot be generic.
-  if (auto *ED = dyn_cast<EnumDecl>(D)) {
-    if (ED->isGenericContext()) {
-      unsigned reasonKind = attr->Underscored
-                                ? unsigned(ObjCReason::ExplicitlyUnderscoreCDecl)
-                                : unsigned(ObjCReason::ExplicitlyCDecl);
-      diagnoseAndRemoveAttr(attr, diag::objc_enum_generic, ED, reasonKind);
-    }
-  }
-
   // Reject using both @c and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
   }
-}
-
-void AttributeChecker::visitCOMAttr(COMAttr *attr) {
-  if (!Ctx.LangOpts.EnableCOMInterop) {
-    diagnoseAndRemoveAttr(attr, diag::attr_com_requires_flag);
-    return;
-  }
-
-  if (isa<ProtocolDecl>(D)) {
-    if (attr->IID.empty()) {
-      diagnose(attr->getLocation(), diag::attr_com_protocol_requires_iid);
-      attr->setInvalid();
-      return;
-    }
-
-    if (attr->CLSID && !attr->CLSID->empty()) {
-      diagnose(attr->getLocation(), diag::attr_com_protocol_unexpected_arg, "CLSID");
-      attr->setInvalid();
-      return;
-    }
-
-    if (!UUID::fromString(attr->IID.str().c_str())) {
-      diagnose(attr->getLocation(), diag::attr_com_invalid_guid, attr->IID);
-      attr->setInvalid();
-      return;
-    }
-  } else if (isa<ClassDecl>(D)) {
-    if (!attr->IID.empty()) {
-      diagnose(attr->getLocation(), diag::attr_com_class_unexpected_iid);
-      attr->setInvalid();
-      return;
-    }
-
-    if (attr->CLSID && (attr->CLSID->empty() ||
-                        !UUID::fromString(attr->CLSID->str().c_str()))) {
-      diagnose(attr->getLocation(), diag::attr_com_invalid_guid, *attr->CLSID);
-      attr->setInvalid();
-      return;
-    }
-  }
-
-  // TODO(compnerd) ensure that `ISwiftObject` is not conformed to.
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
@@ -3035,7 +2976,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
                                SF, attr->getLocation(),
-                               NLFlags::QualifiedDefault);
+                               NL_QualifiedDefault);
     if (decls.size() == 1)
       ApplicationDelegateProto = dyn_cast<ProtocolDecl>(decls[0]);
   }
@@ -3961,9 +3902,9 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
   if (!typeCtx)
     typeCtx = cast<ExtensionDecl>(declCtxt->getAsDecl())->getExtendedNominal();
 
-  NLOptions options = NLFlags::QualifiedDefault;
+  auto options = NL_QualifiedDefault;
   if (declCtxt->isInSpecializeExtensionContext())
-    options |= NLFlags::IncludeUsableFromInline;
+    options |= NL_IncludeUsableFromInline;
 
   if (typeCtx)
     moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
@@ -5061,11 +5002,11 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
 
       auto builderType = nominal->getDeclaredType();
       nominal->lookupQualified(builderType, DeclNameRef(buildPartialBlockFirst),
-                               attr->getLocation(), NLFlags::QualifiedDefault,
+                               attr->getLocation(), NL_QualifiedDefault,
                                buildPartialBlockFirstMatches);
       nominal->lookupQualified(
           builderType, DeclNameRef(buildPartialBlockAccumulated),
-          attr->getLocation(), NLFlags::QualifiedDefault,
+          attr->getLocation(), NL_QualifiedDefault,
           buildPartialBlockAccumulatedMatches);
 
       hasAccessibleBuildPartialBlockFirst = llvm::any_of(
@@ -9198,7 +9139,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
     SmallVector<ValueDecl *, 1> lookupResults;
     attachedContext->lookupQualified(attachedContext->getParentModule(),
                                      nameRef.withoutArgumentLabels(ctx),
-                                     attr->getLocation(), NLFlags::OnlyTypes,
+                                     attr->getLocation(), NL_OnlyTypes,
                                      lookupResults);
     if (lookupResults.size() == 1)
       return lookupResults[0];

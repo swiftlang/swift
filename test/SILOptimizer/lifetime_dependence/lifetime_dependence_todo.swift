@@ -3,6 +3,7 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all
 
+// REQUIRES: swift_in_compiler
 
 // Future tests for LifetimeDependenceDiagnostics.
 // REQUIRES: disabled

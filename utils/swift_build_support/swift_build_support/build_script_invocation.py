@@ -438,10 +438,6 @@ class BuildScriptInvocation(object):
                     shlex.quote(opt) for opt in args.extra_cmake_options)
             ]
 
-        impl_args += [
-            "--llvm-enable-index-store=%s" % (1 if args.llvm_enable_index_store else 0)
-        ]
-
         if args.lto_type is not None:
             impl_args += [
                 "--llvm-enable-lto=%s" % args.lto_type,
@@ -733,11 +729,6 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_emscriptenstdlib)
         builder.add_product(products.EmscriptenSwiftSDK,
                             is_enabled=self.args.build_emscriptenstdlib)
-
-        builder.add_product(products.EmscriptenHostLLVM,
-                            is_enabled=self.args.build_emscripten_host_llvm)
-        builder.add_product(products.EmscriptenHostSwift,
-                            is_enabled=self.args.build_emscripten_host_swift)
 
         builder.add_product(products.SwiftFoundationTests,
                             is_enabled=self.args.build_foundation)

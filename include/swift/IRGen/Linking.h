@@ -790,7 +790,6 @@ public:
     LinkEntity::Kind kind;
     switch (declRef.kind) {
     case SILDeclRef::Kind::Func:
-    case SILDeclRef::Kind::DistributedThunk:
       kind = Kind::DispatchThunk;
       break;
     case SILDeclRef::Kind::Initializer:
@@ -824,7 +823,6 @@ public:
     LinkEntity::Kind kind;
     switch (declRef.kind) {
     case SILDeclRef::Kind::Func:
-    case SILDeclRef::Kind::DistributedThunk:
       kind = Kind::MethodDescriptor;
       break;
     case SILDeclRef::Kind::Initializer:

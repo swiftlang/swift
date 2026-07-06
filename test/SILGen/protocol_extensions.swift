@@ -1,5 +1,4 @@
 
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name protocol_extensions -disable-objc-attr-requires-foundation-module -enable-objc-interop %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name protocol_extensions -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 public protocol P1 {

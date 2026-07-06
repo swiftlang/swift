@@ -8,22 +8,22 @@
 // RUN: diff --strip-trailing-cr %t/expansions.txt %t/expansions.txt.expected
 
 //--- test.swift
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"))
 public func nonnullUnsafeRawBufferPointer(_ size: CInt) -> OpaquePointer {}
 
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"))
 public func nullableUnsafeRawBufferPointer(_ size: CInt) -> OpaquePointer? {}
 
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"))
 public func impNullableUnsafeRawBufferPointer(_ size: CInt) -> OpaquePointer! {}
 
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
 public func nonnullSpan(p: OpaquePointer, size: CInt) -> OpaquePointer {}
 
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
 public func nullableSpan(p: OpaquePointer?, _ size: CInt) -> OpaquePointer? {}
 
-@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
+@_SwiftifyImport(.sizedBy(pointer: .return, size: "size"), .sizedBy(pointer: .param(1), size: "size"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
 public func impNullableSpan(p: OpaquePointer!, _ size: CInt) -> OpaquePointer! {}
 
 //--- expansions.txt.expected

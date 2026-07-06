@@ -396,8 +396,7 @@ entry(%0 : $*Cell<T>):
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}19CellThatMovesAsLikeVMr"(ptr %"CellThatMovesAsLike<T>", ptr {{.*}}, ptr {{.*}})
-// CHECK: [[IS_POD:%.*]] = select i1 {{.*}}, {{i64|i32}} 2, {{i64|i32}} 10
-// CHECK: call void @swift_initRawStructMetadata2(ptr %"CellThatMovesAsLike<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 0, {{i64|i32}} [[IS_POD]])
+// CHECK: call void @swift_initRawStructMetadata2(ptr %"CellThatMovesAsLike<T>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} 0, {{i64|i32}} 2)
 
 //===----------------------------------------------------------------------===//
 // CellThatMovesAsLike<T> destroy
@@ -633,9 +632,7 @@ entry(%0 : $*Cell<T>):
 // CHECK-LABEL: define {{.*}} swiftcc %swift.metadata_response @"$s{{[A-Za-z0-9_]*}}17VectorMovesAsLikeVMr"(ptr %"VectorMovesAsLike<T, N>", ptr {{.*}}, ptr {{.*}})
 // CHECK:         [[N_GEP:%.*]] = getelementptr inbounds {{i64|i32}}, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 3
 // CHECK-NEXT:    [[N:%.*]] = load {{i64|i32}}, ptr [[N_GEP]]
-// CHECK:         [[IS_POD:%.*]] = select i1 {{.*}}, {{i64|i32}} 2, {{i64|i32}} 10
-// CHECK-NEXT:    [[IS_ARRAY:%.*]] = or {{i64|i32}} [[IS_POD]], 1
-// CHECK:         call void @swift_initRawStructMetadata2(ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} [[N]], {{i64|i32}} [[IS_ARRAY]])
+// CHECK:         call void @swift_initRawStructMetadata2(ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 0, ptr {{%.*}}, {{i64|i32}} [[N]], {{i64|i32}} 3)
 
 //===----------------------------------------------------------------------===//
 // VectorMovesAsLike destroy

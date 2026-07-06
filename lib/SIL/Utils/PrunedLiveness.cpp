@@ -574,7 +574,12 @@ bool PrunedLiveRange<LivenessWithDefs>::isInstructionAvailable(
 
 template <typename LivenessWithDefs>
 bool PrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
-    SILInstruction *inst) const {
+    SILInstruction *inst, DeadEndBlocks *deadEndBlocks) const {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
+  if (deadEndBlocks) {
+    return asImpl().isWithinExtendedBoundary(inst, *deadEndBlocks);
+  }
+#endif
   return asImpl().isWithinLivenessBoundary(inst);
 }
 
@@ -782,7 +787,7 @@ static FunctionTest SSAPrunedLiveness__areUsesWithinBoundary(
       }
 
       auto result =
-          liveness.areUsesWithinBoundary(operands);
+          liveness.areUsesWithinBoundary(operands, test.getDeadEndBlocks());
 
       llvm::outs() << "RESULT: " << StringRef(result ? "true" : "false")
                    << "\n";
@@ -790,18 +795,20 @@ static FunctionTest SSAPrunedLiveness__areUsesWithinBoundary(
 } // end namespace swift::test
 
 template <typename LivenessWithDefs>
-bool PrunedLiveRange<LivenessWithDefs>::areUsesWithinBoundary(ArrayRef<Operand *> uses) const {
+bool PrunedLiveRange<LivenessWithDefs>::areUsesWithinBoundary(
+    ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
   SILInstruction::OperandUserRange users(uses, SILInstruction::OperandToUser());
-  return areWithinBoundary(users);
+  return areWithinBoundary(users, deadEndBlocks);
 }
 
 template <typename LivenessWithDefs>
-bool PrunedLiveRange<LivenessWithDefs>::areUsesOutsideBoundary(ArrayRef<Operand *> uses) const {
+bool PrunedLiveRange<LivenessWithDefs>::areUsesOutsideBoundary(
+    ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
   assert(asImpl().isInitialized());
 
   for (auto *use : uses) {
     auto *user = use->getUser();
-    if (isWithinBoundary(user))
+    if (isWithinBoundary(user, deadEndBlocks))
       return false;
   }
   return true;

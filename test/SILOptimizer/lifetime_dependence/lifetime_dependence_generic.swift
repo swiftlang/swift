@@ -6,6 +6,7 @@
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN:   -parse-stdlib -module-name Swift
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 

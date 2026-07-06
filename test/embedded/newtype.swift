@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -I %S/Inputs/ -enable-experimental-feature Embedded
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 import StructAsOptionSet

@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values -parse-stdlib -module-name Swift %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen -parse-stdlib -module-name Swift %s | %FileCheck %s
 
 @_marker protocol Copyable {}

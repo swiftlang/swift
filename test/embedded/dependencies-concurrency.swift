@@ -38,6 +38,7 @@ _vsnprintf
 //--- test.swift
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx

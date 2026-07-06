@@ -882,10 +882,6 @@ option(SWIFT_BUILD_SWIFT_SYNTAX
   "Enable building swift syntax"
   FALSE)
 
-option(SWIFT_BUILD_IMMEDIATE_MODE
-  "Build immediate/-interpret JIT mode (swiftImmediate). Requires LLVM's ORC/ExecutionEngine JIT libraries, which are unavailable on a JIT-less host such as a WebAssembly runtime."
-  TRUE)
-
 option(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
     "Build the Swift regex parser as part of the compiler."
     TRUE)
@@ -1078,10 +1074,6 @@ if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SW
     endif()
   endif()
   add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
-endif()
-
-if(SWIFT_BUILD_IMMEDIATE_MODE)
-  add_definitions(-DSWIFT_BUILD_IMMEDIATE_MODE)
 endif()
 
 if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")

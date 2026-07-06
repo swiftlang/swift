@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name Test %s -verify -enable-experimental-feature CustomAvailability -import-bridging-header %S/Inputs/AvailabilityDomains.h
 // RUN: %target-swift-emit-silgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -import-bridging-header %S/Inputs/AvailabilityDomains.h \

@@ -1516,7 +1516,7 @@ lookupValueWitnessesViaImplementsAttr(
   auto name = req->createNameRef();
   auto *nominal = DC->getSelfNominalTypeDecl();
 
-  NLOptions subOptions = {NLFlags::ProtocolMembers, NLFlags::IncludeAttributeImplements};
+  NLOptions subOptions = (NL_ProtocolMembers | NL_IncludeAttributeImplements);
 
   nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
 
@@ -1665,8 +1665,8 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
     // to restate them in the resulting list, or else an otherwise valid
     // conformance will become ambiguous.
     const NLOptions options =
-        (doUnqualifiedLookup ? NLOptions() : NLFlags::ProtocolMembers) |
-        NLFlags::IgnoreMissingImports;
+        (doUnqualifiedLookup ? NLOptions(0) : NL_ProtocolMembers) |
+        NL_IgnoreMissingImports;
 
     auto getWitness = [req, DC](ValueDecl *witness) -> ValueDecl * {
       // Protocol members can't be witnesses.
@@ -6768,8 +6768,8 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
 
     static bool hasValidMethod(NominalTypeDecl *typeDecl,
                                SmallVectorImpl<InvalidMethod> &invalid) {
-      NLOptions subOptions = NLFlags::QualifiedDefault;
-      subOptions |= NLFlags::ProtocolMembers;
+      NLOptions subOptions = NL_QualifiedDefault;
+      subOptions |= NL_ProtocolMembers;
 
       DeclNameRef baseName(typeDecl->getASTContext().Id_appendInterpolation);
 
@@ -7666,11 +7666,10 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     // (canonicalized) requirement.
     if (assocType->getProtocol() != proto) {
       SmallVector<ValueDecl *, 2> found;
-      NLOptions options = {NLFlags::QualifiedDefault, NLFlags::ProtocolMembers, NLFlags::OnlyTypes};
       module->lookupQualified(
                            proto, DeclNameRef(assocType->getName()),
                            proto->getLoc(),
-                           options,
+                           NL_QualifiedDefault|NL_ProtocolMembers|NL_OnlyTypes,
                            found);
       if (found.size() == 1 && isa<AssociatedTypeDecl>(found[0]))
         assocType = cast<AssociatedTypeDecl>(found[0]);
@@ -7683,7 +7682,6 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
         findAssociatedTypeDefault(assocType);
     if (!defaultAssocType)
       continue;
-    ASSERT(defaultedAssocDecl);
 
     Type defaultAssocTypeInContext =
       proto->mapTypeIntoEnvironment(defaultAssocType);
@@ -7696,10 +7694,10 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       proto->diagnose(diag::assoc_type_default_conformance_failed,
                       defaultAssocType, assocType,
                       req.getFirstType(), req.getSecondType());
-      auto diag = defaultedAssocDecl->diagnose(
-          diag::assoc_type_default_here, assocType, defaultAssocType);
-      if (auto *typeRepr = defaultedAssocDecl->getDefaultDefinitionTypeRepr())
-        diag.highlight(typeRepr->getSourceRange());
+      defaultedAssocDecl
+          ->diagnose(diag::assoc_type_default_here, assocType, defaultAssocType)
+          .highlight(defaultedAssocDecl->getDefaultDefinitionTypeRepr()
+                         ->getSourceRange());
 
       continue;
     }

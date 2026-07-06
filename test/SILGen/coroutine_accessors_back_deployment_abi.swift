@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -enable-library-evolution -module-name Library -enable-experimental-feature CoroutineAccessors -target %target-swift-5.9-abi-triple
 // RUN: %target-swift-emit-silgen                           \
 // RUN:     %s                                              \
 // RUN:     -enable-library-evolution                       \

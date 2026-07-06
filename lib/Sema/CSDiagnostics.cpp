@@ -2258,7 +2258,7 @@ bool AssignmentFailure::diagnoseAsError() {
         if (auto *nominal = typeContext->getSelfNominalTypeDecl()) {
           SmallVector<ValueDecl *, 2> results;
           DC->lookupQualified(nominal, VD->createNameRef(), Loc,
-                              NLFlags::QualifiedDefault, results);
+                              NL_QualifiedDefault, results);
 
           auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
             // We're looking for a settable property that is the same type as
@@ -3656,12 +3656,8 @@ bool ContextualFailure::tryProtocolConformanceFixIt() const {
     }
   }
 
-  if (missingProtoTypeStrings.empty()) {
-    // This can happen if a type is declared as implementing all the
-    // protocols, but where the conformance to one or more protocols is
-    // invalid.
-    return false;
-  }
+  assert(!missingProtoTypeStrings.empty() &&
+         "type already conforms to all the protocols?");
 
   // Combine all protocol names together, separated by commas.
   std::string protoString = llvm::join(missingProtoTypeStrings, ", ");
@@ -6222,38 +6218,6 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
     addFixIts(emitDiagnosticAt(diagLoc, diag::argument_out_of_order_named_named,
                                first, second));
   }
-  return true;
-}
-
-bool OutOfOrderArgumentFailure::diagnoseAsNote() {
-  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
-  if (!(overload && overload->choice.isDecl()))
-    return false;
-
-  auto *argList = getArgumentListFor(getLocator());
-  if (!argList)
-    return false;
-
-  auto first = argList->getLabel(ArgIdx);
-  auto second = argList->getLabel(PrevArgIdx);
-
-  if (first.nonempty() && second.nonempty()) {
-    emitDiagnosticAt(overload->choice.getDecl(),
-                     diag::argument_out_of_order_note_named, first, second);
-  } else if (first.empty() && second.empty()) {
-    emitDiagnosticAt(overload->choice.getDecl(),
-                     diag::argument_out_of_order_note_unnamed, ArgIdx + 1,
-                     PrevArgIdx + 1);
-  } else if (first.empty()) {
-    emitDiagnosticAt(overload->choice.getDecl(),
-                     diag::argument_out_of_order_note_unnamed_named, ArgIdx + 1,
-                     second);
-  } else {
-    emitDiagnosticAt(overload->choice.getDecl(),
-                     diag::argument_out_of_order_note_named_unnamed, first,
-                     PrevArgIdx + 1);
-  }
-
   return true;
 }
 

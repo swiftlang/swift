@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -parse-stdlib -module-name Swift -parse-as-library %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -module-name Swift -parse-as-library %s | %FileCheck %s
 
 protocol Error {}

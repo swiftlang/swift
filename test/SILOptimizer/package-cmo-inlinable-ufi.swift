@@ -15,6 +15,7 @@
 // RUN: %FileCheck %s --check-prefix=CHECK-MAIN-OPT < %t/Main-opt.sil
 // RUN: %FileCheck %s --check-prefix=CHECK-MAIN < %t/MAIN.sil
 
+// REQUIRES: swift_in_compiler
 
 //--- main.swift
 

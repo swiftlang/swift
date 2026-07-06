@@ -1616,7 +1616,6 @@ public:
         PrevArgIdx(prevArgIdx), Bindings(bindings.begin(), bindings.end()) {}
 
   bool diagnoseAsError() override;
-  bool diagnoseAsNote() override;
 };
 
 /// Diagnose an attempt to destructure a single tuple closure parameter
@@ -2402,6 +2401,15 @@ class ExtraneousCallFailure final : public FailureDiagnostic {
 public:
   ExtraneousCallFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+class InvalidUseOfTrailingClosure final : public ArgumentMismatchFailure {
+public:
+  InvalidUseOfTrailingClosure(const Solution &solution, Type argType,
+                              Type paramType, ConstraintLocator *locator)
+      : ArgumentMismatchFailure(solution, argType, paramType, locator) {}
 
   bool diagnoseAsError() override;
 };

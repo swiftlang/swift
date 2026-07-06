@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen-ossa %s
+// RUN: %target-swift-emit-silgen %s
 
 // https://github.com/swiftlang/swift/issues/62061
 

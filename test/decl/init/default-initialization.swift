@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
+// REQUIRES: swift_in_compiler
 
 struct A {
   var i : Int

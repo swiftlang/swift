@@ -30,7 +30,7 @@ import Swift
 /// To create a continuation
 /// call ``withContinuation(of:throwing:_:)``.
 ///
-/// To resume the task, suspended on a continuation, call ``resume(returning:)-5fa8w``,
+/// To resume the task, suspended on a continuation, call ``resume(returning:)``,
 /// ``resume(throwing:)``, ``resume(with:)``, or ``resume()``.
 ///
 /// - SeeAlso: ``CheckedContinuation``

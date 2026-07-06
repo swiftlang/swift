@@ -159,15 +159,15 @@ private:
 bool swift::declIsVisibleToNameLookup(
     const ValueDecl *decl, const DeclContext *moduleScopeContext,
     NLOptions options) {
-  // NLFlags::IgnoreAccessControl only applies to the current module. If
+  // NL_IgnoreAccessControl only applies to the current module. If
   // it applies here, the declaration is visible.
-  if (options.contains(NLFlags::IgnoreAccessControl) &&
+  if ((options & NL_IgnoreAccessControl) &&
       moduleScopeContext &&
       moduleScopeContext->getParentModule() ==
           decl->getDeclContext()->getParentModule())
     return true;
 
-  bool includeUsableFromInline = options.contains(NLFlags::IncludeUsableFromInline);
+  bool includeUsableFromInline = options & NL_IncludeUsableFromInline;
   return decl->isAccessibleFrom(moduleScopeContext, false,
                                 includeUsableFromInline);
 }
@@ -234,9 +234,9 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   };
 
   OptionSet<ModuleLookupFlags> currentModuleLookupFlags = {};
-  if (options.contains(NLFlags::ExcludeMacroExpansions))
+  if (options & NL_ExcludeMacroExpansions)
     currentModuleLookupFlags |= ModuleLookupFlags::ExcludeMacroExpansions;
-  if (options.contains(NLFlags::ABIProviding))
+  if (options & NL_ABIProviding)
     currentModuleLookupFlags |= ModuleLookupFlags::ABIProviding;
   if (hasModuleSelector)
     currentModuleLookupFlags |= ModuleLookupFlags::HasModuleSelector;
@@ -277,7 +277,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
     auto &imports = ctx.getImportCache().getImportSet(moduleOrFile);
 
     OptionSet<ModuleLookupFlags> importedModuleLookupFlags = {};
-    if (options.contains(NLFlags::ABIProviding))
+    if (options & NL_ABIProviding)
       currentModuleLookupFlags |= ModuleLookupFlags::ABIProviding;
     // Do not propagate HasModuleSelector here; the selector wasn't specific.
 
@@ -422,7 +422,7 @@ void namelookup::lookupVisibleDeclsInModule(
   LookupVisibleDecls lookup(ctx, resolutionKind, lookupKind);
   lookup.lookupInModule(decls, moduleOrFile, accessPath, moduleScopeContext,
                         /*hasModuleSelector=*/false,
-                        NLFlags::QualifiedDefault);
+                        NL_QualifiedDefault);
 }
 
 void namelookup::simple_display(llvm::raw_ostream &out, ResolutionKind kind) {

@@ -195,8 +195,6 @@ bool SILType::isEmpty(const SILFunction &F) const {
                                 F.getResilienceExpansion())) {
       return false;
     }
-    if (structDecl->hasUnreferenceableStorage())
-      return false;
 
     TypeExpansionContext typeEx = F.getTypeExpansionContext();
     for (VarDecl *field : structDecl->getStoredProperties()) {

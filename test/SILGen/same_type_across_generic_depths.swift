@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-silgen %s > %t/out.sil
 // RUN: %target-swift-emit-silgen %t/out.sil | %FileCheck %s

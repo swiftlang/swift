@@ -529,11 +529,11 @@ Type SILGenModule::getConfiguredExecutorFactory() {
     mainType->lookupQualified(mainType,
                               DeclNameRef(identifier),
                               SourceLoc(),
-                              {NLFlags::RemoveNonVisible,
-                               NLFlags::RemoveOverridden,
-                               NLFlags::OnlyTypes,
-                               NLFlags::RemoveAssociatedTypes,
-                               NLFlags::ProtocolMembers},
+                              NL_RemoveNonVisible |
+                              NL_RemoveOverridden |
+                              NL_OnlyTypes |
+                              NL_RemoveAssociatedTypes |
+                              NL_ProtocolMembers,
                               decls);
     for (auto decl : decls) {
       auto *genericDecl = cast<GenericTypeDecl>(decl);
@@ -998,8 +998,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
   }
 
   switch (constant.kind) {
-  case SILDeclRef::Kind::Func:
-  case SILDeclRef::Kind::DistributedThunk: {
+  case SILDeclRef::Kind::Func: {
     if (auto *ce = constant.getAbstractClosureExpr()) {
       preEmitFunction(constant, f, ce);
       PrettyStackTraceSILFunction X("silgen closureexpr", f);

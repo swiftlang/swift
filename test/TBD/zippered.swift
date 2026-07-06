@@ -1,5 +1,4 @@
 // REQUIRES: OS=macosx
-// REQUIRES: SWIFT_STDLIB_ARCH=arm64
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 

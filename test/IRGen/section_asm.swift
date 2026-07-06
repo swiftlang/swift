@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -primary-file %S/section.swift -S -parse-as-library | %FileCheck --check-prefix CHECK%target-os-binfmt-elf %s
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_CompileTimeValuesPreview
 // UNSUPPORTED: CPU=wasm32
 

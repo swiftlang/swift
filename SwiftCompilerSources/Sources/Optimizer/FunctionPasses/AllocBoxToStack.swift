@@ -96,18 +96,8 @@ private func tryConvertBoxesToStack(in function: Function, isMandatory: Bool,
 
   functionsToSpecialize.createSpecializedFunctions(context)
 
-  // First, create all alloc_stacks (and insert destroy_addr/dealloc_stack)
-  // before rewriting any uses. This is important because rewriteUses may
-  // specialize apply sites, changing their argument conventions from @owned
-  // to @inout_aliasable. If we interleave createAllocStack and rewriteUses,
-  // processing the first box rewrites the apply for ALL boxes, so
-  // getFinalDestroys for subsequent boxes won't find the apply as a final
-  // destroy, and their dealloc_stacks will be missing.
-  var stacks = Array<Value>()
   for (box, flags) in promotableBoxes {
-    stacks.append(createAllocStack(for: box, flags: flags, context))
-  }
-  for ((box, _), stack) in zip(promotableBoxes, stacks) {
+    let stack = createAllocStack(for: box, flags: flags, context)
     functionsToSpecialize.rewriteUses(of: box, with: stack, context)
     context.erase(instruction: box)
 

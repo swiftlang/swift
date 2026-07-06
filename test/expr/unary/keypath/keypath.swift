@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -parse-as-library %s -verify -solver-disable-enumerate-supertypes
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -parse-as-library %s -verify
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 struct Sub: Hashable {
@@ -305,7 +305,6 @@ func tupleGeneric<T, U>(_ v: (T, U)) {
   // expected-note@-12 {{}}
   // expected-error@-2 {{generic parameter 'T' could not be inferred}}
   // expected-error@-3 {{generic parameter 'U' could not be inferred}}
-  // expected-error@-4 {{key path with root type '(T, U)' cannot be applied to a base of type '(String, String, String)'}}
 }
 
 struct Z { }
@@ -467,7 +466,7 @@ func testKeyPathSubscriptExistentialBase(concreteBase: inout B,
   _ = concreteBase[keyPath: pkp]
 
   concreteBase[keyPath: kp] = s // expected-error {{cannot assign through subscript: 'kp' is a read-only key path}}
-  concreteBase[keyPath: wkp] = s // expected-error {{cannot assign through subscript: 'concreteBase' is immutable}}
+  concreteBase[keyPath: wkp] = s // expected-error {{key path with root type 'any P' cannot be applied to a base of type 'B'}}
   concreteBase[keyPath: rkp] = s
   concreteBase[keyPath: pkp] = s // expected-error {{cannot assign through subscript: 'pkp' is a read-only key path}}
 

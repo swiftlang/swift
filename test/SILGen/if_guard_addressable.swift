@@ -1,6 +1,3 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-experimental-feature AddressableParameters %s
-
 // RUN: %target-swift-emit-silgen -enable-experimental-feature AddressableParameters %s 
 
 // REQUIRES: swift_feature_AddressableParameters

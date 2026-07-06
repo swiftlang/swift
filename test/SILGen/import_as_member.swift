@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -I %S/../IDE/Inputs/custom-modules %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
 // REQUIRES: objc_interop
 import ImportAsMember.A

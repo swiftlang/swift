@@ -1,5 +1,4 @@
 // REQUIRES: objc_interop, OS=macosx
-// REQUIRES: SWIFT_STDLIB_ARCH=arm64
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)
 

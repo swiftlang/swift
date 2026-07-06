@@ -894,12 +894,6 @@ bool CompilerInstance::setUpModuleLoaders() {
     return true;
   }
 
-  // If memory statistics were requested, start tracking per-module materialized
-  // decl counts now, before any significant deserialization occurs.
-  if (FEOpts.CompilerDebuggingOpts.PrintClangStats ||
-      !FEOpts.StatsOutputDir.empty())
-    clangImporter->enableMemoryStatistics();
-
   // Configure ModuleInterfaceChecker for the ASTContext.
   auto const &Clang = clangImporter->getClangInstance();
   std::string ModuleCachePath = ModuleCachePathFromInvocation.empty()
@@ -1861,10 +1855,9 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM) {
   FrontendStatsTracer tracer(SM->getASTContext().Stats,
                              "SIL-mandatory-passes");
-  auto Action = Invocation.getFrontendOptions().RequestedAction;
-
   // Don't run diagnostic passes at all when merging modules.
-  if (Action == FrontendOptions::ActionType::MergeModules) {
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::MergeModules) {
     return false;
   }
   if (Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
@@ -1872,18 +1865,7 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
     // to run the ownership evaluator.
     return runSILOwnershipEliminatorPass(*SM);
   }
-
-  const bool RequestedSILGenOSSA =
-    (Action == FrontendOptions::ActionType::EmitSILGenOSSA);
-
-  // Run the passes SILGen relies on to reach verified OSSA SIL.
-  runSILGenPasses(*SM, /*VerifySILGen=*/RequestedSILGenOSSA);
-
-  // Stop here if the OSSA after SILGen is all that was requested.
-  if (RequestedSILGenOSSA)
-    return true;
-
-  return runSILDiagnosticPasses(*SM, /*RunSILGenPasses=*/false);
+  return runSILDiagnosticPasses(*SM);
 }
 
 /// Perform SIL optimization passes if optimizations haven't been disabled.

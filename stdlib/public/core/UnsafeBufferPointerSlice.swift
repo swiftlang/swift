@@ -277,6 +277,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  ///   - buffer: The buffer temporarily bound to instances of `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
@@ -302,7 +303,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///   `Int(bitPattern: base.baseAddress+startIndex) % MemoryLayout<T>.alignment`
   ///   must equal zero.
   ///
-  /// - Parameter type: The type `T` that the memory has already been bound to.
+  /// - Parameter to: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
   @inlinable
   @_alwaysEmitIntoClient
@@ -516,7 +517,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
-  ///     - type buffer: The buffer temporarily bound to instances of `T`.
+  ///   - buffer: The buffer temporarily bound to instances of `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
@@ -542,7 +543,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
   ///   `Int(bitPattern: base.baseAddress+startIndex) % MemoryLayout<T>.alignment`
   ///   must equal zero.
   ///
-  /// - Parameter type: The type `T` that the memory has already been bound to.
+  /// - Parameter to: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
   @inlinable
   @_alwaysEmitIntoClient
@@ -694,6 +695,7 @@ extension Slice {
   ///     closure's execution. If `body` has a return value, that value
   ///     is also used as the return value for the `withMemoryRebound(to:_:)`
   ///     method.
+  ///   - buffer: The buffer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
@@ -1141,6 +1143,7 @@ extension Slice {
   ///     closure's execution. If `body` has a return value, that value
   ///     is also used as the return value for the `withMemoryRebound(to:_:)`
   ///     method.
+  ///   - buffer: The buffer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient

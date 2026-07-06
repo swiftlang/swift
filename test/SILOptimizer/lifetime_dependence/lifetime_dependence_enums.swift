@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -sil-verify-all | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 
 public protocol OptionalType<Wrapped> {
   associatedtype Wrapped

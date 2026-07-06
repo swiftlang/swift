@@ -3,7 +3,6 @@
 // RUN: %FileCheck %s < %t/anyAppleOS.h
 
 // REQUIRES: objc_interop
-// REQUIRES: SWIFT_STDLIB_ARCH=arm64
 
 import Foundation
 

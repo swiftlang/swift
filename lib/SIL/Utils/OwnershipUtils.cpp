@@ -237,7 +237,6 @@ bool swift::findInnerTransitiveGuaranteedUses(
 
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
-    case OperandOwnership::DebugUse:
     case OperandOwnership::BitwiseEscape:
     // Reborrow only happens when this is called on a value that creates a
     // borrow scope.
@@ -378,7 +377,6 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
 
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
-    case OperandOwnership::DebugUse:
     case OperandOwnership::BitwiseEscape:
     // EndBorrow either happens when this is called on a value that creates a
     // borrow scope, or when it is pushed as a use when processing a nested
@@ -1000,7 +998,8 @@ computeTransitiveLiveness(MultiDefPrunedLiveness &liveness) const {
 }
 
 template <typename Instructions>
-bool BorrowedValue::areWithinExtendedScope(Instructions insts) const {
+bool BorrowedValue::areWithinExtendedScope(Instructions insts,
+                                           DeadEndBlocks *deadEndBlocks) const {
   // First make sure that we actually have a local scope. If we have a non-local
   // scope, then we have something (like a SILFunctionArgument) where a larger
   // semantic construct (in the case of SILFunctionArgument, the function
@@ -1012,20 +1011,20 @@ bool BorrowedValue::areWithinExtendedScope(Instructions insts) const {
   // Compute the local scope's liveness.
   MultiDefPrunedLiveness liveness(value->getFunction());
   computeTransitiveLiveness(liveness);
-  return liveness.areWithinBoundary(insts);
+  return liveness.areWithinBoundary(insts, deadEndBlocks);
 }
 
 template bool BorrowedValue::areWithinExtendedScope<UsePointInstructionRange>(
-    UsePointInstructionRange insts) const;
+    UsePointInstructionRange insts, DeadEndBlocks *deadEndBlocks) const;
 
 template bool
 BorrowedValue::areWithinExtendedScope<SILInstruction::OperandUserRange>(
-    SILInstruction::OperandUserRange insts) const;
+    SILInstruction::OperandUserRange insts, DeadEndBlocks *deadEndBlocks) const;
 
 bool BorrowedValue::areUsesWithinExtendedScope(
-    ArrayRef<Operand *> uses) const {
+    ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
   SILInstruction::OperandUserRange users(uses, SILInstruction::OperandToUser());
-  return areWithinExtendedScope(users);
+  return areWithinExtendedScope(users, deadEndBlocks);
 }
 
 // The visitor \p func is only called on final scope-ending uses, not reborrows.
@@ -1168,14 +1167,15 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
 //                              AddressOwnership
 //===----------------------------------------------------------------------===//
 
-bool AddressOwnership::areUsesWithinLifetime(ArrayRef<Operand *> uses) const {
+bool AddressOwnership::areUsesWithinLifetime(
+    ArrayRef<Operand *> uses, DeadEndBlocks &deadEndBlocks) const {
   if (!base.hasLocalOwnershipLifetime())
     return true;
 
   SILValue root = base.getOwnershipReferenceAggregate();
   BorrowedValue borrow(root);
   if (borrow)
-    return borrow.areUsesWithinExtendedScope(uses);
+    return borrow.areUsesWithinExtendedScope(uses, &deadEndBlocks);
 
   // --- A reference with no borrow scope! Currently happens for project_box.
 
@@ -1190,7 +1190,7 @@ bool AddressOwnership::areUsesWithinLifetime(ArrayRef<Operand *> uses) const {
 
   // FIXME (implicit borrow): handle reborrows transitively just like above so
   // we don't bail out if a uses is within the reborrowed scope.
-  return liveness.areUsesWithinBoundary(uses);
+  return liveness.areUsesWithinBoundary(uses, &deadEndBlocks);
 }
 
 //===----------------------------------------------------------------------===//

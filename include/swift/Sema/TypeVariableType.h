@@ -331,7 +331,9 @@ public:
   /// Assign a fixed type to this equivalence class.
   void assignFixedType(Type type,
                        constraints::SolverTrail *trail) {
-    DEBUG_ASSERT(!getFixedType(nullptr) && "Already has a fixed type!");
+    assert((!getFixedType(nullptr) ||
+            getFixedType(nullptr)->isEqual(type)) &&
+           "Already has a fixed type!");
     auto rep = getRepresentative(trail);
     if (trail)
       rep->getImpl().recordBinding(*trail);

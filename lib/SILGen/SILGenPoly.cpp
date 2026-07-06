@@ -652,13 +652,7 @@ ManagedValue Transform::transform(ManagedValue v,
       } else if (inputSubstType->isSet()) {
         fn = SGF.SGM.getSetUpCast(Loc);
       } else {
-        ABORT([&](llvm::raw_ostream &out) {
-          out << "Unsupported collection upcast kind\n";
-          v.dump(out);
-          loweredResultTy.getASTType()->dump(out);
-          inputSubstType->dump(out);
-          outputSubstType->dump(out);
-        });
+        llvm::report_fatal_error("unsupported collection upcast kind");
       }
 
       return SGF.emitCollectionConversion(Loc, fn, inputSubstType,
@@ -768,18 +762,6 @@ ManagedValue Transform::transform(ManagedValue v,
                      outputSubstType,
                      loweredResultTy,
                      ctxt);
-  }
-
-  // CGFloat to Double.
-  if (inputSubstType->isCGFloat() &&
-      outputSubstType->isDouble()) {
-    return SGF.emitCGFloatToDouble(Loc, v.getUnmanagedValue(), ctxt);
-  }
-
-  // Double to CGFloat.
-  if (inputSubstType->isDouble() &&
-      outputSubstType->isCGFloat()) {
-    return SGF.emitDoubleToCGFloat(Loc, v.getUnmanagedValue(), ctxt);
   }
 
   // - T.TangentVector to Optional<T>.TangentVector
@@ -1082,9 +1064,8 @@ emitThunkIndirectErrorArgument(SILGenFunction &SGF, SILLocation loc,
                                CanSILFunctionType fnType) {
   // If the function we're calling has an indirect error result, create an
   // argument for it.
-  auto convention = SGF.silConv.getFunctionConventions(fnType);
-  auto innerError = convention.getIndirectErrorResult();
-  if (!innerError)
+  auto innerError = fnType->getOptionalErrorResult();
+  if (!innerError || innerError->getConvention() != ResultConvention::Indirect)
     return std::nullopt;
 
   // If the type of the indirect error is the same for both the inner

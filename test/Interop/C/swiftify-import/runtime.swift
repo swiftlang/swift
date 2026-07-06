@@ -1,9 +1,8 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
-// REQUIRES: swift_feature_SafeInteropWrappersNullAsEmptySpan
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-run-simple-swift-split-file(test.swift -I %t%{fs-sep}Inputs -target %target-swift-6.2-abi-triple -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan)
+// RUN: %target-run-simple-swift-split-file(test.swift -I %t%{fs-sep}Inputs -target %target-swift-6.2-abi-triple -enable-experimental-feature SafeInteropWrappers)
 //
 // REQUIRES: executable_test
 

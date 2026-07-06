@@ -2,6 +2,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: embedded_stdlib
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 struct SomeStruct {

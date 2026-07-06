@@ -134,8 +134,3 @@ module ImmortalFRTHashable {
   header "immortal-frt-hashable.h"
   requires cplusplus
 }
-
-module FrtSequence {
-  header "frt-sequence.h"
-  requires cplusplus
-}

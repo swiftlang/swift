@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -enable-experimental-feature Lifetimes -emit-sil 
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 // Ensure we don't crash
