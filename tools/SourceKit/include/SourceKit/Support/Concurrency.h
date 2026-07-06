@@ -124,15 +124,9 @@ public:
                                                 isStackDeep));
   }
 
-  void dispatchBarrierSync(void *Context, DispatchFn Fn,
-                           bool isStackDeep = false) {
-    Impl::dispatchBarrierSync(ImplObj, DispatchData(Context, Fn, isStackDeep));
-  }
-  template <typename Callable>
-  void dispatchBarrierSync(Callable &&Fn, bool isStackDeep = false) {
-    Impl::dispatchBarrierSync(ImplObj, DispatchData(std::forward<Callable>(Fn),
-                                                    isStackDeep));
-  }
+  // NOTE: We don't expose dispatchBarrierSync here since there's a libdispatch
+  // bug that can result in a deadlock for `dispatch_sync` +
+  // `dispatch_barrier_sync`.
 
   static void dispatchOnMain(void *Context, DispatchFn Fn,
                              bool isStackDeep = false) {
@@ -227,7 +221,6 @@ private:
     static void dispatch(Ty Obj, const DispatchData &Fn);
     static void dispatchSync(Ty Obj, const DispatchData &Fn);
     static void dispatchBarrier(Ty Obj, const DispatchData &Fn);
-    static void dispatchBarrierSync(Ty Obj, const DispatchData &Fn);
     static void dispatchOnMain(const DispatchData &Fn);
     static void dispatchConcurrent(Priority Prio, const DispatchData &Fn);
     static void suspend(Ty Obj);

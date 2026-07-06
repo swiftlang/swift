@@ -26,7 +26,7 @@ class UIDRegistryImpl {
   typedef llvm::StringMap<void *, llvm::BumpPtrAllocator> HashTableTy;
   typedef llvm::StringMapEntry<void *> EntryTy;
   HashTableTy HashTable;
-  WorkQueue Queue{ WorkQueue::Dequeuing::Concurrent, "UIDRegistryImpl" };
+  std::mutex HashTableMtx;
 
 public:
 
@@ -86,21 +86,9 @@ void UIdent::print(llvm::raw_ostream &OS) const {
 void *UIDRegistryImpl::get(StringRef Str) {
   assert(!Str.empty());
   assert(!Str.contains(' '));
-  EntryTy *Ptr = 0;
-  Queue.dispatchSync([&]{
-    HashTableTy::iterator It = HashTable.find(Str);
-    if (It != HashTable.end())
-      Ptr = &(*It);
-  });
 
-  if (Ptr == 0) {
-    Queue.dispatchBarrierSync([&]{
-      EntryTy &Entry = *HashTable.insert(std::make_pair(Str, nullptr)).first;
-      Ptr = &Entry;
-    });
-  }
-
-  return Ptr;
+  std::lock_guard<std::mutex> lock(HashTableMtx);
+  return &(*HashTable.try_emplace(Str, nullptr).first);
 }
 
 StringRef UIDRegistryImpl::getName(void *Ptr) {
