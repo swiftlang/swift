@@ -1689,6 +1689,10 @@ public:
   /// Per-file AST cache: get/set source range overrides for deserialized attrs.
   SourceRange getCachedAttrSourceRange(const DeclAttribute *A) const;
   void setCachedAttrSourceRange(const DeclAttribute *A, SourceRange R);
+  /// Per-file AST cache: get/set source range overrides for deserialized
+  /// parameter lists.
+  SourceRange getCachedParamListSourceRange(const ParameterList *PL) const;
+  void setCachedParamListSourceRange(const ParameterList *PL, SourceRange R);
 private:
 
   friend TypeBase;

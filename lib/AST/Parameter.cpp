@@ -109,7 +109,13 @@ void ParameterList::getParams(
 
 /// Return the full source range of this parameter list.
 SourceRange ParameterList::getSourceRange() const {
-  // If we have locations for the parens, then they define our range.
+  // Per-file AST cache: check for a source range override populated by
+  // SnapshotDeserializer. This is used for deserialized parameter lists
+  // whose LParenLoc/RParenLoc are invalid.
+  if (size() != 0 && get(0)) {
+    if (auto R = get(0)->getASTContext().getCachedParamListSourceRange(this); R.isValid())
+      return R;
+  }
   if (LParenLoc.isValid())
     return { LParenLoc, RParenLoc };
   

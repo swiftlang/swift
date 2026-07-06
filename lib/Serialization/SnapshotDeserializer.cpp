@@ -519,6 +519,8 @@ private:
               // Walk params of function decls.
               if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member)) {
                 if (auto *params = AFD->getParameters()) {
+                  if (auto R = readRange(); R.isValid())
+                    ctx.setCachedParamListSourceRange(params, R);
                   for (auto *param : *params)
                     setDeclRange(param);
                 }
@@ -526,6 +528,8 @@ private:
                 if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
                   for (auto *accessor : ASD->getAllAccessors()) {
                     if (auto *accParams = accessor->getParameters()) {
+                      if (auto R = readRange(); R.isValid())
+                        ctx.setCachedParamListSourceRange(accParams, R);
                       for (auto *param : *accParams)
                         setDeclRange(param);
                     }

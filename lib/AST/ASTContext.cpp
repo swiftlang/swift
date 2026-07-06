@@ -474,6 +474,10 @@ struct ASTContext::Implementation {
   /// Per-file AST cache: map from deserialized attributes to their original
   /// source ranges. DeclAttribute::Range is const, so we can't set it directly.
   llvm::DenseMap<const DeclAttribute *, SourceRange> CachedAttrSourceRanges;
+  /// Per-file AST cache: map from deserialized parameter lists to their
+  /// original source ranges. ParameterList is not a Decl, so it needs its
+  /// own map.
+  llvm::DenseMap<const ParameterList *, SourceRange> CachedParamListSourceRanges;
 
   /// Map from declarations to foreign error conventions.
   /// This applies to both actual imported functions and to @objc functions.
@@ -3163,6 +3167,17 @@ SourceRange ASTContext::getCachedAttrSourceRange(const DeclAttribute *A) const {
 
 void ASTContext::setCachedAttrSourceRange(const DeclAttribute *A, SourceRange R) {
   getImpl().CachedAttrSourceRanges[A] = R;
+}
+
+SourceRange ASTContext::getCachedParamListSourceRange(const ParameterList *PL) const {
+  auto it = getImpl().CachedParamListSourceRanges.find(PL);
+  if (it == getImpl().CachedParamListSourceRanges.end())
+    return SourceRange();
+  return it->second;
+}
+
+void ASTContext::setCachedParamListSourceRange(const ParameterList *PL, SourceRange R) {
+  getImpl().CachedParamListSourceRanges[PL] = R;
 }
 
 NormalProtocolConformance *

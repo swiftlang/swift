@@ -8606,6 +8606,9 @@ ActorIsolation VarDecl::getInitializerIsolation() const {
 }
 
 SourceRange VarDecl::getSourceRange() const {
+  // Per-file AST cache: check for a source range override.
+  if (auto R = getASTContext().getCachedDeclSourceRange(this); R.isValid())
+    return R;
   if (auto Param = dyn_cast<ParamDecl>(this))
     return Param->getSourceRange();
   return getNameLoc();
@@ -9685,6 +9688,11 @@ Type DeclContext::getSelfInterfaceType() const {
 
 /// Return the full source range of this parameter.
 SourceRange ParamDecl::getSourceRange() const {
+  // Per-file AST cache: check for a source range override populated by
+  // SnapshotDeserializer. This is used for deserialized params whose
+  // internal source locations are invalid.
+  if (auto R = getASTContext().getCachedDeclSourceRange(this); R.isValid())
+    return R;
   SourceLoc APINameLoc = getArgumentNameLoc();
   SourceLoc nameLoc = getNameLoc();
 

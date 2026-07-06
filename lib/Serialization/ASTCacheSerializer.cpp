@@ -187,6 +187,7 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
               // Walk params of function decls.
               if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member)) {
                 if (auto *params = AFD->getParameters()) {
+                  writeRange(params->getSourceRange());
                   for (auto *param : *params)
                     writeDeclRange(param);
                 }
@@ -194,6 +195,7 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
                 if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
                   for (auto *accessor : ASD->getAllAccessors()) {
                     if (auto *accParams = accessor->getParameters()) {
+                      writeRange(accParams->getSourceRange());
                       for (auto *param : *accParams)
                         writeDeclRange(param);
                     }
