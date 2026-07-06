@@ -415,6 +415,12 @@ private:
     TRIVIAL_CASE(SILBoxType)
     TRIVIAL_CASE(SILMoveOnlyWrappedType)
 
+    bool visitHiddenTypeLayoutInfoType(CanHiddenTypeLayoutInfoType first,
+                                       Type secondType,
+                                       Type sugaredFirstType) {
+      llvm_unreachable("Should never reach here");
+    }
+
     bool visitProtocolCompositionType(CanProtocolCompositionType firstProtocolComposition,
                                       Type secondType,
                                       Type sugaredFirstType) {

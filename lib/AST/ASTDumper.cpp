@@ -3070,6 +3070,11 @@ namespace {
       printRec(MED->getArgs(), Label::optional("args"));
       printFoot();
     }
+
+    void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *HTLD, Label label) {
+      printCommon(HTLD, "hidden_type_layout_info_decl", label);
+      printFoot();
+    }
   };
 } // end anonymous namespace
 
@@ -6260,6 +6265,8 @@ namespace {
         printRec(originalType, Label::always("original_type"));
       printFoot();
     }
+
+    TRIVIAL_TYPE_PRINTER(HiddenTypeLayoutInfo, hidden_type_layout_info)
 
     void visitPlaceholderType(PlaceholderType *T, Label label) {
       printCommon("placeholder_type", label);

@@ -24,6 +24,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/IRGen/HiddenTypeIRABIDetails.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
@@ -234,6 +235,12 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:
     return functionsCount;
+
+  case TypeKind::HiddenTypeLayoutInfo: {
+    auto *abiInfo = cast<HiddenTypeLayoutInfoType>(type)->getDecl()->getABIInfo();
+    assert(abiInfo && "HiddenTypeLayoutInfoType should have ABI info");
+    return abiInfo->getReferenceCountingSystem().has_value();
+  }
 
   // Nothing else is statically just a class reference.
   case TypeKind::SILBlockStorage:
@@ -1882,6 +1889,7 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::SILFunction:
   case TypeKind::SILToken:
   case TypeKind::SILMoveOnlyWrapped:
+  case TypeKind::HiddenTypeLayoutInfo:
   case TypeKind::Join:
   case TypeKind::Meet:
     ABORT([&](llvm::raw_ostream &out) {
@@ -4751,6 +4759,14 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::Existential:
     return cast<ExistentialType>(type)->getConstraintType()
         ->getReferenceCounting();
+
+  case TypeKind::HiddenTypeLayoutInfo: {
+    auto *abiInfo = cast<HiddenTypeLayoutInfoType>(this)->getDecl()->getABIInfo();
+    assert(abiInfo);
+    auto refcounting = abiInfo->getReferenceCountingSystem();
+    assert(refcounting);
+    return *refcounting;
+  }
 
   case TypeKind::Function:
   case TypeKind::GenericFunction:

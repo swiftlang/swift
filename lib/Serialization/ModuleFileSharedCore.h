@@ -267,6 +267,12 @@ private:
   /// Identifiers referenced by this module.
   ArrayRef<RawBitOffset> Identifiers;
 
+  /// Hidden type layout info decls referenced by this module.
+  ArrayRef<RawBitOffset> HiddenTypeLayoutInfoDecls;
+
+  /// Fallback table: flat pairs of (xrefDeclID, hiddenLayoutDeclID).
+  ArrayRef<uint64_t> HiddenTypeFallbackTableData;
+
   class DeclTableInfo;
   using SerializedDeclTable =
       llvm::OnDiskIterableChainedHashTable<DeclTableInfo>;

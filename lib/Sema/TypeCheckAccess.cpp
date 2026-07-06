@@ -737,6 +737,7 @@ public:
   UNINTERESTING(Var) // Handled at the PatternBinding level.
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
+  UNINTERESTING(HiddenTypeLayoutInfo)
 
   /// \see visitPatternBindingDecl
   void checkNamedPattern(const NamedPattern *NP, bool isTypeContext,
@@ -1501,6 +1502,7 @@ public:
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
   UNINTERESTING(OpaqueType) // Handled by the Var or Subscript.
+  UNINTERESTING(HiddenTypeLayoutInfo)
 
   /// If \p VD's layout is exposed by a @frozen struct or class, return said
   /// struct or class.
@@ -2421,6 +2423,7 @@ public:
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
   UNINTERESTING(OpaqueType) // TODO
+  UNINTERESTING(HiddenTypeLayoutInfo)
 
   // Handled at the PatternBinding level; if the pattern has a simple
   // "name: TheType" form, we can get better results by diagnosing the TypeRepr.

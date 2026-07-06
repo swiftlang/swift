@@ -38,6 +38,8 @@ class IRABIDetailsProviderImpl;
 
 namespace irgen {
 
+class HiddenTypeIRABIInfo;
+
 class SignatureExpansionABIDetails;
 class TypeInfo;
 
@@ -213,6 +215,11 @@ public:
   /// is not a fixed layout type.
   std::optional<SizeAndAlignment>
   getTypeSizeAlignment(const NominalTypeDecl *TD);
+
+  /// Produce a HiddenTypeIRABIInfo for the given nominal type declaration.
+  /// Returns nullptr if the type does not support hidden ABI info.
+  irgen::HiddenTypeIRABIInfo *
+  getHiddenTypeIRABIInfo(const NominalTypeDecl *TD);
 
   /// An representation of a single type, or a C struct with multiple members
   /// with specified types. The C struct is expected to be passed via swiftcc

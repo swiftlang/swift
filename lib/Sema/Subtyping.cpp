@@ -621,6 +621,8 @@ swift::constraints::getConversionBehavior(Type type) {
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
   case TypeKind::Hidden:
+  case TypeKind::HiddenTypeLayoutInfo:
+
     ABORT([&](llvm::raw_ostream &out) {
       out << "Unusual type spotted in constraint system:\n";
       canType->dump(out);

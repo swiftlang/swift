@@ -17,6 +17,8 @@
 #include "GenStruct.h"
 
 #include "IRGen.h"
+#include "IRGenMangler.h"
+#include "swift/IRGen/HiddenTypeIRABIDetails.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -76,7 +78,11 @@ enum class StructTypeInfoKind {
   LoadableClangRecordTypeInfo,
   AddressOnlyClangRecordTypeInfo,
   NonFixedStructTypeInfo,
-  ResilientStructTypeInfo
+  ResilientStructTypeInfo,
+  HiddenLoadableStructTypeInfo,
+  HiddenFixedStructTypeInfo,
+  HiddenResilientStructTypeInfo,
+  HiddenNonFixedStructTypeInfo,
 };
 
 static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
@@ -1026,6 +1032,17 @@ namespace {
       // Otherwise, do elementwise destruction of the value.
       return super::consume(IGF, explosion, atomicity, T);
     }
+
+    HiddenTypeIRABIInfo *getHiddenTypeIRABIInfo(ASTContext &ctx) const override {
+      SmallVector<Type, 8> fieldTypes;
+      for (auto &field : getFields())
+        fieldTypes.push_back(field.Field->getInterfaceType());
+
+      return new (ctx) HiddenStructTypeIRABIInfo(
+          HiddenTypeIRABIInfo::Kind::LoadableStruct,
+          fieldTypes,
+          isCopyable(ResilienceExpansion::Minimal));
+    }
   };
 
   /// A type implementation for non-loadable but fixed-size struct types.
@@ -1118,6 +1135,17 @@ namespace {
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
                                    const StructFieldInfo &field) const {
       llvm_unreachable("non-fixed field in fixed struct?");
+    }
+
+    HiddenTypeIRABIInfo *getHiddenTypeIRABIInfo(ASTContext &ctx) const override {
+      SmallVector<Type, 8> fieldTypes;
+      for (auto &field : getFields())
+        fieldTypes.push_back(field.Field->getInterfaceType());
+
+      return new (ctx) HiddenStructTypeIRABIInfo(
+          HiddenTypeIRABIInfo::Kind::AddressOnlyStruct,
+          fieldTypes,
+          isCopyable(ResilienceExpansion::Minimal));
     }
   };
 
@@ -1303,6 +1331,17 @@ namespace {
               return nullptr;
             });
         });
+    }
+
+    HiddenTypeIRABIInfo *getHiddenTypeIRABIInfo(ASTContext &ctx) const override {
+      SmallVector<Type, 8> fieldTypes;
+      for (auto &field : getFields())
+        fieldTypes.push_back(field.Field->getInterfaceType());
+
+      return new (ctx) HiddenStructTypeIRABIInfo(
+          HiddenTypeIRABIInfo::Kind::NonFixedStruct,
+          fieldTypes,
+          isCopyable(ResilienceExpansion::Minimal));
     }
   };
 
@@ -1701,6 +1740,14 @@ private:
       return structTI.as<NonFixedStructTypeInfo>().op(IGF, __VA_ARGS__);       \
     case StructTypeInfoKind::ResilientStructTypeInfo:                          \
       llvm_unreachable("resilient structs are opaque");                        \
+    case StructTypeInfoKind::HiddenLoadableStructTypeInfo:                    \
+      llvm_unreachable("hidden structs don't have named fields");             \
+    case StructTypeInfoKind::HiddenFixedStructTypeInfo:                      \
+      llvm_unreachable("hidden structs don't have named fields");             \
+    case StructTypeInfoKind::HiddenResilientStructTypeInfo:                   \
+      llvm_unreachable("hidden resilient structs are opaque");                \
+    case StructTypeInfoKind::HiddenNonFixedStructTypeInfo:                   \
+      llvm_unreachable("hidden non-fixed structs are opaque");               \
     }                                                                          \
     llvm_unreachable("bad struct type info kind!");                            \
   } while (0)
@@ -1805,6 +1852,11 @@ namespace {
                           bool useStructLayouts) const override {
       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
     }
+
+    HiddenTypeIRABIInfo *getHiddenTypeIRABIInfo(ASTContext &ctx) const override {
+      return new (ctx) HiddenResilientStructTypeIRABIInfo(
+          isCopyable(ResilienceExpansion::Minimal));
+    }
   };
 } // end anonymous namespace
 
@@ -1813,6 +1865,390 @@ TypeConverter::convertResilientStruct(IsCopyable_t copyable,
                                       IsABIAccessible_t abiAccessible) {
   llvm::Type *storageType = IGM.OpaqueTy;
   return new ResilientStructTypeInfo(storageType, copyable, abiAccessible);
+}
+
+//===----------------------------------------------------------------------===//
+// Hidden Value Type Support
+//===----------------------------------------------------------------------===//
+
+/// A field-info implementation for hidden value types.
+/// Unlike StructFieldInfo, this stores the SILType directly rather than
+/// computing it from a VarDecl, since hidden types don't have VarDecls.
+class HiddenFieldInfo : public RecordField<HiddenFieldInfo> {
+public:
+  HiddenFieldInfo(SILType silType, const TypeInfo &type)
+    : RecordField(type), StoredSILType(silType) {}
+
+  HiddenFieldInfo(SILType silType, const ElementLayout &layout,
+                  unsigned begin, unsigned end)
+    : RecordField(layout, begin, end), StoredSILType(silType) {}
+
+  SILType StoredSILType;
+
+  StringRef getFieldName() const {
+    return StringRef();
+  }
+
+  SILType getType(IRGenModule &IGM, SILType T) const {
+    return StoredSILType;
+  }
+};
+
+/// A type implementation for loadable hidden value types.
+class HiddenLoadableStructTypeInfo final
+    : public RecordTypeInfo<HiddenLoadableStructTypeInfo, LoadableTypeInfo,
+                            HiddenFieldInfo> {
+  using super = RecordTypeInfo<HiddenLoadableStructTypeInfo, LoadableTypeInfo,
+                               HiddenFieldInfo>;
+public:
+  HiddenLoadableStructTypeInfo(ArrayRef<HiddenFieldInfo> fields,
+                         FieldsAreABIAccessible_t areFieldsABIAccessible,
+                         unsigned explosionSize,
+                         llvm::Type *storageType, Size size,
+                         SpareBitVector &&spareBits,
+                         Alignment align,
+                         IsTriviallyDestroyable_t isTriviallyDestroyable,
+                         IsCopyable_t isCopyable,
+                         IsFixedSize_t alwaysFixedSize,
+                         IsABIAccessible_t isABIAccessible)
+    : super(fields, explosionSize, areFieldsABIAccessible,
+            storageType, size, std::move(spareBits),
+            align, isTriviallyDestroyable,
+            isCopyable,
+            alwaysFixedSize, isABIAccessible)
+  {
+    setSubclassKind((unsigned)StructTypeInfoKind::HiddenLoadableStructTypeInfo);
+  }
+
+  std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+    return std::nullopt;
+  }
+  std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+    return std::nullopt;
+  }
+
+  Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
+                              const HiddenFieldInfo &field) const {
+    if (field.isEmpty())
+      return addr;
+    return field.projectAddress(IGF, addr, std::nullopt);
+  }
+
+  void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                        Size offset) const override {
+    for (auto &field : getFields()) {
+      auto fieldOffset = offset + field.getFixedByteOffset();
+      cast<LoadableTypeInfo>(field.getTypeInfo())
+        .addToAggLowering(IGM, lowering, fieldOffset);
+    }
+  }
+
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
+    llvm_unreachable("Producing type layout strings from a hidden representation is not yet supported");
+  }
+
+  void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                            Address addr, SILType T,
+                            bool isOutlined) const override {
+    HiddenLoadableStructTypeInfo::initialize(IGF, params, addr, isOutlined);
+  }
+};
+
+/// A type implementation for fixed-size, address-only hidden value types.
+class HiddenFixedStructTypeInfo final
+    : public RecordTypeInfo<HiddenFixedStructTypeInfo,
+                            IndirectTypeInfo<HiddenFixedStructTypeInfo,
+                                             FixedTypeInfo>,
+                            HiddenFieldInfo> {
+  using super = RecordTypeInfo<HiddenFixedStructTypeInfo,
+                               IndirectTypeInfo<HiddenFixedStructTypeInfo,
+                                                FixedTypeInfo>,
+                               HiddenFieldInfo>;
+public:
+  HiddenFixedStructTypeInfo(ArrayRef<HiddenFieldInfo> fields,
+                            FieldsAreABIAccessible_t areFieldsABIAccessible,
+                            llvm::Type *storageType, Size size,
+                            SpareBitVector &&spareBits,
+                            Alignment align,
+                            IsTriviallyDestroyable_t isTriviallyDestroyable,
+                            IsBitwiseTakable_t isBitwiseTakable,
+                            IsCopyable_t isCopyable,
+                            IsFixedSize_t alwaysFixedSize,
+                            IsABIAccessible_t isABIAccessible)
+      : super(fields, areFieldsABIAccessible,
+              storageType, size, std::move(spareBits),
+              align, isTriviallyDestroyable, isBitwiseTakable,
+              isCopyable,
+              alwaysFixedSize, isABIAccessible)
+  {
+    setSubclassKind((unsigned)StructTypeInfoKind::HiddenFixedStructTypeInfo);
+  }
+
+  std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+    return std::nullopt;
+  }
+  std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+    return std::nullopt;
+  }
+
+  Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
+                              const HiddenFieldInfo &field) const {
+    if (field.isEmpty())
+      return addr;
+    return field.projectAddress(IGF, addr, std::nullopt);
+  }
+
+  MemberAccessStrategy
+  getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
+                                 const HiddenFieldInfo &field) const {
+    llvm_unreachable("non-fixed field in fixed hidden struct?");
+  }
+
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
+    llvm_unreachable("type layout entry for hidden address-only types not yet supported");
+  }
+};
+
+namespace {
+  class HiddenNonFixedOffsets : public NonFixedOffsetsImpl {
+    SmallVector<SILType, 8> FieldSILTypes;
+    SmallVector<const TypeInfo *, 8> FieldTIs;
+  public:
+    HiddenNonFixedOffsets(ArrayRef<SILType> fieldSILTypes,
+                          ArrayRef<const TypeInfo *> fieldTIs)
+      : FieldSILTypes(fieldSILTypes.begin(), fieldSILTypes.end()),
+        FieldTIs(fieldTIs.begin(), fieldTIs.end()) {}
+
+    llvm::Value *getOffsetForIndex(IRGenFunction &IGF,
+                                   unsigned index) override {
+      auto &IGM = IGF.IGM;
+      llvm::Value *offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
+      for (unsigned i = 0; i <= index; ++i) {
+        auto &fieldTI = *FieldTIs[i];
+        auto fieldAlign = fieldTI.getAlignmentMask(IGF, FieldSILTypes[i]);
+        offset = IGF.Builder.CreateAdd(offset, fieldAlign);
+        offset = IGF.Builder.CreateAnd(
+            offset, IGF.Builder.CreateNot(fieldAlign));
+        if (i == index)
+          return offset;
+        auto fieldSize = fieldTI.getSize(IGF, FieldSILTypes[i]);
+        offset = IGF.Builder.CreateAdd(offset, fieldSize);
+      }
+      llvm_unreachable("index out of range");
+    }
+  };
+
+  class HiddenNonFixedStructTypeInfo final
+      : public RecordTypeInfo<HiddenNonFixedStructTypeInfo,
+                              WitnessSizedTypeInfo<HiddenNonFixedStructTypeInfo>,
+                              HiddenFieldInfo>
+  {
+    using super = RecordTypeInfo<HiddenNonFixedStructTypeInfo,
+                                 WitnessSizedTypeInfo<HiddenNonFixedStructTypeInfo>,
+                                 HiddenFieldInfo>;
+
+    SmallVector<SILType, 8> FieldSILTypes;
+    SmallVector<const TypeInfo *, 8> FieldTIs;
+  public:
+    HiddenNonFixedStructTypeInfo(ArrayRef<HiddenFieldInfo> fields,
+                                 FieldsAreABIAccessible_t areFieldsABIAccessible,
+                                 ArrayRef<SILType> fieldSILTypes,
+                                 ArrayRef<const TypeInfo *> fieldTIs,
+                                 llvm::Type *storageType,
+                                 Alignment align,
+                                 IsTriviallyDestroyable_t isTriviallyDestroyable,
+                                 IsBitwiseTakable_t isBitwiseTakable,
+                                 IsCopyable_t isCopyable,
+                                 IsABIAccessible_t isABIAccessible)
+      : super(fields, areFieldsABIAccessible,
+              storageType, align, isTriviallyDestroyable, isBitwiseTakable,
+              isCopyable, isABIAccessible),
+        FieldSILTypes(fieldSILTypes.begin(), fieldSILTypes.end()),
+        FieldTIs(fieldTIs.begin(), fieldTIs.end())
+    {
+      setSubclassKind(
+          (unsigned)StructTypeInfoKind::HiddenNonFixedStructTypeInfo);
+    }
+
+    HiddenNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF) const {
+      return HiddenNonFixedOffsets(FieldSILTypes, FieldTIs);
+    }
+    HiddenNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return HiddenNonFixedOffsets(FieldSILTypes, FieldTIs);
+    }
+
+    Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
+                                const HiddenFieldInfo &field) const {
+      if (field.isEmpty())
+        return addr;
+      auto offsets = getNonFixedOffsets(IGF, T);
+      return field.projectAddress(IGF, addr, offsets);
+    }
+
+    MemberAccessStrategy
+    getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
+                                   const HiddenFieldInfo &field) const {
+      llvm_unreachable("non-fixed field access not supported for hidden types");
+    }
+
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address addr,
+                                         SILType T,
+                                         bool isOutlined) const override {
+      return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, addr);
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *whichCase,
+                                   llvm::Value *numEmptyCases,
+                                   Address addr,
+                                   SILType T,
+                                   bool isOutlined) const override {
+      emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases, addr);
+    }
+
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      llvm_unreachable("Generating type layouts from a hidden type is not yet supported");
+    }
+  };
+} // end anonymous namespace
+
+const TypeInfo *irgen::createTypeInfoFromHiddenStructTypeABIInfo(
+    IRGenModule &IGM,
+    CanType type,
+    const HiddenStructTypeIRABIInfo &abiInfo) {
+
+  IRGenMangler mangler(IGM.Context);
+  auto typeName = mangler.mangleTypeForLLVMTypeName(type);
+  auto *structTy = llvm::StructType::create(IGM.getLLVMContext(), typeName);
+
+  SmallVector<SILType, 8> fieldSILTypes;
+  SmallVector<const TypeInfo *, 8> fieldTIs;
+  for (auto fieldType : abiInfo.getFieldTypes()) {
+    SILType silType = IGM.getLoweredType(fieldType->getCanonicalType());
+    fieldSILTypes.push_back(silType);
+    fieldTIs.push_back(&IGM.getTypeInfo(silType));
+  }
+
+  StructLayout layout(IGM, type, LayoutKind::NonHeapObject,
+                      LayoutStrategy::Optimal, fieldTIs, structTy);
+
+  auto triviallyDestroyable = abiInfo.getSILTypeProperties().isTrivial()
+      ? IsTriviallyDestroyable : IsNotTriviallyDestroyable;
+  auto copyable = abiInfo.Copyable ? IsCopyable : IsNotCopyable;
+
+  switch (abiInfo.getKind()) {
+    case HiddenTypeIRABIInfo::Kind::LoadableStruct: {
+      SmallVector<HiddenFieldInfo, 8> fields;
+      auto fieldsABIAccessible = FieldsAreABIAccessible;
+      unsigned explosionSize = 0;
+      for (unsigned i = 0, e = fieldTIs.size(); i != e; ++i) {
+        auto *loadableTI = cast<LoadableTypeInfo>(fieldTIs[i]);
+        if (!loadableTI->isABIAccessible())
+          fieldsABIAccessible = FieldsAreNotABIAccessible;
+
+        unsigned begin = explosionSize;
+        explosionSize += loadableTI->getExplosionSize();
+        fields.push_back(HiddenFieldInfo(fieldSILTypes[i],
+                                        layout.getElements()[i],
+                                        begin, explosionSize));
+      }
+
+      return HiddenLoadableStructTypeInfo::create(
+          fields, fieldsABIAccessible, explosionSize,
+          layout.getType(), layout.getSize(),
+          std::move(layout.getSpareBits()), layout.getAlignment(),
+          triviallyDestroyable, copyable,
+          layout.isAlwaysFixedSize(), isTypeABIAccessibleIfFixedSize(IGM, type));
+    }
+    case HiddenTypeIRABIInfo::Kind::AddressOnlyStruct: {
+      SmallVector<HiddenFieldInfo, 8> fields;
+      auto fieldsABIAccessible = FieldsAreABIAccessible;
+      for (unsigned i = 0, e = fieldTIs.size(); i != e; ++i) {
+        if (!fieldTIs[i]->isABIAccessible())
+          fieldsABIAccessible = FieldsAreNotABIAccessible;
+
+        fields.push_back(HiddenFieldInfo(fieldSILTypes[i],
+                                        layout.getElements()[i],
+                                        0, 0));
+      }
+
+      return HiddenFixedStructTypeInfo::create(
+          fields, fieldsABIAccessible,
+          layout.getType(), layout.getSize(),
+          std::move(layout.getSpareBits()), layout.getAlignment(),
+          triviallyDestroyable, layout.isBitwiseTakable(),
+          copyable, layout.isAlwaysFixedSize(), isTypeABIAccessibleIfFixedSize(IGM, type));
+    }
+    case HiddenTypeIRABIInfo::Kind::NonFixedStruct: {
+      SmallVector<HiddenFieldInfo, 8> fields;
+      auto fieldsABIAccessible = FieldsAreABIAccessible;
+      for (unsigned i = 0, e = fieldTIs.size(); i != e; ++i) {
+        if (!fieldTIs[i]->isABIAccessible())
+          fieldsABIAccessible = FieldsAreNotABIAccessible;
+
+        fields.push_back(HiddenFieldInfo(fieldSILTypes[i],
+                                        layout.getElements()[i],
+                                        0, 0));
+      }
+
+      return HiddenNonFixedStructTypeInfo::create(
+          fields, fieldsABIAccessible,
+          fieldSILTypes, fieldTIs,
+          layout.getType(), layout.getAlignment(),
+          layout.isTriviallyDestroyable(),
+          layout.isBitwiseTakable(),
+          copyable, IsABIAccessible_t(abiInfo.IsKnownABIAccessible));
+    }
+    default:
+      llvm_unreachable("non-struct hidden type in createTypeInfoFromHiddenStructTypeABIInfo");
+  }
+}
+
+namespace {
+  class HiddenResilientStructTypeInfo
+      : public ResilientTypeInfo<HiddenResilientStructTypeInfo>
+  {
+    std::string MetadataAccessorName;
+  public:
+    HiddenResilientStructTypeInfo(llvm::Type *T,
+                                  IsCopyable_t copyable,
+                                  IsABIAccessible_t abiAccessible,
+                                  StringRef metadataAccessorName)
+      : ResilientTypeInfo(T, copyable, abiAccessible),
+        MetadataAccessorName(metadataAccessorName.str()) {
+      setSubclassKind(
+          (unsigned)StructTypeInfoKind::HiddenResilientStructTypeInfo);
+    }
+
+    StringRef getMetadataAccessorName() const { return MetadataAccessorName; }
+
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      llvm_unreachable("Producing a type layout entry from hidden types is not yet supported");
+    }
+  };
+} // end anonymous namespace
+
+const TypeInfo *irgen::createResilientTypeInfoFromABIInfo(
+    IRGenModule &IGM,
+    const HiddenResilientStructTypeIRABIInfo &abiInfo) {
+  auto copyable = abiInfo.Copyable ? IsCopyable : IsNotCopyable;
+  auto abiAccessible = IsABIAccessible_t(abiInfo.IsKnownABIAccessible);
+  return new HiddenResilientStructTypeInfo(
+      IGM.OpaqueTy, copyable, abiAccessible, abiInfo.getMetadataAccessorName());
 }
 
 const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,

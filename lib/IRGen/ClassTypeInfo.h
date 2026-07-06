@@ -19,6 +19,7 @@
 
 #include "ClassLayout.h"
 #include "HeapTypeInfo.h"
+#include "swift/IRGen/HiddenTypeIRABIDetails.h"
 
 #include "swift/ClangImporter/ClangImporterRequests.h"
 
@@ -159,6 +160,13 @@ public:
     }
 
     HeapTypeInfo::strongRelease(IGF, e, atomicity);
+  }
+
+  HiddenTypeIRABIInfo *getHiddenTypeIRABIInfo(ASTContext &ctx) const override {
+    assert(getReferenceCounting() == ReferenceCounting::Native &&
+           "Only native reference counting is currently supported for "
+           "hidden types");
+    return new (ctx) HiddenReferenceTypeIRABIInfo(getReferenceCounting());
   }
 };
 

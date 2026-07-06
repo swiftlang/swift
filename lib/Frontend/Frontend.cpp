@@ -311,6 +311,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.EnableSerializationRemarks =
       getLangOptions().EnableModuleSerializationRemarks;
 
+  serializationOpts.IRGenOpts = &getIRGenOptions();
+
   return serializationOpts;
 }
 
