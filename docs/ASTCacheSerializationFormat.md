@@ -668,12 +668,18 @@ not matching original bodies exactly.
 
 ### 11.7 Known issues and workarounds
 
-**DenseMap corruption (worked around):** `deserializeAllBodies` originally
-used a stack-local `DenseMap<DeclID, BraceStmt*>`. The contiguous bucket array
-was corrupted by out-of-bounds writes from subagent deserializer cases (root
-cause never fully identified). Replaced with `std::map` which uses separate
-heap-allocated nodes. The map is small (<20 entries per file), so the
-performance difference is negligible.
+All three items below are workarounds that paper over real bugs, not fixes.
+Each masks a different problem that needs to be properly resolved.
+
+**DenseMap corruption (NOT fixed — workaround):** `deserializeAllBodies`
+originally used a stack-local `DenseMap<DeclID, BraceStmt*>`. The contiguous
+bucket array was corrupted by an out-of-bounds write in one of the subagent
+deserializer cases (root cause never identified). Swapping to `std::map`
+does NOT fix the write — it just moves the victim memory so the corruption
+lands somewhere less catastrophic. The out-of-bounds write is still
+happening, potentially corrupting other heap data. The proper fix is to find
+the offending deserializer case using AddressSanitizer or bounds-checking
+assertions on `ExprTable`/`StmtTable` access, then revert to `DenseMap`.
 
 **CaseStmt labels (NOT serialized — workaround):** The serializer only writes
 `{bodyStmtID}` for `CaseStmt` — it does not serialize the case label items
@@ -684,11 +690,16 @@ This produces wrong AST: a `case .red:` becomes `default:`. The proper fix is
 to serialize the `CaseLabelItem` array (patterns + guard exprs) in the body
 block record.
 
-**ErasureExpr type resolution (worked around):** `ErasureExpr::create` needs
-a valid existential type. In the unit test context (no `ResolveType`
-callback), the type is null. Fixed by falling back to `ErrorExpr` when `ty`
-is null or not existential. In production, `ResolveType` is set and returns
-the correct type.
+**ErasureExpr type resolution (NOT validated — workaround):**
+`ErasureExpr::create` needs a valid existential type. In the unit test
+context (no `ResolveType` callback), the type is null. The deserializer
+falls back to `ErrorExpr` when `ty` is null or not existential. In
+production, `ResolveType` is set and should return the correct type, but
+this is unverified — the unit test passes but only confirms the record was
+written and something came back. It does NOT validate that the deserialized
+`ErasureExpr` matches the original (it gets `ErrorExpr`, not `ErasureExpr`).
+The proper fix is to set up `ResolveType` in the test fixture so the test
+actually exercises the ErasureExpr deserialization path.
 
    - Common diff patterns: missing source ranges on body exprs/stmts,
      `ErrorExpr` where original has a typed expr, missing `body` field on
