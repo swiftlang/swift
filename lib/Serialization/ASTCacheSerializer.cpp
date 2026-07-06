@@ -101,6 +101,22 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
                        StringRef outputPath) {
   // Force type-checking of all delayed function bodies
   const_cast<SourceFile &>(SF).typeCheckDelayedFunctions();
+  // Pre-type-check all function bodies so BodyKind is TypeChecked.
+  for (auto item : const_cast<SourceFile &>(SF).getTopLevelItems()) {
+    if (auto *D = item.dyn_cast<Decl *>()) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+        (void)AFD->getTypecheckedBody();
+      if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+        for (auto *member : IDC->getMembers()) {
+          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member))
+            (void)AFD->getTypecheckedBody();
+          if (auto *ASD = dyn_cast<AbstractStorageDecl>(member))
+            for (auto *acc : ASD->getAllAccessors())
+              (void)acc->getTypecheckedBody();
+        }
+      }
+    }
+  }
 
   // 1. Compute cache key
   ASTCacheKey key = computeASTCacheKey(ctx, SF);
@@ -251,7 +267,9 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
         auto *body = AFD->getBody(/*canSynthesize=*/false);
         bodySer.serializeBody(body);
       };
-      for (auto item : const_cast<SourceFile &>(SF).getTopLevelItems()) {
+      auto itemsVec = const_cast<SourceFile &>(SF).getTopLevelItems();
+      SmallVector<ASTNode, 32> items(itemsVec.begin(), itemsVec.end());
+      for (auto item : items) {
         if (auto *D = item.dyn_cast<Decl *>()) {
           if (isa<ImportDecl>(D))
             continue;
