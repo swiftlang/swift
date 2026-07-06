@@ -808,7 +808,6 @@ private:
           }
         }
       }
-      fprintf(stderr, "DESER: body deserialization done\n");
     }
 
     // C1: Store the ModuleFile in the SourceFile to keep it alive.
