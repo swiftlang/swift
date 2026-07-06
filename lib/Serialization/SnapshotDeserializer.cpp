@@ -605,6 +605,43 @@ private:
         }
       }
     }
+    // Reorder HasStorageAttr to be first in the attr list, matching the
+    // original AST where the type checker prepends it. We do this AFTER
+    // range restoration so the range blob alignment is not affected.
+    for (auto *D : decls) {
+      auto walkReorder = [&](Decl *decl) {
+        if (auto *vd = dyn_cast<VarDecl>(decl)) {
+          if (vd->hasStorage()) {
+            auto &attrs = vd->getAttrs();
+            if (auto *hsa = attrs.getAttribute<HasStorageAttr>()) {
+              if (auto *first = *attrs.begin(); first != hsa) {
+                // Only move HasStorageAttr before the first attr if the
+                // first attr is explicit (not implicit). If the first attr
+                // is also implicit (e.g. final_attr), keep the current order
+                // since both were added by the type checker in a specific order.
+                if (!first->isImplicit()) {
+                  // Swap cached attr ranges so they follow the attrs.
+                  auto &ctxRef = vd->getASTContext();
+                  auto hsaRange = ctxRef.getCachedAttrSourceRange(hsa);
+                  auto firstRange = ctxRef.getCachedAttrSourceRange(first);
+                  ctxRef.setCachedAttrSourceRange(hsa, firstRange);
+                  ctxRef.setCachedAttrSourceRange(first, hsaRange);
+                  // Move HasStorageAttr to front.
+                  attrs.removeAttribute(hsa);
+                  attrs.add(hsa);
+                }
+              }
+            }
+          }
+        }
+      };
+      walkReorder(D);
+      if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+        for (auto *member : IDC->getMembers()) {
+          walkReorder(member);
+        }
+      }
+    }
     // Reconstruct TrailingWhereClause for extensions from whereClausesBlob.
     // The serializer stores the source text of each extension's where clause.
     // We re-parse it with a minimal parser to reconstruct the RequirementRepr
