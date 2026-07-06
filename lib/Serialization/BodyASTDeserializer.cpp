@@ -256,6 +256,50 @@ Stmt *BodyASTDeserializer::deserializeStmt(ArrayRef<uint64_t> record,
       result = ReturnStmt::createParsed(Ctx, SourceLoc(), resultExpr);
     break;
   }
+  case Stmt_Yield: {
+    if (record.size() < 4)
+      return nullptr;
+    uint32_t numYields = static_cast<uint32_t>(record[3]);
+    SmallVector<Expr*, 4> yieldExprs;
+    for (uint32_t i = 0; i < numYields && 4 + i < record.size(); i++) {
+      Expr *e = lookupExpr(static_cast<uint32_t>(record[4 + i]));
+      if (e) yieldExprs.push_back(e);
+    }
+    result = YieldStmt::create(Ctx, SourceLoc(), SourceLoc(), yieldExprs,
+                               SourceLoc(),
+                               implicit ? std::optional<bool>(true)
+                                        : std::nullopt);
+    break;
+  }
+  case Stmt_Switch: {
+    if (record.size() < 5)
+      return nullptr;
+    Expr *subject = lookupExpr(static_cast<uint32_t>(record[3]));
+    uint32_t numCases = static_cast<uint32_t>(record[4]);
+    SmallVector<CaseStmt*, 4> cases;
+    for (uint32_t i = 0; i < numCases && 5 + i < record.size(); i++) {
+      Stmt *cs = lookupStmt(static_cast<uint32_t>(record[5 + i]));
+      if (auto *C = dyn_cast_or_null<CaseStmt>(cs))
+        cases.push_back(C);
+    }
+    if (implicit)
+      result = SwitchStmt::createImplicit(LabeledStmtInfo(), subject, cases, Ctx);
+    else
+      result = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), subject,
+                                  SourceLoc(), cases, SourceLoc(),
+                                  SourceLoc(), Ctx);
+    break;
+  }
+  case Stmt_Case: {
+    if (record.size() < 4)
+      return nullptr;
+    BraceStmt *body = dyn_cast_or_null<BraceStmt>(
+        lookupStmt(static_cast<uint32_t>(record[3])));
+    SmallVector<CaseLabelItem, 1> labels;
+    result = CaseStmt::createImplicit(Ctx, CaseParentKind::Switch,
+                                      labels, body);
+    break;
+  }
   default:
     return nullptr;
   }

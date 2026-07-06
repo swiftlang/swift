@@ -271,7 +271,69 @@ void BodyASTSerializer::serializeStmt(Stmt *stmt) {
     Out.EmitRecord(STMT_NODE, Scratch);
     break;
   }
+  case StmtKind::Yield: {
+    auto *YS = cast<YieldStmt>(stmt);
+    auto yields = YS->getYields();
+    SmallVector<uint32_t, 4> yieldIDs;
+    for (auto *yieldExpr : yields) {
+      uint32_t eid = assignExprID(yieldExpr);
+      serializeExpr(yieldExpr);
+      yieldIDs.push_back(eid);
+    }
+    Scratch.clear();
+    Scratch.push_back(stmtID);
+    Scratch.push_back(Stmt_Yield);
+    Scratch.push_back(stmt->isImplicit() ? 1u : 0u);
+    Scratch.push_back(static_cast<uint32_t>(yieldIDs.size()));
+    for (auto yid : yieldIDs)
+      Scratch.push_back(yid);
+    Out.EmitRecord(STMT_NODE, Scratch);
+    break;
+  }
+  case StmtKind::Switch: {
+    auto *SS = cast<SwitchStmt>(stmt);
+    Expr *subject = SS->getSubjectExpr();
+    uint32_t subjectID = 0;
+    if (subject) {
+      subjectID = assignExprID(subject);
+      serializeExpr(subject);
+    }
+    auto cases = SS->getCases();
+    SmallVector<uint32_t, 4> caseIDs;
+    for (auto *CS : cases) {
+      uint32_t sid = assignStmtID(CS);
+      serializeStmt(CS);
+      caseIDs.push_back(sid);
+    }
+    Scratch.clear();
+    Scratch.push_back(stmtID);
+    Scratch.push_back(Stmt_Switch);
+    Scratch.push_back(stmt->isImplicit() ? 1u : 0u);
+    Scratch.push_back(subjectID);
+    Scratch.push_back(static_cast<uint32_t>(caseIDs.size()));
+    for (auto cid : caseIDs)
+      Scratch.push_back(cid);
+    Out.EmitRecord(STMT_NODE, Scratch);
+    break;
+  }
+  case StmtKind::Case: {
+    auto *CS = cast<CaseStmt>(stmt);
+    BraceStmt *caseBody = CS->getBody();
+    uint32_t bodyID = 0;
+    if (caseBody) {
+      bodyID = assignStmtID(caseBody);
+      serializeStmt(caseBody);
+    }
+    Scratch.clear();
+    Scratch.push_back(stmtID);
+    Scratch.push_back(Stmt_Case);
+    Scratch.push_back(stmt->isImplicit() ? 1u : 0u);
+    Scratch.push_back(bodyID);
+    Out.EmitRecord(STMT_NODE, Scratch);
+    break;
+  }
   default:
+    Scratch.clear();
     Scratch.push_back(stmtID);
     Scratch.push_back(Stmt_Error);
     Scratch.push_back(stmt->isImplicit() ? 1u : 0u);
