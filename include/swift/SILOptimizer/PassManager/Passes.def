@@ -150,6 +150,10 @@ PASS(LoopInvariantCodeMotion, "loop-invariant-code-motion",
      "New Loop Invariant Code Motion")
 PASS(PackSpecialization, "pack-specialization",
      "Specialize uses of parameter packs")
+PASS(DeadObjectElimination, "dead-object-elimination",
+     "Removes dead object, stack and array allocations")
+PASS(MandatoryDeadObjectElimination, "mandatory-dead-object-elimination",
+     "Removes dead stack allocations")
 
 PASS(ClosureSpecialization, "closure-specialization",
      "Specialize functions with closure arguments")
@@ -268,7 +272,7 @@ LEGACY_PASS(DeadArgSignatureOpt, "dead-arg-signature-opt",
      "Dead Argument Elimination via Function Specialization")
 LEGACY_PASS(DeadFunctionAndGlobalElimination, "sil-deadfuncelim",
      "Dead Function and Global Variable Elimination")
-LEGACY_PASS(DeadObjectElimination, "deadobject-elim",
+LEGACY_PASS(LegacyDeadObjectElimination, "deadobject-elim",
      "Dead Object Elimination for Classes with Trivial Destruction")
 LEGACY_PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
