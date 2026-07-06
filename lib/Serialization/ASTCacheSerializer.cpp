@@ -182,10 +182,6 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
           }
           if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
             for (auto *member : IDC->getMembers()) {
-              // Skip EnumCaseDecl — it's a parser-internal grouping node
-              // not present in the deserialized AST.
-              if (isa<EnumCaseDecl>(member))
-                continue;
               writeDeclRange(member);
               // Walk accessors of storage decls (not in getMembers()).
               if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {

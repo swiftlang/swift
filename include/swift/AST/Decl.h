@@ -9169,12 +9169,6 @@ public:
   using Decl::getASTContext;
 };
   
-inline SourceRange EnumCaseDecl::getSourceRange() const {
-  auto subRange = getElements().back()->getSourceRange();
-  if (subRange.isValid())
-    return {CaseLoc, subRange.End};
-  return {};
-}
 
 /// Describes the kind of initializer.
 enum class CtorInitializerKind {

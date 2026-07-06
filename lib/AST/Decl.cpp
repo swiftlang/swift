@@ -12325,6 +12325,16 @@ SourceRange ImportDecl::getSourceRange() const {
   return SourceRange(ImportLoc, getImportPath().getSourceRange().End);
 }
 
+SourceRange EnumCaseDecl::getSourceRange() const {
+  // Per-file AST cache: check for a source range override.
+  if (auto R = getASTContext().getCachedDeclSourceRange(this); R.isValid())
+    return R;
+  auto subRange = getElements().back()->getSourceRange();
+  if (subRange.isValid() && CaseLoc.isValid())
+    return {CaseLoc, subRange.End};
+  return {};
+}
+
 Type ConstructorDecl::getResultInterfaceType() const {
   Type resultTy;
 
