@@ -71,6 +71,8 @@ Or upgrade all warnings except deprecated declaration to errors:
 
 ## Topics
 - <doc:dynamic-callable-requirements>
+- <doc:actor-isolation-violations-in-protocol-conformances-and-overrides>
+- <doc:actors-cannot-conform-to-global-actor-protocols>
 - <doc:add-preconcurrency-import>
 - <doc:always-available-domain>
 - <doc:trailing-closure-matching>
@@ -88,6 +90,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
+- <doc:getting-non-sendable-values-out-of-actors>
 - <doc:return-type-implicit-copy>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
@@ -101,6 +104,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:module-self-import>
 - <doc:multiple-inheritance>
 - <doc:nominal-types>
+- <doc:non-sendable-types-and-objective-c-interoperability>
 - <doc:oslog>
 - <doc:option-obsoleted-by-module-selectors>
 - <doc:exclusivity-violation>
