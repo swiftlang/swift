@@ -7691,11 +7691,11 @@ GROUPED_WARNING(variable_never_used, NoUsage, NoUsage,
 GROUPED_WARNING(immutable_value_never_used_but_assigned, NoUsage, NoUsage,
         "immutable value %0 was never used; consider removing it",
         (Identifier))
-WARNING(variable_never_mutated, none,
+GROUPED_WARNING(variable_never_mutated, VariableNeverMutated, none,
         "variable %0 was never mutated; "
         "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
         (Identifier, bool))
-WARNING(variable_tuple_elt_never_mutated, none,
+GROUPED_WARNING(variable_tuple_elt_never_mutated, VariableNeverMutated, none,
         "variable %0 was never mutated; "
         "consider changing the pattern to 'case (..., let %1, ...)'",
         (Identifier, StringRef))
