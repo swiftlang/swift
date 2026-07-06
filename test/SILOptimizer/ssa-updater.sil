@@ -12,6 +12,9 @@ class C {}
 
 sil @c2 : $@convention(thin) (@guaranteed C) -> @owned C
 
+sil @use_int64 : $@convention(thin) (Builtin.Int64) -> ()
+sil @use_two_int64 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
+
 // CHECK-LABEL: sil [ossa] @reuse_phi_arg1 :
 // CHECK:       bb17([[P:%.*]] : @owned $C):
 // CHECK:         apply {{%[0-9]+}}([[P]])
@@ -180,3 +183,102 @@ bb23:
   br bb3
 
 }
+
+// CHECK-LABEL: sil @ib_ssa_updater :
+// CHECK:         [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK:         apply {{%[0-9]+}}([[L1]])
+// CHECK:       bb1:
+// CHECK:         [[L2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK:         apply {{%[0-9]+}}([[L1]])
+// CHECK:         fix_lifetime [[L2]]
+// CHECK:         apply {{%[0-9]+}}([[L2]])
+// CHECK:         [[L3:%.*]] = integer_literal $Builtin.Int64, 3
+// CHECK:         fix_lifetime [[L3]]
+// CHECK:         apply {{%[0-9]+}}([[L3]])
+// CHECK:       bb2:
+// CHECK:         apply {{%[0-9]+}}([[L3]])
+// CHECK:       } // end sil function 'ib_ssa_updater'
+sil @ib_ssa_updater : $@convention(thin) () -> () {
+bb0:
+  specify_test "instruction_based_ssa_updater"
+  %f = function_ref @use_int64 : $@convention(thin) (Builtin.Int64) -> ()
+  %1 = integer_literal $Builtin.Int64, 1
+  fix_lifetime %1
+  %use0 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  br bb1
+
+bb1:
+  %2 = integer_literal $Builtin.Int64, 2
+  %use1 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  fix_lifetime %2
+  %use2 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  %3 = integer_literal $Builtin.Int64, 3
+  fix_lifetime %3
+  %use3 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  br bb2
+
+bb2:
+  %use4 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil @ib_ssa_updater_reverse :
+// CHECK:         [[L3:%.*]] = integer_literal $Builtin.Int64, 3
+// CHECK:         apply {{%[0-9]+}}([[L3]])
+// CHECK:       bb1:
+// CHECK:         [[L2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK:         apply {{%[0-9]+}}([[L3]])
+// CHECK:         fix_lifetime [[L2]]
+// CHECK:         apply {{%[0-9]+}}([[L2]])
+// CHECK:         [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK:         fix_lifetime [[L1]]
+// CHECK:         apply {{%[0-9]+}}([[L1]])
+// CHECK:       bb2:
+// CHECK:         apply {{%[0-9]+}}([[L1]])
+// CHECK:       } // end sil function 'ib_ssa_updater_reverse'
+sil @ib_ssa_updater_reverse : $@convention(thin) () -> () {
+bb0:
+  specify_test "instruction_based_ssa_updater"
+  %f = function_ref @use_int64 : $@convention(thin) (Builtin.Int64) -> ()
+  %3 = integer_literal $Builtin.Int64, 3
+  fix_lifetime %3
+  %use0 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  br bb1
+
+bb1:
+  %2 = integer_literal $Builtin.Int64, 2
+  %use1 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  fix_lifetime %2
+  %use2 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  %1 = integer_literal $Builtin.Int64, 1
+  fix_lifetime %1
+  %use3 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  br bb2
+
+bb2:
+  %use4 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil @use_and_def_in_same_instruction :
+// CHECK:         [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK:         [[L2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK:         apply {{%[0-9]+}}([[L1]], [[L2]])
+// CHECK-NEXT:    apply {{%[0-9]+}}([[L2]])
+// CHECK:       } // end sil function 'use_and_def_in_same_instruction'
+sil @use_and_def_in_same_instruction : $@convention(thin) () -> () {
+bb0:
+  specify_test "instruction_based_ssa_updater"
+  %f = function_ref @use_int64 : $@convention(thin) (Builtin.Int64) -> ()
+  %f2 = function_ref @use_two_int64 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int64, 2
+  fix_lifetime %1
+  %4 = apply %f2(undef, %2) : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
+  %5 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  %r = tuple ()
+  return %r
+}
+
