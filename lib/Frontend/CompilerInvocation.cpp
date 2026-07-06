@@ -2234,6 +2234,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_target_cpu))
     Opts.TargetCPU = A->getValue();
 
+  if (auto IndexStorePath = llvm::sys::Process::GetEnv("SWIFT_INDEX_STORE_PATH")) {
+    Opts.IndexStorePath = *IndexStorePath;
+  }
   if (const Arg *A = Args.getLastArg(OPT_index_store_path))
     Opts.IndexStorePath = A->getValue();
 

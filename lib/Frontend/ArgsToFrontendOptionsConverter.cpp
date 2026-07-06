@@ -58,6 +58,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   using namespace options;
 
   handleDebugCrashGroupArguments();
+  handleIndexStoreEnvironmentArguments();
 
   if (const Arg *A = Args.getLastArg(OPT_dump_api_path)) {
     Opts.DumpAPIPath = A->getValue();
@@ -94,11 +95,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_bridging_header_directory_for_print)) {
     Opts.BridgingHeaderDirForPrint = A->getValue();
   }
-  Opts.IndexIgnoreClangModules |= Args.hasArg(OPT_index_ignore_clang_modules);
-  Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
-  Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
-  Opts.IndexIncludeLocals |= Args.hasArg(OPT_index_include_locals);
-  Opts.IndexStoreCompress |= Args.hasArg(OPT_index_store_compress);
+  handleIndexStoreOptions(Args);
   Opts.SerializeDebugInfoSIL |=
       Args.hasArg(OPT_experimental_serialize_debug_info);
 
@@ -492,6 +489,39 @@ void ArgsToFrontendOptionsConverter::handleDebugCrashGroupArguments() {
     } else {
       llvm_unreachable("Unknown debug_crash_Group option!");
     }
+  }
+}
+
+void ArgsToFrontendOptionsConverter::handleIndexStoreOptions(
+    const llvm::opt::ArgList &Args) {
+  using namespace options;
+  Opts.IndexIgnoreClangModules |= Args.hasArg(OPT_index_ignore_clang_modules);
+  Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
+  Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
+  Opts.IndexIncludeLocals |= Args.hasArg(OPT_index_include_locals);
+  Opts.IndexStoreCompress |= Args.hasArg(OPT_index_store_compress);
+}
+
+void ArgsToFrontendOptionsConverter::handleIndexStoreEnvironmentArguments() {
+  if (auto indexStorePath = llvm::sys::Process::GetEnv("SWIFT_INDEX_STORE_PATH")) {
+    Opts.IndexStorePath = *indexStorePath;
+  }
+  if (auto indexStoreOptions = llvm::sys::Process::GetEnv("SWIFT_INDEX_STORE_OPTIONS")) {
+    size_t start = 0;
+    size_t end = indexStoreOptions->find(" ");
+    std::vector<const char *> EnvVarArgs;
+    while (true) {
+      EnvVarArgs.push_back(indexStoreOptions->substr(start, end).c_str());
+      if (end == std::string::npos) {
+        break;
+      }
+      start = end + 1;
+      end = indexStoreOptions->find(" ", start);
+    }
+    unsigned MissingArgIndex, MissingArgCount;
+    llvm::opt::InputArgList ParsedArgs = createSwiftOptTable()->ParseArgs(
+        EnvVarArgs, MissingArgIndex, MissingArgCount);
+    handleIndexStoreOptions(ParsedArgs);
   }
 }
 

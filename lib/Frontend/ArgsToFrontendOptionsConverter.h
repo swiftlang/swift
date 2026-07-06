@@ -33,6 +33,10 @@ private:
       cachedOutputFilenamesFromCommandLineOrFilelist;
 
   void handleDebugCrashGroupArguments();
+  /// Handle index store options that can be passed either on the command line
+  /// or via the `SWIFT_INDEX_STORE_OPTIONS` environment variable.
+  void handleIndexStoreOptions(const llvm::opt::ArgList &Args);
+  void handleIndexStoreEnvironmentArguments();
 
   void computeDebugTimeOptions();
   bool computeFallbackModuleName();
