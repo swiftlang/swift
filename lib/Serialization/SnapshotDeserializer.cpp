@@ -799,7 +799,7 @@ private:
         if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
           deserializeBody(AFD);
         if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
-          for (auto *member : IDC->getMembers()) {
+          for (auto *member : IDC->getAllMembers()) {
             if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member))
               deserializeBody(AFD);
             if (auto *ASD = dyn_cast<AbstractStorageDecl>(member))
@@ -808,6 +808,7 @@ private:
           }
         }
       }
+      fprintf(stderr, "DESER: body deserialization done\n");
     }
 
     // C1: Store the ModuleFile in the SourceFile to keep it alive.

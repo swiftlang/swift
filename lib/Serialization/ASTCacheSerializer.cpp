@@ -99,10 +99,32 @@ namespace swift::serialization {
 /// instead of inlining them as copies (isDeclXRef=false).
 bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
                        StringRef outputPath) {
-  // Force type-checking of all delayed function bodies
+  // Force type-checking of all delayed function bodies and synthesized members.
   const_cast<SourceFile &>(SF).typeCheckDelayedFunctions();
-  // Pre-collect all function decls BEFORE type-checking, so lazy member
-  // loading during getTypecheckedBody() doesn't invalidate our iteration.
+  // Type-check all function bodies. Use a copy of items to avoid
+  // invalidation from lazy member loading.
+  {
+    auto preItemsVec = const_cast<SourceFile &>(SF).getTopLevelItems();
+    SmallVector<ASTNode, 32> preItems(preItemsVec.begin(), preItemsVec.end());
+    for (auto item : preItems) {
+      if (auto *D = item.dyn_cast<Decl *>()) {
+        if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+          (void)AFD->getTypecheckedBody();
+        if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+          for (auto *member : IDC->getMembers()) {
+            if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member))
+              (void)AFD->getTypecheckedBody();
+            if (auto *ASD = dyn_cast<AbstractStorageDecl>(member))
+              for (auto *acc : ASD->getAllAccessors())
+                (void)acc->getTypecheckedBody();
+          }
+        }
+      }
+    }
+  }
+  // Collect all function decls AFTER type-checking so synthesized
+  // implicit members are present. Use getAllMembers() to match the
+  // ASTDumper's TypeChecked member loading.
   SmallVector<AbstractFunctionDecl*, 32> allFuncs;
   {
     auto preItemsVec = const_cast<SourceFile &>(SF).getTopLevelItems();
@@ -114,7 +136,7 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
         if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
           allFuncs.push_back(AFD);
         if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
-          for (auto *member : IDC->getMembers()) {
+          for (auto *member : IDC->getAllMembers()) {
             if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member))
               allFuncs.push_back(AFD);
             if (auto *ASD = dyn_cast<AbstractStorageDecl>(member))
@@ -125,9 +147,6 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
       }
     }
   }
-  // Type-check all function bodies so BodyKind is TypeChecked.
-  for (auto *AFD : allFuncs)
-    (void)AFD->getTypecheckedBody();
 
   // 1. Compute cache key
   ASTCacheKey key = computeASTCacheKey(ctx, SF);
@@ -273,8 +292,11 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
     {
       BodySerializer bodySer(key.bodyBlob);
       for (auto *AFD : allFuncs) {
-        if (AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::TypeChecked) {
-          auto *body = AFD->getBody(/*canSynthesize=*/false);
+        auto kind = AFD->getBodyKind();
+        if (kind == AbstractFunctionDecl::BodyKind::TypeChecked ||
+            kind == AbstractFunctionDecl::BodyKind::Synthesize) {
+          // getBody(true) allows synthesis for Synthesize-kind accessors.
+          auto *body = AFD->getBody(/*canSynthesize=*/true);
           bodySer.serializeBody(body);
         } else {
           bodySer.serializeBody(nullptr);
