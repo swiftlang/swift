@@ -43,7 +43,7 @@ public struct UniqueArray<Element: ~Copyable>: ~Copyable {
   @usableFromInline
   internal var _storage: _RigidArray<Element>
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(_storage: consuming _RigidArray<Element>) {
     self._storage = _storage
   }
@@ -59,7 +59,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var capacity: Int {
     _assumeNonNegative(_storage.capacity)
@@ -70,7 +70,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var freeCapacity: Int {
     _assumeNonNegative(_storage.capacity &- _storage.count)
@@ -83,7 +83,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var span: Span<Element> {
     @_lifetime(borrow self)
     @_transparent
@@ -97,7 +97,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
     @_transparent
@@ -127,7 +127,7 @@ extension UniqueArray where Element: ~Copyable {
   /// - Complexity: Adds O(1) overhead to the complexity of the function
   ///    argument.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public mutating func edit<E: Error, R: ~Copyable>(
     _ body: (inout OutputSpan<Element>) throws(E) -> R
@@ -136,7 +136,7 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 internal func _growUniqueArrayCapacity(_ capacity: Int) -> Int {
   // A growth factor of 1.5 seems like a reasonable compromise between
@@ -159,7 +159,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func setCapacity(_ newCapacity: Int) {
     _storage.setCapacity(newCapacity)
   }
@@ -173,19 +173,19 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func reserveCapacity(_ n: Int) {
     _storage.reserveCapacity(n)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal mutating func _ensureFreeCapacity(_ freeCapacity: Int) {
     guard _storage.freeCapacity < freeCapacity else { return }
     _ensureFreeCapacitySlow(freeCapacity)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func _grow(freeCapacity: Int) -> Int {
     Swift.max(
@@ -193,7 +193,7 @@ extension UniqueArray where Element: ~Copyable {
       _growUniqueArrayCapacity(capacity))
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _ensureFreeCapacitySlow(_ freeCapacity: Int) {
     let newCapacity = _grow(freeCapacity: freeCapacity)
     setCapacity(newCapacity)
@@ -207,7 +207,7 @@ extension UniqueArray {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func clone() -> Self {
     UniqueArray(consuming: _storage.clone())
   }
@@ -220,7 +220,7 @@ extension UniqueArray {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func clone(capacity: Int) -> Self {
     UniqueArray(consuming: _storage.clone(capacity: capacity))
   }

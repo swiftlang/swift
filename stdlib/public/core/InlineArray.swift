@@ -120,7 +120,7 @@ extension InlineArray: @unchecked Sendable where Element: Sendable & ~Copyable {
 extension InlineArray where Element: ~Copyable {
   /// Returns a pointer to the first element in the array.
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _address: UnsafePointer<Element> {
 #if $AddressOfProperty2
@@ -132,7 +132,7 @@ extension InlineArray where Element: ~Copyable {
 
   /// Returns a buffer pointer over the entire array.
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _buffer: UnsafeBufferPointer<Element> {
     unsafe UnsafeBufferPointer<Element>(start: _address, count: count)
@@ -144,7 +144,7 @@ extension InlineArray where Element: ~Copyable {
   /// Use this when the value of the pointer could potentially be directly used
   /// by users (e.g. through the use of span or the unchecked subscript).
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _protectedAddress: UnsafePointer<Element> {
 #if $AddressOfProperty2
@@ -160,7 +160,7 @@ extension InlineArray where Element: ~Copyable {
   /// Use this when the value of the pointer could potentially be directly used
   /// by users (e.g. through the use of span or the unchecked subscript).
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _protectedBuffer: UnsafeBufferPointer<Element> {
     unsafe UnsafeBufferPointer<Element>(start: _protectedAddress, count: count)
@@ -168,7 +168,7 @@ extension InlineArray where Element: ~Copyable {
 
   /// Returns a mutable pointer to the first element in the array.
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _mutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
@@ -182,7 +182,7 @@ extension InlineArray where Element: ~Copyable {
 
   /// Returns a mutable buffer pointer over the entire array.
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _mutableBuffer: UnsafeMutableBufferPointer<Element> {
     mutating get {
@@ -199,7 +199,7 @@ extension InlineArray where Element: ~Copyable {
   /// Use this when the value of the pointer could potentially be directly used
   /// by users (e.g. through the use of span or the unchecked subscript).
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _protectedMutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
@@ -217,7 +217,7 @@ extension InlineArray where Element: ~Copyable {
   /// Use this when the value of the pointer could potentially be directly used
   /// by users (e.g. through the use of span or the unchecked subscript).
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _protectedMutableBuffer: UnsafeMutableBufferPointer<Element> {
     mutating get {
@@ -232,7 +232,7 @@ extension InlineArray where Element: ~Copyable {
   /// instance, to a mutable buffer suitable for initialization.
   @available(SwiftStdlib 6.2, *)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal static func _initializationBuffer(
     start: Builtin.RawPointer
@@ -267,7 +267,7 @@ extension InlineArray where Element: ~Copyable {
   /// - Parameter body: A closure that returns an owned `Element` to emplace at
   ///   the passed in index.
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
     _storage = try Builtin.emplace { (rawPtr) throws(E) -> () in
       let buffer = unsafe Self._initializationBuffer(start: rawPtr)
@@ -309,7 +309,7 @@ extension InlineArray where Element: ~Copyable {
   ///     preceding element, and returns an owned `Element` instance to emplace
   ///     into the array.
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init<E: Error>(
     first: consuming Element,
     next: (borrowing Element) throws(E) -> Element
@@ -350,7 +350,7 @@ extension InlineArray where Element: ~Copyable {
   }
 
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init<E: Error>(
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
@@ -373,7 +373,7 @@ extension InlineArray where Element: Copyable {
   ///
   /// - Parameter value: The instance to initialize this array with.
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(repeating value: Element) {
     _storage = Builtin.emplace {
       let buffer = unsafe Self._initializationBuffer(start: $0)
@@ -405,7 +405,7 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("fixed_storage.get_count")
   @inline(__always)
   public var count: Int {
@@ -416,7 +416,7 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var isEmpty: Bool {
     count == 0
@@ -428,7 +428,7 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var startIndex: Index {
     0
@@ -441,7 +441,7 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var endIndex: Index {
     count
@@ -451,7 +451,7 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var indices: Range<Index> {
     unsafe Range(_uncheckedBounds: (0, count))
@@ -465,7 +465,7 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public borrowing func index(after i: Index) -> Index {
     i &+ 1
@@ -479,13 +479,13 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public borrowing func index(before i: Index) -> Index {
     i &- 1
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("fixed_storage.check_index")
   @inline(__always)
   internal func _checkIndex(_ i: Index) {
@@ -500,7 +500,7 @@ extension InlineArray where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_addressableSelf
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(_ i: Index) -> Element {
     @_transparent
     borrow {
@@ -526,7 +526,7 @@ extension InlineArray where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_addressableSelf
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   public subscript(unchecked i: Index) -> Element {
     @_transparent
@@ -560,7 +560,7 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func swapAt(
     _ i: Index,
     _ j: Index
@@ -591,7 +591,7 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var span: Span<Element> {
     @_lifetime(borrow self)
     @_transparent
@@ -611,7 +611,7 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
     @_transparent

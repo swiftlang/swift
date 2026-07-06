@@ -386,7 +386,7 @@ public func _stringForPrintObject(_ value: Any) -> String {
 
 public func _debuggerTestingCheckExpect(_: String, _: String) { }
 
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 internal func _withHeapObject<R>(
   of object: AnyObject,
   _ body: (UnsafeMutableRawPointer) -> R
@@ -404,19 +404,19 @@ internal func _swift_unownedRetainCount(_: UnsafeMutableRawPointer) -> Int
 internal func _swift_weakRetainCount(_: UnsafeMutableRawPointer) -> Int
 
 // Utilities to get refcount(s) of class objects.
-@_alwaysEmitIntoClient
+@export(implementation)
 public func _getRetainCount(_ object: AnyObject) -> UInt {
   let count = unsafe _withHeapObject(of: object) { unsafe _swift_retainCount($0) }
   return UInt(bitPattern: count)
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 public func _getUnownedRetainCount(_ object: AnyObject) -> UInt {
   let count = unsafe _withHeapObject(of: object) { unsafe _swift_unownedRetainCount($0) }
   return UInt(bitPattern: count)
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 public func _getWeakRetainCount(_ object: AnyObject) -> UInt {
   let count = unsafe _withHeapObject(of: object) { unsafe _swift_weakRetainCount($0) }
   return UInt(bitPattern: count)

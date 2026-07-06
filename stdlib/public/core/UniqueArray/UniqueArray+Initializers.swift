@@ -14,21 +14,21 @@
 extension UniqueArray where Element: ~Copyable {
   /// Initializes a new unique array with no elements.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init() {
     _storage = .init(capacity: 0)
   }
   
   /// Initializes a new unique array with the specified capacity and no elements.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(capacity: Int) {
     _storage = .init(capacity: capacity)
   }
 
   /// Initializes a new unique array with the specified capacity and no elements.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(minimumCapacity: Int) {
     self.init(capacity: minimumCapacity)
   }
@@ -47,7 +47,7 @@ extension UniqueArray where Element: ~Copyable {
   ///       initialized with however many items the callback adds to the
   ///       output span before it returns (or before it throws an error).
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init<E: Error>(
     capacity: Int,
     initializingWith body: (inout OutputSpan<Element>) throws(E) -> Void
@@ -69,7 +69,7 @@ extension UniqueArray where Element: Copyable {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(repeating repeatedValue: Element, count: Int) {
     self.init(consuming: _RigidArray(repeating: repeatedValue, count: count))
   }
@@ -82,7 +82,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(consuming storage: consuming _RigidArray<Element>) {
     self._storage = storage
   }
@@ -98,7 +98,7 @@ extension UniqueArray where Element: Copyable {
   ///      just enough capacity to store the contents.
   ///   - contents: The sequence whose contents to copy into the new array.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(
     capacity: Int? = nil,
     copying contents: some Sequence<Element>
@@ -116,7 +116,7 @@ extension UniqueArray where Element: Copyable {
   ///   - span: The span whose contents to copy into the new array.
   ///      The span must not contain more than `capacity` elements.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(
     capacity: Int? = nil,
     copying span: Span<Element>

@@ -56,7 +56,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
 
   /// Extract the underlying raw continuation and discard `self`
   /// without firing the deinit trap
-  @_alwaysEmitIntoClient
+  @export(implementation)
   consuming func _takeContext() -> Builtin.RawUnsafeContinuation {
     let ctx = self.context
     discard self
@@ -67,7 +67,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   /// from its suspension point
   ///
   /// - Parameter value: The value to return from the continuation
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func resume(returning value: consuming sending Success) where Failure == Never {
     #if $BuiltinContinuationNonCopyableSuccess
     Builtin.resumeNonThrowingContinuationReturning(context, value)
@@ -81,7 +81,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   /// from its suspension point
   ///
   /// - Parameter value: The value to return from the continuation
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func resume(returning value: consuming sending Success) {
     #if $BuiltinContinuationNonCopyableSuccess
     Builtin.resumeThrowingContinuationReturning(context, value)
@@ -95,7 +95,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   /// from its suspension point
   ///
   /// - Parameter error: The error to throw from the continuation
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func resume(throwing error: __owned Failure) {
     #if $BuiltinContinuationNonCopyableSuccess
     Builtin.resumeThrowingContinuationThrowing(context, error)
@@ -111,7 +111,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   ///
   /// - Parameter result: A value to either return or throw from the
   ///   continuation
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func resume(
     with result: consuming sending Result<Success, Failure>
   ) {
@@ -130,7 +130,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
 
   /// Resume the task awaiting the continuation by having it return
   /// from its suspension point
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func resume() where Success == Void {
     self.resume(returning: ())
   }
@@ -158,7 +158,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
 ///   - throwing: The `Failure` type that may be thrown
 ///   - body: A closure that takes a `Continuation` parameter
 /// - Returns: The value the continuation is resumed with
-@_alwaysEmitIntoClient
+@export(implementation)
 @available(SwiftStdlib 6.4, *)
 public nonisolated(nonsending) func withContinuation<Success: ~Copyable, Failure: Error>(
   of: Success.Type = Success.self,
@@ -195,7 +195,7 @@ public nonisolated(nonsending) func withContinuation<Success: ~Copyable, Failure
 ///   - of: The `Success` type returned by the continuation
 ///   - body: A closure that takes a `Continuation` parameter
 /// - Returns: The value the continuation is resumed with
-@_alwaysEmitIntoClient
+@export(implementation)
 @available(SwiftStdlib 6.4, *)
 public nonisolated(nonsending) func withContinuation<Success: ~Copyable>(
   of: Success.Type = Success.self,
@@ -221,7 +221,7 @@ extension CheckedContinuation {
   /// the non-copyable semantics would not be able to statically enforce
   /// the resume-once semantics, however the correct use of the
   /// continuation is enforced in some way at runtime.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(
     _ continuation: consuming Continuation<T, E>,
     function: String = #function
@@ -243,7 +243,7 @@ extension UnsafeContinuation {
   /// the non-copyable semantics would not be able to statically enforce
   /// the resume-once semantics, however the correct use of the
   /// continuation is enforced in some way at runtime.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(
     _ continuation: consuming Continuation<T, E>
   ) {

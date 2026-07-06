@@ -166,7 +166,7 @@ func _stdlib_atomicLoadARCRef(
 }
 
 @_transparent
-@_alwaysEmitIntoClient
+@export(implementation)
 @discardableResult
 public func _stdlib_atomicAcquiringInitializeARCRef<T: AnyObject>(
   object target: UnsafeMutablePointer<T?>,
@@ -192,7 +192,7 @@ public func _stdlib_atomicAcquiringInitializeARCRef<T: AnyObject>(
   return unsafe Unmanaged<T>.fromOpaque(ptr)
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 public func _stdlib_atomicAcquiringLoadARCRef<T: AnyObject>(
   object target: UnsafeMutablePointer<T?>

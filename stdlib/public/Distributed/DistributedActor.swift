@@ -361,7 +361,7 @@ extension DistributedActor {
   /// state.
   ///
   /// When the actor is remote, the closure won't be executed and this function will return nil.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   // we need to silgen_name here because the signature is the same as __abi_whenLocal,
   // and even though this is @AEIC, the symbol name would conflict.
   @_silgen_name("$s11Distributed0A5ActorPAAE20whenLocalTypedThrowsyqd__Sgqd__xYiYaYbqd_0_YKXEYaqd_0_YKs8SendableRd__s5ErrorRd_0_r0_lF")
@@ -401,7 +401,7 @@ extension DistributedActor {
 /// distributed actor
 @available(SwiftStdlib 5.7, *)
 extension DistributedActor {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_implements(Actor, unownedExecutor)
   public nonisolated var __actorUnownedExecutor: UnownedSerialExecutor {
     if #available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *) {

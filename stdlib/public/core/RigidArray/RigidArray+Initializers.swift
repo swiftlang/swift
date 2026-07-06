@@ -16,7 +16,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal init() {
     unsafe _storage = .init(start: nil, count: 0)
@@ -25,7 +25,7 @@ extension _RigidArray where Element: ~Copyable {
   
   /// Initializes a new rigid array with the specified capacity and no elements.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(capacity: Int) {
     _precondition(capacity >= 0, "Array capacity must be nonnegative")
     if capacity > 0 {
@@ -50,7 +50,7 @@ extension _RigidArray where Element: ~Copyable {
   ///       initialized with however many items the callback adds to the
   ///       output span before it returns (or before it throws an error).
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init<E: Error>(
     capacity: Int,
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
@@ -72,7 +72,7 @@ extension _RigidArray where Element: Copyable {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(repeating repeatedValue: Element, count: Int) {
     self.init(capacity: count)
     unsafe _freeSpace.initialize(repeating: repeatedValue)
@@ -90,7 +90,7 @@ extension _RigidArray where Element: Copyable {
   ///   - contents: The sequence whose contents to copy into the new array.
   ///      The sequence must not contain more than `capacity` elements.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal init(
     capacity: Int,
@@ -109,7 +109,7 @@ extension _RigidArray where Element: Copyable {
   ///   - contents: The collection whose contents to copy into the new array.
   ///      The collection must not contain more than `capacity` elements.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal init(
     capacity: Int? = nil,
@@ -128,7 +128,7 @@ extension _RigidArray where Element: Copyable {
   ///   - span: The span whose contents to copy into the new array.
   ///      The span must not contain more than `capacity` elements.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal init(
     capacity: Int? = nil,

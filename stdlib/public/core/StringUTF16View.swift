@@ -425,7 +425,7 @@ extension String.UTF16View: BidirectionalCollection {
     return self[_unchecked: idx]
   }
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal subscript(_unchecked idx: Index) -> UTF16.CodeUnit {
     if _fastPath(_guts.isFastUTF8) {
       let scalar = _guts.fastUTF8Scalar(
@@ -708,7 +708,7 @@ extension String.UTF16View {
   // (referring to the second surrogate) and returns `idx`. Otherwise, this will
   // scalar-align the index. This is needed because we may be passed a
   // non-scalar-aligned index from the UTF8View.
-  @_alwaysEmitIntoClient // Swift 5.1
+  @export(implementation) // Swift 5.1
   @inline(__always)
   internal func _utf16AlignNativeIndex(_ idx: String.Index) -> String.Index {
     _internalInvariant(!_guts.isForeign)
