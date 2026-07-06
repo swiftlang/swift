@@ -408,39 +408,6 @@ private func provideValue(
   }
 }
 
-/// If the memory location depends on something, insert a dependency for the loaded value:
-///
-///     %2 = mark_dependence %1 on %0
-///     %3 = load %2
-/// ->
-///     %2 = mark_dependence %1 on %0 // not needed anymore, can be removed eventually
-///     %3 = load %2
-///     %4 = mark_dependence %3 on %0
-///     // replace %3 with %4
-///
-private func insertMarkDependencies(for load: LoadInst, _ context: FunctionPassContext) {
-  var inserter = MarkDependenceInserter(load: load, context: context)
-  _ = inserter.walkUp(address: load.address, path: UnusedWalkingPath())
-}
-
-private struct MarkDependenceInserter : AddressUseDefWalker {
-  let load: LoadInst
-  let context: FunctionPassContext
-
-  mutating func walkUp(address: Value, path: UnusedWalkingPath) -> WalkResult {
-    if let mdi = address as? MarkDependenceInst {
-      let builder = Builder(after: load, context)
-      let newMdi = builder.createMarkDependence(value: load, base: mdi.base, kind: mdi.dependenceKind)
-      load.uses.ignore(user: newMdi).replaceAll(with: newMdi, context)
-    }
-    return walkUpDefault(address: address, path: path)
-  }
-
-  mutating func rootDef(address: Value, path: UnusedWalkingPath) -> WalkResult {
-    return .continueWalk
-  }
-}
-
 /// In case of a `load [take]` shrink lifetime of the value in memory back to the `availableValue`
 /// and return the (possibly projected) available value. For example:
 ///
