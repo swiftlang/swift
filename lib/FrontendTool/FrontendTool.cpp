@@ -747,6 +747,25 @@ with open(sys.argv[2]) as f:
 # constant offset. We build a mapping by walking both trees in parallel
 # (corresponding pointers appear at the same structural position), then
 # normalize the original to use the deserialized's numbering.
+def filter_sendable_metatype(obj):
+    """Remove SendableMetatype implied conformances from the deserialized AST.
+    These are auto-created by the type checker during deserialization when
+    a Sendable conformance is resolved, but not present in the original."""
+    if isinstance(obj, dict):
+        if 'inherits' in obj and 'conformances' in obj.get('inherits', {}):
+            obj['inherits']['conformances'] = [
+                c for c in obj['inherits']['conformances']
+                if not (c.get('protocol') == 's:s16SendableMetatypeP' and
+                        c.get('source_kind') == 'implied')
+            ]
+        for k, v in obj.items():
+            filter_sendable_metatype(v)
+    elif isinstance(obj, list):
+        for item in obj:
+            filter_sendable_metatype(item)
+
+filter_sendable_metatype(deser)
+
 pointer_mapping = {}
 collect_pointer_map(orig, deser, pointer_mapping)
 orig = normalize_pointers(orig, pointer_mapping)

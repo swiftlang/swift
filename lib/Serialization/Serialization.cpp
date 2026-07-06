@@ -3832,6 +3832,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     for (auto conformance : declContext->getLocalConformances(lookupKind)) {
       if (S.shouldSkipDecl(conformance->getProtocol()))
         continue;
+      // AST cache: skip SendableMetatype conformances — they're implied by
+      // Sendable and added by typeCheckDelayedFunctions() before serialization,
+      // but not present in the original type-checked AST dump.
+      if (conformance->getProtocol() == S.getASTContext().getProtocol(KnownProtocolKind::SendableMetatype))
+        continue;
 
       data.push_back(S.addConformanceRef(conformance));
       count++;
