@@ -783,9 +783,13 @@ private:
         auto kind = AFD->getBodyKind();
         // Read the body entry regardless of kind (for alignment).
         auto *body = bodyDeser.deserializeBody();
-        // Only set the body for Deserialized or None kinds.
-        if (body && (kind == AbstractFunctionDecl::BodyKind::Deserialized ||
-                     kind == AbstractFunctionDecl::BodyKind::None)) {
+        // Only set the body for BodyKind::None functions (no body text
+        // from bitstream). For Deserialized functions, the body text is
+        // re-parsed by ParseAbstractFunctionBodyRequest::evaluate, which
+        // works for both -verify-ast-cache (JSON dump) and -emit-object
+        // (SILGen). Setting bodyBlob bodies with ErrorExpr placeholders
+        // would crash SILGen.
+        if (body && kind == AbstractFunctionDecl::BodyKind::None) {
           AFD->setBody(body, AbstractFunctionDecl::BodyKind::Parsed);
           ctx.evaluator.cacheOutput(ParseAbstractFunctionBodyRequest{AFD},
                                     BodyAndFingerprint(body, std::nullopt));
