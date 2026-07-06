@@ -3351,7 +3351,22 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     if (!FnScope)
       SILFn->setDebugScope(DS);
 
-    auto CachedScope = ScopeCache.find(FnScope);
+    // A polymorphic function can be inlined more than once with different type
+    // substitutions -- most notably once per element of a parameter-pack
+    // expansion, where a single generic specialization is inlined several times
+    // with different concrete types. DWARF stores a parameter's type in the
+    // (single) abstract DISubprogram, so instances that substitute different
+    // concrete types for the same parameter cannot share one subprogram: their
+    // differently-typed (and differently-sized) parameters would otherwise
+    // collide on a single abstract variable. Give each such inlined instance
+    // its own DISubprogram, keyed by its own inlined scope rather than by the
+    // function's canonical scope.
+    bool DistinctInlinedInstance =
+        DS != FnScope && DS->InlinedCallSite &&
+        SILFn->getLoweredFunctionType()->isPolymorphic();
+
+    const SILDebugScope *CacheKey = DistinctInlinedInstance ? DS : FnScope;
+    auto CachedScope = ScopeCache.find(CacheKey);
     if (CachedScope != ScopeCache.end())
       return cast<llvm::DIScope>(CachedScope->second);
 
@@ -3364,7 +3379,11 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
         SILFn->isGeneric();
     if (!SILFn->getName().empty() && !SILFn->isZombie() && !genericInEmbedded)
       Fn = IGM.getAddrOfSILFunction(SILFn, NotForDefinition);
-    auto *SP = emitFunction(*SILFn, Fn);
+    auto *SP =
+        DistinctInlinedInstance
+            ? emitFunction(DS, Fn, SILFn->getRepresentation(),
+                           SILFn->getLoweredType(), SILFn->getDeclContext())
+            : emitFunction(*SILFn, Fn);
 
     // Cache it.
     ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
