@@ -1577,6 +1577,13 @@ void IRGenModule::constructInitialFnAttributes(
     Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
   }
 
+  // When the Clang configuration disables builtins Clang stamps
+  // its functions with the "no-builtins" attribute. Mirror that on
+  // the Swift side (otherwise the mismatch prevents function inlining.)
+  if (getClangASTContext().getLangOpts().NoBuiltin) {
+    Attrs.addAttribute("no-builtins");
+  }
+
   // Mark as 'nounwind' to avoid referencing exception personality symbols, this
   // is okay even with C++ interop on because the landinpads are trapping.
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
