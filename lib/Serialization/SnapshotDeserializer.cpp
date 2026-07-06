@@ -275,28 +275,36 @@ private:
         if (DC->isTypeContext()) {
           auto *selfDecl = AFD->getImplicitSelfDecl(/*createIfNeeded=*/true);
           if (selfDecl) {
-            auto selfTy = DC->getSelfInterfaceType();
-            if (selfTy) {
-              selfDecl->setInterfaceType(selfTy);
-              if (DC->getDeclaredInterfaceType()->hasReferenceSemantics()) {
-                selfDecl->setSpecifier(ParamSpecifier::Default);
-              } else if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-                // Set/modify accessors on value types take inout self.
-                auto kind = accessor->getAccessorKind();
-                bool isMutatingAccessor =
-                    (kind == AccessorKind::Set ||
-                     kind == AccessorKind::Modify ||
-                     kind == AccessorKind::Init);
-                selfDecl->setSpecifier(isMutatingAccessor
-                                       ? ParamSpecifier::InOut
-                                       : ParamSpecifier::Default);
-              } else if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-                selfDecl->setSpecifier(FD->isMutating()
-                                       ? ParamSpecifier::InOut
-                                       : ParamSpecifier::Default);
-              } else if (isa<ConstructorDecl>(AFD)) {
-                selfDecl->setSpecifier(ParamSpecifier::InOut);
-              }
+            // Only set interface type for instance methods, not static methods.
+            // Static methods' self decl doesn't have an interface type in the
+            // original type-checked AST dump.
+            bool isStatic = false;
+            if (auto *FD = dyn_cast<FuncDecl>(AFD))
+              isStatic = FD->isStatic();
+            else if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
+              isStatic = accessor->isStatic();
+            if (!isStatic && !isa<DestructorDecl>(AFD)) {
+              auto selfTy = DC->getSelfInterfaceType();
+              if (selfTy)
+                selfDecl->setInterfaceType(selfTy);
+            }
+            if (DC->getDeclaredInterfaceType()->hasReferenceSemantics()) {
+              selfDecl->setSpecifier(ParamSpecifier::Default);
+            } else if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+              auto kind = accessor->getAccessorKind();
+              bool isMutatingAccessor =
+                  (kind == AccessorKind::Set ||
+                   kind == AccessorKind::Modify ||
+                   kind == AccessorKind::Init);
+              selfDecl->setSpecifier(isMutatingAccessor
+                                     ? ParamSpecifier::InOut
+                                     : ParamSpecifier::Default);
+            } else if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+              selfDecl->setSpecifier(FD->isMutating()
+                                     ? ParamSpecifier::InOut
+                                     : ParamSpecifier::Default);
+            } else if (isa<ConstructorDecl>(AFD)) {
+              selfDecl->setSpecifier(ParamSpecifier::InOut);
             }
           }
         }
