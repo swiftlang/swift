@@ -329,7 +329,10 @@ Expr *BodyDeserializer::deserializeExpr() {
     auto *rhs = deserializeExpr();
     if (!lhs || !rhs)
       return new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
-    return BinaryExpr::create(Ctx, lhs, nullptr, rhs, /*implicit=*/true, ty);
+    // BinaryExpr needs a non-null fn (the operator declref) for getLoc().
+    // Use an ErrorExpr as a placeholder to avoid crashes.
+    auto *fn = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
+    return BinaryExpr::create(Ctx, lhs, fn, rhs, /*implicit=*/true, ty);
   }
   case ExprKindTag::Call: {
     auto *fn = deserializeExpr();
