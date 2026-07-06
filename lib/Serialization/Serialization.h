@@ -367,6 +367,15 @@ protected:
   /// non-inlinable function bodies, enabling structural AST verification.
   virtual bool serializeAllBodyText() const { return false; }
 
+  /// Hook called near the end of writeAST, after all decls and types have
+  /// been collected (via addDeclRef/addTypeRef) but BEFORE writeAllDeclsAndTypes
+  /// flushes the type/decl tables to the bitstream. ASTCacheSerializer
+  /// overrides this to serialize function body AST nodes (BodyASTSerializer),
+  /// which call addTypeRef/addDeclRef for body-local references. Without this
+  /// hook, body serialization would add new type IDs after the tables are
+  /// flushed, causing "invalid type ID" crashes on deserialization.
+  virtual void serializeBodies() {}
+
   /// Check if a decl should be skipped during serialization.
   bool shouldSkipDecl(const Decl *D) const;
 

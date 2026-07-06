@@ -45,10 +45,12 @@ namespace {
 /// ASTCacheSerializer overrides the cross-reference behavior of Serializer
 /// to emit CrossFileDeclRef records for same-module cross-file decls.
 class ASTCacheSerializer : public Serializer {
+  ArrayRef<AbstractFunctionDecl*> allFuncs;
 public:
   ASTCacheSerializer(ModuleOrSourceFile DC,
-                     const SerializationOptions &opts)
-      : Serializer(SWIFTMODULE_SIGNATURE, DC, opts) {}
+                     const SerializationOptions &opts,
+                     ArrayRef<AbstractFunctionDecl*> funcs)
+      : Serializer(SWIFTMODULE_SIGNATURE, DC, opts), allFuncs(funcs) {}
   /// Return true for same-module cross-file decls so they route through
   /// writeCrossReference instead of being inlined as copies.
   bool isDeclXRef(const Decl *D) const override {
@@ -72,10 +74,27 @@ public:
   /// cache round-trips the full AST for structural verification.
   bool serializeAllBodyText() const override { return true; }
 
+  /// Serialize function body AST nodes to the ASTCACHE_BODY_BLOCK_ID block.
+  /// Called by Serializer::writeAST BEFORE writeAllDeclsAndTypes flushes
+  /// the type/decl tables, so body-local addTypeRef/addDeclRef calls are
+  /// included in the flushed tables.
+  void serializeBodies() override {
+    BodyASTSerializer bodySer(*this);
+    for (auto *AFD : allFuncs) {
+      auto kind = AFD->getBodyKind();
+      if (kind == AbstractFunctionDecl::BodyKind::TypeChecked ||
+          kind == AbstractFunctionDecl::BodyKind::Synthesize ||
+          kind == AbstractFunctionDecl::BodyKind::None) {
+        auto *body = AFD->getBody(/*canSynthesize=*/true);
+        DeclID funcDeclID = addDeclRef(AFD);
+        bodySer.serializeBody(funcDeclID, body);
+      }
+    }
+  }
+
   /// Serialize the SourceFile to the given stream using the overridden
   /// isDeclXRef to route same-module cross-file decls through writeCrossReference.
-  void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                      ArrayRef<AbstractFunctionDecl*> allFuncs) {
+  void writeToStream(raw_ostream &os, ModuleOrSourceFile DC) {
     writeBlockInfoBlock();
     {
       BCBlockRAII moduleBlock(Out, MODULE_BLOCK_ID, 2);
@@ -84,18 +103,6 @@ public:
       writeSIL(nullptr);
       writeAST(DC);
       writeHiddenTypeLayoutsBlock();
-      // Serialize function bodies to the body block.
-      BodyASTSerializer bodySer(*this);
-      for (auto *AFD : allFuncs) {
-        auto kind = AFD->getBodyKind();
-        if (kind == AbstractFunctionDecl::BodyKind::TypeChecked ||
-            kind == AbstractFunctionDecl::BodyKind::Synthesize ||
-            kind == AbstractFunctionDecl::BodyKind::None) {
-          auto *body = AFD->getBody(/*canSynthesize=*/true);
-          DeclID funcDeclID = addDeclRef(AFD);
-          bodySer.serializeBody(funcDeclID, body);
-        }
-      }
     }
     SerializerBase::writeToStream(os);
   }
@@ -188,9 +195,9 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
     langOpts.AllowModuleWithCompilerErrors = true;
 
     ASTCacheSerializer serializer(
-        ModuleOrSourceFile(const_cast<SourceFile *>(&SF)), opts);
+        ModuleOrSourceFile(const_cast<SourceFile *>(&SF)), opts, allFuncs);
     serializer.writeToStream(bitstreamOS,
-        ModuleOrSourceFile(const_cast<SourceFile *>(&SF)), allFuncs);
+        ModuleOrSourceFile(const_cast<SourceFile *>(&SF)));
 
     langOpts.AllowModuleWithCompilerErrors = savedAllowErrors;
     langOpts.AllowModuleWithCompilerErrors = savedAllowErrors;

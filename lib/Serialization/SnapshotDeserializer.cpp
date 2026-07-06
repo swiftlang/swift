@@ -802,13 +802,13 @@ private:
         auto *D = mf->getDecl(kv.first);
         if (!D) continue;
         auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
-        if (!AFD) continue;
-        auto kind = AFD->getBodyKind();
         auto *body = kv.second;
-        // Only set the body for BodyKind::None functions (no body text
-        // from bitstream). For Deserialized functions, the body text is
-        // re-parsed by ParseAbstractFunctionBodyRequest::evaluate.
-        if (body && kind == AbstractFunctionDecl::BodyKind::None) {
+        // Set the deserialized body on the function.
+        // contains fully type-checked AST nodes (not ErrorExpr placeholders),
+        // so this is safe for both -verify-ast-cache (JSON dump) and -emit-object
+        // (SILGen). Cache the ParseAbstractFunctionBodyRequest so the body is
+        // returned without re-parsing.
+        if (body) {
           AFD->setBody(body, AbstractFunctionDecl::BodyKind::Parsed);
           ctx.evaluator.cacheOutput(ParseAbstractFunctionBodyRequest{AFD},
                                     BodyAndFingerprint(body, std::nullopt));

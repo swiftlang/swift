@@ -492,7 +492,15 @@ BodyASTDeserializer::deserializeAllBodies(ArrayRef<uint8_t> bitstreamData) {
         }
         continue;
       }
-      // Skip other sub-blocks.
+      // For MODULE_BLOCK, ENTER it to find nested body blocks.
+      // Skip all other sub-blocks.
+      if (entry.ID == llvm::bitc::FIRST_APPLICATION_BLOCKID) {
+        if (llvm::Error Err = cursor.EnterSubBlock(entry.ID)) {
+          consumeError(std::move(Err));
+          continue;
+        }
+        continue;
+      }
       if (llvm::Error Err = cursor.SkipBlock()) {
         consumeError(std::move(Err));
         break;

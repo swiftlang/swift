@@ -561,3 +561,184 @@ encounter these records.
 |------|-------|
 | `PatternImplicitTests.cpp` | `Pattern::clearImplicit()` behavior: clears on named pattern, non-recursive, setImplicit re-arms, no-op on non-implicit (4 tests) |
 | `GenericSignatureTests.cpp` | `GenericContext::hasComputedGenericSignature()`: false before set, true after (2 tests) |
+
+## 11. Unsupported body AST nodes (2026-07-06)
+
+The `BodyASTSerializer`/`BodyASTDeserializer` currently handle a small subset
+of expression/statement kinds. **ALL must be implemented** for
+`-verify-ast-cache` to reach zero diffs. Reward-hacking by adding only the
+kinds that appear in test files is explicitly forbidden — every kind that can
+appear in a type-checked function body must round-trip.
+
+### 11.1 Unsupported TYPE kinds (Serializer::TypeSerializer)
+
+`UNSUPPORTED_TYPE` in `Serialization.cpp:5838-5844` marks types that abort on
+serialization. These never appear in decl signatures (so the swiftmodule
+serializer never needed them), but DO appear in type-checked function bodies.
+
+| Type kind | Why it appears in bodies | Fix |
+|-----------|--------------------------|-----|
+| `LValueType` | `inout` params, `&` expressions, `borrow` lvalues | Add `visitLValueType` that serializes `{underlyingTypeID, isMutating}` and a matching deserializer in `Deserialization.cpp` `readType` |
+| `InOutType` | `inout` parameter interface types | Same pattern as LValueType: `{underlyingTypeID}` |
+| `ModuleType` | `import` expressions (rare) | Serialize module name as IdentifierID |
+| `TypeVariableType` | Unresolved generics (rare) | Serialize constraint info |
+| `ErrorUnionType` / `JoinType` / `MeetType` | Type inference intermediate state (should be resolved by typecheck) | Skip (typeID=0) — these should not appear in type-checked bodies |
+
+### 11.2 Unsupported EXPRESSION kinds (BodyASTSerializer)
+
+The `ExprKind` enum in `ModuleFormat.h:1016-1030` only defines 13 kinds
+(0-12). The full `ExprNodes.def` defines ~100+ concrete kinds. **All concrete
+(non-abstract, non-UNCHECKED) kinds must be serialized.**
+
+#### Currently supported (10):
+Error, DeclRef, IntegerLiteral, MemberRef, Binary, Call, Assign, InOut,
+DotSyntaxCall, Type, Tuple, Paren, UnresolvedDot
+
+#### Missing — MUST implement (grouped by category):
+
+**Literals (5):**
+- NilLiteralExpr — `nil`
+- FloatLiteralExpr — `3.14`
+- BooleanLiteralExpr — `true`/`false`
+- StringLiteralExpr — `"hello"`
+- MagicIdentifierLiteralExpr — `#file`, `#line`, `#function`, `#dsohandle`
+
+**Decl refs (2):**
+- SuperRefExpr — `super`
+- OtherConstructorDeclRefExpr — `.init`
+
+**Identity wrappers (5):**
+- ParenExpr — `(x)` — wraps subExpr
+- DotSelfExpr — `.self`
+- AwaitExpr — `await x`
+- UnsafeExpr — `unsafe x`
+- BorrowExpr — `borrow x`
+
+**Conversions (30+):**
+All `ImplicitConversionExpr` subclasses: Load, ABISafeConversion,
+DestructureTuple, FunctionConversion, CovariantFunctionConversion,
+CovariantReturnConversion, MetatypeConversion, CollectionUpcastConversion,
+Erasure, AnyHashableErasure, BridgeToObjC, BridgeFromObjC,
+ConditionalBridgeFromObjC, DerivedToBase, ArchetypeToSuper, InjectIntoOptional,
+ClassMetatypeToObject, ExistentialMetatypeToObject, ProtocolMetatypeToObject,
+InOutToPointer, ArrayToPointer, StringToPointer, PointerToPointer,
+ForeignObjectConversion, UnevaluatedInstance, UnderlyingToOpaque, Unreachable,
+DifferentiableFunction, LinearFunction, DifferentiableFunctionExtractOriginal,
+LinearFunctionExtractOriginal, LinearToDifferentiableFunction,
+ActorIsolationErasure, UnsafeCast
+
+All `ExplicitCastExpr` subclasses: ForcedCheckedCast, ConditionalCheckedCast,
+Is, Coerce
+
+**Collection literals (3):**
+- ArrayExpr — `[1, 2, 3]`
+- DictionaryExpr — `["a": 1]`
+- KeyPathApplicationExpr — `obj[keyPath: \.property]`
+
+**Closures (2):**
+- ClosureExpr — `{ args in body }`
+- AutoClosureExpr — implicit autoclosure
+
+**Misc (20+):**
+- TupleElementExpr — `tuple.0`
+- ForceValueExpr — `x!`
+- BindOptionalExpr — `x?` (optional chaining)
+- OptionalEvaluationExpr — implicit
+- OpenExistentialExpr — implicit
+- MakeTemporarilyEscapableExpr — implicit
+- PrefixUnaryExpr — `-x`, `!x`
+- PostfixUnaryExpr — `x++`
+- KeyPathExpr — `\Type.property`
+- CaptureListExpr — `[weak self] { ... }`
+- TernaryExpr — `cond ? a : b`
+- EnumIsCaseExpr — `case .foo`
+- DiscardAssignmentExpr — `_ =`
+- CopyExpr — `copy x`
+- ConsumeExpr — `consume x`
+- VarargExpansionExpr — `x...`
+- PackElementExpr, PackExpansionExpr, MaterializePackExpr — variadic generics
+- ExtractFunctionIsolationExpr — implicit
+- DynamicTypeExpr — `type(of: x)`
+- RebindSelfInConstructorExpr — implicit
+- OpaqueValueExpr — implicit
+- PropertyWrapperValuePlaceholderExpr, AppliedPropertyWrapperExpr — property wrappers
+- DefaultArgumentExpr — implicit
+- UnresolvedMemberChainResultExpr — implicit
+- SequenceExpr — pre-resolution (should not appear after typecheck)
+- TapExpr — `tap` (debugging)
+- LazyInitializerExpr — `lazy`
+- CodeCompletionExpr, EditorPlaceholderExpr — IDE only
+- MacroExpansionExpr — macro expansion
+- TypeValueExpr — `Type.self` variant
+- CurrentContextIsolationExpr — implicit
+- ObjCSelectorExpr — `#selector`
+- SingleValueStmtExpr — implicit
+- KeyPathDotExpr, TypeJoinExpr, ArrowExpr, UnresolvedPatternExpr — unchecked (should not appear after typecheck)
+- OverloadedDeclRefExpr, UnresolvedDeclRefExpr, UnresolvedSpecializeExpr, UnresolvedMemberExpr — unchecked (should not appear after typecheck)
+
+### 11.3 Unsupported STATEMENT kinds (BodyASTSerializer)
+
+#### Currently supported (6):
+Error, Brace, Return, Yield, Switch, Case
+
+#### Missing — MUST implement:
+- ThenStmt — if statement then-branch (trivial wrapper around BraceStmt)
+- DeferStmt — `defer { ... }`
+- IfStmt — `if cond { ... }`
+- GuardStmt — `guard cond else { ... }`
+- WhileStmt — `while cond { ... }`
+- RepeatWhileStmt — `repeat { ... } while cond`
+- DoStmt — `do { ... }`
+- DoCatchStmt — `do { ... } catch { ... }`
+- ForEachStmt — `for x in seq { ... }`
+- BreakStmt — `break`
+- ContinueStmt — `continue`
+- FallthroughStmt — `fallthrough`
+- FailStmt — implicit fail
+- ThrowStmt — `throw x`
+- DiscardStmt — `discard`
+- PoundAssertStmt — `#assert`
+- OpaqueStmt — implicit
+
+### 11.4 LOCAL_DECL records
+The `LOCAL_DECL` record kind (value 4) is defined in `ModuleFormat.h` but
+NOT implemented in either serializer or deserializer. Local decls
+(VarDecl, ParamDecl) created during type-checking inside function bodies
+need to be serialized so that `let x = ...` declarations in bodies round-trip.
+
+### 11.5 Implementation strategy
+Each subagent implements a category:
+1. **Types**: Add LValueType + InOutType serialization to
+   `Serializer::TypeSerializer` (`Serialization.cpp:5838`) and deserialization
+   to `ModuleFile::readType` (`Deserialization.cpp`).
+2. **Literals + simple exprs**: NilLiteral, FloatLiteral, BooleanLiteral,
+   StringLiteral, MagicIdentifierLiteral, SuperRef, OtherConstructorDeclRef,
+   Paren, DotSelf, Await, Unsafe, Borrow, Copy, Consume, ForceValue,
+   BindOptional, OptionalEvaluation, TupleElement, Ternary, EnumIsCase.
+3. **Conversions**: All ImplicitConversionExpr subclasses (serialize subExpr
+   + type) and ExplicitCastExpr subclasses.
+4. **Collections + Closures**: ArrayExpr, DictionaryExpr,
+   KeyPathApplicationExpr, ClosureExpr, AutoClosureExpr, CaptureListExpr.
+5. **Statements**: Then, Defer, If, Guard, While, RepeatWhile, Do, DoCatch,
+   ForEach, Break, Continue, Fallthrough, Fail, Throw, Discard, PoundAssert.
+6. **Local decls**: Implement LOCAL_DECL record for VarDecl/ParamDecl.
+
+Each subagent must:
+a. Add the ExprKind/StmtKind enum value to `ModuleFormat.h`.
+b. Add serialization to `BodyASTSerializer.cpp`.
+c. Add deserialization to `BodyASTDeserializer.cpp`.
+d. Add unit tests to `BodyASTSerializationTests.cpp`.
+e. Verify build: `ninja swift-frontend SwiftASTTests`.
+f. Verify tests pass: `unittests/AST/SwiftASTTests --gtest_filter="*BodyAST*"`.
+
+### 11.6 Key patterns
+- **IdentityExpr subclasses** (Paren, DotSelf, Await, Unsafe, Borrow,
+  UnresolvedMemberChainResult): serialize `{subExprID}`, trivial.
+- **ImplicitConversionExpr subclasses**: serialize `{subExprID}`. All 30+
+  have the same shape — they wrap a subExpr and have a type. The deserializer
+  can use a single case for all of them, dispatching on the ExprKind.
+- **ExplicitCastExpr subclasses**: serialize `{subExprID, targetTypeID,
+  castKind}`.
+- **LiteralExpr subclasses**: serialize kind-specific data (bool value, string
+  value, float value) + typeID.
+- **Control flow stmts**: serialize condition expr + body stmt + else body.

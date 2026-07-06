@@ -7381,6 +7381,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     }
   }
 
+  // Allow subclasses to serialize additional entities (e.g., body AST nodes)
+  // that reference types/decls via addTypeRef/addDeclRef. Must happen BEFORE
+  // writeAllDeclsAndTypes flushes the tables.
+  serializeBodies();
+
   writeAllDeclsAndTypes();
   std::vector<CharOffset> identifierOffsets = writeAllIdentifiers();
 
