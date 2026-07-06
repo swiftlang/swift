@@ -63,11 +63,12 @@ struct FieldRecordBase {
   const bool IsIndirectCase;
   const bool IsVar;
   const bool HasMangledTypeName;
+  const bool IsArtificial;
 
-  FieldRecordBase(bool IsIndirectCase, bool IsVar,
-                       bool HasMangledTypeName)
+  FieldRecordBase(bool IsIndirectCase, bool IsVar, bool HasMangledTypeName,
+                  bool IsArtificial = false)
       : IsIndirectCase(IsIndirectCase), IsVar(IsVar),
-        HasMangledTypeName(HasMangledTypeName) {}
+        HasMangledTypeName(HasMangledTypeName), IsArtificial(IsArtificial) {}
 
   virtual ~FieldRecordBase(){};
 

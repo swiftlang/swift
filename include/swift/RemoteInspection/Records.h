@@ -111,6 +111,8 @@ public:
   bool isVar() const {
     return Flags.isVar();
   }
+
+  bool isArtificial() const { return Flags.isArtificial(); }
 };
 using FieldRecord = TargetFieldRecord<InProcess>;
 
