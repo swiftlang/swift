@@ -642,6 +642,38 @@ private:
         }
       }
     }
+    // Remove implicit TransparentAttr from deserialized accessors. The
+    // serializer writes it because typeCheckDelayedFunctions() triggers
+    // Remove implicit TransparentAttr from deserialized accessors where the
+    // storage decl is not @usableFromInline/@inlinable. The serializer writes
+    // TransparentAttr because typeCheckDelayedFunctions() triggers
+    // IsAccessorTransparentRequest, which returns true for all implicit
+    // getters of non-resilient stored properties. But the original dump
+    // (before serialization) doesn't have it for non-inlinable accessors.
+    for (auto *D : decls) {
+      auto walkRemoveTransparent = [&](Decl *decl) {
+        if (auto *ASD = dyn_cast<AbstractStorageDecl>(decl)) {
+          // Check if the storage is @usableFromInline or @inlinable.
+          bool isInlinable = ASD->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+                             ASD->getAttrs().hasAttribute<InlinableAttr>();
+          if (!isInlinable) {
+            for (auto *accessor : ASD->getAllAccessors()) {
+              auto &attrs = accessor->getAttrs();
+              if (auto *ta = attrs.getAttribute<TransparentAttr>()) {
+                if (ta->isImplicit()) {
+                  attrs.removeAttribute(ta);
+                }
+              }
+            }
+          }
+        }
+      };
+      walkRemoveTransparent(D);
+      if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+        for (auto *member : IDC->getMembers())
+          walkRemoveTransparent(member);
+      }
+    }
     // Reconstruct TrailingWhereClause for extensions from whereClausesBlob.
     // The serializer stores the source text of each extension's where clause.
     // We re-parse it with a minimal parser to reconstruct the RequirementRepr

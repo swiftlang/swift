@@ -882,7 +882,11 @@ void IsAccessorTransparentRequest::cacheResult(bool value) const {
 
   // For interface printing, API diff, etc.
   if (value) {
-    if (!accessor->getAttrs().hasAttribute<TransparentAttr>()) {
+    // Don't add TransparentAttr to accessors deserialized from the AST cache.
+    // The original AST may not have had it evaluated, and adding it creates
+    // a diff in -verify-ast-cache.
+    if (accessor->getBodyKind() != AbstractFunctionDecl::BodyKind::Deserialized &&
+        !accessor->getAttrs().hasAttribute<TransparentAttr>()) {
       auto &ctx = accessor->getASTContext();
       accessor->addAttribute(new (ctx) TransparentAttr(/*IsImplicit=*/true));
     }
