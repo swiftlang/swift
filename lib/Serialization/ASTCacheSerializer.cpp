@@ -54,23 +54,20 @@ public:
       return true; // cross-module: use standard xref
     if (!SF || topLevel == SF || topLevel == SF->getSynthesizedFile())
       return false; // local to this file: inline
-    // Inline protocols and all their members (don't xref) so the
-    // requirement machine can build associated type introduction rules.
-    // Xref'd protocols have empty getAssociatedTypeMembers() which causes
-    // crashes in getReducedTypeParameter(). Members of protocols (associated
-    // types, pattern bindings, etc.) cannot be xref'd individually either,
-    // so they must be inlined with their parent protocol.
-    if (auto *DC = D->getDeclContext())
-      if (auto *nominal = DC->getSelfNominalTypeDecl())
-        if (isa<ProtocolDecl>(nominal))
-          return false;
-    if (isa<ProtocolDecl>(D))
-      return false;
     // Same-module cross-file: route through writeCrossReference.
     // The deserializer resolves these via CachedNominalDeclRegistry
     // instead of lookupQualified, avoiding the parse-during-load crash.
     return true;
   }
+
+  /// Use name-based DependentMemberType serialization so that associated
+  /// types in xref'd protocols don't need AssociatedTypeDecl resolution.
+  /// The deserialized type uses DependentMemberType::get(base, name) which
+  /// resolves the AssociatedTypeDecl lazily during type checking.
+  bool useNameBasedDependentMemberType() const override { return true; }
+  /// Serialize body text for ALL functions (not just @inlinable) so the
+  /// cache round-trips the full AST for structural verification.
+  bool serializeAllBodyText() const override { return true; }
 
   /// Serialize the SourceFile to the given stream using the overridden
   /// isDeclXRef to route same-module cross-file decls through writeCrossReference.
@@ -104,6 +101,20 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
 
   // 1. Compute cache key
   ASTCacheKey key = computeASTCacheKey(ctx, SF);
+
+  // Populate importsBlob with explicit import module names (one per line).
+  // Only ImportDecls from the source file's Items are explicit — implicit
+  // imports (added by import resolution) are excluded. Used by the
+  // deserializer to reconstruct ImportDecl nodes matching the parsed AST.
+  {
+    llvm::raw_string_ostream importsOS(key.importsBlob);
+    for (auto item : const_cast<SourceFile &>(SF).getTopLevelItems()) {
+      if (auto *importDecl = dyn_cast<ImportDecl>(item.dyn_cast<Decl *>())) {
+        importsOS << importDecl->getModulePath().front().Item.str()
+                  << "\n";
+      }
+    }
+  }
 
   // 2. Serialize the AST to a bitstream using ASTCacheSerializer
   std::string bitstreamData;

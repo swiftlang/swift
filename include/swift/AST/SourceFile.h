@@ -299,6 +299,12 @@ public:
     Items->insert(Items->begin(), items.begin(), items.end());
   }
 
+  /// Clear the pre-populated empty Items from a failed cache load so that
+  /// ParseSourceFileRequest can parse from source normally.
+  void clearCacheForFailedLoad() {
+    Items = std::nullopt;
+  }
+
   /// Retrieves an immutable view of the list of top-level decls in this file.
   ///
   /// NOTE: Please use getTopLevelItems() instead.

@@ -1453,6 +1453,12 @@ namespace decls_block {
     TypeIDField,        // base type
     DeclIDField         // associated type decl
   );
+  TYPE_LAYOUT(DependentMemberNamedTypeLayout,
+    DEPENDENT_MEMBER_NAMED_TYPE,
+    TypeIDField,        // base type
+    IdentifierIDField,  // associated type name
+    DeclIDField         // protocol decl (for AssociatedTypeDecl resolution)
+  );
   TYPE_LAYOUT(NominalTypeLayout,
     NOMINAL_TYPE,
     DeclIDField, // decl

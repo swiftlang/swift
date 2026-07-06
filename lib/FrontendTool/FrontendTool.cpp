@@ -679,135 +679,47 @@ static bool verifyASTCache(CompilerInstance &Instance) {
       return true;
     }
     scriptFile << R"PY(
-import json, sys, re
+import json, sys
 
-# Keys whose values differ between original and deserialized ASTs
-# in ways that are NOT format bugs.
-IGNORED_KEYS = {
-    "range", "loc",                    # source locations not serialized
-    "source_kind",                     # synthesized/explicit not preserved
-    "implicit",                        # set by deserializer, not structural
-    "nonisolated",                     # conformance isolation metadata
-    "attrs",                           # @_transparent etc. synthesized by deser
-    "interface_type",                  # lazy-loaded, may differ on parameters
-    "inout",                           # parameter inout-ness not preserved
-    "filename",                        # path differs between orig and deser
-    "body",                            # function bodies not serialized (by design)
-    "requirement_signature",           # lazy-loaded protocol signature
-    "uncomputed_requirement_signature", # lazy-loaded protocol signature
-    "generic_signature",               # lazy-loaded generic signature
-    "original_init",                   # lazy-loaded initializer
-    "processed_init",                  # lazy-loaded initializer
-    "final",                           # set by deserializer for class members
-}
-
-# Synthesized protocol conformances that appear in deserialized but not original.
-SYNTHESIZED_PROTOCOLS = {
-    "s:s16SendableMetatypeP",
-}
-
-def normalize_pointer_ids(obj):
-    """Renumber 'replaced-pointer-N' references to first-seen sequential order."""
-    pointer_map = {}
-    next_id = [0]
-    def walk(o):
-        if isinstance(o, str):
-            def replace(m):
-                old = m.group(0)
-                if old not in pointer_map:
-                    pointer_map[old] = "replaced-pointer-%d" % next_id[0]
-                    next_id[0] += 1
-                return pointer_map[old]
-            return re.sub(r'replaced-pointer-\d+', replace, o)
-        elif isinstance(o, dict):
-            return {k: walk(v) for k, v in o.items()}
-        elif isinstance(o, list):
-            return [walk(x) for x in o]
-        return o
-    return walk(obj)
-
-def strip_synthesized_conformances(obj):
-    """Remove conformance objects for synthesized protocols."""
-    if isinstance(obj, dict):
-        kind = obj.get("_kind", "")
-        if kind in ("normal_conformance", "builtin_conformance"):
-            proto = obj.get("protocol", "")
-            if proto in SYNTHESIZED_PROTOCOLS:
-                return None  # signal removal
-        return {k: strip_synthesized_conformances(v) for k, v in obj.items()
-                if strip_synthesized_conformances(v) is not None}
-    elif isinstance(obj, list):
-        result = []
-        for x in obj:
-            r = strip_synthesized_conformances(x)
-            if r is not None:
-                result.append(r)
-        return result
-    return obj
-
-def flatten_enum_case_decls(obj):
-    """Remove enum_case_decl nodes. These are compiler-internal grouping
-    nodes that don't survive serialization. The enum elements already
-    appear as direct members in both original and deserialized ASTs,
-    so we just drop the enum_case_decl wrapper."""
-    if isinstance(obj, dict):
-        result = {k: flatten_enum_case_decls(v) for k, v in obj.items()}
-        if "members" in result and isinstance(result["members"], list):
-            result["members"] = [m for m in result["members"]
-                                 if not (isinstance(m, dict) and
-                                         m.get("_kind") == "enum_case_decl")]
-        return result
-    elif isinstance(obj, list):
-        return [flatten_enum_case_decls(x) for x in obj]
-    return obj
+diffs = []
 
 def compare(a, b, path=""):
-    """Recursively compare two JSON trees, ignoring lossy keys."""
+    """Recursively compare two JSON trees, collecting ALL diffs."""
     if isinstance(a, dict) and isinstance(b, dict):
-        a_keys = set(k for k in a.keys() if k not in IGNORED_KEYS)
-        b_keys = set(k for k in b.keys() if k not in IGNORED_KEYS)
+        a_keys = set(a.keys())
+        b_keys = set(b.keys())
         if a_keys != b_keys:
             extra_a = a_keys - b_keys
             extra_b = b_keys - a_keys
             if extra_a:
-                print("DIFF at %s: keys only in original: %s" % (path, extra_a))
+                diffs.append("DIFF at %s: keys only in original: %s" % (path, sorted(extra_a)))
             if extra_b:
-                print("DIFF at %s: keys only in deserialized: %s" % (path, extra_b))
-            return False
-        for k in a_keys:
-            if not compare(a[k], b[k], path + "." + k):
-                return False
-        return True
+                diffs.append("DIFF at %s: keys only in deserialized: %s" % (path, sorted(extra_b)))
+        for k in (a_keys & b_keys):
+            compare(a[k], b[k], path + "." + k)
     elif isinstance(a, list) and isinstance(b, list):
         if len(a) != len(b):
-            print("DIFF at %s: array length %d vs %d" % (path, len(a), len(b)))
-            return False
+            diffs.append("DIFF at %s: array length %d vs %d" % (path, len(a), len(b)))
         for i, (x, y) in enumerate(zip(a, b)):
-            if not compare(x, y, "%s[%d]" % (path, i)):
-                return False
-        return True
+            compare(x, y, "%s[%d]" % (path, i))
     else:
         if a != b:
-            print("DIFF at %s: %r vs %r" % (path, a, b))
-            return False
-        return True
+            diffs.append("DIFF at %s: %r vs %r" % (path, a, b))
 
 with open(sys.argv[1]) as f:
     orig = json.load(f)
 with open(sys.argv[2]) as f:
     deser = json.load(f)
-orig = strip_synthesized_conformances(orig)
-deser = strip_synthesized_conformances(deser)
-orig = flatten_enum_case_decls(orig)
-deser = flatten_enum_case_decls(deser)
-orig = normalize_pointer_ids(orig)
-deser = normalize_pointer_ids(deser)
 
+compare(orig, deser)
 
-if compare(orig, deser):
+if not diffs:
     print("AST round-trip verification: PASSED")
     sys.exit(0)
 else:
+    for d in diffs:
+        print(d)
+    print("\nTotal diffs: %d" % len(diffs))
     sys.exit(1)
 )PY";
   }

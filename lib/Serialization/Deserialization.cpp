@@ -8171,6 +8171,34 @@ Expected<Type> DESERIALIZE_TYPE(DEPENDENT_MEMBER_TYPE)(
   return DependentMemberType::get(MF.getType(baseID),
                                   cast<AssociatedTypeDecl>(assocType.get()));
 }
+Expected<Type> DESERIALIZE_TYPE(DEPENDENT_MEMBER_NAMED_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  TypeID baseID;
+  IdentifierID assocTypeNameID;
+  DeclID protoID;
+
+  decls_block::DependentMemberNamedTypeLayout::readRecord(scratch, baseID,
+                                                          assocTypeNameID,
+                                                          protoID);
+  auto assocTypeName = MF.getIdentifier(assocTypeNameID);
+  auto baseType = MF.getType(baseID);
+
+  // Resolve the AssociatedTypeDecl via the protocol so the type checker's
+  // constraint system has a resolved DependentMemberType. This mirrors the
+  // ASTDemangler's createDependentMemberType(member, base, protocol).
+  if (protoID != 0) {
+    auto protoResult = MF.getDeclChecked(protoID);
+    if (!protoResult)
+      return protoResult.takeError();
+    if (auto *proto = dyn_cast<ProtocolDecl>(protoResult.get())) {
+      if (auto *assocType = proto->getAssociatedType(assocTypeName))
+        return DependentMemberType::get(baseType, assocType);
+    }
+  }
+
+  // Fallback: create unresolved (name-only) DependentMemberType
+  return DependentMemberType::get(baseType, assocTypeName);
+}
 
 Expected<Type> DESERIALIZE_TYPE(BOUND_GENERIC_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {

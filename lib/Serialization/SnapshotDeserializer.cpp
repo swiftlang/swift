@@ -158,7 +158,8 @@ private:
     SmallVector<Decl *, 32> decls;
     mf->getTopLevelDecls(decls);
 
-    // Populate SourceFile::Items with the deserialized decls
+    // Populate SourceFile::Items with the deserialized decls.
+    // ImportDecls are reconstructed after setImports (below) and prepended.
     SmallVector<ASTNode, 32> itemNodes;
     for (auto *D : decls) {
       itemNodes.push_back(ASTNode(D));
@@ -187,6 +188,138 @@ private:
         ctx.registerCachedNominalDecl(NTD, Identifier(), 0, true);
       }
     }
+    // Eagerly load associated types for deserialized protocols. The
+    // requirement machine needs getAssociatedTypeMembers() to build
+    // associated type introduction rules (τ.[P:T]). Without eager
+    // loading, xref'd protocols have empty associated type lists and
+    // getReducedTypeParameter() crashes.
+    for (auto *D : decls) {
+      if (auto *PD = dyn_cast<ProtocolDecl>(D)) {
+        (void)PD->getAssociatedTypeMembers();
+        // Eagerly compute the requirement signature so that dumpJSON
+        // emits "requirement_signature" instead of "uncomputed_requirement_signature".
+        (void)PD->getRequirementSignature();
+      }
+    }
+    // Eagerly set the interface type and specifier on implicit self decls
+    // of deserialized methods. This matches what the type checker would
+    // compute, ensuring the self decl is usable immediately after deserialization.
+    // Walk into nominal type members to reach methods (top-level decls only
+    // contain struct/class/enum/protocol declarations, not their methods).
+    auto setupSelfDecl = [](AbstractFunctionDecl *AFD) {
+      if (auto *DC = AFD->getDeclContext()) {
+        if (DC->isTypeContext()) {
+          auto *selfDecl = AFD->getImplicitSelfDecl(/*createIfNeeded=*/true);
+          if (selfDecl) {
+            auto selfTy = DC->getSelfInterfaceType();
+            if (selfTy) {
+              selfDecl->setInterfaceType(selfTy);
+              if (DC->getDeclaredInterfaceType()->hasReferenceSemantics()) {
+                selfDecl->setSpecifier(ParamSpecifier::Default);
+              } else if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+                // Set/modify accessors on value types take inout self.
+                auto kind = accessor->getAccessorKind();
+                bool isMutatingAccessor =
+                    (kind == AccessorKind::Set ||
+                     kind == AccessorKind::Modify ||
+                     kind == AccessorKind::Init);
+                selfDecl->setSpecifier(isMutatingAccessor
+                                       ? ParamSpecifier::InOut
+                                       : ParamSpecifier::Default);
+              } else if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
+                selfDecl->setSpecifier(FD->isMutating()
+                                       ? ParamSpecifier::InOut
+                                       : ParamSpecifier::Default);
+              } else if (isa<ConstructorDecl>(AFD)) {
+                selfDecl->setSpecifier(ParamSpecifier::InOut);
+              }
+            }
+          }
+        }
+      }
+    };
+    auto setupMembers = [&](IterableDeclContext *IDC) {
+      for (auto *member : IDC->getMembers()) {
+        if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member)) {
+          setupSelfDecl(AFD);
+        } else if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
+          // Accessors (get/set/didSet etc.) are AbstractFunctionDecls nested
+          // inside storage decls. Walk all accessors (including implicit)
+          // to set up their self decls too.
+          for (auto *accessor : ASD->getAllAccessors()) {
+            setupSelfDecl(accessor);
+          }
+        }
+      }
+    };
+    for (auto *D : decls) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        setupSelfDecl(AFD);
+      } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+        setupMembers(NTD);
+      } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+        setupMembers(ED);
+      }
+    }
+    // Reconstruct EnumCaseDecl wrappers for deserialized enums.
+    // The serializer skips EnumCaseDecl (it's a parser-internal grouping node)
+    // and serializes EnumElementDecls directly as members. The parsed AST
+    // has EnumCaseDecl as an extra member before each group of elements.
+    // We group ALL consecutive EnumElementDecls into a single EnumCaseDecl,
+    // which handles the common `case X, Y, Z` pattern.
+    for (auto *D : decls) {
+      if (auto *ED = dyn_cast<EnumDecl>(D)) {
+        auto members = ED->getMembers();
+        // Collect consecutive EnumElementDecl groups and insert EnumCaseDecl
+        // wrappers before each group.
+        SmallVector<Decl *, 16> oldMembers(members.begin(), members.end());
+        SmallVector<Decl *, 16> newMembers;
+        SmallVector<EnumElementDecl *, 8> caseElements;
+        for (auto *member : oldMembers) {
+          if (auto *EED = dyn_cast<EnumElementDecl>(member)) {
+            caseElements.push_back(EED);
+          } else {
+            if (!caseElements.empty()) {
+              auto *caseDecl = EnumCaseDecl::create(SourceLoc(),
+                  ArrayRef<EnumElementDecl*>(caseElements), ED);
+              newMembers.push_back(caseDecl);
+              // The parsed AST has EnumElementDecls as direct members too
+              // (in addition to being wrapped by EnumCaseDecl).
+              for (auto *EED : caseElements) {
+                newMembers.push_back(EED);
+              }
+              caseElements.clear();
+            }
+            newMembers.push_back(member);
+          }
+        }
+        if (!caseElements.empty()) {
+          auto *caseDecl = EnumCaseDecl::create(SourceLoc(),
+              ArrayRef<EnumElementDecl*>(caseElements), ED);
+          newMembers.push_back(caseDecl);
+          for (auto *EED : caseElements) {
+            newMembers.push_back(EED);
+          }
+        }
+        // Only re-add if we created EnumCaseDecls.
+        if (newMembers.size() != oldMembers.size()) {
+          // Remove all existing members and re-add with EnumCaseDecls.
+          // addMember appends, so we need to clear first by removing all.
+          for (auto *member : oldMembers) {
+            ED->removeMember(member);
+          }
+          for (auto *member : newMembers) {
+            ED->addMember(member);
+          }
+        }
+      }
+    }
+
+
+
+
+
+
 
     // C3: Populate Imports from the ModuleFile's loaded dependencies.
     // associateWithFileContext calls loadDependenciesForFileContext which
@@ -224,6 +357,37 @@ private:
             /*accessLevel*/ accessLevel));
       }
       SF.setImports(attributedImports);
+    }
+
+    // Reconstruct ImportDecl nodes from the explicit imports in importsBlob,
+    // prepend them to Items to match the parsed AST's item ordering.
+    // The serializer skips ImportDecls (visitImportDecl is unreachable),
+    // so we reconstruct them from the importsBlob (which contains only
+    // explicit imports, not implicit ones added by import resolution).
+    {
+      SmallVector<ASTNode, 32> itemNodesWithImports;
+      SmallVector<StringRef, 4> importNames;
+      StringRef importsBlobRef = key.importsBlob;
+      while (!importsBlobRef.empty()) {
+        auto [name, rest] = importsBlobRef.split('\n');
+        if (!name.empty()) {
+          importNames.push_back(name);
+        }
+        importsBlobRef = rest;
+      }
+      for (auto importName : importNames) {
+        ImportPath::Builder pathBuilder;
+        pathBuilder.push_back(ctx.getIdentifier(importName));
+        ImportPath importPath = pathBuilder.copyTo(ctx);
+        auto *importDecl = ImportDecl::create(
+            ctx, &SF, SourceLoc(), ImportKind::Module, SourceLoc(),
+            importPath);
+        itemNodesWithImports.push_back(ASTNode(importDecl));
+      }
+      for (auto *D : decls) {
+        itemNodesWithImports.push_back(ASTNode(D));
+      }
+      SF.setTopLevelItems(itemNodesWithImports);
     }
 
     // Set the private discriminator from the cache key

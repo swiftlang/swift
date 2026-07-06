@@ -1653,10 +1653,6 @@ void CompilerInstance::performSema() {
 
   performParseAndResolveImportsOnly();
 
-  // Run dedup after parsing so parsed files' top-level decls are available.
-  if (!Invocation.getFrontendOptions().ExperimentalASTCacheDir.empty()) {
-    dedupExtensions();
-  }
   FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
 
   forEachFileToTypeCheck([&](SourceFile &SF) {
@@ -2188,6 +2184,20 @@ void CompilerInstance::loadASTCache() {
     cacheableFiles.push_back(SF);
   }
 
+  // Two-pass approach:
+  // Pass 1: Read all cache files from disk and pre-populate SourceFile::Items
+  // with empty vectors for files that have valid cache files. This prevents
+  // ParseSourceFileRequest from parsing cached files from source if
+ // SourceLookupCache is constructed during the deserialization of another
+  // file (e.g., via lookupQualified triggered by xref resolution).
+  // Without this, a source-parsed Container would be created alongside the
+  // cached one, causing the requirement machine to use the wrong decl.
+  struct CacheEntry {
+    SourceFile *SF;
+    std::unique_ptr<llvm::MemoryBuffer> Buffer;
+  };
+  SmallVector<CacheEntry, 32> cacheEntries;
+
   for (auto *SF : cacheableFiles) {
     auto cachePath = computeCachePath(SF);
     auto bufOrErr = llvm::MemoryBuffer::getFile(cachePath);
@@ -2198,8 +2208,17 @@ void CompilerInstance::loadASTCache() {
       }
       continue;
     }
+    // Pre-populate Items with an empty vector to prevent ParseSourceFileRequest
+    // from parsing this file from source during another file's deserialization.
+    SF->setTopLevelItems({});
+    cacheEntries.push_back({SF, std::move(*bufOrErr)});
+  }
 
-    bool loaded = SF->loadFromCache(SF->getASTContext(), **bufOrErr);
+  // Pass 2: Deserialize each cached file. Files without cache entries will
+  // be parsed from source normally during type checking.
+  for (auto &entry : cacheEntries) {
+    auto *SF = entry.SF;
+    bool loaded = SF->loadFromCache(SF->getASTContext(), *entry.Buffer);
 
     if (loaded) {
       if (frontendOpts.DebugASTCache) {
@@ -2210,322 +2229,13 @@ void CompilerInstance::loadASTCache() {
         llvm::errs() << "AST cache: MISS (invalid) for "
                      << SF->getFilename() << "\n";
       }
+      // Restore: clear the empty Items so parsing can proceed normally
+      SF->clearCacheForFailedLoad();
     }
   }
 
 }
 
-void CompilerInstance::dedupExtensions() {
-  auto &mainModule = *getMainModule();
-  SmallVector<SourceFile *, 4> cacheableFiles;
-  for (auto *file : mainModule.getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(file))
-      cacheableFiles.push_back(SF);
-  }
-  // Register all top-level NominalTypeDecls from ALL SourceFiles (including
-  // parsed ones) in the registry. This ensures that computeNominalType can
-  // find the real nominal when called on a duplicate from a cached file.
-  // Parsed files overwrite cached files (first-registered wins, but parsed
-  // files are registered after cached files, so we force-overwrite).
-  auto &astCtx = mainModule.getASTContext();
-  for (auto *SF : cacheableFiles) {
-    for (auto item : SF->getTopLevelItems()) {
-      auto *D = item.dyn_cast<Decl *>();
-      if (!D) continue;
-      if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        // Force-register: overwrite any cached duplicate so that
-        // computeNominalType returns types pointing to the real nominal
-        astCtx.registerCachedNominalDecl(NTD, Identifier(), 0, true);
-      }
-    }
-  }
-  // Each .swiftast file contains copies of all same-module decls it references.
-  // This creates duplicate NominalTypeDecls. After loading all cache files,
-  // build a map of (kind, name) -> first-seen nominal, then for each extension
-  // on a duplicate nominal, re-register it on the real one.
-  llvm::DenseMap<std::pair<DeclKind, Identifier>, NominalTypeDecl *> realNominals;
-  auto getRealNominal = [&](NominalTypeDecl *nominal) -> NominalTypeDecl * {
-    if (!nominal) return nullptr;
-    // Walk up to find the top-level ancestor, then descend to find the real nominal
-    // Walk up to find the top-level ancestor, then descend to find the real nominal.
-    // Walk through ExtensionDecls to find the containing NominalTypeDecl.
-    auto *topLevel = nominal;
-    while (true) {
-      auto *dc = topLevel->getDeclContext();
-      if (auto *parentNTD = dyn_cast_or_null<NominalTypeDecl>(dc)) {
-        topLevel = parentNTD;
-      } else if (auto *ext = dyn_cast_or_null<ExtensionDecl>(dc)) {
-        auto *extNom = ext->getExtendedNominal();
-        if (!extNom || extNom == topLevel) break;
-        topLevel = extNom;
-      } else {
-        break;
-      }
-    }
-    auto key = std::make_pair(topLevel->getKind(), topLevel->getName());
-    auto it = realNominals.find(key);
-    if (it == realNominals.end())
-      return nominal; // no real one found
-    NominalTypeDecl *realTop = it->second;
-    // If nominal IS topLevel and topLevel is already the real one, no dedup needed
-    if (topLevel == nominal && topLevel == realTop)
-      return nominal;
-    // If nominal IS topLevel, return realTop
-    if (topLevel == nominal)
-      return realTop;
-    // Otherwise, descend from realTop to find the matching nominal by name
-    // Use getMembers() which triggers lazy loading (safe after all cache loaded)
-    NominalTypeDecl *current = realTop;
-    // Walk the chain from realTop to nominal
-    SmallVector<NominalTypeDecl *, 4> chain;
-    auto *n = nominal;
-    while (n != topLevel) {
-      chain.push_back(n);
-      auto *dc = n->getDeclContext();
-      if (auto *parentNTD = dyn_cast_or_null<NominalTypeDecl>(dc)) {
-        n = parentNTD;
-      } else if (auto *ext = dyn_cast_or_null<ExtensionDecl>(dc)) {
-        n = ext->getExtendedNominal();
-        if (!n) break;
-      } else {
-        break;
-      }
-    }
-    std::reverse(chain.begin(), chain.end());
-    for (auto *target : chain) {
-      NominalTypeDecl *found = nullptr;
-      // Search direct members
-      for (auto *member : current->getMembers()) {
-        if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
-          if (NTD->getName() == target->getName() &&
-              NTD->getKind() == target->getKind()) {
-            found = NTD;
-            break;
-          }
-        }
-      }
-      // Search extensions if not found
-      if (!found) {
-        for (auto *ext : current->getExtensions()) {
-          // Skip extensions from the same SourceFile as the duplicate nominal
-          // (those are copies, not real ones)
-          auto *extSF = ext->getParentSourceFile();
-          auto *targetSF = target->getParentSourceFile();
-          if (extSF && targetSF && extSF == targetSF)
-            continue;
-          for (auto *member : ext->getMembers()) {
-            if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
-              if (NTD->getName() == target->getName() &&
-                  NTD->getKind() == target->getKind() &&
-                  NTD != target) {
-                found = NTD;
-                break;
-              }
-            }
-          }
-          if (found) break;
-        }
-      }
-      if (!found) return nominal; // can't find real nested nominal
-      current = found;
-    }
-    return current;
-  };
-  // Build map of real nominals from ALL SourceFiles (both cached and parsed).
-  // Parsed files take priority over cached files (the parsed decl is always real).
-  for (auto *SF : cacheableFiles) {
-    for (auto item : SF->getTopLevelItems()) {
-      auto *D = item.dyn_cast<Decl *>();
-      if (!D) continue;
-      if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        auto key = std::make_pair(NTD->getKind(), NTD->getName());
-        realNominals[key] = NTD; // overwrite with parsed (real) decl
-      }
-    }
-  }
-  for (auto *SF : cacheableFiles) {
-    if (!SF->LoadedFromAstCache)
-      continue;
-    for (auto item : SF->getTopLevelItems()) {
-      auto *D = item.dyn_cast<Decl *>();
-      if (!D) continue;
-      if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
-        auto *nominal = ext->getExtendedNominal();
-        if (!nominal) continue;
-        auto *realNominal = getRealNominal(nominal);
-        if (realNominal != nominal) {
-          bool alreadyHas = false;
-          for (auto e : realNominal->getExtensions()) {
-            if (e == ext) { alreadyHas = true; break; }
-          }
-          if (!alreadyHas) {
-            realNominal->moveExtension(ext);
-            ext->setExtendedNominal(realNominal);
-            // Rebuild ExtendedTypeRequest cache with the real nominal
-            auto &ctx = realNominal->getASTContext();
-            auto existingExtType = evaluateOrDefault(ctx.evaluator,
-                ExtendedTypeRequest{ext}, Type());
-            if (auto *nomType = dyn_cast_or_null<NominalType>(existingExtType.getPointer())) {
-              auto newExtType = Type(NominalType::get(realNominal,
-                                                      nomType->getParent(), ctx));
-              ctx.evaluator.clearCachedOutput(ExtendedTypeRequest{ext});
-              ctx.evaluator.cacheOutput(ExtendedTypeRequest{ext},
-                                        std::move(newExtType));
-            }
-          }
-        }
-      }
-    }
-  }
-  // Remove duplicate extensions: if two extensions on the same nominal
-  // define members with the same name+kind, the later one is a duplicate.
-  // Parsed extensions take priority over cached extensions (parsed extensions
-  // are the real source of truth). Only remove CACHED extensions that
-  // duplicate members from parsed extensions.
-  for (auto &entry : realNominals) {
-    auto *nominal = entry.second;
-    // First pass: collect member names from parsed (non-cached) extensions
-    llvm::DenseSet<std::pair<DeclKind, Identifier>> parsedMemberNames;
-    for (auto *ext : nominal->getExtensions()) {
-      auto *SF = ext->getParentSourceFile();
-      if (SF && !SF->LoadedFromAstCache) {
-        for (auto *member : ext->getMembers()) {
-          if (auto *NTD = dyn_cast<NominalTypeDecl>(member))
-            parsedMemberNames.insert({NTD->getKind(), NTD->getName()});
-        }
-      }
-    }
-    // Second pass: remove cached extensions whose members duplicate parsed
-    // ones or earlier-seen members. Parsed extensions take priority.
-    SmallVector<ExtensionDecl *, 4> toRemove;
-    llvm::DenseSet<std::pair<DeclKind, Identifier>> seenMemberNames;
-    for (auto *ext : nominal->getExtensions()) {
-      auto *SF = ext->getParentSourceFile();
-      bool isCached = SF && SF->LoadedFromAstCache;
-      bool isDup = false;
-      for (auto *member : ext->getMembers()) {
-        if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
-          auto key = std::make_pair(NTD->getKind(), NTD->getName());
-          if (isCached && parsedMemberNames.count(key)) {
-            isDup = true;
-            break;
-          }
-          if (seenMemberNames.count(key)) {
-            isDup = true;
-            break;
-          }
-        }
-      }
-      if (isDup) {
-        toRemove.push_back(ext);
-      } else {
-        for (auto *member : ext->getMembers()) {
-          if (auto *NTD = dyn_cast<NominalTypeDecl>(member))
-            seenMemberNames.insert({NTD->getKind(), NTD->getName()});
-        }
-      }
-    }
-    for (auto *ext : toRemove)
-      nominal->removeExtension(ext);
-    if (!toRemove.empty())
-      nominal->clearLookupTable();
-  }
-  // Dedup direct members of nominals. With isDeclXRef=false, cached files
-  // serialize referenced NominalTypeDecls inline. These become direct members
-  // of the extended nominal (not extension members). removeExtension can't
-  // remove them. Walk each nominal's members and remove duplicate
-  // NominalTypeDecls (same name+kind), preferring parsed over cached.
-  // Recurse into nested nominals to handle arbitrary nesting depth.
-  std::function<void(NominalTypeDecl *)> dedupDirectMembers;
-  dedupDirectMembers = [&](NominalTypeDecl *nominal) {
-    // Force-load all members so we can iterate them.
-    nominal->getMembers();
-    // Collect parsed member names (from non-cached source files).
-    llvm::DenseSet<std::pair<DeclKind, Identifier>> parsedMemberNames;
-    for (auto *member : nominal->getMembers()) {
-      auto *SF = member->getDeclContext()->getParentSourceFile();
-      if (SF && !SF->LoadedFromAstCache) {
-        if (auto *NTD = dyn_cast<NominalTypeDecl>(member))
-          parsedMemberNames.insert({NTD->getKind(), NTD->getName()});
-      }
-    }
-    // Remove cached duplicate direct members.
-    SmallVector<Decl *, 4> toRemoveDirect;
-    llvm::DenseSet<std::pair<DeclKind, Identifier>> seenMemberNames;
-    for (auto *member : nominal->getMembers()) {
-      if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
-        auto key = std::make_pair(NTD->getKind(), NTD->getName());
-        auto *SF = member->getDeclContext()->getParentSourceFile();
-        bool isCached = SF && SF->LoadedFromAstCache;
-        if (isCached && parsedMemberNames.count(key)) {
-          toRemoveDirect.push_back(member);
-          continue;
-        }
-        if (seenMemberNames.count(key)) {
-          toRemoveDirect.push_back(member);
-          continue;
-        }
-        seenMemberNames.insert(key);
-      }
-    }
-    for (auto *member : toRemoveDirect)
-      nominal->removeMember(member);
-    // Clear the lookup table so stale entries (pointing to removed members)
-    // are invalidated. The table will be rebuilt on next access.
-    if (!toRemoveDirect.empty())
-      nominal->clearLookupTable();
-    // Re-register surviving NominalTypeDecl members so the registry points
-    // to the kept (not removed) decl. Recurse into nested nominals.
-    for (auto *member : nominal->getMembers()) {
-      if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
-        astCtx.registerCachedNominalDecl(NTD, nominal->getName(),
-            static_cast<uint8_t>(nominal->getKind()), true);
-        dedupDirectMembers(NTD);
-      }
-    }
-  };
-  for (auto &entry : realNominals)
-    dedupDirectMembers(entry.second);
-  // Register NominalTypeDecls that are members of extensions in the registry,
-  // so computeNominalType can redirect duplicate types to the real nominal.
-  // Parsed extensions are registered first (force=true, highest priority).
-  // Cached extensions are registered second (force=false, only if not already registered).
-  for (auto *SF : cacheableFiles) {
-    if (SF->LoadedFromAstCache) continue;
-    for (auto item : SF->getTopLevelItems()) {
-      auto *D = item.dyn_cast<Decl *>();
-      if (!D) continue;
-      if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
-        auto *extNom = ext->getExtendedNominal();
-        if (!extNom) continue;
-        for (auto *member : ext->getMembers()) {
-          if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
-            astCtx.registerCachedNominalDecl(NTD, extNom->getName(),
-                static_cast<uint8_t>(extNom->getKind()), true);
-          }
-        }
-      }
-    }
-  }
-  // Register from cached extensions (lower priority — don't overwrite parsed)
-  for (auto *SF : cacheableFiles) {
-    if (!SF->LoadedFromAstCache) continue;
-    for (auto item : SF->getTopLevelItems()) {
-      auto *D = item.dyn_cast<Decl *>();
-      if (!D) continue;
-      if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
-        auto *extNom = ext->getExtendedNominal();
-        if (!extNom) continue;
-        for (auto *member : ext->getMembers()) {
-          if (auto *NTD = dyn_cast<NominalTypeDecl>(member)) {
-            astCtx.registerCachedNominalDecl(NTD, extNom->getName(),
-                static_cast<uint8_t>(extNom->getKind()), false);
-          }
-        }
-      }
-    }
-  }
-}
 
 void CompilerInstance::saveASTCache() {
   const auto &frontendOpts = Invocation.getFrontendOptions();

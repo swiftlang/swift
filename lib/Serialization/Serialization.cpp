@@ -4220,8 +4220,12 @@ private:
     // merging them.
     if (!S.SF) return;
 
-    if (AFD->getResilienceExpansion() != swift::ResilienceExpansion::Minimal)
-      return;
+    // The AST cache serializes body text for ALL functions (not just
+    // @inlinable ones) to enable structural AST round-trip verification.
+    if (!S.serializeAllBodyText()) {
+      if (AFD->getResilienceExpansion() != swift::ResilienceExpansion::Minimal)
+        return;
+    }
 
     if (!AFD->hasInlinableBodyText()) return;
     SmallString<128> scratch;
@@ -6087,12 +6091,27 @@ public:
 
   void visitDependentMemberType(const DependentMemberType *dependent) {
     using namespace decls_block;
-    unsigned abbrCode = S.DeclTypeAbbrCodes[DependentMemberTypeLayout::Code];
-    assert(dependent->getAssocType() && "Unchecked dependent member type");
-    DependentMemberTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode,
-        S.addTypeRef(dependent->getBase()),
-        S.addDeclRef(dependent->getAssocType()));
+    if (S.useNameBasedDependentMemberType()) {
+      unsigned abbrCode =
+          S.DeclTypeAbbrCodes[DependentMemberNamedTypeLayout::Code];
+      // Get the protocol from the AssociatedTypeDecl for lazy resolution
+      // on deserialization via protocol->getAssociatedType(name).
+      const ProtocolDecl *proto = nullptr;
+      if (auto *assocType = dependent->getAssocType())
+        proto = assocType->getProtocol();
+      DependentMemberNamedTypeLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          S.addTypeRef(dependent->getBase()),
+          S.addDeclBaseNameRef(dependent->getName()),
+          S.addDeclRef(proto));
+    } else {
+      unsigned abbrCode = S.DeclTypeAbbrCodes[DependentMemberTypeLayout::Code];
+      assert(dependent->getAssocType() && "Unchecked dependent member type");
+      DependentMemberTypeLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          S.addTypeRef(dependent->getBase()),
+          S.addDeclRef(dependent->getAssocType()));
+    }
   }
 
   void serializeFunctionTypeParams(const AnyFunctionType *fnTy) {
@@ -6641,6 +6660,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TypeAliasLayout>();
   registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
   registerDeclTypeAbbr<DependentMemberTypeLayout>();
+  registerDeclTypeAbbr<DependentMemberNamedTypeLayout>();
   registerDeclTypeAbbr<StructLayout>();
   registerDeclTypeAbbr<ConstructorLayout>();
   registerDeclTypeAbbr<VarLayout>();

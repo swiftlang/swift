@@ -355,6 +355,17 @@ protected:
   /// cross-file decls through writeCrossReference (instead of inlining
   /// them as copies, which creates duplicate NominalTypeDecls).
   virtual bool isDeclXRef(const Decl *D) const;
+  /// Whether to serialize DependentMemberType using name-based records
+  /// (DEPENDENT_MEMBER_NAMED_TYPE) instead of decl-based records
+  /// (DEPENDENT_MEMBER_TYPE). ASTCacheSerializer overrides this to true
+  /// to avoid needing AssociatedTypeDecl resolution for xref'd protocols.
+  virtual bool useNameBasedDependentMemberType() const { return false; }
+
+  /// Whether to serialize function body text for ALL functions (not just
+  /// @inlinable ones with ResilienceExpansion::Minimal). ASTCacheSerializer
+  /// overrides this to true so the cache round-trips the full AST, including
+  /// non-inlinable function bodies, enabling structural AST verification.
+  virtual bool serializeAllBodyText() const { return false; }
 
   /// Check if a decl should be skipped during serialization.
   bool shouldSkipDecl(const Decl *D) const;
