@@ -506,7 +506,32 @@ private:
           setDeclRange(D);
           if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
             for (auto *member : IDC->getMembers()) {
+              // Skip EnumCaseDecl — it's reconstructed by the deserializer
+              // and not present in the serializer's walk.
+              if (isa<EnumCaseDecl>(member))
+                continue;
               setDeclRange(member);
+              // Walk accessors of storage decls (not in getMembers()).
+              if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
+                for (auto *accessor : ASD->getAllAccessors())
+                  setDeclRange(accessor);
+              }
+              // Walk params of function decls.
+              if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member)) {
+                if (auto *params = AFD->getParameters()) {
+                  for (auto *param : *params)
+                    setDeclRange(param);
+                }
+                // Walk accessors' params too.
+                if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
+                  for (auto *accessor : ASD->getAllAccessors()) {
+                    if (auto *accParams = accessor->getParameters()) {
+                      for (auto *param : *accParams)
+                        setDeclRange(param);
+                    }
+                  }
+                }
+              }
             }
           }
         }
