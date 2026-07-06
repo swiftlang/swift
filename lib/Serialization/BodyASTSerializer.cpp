@@ -92,10 +92,10 @@ void BodyASTSerializer::serializeExpr(Expr *E) {
   }
   case ExprKind::MemberRef: {
     auto *MRE = cast<MemberRefExpr>(E);
-    // Serialize the base expression first (depth-first).
     serializeExpr(MRE->getBase());
     uint32_t baseExprID = assignExprID(MRE->getBase());
     DeclID memberDeclID = S.addDeclRef(MRE->getMember().getDecl());
+    Scratch.clear();
     Scratch.push_back(exprID);
     Scratch.push_back(Expr_MemberRef);
     Scratch.push_back(typeID);
@@ -105,15 +105,97 @@ void BodyASTSerializer::serializeExpr(Expr *E) {
     Out.EmitRecord(EXPR_NODE, Scratch);
     break;
   }
-  case ExprKind::Type: {
+  case ExprKind::Binary: {
+    auto *BE = cast<BinaryExpr>(E);
+    serializeExpr(BE->getLHS());
+    serializeExpr(BE->getRHS());
+    Expr *fnExpr = BE->getFn();
+    if (fnExpr) serializeExpr(fnExpr);
+    uint32_t lhsID = assignExprID(BE->getLHS());
+    uint32_t rhsID = assignExprID(BE->getRHS());
+    uint32_t fnID = fnExpr ? assignExprID(fnExpr) : 0;
+    Scratch.clear();
     Scratch.push_back(exprID);
-    Scratch.push_back(Expr_Type);
+    Scratch.push_back(Expr_Binary);
     Scratch.push_back(typeID);
     Scratch.push_back(implicit ? 1u : 0u);
+    Scratch.push_back(lhsID);
+    Scratch.push_back(rhsID);
+    Scratch.push_back(fnID);
+    Out.EmitRecord(EXPR_NODE, Scratch);
+    break;
+  }
+  case ExprKind::Call: {
+    auto *CE = cast<CallExpr>(E);
+    serializeExpr(CE->getFn());
+    uint32_t fnID = assignExprID(CE->getFn());
+    auto *args = CE->getArgs();
+    uint32_t numArgs = args ? args->size() : 0;
+    SmallVector<uint32_t, 4> argIDs;
+    for (unsigned i = 0; i < numArgs; i++) {
+      Expr *argExpr = args->getExpr(i);
+      serializeExpr(argExpr);
+      argIDs.push_back(assignExprID(argExpr));
+    }
+    Scratch.clear();
+    Scratch.push_back(exprID);
+    Scratch.push_back(Expr_Call);
+    Scratch.push_back(typeID);
+    Scratch.push_back(implicit ? 1u : 0u);
+    Scratch.push_back(fnID);
+    Scratch.push_back(numArgs);
+    for (auto aid : argIDs)
+      Scratch.push_back(aid);
+    Out.EmitRecord(EXPR_NODE, Scratch);
+    break;
+  }
+  case ExprKind::Assign: {
+    auto *AE = cast<AssignExpr>(E);
+    serializeExpr(AE->getDest());
+    serializeExpr(AE->getSrc());
+    uint32_t destID = assignExprID(AE->getDest());
+    uint32_t srcID = assignExprID(AE->getSrc());
+    Scratch.clear();
+    Scratch.push_back(exprID);
+    Scratch.push_back(Expr_Assign);
+    Scratch.push_back(typeID);
+    Scratch.push_back(implicit ? 1u : 0u);
+    Scratch.push_back(destID);
+    Scratch.push_back(srcID);
+    Out.EmitRecord(EXPR_NODE, Scratch);
+    break;
+  }
+  case ExprKind::InOut: {
+    auto *IO = cast<InOutExpr>(E);
+    serializeExpr(IO->getSubExpr());
+    uint32_t subID = assignExprID(IO->getSubExpr());
+    Scratch.clear();
+    Scratch.push_back(exprID);
+    Scratch.push_back(Expr_InOut);
+    Scratch.push_back(typeID);
+    Scratch.push_back(implicit ? 1u : 0u);
+    Scratch.push_back(subID);
+    Out.EmitRecord(EXPR_NODE, Scratch);
+    break;
+  }
+  case ExprKind::DotSyntaxCall: {
+    auto *DSC = cast<DotSyntaxCallExpr>(E);
+    serializeExpr(DSC->getFn());
+    serializeExpr(DSC->getBase());
+    uint32_t fnID = assignExprID(DSC->getFn());
+    uint32_t baseID = assignExprID(DSC->getBase());
+    Scratch.clear();
+    Scratch.push_back(exprID);
+    Scratch.push_back(Expr_DotSyntaxCall);
+    Scratch.push_back(typeID);
+    Scratch.push_back(implicit ? 1u : 0u);
+    Scratch.push_back(fnID);
+    Scratch.push_back(baseID);
     Out.EmitRecord(EXPR_NODE, Scratch);
     break;
   }
   default:
+    Scratch.clear();
     Scratch.push_back(exprID);
     Scratch.push_back(Expr_Error);
     Scratch.push_back(typeID);

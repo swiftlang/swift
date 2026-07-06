@@ -61,6 +61,18 @@ class BodyASTDeserializer {
 
   /// Reconstructs a statement from a record.
   Stmt *deserializeStmt(ArrayRef<uint64_t> record, uint32_t stmtID);
+  /// Look up a previously deserialized expression by ID.
+  Expr *lookupExpr(uint32_t exprID) {
+    if (exprID > 0 && exprID <= ExprTable.size())
+      return ExprTable[exprID - 1];
+    return nullptr;
+  }
+  /// Look up a previously deserialized statement by ID.
+  Stmt *lookupStmt(uint32_t stmtID) {
+    if (stmtID > 0 && stmtID <= StmtTable.size())
+      return StmtTable[stmtID - 1];
+    return nullptr;
+  }
 
 public:
   BodyASTDeserializer(

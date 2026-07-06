@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ArgumentList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/FunctionRefInfo.h"
@@ -95,13 +96,88 @@ Expr *BodyASTDeserializer::deserializeExpr(ArrayRef<uint64_t> record,
   case Expr_Type: {
     // {ExprID, ExprKind, TypeID, implicit}
     if (!ty) {
-      // Create an ErrorExpr if type is unresolved (test environment).
       result = new (Ctx) ErrorExpr(SourceRange());
       break;
     }
     result = TypeExpr::createImplicit(ty, Ctx);
     if (!implicit)
       result->setImplicit(false);
+    break;
+  }
+  case Expr_Binary: {
+    // {ExprID, ExprKind, TypeID, implicit, lhsExprID, rhsExprID, fnExprID}
+    if (record.size() < 7)
+      return nullptr;
+    uint32_t lhsID = static_cast<uint32_t>(record[4]);
+    uint32_t rhsID = static_cast<uint32_t>(record[5]);
+    uint32_t fnID = static_cast<uint32_t>(record[6]);
+    Expr *lhs = lookupExpr(lhsID);
+    Expr *rhs = lookupExpr(rhsID);
+    Expr *fn = (fnID > 0) ? lookupExpr(fnID) : nullptr;
+    if (!lhs || !rhs)
+      return nullptr;
+    result = BinaryExpr::create(Ctx, lhs, fn, rhs, implicit, ty);
+    break;
+  }
+  case Expr_Call: {
+    // {ExprID, ExprKind, TypeID, implicit, fnExprID, numArgs, [argExprIDs...]}
+    if (record.size() < 6)
+      return nullptr;
+    uint32_t fnID = static_cast<uint32_t>(record[4]);
+    uint32_t numArgs = static_cast<uint32_t>(record[5]);
+    Expr *fn = lookupExpr(fnID);
+    if (!fn)
+      return nullptr;
+    SmallVector<Expr*, 4> argExprs;
+    for (uint32_t i = 0; i < numArgs; i++) {
+      if (record.size() <= 6 + i)
+        return nullptr;
+      Expr *arg = lookupExpr(static_cast<uint32_t>(record[6 + i]));
+      if (!arg)
+        return nullptr;
+      argExprs.push_back(arg);
+    }
+    auto *argList = ArgumentList::forImplicitUnlabeled(Ctx, argExprs);
+    result = CallExpr::createImplicit(Ctx, fn, argList);
+    result->setImplicit(implicit);
+    if (ty)
+      result->setType(ty);
+    break;
+  }
+  case Expr_Assign: {
+    // {ExprID, ExprKind, TypeID, implicit, destExprID, srcExprID}
+    if (record.size() < 6)
+      return nullptr;
+    Expr *dest = lookupExpr(static_cast<uint32_t>(record[4]));
+    Expr *src = lookupExpr(static_cast<uint32_t>(record[5]));
+    if (!dest || !src)
+      return nullptr;
+    result = new (Ctx) AssignExpr(dest, SourceLoc(), src, implicit);
+    if (ty)
+      result->setType(ty);
+    break;
+  }
+  case Expr_InOut: {
+    // {ExprID, ExprKind, TypeID, implicit, subExprID}
+    if (record.size() < 5)
+      return nullptr;
+    Expr *sub = lookupExpr(static_cast<uint32_t>(record[4]));
+    if (!sub)
+      return nullptr;
+    result = new (Ctx) InOutExpr(SourceLoc(), sub, Type(), implicit);
+    break;
+  }
+  case Expr_DotSyntaxCall: {
+    // {ExprID, ExprKind, TypeID, implicit, fnExprID, baseExprID}
+    if (record.size() < 6)
+      return nullptr;
+    Expr *fn = lookupExpr(static_cast<uint32_t>(record[4]));
+    Expr *base = lookupExpr(static_cast<uint32_t>(record[5]));
+    if (!fn || !base)
+      return nullptr;
+    result = DotSyntaxCallExpr::create(Ctx, fn, SourceLoc(),
+                                       Argument::unlabeled(base), ty);
+    result->setImplicit(implicit);
     break;
   }
   default:

@@ -313,4 +313,75 @@ TEST_F(BodyASTSerializationTest, ImplicitFlagPreserved) {
   EXPECT_TRUE(E->isImplicit());
 }
 
+// === Stage C Tests: Compound Expressions ===
+
+/// TEST: BinaryExpr round-trips.
+TEST_F(BodyASTSerializationTest, BinaryExprRoundTrip) {
+  auto *lhs = new (Ctx) IntegerLiteralExpr("1", SourceLoc(), false);
+  auto *rhs = new (Ctx) IntegerLiteralExpr("2", SourceLoc(), false);
+  auto *fn = new (Ctx) ErrorExpr(SourceRange());
+  auto *bin = BinaryExpr::create(Ctx, lhs, fn, rhs, /*implicit=*/false, Type());
+
+  SmallVector<ASTNode, 4> elements;
+  elements.push_back(ASTNode(bin));
+  auto *body = BraceStmt::create(Ctx, SourceLoc(), elements, SourceLoc(),
+                                 /*implicit=*/std::nullopt);
+
+  auto data = serializeBody(/*funcDeclID=*/1, body);
+  EXPECT_GT(data.size(), 4u);
+
+  auto deser = makeDeserializer();
+  auto *result = deser.deserializeBody(data);
+
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->getNumElements(), 1u);
+  auto elt = result->getElements()[0];
+  ASSERT_TRUE(isa<Expr *>(elt));
+  auto *E = cast<Expr *>(elt);
+  EXPECT_EQ(E->getKind(), ExprKind::Binary);
+}
+
+/// TEST: AssignExpr round-trips.
+TEST_F(BodyASTSerializationTest, AssignExprRoundTrip) {
+  auto *dest = new (Ctx) IntegerLiteralExpr("0", SourceLoc(), false);
+  auto *src = new (Ctx) IntegerLiteralExpr("42", SourceLoc(), false);
+  auto *assign = new (Ctx) AssignExpr(dest, SourceLoc(), src, /*Implicit=*/false);
+
+  SmallVector<ASTNode, 4> elements;
+  elements.push_back(ASTNode(assign));
+  auto *body = BraceStmt::create(Ctx, SourceLoc(), elements, SourceLoc(),
+                                 /*implicit=*/std::nullopt);
+
+  auto data = serializeBody(/*funcDeclID=*/1, body);
+  auto deser = makeDeserializer();
+  auto *result = deser.deserializeBody(data);
+
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->getNumElements(), 1u);
+  auto elt = result->getElements()[0];
+  ASSERT_TRUE(isa<Expr *>(elt));
+  EXPECT_EQ(cast<Expr *>(elt)->getKind(), ExprKind::Assign);
+}
+
+/// TEST: InOutExpr round-trips.
+TEST_F(BodyASTSerializationTest, InOutExprRoundTrip) {
+  auto *sub = new (Ctx) IntegerLiteralExpr("0", SourceLoc(), false);
+  auto *io = new (Ctx) InOutExpr(SourceLoc(), sub, Type(), /*isImplicit=*/false);
+
+  SmallVector<ASTNode, 4> elements;
+  elements.push_back(ASTNode(io));
+  auto *body = BraceStmt::create(Ctx, SourceLoc(), elements, SourceLoc(),
+                                 /*implicit=*/std::nullopt);
+
+  auto data = serializeBody(/*funcDeclID=*/1, body);
+  auto deser = makeDeserializer();
+  auto *result = deser.deserializeBody(data);
+
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->getNumElements(), 1u);
+  auto elt = result->getElements()[0];
+  ASSERT_TRUE(isa<Expr *>(elt));
+  EXPECT_EQ(cast<Expr *>(elt)->getKind(), ExprKind::InOut);
+}
+
 } // anonymous namespace
