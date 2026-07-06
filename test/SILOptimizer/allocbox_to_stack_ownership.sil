@@ -472,6 +472,38 @@ bb0(%0 : $Int):
   unreachable
 }
 
+// Verify the case in which a box used by a partial apply which is then used by a try_apply.
+//
+// <rdar://problem/42815224> Swift CI: 2. Swift Source Compatibility Suite (master): Kitura project fails with compiler crash
+// CHECK-LABEL: sil [ossa] @testPAUsedByTryApplyClosure : $@convention(thin) (@guaranteed { var Int }) -> () {
+// CHECK-LABEL: } // end sil function 'testPAUsedByTryApplyClosure'
+sil [ossa] @testPAUsedByTryApplyClosure : $@convention(thin) (@guaranteed { var Int }) -> () {
+bb0(%0: @guaranteed ${ var Int }):
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testPAUsedByTryApply :
+// CHECK-LABEL: } // end sil function 'testPAUsedByTryApply'
+sil [ossa] @testPAUsedByTryApply : $@convention(method) (@guaranteed @callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error any Error) -> () {
+bb0(%0: @guaranteed $@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error any Error):
+  %box = alloc_box ${ var Int }, var
+  %closure = function_ref @testPAUsedByTryApplyClosure : $@convention(thin) (@guaranteed { var Int }) -> ()
+  %pa = partial_apply [callee_guaranteed] %closure(%box) : $@convention(thin) (@guaranteed { var Int }) -> ()
+  try_apply %0(%pa) : $@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error any Error, normal bb2, error bb3
+
+bb2(%result : $()):
+  br bb4
+
+bb3(%error : $Error):
+  br bb4
+
+bb4:
+  destroy_value %pa
+  %v = tuple ()
+  return %v : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_copy_and_borrow_of_closure
 // CHECK-NOT:     alloc_box
 // CHECK:         alloc_stack
@@ -1010,6 +1042,7 @@ bb2:
 // CHECK:      bb1:
 // CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
+// CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
 // CHECK:        store
@@ -1557,4 +1590,104 @@ bb0(%0 : @owned $@callee_owned () -> (), %1 : @owned $@callee_owned () -> ()):
   apply %1() : $@callee_owned () -> ()
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @partial_dead_end :
+// CHECK:         %2 = alloc_stack $C
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_addr %2
+// CHECK-NEXT:    dealloc_stack %2
+// CHECK-NEXT:    br bb4
+// CHECK:       bb4:
+// CHECK-NEXT:    unreachable
+// CHECK:       bb5:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'partial_dead_end'
+sil [ossa] @partial_dead_end : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  cond_br undef, bb1, bb3
+
+bb1:
+  %2 = alloc_box ${ var C }
+  %3 = begin_borrow %2
+  %4 = project_box %3, 0
+  %5 = copy_value %0
+  store %5 to [init] %4
+  cond_br undef, bb2, bb5
+
+bb2:
+  end_borrow %3
+  destroy_value %2
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  unreachable
+
+bb5:
+  end_borrow %3
+  destroy_value [dead_end] %2
+  unreachable
+}
+
+// Make sure that we can promote this box and dealloc_stack
+// on each path.
+//
+// CHECK-LABEL: sil [ossa] @box_reachable_from_release_test
+sil [ossa] @box_reachable_from_release_test : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+// CHECK: bb1:
+// CHECK-NEXT: alloc_stack
+bb1:
+  %1 = alloc_box ${ var Bool }
+  cond_br undef, bb2, bb3
+
+// CHECK: bb2:
+// CHECK-NEXT: dealloc_stack
+bb2:
+  destroy_value %1 : ${ var Bool }
+  br bb1
+
+// CHECK: bb3:
+// CHECK-NEXT: dealloc_stack
+bb3:
+  destroy_value %1 : ${ var Bool }
+  %2 = tuple ()
+// CHECK: return
+  return %2 : $()
+}
+
+sil [ossa] @move_closure_callee : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> () {
+bb0(%box : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %13 = integer_literal $Builtin.Int32, 13
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  store %13 to [trivial] %addr : $*Builtin.Int32
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @move_closure : {{.*}} {
+// CHECK:         [[SPECIALIZED_CLOSURE:%[^,]+]] = function_ref @$s19move_closure_calleeTf0s_n : $@convention(thin) (@inout_aliasable Builtin.Int32) -> ()
+// CHECK:         partial_apply [callee_guaranteed] [[SPECIALIZED_CLOSURE]]
+// CHECK-LABEL: } // end sil function 'move_closure'
+sil [ossa] @move_closure : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %callee = function_ref @move_closure_callee : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %box_copy = copy_value %box : ${ var Builtin.Int32 }
+  mark_function_escape %addr : $*Builtin.Int32
+  %closure = partial_apply [callee_guaranteed] %callee(%box_copy) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %closure_move = move_value %closure : $@callee_guaranteed () -> ()
+  apply %closure_move() : $@callee_guaranteed () -> ()
+  destroy_value %closure_move : $@callee_guaranteed () -> ()
+  %value = load [trivial] %addr : $*Builtin.Int32
+  destroy_value %box : ${ var Builtin.Int32 }
+  return %value : $Builtin.Int32
 }
