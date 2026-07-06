@@ -2126,9 +2126,18 @@ public:
 
       auto calleeIsolationInfo = getIsolationInfo(op);
 
+      auto *sourceInst = Impl::getSourceInst(op);
+      const bool isSourceOpSending = [&] () -> bool {
+        if (sourceInst)
+          if (auto fas = FullApplySite::isa(sourceInst))
+            return fas.isSending(*op.getSourceOp());
+        return false;
+      }();
+
       // If our callee and region are both actor isolated and part of the same
-      // isolation domain, do not treat this as a send.
-      if (calleeIsolationInfo.isActorIsolated() &&
+      // isolation domain, do not treat this as a send. If we are passed as a
+      // sending parameter, we cannot do this.
+      if (!isSourceOpSending && calleeIsolationInfo.isActorIsolated() &&
           sentRegionIsolation.hasSameIsolation(calleeIsolationInfo))
         return;
 
@@ -2140,11 +2149,10 @@ public:
 
       // Next see if we are disconnected and have the same isolation. In such a
       // case, if we are not marked explicitly as sending, we do not send
-      // since the disconnected value is allowed to be resued after we
+      // since the disconnected value is allowed to be reused after we
       // return. If we are passed as a sending parameter, we cannot do this.
-      if (auto *sourceInst = Impl::getSourceInst(op)) {
-        if (auto fas = FullApplySite::isa(sourceInst);
-            (!fas || !fas.isSending(*op.getSourceOp())) &&
+      if (sourceInst) {
+        if (!isSourceOpSending &&
             sentRegionIsolation.isDisconnected() && calleeIsolationInfo &&
             sentRegionIsolation.hasSameIsolation(calleeIsolationInfo))
           return;
