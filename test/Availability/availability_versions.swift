@@ -398,7 +398,7 @@ class SubOfClassWithPotentiallyUnavailableInitializer : SuperWithWithPotentially
 // Properties
 
 class ClassWithPotentiallyUnavailableProperties {
-    // expected-note@-1 4{{add '@available' attribute to enclosing class}}
+    // expected-note@-1 3{{add '@available' attribute to enclosing class}}
 
   var nonLazyAvailableOn10_9Stored: Int = 9
 
@@ -414,20 +414,19 @@ class ClassWithPotentiallyUnavailableProperties {
 
   @available(OSX, introduced: 10.9)
   lazy var availableOn10_9Stored: Int = 9
-  
+
   @available(OSX, introduced: 51) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
   lazy var availableOn51Stored : Int = 10
 
   @available(OSX, introduced: 10.9)
   var availableOn10_9Computed: Int {
     get {
-      let _: Int = availableOn51Stored // expected-error {{'availableOn51Stored' is only available in macOS 51 or newer}}
-          // expected-note@-1 {{add 'if #available' version check}}
-      
+      let _: Int = availableOn51Stored
+
       if #available(OSX 51, *) {
         let _: Int = availableOn51Stored
       }
-      
+
       return availableOn10_9Stored
     }
     set(newVal) {
@@ -512,15 +511,13 @@ class ClassWithReferencesInInitializers {
 }
 
 func accessPotentiallyUnavailableProperties(_ o: ClassWithPotentiallyUnavailableProperties) {
-      // expected-note@-1 17{{add '@available' attribute to enclosing global function}}
+      // expected-note@-1 15{{add '@available' attribute to enclosing global function}}
   // Stored properties
   let _: Int = o.availableOn10_9Stored
-  let _: Int = o.availableOn51Stored // expected-error {{'availableOn51Stored' is only available in macOS 51 or newer}}
-      // expected-note@-1 {{add 'if #available' version check}}
-  
+  let _: Int = o.availableOn51Stored
+
   o.availableOn10_9Stored = 9
-  o.availableOn51Stored = 10 // expected-error {{'availableOn51Stored' is only available in macOS 51 or newer}}
-      // expected-note@-1 {{add 'if #available' version check}}
+  o.availableOn51Stored = 10
 
   // Computed Properties
   let _: Int = o.availableOn10_9Computed
@@ -625,13 +622,16 @@ enum CompassPoint {
   @available(OSX, introduced: 52)
   case West
 
+  @available(OSX, introduced: 52)
+  case NorthWest
+
   case WithAvailableByEnumPayload(p : EnumIntroducedOn51)
 
   // expected-error@+1 {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
   @available(OSX, introduced: 52)
   case WithAvailableByEnumElementPayload(p : EnumIntroducedOn52)
 
-  // expected-error@+1 2{{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
+  // expected-error@+1 {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
   @available(OSX, introduced: 52)
   case WithAvailableByEnumElementPayload1(p : EnumIntroducedOn52), WithAvailableByEnumElementPayload2(p : EnumIntroducedOn52)
 
@@ -647,7 +647,7 @@ enum CompassPoint {
 func functionTakingEnumIntroducedOn52(_ e: EnumIntroducedOn52) { }
 
 func useEnums() {
-      // expected-note@-1 2{{add '@available' attribute to enclosing global function}}
+      // expected-note@-1 3{{add '@available' attribute to enclosing global function}}
   let _: CompassPoint = .North // expected-error {{'CompassPoint' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
@@ -668,7 +668,7 @@ func useEnums() {
     switch (point) {
       case .North, .South, .East:
         markUsed("NSE")
-      case .West: // We do not expect an error here
+      case .West, .NorthWest: // We do not expect an error here
         markUsed("W")
 
       case .WithPotentiallyUnavailablePayload(_):
@@ -686,7 +686,8 @@ func useEnums() {
         markUsed("WithAvailableByEnumElementPayload2")
       case .WithAvailableByEnumElementPayload(let p):
         markUsed("WithAvailableByEnumElementPayload")
-        functionTakingEnumIntroducedOn52(p)
+        functionTakingEnumIntroducedOn52(p) // expected-error {{'functionTakingEnumIntroducedOn52' is only available in macOS 52 or newer}}
+        // expected-note@-1 {{add 'if #available' version check}}
     }
   }
 }
@@ -719,7 +720,7 @@ func switchStatements(point: CompassPoint) {
   // Multiple case label items that share the same availability still allow
   // refinement to that common availability.
   switch point {
-  case .WithAvailableByEnumElementPayload1(_), .WithAvailableByEnumElementPayload2(_):
+  case .West, .NorthWest:
     _ = globalFuncAvailableOn52()
   default:
     break
@@ -752,7 +753,7 @@ func switchStatements(point: CompassPoint) {
     case .West:
       _ = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-    case .WithAvailableByEnumElementPayload1(_):
+    case .NorthWest:
       _ = globalFuncAvailableOn52()
     default:
       break

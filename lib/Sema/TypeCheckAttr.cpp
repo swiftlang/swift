@@ -5636,7 +5636,8 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
     auto attr = availabilityConstraint->getAttr();
     if (auto diag =
             TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D))
-      diagnose(attr.getParsedAttr()->getLocation(), diag.value());
+      diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
+                            *diag);
   }
 }
 
