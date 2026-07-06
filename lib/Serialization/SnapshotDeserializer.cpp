@@ -22,6 +22,7 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckedSnapshot.h"
 #include "swift/AST/FineGrainedDependencies.h"
@@ -208,6 +209,57 @@ private:
         // Force-compute the generic signature so that dumpJSON emits
         // "generic_signature" instead of "parsed_generic_params".
         (void)PD->getGenericSignature();
+      }
+    }
+    // Fix source_kind for synthesized conformances. The serializer writes all
+    // conformances via getLocalConformances(All) but doesn't serialize the
+    // ConformanceEntryKind (Explicit vs Synthesized). Deserialized conformances
+    // default to Explicit, but synthesized conformances should be Synthesized.
+    // A conformance is synthesized if its protocol does not appear in the
+    // nominal's explicit inherits list.
+    for (auto *D : decls) {
+      if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+        // Collect the set of protocols that are explicitly inherited.
+        llvm::SmallPtrSet<ProtocolDecl*, 4> explicitProtos;
+        if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+          auto inherited = NTD->getInherited();
+          for (auto i : inherited.getIndices()) {
+            if (auto inheritedType = inherited.getResolvedType(i)) {
+              if (auto *protoType = inheritedType->getAs<ProtocolType>()) {
+                explicitProtos.insert(protoType->getDecl());
+              }
+            }
+          }
+        } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+          auto inherited = ED->getInherited();
+          for (auto i : inherited.getIndices()) {
+            if (auto inheritedType = inherited.getResolvedType(i)) {
+              if (auto *protoType = inheritedType->getAs<ProtocolType>()) {
+                explicitProtos.insert(protoType->getDecl());
+              }
+            }
+          }
+        }
+
+        for (auto *conf : IDC->getLocalConformances(
+                 ConformanceLookupKind::All)) {
+          if (auto *npc = dyn_cast<NormalProtocolConformance>(conf)) {
+            auto *proto = npc->getProtocol();
+            if (!proto)
+              continue;
+            // Skip builtin conformances (Copyable, Escapable) — they're
+            // already marked as synthesized.
+            if (npc->getKind() != ProtocolConformanceKind::Normal)
+              continue;
+            // If the protocol is not in the explicit inherits list, mark
+            // the conformance as synthesized.
+            if (!explicitProtos.count(proto) &&
+                npc->getSourceKind() == ConformanceEntryKind::Explicit) {
+              npc->setSourceKindAndImplyingConformance(
+                  ConformanceEntryKind::Synthesized, nullptr);
+            }
+          }
+        }
       }
     }
     // Eagerly set the interface type and specifier on implicit self decls
