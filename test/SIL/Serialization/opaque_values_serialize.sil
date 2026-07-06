@@ -19,7 +19,7 @@ struct S : Foo {
   init()
 }
 
-// CHECK-LABEL: sil [serialized] @initDeinitExistentialValue : $@convention(thin) <T> (@in T) -> () {
+// CHECK-LABEL: sil [serialized] [opaque] @initDeinitExistentialValue : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0([[ARG:%.*]] : $T):
 // CHECK:  [[IE:%.*]] = init_existential_value [[ARG]] : $T, $T, $Any
 // CHECK:  deinit_existential_value [[IE]] : $Any
@@ -32,7 +32,7 @@ bb0(%0 : $T):
   return %t : $()
 }
 
-// CHECK-LABEL: sil [serialized] @openExistentialBoxValue : $@convention(thin) (@in any Error) -> () {
+// CHECK-LABEL: sil [serialized] [opaque] @openExistentialBoxValue : $@convention(thin) (@in any Error) -> () {
 // CHECK: bb0([[ARG:%.*]] : $any Error):
 // CHECK:  open_existential_box_value [[ARG]] : $any Error to $@opened({{.*}}, any Error) Self
 // CHECK-LABEL: } // end sil function 'openExistentialBoxValue'
@@ -43,7 +43,7 @@ bb0(%0 : $Error):
   return %t : $()
 }
 
-// CHECK-LABEL: sil [serialized] @openExistentialValue : $@convention(thin) (@in any Foo) -> () {
+// CHECK-LABEL: sil [serialized] [opaque] @openExistentialValue : $@convention(thin) (@in any Foo) -> () {
 // CHECK: bb0([[ARG:%.*]] : $any Foo):
 // CHECK:  open_existential_value [[ARG]] : $any Foo to $@opened({{.*}}, any Foo) Self
 // CHECK-LABEL: } // end sil function 'openExistentialValue'
@@ -57,7 +57,7 @@ bb0(%0 : $Foo):
 // Test @in/@out serialization.
 // ----
 
-// CHECK-LABEL: sil [serialized] @serialize_identity : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK-LABEL: sil [serialized] [opaque] @serialize_identity : $@convention(thin) <T> (@in T) -> @out T {
 sil [serialized] @serialize_identity : $@convention(thin) <T> (@in T) -> @out T {
 // CHECK: bb0(%0 : $T):
 bb0(%0 : $T):
@@ -71,7 +71,7 @@ bb0(%0 : $T):
 
 sil @doWithS : $@convention(method) (S) -> ()
 
-// CHECK-LABEL: sil [transparent] [serialized] [thunk] @serialize_mutating : $@convention(witness_method: Foo) (@in_guaranteed S) -> () {
+// CHECK-LABEL: sil [transparent] [serialized] [thunk] [opaque] @serialize_mutating : $@convention(witness_method: Foo) (@in_guaranteed S) -> () {
 sil [transparent] [serialized] [thunk] @serialize_mutating : $@convention(witness_method: Foo) (@in_guaranteed S) -> () {
 // CHECK: bb0(%0 : $S):
 bb0(%0 : $S):
@@ -87,7 +87,7 @@ struct WeakBox<T : AnyObject> {
   weak var t: T?
 }
 
-// CHECK-LABEL: sil [ossa] @test_strong_copy_weak_value : {{.*}} {
+// CHECK-LABEL: sil [ossa] [opaque] @test_strong_copy_weak_value : {{.*}} {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] :
 // CHECK:         [[WEAK_OPTIONAL:%[^,]+]] = struct_extract [[INSTANCE]]
 // CHECK:         strong_copy_weak_value [[WEAK_OPTIONAL]]
@@ -101,7 +101,7 @@ bb0(%instance : @guaranteed $WeakBox<T>):
 
 // Test tuple_pack_extract parsing.
 
-// CHECK-LABEL: sil [ossa] @test_tuple_pack_extract : {{.*}} {
+// CHECK-LABEL: sil [ossa] [opaque] @test_tuple_pack_extract : {{.*}} {
 // CHECK:       bb0([[TUPLE_ADDR:%[^,]+]] :
 // CHECK:         [[TUPLE:%[^,]+]] = load_borrow [[TUPLE_ADDR]]
 // CHECK:         [[ZERO:%[^,]+]] = integer_literal
@@ -120,7 +120,7 @@ entry(%tuple_addr : $*(repeat each T)):
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @test_weak_copy_value_1 : {{.*}} {
+// CHECK-LABEL: sil [ossa] [opaque] @test_weak_copy_value_1 : {{.*}} {
 // CHECK:       bb0([[VALUE:%[^,]+]] :
 // CHECK:         weak_copy_value [[VALUE]]
 // CHECK-LABEL: } // end sil function 'test_weak_copy_value_1'

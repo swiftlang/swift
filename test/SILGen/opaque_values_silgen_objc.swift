@@ -5,13 +5,13 @@
 
 // REQUIRES: objc_interop
 
-// CHECK-LABEL: sil {{.*}}[ossa] @$s25opaque_values_silgen_objc10UnownedBoxV5valuexvg : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s25opaque_values_silgen_objc10UnownedBoxV5valuexvg : {{.*}} {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] :
 // CHECK:         [[UNOWNED_VALUE:%[^,]+]] = struct_extract [[INSTANCE]]
 // CHECK:         [[STRONG_VALUE:%[^,]+]] = strong_copy_unowned_value [[UNOWNED_VALUE]]
 // CHECK:         return [[STRONG_VALUE]]
 // CHECK-LABEL: } // end sil function '$s25opaque_values_silgen_objc10UnownedBoxV5valuexvg'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s25opaque_values_silgen_objc10UnownedBoxV5valueACyxGx_tcfC : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s25opaque_values_silgen_objc10UnownedBoxV5valueACyxGx_tcfC : {{.*}} {
 // CHECK:       bb0([[STRONG_VALUE:%[^,]+]] :
 // CHECK:         [[UNOWNED_VALUE:%[^,]+]] = unowned_copy_value [[STRONG_VALUE]]
 // CHECK:         destroy_value [[STRONG_VALUE]]

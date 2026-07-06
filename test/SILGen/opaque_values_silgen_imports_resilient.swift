@@ -11,7 +11,7 @@ import ResilientLibrary
 // init_enum_data_addr/inject_enum_addr and there isn't generally enough
 // information to determine whether a destroy_addr is required so it is always
 // required.
-// CHECK-LABEL: sil [ossa] @produceSomeEmptyNontrivialAddronlyEnumInstance : {{.*}} {
+// CHECK-LABEL: sil [ossa] [opaque] @produceSomeEmptyNontrivialAddronlyEnumInstance : {{.*}} {
 // CHECK:         [[EMPTY_CASE:%[^,]+]] = enum $EnumNontrivialWithEmptyCases, #EnumNontrivialWithEmptyCases.empty!enumelt
 // CHECK:         [[SOME_EMPTY_CASE:%[^,]+]] = enum $Optional<EnumNontrivialWithEmptyCases>, #Optional.some!enumelt, [[EMPTY_CASE]]
 // CHECK:         destroy_value [[SOME_EMPTY_CASE]]
@@ -22,7 +22,7 @@ public func produceSomeEmptyNontrivialAddronlyEnumInstance(_ one: EnumNontrivial
   }
 }
 
-// CHECK-LABEL: sil [ossa] @produceNoneEmptyAddronlyEnumInstance : {{.*}} {
+// CHECK-LABEL: sil [ossa] [opaque] @produceNoneEmptyAddronlyEnumInstance : {{.*}} {
 // CHECK:         [[NONE:%[^,]+]] = enum $Optional<EnumNontrivialWithEmptyCases>, #Optional.none!enumelt 
 // CHECK:         return [[NONE]] : $Optional<EnumNontrivialWithEmptyCases> 
 // CHECK-LABEL: } // end sil function 'produceNoneEmptyAddronlyEnumInstance'

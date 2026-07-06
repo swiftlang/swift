@@ -18,7 +18,7 @@ class StillOpaqueClass<T>: OpaqueClass<T> {
 
 // Test vtables - OpaqueTupleClass
 // ---
-// CHECK-LABEL: sil private [thunk] [ossa] @$s27opaque_values_silgen_vtable16OpaqueTupleClassC8inAndOut1xx_xtx_xt_tFAA0eG0CAdExx_tFTV : $@convention(method) <τ_0_0> (@in_guaranteed (τ_0_0, τ_0_0), @guaranteed OpaqueTupleClass<τ_0_0>) -> @out (τ_0_0, τ_0_0) {
+// CHECK-LABEL: sil private [thunk] [ossa] [opaque] @$s27opaque_values_silgen_vtable16OpaqueTupleClassC8inAndOut1xx_xtx_xt_tFAA0eG0CAdExx_tFTV : $@convention(method) <τ_0_0> (@in_guaranteed (τ_0_0, τ_0_0), @guaranteed OpaqueTupleClass<τ_0_0>) -> @out (τ_0_0, τ_0_0) {
 // HECK: bb0([[ARG0:%.*]] : $(U, U), [[ARG1:%.*]] : $OpaqueTupleClass<U>):
 // HECK:   ([[TELEM0:%.*]], [[TELEM1:%.*]]) = destructure_tuple [[ARG0]] : $(U, U)
 // HECK:   [[APPLY:%.*]] = apply {{.*}}<U>([[TELEM0]], [[TELEM1]], [[ARG1]]) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @guaranteed OpaqueTupleClass<τ_0_0>) -> (@out τ_0_0, @out τ_0_0)
@@ -34,7 +34,7 @@ class StillOpaqueClass<T>: OpaqueClass<T> {
 
 // Test vtables - StillOpaqueClass
 // ---
-// CHECK-LABEL: sil private [thunk] [ossa] @$s27opaque_values_silgen_vtable16StillOpaqueClassC24variantOptionalityTuples1xx_xm_xxcttx_xm_xxcttSg_tFAA0fG0CAdeFx_xm_xxctt_tFTV : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @thick τ_0_0.Type, @guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0, τ_0_0>, @guaranteed StillOpaqueClass<τ_0_0>) -> @out Optional<(τ_0_0, (@thick τ_0_0.Type, @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0, τ_0_0>))> {
+// CHECK-LABEL: sil private [thunk] [ossa] [opaque] @$s27opaque_values_silgen_vtable16StillOpaqueClassC24variantOptionalityTuples1xx_xm_xxcttx_xm_xxcttSg_tFAA0fG0CAdeFx_xm_xxctt_tFTV : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @thick τ_0_0.Type, @guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0, τ_0_0>, @guaranteed StillOpaqueClass<τ_0_0>) -> @out Optional<(τ_0_0, (@thick τ_0_0.Type, @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0, τ_0_0>))> {
 // HECK: bb0([[ARG0:%.*]] : $T, [[ARG1:%.*]] : $@thick T.Type, [[ARG2:%.*]] : $@callee_guaranteed (@in_guaranteed T) -> @out T, [[ARG3:%.*]] : $StillOpaqueClass<T>):
 // HECK:   [[TELEM0:%.*]] = tuple ([[ARG1]] : $@thick T.Type, [[ARG2]] : $@callee_guaranteed (@in_guaranteed T) -> @out T)
 // HECK:   [[TELEM1:%.*]] = tuple ([[ARG0]] : $T, [[TELEM0]] : $(@thick T.Type, @callee_guaranteed (@in_guaranteed T) -> @out T))
