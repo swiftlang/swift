@@ -675,10 +675,14 @@ cause never fully identified). Replaced with `std::map` which uses separate
 heap-allocated nodes. The map is small (<20 entries per file), so the
 performance difference is negligible.
 
-**CaseStmt assertion (fixed):** `CaseStmt::createImplicit` requires at least
-one `CaseLabelItem`. The deserializer was passing an empty labels vector.
-Fixed by adding a default `AnyPattern` label via
-`CaseLabelItem::getDefault(AnyPattern::createImplicit(Ctx))`.
+**CaseStmt labels (NOT serialized — workaround):** The serializer only writes
+`{bodyStmtID}` for `CaseStmt` — it does not serialize the case label items
+(patterns, guard expressions, enum elements). The deserializer creates a
+dummy `default` label via `CaseLabelItem::getDefault(AnyPattern::createImplicit(Ctx))`
+just to satisfy `CaseStmt::createImplicit`'s assertion that `NumPatterns > 0`.
+This produces wrong AST: a `case .red:` becomes `default:`. The proper fix is
+to serialize the `CaseLabelItem` array (patterns + guard exprs) in the body
+block record.
 
 **ErasureExpr type resolution (worked around):** `ErasureExpr::create` needs
 a valid existential type. In the unit test context (no `ResolveType`
@@ -686,15 +690,10 @@ callback), the type is null. Fixed by falling back to `ErrorExpr` when `ty`
 is null or not existential. In production, `ResolveType` is set and returns
 the correct type.
 
-### 11.8 Outstanding work
-
-1. **Reduce verify-ast-cache diffs to zero** (135 → 0):
-   - Fix deserialized body fidelity: many bodies have `ErrorExpr` fallbacks
-     where types couldn't be resolved or expression kinds couldn't be
-     reconstructed. Need to trace each diff to its root cause.
    - Common diff patterns: missing source ranges on body exprs/stmts,
      `ErrorExpr` where original has a typed expr, missing `body` field on
-     accessors, pattern binding decls not serialized.
+     accessors, pattern binding decls not serialized,
+     `CaseStmt` labels not serialized (all cases become `default`).
 
 2. **Implement LOCAL_DECL records**: Serialize local VarDecl/ParamDecl
    created inside function bodies. Currently, `let x = ...` declarations
