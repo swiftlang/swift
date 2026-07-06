@@ -337,13 +337,13 @@ struct ASTContext::Implementation {
   /// The declaration of 'AsyncSequence.makeAsyncIterator()'.
   FuncDecl *MakeAsyncIterator = nullptr;
 
-  /// The declaration of 'BorrowingSequence.makeBorrowingIterator()'.
+  /// The declaration of 'Iterable.makeBorrowingIterator()'.
   FuncDecl *MakeBorrowingIterator = nullptr;
 
   /// The declaration of 'IteratorProtocol.next()'.
   FuncDecl *IteratorNext = nullptr;
 
-  /// The declaration of 'IteratorProtocol.nextSpan(maximumCount:)'.
+  /// The declaration of 'IteratorProtocol.nextSpan(maxCount:)'.
   FuncDecl *BorrowingIteratorNextSpan = nullptr;
 
   /// The declaration of 'AsyncIteratorProtocol.next()'.
@@ -1134,12 +1134,12 @@ FuncDecl *ASTContext::getSequenceMakeIterator() const {
   return nullptr;
 }
 
-FuncDecl *ASTContext::getBorrowingSequenceMakeBorrowingIterator() const {
+FuncDecl *ASTContext::getIterableMakeBorrowingIterator() const {
   if (getImpl().MakeBorrowingIterator) {
     return getImpl().MakeBorrowingIterator;
   }
 
-  auto proto = getProtocol(KnownProtocolKind::BorrowingSequence);
+  auto proto = getProtocol(KnownProtocolKind::Iterable);
   if (!proto)
     return nullptr;
 
@@ -1547,7 +1547,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CxxMutableRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
-  case KnownProtocolKind::CxxBorrowingSequence:
+  case KnownProtocolKind::CxxIterable:
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
   case KnownProtocolKind::CxxSpan:
