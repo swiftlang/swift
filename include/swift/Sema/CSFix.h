@@ -1632,6 +1632,12 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  // May have overloaded methods being partially applied, causing ambiguity that
+  // does not currently impact diagnostic produced
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static AllowInvalidPartialApplication *create(bool isWarning,
                                                 ConstraintSystem &cs,
                                                 ConstraintLocator *locator);
