@@ -384,4 +384,86 @@ TEST_F(BodyASTSerializationTest, InOutExprRoundTrip) {
   EXPECT_EQ(cast<Expr *>(elt)->getKind(), ExprKind::InOut);
 }
 
+// === Stage E Test: Full body round-trip ===
+
+/// TEST: A complete function body with multiple statements round-trips.
+/// This exercises the full serializer/deserializer pipeline:
+/// BraceStmt → ReturnStmt → BinaryExpr → IntegerLiteralExpr
+TEST_F(BodyASTSerializationTest, FullBodyRoundTrip) {
+  // Build: { return 1 + 2 }
+  auto *lhs = new (Ctx) IntegerLiteralExpr("1", SourceLoc(), false);
+  auto *rhs = new (Ctx) IntegerLiteralExpr("2", SourceLoc(), false);
+  auto *fn = new (Ctx) ErrorExpr(SourceRange());
+  auto *bin = BinaryExpr::create(Ctx, lhs, fn, rhs, /*implicit=*/false, Type());
+
+  auto *retStmt = ReturnStmt::createParsed(Ctx, SourceLoc(), bin);
+
+  SmallVector<ASTNode, 4> elements;
+  elements.push_back(ASTNode(retStmt));
+  auto *body = BraceStmt::create(Ctx, SourceLoc(), elements, SourceLoc(),
+                                 /*implicit=*/std::nullopt);
+
+  auto data = serializeBody(/*funcDeclID=*/1, body);
+  EXPECT_GT(data.size(), 4u);
+
+  auto deser = makeDeserializer();
+  auto *result = deser.deserializeBody(data);
+
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->getNumElements(), 1u);
+
+  // The element should be a ReturnStmt.
+  auto elt = result->getElements()[0];
+  ASSERT_TRUE(isa<Stmt *>(elt));
+  auto *RS = cast<ReturnStmt>(cast<Stmt *>(elt));
+  EXPECT_TRUE(RS->hasResult());
+
+  // The result should be a BinaryExpr.
+  auto *resultExpr = RS->getResult();
+  ASSERT_NE(resultExpr, nullptr);
+  EXPECT_EQ(resultExpr->getKind(), ExprKind::Binary);
+}
+
+/// TEST: Empty body (e.g., destructor) round-trips.
+TEST_F(BodyASTSerializationTest, EmptyBodyRoundTrip) {
+  SmallVector<ASTNode, 4> elements;
+  auto *body = BraceStmt::create(Ctx, SourceLoc(), elements, SourceLoc(),
+                                 /*implicit=*/std::nullopt);
+
+  auto data = serializeBody(/*funcDeclID=*/1, body);
+  auto deser = makeDeserializer();
+  auto *result = deser.deserializeBody(data);
+
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->getNumElements(), 0u);
+}
+
+/// TEST: Multiple statements in body round-trip.
+TEST_F(BodyASTSerializationTest, MultipleStatementsRoundTrip) {
+  // Build: { 42; return }
+  auto *intExpr = new (Ctx) IntegerLiteralExpr("42", SourceLoc(), false);
+  auto *retStmt = ReturnStmt::createParsed(Ctx, SourceLoc(), nullptr);
+
+  SmallVector<ASTNode, 4> elements;
+  elements.push_back(ASTNode(intExpr));
+  elements.push_back(ASTNode(retStmt));
+  auto *body = BraceStmt::create(Ctx, SourceLoc(), elements, SourceLoc(),
+                                 /*implicit=*/std::nullopt);
+
+  auto data = serializeBody(/*funcDeclID=*/1, body);
+  auto deser = makeDeserializer();
+  auto *result = deser.deserializeBody(data);
+
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->getNumElements(), 2u);
+
+  auto elt0 = result->getElements()[0];
+  ASSERT_TRUE(isa<Expr *>(elt0));
+  EXPECT_EQ(cast<Expr *>(elt0)->getKind(), ExprKind::IntegerLiteral);
+
+  auto elt1 = result->getElements()[1];
+  ASSERT_TRUE(isa<Stmt *>(elt1));
+  EXPECT_EQ(cast<Stmt *>(elt1)->getKind(), StmtKind::Return);
+}
+
 } // anonymous namespace
