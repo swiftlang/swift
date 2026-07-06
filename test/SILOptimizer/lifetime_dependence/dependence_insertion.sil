@@ -204,3 +204,63 @@ bb0(%0 : $*Holder):
   %13 = tuple ()
   return %13
 }
+
+// rdar://181348593 (Exclusivity sub-object analysis is defeated by end_cow_mutation_addr)
+//
+// Test that mark_dependence is inserted immediately after the apply whose result depends on an
+// @_addressableForDependencies field, and that the dependence base is the struct_element_addr into that
+// field -- not the enclosing begin_access. Using the enclosing access as the dependence base would extend
+// its scope over the unrelated access to 'Agg.bar' below, causing a spurious exclusivity conflict.
+
+@_addressableForDependencies
+struct Foo {
+  var i: Int
+}
+
+struct Bar {
+  var i: Int
+  func method()
+}
+
+struct Agg {
+  @_hasStorage var foo: Foo { get set }
+  @_hasStorage var bar: Bar { get set }
+}
+
+sil @getDep : $@convention(thin) (@inout Foo) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @$s3BarV6methodyyF : $@convention(method) (@in_guaranteed Bar) -> ()
+
+// CHECK-LABEL: sil hidden [ossa] @run : $@convention(thin) (@inout Agg) -> () {
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] %0
+// CHECK: [[FOO:%.*]] = struct_element_addr [[ACCESS]], #Agg.foo
+// CHECK: [[NE:%.*]] = apply %{{.*}}([[FOO]]) : $@convention(thin) (@inout Foo) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK: mark_dependence [unresolved] [[NE]] on [[FOO]]
+// CHECK: end_access [[ACCESS]]
+// CHECK-LABEL: } // end sil function 'run'
+sil hidden [ossa] @run : $@convention(thin) (@inout Agg) -> () {
+bb0(%0 : $*Agg):
+  %2 = alloc_box ${ var NE }, var, name "span"
+  %3 = begin_borrow [lexical] [var_decl] %2
+  %4 = project_box %3, 0
+  %5 = begin_access [modify] [unknown] %0
+  %6 = struct_element_addr %5, #Agg.foo
+  %7 = function_ref @getDep : $@convention(thin) (@inout Foo) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %8 = apply %7(%6) : $@convention(thin) (@inout Foo) -> @lifetime(borrow address_for_deps 0) @owned NE
+  store %8 to [init] %4
+  end_access %5
+
+  %11 = begin_access [read] [unknown] %0
+  %12 = struct_element_addr %11, #Agg.bar
+  %13 = alloc_stack $Bar
+  copy_addr %12 to [init] %13
+  end_access %11
+  %16 = function_ref @$s3BarV6methodyyF : $@convention(method) (@in_guaranteed Bar) -> ()
+  %17 = apply %16(%13) : $@convention(method) (@in_guaranteed Bar) -> ()
+  destroy_addr %13
+  dealloc_stack %13
+
+  end_borrow %3
+  destroy_value %2
+  %36 = tuple ()
+  return %36
+}

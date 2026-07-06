@@ -549,6 +549,11 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
       SingleUser = inst;
       break;
     }
+    case SILInstructionKind::EndCOWMutationAddrInst: {
+      // Ignore an end_cow_mutation_addr for the purpose finding projection
+      // uses. It only uses the address, it does not produce a new address.
+      continue;
+    }
     default:
       return std::make_pair(nullptr, 0);
     }
