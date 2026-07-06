@@ -1914,9 +1914,7 @@ public:
   SourceLoc getLocFromSource() const {
     return getImportPath().getSourceRange().Start;
   }
-  SourceRange getSourceRange() const {
-    return SourceRange(ImportLoc, getImportPath().getSourceRange().End);
-  }
+  SourceRange getSourceRange() const;
   SourceLoc getKindLoc() const { return KindLoc; }
 
   static bool classof(const Decl *D) {

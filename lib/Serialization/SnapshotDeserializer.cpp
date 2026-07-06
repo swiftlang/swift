@@ -47,6 +47,7 @@ namespace {
 class SnapshotDeserializer {
   SourceFile &SF;
   ASTContext &ctx;
+  SmallVector<SourceRange, 4> importDeclRanges;
 
 public:
   SnapshotDeserializer(SourceFile &SF, ASTContext &ctx)
@@ -431,6 +432,44 @@ private:
       SF.setImports(attributedImports);
     }
 
+    // Read ImportDecl source ranges from declRangesBlob before reconstructing
+    // them. ImportDecls come first in the serializer's top-level item walk.
+    if (!key.declRangesBlob.empty()) {
+      auto &sourceMgr = ctx.SourceMgr;
+      unsigned bufferID = SF.getBufferID();
+      if (bufferID != 0) {
+        const char *data = key.declRangesBlob.data();
+        size_t remaining = key.declRangesBlob.size();
+        auto readUint32 = [&]() -> uint32_t {
+          if (remaining < 4) return 0;
+          uint32_t val;
+          memcpy(&val, data, 4);
+          data += 4;
+          remaining -= 4;
+          return val;
+        };
+        auto readRange = [&]() -> SourceRange {
+          uint32_t start = readUint32();
+          uint32_t end = readUint32();
+          if (start == 0 && end == 0)
+            return SourceRange();
+          return SourceRange(sourceMgr.getLocForOffset(bufferID, start),
+                              sourceMgr.getLocForOffset(bufferID, end));
+        };
+        // Count ImportDecls from importsBlob (one per line) and read
+        // that many ranges. ImportDecls have no semantic attrs.
+        unsigned numImports = 0;
+        StringRef importsRef = key.importsBlob;
+        while (!importsRef.empty()) {
+          auto [name, rest] = importsRef.split('\n');
+          if (!name.empty())
+            numImports++;
+          importsRef = rest;
+        }
+        for (unsigned i = 0; i < numImports; i++)
+          importDeclRanges.push_back(readRange());
+      }
+    }
     // Reconstruct ImportDecl nodes from the explicit imports in importsBlob,
     // prepend them to Items to match the parsed AST's item ordering.
     // The serializer skips ImportDecls (visitImportDecl is unreachable),
@@ -454,6 +493,12 @@ private:
         auto *importDecl = ImportDecl::create(
             ctx, &SF, SourceLoc(), ImportKind::Module, SourceLoc(),
             importPath);
+        if (!importDeclRanges.empty()) {
+          auto R = importDeclRanges.front();
+          importDeclRanges.erase(importDeclRanges.begin());
+          if (R.isValid())
+            ctx.setCachedDeclSourceRange(importDecl, R);
+        }
         itemNodesWithImports.push_back(ASTNode(importDecl));
       }
       for (auto *D : decls) {
@@ -502,6 +547,20 @@ private:
               ctx.setCachedAttrSourceRange(attr, R);
           }
         };
+        // Skip ImportDecl ranges — they were already read and applied to
+        // reconstructed ImportDecls in the pre-reconstruction block above.
+        {
+          unsigned numImports = 0;
+          StringRef importsRef = key.importsBlob;
+          while (!importsRef.empty()) {
+            auto [name, rest] = importsRef.split('\n');
+            if (!name.empty())
+              numImports++;
+            importsRef = rest;
+          }
+          for (unsigned i = 0; i < numImports; i++)
+            (void)readRange();
+        }
         for (auto *D : decls) {
           setDeclRange(D);
         // Walk params of top-level function decls (not inside an IDC).

@@ -167,11 +167,11 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
       };
       for (auto item : const_cast<SourceFile &>(SF).getTopLevelItems()) {
         if (auto *D = item.dyn_cast<Decl *>()) {
-          // Skip ImportDecls — they are not in the deserialized decls vector
-          // (reconstructed separately by SnapshotDeserializer).
+          writeDeclRange(D);
+          // ImportDecls are reconstructed separately by SnapshotDeserializer,
+          // so skip param/member walks. The range was written above.
           if (isa<ImportDecl>(D))
             continue;
-          writeDeclRange(D);
           // Walk params of top-level function decls (not inside an IDC).
           if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
             if (auto *params = AFD->getParameters()) {

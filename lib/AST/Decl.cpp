@@ -12318,6 +12318,13 @@ SourceRange ConstructorDecl::getSourceRange() const {
   return { getConstructorLoc(), End };
 }
 
+SourceRange ImportDecl::getSourceRange() const {
+  // Per-file AST cache: check for a source range override.
+  if (auto R = getASTContext().getCachedDeclSourceRange(this); R.isValid())
+    return R;
+  return SourceRange(ImportLoc, getImportPath().getSourceRange().End);
+}
+
 Type ConstructorDecl::getResultInterfaceType() const {
   Type resultTy;
 
