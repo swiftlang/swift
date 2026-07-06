@@ -422,6 +422,45 @@ AST cache: HIT for Sources/_NIODataStructures/Heap.swift
 round-trip verification action (serialize → deserialize → JSON-diff); see the
 plan in `local://ast-cache-format-plan.md`, Steps 10–13.
 
+## 8.1. Remaining verify-ast-cache diffs (123 on rich test file)
+
+The strict `compare()` in the verify script reports 123 diffs. Categories:
+
+| Category | Count | Root cause | Fix approach |
+|----------|-------|-----------|-------------|
+| `range`/`loc` | 46 | Source locations not in decl record layouts (only `SwiftAttrAttr` serializes them via `writeSourceLocation`) | Serialize source ranges in a side block (like existing `DECL_LOCS_BLOCK_ID` from `.swiftsourceinfo`), restore during deserialization |
+| `value_mismatch` (pointer IDs) | 61 | `decl_context` pointer IDs off-by-one — `ImportDecl` insertion shifts numbering. `ASTDumper` assigns `replaced-pointer-N` in first-seen order during JSON dump | Dump rendering artifact; could be fixed by structural pointer ID normalization or by not inserting ImportDecl |
+| `body` | 13 | Cache stores body *text* (source string via `InlinableBodyTextLayout`), not body *AST* (`brace_stmt` nodes). `ASTDumper` renders `body` as AST structure | Either serialize full body AST (large) or re-parse body text into AST during deserialization |
+| `implicit` on patterns | 7 | Deserializer uses `createImplicit` for all patterns (`NamedPattern::createImplicit`, `TypedPattern::createImplicit`, etc.) — swiftmodule design assumes patterns are reconstructed, not parsed | Add `isImplicit` field to pattern record layouts, or use non-implicit `create` methods during deserialization |
+| `where_requirements` | 1 | `getTrailingWhereClause()` returns parsed where clause, not serialized. Generic signature IS serialized but dumper shows them as separate fields | Reconstruct `TrailingWhereClause` from generic signature requirements, or serialize it |
+| `generic_signature` | 1 | Protocol generic signature rendering difference | Force-evaluate `getGenericSignature()` during deserialization |
+| Synthesized conformances | ~6 | `source_kind: 'synthesized'` vs `'explicit'` — deserializer marks synthesized conformances as explicit | Fix deserialization path to preserve `source_kind` |
+| `attrs` ordering | 2 | `has_storage_attr` vs `usable_from_inline_attr` swapped — synthesized attribute added at different position | Control attribute insertion order during deserialization |
+| `accessors` array length | 3 | Missing accessor in deserialized (e.g., `final_attr` on getter) | Force-load all accessors during deserialization |
+
+### Fixes already applied (reduced from 200 → 123)
+
+| Fix | Diffs cleared | How |
+|-----|-------|-----|
+| `interface_type` on `implicit_self_decl` | 15 | Eager self decl creation in `SnapshotDeserializer` with interface type from `DC->getSelfInterfaceType()` and specifier based on function kind |
+| `requirement_signature` | 2 | Force-compute `ProtocolDecl::getRequirementSignature()` during deserialization |
+| `inout` on self decls | 4 | `AccessorDecl` kind check (Set/Modify/Init = inout), `ConstructorDecl` handling |
+| `enum_case_decl` reconstruction | ~20 cascade | Group consecutive `EnumElementDecl`s, insert `EnumCaseDecl` wrapper before each group, keep elements as direct members too |
+| `import_decl` array alignment | ~10 | Reconstruct `ImportDecl` nodes from `importsBlob` during deserialization |
+
+### What's NOT fixable without extending the bitstream
+
+The `range`, `body`, and `implicit` categories (66 diffs total) require
+additional data in the cache bitstream that the swiftmodule format doesn't
+store. The infrastructure exists:
+
+- **`DECL_LOCS_BLOCK_ID`** (line 912 of `ModuleFormat.h`) — existing source
+  location block from `.swiftsourceinfo`, could be added to the cache bitstream
+- **`InlinableBodyTextLayout`** — body text is already stored; re-parsing it
+  into AST would produce the `brace_stmt` nodes the dumper expects
+- **Pattern record layouts** — adding an `isImplicit` bit to each pattern
+  layout would let the deserializer use non-implicit constructors
+
 ## 9. Key source files
 
 | File | Role |

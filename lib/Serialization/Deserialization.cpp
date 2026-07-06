@@ -4848,6 +4848,34 @@ public:
             DeclContextID::getFromOpaqueValue(initContextIDs[i]);
       }
     }
+    // AST cache: patterns deserialized from cache should not be marked implicit
+    // unless their enclosing PatternBindingDecl is itself implicit (synthesized).
+    // The swiftmodule format uses createImplicit for all patterns (they're
+    // reconstructed, not parsed). For the per-file cache, non-synthesized
+    // patterns were parsed from source and should not be implicit.
+    if (dc && !isImplicit) {
+      if (auto *SF = dc->getParentSourceFile()) {
+        if (SF->LoadedFromAstCache) {
+          for (auto &p : patterns) {
+            auto *pat = p.first;
+            std::function<void(Pattern*)> clearImplicitRec = [&](Pattern *p) {
+              if (!p) return;
+              p->clearImplicit();
+              if (auto *pp = dyn_cast<ParenPattern>(p))
+                clearImplicitRec(pp->getSubPattern());
+              else if (auto *tp = dyn_cast<TypedPattern>(p))
+                clearImplicitRec(tp->getSubPattern());
+              else if (auto *bp = dyn_cast<BindingPattern>(p))
+                clearImplicitRec(bp->getSubPattern());
+              else if (auto *tp = dyn_cast<TuplePattern>(p))
+                for (auto &elt : tp->getElements())
+                  clearImplicitRec(elt.getPattern());
+            };
+            clearImplicitRec(pat);
+          }
+        }
+      }
+    }
 
     auto binding =
       PatternBindingDecl::createDeserialized(ctx, SourceLoc(),

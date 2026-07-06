@@ -135,6 +135,7 @@ public:
   /// exists no source code for it.
   bool isImplicit() const { return Bits.Pattern.isImplicit; }
   void setImplicit() { Bits.Pattern.isImplicit = true; }
+  void clearImplicit() { Bits.Pattern.isImplicit = false; }
 
   /// Find the smallest subpattern which obeys the property that matching it is
   /// equivalent to matching this pattern.
