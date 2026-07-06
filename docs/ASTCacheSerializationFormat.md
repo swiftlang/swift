@@ -501,6 +501,10 @@ Existing `.swiftmodule` readers never encounter these records.
 | `lib/Serialization/SnapshotDeserializer.cpp` | `deserializeBitstream` (eager registry + associated-type load + body deserialization), `parseCacheHeader` |
 | `lib/Frontend/Frontend.cpp` | `loadASTCache` (two-pass), `saveASTCache` |
 
+## 10. Test files
+
+### Lit tests (`test/ASTCache/`)
+
 | File | Tests |
 |------|-------|
 | `basic.swift` | Cache MISS → SAVED → HIT cycle |
