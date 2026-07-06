@@ -132,6 +132,8 @@ PASS(LateOnoneSimplification, "late-onone-simplification",
     "Peephole simplifications which can only run late in the -Onone pipeline")
 PASS(CleanupDebugSteps, "cleanup-debug-steps",
     "Cleanup debug_step instructions for Onone")
+PASS(KillInvalidDebugValues, "kill-invalid-debug-values",
+    "Kill debug_value instructions that appear after destroying consumers")
 PASS(NamedReturnValueOptimization, "named-return-value-optimization",
     "Optimize copies to an indirect return value")
 PASS(StripObjectHeaders, "strip-object-headers",

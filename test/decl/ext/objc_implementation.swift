@@ -17,6 +17,7 @@ protocol EmptySwiftProto {}
   // expected-note@-9 {{missing instance method 'extensionMethod(fromHeader2:)'}} {{none}}
   // expected-note@-10 {{missing property 'readonlyPropertyFromHeader7'}}
   // expected-note@-11 {{add stubs for missing '@implementation' requirements}} {{77-77=\n    @objc(methodFromHeader3:)\n    open func method(fromHeader3 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(methodFromHeader4:)\n    open func method(fromHeader4 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(propertyFromHeader7)\n    open var propertyFromHeader7: Int32\n\n    @objc(propertyFromHeader8)\n    open var propertyFromHeader8: Int32\n\n    @objc(propertyFromHeader9)\n    open var propertyFromHeader9: Int32\n\n    @objc(readonlyPropertyFromHeader7)\n    open let readonlyPropertyFromHeader7: Int32\n\n    @objc(extensionMethodFromHeader2:)\n    open func extensionMethod(fromHeader2 param: Int32) {\n        <#code#>\n    \}\n}}
+  // expected-warning@-12 {{'@objc @implementation' extension does not implement initializer 'init(fromSuperclass2:)' inherited from its superclass; invoking it from Objective-C will trap at runtime}}
 
   func method(fromHeader1: CInt) {
     // OK, provides an implementation for the header's method.
