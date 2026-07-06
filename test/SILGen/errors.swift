@@ -188,14 +188,14 @@ func all_together_now(_ flag: Bool) -> Cat {
 // CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
 // CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]
 //
 // CHECK: [[CAST_NO_BB]]:
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB]]
 //
-// CHECK: [[RETHROW_BB]]([[ERROR_FOR_RETHROW:%.*]] : @owned $any Error):
-// CHECK:   throw [[ERROR_FOR_RETHROW]]
+// CHECK: [[RETHROW_BB]]:
+// CHECK:   throw [[ERROR]]
 // CHECK: } // end sil function '$s6errors20all_together_now_twoyAA3CatCSgSbKF'
 func all_together_now_two(_ flag: Bool) throws -> Cat? {
   do {
@@ -225,14 +225,14 @@ func all_together_now_two(_ flag: Bool) throws -> Cat? {
 // CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
 // CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]
 //
 // CHECK: [[CAST_NO_BB]]:
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB]]
 //
-// CHECK: [[RETHROW_BB]]([[ERROR_FOR_RETHROW:%.*]] : @owned $any Error):
-// CHECK:   throw [[ERROR_FOR_RETHROW]]
+// CHECK: [[RETHROW_BB]]:
+// CHECK:   throw [[ERROR]]
 // CHECK: } // end sil function '$s6errors22all_together_now_threeyAA3CatCSgSbKF'
 func all_together_now_three(_ flag: Bool) throws -> Cat? {
   do {
@@ -275,14 +275,14 @@ func all_together_now_three(_ flag: Bool) throws -> Cat? {
 // CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
 // CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]
 //
 // CHECK: [[CAST_NO_BB]]:
 // CHECK:   end_borrow [[BORROWED_ERROR]]
-// CHECK:   br [[RETHROW_BB]]([[ERROR]] : $any Error)
+// CHECK:   br [[RETHROW_BB]]
 //
-// CHECK: [[RETHROW_BB]]([[ERROR_FOR_RETHROW:%.*]] : @owned $any Error):
-// CHECK:   throw [[ERROR_FOR_RETHROW]]
+// CHECK: [[RETHROW_BB]]:
+// CHECK:   throw [[ERROR]]
 // CHECK: } // end sil function '$s6errors21all_together_now_fouryAA3CatCSgSbKF'
 func all_together_now_four(_ flag: Bool) throws -> Cat? {
   do {
@@ -363,7 +363,7 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 // CHECK-NEXT: br [[RETHROW]]
 
 // Rethrow
-// CHECK: [[RETHROW]]([[ERROR:%.*]] : @owned $any Error):
+// CHECK: [[RETHROW]]:
 // CHECK-NEXT: throw [[ERROR]] : $any Error
 func all_together_now_five(_ flag: Bool) throws -> Cat {
   do {

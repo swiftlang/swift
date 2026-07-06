@@ -748,6 +748,8 @@ namespace swift {
 
 static bool hasValidControlFlow(const SILFunction *f) {
   for (auto &block : *f) {
+    if (block.empty())
+      return false;
     if (!isa<TermInst>(&block.back()))
       return false;
   }
