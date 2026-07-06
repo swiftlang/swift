@@ -339,6 +339,7 @@ Expr *BodyDeserializer::deserializeExpr() {
   case ExprKindTag::MemberRef: {
     auto *base = deserializeExpr();
     auto *member = readDeclRef();
+    // Always read both fields before checking errors to stay aligned.
     if (!member || !base || isa<ErrorExpr>(base))
       return new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
     auto *mre = new (Ctx) MemberRefExpr(base, SourceLoc(),
@@ -367,8 +368,6 @@ Expr *BodyDeserializer::deserializeExpr() {
   }
   case ExprKindTag::Call: {
     auto *fn = deserializeExpr();
-    if (!fn || isa<ErrorExpr>(fn))
-      return new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
     uint32_t numArgs = readUInt32();
     SmallVector<Expr*, 4> argExprs;
     for (uint32_t i = 0; i < numArgs; i++) {
@@ -377,6 +376,9 @@ Expr *BodyDeserializer::deserializeExpr() {
         argExpr = new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
       argExprs.push_back(argExpr);
     }
+    // Now check for errors (after reading all fields to stay aligned).
+    if (!fn || isa<ErrorExpr>(fn))
+      return new (Ctx) ErrorExpr(SourceRange(), ErrorType::get(Ctx));
     auto *argList = ArgumentList::forImplicitUnlabeled(Ctx, argExprs);
     auto *call = CallExpr::createImplicit(Ctx, fn, argList);
     call->setImplicit(isImplicit);

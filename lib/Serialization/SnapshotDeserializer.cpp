@@ -782,12 +782,15 @@ private:
         // Read a body entry for every function to stay aligned with the
         // serializer (which writes one entry per function).
         bodyDeser.setDeclContext(AFD);
-        if (AFD->getBodyKind() != AbstractFunctionDecl::BodyKind::Deserialized) {
+        auto kind = AFD->getBodyKind();
+        if (kind != AbstractFunctionDecl::BodyKind::Deserialized &&
+            kind != AbstractFunctionDecl::BodyKind::None) {
           // Still need to consume the entry to stay aligned.
           (void)bodyDeser.deserializeBody();
           return;
         }
-        if (auto *body = bodyDeser.deserializeBody()) {
+        auto *body = bodyDeser.deserializeBody();
+        if (body) {
           AFD->setBody(body, AbstractFunctionDecl::BodyKind::Parsed);
           ctx.evaluator.cacheOutput(ParseAbstractFunctionBodyRequest{AFD},
                                     BodyAndFingerprint(body, std::nullopt));

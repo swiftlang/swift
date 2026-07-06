@@ -294,8 +294,8 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
       for (auto *AFD : allFuncs) {
         auto kind = AFD->getBodyKind();
         if (kind == AbstractFunctionDecl::BodyKind::TypeChecked ||
-            kind == AbstractFunctionDecl::BodyKind::Synthesize) {
-          // getBody(true) allows synthesis for Synthesize-kind accessors.
+            kind == AbstractFunctionDecl::BodyKind::Synthesize ||
+            kind == AbstractFunctionDecl::BodyKind::None) {
           auto *body = AFD->getBody(/*canSynthesize=*/true);
           bodySer.serializeBody(body);
         } else {
