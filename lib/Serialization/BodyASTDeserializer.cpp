@@ -1068,6 +1068,8 @@ Stmt *BodyASTDeserializer::deserializeStmt(ArrayRef<uint64_t> record,
     BraceStmt *body = dyn_cast_or_null<BraceStmt>(
         lookupStmt(static_cast<uint32_t>(record[3])));
     SmallVector<CaseLabelItem, 1> labels;
+    // CaseStmt requires at least one label item. Create a default case label.
+    labels.push_back(CaseLabelItem::getDefault(AnyPattern::createImplicit(Ctx)));
     result = CaseStmt::createImplicit(Ctx, CaseParentKind::Switch,
                                       labels, body);
     break;
@@ -1395,9 +1397,9 @@ BraceStmt *BodyASTDeserializer::deserializeBody(ArrayRef<uint8_t> bitstreamData)
   return nullptr;
 }
 
-llvm::DenseMap<serialization::DeclID, BraceStmt *>
+std::map<serialization::DeclID, BraceStmt *>
 BodyASTDeserializer::deserializeAllBodies(ArrayRef<uint8_t> bitstreamData) {
-  llvm::DenseMap<serialization::DeclID, BraceStmt *> result;
+  std::map<serialization::DeclID, BraceStmt *> result;
 
   ArrayRef<uint8_t> data = bitstreamData;
   if (data.size() >= 4 && data[0] == 0xE2 && data[1] == 0x9C &&
@@ -1453,10 +1455,7 @@ BodyASTDeserializer::deserializeAllBodies(ArrayRef<uint8_t> bitstreamData) {
             break;
           }
           unsigned recordID = maybeRecordID.get();
-
           if (recordID == astcache_body_block::BODY) {
-            fprintf(stderr, "DEBUG: BODY record, scratch.size()=%zu, scratch[0]=%llu, scratch[1]=%llu\n",
-                    scratch.size(), (unsigned long long)scratch[0], (unsigned long long)scratch[1]);
             if (scratch.size() >= 2) {
               funcDeclID = static_cast<serialization::DeclID>(scratch[0]);
               rootStmtID = static_cast<uint32_t>(scratch[1]);
