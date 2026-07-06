@@ -315,6 +315,8 @@ struct BridgedType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getEnumCasePayload(EnumElementIterator i, BridgedFunction f) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
   getEnumCasePayload(SwiftInt caseIndex, BridgedFunction f) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE  BridgedType getEnumCasePayload(BridgedDeclObj caseDecl,
+                                                                     BridgedFunction f) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj
   getEnumElementDecl(EnumElementIterator i) const;
   BRIDGED_INLINE SwiftInt getNumTupleElements() const;
