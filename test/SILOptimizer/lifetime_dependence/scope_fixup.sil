@@ -1023,3 +1023,90 @@ bb5:
   end_borrow %1
   unreachable
 }
+
+// rdar://181348593 (Exclusivity sub-object analysis is defeated by end_cow_mutation_addr)
+//
+// Check that the inserted end_cow_mutation_addr uses the access to the sub-object ('foo'),
+// not the access to the enclosing aggregate ('self'), so that the sub-object access does not
+// artificially overlap with an access to an unrelated sub-object ('bar').
+
+struct Bar<T> {
+  @_hasStorage var t: T { get set }
+  func method()
+  init(t: T)
+}
+
+struct Agg<T> {
+  @_hasStorage var foo: [2 of Int] { get set }
+  @_hasStorage var bar: [2 of Bar<T>] { get set }
+}
+
+sil @get_mutable_span_int : $@convention(thin) (@inout InlineArray<2, Int>) -> @lifetime(borrow address_for_deps 0) @owned MutableSpan<Int>
+sil @get_mutable_span_bar : $@convention(thin) <τ_0_0> (@inout InlineArray<2, Bar<τ_0_0>>) -> @lifetime(borrow address_for_deps 0) @owned MutableSpan<Bar<τ_0_0>>
+sil @bar_method : $@convention(method) <τ_0_0> (@in_guaranteed Bar<τ_0_0>) -> ()
+sil @use_span_int : $@convention(thin) (@inout MutableSpan<Int>) -> ()
+sil @use_span_bar : $@convention(thin) <τ_0_0> (@inout MutableSpan<Bar<τ_0_0>>) -> ()
+
+// CHECK-LABEL: sil hidden [ossa] @test_no_end_cow : $@convention(method) <T> (@inout Agg<T>) -> () {
+// CHECK: bb0([[SELF:%.*]] :
+// CHECK:   [[FOO_ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF]]
+// CHECK:   [[FOO:%.*]] = struct_element_addr [[FOO_ACCESS]], #Agg.foo
+// CHECK:   apply %{{.*}}([[FOO]]) : $@convention(thin) (@inout InlineArray<2, Int>) -> @lifetime(borrow address_for_deps 0) @owned MutableSpan<Int>
+// CHECK-NOT: end_cow_mutation_addr
+// CHECK:   end_access [[FOO_ACCESS]]
+// CHECK-LABEL: } // end sil function 'test_no_end_cow'
+sil hidden [ossa] @test_no_end_cow : $@convention(method) <T> (@inout Agg<T>) -> () {
+bb0(%0 : $*Agg<T>):
+  %2 = alloc_box ${ var MutableSpan<Int> }, var, name "foo"
+  %3 = begin_borrow [lexical] [var_decl] %2
+  %4 = project_box %3, 0
+  %5 = begin_access [modify] [unknown] %0 : $*Agg<T>
+  %6 = struct_element_addr %5 : $*Agg<T>, #Agg.foo
+  %7 = function_ref @get_mutable_span_int : $@convention(thin) (@inout InlineArray<2, Int>) -> @lifetime(borrow address_for_deps 0) @owned MutableSpan<Int>
+  %8 = apply %7(%6) : $@convention(thin) (@inout InlineArray<2, Int>) -> @lifetime(borrow address_for_deps 0) @owned MutableSpan<Int>
+  %9 = mark_dependence [unresolved] %8 on %6
+  store %9 to [init] %4
+  end_access %5
+
+  %28 = begin_access [modify] [unknown] %4 : $*MutableSpan<Int>
+  %30 = function_ref @use_span_int : $@convention(thin) (@inout MutableSpan<Int>) -> ()
+  %31 = apply %30(%28) : $@convention(thin) (@inout MutableSpan<Int>) -> ()
+  end_access %28
+
+  end_borrow %3
+  destroy_value %2
+  %37 = tuple ()
+  return %37
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_end_cow_subobject : $@convention(method) <T> (@inout Agg<T>) -> () {
+// CHECK: bb0([[SELF:%.*]] :
+// CHECK:   [[BAR_ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF]]
+// CHECK:   [[BAR:%.*]] = struct_element_addr [[BAR_ACCESS]], #Agg.bar
+// CHECK:   apply %{{.*}}([[BAR]]) : $@convention(thin) <τ_0_0> (@inout InlineArray<2, Bar<τ_0_0>>) -> @lifetime(borrow address_for_deps 0) @owned MutableSpan<Bar<τ_0_0>>
+// CHECK:   end_cow_mutation_addr [[BAR]]
+// CHECK:   end_access [[BAR_ACCESS]]
+// CHECK-LABEL: } // end sil function 'test_end_cow_subobject'
+sil hidden [ossa] @test_end_cow_subobject : $@convention(method) <T> (@inout Agg<T>) -> () {
+bb0(%0 : $*Agg<T>):
+  %2 = alloc_box $<τ_0_0> { var MutableSpan<Bar<τ_0_0>> } <T>, var, name "foo"
+  %3 = begin_borrow [lexical] [var_decl] %2
+  %4 = project_box %3, 0
+  %5 = begin_access [modify] [unknown] %0 : $*Agg<T>
+  %6 = struct_element_addr %5 : $*Agg<T>, #Agg.bar
+  %7 = function_ref @get_mutable_span_bar : $@convention(thin) <T> (@inout InlineArray<2, Bar<T>>) -> @lifetime(borrow address_for_deps 0) @owned MutableSpan<Bar<T>>
+  %8 = apply %7<T>(%6) : $@convention(thin) <τ_0_0> (@inout InlineArray<2, Bar<τ_0_0>>) -> @lifetime(borrow address_for_deps 0) @owned MutableSpan<Bar<τ_0_0>>
+  %9 = mark_dependence [unresolved] %8 on %6
+  store %9 to [init] %4
+  end_access %5
+
+  %28 = begin_access [modify] [unknown] %4 : $*MutableSpan<Bar<T>>
+  %30 = function_ref @use_span_bar : $@convention(thin) <τ_0_0> (@inout MutableSpan<Bar<τ_0_0>>) -> ()
+  %31 = apply %30<T>(%28) : $@convention(thin) <τ_0_0> (@inout MutableSpan<Bar<τ_0_0>>) -> ()
+  end_access %28
+
+  end_borrow %3
+  destroy_value %2
+  %37 = tuple ()
+  return %37
+}

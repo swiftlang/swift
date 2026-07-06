@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -Xllvm -sil-print-types -Xllvm -sil-disable-pass=onone-simplification -emit-sil \
 // RUN: -enable-experimental-feature Lifetimes \
+// RUN: -disable-availability-checking \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_Lifetimes
@@ -335,4 +336,25 @@ func testWrite(_ w: inout ArrayWrapper) {
 func testSpanOfBorrowByAddress(_ i: Int) -> Int {
     let span = String(i).utf8.span
     return span.count
+}
+
+// =======================================================================================
+// rdar://181348593 (Exclusivity sub-object analysis is defeated by end_cow_mutation_addr)
+// Create the end_cow_mutation_addr on the sub-object, not the aggregate.
+
+struct AddressOnlyWrapper<T> {
+  var t: T
+
+  func method() {}
+}
+
+struct Agg<T> {
+  var foo: [2 of Int]
+  var bar: AddressOnlyWrapper<T> // instead of `let`
+
+  mutating func testMutableSpanOnSubobject() {
+    var foo = foo.mutableSpan
+    self.bar.method() // no exclusivity conflict: 'foo' and 'bar' are separate sub-objects.
+    foo[0] = 0
+  }
 }

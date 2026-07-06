@@ -225,14 +225,25 @@ private func createEndCOWMutationIfNeeded(lifetimeDep: LifetimeDependence, _ con
       return
   }
 
-  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.dependentValue.parentFunction, context) &&
-    lifetimeDep.parentValue.type.mayHaveOptimizedCOWType(in: lifetimeDep.dependentValue.parentFunction) else {
+  // If the mark dependence instruction takes an address base, create the end_cow_mutation_addr on that address
+  // projection rather than the parent address. This narrows address users to the relevant sub-object.
+  let depBase = {
+    if let markDepBase = lifetimeDep.markDepInst?.base {
+      if markDepBase.type.isAddress {
+        return markDepBase
+      }
+    }
+    return lifetimeDep.parentValue
+  }()
+  assert(depBase.type.isAddress)
+  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.function, context) &&
+    depBase.type.mayHaveOptimizedCOWType(in: lifetimeDep.function) else {
     return
   }
 
   for endInstruction in scoped.endInstructions {
     let builder = Builder(before: endInstruction, context)
-    builder.createEndCOWMutationAddr(address: lifetimeDep.parentValue)
+    builder.createEndCOWMutationAddr(address: depBase)
   }
 }
 
