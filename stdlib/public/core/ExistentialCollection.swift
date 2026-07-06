@@ -1335,8 +1335,7 @@ extension AnySequence {
   }
 
 #if !$Embedded
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func map<T, E>(
     _ transform: (Element) throws(E) -> T
   ) throws(E) -> [T] {
@@ -1441,8 +1440,7 @@ extension AnyCollection {
   }
 
 #if !$Embedded
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func map<T, E>(
     _ transform: (Element) throws(E) -> T
   ) throws(E) -> [T] {
@@ -1553,8 +1551,7 @@ extension AnyBidirectionalCollection {
   }
 
 #if !$Embedded
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func map<T, E>(
     _ transform: (Element) throws(E) -> T
   ) throws(E) -> [T] {
@@ -1667,8 +1664,7 @@ extension AnyRandomAccessCollection {
   }
 
 #if !$Embedded
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func map<T, E>(
     _ transform: (Element) throws(E) -> T
   ) throws(E) -> [T] {

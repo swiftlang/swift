@@ -559,7 +559,7 @@ extension __CocoaDictionary: _DictionaryBuffer {
 }
 
 extension __CocoaDictionary {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func mapValues<Key: Hashable, Value, T, E: Error>(
     _ transform: (Value) throws(E) -> T
   ) throws(E) -> _NativeDictionary<Key, T> {

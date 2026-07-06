@@ -330,7 +330,7 @@ extension Actor {
   /// - Returns: the return value of the `operation`
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
   @available(SwiftStdlib 5.1, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
   @_unavailableInEmbedded
   public nonisolated func assumeIsolated<T : Sendable>(

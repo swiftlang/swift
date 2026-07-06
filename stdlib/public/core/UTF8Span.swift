@@ -34,7 +34,7 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
   @usableFromInline
   internal var _countAndFlags: UInt64
 
-  // @_alwaysEmitIntoClient
+  // @export(implementation)
   @inline(__always)
   @_lifetime(borrow start)
   internal init(
@@ -67,7 +67,7 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
 
   // FIXME: we need to make sure ALL API are nil safe, that is they
   // at least check the count first
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _start() -> UnsafeRawPointer {
     unsafe _unsafeBaseAddress._unsafelyUnwrappedUnchecked
   }
@@ -158,7 +158,7 @@ extension UTF8Span {
   ///   for the `withUnsafeBufferPointer(_:)` method. The closure's
   ///   parameter is valid only for the duration of its execution.
   /// - Returns: The return value of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   borrowing public func _withUnsafeBufferPointer<
     E: Error, Result: ~Copyable //& ~Escapable
   >(
@@ -286,7 +286,7 @@ extension String {
   ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var _utf8Span: UTF8Span? {
-    @_alwaysEmitIntoClient @inline(__always)
+    @export(implementation) @inline(__always)
     @_lifetime(borrow self)
     borrowing get {
       utf8Span
@@ -428,7 +428,7 @@ extension Substring {
   ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var _utf8Span: UTF8Span? {
-    @_alwaysEmitIntoClient @inline(__always)
+    @export(implementation) @inline(__always)
     @_lifetime(borrow self)
     borrowing get {
       utf8Span

@@ -571,22 +571,22 @@ extension UInt128 {
   // IMPORTANT: The following four apparently unnecessary overloads of
   // comparison operations are necessary for literal comparands to be
   // inferred as the desired type.
-  @_transparent @_alwaysEmitIntoClient
+  @_transparent @export(implementation)
   public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
   }
 
-  @_transparent @_alwaysEmitIntoClient
+  @_transparent @export(implementation)
   public static func <= (lhs: Self, rhs: Self) -> Bool {
     return !(rhs < lhs)
   }
 
-  @_transparent @_alwaysEmitIntoClient
+  @_transparent @export(implementation)
   public static func >= (lhs: Self, rhs: Self) -> Bool {
     return !(lhs < rhs)
   }
 
-  @_transparent @_alwaysEmitIntoClient
+  @_transparent @export(implementation)
   public static func > (lhs: Self, rhs: Self) -> Bool {
     return rhs < lhs
   }

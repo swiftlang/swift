@@ -73,7 +73,7 @@ import Swift
 /// Therefore, if a cancellation handler must acquire a lock, other code should
 /// not cancel tasks or resume continuations while holding that lock.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Return,
   onCancel handler: sending () -> Void
@@ -372,7 +372,7 @@ func _taskRemoveCancellationHandler(
 /// }
 /// ```
 @available(SwiftStdlib 6.4, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Value,
 ) async throws(Failure) -> Value {
@@ -466,7 +466,7 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
 /// }
 /// ```
 @available(SwiftStdlib 6.4, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 public func withTaskCancellationShield<Value, Failure>(
   operation: () throws(Failure) -> Value,
 ) throws(Failure) -> Value {
@@ -505,9 +505,9 @@ extension Task where Success == Never, Failure == Never {
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   /// - SeeAlso: ``UnsafeCurrentTask/hasActiveCancellationShield``
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var hasActiveCancellationShield: Bool {
-    @_alwaysEmitIntoClient
+    @export(implementation)
     get {
       unsafe withUnsafeCurrentTask { task in
         unsafe task?.hasActiveCancellationShield ?? false

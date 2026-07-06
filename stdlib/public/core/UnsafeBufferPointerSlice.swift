@@ -24,8 +24,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///
   /// - Parameter source: A collection of `UInt8` elements. `source.count` must
   ///   be less than or equal to this buffer slice's `count`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func copyBytes<C: Collection>(
     from source: C
   ) where C.Element == UInt8 {
@@ -57,8 +56,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///     The typed buffer contains `self.count / MemoryLayout<T>.stride`
   ///     instances of `T`.
   @discardableResult
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func initializeMemory<T>(
     as type: T.Type, repeating repeatedValue: T
   ) -> UnsafeMutableBufferPointer<T> {
@@ -89,8 +87,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///   buffer, and a typed buffer of the written elements. The returned
   ///   buffer references memory starting at the same base address as this
   ///   buffer.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func initializeMemory<S: Sequence>(
     as type: S.Element.Type, from source: S
   ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Element>) {
@@ -121,8 +118,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   /// - Returns: A typed buffer referencing the initialized elements.
   ///     The returned buffer references memory starting at the same
   ///     base address as this slice, and its count is equal to `source.count`
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func initializeMemory<C: Collection>(
     as type: C.Element.Type,
     fromContentsOf source: C
@@ -159,8 +155,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///     The returned buffer references memory starting at the same
   ///     base address as this slice, and its count is equal to `source.count`.
   @discardableResult
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func moveInitializeMemory<T: ~Copyable>(
     as type: T.Type,
     fromContentsOf source: UnsafeMutableBufferPointer<T>
@@ -197,8 +192,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///     The returned buffer references memory starting at the same
   ///     base address as this slice, and its count is equal to `source.count`.
   @discardableResult
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func moveInitializeMemory<T>(
     as type: T.Type,
     fromContentsOf source: Slice<UnsafeMutableBufferPointer<T>>
@@ -226,8 +220,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///   The typed buffer references `self.count / MemoryLayout<T>.stride`
   ///   instances of `T`.
   @discardableResult
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func bindMemory<T: ~Copyable>(
     to type: T.Type
   ) -> UnsafeMutableBufferPointer<T> {
@@ -278,8 +271,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     _ body: (UnsafeMutableBufferPointer<T>) throws(E) -> Result
@@ -304,8 +296,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///
   /// - Parameter type: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func assumingMemoryBound<T: ~Copyable>(
     to type: T.Type
   ) -> UnsafeMutableBufferPointer<T> {
@@ -342,8 +333,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer
   ///   slice's memory.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
     let buffer = unsafe Base(rebasing: self)
     return unsafe buffer.load(fromByteOffset: offset, as: T.self)
@@ -380,8 +370,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func loadUnaligned<T : BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -389,8 +378,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
     let buffer = unsafe Base(rebasing: self)
     return unsafe buffer.loadUnaligned(fromByteOffset: offset, as: T.self)
   }
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -434,8 +422,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///   - type: The type to use for the newly constructed instance. The memory
   ///     must be initialized to a value of a type that is layout compatible
   ///     with `type`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
@@ -465,8 +452,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
   ///   The typed buffer references `self.count / MemoryLayout<T>.stride`
   ///   instances of `T`.
   @discardableResult
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func bindMemory<T: ~Copyable>(
     to type: T.Type
   ) -> UnsafeBufferPointer<T> {
@@ -518,8 +504,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
   ///     - type buffer: The buffer temporarily bound to instances of `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     _ body: (UnsafeBufferPointer<T>) throws(E) -> Result
@@ -544,8 +529,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
   ///
   /// - Parameter type: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func assumingMemoryBound<T: ~Copyable>(
     to type: T.Type
   ) -> UnsafeBufferPointer<T> {
@@ -582,8 +566,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer
   ///   slice's memory.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
     let buffer = unsafe Base(rebasing: self)
     return unsafe buffer.load(fromByteOffset: offset, as: T.self)
@@ -620,8 +603,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func loadUnaligned<T : BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -629,8 +611,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
     let buffer = unsafe Base(rebasing: self)
     return unsafe buffer.loadUnaligned(fromByteOffset: offset, as: T.self)
   }
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -695,8 +676,7 @@ extension Slice {
   ///     is also used as the return value for the `withMemoryRebound(to:_:)`
   ///     method.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func withMemoryRebound<
     T: ~Copyable, E: Error, Result: ~Copyable, Element
   >(
@@ -721,8 +701,7 @@ extension Slice {
   ///
   /// - Parameter repeatedValue: The value with which to initialize this
   ///   buffer slice's memory.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func initialize<Element>(repeating repeatedValue: Element)
     where Base == UnsafeMutableBufferPointer<Element> {
     unsafe Base(rebasing: self).initialize(repeating: repeatedValue)
@@ -749,8 +728,7 @@ extension Slice {
   ///   buffer.
   /// - Returns: An iterator to any elements of `source` that didn't fit in the
   ///   buffer, and an index to the next uninitialized element in the buffer.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func initialize<S>(
     from source: S
   ) -> (unwritten: S.Iterator, index: Index)
@@ -788,8 +766,7 @@ extension Slice {
   ///     initialize the buffer slice's storage.
   /// - Returns: The index one past the last element of the buffer slice
   ///    initialized by this function.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func initialize<Element>(
     fromContentsOf source: some Collection<Element>
   ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
@@ -808,8 +785,7 @@ extension Slice {
   ///
   /// - Parameters:
   ///   - repeatedValue: The value used when updating this pointer's memory.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func update<Element>(repeating repeatedValue: Element)
     where Base == UnsafeMutableBufferPointer<Element> {
     unsafe Base(rebasing: self).update(repeating: repeatedValue)
@@ -824,8 +800,7 @@ extension Slice {
   ///   the contents of the buffer slice.
   /// - Returns: An iterator to any elements of `source` that didn't fit in the
   ///   buffer slice, and the index one past the last updated element.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func update<S>(
     from source: S
   ) -> (unwritten: S.Iterator, index: Index)
@@ -858,8 +833,7 @@ extension Slice {
   /// - Parameter source: A collection of elements to be used to update
   ///     the buffer's contents.
   /// - Returns: An index one past the index of the last element updated.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func update<Element>(
     fromContentsOf source: some Collection<Element>
   ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
@@ -897,8 +871,7 @@ extension Slice {
   ///     The memory region underlying `source` must be initialized.
   /// - Returns: The index one past the last element of the buffer slice
   ///    initialized by this function.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func moveInitialize<Element>(
     fromContentsOf source: UnsafeMutableBufferPointer<Element>
   ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
@@ -936,8 +909,7 @@ extension Slice {
   ///     The memory region underlying `source` must be initialized.
   /// - Returns: The index one past the last element of the buffer slice
   ///    initialized by this function.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func moveInitialize<Element>(
     fromContentsOf source: Slice<UnsafeMutableBufferPointer<Element>>
   ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
@@ -972,8 +944,7 @@ extension Slice {
   /// - Parameter source: A buffer containing the values to move.
   ///     The memory region underlying `source` must be initialized.
   /// - Returns: An index one past the index of the last element updated.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func moveUpdate<Element>(
     fromContentsOf source: UnsafeMutableBufferPointer<Element>
   ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
@@ -1008,8 +979,7 @@ extension Slice {
   /// - Parameter source: A buffer slice containing the values to move.
   ///     The memory region underlying `source` must be initialized.
   /// - Returns: An index one past the index of the last element updated.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func moveUpdate<Element>(
     fromContentsOf source: Slice<UnsafeMutableBufferPointer<Element>>
   ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
@@ -1030,8 +1000,7 @@ extension Slice {
   /// - Returns: A raw buffer to the same range of memory as this buffer.
   ///   The range of memory is still bound to `Element`.
   @discardableResult
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func deinitialize<Element>() -> UnsafeMutableRawBufferPointer
     where Base == UnsafeMutableBufferPointer<Element> {
     unsafe Base(rebasing: self).deinitialize()
@@ -1046,8 +1015,7 @@ extension Slice {
   /// - Parameters:
   ///   - value: The value used to initialize the buffer element's memory.
   ///   - index: The index of the element to initialize
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func initializeElement<Element>(at index: Int, to value: Element)
     where Base == UnsafeMutableBufferPointer<Element> {
     unsafe assert(startIndex <= index && index < endIndex)
@@ -1064,8 +1032,7 @@ extension Slice {
   /// - Parameters:
   ///   - index: The index of the buffer element to retrieve and deinitialize.
   /// - Returns: The instance referenced by this index in this buffer.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func moveElement<Element>(from index: Index) -> Element
     where Base == UnsafeMutableBufferPointer<Element> {
     unsafe assert(startIndex <= index && index < endIndex)
@@ -1080,8 +1047,7 @@ extension Slice {
   ///
   /// - Parameters:
   ///   - index: The index of the buffer element to deinitialize.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func deinitializeElement<Element>(at index: Base.Index)
     where Base == UnsafeMutableBufferPointer<Element> {
     unsafe assert(startIndex <= index && index < endIndex)
@@ -1142,8 +1108,7 @@ extension Slice {
   ///     is also used as the return value for the `withMemoryRebound(to:_:)`
   ///     method.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func withMemoryRebound<
     T: ~Copyable, E: Error, Result: ~Copyable, Element
   >(
@@ -1155,8 +1120,7 @@ extension Slice {
     try unsafe Base(rebasing: self).withMemoryRebound(to: T.self, body)
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func withContiguousMutableStorageIfAvailable<R, Element>(
     _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? where Base == UnsafeMutableBufferPointer<Element> {

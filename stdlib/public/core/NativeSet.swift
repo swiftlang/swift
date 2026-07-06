@@ -81,7 +81,7 @@ extension _NativeSet { // Primitive fields
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal var bucketCount: Int {
     unsafe _assumeNonNegative(_storage._bucketCount)
@@ -135,7 +135,7 @@ extension _NativeSet { // Low-level unchecked operations
     unsafe (_elements + bucket.offset).initialize(to: element)
   }
 
-  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @export(implementation) // Introduced in 5.1
   @inline(__always)
   @unsafe
   internal func uncheckedAssign(
@@ -475,7 +475,7 @@ extension _NativeSet { // Insertions
 
   /// Insert an element into uniquely held storage, replacing an existing value
   /// (if any).  Storage must be uniquely referenced with adequate capacity.
-  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @export(implementation) // Introduced in 5.1
   internal mutating func _unsafeUpdate(
     with element: __owned Element
   ) {
@@ -616,7 +616,7 @@ extension _NativeSet.Iterator: IteratorProtocol {
 }
 
 extension _NativeSet {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
   where S.Element == Element {
     unsafe _UnsafeBitset.withTemporaryBitset(capacity: self.bucketCount) { seen in
@@ -637,7 +637,7 @@ extension _NativeSet {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func isStrictSubset<S: Sequence>(of possibleSuperset: S) -> Bool
   where S.Element == Element {
     unsafe _UnsafeBitset.withTemporaryBitset(capacity: self.bucketCount) { seen in
@@ -665,7 +665,7 @@ extension _NativeSet {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func isStrictSuperset<S: Sequence>(of possibleSubset: S) -> Bool
   where S.Element == Element {
     unsafe _UnsafeBitset.withTemporaryBitset(capacity: self.bucketCount) { seen in
@@ -686,7 +686,7 @@ extension _NativeSet {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal __consuming func extractSubset(
     using bitset: _UnsafeBitset,
     count: Int
@@ -705,7 +705,7 @@ extension _NativeSet {
     return result
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal __consuming func subtracting<S: Sequence>(_ other: S) -> _NativeSet
   where S.Element == Element {
     guard count > 0 else { return _NativeSet() }
@@ -747,7 +747,7 @@ extension _NativeSet {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal consuming func filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool
   ) throws(E) -> _NativeSet<Element> {
@@ -764,7 +764,7 @@ extension _NativeSet {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal __consuming func intersection(
     _ other: _NativeSet<Element>
   ) -> _NativeSet<Element> {
@@ -797,7 +797,7 @@ extension _NativeSet {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal __consuming func genericIntersection<S: Sequence>(
     _ other: S
   ) -> _NativeSet<Element>

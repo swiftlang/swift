@@ -101,7 +101,7 @@ extension Duration {
   ///     let d = Duration.seconds(1)
   ///     print(d.attoseconds) // 1_000_000_000_000_000_000
   @available(StdlibDeploymentTarget 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var attoseconds: Int128 {
     Int128(_low: _low, _high: _high)
   }
@@ -115,7 +115,7 @@ extension Duration {
   ///
   /// - Parameter attoseconds: The total duration expressed in attoseconds.
   @available(StdlibDeploymentTarget 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(attoseconds: Int128) {
     self.init(_high: attoseconds._high, low: attoseconds._low)
   }
