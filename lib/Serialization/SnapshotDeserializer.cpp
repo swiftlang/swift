@@ -35,6 +35,8 @@
 #include <functional>
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ParseRequests.h"
+#include "swift/AST/TypeCheckRequests.h"
+#include "BodySerializer.h"
 
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -771,6 +773,34 @@ private:
         }
       }
     }
+    // Deserialize function bodies from bodyBlob.
+    // The bodyBlob stores the type-checked body AST for each function.
+    // We reconstruct the BraceStmt and cache it so getBody() returns it.
+    if (!key.bodyBlob.empty()) {
+      serialization::BodyDeserializer bodyDeser(key.bodyBlob, ctx);
+      auto deserializeBody = [&](AbstractFunctionDecl *AFD) {
+        if (AFD->getBodyKind() != AbstractFunctionDecl::BodyKind::Deserialized)
+          return;
+        if (auto *body = bodyDeser.deserializeBody()) {
+          AFD->setBody(body, AbstractFunctionDecl::BodyKind::Parsed);
+          ctx.evaluator.cacheOutput(ParseAbstractFunctionBodyRequest{AFD},
+                                    BodyAndFingerprint(body, std::nullopt));
+        }
+      };
+      for (auto *D : decls) {
+        if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+          deserializeBody(AFD);
+        if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+          for (auto *member : IDC->getMembers()) {
+            if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member))
+              deserializeBody(AFD);
+            if (auto *ASD = dyn_cast<AbstractStorageDecl>(member))
+              for (auto *acc : ASD->getAllAccessors())
+                deserializeBody(acc);
+          }
+        }
+      }
+    }
 
     // C1: Store the ModuleFile in the SourceFile to keep it alive.
     // The ASTContext arena doesn't call destructors, so we register a cleanup
@@ -819,6 +849,7 @@ private:
     if (!readString(buf, key.overlaysBlob, offset)) return false;
     if (!readString(buf, key.declRangesBlob, offset)) return false;
     if (!readString(buf, key.whereClausesBlob, offset)) return false;
+    if (!readString(buf, key.bodyBlob, offset)) return false;
 
     return true;
   }

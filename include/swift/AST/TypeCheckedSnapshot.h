@@ -72,6 +72,9 @@ struct ASTCacheKey {
  /// extension index. Format: (uint32_t textLength, char[textLength]) per
  /// extension that has a where clause, in top-level decl order.
  std::string whereClausesBlob;
+  /// Serialized function body AST: for each function with a type-checked body,
+  /// stores the body's AST nodes in a custom binary format.
+  std::string bodyBlob;
 
   /// Check if this cache key is valid for the given source file.
   bool isValid(ASTContext &ctx, const SourceFile &SF,

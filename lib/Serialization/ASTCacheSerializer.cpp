@@ -26,6 +26,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/AST/TypeCheckedSnapshot.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "BodySerializer.h"
 #include "swift/Subsystems.h"
 #include "llvm/Bitcode/BitcodeConvenience.h"
 #include "llvm/Support/FileSystem.h"
@@ -239,6 +240,35 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
         }
       }
     }
+    // Serialize function body AST to bodyBlob.
+    // For each function with BodyKind::TypeChecked, serialize the body's
+    // BraceStmt (type-checked expression tree) to the bodyBlob.
+    {
+      BodySerializer bodySer(key.bodyBlob);
+      auto serializeBody = [&](AbstractFunctionDecl *AFD) {
+        if (AFD->getBodyKind() != AbstractFunctionDecl::BodyKind::TypeChecked)
+          return;
+        auto *body = AFD->getBody(/*canSynthesize=*/false);
+        bodySer.serializeBody(body);
+      };
+      for (auto item : const_cast<SourceFile &>(SF).getTopLevelItems()) {
+        if (auto *D = item.dyn_cast<Decl *>()) {
+          if (isa<ImportDecl>(D))
+            continue;
+          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+            serializeBody(AFD);
+          if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+            for (auto *member : IDC->getMembers()) {
+              if (auto *AFD = dyn_cast<AbstractFunctionDecl>(member))
+                serializeBody(AFD);
+              if (auto *ASD = dyn_cast<AbstractStorageDecl>(member))
+                for (auto *acc : ASD->getAllAccessors())
+                  serializeBody(acc);
+            }
+          }
+        }
+      }
+    }
   }
 
   // 3. Write the .swiftast container (same format as SnapshotSerializer)
@@ -287,6 +317,7 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
   writeString(key.overlaysBlob);
   writeString(key.declRangesBlob);
   writeString(key.whereClausesBlob);
+  writeString(key.bodyBlob);
   // Write bitstream (length-prefixed)
   writeString(bitstreamData);
 
