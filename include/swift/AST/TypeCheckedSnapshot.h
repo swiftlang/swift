@@ -65,6 +65,9 @@ struct ASTCacheKey {
 
   /// Serialized separately-imported overlays: (overlay_name, declaring_name) pairs.
   std::string overlaysBlob;
+  /// Serialized decl source ranges: (startOffset, endOffset) pairs for each
+  /// top-level decl and nested member, in serialization order.
+  std::string declRangesBlob;
 
   /// Check if this cache key is valid for the given source file.
   bool isValid(ASTContext &ctx, const SourceFile &SF,

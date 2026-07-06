@@ -1681,6 +1681,15 @@ private:
 
   std::optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
   void setExternalSourceLocs(const Decl *D, ExternalSourceLocs *Locs);
+public:
+  /// Per-file AST cache: get/set source range overrides for deserialized decls.
+  SourceRange getCachedDeclSourceRange(const Decl *D) const;
+  void setCachedDeclSourceRange(const Decl *D, SourceRange R);
+  bool hasCachedDeclSourceRange(const Decl *D) const;
+  /// Per-file AST cache: get/set source range overrides for deserialized attrs.
+  SourceRange getCachedAttrSourceRange(const DeclAttribute *A) const;
+  void setCachedAttrSourceRange(const DeclAttribute *A, SourceRange R);
+private:
 
   friend TypeBase;
   friend ArchetypeType;

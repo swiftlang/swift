@@ -5051,7 +5051,8 @@ public:
     printFlag(Attr->isImplicit(), "implicit");
     printFlag(Attr->isInvalid(), "invalid");
     printFlag(Attr->getAddedByAccessNote(), "added_by_access_note");
-    printSourceRange(Attr->Range, Ctx);
+    auto cachedRange = Ctx ? Ctx->getCachedAttrSourceRange(Attr) : SourceRange();
+    printSourceRange(cachedRange.isValid() ? cachedRange : Attr->Range, Ctx);
   }
 
   /// Deleting this ensures that all attributes are covered by the

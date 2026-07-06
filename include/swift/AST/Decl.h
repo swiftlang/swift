@@ -8282,6 +8282,25 @@ public:
     setBodyKind(BodyKind::Deserialized);
     BodyStringRepresentation = body;
   }
+  /// Per-file AST cache: get the stored body text for re-parsing.
+  StringRef getBodyStringRepresentation() const {
+    if (getBodyKind() != BodyKind::Deserialized)
+      return {};
+    return BodyStringRepresentation;
+  }
+  /// Per-file AST cache: prepare for body re-parsing by switching to
+  /// BodyKind::Unparsed and setting the source range. Used by
+  /// SnapshotDeserializer to re-parse body text into a BraceStmt.
+  void prepareForBodyReparsing(SourceRange range) {
+    assert(getBodyKind() == BodyKind::Deserialized);
+    setBodyKind(BodyKind::Unparsed);
+    BodyRange = range;
+  }
+  /// Per-file AST cache: restore to Deserialized if re-parsing failed.
+  void restoreDeserializedBody(StringRef bodyText) {
+    setBodyKind(BodyKind::Deserialized);
+    BodyStringRepresentation = bodyText;
+  }
 
   bool isBodyTypeChecked() const {
     return getBodyKind() == BodyKind::TypeChecked;

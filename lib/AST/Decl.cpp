@@ -1005,6 +1005,11 @@ inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Decl::*)() const);
 
 SourceRange Decl::getSourceRange() const {
+  // Per-file AST cache: check for a source range override populated by
+  // SnapshotDeserializer. This is used for deserialized decls whose
+  // internal source locations are invalid (set to SourceLoc()).
+  if (auto R = getASTContext().getCachedDeclSourceRange(this); R.isValid())
+    return R;
   switch (getKind()) {
 #define DECL(ID, PARENT) \
 static_assert(sizeof(checkSourceRangeType(&ID##Decl::getSourceRange)) == 1, \

@@ -468,6 +468,12 @@ struct ASTContext::Implementation {
   /// Map from Swift declarations to deserialized resolved locations, ie.
   /// actual \c SourceLocs that require opening their external buffer.
   llvm::DenseMap<const Decl *, ExternalSourceLocs *> ExternalSourceLocs;
+  /// Per-file AST cache: map from deserialized decls to their original source
+  /// ranges. Populated by SnapshotDeserializer from the cache bitstream.
+  llvm::DenseMap<const Decl *, SourceRange> CachedDeclSourceRanges;
+  /// Per-file AST cache: map from deserialized attributes to their original
+  /// source ranges. DeclAttribute::Range is const, so we can't set it directly.
+  llvm::DenseMap<const DeclAttribute *, SourceRange> CachedAttrSourceRanges;
 
   /// Map from declarations to foreign error conventions.
   /// This applies to both actual imported functions and to @objc functions.
@@ -3131,6 +3137,32 @@ ASTContext::getExternalSourceLocs(const Decl *D) {
 void ASTContext::setExternalSourceLocs(const Decl *D,
                                        ExternalSourceLocs *Locs) {
   getImpl().ExternalSourceLocs[D] = Locs;
+}
+
+SourceRange ASTContext::getCachedDeclSourceRange(const Decl *D) const {
+  auto it = getImpl().CachedDeclSourceRanges.find(D);
+  if (it == getImpl().CachedDeclSourceRanges.end())
+    return SourceRange();
+  return it->second;
+}
+
+void ASTContext::setCachedDeclSourceRange(const Decl *D, SourceRange R) {
+  getImpl().CachedDeclSourceRanges[D] = R;
+}
+
+bool ASTContext::hasCachedDeclSourceRange(const Decl *D) const {
+  return getImpl().CachedDeclSourceRanges.count(D) > 0;
+}
+
+SourceRange ASTContext::getCachedAttrSourceRange(const DeclAttribute *A) const {
+  auto it = getImpl().CachedAttrSourceRanges.find(A);
+  if (it == getImpl().CachedAttrSourceRanges.end())
+    return SourceRange();
+  return it->second;
+}
+
+void ASTContext::setCachedAttrSourceRange(const DeclAttribute *A, SourceRange R) {
+  getImpl().CachedAttrSourceRanges[A] = R;
 }
 
 NormalProtocolConformance *

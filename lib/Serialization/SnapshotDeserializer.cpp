@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
@@ -32,6 +33,8 @@
 #include "ModuleFileSharedCore.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include <functional>
+#include "swift/Parse/Parser.h"
+#include "swift/AST/ParseRequests.h"
 
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -456,6 +459,51 @@ private:
       SF.setPrivateDiscriminatorForCache(
           ctx.getIdentifier(key.privateDiscriminator));
     }
+    // Restore decl source ranges from the declRangesBlob.
+    // The serialized decls have invalid SourceLocs; we set cached overrides
+    // on ASTContext so Decl::getSourceRange() returns valid ranges.
+    if (!key.declRangesBlob.empty()) {
+      auto &sourceMgr = ctx.SourceMgr;
+      unsigned bufferID = SF.getBufferID();
+      if (bufferID != 0) {
+        const char *data = key.declRangesBlob.data();
+        size_t remaining = key.declRangesBlob.size();
+        auto readUint32 = [&]() -> uint32_t {
+          if (remaining < 4) return 0;
+          uint32_t val;
+          memcpy(&val, data, 4);
+          data += 4;
+          remaining -= 4;
+          return val;
+        };
+        auto readRange = [&]() -> SourceRange {
+          uint32_t start = readUint32();
+          uint32_t end = readUint32();
+          if (start == 0 && end == 0)
+            return SourceRange(); // Invalid range marker
+          SourceLoc startLoc = sourceMgr.getLocForOffset(bufferID, start);
+          SourceLoc endLoc = sourceMgr.getLocForOffset(bufferID, end);
+          return SourceRange(startLoc, endLoc);
+        };
+        auto setDeclRange = [&](Decl *D) {
+          if (auto R = readRange(); R.isValid())
+            ctx.setCachedDeclSourceRange(D, R);
+          // Also read attr ranges in the same order as the serializer.
+          for (auto *attr : D->getSemanticAttrs()) {
+            if (auto R = readRange(); R.isValid())
+              ctx.setCachedAttrSourceRange(attr, R);
+          }
+        };
+        for (auto *D : decls) {
+          setDeclRange(D);
+          if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+            for (auto *member : IDC->getMembers()) {
+              setDeclRange(member);
+            }
+          }
+        }
+      }
+    }
 
     // C1: Store the ModuleFile in the SourceFile to keep it alive.
     // The ASTContext arena doesn't call destructors, so we register a cleanup
@@ -502,6 +550,7 @@ private:
     if (!readString(buf, key.importsBlob, offset)) return false;
     if (!readString(buf, key.privateDiscriminator, offset)) return false;
     if (!readString(buf, key.overlaysBlob, offset)) return false;
+    if (!readString(buf, key.declRangesBlob, offset)) return false;
 
     return true;
   }

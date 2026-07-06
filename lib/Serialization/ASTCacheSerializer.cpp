@@ -131,6 +131,53 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
         ModuleOrSourceFile(const_cast<SourceFile *>(&SF)));
 
     langOpts.AllowModuleWithCompilerErrors = savedAllowErrors;
+    langOpts.AllowModuleWithCompilerErrors = savedAllowErrors;
+
+    // Collect decl source ranges for the deserializer to restore.
+    // The deserialized decls have invalid SourceLocs; this blob provides
+    // the original source offsets so getSourceRange() can return valid ranges.
+    auto &sourceMgr = ctx.SourceMgr;
+    unsigned bufferID = SF.getBufferID();
+    if (bufferID != 0) {
+      llvm::raw_string_ostream rangesOS(key.declRangesBlob);
+      // Walk all decls in the SourceFile and write their source ranges.
+      // Format: for each decl: (uint32_t startOffset, uint32_t endOffset)
+      auto writeRange = [&](SourceRange range) {
+        if (!range.isValid()) {
+          uint32_t zero = 0;
+          rangesOS.write(reinterpret_cast<const char *>(&zero), 4);
+          rangesOS.write(reinterpret_cast<const char *>(&zero), 4);
+          return;
+        }
+        uint32_t start = static_cast<uint32_t>(
+            sourceMgr.getLocOffsetInBuffer(range.Start, bufferID));
+        uint32_t end = static_cast<uint32_t>(
+            sourceMgr.getLocOffsetInBuffer(range.End, bufferID));
+        rangesOS.write(reinterpret_cast<const char *>(&start), 4);
+        rangesOS.write(reinterpret_cast<const char *>(&end), 4);
+      };
+      auto writeDeclRange = [&](const Decl *D) {
+        writeRange(D->getSourceRange());
+        // Also write ranges for each semantic attr.
+        for (auto *attr : D->getSemanticAttrs()) {
+          writeRange(attr->getRange());
+        }
+      };
+      for (auto item : const_cast<SourceFile &>(SF).getTopLevelItems()) {
+        if (auto *D = item.dyn_cast<Decl *>()) {
+          // Skip ImportDecls — they are not in the deserialized decls vector
+          // (reconstructed separately by SnapshotDeserializer).
+          if (isa<ImportDecl>(D))
+            continue;
+          writeDeclRange(D);
+          if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+            for (auto *member : IDC->getMembers()) {
+              writeDeclRange(member);
+            }
+          }
+        }
+      }
+    }
   }
 
   // 3. Write the .swiftast container (same format as SnapshotSerializer)
@@ -177,7 +224,7 @@ bool writeASTCacheFile(ASTContext &ctx, const SourceFile &SF,
   writeString(key.importsBlob);
   writeString(key.privateDiscriminator);
   writeString(key.overlaysBlob);
-
+  writeString(key.declRangesBlob);
   // Write bitstream (length-prefixed)
   writeString(bitstreamData);
 

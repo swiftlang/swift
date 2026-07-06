@@ -678,10 +678,40 @@ static bool verifyASTCache(CompilerInstance &Instance) {
       llvm::errs() << "AST round-trip verification: FAILED (cannot write script)\n";
       return true;
     }
-    scriptFile << R"PY(
-import json, sys
+  scriptFile << R"PY(
+import json, sys, re
 
 diffs = []
+
+def collect_pointer_map(a, b, mapping):
+    """Walk both trees in parallel, collecting mappings from
+    'replaced-pointer-N' in original to 'replaced-pointer-M' in deserialized.
+    Both should appear at the same structural position."""
+    if isinstance(a, dict) and isinstance(b, dict):
+        for k in sorted(set(a.keys()) & set(b.keys())):
+            collect_pointer_map(a[k], b[k], mapping)
+    elif isinstance(a, list) and isinstance(b, list):
+        for x, y in zip(a, b):
+            collect_pointer_map(x, y, mapping)
+    elif isinstance(a, str) and isinstance(b, str):
+        if a.startswith("replaced-pointer-") and b.startswith("replaced-pointer-"):
+            if a not in mapping:
+                mapping[a] = b
+
+def normalize_pointers(obj, mapping, reverse=False):
+    """Replace all 'replaced-pointer-N' strings in obj using the mapping.
+    If reverse, maps deserialized→original; otherwise original→deserialized."""
+    if isinstance(obj, dict):
+        return {k: normalize_pointers(v, mapping, reverse) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [normalize_pointers(v, mapping, reverse) for v in obj]
+    elif isinstance(obj, str) and obj.startswith("replaced-pointer-"):
+        if reverse:
+            # Reverse mapping: deserialized→original
+            rev = {v: k for k, v in mapping.items()}
+            return rev.get(obj, obj)
+        return mapping.get(obj, obj)
+    return obj
 
 def compare(a, b, path=""):
     """Recursively compare two JSON trees, collecting ALL diffs."""
@@ -710,6 +740,16 @@ with open(sys.argv[1]) as f:
     orig = json.load(f)
 with open(sys.argv[2]) as f:
     deser = json.load(f)
+
+# Normalize pointer IDs: both dumps assign 'replaced-pointer-N' in first-seen
+# order during the ASTDumper JSON walk. If the two ASTs have decls in slightly
+# different order (e.g., ImportDecl insertion), the numbering diverges by a
+# constant offset. We build a mapping by walking both trees in parallel
+# (corresponding pointers appear at the same structural position), then
+# normalize the original to use the deserialized's numbering.
+pointer_mapping = {}
+collect_pointer_map(orig, deser, pointer_mapping)
+orig = normalize_pointers(orig, pointer_mapping)
 
 compare(orig, deser)
 
