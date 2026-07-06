@@ -512,7 +512,13 @@ Expr *BodyASTDeserializer::deserializeExpr(ArrayRef<uint64_t> record,
       else
         conformances.push_back(ProtocolConformanceRef());
     }
-    result = ErasureExpr::create(Ctx, sub, ty, conformances, {});
+    if (ty && ty->isExistentialType()) {
+      result = ErasureExpr::create(Ctx, sub, ty, conformances, {});
+    } else {
+      // Type resolution failed (e.g., test context without ModuleFile).
+      // Fall back to ErrorExpr to avoid crashing on getExistentialLayout.
+      result = new (Ctx) ErrorExpr(SourceRange());
+    }
     break;
   }
   // UnderlyingToOpaqueExpr: {ExprID, ExprKind, TypeID, implicit, subExprID,
