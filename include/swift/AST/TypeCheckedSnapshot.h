@@ -32,7 +32,7 @@ class SourceFile;
 
 /// The .swiftast file format magic header.
 static constexpr const char *SWIFTAST_MAGIC = "SWIFTAST\0";
-static constexpr uint32_t SWIFTAST_FORMAT_VERSION = 1;
+static constexpr uint32_t SWIFTAST_FORMAT_VERSION = 2;
 
 /// Cache key for a .swiftast file. This is stored at the beginning of the
 /// .swiftast file and validated on load.
@@ -70,11 +70,7 @@ struct ASTCacheKey {
   std::string declRangesBlob;
   /// Serialized trailing where clause source text for extensions, keyed by
  /// extension index. Format: (uint32_t textLength, char[textLength]) per
- /// extension that has a where clause, in top-level decl order.
  std::string whereClausesBlob;
-  /// Serialized function body AST: for each function with a type-checked body,
-  /// stores the body's AST nodes in a custom binary format.
-  std::string bodyBlob;
 
   /// Check if this cache key is valid for the given source file.
   bool isValid(ASTContext &ctx, const SourceFile &SF,

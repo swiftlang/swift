@@ -37,7 +37,6 @@
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "BodyASTDeserializer.h"
-#include "BodySerializer.h"
 
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -859,11 +858,11 @@ private:
     if (!readString(buf, key.macroPluginsHash, offset)) return false;
     if (!readString(buf, key.crossImportOverlaysHash, offset)) return false;
     if (!readString(buf, key.dependencyProvidesHash, offset)) return false;
+    if (!readString(buf, key.importsBlob, offset)) return false;
     if (!readString(buf, key.privateDiscriminator, offset)) return false;
     if (!readString(buf, key.overlaysBlob, offset)) return false;
     if (!readString(buf, key.declRangesBlob, offset)) return false;
     if (!readString(buf, key.whereClausesBlob, offset)) return false;
-    if (!readString(buf, key.bodyBlob, offset)) return false;
 
     return true;
   }

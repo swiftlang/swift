@@ -9,7 +9,6 @@ add_swift_host_library(swiftSerialization STATIC
   SnapshotSerializer.cpp
   Serialization.cpp
   ASTCacheSerializer.cpp
-  BodySerializer.cpp
   BodyASTSerializer.cpp
   BodyASTDeserializer.cpp
   SerializedModuleLoader.cpp
