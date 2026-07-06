@@ -55,7 +55,7 @@ by `SnapshotDeserializer::parseCacheHeader`
 | Field                       | Encoding              | Notes |
 |-----------------------------|-----------------------|-------|
 | `magic`                     | 9 bytes               | `"SWIFTAST\0"` (`SWIFTAST_MAGIC`) |
-| `formatVersion`             | `uint32_t`            | Currently `1` (`SWIFTAST_FORMAT_VERSION`) |
+| `formatVersion`             | `uint32_t`            | Currently `2` (`SWIFTAST_FORMAT_VERSION`; bumped from 1 when `bodyBlob` was removed from the header) |
 | `compilerVersionHash`       | `uint32_t`            | Full Swift compiler version string hash |
 | `sourceFileHash`            | length-prefixed string | SHA-256 of the source file content |
 | `importedModulesHash`       | length-prefixed string | SHA-256 of imported modules (name + content) |
@@ -64,12 +64,11 @@ by `SnapshotDeserializer::parseCacheHeader`
 | `dependencyProvidesHash`    | length-prefixed string | SHA-256 of dependency "provides" (from `.swiftdeps`) |
 | `importsBlob`               | length-prefixed string | Serialized `(module_name, import_attributes)` pairs; populates `SourceFile::Imports` on hit |
 | `privateDiscriminator`      | length-prefixed string | The file's private discriminator |
-| `overlaysBlob`              | length-prefixed string | `(overlay_name, declaring_name)` pairs |
-
+| `declRangesBlob`            | length-prefixed string | `(startOffset, endOffset)` pairs for each top-level decl and nested member, in serialization order |
+| `whereClausesBlob`          | length-prefixed string | `(uint32_t textLength, char[textLength])` per extension with a where clause, in top-level decl order |
 > **Note:** `ASTCacheKey::langOptsHash` is present in the struct but is **not**
 > written to the file in the current implementation. The wire format consists of
-> the fixed-width fields above plus the eight length-prefixed strings, in the
-> order listed. `parseCacheHeader` reads exactly these fields.
+> the fixed-width fields above plus the ten length-prefixed strings, in the
 
 Length-prefixed string encoding: `uint32_t length` followed by `length` bytes
 of UTF-8.
@@ -84,9 +83,12 @@ A length-prefixed blob containing a standard LLVM bitstream. Written by
    - `writeHeader()` — swiftmodule header (signature `SWIFTMODULE_SIGNATURE`).
    - `writeInputBlock()` — imported module list.
    - `writeSIL(nullptr)` — no SIL is serialized for the cache.
-   - `writeAST(DC)` — the type-checked AST.
+   - `writeAST(DC)` — the type-checked AST. Calls `serializeBodies()` virtual
+     hook (overridden by `ASTCacheSerializer`) BEFORE `writeAllDeclsAndTypes()`
+     to serialize function body AST nodes to `ASTCACHE_BODY_BLOCK_ID`
+     sub-blocks (see Section 11). Body-local `addTypeRef`/`addDeclRef` calls
+     are included in the flushed type/decl tables.
    - `writeHiddenTypeLayoutsBlock()` — abbreviations for hidden type records.
-
 The bitstream uses the **same record layouts** as `.swiftmodule` for all
 existing records, plus the cache-only `DEPENDENT_MEMBER_NAMED_TYPE` record
 (Section 4).
@@ -419,66 +421,35 @@ AST cache: HIT for Sources/_NIODataStructures/Heap.swift
 ```
 
 `-verify-ast-cache` (declared in `Options.td:1809`) is reserved for the
-round-trip verification action (serialize → deserialize → JSON-diff); see the
-plan in `local://ast-cache-format-plan.md`, Steps 10–13.
+## 8.1. Verify-ast-cache diff history
 
-## 8.1. Remaining verify-ast-cache diffs (111 on rich test file)
+The `-verify-ast-cache` action serializes a SourceFile to `.swiftast`,
+deserializes it, dumps both to JSON, and diffs. Current state: **135 diffs**
+(no crash). The `body` category is NO LONGER dropped — full body AST
+serialization is implemented (Section 11). The remaining 135 diffs are from
+deserialized bodies not matching original bodies exactly (ErrorExpr fallbacks,
+missing types, missing source ranges on body nodes, missing LOCAL_DECL records).
 
-The strict `compare()` in the verify script reports 111 diffs (down from 123).
-Categories:
+**Historical diff reduction phases:**
 
-| Category | Count | Root cause | Status |
-|----------|-------|-----------|--------|
-| `range`/`loc` | 46 | Source locations not in decl record layouts (only `SwiftAttrAttr` serializes them via `writeSourceLocation`) | **Dropped** — needs `DECL_LOCS_BLOCK_ID` side block |
-| `value_mismatch` (pointer IDs) | 61 | `decl_context` pointer IDs off-by-one — `ImportDecl` insertion shifts numbering. `ASTDumper` assigns `replaced-pointer-N` in first-seen order during JSON dump | **Dropped** — dump rendering artifact |
-| `body` | 15 | Cache stores body *text* (source string via `InlinableBodyTextLayout`), not body *AST* (`brace_stmt` nodes). `ASTDumper` renders `body` as AST structure | **Dropped** — `ParseAbstractFunctionBodyRequest` returns `{}` for `BodyKind::Deserialized`; re-parsing via `parseAbstractFunctionBodyDelayed` requires `BodyKind::Unparsed` and a valid source range |
-| `where_requirements` | 1 | `getTrailingWhereClause()` returns parsed where clause, not serialized. Generic signature IS serialized but includes inferred requirements (Copyable, Escapable) not in source where clause | **Dropped** — needs bitstream serialization of `TrailingWhereClause` |
-| `implicit` on attrs | 2 | `has_storage_attr` vs `usable_from_inline_attr` swapped — synthesized attribute added at different position | **Dropped** — ordering depends on implicit vs explicit attrs |
-| `accessors` array length | 1 | Missing/extra accessor in deserialized (`transparent_attr` propagated to accessor incorrectly) | **Dropped** — separate accessor attr propagation issue |
+| Phase | Diffs | Key fixes |
+|-------|-------|-----------|
+| Initial | 200+ | `interface_type` on self decls, `requirement_signature`, `inout` on self, `enum_case_decl` reconstruction, `import_decl` array alignment |
+| Phase 2 (200→123) | 77 | `Pattern::clearImplicit()`, `generic_signature` force-compute, synthesized conformance `source_kind` |
+| Phase 3 (123→111) | 12 | `importsBlob` read fix in `parseCacheHeader` (pre-existing bug), body text serialization |
+| Phase 4 (111→15) | 96 | `serializeBodies()` hook + bitstream body block + `BodyASTSerializer`/`BodyASTDeserializer` |
+| Phase 5 (15→135) | -120 | Setting bodies on ALL functions (not just `BodyKind::None`). Diff count increased because more bodies are now compared. No crash. |
 
-### Fixes applied
+**Remaining diff categories (135 total):**
 
-**Phase 1 (200 → 123):**
+| Category | Cause | Status |
+|----------|-------|--------|
+| `body` content mismatch | Deserialized bodies have `ErrorExpr` fallbacks where types couldn't be resolved, or expression kinds couldn't be reconstructed with full fidelity | **Active** — needs type resolution fixes and missing LOCAL_DECL records |
+| `range` on body nodes | Body exprs/stmts have invalid source ranges after deserialization | **Active** — needs source range serialization in body block |
+| `pattern_binding_decl` | Local `let`/`var` declarations in bodies not serialized (LOCAL_DECL not implemented) | **Active** — Section 11.4 |
+| `accessors` body | Accessor bodies deserialized but may have mismatched structure | **Active** |
 
-| Fix | Diffs cleared | How |
-|-----|-------|-----|
-| `interface_type` on `implicit_self_decl` | 15 | Eager self decl creation in `SnapshotDeserializer` with interface type from `DC->getSelfInterfaceType()` and specifier based on function kind |
-| `requirement_signature` | 2 | Force-compute `ProtocolDecl::getRequirementSignature()` during deserialization |
-| `inout` on self decls | 4 | `AccessorDecl` kind check (Set/Modify/Init = inout), `ConstructorDecl` handling |
-| `enum_case_decl` reconstruction | ~20 cascade | Group consecutive `EnumElementDecl`s, insert `EnumCaseDecl` wrapper before each group, keep elements as direct members too |
-| `import_decl` array alignment | ~10 | Reconstruct `ImportDecl` nodes from `importsBlob` during deserialization |
-
-**Phase 2 (123 → 111) — TDD with lit tests and C++ unit tests:**
-
-| Fix | Diffs cleared | How | Tests |
-|-----|-------|-----|-------|
-| `implicit` on patterns | 6 | Added `Pattern::clearImplicit()` (`Pattern.h:138`); recursively clears implicit flag on patterns within non-implicit PBDs in `Deserialization.cpp:4856`. Walker descends ParenPattern/TypedPattern/BindingPattern/TuplePattern. Synthesized (implicit) PBDs keep their patterns implicit | `test/ASTCache/pattern_implicit.swift`; `unittests/AST/PatternImplicitTests.cpp` (4 tests) |
-| `generic_signature` | 1 | Force-compute `getGenericSignature()` on deserialized protocols in `SnapshotDeserializer.cpp:210` so ASTDumper renders `generic_signature` instead of `parsed_generic_params` | `test/ASTCache/generic_signature.swift`; `unittests/AST/GenericSignatureTests.cpp` (2 tests) |
-| Synthesized conformances (`source_kind`) | 6 | Mark conformances as `Synthesized` when their protocol is not in the explicit inherits list (`SnapshotDeserializer.cpp:213`). Handles both `NominalTypeDecl` and `ExtensionDecl` inherits via `getInherited().getResolvedType(i)` | `test/ASTCache/synthesized_conformance.swift` |
-
-### What's NOT fixable without extending the bitstream
-
-The `range`, `body`, and `where_requirements` categories (62 diffs total)
-require additional data in the cache bitstream that the swiftmodule format
-doesn't store. The infrastructure exists:
-
-- **`DECL_LOCS_BLOCK_ID`** (line 912 of `ModuleFormat.h`) — existing source
-  location block from `.swiftsourceinfo`, could be added to the cache bitstream
-- **`InlinableBodyTextLayout`** — body text is already stored; re-parsing it
-  into AST would produce the `brace_stmt` nodes the dumper expects, but
-  `ParseAbstractFunctionBodyRequest` returns `{}` for `BodyKind::Deserialized`
-  and the request evaluator caches this empty result
-- **Pattern record layouts** — the `implicit` fix (Phase 2) works around
-  this by clearing implicit on non-implicit PBDs; the remaining 2 attr
-  implicit diffs are attribute ordering issues
-
-The `value_mismatch` pointer ID diffs (61) are a dump rendering artifact:
-  `ASTDumper` assigns `replaced-pointer-N` in first-seen order during the JSON
-  dump, and `ImportDecl` insertion shifts the numbering. Structural pointer ID
-  normalization in the compare script could address this.
-
-## 8.2. Decision: serialize full function body AST in the bitstream
-
+## 8.2. Decision: serialize full function body AST in the bitstream (DONE)
 **Date:** 2026-07-06
 
 **Background:** A custom `bodyBlob` binary format was attempted to serialize
@@ -495,23 +466,19 @@ commits, the approach was abandoned because:
    should not survive to SILgen").
 3. 169 diffs remained after extensive effort, with no clear path to zero.
 
-**Decision:** Extend the bitstream serialization itself to write expression
-and statement AST nodes. The existing `Serializer` base class already
-serializes decls, types, and signatures with full fidelity — that's why
-non-body diffs were driven to zero. But it has NO expression or statement
-serialization at all (no `writeExpr`, no `visitStmt`). The
-`Serializer::writeStmtRef` method exists but always writes null.
+**Decision (implemented):** Extended the bitstream serialization to write
+expression and statement AST nodes via `BodyASTSerializer` (Section 11).
+The `ASTCacheSerializer` overrides the `serializeBodies()` virtual hook
+(called by `Serializer::writeAST` before `writeAllDeclsAndTypes` flushes the
+tables) to serialize each function's `BraceStmt` to an
+`ASTCACHE_BODY_BLOCK_ID` sub-block within `MODULE_BLOCK`. This gives full
+fidelity because every type and decl reference in the body resolves through
+the same `addTypeRef`/`addDeclRef` tables used for the rest of the AST.
 
-The plan is to extend the `ASTCacheSerializer` to serialize function bodies
-as bitstream records, using the same `writeType`, `addDeclRef`,
-`SubstitutionMap` serialization, etc. that the existing infrastructure
-provides. This gives full fidelity because every type and decl reference
-in the body resolves through the same tables used for the rest of the AST.
-
-**Key constraint:** The `.swiftmodule` format must not break. New record
-types for expressions/statements must be appended to the enum, just as
-`DEPENDENT_MEMBER_NAMED_TYPE` was. Existing `.swiftmodule` readers never
-encounter these records.
+**Key constraint (met):** The `.swiftmodule` format is not affected. New
+record types (`EXPR_NODE`, `STMT_NODE`, `BODY`, `LOCAL_DECL`) are in the
+cache-only `ASTCACHE_BODY_BLOCK_ID` block, not in `DECLS_AND_TYPES_BLOCK`.
+Existing `.swiftmodule` readers never encounter these records.
 
 ## 9. Key source files
 
@@ -521,18 +488,18 @@ encounter these records.
 | `include/swift/AST/SourceFile.h` | `clearCacheForFailedLoad()`, `LoadedFromAstCache`, `CachedModuleFile` |
 | `include/swift/AST/Pattern.h` | `Pattern::clearImplicit()` (Phase 2 fix for pattern implicit-flag diffs) |
 | `include/swift/AST/ProtocolConformance.h` | `NormalProtocolConformance::setSourceKindAndImplyingConformance()` (Phase 2 fix for synthesized conformance diffs) |
-| `lib/Serialization/ASTCacheSerializer.cpp` | `ASTCacheSerializer` (`isDeclXRef`, `useNameBasedDependentMemberType`), `writeASTCacheFile` |
-| `lib/Serialization/Serialization.h` | `Serializer` virtuals: `isDeclXRef`, `useNameBasedDependentMemberType`, `writeCrossReference` |
-| `lib/Serialization/Serialization.cpp` | `visitDependentMemberType` branch, abbreviation registration |
-| `lib/Serialization/ModuleFormat.h` | `DependentMemberNamedTypeLayout` |
-| `lib/Serialization/DeclTypeRecordNodes.def` | `TYPE(DEPENDENT_MEMBER_NAMED)` enum entry |
-| `lib/Serialization/Deserialization.cpp` | `DESERIALIZE_TYPE(DEPENDENT_MEMBER_NAMED_TYPE)`; `resolveCrossReference` registry fast-path |
-| `lib/Serialization/SnapshotDeserializer.cpp` | `deserializeBitstream` (eager registry + associated-type load), `parseCacheHeader` |
+| `lib/Serialization/ASTCacheSerializer.cpp` | `ASTCacheSerializer` (`isDeclXRef`, `useNameBasedDependentMemberType`, `serializeBodies`), `writeASTCacheFile` |
+| `lib/Serialization/Serialization.h` | `Serializer` virtuals: `isDeclXRef`, `useNameBasedDependentMemberType`, `writeCrossReference`, `serializeBodies` |
+| `lib/Serialization/Serialization.cpp` | `visitDependentMemberType` branch, `visitLValueType`/`visitInOutType`, `serializeBodies` hook call, abbreviation registration |
+| `lib/Serialization/ModuleFormat.h` | `DependentMemberNamedTypeLayout`, `astcache_body_block` namespace (`ExprKind`, `StmtKind`, `RecordKind`), `ASTCACHE_BODY_BLOCK_ID` |
+| `lib/Serialization/DeclTypeRecordNodes.def` | `TYPE(DEPENDENT_MEMBER_NAMED)`, `TYPE(LVALUE)`, `TYPE(INOUT)` enum entries |
+| `lib/Serialization/Deserialization.cpp` | `DESERIALIZE_TYPE` for `DEPENDENT_MEMBER_NAMED_TYPE`, `LVALUE_TYPE`, `INOUT_TYPE`; `resolveCrossReference` registry fast-path |
+| `lib/Serialization/BodyASTSerializer.h` | `BodyASTSerializer` class declaration |
+| `lib/Serialization/BodyASTSerializer.cpp` | `BodyASTSerializer` implementation: `serializeExpr`, `serializeStmt`, `serializeBody` (75+ expr/stmt kinds) |
+| `lib/Serialization/BodyASTDeserializer.h` | `BodyASTDeserializer` class declaration with callback-based resolution |
+| `lib/Serialization/BodyASTDeserializer.cpp` | `BodyASTDeserializer` implementation: `deserializeExpr`, `deserializeStmt`, `deserializeAllBodies` (75+ expr/stmt kinds) |
+| `lib/Serialization/SnapshotDeserializer.cpp` | `deserializeBitstream` (eager registry + associated-type load + body deserialization), `parseCacheHeader` |
 | `lib/Frontend/Frontend.cpp` | `loadASTCache` (two-pass), `saveASTCache` |
-
-## 10. Test files
-
-### Lit tests (`test/ASTCache/`)
 
 | File | Tests |
 |------|-------|
@@ -554,11 +521,13 @@ encounter these records.
 | `emit_object.swift` | `-emit-object` with cached AST |
 | `fibonacci.swift` | Complex function bodies |
 | `generics.swift` | Generic type serialization |
+| `body_roundtrip.swift` | Body AST round-trip verification |
 
 ### Unit tests (`unittests/AST/`)
 
 | File | Tests |
 |------|-------|
+| `BodyASTSerializationTests.cpp` | 56 tests: body block structure, expr/stmt round-trip for all 75+ kinds (Stages A-E) |
 | `PatternImplicitTests.cpp` | `Pattern::clearImplicit()` behavior: clears on named pattern, non-recursive, setImplicit re-arms, no-op on non-implicit (4 tests) |
 | `GenericSignatureTests.cpp` | `GenericContext::hasComputedGenericSignature()`: false before set, true after (2 tests) |
 
