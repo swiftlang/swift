@@ -478,8 +478,14 @@ protected:
 
   using SerializerBase::SerializerBase;
   using SerializerBase::writeToStream;
-
 public:
+  /// Accessor for the bitstream writer (used by BodyASTSerializer).
+  llvm::BitstreamWriter &getWriter() { return Out; }
+  /// Accessor for the reusable scratch record buffer (used by BodyASTSerializer).
+  SmallVectorImpl<uint64_t> &getScratchRecord() { return ScratchRecord; }
+  /// Accessor for the serialized bitstream buffer.
+  ArrayRef<char> getBuffer() const { return Buffer; }
+
   Serializer(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC,
              const SerializationOptions &options)
       : SerializerBase(signature, DC), Options(options) {}

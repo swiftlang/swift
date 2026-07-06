@@ -2,6 +2,7 @@ add_swift_unittest(SwiftASTTests
   ArithmeticEvaluator.cpp
   ASTDumperTests.cpp
   PatternImplicitTests.cpp
+  BodyASTSerializationTests.cpp
   GenericSignatureTests.cpp
   ASTWalkerTests.cpp
   AvailabilityContextTests.cpp
@@ -27,4 +28,5 @@ target_link_libraries(SwiftASTTests
    # FIXME: Circular dependencies.
    swiftParse
    swiftSema
+   swiftSerialization
 )
