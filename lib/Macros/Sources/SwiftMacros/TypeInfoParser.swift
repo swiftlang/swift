@@ -499,7 +499,7 @@ extension EnumCaseInfo: TypeInfoProtocol {
     ).expect(
       .stringArg("name"),
       .stringArg("associatedValueLabels").toOptional().toArray(),
-      .boolArg("isReachable"),
+      .boolArg("isReachable")
     )
 
     return Self(

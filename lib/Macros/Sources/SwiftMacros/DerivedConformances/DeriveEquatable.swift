@@ -111,7 +111,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
 
   /// `a == b` for an enum, picking the cheapest valid strategy for its shape.
   static func getEnumBody(
-    _ enumInfo: EnumTypeInfo,
+    _ enumInfo: EnumTypeInfo
   ) -> CodeBlockItemListSyntax {
     if enumInfo.hasNoAssociatedValues() {
       return getNoAssociatedValuesBody(enumInfo)
@@ -127,7 +127,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
 
   /// `a == b` for an enum with no associated values: compare discriminants.
   static func getNoAssociatedValuesBody(
-    _ enumInfo: EnumTypeInfo,
+    _ enumInfo: EnumTypeInfo
   ) -> CodeBlockItemListSyntax {
     var items = getDiscriminant(enumInfo, scrutinee: "a", discrName: "index_a")
     items += getDiscriminant(enumInfo, scrutinee: "b", discrName: "index_b")
@@ -138,7 +138,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
   /// `a == b` for an enum with associated values: match `(a, b)` against
   /// each case pairwise and compare bound payloads.
   static func getHasAssociatedValuesBody(
-    _ enumInfo: EnumTypeInfo,
+    _ enumInfo: EnumTypeInfo
   ) -> CodeBlockItemListSyntax {
     var cases: [SwitchCaseSyntax] = []
     for caseInfo in enumInfo.cases {
@@ -244,7 +244,7 @@ func getDiscriminant(
 /// since their payload is never inspected.
 func getEnumElementPayloadPattern(
   _ caseInfo: EnumCaseInfo,
-  varPrefix: String,
+  varPrefix: String
 ) -> PatternSyntax {
   if caseInfo.associatedValueLabels.isEmpty || !caseInfo.isReachable {
     return ".\(raw: caseInfo.name)"
