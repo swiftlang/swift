@@ -247,6 +247,11 @@ private struct Uses {
         } else {
           Builder(before: destroy, context).createEndBorrow(of: storeBorrow)
         }
+      case let debugValue as DebugValueInst:
+        if debugValue.parentBlock != storeBorrow.parentBlock || !storeBorrow.strictlyDominatesInBlock(debugValue) {
+          debugValue.move(before: storeBorrow.next!, context)
+        }
+        fallthrough
       default:
         use.set(to: storeBorrow, context)
       }
