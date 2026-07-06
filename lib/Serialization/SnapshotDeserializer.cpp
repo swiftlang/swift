@@ -777,10 +777,11 @@ private:
     // The bodyBlob stores the type-checked body AST for each function.
     // We reconstruct the BraceStmt and cache it so getBody() returns it.
     if (!key.bodyBlob.empty()) {
+      serialization::BodyDeserializer bodyDeser(key.bodyBlob, ctx, nullptr);
       auto deserializeBody = [&](AbstractFunctionDecl *AFD) {
         if (AFD->getBodyKind() != AbstractFunctionDecl::BodyKind::Deserialized)
           return;
-        serialization::BodyDeserializer bodyDeser(key.bodyBlob, ctx, AFD);
+        bodyDeser.setDeclContext(AFD);
         if (auto *body = bodyDeser.deserializeBody()) {
           AFD->setBody(body, AbstractFunctionDecl::BodyKind::Parsed);
           ctx.evaluator.cacheOutput(ParseAbstractFunctionBodyRequest{AFD},

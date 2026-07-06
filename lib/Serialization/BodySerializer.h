@@ -60,6 +60,7 @@ public:
   BodyDeserializer(StringRef blob, ASTContext &ctx, DeclContext *dc)
       : Data(blob.data()), Remaining(blob.size()), Ctx(ctx), DC(dc) {}
   BraceStmt *deserializeBody();
+  void setDeclContext(DeclContext *dc) { DC = dc; }
 };
 
 } // namespace serialization

@@ -254,9 +254,6 @@ Type BodyDeserializer::readType() {
 ValueDecl *BodyDeserializer::readDeclRef() {
   StringRef name = readString();
   if (name.empty()) return nullptr;
-  // Try to find the decl by name in the function's decl context.
-  // This is a simplified resolution — full USR-based resolution would
-  // be more robust.
   auto ident = Ctx.getIdentifier(name);
   if (!DC) return nullptr;
   // Check if it's a parameter of the function.
@@ -268,12 +265,21 @@ ValueDecl *BodyDeserializer::readDeclRef() {
       }
     }
   }
-  // TODO: look up in enclosing decl context (struct/class members, etc.)
+  // Check if it's a member of the enclosing nominal type.
+  auto *parentDC = DC->getSelfNominalTypeDecl();
+  if (parentDC) {
+    for (auto *member : parentDC->getMembers()) {
+      if (auto *VD = dyn_cast<ValueDecl>(member)) {
+        if (VD->getBaseIdentifier() == ident)
+          return VD;
+      }
+    }
+  }
   return nullptr;
 }
 
 Expr *BodyDeserializer::deserializeExpr() {
-  [[maybe_unused]] Type ty = readType();
+  Type ty = readType();
   uint8_t tag = readUInt8();
 
   switch (static_cast<ExprKindTag>(tag)) {
@@ -281,8 +287,60 @@ Expr *BodyDeserializer::deserializeExpr() {
     auto *decl = readDeclRef();
     if (!decl) return nullptr;
     return new (Ctx) DeclRefExpr(ConcreteDeclRef(decl), DeclNameLoc(),
-                                /*Implicit=*/true);
+                                /*Implicit=*/true, AccessSemantics::Ordinary,
+                                ty);
   }
+  case ExprKindTag::MemberRef: {
+    auto *base = deserializeExpr();
+    auto *member = readDeclRef();
+    if (!base || !member) return nullptr;
+    return new (Ctx) MemberRefExpr(base, SourceLoc(),
+                                   ConcreteDeclRef(member), DeclNameLoc(),
+                                   /*Implicit=*/true);
+  }
+  case ExprKindTag::IntegerLiteral: {
+    StringRef digits = readString();
+    return new (Ctx) IntegerLiteralExpr(digits, SourceLoc(),
+                                        /*Implicit=*/true);
+  }
+  case ExprKindTag::Binary: {
+    auto *lhs = deserializeExpr();
+    auto *rhs = deserializeExpr();
+    if (!lhs || !rhs) return nullptr;
+    return BinaryExpr::create(Ctx, lhs, nullptr, rhs, /*implicit=*/true, ty);
+  }
+  case ExprKindTag::Call: {
+    auto *fn = deserializeExpr();
+    uint32_t numArgs = readUInt32();
+    SmallVector<Expr*, 4> argExprs;
+    for (uint32_t i = 0; i < numArgs; i++) {
+      auto *argExpr = deserializeExpr();
+      if (!argExpr) return nullptr;
+      argExprs.push_back(argExpr);
+    }
+    auto *argList = ArgumentList::forImplicitUnlabeled(Ctx, argExprs);
+    return CallExpr::createImplicit(Ctx, fn, argList);
+  }
+  case ExprKindTag::Assign: {
+    auto *dest = deserializeExpr();
+    auto *src = deserializeExpr();
+    if (!dest || !src) return nullptr;
+    return new (Ctx) AssignExpr(dest, SourceLoc(), src, /*Implicit=*/true);
+  }
+  case ExprKindTag::InOut: {
+    auto *sub = deserializeExpr();
+    if (!sub) return nullptr;
+    return new (Ctx) InOutExpr(SourceLoc(), sub, Type(), /*isImplicit=*/true);
+  }
+  case ExprKindTag::DotSyntaxCall: {
+    auto *fn = deserializeExpr();
+    auto *base = deserializeExpr();
+    if (!fn || !base) return nullptr;
+    return DotSyntaxCallExpr::create(Ctx, fn, SourceLoc(),
+                                     Argument::unlabeled(base), ty);
+  }
+  case ExprKindTag::Type:
+    return TypeExpr::createImplicit(ty, Ctx);
   default:
     return nullptr;
   }
