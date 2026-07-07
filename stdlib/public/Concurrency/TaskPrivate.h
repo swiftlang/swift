@@ -1005,7 +1005,7 @@ struct AsyncTask::PrivateStorage {
   TaskDependencyStatusRecord *dependencyRecord = nullptr;
 
   /// Intrusive live-task registry links.
-  std::atomic<uintptr_t> registryNext{0};
+  std::atomic<AsyncTask *> registryNext{nullptr};
   std::atomic<AsyncTask *> registryPrev{nullptr};
 
   // The lock used to protect more complicated operations on the task status.

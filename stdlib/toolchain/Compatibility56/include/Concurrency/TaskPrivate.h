@@ -258,7 +258,7 @@ struct AsyncTask::PrivateStorage {
   /// state.
   uintptr_t ExclusivityAccessSet[2] = {0, 0};
 
-  std::atomic<uintptr_t> registryNext{0};
+  std::atomic<AsyncTask *> registryNext{nullptr};
   std::atomic<AsyncTask *> registryPrev{nullptr};
 
   /// The top 32 bits of the task ID. The bottom 32 bits are in Job::Id.

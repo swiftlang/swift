@@ -12,46 +12,32 @@
 
 #include "TaskRegistry.h"
 #include "TaskPrivate.h"
+#include "swift/Threading/Mutex.h"
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
 
 using namespace swift;
 
-static constexpr uintptr_t RegistryNextDeletedBit = 1;
-
-static inline uintptr_t encodeRegistryNext(AsyncTask *task, bool deleted) {
-  return reinterpret_cast<uintptr_t>(task) |
-         (deleted ? RegistryNextDeletedBit : 0);
-}
-
-static inline AsyncTask *decodeRegistryNext(uintptr_t value) {
-  return reinterpret_cast<AsyncTask *>(value & ~RegistryNextDeletedBit);
-}
-
 static inline size_t registryShardIndex(uint64_t taskId) {
   return static_cast<size_t>(taskId) & (TaskRegistryShardCount - 1);
 }
 
-static_assert((alignof(AsyncTask) & RegistryNextDeletedBit) == 0,
-              "AsyncTask pointers must leave room for the registry mark bit");
-
 std::atomic<AsyncTask *> swift::_swift_concurrency_task_registry[TaskRegistryShardCount] = {};
+static LazyMutex ShardLocks[TaskRegistryShardCount];
 
 void swift::taskRegistryInsert(AsyncTask *task) {
   auto shardIndex = registryShardIndex(task->getTaskId());
   auto &shardHead = _swift_concurrency_task_registry[shardIndex];
-  AsyncTask *head;
-  do {
-    head = shardHead.load(std::memory_order_acquire);
-    task->_private().registryNext.store(encodeRegistryNext(head, false),
-                                       std::memory_order_relaxed);
-    task->_private().registryPrev.store(nullptr, std::memory_order_relaxed);
-  } while (!shardHead.compare_exchange_weak(
-      head, task, std::memory_order_release, std::memory_order_acquire));
-
+  
+  LazyMutex::ScopedLock guard(ShardLocks[shardIndex]);
+  
+  AsyncTask *head = shardHead.load(std::memory_order_relaxed);
+  task->_private().registryNext.store(head, std::memory_order_relaxed);
+  task->_private().registryPrev.store(nullptr, std::memory_order_relaxed);
   if (head) {
     head->_private().registryPrev.store(task, std::memory_order_relaxed);
   }
+  shardHead.store(task, std::memory_order_relaxed);
 
   SWIFT_TASK_DEBUG_LOG("TaskRegistry: inserted task %p id=%llu",
                        task, (unsigned long long)task->getTaskId());
@@ -60,67 +46,69 @@ void swift::taskRegistryInsert(AsyncTask *task) {
 void swift::taskRegistryRemove(AsyncTask *task) {
   auto shardIndex = registryShardIndex(task->getTaskId());
   auto &shardHead = _swift_concurrency_task_registry[shardIndex];
-  uintptr_t next = task->_private().registryNext.fetch_or(
-      RegistryNextDeletedBit, std::memory_order_release);
-  AsyncTask *succ = decodeRegistryNext(next);
+  
+  LazyMutex::ScopedLock guard(ShardLocks[shardIndex]);
+  
+  AsyncTask *prev = task->_private().registryPrev.load(std::memory_order_relaxed);
+  AsyncTask *next = task->_private().registryNext.load(std::memory_order_relaxed);
 
-  while (true) {
-    AsyncTask *prev = task->_private().registryPrev.load(
-        std::memory_order_acquire);
-
-    if (!prev) {
-      AsyncTask *expected = task;
-      if (shardHead.compare_exchange_strong(
-              expected, succ, std::memory_order_release,
-              std::memory_order_acquire)) {
-        if (succ) {
-          succ->_private().registryPrev.compare_exchange_strong(
-              expected, nullptr, std::memory_order_release,
-              std::memory_order_acquire);
-        }
-        SWIFT_TASK_DEBUG_LOG("TaskRegistry: removed task %p id=%llu",
-                             task, (unsigned long long)task->getTaskId());
-        return;
-      }
-      continue;
-    }
-
-    uintptr_t prevNext = prev->_private().registryNext.load(
-        std::memory_order_acquire);
-    if (decodeRegistryNext(prevNext) != task) {
-      continue;
-    }
-
-    uintptr_t desired = encodeRegistryNext(succ, prevNext & RegistryNextDeletedBit);
-    if (prev->_private().registryNext.compare_exchange_strong(
-            prevNext, desired, std::memory_order_release,
-            std::memory_order_acquire)) {
-      if (succ) {
-        succ->_private().registryPrev.compare_exchange_strong(
-            task, prev, std::memory_order_release,
-            std::memory_order_acquire);
-      }
-      SWIFT_TASK_DEBUG_LOG("TaskRegistry: removed task %p id=%llu",
-                           task, (unsigned long long)task->getTaskId());
-      return;
-    }
+  if (prev) {
+    prev->_private().registryNext.store(next, std::memory_order_relaxed);
+  } else {
+    shardHead.store(next, std::memory_order_relaxed);
   }
+
+  if (next) {
+    next->_private().registryPrev.store(prev, std::memory_order_relaxed);
+  }
+
+  task->_private().registryNext.store(nullptr, std::memory_order_relaxed);
+  task->_private().registryPrev.store(nullptr, std::memory_order_relaxed);
+
+  SWIFT_TASK_DEBUG_LOG("TaskRegistry: removed task %p id=%llu",
+                       task, (unsigned long long)task->getTaskId());
 }
 
 size_t swift::swift_task_registryCount() {
   size_t count = 0;
   for (size_t shardIndex = 0; shardIndex < TaskRegistryShardCount; ++shardIndex) {
+    LazyMutex::ScopedLock guard(ShardLocks[shardIndex]);
     for (auto *task = _swift_concurrency_task_registry[shardIndex].load(
-             std::memory_order_acquire);
-         task;) {
-      uintptr_t next = task->_private().registryNext.load(
-          std::memory_order_acquire);
-      if ((next & RegistryNextDeletedBit) == 0)
-        ++count;
-      task = decodeRegistryNext(next);
+             std::memory_order_relaxed);
+         task;
+         task = task->_private().registryNext.load(std::memory_order_relaxed)) {
+      ++count;
     }
   }
   return count;
+}
+
+void swift::swift_task_registryWalk(void (*callback)(void *, void *), void *context) {
+  for (size_t shardIndex = 0; shardIndex < TaskRegistryShardCount; ++shardIndex) {
+    LazyMutex::ScopedLock guard(ShardLocks[shardIndex]);
+    for (auto *task = _swift_concurrency_task_registry[shardIndex].load(
+             std::memory_order_relaxed);
+         task;
+         task = task->_private().registryNext.load(std::memory_order_relaxed)) {
+      callback(task, context);
+    }
+  }
+}
+
+void *swift::swift_task_getShardHead(size_t shardIndex) {
+  if (shardIndex >= TaskRegistryShardCount)
+    return nullptr;
+  return _swift_concurrency_task_registry[shardIndex].load(std::memory_order_relaxed);
+}
+
+void *swift::swift_task_getTaskNext(void *task) {
+  if (!task)
+    return nullptr;
+  return static_cast<AsyncTask *>(task)->_private().registryNext.load(std::memory_order_relaxed);
+}
+
+uint64_t swift::swift_task_getId(void *task) {
+  return static_cast<AsyncTask *>(task)->getTaskId();
 }
 
 #endif // !SWIFT_CONCURRENCY_EMBEDDED

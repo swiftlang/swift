@@ -10,18 +10,56 @@
 
 import _Concurrency
 import Darwin
+import Foundation
 import Dispatch
 import StdlibUnittest
 
-// Resolve at runtime so this test links against the stock system dylib but
-// can be pointed at our modified build via DYLD_LIBRARY_PATH.
-// RTLD_DEFAULT (-2) searches all loaded images, unlike NULL which only searches
-// the main program's namespace.
 let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
+
 func registryCount() -> Int {
   typealias Fn = @convention(c) () -> Int
   guard let sym = dlsym(RTLD_DEFAULT, "swift_task_registryCount") else { return -1 }
   return unsafeBitCast(sym, to: Fn.self)()
+}
+
+typealias GetShardHeadFn = @convention(c) (Int) -> UnsafeRawPointer?
+typealias GetTaskNextFn = @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer?
+typealias GetTaskIdFn = @convention(c) (UnsafeRawPointer) -> UInt64
+
+func getShardHead(index: Int) -> UnsafeRawPointer? {
+  guard let sym = dlsym(RTLD_DEFAULT, "swift_task_getShardHead") else { return nil }
+  return unsafeBitCast(sym, to: GetShardHeadFn.self)(index)
+}
+
+func getTaskNext(task: UnsafeRawPointer) -> UnsafeRawPointer? {
+  guard let sym = dlsym(RTLD_DEFAULT, "swift_task_getTaskNext") else { return nil }
+  return unsafeBitCast(sym, to: GetTaskNextFn.self)(task)
+}
+
+func getTaskId(task: UnsafeRawPointer) -> UInt64 {
+  guard let sym = dlsym(RTLD_DEFAULT, "swift_task_getId") else { return 0 }
+  return unsafeBitCast(sym, to: GetTaskIdFn.self)(task)
+}
+
+actor Barrier {
+  private var arrived = 0
+  private var waiter: CheckedContinuation<Void, Never>?
+  private let target: Int
+  init(_ n: Int) { target = n }
+  func arrive() { arrived += 1; if arrived == target { waiter?.resume() } }
+  func wait() async { if arrived < target { await withCheckedContinuation { waiter = $0 } } }
+}
+
+actor ContinuationRegistry {
+  private var conts: [CheckedContinuation<Void, Never>] = []
+  func register(_ cont: CheckedContinuation<Void, Never>) {
+    conts.append(cont)
+  }
+  func takeAll() -> [CheckedContinuation<Void, Never>] {
+    let list = conts
+    conts = []
+    return list
+  }
 }
 
 @main struct Main {
@@ -55,6 +93,91 @@ func registryCount() -> Int {
         expectLE(countAfterDestroy, baseline,
           "after task \(i+1) finished: expected count <= \(baseline), got \(countAfterDestroy)")
       }
+    }
+
+    // Verify that every task in the registry is placed in the correct shard (index == taskId % 16)
+    tests.test("shardDistribution") {
+      let n = 20
+      let barrier = Barrier(n)
+      let contRegistry = ContinuationRegistry()
+      let done = DispatchGroup()
+      done.enter()
+
+      Task {
+        for _ in 0..<n {
+          Task {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+              Task {
+                await contRegistry.register(cont)
+                await barrier.arrive()
+              }
+            }
+          }
+        }
+
+        await barrier.wait()
+        try? await Task.sleep(nanoseconds: 10_000_000)
+
+        // Walk all 16 shards
+        var totalFound = 0
+        for shardIndex in 0..<16 {
+          var curr = getShardHead(index: shardIndex)
+          while let taskPtr = curr {
+            let id = getTaskId(task: taskPtr)
+            expectEqual(Int(id % 16), shardIndex, "Task with ID \(id) found in wrong shard \(shardIndex) (expected \(id % 16))")
+            totalFound += 1
+            curr = getTaskNext(task: taskPtr)
+          }
+        }
+
+        expectGE(totalFound, n, "Expected to find at least \(n) tasks across the shards")
+
+        // Resume all
+        let resume = await contRegistry.takeAll()
+        for c in resume { c.resume() }
+        
+        done.leave()
+      }
+
+      done.wait()
+    }
+
+    // Verify that concurrent additions and removals on the same shards do not corrupt lists
+    tests.test("concurrentCollisions") {
+      let concurrency = 200
+      let barrier = Barrier(concurrency)
+      let contRegistry = ContinuationRegistry()
+      let done = DispatchGroup()
+      done.enter()
+
+      Task {
+        await withTaskGroup(of: Void.self) { group in
+          for _ in 0..<concurrency {
+            group.addTask {
+              await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                Task {
+                  await contRegistry.register(cont)
+                  await barrier.arrive()
+                }
+              }
+            }
+          }
+
+          await barrier.wait()
+          try? await Task.sleep(nanoseconds: 20_000_000)
+
+          // Verify total count
+          let count = registryCount()
+          expectGE(count, concurrency, "Expected count >= \(concurrency), got \(count)")
+
+          // Resume all
+          let resume = await contRegistry.takeAll()
+          for c in resume { c.resume() }
+        }
+        done.leave()
+      }
+
+      done.wait()
     }
 
     await runAllTestsAsync()
