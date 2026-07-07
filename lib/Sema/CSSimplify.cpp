@@ -11679,7 +11679,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       return success();
     };
 
-    if (baseObjTy->getOptionalObjectType()) {
+    if (auto unwrapTy = baseObjTy->getOptionalObjectType()) {
       // If the base type was an optional, look through it.
 
       // If the base type is optional because we haven't chosen to force an
@@ -11696,8 +11696,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // Let's check whether the problem is related to optionality of base
       // type, or there is no member with a given name.
       result =
-          performMemberLookup(kind, member, baseObjTy->getOptionalObjectType(),
-                              functionRefInfo, locator,
+          performMemberLookup(kind, member, unwrapTy, functionRefInfo, locator,
                               /*includeInaccessibleMembers*/ true);
 
       if (result.OverallResult == MemberLookupResult::Unsolved)
@@ -11707,6 +11706,21 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // let's fallback to a "not such member" fix.
       if (result.ViableCandidates.empty() && result.UnviableCandidates.empty())
         return fixMissingMember(origBaseTy, memberTy, locator);
+
+      // If we have a subscript dynamic member we can't attempt the member
+      // constraint since the applicable function won't be on the correct
+      // type var. Just unconditionally record the fix since we know we at
+      // least have a candidate.
+      if (locator->isSubscriptMemberRef() &&
+          unwrapTy->getMetatypeInstanceType()
+              ->hasDynamicMemberLookupAttribute()) {
+        if (recordFix(UnwrapOptionalBase::create(*this, member, baseObjTy,
+                                                 locator))) {
+          return SolutionKind::Error;
+        }
+        recordTypeVariablesAsHoles(memberTy);
+        return SolutionKind::Solved;
+      }
 
       bool baseIsKeyPathRootType = [&]() {
         auto keyPathComponent =
@@ -11741,9 +11755,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       addDisjunctionConstraint(optionalities, locator);
 
       // Look through one level of optional.
-      addValueMemberConstraint(baseObjTy->getOptionalObjectType(), member,
-                               innerTV, useDC, functionRefInfo,
-                               outerAlternatives, locator);
+      addValueMemberConstraint(unwrapTy, member, innerTV, useDC,
+                               functionRefInfo, outerAlternatives, locator);
       return SolutionKind::Solved;
     }
 
