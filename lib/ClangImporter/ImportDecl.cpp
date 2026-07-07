@@ -386,7 +386,6 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
         break;
       case clang::TargetInfo::AArch64ABIBuiltinVaList:
         break;
-      case clang::TargetInfo::PNaClABIBuiltinVaList:
       case clang::TargetInfo::SystemZBuiltinVaList:
       case clang::TargetInfo::X86_64ABIBuiltinVaList:
       case clang::TargetInfo::XtensaABIBuiltinVaList:

@@ -232,7 +232,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::KFreeBSD:
   case llvm::Triple::Lv2:
   case llvm::Triple::Mesa3D:
-  case llvm::Triple::NaCl:
   case llvm::Triple::NetBSD:
   case llvm::Triple::NVCL:
   case llvm::Triple::PS5:
