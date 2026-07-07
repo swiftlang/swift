@@ -953,7 +953,13 @@ if(SWIFT_PATH_TO_CMARK_BUILD)
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   message(STATUS "CMark Version: ${_CMARK_VERSION}")
 elseif(SWIFT_INCLUDE_TOOLS AND NOT "cmark" IN_LIST LLVM_EXTERNAL_PROJECTS)
-  find_package(cmark-gfm CONFIG REQUIRED)
+  # Try to find cmark-gfm, but don't fail the whole configuration if it's
+  # missing - disable tools that depend on it instead.
+  find_package(cmark-gfm CONFIG QUIET)
+  if(NOT TARGET cmark-gfm::cmark AND NOT cmark_gfm_FOUND)
+    message(WARNING "cmark-gfm not found; disabling Swift tools that depend on cmark-gfm")
+    set(SWIFT_INCLUDE_TOOLS FALSE)
+  endif()
 endif()
 message(STATUS "")
 

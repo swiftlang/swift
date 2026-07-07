@@ -350,6 +350,10 @@ AsyncTask::~AsyncTask() {
     #endif
   }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
+  taskRegistryRemove(this);
+#endif
+
   Private.destroy();
 
   concurrency::trace::task_destroy(this);
@@ -399,10 +403,6 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   // swift_task_complete should have been run, which will have torn down
   // the task-local allocator.  There's actually nothing else to clean up
   // here.
-
-#if !SWIFT_CONCURRENCY_EMBEDDED
-  taskRegistryRemove(task);
-#endif
 
   SWIFT_TASK_DEBUG_LOG("Destroyed task %p", task);
   swift_slowDealloc(task, 0, alignof(AsyncTask) - 1);

@@ -10,31 +10,29 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A global singly-linked list of all live AsyncTask objects.
-// Protected by a single LazyMutex; intended for debugger / tool enumeration.
+// A global lock-free singly-linked list of all live AsyncTask objects.
+// Intended for debugger / tool enumeration.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_CONCURRENCY_TASKREGISTRY_H
 #define SWIFT_CONCURRENCY_TASKREGISTRY_H
 
+#include <atomic>
+
 #include "swift/ABI/Task.h"
 #include "swift/Runtime/Config.h"
 
 namespace swift {
 
-struct TaskRegistryNode {
-  AsyncTask *task;
-  TaskRegistryNode *next;
-};
+static constexpr size_t TaskRegistryShardCount = 16;
 
-/// Head of the global live-task linked list.
-/// Walk via node->next; node->task points to a live AsyncTask.
-/// Guarded by the internal RegistryLock in TaskRegistry.cpp.
-/// Exported so that LLDB and swift-inspect can locate the list without a
+/// Head pointers for the global live-task registry shards.
+/// Walk each shard via task->_private().registryNext; the low bit marks logical delete.
+/// Exported so that LLDB and swift-inspect can locate the lists without a
 /// new runtime API.
 SWIFT_EXPORT_FROM(swift_Concurrency)
-extern TaskRegistryNode *_swift_concurrency_task_registry;
+extern std::atomic<AsyncTask *> _swift_concurrency_task_registry[TaskRegistryShardCount];
 
 /// Register a newly created task. Must be called after full initialization.
 void taskRegistryInsert(AsyncTask *task);
