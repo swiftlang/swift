@@ -133,6 +133,26 @@ StringBreadcrumbsTests.test("stale breadcrumbs") {
   expectEqual(oldLen + 1, str.utf16.count)
 }
 
+// Cover the `precalculatedUTF16Count` (a.k.a. "one crumb") path of
+// `_StringBreadcrumbs.init`. Strings created from UTF-16 stash their UTF-16
+// count in the breadcrumbs slot; when full breadcrumbs are first needed, that
+// count is threaded through `_StringBreadcrumbs.init(precalculatedUTF16Count:)`
+// instead of being rescanned.
+StringBreadcrumbsTests.test("one-crumb strings from UTF-16") {
+  let inputs = [
+    String(repeating: "0123456789", count: 8),          // 80 ASCII units
+    String(repeating: "是", count: 70),                  // 70 3-byte units
+    String(repeating: "𓀀", count: 70),                  // 140 surrogate units
+    "a" + String(repeating: "𓀀", count: 70),            // misaligned pairs
+    largeUnicode + largeUnicode + largeUnicode,          // mixed content
+  ]
+  for input in inputs {
+    let fromUTF16 = String(decoding: Array(input.utf16), as: UTF16.self)
+    expectEqual(input, fromUTF16)
+    validateBreadcrumbs(fromUTF16)
+  }
+}
+
 
 
 runAllTests()
