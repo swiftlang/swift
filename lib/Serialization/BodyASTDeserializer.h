@@ -104,7 +104,7 @@ public:
   /// Deserializes ALL body blocks from the given bitstream data.
   /// Returns a map from DeclID → root BraceStmt.
   /// Each body block has its own ExprID/StmtID space (cleared per block).
-  std::map<serialization::DeclID, BraceStmt *>
+  std::vector<std::pair<serialization::DeclID, BraceStmt *>>
   deserializeAllBodies(ArrayRef<uint8_t> bitstreamData);
 
   /// Returns the number of EXPR_NODE records deserialized.

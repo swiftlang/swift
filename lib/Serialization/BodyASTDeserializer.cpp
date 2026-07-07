@@ -1397,9 +1397,9 @@ BraceStmt *BodyASTDeserializer::deserializeBody(ArrayRef<uint8_t> bitstreamData)
   return nullptr;
 }
 
-std::map<serialization::DeclID, BraceStmt *>
+std::vector<std::pair<serialization::DeclID, BraceStmt *>>
 BodyASTDeserializer::deserializeAllBodies(ArrayRef<uint8_t> bitstreamData) {
-  std::map<serialization::DeclID, BraceStmt *> result;
+  std::vector<std::pair<serialization::DeclID, BraceStmt *>> result;
 
   ArrayRef<uint8_t> data = bitstreamData;
   if (data.size() >= 4 && data[0] == 0xE2 && data[1] == 0x9C &&
@@ -1476,10 +1476,13 @@ BodyASTDeserializer::deserializeAllBodies(ArrayRef<uint8_t> bitstreamData) {
         // Look up the root BraceStmt.
         if (funcDeclID > 0 && rootStmtID > 0 &&
             rootStmtID <= StmtTable.size()) {
-          if (auto *BS = dyn_cast_or_null<BraceStmt>(StmtTable[rootStmtID - 1]))
-            result[funcDeclID] = BS;
+          if (auto *BS = dyn_cast_or_null<BraceStmt>(StmtTable[rootStmtID - 1])) {
+          // Use a simple vector — no hashing, no grow, no contiguous bucket
+          // array to corrupt. If this still crashes, the corruption is
+          // happening to StmtTable/ExprTable or the stack itself.
+          result.push_back({funcDeclID, BS});
+          }
         }
-        continue;
       }
       // For MODULE_BLOCK, ENTER it to find nested body blocks.
       // Skip all other sub-blocks.
