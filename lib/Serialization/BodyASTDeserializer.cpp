@@ -1417,6 +1417,7 @@ BodyASTDeserializer::deserializeAllBodies(ArrayRef<uint8_t> bitstreamData) {
     }
     llvm::BitstreamEntry entry = maybeEntry.get();
 
+
     if (entry.Kind == llvm::BitstreamEntry::SubBlock) {
       if (entry.ID == ASTCACHE_BODY_BLOCK_ID) {
         if (llvm::Error Err = cursor.EnterSubBlock(ASTCACHE_BODY_BLOCK_ID)) {
@@ -1435,7 +1436,7 @@ BodyASTDeserializer::deserializeAllBodies(ArrayRef<uint8_t> bitstreamData) {
 
         while (true) {
           llvm::Expected<llvm::BitstreamEntry> maybeE =
-              cursor.advance(llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
+              cursor.advance();
           if (!maybeE) {
             consumeError(maybeE.takeError());
             break;
@@ -1501,7 +1502,12 @@ BodyASTDeserializer::deserializeAllBodies(ArrayRef<uint8_t> bitstreamData) {
     }
     if (entry.Kind == llvm::BitstreamEntry::Error)
       break;
-    // Skip records and end blocks.
+    // EndBlock — already popped by advance() without AF_DontPopBlockAtEnd.
+    // Skip records — must read the record data to advance past it.
+    if (entry.Kind == llvm::BitstreamEntry::Record) {
+      SmallVector<uint64_t, 64> scratch;
+      llvm::consumeError(cursor.readRecord(entry.ID, scratch).takeError());
+    }
   }
 
   return result;

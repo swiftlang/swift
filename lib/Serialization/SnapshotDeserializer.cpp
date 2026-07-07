@@ -797,17 +797,14 @@ private:
             return mf->getIdentifier(iid);
           });
       auto bodies = bodyDeser.deserializeAllBodies(bitstreamData8);
+      fprintf(stderr, "DEBUG: bodies.size()=%zu\n", bodies.size());
       // Resolve each body's DeclID to an AbstractFunctionDecl and set its body.
       for (auto &kv : bodies) {
         auto *D = mf->getDecl(kv.first);
         if (!D) continue;
         auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
+        if (!AFD) continue;
         auto *body = kv.second;
-        // Set the deserialized body on the function.
-        // contains fully type-checked AST nodes (not ErrorExpr placeholders),
-        // so this is safe for both -verify-ast-cache (JSON dump) and -emit-object
-        // (SILGen). Cache the ParseAbstractFunctionBodyRequest so the body is
-        // returned without re-parsing.
         if (body) {
           AFD->setBody(body, AbstractFunctionDecl::BodyKind::Parsed);
           ctx.evaluator.cacheOutput(ParseAbstractFunctionBodyRequest{AFD},
