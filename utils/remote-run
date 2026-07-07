@@ -116,7 +116,9 @@ class CommandRunner(object):
     def mkdirs_remote(self, directories):
         if directories:
             mkdir_command = ['/bin/mkdir', '-p'] + directories
-            self.run_remote(mkdir_command)
+            result = self.run_remote(mkdir_command)
+            if result is not None:
+                _exit_propagating_remote_signal(*result)
 
     def send(self, input_prefix, remote_prefix, local_to_remote_files):
         # Prepare the remote directory structure.
@@ -186,15 +188,13 @@ class CommandRunner(object):
 
             # Process error code
             if remote_proc.returncode:
-                # FIXME: We may still want to fetch the output files to see what
-                # went wrong.
-                _exit_propagating_remote_signal(remote_proc.returncode, stdout, stderr)
+                return (remote_proc.returncode, stdout, stderr)
             else:
                 # Nothing went wrong. Return
                 return
 
         if attempt > 3 and remote_proc is not None:
-            _exit_propagating_remote_signal(remote_proc.returncode, stdout, stderr)
+            return (remote_proc.returncode, stdout, stderr)
 
     def run_rsync(self, invocation, sources):
         attempt = 1
@@ -512,7 +512,9 @@ def main():
     output_dir = posixpath.join(args.remote_dir, args.remote_output_prefix)
 
     if args.output_prefix:
-        runner.run_remote(['/bin/rm', '-rf', output_dir])
+        result = runner.run_remote(['/bin/rm', '-rf', output_dir])
+        if result is not None:
+            _exit_propagating_remote_signal(*result)
 
     dirs = set()
     for output in path_set.outputs:
@@ -535,7 +537,7 @@ def main():
         runner.send(posixpath.dirname(args.output_prefix),
                     output_dir, path_set.existing_nodir_outputs)
 
-    runner.run_remote(argproc.args, envproc.env)
+    run_result = runner.run_remote(argproc.args, envproc.env)
 
     if path_set.outputs:
         runner.fetch(args.output_prefix, output_dir, path_set.outputs)
@@ -543,6 +545,9 @@ def main():
     if path_set.nodir_outputs:
         runner.fetch(posixpath.dirname(args.output_prefix),
                      output_dir, path_set.nodir_outputs)
+
+    if run_result is not None:
+        _exit_propagating_remote_signal(*run_result)
 
 if __name__ == "__main__":
     main()
