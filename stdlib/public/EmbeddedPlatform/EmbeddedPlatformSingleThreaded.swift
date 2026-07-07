@@ -12,38 +12,43 @@
 
 fileprivate struct SingleThreadedMutex {
   var checked: Bool
-  var locked: Bool
+  var recursive: Bool
+  var lockCount: UInt
 }
 
 @implementation @c
 public func _swift_mutex_init(
   _ mutex: UnsafeMutableRawPointer,
-  _ checked: Int
+  _ flags: SwiftMutexFlags
 ) {
   let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
   storage.pointee = SingleThreadedMutex(
-    checked: checked != 0,
-    locked: false)
+    checked: flags.contains(.checked),
+    recursive: flags.contains(.recursive),
+    lockCount: 0)
 }
 
 @implementation @c
 public func _swift_mutex_destroy(_ mutex: UnsafeMutableRawPointer) {
   let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
-  if storage.pointee.checked && storage.pointee.locked {
+  if storage.pointee.checked && storage.pointee.lockCount != 0 {
     fatalError("destroying a locked mutex")
   }
 
-  storage.pointee = SingleThreadedMutex(checked: false, locked: false)
+  storage.pointee = SingleThreadedMutex(
+    checked: false,
+    recursive: false,
+    lockCount: 0)
 }
 
 @implementation @c
 public func _swift_mutex_lock(_ mutex: UnsafeMutableRawPointer) {
   let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
   if storage.pointee.checked {
-    if storage.pointee.locked {
+    if storage.pointee.lockCount != 0 && !storage.pointee.recursive {
       fatalError("locking an already locked mutex")
     }
-    storage.pointee.locked = true
+    storage.pointee.lockCount += 1
   }
 }
 
@@ -51,10 +56,10 @@ public func _swift_mutex_lock(_ mutex: UnsafeMutableRawPointer) {
 public func _swift_mutex_unlock(_ mutex: UnsafeMutableRawPointer) {
   let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
   if storage.pointee.checked {
-    if !storage.pointee.locked {
+    if storage.pointee.lockCount == 0 {
       fatalError("unlocking an unlocked mutex")
     }
-    storage.pointee.locked = false
+    storage.pointee.lockCount -= 1
   }
 }
 
@@ -62,10 +67,10 @@ public func _swift_mutex_unlock(_ mutex: UnsafeMutableRawPointer) {
 public func _swift_mutex_tryLock(_ mutex: UnsafeMutableRawPointer) -> Int {
   let storage = mutex.assumingMemoryBound(to: SingleThreadedMutex.self)
   if storage.pointee.checked {
-    if storage.pointee.locked {
+    if storage.pointee.lockCount != 0 && !storage.pointee.recursive {
       return 0
     }
-    storage.pointee.locked = true
+    storage.pointee.lockCount += 1
   }
   return 1
 }

@@ -23,7 +23,7 @@
 // REQUIRES: swift_feature_Extern
 
 @_extern(c, "_swift_mutex_init")
-func _swift_mutex_init(_: UnsafeMutableRawPointer, _: Int)
+func _swift_mutex_init(_: UnsafeMutableRawPointer, _: CUnsignedLongLong)
 
 @_extern(c, "_swift_mutex_destroy")
 func _swift_mutex_destroy(_: UnsafeMutableRawPointer)
@@ -50,29 +50,32 @@ func withMutexStorage(_ body: (UnsafeMutableRawPointer) -> Void) {
   }
 }
 
+let checked: CUnsignedLongLong = 0x01
+let recursive: CUnsignedLongLong = 0x02
+
 @main
 struct Main {
   static func main() {
 #if LOCK_LOCKED
     withMutexStorage { mutex in
-      _swift_mutex_init(mutex, 1)
+      _swift_mutex_init(mutex, checked)
       _swift_mutex_lock(mutex)
       _swift_mutex_lock(mutex)
     }
 #elseif UNLOCK_UNLOCKED
     withMutexStorage { mutex in
-      _swift_mutex_init(mutex, 1)
+      _swift_mutex_init(mutex, checked)
       _swift_mutex_unlock(mutex)
     }
 #elseif DESTROY_LOCKED
     withMutexStorage { mutex in
-      _swift_mutex_init(mutex, 1)
+      _swift_mutex_init(mutex, checked)
       _swift_mutex_lock(mutex)
       _swift_mutex_destroy(mutex)
     }
 #else
     withMutexStorage { mutex in
-      _swift_mutex_init(mutex, 1)
+      _swift_mutex_init(mutex, checked)
       check(_swift_mutex_tryLock(mutex) != 0)
       check(_swift_mutex_tryLock(mutex) == 0)
       _swift_mutex_unlock(mutex)
@@ -83,7 +86,7 @@ struct Main {
 
       _swift_mutex_destroy(mutex)
 
-      _swift_mutex_init(mutex, 1)
+      _swift_mutex_init(mutex, checked)
       check(_swift_mutex_tryLock(mutex) != 0)
       _swift_mutex_unlock(mutex)
       _swift_mutex_destroy(mutex)
@@ -93,6 +96,17 @@ struct Main {
       _swift_mutex_init(mutex, 0)
       _swift_mutex_lock(mutex)
       check(_swift_mutex_tryLock(mutex) != 0)
+      _swift_mutex_unlock(mutex)
+      _swift_mutex_unlock(mutex)
+      _swift_mutex_destroy(mutex)
+    }
+
+    withMutexStorage { mutex in
+      _swift_mutex_init(mutex, checked | recursive)
+      _swift_mutex_lock(mutex)
+      _swift_mutex_lock(mutex)
+      check(_swift_mutex_tryLock(mutex) != 0)
+      _swift_mutex_unlock(mutex)
       _swift_mutex_unlock(mutex)
       _swift_mutex_unlock(mutex)
       _swift_mutex_destroy(mutex)

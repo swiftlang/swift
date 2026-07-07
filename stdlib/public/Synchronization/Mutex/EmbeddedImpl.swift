@@ -18,7 +18,7 @@ internal typealias _SwiftEmbeddedMutex = [6 of UInt]
 @usableFromInline
 internal func _swift_mutex_init(
   _ mutex: UnsafeMutableRawPointer,
-  _ checked: Int
+  _ flags: CUnsignedLongLong
 )
 
 @_extern(c, "_swift_mutex_destroy")
