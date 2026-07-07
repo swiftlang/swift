@@ -461,7 +461,7 @@ class FieldRecordImpl : public FieldRecordBase {
 public:
   FieldRecordImpl(RemoteRef<const FieldRecord> FR, TypeRefBuilder &Builder)
       : FieldRecordBase(FR->isIndirectCase(), FR->isVar(),
-                             FR->hasMangledTypeName()),
+                        FR->hasMangledTypeName(), FR->isArtificial()),
         Field(FR), Builder(Builder) {}
 
   ~FieldRecordImpl() override {}
@@ -560,7 +560,7 @@ bool TypeRefBuilder::getFieldTypeRefs(
     bool IsIndirect = FD.isEnum() && Field->IsIndirectCase;
 
     auto FieldTI = FieldTypeInfo(FieldName.str(), FieldValue, Substituted,
-                                 IsIndirect, IsGeneric);
+                                 IsIndirect, IsGeneric, Field->IsArtificial);
     Fields.push_back(FieldTI);
   }
   return true;
