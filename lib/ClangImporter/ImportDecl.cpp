@@ -2414,16 +2414,24 @@ namespace {
 
       // Recursively walk a record's fields (and C++ bases) to determine
       // the cause of non-triviality. Returns the "worst" cause found.
+      bool cxxInteropEnabled =
+          Impl.SwiftContext.LangOpts.EnableCXXInterop;
       auto classifyNonTrivialRecord =
-          [](const clang::RecordDecl *decl,
+          [cxxInteropEnabled](const clang::RecordDecl *decl,
              auto &self) -> NonTrivialCause {
             if (!decl->isCompleteDefinition())
               return NonTrivialCause::Other;
 
             if (auto *cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
-              if (cxxDecl->hasUserDeclaredCopyConstructor() ||
-                  cxxDecl->hasUserDeclaredDestructor())
-                return NonTrivialCause::UserProvidedCxx;
+              if (cxxInteropEnabled) {
+                if (cxxDecl->hasNonTrivialCopyConstructor() ||
+                    cxxDecl->hasNonTrivialDestructor())
+                  return NonTrivialCause::UserProvidedCxx;
+              } else {
+                if (cxxDecl->hasUserDeclaredCopyConstructor() ||
+                    cxxDecl->hasUserDeclaredDestructor())
+                  return NonTrivialCause::UserProvidedCxx;
+              }
             }
 
             // Reject types with non-trivial fields inside unions.
