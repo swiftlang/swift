@@ -3418,6 +3418,23 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose situations when a key path dynamic member lookup expects
+/// a `ReferenceWritableKeyPath` but the base is not a class and so
+/// the argument is `WritableKeyPath`.
+class NonClassBaseInDynamicMemberLookup final : public FailureDiagnostic {
+  Type BaseType;
+  ValueDecl *Member;
+
+public:
+  NonClassBaseInDynamicMemberLookup(const Solution &solution, Type baseType,
+                                    ValueDecl *member,
+                                    ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), BaseType(resolveType(baseType)),
+        Member(member) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

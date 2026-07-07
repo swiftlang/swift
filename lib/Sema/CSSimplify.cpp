@@ -39,6 +39,8 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/CSFix.h"
+#include "swift/Sema/Constraint.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
@@ -4340,7 +4342,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         // If the path ends at `optional payload` it means that this
         // check is part of an implicit value-to-optional conversion,
         // and it could be safely dropped.
-        if (!path.empty() && path.back().is<LocatorPathElt::OptionalInjection>())
+        while (!path.empty() &&
+               path.back().is<LocatorPathElt::OptionalInjection>())
           path.pop_back();
 
         // Determine whether this conformance mismatch is
@@ -4402,27 +4405,44 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           if (last.is<LocatorPathElt::InstanceType>())
             return SolutionKind::Error;
 
+          // Fail here and let the generic argument matching handle the failure
+          // because we need to present complete types in the diagnostic and
+          // point to the mismatching location(s).
+          if (last.is<LocatorPathElt::GenericArgument>())
+            return SolutionKind::Error;
+
+          if (last.is<LocatorPathElt::CoercionOperand>()) {
+            auto *fix = ContextualMismatch::create(
+                *this, type1, type2, getConstraintLocator(anchor, path));
+            if (recordFix(fix))
+              return SolutionKind::Error;
+            break;
+          }
+
+          if (last.is<LocatorPathElt::ContextualType>() ||
+              last.is<LocatorPathElt::EnumPatternImplicitCastMatch>() ||
+              last.is<LocatorPathElt::SequenceElementType>()) {
+            auto proto = protoDecl->getDeclaredInterfaceType();
+            auto *fix = MissingConformance::forContextual(
+                *this, type1, proto, getConstraintLocator(anchor, path));
+
+            if (recordFix(fix))
+              return SolutionKind::Error;
+
+            break;
+          }
         } else { // There are no elements in the path
-          if (!(isExpr<AssignExpr>(anchor) || isExpr<CoerceExpr>(anchor)))
-            return SolutionKind::Error;
-        }
-
-        if (isExpr<CoerceExpr>(anchor)) {
-          auto *fix = ContextualMismatch::create(
-              *this, type1, type2, getConstraintLocator(anchor, path));
-          if (recordFix(fix))
-            return SolutionKind::Error;
-          break;
-        }
-
-        auto proto = protoDecl->getDeclaredInterfaceType();
-        auto *fix = MissingConformance::forContextual(
-            *this, type1, proto, getConstraintLocator(anchor, path));
-
-        if (recordFix(fix))
+          if (isExpr<AssignExpr>(anchor)) {
+            auto *fix = ContextualMismatch::create(
+                *this, type1, type2, getConstraintLocator(anchor, path));
+            if (recordFix(fix))
+              return SolutionKind::Error;
+            break;
+          }
           return SolutionKind::Error;
+        }
 
-        break;
+        return SolutionKind::Error;
       }
     }
   }
@@ -4819,6 +4839,19 @@ ConstraintSystem::matchTypesBindTypeVar(
                : SolutionKind::Error;
   }
 
+  // If a type assigned to a synthesized argument has type variables
+  // it should be possible to assign holes to them because it's not
+  // guaranteed that they could always be resolved from the context.
+  //
+  // For example, when a parameter has a function type that returns
+  // a generic parameter, if it's not connected to anything else i.e.
+  // doesn't appear in other parameter positions or there is no
+  // contextual type for the call when it's a result, it won't be
+  // possible to resolve.
+  if (typeVar->getImpl().isSynthesizedArgument()) {
+    recordAnyTypeVarAsPotentialHole(type);
+  }
+
   assignFixedType(typeVar, type, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
@@ -5040,7 +5073,8 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   // `let _: Bool = try? foo()` and `foo()` produces `Int`
   // we should diagnose it as type mismatch instead of missing unwrap.
   bool possibleContextualMismatch = [&]() {
-    if (!locator.endsWith<LocatorPathElt::ContextualType>())
+    if (!(locator.endsWith<LocatorPathElt::ContextualType>() ||
+          locator.endsWith<LocatorPathElt::Condition>()))
       return false;
 
     // If the contextual type is optional as well, it's definitely a
@@ -6784,6 +6818,9 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
+    if (hasAnyRestriction())
+      return false;
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       return true;
@@ -6829,6 +6866,9 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
+    if (hasAnyRestriction())
+      return false;
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       return true;
@@ -6839,6 +6879,12 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(
             CollectionElementContextualMismatch::create(
                 *this, lhs, rhs, getConstraintLocator(anchor, path)));
+        return true;
+      }
+      if (path.back().is<LocatorPathElt::ApplyArgToParam>()) {
+        conversionsOrFixes.push_back(
+            AllowArgumentMismatch::create(*this, lhs, rhs,
+                                          getConstraintLocator(anchor, path)));
         return true;
       }
     }
@@ -6896,6 +6942,11 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::PatternMatch: {
+    // Let's let the matching (i.e. deep equality) happen before attempting any
+    // fixes for patterns.
+    if (hasAnyRestriction())
+      return false;
+
     auto *pattern = elt.castTo<LocatorPathElt::PatternMatch>().getPattern();
 
     // TODO: We ought to introduce a new locator element for this.
@@ -11392,7 +11443,8 @@ static ConstraintFix *fixMemberRef(
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
       return TreatRValueAsLValue::create(cs, cs.getConstraintLocator(locator));
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
-      break;
+      return IgnoreClassRequirementForDynamicMemberLookup::create(
+          cs, baseTy, choice.getDecl(), cs.getConstraintLocator(locator));
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
       return AllowAnyObjectKeyPathRoot::create(cs, locator);
 
@@ -11488,10 +11540,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // If the base type of this member lookup is a "hole" there is no
   // reason to perform a lookup because it wouldn't return any results.
   if (shouldAttemptFixes()) {
-    auto markMemberTypeAsPotentialHole = [&](Type memberTy) {
-      recordAnyTypeVarAsPotentialHole(simplifyType(memberTy));
-    };
-
     // If this is an unresolved member ref e.g. `.foo` and its contextual base
     // type has been determined to be a "hole", let's mark the resulting member
     // type as a potential hole and continue solving.
@@ -11543,14 +11591,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             return SolutionKind::Error;
         }
 
-        markMemberTypeAsPotentialHole(memberTy);
+        recordTypeVariablesAsHoles(memberTy);
         return SolutionKind::Solved;
       }
     } else if (kind == ConstraintKind::ValueMember &&
                baseObjTy->getMetatypeInstanceType()->isPlaceholder()) {
       // If base type is a "hole" there is no reason to record any
       // more "member not found" fixes for chained member references.
-      markMemberTypeAsPotentialHole(memberTy);
+      recordTypeVariablesAsHoles(memberTy);
       return SolutionKind::Solved;
     }
   }
@@ -14625,6 +14673,27 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (restriction != ConversionRestrictionKind::PointerToPointer)
       increaseScore(ScoreKind::SK_ValueToPointerConversion, locator);
 
+    // Since this match doesn't add any custom path elements, let's drop
+    // `OptionalInjection` to avoid confusing generic argument matching.
+    // This is important, for example, in situations like
+    // `inout T` -> `UnsafePointer<U>?` in argument positions,
+    // `inout T` would be "injected" into optional by unwrapping `UnsafePointer`
+    // so the only match that matters here is pointers and their
+    // `Pointee` generic parameters.
+    if (shouldAttemptFixes()) {
+      if (locator.endsWith<LocatorPathElt::OptionalInjection>()) {
+        SmallVector<LocatorPathElt, 2> path;
+        auto anchor = locator.getLocatorParts(path);
+
+        while (!path.empty() &&
+               path.back().is<LocatorPathElt::OptionalInjection>()) {
+          path.pop_back();
+        }
+
+        locator = getConstraintLocator(anchor, path);
+      }
+    }
+
     auto result =
         matchTypes(baseType1.getPointer(), baseType2.getPointer(),
                    ConstraintKind::BindToPointerType, subflags, locator);
@@ -14677,6 +14746,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (loc->isForAssignment() || loc->isForCoercion() ||
         loc->isForContextualType() ||
         loc->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
+        loc->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>() ||
         loc->isForOptionalTry()) {
       if (restriction == ConversionRestrictionKind::Superclass) {
         if (auto *fix = CoerceToCheckedCast::attempt(
@@ -16069,6 +16139,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TooManyDynamicMemberLookups:
   case FixKind::IgnoreNonMetatypeDynamicType:
   case FixKind::IgnoreIsolatedConformance:
+  case FixKind::IgnoreClassRequirementForDynamicMemberLookup:
     llvm_unreachable("handled elsewhere");
   }
 
