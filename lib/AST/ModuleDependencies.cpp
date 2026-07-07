@@ -674,7 +674,6 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
 
   {
     clang::dependencies::DependencyScanningServiceOptions opts;
-    opts.Format = clang::dependencies::ScanningOutputFormat::FullIncludeTree;
     // The current working directory optimization (off by default) should not
     // impact CAS. We set the optization to all to be consistent with the
     // non-CAS case.
