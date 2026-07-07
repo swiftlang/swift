@@ -1435,6 +1435,196 @@ static NominalTypeDecl *pickStaticKeyPathClass(IRGenModule &IGM,
   return nominal;
 }
 
+namespace {
+/// Per-component decision data driving the static-instance emitter.
+///
+/// The `emitStaticKeyPathInstance` fast path serializes a single
+/// `KeyPathPatternComponent` into a fixed on-disk layout.  This POD is the
+/// bridge between the "figure out what to emit" phase and the "assemble the
+/// constant" phase.  It speaks in *semantic* fields — the kind of
+/// component, its offset (for stored/tuple), its getter/setter SIL
+/// references (for computed) — leaving `KeyPathComponentHeader` as the
+/// sole authority on the ABI bit layout of the header word.
+struct StaticKeyPathComponentLayout {
+  enum class Kind {
+    /// Struct member or tuple element — same encoding
+    /// (`_SwiftKeyPathComponentHeader_StructTag`), with `isLet` false for
+    /// tuple elements (there is no `let` tuple element).
+    StructOrTuple,
+    /// Class member (`_SwiftKeyPathComponentHeader_ClassTag`).
+    Class,
+    /// Get-only or settable computed property, or unapplied method
+    /// (`_SwiftKeyPathComponentHeader_ComputedTag`).  See `computedKind`
+    /// for the get-only vs settable-mutating vs settable-nonmutating split.
+    Computed,
+  };
+
+  Kind kind;
+
+  /// For `StructOrTuple` / `Class`: whether the property is `let`.  Drives
+  /// the header's `StoredMutableFlag` bit.  Always `false` for tuple
+  /// elements.  Unused for `Computed`.
+  bool isLet = false;
+
+  /// For `StructOrTuple` / `Class`: byte offset of the field within its
+  /// container.  The emitter picks between inline-in-header and
+  /// out-of-line-trailing-word encoding via
+  /// `KeyPathComponentHeader::offsetCanBeInline`.  Unused for `Computed`.
+  uint32_t offset = 0;
+
+  /// For `Computed`: whether the component is get-only (also used for
+  /// `Method`), settable-mutating (struct default), or settable-
+  /// nonmutating (class default, or `nonmutating set` on a struct).
+  /// Unused for stored components.
+  KeyPathComponentHeader::ComputedPropertyKind computedKind =
+      KeyPathComponentHeader::GetOnly;
+
+  /// For `Computed`: the getter SIL function pointer.  Used both as the
+  /// component's `id` (unsigned identity) and as the ptr-auth-signed
+  /// getter slot.  Null for stored components.
+  llvm::Constant *getter = nullptr;
+
+  /// For `Computed`: the setter SIL function pointer, when
+  /// `computedKind != GetOnly`.  Null otherwise.
+  llvm::Constant *setter = nullptr;
+};
+} // end anonymous namespace
+
+/// Compute the per-component layout of a single embedded-Swift static
+/// key path component, driving off its `Kind`.
+///
+/// This is the sole place the switch-over-`Kind` lives on the IRGen side
+/// (mirroring the class-picking switch in `KeyPathInst::
+/// getStaticInstanceClassType()`); the actual constant assembler in
+/// `emitStaticKeyPathInstance` is then straight-line and format-only,
+/// turning the semantic fields into `KeyPathComponentHeader` bits at
+/// emission time via `encodeStaticKeyPathComponentHeader`.
+static StaticKeyPathComponentLayout
+computeStaticKeyPathComponentLayout(IRGenModule &IGM,
+                                    const KeyPathPatternComponent &comp,
+                                    CanType rootTy) {
+  StaticKeyPathComponentLayout layout;
+  auto rootSILTy =
+      SILType::getPrimitiveObjectType(rootTy->getCanonicalType());
+
+  switch (comp.getKind()) {
+  case KeyPathPatternComponent::Kind::StoredProperty: {
+    auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
+    layout.isLet = property->isLet();
+
+    if (rootTy->getStructOrBoundGenericStruct()) {
+      layout.kind = StaticKeyPathComponentLayout::Kind::StructOrTuple;
+      auto *fixedOffset =
+          emitPhysicalStructMemberFixedOffset(IGM, rootSILTy, property);
+      assert(fixedOffset &&
+             "embedded stored-property key path must have a fixed offset");
+      layout.offset = static_cast<uint32_t>(
+          cast<llvm::ConstantInt>(fixedOffset)->getValue().getZExtValue());
+    } else if (rootTy->getClassOrBoundGenericClass()) {
+      layout.kind = StaticKeyPathComponentLayout::Kind::Class;
+      auto *fixedOffset = tryEmitConstantClassFragilePhysicalMemberOffset(
+          IGM, rootSILTy, property);
+      assert(fixedOffset &&
+             "embedded class-ivar key path must have a fixed offset");
+      layout.offset = static_cast<uint32_t>(
+          cast<llvm::ConstantInt>(fixedOffset)->getValue().getZExtValue());
+    } else {
+      llvm_unreachable("stored-property key path on unsupported base");
+    }
+    return layout;
+  }
+  case KeyPathPatternComponent::Kind::TupleElement: {
+    assert(rootTy->is<TupleType>() && "tuple-element key path on non-tuple");
+    layout.kind = StaticKeyPathComponentLayout::Kind::StructOrTuple;
+    // Tuple elements are always mutable at the language level (no `let`
+    // tuple element).  The runtime reads them with the struct-tag
+    // discriminator (see `_projectReadOnly`), so we encode them the same
+    // way as struct members.
+    layout.isLet = false;
+    auto elementOffset =
+        getFixedTupleElementOffset(IGM, rootSILTy, comp.getTupleIndex());
+    assert(elementOffset &&
+           "embedded tuple-element key path must have a fixed offset");
+    layout.offset = static_cast<uint32_t>(elementOffset->getValue());
+    return layout;
+  }
+  case KeyPathPatternComponent::Kind::GettableProperty:
+  case KeyPathPatternComponent::Kind::SettableProperty:
+  case KeyPathPatternComponent::Kind::Method: {
+    layout.kind = StaticKeyPathComponentLayout::Kind::Computed;
+    bool settable =
+        comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty;
+    bool mutating = settable && comp.isComputedSettablePropertyMutating();
+
+    if (!settable) {
+      // `Method` and `GettableProperty` both encode as a computed get-only
+      // component: the pattern's "getter" is the method's implementation
+      // for `Method`, and the property's getter for `GettableProperty`.
+      layout.computedKind = KeyPathComponentHeader::GetOnly;
+    } else if (mutating) {
+      layout.computedKind = KeyPathComponentHeader::SettableMutating;
+    } else {
+      layout.computedKind = KeyPathComponentHeader::SettableNonmutating;
+    }
+
+    layout.getter = IGM.getAddrOfSILFunction(
+        comp.getComputedPropertyForGettable(), NotForDefinition);
+    if (settable) {
+      layout.setter = IGM.getAddrOfSILFunction(
+          comp.getComputedPropertyForSettable(), NotForDefinition);
+    }
+    return layout;
+  }
+  default:
+    llvm_unreachable("caller should have filtered other kinds");
+  }
+}
+
+/// Encode a `StaticKeyPathComponentLayout` into the pair of words the
+/// runtime expects: the `RawKeyPathComponent.Header` word, and (for
+/// stored/tuple components whose offset doesn't fit in the header
+/// payload) a trailing 32-bit out-of-line offset word.  This is the sole
+/// place the semantic layout maps onto `KeyPathComponentHeader` bits.
+static std::pair<KeyPathComponentHeader, std::optional<uint32_t>>
+encodeStaticKeyPathComponentHeader(
+    const StaticKeyPathComponentLayout &layout) {
+  switch (layout.kind) {
+  case StaticKeyPathComponentLayout::Kind::StructOrTuple:
+    if (KeyPathComponentHeader::offsetCanBeInline(layout.offset)) {
+      return {KeyPathComponentHeader::forStructComponentWithInlineOffset(
+                  layout.isLet, layout.offset),
+              std::nullopt};
+    }
+    return {KeyPathComponentHeader::forStructComponentWithOutOfLineOffset(
+                layout.isLet),
+            layout.offset};
+
+  case StaticKeyPathComponentLayout::Kind::Class:
+    if (KeyPathComponentHeader::offsetCanBeInline(layout.offset)) {
+      return {KeyPathComponentHeader::forClassComponentWithInlineOffset(
+                  layout.isLet, layout.offset),
+              std::nullopt};
+    }
+    return {KeyPathComponentHeader::forClassComponentWithOutOfLineOffset(
+                layout.isLet),
+            layout.offset};
+
+  case StaticKeyPathComponentLayout::Kind::Computed:
+    // Static instantiation: use the getter function pointer as the
+    // property identity.  The runtime uses a method descriptor pointer
+    // (class), a struct field index, or the getter function pointer
+    // (struct); embedded Swift never emits method descriptors, so a
+    // unique-per-property pointer is a simpler common encoding here.  The
+    // id field is not ptr-auth signed at runtime (see
+    // `RawKeyPathComponent._computedIDValue`), so we store it raw.
+    return {KeyPathComponentHeader::forComputedProperty(
+                layout.computedKind, KeyPathComponentHeader::Pointer,
+                /*hasArguments=*/false, KeyPathComponentHeader::Resolved),
+            std::nullopt};
+  }
+  llvm_unreachable("unhandled StaticKeyPathComponentLayout::Kind");
+}
+
 llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
   assert(canEmitStaticKeyPathInstance(KPI) &&
          "callers must check canEmitStaticKeyPathInstance() first");
@@ -1460,139 +1650,20 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
           ->getCanonicalType();
   llvm::Constant *metadata = getAddrOfTypeMetadata(concreteKeyPathTy);
 
-  // Compute the component header word, an optional out-of-line offset word
-  // (stored/tuple components), and an optional list of pointer-sized fields
-  // to lay out after a component-level `pointerAlignmentSkew` (computed
-  // components: id, getter, [setter]).
-  auto rootSILTy =
-      SILType::getPrimitiveObjectType(rootTy->getCanonicalType());
-
-  uint32_t componentHeaderWord = 0;
+  // Compute the per-component layout (semantic form) and encode it into
+  // the header word + optional out-of-line offset word.  For identity
+  // (no components) both are absent.
+  std::optional<StaticKeyPathComponentLayout> compLayout;
+  std::optional<KeyPathComponentHeader> componentHeader;
   std::optional<uint32_t> outOfLineOffsetWord;
-  llvm::Constant *computedGetterFn = nullptr;
-  llvm::Constant *computedSetterFn = nullptr;
-  bool computedSetterIsMutating = false;
-
   if (hasComponent) {
-    const auto &comp = components[0];
-    switch (comp.getKind()) {
-    case KeyPathPatternComponent::Kind::StoredProperty: {
-      auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
-      bool isLet = property->isLet();
-
-      if (rootTy->getStructOrBoundGenericStruct()) {
-        auto *fixedOffset =
-            emitPhysicalStructMemberFixedOffset(*this, rootSILTy, property);
-        assert(fixedOffset &&
-               "embedded stored-property key path must have a fixed offset");
-        auto offset =
-            cast<llvm::ConstantInt>(fixedOffset)->getValue().getZExtValue();
-        if (KeyPathComponentHeader::offsetCanBeInline(offset)) {
-          componentHeaderWord =
-              KeyPathComponentHeader::forStructComponentWithInlineOffset(
-                  isLet, offset)
-                  .getData();
-        } else {
-          componentHeaderWord =
-              KeyPathComponentHeader::forStructComponentWithOutOfLineOffset(
-                  isLet)
-                  .getData();
-          outOfLineOffsetWord = static_cast<uint32_t>(offset);
-        }
-      } else if (rootTy->getClassOrBoundGenericClass()) {
-        auto *offset = tryEmitConstantClassFragilePhysicalMemberOffset(
-            *this, rootSILTy, property);
-        assert(offset &&
-               "embedded class-ivar key path must have a fixed offset");
-        auto offsetValue =
-            cast<llvm::ConstantInt>(offset)->getValue().getZExtValue();
-        if (KeyPathComponentHeader::offsetCanBeInline(offsetValue)) {
-          componentHeaderWord =
-              KeyPathComponentHeader::forClassComponentWithInlineOffset(
-                  isLet, offsetValue)
-                  .getData();
-        } else {
-          componentHeaderWord =
-              KeyPathComponentHeader::forClassComponentWithOutOfLineOffset(
-                  isLet)
-                  .getData();
-          outOfLineOffsetWord = static_cast<uint32_t>(offsetValue);
-        }
-      } else {
-        llvm_unreachable("stored-property key path on unsupported base");
-      }
-      break;
-    }
-    case KeyPathPatternComponent::Kind::TupleElement: {
-      assert(rootTy->is<TupleType>() && "tuple-element key path on non-tuple");
-      auto elementOffset =
-          getFixedTupleElementOffset(*this, rootSILTy, comp.getTupleIndex());
-      assert(elementOffset &&
-             "embedded tuple-element key path must have a fixed offset");
-      auto offset = elementOffset->getValue();
-      // Tuple elements are always mutable at the language level (no `let`
-      // tuple element).  We encode them with the struct-tag discriminator
-      // because that's how the runtime reads them (see `_projectReadOnly`).
-      if (KeyPathComponentHeader::offsetCanBeInline(offset)) {
-        componentHeaderWord =
-            KeyPathComponentHeader::forStructComponentWithInlineOffset(
-                /*isLet=*/false, offset)
-                .getData();
-      } else {
-        componentHeaderWord =
-            KeyPathComponentHeader::forStructComponentWithOutOfLineOffset(
-                /*isLet=*/false)
-                .getData();
-        outOfLineOffsetWord = static_cast<uint32_t>(offset);
-      }
-      break;
-    }
-    case KeyPathPatternComponent::Kind::GettableProperty:
-    case KeyPathPatternComponent::Kind::SettableProperty:
-    case KeyPathPatternComponent::Kind::Method: {
-      bool settable =
-          comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty;
-      bool mutating = settable && comp.isComputedSettablePropertyMutating();
-
-      KeyPathComponentHeader::ComputedPropertyKind componentKind;
-      if (!settable) {
-        // `Method` and `GettableProperty` both encode as a computed
-        // get-only component: the pattern's "getter" is the method's
-        // implementation for `Method`, and the property's getter for
-        // `GettableProperty`.
-        componentKind = KeyPathComponentHeader::GetOnly;
-      } else if (mutating) {
-        componentKind = KeyPathComponentHeader::SettableMutating;
-      } else {
-        componentKind = KeyPathComponentHeader::SettableNonmutating;
-      }
-
-      // Static instantiation: use the getter function pointer as the
-      // property identity.  The runtime uses a method descriptor pointer
-      // (class), a struct field index, or the getter function pointer
-      // (struct), but embedded Swift never emits method descriptors, so a
-      // unique-per-property pointer is a simpler common encoding here.  The
-      // id field is not ptr-auth signed at runtime (see
-      // `RawKeyPathComponent._computedIDValue`), so we store it raw.
-      componentHeaderWord =
-          KeyPathComponentHeader::forComputedProperty(
-              componentKind, KeyPathComponentHeader::Pointer,
-              /*hasArguments=*/false, KeyPathComponentHeader::Resolved)
-              .getData();
-
-      auto *getter = comp.getComputedPropertyForGettable();
-      computedGetterFn = getAddrOfSILFunction(getter, NotForDefinition);
-      if (settable) {
-        auto *setter = comp.getComputedPropertyForSettable();
-        computedSetterFn = getAddrOfSILFunction(setter, NotForDefinition);
-        computedSetterIsMutating = mutating;
-      }
-      break;
-    }
-    default:
-      llvm_unreachable("caller should have filtered other kinds");
-    }
+    compLayout = computeStaticKeyPathComponentLayout(
+        *this, components[0], rootTy->getCanonicalType());
+    std::tie(componentHeader, outOfLineOffsetWord) =
+        encodeStaticKeyPathComponentHeader(*compLayout);
   }
+  bool isComputed = compLayout && compLayout->kind ==
+                                      StaticKeyPathComponentLayout::Kind::Computed;
 
   auto ptrSize = getPointerSize().getValue();
   uint64_t pointerAlignmentSkewBytes = ptrSize - 4;
@@ -1609,10 +1680,10 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
     componentBytes = 4; // component header
     if (outOfLineOffsetWord)
       componentBytes += 4;
-    if (computedGetterFn) {
+    if (isComputed) {
       componentBytes += pointerAlignmentSkewBytes;
       componentBytes += ptrSize * 2; // id + getter
-      if (computedSetterFn)
+      if (compLayout->setter)
         componentBytes += ptrSize; // setter
     }
   }
@@ -1675,12 +1746,12 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
         llvm::ArrayType::get(Int8Ty, pointerAlignmentSkewBytes)));
 
   if (hasComponent) {
-    fields.addInt32(componentHeaderWord);
+    fields.addInt32(componentHeader->getData());
 
     if (outOfLineOffsetWord)
       fields.addInt32(*outOfLineOffsetWord);
 
-    if (computedGetterFn) {
+    if (isComputed) {
       if (pointerAlignmentSkewBytes != 0)
         fields.add(llvm::ConstantAggregateZero::get(
             llvm::ArrayType::get(Int8Ty, pointerAlignmentSkewBytes)));
@@ -1688,18 +1759,18 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
       // The computed id — an unsigned pointer that uniquely identifies the
       // property.  We use the getter as the identity.
       fields.add(
-          llvm::ConstantExpr::getBitCast(computedGetterFn, Int8PtrTy));
+          llvm::ConstantExpr::getBitCast(compLayout->getter, Int8PtrTy));
 
       // Address-discriminated ptr-auth signing for getter and setter.
       auto schema = getOptions().PointerAuth.KeyPaths;
-      fields.addSignedPointer(computedGetterFn, schema,
+      fields.addSignedPointer(compLayout->getter, schema,
                               PointerAuthEntity::Special::KeyPathGetter);
-      if (computedSetterFn) {
+      if (compLayout->setter) {
         auto setterAuth =
-            computedSetterIsMutating
+            compLayout->computedKind == KeyPathComponentHeader::SettableMutating
                 ? PointerAuthEntity::Special::KeyPathMutatingSetter
                 : PointerAuthEntity::Special::KeyPathNonmutatingSetter;
-        fields.addSignedPointer(computedSetterFn, schema, setterAuth);
+        fields.addSignedPointer(compLayout->setter, schema, setterAuth);
       }
     }
   }

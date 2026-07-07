@@ -4167,7 +4167,7 @@ public:
   void visitReferencedFunctionsAndMethods(
       std::function<void (SILFunction *)> functionCallBack,
       std::function<void (SILDeclRef)> methodCallBack) const;
-    
+
   void incrementRefCounts() const;
   void decrementRefCounts() const;
 
