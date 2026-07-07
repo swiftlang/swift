@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -Xllvm -sil-print-types -g -Xllvm -sil-print-debuginfo-verbose %s
+// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -Xllvm -sil-print-types -Xllvm -sil-print-types -g -Xllvm -sil-print-debuginfo-verbose %s
 
 // RUN: not --crash %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values -o /dev/null %s
 
@@ -184,7 +184,8 @@ func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
 // CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing34testForEachNonCopyableSILDebugInfo3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
 @available(SwiftStdlib 6.4, *)
 func testForEachNonCopyableSILDebugInfo(seq: borrowing Span<NoncopyableInt>){
-  // CHECK: debug_value {{.*}} : $*NoncopyableInt, let, name "element", expr op_deref, loc "{{.*}}":[[@LINE+1]]:7 isImplicit: false
+  // CHECK-ADDR: debug_value {{.*}} : $*NoncopyableInt, let, name "element", expr op_deref, loc "{{.*}}":[[@LINE+2]]:7 isImplicit: false
+  // CHECK-OPAQUE: debug_value {{.*}} : $NoncopyableInt, let, name "element", loc "{{.*}}":[[@LINE+1]]:7 isImplicit: false
   for element in seq {
       if (element.value == 0){
           continue
