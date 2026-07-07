@@ -147,9 +147,9 @@ private struct FunctionChecker {
       }
 
     case let ba as BeginApplyInst:
-      if context.options.noAllocations {
-        throw Diagnostic(.embedded_swift_allocating_coroutine, at: instruction.location)
-      }
+      // Whether a coroutine call allocates under -no-allocations depends on the
+      // callee-allocated (yield_once_2) frame's allocator kind, which is only
+      // known in IRGen; that check is emitted there (see visitBeginApplyInst).
       try checkApply(apply: ba)
 
     case let pai as PartialApplyInst:

@@ -15,9 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/ABI/Coro.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -4850,6 +4852,23 @@ void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
 }
 
 void IRGenSILFunction::visitBeginApplyInst(BeginApplyInst *i) {
+  // In -no-allocations mode, calling a callee-allocated (yield_once_2)
+  // coroutine is only allowed when its frame can be stack-allocated.
+  // Note: We treat Async stack like regular stack for this purpose;
+  // if a no-allocations target can do async, then it presumably has
+  // some way to provide an Async stack.
+  if (IGM.getSILModule().getOptions().NoAllocations &&
+      i->getSubstCalleeType()->isCalleeAllocatedCoroutine()) {
+    auto kind = getDefaultCoroutineAllocatorKind();
+    if (kind &&   // nullopt => inherits from caller
+	*kind != CoroAllocatorKind::Stack && // Explicit Stack usage
+	*kind != CoroAllocatorKind::Async // Explicit Async Stack
+       ) {
+      // We can't use a heap-allocated frame in no-allocations mode
+      IGM.Context.Diags.diagnose(i->getLoc().getSourceLoc(),
+                                 diag::embedded_swift_allocating_coroutine);
+    }
+  }
   visitFullApplySite(i);
 }
 
