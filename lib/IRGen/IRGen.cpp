@@ -783,6 +783,20 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
                         llvm::vfs::OutputBackend &Backend,
                         UnifiedStatsReporter *Stats) {
 
+  // Whenever we leave this function, finalize the main remark streamer (if the
+  // context owns one). Finalization flushes the remark string table to the end
+  // of the remarks file and deregisters the streamer from the context. It must
+  // happen before the streamer (owned by the context) is destroyed, both to
+  // produce a valid remarks file and to satisfy the RemarkStreamer destructor's
+  // assertion that its serializer was released. Using a scope guard ensures
+  // this covers every early return (e.g. incremental codegen skipping the
+  // object file), not just the successful codegen path.
+  auto &Ctxt = Module->getContext();
+  SWIFT_DEFER {
+    if (Ctxt.getMainRemarkStreamer())
+      llvm::finalizeLLVMOptimizationRemarks(Ctxt);
+  };
+
   if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
     // existing object file which was generated from the same llvm IR.
@@ -848,7 +862,6 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
     Module->print(irgenFile, nullptr);
   }
 
-  auto &Ctxt = Module->getContext();
   std::unique_ptr<llvm::DiagnosticHandler> OldDiagnosticHandler =
           Ctxt.getDiagnosticHandler();
   Ctxt.setDiagnosticHandler(std::make_unique<SwiftDiagnosticHandler>(Opts));
@@ -1394,8 +1407,8 @@ static void initLLVMModule(IRGenModule &IGM, SILModule &SIL, std::optional<unsig
 
       const auto format = SILOpts.OptRecordFormat;
       llvm::Expected<std::unique_ptr<llvm::remarks::RemarkSerializer>>
-        remarkSerializerOrErr = llvm::remarks::createRemarkSerializer(
-          format, llvm::remarks::SerializerMode::Separate, *file);
+          remarkSerializerOrErr =
+              llvm::remarks::createRemarkSerializer(format, *file);
       if (llvm::Error err = remarkSerializerOrErr.takeError()) {
         diagEngine.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
                             toString(std::move(err)));
