@@ -652,3 +652,14 @@ do {
     context(from: TestSyntax(v) ?? TestSyntax(other.first?.value), root: v) // Ok (no warnings)
   }
 }
+
+func flood(_: Int) {
+}
+
+struct Balderdash {
+  let x: UInt
+}
+func bazzle(b: Balderdash?) -> Void {
+  return flood(b?.x) // expected-error {{cannot convert value of type 'UInt?' to expected argument type 'Int'}}
+}
+

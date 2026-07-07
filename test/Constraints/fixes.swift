@@ -229,9 +229,10 @@ func moreComplexUnwrapFixes() {
   // expected-note@-3{{chain the optional using '?'}}{{17-17=?}}
   // expected-note@-4{{force-unwrap using '!'}}{{17-17=!}}
 
-  takeNon(os?.value) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-  // expected-note@-1{{force-unwrap using '!'}}{{13-14=!}}
-  // expected-note@-2{{coalesce}}
+  takeNon(os?.value) // expected-error {{cannot convert value of type 'Int?' to expected argument type 'Int'}}
+  // former error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // former note {{force-unwrap using '!'}}{{13-14=!}}
+  // former note {{coalesce}}
   takeNon(os?.optValue) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
   // expected-note@-1{{force-unwrap using '!'}}{{11-11=(}} {{23-23=)!}}
   // expected-note@-2{{coalesce}}
