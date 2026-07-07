@@ -3500,31 +3500,31 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
     return SILType();
   auto components = pattern->getComponents();
 
-  // The Embedded Swift runtime can only support zero or one component,
-  // because it can't reason about intermediate steps.
-  if (components.size() > 1)
-    return SILType();
-
   auto keyPathTy = getKeyPathType();
   auto rootTy = keyPathTy->getGenericArgs()[0]->getCanonicalType();
   auto valueTy = keyPathTy->getGenericArgs()[1]->getCanonicalType();
   auto &ctx = getModule().getASTContext();
 
-  NominalTypeDecl *keyPathClass = nullptr;
-
   // Identity key path (0 components) — matches the runtime walker's
   // starting `capability = .value` in
   // `_getKeyPathClassAndInstanceSizeFromPattern`.
   if (components.empty()) {
-    keyPathClass = ctx.getWritableKeyPathDecl();
-  } else {
+    auto identityTy = BoundGenericType::get(ctx.getWritableKeyPathDecl(),
+                                            /*parent=*/swift::Type(),
+                                            {rootTy, valueTy})
+                          ->getCanonicalType();
+    return SILType::getPrimitiveObjectType(identityTy);
+  }
+
+  // Single-component patterns: allow the full set of supported component
+  // kinds (stored, tuple, gettable/settable computed, method).
+  if (components.size() == 1) {
     const auto &comp = components[0];
+    NominalTypeDecl *keyPathClass = nullptr;
     switch (comp.getKind()) {
     case KeyPathPatternComponent::Kind::StoredProperty: {
       auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
       if (property->isLet()) {
-        // `let` properties are read-only regardless of whether the root
-        // is a struct or a class.
         keyPathClass = ctx.getKeyPathDecl();
       } else if (rootTy->getClassOrBoundGenericClass()) {
         keyPathClass = ctx.getReferenceWritableKeyPathDecl();
@@ -3534,27 +3534,16 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       break;
     }
     case KeyPathPatternComponent::Kind::TupleElement:
-      // Tuple elements are always mutable.
       keyPathClass = ctx.getWritableKeyPathDecl();
       break;
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
     case KeyPathPatternComponent::Kind::Method: {
-      // Reject captured subscript indices and external decl references —
-      // they'd require additional pattern-instantiation state we don't
-      // handle statically yet.
+      // Reject captured subscript indices and external decl references.
       if (!comp.getArguments().empty() || comp.getExternalDecl())
         return SILType();
-      // The pattern's getter/setter may themselves be generic (e.g. when
-      // the key path was written against a generic type that was later
-      // specialized in a wrapper call).  We currently only take their
-      // addresses via `getAddrOfSILFunction`, which doesn't apply
-      // substitutions, so bail out rather than emit a reference to an
-      // unspecialized accessor that has no LLVM definition.
-      //
-      // `Method` and `GettableProperty` components only have a getter (the
-      // Method's implementation), so we don't need to consult the setter
-      // there.  `SettableProperty` components have both.
+      // Bail on generic accessors — we take their addresses via
+      // `getAddrOfSILFunction`, which doesn't apply substitutions.
       if (comp.getComputedPropertyForGettable()->isGeneric())
         return SILType();
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
@@ -3563,16 +3552,11 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
 
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
           comp.isComputedSettablePropertyMutating()) {
-        // Mutating setter (struct default) → WritableKeyPath.
         keyPathClass = ctx.getWritableKeyPathDecl();
       } else if (comp.getKind() ==
                  KeyPathPatternComponent::Kind::SettableProperty) {
-        // Nonmutating setter (class default, or `nonmutating set` on a
-        // struct) → ReferenceWritableKeyPath.
         keyPathClass = ctx.getReferenceWritableKeyPathDecl();
       } else {
-        // Get-only computed properties and unapplied method key paths are
-        // both read-only.
         keyPathClass = ctx.getKeyPathDecl();
       }
       break;
@@ -3582,9 +3566,59 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
     case KeyPathPatternComponent::Kind::OptionalWrap:
       return SILType();
     }
+    assert(keyPathClass && "unhandled component kind above?");
+    auto concreteTy = BoundGenericType::get(keyPathClass,
+                                            /*parent=*/swift::Type(),
+                                            {rootTy, valueTy})
+                          ->getCanonicalType();
+    return SILType::getPrimitiveObjectType(concreteTy);
   }
 
-  assert(keyPathClass && "unhandled component kind above?");
+  // Multi-component chains: every component must be a fixed-offset
+  // stored-property or tuple-element access.  Walk the chain and pick the
+  // most specialized `KeyPath` subclass:
+  //   * start as WritableKeyPath (mirroring `capability = .value`)
+  //   * any `let` demotes permanently to KeyPath
+  //   * crossing a class boundary (component root is a class type) while
+  //     still writable promotes WritableKeyPath → ReferenceWritableKeyPath
+  NominalTypeDecl *keyPathClass = ctx.getWritableKeyPathDecl();
+  auto subs = getSubstitutions();
+  CanType currentRoot = rootTy;
+
+  for (const auto &comp : components) {
+    bool rootIsClass = (bool)currentRoot->getClassOrBoundGenericClass();
+
+    switch (comp.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty: {
+      auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
+      if (property->isLet()) {
+        keyPathClass = ctx.getKeyPathDecl();
+      } else if (rootIsClass &&
+                 keyPathClass == ctx.getWritableKeyPathDecl()) {
+        keyPathClass = ctx.getReferenceWritableKeyPathDecl();
+      }
+      break;
+    }
+    case KeyPathPatternComponent::Kind::TupleElement:
+      // Tuple elements are always mutable; no let-demote.  They don't
+      // introduce a class boundary either (tuples live inline in their
+      // parent).
+      break;
+    default:
+      // Computed / method / optional components aren't representable in
+      // an embedded multi-component chain, because the runtime walker
+      // only knows how to advance by a fixed offset or dereference a
+      // class reference.
+      return SILType();
+    }
+
+    // Advance to the next root type by substituting the pattern
+    // component's declared component type into the KP's substitution
+    // map.
+    currentRoot =
+        comp.getComponentType().subst(subs)->getCanonicalType();
+  }
+
   auto concreteTy =
       BoundGenericType::get(keyPathClass, /*parent=*/swift::Type(),
                             {rootTy, valueTy})

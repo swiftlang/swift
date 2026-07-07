@@ -416,7 +416,33 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
       }
 
 #if hasFeature(Embedded)
-      fatalError("Multi-component key path is not permitted in Embedded Swift")
+      // Multi-component key paths in Embedded Swift are always chains of
+      // fixed-offset stored / tuple components (enforced by the IRGen
+      // static-instance emitter — see `KeyPathInst::
+      // getStaticInstanceClassType`).  Walk them with byte-level pointer
+      // arithmetic, without generic dispatch on `Any.Type`.  Class-typed
+      // intermediates stay alive because the outer container (the root
+      // value, or an outer class we've already walked through) still
+      // holds a strong reference to them for the duration of `root`'s
+      // lifetime.
+      return unsafe withUnsafePointer(to: root) { rootPtr in
+        var current = unsafe UnsafeRawPointer(rootPtr)
+        while unsafe !buffer.data.isEmpty {
+          let (rawComponent, _) = unsafe buffer.next()
+          switch unsafe rawComponent.value {
+          case .struct(let offset):
+            unsafe current = unsafe current.advanced(by: offset)
+          case .class(let offset):
+            let obj = unsafe current.load(as: AnyObject.self)
+            unsafe current = unsafe UnsafeRawPointer(
+              Builtin.bridgeToRawPointer(obj)).advanced(by: offset)
+          default:
+            fatalError(
+              "Embedded Swift multi-component key path must be stored/tuple")
+          }
+        }
+        return unsafe current.load(as: Value.self)
+      }
 #else
       let maxSize = unsafe buffer.maxSize
       let roundedMaxSize = 1 &<< (Int.bitWidth &- maxSize.leadingZeroBitCount)
@@ -573,12 +599,30 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
       }
 
 #if hasFeature(Embedded)
-      fatalError("Multi-component key path is not permitted in Embedded Swift")
+      // Multi-component walker for chains of fixed-offset stored/tuple
+      // components.  All writable-KP chains projected here are pure struct
+      // / tuple (no class jump), because a chain that crosses a class
+      // boundary is a `ReferenceWritableKeyPath`.  So we can walk with
+      // plain pointer arithmetic — no writeback / keep-alive needed.
+      while true {
+        let (rawComponent, optNextType) = unsafe buffer.next()
+        switch unsafe rawComponent.value {
+        case .struct(let offset):
+          unsafe p = unsafe p.advanced(by: offset)
+        default:
+          fatalError(
+            "Embedded Swift WritableKeyPath chain must be stored struct/tuple")
+        }
+        if optNextType == nil { break }
+      }
+      let typedPointer = unsafe p.assumingMemoryBound(to: Value.self)
+      return unsafe (pointer: UnsafeMutablePointer(mutating: typedPointer),
+              owner: keepAlive)
 #else
       while true {
         let (rawComponent, optNextType) = unsafe buffer.next()
         let nextType = optNextType ?? Value.self
-        
+
         func project<CurValue>(_: CurValue.Type) {
           func project2<NewValue>(_: NewValue.Type) {
             unsafe p = unsafe rawComponent._projectMutableAddress(p,
@@ -590,7 +634,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
           _openExistential(nextType, do: project2)
         }
         _openExistential(type, do: project)
-        
+
         if optNextType == nil { break }
         type = nextType
       }
@@ -641,7 +685,37 @@ public class ReferenceWritableKeyPath<
       }
 
 #if hasFeature(Embedded)
-      fatalError("Multi-component key path is not permitted in Embedded Swift")
+      // Multi-component walker for chains of fixed-offset stored/tuple
+      // components (enforced by the IRGen static-instance emitter).  A
+      // `ReferenceWritableKeyPath` chain crosses at least one class
+      // boundary, so `keepAlive` will be set to the last class we
+      // dereferenced — that class owns the heap storage the returned
+      // pointer points into.
+      var origBase2 = origBase
+      let final: UnsafeMutablePointer<Value> =
+        unsafe withUnsafeMutableBytes(of: &origBase2) { baseBytes in
+          var p = unsafe UnsafeRawPointer(baseBytes.baseAddress
+              ._unsafelyUnwrappedUnchecked)
+          while true {
+            let (rawComponent, optNextType) = unsafe buffer.next()
+            switch unsafe rawComponent.value {
+            case .struct(let offset):
+              unsafe p = unsafe p.advanced(by: offset)
+            case .class(let offset):
+              let obj = unsafe p.load(as: AnyObject.self)
+              keepAlive = obj
+              unsafe p = unsafe UnsafeRawPointer(
+                Builtin.bridgeToRawPointer(obj)).advanced(by: offset)
+            default:
+              fatalError(
+                "Embedded Swift RWK chain must be stored struct/tuple/class")
+            }
+            if optNextType == nil { break }
+          }
+          let typed = unsafe p.assumingMemoryBound(to: Value.self)
+          return unsafe UnsafeMutablePointer(mutating: typed)
+        }
+      return unsafe final
 #else
       // 16 is the max alignment allowed on practically every platform we deploy
       // to.

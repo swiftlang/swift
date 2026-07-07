@@ -1637,11 +1637,12 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
     return cached->second;
 
   auto components = pattern->getComponents();
-  bool hasComponent = !components.empty();
+  auto numComponents = components.size();
 
   auto keyPathTy = KPI->getKeyPathType();
   auto rootTy = keyPathTy->getGenericArgs()[0];
   auto valueTy = keyPathTy->getGenericArgs()[1];
+  auto subs = KPI->getSubstitutions();
 
   // Compute the concrete key-path class and get its metadata.
   NominalTypeDecl *keyPathClass = pickStaticKeyPathClass(*this, KPI);
@@ -1651,47 +1652,107 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
   llvm::Constant *metadata = getAddrOfTypeMetadata(concreteKeyPathTy);
 
   // Compute the per-component layout (semantic form) and encode it into
-  // the header word + optional out-of-line offset word.  For identity
-  // (no components) both are absent.
-  std::optional<StaticKeyPathComponentLayout> compLayout;
-  std::optional<KeyPathComponentHeader> componentHeader;
-  std::optional<uint32_t> outOfLineOffsetWord;
-  if (hasComponent) {
-    compLayout = computeStaticKeyPathComponentLayout(
-        *this, components[0], rootTy->getCanonicalType());
-    std::tie(componentHeader, outOfLineOffsetWord) =
-        encodeStaticKeyPathComponentHeader(*compLayout);
+  // the header word + optional out-of-line offset word for each
+  // component.  Also collect the intermediate type metadata pointer
+  // between successive components — the runtime walker reads this to
+  // determine the type of the intermediate value in the non-embedded
+  // case; the embedded walker skips over it.  For a chain of N
+  // components, there are N components emitted and (N - 1) intermediate
+  // type pointers.
+  struct StepInfo {
+    KeyPathComponentHeader header{
+        KeyPathComponentHeader::forOptionalForce()}; // arbitrary default
+    std::optional<uint32_t> outOfLineOffsetWord;
+    bool isComputed = false;
+    // Fields relevant to computed components (only possible when
+    // numComponents == 1).
+    KeyPathComponentHeader::ComputedPropertyKind computedKind =
+        KeyPathComponentHeader::GetOnly;
+    llvm::Constant *getter = nullptr;
+    llvm::Constant *setter = nullptr;
+    // Metadata pointer for the intermediate type following this
+    // component; null for the last component.
+    llvm::Constant *nextTypeMetadata = nullptr;
+  };
+  SmallVector<StepInfo, 4> steps;
+  steps.reserve(numComponents);
+
+  CanType currentRoot = rootTy->getCanonicalType();
+  for (size_t i = 0; i < numComponents; ++i) {
+    const auto &comp = components[i];
+    auto layout =
+        computeStaticKeyPathComponentLayout(*this, comp, currentRoot);
+    auto [hdr, offsetWord] = encodeStaticKeyPathComponentHeader(layout);
+
+    StepInfo step;
+    step.header = hdr;
+    step.outOfLineOffsetWord = offsetWord;
+    step.isComputed =
+        layout.kind == StaticKeyPathComponentLayout::Kind::Computed;
+    step.computedKind = layout.computedKind;
+    step.getter = layout.getter;
+    step.setter = layout.setter;
+
+    // Advance to the next root by substituting the component's declared
+    // component type.  The intermediate type metadata is emitted between
+    // this component and the next one.
+    CanType nextType =
+        comp.getComponentType().subst(subs)->getCanonicalType();
+    if (i + 1 < numComponents) {
+      step.nextTypeMetadata = getAddrOfTypeMetadata(nextType);
+    }
+    steps.push_back(step);
+    currentRoot = nextType;
   }
-  bool isComputed = compLayout && compLayout->kind ==
-                                      StaticKeyPathComponentLayout::Kind::Computed;
 
   auto ptrSize = getPointerSize().getValue();
   uint64_t pointerAlignmentSkewBytes = ptrSize - 4;
 
-  // Compute the buffer header word.  `size` is the size of the component
-  // buffer in bytes, excluding the buffer header itself (i.e. size of the
-  // component's header + body).  For identity (no components), that's zero.
+  // Compute the buffer size (bytes of the component buffer's `data`
+  // area, excluding the buffer header itself but including the initial
+  // 4-byte pointer-alignment skew that separates the header word from
+  // the first component header).
   //
-  // For computed components the body is: pointerAlignmentSkew (4 on 64-bit)
-  // + id (pointer) + getter (pointer) + optional setter (pointer).  This
-  // matches `RawKeyPathComponent.bodySize` for `.computed` in KeyPath.swift.
+  // Layout inside `data` (matching `KeyPathBuffer.next()`):
+  //
+  //   comp[0] header (i32)
+  //   comp[0] body (0 or 4 bytes: out-of-line offset, or computed tail)
+  //   [ pad to pointer alignment ]
+  //   intermediate type metadata (ptrSize)     — only if there's a next
+  //   comp[1] header (i32)
+  //   comp[1] body
+  //   ...
+  //   comp[N-1] header (i32)
+  //   comp[N-1] body
+  //
+  // For computed components (single-component patterns only) the body is
+  // `pointerAlignmentSkew + id + getter + [setter]`.
   uint32_t componentBytes = 0;
-  if (hasComponent) {
-    componentBytes = 4; // component header
-    if (outOfLineOffsetWord)
+  for (size_t i = 0; i < numComponents; ++i) {
+    const auto &step = steps[i];
+    componentBytes += 4; // component header
+    if (step.outOfLineOffsetWord)
       componentBytes += 4;
-    if (isComputed) {
+    if (step.isComputed) {
       componentBytes += pointerAlignmentSkewBytes;
       componentBytes += ptrSize * 2; // id + getter
-      if (compLayout->setter)
+      if (step.setter)
         componentBytes += ptrSize; // setter
+    }
+    if (step.nextTypeMetadata) {
+      // Pad up to pointer alignment before the intermediate type ptr.
+      uint32_t pad =
+          static_cast<uint32_t>((ptrSize - (componentBytes % ptrSize)) %
+                                ptrSize);
+      componentBytes += pad;
+      componentBytes += static_cast<uint32_t>(ptrSize);
     }
   }
   KeyPathBufferHeader bufHdr(componentBytes,
                              /*trivial=*/true,
                              /*hasReferencePrefix=*/false);
   uint32_t bufferHeaderWord = bufHdr.getData();
-  if (hasComponent)
+  if (numComponents == 1)
     bufferHeaderWord |= _SwiftKeyPathBufferHeader_IsSingleComponentFlag;
 
   // Assemble the constant.
@@ -1700,19 +1761,24 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
   //     [ padding_bytes x i8 ],
   //     i32 bufferHeaderWord,
   //     [ pointer_alignment_skew_bytes x i8 ],       // buffer-level skew
-  //     i32 componentHeaderWord,
-  //     [ i32 outOfLineOffsetWord ],                 // stored/tuple only
-  //     [ pointer_alignment_skew_bytes x i8 ],       // component-level skew,
-  //                                                  //   computed only
-  //     ptr computedId,                              // computed only
-  //     ptr computedGetter,                          // computed only, signed
-  //     [ ptr computedSetter ] }                     // computed settable
+  //     <for each component i>:
+  //       i32 componentHeaderWord,
+  //       [ i32 outOfLineOffsetWord ],               // stored/tuple only
+  //       <if computed (single-component only)>:
+  //         [ pointer_alignment_skew_bytes x i8 ]
+  //         ptr computedId
+  //         ptr computedGetter (ptr-auth signed)
+  //         [ ptr computedSetter ]                    // settable only
+  //       <if i + 1 < N>:
+  //         [ pad up to pointer alignment ]
+  //         ptr nextTypeMetadata
+  //   }
   //
   // The getter/setter pointer fields are address-discriminated ptr-auth
   // signed (schema `PointerAuth.KeyPaths`) with the standard KeyPath
-  // getter/nonmutating-setter/mutating-setter discriminators.  The id field
-  // is stored raw because the runtime treats it as an opaque identity value
-  // (`RawKeyPathComponent._computedIDValue`).
+  // getter/nonmutating-setter/mutating-setter discriminators.  The id
+  // field is stored raw because the runtime treats it as an opaque
+  // identity value (`RawKeyPathComponent._computedIDValue`).
   uint64_t bodySize = 2 * ptrSize; // isa + refcount
   uint64_t paddingBytes = (16 - (bodySize % 16)) % 16;
 
@@ -1745,35 +1811,64 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
     fields.add(llvm::ConstantAggregateZero::get(
         llvm::ArrayType::get(Int8Ty, pointerAlignmentSkewBytes)));
 
-  if (hasComponent) {
-    fields.addInt32(componentHeader->getData());
+  // Track running byte position within the component buffer so we can
+  // insert the correct pad before each intermediate type-metadata
+  // pointer.  The pointer-alignment skew above is not part of `data`.
+  uint32_t bytesInData = 0;
 
-    if (outOfLineOffsetWord)
-      fields.addInt32(*outOfLineOffsetWord);
+  for (size_t i = 0; i < numComponents; ++i) {
+    const auto &step = steps[i];
+    fields.addInt32(step.header.getData());
+    bytesInData += 4;
 
-    if (isComputed) {
-      if (pointerAlignmentSkewBytes != 0)
+    if (step.outOfLineOffsetWord) {
+      fields.addInt32(*step.outOfLineOffsetWord);
+      bytesInData += 4;
+    }
+
+    if (step.isComputed) {
+      // Only reachable when numComponents == 1 (multi-component chains
+      // reject computed components in `getStaticInstanceClassType`).
+      if (pointerAlignmentSkewBytes != 0) {
         fields.add(llvm::ConstantAggregateZero::get(
             llvm::ArrayType::get(Int8Ty, pointerAlignmentSkewBytes)));
+        bytesInData += pointerAlignmentSkewBytes;
+      }
+      fields.add(llvm::ConstantExpr::getBitCast(step.getter, Int8PtrTy));
+      bytesInData += ptrSize;
 
-      // The computed id — an unsigned pointer that uniquely identifies the
-      // property.  We use the getter as the identity.
-      fields.add(
-          llvm::ConstantExpr::getBitCast(compLayout->getter, Int8PtrTy));
-
-      // Address-discriminated ptr-auth signing for getter and setter.
       auto schema = getOptions().PointerAuth.KeyPaths;
-      fields.addSignedPointer(compLayout->getter, schema,
+      fields.addSignedPointer(step.getter, schema,
                               PointerAuthEntity::Special::KeyPathGetter);
-      if (compLayout->setter) {
+      bytesInData += ptrSize;
+
+      if (step.setter) {
         auto setterAuth =
-            compLayout->computedKind == KeyPathComponentHeader::SettableMutating
+            step.computedKind == KeyPathComponentHeader::SettableMutating
                 ? PointerAuthEntity::Special::KeyPathMutatingSetter
                 : PointerAuthEntity::Special::KeyPathNonmutatingSetter;
-        fields.addSignedPointer(compLayout->setter, schema, setterAuth);
+        fields.addSignedPointer(step.setter, schema, setterAuth);
+        bytesInData += ptrSize;
       }
     }
+
+    if (step.nextTypeMetadata) {
+      // Pad up to pointer alignment before writing the intermediate
+      // type metadata pointer.
+      uint32_t pad =
+          static_cast<uint32_t>((ptrSize - (bytesInData % ptrSize)) %
+                                ptrSize);
+      if (pad != 0) {
+        fields.add(llvm::ConstantAggregateZero::get(
+            llvm::ArrayType::get(Int8Ty, pad)));
+        bytesInData += pad;
+      }
+      fields.add(llvm::ConstantExpr::getBitCast(step.nextTypeMetadata,
+                                                Int8PtrTy));
+      bytesInData += ptrSize;
+    }
   }
+  (void)bytesInData; // used for arithmetic above only
 
   auto *global = fields.finishAndCreateGlobal(
       "keypath", Alignment(16), /*constant*/ true,

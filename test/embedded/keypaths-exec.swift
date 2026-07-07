@@ -345,3 +345,122 @@ do {
   }
   print(box.value == 777 ? "OK!" : "FAIL") // CHECK: OK!
 }
+
+// -----------------------------------------------------------------------------
+// Multi-component chains of fixed-offset stored/tuple components.  These
+// exercise the walker that iterates through more than one component in a
+// single key path — supported in Embedded Swift when every step is a
+// struct/tuple field or a class ivar (i.e. resolves to a fixed offset).
+// -----------------------------------------------------------------------------
+
+// Nested struct chain (2 components, pure struct/tuple, all `var`) →
+// WritableKeyPath.
+struct Inner {
+  var a: Int32
+  var b: Int32
+}
+struct Outer {
+  var name: Int8
+  var inner: Inner
+}
+
+do {
+  var o = Outer(name: 1, inner: Inner(a: 10, b: 20))
+  let kpA: WritableKeyPath<Outer, Int32> = \.inner.a
+  let kpB: WritableKeyPath<Outer, Int32> = \.inner.b
+
+  // Read.
+  print(o[keyPath: kpA] == 10 && o[keyPath: kpB] == 20 ? "OK!" : "FAIL") // CHECK: OK!
+  print(getValueIn(o, keyPath: kpA) == 10 ? "OK!" : "FAIL") // CHECK: OK!
+
+  // Write.
+  o[keyPath: kpA] = 111
+  setValueIn(&o, Int32(222), keyPath: kpB)
+  print(o.inner.a == 111 && o.inner.b == 222 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// Longer chain: 3 stored struct fields.
+struct L1 { var lower: L2 }
+struct L2 { var lowest: L3 }
+struct L3 { var value: Int32 }
+
+do {
+  var l = L1(lower: L2(lowest: L3(value: 100)))
+  let kp: WritableKeyPath<L1, Int32> = \.lower.lowest.value
+  print(l[keyPath: kp] == 100 ? "OK!" : "FAIL") // CHECK: OK!
+  l[keyPath: kp] = 999
+  print(l.lower.lowest.value == 999 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// Chain with a `let` intermediate → read-only KeyPath (all `let` on any
+// component demotes to KeyPath).
+struct LetChainOuter {
+  let inner: LetChainInner
+}
+struct LetChainInner {
+  var v: Int32
+}
+
+do {
+  let o = LetChainOuter(inner: LetChainInner(v: 42))
+  let kp: KeyPath<LetChainOuter, Int32> = \.inner.v
+  print(o[keyPath: kp] == 42 ? "OK!" : "FAIL") // CHECK: OK!
+  print(getValueIn(o, keyPath: kp) == 42 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// Chain crossing a class boundary → ReferenceWritableKeyPath.  Writing
+// through the KP mutates the class instance, which is observed via an
+// independent reference.
+final class ClassBox {
+  var value: Int32 = 0
+}
+struct HasClassField {
+  var boxed: ClassBox
+}
+
+do {
+  let box = ClassBox()
+  var hcf = HasClassField(boxed: box)
+  let kp: ReferenceWritableKeyPath<HasClassField, Int32> = \.boxed.value
+
+  print(hcf[keyPath: kp] == 0 ? "OK!" : "FAIL") // CHECK: OK!
+  hcf[keyPath: kp] = 55
+  print(box.value == 55 ? "OK!" : "FAIL") // CHECK: OK!
+  // The KP mutates the class, so an alias observes the write.
+  print(hcf.boxed.value == 55 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// Chain that starts at a class root and dives into a struct ivar:
+// class → struct field → struct field.  Because the root is a class,
+// this is ReferenceWritableKeyPath.
+final class RootClass {
+  var stuff = Inner(a: 1, b: 2)
+}
+
+do {
+  let rc = RootClass()
+  let kpA: ReferenceWritableKeyPath<RootClass, Int32> = \.stuff.a
+  let kpB: ReferenceWritableKeyPath<RootClass, Int32> = \.stuff.b
+
+  print(rc[keyPath: kpA] == 1 && rc[keyPath: kpB] == 2 ? "OK!" : "FAIL") // CHECK: OK!
+
+  rc[keyPath: kpA] = 100
+  rc[keyPath: kpB] = 200
+  print(rc.stuff.a == 100 && rc.stuff.b == 200 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// Chain into a tuple element (mixed struct + tuple), read + write.
+struct HasTuple {
+  var pair: (Int32, Int64)
+}
+
+do {
+  var ht = HasTuple(pair: (7, 8))
+  let kp0: WritableKeyPath<HasTuple, Int32> = \.pair.0
+  let kp1: WritableKeyPath<HasTuple, Int64> = \.pair.1
+
+  print(ht[keyPath: kp0] == 7 && ht[keyPath: kp1] == 8 ? "OK!" : "FAIL") // CHECK: OK!
+  ht[keyPath: kp0] = 70
+  ht[keyPath: kp1] = 80
+  print(ht.pair.0 == 70 && ht.pair.1 == 80 ? "OK!" : "FAIL") // CHECK: OK!
+}
