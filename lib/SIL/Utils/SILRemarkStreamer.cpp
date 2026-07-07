@@ -23,6 +23,18 @@ SILRemarkStreamer::SILRemarkStreamer(
     : owner(Owner::SILModule), streamer(std::move(streamer)), context(nullptr),
       remarkStream(std::move(stream)), ctx(Ctx) { }
 
+SILRemarkStreamer::~SILRemarkStreamer() {
+  // If we still own the underlying LLVM streamer (i.e. it was never handed off
+  // to an LLVMContext via intoLLVMContext), release its serializer so that the
+  // remark string table is flushed to the end of the remarks file. This also
+  // satisfies llvm::remarks::RemarkStreamer's destructor assertion that the
+  // serializer has been released before the streamer is destroyed. When owned
+  // by an LLVMContext, finalization is instead performed via
+  // llvm::finalizeLLVMOptimizationRemarks once backend codegen completes.
+  if (owner == Owner::SILModule && streamer)
+    streamer->releaseSerializer();
+}
+
 llvm::remarks::RemarkStreamer &SILRemarkStreamer::getLLVMStreamer() {
   switch (owner) {
   case Owner::SILModule:
@@ -69,8 +81,8 @@ SILRemarkStreamer::create(SILModule &silModule) {
   }
 
   llvm::Expected<std::unique_ptr<llvm::remarks::RemarkSerializer>>
-      remarkSerializerOrErr = llvm::remarks::createRemarkSerializer(
-          format, llvm::remarks::SerializerMode::Separate, *file);
+      remarkSerializerOrErr =
+          llvm::remarks::createRemarkSerializer(format, *file);
   if (llvm::Error err = remarkSerializerOrErr.takeError()) {
     diagEngine.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
                         toString(std::move(err)));

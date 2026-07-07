@@ -875,6 +875,15 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
                                  *OutputFile, DiagMutex,
                                  CASIDFile ? CASIDFile.get() : nullptr);
 
+  // The backend has finished emitting all optimization remarks into the main
+  // remark streamer, if any. Finalize it now: this flushes the remark string
+  // table to the end of the remarks file and deregisters the streamer from the
+  // context. It must happen before the streamer (owned by the context) is
+  // destroyed, both to produce a valid remarks file and to satisfy the
+  // RemarkStreamer destructor's assertion that its serializer was released.
+  if (Ctxt.getMainRemarkStreamer())
+    llvm::finalizeLLVMOptimizationRemarks(Ctxt);
+
   Ctxt.setDiagnosticHandler(std::move(OldDiagnosticHandler));
 
   return res;
@@ -1383,8 +1392,8 @@ static void initLLVMModule(IRGenModule &IGM, SILModule &SIL, std::optional<unsig
 
       const auto format = SILOpts.OptRecordFormat;
       llvm::Expected<std::unique_ptr<llvm::remarks::RemarkSerializer>>
-        remarkSerializerOrErr = llvm::remarks::createRemarkSerializer(
-          format, llvm::remarks::SerializerMode::Separate, *file);
+        remarkSerializerOrErr =
+            llvm::remarks::createRemarkSerializer(format, *file);
       if (llvm::Error err = remarkSerializerOrErr.takeError()) {
         diagEngine.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
                             toString(std::move(err)));
