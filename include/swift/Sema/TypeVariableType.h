@@ -228,6 +228,10 @@ public:
   /// operator.
   bool isTernary() const;
 
+  /// Determine whether this type variable represents a type of a synthesized
+  /// argument of a call/subscript.
+  bool isSynthesizedArgument() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///

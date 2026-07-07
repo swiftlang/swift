@@ -101,9 +101,10 @@ do {
     // Some of these might be hard to resolve, but we should produce better diagnostics.
 
     let _: [any Command] = [aOpt, bOpt].filter { $0 != nil }
-    // expected-error@-1 {{no exact matches in call to instance method 'filter'}}
+    // expected-error@-1 {{cannot convert value of type 'A?' to expected element type 'any Command'}}
+    // expected-error@-2 {{cannot convert value of type 'B?' to expected element type 'any Command'}}
     let _: [any Command] = [a, b].map { $0 }
-    // expected-error@-1 {{failed to produce diagnostic for expression}}
+    // expected-error@-1 {{cannot convert value of type 'Super' to closure result type 'any Command'}}
     let _: [any Command] = [a, b].flatMap { [$0] }
     // expected-error@-1 {{cannot convert value of type 'Super' to expected element type 'any Command'}}
 
