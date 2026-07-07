@@ -2872,6 +2872,7 @@ void Serializer::writeLifetimeDependencies(
         info.isFromAnnotation(), info.hasCaptures(),
         info.hasInheritLifetimeParamIndices(),
         info.hasScopeLifetimeParamIndices(), info.hasAddressableParamIndices(),
+        info.hasConditionallyAddressableParamIndices(),
         paramIndices);
     paramIndices.clear();
   }
