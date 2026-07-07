@@ -1673,14 +1673,6 @@ namespace llvm {
 
   // Values hash just like pointers.
   template<> struct DenseMapInfo<swift::SILValue> {
-    static swift::SILValue getEmptyKey() {
-      return swift::SILValue::getFromOpaqueValue(
-                                      llvm::DenseMapInfo<void*>::getEmptyKey());
-    }
-    static swift::SILValue getTombstoneKey() {
-      return swift::SILValue::getFromOpaqueValue(
-                                  llvm::DenseMapInfo<void*>::getTombstoneKey());
-    }
     static unsigned getHashValue(swift::SILValue V) {
       return DenseMapInfo<swift::ValueBase *>::getHashValue(V);
     }

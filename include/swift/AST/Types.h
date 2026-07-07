@@ -8799,12 +8799,6 @@ inline CanType CanType::getNominalParent() const {
 }
 
 inline bool CanType::isActuallyCanonicalOrNull() const {
-#if LLVM_VERSION_MAJOR <= 21
-  if (getPointer() == llvm::DenseMapInfo<TypeBase *>::getEmptyKey() ||
-      getPointer() == llvm::DenseMapInfo<TypeBase *>::getTombstoneKey())
-    return true;
-#endif
-
   return getPointer() == nullptr || getPointer()->isCanonical();
 }
 
