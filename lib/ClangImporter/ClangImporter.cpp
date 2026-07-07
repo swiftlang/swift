@@ -3167,14 +3167,14 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
         // a tree, so these don't require deduplication.
         addImplicitImport(CurrModule, /*guaranteedUnique=*/true);
       }
-      for (auto *I : CurrModule->Imports) {
+      for (clang::Module *I : CurrModule->Imports) {
         // `underlying` is the current TLM. Only explicit submodules need to
         // be imported under the same TLM, which is handled above.
         if (I->getTopLevelModule() == underlying)
           continue;
         addImplicitImport(I, /*guaranteedUnique=*/false);
       }
-      for (auto *Submodule : CurrModule->submodules())
+      for (clang::Module *Submodule : CurrModule->submodules())
         SubmoduleWorklist.push_back(Submodule);
     }
   }
@@ -4145,7 +4145,7 @@ static void getImportDecls(ClangModuleUnit *ClangUnit, const clang::Module *M,
 
   ASTContext &Ctx = ClangUnit->getASTContext();
 
-  for (auto *ImportedMod : M->Imports) {
+  for (clang::Module *ImportedMod : M->Imports) {
     auto *ID = createImportDecl(Ctx, ClangUnit, ImportedMod, Exported);
     Results.push_back(ID);
   }
