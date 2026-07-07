@@ -6,7 +6,7 @@
 
 func basicTests() -> Int {
   let x = 42 // expected-warning {{immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}} {{3-8=_}}
-  var y = 12 // expected-warning {{variable 'y' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
+  var y = 12 // expected-warning {{variable 'y' was never mutated; consider changing to 'let' constant}} {{group-name=VariableNeverMutated}} {{3-6=let}}
   _ = 42 // ok
   _ = 42 // ok
   return y
@@ -566,7 +566,7 @@ func testUselessCastWithInvalidParam(foo: Any?) -> Int {
 
 // https://github.com/swiftlang/swift/issues/72811
 func testEnumeratedForLoop(a: [Int]) {
-  for var (b, c) in a.enumerated() {  // expected-warning {{variable 'b' was never mutated; consider changing the pattern to 'case (..., let b, ...)'}}
+  for var (b, c) in a.enumerated() {  // expected-warning {{variable 'b' was never mutated; consider changing the pattern to 'case (..., let b, ...)'}} {{group-name=VariableNeverMutated}}
     c = b
     let _ = c
   }
