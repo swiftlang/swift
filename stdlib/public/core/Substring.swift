@@ -1110,6 +1110,56 @@ extension Substring.UTF16View: BidirectionalCollection {
 }
 
 extension Substring.UTF16View {
+  @available(SwiftStdlib 6.5, *)
+  public __consuming func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Unicode.UTF16.CodeUnit>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Unicode.UTF16.CodeUnit>.Index) {
+    let count = self.count
+    // An empty slice needs no storage, so tolerate a nil/empty destination.
+    guard count > 0 else {
+      return (Substring().utf16.makeIterator(), 0)
+    }
+    guard unsafe buffer.baseAddress != nil else {
+      _preconditionFailure(
+        "Attempt to copy string contents into nil buffer pointer")
+    }
+    guard buffer.count >= count else {
+      _preconditionFailure(
+        "Insufficient space to copy string contents")
+    }
+
+    // UTF-16 offset of this slice's start within the base (whole-string) view.
+    let lower = _base.distance(from: _base.startIndex, to: _bounds.lowerBound)
+    let range = lower ..< (lower &+ count)
+
+    if _fastPath(_wholeGuts.isFastUTF8) {
+      unsafe _base._nativeCopy(
+        into: unsafe UnsafeMutableBufferPointer(
+          start: buffer.baseAddress,
+          count: count
+        ),
+        offsetRange: range
+      )
+      return (Substring().utf16.makeIterator(), count)
+    }
+
+#if _runtime(_ObjC)
+    // Foreign (bridged) strings can't use `_nativeCopy`, but can use ObjC.
+    _wholeGuts._object.withCocoaObject { ns in
+      unsafe _cocoaStringCopyCharacters(
+        from: ns,
+        range: range,
+        into: buffer.baseAddress._unsafelyUnwrappedUnchecked
+      )
+    }
+    return (Substring().utf16.makeIterator(), count)
+#else
+    fatalError("No foreign strings on non-ObjC platforms in this version of Swift")
+#endif
+  }
+}
+
+extension Substring.UTF16View {
   /// Returns a boolean value indicating whether this UTF16 view
   /// is trivially identical to `other`.
   ///
