@@ -99,19 +99,16 @@ extension TaskLocalMacro: PeerMacro {
 
     // If the property is global, do not prefix the synthesised decl with 'static'
     let isGlobal = context.lexicalContext.isEmpty
-    let staticKw: TokenSyntax?
+    let staticKeyword: TokenSyntax?
     if isGlobal {
-      staticKw = nil
+      staticKeyword = nil
     } else {
-      staticKw = TokenSyntax.keyword(.static, trailingTrivia: .space)
+      staticKeyword = TokenSyntax.keyword(.static, trailingTrivia: .space)
     }
-
-    let nonisolatedKw = TokenSyntax.keyword(.nonisolated, trailingTrivia: .space)
-    let dollarName = "$\(name.text)"
 
     return [
       """
-      \(attributes)\(access)\(nonisolatedKw)\(staticKw)let \(raw: dollarName)\(explicitTypeAnnotation) = TaskLocal(wrappedValue: \(initialValue))
+      \(attributes)\(access)\(staticKeyword)let $\(name)\(explicitTypeAnnotation) = TaskLocal(wrappedValue: \(initialValue))
       """
     ]
   }
