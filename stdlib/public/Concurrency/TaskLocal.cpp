@@ -337,6 +337,7 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
       (int)fileLength, file,
       (int)line);
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   if (_swift_shouldReportFatalErrorsToDebugger()) {
     RuntimeErrorDetails details = {
         .version = RuntimeErrorDetails::currentVersion,
@@ -353,6 +354,7 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
     };
     _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
   }
+#endif
 
 #if defined(_WIN32)
   #define STDERR_FILENO 2
