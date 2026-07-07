@@ -29,14 +29,8 @@
 /// to O(1); but the spikes make this construct less suitable for use cases that
 /// expect predictable, consistent performance on every operation.
 ///
-/// Implicit growth also makes it more difficult to predict/analyze the amount
-/// of memory an algorithm would need. Developers targeting environments with
-/// stringent limits on heap allocations may prefer to avoid using dynamically
-/// resizing container types as a matter of policy. The type `RigidArray` provides
-/// a fixed-capacity array variant that caters specifically for these use cases,
-/// trading ease-of-use for more consistent/predictable execution.
-/// For copyable elements, the copy-on-write `Array` type is an
-/// even more convenient and expressive choice.
+/// For copyable elements, the copy-on-write `Array` type is still a more
+/// convenient and expressive choice.
 @available(SwiftStdlib 6.4, *)
 @frozen
 public struct UniqueArray<Element: ~Copyable>: ~Copyable {
