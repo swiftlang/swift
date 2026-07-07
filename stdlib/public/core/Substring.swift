@@ -1110,6 +1110,7 @@ extension Substring.UTF16View: BidirectionalCollection {
 }
 
 extension Substring.UTF16View {
+  @available(SwiftStdlib 6.5, *)
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Unicode.UTF16.CodeUnit>
   ) -> (Iterator, UnsafeMutableBufferPointer<Unicode.UTF16.CodeUnit>.Index) {

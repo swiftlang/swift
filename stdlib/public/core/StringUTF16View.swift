@@ -503,6 +503,7 @@ extension String.UTF16View {
     return Iterator(_guts)
   }
 
+  @available(SwiftStdlib 6.5, *)
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Unicode.UTF16.CodeUnit>
   ) -> (Iterator, UnsafeMutableBufferPointer<Unicode.UTF16.CodeUnit>.Index) {
