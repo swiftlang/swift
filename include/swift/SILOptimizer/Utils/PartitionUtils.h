@@ -1940,8 +1940,17 @@ public:
     // assign an actor introducing inst.
     auto rep = getRepresentativeValue(op.getOpArg2()).getValue();
     if (dynamicRegionIsolation.isDisconnected() ||
-        staticRegionIsolation.isUnsafeNonIsolated())
+        staticRegionIsolation.isUnsafeNonIsolated()) {
+      REGIONBASEDISOLATION_VERBOSE_LOG(
+          llvm::dbgs()
+          << "    * Note: Eliding assign-into-sending-result error. "
+             "Reason: "
+          << (dynamicRegionIsolation.isDisconnected()
+                  ? "assigned region is disconnected"
+                  : "assigned value is nonisolated(unsafe)")
+          << "\n");
       return;
+    }
 
     handleError(AssignNeverSendableIntoSendingResultError(
         op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation));
@@ -2028,8 +2037,12 @@ public:
         // invariant when looking at other values in the region that are not
         // marked as nonisolated(unsafe).
         if (getIsolationRegionInfo(srcElement).isUnsafeNonIsolated() ||
-            getIsolationRegionInfo(destElement).isUnsafeNonIsolated())
+            getIsolationRegionInfo(destElement).isUnsafeNonIsolated()) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << "    * Note: Eliding merge error. Reason: "
+                              "src or dest element is nonisolated(unsafe)\n");
           return;
+        }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destIsolation,
             RegionMergeReason::Assign));
@@ -2067,8 +2080,12 @@ public:
         // invariant when looking at other values in the region that are not
         // marked as nonisolated(unsafe).
         if (getIsolationRegionInfo(srcElement).isUnsafeNonIsolated() ||
-            getIsolationRegionInfo(destElement).isUnsafeNonIsolated())
+            getIsolationRegionInfo(destElement).isUnsafeNonIsolated()) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << "    * Note: Eliding merge error. Reason: "
+                              "src or dest element is nonisolated(unsafe)\n");
           return;
+        }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destIsolation,
             RegionMergeReason::Assign));
@@ -2103,6 +2120,9 @@ public:
       // element. In such a case, this is also not a real send point.
       Element sentElement = op.getOpArg1();
       if (getIsolationRegionInfo(sentElement).isUnsafeNonIsolated()) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs() << "    * Note: Eliding send. Reason: "
+                            "sent element is nonisolated(unsafe)\n");
         return;
       }
 
@@ -2129,13 +2149,18 @@ public:
       // If our callee and region are both actor isolated and part of the same
       // isolation domain, do not treat this as a send.
       if (calleeIsolationInfo.isActorIsolated() &&
-          sentRegionIsolation.hasSameIsolation(calleeIsolationInfo))
+          sentRegionIsolation.hasSameIsolation(calleeIsolationInfo)) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs() << "    * Note: Eliding send. Reason: "
+                            "callee and sent region share actor isolation\n");
         return;
+      }
 
       // At this point, check if our sent value is not disconnected. If so, emit
       // a sent never sendable helper.
       if (sentRegionIsolation && !sentRegionIsolation.isDisconnected()) {
-        return handleSendNeverSentHelper(op, op.getOpArg1(), sentRegionIsolation);
+        return handleSentNeverSendableHelper(op, op.getOpArg1(),
+                                             sentRegionIsolation);
       }
 
       // Next see if we are disconnected and have the same isolation. In such a
@@ -2146,8 +2171,13 @@ public:
         if (auto fas = FullApplySite::isa(sourceInst);
             (!fas || !fas.isSending(*op.getSourceOp())) &&
             sentRegionIsolation.isDisconnected() && calleeIsolationInfo &&
-            sentRegionIsolation.hasSameIsolation(calleeIsolationInfo))
+            sentRegionIsolation.hasSameIsolation(calleeIsolationInfo)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs()
+              << "    * Note: Eliding send. Reason: disconnected value with "
+                 "matching isolation passed to a non-sending parameter\n");
           return;
+        }
       }
 
       // Mark op.getOpArg1() as sent.
@@ -2192,8 +2222,12 @@ public:
         // invariant when looking at other values in the region that are not
         // marked as nonisolated(unsafe).
         if (getIsolationRegionInfo(srcElement).isUnsafeNonIsolated() ||
-            getIsolationRegionInfo(destElement).isUnsafeNonIsolated())
+            getIsolationRegionInfo(destElement).isUnsafeNonIsolated()) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << "    * Note: Eliding merge error. Reason: "
+                              "src or dest element is nonisolated(unsafe)\n");
           return;
+        }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destRegIsolation,
             op.getRegionMergeReason()));
@@ -2344,7 +2378,13 @@ public:
       }
 
       // If we did not, then handle the direct return case.
-      handleDirectReturn();
+      if (!handleDirectReturn()) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs()
+            << "    * Note: Accepting disconnected 'inout sending' value at "
+               "exit. Reason: no conflicting return value in the same "
+               "region\n");
+      }
       return;
     }
     case PartitionOpKind::UnknownPatternError:
@@ -2447,6 +2487,12 @@ private:
             if (auto elt = getElement(value)) {
               SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
               if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                REGIONBASEDISOLATION_VERBOSE_LOG(
+                    llvm::dbgs()
+                    << "    * Note: Suppressing LocalUseAfterSend error. "
+                       "Reason: "
+                       "temporary alloc_stack initialized with unsafe "
+                       "nonisolated value\n");
                 return;
               }
             }
@@ -2455,8 +2501,13 @@ private:
 
         // See if we have a convert function from a `@Sendable` type. In this
         // case, we want to squelch the error.
-        if (isHiddenSendableFunctionType(equivalenceClassRep))
+        if (isHiddenSendableFunctionType(equivalenceClassRep)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs()
+              << "    * Note: Suppressing LocalUseAfterSend error. Reason: "
+                 "hidden sendable function type\n");
           return;
+        }
       }
 
       // If our instruction does not have any isolation info associated with it,
@@ -2466,8 +2517,13 @@ private:
           sentOp->getUser()->getFunction()->getActorIsolation();
       if (functionIsolation.isActorIsolated() &&
           SILIsolationInfo::get(sentOp->getUser())
-              .hasSameIsolation(functionIsolation))
+              .hasSameIsolation(functionIsolation)) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs()
+            << "    * Note: Suppressing LocalUseAfterSend error. Reason: "
+               "function isolation matches sent operand isolation\n");
         return;
+      }
     }
 
     // Ok, we actually need to emit a call to the callback.
@@ -2476,7 +2532,7 @@ private:
 
   // Private helper that squelches the error if our send instruction and our
   // use have the same isolation.
-  void handleSendNeverSentHelper(
+  void handleSentNeverSendableHelper(
       const PartitionOp &op, Element elt,
       SILDynamicMergedIsolationInfo dynamicMergedIsolationInfo) {
     if (shouldTryToSquelchErrors()) {
@@ -2491,6 +2547,11 @@ private:
             if (auto elt = getElement(value)) {
               SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
               if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                REGIONBASEDISOLATION_VERBOSE_LOG(
+                    llvm::dbgs()
+                    << "    * Note: Suppressing SentNeverSendable error. "
+                       "Reason: temporary alloc_stack initialized with unsafe "
+                       "nonisolated value\n");
                 return;
               }
             }
@@ -2499,8 +2560,13 @@ private:
 
         // See if we have a convert function from a `@Sendable` type. In this
         // case, we want to squelch the error.
-        if (isHiddenSendableFunctionType(equivalenceClassRep))
+        if (isHiddenSendableFunctionType(equivalenceClassRep)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs()
+              << "    * Note: Suppressing SentNeverSendable error. Reason: "
+                 "hidden sendable function type\n");
           return;
+        }
       }
     }
 
