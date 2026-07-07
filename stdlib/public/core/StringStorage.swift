@@ -889,9 +889,11 @@ extension _StringGuts {
   @inline(never)
   @_effects(releasenone)
   internal func createAndLoadBreadcrumbs_time_here_is_String_to_NSString_bridging_overhead(
-    _ mutPtr: UnsafeMutablePointer<_StringBreadcrumbs?>
+    _ mutPtr: UnsafeMutablePointer<_StringBreadcrumbs?>,
+    precalculatedUTF16Count: Int? = nil
   ) -> Unmanaged<_StringBreadcrumbs> {
-    let desired = _StringBreadcrumbs(String(self))
+    let desired = _StringBreadcrumbs(
+      String(self), precalculatedUTF16Count: precalculatedUTF16Count)
     return unsafe _stdlib_atomicAcquiringInitializeARCRef(
       object: mutPtr, desired: desired)
   }
@@ -918,14 +920,19 @@ extension _StringGuts {
         unsafe UnsafeMutablePointer(Builtin.addressof(&$0._breadcrumbs))
       }
     }
-    
+
+    var knownUTF16Count: Int? = nil
     if oneCrumb {
-      // The slot holds a raw integer (UTF-16 count), not an ARC reference.
-      // CAS it to zero so the existing nil-handling path can initialize real
-      // breadcrumbs. The range check ensures we never zero out a valid
-      // breadcrumbs pointer if another thread already upgraded.
+      /*
+       The slot holds a raw integer (UTF-16 count), not an ARC reference.
+       Capture it for use in full crumb creation, then CAS it to zero so the
+       nil-handling path can initialize real breadcrumbs. The range check
+       ensures we never zero out a valid breadcrumbs pointer if another thread
+       already upgraded.
+       */
       let word = Builtin.atomicload_acquire_Word(mutPtr._rawValue)
       if Int(word) > 0 && Int(word) <= Int(Int32.max) {
+        knownUTF16Count = Int(word)
         _ = Builtin.cmpxchg_acqrel_acquire_Word(
           mutPtr._rawValue, word, 0._builtinWordValue)
       }
@@ -934,7 +941,8 @@ extension _StringGuts {
     if let breadcrumbs = unsafe _stdlib_atomicAcquiringLoadARCRef(object: mutPtr) {
       return unsafe breadcrumbs
     }
-    return unsafe createAndLoadBreadcrumbs_time_here_is_String_to_NSString_bridging_overhead(mutPtr)
+    return unsafe createAndLoadBreadcrumbs_time_here_is_String_to_NSString_bridging_overhead(
+      mutPtr, precalculatedUTF16Count: knownUTF16Count)
   }
   
   @inline(__always)

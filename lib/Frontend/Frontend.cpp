@@ -1221,6 +1221,15 @@ bool CompilerInvocation::shouldImportCxx() const {
   return true;
 }
 
+bool CompilerInvocation::shouldImportCOM() const {
+  const auto &LangOpts = getLangOptions();
+  const auto &FEOpts = getFrontendOptions();
+
+  return LangOpts.EnableCOMInterop &&
+      !LangOpts.DisableImplicitCOMModuleImport &&
+      FEOpts.InputMode != FrontendOptions::ParseInputMode::SwiftModuleInterface;
+}
+
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -1308,6 +1317,12 @@ bool CompilerInstance::canImportCxxShim() const {
               .DependencyScanningSubInvocation;
 }
 
+bool CompilerInstance::canImportCOM() const {
+  const auto &ASTContext = getASTContext();
+  ImportPath::Module::Builder mod(ASTContext.getIdentifier(COM_MODULE_NAME));
+  return ASTContext.testImportModule(mod.get());
+}
+
 bool CompilerInstance::supportCaching() const {
   if (!Invocation.getCASOptions().EnableCaching)
     return false;
@@ -1390,6 +1405,10 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     if (canImportCxxShim())
       pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});
   }
+
+  if (Invocation.getLangOptions().EnableCOMInterop)
+    if (Invocation.shouldImportCOM() && canImportCOM())
+      pushImport(COM_MODULE_NAME);
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
   if (frontendOpts.ModuleHasBridgingHeader) {

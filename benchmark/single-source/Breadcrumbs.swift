@@ -40,8 +40,14 @@ public let benchmarks: [BenchmarkInfo] = [
 
   MutatedUTF16ToIdx(workload: asciiWorkload, count: 50).info,
   MutatedUTF16ToIdx(workload: mixedWorkload, count: 50).info,
+  MutatedUTF16ToIdx(workload: longMixedWorkload, count: 10).info,
+  MutatedUTF16ToIdx(workload: longCyrillicWorkload, count: 10).info,
+  MutatedUTF16ToIdx(workload: longCJKWorkload, count: 10).info,
   MutatedIdxToUTF16(workload: asciiWorkload, count: 50).info,
   MutatedIdxToUTF16(workload: mixedWorkload, count: 50).info,
+  MutatedIdxToUTF16(workload: longMixedWorkload, count: 10).info,
+  MutatedIdxToUTF16(workload: longCyrillicWorkload, count: 10).info,
+  MutatedIdxToUTF16(workload: longCJKWorkload, count: 10).info,
 ]
 
 extension String {
