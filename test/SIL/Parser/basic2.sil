@@ -41,18 +41,6 @@ bb0(%0 : $@sil_unmanaged Builtin.NativeObject):
   return %1 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil [ossa] @test_destroy_poison
-// CHECK: bb0([[T0:%[0-9]+]] : @owned $Builtin.NativeObject):
-// CHECK-NEXT: destroy_value [poison] [[T0]] : $Builtin.NativeObject
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-sil [ossa] @test_destroy_poison : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $Builtin.NativeObject):
-  destroy_value [poison] %0 : $Builtin.NativeObject
-  %2 = tuple ()
-  return %2 : $()
-}
-
 // CHECK-LABEL: sil [ossa] @test_movevalue_parsing : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[REGISTER_0:%[^,]+]] :
 // CHECK-NEXT: [[REGISTER_1:%[^,]+]] = move_value [[REGISTER_0]]
@@ -78,17 +66,11 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
 // CHECK-LABEL: sil [ossa] @test_debug_value_alloc_stack_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK:  debug_value [moveable_value_debuginfo] %0 : $Builtin.NativeObject
-// CHECK:  debug_value [poison] %0 : $Builtin.NativeObject
-// CHECK:  debug_value [poison] [moveable_value_debuginfo] %0 : $Builtin.NativeObject
-// CHECK:  debug_value [poison] [moveable_value_debuginfo] %0 : $Builtin.NativeObject
 // CHECK:  alloc_stack [moveable_value_debuginfo] $Builtin.NativeObject
 // CHECK: } // end sil function 'test_debug_value_alloc_stack_moved'
 sil [ossa] @test_debug_value_alloc_stack_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   debug_value [moveable_value_debuginfo] %0 : $Builtin.NativeObject
-  debug_value [poison] %0 : $Builtin.NativeObject
-  debug_value [moveable_value_debuginfo] [poison] %0 : $Builtin.NativeObject
-  debug_value [poison] [moveable_value_debuginfo] %0 : $Builtin.NativeObject
 
   %1 = alloc_stack [moveable_value_debuginfo] $Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
@@ -371,9 +353,9 @@ bb2:
 
 // CHECK-LABEL: sil [ossa] @test_destroy_value : {{.*}} {
 // CHECK:         destroy_value
-// CHECK:         destroy_value [poison]
+// CHECK:         destroy_value
 // CHECK:         destroy_value [dead_end]
-// CHECK:         destroy_value [poison] [dead_end]
+// CHECK:         destroy_value [dead_end]
 // CHECK-LABEL: } // end sil function 'test_destroy_value'
 sil [ossa] @test_destroy_value : $@convention(thin) () -> () {
 entry:
@@ -388,7 +370,7 @@ gleft:
   br exit
 gright:
   %k2 = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
-  destroy_value [poison] %k2 : $Klass
+  destroy_value %k2 : $Klass
   br exit
 exit:
   %retval = tuple()
@@ -401,7 +383,7 @@ bleft:
   unreachable
 bright:
   %k4 = apply %getKlass() : $@convention(thin) () -> (@owned Klass)
-  destroy_value [poison] [dead_end] %k4 : $Klass
+  destroy_value [dead_end] %k4 : $Klass
   unreachable
 }
 

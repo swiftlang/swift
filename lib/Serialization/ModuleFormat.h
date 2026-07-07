@@ -59,7 +59,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
 const uint16_t SWIFTMODULE_VERSION_MINOR =
-    1007; // per-argument SILLocations on apply
+    1008; // remove PoisonRefs from debug_value and destroy_value
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///

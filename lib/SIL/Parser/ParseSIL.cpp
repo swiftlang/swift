@@ -3565,14 +3565,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
   case SILInstructionKind::DestroyValueInst: {
-    PoisonRefs_t poisonRefs = DontPoisonRefs;
     IsDeadEnd_t isDeadEnd = IsntDeadEnd;
     StringRef attributeName;
     SourceLoc attributeLoc;
     while (parseSILOptional(attributeName, attributeLoc, *this)) {
-      if (attributeName == "poison")
-        poisonRefs = PoisonRefs;
-      else if (attributeName == "dead_end")
+      if (attributeName == "dead_end")
         isDeadEnd = IsDeadEnd;
       else {
         P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
@@ -3582,7 +3579,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createDestroyValue(InstLoc, Val, poisonRefs, isDeadEnd);
+    ResultVal = B.createDestroyValue(InstLoc, Val, isDeadEnd);
     break;
   }
   case SILInstructionKind::BeginCOWMutationInst: {
@@ -3623,19 +3620,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   }
 
   case SILInstructionKind::DebugValueInst: {
-    PoisonRefs_t poisonRefs = DontPoisonRefs;
     bool hasTrace = false;
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
         DoesNotUseMoveableValueDebugInfo;
     SILDebugVariable VarInfo;
 
-    // Allow for poison and moved to be in either order.
+    // Allow for trace and moved to be in either order.
     StringRef attributeName;
     SourceLoc attributeLoc;
     while (parseSILOptional(attributeName, attributeLoc, *this)) {
-      if (attributeName == "poison")
-        poisonRefs = PoisonRefs;
-      else if (attributeName == "trace")
+      if (attributeName == "trace")
         hasTrace = true;
       else if (attributeName == "moveable_value_debuginfo")
         usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
@@ -3651,13 +3645,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseSILDebugTransformBlock(DebugBB, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
-    if (Val->getType().isAddress())
-      assert(!poisonRefs && "debug_value w/ address value does not support poison");
 
     if (Val->getType().isMoveOnly())
       usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
 
-    ResultVal = B.createDebugValue(InstLoc, Val, VarInfo, poisonRefs,
+    ResultVal = B.createDebugValue(InstLoc, Val, VarInfo,
                                    usesMoveableValueDebugInfo, hasTrace);
 
     if (DebugBB)
