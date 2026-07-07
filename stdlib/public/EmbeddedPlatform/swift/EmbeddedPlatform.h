@@ -348,11 +348,6 @@ __swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
  */
 void _swift_exit(__swift_ptrdiff_t code);
 
-#undef EMBEDDED_SWIFT_SINGLE
-#undef EMBEDDED_SWIFT_SIZED_BY
-#undef EMBEDDED_SWIFT_COUNTED_BY
-#undef EMBEDDED_SWIFT_NULLABLE
-#undef EMBEDDED_SWIFT_NONNULL
 #undef EMBEDDED_SWIFT_NAME
 #undef EMBEDDED_SWIFT_OPTION_SET
 
