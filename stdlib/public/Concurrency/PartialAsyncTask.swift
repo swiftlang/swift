@@ -55,7 +55,7 @@ internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
 ///
-/// An `UnownedJob` must be eventually run *exactly once* using ``runSynchronously(on:)``.
+/// An `UnownedJob` must be eventually run *exactly once* using `runSynchronously(on:)`.
 /// Not doing so is effectively going to leak and "hang" the work that the job represents (e.g. a ``Task``).
 @available(SwiftStdlib 5.1, *)
 @frozen
@@ -141,8 +141,6 @@ public struct UnownedJob: Sendable {
   /// as a job can only ever be run once, and must not be accessed after it has been run.
   ///
   /// - Parameter executor: the task executor this job will be run on.
-  ///
-  /// - SeeAlso: ``runSynchronously(isolatedTo:taskExecutor:)``
   @_unavailableInEmbedded
   @available(StdlibDeploymentTarget 6.0, *)
   @_alwaysEmitIntoClient
@@ -170,7 +168,8 @@ public struct UnownedJob: Sendable {
   /// - Parameter serialExecutor: the executor this job will be semantically running on.
   /// - Parameter taskExecutor: the task executor this job will be run on.
   ///
-  /// - SeeAlso: ``runSynchronously(on:)``
+  /// - SeeAlso: ``runSynchronously(on:)-(UnownedSerialExecutor)``
+  /// - SeeAlso: ``runSynchronously(on:)-(UnownedTaskExecutor)``
   @_unavailableInEmbedded
   @available(StdlibDeploymentTarget 6.0, *)
   @_alwaysEmitIntoClient
@@ -445,7 +444,8 @@ extension ExecutorJob {
   /// - Parameter serialExecutor: the executor this job will be semantically running on.
   /// - Parameter taskExecutor: the task executor this job will be run on.
   ///
-  /// - SeeAlso: ``runSynchronously(on:)``
+  /// - SeeAlso: ``runSynchronously(on:)-(UnownedSerialExecutor)``
+  /// - SeeAlso: ``runSynchronously(on:)-(UnownedTaskExecutor)``
   @_unavailableInEmbedded
   @available(StdlibDeploymentTarget 6.0, *)
   @_alwaysEmitIntoClient
@@ -611,7 +611,7 @@ public struct JobPriority: Sendable {
 
 @available(StdlibDeploymentTarget 5.9, *)
 extension TaskPriority {
-  /// Convert this ``UnownedJob/Priority`` to a ``TaskPriority``.
+  /// Convert this ``JobPriority`` to a ``TaskPriority``.
   ///
   /// Most values are directly interchangeable, but this initializer reserves the right to fail for certain values.
   @available(StdlibDeploymentTarget 5.9, *)
@@ -972,7 +972,7 @@ public nonisolated(nonsending) func withUnsafeThrowingContinuation<T>(
 }
 
 /// Source-compatibility overload; replaced by
-/// ``withUnsafeThrowingContinuation(_:)``.
+/// ``withUnsafeThrowingContinuation(_:)-((UnsafeContinuation<T,E>)->Void)``.
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @unsafe

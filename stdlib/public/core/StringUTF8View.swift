@@ -220,7 +220,7 @@ extension String.UTF8View: BidirectionalCollection {
   ///     print("First character's UTF-8 code unit: \(greeting.utf8[i])")
   ///     // Prints "First character's UTF-8 code unit: 72"
   ///
-  /// - Parameter position: A valid index of the view. `position`
+  /// - Parameter i: A valid index of the view. `i`
   ///   must be less than the view's end index.
   @inlinable @inline(__always)
   public subscript(i: Index) -> UTF8.CodeUnit {

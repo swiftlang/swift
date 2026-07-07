@@ -92,7 +92,7 @@ extension RangeExpression {
   ///
   /// - Parameters:
   ///   - pattern: A range.
-  ///   - bound: A value to match against `pattern`.
+  ///   - value: A value to match against `pattern`.
   @inlinable
   @inline(__always)
   public static func ~= (pattern: Self, value: Bound) -> Bool {
@@ -944,7 +944,7 @@ extension Collection {
   ///     print(streetsSlice[0])
   ///     // error: Index out of bounds
   ///
-  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  /// - Parameter r: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
   ///
   /// - Complexity: O(1)

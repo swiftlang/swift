@@ -392,7 +392,6 @@ extension UnsafePointer where Pointee: ~Copyable {
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
-  ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
@@ -1250,7 +1249,6 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
-  ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
   @unsafe
