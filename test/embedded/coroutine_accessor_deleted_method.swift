@@ -11,10 +11,12 @@
 // RUN: %target-run %t/a.out | %FileCheck %s --check-prefix=CHECK-OUT
 
 // Also works outside of Embedded, though dead-method elimination only runs here
-// under optimization (Embedded always runs it):
+// under optimization (Embedded always runs it).  The full non-embedded link+run
+// is skipped on wasm, where the SDK lacks non-embedded static-executable link
+// args (the -emit-ir check below still exercises the stub there).
 // RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature CoroutineAccessors -O -wmo -emit-ir | %FileCheck %s
-// RUN: %target-build-swift %s -parse-as-library -enable-experimental-feature CoroutineAccessors -O -wmo -o %t/a.desktop.out
-// RUN: %target-run %t/a.desktop.out | %FileCheck %s --check-prefix=CHECK-OUT
+// RUN: %if !CPU=wasm32 %{ %target-build-swift %s -parse-as-library -enable-experimental-feature CoroutineAccessors -O -wmo -o %t/a.desktop.out %}
+// RUN: %if !CPU=wasm32 %{ %target-run %t/a.desktop.out | %FileCheck %s --check-prefix=CHECK-OUT %}
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
