@@ -7563,7 +7563,9 @@ typeCheckOriginalFuncWithCustomDerivative(DerivativeAttr *attr,
     return true;
   }
 
-  if (originalAFD->isAlwaysEmittedIntoClient() !=
+  // If original function is definition, then derivative must match it in
+  // terms of exported interface / implementation.
+  if (originalAFD->hasBody() && originalAFD->isAlwaysEmittedIntoClient() !=
       derivative->isAlwaysEmittedIntoClient()) {
     diags.diagnose(derivative->getLoc(),
                    diag::derivative_attr_always_emit_into_client_mismatch);
