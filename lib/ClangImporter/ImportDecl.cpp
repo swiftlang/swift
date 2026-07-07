@@ -8799,8 +8799,19 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
     if (!afd)
       continue;
 
-    // Only add the attribute to functions that don't already have availability
-    if (afd->getAttrs().hasAttribute<AvailableAttr>())
+    // Skip if the method already carries a rename pointing at its async
+    // alternative (e.g. one synthesized during import); a plain imported OS
+    // availability attribute must not suppress it, or an async
+    // '@objc @implementation' member won't match its completion-handler
+    // requirement and no thunk will be generated.
+    //
+    // Check the attribute syntactically: resolving getAsyncAlternative() here
+    // does name lookup, which re-enters member loading while this nominal is
+    // still importing and corrupts its member lookup table.
+    if (llvm::any_of(afd->getAttrs().getAttributes<AvailableAttr>(),
+                     [](const AvailableAttr *attr) {
+                       return !attr->getRename().empty();
+                     }))
       continue;
 
     llvm::VersionTuple NoVersion;
