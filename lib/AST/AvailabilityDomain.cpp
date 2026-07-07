@@ -12,6 +12,7 @@
 
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
@@ -557,15 +558,12 @@ bool IsCustomAvailabilityDomainPermanentlyEnabled::evaluate(
   if (!domainDecl)
     return false;
 
-  if (auto deprecatedAttr = domainDecl->getDeprecatedAttr()) {
-    if (deprecatedAttr->getDomain().isUniversal())
-      return true;
-  }
-
-  if (auto unavailableAttr = domainDecl->getUnavailableAttr()) {
-    if (unavailableAttr->getDomain().isUniversal())
-      return true;
-  }
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(domainDecl->getASTContext());
+  auto restriction = deploymentAvailability.restrictionForDecl(domainDecl);
+  if (restriction)
+    if (restriction->isUnavailable() || restriction->isDeprecated())
+      return restriction->getDomain().isUniversal();
 
   return false;
 }

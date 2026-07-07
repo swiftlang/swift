@@ -26,6 +26,8 @@ AvailabilityRestriction::getDomainAndRange(const ASTContext &ctx) const {
   case Reason::UnavailableUnintroduced:
   case Reason::Unintroduced:
     return getAttr().getIntroducedDomainAndRange(ctx).value();
+  case Reason::Deprecated:
+    return getAttr().getDeprecatedDomainAndRange(ctx).value();
   }
 }
 
@@ -43,6 +45,9 @@ AvailabilityRestriction::getFixItDomainAndRange(const ASTContext &ctx) const {
     case Reason::Unintroduced:
       return AvailabilityDomainAndRange(
           attrDomain, AvailabilityRange(getAttr().getIntroduced().value()));
+    case Reason::Deprecated:
+      return AvailabilityDomainAndRange(
+          attrDomain, AvailabilityRange(getAttr().getDeprecated().value()));
     }
   }
   return getDomainAndRange(ctx);
@@ -76,6 +81,10 @@ void AvailabilityRestriction::print(llvm::raw_ostream &os) const {
   case Reason::Unintroduced:
     os << "introduced";
     version = getAttr().getIntroduced();
+    break;
+  case Reason::Deprecated:
+    os << "deprecated";
+    version = getAttr().getDeprecated();
     break;
   }
 
@@ -152,6 +161,11 @@ static bool canIgnoreRestrictionInUnavailableContexts(
   case AvailabilityRestriction::Reason::UnavailableObsolete:
   case AvailabilityRestriction::Reason::UnavailableUnintroduced:
     return domain.isVersioned();
+
+  case AvailabilityRestriction::Reason::Deprecated:
+    // Filtering of deprecation restrictions is done by
+    // getDeprecationRestrictionForAttr().
+    return false;
   }
 }
 
@@ -178,6 +192,44 @@ shouldIgnoreRestrictionInContext(const Decl *decl,
     domain = targetDomain;
 
   return context.isUnavailableForDomain(domain);
+}
+
+static std::optional<AvailabilityRestriction>
+getDeprecationRestrictionForAttr(const Decl *decl,
+                                 const SemanticAvailableAttr &attr,
+                                 const AvailabilityContext &context,
+                                 std::optional<AvailabilityRange> availableRange,
+                                 const AvailabilityRestrictionFlags flags) {
+  bool includeSoftDeprecation =
+      flags.contains(AvailabilityRestrictionFlag::IncludeSoftDeprecation);
+
+  if (context.isDeprecated())
+    return std::nullopt;
+
+  if (context.isUnavailable() && isa<TypeDecl>(decl))
+    return std::nullopt;
+
+  // Don't diagnose deprecation in contexts that are unreachable for the
+  // deprecated domain.
+  if (availableRange && availableRange->isKnownUnreachable())
+    return std::nullopt;
+
+  if (attr.isUnconditionallyDeprecated())
+    return AvailabilityRestriction::deprecated(attr);
+
+  auto &ctx = decl->getASTContext();
+  if (auto deprecatedRange = attr.getDeprecatedRange(ctx)) {
+    // When IncludeSoftDeprecation is specified, decls deprecated in a future
+    // deployment target are diagnosed too.
+    if (includeSoftDeprecation)
+      return AvailabilityRestriction::deprecated(attr);
+
+    auto deploymentRange = attr.getDomain().getDeploymentRange(ctx);
+    if (deploymentRange && deploymentRange->isContainedIn(*deprecatedRange))
+      return AvailabilityRestriction::deprecated(attr);
+  }
+
+  return std::nullopt;
 }
 
 std::optional<AvailabilityRestriction> swift::getAvailabilityRestrictionForAttr(
@@ -215,6 +267,11 @@ std::optional<AvailabilityRestriction> swift::getAvailabilityRestrictionForAttr(
                    ? AvailabilityRestriction::unintroduced(attr)
                    : AvailabilityRestriction::unavailableUnintroduced(attr);
     }
+
+    // Is the decl deprecated in this context?
+    if (auto deprecation = getDeprecationRestrictionForAttr(
+            decl, attr, context, availableRange, flags))
+      return deprecation;
 
     return std::nullopt;
   };
@@ -298,6 +355,7 @@ static bool restrictionIndicatesRuntimeUnavailability(
     return domainCanBeUnconditionallyUnavailableAtRuntime(domain, ctx);
   case AvailabilityRestriction::Reason::UnavailableObsolete:
   case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+  case AvailabilityRestriction::Reason::Deprecated:
     return false;
   case AvailabilityRestriction::Reason::Unintroduced:
     return domainIsUnavailableAtRuntimeIfUnintroduced(domain, ctx);

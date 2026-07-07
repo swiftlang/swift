@@ -259,6 +259,7 @@ static bool isUnavailableInAllVersions(ValueDecl *decl) {
       return true;
     case AvailabilityRestriction::Reason::UnavailableObsolete:
     case AvailabilityRestriction::Reason::Unintroduced:
+    case AvailabilityRestriction::Reason::Deprecated:
       break;
     }
   }
@@ -1860,7 +1861,8 @@ getOverrideAvailability(ValueDecl *override, ValueDecl *base) {
   flags |= AvailabilityRestrictionFlag::
       AllowUniversallyUnavailableInCompatibleContexts;
 
-  if (auto restriction = baseAvailability.restrictionForDecl(override, flags)) {
+  if (auto restriction =
+          baseAvailability.unsatisfiedRestrictionForDecl(override, flags)) {
     if (restriction->isUnavailable())
       return {OverrideAvailability::OverrideUnavailable, restriction};
 

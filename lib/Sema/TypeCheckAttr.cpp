@@ -2247,6 +2247,7 @@ getSemanticAvailableRangeDeclAndAttr(const Decl *decl,
     switch (restriction->getReason()) {
     case AvailabilityRestriction::Reason::UnavailableUnconditionally:
     case AvailabilityRestriction::Reason::UnavailableObsolete:
+    case AvailabilityRestriction::Reason::Deprecated:
       break;
     case AvailabilityRestriction::Reason::UnavailableUnintroduced:
     case AvailabilityRestriction::Reason::Unintroduced:
@@ -5647,7 +5648,8 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
     availabilityContext.constrainWithContext(parentAvailability, Ctx);
   }
 
-  auto availabilityRestriction = availabilityContext.restrictionForDecl(D);
+  auto availabilityRestriction =
+      availabilityContext.unsatisfiedRestrictionForDecl(D);
   if (!availabilityRestriction)
     return;
 

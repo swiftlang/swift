@@ -1838,5 +1838,5 @@ bool DeclContext::isAlwaysAvailableConformanceContext() const {
   // target.
   auto &ctx = getASTContext();
   auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
-  return !deploymentTarget.restrictionForDecl(ext);
+  return !deploymentTarget.unsatisfiedRestrictionForDecl(ext);
 }
