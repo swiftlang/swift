@@ -2503,7 +2503,7 @@ namespace {
           Impl.addImportDiagnostic(
               decl,
               Diagnostic(
-                  diag::record_non_trivial_copy_destroy,
+                  diag::record_non_trivial_weak_ref,
                   Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
               decl->getLocation());
           return nullptr;
@@ -2534,7 +2534,7 @@ namespace {
             Impl.addImportDiagnostic(
                 decl,
                 Diagnostic(
-                    diag::record_non_trivial_copy_destroy,
+                    diag::record_non_trivial_strong_ref,
                     Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
                 decl->getLocation());
             return nullptr;
