@@ -395,7 +395,12 @@ void swift::performLLVMOptimizations(
     PTO.MergeFunctions = !Opts.DisableLLVMMergeFunctions;
     // Splitting trades code size to enhance memory locality, avoid in -Osize.
     DoHotColdSplit = Opts.EnableHotColdSplit && !Opts.optimizeForSize();
-    level = llvm::OptimizationLevel::Os;
+    // The dedicated Os/Oz size-optimization pipelines were removed upstream in
+    // favor of running the O2 pipeline together with the optsize/minsize
+    // function attributes. Swift already attaches those attributes based on the
+    // optimization mode (see IRGenModule::constructInitialFnAttributes), so the
+    // size preference is preserved at the function level.
+    level = llvm::OptimizationLevel::O2;
   } else {
     level = llvm::OptimizationLevel::O0;
   }
