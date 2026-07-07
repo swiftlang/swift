@@ -77,7 +77,7 @@ where
   ///   destroyed to encode an instance of its `AtomicOptionalRepresentation`.
   /// - Returns: The newly encoded `AtomicOptionalRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming Self?
@@ -105,7 +105,7 @@ where
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming RawValue.AtomicOptionalRepresentation
@@ -138,7 +138,7 @@ extension Optional: AtomicRepresentable where Wrapped: AtomicOptionalRepresentab
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming Wrapped?
@@ -157,7 +157,7 @@ extension Optional: AtomicRepresentable where Wrapped: AtomicOptionalRepresentab
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation

@@ -115,7 +115,7 @@ public func _identityCast<T, U>(_ x: T, to expectedType: U.Type) -> U {
 ///
 /// This cast can be useful for dispatching to specializations of generic
 /// functions.
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 public func _specialize<T, U>(_ x: T, for: U.Type) -> U? {
   guard T.self == U.self else {
@@ -165,7 +165,7 @@ internal func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
 ///   - t1: Another type to compare.
 /// - Returns: `true` if both `t0` and `t1` are `nil` or if they represent the
 ///   same type; otherwise, `false`.
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 public func == (
   t0: (any (~Copyable & ~Escapable).Type)?,
@@ -196,7 +196,7 @@ public func == (
 ///   - t1: Another type to compare.
 /// - Returns: `true` if one, but not both, of `t0` and `t1` are `nil`, or if
 ///   they represent different types; otherwise, `false`.
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 public func != (
   t0: (any (~Copyable & ~Escapable).Type)?,
@@ -786,7 +786,7 @@ func _isUnique_native<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique_native(&object))
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 public // @testable
 func _COWBufferForReading<T: AnyObject>(_ object: T) -> T {
@@ -808,7 +808,7 @@ func _isPOD<T: ~Copyable & ~Escapable>(_ type: T.Type) -> Bool {
 ///
 /// Note that there may be cases in which, despite `T` being concrete at some
 /// point in the caller chain, this function will return `false`.
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 public // @testable
 func _isConcrete<T>(_ type: T.Type) -> Bool {
@@ -839,7 +839,7 @@ func _isOptional<T>(_ type: T.Type) -> Bool {
 ///
 /// Optimizations performed at various stages during compilation may affect the
 /// result of this function.
-@_alwaysEmitIntoClient @inline(__always)
+@export(implementation) @inline(__always)
 internal func _isComputed(_ value: Int) -> Bool {
   return !Bool(Builtin.int_is_constant_Word(value._builtinWordValue))
 }
@@ -982,7 +982,7 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 ///
 /// - Parameter value: The value for which to find the dynamic type.
 /// - Returns: The dynamic type, which is a metatype instance.
-@_alwaysEmitIntoClient
+@export(implementation)
 @_semantics("typechecker.type(of:)")
 public func type<T: ~Copyable & ~Escapable, Metatype>(
   of value: borrowing T
@@ -1087,7 +1087,7 @@ func __abi_type<T, Metatype>(of value: T) -> Metatype {
 ///   - body: A closure that is executed immediately with an escapable copy of
 ///     `closure` as its argument.
 /// - Returns: The return value, if any, of the `body` closure.
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @_semantics("typechecker.withoutActuallyEscaping(_:do:)")
 public func withoutActuallyEscaping<ClosureType, ResultType, Failure>(
@@ -1119,7 +1119,7 @@ func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
 }
 
 @_unavailableInEmbedded
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @_semantics("typechecker._openExistential(_:do:)")
 public func _openExistential<ExistentialType, ContainedType, ResultType, Failure>(
@@ -1158,7 +1158,7 @@ func __abi_openExistential<ExistentialType, ContainedType, ResultType>(
 /// constructed from literals or if the construction site of the string is not
 /// in the function containing the call to this SPI.
 @_transparent
-@_alwaysEmitIntoClient
+@export(implementation)
 public // @SPI(OSLog)
 func _getGlobalStringTablePointer(_ constant: String) -> UnsafePointer<CChar> {
   return unsafe UnsafePointer<CChar>(Builtin.globalStringTablePointer(constant));

@@ -20,7 +20,7 @@ import Swift
 %      'init/*throws*/',
 %   ],
 %   [ # ALL_AVAILABILITY
-%     '@_alwaysEmitIntoClient',
+%     '@export(implementation)',
 %     '@available(SwiftStdlib 5.1, *)',
 %   ],
 %   [ # PARAMS
@@ -34,7 +34,7 @@ import Swift
 %      'static func detached/*throws*/',
 %   ],
 %   [
-%     '@_alwaysEmitIntoClient',
+%     '@export(implementation)',
 %     '@available(SwiftStdlib 5.1, *)',
 %   ],
 %   [ # PARAMS
@@ -49,7 +49,7 @@ import Swift
 %      'init/*throws*/',
 %   ],
 %   [ # ALL_AVAILABILITY
-%     '@_alwaysEmitIntoClient',
+%     '@export(implementation)',
 %     '@available(SwiftStdlib 6.0, *)',
 %   ],
 %   [ # PARAMS
@@ -64,7 +64,7 @@ import Swift
 %      'static func detached/*throws*/',
 %   ],
 %   [
-%     '@_alwaysEmitIntoClient',
+%     '@export(implementation)',
 %     '@available(SwiftStdlib 6.0, *)',
 %   ],
 %   [ # PARAMS
@@ -85,7 +85,7 @@ import Swift
 %      'func detach<Success>/*throws*/',
 %   ],
 %   [ # ALL_AVAILABILITY
-%     '@_alwaysEmitIntoClient',
+%     '@export(implementation)',
 %     '@available(SwiftStdlib 5.1, *)',
 %     '@available(*, deprecated, message: "`detach` was replaced by `Task.detached` and will be removed shortly.")',
 %   ],
@@ -100,7 +100,7 @@ import Swift
 %      'static func runDetached/*throws*/',
 %   ],
 %   [ # ALL_AVAILABILITY
-%     '@_alwaysEmitIntoClient',
+%     '@export(implementation)',
 %     '@available(SwiftStdlib 5.1, *)',
 %     '@available(*, deprecated, message: "`Task.runDetached` was replaced by `Task.detached` and will be removed shortly.")',
 %   ],
@@ -115,7 +115,7 @@ import Swift
 %      'func asyncDetached<Success>/*throws*/',
 %   ],
 %   [ # ALL_AVAILABILITY
-%     '@_alwaysEmitIntoClient',
+%     '@export(implementation)',
 %     '@available(SwiftStdlib 5.1, *)',
 %     '@available(*, deprecated, message: "`asyncDetached` was replaced by `Task.detached` and will be removed shortly.")',
 %   ],
@@ -130,7 +130,7 @@ import Swift
 %      'func async<Success>/*throws*/',
 %   ],
 %   [ # ALL_AVAILABILITY
-%     '@_alwaysEmitIntoClient',
+%     '@export(implementation)',
 %     '@available(SwiftStdlib 5.1, *)',
 %     '@available(*, deprecated, message: "`async` was replaced by `Task.init` and will be removed shortly.")',
 %   ],
@@ -194,7 +194,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
 % # --------------------------------------------------------------------------------------------------------------------
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public ${METHOD_VARIANT}(
       ${",\n    ".join(adjust_params_for_kind(PARAMS))}
@@ -206,7 +206,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
 % if not HAS_TASK_EXECUTOR:
 #elseif $Embedded
   @discardableResult
-  @_alwaysEmitIntoClient
+  @export(implementation)
   ${"  \n".join(adjust_availability(['@available(SwiftStdlib 5.1, *)']))}
   public ${METHOD_VARIANT}(
       ${",\n    ".join(adjust_params_for_kind(PARAMS))}

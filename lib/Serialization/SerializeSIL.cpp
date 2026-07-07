@@ -1128,12 +1128,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     if (!Options.SerializeDebugInfoSIL)
      return;
     auto DVI = cast<DebugValueInst>(&SI);
-    unsigned attrs = unsigned(DVI->poisonRefs() & 0x1);
+    unsigned attrs = 0;
+    bool hasReconstructionBlock = DVI->getDebugReconstructionBlock() != nullptr;
+    attrs |= unsigned(hasReconstructionBlock);
     attrs |= unsigned(DVI->usesMoveableValueDebugInfo()) << 1;
     attrs |= unsigned(DVI->hasTrace()) << 2;
-
-    bool hasReconstructionBlock = DVI->getDebugReconstructionBlock() != nullptr;
-    attrs |= unsigned(hasReconstructionBlock) << 11;
 
     if (hasReconstructionBlock)
       DebugBBWorklist.push_back(const_cast<DebugValueInst *>(DVI));
@@ -1896,7 +1895,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *HTE = dyn_cast<HopToExecutorInst>(&SI)) {
       Attr = HTE->isMandatory();
     } else if (auto *DVI = dyn_cast<DestroyValueInst>(&SI)) {
-      Attr = unsigned(DVI->poisonRefs()) | (unsigned(DVI->isDeadEnd()) << 1);
+      Attr = unsigned(DVI->isDeadEnd());
     } else if (auto *BCMI = dyn_cast<BeginCOWMutationInst>(&SI)) {
       Attr = BCMI->isNative();
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {

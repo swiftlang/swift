@@ -16,6 +16,8 @@ func test2() throws { // Not OK
     // CHECK: bb{{[0-9]+}}:
     // CHECK: bb{{[0-9]+}}:
     // CHECK:      end_borrow [[ERROR_BORROW]]
+    // CHECK-NEXT: br [[FORWARD_ERROR:bb[0-9]+]]
+    // CHECK: [[FORWARD_ERROR]]:
     // CHECK-NEXT: store [[ERROR]] to [init]
     // CHECK-NEXT: throw_addr
 

@@ -223,7 +223,7 @@ extension __RawDictionaryStorage {
       Builtin.addressof(&_swiftEmptyDictionarySingleton))
   }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal final func uncheckedKey<Key: Hashable>(at bucket: _HashTable.Bucket) -> Key {
     defer { unsafe _fixLifetime(self) }
@@ -233,14 +233,14 @@ extension __RawDictionaryStorage {
   }
 
   @safe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never)
   internal final func find<Key: Hashable>(_ key: Key) -> (bucket: _HashTable.Bucket, found: Bool) {
     return unsafe find(key, hashValue: key._rawHashValue(seed: _seed))
   }
 
   @safe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never)
   internal final func find<Key: Hashable>(_ key: Key, hashValue: Int) -> (bucket: _HashTable.Bucket, found: Bool) {
       let hashTable = unsafe _hashTable

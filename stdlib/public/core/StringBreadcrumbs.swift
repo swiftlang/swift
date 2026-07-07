@@ -24,9 +24,7 @@ internal final class _StringBreadcrumbs {
 
   // TODO: Does this need to be inout, unique, or how will we be enforcing
   // atomicity?
-  internal init(_ str: String) {
-    let stride = _StringBreadcrumbs.breadcrumbStride
-
+  internal init(_ str: String, precalculatedUTF16Count: Int? = nil) {
     self.crumbs = []
 
     if str.isEmpty {
@@ -34,13 +32,46 @@ internal final class _StringBreadcrumbs {
       return
     }
 
+    let stride = _StringBreadcrumbs.breadcrumbStride
+    let utf16 = str.utf16
+
+    _internalInvariant(str._guts.isFastUTF8)
+
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+    let utf16Length: Int
+    if let precalculatedUTF16Count {
+      // If this String was originally created from UTF16, it will already have a length value we can use
+      utf16Length = precalculatedUTF16Count
+      _internalInvariant(utf16Length == utf16._utf16Distance(
+        from: utf16.startIndex, to: utf16.endIndex))
+    } else {
+      /*
+       This could be optimized further to do a one-pass vectorized scan,
+       but this reuses machinery from the rest of the UTF16 infrastructure
+       and is still ~3x faster than the scalar version it replaced
+       */
+      utf16Length = utf16._utf16Distance(
+        from: utf16.startIndex, to: utf16.endIndex)
+    }
+    self.utf16Length = utf16Length
+
+    // One crumb at offset 0, plus one per full `stride` thereafter
+    self.crumbs.reserveCapacity(1 &+ (utf16Length / stride))
+
+    str._guts.withFastUTF8 { utf8 in
+      var crumb = utf16.startIndex
+      self.crumbs.append(crumb)
+      var remaining = utf16Length
+      while remaining >= stride {
+        crumb = unsafe utf16._nativeIndex(utf8, from: crumb, offsetBy: stride)
+        self.crumbs.append(crumb)
+        remaining &-= stride
+      }
+    }
+#else
     self.crumbs.reserveCapacity(
       (str._guts.count / 3) / stride)
 
-    // TODO(String performance): More efficient implementation of initial scan.
-    // We'll also want to benchmark this initial scan in order to track changes.
-
-    let utf16 = str.utf16
     var i = 0
     var curIdx = utf16.startIndex
     while curIdx != utf16.endIndex {
@@ -57,8 +88,9 @@ internal final class _StringBreadcrumbs {
     }
 
     self.utf16Length = i
-    _internalInvariant(self.crumbs.count == 1 + (self.utf16Length / stride))
+#endif
 
+    _internalInvariant(self.crumbs.count == 1 + (self.utf16Length / stride))
     _invariantCheck(for: str)
   }
 }

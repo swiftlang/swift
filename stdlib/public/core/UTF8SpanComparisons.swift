@@ -15,7 +15,7 @@ extension UTF8Span {
   /// Whether this span has the same bytes as `other`.
   ///
   /// - Complexity: O(n)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func bytesEqual(to other: some Sequence<UInt8>) -> Bool {
     unsafe _withUnsafeBufferPointer { unsafe $0.elementsEqual(other) }
   }
@@ -23,7 +23,7 @@ extension UTF8Span {
   /// Whether this span has the same `Unicode.Scalar`s as `other`.
   ///
   /// - Complexity: O(n)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func unicodeScalarsEqual(
     to other: some Sequence<Unicode.Scalar>
   ) -> Bool {
@@ -47,7 +47,7 @@ extension UTF8Span {
   ///
   /// - Complexity: O(n)
   @_unavailableInEmbedded
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func charactersEqual(
     to other: some Sequence<Character>
   ) -> Bool {
@@ -110,7 +110,7 @@ extension UTF8Span {
   /// memory region, and have the same flags (such as ``isKnownASCII``).
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     unsafe (self._unsafeBaseAddress == other._unsafeBaseAddress) &&
     (self._countAndFlags == other._countAndFlags)

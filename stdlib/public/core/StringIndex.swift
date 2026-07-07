@@ -251,19 +251,19 @@ extension String.Index {
 }
 
 extension String.Index {
-  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  @export(implementation) @inline(__always) // Swift 5.7
   internal static var __scalarAlignmentBit: UInt64 { 0x1 }
 
-  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  @export(implementation) @inline(__always) // Swift 5.7
   internal static var __characterAlignmentBit: UInt64 { 0x2 }
 
-  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  @export(implementation) @inline(__always) // Swift 5.7
   internal static var __utf8Bit: UInt64 { 0x4 }
 
-  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  @export(implementation) @inline(__always) // Swift 5.7
   internal static var __utf16Bit: UInt64 { 0x8 }
 
-  @_alwaysEmitIntoClient @inline(__always) // Swift 5.7
+  @export(implementation) @inline(__always) // Swift 5.7
   internal static func __encodingBit(utf16: Bool) -> UInt64 {
     let utf16 = Int8(Builtin.zext_Int1_Int8(utf16._value))
     return __utf8Bit &<< utf16
@@ -309,13 +309,13 @@ extension String.Index {
 
 */
 extension String.Index {
-  @_alwaysEmitIntoClient // Swift 5.1
+  @export(implementation) // Swift 5.1
   @inline(__always)
   internal var _isScalarAligned: Bool {
     0 != _rawBits & Self.__scalarAlignmentBit
   }
 
-  @_alwaysEmitIntoClient // Swift 5.1
+  @export(implementation) // Swift 5.1
   @inline(__always)
   internal var _scalarAligned: String.Index {
     var idx = self
@@ -347,7 +347,7 @@ extension String.Index {
 // fine -- `index(after:)` and `index(before:)` still do the right thing with
 // minimal/no performance loss. (The start/end index is handled specially.)
 extension String.Index {
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal var _isCharacterAligned: Bool {
     0 != _rawBits & Self.__characterAlignmentBit
@@ -357,7 +357,7 @@ extension String.Index {
   /// set.
   ///
   /// (`Character` alignment implies scalar alignment.)
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal var _characterAligned: String.Index {
     let r = _rawBits | Self.__characterAlignmentBit | Self.__scalarAlignmentBit
@@ -368,7 +368,7 @@ extension String.Index {
 }
 
 extension String.Index {
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   internal func _copyingAlignment(from index: Self) -> Self {
     let mask = Self.__scalarAlignmentBit | Self.__characterAlignmentBit
     return Self((_rawBits & ~mask) | (index._rawBits & mask))
@@ -420,7 +420,7 @@ extension String.Index {
 // handled in `_StringGuts.ensureMatchingEncoding(_:)`; see there for the sordid
 // details.
 extension String.Index {
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal var _encodingBits: UInt64 {
     _rawBits & (Self.__utf8Bit | Self.__utf16Bit)
@@ -431,7 +431,7 @@ extension String.Index {
   ///
   /// (This returns true if either we know for sure that this is an UTF-8 index,
   /// or if we don't have enough information to determine its encoding.)
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal var _canBeUTF8: Bool {
     // The only way an index cannot be UTF-8 is it has only the UTF-16 flag set.
@@ -444,7 +444,7 @@ extension String.Index {
   /// (This returns true if either we know for sure that this is an UTF-16
   /// index, or if we don't have enough information to determine its
   /// encoding.)
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal var _canBeUTF16: Bool {
     // The only way an index cannot be UTF-16 is it has only the UTF-8 flag set.
@@ -459,30 +459,30 @@ extension String.Index {
   /// is guaranteed to never incorrectly return false. If all loaded binaries
   /// were built in 5.7+, then this method is guaranteed to always return the
   /// correct value.
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal func _hasMatchingEncoding(isUTF8 utf8: Bool) -> Bool {
     _encodingBits != Self.__encodingBit(utf16: utf8)
   }
 
   /// Returns the same index with the UTF-8 bit set.
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal var _knownUTF8: Self { Self(_rawBits | Self.__utf8Bit) }
 
   /// Returns the same index with the UTF-16 bit set.
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal var _knownUTF16: Self { Self(_rawBits | Self.__utf16Bit) }
 
   /// Returns the same index with both UTF-8 & UTF-16 bits set.
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(__always)
   internal var _encodingIndependent: Self {
     Self(_rawBits | Self.__utf8Bit | Self.__utf16Bit)
   }
 
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   internal func _copyingEncoding(from index: Self) -> Self {
     let mask = Self.__utf8Bit | Self.__utf16Bit
     return Self((_rawBits & ~mask) | (index._rawBits & mask))
@@ -516,7 +516,7 @@ extension String.Index: Hashable {
 }
 
 extension String.Index {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var _encodingDescription: String {
     switch (_rawBits & Self.__utf8Bit != 0, _rawBits & Self.__utf16Bit != 0) {
     case (false, false): return "unknown"
@@ -530,7 +530,7 @@ extension String.Index {
   ///
   /// - Important: The contents of the returned string are not guaranteed to
   ///    remain stable: they may arbitrarily change in any Swift release.
-  @_alwaysEmitIntoClient // FIXME: Use @backDeployed
+  @export(implementation) // FIXME: Use @backDeployed
   @inline(never)
   public var debugDescription: String {
     // 23[utf8]+1
@@ -550,7 +550,7 @@ extension String.Index {
   ///
   /// - Important: The contents of the returned string are not guaranteed to
   ///    remain stable: they may arbitrarily change in any Swift release.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, renamed: "debugDescription")
   public var _description: String {
     debugDescription
@@ -560,7 +560,7 @@ extension String.Index {
   ///
   /// - Important: The contents of the returned string are not guaranteed to
   ///    remain stable: they may arbitrarily change in any Swift release.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, renamed: "debugDescription")
   public var _debugDescription: String {
     debugDescription

@@ -160,7 +160,7 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
 }
 
 extension CollectionOfOne {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func withContiguousStorageIfAvailable<R: ~Copyable, E: Error>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R? {
@@ -179,7 +179,7 @@ extension CollectionOfOne {
   /// - Returns: A `Span` over the element of this collection.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var span: Span<Element> {
     @_lifetime(borrow self)
     get {
@@ -194,7 +194,7 @@ extension CollectionOfOne {
   /// - Returns: A `MutableSpan` over the element of this collection.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
     mutating get {
@@ -227,19 +227,19 @@ extension CollectionOfOne: Sendable where Element: Sendable { }
 extension CollectionOfOne.Iterator: Sendable where Element: Sendable { }
 
 extension CollectionOfOne where Element: Equatable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func ==(lhs: CollectionOfOne<Element>, rhs: CollectionOfOne<Element>) -> Bool {
     return lhs._element == rhs._element
   }
 }
 
 extension CollectionOfOne where Element: Hashable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(self._element)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var hashValue: Int { // Prevent compiler from synthesizing hashValue.
     var hasher = Hasher()
     self.hash(into: &hasher)

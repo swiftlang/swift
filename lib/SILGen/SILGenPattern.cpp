@@ -3904,7 +3904,6 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
 void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
                                        ArrayRef<CaseStmt *> clauses,
                                        JumpDest catchFallthroughDest) {
-
   auto completionHandler = [&](PatternMatchEmission &emission,
                                ArgArray argArray, ClauseRow &row) {
     auto clause = row.getClientData<CaseStmt>();
@@ -4054,6 +4053,14 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   // multiple-entry case blocks.
   emission.emitAddressOnlyAllocations();
 
+  SILBasicBlock *failureBB = nullptr;
+  JumpDest failureDest = JumpDest::invalid();
+
+  if (ThrowDest.isValid()) {
+    failureBB = createBasicBlock();
+    failureDest = JumpDest(failureBB, getCleanupsDepth(), CleanupLocation(S));
+  }
+  
   Scope stmtScope(Cleanups, CleanupLocation(S));
 
   auto consumptionKind = exn.getType().isObject()
@@ -4066,8 +4073,6 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   ConsumableManagedValue subject = {exn.borrow(*this, S), consumptionKind};
 
   auto failure = [&](SILLocation location) {
-    // If we fail to match anything, just rethrow the exception.
-
     // If the throw destination is not valid, then the PatternMatchEmission
     // logic is emitting an unreachable block but didn't prune the failure BB.
     // Mark it as such.
@@ -4076,26 +4081,17 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
       return;
     }
 
-    // Since we borrowed exn before sending it to our subcases, we know that it
-    // must be at +1 at this point. That being said, SILGenPattern will
-    // potentially invoke this for each of the catch statements, so we need to
-    // copy before we pass it into the throw.
-    CleanupStateRestorationScope scope(Cleanups);
-    if (exn.hasCleanup()) {
-      scope.pushCleanupState(exn.getCleanup(),
-                             CleanupState::PersistentlyActive);
-    }
-
-    // We may create temporaries while bridging from typed to untyped throws.
-    FullExpr throwScope(Cleanups, CleanupLocation(location));
-    emitThrow(S, exn);
+    // Jump to the failure block, which sits out of the current scope, so
+    // we release the borrow on the original error value and can forward it
+    // to the outer function.
+    Cleanups.emitBranchAndCleanups(failureDest, S);
   };
   // Set up an initial clause matrix.
   ClauseMatrix clauseMatrix(clauseRows);
 
   // Recursively specialize and emit the clause matrix.
   emission.emitDispatch(clauseMatrix, subject, failure);
-  assert(!B.hasValidInsertionPoint());
+  ASSERT(!B.hasValidInsertionPoint());
 
   stmtScope.pop();
 
@@ -4109,4 +4105,21 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
       Cleanups.emitBranchAndCleanups(catchFallthroughDest, caseStmt->getBody());
     }
   });
+
+  // Emit the failure block, if it was needed.
+  if (ThrowDest.isValid()) {
+    if (failureBB->pred_empty()) {
+      // Drop the failure block if we didn't use it.
+      failureBB->eraseFromParent();
+    } else {
+      B.emitBlock(failureBB);
+
+      // We may create temporaries while bridging from typed to untyped throws.
+      FullExpr throwScope(Cleanups, CleanupLocation(S));
+      emitThrow(S, exn);
+      ASSERT(!B.hasValidInsertionPoint());
+    }
+  }
+
 }
+

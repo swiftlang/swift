@@ -520,7 +520,7 @@ extension Unicode.Scalar {
   }
 
   // Access the scalar as encoded in UTF-8
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   internal func withUTF8CodeUnits<Result, E: Error>(
     _ body: (UnsafeBufferPointer<UInt8>) throws(E) -> Result

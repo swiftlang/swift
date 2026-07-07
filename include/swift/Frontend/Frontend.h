@@ -464,6 +464,9 @@ public:
   /// Whether the CXX module should be implicitly imported.
   bool shouldImportCxx() const;
 
+  /// Whether the COM module should be implicitly imported.
+  bool shouldImportCOM() const;
+
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
   /// Return value includes the buffer so caller can keep it alive.
@@ -723,6 +726,9 @@ public:
   /// Whether the CxxShim library can be imported
   /// i.e. if it can be found.
   bool canImportCxxShim() const;
+
+  /// Whether the COM support library can be imported, i.e. if it can be found.
+  bool canImportCOM() const;
 
   /// Whether this compiler instance supports caching.
   bool supportCaching() const;

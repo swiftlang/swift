@@ -1063,7 +1063,7 @@ static bool tryExtendLifetimeToLastUse(
         auto loc = RegularLocation(builder.getInsertionPointLoc());
         auto isDeadEnd = IsDeadEnd_t(
             deadEndBlocks->isDeadEnd(builder.getInsertionPoint()->getParent()));
-        builder.createDestroyValue(loc, closureCopy, DontPoisonRefs, isDeadEnd);
+        builder.createDestroyValue(loc, closureCopy, isDeadEnd);
       });
 
   // Closure User may not be post-dominating the previously created copy_value.
