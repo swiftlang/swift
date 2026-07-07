@@ -147,7 +147,13 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
   TargetOptions TargetOpts;
 
   // Linker support for this is not widespread enough.
-  TargetOpts.SupportIndirectSymViaGOTPCRel_AArch64_ELF = false;
+  //
+  // FIXME: The downstream 'llvm::TargetOptions' field this depends on
+  // (added by llvm.org/pr78003 / swiftlang/llvm-project#9339) is not present
+  // on the current llvm-project branch, so there is currently no way to
+  // disable indirect symbol replacement with GOTPCREL for AArch64/ELF.
+  // Restore this once that patch is forward-ported.
+  // TargetOpts.SupportIndirectSymViaGOTPCRel_AArch64_ELF = false;
 
   // Explicitly request debugger tuning for LLDB which is the default
   // on Darwin platforms but not on others.
