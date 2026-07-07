@@ -45,7 +45,6 @@ extension AdditiveArithmetic where Self: Differentiable {
     return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
   }
 
-  /*
   @inlinable
   @_alwaysEmitIntoClient  
   @derivative(of: +=)
@@ -62,9 +61,8 @@ extension AdditiveArithmetic where Self: Differentiable {
     (value: Void, differential: (inout TangentVector, TangentVector) -> Void) {
     lhs += rhs
     return ((), { $0 += $1 })
-  }*/
+  }
 
-  
   @inlinable
   @_transparent
   @derivative(of: -)
@@ -81,7 +79,6 @@ extension AdditiveArithmetic where Self: Differentiable {
     return (lhs - rhs, { (dlhs, drhs) in dlhs - drhs })
   }
 
-  /*
   @inlinable
   @_alwaysEmitIntoClient
   @derivative(of: -=)
@@ -98,5 +95,5 @@ extension AdditiveArithmetic where Self: Differentiable {
     (value: Void, differential: (inout TangentVector, TangentVector) -> Void) {
     lhs -= rhs
     return ((), { $0 -= $1 })
-  }*/
+  }
 }
