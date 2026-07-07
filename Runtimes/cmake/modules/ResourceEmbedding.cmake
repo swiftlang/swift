@@ -25,7 +25,7 @@ function(generate_plist project_name project_version target)
   get_target_property(EMBED_PLIST ${target} EMBED_PLIST)
   if(APPLE AND EMBED_PLIST)
     target_link_options(${target} PRIVATE
-      "SHELL:-Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker ${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}")
+      "SHELL:LINKER:-sectcreate LINKER:__TEXT LINKER:__info_plist LINKER:${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}")
   endif()
 
   configure_file(
