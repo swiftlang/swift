@@ -123,19 +123,6 @@ public:
       llvm::PrefixMapper *mapper, bool ShareClangCompilerInstance);
 
 private:
-  /// Initialize/finalize the clang compiler scanning tool.
-  /// Behind the scenes, the clang scanning tool maintains
-  /// a single clang compiler instance to perform all by-name
-  /// dependency scans. initializeClangScanningTool() initializes
-  /// the clang compiler instance, and returns an error if the
-  /// initialization fails. Once successfully initialized,
-  /// the same clang compiler instance is reused whenever
-  /// scanFilesystemForClangModuleDependency is called,
-  /// throughout the lifetime of the ModuleDependencyScanningWorker
-  /// instance.
-  llvm::Error initializeClangScanningTool();
-  llvm::Error finalizeClangScanningTool();
-
   /// Query dependency information for a named Clang module
   ///
   /// \param moduleName moduel identifier for the query
@@ -208,6 +195,12 @@ private:
   std::unique_ptr<InterfaceSubContextDelegateImpl> scanningASTDelegate;
   // The Clang scanner tool used by this worker.
   clang::tooling::DependencyScanningTool clangScanningTool;
+  // A persistent by-name scanning context maintaining a single Clang compiler
+  // instance that is reused across all by-name lookups performed by this worker
+  // when \c ShareClangCompilerInstance is set. Lazily created on the first
+  // by-name query.
+  std::optional<clang::tooling::CompilerInstanceWithContext>
+      clangScanningContext;
   // Swift and Clang module loaders acting as scanners.
   std::unique_ptr<SwiftModuleScanner> swiftModuleScannerLoader;
 
@@ -326,8 +319,6 @@ private:
                           DiagnosticEngine &Diagnostics, bool ParallelScan,
                           bool ShareClangCompilerInstance,
                           bool EmitScanRemarks);
-  llvm::Error initializeWorkerClangScanningTool();
-  llvm::Error finalizeWorkerClangScanningTool();
 
   /// Main routine that computes imported module dependency transitive
   /// closure for the given module.
@@ -479,10 +470,6 @@ private:
   std::mutex WorkersLock;
   /// Count of filesystem queries performed
   std::atomic<unsigned> NumLookups = 0;
-  /// Flag to use a single clang compiler instance to do all
-  /// dependency queries during the life time of each worker this
-  /// scanner owns.
-  bool ShareClangCompilerInstance = true;
 };
 
 /// Check if a module path is under one of the known SDK private framework
