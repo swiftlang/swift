@@ -636,6 +636,19 @@ private:
         ContextualPattern::forPatternBindingDecl(patternBinding, index);
     Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
 
+    if (patternType->hasError()) {
+      // Fail immediately if this is an invalid pattern and the solver is not
+      // in the diagnostic mode.
+      if (!cs.shouldAttemptFixes()) {
+        hadError = true;
+        return;
+      }
+
+      // In diagnostic mode, let's let the type through. It would get pattern
+      // type turned into a hole during the constraint generation for the
+      // pattern.
+    }
+
     auto target = getTargetForPattern(patternBinding, index, patternType);
     if (!target) {
       hadError = true;
