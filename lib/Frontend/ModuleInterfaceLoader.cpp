@@ -518,7 +518,7 @@ public:
     if (!buf)
       return DependencyStatus::Missing;
 
-    return xxHash64(buf.get()->getBuffer()) == dep.getContentHash() ?
+    return xxh3_64bits(buf.get()->getBuffer()) == dep.getContentHash() ?
         DependencyStatus::UpToDate :
         DependencyStatus::OutOfDate;
   }
