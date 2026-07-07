@@ -2399,50 +2399,123 @@ namespace {
         return nullptr;
       }
 
-      auto isNonTrivialDueToAddressDiversifiedPtrAuth =
-          [](const clang::RecordDecl *decl) {
-            if (!decl->isCompleteDefinition())
-              return true;
+      // Classify why a C/C++ record is non-trivial to copy or destroy.
+      // This determines whether we can import the struct and under which
+      // feature flags.
+      enum class NonTrivialCause {
+        Trivial,
+        PtrAuthOnly,
+        ARCStrongOnly,
+        HasWeak,
+        HasCUnion,
+        UserProvidedCxx,
+        Other
+      };
 
-            for (auto *field : decl->fields()) {
-              if (!field->getType().isNonTrivialToPrimitiveCopy()) {
-                continue;
-              }
-              if (field->getType().isNonTrivialToPrimitiveCopy() !=
-                  clang::QualType::PCK_PtrAuth) {
-                return false;
+      // Recursively walk a record's fields (and C++ bases) to determine
+      // the cause of non-triviality. Returns the "worst" cause found.
+      auto classifyNonTrivialRecord =
+          [](const clang::RecordDecl *decl,
+             auto &self) -> NonTrivialCause {
+            if (!decl->isCompleteDefinition())
+              return NonTrivialCause::Other;
+
+            if (auto *cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+              if (cxxDecl->hasUserDeclaredCopyConstructor() ||
+                  cxxDecl->hasUserDeclaredDestructor())
+                return NonTrivialCause::UserProvidedCxx;
+            }
+
+            // Reject types with non-trivial fields inside unions.
+            if (decl->hasNonTrivialToPrimitiveCopyCUnion() ||
+                decl->hasNonTrivialToPrimitiveDestructCUnion())
+              return NonTrivialCause::HasCUnion;
+
+            auto cause = NonTrivialCause::Trivial;
+
+            auto dominated = [](NonTrivialCause a,
+                                NonTrivialCause b) -> NonTrivialCause {
+              return a > b ? a : b;
+            };
+
+            // Walk C++ base classes.
+            if (auto *cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+              for (auto &base : cxxDecl->bases()) {
+                auto *baseRecord =
+                    base.getType()->getAsCXXRecordDecl();
+                if (!baseRecord)
+                  return NonTrivialCause::Other;
+                cause = dominated(cause, self(baseRecord, self));
+                if (cause >= NonTrivialCause::HasWeak)
+                  return cause;
               }
             }
-            return true;
+
+            for (auto *field : decl->fields()) {
+              auto fieldType = field->getType();
+              auto pck = fieldType.isNonTrivialToPrimitiveCopy();
+
+              switch (pck) {
+              case clang::QualType::PCK_Trivial:
+              case clang::QualType::PCK_VolatileTrivial:
+                break;
+              case clang::QualType::PCK_PtrAuth:
+                cause = dominated(cause, NonTrivialCause::PtrAuthOnly);
+                break;
+              case clang::QualType::PCK_ARCStrong:
+                cause = dominated(cause, NonTrivialCause::ARCStrongOnly);
+                break;
+              case clang::QualType::PCK_ARCWeak:
+                return NonTrivialCause::HasWeak;
+              case clang::QualType::PCK_Struct: {
+                auto *inner = fieldType->getAsRecordDecl();
+                if (!inner)
+                  return NonTrivialCause::Other;
+                cause = dominated(cause, self(inner, self));
+                if (cause >= NonTrivialCause::HasWeak)
+                  return cause;
+                break;
+              }
+              }
+            }
+
+            return cause;
           };
 
       bool isNonTrivialPtrAuth = false;
       bool hasArcFields = false;
-      // FIXME: We should actually support strong ARC references and similar in
-      // C structs. That'll require some SIL and IRGen work, though.
       if (decl->isNonTrivialToPrimitiveCopy() ||
           decl->isNonTrivialToPrimitiveDestroy()) {
-        isNonTrivialPtrAuth = Impl.SwiftContext.SILOpts
-                                  .EnableImportPtrauthFieldFunctionPointers &&
-                              isNonTrivialDueToAddressDiversifiedPtrAuth(decl);
-        if (!isNonTrivialPtrAuth) {
-          // Check if the non-triviality is due to ARC fields and the
-          // experimental feature flag is enabled.
-          if (Impl.SwiftContext.LangOpts.hasFeature(
-                  Feature::ImportCStructsWithArcFields)) {
-            hasArcFields = true;
-          } else {
-            // Note that there is a third predicate related to these,
-            // isNonTrivialToPrimitiveDefaultInitialize. That one's not
-            // important for us because Swift never "trivially
-            // default-initializes" a struct (i.e. uses whatever bits were lying
-            // around as an initial value).
+        auto cause = classifyNonTrivialRecord(decl, classifyNonTrivialRecord);
+        switch (cause) {
+        case NonTrivialCause::Trivial:
+        case NonTrivialCause::HasCUnion:
+        case NonTrivialCause::Other:
+          Impl.addImportDiagnostic(
+              decl,
+              Diagnostic(
+                  diag::record_non_trivial_copy_destroy,
+                  Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+              decl->getLocation());
+          return nullptr;
 
-            // FIXME: It would be nice to instead import the declaration but
-            // mark it as unavailable, but then it might get used as a type for
-            // an imported function and the developer would be able to use it
-            // without referencing the name, which would sidestep our
-            // availability diagnostics.
+        case NonTrivialCause::HasWeak:
+          Impl.addImportDiagnostic(
+              decl,
+              Diagnostic(
+                  diag::record_non_trivial_copy_destroy,
+                  Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+              decl->getLocation());
+          return nullptr;
+
+        case NonTrivialCause::UserProvidedCxx:
+          break;
+
+        case NonTrivialCause::PtrAuthOnly:
+          if (Impl.SwiftContext.SILOpts
+                  .EnableImportPtrauthFieldFunctionPointers) {
+            isNonTrivialPtrAuth = true;
+          } else {
             Impl.addImportDiagnostic(
                 decl,
                 Diagnostic(
@@ -2451,6 +2524,22 @@ namespace {
                 decl->getLocation());
             return nullptr;
           }
+          break;
+
+        case NonTrivialCause::ARCStrongOnly:
+          if (Impl.SwiftContext.LangOpts.hasFeature(
+                  Feature::ImportCStructsWithArcFields)) {
+            hasArcFields = true;
+          } else {
+            Impl.addImportDiagnostic(
+                decl,
+                Diagnostic(
+                    diag::record_non_trivial_copy_destroy,
+                    Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+                decl->getLocation());
+            return nullptr;
+          }
+          break;
         }
       }
 

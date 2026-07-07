@@ -51,3 +51,36 @@ func receiveStrongStructFromCFunction() {
   let s = returnStrongArcStruct()
   let _: MYObject = s.myobj
 }
+
+// Nested structs with strong ARC fields should be imported.
+// CHECK-IDE-TEST: struct OuterArcStruct {
+// CHECK-IDE-TEST:   init()
+// CHECK-IDE-TEST:   init(nested: InnerArcStruct, tag: Int32)
+// CHECK-IDE-TEST:   var nested: InnerArcStruct
+// CHECK-IDE-TEST:   var tag: Int32
+// CHECK-IDE-TEST: }
+func testNestedArcStructImport() {
+  let inner = InnerArcStruct(inner: MYObject())
+  let outer = OuterArcStruct(nested: inner, tag: 42)
+  let _: MYObject = outer.nested.inner
+}
+
+// Structs with __weak fields should not be imported even with the flag.
+func weakArcStructIsRejected() {
+  _ = WeakInAStructArc() // expected-error {{cannot find 'WeakInAStructArc' in scope}}
+}
+
+// Structs nesting a __weak field should not be imported.
+func outerWithWeakInnerIsRejected() {
+  _ = OuterWithWeakInner() // expected-error {{cannot find 'OuterWithWeakInner' in scope}}
+}
+
+// Union with strong ARC fields should not be imported.
+func unionWithStrongIsRejected() {
+  _ = UnionWithStrong() // expected-error {{cannot find 'UnionWithStrong' in scope}}
+}
+
+// Struct containing a union with strong ARC fields should not be imported.
+func structWithArcUnionIsRejected() {
+  _ = StructWithArcUnion() // expected-error {{cannot find 'StructWithArcUnion' in scope}}
+}
