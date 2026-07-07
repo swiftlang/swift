@@ -671,15 +671,19 @@ not matching original bodies exactly.
 All three items below are workarounds that paper over real bugs, not fixes.
 Each masks a different problem that needs to be properly resolved.
 
-**DenseMap corruption (NOT fixed — workaround):** `deserializeAllBodies`
-originally used a stack-local `DenseMap<DeclID, BraceStmt*>`. The contiguous
-bucket array was corrupted by an out-of-bounds write in one of the subagent
-deserializer cases (root cause never identified). Swapping to `std::map`
-does NOT fix the write — it just moves the victim memory so the corruption
-lands somewhere less catastrophic. The out-of-bounds write is still
-happening, potentially corrupting other heap data. The proper fix is to find
-the offending deserializer case using AddressSanitizer or bounds-checking
-assertions on `ExprTable`/`StmtTable` access, then revert to `DenseMap`.
+**DenseMap corruption (worked around — but corruption was causing silent
+wrong results):** `deserializeAllBodies` originally used a stack-local
+`DenseMap<DeclID, BraceStmt*>`. The contiguous bucket array was corrupted
+by an out-of-bounds write from a subagent deserializer case (root cause
+not yet identified). Replacing with `std::vector<std::pair<DeclID,
+BraceStmt*>>` eliminated the crash AND dropped verify-ast-cache diffs
+from 135 to 48 — meaning 87 of 135 diffs were caused by corrupted DenseMap
+lookups returning wrong `BraceStmt*` pointers (functions getting the wrong
+bodies), not by serialization logic errors. The underlying out-of-bounds
+write still happens but no longer affects correctness because the vector
+uses simple append (no hashing, no grow-with-rehash). The proper fix is to
+find the offending deserializer case using AddressSanitizer or
+bounds-checking assertions on `ExprTable`/`StmtTable` access.
 
 **CaseStmt labels (NOT serialized — workaround):** The serializer only writes
 `{bodyStmtID}` for `CaseStmt` — it does not serialize the case label items
@@ -701,6 +705,15 @@ written and something came back. It does NOT validate that the deserialized
 The proper fix is to set up `ResolveType` in the test fixture so the test
 actually exercises the ErasureExpr deserialization path.
 
+### 11.8 Outstanding work
+
+Current state: **48 diffs** (down from 135), 14/19 lit tests pass, 56/56
+unit tests pass. No crashes.
+
+1. **Reduce verify-ast-cache diffs from 48 to zero**:
+   - Trace each remaining diff to its root cause. With the DenseMap
+     corruption fixed (vector workaround), the remaining 48 diffs are
+     genuine serialization fidelity gaps.
    - Common diff patterns: missing source ranges on body exprs/stmts,
      `ErrorExpr` where original has a typed expr, missing `body` field on
      accessors, pattern binding decls not serialized,
@@ -711,17 +724,22 @@ actually exercises the ErasureExpr deserialization path.
    in bodies are not serialized — they appear as `pattern_binding_decl`
    in the original AST but are missing from the deserialized AST.
 
-3. **Investigate root cause of DenseMap corruption**: The `std::map`
-   workaround avoids the crash, but the underlying out-of-bounds write in a
-   deserializer case should be found and fixed. Use AddressSanitizer or
-   bounds-checking assertions on ExprTable/StmtTable access.
+3. **Investigate root cause of out-of-bounds write**: The
+   `std::vector<std::pair>` workaround avoids the corruption, but the
+   underlying out-of-bounds write in a deserializer case should be found
+   and fixed. Use AddressSanitizer or bounds-checking assertions on
+   ExprTable/StmtTable access.
 
 4. **Source range serialization for body nodes**: Body exprs/stmts have
    invalid source ranges after deserialization. Need to either serialize
    source ranges in the body block or extend the `declRangesBlob` to cover
    body-local decls.
 
-5. **Missing expression kinds not yet checked**: Some expression kinds in
+5. **CaseStmt label serialization**: Serialize the `CaseLabelItem` array
+   (patterns + guard exprs). Depends on LOCAL_DECL records for VarDecls
+   inside patterns.
+
+6. **Missing expression kinds not yet checked**: Some expression kinds in
    `ExprNodes.def` may not appear in the test files but could appear in
    real-world code. Audit against the full `ExprNodes.def` list and verify
    each concrete kind has a serialization case. Known gaps:
@@ -733,3 +751,70 @@ actually exercises the ErasureExpr deserialization path.
      `MaterializePackExpr`, `DotSyntaxBaseIgnoredExpr`,
      `UnresolvedMemberChainResultExpr`, `InterpolatedStringLiteralExpr`,
      `RegexLiteralExpr`, `ObjectLiteralExpr`, `CaptureListExpr`
+
+## 12. Design review feedback (2026-07-06)
+
+A Swift project reviewer raised three concerns about the per-file AST cache
+approach. These are architectural, not implementation-level, and deserve
+careful consideration before investing further in body serialization.
+
+### 12.1 Cross-file in-memory object graph dependencies
+
+**Concern:** The type-checked AST for a file can depend on in-memory objects
+constructed during another file's type-checking — conformances, witness
+tables, generic environment bindings, associated type resolutions. The
+`CachedNominalDeclRegistry` handles nominal type resolution, but the full
+set of cross-file in-memory dependencies may not be captured by the cache
+format. `.swiftdeps` may not fully model these dependencies.
+
+**Risk:** High. If a cached file's deserialized AST references a conformance
+or substitution map that was resolved differently in a different compilation
+context, the cached AST could be semantically wrong — producing incorrect
+code or silent miscompilation. The `-verify-ast-cache` test only validates
+structural equivalence (JSON diff), not semantic correctness.
+
+### 12.2 State-dependent behavior and testability
+
+**Concern:** The compiler's behavior now depends not only on the input
+program but on all past compilation invocations (the state of the cache
+directory). This creates a long tail of bugs that are impossible to
+reproduce because they depend on a specific sequence of events on the
+user's machine.
+
+**Risk:** Medium. The cache validation (ASTCacheKey comparison of source
+hash, imported module hashes, etc.) should catch stale caches. But the
+reviewer's point is that two compilations with identical inputs could
+produce different in-memory object graphs (e.g., conformance resolution
+order), and caching one may miss dependencies the other had.
+
+### 12.3 Parsing overhead — is the cache solving the right problem?
+
+**Concern:** The motivation for caching is that parsing is slow. But the
+Swift compiler previously had a "delayed parsing" mechanism that skipped
+bodies of nominal types and extensions in secondary files when not needed.
+If this mechanism bitrotted, or if swift-syntax now parses everything
+eagerly, the right fix might be to restore delayed parsing rather than
+cache the entire type-checked AST.
+
+**Risk:** This could make the entire body serialization effort (Section 11)
+unnecessary. If the parsing overhead comes from unnecessary body parsing
+that could be avoided by restoring delayed parsing, the cache approach is
+solving the symptom, not the cause.
+
+### 12.4 Recommendation
+
+Before investing further in body serialization fidelity (reducing 48 → 0
+diffs), investigate the source of parsing overhead:
+
+1. Profile a real build (e.g., swift-nio) to identify where time is spent.
+2. Check if delayed parsing is still functional or bitrotted.
+3. Check if swift-syntax's integration changed parsing behavior.
+4. If delayed parsing can be restored, measure whether it eliminates the
+   overhead without needing body caching.
+
+If delayed parsing restores performance, the body serialization work
+(Section 11) may be unnecessary — the cache could store only decl/type
+signatures (which already round-trip with zero diffs) without bodies.
+The body serialization infrastructure is not wasted — it's a working
+implementation — but it may not be the highest-value use of time if the
+root cause is elsewhere.
