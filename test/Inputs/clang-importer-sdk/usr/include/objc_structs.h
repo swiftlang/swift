@@ -8,11 +8,11 @@ struct StructOfBlocks {
   void (^__unsafe_unretained _Nonnull block)(void);
 };
 
-struct StrongsInAStruct { // expected-note {{record 'StrongsInAStruct' is not trivial to copy or destroy}}
+struct StrongsInAStruct { // expected-note {{record 'StrongsInAStruct' contains strong references and cannot be imported without enabling experimental feature ImportCStructsWithArcFields}}
   __strong NSString *nsstr;
 };
 
-struct WeaksInAStruct { // expected-note {{record 'WeaksInAStruct' is not trivial to copy or destroy}}
+struct WeaksInAStruct { // expected-note {{record 'WeaksInAStruct' contains a weak reference and cannot be imported}}
   __weak NSString *nsstr;
 };
 
