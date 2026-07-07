@@ -261,3 +261,87 @@ do {
   print(a.z == 10 && b.z == 20 ? "OK!" : "FAIL") // CHECK: OK!
   print(getValueIn(a, keyPath: kp) + getValueIn(b, keyPath: kp) == 30 ? "OK!" : "FAIL") // CHECK: OK!
 }
+
+// -----------------------------------------------------------------------------
+// `UnsafePointer(to:)` / `UnsafeMutablePointer(to:)`: turn a `KeyPath` or
+// `WritableKeyPath` into a raw byte offset via `_storedInlineOffset` and
+// GEP through the pointer.  Returns `nil` for computed properties.
+// -----------------------------------------------------------------------------
+
+struct Sample {
+  var head: Int8      // offset 0
+  var mid:  Int32     // offset 4 (Int32 alignment)
+  var tail: Int64     // offset 8
+  var computed: Int32 { mid &* 10 }
+}
+
+do {
+  var s = Sample(head: 1, mid: 2, tail: 3)
+
+  // Read-only pointer through immutable base.
+  withUnsafePointer(to: s) { p in
+    let pHead = p.pointer(to: \Sample.head)!
+    let pMid  = p.pointer(to: \Sample.mid)!
+    let pTail = p.pointer(to: \Sample.tail)!
+    print(pHead.pointee == 1 && pMid.pointee == 2 && pTail.pointee == 3
+          ? "OK!" : "FAIL") // CHECK: OK!
+
+    // Offsets are consistent with `MemoryLayout.offset(of:)`.
+    let baseAddr = UInt(bitPattern: p)
+    print(UInt(bitPattern: pMid)  &- baseAddr == 4 ? "OK!" : "FAIL") // CHECK: OK!
+    print(UInt(bitPattern: pTail) &- baseAddr == 8 ? "OK!" : "FAIL") // CHECK: OK!
+  }
+
+  // Mutating pointer: write a new value through the pointer, observe it
+  // in the original struct.
+  withUnsafeMutablePointer(to: &s) { p in
+    let pMid = p.pointer(to: \Sample.mid)!
+    pMid.pointee = 555
+  }
+  print(s.mid == 555 ? "OK!" : "FAIL") // CHECK: OK!
+
+  // Computed properties don't have a stored inline offset — the API
+  // returns nil rather than trapping.
+  withUnsafePointer(to: s) { p in
+    let pComputed = p.pointer(to: \Sample.computed)
+    print(pComputed == nil ? "OK!" : "FAIL") // CHECK: OK!
+  }
+}
+
+// A `let` field still has a stored offset: readable via
+// `UnsafePointer.pointer(to:)` because the API takes `KeyPath`, not
+// `WritableKeyPath`.
+do {
+  let wl = WithLet()
+  withUnsafePointer(to: wl) { p in
+    let pa = p.pointer(to: \WithLet.a)!
+    let pb = p.pointer(to: \WithLet.b)!
+    print(pa.pointee == 111 && pb.pointee == 222 ? "OK!" : "FAIL") // CHECK: OK!
+  }
+}
+
+// Tuples: the embedded static-instance emitter treats tuple elements the
+// same as struct fields, so `pointer(to:)` should work here too.
+do {
+  var t: (Int32, Int64) = (100, 200)
+  withUnsafeMutablePointer(to: &t) { p in
+    let p0 = p.pointer(to: \.0)!
+    let p1 = p.pointer(to: \.1)!
+    print(p0.pointee == 100 && p1.pointee == 200 ? "OK!" : "FAIL") // CHECK: OK!
+    p0.pointee = -1
+    p1.pointee = -2
+  }
+  print(t.0 == -1 && t.1 == -2 ? "OK!" : "FAIL") // CHECK: OK!
+}
+
+// Generic-struct specialization: the same `pointer(to:)` on a `Box<Int>`
+// specialization goes through the substitution-map-aware static-instance
+// path.
+do {
+  var box = Box<Int>(value: 42)
+  withUnsafeMutablePointer(to: &box) { p in
+    let pv = p.pointer(to: kpValue(Int.self))!
+    pv.pointee = 777
+  }
+  print(box.value == 777 ? "OK!" : "FAIL") // CHECK: OK!
+}
