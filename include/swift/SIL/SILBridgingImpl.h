@@ -2782,7 +2782,7 @@ BridgedInstruction BridgedBuilder::createCopyAddr(BridgedValue from, BridgedValu
 }
 
 BridgedInstruction BridgedBuilder::createDestroyValue(BridgedValue op, bool isDeadEnd) const {
-  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(), swift::DontPoisonRefs,
+  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(),
                                          swift::IsDeadEnd_t(isDeadEnd))};
 }
 

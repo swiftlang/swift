@@ -571,7 +571,6 @@ SILLocation.
 
 ```
 sil-instruction ::= debug_value sil-debug-value-option* sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)? (',' 'transform' debug-transform-block)?
-sil-debug-value-option ::= [poison]
 sil-debug-value-option ::= [moveable_value_debuginfo]
 sil-debug-value-option ::= [trace]
 
@@ -604,15 +603,6 @@ variable that is being described, including the name of the variable.
 For function and closure arguments `argno` is the number of the function
 argument starting with 1. A compiler-generated source variable will be
 marked `implicit` and optimizers are free to remove it even in -Onone.
-
-If the '[poison]' flag is set, then all references within this debug
-value will be overwritten with a sentinel at this point in the program.
-This is used in debug builds when shortening non-trivial value lifetimes
-to ensure the debugger cannot inspect invalid memory. `debug_value`
-instructions with the poison flag are not generated until OSSA is
-lowered. They are not expected to be serialized within the module, and
-the pipeline is not expected to do any significant code motion after
-lowering.
 
 ```
 advanced-debug-var-attr ::= '(' 'name' string-literal (',' sil-instruction-source-info)? ')'
@@ -3261,7 +3251,7 @@ This instruction is _not_ available in OSSA.
 ### destroy_value
 
 ```
-sil-instruction ::= 'destroy_value' '[dead_end]'? '[poison]'? sil-operand
+sil-instruction ::= 'destroy_value' '[dead_end]'? sil-operand
 
 destroy_value %0 : $A
 ```

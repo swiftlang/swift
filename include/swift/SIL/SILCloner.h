@@ -1793,7 +1793,7 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   remapDebugVariable(VarInfo);
   auto *NewInst = getBuilder().createDebugValue(
       Inst->getLoc(), getOpValue(Inst->getOperand()), *VarInfo,
-      Inst->poisonRefs(), Inst->usesMoveableValueDebugInfo(), Inst->hasTrace());
+      Inst->usesMoveableValueDebugInfo(), Inst->hasTrace());
 
   // Clone the debug-only reconstruction block if present.
   if (auto *SrcDebugBB = Inst->getDebugReconstructionBlock()) {
@@ -2543,7 +2543,7 @@ void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
   recordClonedInstruction(Inst, getBuilder().createDestroyValue(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
-                                    Inst->poisonRefs(), Inst->isDeadEnd()));
+                                    Inst->isDeadEnd()));
 }
 
 template <typename ImplClass>

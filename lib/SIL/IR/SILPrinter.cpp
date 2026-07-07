@@ -2219,8 +2219,6 @@ public:
   }
 
   void visitDebugValueInst(DebugValueInst *DVI) {
-    if (DVI->poisonRefs())
-      *this << "[poison] ";
     if (DVI->usesMoveableValueDebugInfo() &&
         !DVI->getOperand()->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
@@ -2586,8 +2584,6 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   void visitDestroyValueInst(DestroyValueInst *I) {
-    if (I->poisonRefs())
-      *this << "[poison] ";
     if (I->isDeadEnd())
       *this << "[dead_end] ";
     *this << getIDAndType(I->getOperand());

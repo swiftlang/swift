@@ -476,13 +476,11 @@ namespace {
     }
     
     bool visitDestroyValueInst(const DestroyValueInst *RHS) {
-      auto *left = cast<DestroyValueInst>(LHS);
-      return left->poisonRefs() == RHS->poisonRefs();
+      return true;
     }
 
     bool visitDebugValue(const DebugValueInst *RHS) {
-      auto *left = cast<DebugValueInst>(LHS);
-      return left->poisonRefs() == RHS->poisonRefs();
+      return true;
     }
 
     bool visitBeginCOWMutationInst(const BeginCOWMutationInst *RHS) {

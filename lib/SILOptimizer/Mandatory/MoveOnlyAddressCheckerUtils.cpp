@@ -326,7 +326,7 @@ static void insertDebugValueBefore(SILInstruction *insertPt,
   SILBuilderWithScope debugInfoBuilder(insertPt);
   debugInfoBuilder.setCurrentDebugScope(debugVar->getDebugScope());
   debugInfoBuilder.createDebugValue(debugVar->getLoc(), operand(), *varInfo,
-                                    DontPoisonRefs, UsesMoveableValueDebugInfo);
+                                    UsesMoveableValueDebugInfo);
 }
 
 static void convertMemoryReinitToInitForm(SILInstruction *memInst,
