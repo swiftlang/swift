@@ -1310,15 +1310,6 @@ namespace llvm {
 
     using CanTypeInfo = DenseMapInfo<swift::CanType>;
 
-    // Use the second field because the first field can validly be null.
-    static CachingTypeKey getEmptyKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getEmptyKey(),
-              swift::TypeExpansionContext::minimal()};
-    }
-    static CachingTypeKey getTombstoneKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getTombstoneKey(),
-              swift::TypeExpansionContext::minimal()};
-    }
     static unsigned getHashValue(CachingTypeKey val) {
       auto hashSig =
         DenseMapInfo<swift::GenericSignature>::getHashValue(val.Sig);
@@ -1341,12 +1332,6 @@ namespace llvm {
 
     using SILDeclRefInfo = DenseMapInfo<swift::SILDeclRef>;
 
-    static OverrideKey getEmptyKey() {
-      return {SILDeclRefInfo::getEmptyKey(), SILDeclRefInfo::getEmptyKey()};
-    }
-    static OverrideKey getTombstoneKey() {
-      return {SILDeclRefInfo::getTombstoneKey(), SILDeclRefInfo::getTombstoneKey()};
-    }
     static unsigned getHashValue(OverrideKey val) {
       return hash_combine(SILDeclRefInfo::getHashValue(val.base),
                           SILDeclRefInfo::getHashValue(val.derived));
