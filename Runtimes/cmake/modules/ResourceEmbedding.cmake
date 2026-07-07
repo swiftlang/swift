@@ -1,8 +1,14 @@
-
 if(WIN32)
   option(SWIFT_ASSEMBLY_VERSION "Assembly Version" "${PROJECT_VERSION}")
   option(SWIFT_PUBLIC_KEY_TOKEN "Code Signing Identity" "0000000000000000")
 endif()
+
+define_property(
+  TARGET
+  PROPERTY EMBED_PLIST
+  BRIEF_DOCS "Specify whether to embed the plist in the target"
+  INITIALIZE_FROM_VARIABLE ${PROJECT_NAME}_EMBED_PLIST
+)
 
 function(generate_plist project_name project_version target)
   set(PLIST_INFO_PLIST "Info.plist")
@@ -16,7 +22,8 @@ function(generate_plist project_name project_version target)
   set(PLIST_INFO_PLIST_OUT "${PLIST_INFO_PLIST}")
   set(PLIST_INFO_PLIST_IN "${PROJECT_SOURCE_DIR}/${PLIST_INFO_PLIST}.in")
 
-  if(APPLE)
+  get_target_property(EMBED_PLIST ${target} EMBED_PLIST)
+  if(APPLE AND EMBED_PLIST)
     target_link_options(${target} PRIVATE
       "SHELL:-Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker ${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}")
   endif()
