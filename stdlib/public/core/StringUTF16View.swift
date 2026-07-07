@@ -916,83 +916,96 @@ extension String.UTF16View {
     if remaining == 0 { return crumb }
 
     return _guts.withFastUTF8 { utf8 in
-      var readIdx = crumb._encodedOffset
-      let readEnd = utf8.count
+      unsafe _nativeIndex(utf8, from: crumb, offsetBy: remaining)
+    }
+  }
 
-      var utf16I = 0
-      let utf16End: Int = remaining
+  /// Return the index `offset` UTF-16 code units forward from `crumb`.
+  /// `crumb` must be scalar-aligned or a trailing-surrogate index, and there
+  /// must be at least `offset` UTF-16 code units between `crumb` and the end.
+  @_effects(releasenone)
+  @inline(__always)
+  internal func _nativeIndex(
+    _ utf8: UnsafeBufferPointer<UInt8>,
+    from crumb: Index,
+    offsetBy offset: Int
+  ) -> Index {
+    var readIdx = crumb._encodedOffset
+    let readEnd = utf8.count
 
-      // Adjust for sub-scalar initial transcoding: If we're starting the scan
-      // at a trailing surrogate, then we set our starting count to be -1 so as
-      // offset counting the leading surrogate.
-      if crumb.transcodedOffset != 0 {
-        utf16I = -1
-      }
+    var utf16I = 0
+    let utf16End: Int = offset
+
+    // Adjust for sub-scalar initial transcoding: If we're starting the scan
+    // at a trailing surrogate, then we set our starting count to be -1 so as
+    // offset counting the leading surrogate.
+    if crumb.transcodedOffset != 0 {
+      utf16I = -1
+    }
 
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
-      // Guess-and-check fast path.
-      //
-      // The smallest possible UTF8 distance for N UTF16 code units is N bytes.
-      // Start there, and use the vectorized length function to quickly find how
-      // far over that minimum we actually are. If this run happens to be all
-      // ASCII, it will be correct. If not, it gets us vectorized counting of
-      // the initial prefix, and we then repeat from where we landed: each round
-      // turns another chunk of the remaining distance into a vectorized count
-      // instead of a scalar walk. The range shrinks every round (dense UTF-8
-      // means a larger undershoot, so more rounds), so we stop once it drops
-      // below `guessThreshold` and let the scalar loop below finish the tail.
-      //
-      // `guessThreshold` has to be at least 16, otherwise we don't hit the
-      // vector path in _utf16Distance. It also amortizes setup/call overhead,
-      // and gates each round so we never guess a range too small to vectorize.
-      let guessThreshold = 32
-      if remaining >= guessThreshold {
-        var current = crumb
-        var unitsRemaining = remaining
-        repeat {
-          let guessOffset = unsafe _scalarAlign(
-            utf8, current._encodedOffset &+ unitsRemaining)
-          let guessIndex = String.Index(
-            encodedOffset: guessOffset, transcodedOffset: 0
-          )._knownUTF8
-          let guessDistance = _utf16Distance(from: current, to: guessIndex)
-          _internalInvariant(guessDistance <= unitsRemaining)
-          if guessDistance == unitsRemaining {
-            return guessIndex
-          }
-          unitsRemaining &-= guessDistance
-          current = guessIndex
-        } while unitsRemaining >= guessThreshold
-        readIdx = current._encodedOffset
-        utf16I = remaining &- unitsRemaining
-      }
+    // Guess-and-check fast path.
+    //
+    // The smallest possible UTF8 distance for N UTF16 code units is N bytes.
+    // Start there, and use the vectorized length function to quickly find how
+    // far over that minimum we actually are. If this run happens to be all
+    // ASCII, it will be correct. If not, it gets us vectorized counting of
+    // the initial prefix, and we then repeat from where we landed: each round
+    // turns another chunk of the remaining distance into a vectorized count
+    // instead of a scalar walk. The range shrinks every round (dense UTF-8
+    // means a larger undershoot, so more rounds), so we stop once it drops
+    // below `guessThreshold` and let the scalar loop below finish the tail.
+    //
+    // `guessThreshold` has to be at least 16, otherwise we don't hit the
+    // vector path in _utf16Distance. It also amortizes setup/call overhead,
+    // and gates each round so we never guess a range too small to vectorize.
+    let guessThreshold = 32
+    if offset >= guessThreshold {
+      var current = crumb
+      var unitsRemaining = offset
+      repeat {
+        let guessOffset = unsafe _scalarAlign(
+          utf8, current._encodedOffset &+ unitsRemaining)
+        let guessIndex = String.Index(
+          encodedOffset: guessOffset, transcodedOffset: 0
+        )._knownUTF8
+        let guessDistance = _utf16Distance(from: current, to: guessIndex)
+        _internalInvariant(guessDistance <= unitsRemaining)
+        if guessDistance == unitsRemaining {
+          return guessIndex
+        }
+        unitsRemaining &-= guessDistance
+        current = guessIndex
+      } while unitsRemaining >= guessThreshold
+      readIdx = current._encodedOffset
+      utf16I = offset &- unitsRemaining
+    }
 #endif
 
-      _internalInvariant(readIdx < readEnd)
+    _internalInvariant(readIdx < readEnd)
 
-      while true {
-        _precondition(readIdx < readEnd, "String index is out of bounds")
-        let len = unsafe _utf8ScalarLength(utf8[_unchecked: readIdx])
-        let utf16Len = len == 4 ? 2 : 1
-        utf16I &+= utf16Len
+    while true {
+      _precondition(readIdx < readEnd, "String index is out of bounds")
+      let len = unsafe _utf8ScalarLength(utf8[_unchecked: readIdx])
+      let utf16Len = len == 4 ? 2 : 1
+      utf16I &+= utf16Len
 
-        if utf16I >= utf16End {
-          // Uncommon: final sub-scalar transcoded offset
-          if _slowPath(utf16I > utf16End) {
-            _internalInvariant(utf16Len == 2)
-            return Index(
-              encodedOffset: readIdx, transcodedOffset: 1
-            )._knownUTF8
-          }
+      if utf16I >= utf16End {
+        // Uncommon: final sub-scalar transcoded offset
+        if _slowPath(utf16I > utf16End) {
+          _internalInvariant(utf16Len == 2)
           return Index(
-            _encodedOffset: readIdx &+ len
-          )._scalarAligned._knownUTF8
+            encodedOffset: readIdx, transcodedOffset: 1
+          )._knownUTF8
         }
-
-        readIdx &+= len
+        return Index(
+          _encodedOffset: readIdx &+ len
+        )._scalarAligned._knownUTF8
       }
-      fatalError()
+
+      readIdx &+= len
     }
+    fatalError()
   }
   
   // See _nativeCopy(into:alignedRange:), except this uses un-verified UTF16
