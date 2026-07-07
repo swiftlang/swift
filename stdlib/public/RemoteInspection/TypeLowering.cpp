@@ -1511,20 +1511,25 @@ unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
   return offset;
 }
 
-void RecordTypeInfoBuilder::addField(
-    const std::string &Name, const TypeRef *TR,
-    remote::TypeInfoProvider *ExternalTypeInfo) {
+void RecordTypeInfoBuilder::addField(const std::string &Name, const TypeRef *TR,
+                                     remote::TypeInfoProvider *ExternalTypeInfo,
+                                     bool artificial) {
   const TypeInfo *TI = TC.getTypeInfo(TR, ExternalTypeInfo);
   if (TI == nullptr) {
     markInvalid("no TypeInfo for field type", TR);
     return;
   }
 
-  unsigned offset = addField(TI->getSize(),
-                             TI->getAlignment(),
-                             TI->getNumExtraInhabitants(),
-                             TI->getBorrowability(),
-                             TI->isAddressableForDependencies());
+  // An artificial field (e.g. the synthetic "like" field emitted for a
+  // `@_rawLayout` struct) contributes its size and alignment to the record
+  // but not its extra inhabitants: a raw-layout type is laid out as opaque
+  // storage in-process and exposes no extra inhabitants, so mirroring the
+  // like type's extra inhabitants here would disagree with the real ABI.
+  unsigned numExtraInhabitants = artificial ? 0 : TI->getNumExtraInhabitants();
+
+  unsigned offset =
+      addField(TI->getSize(), TI->getAlignment(), numExtraInhabitants,
+               TI->getBorrowability(), TI->isAddressableForDependencies());
   Fields.push_back({Name, offset, -1, TR, *TI});
 }
 
@@ -2514,7 +2519,8 @@ public:
         return nullptr;
 
       for (auto Field : Fields)
-        builder.addField(Field.Name, Field.TR, ExternalTypeInfo);
+        builder.addField(Field.Name, Field.TR, ExternalTypeInfo,
+                         Field.Artificial);
       return builder.build();
     }
     case FieldDescriptorKind::Enum:
@@ -2871,7 +2877,8 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
                      /*addressableForDependencies=*/false);
 
     for (auto Field : Fields)
-      builder.addField(Field.Name, Field.TR, ExternalTypeInfo);
+      builder.addField(Field.Name, Field.TR, ExternalTypeInfo,
+                       Field.Artificial);
     return builder.build();
   }
   case FieldDescriptorKind::Struct:
