@@ -1,11 +1,18 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -g -Xllvm -sil-print-debuginfo-verbose -enable-experimental-feature BorrowingForLoop -enable-experimental-feature BorrowingSequence %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -g -Xllvm -sil-print-debuginfo-verbose -enable-experimental-feature BorrowingForLoop -enable-experimental-feature BorrowingSequence %s
+
+// RUN: not --crash %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values -enable-experimental-feature BorrowingForLoop -enable-experimental-feature BorrowingSequence -o /dev/null %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
 // RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
 // RUN:     -enable-experimental-feature BorrowingForLoop \
 // RUN:     -enable-experimental-feature BorrowingSequence \
-// RUN:     %s | %FileCheck %s
+// RUN:     %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ADDR
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
+// RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
+// RUN:     -enable-experimental-feature BorrowingForLoop \
+// RUN:     -enable-experimental-feature BorrowingSequence \
+// RUN:     -enable-sil-opaque-values \
+// RUN:     %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPAQUE
 
 // REQUIRES: swift_feature_BorrowingForLoop
 // REQUIRES: swift_feature_BorrowingSequence
@@ -184,7 +191,8 @@ func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
 // CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing34testForEachNonCopyableSILDebugInfo3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
 @available(SwiftStdlib 6.4, *)
 func testForEachNonCopyableSILDebugInfo(seq: borrowing Span<NoncopyableInt>){
-  // CHECK: debug_value {{.*}} : $*NoncopyableInt, let, name "element", expr op_deref, loc "{{.*}}":[[@LINE+1]]:7 isImplicit: false
+  // CHECK-ADDR: debug_value {{.*}} : $*NoncopyableInt, let, name "element", expr op_deref, loc "{{.*}}":[[@LINE+2]]:7 isImplicit: false
+  // CHECK-OPAQUE: debug_value {{.*}} : $NoncopyableInt, let, name "element", loc "{{.*}}":[[@LINE+1]]:7 isImplicit: false
   for element in seq {
       if (element.value == 0){
           continue
