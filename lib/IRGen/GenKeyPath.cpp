@@ -1379,3 +1379,343 @@ std::pair<llvm::Value *, llvm::Value *> irgen::emitKeyPathArgument(
 
   return std::make_pair(argsBuf.getAddress(), argsBufSize);
 }
+
+//===----------------------------------------------------------------------===//
+// Static key path instantiation for Embedded Swift.
+//===----------------------------------------------------------------------===//
+//
+// Instead of emitting a runtime pattern and calling `swift_getKeyPath`, in
+// Embedded Swift we can emit the fully-instantiated key path object directly
+// as an immortal constant global.  This is possible when every property of
+// the key path is known statically at IRGen time:
+//
+//   - The key path type has no unspecialized generic arguments.
+//   - The pattern doesn't capture any values.
+//   - Every component is one of the kinds we support here.
+//   - The key path has zero or one components.
+//
+// The emitted object layout mirrors what the non-embedded Swift-side
+// `AnyKeyPath._create` produces at runtime:
+//
+//     ┌──────────────────────────┐
+//     │ isa (metadata pointer)   │  ─── object header
+//     │ refcount = -1            │      (immortal)
+//     ├──────────────────────────┤
+//     │ [ padding to 16-byte     │  ─── in non-embedded builds this
+//     │   alignment ]            │      contains _kvcKeyPathStringPtr;
+//     │                          │      in embedded there is no such
+//     │                          │      field, so the padding is just
+//     │                          │      what's needed to reach the
+//     │                          │      _SixteenAligned tail alignment.
+//     ├──────────────────────────┤
+//     │ KeyPathBuffer.Header : i32 │  ─── tail buffer (Int32 elements)
+//     │ RawKeyPathComponent      │
+//     │   .Header : i32          │
+//     │ [ out-of-line offset :   │
+//     │   i32, if the offset     │
+//     │   doesn't fit inline ]   │
+//     └──────────────────────────┘
+
+bool IRGenModule::canEmitStaticKeyPathInstance(KeyPathInst *KPI) {
+  // Only in embedded Swift.
+  if (!Context.LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  return (bool)KPI->getStaticInstanceClassType();
+}
+
+/// Pick the concrete `KeyPath` subclass this keypath instruction resolves
+/// to at runtime.
+static NominalTypeDecl *pickStaticKeyPathClass(IRGenModule &IGM,
+                                               KeyPathInst *KPI) {
+  auto silTy = KPI->getStaticInstanceClassType();
+  assert(silTy && "caller should have checked canEmitStaticKeyPathInstance");
+  auto *nominal = silTy.getNominalOrBoundGenericNominal();
+  assert(nominal && "static key path type must be a nominal class");
+  return nominal;
+}
+
+llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
+  assert(canEmitStaticKeyPathInstance(KPI) &&
+         "callers must check canEmitStaticKeyPathInstance() first");
+
+  auto *pattern = KPI->getPattern();
+
+  // Multiple `keypath_inst`s referring to the same pattern share one global.
+  auto cached = StaticKeyPathInstances.find(pattern);
+  if (cached != StaticKeyPathInstances.end())
+    return cached->second;
+
+  auto components = pattern->getComponents();
+  bool hasComponent = !components.empty();
+
+  auto keyPathTy = KPI->getKeyPathType();
+  auto rootTy = keyPathTy->getGenericArgs()[0];
+  auto valueTy = keyPathTy->getGenericArgs()[1];
+
+  // Compute the concrete key-path class and get its metadata.
+  NominalTypeDecl *keyPathClass = pickStaticKeyPathClass(*this, KPI);
+  auto concreteKeyPathTy =
+      BoundGenericType::get(keyPathClass, Type(), {rootTy, valueTy})
+          ->getCanonicalType();
+  llvm::Constant *metadata = getAddrOfTypeMetadata(concreteKeyPathTy);
+
+  // Compute the component header word, an optional out-of-line offset word
+  // (stored/tuple components), and an optional list of pointer-sized fields
+  // to lay out after a component-level `pointerAlignmentSkew` (computed
+  // components: id, getter, [setter]).
+  auto rootSILTy =
+      SILType::getPrimitiveObjectType(rootTy->getCanonicalType());
+
+  uint32_t componentHeaderWord = 0;
+  std::optional<uint32_t> outOfLineOffsetWord;
+  llvm::Constant *computedGetterFn = nullptr;
+  llvm::Constant *computedSetterFn = nullptr;
+  bool computedSetterIsMutating = false;
+
+  if (hasComponent) {
+    const auto &comp = components[0];
+    switch (comp.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty: {
+      auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
+      bool isLet = property->isLet();
+
+      if (rootTy->getStructOrBoundGenericStruct()) {
+        auto *fixedOffset =
+            emitPhysicalStructMemberFixedOffset(*this, rootSILTy, property);
+        assert(fixedOffset &&
+               "embedded stored-property key path must have a fixed offset");
+        auto offset =
+            cast<llvm::ConstantInt>(fixedOffset)->getValue().getZExtValue();
+        if (KeyPathComponentHeader::offsetCanBeInline(offset)) {
+          componentHeaderWord =
+              KeyPathComponentHeader::forStructComponentWithInlineOffset(
+                  isLet, offset)
+                  .getData();
+        } else {
+          componentHeaderWord =
+              KeyPathComponentHeader::forStructComponentWithOutOfLineOffset(
+                  isLet)
+                  .getData();
+          outOfLineOffsetWord = static_cast<uint32_t>(offset);
+        }
+      } else if (rootTy->getClassOrBoundGenericClass()) {
+        auto *offset = tryEmitConstantClassFragilePhysicalMemberOffset(
+            *this, rootSILTy, property);
+        assert(offset &&
+               "embedded class-ivar key path must have a fixed offset");
+        auto offsetValue =
+            cast<llvm::ConstantInt>(offset)->getValue().getZExtValue();
+        if (KeyPathComponentHeader::offsetCanBeInline(offsetValue)) {
+          componentHeaderWord =
+              KeyPathComponentHeader::forClassComponentWithInlineOffset(
+                  isLet, offsetValue)
+                  .getData();
+        } else {
+          componentHeaderWord =
+              KeyPathComponentHeader::forClassComponentWithOutOfLineOffset(
+                  isLet)
+                  .getData();
+          outOfLineOffsetWord = static_cast<uint32_t>(offsetValue);
+        }
+      } else {
+        llvm_unreachable("stored-property key path on unsupported base");
+      }
+      break;
+    }
+    case KeyPathPatternComponent::Kind::TupleElement: {
+      assert(rootTy->is<TupleType>() && "tuple-element key path on non-tuple");
+      auto elementOffset =
+          getFixedTupleElementOffset(*this, rootSILTy, comp.getTupleIndex());
+      assert(elementOffset &&
+             "embedded tuple-element key path must have a fixed offset");
+      auto offset = elementOffset->getValue();
+      // Tuple elements are always mutable at the language level (no `let`
+      // tuple element).  We encode them with the struct-tag discriminator
+      // because that's how the runtime reads them (see `_projectReadOnly`).
+      if (KeyPathComponentHeader::offsetCanBeInline(offset)) {
+        componentHeaderWord =
+            KeyPathComponentHeader::forStructComponentWithInlineOffset(
+                /*isLet=*/false, offset)
+                .getData();
+      } else {
+        componentHeaderWord =
+            KeyPathComponentHeader::forStructComponentWithOutOfLineOffset(
+                /*isLet=*/false)
+                .getData();
+        outOfLineOffsetWord = static_cast<uint32_t>(offset);
+      }
+      break;
+    }
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method: {
+      bool settable =
+          comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty;
+      bool mutating = settable && comp.isComputedSettablePropertyMutating();
+
+      KeyPathComponentHeader::ComputedPropertyKind componentKind;
+      if (!settable) {
+        // `Method` and `GettableProperty` both encode as a computed
+        // get-only component: the pattern's "getter" is the method's
+        // implementation for `Method`, and the property's getter for
+        // `GettableProperty`.
+        componentKind = KeyPathComponentHeader::GetOnly;
+      } else if (mutating) {
+        componentKind = KeyPathComponentHeader::SettableMutating;
+      } else {
+        componentKind = KeyPathComponentHeader::SettableNonmutating;
+      }
+
+      // Static instantiation: use the getter function pointer as the
+      // property identity.  The runtime uses a method descriptor pointer
+      // (class), a struct field index, or the getter function pointer
+      // (struct), but embedded Swift never emits method descriptors, so a
+      // unique-per-property pointer is a simpler common encoding here.  The
+      // id field is not ptr-auth signed at runtime (see
+      // `RawKeyPathComponent._computedIDValue`), so we store it raw.
+      componentHeaderWord =
+          KeyPathComponentHeader::forComputedProperty(
+              componentKind, KeyPathComponentHeader::Pointer,
+              /*hasArguments=*/false, KeyPathComponentHeader::Resolved)
+              .getData();
+
+      auto *getter = comp.getComputedPropertyForGettable();
+      computedGetterFn = getAddrOfSILFunction(getter, NotForDefinition);
+      if (settable) {
+        auto *setter = comp.getComputedPropertyForSettable();
+        computedSetterFn = getAddrOfSILFunction(setter, NotForDefinition);
+        computedSetterIsMutating = mutating;
+      }
+      break;
+    }
+    default:
+      llvm_unreachable("caller should have filtered other kinds");
+    }
+  }
+
+  auto ptrSize = getPointerSize().getValue();
+  uint64_t pointerAlignmentSkewBytes = ptrSize - 4;
+
+  // Compute the buffer header word.  `size` is the size of the component
+  // buffer in bytes, excluding the buffer header itself (i.e. size of the
+  // component's header + body).  For identity (no components), that's zero.
+  //
+  // For computed components the body is: pointerAlignmentSkew (4 on 64-bit)
+  // + id (pointer) + getter (pointer) + optional setter (pointer).  This
+  // matches `RawKeyPathComponent.bodySize` for `.computed` in KeyPath.swift.
+  uint32_t componentBytes = 0;
+  if (hasComponent) {
+    componentBytes = 4; // component header
+    if (outOfLineOffsetWord)
+      componentBytes += 4;
+    if (computedGetterFn) {
+      componentBytes += pointerAlignmentSkewBytes;
+      componentBytes += ptrSize * 2; // id + getter
+      if (computedSetterFn)
+        componentBytes += ptrSize; // setter
+    }
+  }
+  KeyPathBufferHeader bufHdr(componentBytes,
+                             /*trivial=*/true,
+                             /*hasReferencePrefix=*/false);
+  uint32_t bufferHeaderWord = bufHdr.getData();
+  if (hasComponent)
+    bufferHeaderWord |= _SwiftKeyPathBufferHeader_IsSingleComponentFlag;
+
+  // Assemble the constant.
+  //
+  //   { { metadata_ptr, refcount_intptr },
+  //     [ padding_bytes x i8 ],
+  //     i32 bufferHeaderWord,
+  //     [ pointer_alignment_skew_bytes x i8 ],       // buffer-level skew
+  //     i32 componentHeaderWord,
+  //     [ i32 outOfLineOffsetWord ],                 // stored/tuple only
+  //     [ pointer_alignment_skew_bytes x i8 ],       // component-level skew,
+  //                                                  //   computed only
+  //     ptr computedId,                              // computed only
+  //     ptr computedGetter,                          // computed only, signed
+  //     [ ptr computedSetter ] }                     // computed settable
+  //
+  // The getter/setter pointer fields are address-discriminated ptr-auth
+  // signed (schema `PointerAuth.KeyPaths`) with the standard KeyPath
+  // getter/nonmutating-setter/mutating-setter discriminators.  The id field
+  // is stored raw because the runtime treats it as an opaque identity value
+  // (`RawKeyPathComponent._computedIDValue`).
+  uint64_t bodySize = 2 * ptrSize; // isa + refcount
+  uint64_t paddingBytes = (16 - (bodySize % 16)) % 16;
+
+  // Reuse the immortal-refcount constant from `emitConstantObject`.
+  if (!swiftImmortalRefCount) {
+    // = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
+    // (all-ones on both 32-bit and 64-bit).
+    swiftImmortalRefCount = llvm::ConstantInt::get(IntPtrTy, -1);
+  }
+
+  auto *ObjectHeaderTy = RefCountedStructTy;
+  auto *objectHeader = llvm::ConstantStruct::get(
+      ObjectHeaderTy,
+      {llvm::ConstantExpr::getBitCast(metadata,
+                                      ObjectHeaderTy->getElementType(0)),
+       swiftImmortalRefCount});
+
+  ConstantInitBuilder initBuilder(*this);
+  auto fields = initBuilder.beginStruct();
+
+  fields.add(objectHeader);
+
+  if (paddingBytes != 0)
+    fields.add(llvm::ConstantAggregateZero::get(
+        llvm::ArrayType::get(Int8Ty, paddingBytes)));
+
+  fields.addInt32(bufferHeaderWord);
+
+  if (pointerAlignmentSkewBytes != 0)
+    fields.add(llvm::ConstantAggregateZero::get(
+        llvm::ArrayType::get(Int8Ty, pointerAlignmentSkewBytes)));
+
+  if (hasComponent) {
+    fields.addInt32(componentHeaderWord);
+
+    if (outOfLineOffsetWord)
+      fields.addInt32(*outOfLineOffsetWord);
+
+    if (computedGetterFn) {
+      if (pointerAlignmentSkewBytes != 0)
+        fields.add(llvm::ConstantAggregateZero::get(
+            llvm::ArrayType::get(Int8Ty, pointerAlignmentSkewBytes)));
+
+      // The computed id — an unsigned pointer that uniquely identifies the
+      // property.  We use the getter as the identity.
+      fields.add(
+          llvm::ConstantExpr::getBitCast(computedGetterFn, Int8PtrTy));
+
+      // Address-discriminated ptr-auth signing for getter and setter.
+      auto schema = getOptions().PointerAuth.KeyPaths;
+      fields.addSignedPointer(computedGetterFn, schema,
+                              PointerAuthEntity::Special::KeyPathGetter);
+      if (computedSetterFn) {
+        auto setterAuth =
+            computedSetterIsMutating
+                ? PointerAuthEntity::Special::KeyPathMutatingSetter
+                : PointerAuthEntity::Special::KeyPathNonmutatingSetter;
+        fields.addSignedPointer(computedSetterFn, schema, setterAuth);
+      }
+    }
+  }
+
+  auto *global = fields.finishAndCreateGlobal(
+      "keypath", Alignment(16), /*constant*/ true,
+      llvm::GlobalValue::PrivateLinkage);
+
+  // Cast to the concrete key path class pointer type so callers can use it
+  // as a Swift class reference.
+  auto &keyPathTI = getTypeInfo(getLoweredType(KPI->getKeyPathType()));
+  auto *keyPathPtrTy = keyPathTI.getStorageType();
+  auto *result = llvm::ConstantExpr::getBitCast(global, keyPathPtrTy);
+
+  StaticKeyPathInstances[pattern] = result;
+  return result;
+}
+
+//===----------------------------------------------------------------------===//

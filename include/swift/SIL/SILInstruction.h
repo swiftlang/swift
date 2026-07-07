@@ -4438,6 +4438,13 @@ public:
 
   SubstitutionMap getSubstitutions() const { return Substitutions; }
 
+  /// If this `keypath_inst` can be emitted as a statically-instantiated
+  /// immortal instance in Embedded Swift, returns the concrete key path
+  /// class SILType (e.g. `$KeyPath<Foo, Bar>`, `$WritableKeyPath<Foo,
+  /// Bar>`, or `$ReferenceWritableKeyPath<Foo, Bar>`) that IRGen would use
+  /// as the object's isa.  Returns an invalid SILType otherwise.
+  SILType getStaticInstanceClassType() const;
+
   void dropReferencedPattern();
   
   ~KeyPathInst();

@@ -8116,6 +8116,19 @@ void IRGenSILFunction::visitFunctionExtractIsolationInst(
 }
 
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
+  // In embedded Swift, key paths whose pattern is fully-known at compile
+  // time (no substitutions, no captured operands, only supported component
+  // kinds) get emitted as immortal constant globals rather than being
+  // instantiated at runtime through `swift_getKeyPath` (which isn't
+  // available in embedded builds anyway).
+  if (IGM.canEmitStaticKeyPathInstance(I)) {
+    llvm::Constant *staticInstance = IGM.emitStaticKeyPathInstance(I);
+    Explosion e;
+    e.add(staticInstance);
+    setLoweredExplosion(I, e);
+    return;
+  }
+
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
   // Build up the argument vector to instantiate the pattern here.
   std::optional<StackAddress> dynamicArgsBuf;

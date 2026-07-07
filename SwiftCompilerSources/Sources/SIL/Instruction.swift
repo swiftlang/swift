@@ -1350,7 +1350,20 @@ final public class KeyPathInst : SingleValueInstruction {
   }
 
   public var supportedInEmbeddedSwift: Bool {
-    bridged.KeyPathInst_getNumComponents() <= 1 && !type.hasArchetype
+    // The `EmbeddedSwiftDiagnostics` pass uses this predicate to decide
+    // whether to reject a `keypath` inst with `err_embedded_swift_keypath`.
+    // A pattern is supported iff IRGen can turn it into a static immortal
+    // instance, so gate this on the same predicate IRGen consults.
+    return staticInstanceClassType != nil
+  }
+
+  /// If this key path will be statically instantiated in Embedded Swift,
+  /// returns the concrete key path class type (`KeyPath<Root, Value>` /
+  /// `WritableKeyPath<Root, Value>` / `ReferenceWritableKeyPath<Root,
+  /// Value>`) that IRGen will use as the object's isa.  Nil if the key path
+  /// isn't statically instantiable.
+  public var staticInstanceClassType: Type? {
+    return bridged.KeyPathInst_getStaticInstanceClassType().typeOrNil
   }
 
   public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
