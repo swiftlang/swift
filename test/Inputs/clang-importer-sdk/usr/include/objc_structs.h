@@ -34,3 +34,33 @@ struct UnavailableArcStruct {
 struct CNameForRenamedArcStruct {
   __strong MYObject *_Nonnull myobj;
 } __attribute__((swift_name("RenamedArcStruct")));
+
+// Nested struct with strong ARC fields should be imported.
+struct InnerArcStruct {
+  __strong MYObject *_Nonnull inner;
+};
+struct OuterArcStruct {
+  struct InnerArcStruct nested;
+  int tag;
+};
+
+// Struct with __weak fields should not be imported.
+struct WeakInAStructArc {
+  __weak MYObject *_Nullable weakobj;
+};
+
+// Struct nesting a __weak field should not be imported.
+struct OuterWithWeakInner {
+  struct WeakInAStructArc nested;
+};
+
+// Union with strong ARC fields should not be imported.
+union UnionWithStrong {
+  __strong MYObject *_Nonnull obj;
+  void *_Nonnull raw;
+};
+
+// Struct containing a union with strong ARC fields should not be imported.
+struct StructWithArcUnion {
+  union UnionWithStrong u;
+};
