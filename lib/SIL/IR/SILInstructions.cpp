@@ -437,7 +437,6 @@ SILType AllocBoxInst::getAddressType() const {
 
 DebugValueInst::DebugValueInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILDebugVariable Var,
-    PoisonRefs_t poisonRefs,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace, bool prependDeref)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
@@ -447,7 +446,6 @@ DebugValueInst::DebugValueInst(
               getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
               getTrailingObjects<SILDIExprElement>()) {
-  setPoisonRefs(poisonRefs);
   if (usesMoveableValueDebugInfo || Operand->getType().isMoveOnly())
     setUsesMoveableValueDebugInfo();
   setTrace(trace);
@@ -458,7 +456,6 @@ DebugValueInst::DebugValueInst(
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILModule &M,
                                        SILDebugVariable Var,
-                                       PoisonRefs_t poisonRefs,
                                        UsesMoveableValueDebugInfo_t wasMoved,
                                        bool trace) {
   // Don't store the same information twice.
@@ -476,7 +473,7 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
   }
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
   return ::new (buf)
-    DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace, prependDeref);
+    DebugValueInst(DebugLoc, Operand, Var, wasMoved, trace, prependDeref);
 }
 
 void DebugValueInst::prependDeref() {
