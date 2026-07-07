@@ -294,19 +294,26 @@ public:
   using SubstGenericParameterFn =
     std::function<const void *(unsigned depth, unsigned index)>;
 
-  /// Callback used to provide the substitution of a generic parameter
-  /// (described by the ordinal, or "flat index") to its metadata. The index may
-  /// be "full" or it may be only relative to key arguments. The call is
-  /// provided both indexes and may use the one it requires.
-  ///
-  /// The return type here is a lie; it's actually a MetadataPackOrValue.
-  using SubstGenericParameterOrdinalFn =
-    std::function<const void *(unsigned fullOrdinal, unsigned keyOrdinal)>;
-
   /// Callback used to provide the substitution of a witness table based on
   /// its index into the enclosing generic environment.
   using SubstDependentWitnessTableFn =
     std::function<const WitnessTable *(const Metadata *type, unsigned index)>;
+
+  /// Non-owning `function_ref` variants of the substitution callbacks, for code
+  /// paths that only ever invoke the callbacks synchronously and need to save
+  /// on stack space.
+  ///
+  /// The ordinal variant is provided both the "full" ordinal and the ordinal
+  /// relative to key arguments, and may use whichever it requires. As with the
+  /// owning variants, the `const void *` return type is really a
+  /// MetadataPackOrValue.
+  using SubstGenericParameterRefFn =
+      llvm::function_ref<const void *(unsigned depth, unsigned index)>;
+  using SubstGenericParameterOrdinalRefFn = llvm::function_ref<const void *(
+      unsigned fullOrdinal, unsigned keyOrdinal)>;
+  using SubstDependentWitnessTableRefFn =
+      llvm::function_ref<const WitnessTable *(const Metadata *type,
+                                              unsigned index)>;
 
   /// A pointer to type metadata or a heap-allocated metadata pack.
   struct SWIFT_RUNTIME_LIBRARY_VISIBILITY MetadataPackOrValue {
@@ -411,7 +418,7 @@ public:
 
     /// Information about the generic context descriptors that make up \c
     /// descriptor, from the outermost to the innermost.
-    mutable llvm::SmallVector<PathElement, 8> descriptorPath;
+    mutable llvm::SmallVector<PathElement, 2> descriptorPath;
 
     /// The number of key generic parameters.
     mutable unsigned numKeyGenericParameters = 0;
@@ -575,9 +582,9 @@ public:
       llvm::ArrayRef<GenericParamDescriptor> genericParams,
       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
       llvm::SmallVectorImpl<const void *> &extraArguments,
-      SubstGenericParameterFn substGenericParam,
-      SubstGenericParameterOrdinalFn substGenericParamOrdinal,
-      SubstDependentWitnessTableFn substWitnessTable,
+      SubstGenericParameterRefFn substGenericParam,
+      SubstGenericParameterOrdinalRefFn substGenericParamOrdinal,
+      SubstDependentWitnessTableRefFn substWitnessTable,
       ConformanceExecutionContext *context);
 
   /// A helper function which avoids performing a store if the destination
