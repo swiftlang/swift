@@ -917,7 +917,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         auto &protoInfo = IGM.getProtocolInfo(methodProto,
                                               ProtocolInfoKind::Full);
         auto index = protoInfo.getFunctionIndex(declRef);
-        idValue = llvm::ConstantInt::get(IGM.SizeTy, -index.getValue());
+        idValue = llvm::ConstantInt::getSigned(IGM.SizeTy, -index.getValue());
         idResolution = KeyPathComponentHeader::Resolved;
       }
       break;
