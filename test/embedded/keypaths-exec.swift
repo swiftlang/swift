@@ -465,3 +465,84 @@ do {
   ht[keyPath: kp1] = 80
   print(ht.pair.0 == 70 && ht.pair.1 == 80 ? "OK!" : "FAIL") // CHECK: OK!
 }
+
+// -----------------------------------------------------------------------------
+// AnyKeyPath / PartialKeyPath type erasure.  Even though embedded doesn't
+// have full existential type introspection, key path erasure works because
+// each concrete KeyPath subclass overrides `_projectReadOnlyAsAny` — those
+// overrides are found via the vtable of the immortal static-instance
+// object, so `AnyKeyPath.subscript` / `PartialKeyPath.subscript` /
+// `swift_getAtAnyKeyPath` / `swift_getAtPartialKeyPath` route through them
+// without needing `_openExistential` on `Any.Type`.
+//
+// Covers: single-component, multi-component chain, class-boundary chain,
+// wrong-typed root (nil result), PartialKeyPath, identity, Hashable use.
+// -----------------------------------------------------------------------------
+
+struct Erasable {
+  var x: Int32
+  var y: Int32
+}
+struct OtherRoot {
+  var v: Int32
+}
+struct NestedErasable {
+  var e: Erasable
+}
+final class ClsErasable {
+  var count: Int32 = 100
+}
+struct HoldsClsErasable {
+  var c: ClsErasable
+}
+
+do {
+  // Single-component KP erased to `AnyKeyPath`.
+  let kpX: KeyPath<Erasable, Int32> = \Erasable.x
+  let anyX: AnyKeyPath = kpX
+  let e = Erasable(x: 42, y: 99)
+  print((e[keyPath: anyX] as? Int32) == 42 ? "OK!" : "FAIL") // CHECK: OK!
+
+  // Multi-component chain erased.
+  let kpNested: KeyPath<NestedErasable, Int32> = \NestedErasable.e.x
+  let anyNested: AnyKeyPath = kpNested
+  print((NestedErasable(e: e)[keyPath: anyNested] as? Int32) == 42
+        ? "OK!" : "FAIL") // CHECK: OK!
+
+  // Class-boundary chain erased.
+  let hc = HoldsClsErasable(c: ClsErasable())
+  hc.c.count = 77
+  let kpCls: ReferenceWritableKeyPath<HoldsClsErasable, Int32> =
+      \HoldsClsErasable.c.count
+  let anyCls: AnyKeyPath = kpCls
+  print((hc[keyPath: anyCls] as? Int32) == 77 ? "OK!" : "FAIL") // CHECK: OK!
+
+  // Heterogeneous `[AnyKeyPath]` array — wrong-typed root yields nil.
+  let kpV: KeyPath<OtherRoot, Int32> = \OtherRoot.v
+  let paths: [AnyKeyPath] = [kpX, kpV]
+  print((e[keyPath: paths[0]] as? Int32) == 42 ? "OK!" : "FAIL") // CHECK: OK!
+  print(e[keyPath: paths[1]] == nil ? "OK!" : "FAIL") // CHECK: OK!
+
+  // PartialKeyPath — root fixed, value erased to Any (not Any?).
+  let partial: PartialKeyPath<Erasable> = kpX
+  print((e[keyPath: partial] as? Int32) == 42 ? "OK!" : "FAIL") // CHECK: OK!
+
+  // Identity via `AnyKeyPath`.
+  var i: Int32 = 7
+  let anyIdent: AnyKeyPath = \Int32.self
+  print((i[keyPath: anyIdent] as? Int32) == 7 ? "OK!" : "FAIL") // CHECK: OK!
+  _ = i  // suppress "never mutated" note
+
+  // `AnyKeyPath == AnyKeyPath` — the static-instance emitter shares one
+  // immortal global per pattern, so identical-shape paths compare equal
+  // by object identity.  Different-typed paths compare unequal.
+  print(anyX == kpX ? "OK!" : "FAIL") // CHECK: OK!
+  print(anyX != paths[1] ? "OK!" : "FAIL") // CHECK: OK!
+
+  // `AnyKeyPath` as a Dictionary key exercises `hash(into:)`.
+  var counts: [AnyKeyPath: Int] = [:]
+  counts[anyX, default: 0] += 1
+  counts[anyX, default: 0] += 1
+  counts[anyNested, default: 0] += 1
+  print(counts[anyX] == 2 && counts[anyNested] == 1 ? "OK!" : "FAIL") // CHECK: OK!
+}
