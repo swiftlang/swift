@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -sil-print-types -module-name moveonly_addresschecker -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -module-name moveonly_addresschecker -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature Lifetimes -enable-sil-verify-all %s | %FileCheck %s
 
 // REQUIRES: swift_feature_MoveOnlyClasses
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage raw
 
@@ -332,8 +333,8 @@ bb0(%arg : @owned $Klass):
 // CHECK-LABEL: sil [ossa] @classSimpleNonConsumingUseTest : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 // CHECK: [[STACK:%.*]] = alloc_stack [lexical] $Klass, var, name "x2"
 // CHECK: store {{%.*}} to [init] [[STACK]]
-// CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] [[STACK]]
 // CHECK: destroy_addr [[STACK]]
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] [[STACK]]
 // CHECK: store {{%.*}} to [init] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] [[STACK]]
@@ -1012,3 +1013,84 @@ bb0(%0 : $*ContainerC):
   dealloc_stack %1 : $*@moveOnly ContainerC
   return %result : $CopyableKlass
 }
+
+// Reassigning a move-only 'var' with a value that is lifetime-dependent on
+// another access. The old value's destroy_addr must be hoisted out of the
+// reinitializing modify access scope (rather than sunk inside it, immediately
+// before the reinit), and the reinit must be rewritten to an init.
+// rdar://161667945
+struct UniqueArray : ~Copyable {
+  @_hasStorage var ptr: UnsafeMutablePointer<Int> { get set }
+  init()
+  var mutableSpan: MutableSpan<Int> {
+    @_lifetime(&self)
+    mutating get
+  }
+  deinit
+}
+
+sil @$s4test11UniqueArrayV11mutableSpans07MutableE0VySiGvg : $@convention(method) (@inout UniqueArray) -> @lifetime(borrow 0) @owned MutableSpan<Int>
+sil @$s4test11UniqueArrayVACycfC : $@convention(method) (@thin UniqueArray.Type) -> @owned UniqueArray
+sil @$s4test7useSpanyys07MutableC0VySiGF : $@convention(thin) (@guaranteed MutableSpan<Int>) -> ()
+sil @$ss11MutableSpanVsRi_zrlEAByxGycfC : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@thin MutableSpan<τ_0_0>.Type) -> @lifetime(immortal) @owned MutableSpan<τ_0_0>
+
+// CHECK-LABEL: sil hidden [ossa] @reinitMutableSpanThroughModifyAccess : $@convention(thin) () -> () {
+// CHECK:   [[MS:%.*]] = alloc_stack [lexical] [var_decl] $MutableSpan<Int>, var, name "ms"
+// CHECK:   store {{%.*}} to [init] [[MS]]
+// CHECK:   [[READ:%.*]] = begin_access [read] [static] [[MS]]
+// CHECK:   load_borrow [[READ]]
+// CHECK:   end_access [[READ]]
+// The old value of 'ms' is destroyed after the borrowing getter's access ends
+// and before the reinitializing modify access begins -- not sunk inside it.
+// CHECK:   destroy_addr [[MS]]
+// CHECK:   [[REINIT:%.*]] = begin_access [modify] [static] [[MS]]
+// CHECK-NOT:   destroy_addr
+// CHECK:   store {{%.*}} to [init] [[REINIT]]
+// CHECK:   end_access [[REINIT]]
+// CHECK-LABEL: } // end sil function 'reinitMutableSpanThroughModifyAccess'
+sil hidden [ossa] @reinitMutableSpanThroughModifyAccess : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $MutableSpan<Int>, var, name "ms", type $MutableSpan<Int>
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+  %2 = metatype $@thin MutableSpan<Int>.Type
+  // function_ref MutableSpan<>.init()
+  %3 = function_ref @$ss11MutableSpanVsRi_zrlEAByxGycfC : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@thin MutableSpan<τ_0_0>.Type) -> @lifetime(immortal) @owned MutableSpan<τ_0_0>
+  %4 = apply %3<Int>(%2) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@thin MutableSpan<τ_0_0>.Type) -> @lifetime(immortal) @owned MutableSpan<τ_0_0>
+  store %4 to [init] %1
+  %6 = begin_access [read] [static] %1
+  %7 = load [copy] %6
+  // function_ref useSpan(_:)
+  %8 = function_ref @$s4test7useSpanyys07MutableC0VySiGF : $@convention(thin) (@guaranteed MutableSpan<Int>) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed MutableSpan<Int>) -> ()
+  destroy_value %7
+  end_access %6
+  %12 = alloc_stack [lexical] [var_decl] $UniqueArray, var, name "ua", type $UniqueArray
+  %13 = mark_unresolved_non_copyable_value [consumable_and_assignable] %12
+  %14 = metatype $@thin UniqueArray.Type
+  // function_ref UniqueArray.init()
+  %15 = function_ref @$s4test11UniqueArrayVACycfC : $@convention(method) (@thin UniqueArray.Type) -> @owned UniqueArray
+  %16 = apply %15(%14) : $@convention(method) (@thin UniqueArray.Type) -> @owned UniqueArray
+  store %16 to [init] %13
+  %18 = begin_access [modify] [static] %13
+  // function_ref UniqueArray.mutableSpan.getter
+  %19 = function_ref @$s4test11UniqueArrayV11mutableSpans07MutableE0VySiGvg : $@convention(method) (@inout UniqueArray) -> @lifetime(borrow 0) @owned MutableSpan<Int>
+  %20 = apply %19(%18) : $@convention(method) (@inout UniqueArray) -> @lifetime(borrow 0) @owned MutableSpan<Int>
+  %21 = mark_dependence [unresolved] %20 on %18
+  end_access %18
+  %23 = begin_access [modify] [static] %1
+  store %21 to [assign] %23
+  end_access %23
+  destroy_addr %13
+  dealloc_stack %12
+  %28 = begin_access [read] [static] %1
+  %29 = load [copy] %28
+  // function_ref useSpan(_:)
+  %30 = function_ref @$s4test7useSpanyys07MutableC0VySiGF : $@convention(thin) (@guaranteed MutableSpan<Int>) -> ()
+  %31 = apply %30(%29) : $@convention(thin) (@guaranteed MutableSpan<Int>) -> ()
+  destroy_value %29
+  end_access %28
+  destroy_addr %1
+  dealloc_stack %0
+  %36 = tuple ()
+  return %36 : $()
+} // end sil function 'reinitMutableSpanThroughModifyAccess'
