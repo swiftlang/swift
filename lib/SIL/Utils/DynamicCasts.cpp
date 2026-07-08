@@ -119,6 +119,16 @@ classifyDynamicCastToProtocol(SILFunction *function, CanType source, CanType tar
     if (!matchesActorIsolation(conformance, function))
       return DynamicCastFeasibility::MaySucceed;
 
+    // The compile-time conformance may be provided by a @reparented
+    // extension whose availability isn't the same as the availability of
+    // the resilient-parent protocol itself. In that case, if the deployment
+    // target is older than the extension, the cast may not succeed.
+    //
+    // For now, conservatively say that all casts to resilient-parent protocols
+    // are not statically optimizable.
+    if (TargetProtocol->getAttrs().hasAttribute<ReparentableAttr>())
+      return DynamicCastFeasibility::MaySucceed;
+
     return DynamicCastFeasibility::WillSucceed;
   }
 
