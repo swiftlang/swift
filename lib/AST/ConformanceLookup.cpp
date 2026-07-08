@@ -773,6 +773,19 @@ LookupConformanceRequest::evaluate(Evaluator &evaluator,
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
+    } else if (protocol->isSpecificProtocol(KnownProtocolKind::IUnknown) ||
+               protocol->isSpecificProtocol(KnownProtocolKind::ISwiftObject)) {
+      // Synthesize COM protocol conformances for @com classes.
+      auto KP = protocol->isSpecificProtocol(KnownProtocolKind::IUnknown)
+                    ? KnownProtocolKind::IUnknown
+                    : KnownProtocolKind::ISwiftObject;
+      ImplicitKnownProtocolConformanceRequest request{nominal, KP};
+      if (auto conformance = evaluateOrDefault(ctx.evaluator, request, nullptr)) {
+        conformances.clear();
+        conformances.push_back(conformance);
+      } else {
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
     } else {
       // Was unable to infer the missing conformance.
       return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
