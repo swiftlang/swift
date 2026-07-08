@@ -40,6 +40,11 @@ public protocol Stylable: Drawable {
     func style() -> Bool
 }
 
+// Non-copyable protocol.
+public protocol Resource: ~Copyable {
+    func use() -> Int
+}
+
 // Concrete type conforming to Drawable (for boxing constructor test).
 public struct Circle: Drawable {
     var radius: Int
@@ -199,6 +204,30 @@ public struct Circle: Drawable {
 // CHECK:         static {{.*}} Resizable _fromExistential(void *_Nonnull typeMetadata, void *_Nonnull projectedValue, const void *_Nonnull wt) {
 // CHECK:         static {{.*}} const char * _Nonnull getOpaquePointer(const Resizable &object)
 // CHECK:         static {{.*}} Resizable returnNewValue(T callable) {
+// CHECK:       };
+
+// --- Non-copyable protocol: Resource (NonCopyable inverse tag) ---
+
+// CHECK-LABEL: class _impl_Resource;
+
+// CHECK:       struct ResourceTag {
+// CHECK-NEXT:    using WitnessTable = const void *_Nonnull;
+// CHECK-NEXT:  };
+
+// CHECK:       class
+// CHECK-SAME:  Resource final : public swift::_impl::SwiftExistentialType<_impl::ResourceTag, swift::_impl::NonCopyable> {
+// CHECK-NEXT:  public:
+// CHECK:         swift::Int use() const {
+// CHECK:       private:
+// CHECK:         Resource() noexcept : SwiftExistentialType(typename SwiftExistentialType::uninit_t{}) {}
+// CHECK:         friend class _impl::_impl_Resource;
+// CHECK:       };
+
+// CHECK:       class _impl_Resource {
+// CHECK-NEXT:  public:
+// CHECK:         static {{.*}} Resource _fromExistential(void *_Nonnull typeMetadata, void *_Nonnull projectedValue, const void *_Nonnull wt) {
+// CHECK:         static {{.*}} const char * _Nonnull getOpaquePointer(const Resource &object)
+// CHECK:         static {{.*}} Resource returnNewValue(T callable) {
 // CHECK:       };
 
 // --- Non-marker protocol inheriting Drawable: Stylable ---

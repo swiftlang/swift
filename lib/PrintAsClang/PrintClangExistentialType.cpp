@@ -15,6 +15,7 @@
 #include "DeclAndTypePrinter.h"
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangValueType.h"
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -29,6 +30,14 @@
 #include "llvm/Support/SipHash.h"
 
 using namespace swift;
+
+static void printInverseTags(raw_ostream &os, const ProtocolDecl *PD) {
+  using CBR = TypeDecl::CanBeInvertible::Result;
+  if (PD->canConformTo(InvertibleProtocolKind::Copyable) == CBR::Never)
+    os << ", swift::_impl::NonCopyable";
+  if (PD->canConformTo(InvertibleProtocolKind::Escapable) == CBR::Never)
+    os << ", swift::_impl::NonEscapable";
+}
 
 std::optional<std::string>
 ClangExistentialTypePrinter::getCxxTypeName(Type ty,
@@ -368,7 +377,9 @@ void ClangExistentialTypePrinter::printMarkerProtocolDecl(
     os << " final : public swift::_impl::SwiftExistentialType<"
        << cxx_synthesis::getCxxImplNamespaceName() << "::";
     printer.printBaseName(PD);
-    os << "Tag>";
+    os << "Tag";
+    printInverseTags(os, PD);
+    os << ">";
     os << " {\npublic:\n";
 
     os << "private:\n";
@@ -498,7 +509,9 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
                         : "SwiftExistentialType");
     os << "<" << cxx_synthesis::getCxxImplNamespaceName() << "::";
     printer.printBaseName(PD);
-    os << "Tag>";
+    os << "Tag";
+    printInverseTags(os, PD);
+    os << ">";
     os << " {\npublic:\n";
 
     // Emit protocol requirement methods.
@@ -748,6 +761,20 @@ void ClangExistentialTypePrinter::printCompositionTypeDecl(
     printer.printBaseName(PD);
     os << "Tag";
   });
+  // Emit inverse tags if any constituent protocol opts out.
+  {
+    using CBR = TypeDecl::CanBeInvertible::Result;
+    bool needsNonCopyable = llvm::any_of(wtProtocols, [](const ProtocolDecl *P) {
+      return P->canConformTo(InvertibleProtocolKind::Copyable) == CBR::Never;
+    });
+    bool needsNonEscapable = llvm::any_of(wtProtocols, [](const ProtocolDecl *P) {
+      return P->canConformTo(InvertibleProtocolKind::Escapable) == CBR::Never;
+    });
+    if (needsNonCopyable)
+      os << ", swift::_impl::NonCopyable";
+    if (needsNonEscapable)
+      os << ", swift::_impl::NonEscapable";
+  }
   os << "> {\n";
   os << "public:\n";
 
