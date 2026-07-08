@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name serialization -emit-module-path %t/serialization.swiftmodule %s
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name serialization -emit-module-path %t/serialization.swiftmodule %s -I %t
 // RUN: %llvm-bcanalyzer -dump %t/serialization.swiftmodule | %FileCheck -check-prefix CHECK -implicit-check-not UnknownCode %s
 
 @com(interface: "00000000-0000-0000-C000-000000000046")
