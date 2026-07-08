@@ -114,18 +114,18 @@ protected:
   }
 
   Type getContextualType(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualType(anchor, /*forConstraint=*/false);
+    return getSolution().getContextualType(anchor);
   }
 
   TypeLoc getContextualTypeLoc(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualTypeLoc(anchor);
+    auto &solution = getSolution();
+    if (auto contextualInfo = solution.getContextualTypeInfo(anchor))
+      return contextualInfo->typeLoc;
+    return TypeLoc();
   }
 
   ContextualTypePurpose getContextualTypePurpose(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualTypePurpose(anchor);
+    return getSolution().getContextualTypePurpose(anchor);
   }
 
   DeclContext *getDC() const {
@@ -663,8 +663,7 @@ public:
             locator->isForContextualType()
                 ? locator->castLastElementTo<LocatorPathElt::ContextualType>()
                       .getPurpose()
-                : solution.getConstraintSystem().getContextualTypePurpose(
-                      locator->getAnchor()),
+                : solution.getContextualTypePurpose(locator->getAnchor()),
             lhs, rhs, locator, fixBehavior) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,

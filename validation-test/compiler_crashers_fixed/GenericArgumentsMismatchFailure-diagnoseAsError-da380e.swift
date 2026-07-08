@@ -1,5 +1,5 @@
 // {"kind":"typecheck","original":"0e1c3fed","signature":"swift::constraints::GenericArgumentsMismatchFailure::diagnoseAsError()","signatureAssert":"Assertion failed: (purpose != CTP_Unused), function diagnoseAsError","signatureNext":"GenericArgumentsMismatch::diagnose"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 @resultBuilder enum a {
   struct b<c
     static func buildExpression( Int) -> b<String>
