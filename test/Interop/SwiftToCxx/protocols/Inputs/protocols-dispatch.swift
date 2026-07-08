@@ -69,3 +69,11 @@ public struct LargeDrawable: Drawable {
     }
     public func draw() -> Int { return a + b + c + d }
 }
+
+public func drawTwice(_ d: any Drawable) -> Int {
+    return d.draw() + d.draw()
+}
+
+public func bestDrawable(_ a: any Drawable, _ b: any Drawable) -> any Drawable {
+    return a.draw() >= b.draw() ? a : b
+}

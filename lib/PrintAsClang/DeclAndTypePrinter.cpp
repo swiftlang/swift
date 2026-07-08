@@ -1777,6 +1777,8 @@ private:
     os << "}\n";
     if (result.isObjCxxOnly())
       os << "#endif // defined(__OBJC__)\n";
+    if (result.needsExistentialGuard())
+      os << "#endif // SWIFT_CXX_EXISTENTIAL_INTEROP && __cpp_concepts\n";
   }
 
   enum class PrintLeadingSpace : bool {

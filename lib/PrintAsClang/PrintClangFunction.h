@@ -63,11 +63,17 @@ struct ClangRepresentation {
       kind = unsupported;
     else if (kind == representable)
       kind = other.kind;
+    if (other.existentialGuard)
+      existentialGuard = true;
     return *this;
   }
 
+  bool needsExistentialGuard() const { return existentialGuard; }
+  void setNeedsExistentialGuard() { existentialGuard = true; }
+
 private:
   Kind kind;
+  bool existentialGuard = false;
 };
 
 /// Responsible for printing a Swift function decl or type in C or C++ mode, to

@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/Inputs/protocols-dispatch-base.swift -module-name ProtoDispatch -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/proto-dispatch.h -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature CxxExistentialInterop
+// RUN: %target-swift-frontend %S/Inputs/protocols-dispatch.swift -module-name ProtoDispatch -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/proto-dispatch.h -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature CxxExistentialInterop
 
 // RUN: %target-interop-build-clangxx -std=gnu++20 -c %s -I %t -o %t/proto-dispatch-execution.o
-// RUN: %target-interop-build-swift %S/Inputs/protocols-dispatch-base.swift -o %t/proto-dispatch-execution -Xlinker %t/proto-dispatch-execution.o -module-name ProtoDispatch -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+// RUN: %target-interop-build-swift %S/Inputs/protocols-dispatch.swift -o %t/proto-dispatch-execution -Xlinker %t/proto-dispatch-execution.o -module-name ProtoDispatch -Xfrontend -entry-point-function-name -Xfrontend swiftMain
 
 // RUN: %target-codesign %t/proto-dispatch-execution
 // RUN: %target-run %t/proto-dispatch-execution | %FileCheck %s

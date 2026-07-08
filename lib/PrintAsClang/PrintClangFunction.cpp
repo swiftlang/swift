@@ -30,6 +30,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Feature.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "clang/AST/ASTContext.h"
@@ -301,6 +302,55 @@ public:
         printInoutTypeModifier();
       }
       return ClangRepresentation::objcxxonly;
+    }
+
+    // Non-ObjC existential with a single protocol constraint:
+    // emit the C++ existential wrapper class name.
+    if (languageMode == OutputLanguageMode::Cxx &&
+        moduleContext->getASTContext().LangOpts.hasFeature(
+            Feature::CxxExistentialInterop)) {
+      ProtocolDecl *PD = nullptr;
+      ArrayRef<Type> patArgs;
+      if (auto *protoTy = ty->getConstraintType()->getAs<ProtocolType>())
+        PD = protoTy->getDecl();
+      else if (auto *paramProtoTy =
+                   ty->getConstraintType()
+                       ->getAs<ParameterizedProtocolType>()) {
+        PD = paramProtoTy->getProtocol();
+        patArgs = paramProtoTy->getArgs();
+      }
+      if (PD && !PD->isObjC() && !PD->isMarkerProtocol() &&
+            declPrinter.shouldInclude(PD)) {
+          if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
+            if (!isInOutParam)
+              os << "const ";
+            printOptional(optionalKind, [&]() {
+              ClangSyntaxPrinter(PD->getASTContext(), os)
+                  .printPrimaryCxxTypeName(PD, moduleContext);
+              visitGenericArgs(patArgs);
+            });
+            os << '&';
+          } else {
+            printOptional(optionalKind, [&]() {
+              if (modifiersDelegate.mapValueTypeUseKind) {
+                ClangSyntaxPrinter printer(PD->getASTContext(), os);
+                printer.printModuleNamespaceQualifiersIfNeeded(
+                    PD->getModuleContext(), moduleContext);
+                if (!printer.printNestedTypeNamespaceQualifiers(PD))
+                  os << "::";
+                os << cxx_synthesis::getCxxImplNamespaceName() << "::";
+                ClangValueTypePrinter::printCxxImplClassName(os, PD);
+              } else {
+                ClangSyntaxPrinter(PD->getASTContext(), os)
+                    .printPrimaryCxxTypeName(PD, moduleContext);
+                visitGenericArgs(patArgs);
+              }
+            });
+          }
+          ClangRepresentation repr(ClangRepresentation::representable);
+          repr.setNeedsExistentialGuard();
+          return repr;
+        }
     }
 
     return visitPart(ty->getConstraintType(), optionalKind, isInOutParam);
@@ -1116,6 +1166,10 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     if (resultingRepresentation.isObjCxxOnly() &&
         outputLang == OutputLanguageMode::Cxx)
       os << "#if defined(__OBJC__)\n";
+    if (resultingRepresentation.needsExistentialGuard() &&
+        outputLang == OutputLanguageMode::Cxx)
+      os << "#if defined(SWIFT_CXX_EXISTENTIAL_INTEROP) && "
+            "defined(__cpp_concepts) && __cpp_concepts >= 202002L\n";
     os << functionSignatureOS.str();
   }
   return resultingRepresentation;
@@ -1157,6 +1211,43 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
       namePrinter();
       return;
     }
+
+    // Non-ObjC existential: pass pointer to the wrapper's storage.
+    // Class-bound existentials are loadable and may be passed directly
+    // (via a passStub struct), so wrap in swift_interop_passDirect when needed.
+    if (auto *existTy = type->getAs<ExistentialType>()) {
+      ProtocolDecl *PD = nullptr;
+      if (auto *protoTy =
+              existTy->getConstraintType()->getAs<ProtocolType>())
+        PD = protoTy->getDecl();
+      else if (auto *paramProtoTy =
+                   existTy->getConstraintType()
+                       ->getAs<ParameterizedProtocolType>())
+        PD = paramProtoTy->getProtocol();
+      if (PD) {
+        if (!directTypeEncoding.empty()) {
+          ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+              .printBaseName(moduleContext);
+          os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+             << "::swift_interop_passDirect_" << directTypeEncoding << '(';
+        }
+        ClangSyntaxPrinter(PD->getASTContext(), os)
+            .printModuleNamespaceQualifiersIfNeeded(PD->getModuleContext(),
+                                                    moduleContext);
+        if (!ClangSyntaxPrinter(PD->getASTContext(), os)
+                 .printNestedTypeNamespaceQualifiers(PD))
+          os << "::";
+        os << cxx_synthesis::getCxxImplNamespaceName() << "::";
+        ClangValueTypePrinter::printCxxImplClassName(os, PD);
+        os << "::getOpaquePointer(";
+        namePrinter();
+        os << ')';
+        if (!directTypeEncoding.empty())
+          os << ')';
+        return;
+      }
+    }
+
     if (auto *classDecl = type->getClassOrBoundGenericClass()) {
       if (classDecl->hasClangNode()) {
         if (isInOut)
@@ -1545,6 +1636,51 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           os, classDecl, moduleContext,
           [&]() { printCallToCFunc(/*additionalParam=*/std::nullopt); });
       return;
+    }
+    // Non-ObjC existential return: construct wrapper via _impl::returnNewValue.
+    if (auto *existTy = resultTy->getAs<ExistentialType>()) {
+      if (!existTy->isObjCExistentialType()) {
+        if (existTy->getConstraintType()->is<ProtocolType>() ||
+            existTy->getConstraintType()
+                ->is<ParameterizedProtocolType>()) {
+          os << "  return ";
+          printTypeImplTypeSpecifier(resultTy, moduleContext);
+          os << "::returnNewValue";
+          if (auto *paramProtoTy =
+                  existTy->getConstraintType()
+                      ->getAs<ParameterizedProtocolType>()) {
+            os << '<';
+            llvm::interleaveComma(
+                paramProtoTy->getArgs(), os, [&](Type argTy) {
+                  CFunctionSignatureTypePrinter typePrinter(
+                      os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
+                      interopContext,
+                      CFunctionSignatureTypePrinterModifierDelegate(),
+                      moduleContext, declPrinter,
+                      FunctionSignatureTypeUse::TypeReference);
+                  typePrinter.visit(argTy, std::nullopt, false);
+                });
+            os << '>';
+          }
+          os << "([&](char * _Nonnull result) "
+                "SWIFT_INLINE_THUNK_ATTRIBUTES {\n    ";
+          if (auto directResultType = signature.getDirectResultType()) {
+            std::string typeEncoding =
+                encodeTypeInfo(*directResultType, moduleContext, typeMapping);
+            ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+                .printBaseName(moduleContext);
+            os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+               << "::swift_interop_returnDirect_" << typeEncoding << '('
+               << "result" << ", ";
+            printCallToCFunc(std::nullopt);
+            os << ')';
+          } else {
+            printCallToCFunc(/*firstParam=*/StringRef("result"));
+          }
+          os << ";\n  });\n";
+          return;
+        }
+      }
     }
     if (auto *decl = resultTy->getNominalOrBoundGenericNominal();
         decl && !resultTy->isObjCExistentialType() &&
