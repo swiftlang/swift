@@ -72,21 +72,20 @@
 // CHECK:   _destroyValue();
 // CHECK: }
 
-// --- Conversion operator to Any (SwiftExistentialType<>) ---
+// --- Generic subset conversion operator (subsumes conversion to Any) ---
 
-// CHECK: SwiftExistentialType<Tags...>::operator SwiftExistentialType<>() const noexcept
-// CHECK:     requires(sizeof...(Tags) > 0 && Traits::IsCopyable) {
-// CHECK:   SwiftExistentialType<> result(
-// CHECK:       typename SwiftExistentialType<>::uninit_t{});
+// CHECK: SwiftExistentialType<Tags...>::operator SwiftExistentialType<TargetTags...>() const noexcept {
+// CHECK:   SwiftExistentialType<TargetTags...> result(
+// CHECK:       typename SwiftExistentialType<TargetTags...>::uninit_t{});
 // CHECK:   result._type = _type;
 // CHECK:   _getVWT()->initializeBufferWithCopyOfBuffer(
 // CHECK: }
 
-// --- SwiftClassExistentialType conversion operator to Any ---
+// --- SwiftClassExistentialType generic subset conversion ---
 
-// CHECK: SwiftClassExistentialType<Tags...>::operator SwiftExistentialType<>() const noexcept {
-// CHECK:   SwiftExistentialType<> result(
-// CHECK:       typename SwiftExistentialType<>::uninit_t{});
+// CHECK: SwiftClassExistentialType<Tags...>::operator SwiftExistentialType<TargetTags...>() const noexcept {
+// CHECK:   SwiftExistentialType<TargetTags...> result(
+// CHECK:       typename SwiftExistentialType<TargetTags...>::uninit_t{});
 // CHECK:   result._type = swift_getObjectType(
 // CHECK: }
 

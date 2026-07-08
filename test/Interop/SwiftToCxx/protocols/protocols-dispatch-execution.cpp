@@ -110,6 +110,24 @@ int main() {
 // CHECK-NEXT: copy.draw() = 25
 // CHECK-NEXT: copy.resize(3) = true
 
+    // Test 9: Subset conversion -- pass 3-way composition to 2-way function.
+    // Exercises the generic subset operator at runtime:
+    // SwiftExistentialType<DrawableTag, ResizableTag, ScalableTag> narrows to
+    // SwiftExistentialType<DrawableTag, ResizableTag> via implicit conversion.
+    {
+        auto comp3 = ProtoDispatch::makeDrawableResizableAndScalable();
+        printf("comp3.draw() = %ld\n", comp3.draw());
+        printf("comp3.scale() = %ld\n", comp3.scale());
+        assert(comp3.draw() == 25);
+        assert(comp3.scale() == 15);  // radius * 3
+        swift::Int result = ProtoDispatch::drawAndResize(comp3);
+        printf("drawAndResize(3-way) = %ld\n", result);
+        assert(result == 26);
+    }
+// CHECK-NEXT: comp3.draw() = 25
+// CHECK-NEXT: comp3.scale() = 15
+// CHECK-NEXT: drawAndResize(3-way) = 26
+
     printf("done\n");
 // CHECK-NEXT: done
     return 0;

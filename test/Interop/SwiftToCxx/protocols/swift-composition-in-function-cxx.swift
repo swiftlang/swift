@@ -49,10 +49,11 @@ public func makeDrawableAndResizable() -> any Drawable & Resizable {
 // CHECK: static {{.*}} AnyDrawableAndResizable returnNewValue
 
 // --- Composition parameter: drawAndResize ---
+// Parameter uses base template type for implicit subset conversion.
 
 // CHECK-LABEL: SWIFT_INLINE_THUNK swift::Int drawAndResize
-// CHECK-SAME: const Functions::AnyDrawableAndResizable&
-// CHECK: _impl::_impl_AnyDrawableAndResizable::getOpaquePointer(
+// CHECK-SAME: const swift::_impl::SwiftExistentialType<Functions::_impl::DrawableTag, Functions::_impl::ResizableTag>&
+// CHECK: reinterpret_cast<const char *>(&
 
 // --- Composition return: makeDrawableAndResizable ---
 

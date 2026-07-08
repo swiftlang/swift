@@ -398,34 +398,69 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "  _destroyValue();\n";
   os << "}\n\n";
 
-  // Implicit conversion to Any (SwiftExistentialType<>)
+  // Generic subset conversion (includes conversion to Any when
+  // TargetTags is empty): SwiftExistentialType<Tags...> ->
+  // SwiftExistentialType<TargetTags...> where TargetTags ⊆ Tags.
   os << tmplPrefix;
+  os << "template <typename... TargetTags>\n";
+  os << "  requires (sizeof...(TargetTags) < sizeof...(Tags) &&\n";
+  os << "            ExistentialTagTraits<Tags...>::IsCopyable &&\n";
+  os << "            ((ProtocolTag<TargetTags> || MarkerTag<TargetTags> || "
+        "InverseTag<TargetTags>) && ...) &&\n";
+  os << "            (ContainedIn<TargetTags, Tags...> && ...))\n";
   os << "SWIFT_INLINE_THUNK\n";
-  os << cls << "::operator SwiftExistentialType<>() const noexcept\n";
-  os << "    requires(sizeof...(Tags) > 0 && ExistentialTagTraits<Tags...>::IsCopyable) {\n";
-  os << "  SwiftExistentialType<> result(\n";
-  os << "      typename SwiftExistentialType<>::uninit_t{});\n";
+  os << cls << "::operator SwiftExistentialType<TargetTags...>()"
+        " const noexcept {\n";
+  os << "  SwiftExistentialType<TargetTags...> result(\n";
+  os << "      typename SwiftExistentialType<TargetTags...>::uninit_t{});\n";
   os << "  result._type = _type;\n";
   os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
   os << "      result._buffer, const_cast<void **>(_buffer), _type);\n";
+  os << "  if constexpr (SwiftExistentialType<TargetTags...>"
+        "::Traits::NumWitnessTables > 0) {\n";
+  os << "    size_t ti = 0;\n";
+  os << "    auto copyIfProtocol = [&]<typename T>() {\n";
+  os << "      if constexpr (ProtocolTag<T>)\n";
+  os << "        result._witnessTables[ti++] = "
+        "this->_witnessTables[_wtIndexOf<T, Tags...>()];\n";
+  os << "    };\n";
+  os << "    (copyIfProtocol.template operator()<TargetTags>(), ...);\n";
+  os << "  }\n";
   os << "  return result;\n";
   os << "}\n\n";
 
-  // SwiftClassExistentialType: implicit conversion to Any
+  // SwiftClassExistentialType: generic subset conversion to opaque
+  // layout (includes conversion to Any when TargetTags is empty).
   const char *clsTmplPrefix = "template <typename... Tags>\n"
     "  requires ((ProtocolTag<Tags> || MarkerTag<Tags> || InverseTag<Tags>) "
     "&& ...)\n";
   const char *clsCls = "SwiftClassExistentialType<Tags...>";
   os << clsTmplPrefix;
+  os << "template <typename... TargetTags>\n";
+  os << "  requires (sizeof...(TargetTags) < sizeof...(Tags) &&\n";
+  os << "            ((ProtocolTag<TargetTags> || MarkerTag<TargetTags> || "
+        "InverseTag<TargetTags>) && ...) &&\n";
+  os << "            (ContainedIn<TargetTags, Tags...> && ...))\n";
   os << "SWIFT_INLINE_THUNK\n";
-  os << clsCls << "::operator SwiftExistentialType<>() const noexcept {\n";
-  os << "  SwiftExistentialType<> result(\n";
-  os << "      typename SwiftExistentialType<>::uninit_t{});\n";
+  os << clsCls << "::operator SwiftExistentialType<TargetTags...>()"
+        " const noexcept {\n";
+  os << "  SwiftExistentialType<TargetTags...> result(\n";
+  os << "      typename SwiftExistentialType<TargetTags...>::uninit_t{});\n";
   os << "  result._type = swift_getObjectType(\n";
   os << "      reinterpret_cast<void *_Nonnull>(_value));\n";
   os << "  result._buffer[0] = reinterpret_cast<void *_Nonnull>(_value);\n";
   os << "  if (_value) swift_retain(\n";
   os << "      reinterpret_cast<void *_Nonnull>(_value));\n";
+  os << "  if constexpr (SwiftExistentialType<TargetTags...>"
+        "::Traits::NumWitnessTables > 0) {\n";
+  os << "    size_t ti = 0;\n";
+  os << "    auto copyIfProtocol = [&]<typename T>() {\n";
+  os << "      if constexpr (ProtocolTag<T>)\n";
+  os << "        result._witnessTables[ti++] = "
+        "this->_witnessTables[_wtIndexOf<T, Tags...>()];\n";
+  os << "    };\n";
+  os << "    (copyIfProtocol.template operator()<TargetTags>(), ...);\n";
+  os << "  }\n";
   os << "  return result;\n";
   os << "}\n\n";
 

@@ -354,8 +354,8 @@ public:
         }
 
       // Ad-hoc protocol compositions (any A & B).
-      if (auto *compTy = ty->getConstraintType()
-                             ->getAs<ProtocolCompositionType>()) {
+      if (ty->getConstraintType()
+                             ->is<ProtocolCompositionType>()) {
         auto layout = ty->getExistentialLayout();
         auto protocols = layout.getProtocols();
         SmallVector<const ProtocolDecl *, 4> wtProtocols;
@@ -375,9 +375,18 @@ public:
             if (!isInOutParam)
               os << "const ";
             printOptional(optionalKind, [&]() {
-              ClangSyntaxPrinter(moduleContext->getASTContext(), os)
-                  .printBaseName(moduleContext);
-              os << "::" << compName;
+              os << "swift::_impl::SwiftExistentialType<";
+              llvm::interleaveComma(wtProtocols, os,
+                                    [&](const ProtocolDecl *PD) {
+                ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+                    .printBaseName(moduleContext);
+                os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+                   << "::";
+                ClangSyntaxPrinter(PD->getASTContext(), os)
+                    .printBaseName(PD);
+                os << "Tag";
+              });
+              os << '>';
             });
             os << '&';
           } else {
@@ -394,7 +403,9 @@ public:
               }
             });
           }
-          return ClangRepresentation::representable;
+          ClangRepresentation repr(ClangRepresentation::representable);
+          repr.setNeedsExistentialGuard();
+          return repr;
         }
       }
     }
@@ -1293,7 +1304,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
         return;
       }
 
-      // Ad-hoc composition param: use composition _impl::getOpaquePointer.
+      // Ad-hoc composition param: cast address directly (same as
+      // getOpaquePointer but avoids depending on the composition _impl).
       if (existTy->getConstraintType()->is<ProtocolCompositionType>()) {
         auto layout = existTy->getExistentialLayout();
         auto protocols = layout.getProtocols();
@@ -1303,12 +1315,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
             wtProtocols.push_back(proto);
         }
         if (wtProtocols.size() >= 2) {
-          auto compName =
-              ClangExistentialTypePrinter::getCompositionName(wtProtocols);
-          ClangSyntaxPrinter(moduleContext->getASTContext(), os)
-              .printBaseName(moduleContext);
-          os << "::" << cxx_synthesis::getCxxImplNamespaceName()
-             << "::_impl_" << compName << "::getOpaquePointer(";
+          os << "reinterpret_cast<const char *>(&";
           namePrinter();
           os << ')';
           return;

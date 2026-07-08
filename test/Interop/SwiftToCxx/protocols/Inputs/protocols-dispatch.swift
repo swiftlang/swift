@@ -85,3 +85,15 @@ public func drawAndResize(_ x: any Drawable & Resizable) -> Int {
 public func makeDrawableAndResizable() -> any Drawable & Resizable {
     return Circle(radius: 5)
 }
+
+public protocol Scalable {
+    func scale() -> Int
+}
+
+extension Circle: Scalable {
+    public func scale() -> Int { return radius * 3 }
+}
+
+public func makeDrawableResizableAndScalable() -> any Drawable & Resizable & Scalable {
+    return Circle(radius: 5)
+}

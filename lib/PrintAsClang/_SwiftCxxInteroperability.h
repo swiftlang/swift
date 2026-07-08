@@ -285,6 +285,21 @@ struct ExistentialTagTraits {
       !(... || std::is_same_v<Tags, NonCopyable>);
 };
 
+/// Returns the witness-table slot index of tag T within Tags...,
+/// counting only ProtocolTag entries (markers and inverses occupy no slot).
+template <typename T, typename... Tags>
+constexpr size_t _wtIndexOf() {
+  size_t idx = 0;
+  bool found = false;
+  auto step = [&]<typename U>() {
+    if (found) return;
+    if constexpr (std::is_same_v<T, U>) { found = true; }
+    else if constexpr (ProtocolTag<U>) { ++idx; }
+  };
+  (step.template operator()<Tags>(), ...);
+  return idx;
+}
+
 // --- Opaque existential container ---
 
 /// C++ wrapper for a Swift opaque existential container.
@@ -322,9 +337,16 @@ public:
   operator=(SwiftExistentialType &&other) noexcept;
   SWIFT_INLINE_THUNK ~SwiftExistentialType() noexcept;
 
-  /// Implicit conversion to Any (drops witness tables).
-  SWIFT_INLINE_THUNK operator SwiftExistentialType<>() const noexcept
-      requires(sizeof...(Tags) > 0 && Traits::IsCopyable);
+  /// Implicit narrowing to any subset of protocol tags (including
+  /// empty = conversion to Any).
+  template <typename... TargetTags>
+    requires (sizeof...(TargetTags) < sizeof...(Tags) &&
+              Traits::IsCopyable &&
+              ((ProtocolTag<TargetTags> || MarkerTag<TargetTags> ||
+                InverseTag<TargetTags>) && ...) &&
+              (ContainedIn<TargetTags, Tags...> && ...))
+  SWIFT_INLINE_THUNK operator SwiftExistentialType<TargetTags...>()
+      const noexcept;
 
 protected:
   struct uninit_t {};
@@ -426,8 +448,15 @@ public:
     if (_value) swift_release(reinterpret_cast<void *_Nonnull>(_value));
   }
 
-  /// Implicit conversion to Any (repacks from class-bound to opaque layout).
-  SWIFT_INLINE_THUNK operator SwiftExistentialType<>() const noexcept;
+  /// Implicit narrowing to any subset of protocol tags (opaque layout),
+  /// including empty = conversion to Any.
+  template <typename... TargetTags>
+    requires (sizeof...(TargetTags) < sizeof...(Tags) &&
+              ((ProtocolTag<TargetTags> || MarkerTag<TargetTags> ||
+                InverseTag<TargetTags>) && ...) &&
+              (ContainedIn<TargetTags, Tags...> && ...))
+  SWIFT_INLINE_THUNK operator SwiftExistentialType<TargetTags...>()
+      const noexcept;
 
 protected:
   struct uninit_t {};
