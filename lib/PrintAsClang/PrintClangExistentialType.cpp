@@ -741,7 +741,8 @@ void ClangExistentialTypePrinter::printCompositionTypeDecl(
   SmallVector<const ProtocolDecl *, 4> wtProtocols;
   for (auto *PD : protocols) {
     if (!PD->isMarkerProtocol() &&
-        Lowering::TypeConverter::protocolRequiresWitnessTable(PD))
+        Lowering::TypeConverter::protocolRequiresWitnessTable(
+            const_cast<ProtocolDecl *>(PD)))
       wtProtocols.push_back(PD);
   }
 
@@ -754,7 +755,7 @@ void ClangExistentialTypePrinter::printCompositionTypeDecl(
   os << "} // namespace " << cxx_synthesis::getCxxImplNamespaceName() << "\n";
 
   // Wrapper class inheriting from SwiftExistentialType<Tags...>.
-  os << "class " << compositionName
+  os << "class SWIFT_SYMBOL(\"composition\") " << compositionName
      << " final : public swift::_impl::SwiftExistentialType<";
   llvm::interleaveComma(wtProtocols, os, [&](const ProtocolDecl *PD) {
     os << cxx_synthesis::getCxxImplNamespaceName() << "::";

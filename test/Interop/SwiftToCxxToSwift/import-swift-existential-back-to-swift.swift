@@ -58,6 +58,18 @@ SwiftMod::Container<SwiftMod::Drawable> createDrawableContainer();
 // INTERFACE: func createAnyContainer() -> any Container
 // INTERFACE: func createDrawableContainer() -> any Container<any Drawable>
 
+// --- Composition round-trip ---
+SwiftMod::AnyDrawableAndResizable createComposition();
+
+void passComposition(const SwiftMod::AnyDrawableAndResizable& d);
+
+SwiftMod::AnyDrawableAndResizable passThroughComposition(
+    const SwiftMod::AnyDrawableAndResizable& a);
+
+// INTERFACE: func createComposition() -> any Drawable & Resizable
+// INTERFACE: func passComposition(_ d: any Drawable & Resizable)
+// INTERFACE: func passThroughComposition(_ a: any Drawable & Resizable) -> any Drawable & Resizable
+
 #endif
 
 //--- module.modulemap
@@ -73,6 +85,10 @@ public protocol Drawable {
     func draw() -> Int
 }
 
+public protocol Resizable {
+    func resize(to factor: Int) -> Bool
+}
+
 public protocol Renderable: AnyObject {
     func render() -> Int
 }
@@ -82,16 +98,21 @@ public protocol Container<Element> {
     func count() -> Int
 }
 
-public struct Circle: Drawable {
+public struct Circle: Drawable, Resizable {
     var radius: Int
     public init(radius: Int) { self.radius = radius }
     public func draw() -> Int { return radius * radius }
+    public func resize(to factor: Int) -> Bool { return factor > 0 && factor <= radius }
 }
 
 public class Canvas: Renderable {
     var size: Int
     public init(_ size: Int) { self.size = size }
     public func render() -> Int { return size * 2 }
+}
+
+public func makeDrawableAndResizable() -> any Drawable & Resizable {
+    return Circle(radius: 5)
 }
 
 // expected-no-diagnostics

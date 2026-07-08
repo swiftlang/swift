@@ -35,7 +35,7 @@ public func makeDrawableAndResizable() -> any Drawable & Resizable {
 
 // --- Composition wrapper class ---
 
-// CHECK-LABEL: class AnyDrawableAndResizable final : public swift::_impl::SwiftExistentialType<_impl::DrawableTag, _impl::ResizableTag>
+// CHECK-LABEL: class SWIFT_SYMBOL("composition") AnyDrawableAndResizable final : public swift::_impl::SwiftExistentialType<_impl::DrawableTag, _impl::ResizableTag>
 // CHECK: draw() const
 // CHECK: resize() const
 // CHECK: Drawable asDrawable() const

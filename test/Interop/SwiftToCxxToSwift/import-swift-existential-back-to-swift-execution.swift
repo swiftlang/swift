@@ -59,6 +59,18 @@ inline SwiftMod::Container<SwiftMod::Drawable> createDrawableContainer() {
         SwiftMod::DrawableArray::init(5));
 }
 
+// --- Composition round-trips ---
+
+inline SwiftMod::AnyDrawableAndResizable createComposition() {
+    return SwiftMod::makeDrawableAndResizable();
+}
+
+inline SwiftMod::AnyDrawableAndResizable passThroughComposition(
+    const SwiftMod::AnyDrawableAndResizable& d) {
+    auto copy = d;
+    return copy;
+}
+
 #endif
 
 //--- module.modulemap
@@ -74,6 +86,10 @@ public protocol Drawable {
     func draw() -> Int
 }
 
+public protocol Resizable {
+    func resize(to factor: Int) -> Bool
+}
+
 public protocol Renderable: AnyObject {
     func render() -> Int
 }
@@ -83,10 +99,11 @@ public protocol Container<Element> {
     func count() -> Int
 }
 
-public struct Circle: Drawable {
+public struct Circle: Drawable, Resizable {
     var radius: Int
     public init(_ radius: Int) { self.radius = radius }
     public func draw() -> Int { return radius * radius }
+    public func resize(to factor: Int) -> Bool { return factor > 0 && factor <= radius }
 }
 
 public class Canvas: Renderable {
@@ -107,6 +124,10 @@ public struct DrawableArray: Container {
     var n: Int
     public init(_ n: Int) { self.n = n }
     public func count() -> Int { return n }
+}
+
+public func makeDrawableAndResizable() -> any Drawable & Resizable {
+    return Circle(5)
 }
 
 #if SECOND_PASS
@@ -141,9 +162,18 @@ func testPATRoundTrip() {
     print("drawable count: \(dc.count())")
 }
 
+func testCompositionRoundTrip() {
+    let comp = createComposition()
+    print("comp draw: \(comp.draw())")
+
+    let comp2 = passThroughComposition(comp)
+    print("passThrough comp draw: \(comp2.draw())")
+}
+
 testOpaqueRoundTrip()
 testClassBoundRoundTrip()
 testPATRoundTrip()
+testCompositionRoundTrip()
 
 #endif
 
@@ -155,5 +185,7 @@ testPATRoundTrip()
 // CHECK-NEXT: passThrough render: 84
 // CHECK-NEXT: int count: 3
 // CHECK-NEXT: drawable count: 5
+// CHECK-NEXT: comp draw: 25
+// CHECK-NEXT: passThrough comp draw: 25
 
 // expected-no-diagnostics
