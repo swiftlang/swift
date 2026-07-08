@@ -1033,6 +1033,11 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorBool(
   auto &Ctx = getClangASTContext();
   auto &Sema = getClangSema();
 
+  if (!Sema.hasReachableDefinition(CXXRecord))
+    // Importing this operator requires reachable receiver object class
+    return nullptr;
+
+  // Look for operator bool() const
   clang::CXXConversionDecl *OpBool = nullptr;
 
   auto Conversions = CXXRecord->getVisibleConversionFunctions();
