@@ -5117,23 +5117,19 @@ public:
     return getConvention() == ResultConvention::Pack;
   }
 
-  bool isAddressResult(bool loweredAddresses) const {
-    if (loweredAddresses) {
-      return getConvention() == ResultConvention::GuaranteedAddress ||
-             getConvention() == ResultConvention::Inout;
-    }
-    return getConvention() == ResultConvention::Inout;
+  // Formal means after AddressLowering.
+  bool isFormalAddressResult() const {
+    return getConvention() == ResultConvention::GuaranteedAddress ||
+           getConvention() == ResultConvention::Inout;
   }
 
-  bool isGuaranteedResult(bool loweredAddresses) const {
-    if (loweredAddresses) {
-      return getConvention() == ResultConvention::Guaranteed;
-    }
-    return getConvention() == ResultConvention::Guaranteed ||
-           getConvention() == ResultConvention::GuaranteedAddress;
+  // Formal means after AddressLowering.
+  bool isFormalGuaranteedResult() const {
+    return getConvention() == ResultConvention::Guaranteed;
   }
 
-  bool isGuaranteedAddressResult() const {
+  // Formal means after AddressLowering.
+  bool isFormalGuaranteedAddressResult() const {
     return getConvention() == ResultConvention::GuaranteedAddress;
   }
 
@@ -5582,25 +5578,25 @@ public:
     return hasErrorResult() && getErrorResult().isFormalIndirect();
   }
 
-  bool hasGuaranteedResult(bool loweredAddresses) const {
+  bool hasGuaranteedResult() const {
     if (getNumResults() != 1) {
       return false;
     }
-    return getResults()[0].isGuaranteedResult(loweredAddresses);
+    return getSingleResult().isFormalGuaranteedResult();
   }
 
-  bool hasAddressResult(bool loweredAddresses) const {
+  bool hasAddressResult() const {
     if (getNumResults() != 1) {
       return false;
     }
-    return getResults()[0].isAddressResult(loweredAddresses);
+    return getSingleResult().isFormalAddressResult();
   }
 
   bool hasGuaranteedAddressResult() const {
     if (getNumResults() != 1) {
       return false;
     }
-    return getResults()[0].isGuaranteedAddressResult();
+    return getSingleResult().isFormalGuaranteedAddressResult();
   }
 
   struct IndirectFormalResultFilter {
@@ -5646,7 +5642,7 @@ public:
     return llvm::make_filter_range(getResults(), PackResultFilter());
   }
 
-  /// Get a single non-address SILType that represents all formal direct
+  /// Get a single SILType that represents all formal direct
   /// results. The actual SIL result type of an apply instruction that calls
   /// this function depends on the current SIL stage and is known by
   /// SILFunctionConventions. It may be a wider tuple that includes formally

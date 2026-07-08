@@ -2848,7 +2848,7 @@ void LoadableByAddress::recreateSingleApply(
   if ((isa<ApplyInst>(applyInst) || isa<TryApplyInst>(applyInst)) &&
       modNonFuncTypeResultType(genEnv, origSILFunctionType, *currIRMod) &&
       modifiableApply(applySite, *getIRGenModule()) &&
-      !origSILFunctionType->hasGuaranteedResult(true)) {
+      !origSILFunctionType->hasGuaranteedResult()) {
     assert(allApplyRetToAllocMap.find(applyInst) !=
            allApplyRetToAllocMap.end());
     auto newAlloc = allApplyRetToAllocMap.find(applyInst)->second;
