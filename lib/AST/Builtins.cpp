@@ -2281,6 +2281,47 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
   return builder.build(id);
 }
 
+// createDetachedContinuation<T> : (T.Type) -> Builtin.RawUnsafeContinuation
+static ValueDecl *getCreateDetachedContinuation(ASTContext &ctx,
+                                                Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                                      _conformsTo(
+                                        _typeparam(0), _escapable)
+                                        // we allow ~Copyable results
+                                      ),
+                            _parameters(_metatype(_typeparam(0))),
+                            _rawUnsafeContinuation);
+}
+
+// awaitDetachedContinuation<T> : (Builtin.RawUnsafeContinuation) async -> sending T
+// awaitDetachedThrowingContinuation<T> : (Builtin.RawUnsafeContinuation) async throws -> sending T
+static ValueDecl *getAwaitDetachedContinuation(ASTContext &ctx, Identifier id,
+                                               bool throws) {
+  BuiltinFunctionBuilder builder(ctx);
+
+  builder.addParameter(makeConcrete(ctx.TheRawUnsafeContinuationType));
+
+  auto resultTy = makeGenericParam();
+  builder.addConformanceRequirement(resultTy, KnownProtocolKind::Escapable);
+  builder.setResult(resultTy);
+
+  builder.setAsync();
+  if (throws)
+    builder.setThrows();
+  builder.setSendingResult();
+
+  return builder.build(id);
+}
+
+// destroyDetachedContinuation : (Builtin.RawUnsafeContinuation) -> ()
+static ValueDecl *getDestroyDetachedContinuation(ASTContext &ctx,
+                                                 Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawUnsafeContinuation),
+                            _void);
+}
+
 static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto *actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
@@ -3545,6 +3586,25 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::WithUnsafeThrowingContinuation:
     return getWithUnsafeContinuation(Context, Id, /*throws=*/true);
+
+  case BuiltinValueKind::CreateDetachedContinuation:
+    return getCreateDetachedContinuation(Context, Id);
+
+  case BuiltinValueKind::AwaitDetachedContinuation:
+    return getAwaitDetachedContinuation(Context, Id, /*throws=*/false);
+
+  case BuiltinValueKind::AwaitDetachedThrowingContinuation:
+    return getAwaitDetachedContinuation(Context, Id, /*throws=*/true);
+
+  case BuiltinValueKind::ResumeDetachedContinuationReturning:
+  case BuiltinValueKind::ResumeDetachedThrowingContinuationReturning:
+    return getResumeContinuationReturning(Context, Id);
+
+  case BuiltinValueKind::ResumeDetachedThrowingContinuationThrowing:
+    return getResumeContinuationThrowing(Context, Id);
+
+  case BuiltinValueKind::DestroyDetachedContinuation:
+    return getDestroyDetachedContinuation(Context, Id);
 
   case BuiltinValueKind::HopToActor:
     return getHopToActor(Context, Id);

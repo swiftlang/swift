@@ -1704,6 +1704,28 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)AACI->getOperand()->getType().getCategory(), ListOfValues);
     break;
   }
+  case SILInstructionKind::AwaitDetachedContinuationInst: {
+    const AwaitDetachedContinuationInst *ADCI
+      = cast<AwaitDetachedContinuationInst>(&SI);
+
+    // Format: each operand as a (type, category, value) triple, then the resume
+    // block ID and the error block ID if given.  Throwing-ness is encoded by
+    // the presence of the error block.
+    SmallVector<ValueID, 8> args;
+    for (SILValue operand : {ADCI->getContinuation(), ADCI->getResumeBuffer()}) {
+      args.push_back(S.addTypeRef(operand->getType().getRawASTType()));
+      args.push_back((unsigned)operand->getType().getCategory());
+      args.push_back(addValueRef(operand));
+    }
+    args.push_back(BasicBlockMap[ADCI->getResumeBB()]);
+    if (auto errorBB = ADCI->getErrorBB()) {
+      args.push_back(BasicBlockMap[errorBB]);
+    }
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)ADCI->getKind(), 0, 0, args);
+    break;
+  }
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::SwitchEnumAddrInst: {
     // Format:

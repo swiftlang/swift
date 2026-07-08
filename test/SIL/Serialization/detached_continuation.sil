@@ -1,0 +1,36 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name detached
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -module-name detached | %FileCheck %s
+// REQUIRES: concurrency
+
+import Builtin
+import Swift
+import _Concurrency
+
+// CHECK-LABEL: sil @detached_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+sil @detached_await : $@async (Builtin.RawUnsafeContinuation) -> () {
+entry(%token : $Builtin.RawUnsafeContinuation):
+  %a = alloc_stack $Builtin.Int32
+  // CHECK: await_detached_continuation %0 : $Builtin.RawUnsafeContinuation, {{%.*}} : $*Builtin.Int32, resume bb1
+  await_detached_continuation %token : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32, resume bb1
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @detached_await_throws : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+sil @detached_await_throws : $@async (Builtin.RawUnsafeContinuation) -> () {
+entry(%token : $Builtin.RawUnsafeContinuation):
+  %a = alloc_stack $Builtin.Int32
+  // CHECK: await_detached_continuation %0 : $Builtin.RawUnsafeContinuation, {{%.*}} : $*Builtin.Int32, resume {{bb[0-9]+}}, error {{bb[0-9]+}}
+  await_detached_continuation %token : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32, resume bb1, error bb2
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+bb2(%e : $Error):
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+bb3:
+  return undef : $()
+}

@@ -23,6 +23,7 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "Debug.h"
 #include "Error.h"
+#include "ExecutorTracking.h"
 #include "TaskGroupPrivate.h"
 #include "TaskLocal.h"
 #include "TaskPrivate.h"
@@ -34,8 +35,8 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
-#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <new>
@@ -1701,7 +1702,8 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
 }
 
 static void resumeTaskAfterContinuation(AsyncTask *task,
-                                        ContinuationAsyncContext *context) {
+                                        ContinuationAsyncContext *context,
+                                        bool allowInlineResume = false) {
   auto &sync = context->AwaitSynchronization;
 
   auto status = sync.load(std::memory_order_acquire);
@@ -1742,6 +1744,30 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
   sync.store(ContinuationStatus::Resumed, std::memory_order_relaxed);
   context->Cond->signal();
 #else
+  if (allowInlineResume) {
+    auto resumeExecutor = context->ResumeToExecutor;
+    auto trackingInfo = ExecutorTrackingInfo::current();
+    auto currentExecutor = (trackingInfo ? trackingInfo->getActiveExecutor()
+                                         : SerialExecutorRef::generic());
+    auto currentTaskExecutor = (trackingInfo ? trackingInfo->getTaskExecutor()
+                                             : TaskExecutorRef::undefined());
+    auto newTaskExecutor = task->getPreferredTaskExecutor();
+
+    if (!mustSwitchToRun(currentExecutor, resumeExecutor, currentTaskExecutor,
+                         newTaskExecutor) &&
+        !shouldYieldThread()) {
+      // Donate the current thread to the resumed task, exactly like
+      // ExecutorJob.runSynchronously: swift_job_run establishes a fresh tracking
+      // frame (before flagAsRunning, so voucher adoption has a frame to use) and
+      // save/restores the active task around running it, so it is sound even if
+      // it nests.  A synchronous resume is only ever issued by an executor from
+      // its own (non-task) run context, so there is no separate "are we in a
+      // task" gate -- the same contract as running a job synchronously.
+      _swift_tsan_acquire(static_cast<Job *>(task));
+      return swift_job_run(task, resumeExecutor);
+    }
+  }
+
   // TODO: maybe in some mode we should set the status to Resumed here
   // to make a stronger best-effort attempt to catch racing attempts to
   // resume the continuation?
@@ -1774,6 +1800,287 @@ static void swift_continuation_throwingResumeWithErrorImpl(AsyncTask *task,
   concurrency::trace::task_continuation_resume(context, true);
   context->ErrorResult = error;
   resumeTaskAfterContinuation(task, context);
+}
+
+// A *synchronous* continuation resume (swift_continuation_resumeSynchronously
+// and the detached resume entry points) donates the resuming thread to the
+// resumed task instead of enqueuing it -- the same contract as
+// ExecutorJob.runSynchronously.  It is the caller's (executor's) responsibility
+// to only issue a synchronous resume from its own run context, i.e. never from
+// within another running task; there is therefore no runtime "are we in a task"
+// gate here, just as runSynchronously has none.  The actual donation
+// (swift_job_run) establishes a tracking frame before flagAsRunning and
+// save/restores the active task, so it is mechanically sound regardless.
+SWIFT_CC(swift)
+void swift::swift_continuation_resumeSynchronously(AsyncTask *task) {
+  continuationChecking::willResume(task);
+  auto context = static_cast<ContinuationAsyncContext *>(task->ResumeContext);
+  concurrency::trace::task_continuation_resume(context, false);
+  resumeTaskAfterContinuation(task, context, /*allowInlineResume=*/true);
+}
+
+SWIFT_CC(swift)
+void swift::swift_continuation_throwingResumeSynchronouslyWithError(
+    AsyncTask *task, /* +1 */ SwiftError *error) {
+  continuationChecking::willResume(task);
+  auto context = static_cast<ContinuationAsyncContext *>(task->ResumeContext);
+  concurrency::trace::task_continuation_resume(context, true);
+  context->ErrorResult = error;
+  resumeTaskAfterContinuation(task, context, /*allowInlineResume=*/true);
+}
+
+//===----------------------------------------------------------------------===//
+// Detached (split) continuations
+//===----------------------------------------------------------------------===//
+//
+// A detached continuation decouples the *create*, *await*, and *resume*
+// operations of a continuation so they can happen in different functions and on
+// different threads (see docs/DetachableContinuation-CompilerSpec.md).  Unlike
+// swift_continuation_init/await/resume, which assume create and await are
+// adjacent on one task with nothing in between, a detached continuation:
+//
+//   * create (swift_continuation_createDetached): allocates the context and its
+//     result storage, state Pending; does NOT bind a resume-point and does NOT
+//     touch task execution state.  Returns the context pointer, which is the
+//     token shared by both halves.
+//   * await (swift_continuation_awaitDetached): binds the resume-point to the
+//     *current* task, records the awaiting task on the context, and performs the
+//     Pending->Awaited transition / suspend.
+//   * resume (swift_continuation_resumeDetached*): resumes *by context* (the
+//     value/error is stored into the context by the caller first); it must not
+//     rely on task->ResumeContext, and enqueues the recorded awaiting task.
+
+/// Shared tail of the detached resume entry points: perform the
+/// Pending/Awaited -> Resumed transition and, if a task was awaiting, make it
+/// runnable.  The result value (or error) must already be stored in the
+/// context.  Mirrors resumeTaskAfterContinuation, but works purely from the
+/// context (there is no task->ResumeContext to recover) and tolerates the
+/// resume-before-await race where no awaiting task has been recorded yet.
+static void
+resumeDetachedTaskAfterContinuation(ContinuationAsyncContext *context,
+                                    bool allowInlineResume) {
+  auto &sync = context->AwaitSynchronization;
+
+  auto status = sync.load(std::memory_order_acquire);
+  assert(status != ContinuationStatus::Resumed &&
+         "continuation was already resumed");
+
+  // Case 1: Pending -- nobody is awaiting yet.  Record Resumed and return; a
+  // later awaitDetached will observe Resumed and continue inline.  Note that no
+  // awaiting task exists in this case, so we must do this *before* touching
+  // context->AwaitingTask.
+  if (status == ContinuationStatus::Pending &&
+      sync.compare_exchange_strong(status, ContinuationStatus::Resumed,
+                                   /*success*/ std::memory_order_release,
+                                   /*failure*/ std::memory_order_acquire)) {
+    return;
+  }
+
+  // Case 2: Awaited -- a task recorded itself at await time and suspended.
+  assert(status == ContinuationStatus::Awaited &&
+         "detected concurrent attempt to resume continuation");
+
+  auto task = context->AwaitingTask;
+  assert(task && "awaited detached continuation has no awaiting task");
+
+  // Make sure TSan knows that the resume call happens-before the task
+  // restarting.
+  _swift_tsan_release(static_cast<Job *>(task));
+
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  assert(context->Cond != nullptr);
+  sync.store(ContinuationStatus::Resumed, std::memory_order_relaxed);
+  context->Cond->signal();
+#else
+  if (allowInlineResume) {
+    auto resumeExecutor = context->ResumeToExecutor;
+    auto trackingInfo = ExecutorTrackingInfo::current();
+    auto currentExecutor = (trackingInfo ? trackingInfo->getActiveExecutor()
+                                         : SerialExecutorRef::generic());
+    auto currentTaskExecutor = (trackingInfo ? trackingInfo->getTaskExecutor()
+                                             : TaskExecutorRef::undefined());
+    auto newTaskExecutor = task->getPreferredTaskExecutor();
+
+    if (!mustSwitchToRun(currentExecutor, resumeExecutor, currentTaskExecutor,
+                         newTaskExecutor) &&
+        !shouldYieldThread()) {
+      // Donate the current thread to the resumed task -- exactly like
+      // ExecutorJob.runSynchronously / swift_job_run, which establishes the
+      // tracking context *before* flagAsRunning and save/restores the active
+      // task.  A synchronous detached resume is only issued by an executor from
+      // its own (non-task) run context, so no "are we in a task" gate is needed.
+      _swift_tsan_acquire(static_cast<Job *>(task));
+      return swift_job_run(task, resumeExecutor);
+    }
+  }
+
+  task->flagAsAndEnqueueOnExecutor(context->ResumeToExecutor);
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
+}
+
+SWIFT_CC(swift)
+ContinuationAsyncContext *
+swift::swift_continuation_createDetached(const Metadata *resultType,
+                                         AsyncContinuationFlags flags) {
+  // Allocate the context together with trailing storage for the result value,
+  // so that a resume-before-await has somewhere to write the value.  The
+  // storage is owned by the context and reclaimed by
+  // swift_continuation_destroyDetached; it is *not* task-allocated because the
+  // context must survive arbitrary intervening awaits between create and await
+  // (which would violate the task allocator's LIFO discipline).
+  size_t headerSize = sizeof(ContinuationAsyncContext);
+  size_t resultAlign = resultType->vw_alignment();
+  size_t resultSize = resultType->vw_size();
+  size_t resultOffset = llvm::alignTo(headerSize, resultAlign);
+  size_t totalSize = resultOffset + resultSize;
+  size_t alignMask = std::max(alignof(ContinuationAsyncContext), resultAlign) - 1;
+
+  void *allocation = swift_slowAlloc(totalSize, alignMask);
+  auto *context = reinterpret_cast<ContinuationAsyncContext *>(allocation);
+
+  // Initialize the fields we own.  We deliberately do *not* run a constructor
+  // (the base AsyncContext's Parent/ResumeParent are bound later, at await) and
+  // do *not* write any task execution state -- create is a non-event.
+  context->Flags = ContinuationAsyncContext::FlagsType();
+  if (flags.canThrow())
+    context->Flags.setCanThrow(true);
+  if (flags.isExecutorSwitchForced())
+    context->Flags.setIsExecutorSwitchForced(true);
+  context->ErrorResult = nullptr;
+  context->NormalResult =
+      reinterpret_cast<OpaqueValue *>(static_cast<char *>(allocation) +
+                                      resultOffset);
+  if (!flags.hasExecutorOverride())
+    context->ResumeToExecutor = SerialExecutorRef::generic();
+  context->AwaitingTask = nullptr;
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  context->Cond = nullptr;
+#endif
+
+  // Relaxed is fine: resumption must happen-after this call returns and the
+  // token is handed to the executor.
+  context->AwaitSynchronization.store(ContinuationStatus::Pending,
+                                      std::memory_order_relaxed);
+
+  concurrency::trace::task_continuation_init(nullptr, context);
+  return context;
+}
+
+SWIFT_CC(swiftasync)
+void swift::swift_continuation_awaitDetached(
+    ContinuationAsyncContext *context) {
+  auto task = swift_task_getCurrent();
+  assert(task && "awaiting a detached continuation without a task");
+
+  // Bind the resume-point to the current task.  IRGen has already stored this
+  // frame's Parent and ResumeParent into the context immediately before calling
+  // us, so (re-)establish the task's resume state to point at them.  This is
+  // the create-is-a-non-event deferral: intervening awaits between create and
+  // here may have clobbered task->ResumeContext, so we set it now, just before
+  // the CAS.
+  task->ResumeContext = context;
+  task->ResumeTask = context->ResumeParent;
+
+  // Record ourselves as the awaiting task *before* transitioning to Awaited, so
+  // that a racing resume that observes Awaited finds a valid task to enqueue.
+  // The store is published by the release CAS below.
+  context->AwaitingTask = task;
+
+  concurrency::trace::task_continuation_await(context);
+
+  auto &sync = context->AwaitSynchronization;
+
+  auto oldStatus = sync.load(std::memory_order_acquire);
+  assert((oldStatus == ContinuationStatus::Pending ||
+          oldStatus == ContinuationStatus::Resumed) &&
+         "awaiting a corrupt or already-awaited continuation");
+
+  // If the status is already Resumed (resume raced ahead), continue inline.
+  if (oldStatus == ContinuationStatus::Resumed) {
+    if (context->isExecutorSwitchForced())
+      return swift_task_switch(context, context->ResumeParent,
+                               context->ResumeToExecutor);
+    return context->ResumeParent(context);
+  }
+
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  do {
+  ConditionVariable Cond;
+  context->Cond = &Cond;
+#else
+  // Flag the task as suspended on the continuation.
+  task->flagAsSuspendedOnContinuation(context);
+#endif
+
+  // Try to transition to Awaited.
+  bool success =
+    sync.compare_exchange_strong(oldStatus, ContinuationStatus::Awaited,
+                                 /*success*/ std::memory_order_release,
+                                 /*failure*/ std::memory_order_acquire);
+
+  if (success) {
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+    Cond.lock();
+    do {
+      Cond.wait();
+      oldStatus = sync.load(std::memory_order_relaxed);
+    } while (oldStatus != ContinuationStatus::Resumed);
+    Cond.unlock();
+#else
+    // Successfully suspended.
+    _swift_task_clearCurrent();
+    return;
+#endif
+  }
+
+  // The CAS failed, which (given a strong exchange) means a resume raced and
+  // won.
+  assert(oldStatus == ContinuationStatus::Resumed &&
+         "continuation was concurrently corrupted or awaited");
+
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  } while (false);
+#else
+  [[maybe_unused]]
+  uint32_t opaque = task->flagAsRunning();
+  assert(opaque == 0);
+#endif
+
+  if (context->isExecutorSwitchForced())
+    return swift_task_switch(context, context->ResumeParent,
+                             context->ResumeToExecutor);
+  return context->ResumeParent(context);
+}
+
+SWIFT_CC(swift)
+void swift::swift_continuation_resumeDetached(
+    ContinuationAsyncContext *context) {
+  concurrency::trace::task_continuation_resume(context, false);
+  resumeDetachedTaskAfterContinuation(context, /*allowInlineResume=*/true);
+}
+
+SWIFT_CC(swift)
+void swift::swift_continuation_throwingResumeDetached(
+    ContinuationAsyncContext *context) {
+  concurrency::trace::task_continuation_resume(context, false);
+  resumeDetachedTaskAfterContinuation(context, /*allowInlineResume=*/true);
+}
+
+SWIFT_CC(swift)
+void swift::swift_continuation_throwingResumeDetachedWithError(
+    ContinuationAsyncContext *context, /* +1 */ SwiftError *error) {
+  concurrency::trace::task_continuation_resume(context, true);
+  context->ErrorResult = error;
+  resumeDetachedTaskAfterContinuation(context, /*allowInlineResume=*/true);
+}
+
+SWIFT_CC(swift)
+void swift::swift_continuation_destroyDetached(
+    ContinuationAsyncContext *context) {
+  // The await has resolved and taken the result out of the context, and the
+  // resume-exactly-once contract guarantees there is no outstanding reference
+  // to the context from the resume side, so it is safe to free.
+  swift_slowDealloc(context, /*size*/ 0, /*alignMask*/ 0);
 }
 
 bool swift::swift_task_isCancelled(AsyncTask *task) {

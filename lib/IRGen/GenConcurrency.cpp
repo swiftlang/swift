@@ -489,6 +489,38 @@ llvm::Function *IRGenModule::getAwaitAsyncContinuationFn() {
   return suspendFn;
 }
 
+llvm::Function *IRGenModule::getAwaitDetachedContinuationFn() {
+  StringRef name = "__swift_continuation_await_detached_point";
+  if (llvm::GlobalValue *F = Module.getNamedValue(name))
+    return cast<llvm::Function>(F);
+
+  // The parameters here match the extra arguments passed to
+  // @llvm.coro.suspend.async by emitAwaitDetachedContinuation.
+  llvm::Type *argTys[] = { ContinuationAsyncContextPtrTy };
+  auto *suspendFnTy =
+    llvm::FunctionType::get(VoidTy, argTys, false /*vaargs*/);
+
+  llvm::Function *suspendFn =
+      llvm::Function::Create(suspendFnTy, llvm::Function::InternalLinkage,
+                             name, &Module);
+  suspendFn->setCallingConv(SwiftAsyncCC);
+  suspendFn->setDoesNotThrow();
+  IRGenFunction suspendIGF(*this, suspendFn);
+  if (DebugInfo)
+    DebugInfo->emitArtificialFunction(suspendIGF, suspendFn);
+  auto &Builder = suspendIGF.Builder;
+
+  llvm::Value *context = suspendFn->getArg(0);
+  auto *call = Builder.CreateCall(
+      getContinuationAwaitDetachedFunctionPointer(), {context});
+  call->setCallingConv(SwiftAsyncCC);
+  call->setDoesNotThrow();
+  call->setTailCallKind(AsyncTailCallKind);
+
+  Builder.CreateRetVoid();
+  return suspendFn;
+}
+
 void irgen::emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
                               llvm::Value *result, llvm::Value *closure,
                               llvm::Value *closureContext) {

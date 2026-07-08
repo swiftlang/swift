@@ -2629,6 +2629,9 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationThrowing:
+    case BuiltinValueKind::ResumeDetachedContinuationReturning:
+    case BuiltinValueKind::ResumeDetachedThrowingContinuationReturning:
+    case BuiltinValueKind::ResumeDetachedThrowingContinuationThrowing:
       visitor(&builtin->getAllOperands()[1]);
       return;
 
@@ -2913,6 +2916,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::GetAsyncContinuationInst:
   case SILInstructionKind::GetAsyncContinuationAddrInst:
   case SILInstructionKind::AwaitAsyncContinuationInst:
+  case SILInstructionKind::AwaitDetachedContinuationInst:
     return;
   }
 }

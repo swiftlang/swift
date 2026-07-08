@@ -930,6 +930,160 @@ void IRGenFunction::emitResumeAsyncContinuationThrowing(
   call->setCallingConv(IGM.SwiftCC);
 }
 
+// Reinterpret a detached-continuation token (a Builtin.RawUnsafeContinuation
+// that is a direct pointer to the ContinuationAsyncContext) as the context.
+static Address detachedContinuationContext(IRGenFunction &IGF,
+                                           llvm::Value *token) {
+  auto ptr = IGF.Builder.CreateBitOrPointerCast(
+      token, IGF.IGM.ContinuationAsyncContextPtrTy);
+  return Address(ptr, IGF.IGM.ContinuationAsyncContextTy,
+                 IGF.IGM.getAsyncContextAlignment());
+}
+
+void IRGenFunction::emitAwaitDetachedContinuation(
+    llvm::Value *continuation, Address resumeBuffer, SILType resumeTy,
+    llvm::BasicBlock *&normalBB, llvm::PHINode *&optionalErrorResult,
+    llvm::BasicBlock *&optionalErrorBB) {
+  // The token is a direct pointer to the ContinuationAsyncContext, created
+  // separately (in another frame) via swift_continuation_createDetached.
+  Address continuationContext = detachedContinuationContext(*this, continuation);
+  AsyncCoroutineCurrentContinuationContext = continuationContext.getAddress();
+
+  // Bind the resume-point to *this* function.  Create did not bind anything, so
+  // we store the current async context as Parent and a fresh
+  // @llvm.coro.async.resume as ResumeParent; the runtime's
+  // swift_continuation_awaitDetached re-establishes task->ResumeContext from
+  // these immediately before the Pending->Awaited CAS.
+  auto contextBase = Builder.CreateStructGEP(continuationContext, 0, Size(0));
+  auto parentContextAddr = Builder.CreateStructGEP(contextBase, 0, Size(0));
+  llvm::Value *asyncContextValue =
+      Builder.CreateBitCast(getAsyncContext(), IGM.SwiftContextPtrTy);
+  if (auto schema = IGM.getOptions().PointerAuth.AsyncContextParent) {
+    auto authInfo = PointerAuthInfo::emit(*this, schema,
+                                          parentContextAddr.getAddress(),
+                                          PointerAuthEntity());
+    asyncContextValue = emitPointerAuthSign(*this, asyncContextValue, authInfo);
+  }
+  Builder.CreateStore(asyncContextValue, parentContextAddr);
+
+  auto coroResume =
+      Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
+  auto resumeFunctionAddr =
+      Builder.CreateStructGEP(contextBase, 1, IGM.getPointerSize());
+  llvm::Value *coroResumeValue = Builder.CreateBitOrPointerCast(
+      coroResume, IGM.TaskContinuationFunctionPtrTy);
+  if (auto schema = IGM.getOptions().PointerAuth.AsyncContextResume) {
+    auto authInfo = PointerAuthInfo::emit(*this, schema,
+                                          resumeFunctionAddr.getAddress(),
+                                          PointerAuthEntity());
+    coroResumeValue = emitPointerAuthSign(*this, coroResumeValue, authInfo);
+  }
+  Builder.CreateStore(coroResumeValue, resumeFunctionAddr);
+
+  assert(AsyncCoroutineCurrentResume == nullptr &&
+         "Don't support nested await_detached_continuation");
+  AsyncCoroutineCurrentResume = coroResume;
+
+  {
+    // Set up the suspend point, using swift_continuation_awaitDetached as the
+    // await function.  There is no old-SDK fallback: detached continuations are
+    // availability-gated to a runtime that provides the entry point.
+    SmallVector<llvm::Value *, 8> arguments;
+    unsigned swiftAsyncContextIndex = 0;
+    arguments.push_back(IGM.getInt32(swiftAsyncContextIndex));
+    arguments.push_back(AsyncCoroutineCurrentResume);
+    auto resumeProjFn = getOrCreateResumePrjFn();
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
+    auto awaitFnPtr = IGM.getAwaitDetachedContinuationFn();
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(awaitFnPtr, IGM.Int8PtrTy));
+    arguments.push_back(continuationContext.getAddress());
+
+    auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy},
+                                           false /*packed*/);
+    emitSuspendAsyncCall(swiftAsyncContextIndex, resultTy, arguments);
+  }
+
+  // If the continuation is throwing, load the error and branch on it.
+  if (optionalErrorBB) {
+    auto normalContBB = createBasicBlock("await.detached.normal");
+    auto contErrResultAddr =
+        emitAddrOfContinuationErrorResultPointer(*this, continuationContext);
+    auto errorRes = Builder.CreateLoad(contErrResultAddr);
+    auto nullError = llvm::Constant::getNullValue(errorRes->getType());
+    auto hasError = Builder.CreateICmpNE(errorRes, nullError);
+    optionalErrorResult->addIncoming(errorRes, Builder.GetInsertBlock());
+
+    hasError = getSILModule().getOptions().EnableThrowsPrediction
+                   ? Builder.CreateExpectCond(IGM, hasError, false)
+                   : hasError;
+
+    Builder.CreateCondBr(hasError, optionalErrorBB, normalContBB);
+    Builder.emitBlock(normalContBB);
+  }
+
+  // Normal path: the resumer stored the value into the context's own result
+  // storage (NormalResult was bound to it at create time).  Move it into the
+  // caller-provided resume buffer.  Using initializeWithTake handles both
+  // loadable and address-only result types uniformly.
+  {
+    auto contResultAddrAddr =
+        emitAddrOfContinuationNormalResultPointer(*this, continuationContext);
+    auto resultAddrVal = Builder.CreateLoad(contResultAddrAddr);
+    auto &resumeTI = getTypeInfo(resumeTy);
+    Address srcAddr = resumeTI.getAddressForPointer(
+        Builder.CreateBitOrPointerCast(resultAddrVal, IGM.PtrTy));
+    resumeTI.initializeWithTake(*this, resumeBuffer, srcAddr, resumeTy,
+                                /*outlined*/ false,
+                                /*zeroizeIfSensitive=*/false);
+  }
+
+  Builder.CreateBr(normalBB);
+  AsyncCoroutineCurrentResume = nullptr;
+  AsyncCoroutineCurrentContinuationContext = nullptr;
+}
+
+void IRGenFunction::emitResumeDetachedContinuationReturning(
+    llvm::Value *continuation, llvm::Value *srcPtr, SILType valueTy,
+    bool throwing) {
+  // The token is the context pointer directly (resume by context).
+  Address context = detachedContinuationContext(*this, continuation);
+  auto &valueTI = getTypeInfo(valueTy);
+  Address srcAddr = valueTI.getAddressForPointer(srcPtr);
+
+  // Store the value into the context's result storage.
+  auto destPtrAddr = emitAddrOfContinuationNormalResultPointer(*this, context);
+  auto destPtr =
+      Builder.CreateBitCast(Builder.CreateLoad(destPtrAddr), IGM.PtrTy);
+  Address destAddr = valueTI.getAddressForPointer(destPtr);
+  valueTI.initializeWithTake(*this, destAddr, srcAddr, valueTy,
+                             /*outlined*/ false, /*zeroizeIfSensitive=*/true);
+
+  auto call = Builder.CreateCall(
+      throwing ? IGM.getContinuationThrowingResumeDetachedFunctionPointer()
+               : IGM.getContinuationResumeDetachedFunctionPointer(),
+      {context.getAddress()});
+  call->setCallingConv(IGM.SwiftCC);
+}
+
+void IRGenFunction::emitResumeDetachedContinuationThrowing(
+    llvm::Value *continuation, llvm::Value *error) {
+  Address context = detachedContinuationContext(*this, continuation);
+  auto call = Builder.CreateCall(
+      IGM.getContinuationThrowingResumeDetachedWithErrorFunctionPointer(),
+      {context.getAddress(), error});
+  call->setCallingConv(IGM.SwiftCC);
+}
+
+void IRGenFunction::emitDestroyDetachedContinuation(llvm::Value *continuation) {
+  Address context = detachedContinuationContext(*this, continuation);
+  auto call = Builder.CreateCall(
+      IGM.getContinuationDestroyDetachedFunctionPointer(),
+      {context.getAddress()});
+  call->setCallingConv(IGM.SwiftCC);
+}
+
 void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {
   // If our deployment target doesn't contain the new swift_clearSensitive,
   // fall back to memset_s

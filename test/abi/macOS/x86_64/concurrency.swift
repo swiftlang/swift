@@ -462,3 +462,22 @@ Added: _$sSct8_rawTasks06_AsyncB0VvpMV
 
 /// Expose async task name offset in debug header.
 Added: __swift_concurrency_debug_asyncTaskNameOffset
+// Detached executor continuation (ExecutorContinuation / ExecutorContinuationAwaiter)
+Added: _$ss20ExecutorContinuationVMa
+Added: _$ss20ExecutorContinuationVMn
+Added: _$ss20ExecutorContinuationVsRi_zrlE7contextAByxq_GBc_tcfC
+Added: _$ss20ExecutorContinuationVsRi_zrlE7contextBcvg
+Added: _$ss20ExecutorContinuationVsRi_zrlEfD
+Added: _$ss27ExecutorContinuationAwaiterVMa
+Added: _$ss27ExecutorContinuationAwaiterVMn
+Added: _$ss27ExecutorContinuationAwaiterVsRi_zrlE7contextAByxq_GBc_tcfC
+Added: _$ss27ExecutorContinuationAwaiterVsRi_zrlE7contextBcvg
+Added: _$ss27ExecutorContinuationAwaiterVsRi_zrlEfD
+Added: _swift_continuation_resumeSynchronously
+Added: _swift_continuation_throwingResumeSynchronouslyWithError
+Added: _swift_continuation_createDetached
+Added: _swift_continuation_awaitDetached
+Added: _swift_continuation_resumeDetached
+Added: _swift_continuation_throwingResumeDetached
+Added: _swift_continuation_throwingResumeDetachedWithError
+Added: _swift_continuation_destroyDetached

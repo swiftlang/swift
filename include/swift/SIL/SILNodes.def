@@ -780,6 +780,8 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, None, DoesNotRelease)
   TERMINATOR(AwaitAsyncContinuationInst, await_async_continuation,
              TermInst, MayHaveSideEffects, MayRelease)
+  TERMINATOR(AwaitDetachedContinuationInst, await_detached_continuation,
+             TermInst, MayHaveSideEffects, MayRelease)
   DYNAMICCAST_TERMINATOR(CheckedCastBranchInst, checked_cast_br,
              TermInst, None, DoesNotRelease)
   DYNAMICCAST_TERMINATOR(CheckedCastAddrBranchInst, checked_cast_addr_br,

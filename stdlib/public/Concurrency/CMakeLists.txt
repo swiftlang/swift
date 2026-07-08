@@ -83,6 +83,9 @@ list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature"
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "Extern")
 
+# Needed for the split executor continuation (~Escapable awaiter + @_lifetime).
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "Lifetimes")
+
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
 
@@ -115,6 +118,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Continuation.swift
   Errors.swift
   Executor.swift
+  ExecutorContinuation.swift
   ExecutorBridge.swift
   ExecutorAssertions.swift
   AsyncCompactMapSequence.swift

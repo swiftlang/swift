@@ -2343,6 +2343,9 @@ final public class DynamicMethodBranchInst : TermInst {
 final public class AwaitAsyncContinuationInst : TermInst, UnaryInstruction {
 }
 
+final public class AwaitDetachedContinuationInst : TermInst {
+}
+
 public struct CheckedCastInstOptions {
   var storage: UInt8 = 0
 

@@ -34,6 +34,7 @@ bool isARCSignificantTerminator(TermInst *TI) {
   case TermKind::UnwindInst:
   case TermKind::YieldInst:
   case TermKind::AwaitAsyncContinuationInst:
+  case TermKind::AwaitDetachedContinuationInst:
   case TermKind::TryApplyInst:
   case TermKind::SwitchValueInst:
   case TermKind::SwitchEnumInst:

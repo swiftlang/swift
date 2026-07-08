@@ -120,6 +120,13 @@ private:
       return;
     }
 
+    case TermKind::AwaitDetachedContinuationInst: {
+      auto *ADCI = cast<AwaitDetachedContinuationInst>(Term);
+      Operands.push_back(ADCI->getContinuation());
+      Operands.push_back(ADCI->getResumeBuffer());
+      return;
+    }
+
     case TermKind::SwitchEnumInst:
     case TermKind::SwitchEnumAddrInst:
     case TermKind::CheckedCastBranchInst:

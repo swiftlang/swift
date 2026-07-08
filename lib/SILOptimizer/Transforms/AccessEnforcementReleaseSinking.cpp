@@ -210,6 +210,11 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationThrowing:
+    case BuiltinValueKind::ResumeDetachedContinuationReturning:
+    case BuiltinValueKind::ResumeDetachedThrowingContinuationReturning:
+    case BuiltinValueKind::ResumeDetachedThrowingContinuationThrowing:
+    case BuiltinValueKind::CreateDetachedContinuation:
+    case BuiltinValueKind::DestroyDetachedContinuation:
     case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
     case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
     case BuiltinValueKind::AddressOfBorrowOpaque:

@@ -677,6 +677,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::GetAsyncContinuationInst:
   case SILInstructionKind::GetAsyncContinuationAddrInst:
   case SILInstructionKind::AwaitAsyncContinuationInst:
+  case SILInstructionKind::AwaitDetachedContinuationInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
     return RuntimeEffect::Concurrency;

@@ -3587,6 +3587,30 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createAwaitAsyncContinuation(Loc, Cont, resultBB, errorBB);
     break;
   }
+  case SILInstructionKind::AwaitDetachedContinuationInst: {
+    // Format: continuation triple, resume-buffer triple (6 entries), then the
+    // resume block ID and, if the continuation is throwing, the error block ID.
+    SILBasicBlock *errorBB = nullptr;
+    if (ListOfValues.size() >= 8) {
+      errorBB = getBBForReference(Fn, ListOfValues.back());
+      ListOfValues = ListOfValues.drop_back();
+    }
+    SILBasicBlock *resumeBB = getBBForReference(Fn, ListOfValues.back());
+    ListOfValues = ListOfValues.drop_back();
+
+    auto readOperand = [&](unsigned i) -> SILValue {
+      auto ty = MF->getType(ListOfValues[i]);
+      auto category = (SILValueCategory)ListOfValues[i + 1];
+      return getLocalValue(Builder.maybeGetFunction(), ListOfValues[i + 2],
+                           getSILType(ty, category, Fn));
+    };
+    SILValue token = readOperand(0);
+    SILValue resumeBuf = readOperand(3);
+
+    ResultInst = Builder.createAwaitDetachedContinuation(Loc, token, resumeBuf,
+                                                         resumeBB, errorBB);
+    break;
+  }
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::SwitchEnumAddrInst: {
     // Format: condition, a list of cases (EnumElementDecl + Basic Block ID),

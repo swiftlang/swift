@@ -1556,6 +1556,7 @@ public:
   void visitGetAsyncContinuationInst(GetAsyncContinuationInst *i);
   void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *i);
   void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *i);
+  void visitAwaitDetachedContinuationInst(AwaitDetachedContinuationInst *i);
 
   void visitHopToExecutorInst(HopToExecutorInst *i);
   void visitExtractExecutorInst(ExtractExecutorInst *i) {
@@ -8922,6 +8923,28 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     addIncomingExplosionToPHINodes(*this, normalDest, firstIndex, resumeResult);
     assert(firstIndex == normalDest.phis.size());
   }
+}
+
+void IRGenSILFunction::visitAwaitDetachedContinuationInst(
+    AwaitDetachedContinuationInst *i) {
+  llvm::Value *continuation =
+      getLoweredSingletonExplosion(i->getContinuation());
+  Address resumeBuffer = getLoweredAddress(i->getResumeBuffer());
+  SILType resumeTy = i->getResumeBuffer()->getType().getObjectType();
+
+  auto &normalDest = getLoweredBB(i->getResumeBB());
+  auto *normalDestBB = normalDest.bb;
+
+  bool hasError = i->getErrorBB() != nullptr;
+  auto *errorDestBB = hasError ? getLoweredBB(i->getErrorBB()).bb : nullptr;
+  auto *errorPhi = hasError ? getLoweredBB(i->getErrorBB()).phis[0] : nullptr;
+  assert(!hasError || getLoweredBB(i->getErrorBB()).phis.size() == 1 &&
+                          "error basic block should only expect one value");
+
+  // Address form: the value is delivered into the resume buffer, so the resume
+  // successor takes no arguments (nothing to add to its PHI nodes).
+  emitAwaitDetachedContinuation(continuation, resumeBuffer, resumeTy,
+                                normalDestBB, errorPhi, errorDestBB);
 }
 
 void IRGenSILFunction::visitTypeValueInst(TypeValueInst *i) {

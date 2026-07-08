@@ -10591,6 +10591,7 @@ public:
     case TermKind::SwitchValueInst:
     case TermKind::TryApplyInst:
     case TermKind::AwaitAsyncContinuationInst:
+    case TermKind::AwaitDetachedContinuationInst:
     case TermKind::DynamicMethodBranchInst:
       return true;
     }
@@ -10840,6 +10841,74 @@ public:
     return Successors[1].getBB();
   }
   
+  SuccessorListTy getSuccessors() {
+    if (getErrorBB())
+      return Successors;
+    return SuccessorListTy(Successors.data(), 1);
+  }
+};
+
+/// Suspend execution of an async task on a *detached* continuation, awaiting the
+/// value stored by a resume that may come from a different function/thread.
+///
+/// Unlike \c AwaitAsyncContinuationInst, the first operand is a first-class
+/// \c Builtin.RawUnsafeContinuation token (the context returned by
+/// \c createDetachedContinuation), not a co-located \c GetAsyncContinuation*
+/// instruction.  The second operand is the address of a buffer, local to this
+/// function, that receives the resumed value (the address form; matching
+/// \c GetAsyncContinuationAddrInst).  Resuming binds the resume-point to *this*
+/// function.
+class AwaitDetachedContinuationInst final
+  : public InstructionBaseWithTrailingOperands<
+        SILInstructionKind::AwaitDetachedContinuationInst,
+        AwaitDetachedContinuationInst, TermInst>
+{
+  friend SILBuilder;
+
+  std::array<SILSuccessor, 2> Successors;
+
+  AwaitDetachedContinuationInst(SILDebugLocation Loc, SILValue Continuation,
+                                SILValue ResumeBuf,
+                                SILBasicBlock *resumeBB,
+                                SILBasicBlock *errorBBOrNull)
+    : InstructionBaseWithTrailingOperands({Continuation, ResumeBuf}, Loc),
+      Successors{{{this}, {this}}}
+  {
+    Successors[0] = resumeBB;
+    if (errorBBOrNull)
+      Successors[1] = errorBBOrNull;
+  }
+
+  static AwaitDetachedContinuationInst *create(SILDebugLocation Loc,
+                                               SILValue Continuation,
+                                               SILValue ResumeBuf,
+                                               SILBasicBlock *resumeBB,
+                                               SILBasicBlock *errorBBOrNull,
+                                               SILFunction &F);
+
+public:
+  /// The continuation token (a Builtin.RawUnsafeContinuation).
+  SILValue getContinuation() const { return getAllOperands()[0].get(); }
+
+  /// The address of the buffer that receives the resumed value.
+  SILValue getResumeBuffer() const { return getAllOperands()[1].get(); }
+
+  /// True if the continuation can be resumed by throwing an error, which is
+  /// exactly when there is an error successor.
+  bool throws() const { return (bool)getErrorBB(); }
+
+  /// Returns the basic block to which control is transferred when the task is
+  /// resumed normally.  Because this is the address form, the resume block
+  /// takes no arguments; the value is delivered into the resume buffer.
+  SILBasicBlock *getResumeBB() const { return Successors[0].getBB(); }
+
+  /// Returns the basic block to which control is transferred when the task is
+  /// resumed in an error state, or `nullptr` if the continuation does not
+  /// support failure.  This block takes one argument of Error type.
+  SILBasicBlock *getErrorBB() const {
+    return Successors[1].getBB();
+  }
+
   SuccessorListTy getSuccessors() {
     if (getErrorBB())
       return Successors;

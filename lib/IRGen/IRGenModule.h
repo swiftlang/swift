@@ -1641,6 +1641,7 @@ public:
 
   FunctionPointer getFixedClassInitializationFn();
   llvm::Function *getAwaitAsyncContinuationFn();
+  llvm::Function *getAwaitDetachedContinuationFn();
 
   /// The constructor used when generating code.
   ///

@@ -972,6 +972,70 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
                                                 /* +1 */ SwiftError *error);
 
+/// Resume a task from a continuation, given a normal result which has
+/// already been stored into the continuation, running the resumed task
+/// inline on the current thread when the executors are compatible (thread
+/// donation). 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_resumeSynchronously(AsyncTask *continuation);
+
+/// Resume a task from a potentially-throwing continuation by throwing an
+/// error, running the resumed task inline on the current thread when that is
+/// safe (thread donation), otherwise enqueuing it.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_throwingResumeSynchronouslyWithError(
+    AsyncTask *continuation, /* +1 */ SwiftError *error);
+
+/// Create a *detached* continuation for a result of the given type.
+///
+/// Unlike swift_continuation_init, this does not bind the continuation to the
+/// current task or touch the task's execution state -- it merely allocates and
+/// initializes a ContinuationAsyncContext (state Pending, result storage sized
+/// for \p resultType) and returns it.  The returned context pointer is the
+/// opaque token shared by both halves of a split continuation: it is awaited in
+/// one frame via swift_continuation_awaitDetached and resumed (from anywhere)
+/// via swift_continuation_resumeDetached.  It must be destroyed exactly once via
+/// swift_continuation_destroyDetached after the await has resolved.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+ContinuationAsyncContext *
+swift_continuation_createDetached(const Metadata *resultType,
+                                  AsyncContinuationFlags flags);
+
+/// Await a detached continuation from the current task.
+///
+/// The caller (IRGen) must have stored the awaiting frame's Parent and
+/// ResumeParent into \p context before calling this.  This records the current
+/// task as the continuation's awaiting task, binds the task's resume state, and
+/// performs the Pending->Awaited transition / suspend, mirroring
+/// swift_continuation_await.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_continuation_awaitDetached(ContinuationAsyncContext *context);
+
+/// Resume a detached continuation by context, given a normal result which has
+/// already been stored into the continuation's result storage.  Runs the
+/// resumed task inline on the current thread when the executors are compatible
+/// (thread donation), otherwise enqueues it.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_resumeDetached(ContinuationAsyncContext *context);
+
+/// Resume a potentially-throwing detached continuation by context, given a
+/// normal result which has already been stored into the continuation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_throwingResumeDetached(
+    ContinuationAsyncContext *context);
+
+/// Resume a potentially-throwing detached continuation by context by throwing
+/// an error.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_throwingResumeDetachedWithError(
+    ContinuationAsyncContext *context, /* +1 */ SwiftError *error);
+
+/// Destroy a detached continuation created by swift_continuation_createDetached,
+/// after its result has been consumed by the await.  Frees the context and its
+/// result storage.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_destroyDetached(ContinuationAsyncContext *context);
+
 /// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
 extern "C" SWIFT_CC(swift)
 void swift_continuation_logFailedCheck(const char *message);

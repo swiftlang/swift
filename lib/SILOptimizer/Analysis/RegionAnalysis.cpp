@@ -457,6 +457,7 @@ struct TermArgSources {
     case TermKind::SwitchEnumInst:
     case TermKind::SwitchEnumAddrInst:
     case TermKind::AwaitAsyncContinuationInst:
+    case TermKind::AwaitDetachedContinuationInst:
     case TermKind::CheckedCastAddrBranchInst:
       llvm_unreachable("Unsupported?!");
 
@@ -3977,6 +3978,7 @@ FUNCTION_EXITING_TERMINATOR_CONSTANT(ThrowInst, Require)
 // Today, await_async_continuation just takes Sendable values
 // (UnsafeContinuation and UnsafeThrowingContinuation).
 CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(AwaitDetachedContinuationInst, AssertingIfNonSendable)
 CONSTANT_TRANSLATION(GetAsyncContinuationInst, AssertingIfNonSendable)
 CONSTANT_TRANSLATION(ExtractExecutorInst, AssertingIfNonSendable)
 CONSTANT_TRANSLATION(FunctionExtractIsolationInst, Require)

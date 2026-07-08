@@ -233,6 +233,23 @@ public:
   void emitResumeAsyncContinuationThrowing(llvm::Value *continuation,
                                            llvm::Value *error);
 
+  void emitAwaitDetachedContinuation(llvm::Value *continuation,
+                                     Address resumeBuffer,
+                                     SILType resumeTy,
+                                     llvm::BasicBlock *&normalBB,
+                                     llvm::PHINode *&optionalErrorPhi,
+                                     llvm::BasicBlock *&optionalErrorBB);
+
+  void emitResumeDetachedContinuationReturning(llvm::Value *continuation,
+                                               llvm::Value *srcPtr,
+                                               SILType valueTy,
+                                               bool throwing);
+
+  void emitResumeDetachedContinuationThrowing(llvm::Value *continuation,
+                                              llvm::Value *error);
+
+  void emitDestroyDetachedContinuation(llvm::Value *continuation);
+
   void emitClearSensitive(Address address, llvm::Value *size);
 
   FunctionPointer
