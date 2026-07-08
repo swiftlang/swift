@@ -3753,6 +3753,9 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
     backingVar->overwriteAccess(AccessLevel::Private);
     backingVar->overwriteSetterAccess(AccessLevel::Private);
 
+    // The backing storage must be as available as the wrapped property.
+    AvailabilityInference::applyInferredAvailableAttrs(backingVar, {var});
+
     addMemberToContextIfNeeded(backingVar, dc, var);
   }
 
