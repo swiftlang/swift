@@ -61,11 +61,11 @@ print(someFunc())
 // --- Check the records.
 // RUN: c-index-test core -print-record %t/idx | %FileCheck %s
 
-// CHECK: 0:0 | function/Swift | s:10SomeModule8someFuncyyF | Def | rel: 0
-// CHECK-NEXT: 0:0 | class/Swift | [[class_USR:s:10SomeModule2C2C]] | Def | rel: 0
-// CHECK-NEXT: 0:0 | class/Swift | [[class_USR]] | Ref,RelExt | rel: 1
+// CHECK: 0:0 | function(public)/Swift | s:10SomeModule8someFuncyyF | Def | rel: 0
+// CHECK-NEXT: 0:0 | class(public)/Swift | [[class_USR:s:10SomeModule2C2C]] | Def | rel: 0
+// CHECK-NEXT: 0:0 | class(public)/Swift | [[class_USR]] | Ref,RelExt | rel: 1
 // CHECK-NEXT: 	RelExt | s:e:[[publicFunc_USR:s:10SomeModule2C2C10publicFuncyyF]]
-// CHECK-NEXT: 0:0 | instance-method/Swift | [[publicFunc_USR]] | Def,Dyn,RelChild | rel: 1
+// CHECK-NEXT: 0:0 | instance-method(public)/Swift | [[publicFunc_USR]] | Def,Dyn,RelChild | rel: 1
 // CHECK-NEXT: 	RelChild | s:e:[[publicFunc_USR]]
 // CHECK-NEXT: 0:0 | extension/ext-class/Swift | s:e:[[publicFunc_USR]] | Def | rel: 0
 // CHECK-NOT: SECRET
