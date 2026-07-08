@@ -1005,7 +1005,7 @@ public func swift_getPlatformLayerVersion(
   _ minor: UnsafeMutablePointer<Int>
 ) {
   unsafe major.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR
-  unsafe minor.pointee = 0 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
+  unsafe minor.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
 }
 #endif
 
