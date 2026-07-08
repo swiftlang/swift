@@ -321,6 +321,14 @@ namespace irgen {
                                              LinkEntity entity,
                                              Size size = Size(0));
 
+  /// Emit a private (internal) coro function pointer, named \p name,
+  /// referencing \p function.  Unlike emitCoroFunctionPointer, this does not
+  /// require a LinkEntity that maps back to a SIL function, so it can be used
+  /// for synthesized stubs such as the dead-method error stub.
+  llvm::Constant *emitLocalCoroFunctionPointer(IRGenModule &IGM,
+                                               llvm::Function *function,
+                                               llvm::StringRef name);
+
   /// Determine whether the given opaque type requires a witness table for the
   /// given requirement.
   ///

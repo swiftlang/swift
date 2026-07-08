@@ -182,9 +182,13 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
   try fn()
 }
 
+// July 2026:  The compiler no longer emits references to this
+// symbol (the compiler instead synthesizes an equivalent symbol that
+// also works with Embedded Swift).
+// It is retained purely to preserve compatibility with binaries that
+// used the experimental version of CoroutineAccessors.
 @available(SwiftStdlib 9999, *)
 @usableFromInline internal var swift_deletedCalleeAllocatedCoroutineMethodError: () {
-  // TODO: CoroutineAccessors: Change to read from _read.
   @_silgen_name("swift_deletedCalleeAllocatedCoroutineMethodError")
   _read {
     fatalError("Fatal error: Call of deleted method")
