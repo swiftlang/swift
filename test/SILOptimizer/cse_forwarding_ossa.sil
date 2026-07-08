@@ -2,6 +2,7 @@
 sil_stage canonical
 
 import Builtin
+import Swift
 
 class SuperKlass {}
 
@@ -9,6 +10,14 @@ class Klass : SuperKlass {}
 
 struct NonTrivialStruct {
   var val : Klass
+}
+
+struct StructWithOptionalAnyObject {
+  var x: Optional<AnyObject>
+}
+
+struct StructOfStructWithOptionalAnyObject {
+  var s: StructWithOptionalAnyObject
 }
 
 // CHECK-LABEL: sil [ossa] @cse_copy_upcast1 :
@@ -221,3 +230,20 @@ bb0(%0 : @owned $Klass):
   return %res : $(SuperKlass, SuperKlass)
 }
 
+// Two forwarding instructions with identical operands but different forwarding
+// ownership must not be merged as-is: the surviving instruction has to have 
+// its forwarding ownership set to none to remain valid.
+// CHECK-LABEL: sil [ossa] @cse_forwarding_ownership_mismatch :
+// CHECK: [[S:%.*]] = struct $StructWithOptionalAnyObject ({{%.*}}){{.*}}ownership: none
+// CHECK: apply undef([[S]])
+// CHECK: struct $StructOfStructWithOptionalAnyObject ([[S]])
+// CHECK-LABEL: } // end sil function 'cse_forwarding_ownership_mismatch'
+sil [ossa] @cse_forwarding_ownership_mismatch : $@convention(thin) () -> @owned StructOfStructWithOptionalAnyObject {
+bb0:
+  %0 = enum $Optional<AnyObject>, #Optional.none!enumelt
+  %1 = struct $StructWithOptionalAnyObject (%0), forwarding: @guaranteed
+  %2 = apply undef(%1) : $@convention(thin) (@guaranteed StructWithOptionalAnyObject) -> ()
+  %3 = struct $StructWithOptionalAnyObject (%0)
+  %4 = struct $StructOfStructWithOptionalAnyObject (%3), forwarding: @owned
+  return %4
+}

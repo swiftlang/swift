@@ -5,10 +5,6 @@ cmake_minimum_required(VERSION 3.29)
 # in `EmitSwiftInterface.cmake`
 # to ensure it keeps laying down nested swiftmodule folders
 
-if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
-  cmake_policy(SET CMP0157 OLD)
-endif()
-
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../cmake/modules"
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
@@ -157,6 +153,10 @@ endif()
 set_target_properties(swiftSynchronization PROPERTIES
   Swift_MODULE_NAME Synchronization)
 
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(swiftSynchronization INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
+
 target_link_libraries(swiftSynchronization PRIVATE
   swiftCore
   $<$<PLATFORM_ID:Android>:swiftAndroid>
@@ -177,30 +177,6 @@ if(WIN32 AND CMAKE_SYSTEM_PROCESSOR STREQUAL i686)
     target_compile_options(swiftSynchronization PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-whole-module-optimization>)
   endif()
-
-  # WMO requires the early-swift-driver to be usable, which is not yet ready on
-  # Windows. Workaround this by creating an empty stub for swiftCore, removing
-  # the import library from the command line, and adding the library search path
-  # associated with it. Due to the autolink, we will still link against the
-  # library from the correct location but will also use an empty file for the
-  # additional input allowing us to perform the WMO.
-  if(CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
-    get_target_property(_swiftCore_IMPORTED_IMPLIB_RELEASE swiftCore
-      IMPORTED_IMPLIB_RELEASE)
-    if(_swiftCore_IMPORTED_IMPLIB_RELEASE)
-      # Compute the library directory to allow us to find the import library by
-      # name.
-      get_filename_component(_swiftCore_IMPORTED_IMPLIB_RELEASE_DIRNAME
-        ${_swiftCore_IMPORTED_IMPLIB_RELEASE} DIRECTORY)
-      # Create a (empty) stub library
-      file(TOUCH "${CMAKE_CURRENT_BINARY_DIR}/swiftCoreStub.lib")
-      # Replace the import library with a stub to bypass the driver and frontend.
-      # Add the library search path to allow linking via autolinking.
-      set_target_properties(swiftCore PROPERTIES
-        IMPORTED_IMPLIB_RELEASE "${CMAKE_CURRENT_BINARY_DIR}/swiftCoreStub.lib"
-        INTERFACE_LINK_DIRECTORIES ${_swiftCore_IMPORTED_IMPLIB_RELEASE_DIRNAME})
-    endif()
-  endif()
 endif()
 
 install(TARGETS swiftSynchronization
@@ -211,6 +187,25 @@ install(TARGETS swiftSynchronization
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftSynchronization)
 install_swift_interface(swiftSynchronization)
+
+# Inter-project install info
+export(EXPORT SwiftSynchronizationTargets
+  FILE "cmake/SwiftSynchronization/SwiftSynchronizationTargets.cmake")
+install(EXPORT SwiftSynchronizationTargets
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftSynchronization"
+  FILE "SwiftSynchronizationTargets.cmake"
+  COMPONENT SwiftSynchronizationCMake)
+include(CMakePackageConfigHelpers)
+configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/interface/SwiftSynchronizationConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftSynchronization/SwiftSynchronizationConfig.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftSynchronization")
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftSynchronization/SwiftSynchronizationConfigVersion.cmake"
+  VERSION "${PROJECT_VERSION}"
+  COMPATIBILITY ExactVersion)
+install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftSynchronization/SwiftSynchronizationConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftSynchronization/SwiftSynchronizationConfigVersion.cmake"
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftSynchronization")
 
 # Configure plist creation for Darwin platforms.
 generate_plist(swiftSynchronization "${CMAKE_PROJECT_VERSION}" swiftSynchronization)

@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
 // REQUIRES: asserts
-// REQUIRES: swift_in_compiler
 
 //===----------------------------------------------------------------------===//
 // Basic function calls and control flow

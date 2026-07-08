@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -sil-verify-all -emit-sil -O %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 public struct Outer<T> {}
 extension Outer where T == UInt8 {

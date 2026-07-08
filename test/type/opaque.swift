@@ -619,3 +619,19 @@ do {
   func f2() -> some P33333 {}
   // expected-error@-1 {{cannot find type 'P33333' in scope}}
 }
+
+do {
+  struct MyV : Proto {
+    func scaled() -> some Proto { MyV() }
+  }
+
+  struct Test<T: Proto> {
+    let v1: T?
+    let v2: T?
+  }
+
+  func test() {
+    Test(v1: MyV().scaled(), v2: MyV())
+    // expected-error@-1 {{conflicting arguments to generic parameter 'T' ('some Proto' (result type of 'scaled') vs. 'MyV')}}
+  }
+}

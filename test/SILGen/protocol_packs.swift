@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -target %target-swift-5.9-abi-triple -module-name test %s
+
 // RUN: %target-swift-emit-silgen -target %target-swift-5.9-abi-triple -module-name test %s | %FileCheck %s
 
 // A trivial generic type.

@@ -5069,7 +5069,7 @@ abi_role_detail::Storage abi_role_detail::computeStorage(Decl *decl) {
 }
 
 ABIRole::ABIRole(NLOptions opts)
-  : value(opts & NL_ABIProviding ? ProvidesABI : ProvidesAPI)
+  : value(opts.contains(NLFlags::ABIProviding) ? ProvidesABI : ProvidesAPI)
 { }
 
 VarDecl *PatternBindingDecl::
@@ -6841,7 +6841,7 @@ NominalTypeDecl::getExecutorOwnedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -6880,7 +6880,7 @@ NominalTypeDecl::getExecutorLegacyOwnedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -6919,7 +6919,7 @@ NominalTypeDecl::getExecutorLegacyUnownedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -7880,7 +7880,8 @@ void ProtocolDecl::computeKnownProtocolKind() const {
       !module->getName().is("_Differentiation") &&
       !module->getName().is("_Concurrency") &&
       !module->getName().is("Distributed") && 
-      !module->getName().is("Cxx")) {
+      !module->getName().is("Cxx") &&
+      !module->getName().is("COM")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -12464,7 +12465,7 @@ const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   this->lookupQualified(getSelfNominalTypeDecl(),
                         DeclNameRef(C.Id_unownedExecutor),
-                        getLoc(), NL_ProtocolMembers,
+                        getLoc(), NLFlags::ProtocolMembers,
                         results);
 
   for (auto candidate: results) {

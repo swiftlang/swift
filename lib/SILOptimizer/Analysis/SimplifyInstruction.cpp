@@ -741,13 +741,6 @@ SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
   if (!svi->getFunction()->hasOwnership())
     return replaceAllUsesAndErase(svi, result, callbacks);
 
-#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
-  // If we weren't passed a dead end blocks, we can't optimize without ownership
-  // enabled.
-  if (!deadEndBlocks)
-    return next;
-#endif
-
   OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
   OwnershipRAUWHelper helper(ctx, svi, result, /*respectLexicalFlags=*/ true);
 

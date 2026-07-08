@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // REQUIRES: tsan_runtime
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -sanitize=thread %s | %FileCheck %s
 // RUN: %target-swift-frontend -sanitize=thread -emit-ir -primary-file %s | %FileCheck --check-prefix=CHECK-LLVM-IR %s

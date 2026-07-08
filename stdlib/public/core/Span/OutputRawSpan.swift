@@ -33,7 +33,7 @@ public struct OutputRawSpan: ~Copyable, ~Escapable {
   internal var _count: Int
 
   /// Create an OutputRawSpan with zero capacity.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(immortal)
   public init() {
     unsafe _pointer = nil
@@ -49,14 +49,14 @@ extension OutputRawSpan: @unchecked Sendable {}
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @unsafe
   internal func _start() -> UnsafeMutableRawPointer {
     unsafe _pointer._unsafelyUnwrappedUnchecked
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @unsafe
   internal func _tail() -> UnsafeMutableRawPointer {
@@ -69,22 +69,22 @@ extension OutputRawSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
   /// The number of initialized bytes in this span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("fixed_storage.get_count")
   public var byteCount: Int { _assumeNonNegative(_count) }
 
   /// The number of additional bytes that can be appended to this span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var freeCapacity: Int { capacity &- _count }
 
   /// A Boolean value indicating whether the span is empty.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var isEmpty: Bool { _count == 0 }
 
   /// A Boolean value indicating whether the span is full.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var isFull: Bool { _count == capacity }
 
@@ -92,7 +92,7 @@ extension OutputRawSpan {
   /// order.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var byteOffsets: Range<Int> {
     unsafe Range(_uncheckedBounds: (0, byteCount))
   }
@@ -103,7 +103,7 @@ extension OutputRawSpan {
 extension OutputRawSpan {
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow buffer)
   internal init(
     _uncheckedBuffer buffer: UnsafeMutableRawBufferPointer,
@@ -126,7 +126,7 @@ extension OutputRawSpan {
   ///   - initializedCount: the number of initialized bytes
   ///                       at the beginning of `buffer`.
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow buffer)
   public init(
     buffer: UnsafeMutableRawBufferPointer,
@@ -159,7 +159,7 @@ extension OutputRawSpan {
   ///   - initializedCount: the number of initialized bytes
   ///                       at the beginning of `buffer`.
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow buffer)
   public init(
     buffer: borrowing Slice<UnsafeMutableRawBufferPointer>,
@@ -180,7 +180,7 @@ extension OutputRawSpan {
   /// Append a single byte to this span.
   ///
   /// - Parameter value: The byte to append.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   public mutating func append(_ value: UInt8) {
     unsafe _append(value, as: UInt8.self)
@@ -191,7 +191,7 @@ extension OutputRawSpan {
   /// Returns the last byte. The `OutputRawSpan` must not be empty.
   ///
   /// - Returns: The removed byte.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @discardableResult
   @_lifetime(self: copy self)
   public mutating func removeLast() -> UInt8 {
@@ -207,7 +207,7 @@ extension OutputRawSpan {
   ///
   /// - Parameter n: The number of bytes to remove.
   ///     `n` must not be negative or greater than `byteCount`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   public mutating func removeLast(_ n: Int) {
     _precondition(n >= 0, "Can't remove a negative number of bytes")
@@ -217,7 +217,7 @@ extension OutputRawSpan {
 
   /// Remove all this span's bytes and return its memory
   /// to the uninitialized state.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   public mutating func removeAll() {
     // TODO: Consider an option to zero the `_count` bytes being removed.
@@ -229,7 +229,7 @@ extension OutputRawSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
   // Can we use: @_semantics("fixed_storage.check_index")
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal func _checkIndex(_ position: Int) {
     _precondition(position >= 0 && position < _count, "Index out of bounds")
   }
@@ -238,7 +238,7 @@ extension OutputRawSpan {
   ///
   /// - Parameter byteOffset: The offset of the byte to access. `byteOffset`
   ///     must be greater than or equal to zero, and less than `byteCount`.
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   public subscript(_ byteOffset: Int) -> UInt8 {
     get {
       _checkIndex(byteOffset)
@@ -257,7 +257,7 @@ extension OutputRawSpan {
   ///
   /// - Parameter byteOffset: The offset of the byte to access. `byteOffset`
   ///     must be greater than or equal to zero, and less than `byteCount`.
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   @unsafe
   public subscript(unchecked byteOffset: Int) -> UInt8 {
     get {
@@ -280,7 +280,7 @@ extension OutputRawSpan {
   /// - Parameters:
   ///   - value: The value to store as raw bytes.
   ///   - type: The type of the value.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   @_lifetime(self: copy self)
   public mutating func append<T: BitwiseCopyable>(_ value: T, as type: T.Type) {
@@ -288,7 +288,7 @@ extension OutputRawSpan {
   }
 
   /// Appends the given value's bytes to this span's bytes.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @unsafe
   @_lifetime(self: copy self)
@@ -310,7 +310,7 @@ extension OutputRawSpan {
   /// - Parameters:
   ///   - value: The value to store as raw bytes.
   ///   - type: The type of the instance to store.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   public mutating func append<T>(
     _ value: T, as type: T.Type
@@ -327,7 +327,7 @@ extension OutputRawSpan {
   ///   - value: The value to store as raw bytes.
   ///   - type: The type of the instance to store.
   ///   - byteOrder: The order in which the bytes will be encoded to the span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
   public mutating func append<T>(
@@ -352,7 +352,7 @@ extension OutputRawSpan {
   ///   - count: The number of copies of `repeatedValue` to append
   ///       to this span.
   ///   - type: The type of the instance to store repeatedly.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   @_lifetime(self: copy self)
   public mutating func append<T: BitwiseCopyable>(
@@ -363,7 +363,7 @@ extension OutputRawSpan {
     unsafe _append(repeating: repeatedValue, count: count, as: T.self)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   @_lifetime(self: copy self)
   internal mutating func _append<T: BitwiseCopyable>(
@@ -387,7 +387,7 @@ extension OutputRawSpan {
   ///   - count: The number of copies of `repeatedValue` to append
   ///       to this span.
   ///   - type: The type of the instance to store repeatedly.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   public mutating func append<T>(
     repeating repeatedValue: T,
@@ -408,7 +408,7 @@ extension OutputRawSpan {
   ///       to this span.
   ///   - type: The type of the instance to store repeatedly.
   ///   - byteOrder: The order in which the bytes will be encoded to the span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
   public mutating func append<T>(
@@ -429,7 +429,7 @@ extension OutputRawSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
   /// Borrow the underlying initialized memory for read-only access.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var bytes: RawSpan {
     @_lifetime(borrow self)
@@ -441,7 +441,7 @@ extension OutputRawSpan {
   }
 
   /// Exclusively borrow the underlying initialized memory for mutation.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var mutableBytes: MutableRawSpan {
     @_lifetime(&self)
@@ -484,7 +484,7 @@ extension OutputRawSpan {
   /// - Parameter body: A closure that can read from and write to the
   ///     buffer and update the initialized count.
   /// - Returns: The return value of the `body` closure.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @_lifetime(self: copy self)
   @unsafe
@@ -528,7 +528,7 @@ extension OutputRawSpan {
   /// - Returns: The number of initialized bytes in the same buffer, as
   ///      tracked by the consumed `OutputRawSpan` instance.
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func finalize(
     for buffer: UnsafeMutableRawBufferPointer
   ) -> Int {
@@ -555,7 +555,7 @@ extension OutputRawSpan {
   /// - Returns: The number of initialized bytes in the same buffer, as
   ///      tracked by the consumed `OutputRawSpan` instance.
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func finalize(
     for buffer: Slice<UnsafeMutableRawBufferPointer>
   ) -> Int {

@@ -500,6 +500,10 @@ enum class FixKind : uint8_t {
 
   /// Ignore that a conformance is isolated but is not allowed to be.
   IgnoreIsolatedConformance,
+
+  /// Ignore passing `WritableKeyPath` to `ReferenceWritableKeyPath` mismatch
+  /// when trying to access a member using key path dynamic member lookup.
+  IgnoreClassRequirementForDynamicMemberLookup,
 };
 
 enum class FixImpact : unsigned {
@@ -1631,6 +1635,12 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  // May have overloaded methods being partially applied, causing ambiguity that
+  // does not currently impact diagnostic produced
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
   static AllowInvalidPartialApplication *create(bool isWarning,
                                                 ConstraintSystem &cs,
@@ -4032,6 +4042,34 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreIsolatedConformance;
+  }
+};
+
+class IgnoreClassRequirementForDynamicMemberLookup : public ConstraintFix {
+  Type BaseType;
+  ValueDecl *Member;
+
+  IgnoreClassRequirementForDynamicMemberLookup(ConstraintSystem &cs,
+                                               Type baseTy, ValueDecl *member,
+                                               ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreClassRequirementForDynamicMemberLookup,
+                      locator),
+        BaseType(baseTy), Member(member) {}
+
+public:
+  std::string getName() const override {
+    return "ignore non-class base used for key path dynamic member lookup";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreClassRequirementForDynamicMemberLookup *
+  create(ConstraintSystem &cs, Type baseTy, ValueDecl *member,
+         ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() ==
+           FixKind::IgnoreClassRequirementForDynamicMemberLookup;
   }
 };
 

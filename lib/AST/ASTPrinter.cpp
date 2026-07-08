@@ -5456,9 +5456,11 @@ void PrintAST::visitTypeJoinExpr(TypeJoinExpr *expr) {
 }
 
 void PrintAST::visitAssignExpr(AssignExpr *expr) {
-  visit(expr->getDest());
+  if (auto dest = expr->getDest())
+    visit(dest);
   Printer << " = ";
-  visit(expr->getSrc());
+  if (auto src = expr->getSrc())
+    visit(src);
 }
 
 void PrintAST::visitBinaryExpr(BinaryExpr *expr) {
@@ -6428,14 +6430,18 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
-  /// If \p TyDecl belongs to a submodule, return the \c ModuleDecl for that
-  /// submodule; otherwise just return the parent module.
+  /// If \p TyDecl belongs to an explicit submodule, return the \c ModuleDecl
+  /// for that submodule; otherwise just return the parent module.
   ModuleDecl *getParentSubModuleOrModule(GenericTypeDecl *TyDecl) {
     // Only clang declarations can belong to a submodule
     if (auto clangNode = TyDecl->getClangNode()) {
       auto importer = TyDecl->getASTContext().getClangModuleLoader();
       if (auto clangMod = importer->getClangOwningModule(clangNode)) {
-        return importer->getWrapperForModule(clangMod);
+        // Explicit submodules are only visible if specifically imported;
+        // everything else has the visibility of its top-level module.
+        if (clangMod->isSubModule() && clangMod->IsExplicit) {
+          return importer->getWrapperForModule(clangMod);
+        }
       }
     }
 

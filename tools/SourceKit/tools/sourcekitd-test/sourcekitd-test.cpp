@@ -12,9 +12,7 @@
 
 #include "sourcekitd/sourcekitd.h"
 
-#include "SourceKit/Support/Concurrency.h"
 #include "TestOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -46,6 +44,38 @@
 
 // FIXME: Platform compatibility.
 #include <dispatch/dispatch.h>
+
+namespace {
+
+class Semaphore {
+  dispatch_semaphore_t sem;
+
+public:
+  Semaphore() : sem(dispatch_semaphore_create(0)) {}
+  ~Semaphore() {
+    if (sem)
+      dispatch_release(sem);
+  }
+  void signal() { dispatch_semaphore_signal(sem); }
+  bool wait(long milliseconds) {
+    return dispatch_semaphore_wait(
+        sem, dispatch_time(DISPATCH_TIME_NOW, milliseconds * NSEC_PER_MSEC));
+  }
+  Semaphore(Semaphore &&other) : sem(other.sem) { other.sem = nullptr; }
+  Semaphore(const Semaphore &) = delete;
+  Semaphore &operator=(const Semaphore &) = delete;
+};
+
+struct AsyncResponseInfo {
+  Semaphore semaphore;
+  sourcekitd_response_t response = nullptr;
+  sourcekitd_test::TestOptions options;
+  std::string sourceFilename;
+  std::unique_ptr<llvm::MemoryBuffer> sourceBuffer;
+  sourcekitd_request_handle_t requestHandle;
+};
+
+} // anonymous namespace
 
 using namespace llvm;
 
@@ -138,23 +168,12 @@ static SourceKitRequest ActiveRequest = SourceKitRequest::None;
 static sourcekitd_uid_t SemaDiagnosticStage;
 
 static sourcekitd_uid_t NoteDocUpdate;
-static SourceKit::Semaphore semaSemaphore(0);
+static Semaphore semaSemaphore;
 static sourcekitd_response_t semaResponse;
 static const char *semaName;
 
 static sourcekitd_uid_t NoteTest;
-static SourceKit::Semaphore noteSyncSemaphore(0);
-
-namespace {
-struct AsyncResponseInfo {
-  SourceKit::Semaphore semaphore{0};
-  sourcekitd_response_t response = nullptr;
-  TestOptions options;
-  std::string sourceFilename;
-  std::unique_ptr<llvm::MemoryBuffer> sourceBuffer;
-  sourcekitd_request_handle_t requestHandle;
-};
-} // end anonymous namespace
+static Semaphore noteSyncSemaphore;
 
 static std::vector<AsyncResponseInfo> asyncResponses;
 
@@ -250,21 +269,31 @@ static void skt_main(skt_args *args) {
     llvm::SmallString<256> tmpDir;
     auto errCode = llvm::sys::fs::createUniqueDirectory("sourcekitd-test-cwd",
                                                         tmpDir);
-    ASSERT(!errCode && "Failed to create temporary dir for sourcekitd-test");
+    if (errCode) {
+      llvm::report_fatal_error(
+          llvm::Twine("Failed to create temporary dir for sourcekitd-test: ") +
+          errCode.message());
+    }
     errCode = realFS->getRealPath(tmpDir, tmpWorkingDir);
-    ASSERT(!errCode && !tmpWorkingDir.empty() &&
-           "Failed to resolve temporary dir real path");
+    if (errCode) {
+      llvm::report_fatal_error(
+          llvm::Twine("Failed to resolve temporary dir real path: ") +
+          errCode.message());
+    }
+    if (tmpWorkingDir.empty()) {
+      llvm::report_fatal_error(
+          "Failed to resolve temporary dir real path: empty path");
+    }
     realFS->setCurrentWorkingDirectory(tmpWorkingDir);
   }
   SWIFT_DEFER {
     auto cwd = realFS->getCurrentWorkingDirectory().get();
     if (tmpWorkingDir != cwd) {
-      ABORT([&](auto &out) {
-        out << "Working directory of the *process* was set to ";
-        out << "'" << cwd << "'; SourceKit does not support this. ";
-        out << "Make sure to use `llvm::vfs::createPhysicalFileSystem` ";
-        out << "instead of `llvm::vfs::getRealFileSystem`.";
-      });
+      llvm::report_fatal_error(
+          llvm::Twine("Working directory of the *process* was set to '") + cwd +
+          "'; SourceKit does not support this. " +
+          "Make sure to use `llvm::vfs::createPhysicalFileSystem` " +
+          "instead of `llvm::vfs::getRealFileSystem`.");
     }
     realFS->setCurrentWorkingDirectory(origWorkingDir);
     llvm::sys::fs::remove_directories(tmpWorkingDir);

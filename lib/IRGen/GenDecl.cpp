@@ -2207,27 +2207,11 @@ void IRGenModule::emitVTableStubs() {
     const SILFunction &F = *I;
     if (! F.isExternallyUsedSymbol())
       continue;
-    
+
     if (!stub) {
-      // Create a single stub function which calls swift_deletedMethodError().
-      // Use linkonce_odr hidden to merge these symbols, except on
-      // COFF where the linker cannot merge them.
-      bool canLinkOnce = !Module.getTargetTriple().isOSBinFormatCOFF();
-      auto linkage = canLinkOnce ? llvm::GlobalValue::LinkOnceODRLinkage
-                                 : llvm::GlobalValue::InternalLinkage;
-      stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
-                                    linkage, "_swift_dead_method_stub",
-                                    &Module);
-      ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
-                                 : IRLinkage::Internal)
-          .to(stub, /* nonAliasedDefinition */ false);
-      stub->setAttributes(constructInitialAttributes());
-      stub->setCallingConv(DefaultCC);
-      auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
-      auto *errorFunc = getDeletedMethodErrorFn();
-      llvm::CallInst::Create(getDeletedMethodErrorFnType(),
-                             errorFunc, ArrayRef<llvm::Value *>(), "", entry);
-      new llvm::UnreachableInst(getLLVMContext(), entry);
+      // Get (creating if necessary) a single stub function which calls
+      // swift_deletedMethodError().
+      stub = getOrCreateDeadMethodErrorStub();
     }
 
     // For each eliminated method symbol create an alias to the stub.
@@ -2242,11 +2226,11 @@ void IRGenModule::emitVTableStubs() {
       auto *fnPtr = emitAsyncFunctionPointer(*this, stub, entity, asyncLayout.getSize());
       alias = fnPtr;
     } else if (F.getLoweredFunctionType()->isCalleeAllocatedCoroutine()) {
-      // TODO: We cannot directly create a pointer to
-      // `swift_deletedCalleeAllocatedCoroutineMethodError` to workaround a
-      // linker crash. Instead use the stub, which calls
-      // swift_deletedMethodError. This works because swift_deletedMethodError
-      // takes no parameters and simply aborts the program.
+      // There is no dedicated dead-method error symbol for callee-allocated
+      // coroutines; point a coro function pointer (named for the eliminated
+      // function) at the shared stub, which calls swift_deletedMethodError.
+      // This works because swift_deletedMethodError takes no parameters and
+      // simply aborts the program.
       auto entity = LinkEntity::forSILFunction(const_cast<SILFunction *>(&F));
       auto *cfp = emitCoroFunctionPointer(*this, stub, entity);
       alias = cfp;

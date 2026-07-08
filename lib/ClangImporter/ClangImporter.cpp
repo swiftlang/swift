@@ -166,6 +166,7 @@ namespace {
 
   class PCHDeserializationCallbacks : public clang::ASTDeserializationListener {
     ClangImporter::Implementation &Impl;
+    clang::ASTReader *Reader = nullptr;
   public:
     explicit PCHDeserializationCallbacks(ClangImporter::Implementation &impl)
       : Impl(impl) {}
@@ -177,11 +178,25 @@ namespace {
     }
 
     void ReaderInitialized(clang::ASTReader *Reader) override {
+      // Stash the reader so DeclRead can map decls back to their owning module.
+      this->Reader = Reader;
+
       if (!Impl.IsReadingBridgingPCH)
         return;
 
       if (Impl.CASIDForPCH)
         Reader->getModuleManager().getPrimaryModule().CASID = *Impl.CASIDForPCH;
+    }
+
+    void DeclRead(clang::GlobalDeclID ID, const clang::Decl *D) override {
+      // Attribute each materialized (deserialized) decl to its owning serialized
+      // module, so we can report per-module in-RAM AST cost. Only tracked when
+      // memory-stat collection is enabled, to avoid per-decl overhead in normal
+      // builds.
+      if (!Impl.CollectMemoryStats || !Reader)
+        return;
+      if (auto *MF = Reader->getOwningModuleFile(ID))
+        ++Impl.MaterializedDeclsPerModule[MF];
     }
   };
 
@@ -1459,12 +1474,11 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   return CI;
 }
 
-std::unique_ptr<ClangImporter>
-ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
-                      StringRef swiftPCHHash, std::string casidForPCH,
-                      DependencyTracker *tracker, bool ignoreFileMapping,
-                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
-                      std::shared_ptr<llvm::cas::ActionCache> Cache) {
+std::unique_ptr<ClangImporter> ClangImporter::create(
+    ASTContext &ctx, const IRGenOptions *IRGenOpts, StringRef swiftPCHHash,
+    std::string casidForPCH, DependencyTracker *tracker, bool ignoreFileMapping,
+    bool needCodeGenTargetOpts, std::shared_ptr<llvm::cas::ObjectStore> CAS,
+    std::shared_ptr<llvm::cas::ActionCache> Cache) {
   std::unique_ptr<ClangImporter> importer{new ClangImporter(ctx, tracker)};
   auto &importerOpts = ctx.ClangImporterOpts;
 
@@ -1578,7 +1592,7 @@ ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
   clangDiags.setFatalsAsError(ctx.Diags.getShowDiagnosticsAfterFatalError());
 
   // Use Clang to configure/save options for Swift IRGen/CodeGen
-  if (ctx.LangOpts.ClangTarget.has_value()) {
+  if (ctx.LangOpts.ClangTarget.has_value() && needCodeGenTargetOpts) {
     // If '-clang-target' is set, create a mock invocation with the Swift triple
     // to configure CodeGen and Target options for Swift compilation.
     auto swiftTargetClangInvocation = importer->createClangInvocation(
@@ -4590,8 +4604,91 @@ ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
   return Impl.importDeclCached(ClangDecl, Impl.CurrentVersion);
 }
 
+void ClangImporter::enableMemoryStatistics() {
+  Impl.CollectMemoryStats = true;
+}
+
+ClangImporter::ClangMemoryStats ClangImporter::getClangMemoryStats() const {
+  ClangMemoryStats stats;
+  // All imported modules share one ASTContext, so this is the aggregate
+  // deserialized-AST cost across every module (it cannot be split per module).
+  auto &clangCtx = Impl.getClangASTContext();
+  stats.astContextBytes =
+      clangCtx.getASTAllocatedMemory() + clangCtx.getSideTableAllocatedMemory();
+
+  auto *reader = Impl.Instance->getASTReader().get();
+  if (!reader)
+    return stats;
+
+  auto &moduleMgr = reader->getModuleManager();
+  stats.numLoadedModules = moduleMgr.size();
+  stats.perModule.reserve(stats.numLoadedModules);
+
+  for (clang::serialization::ModuleFile &MF : moduleMgr) {
+    ClangModuleMemoryInfo info;
+    info.moduleName = MF.ModuleName;
+    if (MF.Buffer) {
+      // In-memory size of the serialized (.pcm) bitstream buffer. The buffer
+      // may be malloc-backed (heap-allocated) or mmap-backed (file-backed and
+      // demand-paged). These are reported separately because their cost to the
+      // process differs and is hard to attribute uniformly (e.g. mmap pages may
+      // be shared or paged out, and CAS-backed storage differs again).
+      info.inMemoryBufferBytes = MF.Buffer->getBufferSize();
+      info.bufferIsMMapped =
+          MF.Buffer->getBufferKind() == llvm::MemoryBuffer::MemoryBuffer_MMap;
+      if (info.bufferIsMMapped)
+        stats.moduleBufferMMapBytes += info.inMemoryBufferBytes;
+      else
+        stats.moduleBufferMallocBytes += info.inMemoryBufferBytes;
+    }
+    info.onDiskDecls = MF.LocalNumDecls;
+    info.onDiskTypes = MF.LocalNumTypes;
+    info.onDiskIdentifiers = MF.LocalNumIdentifiers;
+    info.onDiskMacros = MF.LocalNumMacros;
+
+    auto it = Impl.MaterializedDeclsPerModule.find(&MF);
+    if (it != Impl.MaterializedDeclsPerModule.end()) {
+      info.materializedDecls = it->second;
+      stats.numMaterializedDecls += it->second;
+    }
+    stats.perModule.push_back(std::move(info));
+  }
+  return stats;
+}
+
 void ClangImporter::printStatistics() const {
   Impl.Instance->getASTReader()->PrintStats();
+
+  // Memory accounting summary + per-module breakdown.
+  auto stats = getClangMemoryStats();
+  uint64_t swiftBytes = Impl.SwiftContext.getTotalMemory();
+  auto &os = llvm::errs();
+  os << "\n*** Clang importer memory ***\n";
+  os << "Clang ASTContext bytes (shared, all modules): "
+     << stats.astContextBytes << "\n";
+  os << "Module buffer bytes (malloc):                 "
+     << stats.moduleBufferMallocBytes << "\n";
+  os << "Module buffer bytes (mmap):                   "
+     << stats.moduleBufferMMapBytes << "\n";
+  os << "Swift ASTContext bytes:                       " << swiftBytes << "\n";
+  os << "Loaded Clang modules: " << stats.numLoadedModules
+     << ", materialized decls: " << stats.numMaterializedDecls << "\n";
+
+  // Sort heaviest-first by materialized decls, then by buffer size.
+  llvm::stable_sort(stats.perModule,
+                    [](const ClangModuleMemoryInfo &a,
+                       const ClangModuleMemoryInfo &b) {
+                      if (a.materializedDecls != b.materializedDecls)
+                        return a.materializedDecls > b.materializedDecls;
+                      return a.inMemoryBufferBytes > b.inMemoryBufferBytes;
+                    });
+  os << "Per-module (sorted by materialized decls):\n";
+  os << "  materializedDecls / onDiskDecls  bufferBytes(kind)  module\n";
+  for (const auto &m : stats.perModule) {
+    os << "  " << m.materializedDecls << " / " << m.onDiskDecls << "  "
+       << m.inMemoryBufferBytes << (m.bufferIsMMapped ? "(mmap)" : "(malloc)")
+       << "  " << m.moduleName << "\n";
+  }
 }
 
 void ClangImporter::verifyAllModules() {
@@ -6692,9 +6789,9 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
     swiftName = func->getName();
 
   if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
-    NLOptions options = NL_IgnoreAccessControl | NL_IgnoreMissingImports;
+    NLOptions options = {NLFlags::IgnoreAccessControl, NLFlags::IgnoreMissingImports};
     ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
-                        NL_QualifiedDefault | options, results);
+                        (NLFlags::QualifiedDefault) | options, results);
   }
   else {
     ASTContext &ctx = func->getASTContext();
@@ -8180,7 +8277,7 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
         ctx.MainModule, ctx.getIdentifier(name), /*hasModuleSelector=*/false,
         results, NLKind::UnqualifiedLookup,
         namelookup::ResolutionKind::Overloadable, ctx.MainModule, SourceLoc(),
-        NL_UnqualifiedDefault);
+        NLFlags::UnqualifiedDefault);
 
     // Filter out any declarations that didn't come from Clang.
     auto newEnd =
@@ -8657,14 +8754,14 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
         isa<clang::CXXConstructorDecl>(decl))
       return true;
 
-    if (clangTypeIsForeignReference(method->getReturnType(), desc.ctx))
-      return true;
-
-    // begin and end methods likely return an interator, so they're unsafe. This
-    // is required so that automatic the conformance to RAC works properly.
+    // begin and end methods likely return an iterator, so they're unsafe.
+    // This is required so that automatic the conformance to RAC works properly.
     if (method->getNameAsString() == "begin" ||
         method->getNameAsString() == "end")
       return false;
+
+    if (clangTypeIsForeignReference(method->getReturnType(), desc.ctx))
+      return true;
 
     auto parentQualType = method
       ->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();

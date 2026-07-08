@@ -1825,6 +1825,14 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   bool useAddress =
       rawElementTy->getAnyPointerElementType() && elementIsNoncopyable;
 
+  // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
+  // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
+  // can synthesize a valid setter for.
+  //
+  // ty->isForeignReferenceType() implies !ty->getAnyPointerElementType().
+  if (rawElementTy->isForeignReferenceType())
+    setterImpl = nullptr;
+
   AccessorDecl *getterDecl = AccessorDecl::create(
       ctx, getterImpl->getLoc(), getterImpl->getLoc(),
       useAddress ? AccessorKind::Address : AccessorKind::Get, subscript,
@@ -1926,6 +1934,14 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
   bool useAddress =
       rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
+
+  // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
+  // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
+  // can synthesize a valid setter for.
+  //
+  // ty->isForeignReferenceType() implies !ty->getAnyPointerElementType().
+  if (rawElementTy->isForeignReferenceType())
+    setterImpl = nullptr;
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,

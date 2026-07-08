@@ -1,0 +1,37 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=store_borrow | %FileCheck %s
+
+import Swift
+import Builtin
+
+class C {}
+
+// CHECK-LABEL: sil [ossa] @remove_dead_store_borrow
+// CHECK:         %1 = alloc_stack
+// CHECK-NEXT:    debug_value %1
+// CHECK-NOT:     store_borrow
+// CHECK:       } // end sil function 'remove_dead_store_borrow'
+sil [ossa] @remove_dead_store_borrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = alloc_stack $C
+  %2 = store_borrow %0 to %1
+  debug_value %2, let, name "x"
+  end_borrow %2
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_alive_store_borrow
+// CHECK:         store_borrow
+// CHECK:       } // end sil function 'dont_remove_alive_store_borrow'
+sil [ossa] @dont_remove_alive_store_borrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = alloc_stack $C
+  %2 = store_borrow %0 to %1
+  fix_lifetime %2
+  end_borrow %2
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+

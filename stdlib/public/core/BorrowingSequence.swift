@@ -78,7 +78,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
   /// Returns a span over the next group of elements that are ready to by visited,
   /// up to the specifed maximum.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   @_lifetime(self: copy self)
   @_transparent
@@ -87,7 +87,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
   }
   
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(self: copy self)
   public mutating func skip(by offset: Int) throws(Failure) -> Int {
     _precondition(offset >= 0, "Can't skip by a negative offset")
@@ -126,7 +126,7 @@ extension Span where Element: ~Copyable {
     }
     
     @available(SwiftStdlib 6.4, *)
-    @_alwaysEmitIntoClient
+    @export(implementation)
     @_lifetime(&self)
     @_lifetime(self: copy self)
     @_transparent
@@ -140,7 +140,7 @@ extension Span where Element: ~Copyable {
     }
     
     @available(SwiftStdlib 6.4, *)
-    @_alwaysEmitIntoClient
+    @export(implementation)
     @_lifetime(self: copy self)
     public mutating func skip(by offset: Int) -> Int {
       _precondition(offset >= 0, "Can't skip by a negative offset")

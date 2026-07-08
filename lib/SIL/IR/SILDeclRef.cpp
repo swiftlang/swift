@@ -132,21 +132,54 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return false;
 }
 
+/// Best effort assert that a `Kind::DistributedThunk` SILDeclRef is
+/// being constructed with `vd` pointing at a distributed_thunk, not the
+/// original 'distributed' decl.
+static void assertDistributedThunkLoc(ValueDecl *vd, SILDeclRef::Kind kind) {
+#ifndef NDEBUG
+  if (kind != SILDeclRef::Kind::DistributedThunk)
+    return;
+  auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(vd);
+  if (!afd)
+    return;
+  auto *thunk = afd->getDistributedThunk();
+  assert((!thunk || thunk == afd) &&
+         "SILDeclRef with DistributedThunk kind must be a distributed_thunk");
+#endif
+}
+
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
-                       bool isDistributedThunk, bool isKnownToBeLocal,
+                       bool isKnownToBeLocal,
                        bool isRuntimeAccessible,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
     : loc(vd), kind(kind),
       isForeign(isForeign),
-      distributedThunk(isDistributedThunk),
       isKnownToBeLocal(isKnownToBeLocal),
       isRuntimeAccessible(isRuntimeAccessible),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
-      isAsyncLetClosure(0), pointer(derivativeId) {}
+      isAsyncLetClosure(0), pointer(derivativeId) {
+  assertDistributedThunkLoc(vd, kind);
+}
+
+SILDeclRef::SILDeclRef(void *opaqueLoc, Kind kind, bool isForeign,
+                       bool isKnownToBeLocal,
+                       bool isRuntimeAccessible,
+                       BackDeploymentKind backDeploymentKind,
+                       unsigned defaultArgIndex, bool isAsyncLetClosure,
+                       AutoDiffDerivativeFunctionIdentifier *derivativeId)
+    : loc(Loc::getFromOpaqueValue(opaqueLoc)), kind(kind),
+      isForeign(isForeign),
+      isKnownToBeLocal(isKnownToBeLocal),
+      isRuntimeAccessible(isRuntimeAccessible),
+      backDeploymentKind(backDeploymentKind),
+      defaultArgIndex(defaultArgIndex), isAsyncLetClosure(isAsyncLetClosure),
+      pointer(derivativeId) {
+  assertDistributedThunkLoc(loc.dyn_cast<ValueDecl *>(), kind);
+}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
-                       bool asDistributed, bool asDistributedKnownToBeLocal)
+                       bool asDistributedKnownToBeLocal)
     : isRuntimeAccessible(false),
       backDeploymentKind(SILDeclRef::BackDeploymentKind::None),
       defaultArgIndex(0), isAsyncLetClosure(0),
@@ -197,14 +230,38 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
   }
 
   isForeign = asForeign;
-  distributedThunk = asDistributed;
   isKnownToBeLocal = asDistributedKnownToBeLocal;
 }
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
                        GenericSignature prespecializedSig)
-    : SILDeclRef(baseLoc, false, false) {
+    : SILDeclRef(baseLoc, /*asForeign=*/false) {
   pointer = prespecializedSig.getPointer();
+}
+
+SILDeclRef SILDeclRef::getDistributedThunkDeclRef() const {
+  auto opaqueLoc = loc.getOpaqueValue();
+
+  // Make sure the new 'loc' is a distributed thunk.
+  // If we're in a decl that as a distributed thunk, get it and store it as the new loc.
+  // If it already is the right decl, this still just works.
+  if (auto *afd =
+          dyn_cast_or_null<AbstractFunctionDecl>(loc.dyn_cast<ValueDecl *>())) {
+    auto *thunk = afd->getDistributedThunk();
+    assert(thunk && "decl has no synthesized distributed thunk to point at, "
+                    "this is a mistake in the compiler in how asDistributed() is used");
+    opaqueLoc = Loc(thunk).getOpaqueValue();
+  }
+
+  return SILDeclRef(opaqueLoc, Kind::DistributedThunk,
+                    /*foreign=*/false,
+                    /*knownToBeLocal=*/false, isRuntimeAccessible,
+                    backDeploymentKind, defaultArgIndex, isAsyncLetClosure,
+                    cast<AutoDiffDerivativeFunctionIdentifier *>(pointer));
+}
+
+ValueDecl *SILDeclRef::getDecl() const {
+  return loc.dyn_cast<ValueDecl *>();
 }
 
 std::optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
@@ -402,6 +459,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   case Kind::PropertyWrapperInitFromProjectedValue:
   case Kind::EntryPoint:
   case Kind::AsyncEntryPoint:
+  case Kind::DistributedThunk:
     // Implicit decls for these don't splice in user-written code.
     return false;
   }
@@ -501,6 +559,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
 
   switch (constant.kind) {
   case Kind::Func:
+  case Kind::DistributedThunk:
   case Kind::Allocator:
   case Kind::Initializer:
   case Kind::Deallocator:
@@ -1288,18 +1347,20 @@ bool SILDeclRef::isNativeToForeignThunk() const {
 }
 
 bool SILDeclRef::isDistributedThunk() const {
-  if (!distributedThunk)
-    return false;
-  return kind == Kind::Func;
+  return kind == Kind::DistributedThunk;
 }
+
+FuncDecl *SILDeclRef::getDistributedThunk() const {
+  if (!isDistributedThunk())
+    return nullptr;
+  // With `kind == Kind::DistributedThunk`, `loc` is the synthesized thunk
+  // itself (normalized at construction time).
+  return dyn_cast_or_null<FuncDecl>(loc.dyn_cast<ValueDecl *>());
+}
+
 bool SILDeclRef::isDistributed() const {
-  if (!hasFuncDecl())
-    return false;
-
-  if (auto decl = getFuncDecl()) {
+  if (auto decl = getFuncDecl())
     return decl->isDistributed();
-  }
-
   return false;
 }
 
@@ -1426,15 +1487,15 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         return NameA->Name.str();
       }
 
-    if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
-      return mangler.mangleDistributedThunk(cast<FuncDecl>(getDecl()));
-    }
-
     // Otherwise, fall through into the 'other decl' case.
     LLVM_FALLTHROUGH;
 
   case SILDeclRef::Kind::EnumElement:
     return mangler.mangleEntity(getDecl(), SKind);
+
+  case SILDeclRef::Kind::DistributedThunk:
+    assert(SKind == ASTMangler::SymbolKind::DistributedThunk);
+    return mangler.mangleDistributedThunk(cast<FuncDecl>(getDecl()));
 
   case SILDeclRef::Kind::Deallocator:
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),

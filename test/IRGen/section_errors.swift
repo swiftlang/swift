@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -parse-as-library -emit-sil %s -o /dev/null -verify
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_CompileTimeValuesPreview
 
 @used @section("__TEXT,__mysection") var g0: Int = 1 // ok

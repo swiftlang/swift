@@ -132,6 +132,8 @@ PASS(LateOnoneSimplification, "late-onone-simplification",
     "Peephole simplifications which can only run late in the -Onone pipeline")
 PASS(CleanupDebugSteps, "cleanup-debug-steps",
     "Cleanup debug_step instructions for Onone")
+PASS(KillInvalidDebugValues, "kill-invalid-debug-values",
+    "Kill debug_value instructions that appear after destroying consumers")
 PASS(NamedReturnValueOptimization, "named-return-value-optimization",
     "Optimize copies to an indirect return value")
 PASS(StripObjectHeaders, "strip-object-headers",
@@ -217,8 +219,6 @@ LEGACY_PASS(AccessMarkerElimination, "access-marker-elim",
      "Access Marker Elimination.")
 LEGACY_PASS(AddressLowering, "address-lowering",
      "SIL Address Lowering")
-LEGACY_PASS(LegacyAllocBoxToStack, "legacy-allocbox-to-stack",
-     "Stack Promotion of Box Objects")
 LEGACY_PASS(ArrayCountPropagation, "array-count-propagation",
      "Array Count Propagation")
 LEGACY_PASS(BasicInstructionPropertyDumper, "basic-instruction-property-dump",

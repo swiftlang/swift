@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values -target %target-swift-5.1-abi-triple -module-name main %s
 // RUN: %target-swift-frontend -emit-silgen -target %target-swift-5.1-abi-triple -module-name main %s | %FileCheck %s
 
 

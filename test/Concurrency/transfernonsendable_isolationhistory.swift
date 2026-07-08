@@ -939,10 +939,13 @@ func per_arg_loc_coroutine(_ x: NS) async {
   // on a different line than the call. The merge of `x` into `bag`'s
   // region happens inside combine; the SIL apply receives `x` at slot 0
   // and `bag.slot` (read coroutine) at slot 1.
-  // expected-note@+1{{'y' is connected to 'bag'}}
-  let y = combine(
-    // expected-note@+1{{'bag.slot' is connected to 'y'}}
-    bag.slot,
+  // FIXME: chain-walker emits a noisy 3-step chain here when the apply's
+  // singleRegion records N-1 single-peer merges; the second note is
+  // direction-reversed and 'bag'/'bag.slot' name the same region. Should
+  // collapse to one chain step "y is connected to x" (revisit alongside
+  // walker dedup / direction fix).
+  let y = combine( // expected-note {{'y' is connected to 'bag'}}
+    bag.slot, // expected-note {{'bag.slot' is connected to 'y'}}
     x, // expected-note {{'bag' is connected to 'x' which is accessible to code in the current isolation context}}
   )
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}

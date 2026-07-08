@@ -82,7 +82,7 @@ public struct _MutexHandle: ~Copyable {
   let storage: Atomic<State>
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init() {
     storage = Atomic(.unlocked)

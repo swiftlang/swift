@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-sil %s -o /dev/null -verify
 // RUN: %target-swift-emit-sil %s -o /dev/null -verify -enable-actor-data-race-checks
 

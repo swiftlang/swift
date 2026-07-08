@@ -2650,6 +2650,11 @@ BridgedInstruction BridgedBuilder::createUncheckedValueCast(BridgedValue op, Bri
                                               type.unbridged())};
 }
 
+BridgedInstruction BridgedBuilder::createUncheckedTrivialBitCast(BridgedValue op, BridgedType type) const {
+  return {unbridged().createUncheckedTrivialBitCast(regularLoc(), op.getSILValue(),
+                                                    type.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType type) const {
   return {unbridged().createUpcast(regularLoc(), op.getSILValue(),
                                    type.unbridged())};
@@ -2777,7 +2782,7 @@ BridgedInstruction BridgedBuilder::createCopyAddr(BridgedValue from, BridgedValu
 }
 
 BridgedInstruction BridgedBuilder::createDestroyValue(BridgedValue op, bool isDeadEnd) const {
-  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(), swift::DontPoisonRefs,
+  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(),
                                          swift::IsDeadEnd_t(isDeadEnd))};
 }
 

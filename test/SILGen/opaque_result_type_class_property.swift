@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s -enable-library-evolution -target %target-swift-5.1-abi-triple | %FileCheck %s
 
 public protocol V {}

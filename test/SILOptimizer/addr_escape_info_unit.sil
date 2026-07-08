@@ -6,7 +6,6 @@
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_AddressableTypes
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

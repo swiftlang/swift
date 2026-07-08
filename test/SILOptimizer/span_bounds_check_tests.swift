@@ -8,7 +8,6 @@
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   | %FileCheck %s  --check-prefix=CHECK-IR
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 

@@ -7,7 +7,6 @@
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test,optimized_stdlib
-// REQUIRES: swift_in_compiler
 
 // Note: This code is not the testfile itself but generates the testfile in the %t directory.
 

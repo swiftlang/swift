@@ -356,6 +356,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       endif()
     endif()
 
+    if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
+      list(APPEND extra_c_compile_flags "-DSWIFT_USE_EMBEDDED_SWIFT_PLATFORM=1")
+    endif()
+
     if("${arch}" MATCHES "wasm32")
       set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
         ExecutorImpl.swift

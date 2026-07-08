@@ -137,7 +137,7 @@ extension ManagedBuffer where Element: ~Copyable {
   ///   call to `body`. The caller is responsible for ensuring that
   ///   the buffer is not being accessed elsewhere while performing
   ///   this call.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   @unsafe
   public final func withUnsafeMutablePointerToHeader<E: Error, R: ~Copyable>(
@@ -153,7 +153,7 @@ extension ManagedBuffer where Element: ~Copyable {
   ///   call to `body`. The caller is responsible for ensuring that
   ///   the buffer is not being accessed elsewhere while performing
   ///   this call.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   @unsafe
   public final func withUnsafeMutablePointerToElements<E: Error, R: ~Copyable>(
@@ -169,7 +169,7 @@ extension ManagedBuffer where Element: ~Copyable {
   ///   call to `body`. The caller is responsible for ensuring that
   ///   the buffer is not being accessed elsewhere while performing
   ///   this call.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   @unsafe
   public final func withUnsafeMutablePointers<E: Error, R: ~Copyable>(
@@ -442,7 +442,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   /// - Note: This pointer is valid only for the duration of the call to
   /// `body`. The caller is responsible for ensuring that the buffer is not
   /// being accessed anyone else while performing this call.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   public func withUnsafeMutablePointerToHeader<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutablePointer<Header>) throws(E) -> R
@@ -456,7 +456,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   /// - Note: This pointer is valid only for the duration of the
   ///   call to `body`. The caller is responsible for ensuring that the
   ///   buffer is not being accessed anyone else while performing this call.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   public func withUnsafeMutablePointerToElements<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutablePointer<Element>) throws(E) -> R
@@ -471,7 +471,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   ///   call to `body`. The caller is responsible for ensuring that
   ///   the buffer is not being accessed elsewhere while performing
   ///   this call.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   public func withUnsafeMutablePointers<E: Error, R: ~Copyable>(
     _ body: (

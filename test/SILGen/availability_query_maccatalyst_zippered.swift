@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx10.52 -target-variant %target-cpu-apple-ios50.0-macabi | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-BACKDEPLOY-MAC
 // RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-ios50.0-macabi -target-variant %target-cpu-apple-macosx10.52 | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-BACKDEPLOY-MAC
 

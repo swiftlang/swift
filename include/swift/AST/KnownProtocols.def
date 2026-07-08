@@ -63,6 +63,10 @@
 #define PROTOCOL(name) PROTOCOL_WITH_NAME(name, #name)
 #define PROTOCOL_(name) PROTOCOL_WITH_NAME(name, "_" #name)
 
+#ifndef COM_PROTOCOL
+#define COM_PROTOCOL(name) PROTOCOL(name)
+#endif
+
 #ifndef CXX_PROTOCOL
 #define CXX_PROTOCOL(name) PROTOCOL(name)
 #endif
@@ -152,6 +156,10 @@ CXX_PROTOCOL(UnsafeCxxRandomAccessIterator)
 CXX_PROTOCOL(UnsafeCxxMutableRandomAccessIterator)
 CXX_PROTOCOL(UnsafeCxxContiguousIterator)
 CXX_PROTOCOL(UnsafeCxxMutableContiguousIterator)
+
+// COM Protocols
+COM_PROTOCOL(IUnknown)
+COM_PROTOCOL(ISwiftObject)
 
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)

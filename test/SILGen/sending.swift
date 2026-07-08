@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -module-name sending -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s | %FileCheck %s
 
 class NonSendable {}

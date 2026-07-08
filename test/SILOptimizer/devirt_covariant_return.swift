@@ -1,7 +1,6 @@
 
 // RUN: %target-swift-frontend -module-name devirt_covariant_return -Xllvm -sil-full-demangle -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -Xllvm -sil-print-types -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances with covariant return types correctly. The verifier

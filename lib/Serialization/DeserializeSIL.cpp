@@ -653,6 +653,12 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
   SILSerializationFunctionBuilder builder(SILMod);
   fn = builder.createDeclaration(name, type,
                                  RegularLocation(sourceLoc));
+  // This declaration stands in for a function whose body we could not
+  // deserialize (e.g. it referenced a Clang declaration broken by a context
+  // change). It has no body, so give it external linkage; otherwise the
+  // `didDeserialize` linkage update below would try to externalize a private
+  // definition and assert.
+  fn->setLinkage(SILLinkage::PublicExternal);
   // The function is not really de-serialized, but it's important to call
   // `didDeserialize` on every new function. Otherwise some Analysis might miss
   // `notifyAddedOrModifiedFunction` notifications.
@@ -890,7 +896,15 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
 
   ValueDecl *clangNodeOwner = nullptr;
   if (clangNodeOwnerID != 0) {
-    clangNodeOwner = dyn_cast_or_null<ValueDecl>(MF->getDecl(clangNodeOwnerID));
+    auto clangNodeOwnerOrErr = MF->getDeclChecked(clangNodeOwnerID);
+    if (!clangNodeOwnerOrErr) {
+      // Emit the diagnostic (e.g. a modularization issue such as a referenced
+      // Clang declaration changing kind) without aborting, then fail this SIL
+      // function read so the caller can recover.
+      MF->diagnoseAndConsumeFatal(clangNodeOwnerOrErr.takeError());
+      return MF->createFatalError();
+    }
+    clangNodeOwner = dyn_cast_or_null<ValueDecl>(clangNodeOwnerOrErr.get());
     if (!clangNodeOwner)
       return MF->diagnoseFatal("invalid clang node owner for SILFunction");
   }
@@ -1827,7 +1841,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                       getSILType(MF->getType(ListOfValues[1]),
                                  (SILValueCategory)TyCategory, Fn));
 
-    auto PoisonRefs = PoisonRefs_t(Attr & 0x1);
+    bool hasReconstructionBlock = Attr & 0x1;
     auto UsesMoveableValDebugInfo =
         UsesMoveableValueDebugInfo_t((Attr >> 1) & 0x1);
     auto HasTrace = (Attr >> 2) & 0x1;
@@ -1910,13 +1924,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     }
 
     ResultInst =
-        Builder.createDebugValue(Loc, Value, DebugVar, PoisonRefs,
+        Builder.createDebugValue(Loc, Value, DebugVar,
                                  UsesMoveableValDebugInfo, HasTrace, !HasLoc);
 
     // If the serialized debug_value has a reconstruction block, add it to
     // the worklist. The matching SIL_DEBUG_RECONSTRUCTION_BLOCK records
     // appear after all regular blocks.
-    bool hasReconstructionBlock = (Attr >> 11) & 0x1;
     if (hasReconstructionBlock)
       DebugBBWorklist.push_back(cast<DebugValueInst>(ResultInst));
 
@@ -2953,14 +2966,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   case SILInstructionKind::DestroyValueInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
-    PoisonRefs_t poisonRefs = PoisonRefs_t(Attr & 0x1);
-    IsDeadEnd_t isDeadEnd = IsDeadEnd_t((Attr >> 1) & 0x1);
+    IsDeadEnd_t isDeadEnd = IsDeadEnd_t(Attr & 0x1);
     ResultInst = Builder.createDestroyValue(
         Loc,
         getLocalValue(
             Builder.maybeGetFunction(), ValID,
             getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn)),
-        poisonRefs, isDeadEnd);
+        isDeadEnd);
     break;
   }
 

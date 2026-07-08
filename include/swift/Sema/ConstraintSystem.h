@@ -3134,13 +3134,6 @@ public:
                                               Type initializerType,
                                               Type propertyType);
 
-  /// Propagate constraints in an effort to enforce local
-  /// consistency to reduce the time to solve the system.
-  ///
-  /// \returns true if the system is known to be inconsistent (have no
-  /// solutions).
-  bool propagateConstraints();
-
   /// The result of attempting to resolve a constraint or set of
   /// constraints.
   enum class SolutionKind : char {
@@ -3153,31 +3146,6 @@ public:
     Error
   };
 
-  class TypeMatchResult {
-    SolutionKind Kind;
-
-  public:
-    inline bool isSuccess() const { return Kind == SolutionKind::Solved; }
-    inline bool isFailure() const { return Kind == SolutionKind::Error; }
-    inline bool isAmbiguous() const { return Kind == SolutionKind::Unsolved; }
-
-    static TypeMatchResult success() {
-      return {SolutionKind::Solved};
-    }
-
-    static TypeMatchResult failure() {
-      return {SolutionKind::Error};
-    }
-
-    static TypeMatchResult ambiguous() {
-      return {SolutionKind::Unsolved};
-    }
-
-    operator SolutionKind() { return Kind; }
-  private:
-    TypeMatchResult(SolutionKind result) : Kind(result) {}
-  };
-
   /// Attempt to repair typing failures and record fixes if needed.
   /// \return true if at least some of the failures has been repaired
   /// successfully, which allows type matcher to continue.
@@ -3186,12 +3154,12 @@ public:
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator);
 
-  TypeMatchResult
+  SolutionKind
   matchPackTypes(PackType *pack1, PackType *pack2,
                  ConstraintKind kind, TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
-  TypeMatchResult
+  SolutionKind
   matchPackExpansionTypes(PackExpansionType *expansion1,
                           PackExpansionType *expansion2,
                           ConstraintKind kind, TypeMatchOptions flags,
@@ -3200,22 +3168,22 @@ public:
   /// Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
-  TypeMatchResult matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
-                                  ConstraintKind kind, TypeMatchOptions flags,
-                                  ConstraintLocatorBuilder locator);
+  SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
+                               ConstraintKind kind, TypeMatchOptions flags,
+                               ConstraintLocatorBuilder locator);
 
   /// Match the @Sendable bit between two functions.
-  TypeMatchResult matchFunctionSendability(FunctionType *func1,
-                                           FunctionType *func2,
-                                           ConstraintKind kind,
-                                           TypeMatchOptions flags,
-                                           ConstraintLocatorBuilder locator);
+  SolutionKind matchFunctionSendability(FunctionType *func1,
+                                        FunctionType *func2,
+                                        ConstraintKind kind,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up two function
   /// types.
-  TypeMatchResult matchFunctionTypes(FunctionType *func1, FunctionType *func2,
-                                     ConstraintKind kind, TypeMatchOptions flags,
-                                     ConstraintLocatorBuilder locator);
+  SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
+                                  ConstraintKind kind, TypeMatchOptions flags,
+                                  ConstraintLocatorBuilder locator);
   
   /// Subroutine of \c matchTypes()
   bool matchFunctionIsolations(FunctionType *func1, FunctionType *func2,
@@ -3229,14 +3197,14 @@ public:
 
   /// Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
-  TypeMatchResult matchSuperclassTypes(Type type1, Type type2,
-                                       TypeMatchOptions flags,
-                                       ConstraintLocatorBuilder locator);
+  SolutionKind matchSuperclassTypes(Type type1, Type type2,
+                                    TypeMatchOptions flags,
+                                    ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up two types that
   /// refer to the same declaration via their generic arguments.
-  TypeMatchResult matchDeepEqualityTypes(Type type1, Type type2,
-                                         ConstraintLocatorBuilder locator);
+  SolutionKind matchDeepEqualityTypes(Type type1, Type type2,
+                                      ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up a value to an
   /// existential type.
@@ -3245,23 +3213,23 @@ public:
   /// Usually this uses Subtype, but when matching the instance type of a
   /// metatype with the instance type of an existential metatype, since we
   /// want an actual conformance check.
-  TypeMatchResult matchExistentialTypes(Type type1, Type type2,
-                                        ConstraintKind kind,
-                                        TypeMatchOptions flags,
-                                        ConstraintLocatorBuilder locator);
+  SolutionKind matchExistentialTypes(Type type1, Type type2,
+                                     ConstraintKind kind,
+                                     TypeMatchOptions flags,
+                                     ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), used to bind a type to a
   /// type variable.
-  TypeMatchResult matchTypesBindTypeVar(
+  SolutionKind matchTypesBindTypeVar(
       TypeVariableType *typeVar, Type type, ConstraintKind kind,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator,
-      llvm::function_ref<TypeMatchResult()> formUnsolvedResult);
+      llvm::function_ref<SolutionKind()> formUnsolvedResult);
 
   /// Matches two function result types for a function application. This is
   /// usually a bind, but also handles e.g IUO unwraps.
-  TypeMatchResult matchFunctionResultTypes(Type expectedResult, Type fnResult,
-                                           TypeMatchOptions flags,
-                                           ConstraintLocatorBuilder locator);
+  SolutionKind matchFunctionResultTypes(Type expectedResult, Type fnResult,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator);
 
   enum ImpliedResultConversionKind : unsigned {
     /// Usual subtyping rules apply.
@@ -3298,21 +3266,9 @@ public: // FIXME: public due to statics in CSSimplify.cpp
   /// the specific types being matched.
   ///
   /// \returns the result of attempting to solve this constraint.
-  TypeMatchResult matchTypes(Type type1, Type type2, ConstraintKind kind,
-                             TypeMatchOptions flags,
-                             ConstraintLocatorBuilder locator);
-
-  TypeMatchResult getTypeMatchSuccess() {
-    return TypeMatchResult::success();
-  }
-
-  TypeMatchResult getTypeMatchFailure(ConstraintLocatorBuilder locator) {
-    return TypeMatchResult::failure();
-  }
-
-  TypeMatchResult getTypeMatchAmbiguous() {
-    return TypeMatchResult::ambiguous();
-  }
+  SolutionKind matchTypes(Type type1, Type type2, ConstraintKind kind,
+                          TypeMatchOptions flags,
+                          ConstraintLocatorBuilder locator);
 
 public:
   // Build a disjunction that attempts both T? and T for a particular
@@ -3763,7 +3719,7 @@ public:
   ///
   /// \returns \c None when the result builder cannot be applied at all,
   /// otherwise the result of applying the result builder.
-  std::optional<TypeMatchResult>
+  std::optional<SolutionKind>
   matchResultBuilder(AnyFunctionRef fn, Type builderType, Type bodyResultType,
                      ConstraintKind bodyResultConstraintKind,
                      Type contextualType, ConstraintLocatorBuilder locator);
@@ -3778,7 +3734,7 @@ public:
 
   /// Matches a wrapped or projected value parameter type to its backing
   /// property wrapper type by applying the property wrapper.
-  TypeMatchResult applyPropertyWrapperToParameter(
+  SolutionKind applyPropertyWrapperToParameter(
       Type wrapperType,
       Type paramType,
       ParamDecl *param,

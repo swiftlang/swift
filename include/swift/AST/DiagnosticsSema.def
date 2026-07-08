@@ -1334,6 +1334,10 @@ GROUPED_WARNING(cannot_find_module_version,ModuleVersionMissing,none,
         "cannot find user version number for%select{| Clang}1 module '%0';"
         " version number ignored", (StringRef, bool))
 
+NOTE(cannot_find_module_version_use_underlying,none,
+     "the underlying Clang module '%0' has version %1; use "
+     "'_underlyingVersion' to check it", (StringRef, llvm::VersionTuple))
+
 GROUPED_WARNING(canimport_missing_module,CanImportMissingModule,none,
         "cannot find module '%0' for canImport check; the directive will"
         " evaluate to false", (StringRef))
@@ -1797,6 +1801,13 @@ ERROR(too_many_dynamic_member_lookups,none,
       "dynamic member lookups",
       (DeclNameRef))
 
+ERROR(keypath_dynamic_member_lookup_expects_class_base, none,
+      "referencing %kind1 on %0 requires it to be a class type",
+      (Type, ValueDecl *))
+NOTE(keypath_dynamic_member_lookup_expects_class_base_note, none,
+     "'subscript(dynamicMember:)' declared in %0 uses 'ReferenceWritableKeyPath'"
+     " which only supports classes", (Type))
+
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
       (Type))
@@ -2149,6 +2160,11 @@ NOTE(objc_implementation_init_turn_required_to_convenience, none,
      "initializer",
      ())
 
+WARNING(objc_implementation_missing_inherited_init,none,
+        "'@objc @implementation' extension does not implement %kind0 inherited "
+        "from its superclass; invoking it from Objective-C will trap at runtime",
+        (const ValueDecl *))
+
 // Fallback diagnostic; super-general by nature.
 ERROR(objc_implementation_member_requires_vtable, none,
       "%kind0 is not valid in an '@objc @implementation' extension because it "
@@ -2214,6 +2230,12 @@ ERROR(attr_com_protocol_unexpected_arg, none,
       "'@com' on a protocol must only have 'interface:'; '%0' is not allowed", (StringRef))
 ERROR(attr_com_class_unexpected_iid, none,
       "'@com' on a class must not have 'interface:'; use 'implementation:' instead", ())
+ERROR(attr_com_explicit_iswiftobject, none,
+      "'ISwiftObject' conformance is compiler-managed and cannot be declared explicitly", ())
+NOTE(attr_com_iswiftobject_implied, none,
+     "'@com' automatically provides 'ISwiftObject' conformance", ())
+ERROR(com_module_missing_type, none,
+      "type '%0' not found in the 'COM' module", (StringRef))
 
 // @_staticExclusiveOnly
 ERROR(attr_static_exclusive_only_disabled,none,
@@ -6916,8 +6938,6 @@ ERROR(objc_setter_for_nonobjc_property,none,
 ERROR(objc_setter_for_nonobjc_subscript,none,
       "'@objc' setter for non-'@objc' subscript", ())
 
-ERROR(objc_enum_generic,none,
-      "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,none,
       "'@objc' %kindonly0 must have a simple name", (const Decl *))
 ERROR(objc_name_subscript,none,
@@ -7046,6 +7066,9 @@ ERROR(objc_borrow_mutate_accessor, none,
 ERROR(objc_invalid_on_func_variadic,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because it has a variadic "
       "parameter", (const AbstractFunctionDecl*, unsigned))
+ERROR(objc_enum_generic,none,
+      "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because it is generic",
+      (const Decl *, unsigned))
 ERROR(objc_invalid_on_func_inout,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because inout "
       "parameters cannot be represented in %" FOREIGN_LANG_SELECT "2",
@@ -7793,11 +7816,11 @@ GROUPED_WARNING(variable_never_used, NoUsage, NoUsage,
 GROUPED_WARNING(immutable_value_never_used_but_assigned, NoUsage, NoUsage,
         "immutable value %0 was never used; consider removing it",
         (Identifier))
-WARNING(variable_never_mutated, none,
+GROUPED_WARNING(variable_never_mutated, VariableNeverMutated, none,
         "variable %0 was never mutated; "
         "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
         (Identifier, bool))
-WARNING(variable_tuple_elt_never_mutated, none,
+GROUPED_WARNING(variable_tuple_elt_never_mutated, VariableNeverMutated, none,
         "variable %0 was never mutated; "
         "consider changing the pattern to 'case (..., let %1, ...)'",
         (Identifier, StringRef))
@@ -9028,6 +9051,11 @@ GROUPED_WARNING(dynamic_cast_involving_protocol_in_embedded_swift,
                 EmbeddedRestrictions, none,
                 "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
                 (const Decl *))
+
+GROUPED_WARNING(open_existential_in_embedded_swift,
+                EmbeddedRestrictions, none,
+                "cannot open existential type %0 in Embedded Swift",
+                (Type))
 
 GROUPED_ERROR(self_referential_superclass_in_embedded_swift,
               EmbeddedRestrictions, none,

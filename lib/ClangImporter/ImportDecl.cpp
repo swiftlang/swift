@@ -4339,6 +4339,14 @@ namespace {
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
+      // If we ignored an invalid custom Swift name (e.g. a rename to
+      // `deinit`), diagnose that now.
+      if (importedName.hasInvalidCustomName() && isActiveSwiftVersion()) {
+        if (auto customName = NameImporter::findCustomName(decl, getVersion()))
+          result->diagnose(diag::invalid_swift_name_for_decl, *customName,
+                           result);
+      }
+
       return result;
     }
 
@@ -4635,29 +4643,42 @@ namespace {
         if (result)
           return result;
       }
-      auto method = VisitFunctionDecl(decl);
 
-      // For regular methods (not operators, constructors, etc.), if the return
-      // type is an uninstantiated templated class, instantiate it now and
-      // update the imported name if it changed. The safety detection logic
-      // (IsSafeUseOfCxxDecl) relies on the returned class being instantiated,
-      // and may affect the imported name (e.g., adding a "__*Unsafe" prefix).
-      // We defer this instantiation to after importing the method so that we
-      // don't eagerly instantiate templates for methods we may not even end up
-      // importing. The "__*Unsafe" lookup fallback in ClangRecordMemberLookup
-      // will also find methods whose imported name changes due to safety after
-      // instantiation.
+      // First, import this CXXMethodDecl as we would any regular C/C++ function
+      auto *method = cast_or_null<ValueDecl>(VisitFunctionDecl(decl));
+      if (!method)
+        return nullptr;
+
+      // VisitFunctionDecl() might return a FuncDecl that was already
+      // fully-imported from a CXXMethodDecl due to circular importing.
+      // In that case, the fully-imported result should already be cached.
+      if (auto known =
+              Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
+          known != Impl.ImportedDecls.end()) {
+        ASSERT(known->second == method && "returning different");
+        // Skip VisitCXXMethodDecl post-processing (which is not idempotent)
+        // and return the already-cached result.
+        return known->second;
+      }
+
+      // Post-VisitFunctionDecl(), perform special handling that is specific
+      // to importing CXXMethodDecls...
+
+      // For regular methods (not operators, ctors, dtors, conversions),
+      // instantiate the return-type template (if needed) and apply the
+      // __Unsafe-method rename here. This is done post-import so we don't
+      // eagerly instantiate templates for methods we may not import.
       //
-      // This post-import behavior is gated on ImportCxxMembersLazily, because
-      // without that feature, IsSafeUseOfCxxDecl relies on ClangImporter
-      // (over-)eagerly instantiating typedef members.
-      if (method && Impl.SwiftContext.LangOpts.hasFeature(
-                        Feature::ImportCxxMembersLazily)) {
-        if (!isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
-                 clang::CXXConversionDecl>(decl) &&
-            decl->getOverloadedOperator() ==
-                clang::OverloadedOperatorKind::OO_None) {
+      // Instantiation is gated on ImportCxxMembersLazily; without that
+      // feature ClangImporter eagerly instantiates typedef members, so the
+      // return type is usually already instantiated by the time we get here.
+      if (!isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
+               clang::CXXConversionDecl>(decl) &&
+          decl->getOverloadedOperator() ==
+              clang::OverloadedOperatorKind::OO_None) {
 
+        if (Impl.SwiftContext.LangOpts.hasFeature(
+                Feature::ImportCxxMembersLazily)) {
           using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
 
           auto retTy = desugarIfElaborated(decl->getReturnType());
@@ -4672,35 +4693,39 @@ namespace {
                 clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
                 /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
           }
-          // Re-import the name now that the return type template is (or was
-          // already) instantiated; safety may have changed, affecting the
-          // base name. Clear the cached name first so importFullName
-          // recomputes it.
-          Impl.getNameImporter().clearCachedName(decl, Impl.CurrentVersion);
-          if (auto updatedName =
-                  Impl.importFullName(decl, Impl.CurrentVersion)) {
-            auto *valueDecl = cast<ValueDecl>(method);
-            if (valueDecl->getName() != updatedName.getDeclName())
-              valueDecl->setName(updatedName.getDeclName());
-          }
+        }
+
+        auto importedName = Impl.importFullName(decl, Impl.CurrentVersion);
+        if (importedName && !importedName.hasCustomName() &&
+            !evaluateOrDefault(Impl.SwiftContext.evaluator,
+                               IsSafeUseOfCxxDecl({decl, Impl.SwiftContext}),
+                               {})) {
+          DeclName currentName = method->getName();
+          Identifier unsafeId = Impl.SwiftContext.getIdentifier(
+              ("__" + currentName.getBaseIdentifier().str() + "Unsafe").str());
+          DeclName unsafeName = currentName.isCompoundName()
+                                    ? DeclName(Impl.SwiftContext, unsafeId,
+                                               currentName.getArgumentNames())
+                                    : DeclName(unsafeId);
+          if (currentName != unsafeName)
+            method->setName(unsafeName);
         }
       }
 
       // Do not expose constructors of abstract C++ classes.
       if (auto recordDecl =
               dyn_cast<clang::CXXRecordDecl>(decl->getDeclContext())) {
-        if (isa<clang::CXXConstructorDecl>(decl) && recordDecl->isAbstract() &&
-            isa_and_nonnull<ValueDecl>(method)) {
+        if (isa<clang::CXXConstructorDecl>(decl) && recordDecl->isAbstract()) {
           Impl.markUnavailable(
-              cast<ValueDecl>(method),
+              method,
               "constructors of abstract C++ classes are unavailable in Swift");
           return method;
         }
       }
 
       if (decl->isVirtual()) {
-        if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
-          if (isa_and_nonnull<StructDecl>(method->getDeclContext())) {
+        if (auto funcDecl = dyn_cast<FuncDecl>(method)) {
+          if (isa<StructDecl>(method->getDeclContext())) {
             // If this is a method of a Swift struct, any possible override of
             // this method would get sliced away, and an invocation would get
             // dispatched statically. This is fine because it matches the C++
@@ -4712,7 +4737,7 @@ namespace {
                                    "virtual function is not available in Swift "
                                    "because it is pure");
             }
-          } else if (isa_and_nonnull<ClassDecl>(funcDecl->getDeclContext())) {
+          } else if (isa<ClassDecl>(funcDecl->getDeclContext())) {
             // This is a foreign reference type. Since `class T` on the Swift
             // side is mapped from `T*` on the C++ side, an invocation of a
             // virtual method `t->method()` should get dispatched dynamically.
@@ -4747,7 +4772,7 @@ namespace {
 
       if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
           hasComputedPropertyAttr(decl)) {
-        if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
+        if (auto funcDecl = dyn_cast<FuncDecl>(method)) {
           auto parent = funcDecl->getParent()->getSelfNominalTypeDecl();
           CXXMethodBridging bridgingInfo(decl);
           if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
@@ -8005,7 +8030,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) const {
   SmallVector<ValueDecl *, 4> results;
   superDecl->lookupQualified(
       superDecl, DeclNameRef(decl->getName()), decl->getLoc(),
-      NL_QualifiedDefault | NL_IgnoreMissingImports, results);
+      {NLFlags::QualifiedDefault, NLFlags::IgnoreMissingImports}, results);
   for (auto member : results) {
     if (member->getKind() != decl->getKind() ||
         member->isInstanceMember() != decl->isInstanceMember() ||
@@ -8077,7 +8102,7 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   SmallVector<ValueDecl *, 2> lookup;
   subscript->getModuleContext()->lookupQualified(
       superDecl, DeclNameRef(subscript->getName()),
-      subscript->getLoc(), NL_QualifiedDefault, lookup);
+      subscript->getLoc(), NLFlags::QualifiedDefault, lookup);
 
   for (auto result : lookup) {
     auto parentSub = dyn_cast<SubscriptDecl>(result);
@@ -8774,8 +8799,19 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
     if (!afd)
       continue;
 
-    // Only add the attribute to functions that don't already have availability
-    if (afd->getAttrs().hasAttribute<AvailableAttr>())
+    // Skip if the method already carries a rename pointing at its async
+    // alternative (e.g. one synthesized during import); a plain imported OS
+    // availability attribute must not suppress it, or an async
+    // '@objc @implementation' member won't match its completion-handler
+    // requirement and no thunk will be generated.
+    //
+    // Check the attribute syntactically: resolving getAsyncAlternative() here
+    // does name lookup, which re-enters member loading while this nominal is
+    // still importing and corrupts its member lookup table.
+    if (llvm::any_of(afd->getAttrs().getAttributes<AvailableAttr>(),
+                     [](const AvailableAttr *attr) {
+                       return !attr->getRename().empty();
+                     }))
       continue;
 
     llvm::VersionTuple NoVersion;
@@ -10156,10 +10192,10 @@ static void finishTypeWitnesses(NormalProtocolConformance *conformance,
     bool satisfied = false;
 
     SmallVector<ValueDecl *, 4> lookupResults;
-    NLOptions options = (NL_QualifiedDefault |
-                         NL_RemoveAssociatedTypes |
-                         NL_OnlyTypes |
-                         NL_ProtocolMembers);
+    NLOptions options = {NLFlags::QualifiedDefault,
+                         NLFlags::RemoveAssociatedTypes,
+                         NLFlags::OnlyTypes,
+                         NLFlags::ProtocolMembers};
 
     dc->lookupQualified(nominal, DeclNameRef(assocType->getName()),
                         nominal->getLoc(), options,

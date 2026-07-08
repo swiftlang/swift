@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -parse-as-library -Osize -emit-ir  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
-// REQUIRES: swift_in_compiler
 
 // This is an end-to-end test to ensure that the optimizer generates
 // optimal code for UnsafeBufferPointer.

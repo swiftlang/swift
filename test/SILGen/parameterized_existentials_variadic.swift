@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name parameterized -target %target-swift-5.9-abi-triple %s
 // RUN: %target-swift-emit-silgen -module-name parameterized -target %target-swift-5.9-abi-triple %s | %FileCheck %s
 
 protocol P<A> {

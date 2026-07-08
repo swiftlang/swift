@@ -38,10 +38,21 @@ public let benchmarks: [BenchmarkInfo] = [
   CopyAllUTF16CodeUnits(workload: longASCIIWorkload, count: 7).info,
   CopyAllUTF16CodeUnits(workload: longMixedWorkload, count: 1).info,
 
+  CopyUTF16ToArray(workload: asciiWorkload, count: 500).info,
+  CopyUTF16ToArray(workload: cjkWorkload, count: 500).info,
+  CopyUTF16SubstringToArray(workload: asciiWorkload, count: 500).info,
+  CopyUTF16SubstringToArray(workload: cjkWorkload, count: 500).info,
+
   MutatedUTF16ToIdx(workload: asciiWorkload, count: 50).info,
   MutatedUTF16ToIdx(workload: mixedWorkload, count: 50).info,
+  MutatedUTF16ToIdx(workload: longMixedWorkload, count: 10).info,
+  MutatedUTF16ToIdx(workload: longCyrillicWorkload, count: 10).info,
+  MutatedUTF16ToIdx(workload: longCJKWorkload, count: 10).info,
   MutatedIdxToUTF16(workload: asciiWorkload, count: 50).info,
   MutatedIdxToUTF16(workload: mixedWorkload, count: 50).info,
+  MutatedIdxToUTF16(workload: longMixedWorkload, count: 10).info,
+  MutatedIdxToUTF16(workload: longCyrillicWorkload, count: 10).info,
+  MutatedIdxToUTF16(workload: longCJKWorkload, count: 10).info,
 ]
 
 extension String {
@@ -448,6 +459,67 @@ class CopyAllUTF16CodeUnits : CopyUTF16CodeUnits {
   override func setUp() {
     super.setUp()
     inputIndices = Array(repeating: 0 ..< inputString.utf16.count, count: count)
+  }
+}
+
+// Covers `String.UTF16View._copyContents`
+class CopyUTF16ToArray: BenchmarkBase {
+  let count: Int
+
+  init(workload: Workload, count: Int) {
+    self.count = count
+    super.init(name: "Breadcrumbs.CopyUTF16ToArray", workload: workload)
+  }
+
+  init(name: String, workload: Workload, count: Int) {
+    self.count = count
+    super.init(name: name, workload: workload)
+  }
+
+  @inline(never)
+  override func run(iterations: Int) {
+    let expected = inputString.utf16.count
+    for _ in 0 ..< iterations {
+      for _ in 0 ..< count {
+        let copy = Array(inputString.utf16)
+        check(copy.count == expected)
+        blackHole(copy)
+      }
+    }
+  }
+}
+
+// Covers `Substring.UTF16View._copyContents`
+class CopyUTF16SubstringToArray: CopyUTF16ToArray {
+  var inputSubstring: Substring = ""
+
+  override init(workload: Workload, count: Int) {
+    super.init(
+      name: "Breadcrumbs.CopyUTF16ToArray.Sub",
+      workload: workload,
+      count: count)
+  }
+
+  override func setUp() {
+    super.setUp()
+    inputSubstring = inputString.dropFirst(5).dropLast(5)
+  }
+
+  override func tearDown() {
+    super.tearDown()
+    inputSubstring = ""
+  }
+
+  @inline(never)
+  override func run(iterations: Int) {
+    let expected = inputSubstring.utf16.count
+    for _ in 0 ..< iterations {
+      for _ in 0 ..< count {
+        let copy = Array(inputSubstring.utf16)
+        check(copy.count == expected)
+        blackHole(copy)
+      }
+    }
   }
 }
 

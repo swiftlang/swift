@@ -2365,6 +2365,17 @@ namespace {
             llvm_unreachable("unknown key path class!");
           }
         } else {
+          if (keyPathTy->is<ArchetypeType>()) {
+            keyPathTy = keyPathTy->getSuperclass();
+            ASSERT(keyPathTy);
+          }
+
+          // Situations like `any KeyPath<...> & Sendable`.
+          if (keyPathTy->isExistentialType()) {
+            keyPathTy = keyPathTy->getSuperclass();
+            ASSERT(keyPathTy);
+          }
+
           auto keyPathBGT = keyPathTy->castTo<BoundGenericType>();
           baseTy = keyPathBGT->getGenericArgs()[0];
 
@@ -8481,6 +8492,16 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           OpenExistentialExpr(existential, opaqueValue, callSubExpr,
                               resultTy);
         cs.setType(replacement, resultTy);
+
+        // Embedded Swift prohibits opened existentials.
+        if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+                dc, apply->getLoc())) {
+          ctx.Diags.diagnose(apply->getLoc(),
+                             diag::open_existential_in_embedded_swift,
+                             existentialInstanceTy)
+            .limitBehavior(*behavior);
+        }
+
         return replacement;
       }
       

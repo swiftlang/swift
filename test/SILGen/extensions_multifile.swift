@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -primary-file %s %S/Inputs/struct_with_initializer.swift -module-name extensions_multifile
 // RUN: %target-swift-emit-silgen -primary-file %s %S/Inputs/struct_with_initializer.swift -module-name extensions_multifile | %FileCheck %s --check-prefix=FRAGILE --check-prefix=CHECK
 // RUN: %target-swift-emit-silgen -primary-file %s %S/Inputs/struct_with_initializer.swift -module-name extensions_multifile -enable-library-evolution | %FileCheck %s --check-prefix=RESILIENT --check-prefix=CHECK
 

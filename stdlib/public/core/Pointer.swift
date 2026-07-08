@@ -136,8 +136,7 @@ extension _Pointer /*: Equatable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
   ///            otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func == <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -150,8 +149,7 @@ extension _Pointer /*: Equatable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` and `rhs` reference different memory addresses;
   ///            otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func != <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_ne_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -181,8 +179,7 @@ extension _Pointer /*: Comparable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address
   ///            earlier than `rhs`; otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func < <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -195,8 +192,7 @@ extension _Pointer /*: Comparable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address
   ///            earlier than or the same as `rhs`; otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func <= <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_ule_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -209,8 +205,7 @@ extension _Pointer /*: Comparable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address
   ///            later than `rhs`; otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func > <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_ugt_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -223,8 +218,7 @@ extension _Pointer /*: Comparable */ {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address
   ///            later than or the same as `rhs`; otherwise, `false`.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func >= <Other: _Pointer>(lhs: Self, rhs: Other) -> Bool {
     return Bool(Builtin.cmp_uge_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -311,7 +305,7 @@ extension _Pointer /*: Strideable*/ {
   /// - Parameter i: The index of the element to project.
   /// - Returns: A pointer to the element at position `i`.
   @_transparent
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func project(_ i: Int) -> Self {
 #if $BuiltinGepProjection
     return Self(Builtin.gepProjection_Word(

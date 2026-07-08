@@ -142,9 +142,7 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
     llvm_unreachable("constructor cannot have erased isolation");
 
   case ActorIsolation::GlobalActor:
-    return ctor->getASTContext().LangOpts.hasFeature(
-               Feature::FlowIsolationGlobalActor) &&
-           ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    return ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
                StrictConcurrency::Complete &&
            !ctor->hasAsync();
   case ActorIsolation::ActorInstance:
@@ -317,7 +315,7 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
   SmallVector<ValueDecl *, 4> decls;
   nominal->lookupQualified(
       nominal, DeclNameRef(ctx.Id_shared),
-      nominal->getLoc(), NL_QualifiedDefault, decls);
+      nominal->getLoc(), NLFlags::QualifiedDefault, decls);
   for (auto decl : decls) {
     auto var = dyn_cast<VarDecl>(decl);
     if (!var)
@@ -1701,41 +1699,6 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
       return;
     }
   }
-}
-
-bool swift::shouldIgnoreDeprecationOfConcurrencyDecl(const Decl *decl,
-                                                     DeclContext *declContext) {
-  auto &ctx = decl->getASTContext();
-  auto concurrencyModule = ctx.getLoadedModule(ctx.Id_Concurrency);
-
-  // Only suppress these diagnostics in the implementation of _Concurrency.
-  if (declContext->getParentModule() != concurrencyModule)
-    return false;
-
-  // Only suppress deprecation diagnostics for decls defined in _Concurrency.
-  if (decl->getDeclContext()->getParentModule() != concurrencyModule)
-    return false;
-
-  auto *legacyJobDecl = ctx.getJobDecl();
-  auto *unownedJobDecl = ctx.getUnownedJobDecl();
-
-  if (decl == legacyJobDecl)
-    return true;
-
-  if (auto *funcDecl = dyn_cast<FuncDecl>(decl)) {
-    auto enqueueDeclName =
-        DeclName(ctx, DeclBaseName(ctx.Id_enqueue), {Identifier()});
-
-    if (funcDecl->getName() == enqueueDeclName &&
-        funcDecl->getParameters()->size() == 1) {
-      auto paramTy = funcDecl->getParameters()->front()->getInterfaceType();
-      if (paramTy->isEqual(legacyJobDecl->getDeclaredInterfaceType()) ||
-          paramTy->isEqual(unownedJobDecl->getDeclaredInterfaceType()))
-        return true;
-    }
-  }
-
-  return false;
 }
 
 /// Determine whether this is the main actor type.
@@ -6275,6 +6238,11 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       if (getIsolationFromAttributes(value))
         return {};
 
+      // An overriding declaration inherits the isolation of the declaration
+      // it overrides, inferring MainActor would break overrides of nonisolated.
+      if (value->getOverriddenDeclOrSuperDeinit())
+        return {};
+
       if (auto *nominal = dyn_cast<NominalTypeDecl>(value)) {
         // Actors cannot infer isolation.
         if (nominal->isAnyActor())
@@ -7650,13 +7618,23 @@ bool swift::checkSendableConformance(
       conformanceDC->getOutermostParentSourceFile() !=
       nominal->getOutermostParentSourceFile()) {
     if (!(nominal->hasClangNode() && wasImplied)) {
-      conformanceDecl
-          ->diagnose(diag::concurrent_value_outside_source_file, nominal)
-          .limitBehaviorWithPreconcurrency(
-              behavior, impliedByPreconcurrencyProtocol, LanguageMode::v6);
+      InFlightDiagnostic outsideSourceFileDiag = conformanceDecl
+          ->diagnose(diag::concurrent_value_outside_source_file, nominal);
 
-      if (behavior == DiagnosticBehavior::Unspecified)
-        return true;
+      // TODO: Remove this staging (and suppress the conformance) once people
+      // have had a chance to adopt...
+      if (isGlobalActorIsolated) {
+        // This branch was being skipped for global actor isolated tests
+        // until 6.4 so we can't emit this as an error for isolated decls.
+        outsideSourceFileDiag.limitBehaviorWithPreconcurrency(
+            behavior, impliedByPreconcurrencyProtocol, LanguageMode::future);
+      } else {
+        outsideSourceFileDiag.limitBehaviorWithPreconcurrency(
+            behavior, impliedByPreconcurrencyProtocol, LanguageMode::v6);
+
+        if (behavior == DiagnosticBehavior::Unspecified)
+          return true;
+      }
     }
   }
 
@@ -8870,13 +8848,10 @@ ActorReferenceResult ActorReferenceResult::Builder::build() {
   // type is Sendable. Note that if the init is a nonisolated actor init,
   // Sendable checking is already performed on arguments at the call-site.
   if (auto *init = dyn_cast<ConstructorDecl>(fromDC)) {
-    // When the FlowIsolationGlobalActor feature is enabled under complete
-    // strict concurrency, we allow users to initialize global actor
-    // non-Sendable types in initializers more aggressively by deferring the
-    // check to the SIL-level flow-isolation pass.
-    if (fromDC->getASTContext().LangOpts.hasFeature(
-            Feature::FlowIsolationGlobalActor) &&
-        fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    // Under complete strict concurrency, we allow users to initialize global
+    // actor non-Sendable types in initializers more aggressively by deferring
+    // the check to the SIL-level flow-isolation pass.
+    if (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete &&
         referencedActor && referencedActor->isSelf() &&
         checkedByFlowIsolation(fromDC, *referencedActor, decl, declRefLoc,

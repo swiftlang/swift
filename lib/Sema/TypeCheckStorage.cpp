@@ -3445,10 +3445,10 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
     auto dc = var->getDeclContext();
     if (dc->isTypeContext()) {
       dc->lookupQualified(dc->getSelfNominalTypeDecl(), projectionName,
-                          var->getLoc(), NL_QualifiedDefault, declsFound);
+                          var->getLoc(), NLFlags::QualifiedDefault, declsFound);
     } else if (dc->isModuleScopeContext()) {
       dc->lookupQualified(dc->getParentModule(), projectionName,
-                          var->getLoc(), NL_QualifiedDefault, declsFound);
+                          var->getLoc(), NLFlags::QualifiedDefault, declsFound);
     } else {
       llvm_unreachable("Property wrappers don't work in local contexts");
     }
@@ -3752,6 +3752,9 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
     // The backing storage is 'private'.
     backingVar->overwriteAccess(AccessLevel::Private);
     backingVar->overwriteSetterAccess(AccessLevel::Private);
+
+    // The backing storage must be as available as the wrapped property.
+    AvailabilityInference::applyInferredAvailableAttrs(backingVar, {var});
 
     addMemberToContextIfNeeded(backingVar, dc, var);
   }

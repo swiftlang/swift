@@ -197,6 +197,7 @@ public:
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH,             ///< Emit PCH of imported bridging header
 
+    EmitSILGenOSSA, ///< SIL after SILGen's cleanup passes (complete OSSA).
     EmitSILGen, ///< Emit raw SIL
     EmitSIL,    ///< Emit canonical SIL
 

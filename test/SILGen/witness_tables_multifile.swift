@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -primary-file %s %S/Inputs/witness_tables_multifile_2.swift
 // RUN: %target-swift-emit-silgen -primary-file %s %S/Inputs/witness_tables_multifile_2.swift | %FileCheck %s -allow-deprecated-dag-overlap -check-prefix=CHECK-FIRST-FILE
 // RUN: %target-swift-emit-silgen %s -primary-file %S/Inputs/witness_tables_multifile_2.swift | %FileCheck %S/Inputs/witness_tables_multifile_2.swift -check-prefix=CHECK-SECOND-FILE
 

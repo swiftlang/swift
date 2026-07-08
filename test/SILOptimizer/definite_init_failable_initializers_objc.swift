@@ -5,7 +5,6 @@
 // long enough in the same form to be worth rewriting CHECK lines.
 
 // REQUIRES: objc_interop
-// REQUIRES: swift_in_compiler
 
 import ObjectiveC
 

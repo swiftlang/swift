@@ -25,7 +25,7 @@ internal func unsafeBitCast<T: ~Escapable & ~Copyable, U>(
 /// This mimics the stdlib definition. It is public for use with import macros.
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @lifetime(borrow source)
 public func _cxxOverrideLifetime<
@@ -45,7 +45,7 @@ public func _cxxOverrideLifetime<
 /// This mimics the stdlib definition. It is public for use with import macros.
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @lifetime(copy source)
 public func _cxxOverrideLifetime<
@@ -74,14 +74,14 @@ public protocol CxxSpan<Element> {
 
 extension CxxSpan where Element: ~Copyable {
   /// Creates a C++ span from a Swift UnsafeBufferPointer
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(_ unsafeBufferPointer: UnsafeBufferPointer<Element>) {
     unsafe precondition(unsafeBufferPointer.baseAddress != nil, 
                   "UnsafeBufferPointer should not point to nil")
     unsafe self.init(unsafeBufferPointer.baseAddress!, Size(unsafeBufferPointer.count))
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
     unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")
@@ -89,7 +89,7 @@ extension CxxSpan where Element: ~Copyable {
   }
 
   @available(SwiftCompatibilitySpan 5.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   public init(_ span: Span<Element>) {
     let p = span.withUnsafeBufferPointer {
@@ -104,7 +104,7 @@ extension CxxSpan where Element: ~Copyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 extension Span where Element: ~Copyable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   @_unsafeNonescapableResult
   @lifetime(borrow span)
@@ -120,7 +120,7 @@ extension Span where Element: ~Copyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 extension MutableSpan where Element: ~Copyable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   @_unsafeNonescapableResult
   @lifetime(borrow span)
@@ -147,7 +147,7 @@ public protocol CxxMutableSpan<Element> {
 
 extension CxxMutableSpan where Element: ~Copyable {
   /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
     unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")
@@ -155,7 +155,7 @@ extension CxxMutableSpan where Element: ~Copyable {
   }
 
   @available(SwiftCompatibilitySpan 5.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   public init(_ span: consuming MutableSpan<Element>) {
     let p = span.withUnsafeMutableBufferPointer {

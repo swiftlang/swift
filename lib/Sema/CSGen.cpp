@@ -2435,9 +2435,14 @@ namespace {
         auto enumPattern = cast<EnumElementPattern>(pattern);
 
         // Create a type variable to represent the pattern.
+        //
+        // This type is contextually dependent in cases like `.a` where
+        // `patternType` represents an implicit base type of `.a` and so
+        // should be allowed to bind to a hole just like regular leading-dot
+        // syntax.
         Type patternType =
             CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                  TVO_CanBindToNoEscape);
+                                  TVO_CanBindToNoEscape | TVO_CanBindToHole);
 
         // Form the member constraint for a reference to a member of this
         // type.
@@ -3119,9 +3124,16 @@ namespace {
       // like this to be the smallest possible nesting level of
       // optional types, e.g. T? over T??; otherwise we don't really
       // have a preference.
-      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                           TVO_PrefersSubtypeBinding |
-                                           TVO_CanBindToNoEscape);
+      unsigned options = TVO_PrefersSubtypeBinding | TVO_CanBindToNoEscape;
+
+      // In completion mode we don't care about fixes, let's allow
+      // the result of an optional chain to be bound to a hole to
+      // for a solution for situations like `a?<#token#>.b`.
+      if (CS.isForCodeCompletion())
+        options |= TVO_CanBindToHole;
+
+      auto valueTy =
+          CS.createTypeVariable(CS.getConstraintLocator(expr), options);
 
       Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
       if (!optTy)
@@ -4238,6 +4250,13 @@ bool ConstraintSystem::generateConstraints(
           target.getPatternBindingOfUninitializedVar(),
           target.getIndexOfUninitializedVar());
 
+      // If `typeCheckPattern` produced a type with errors, let's turn pattern
+      // type into a hole to avoid a recording fallback fix.
+      if (target.getTypeOfUninitializedVar()->hasError()) {
+        increaseScore(SK_Hole, locator);
+        recordTypeVariablesAsHoles(patternType);
+      }
+
       return !patternType;
     }
   }
@@ -4370,7 +4389,7 @@ void ConstraintSystem::removePropertyWrapper(Expr *anchor) {
   }
 }
 
-ConstraintSystem::TypeMatchResult
+ConstraintSystem::SolutionKind
 ConstraintSystem::applyPropertyWrapperToParameter(
     Type wrapperType,
     Type paramType,
@@ -4382,16 +4401,16 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     PreparedOverloadBuilder *preparedOverload) {
   Expr *anchor = getAsExpr(calleeLocator->getAnchor());
 
-  auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> TypeMatchResult {
+  auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> SolutionKind {
     if (!shouldAttemptFixes())
-      return getTypeMatchFailure(locator);
+      return SolutionKind::Error;
 
     recordAnyTypeVarAsPotentialHole(paramType);
 
     if (recordFix(fix, /*impact=*/FixImpact::Mismatch, preparedOverload))
-      return getTypeMatchFailure(locator);
+      return SolutionKind::Error;
 
-    return getTypeMatchSuccess();
+    return SolutionKind::Solved;
   };
 
   // Incorrect use of projected value argument
@@ -4444,10 +4463,10 @@ ConstraintSystem::applyPropertyWrapperToParameter(
                          { wrapperType, PropertyWrapperInitKind::WrappedValue },
                          preparedOverload);
   } else {
-    return getTypeMatchFailure(locator);
+    return SolutionKind::Error;
   }
 
-  return getTypeMatchSuccess();
+  return SolutionKind::Solved;
 }
 
 struct ResolvedMemberResult::Implementation {

@@ -10,7 +10,6 @@
 // RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -emit-sil -O %t/main.swift -o %t/Main-res.sil
 // RUN: %FileCheck %s --check-prefixes=CHECK-OPAQUE < %t/Main-res.sil
 
-// REQUIRES: swift_in_compiler
 
 //--- main.swift
 

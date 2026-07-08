@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -primary-file %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // Test to ensure that mandatory inlining of generics with a dynamic Self
 // substitution works correctly with thick_metatype instructions and SIL

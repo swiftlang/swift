@@ -3,7 +3,6 @@
 // RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -Xllvm -sil-print-types -emit-sil -verify -target %target-swift-5.7-abi-triple -I %t | %FileCheck %s --enable-var-scope --dump-input=fail
 // REQUIRES: concurrency
 // REQUIRES: distributed
-// REQUIRES: swift_in_compiler
 
 /// The convention in this test is that the Swift declaration comes before its FileCheck lines.
 

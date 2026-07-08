@@ -636,11 +636,6 @@ EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 
 /// Allow use of macros to derive various conformances
 EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
-  
-/// Defer checking of global-actor-isolated initializers (and the
-/// global-actor-isolated stored properties they access) from Sema to the
-/// SIL-level flow-isolation pass, allowing more programs to be accepted.
-EXPERIMENTAL_FEATURE(FlowIsolationGlobalActor, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

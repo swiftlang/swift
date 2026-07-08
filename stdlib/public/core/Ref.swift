@@ -21,7 +21,7 @@ public struct Ref<Value: ~Copyable>: Copyable, ~Escapable {
   /// creates a constant reference to that value preventing writes on the 
   /// original value while this reference is still active.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow value)
   @_transparent
   public init(_ value: borrowing Value) {
@@ -32,13 +32,13 @@ public struct Ref<Value: ~Copyable>: Copyable, ~Escapable {
   /// 'unsafeAddress' as the reference based on the borrowed lifetime of the
   /// given 'owner' argument.
   ///
-  /// - Parameter unsafeAddress: The address to use to reference an instance of
+  /// - Parameter pointer: The address to use to reference an instance of
   ///                            type `Value`.
   /// - Parameter owner: The owning instance that this `Ref` instance's
   ///                    lifetime is based on.
   @available(SwiftStdlib 6.4, *)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow owner)
   @_transparent
   public init<Owner: ~Copyable & ~Escapable>(
@@ -60,7 +60,7 @@ extension Ref where Value: ~Copyable {
   /// Dereferences the constant reference allowing for in-place reads to the
   /// underlying value.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var value: Value {
     borrow {

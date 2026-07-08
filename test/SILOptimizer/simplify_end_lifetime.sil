@@ -1,0 +1,276 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=end_lifetime | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class C {}
+class D: C {}
+
+protocol P : AnyObject {}
+extension C : P {}
+
+struct S {
+  var a: C
+  var b: C
+  var c: Int
+}
+
+enum E {
+  case A(Int)
+  case B(C)
+}
+
+sil @cl : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil [ossa] @upcast :
+// CHECK:       bb0(%0 : @owned $D):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'upcast'
+sil [ossa] @upcast : $@convention(thin) (@owned D) -> () {
+bb0(%0 : @owned $D):
+  %1 = upcast %0 to $C
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ref_cast :
+// CHECK:       bb0(%0 : @owned $C):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'unchecked_ref_cast'
+sil [ossa] @unchecked_ref_cast : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = unchecked_ref_cast %0 to $D
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @unconditional_checked_cast :
+// CHECK:       bb0(%0 : @owned $any P):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'unconditional_checked_cast'
+sil [ossa] @unconditional_checked_cast : $@convention(thin) (@owned any P) -> () {
+bb0(%0 : @owned $any P):
+  %1 = unconditional_checked_cast %0 to C
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @convert_function :
+// CHECK:       bb0(%0 : @owned $(C) -> ()):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'convert_function'
+sil [ossa] @convert_function : $@convention(thin) (@owned (C) -> ()) -> () {
+bb0(%0 : @owned $(C) -> ()):
+  %1 = convert_function %0 to $(D) -> ()
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @thin_to_thick_function :
+// CHECK:       bb0:
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'thin_to_thick_function'
+sil [ossa] @thin_to_thick_function : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @cl : $@convention(thin) () -> ()
+  %1 = thin_to_thick_function %0 to $@callee_guaranteed () -> (), forwarding: @owned
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @bridge_object_to_ref :
+// CHECK:       bb0(%0 : @owned $Builtin.BridgeObject):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'bridge_object_to_ref'
+sil [ossa] @bridge_object_to_ref : $@convention(thin) (@owned Builtin.BridgeObject) -> () {
+bb0(%0 : @owned $Builtin.BridgeObject):
+  %1 = bridge_object_to_ref %0 to $C
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// The second operand of ref_to_bridge_object is trivial; only the ref operand
+// gets an end_lifetime.
+// CHECK-LABEL: sil [ossa] @ref_to_bridge_object :
+// CHECK:       bb0(%0 : @owned $C, %1 : $Builtin.Word):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'ref_to_bridge_object'
+sil [ossa] @ref_to_bridge_object : $@convention(thin) (@owned C, Builtin.Word) -> () {
+bb0(%0 : @owned $C, %1 : $Builtin.Word):
+  %2 = ref_to_bridge_object %0, %1
+  end_lifetime %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @init_existential_ref :
+// CHECK:       bb0(%0 : @owned $C):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'init_existential_ref'
+sil [ossa] @init_existential_ref : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = init_existential_ref %0 : $C : $C, $P
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @open_existential_ref :
+// CHECK:       bb0(%0 : @owned $any P):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'open_existential_ref'
+sil [ossa] @open_existential_ref : $@convention(thin) (@owned any P) -> () {
+bb0(%0 : @owned $any P):
+  %1 = open_existential_ref %0 to $@opened("01234567-89ab-cdef-0123-000000000001", P) Self
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// to the two owned fields; no end_lifetime for the trivial Int.
+// CHECK-LABEL: sil [ossa] @struct_two_owned :
+// CHECK:       bb0(%0 : @owned $C, %1 : @owned $C, %2 : $Int):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    end_lifetime %1
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'struct_two_owned'
+sil [ossa] @struct_two_owned : $@convention(thin) (@owned C, @owned C, Int) -> () {
+bb0(%0 : @owned $C, %1 : @owned $C, %2 : $Int):
+  %3 = struct $S (%0, %1, %2)
+  end_lifetime %3
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_two_owned :
+// CHECK:       bb0(%0 : @owned $C, %1 : @owned $C, %2 : $Int):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    end_lifetime %1
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'tuple_two_owned'
+sil [ossa] @tuple_two_owned : $@convention(thin) (@owned C, @owned C, Int) -> () {
+bb0(%0 : @owned $C, %1 : @owned $C, %2 : $Int):
+  %3 = tuple (%0, %1, %2)
+  end_lifetime %3
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @enum_owned_payload :
+// CHECK:       bb0(%0 : @owned $C):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'enum_owned_payload'
+sil [ossa] @enum_owned_payload : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = enum $E, #E.B!enumelt, %0
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @enum_trivial_payload :
+// CHECK:       bb0(%0 : $Int):
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'enum_trivial_payload'
+sil [ossa] @enum_trivial_payload : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = enum $E, #E.A!enumelt, %0, forwarding: @owned
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence :
+// CHECK:       bb0(%0 : @owned $E, %1 : @owned $C):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'mark_dependence'
+sil [ossa] @mark_dependence : $@convention(thin) (@owned E, @owned C) -> @owned C {
+bb0(%0 : @owned $E, %1 : @owned $C):
+  %2 = mark_dependence %0 on %1
+  end_lifetime %2
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_end_lifetimes :
+// CHECK:       bb0(%0 : @owned $C, %1 : $Int):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    cond_br
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       } // end sil function 'multiple_end_lifetimes'
+sil [ossa] @multiple_end_lifetimes : $@convention(thin) (@owned C, Int) -> () {
+bb0(%0 : @owned $C, %1 : $Int):
+  %3 = tuple (%0, %1)
+  cond_br undef, bb1, bb2
+bb1:
+  end_lifetime %3
+  br bb3
+bb2:
+  end_lifetime %3
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @debug_user :
+// CHECK:       bb0(%0 : @owned $D):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'debug_user'
+sil [ossa] @debug_user : $@convention(thin) (@owned D) -> () {
+bb0(%0 : @owned $D):
+  %1 = upcast %0 to $C
+  debug_value %1, let, name "x"
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_additional_user :
+// CHECK:       bb0(%0 : @owned $D):
+// CHECK-NEXT:    %1 = upcast
+// CHECK:         end_lifetime %1
+// CHECK:       } // end sil function 'dont_remove_additional_user'
+sil [ossa] @dont_remove_additional_user : $@convention(thin) (@owned D) -> () {
+bb0(%0 : @owned $D):
+  %1 = upcast %0 to $C
+  %2 = begin_borrow %1
+  end_borrow %2
+  end_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @test_undef :
+// CHECK:       bb0:
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'test_undef'
+sil [ossa] @test_undef : $@convention(thin) () -> () {
+bb0:
+  end_lifetime undef : $C
+  %r = tuple ()
+  return %r
+}
+

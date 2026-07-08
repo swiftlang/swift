@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -parse-as-library -disable-availability-checking %s
 // RUN: %target-swift-emit-silgen -parse-as-library -disable-availability-checking %s | %FileCheck %s
 
 enum Color {

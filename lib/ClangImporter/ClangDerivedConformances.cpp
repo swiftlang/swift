@@ -1065,7 +1065,17 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
     // begin() and end() need to have the same return type
     return;
 
-  if (!iterTy->isPointerOrReferenceType()) {
+  if (iterTy->isPointerOrReferenceType()) {
+    auto pointeeQualType = iterTy->getPointeeType().getCanonicalType();
+    if (auto *pointeeRecord = pointeeQualType->getAsCXXRecordDecl()) {
+      auto info = evaluateOrDefault(
+          ctx.evaluator, ForeignReferenceTypeInfoRequest({pointeeRecord}), {});
+      // If begin()/end() return a pointer to an FRT, the pointer will be
+      // stripped to the bare FRT class in Swift, which is not a usable iterator
+      if (info.isReference())
+        return;
+    }
+  } else {
     // Check if begin() returns an iterator.
     auto *iterDecl = iterTy->getAsCXXRecordDecl();
     if (!iterDecl || !iterDecl->hasDefinition())

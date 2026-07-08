@@ -515,7 +515,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   - combine: A closure that is called with the values for any duplicate
   ///     keys that are encountered. The closure returns the desired value for
   ///     the final dictionary.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init<S: Sequence, E: Error>(
     _ keysAndValues: __owned S,
     uniquingKeysWith combine: (Value, Value) throws(E) -> Value
@@ -568,7 +568,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   - values: A sequence of values to group into a dictionary.
   ///   - keyForValue: A closure that returns a key for each element in
   ///     `values`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init<S: Sequence, E: Error>(
     grouping values: __owned S,
     by keyForValue: (S.Element) throws(E) -> Key
@@ -636,7 +636,7 @@ extension Dictionary {
   ///   argument and returns a Boolean value indicating whether the pair
   ///   should be included in the returned dictionary.
   /// - Returns: A dictionary of the key-value pairs that `isIncluded` allows.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(swift, introduced: 4.0)
   public consuming func filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool
@@ -966,7 +966,7 @@ extension Dictionary {
   ///   this dictionary.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the dictionary.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func mapValues<T, E: Error>(
     _ transform: (Value) throws(E) -> T
   ) throws(E) -> Dictionary<Key, T> {
@@ -1099,7 +1099,7 @@ extension Dictionary {
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func merge<S: Sequence, E: Error>(
     _ other: __owned S,
     uniquingKeysWith combine: (Value, Value) throws(E) -> Value
@@ -1154,7 +1154,7 @@ extension Dictionary {
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func merge<E: Error>(
     _ other: __owned [Key: Value],
     uniquingKeysWith combine: (Value, Value) throws(E) -> Value
@@ -1211,7 +1211,7 @@ extension Dictionary {
   ///     dictionary.
   /// - Returns: A new dictionary with the combined keys and values of this
   ///   dictionary and `other`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public __consuming func merging<S: Sequence, E: Error>(
     _ other: __owned S,
     uniquingKeysWith combine: (Value, Value) throws(E) -> Value
@@ -1271,7 +1271,7 @@ extension Dictionary {
   ///     dictionary.
   /// - Returns: A new dictionary with the combined keys and values of this
   ///   dictionary and `other`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public __consuming func merging<E: Error>(
     _ other: __owned [Key: Value],
     uniquingKeysWith combine: (Value, Value) throws(E) -> Value
@@ -1694,7 +1694,7 @@ extension Dictionary.Keys {
 }
 
 extension Dictionary.Keys {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
     for element in self {
@@ -1707,7 +1707,7 @@ extension Dictionary.Keys {
     hasher.combine(commutativeHash)
   }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var hashValue: Int { // Prevent compiler from synthesizing hashValue.
     var hasher = Hasher()
     self.hash(into: &hasher)
@@ -2352,7 +2352,7 @@ extension Dictionary {
   /// considered identical.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func isTriviallyIdentical(to other: Self) -> Bool {
 #if _runtime(_ObjC)
     if

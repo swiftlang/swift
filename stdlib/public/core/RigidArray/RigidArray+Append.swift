@@ -21,7 +21,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func append(_ item: consuming Element) {
     _precondition(!isFull, "RigidArray capacity overflow")
     unsafe _storage.initializeElement(at: _count, to: item)
@@ -39,7 +39,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func pushLast(_ item: consuming Element) -> Element? {
     if isFull { return item }
     append(item)
@@ -69,7 +69,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`newItemCount`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func append<E: Error>(
     addingCount newItemCount: Int,
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
@@ -100,7 +100,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`items.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func append(
     moving items: UnsafeMutableBufferPointer<Element>
   ) {
@@ -122,7 +122,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`items.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func append(
     moving items: inout OutputSpan<Element>
   ) {
@@ -147,7 +147,7 @@ extension _RigidArray {
   ///
   /// - Complexity: O(`newElements.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func append(
     copying newElements: UnsafeBufferPointer<Element>
   ) {
@@ -171,7 +171,7 @@ extension _RigidArray {
   ///
   /// - Complexity: O(`newElements.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func append(
     copying items: UnsafeMutableBufferPointer<Element>
   ) {
@@ -188,14 +188,14 @@ extension _RigidArray {
   ///
   /// - Complexity: O(`newElements.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func append(copying items: Span<Element>) {
     items.withUnsafeBufferPointer { source in
       unsafe self.append(copying: source)
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal mutating func _append<S: Sequence<Element>>(
     prefixOf items: S
@@ -215,7 +215,7 @@ extension _RigidArray {
   ///
   /// - Complexity: O(*m*), where *m* is the length of `newElements`.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func append(copying newElements: some Sequence<Element>) {
     let done: Void? = newElements.withContiguousStorageIfAvailable { buffer in
       unsafe self.append(copying: buffer)

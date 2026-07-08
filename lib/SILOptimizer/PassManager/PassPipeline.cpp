@@ -88,6 +88,7 @@ static void addModulePrinterPipeline(SILPassPipelinePlan &plan,
 static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Debug Serialization");
   P.addAddressLowering();
+  P.addKillInvalidDebugValues();
   P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
 }
@@ -112,11 +113,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // This guarantees that stack-promotable boxes have [static] enforcement.
   P.addAccessEnforcementSelection();
 
-#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT
   P.addMandatoryAllocBoxToStack();
-#else
-  P.addLegacyAllocBoxToStack();
-#endif
+
   // Needs to run after MandatoryAllocBoxToStack, because MandatoryAllocBoxToStack
   // can convert dynamic accesses to static accesses.
   P.addDiagnoseStaticExclusivity();
@@ -285,9 +283,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     //   call-sites, but PerformanceDiagnostics is sensitive to the # of copies.
     //   If ManualOwnership is used in the compiler itself, we wouldn't be able
     //   to bootstrap the compiler on different platforms with same diagnostics.
-#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT
     P.addComputeSideEffects();
-#endif
     P.addMandatoryCopyPropagation();
   }
 
@@ -359,6 +355,7 @@ SILPassPipelinePlan SILPassPipelinePlan::getOwnershipEliminatorPassPipeline(
   SILPassPipelinePlan P(Options);
   P.startPipeline("Ownership Model Eliminator");
   P.addAddressLowering();
+  P.addKillInvalidDebugValues();
   P.addOwnershipModelEliminator();
   return P;
 }
@@ -926,6 +923,7 @@ SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
   // Lower thunks.
   P.addThunkLowering();
   P.addLowerHopToActor(); // FIXME: earlier for more opportunities?
+  P.addKillInvalidDebugValues();
   P.addOwnershipModelEliminator();
   P.addAlwaysEmitConformanceMetadataPreservation();
   P.addIRGenPrepare();
@@ -1030,6 +1028,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // Perform optimizations that specialize.
   addClosureSpecializePassPipeline(P);
 
+  P.addKillInvalidDebugValues();
   P.addOwnershipModelEliminator();
 
   // Run another iteration of the SSA optimizations to optimize the
@@ -1099,6 +1098,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   if (P.Options.StopOptimizationBeforeLoweringOwnership)
     return P;
 
+  P.addKillInvalidDebugValues();
   P.addOwnershipModelEliminator();
 
   // Finally perform some small transforms.
