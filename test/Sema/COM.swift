@@ -3,6 +3,16 @@
 @com(interface: "00000000-0000-0000-C000-000000000046")
 protocol IUnknown: AnyObject { }
 
+struct GUID {
+  public init(data1: UInt32, data2: UInt16, data3: UInt16,
+              data4: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)) {
+  }
+}
+
+@com(interface: "8e369447-5188-5ada-b9ec-8fcb732d226b")
+protocol ISwiftObject {
+}
+
 @com(interface: "00000000-0000-0000-0000-000000000000")
 protocol IInterface1: IUnknown { }
 

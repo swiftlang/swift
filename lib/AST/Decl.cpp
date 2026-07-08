@@ -7880,7 +7880,8 @@ void ProtocolDecl::computeKnownProtocolKind() const {
       !module->getName().is("_Differentiation") &&
       !module->getName().is("_Concurrency") &&
       !module->getName().is("Distributed") && 
-      !module->getName().is("Cxx")) {
+      !module->getName().is("Cxx") &&
+      !module->getName().is("COM")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
