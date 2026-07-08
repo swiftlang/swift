@@ -149,6 +149,7 @@ public func registerTests() {
     getAccessBaseTest,
     accessPathTest,
     updateBorrowedFromTest,
+    replacePhisWithIncomingValuesTest,
     borrowIntroducersTest,
     enclosingValuesTest,
     forwardingDefUseTest,
