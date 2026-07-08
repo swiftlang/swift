@@ -257,6 +257,7 @@ suite.test("Span.BorrowingIterator/skip-zero")
 }
 
 suite.test("Span.BorrowingIterator/skip-negative")
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
