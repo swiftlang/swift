@@ -112,11 +112,9 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
 /// block and deletes it.
 ///
 void SILInstruction::eraseFromParent() {
-#ifndef NDEBUG
   for (auto result : getResults()) {
-    assert(result->use_empty() && "Uses of SILInstruction remain at deletion.");
+    ASSERT(result->use_empty() && "Uses of SILInstruction remain at deletion.");
   }
-#endif
   getParent()->erase(this);
 }
 

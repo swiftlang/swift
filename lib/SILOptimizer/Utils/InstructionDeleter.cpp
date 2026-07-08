@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
@@ -232,13 +233,31 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
   // Cannot fix operand lifetimes in non-ownership SIL.
   assert(!fixLifetimes || inst->getFunction()->hasOwnership());
 
+  // First, salvage debug info...
+  SmallVector<SILInstruction *, 4> toSalvage;
+  toSalvage.push_back(inst);
+  for (unsigned idx = 0; idx < toSalvage.size(); ++idx) {
+    for (SILValue result : toSalvage[idx]->getResults()) {
+      for (Operand *use : result->getUses()) {
+        SILInstruction *user = use->getUser();
+        toSalvage.push_back(user);
+      }
+    }
+  }
+  for (auto inst : llvm::reverse(toSalvage)) {
+    swift::salvageDebugInfo(inst);
+  }
+
+  // ... then collect the instructions to delete.
+  // We need to do that separately, because `salvageDebugInfo` can insert new
+  // `debug_value` uses, which need to be deleted as well.
+
   // Recursively visit all uses while growing toDeleteInsts in def-use order and
   // dropping dead operands.
   SmallVector<SILInstruction *, 4> toDeleteInsts;
   SmallVector<Operand *, 4> toDropUses;
 
   toDeleteInsts.push_back(inst);
-  swift::salvageDebugInfo(inst);
   for (unsigned idx = 0; idx < toDeleteInsts.size(); ++idx) {
     for (SILValue result : toDeleteInsts[idx]->getResults()) {
       // Temporary use vector to avoid iterator invalidation.
@@ -251,7 +270,6 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
 
         toDeleteInsts.push_back(user);
         toDropUses.push_back(use);
-        swift::salvageDebugInfo(user);
       }
     }
   }
