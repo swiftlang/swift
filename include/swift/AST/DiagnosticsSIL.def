@@ -1074,7 +1074,7 @@ NOTE(regionbasedisolation_named_nosend_send_into_result, none,
      (bool, StringRef, Identifier, StringRef, bool))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
      "Passing %0 value of non-Sendable type %1 as a 'sending' parameter risks "
-     "causing races inbetween %0 uses and uses reachable from the callee",
+     "causing races in between %0 uses and uses reachable from the callee",
      (StringRef, Type))
 
 GROUPED_ERROR(regionbasedisolation_typed_tns_passed_sending_closure, SendingClosureRisksDataRace, none,
@@ -1113,7 +1113,7 @@ NOTE(regionbasedisolation_closure_captures_actor, none,
      (DeclName, StringRef))
 
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_callee, none,
-     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %kind2 risks causing races inbetween %0 uses and uses reachable from %2",
+     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %kind2 risks causing races in between %0 uses and uses reachable from %2",
      (StringRef, Type, const ValueDecl *))
 
 NOTE(regionbasedisolation_named_send_nt_asynclet_capture, none,
