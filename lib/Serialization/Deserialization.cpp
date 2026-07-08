@@ -9658,16 +9658,19 @@ ModuleFile::maybeReadLifetimeDependence() {
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
   bool hasAddressableParamIndices;
+  bool hasConditionallyAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
       scratch, targetIndex, paramIndicesLength, hasImmortalSpecifier,
       isFromAnnotation, hasCaptures, hasInheritLifetimeParamIndices,
       hasScopeLifetimeParamIndices, hasAddressableParamIndices,
+      hasConditionallyAddressableParamIndices,
       lifetimeDependenceData);
 
   SmallBitVector inheritLifetimeParamIndices(paramIndicesLength, false);
   SmallBitVector scopeLifetimeParamIndices(paramIndicesLength, false);
   SmallBitVector addressableParamIndices(paramIndicesLength, false);
+  SmallBitVector conditionallyAddressableParamIndices(paramIndicesLength, false);
 
   unsigned startIndex = 0;
   auto pushData = [&](SmallBitVector &bits) {
@@ -9688,6 +9691,9 @@ ModuleFile::maybeReadLifetimeDependence() {
   if (hasAddressableParamIndices) {
     pushData(addressableParamIndices);
   }
+  if (hasConditionallyAddressableParamIndices) {
+    pushData(conditionallyAddressableParamIndices);
+  }
 
   ASTContext &ctx = getContext();
   return LifetimeDependenceInfo(
@@ -9701,7 +9707,9 @@ ModuleFile::maybeReadLifetimeDependence() {
       hasAddressableParamIndices
           ? IndexSubset::get(ctx, addressableParamIndices)
           : nullptr,
-      nullptr,
+      hasConditionallyAddressableParamIndices
+          ? IndexSubset::get(ctx, conditionallyAddressableParamIndices)
+          : nullptr,
       LifetimeFlags()
           .withImmortalSpecifier(hasImmortalSpecifier)
           .withAnnotated(isFromAnnotation)
