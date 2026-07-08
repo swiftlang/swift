@@ -76,7 +76,7 @@ extension MyActor {
 @MainActor
 func sendingTransferNonSendableError(_ x: NonSendableKlass) {
   transferToSendingParam(x) // expected-error {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
-  // expected-note @-1 {{Passing main actor-isolated value of non-Sendable type 'NonSendableKlass' as a 'sending' parameter to global function 'transferToSendingParam' risks causing races inbetween main actor-isolated uses and uses reachable from 'transferToSendingParam'}}
+  // expected-note @-1 {{Passing main actor-isolated value of non-Sendable type 'NonSendableKlass' as a 'sending' parameter to global function 'transferToSendingParam' risks causing races in between main actor-isolated uses and uses reachable from 'transferToSendingParam'}}
 }
 
 func sendingTransferNonSendableError(_ x: NonSendableKlass) async {
