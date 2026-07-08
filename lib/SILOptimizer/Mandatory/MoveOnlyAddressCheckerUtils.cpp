@@ -358,19 +358,44 @@ static void convertMemoryReinitToInitForm(SILInstruction *memInst,
 
 /// Is this a reinit instruction that we know how to convert into its init form.
 static bool isReinitToInitConvertibleInst(SILInstruction *memInst) {
+  SILValue dest;
   switch (memInst->getKind()) {
   default:
     return false;
 
   case SILInstructionKind::CopyAddrInst: {
     auto *cai = cast<CopyAddrInst>(memInst);
-    return !cai->isInitializationOfDest();
+    if (cai->isInitializationOfDest())
+      return false;
+    dest = cai->getDest();
+    break;
   }
   case SILInstructionKind::StoreInst: {
     auto *si = cast<StoreInst>(memInst);
-    return si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
+    if (si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign)
+      return false;
+    dest = si->getDest();
+    break;
   }
   }
+
+  // If the store's destination is a begin_access, the reinit can only be
+  // converted into an init if the access exists solely to host this reinit.
+  // When the store is converted to an init, then the begin_access is
+  // considered the beginning of that reinitialization. A destroy_addres can
+  // then be inserted before the access to compensate for the reinit
+  // conversion. If, however, the access includes other reads, then we cannot
+  // hoist the destroy_addr out of the access scope.
+  if (auto *bai = dyn_cast<BeginAccessInst>(dest)) {
+    for (auto *use : bai->getUses()) {
+      auto *user = use->getUser();
+      if (user == memInst || isa<EndAccessInst>(user))
+        continue;
+      return false;
+    }
+  }
+
+  return true;
 }
 
 using ScopeRequiringFinalInit = DiagnosticEmitter::ScopeRequiringFinalInit;
@@ -3735,7 +3760,23 @@ void ExtendUnconsumedLiveness::run() {
     }
     for (auto pair : addressUseState.reinitInsts) {
       if (pair.second.test(element)) {
-        destroys[pair.first] = DestroyKind::Reinit;
+        SILInstruction *reinit = pair.first;
+        // If the reinit stores through a begin_access and will be converted
+        // into an init, record the begin_access as the destroy point rather
+        // than the reinit itself. This keeps the old value's destroy from
+        // being sunk into the access scope (immediately before the reinit);
+        // instead liveness is extended only up to the begin_access.
+        SILInstruction *destroy = reinit;
+        if (isReinitToInitConvertibleInst(reinit)) {
+          SILValue dest;
+          if (auto *si = dyn_cast<StoreInst>(reinit))
+            dest = si->getDest();
+          else if (auto *cai = dyn_cast<CopyAddrInst>(reinit))
+            dest = cai->getDest();
+          if (auto *bai = dyn_cast_or_null<BeginAccessInst>(dest))
+            destroy = bai;
+        }
+        destroys[destroy] = DestroyKind::Reinit;
       }
     }
 
