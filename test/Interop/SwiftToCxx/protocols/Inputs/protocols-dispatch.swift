@@ -77,3 +77,11 @@ public func drawTwice(_ d: any Drawable) -> Int {
 public func bestDrawable(_ a: any Drawable, _ b: any Drawable) -> any Drawable {
     return a.draw() >= b.draw() ? a : b
 }
+
+public func drawAndResize(_ x: any Drawable & Resizable) -> Int {
+    return x.draw() + (x.resize(to: 3) ? 1 : 0)
+}
+
+public func makeDrawableAndResizable() -> any Drawable & Resizable {
+    return Circle(radius: 5)
+}

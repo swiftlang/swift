@@ -16,6 +16,7 @@
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangClassType.h"
+#include "PrintClangExistentialType.h"
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
 #include "swift/ABI/MetadataValues.h"
@@ -351,6 +352,51 @@ public:
           repr.setNeedsExistentialGuard();
           return repr;
         }
+
+      // Ad-hoc protocol compositions (any A & B).
+      if (auto *compTy = ty->getConstraintType()
+                             ->getAs<ProtocolCompositionType>()) {
+        auto layout = ty->getExistentialLayout();
+        auto protocols = layout.getProtocols();
+        SmallVector<const ProtocolDecl *, 4> wtProtocols;
+        bool allIncludable = true;
+        for (auto *proto : protocols) {
+          if (proto->isObjC() || proto->isMarkerProtocol())
+            continue;
+          if (!declPrinter.shouldInclude(proto)) {
+            allIncludable = false;
+            break;
+          }
+          wtProtocols.push_back(proto);
+        }
+        if (allIncludable && wtProtocols.size() >= 2) {
+          auto compName = declPrinter.ensureCompositionEmitted(wtProtocols);
+          if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
+            if (!isInOutParam)
+              os << "const ";
+            printOptional(optionalKind, [&]() {
+              ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+                  .printBaseName(moduleContext);
+              os << "::" << compName;
+            });
+            os << '&';
+          } else {
+            printOptional(optionalKind, [&]() {
+              if (modifiersDelegate.mapValueTypeUseKind) {
+                ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+                    .printBaseName(moduleContext);
+                os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+                   << "::_impl_" << compName;
+              } else {
+                ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+                    .printBaseName(moduleContext);
+                os << "::" << compName;
+              }
+            });
+          }
+          return ClangRepresentation::representable;
+        }
+      }
     }
 
     return visitPart(ty->getConstraintType(), optionalKind, isInOutParam);
@@ -1246,6 +1292,28 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
           os << ')';
         return;
       }
+
+      // Ad-hoc composition param: use composition _impl::getOpaquePointer.
+      if (existTy->getConstraintType()->is<ProtocolCompositionType>()) {
+        auto layout = existTy->getExistentialLayout();
+        auto protocols = layout.getProtocols();
+        SmallVector<const ProtocolDecl *, 4> wtProtocols;
+        for (auto *proto : protocols) {
+          if (!proto->isObjC() && !proto->isMarkerProtocol())
+            wtProtocols.push_back(proto);
+        }
+        if (wtProtocols.size() >= 2) {
+          auto compName =
+              ClangExistentialTypePrinter::getCompositionName(wtProtocols);
+          ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+              .printBaseName(moduleContext);
+          os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+             << "::_impl_" << compName << "::getOpaquePointer(";
+          namePrinter();
+          os << ')';
+          return;
+        }
+      }
     }
 
     if (auto *classDecl = type->getClassOrBoundGenericClass()) {
@@ -1679,6 +1747,44 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           }
           os << ";\n  });\n";
           return;
+        }
+        // Ad-hoc composition return: _impl_AnyAAndB::returnNewValue.
+        if (existTy->getConstraintType()
+                ->is<ProtocolCompositionType>()) {
+          auto layout = existTy->getExistentialLayout();
+          auto protocols = layout.getProtocols();
+          SmallVector<const ProtocolDecl *, 4> wtProtocols;
+          for (auto *proto : protocols) {
+            if (!proto->isObjC() && !proto->isMarkerProtocol())
+              wtProtocols.push_back(proto);
+          }
+          if (wtProtocols.size() >= 2) {
+            auto compName =
+                declPrinter.ensureCompositionEmitted(wtProtocols);
+            os << "  return ";
+            ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+                .printBaseName(moduleContext);
+            os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+               << "::_impl_" << compName << "::returnNewValue"
+               << "([&](char * _Nonnull result) "
+                  "SWIFT_INLINE_THUNK_ATTRIBUTES {\n    ";
+            if (auto directResultType =
+                    signature.getDirectResultType()) {
+              std::string typeEncoding = encodeTypeInfo(
+                  *directResultType, moduleContext, typeMapping);
+              ClangSyntaxPrinter(moduleContext->getASTContext(), os)
+                  .printBaseName(moduleContext);
+              os << "::" << cxx_synthesis::getCxxImplNamespaceName()
+                 << "::swift_interop_returnDirect_" << typeEncoding
+                 << '(' << "result" << ", ";
+              printCallToCFunc(std::nullopt);
+              os << ')';
+            } else {
+              printCallToCFunc(/*firstParam=*/StringRef("result"));
+            }
+            os << ";\n  });\n";
+            return;
+          }
         }
       }
     }

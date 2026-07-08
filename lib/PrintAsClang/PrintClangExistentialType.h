@@ -39,6 +39,18 @@ public:
   void printExistentialTypeDecl(const ProtocolDecl *PD,
                                 DeclAndTypePrinter &declAndTypePrinter);
 
+  /// Emits a C++ wrapper class for an ad-hoc protocol composition
+  /// (e.g., `any A & B`). The protocols must be in canonical WT order
+  /// (from ExistentialLayout::getProtocols). The wrapper inherits from
+  /// SwiftExistentialType<ATag, BTag, ...> with one WT slot per protocol.
+  void printCompositionTypeDecl(ArrayRef<const ProtocolDecl *> protocols,
+                                StringRef compositionName,
+                                DeclAndTypePrinter &declAndTypePrinter);
+
+  /// Generates a stable C++ name for a protocol composition.
+  /// Protocols are sorted alphabetically: `any A & B` -> `AnyAAndB`.
+  static std::string getCompositionName(ArrayRef<const ProtocolDecl *> protocols);
+
 private:
   void printMarkerProtocolDecl(const ProtocolDecl *PD,
                                DeclAndTypePrinter &declAndTypePrinter);
@@ -106,6 +118,19 @@ private:
   /// all params and return C-primitive).
   bool canEmitExistentialMethod(const FuncDecl *FD,
                                 DeclAndTypePrinter &printer);
+
+  /// Emits methods from a single protocol in a composition, dispatching
+  /// through the witness table at the given index.
+  void emitCompositionMethodsForProtocol(
+      const ProtocolDecl *PD, size_t wtIndex,
+      llvm::SmallPtrSetImpl<const FuncDecl *> &emittedMethods,
+      DeclAndTypePrinter &declAndTypePrinter);
+
+  /// Emits a single method in a composition wrapper, dispatching through
+  /// the witness table at wtIndex.
+  void emitCompositionMethod(const FuncDecl *FD, size_t methodOffset,
+                             uint16_t ptrAuthDisc, size_t wtIndex,
+                             DeclAndTypePrinter &declAndTypePrinter);
 
   raw_ostream &os;
   raw_ostream &outOfLineOS;

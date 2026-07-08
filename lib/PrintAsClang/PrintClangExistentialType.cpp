@@ -702,3 +702,239 @@ void ClangExistentialTypePrinter::printBoxingConstructors(
     outOfLineOS << "#endif // SWIFT_CXX_EXISTENTIAL_INTEROP && __cpp_concepts\n";
   }
 }
+
+std::string ClangExistentialTypePrinter::getCompositionName(
+    ArrayRef<const ProtocolDecl *> protocols) {
+  SmallVector<StringRef, 4> names;
+  for (auto *PD : protocols)
+    names.push_back(PD->getName().str());
+  llvm::sort(names);
+
+  std::string result = "Any";
+  for (size_t i = 0; i < names.size(); ++i) {
+    if (i > 0)
+      result += "And";
+    result += names[i];
+  }
+  return result;
+}
+
+void ClangExistentialTypePrinter::printCompositionTypeDecl(
+    ArrayRef<const ProtocolDecl *> protocols, StringRef compositionName,
+    DeclAndTypePrinter &declAndTypePrinter) {
+  ClangSyntaxPrinter printer(protocols[0]->getASTContext(), os);
+
+  // Filter to non-marker protocols that contribute witness tables.
+  SmallVector<const ProtocolDecl *, 4> wtProtocols;
+  for (auto *PD : protocols) {
+    if (!PD->isMarkerProtocol() &&
+        Lowering::TypeConverter::protocolRequiresWitnessTable(PD))
+      wtProtocols.push_back(PD);
+  }
+
+  os << "#if defined(SWIFT_CXX_EXISTENTIAL_INTEROP) && "
+        "defined(__cpp_concepts) && __cpp_concepts >= 202002L\n";
+
+  // _impl class forward declaration.
+  os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
+  os << "class _impl_" << compositionName << ";\n";
+  os << "} // namespace " << cxx_synthesis::getCxxImplNamespaceName() << "\n";
+
+  // Wrapper class inheriting from SwiftExistentialType<Tags...>.
+  os << "class " << compositionName
+     << " final : public swift::_impl::SwiftExistentialType<";
+  llvm::interleaveComma(wtProtocols, os, [&](const ProtocolDecl *PD) {
+    os << cxx_synthesis::getCxxImplNamespaceName() << "::";
+    printer.printBaseName(PD);
+    os << "Tag";
+  });
+  os << "> {\n";
+  os << "public:\n";
+
+  // Emit methods from all constituent protocols, with the correct WT index.
+  llvm::SmallPtrSet<const FuncDecl *, 16> emittedMethods;
+  for (size_t wtIdx = 0; wtIdx < wtProtocols.size(); ++wtIdx) {
+    auto *PD = wtProtocols[wtIdx];
+    emitCompositionMethodsForProtocol(PD, wtIdx, emittedMethods,
+                                      declAndTypePrinter);
+  }
+
+  // Conversion methods to each individual protocol wrapper.
+  for (size_t wtIdx = 0; wtIdx < wtProtocols.size(); ++wtIdx) {
+    auto *PD = wtProtocols[wtIdx];
+    os << "  ";
+    printer.printBaseName(PD);
+    os << " as";
+    printer.printBaseName(PD);
+    os << "() const {\n";
+    os << "    return " << cxx_synthesis::getCxxImplNamespaceName()
+       << "::_impl_";
+    printer.printBaseName(PD);
+    os << "::_fromExistential(_type, _projectValue(), _witnessTables["
+       << wtIdx << "]);\n";
+    os << "  }\n";
+  }
+
+  os << "private:\n";
+  os << "  " << compositionName
+     << "() noexcept : SwiftExistentialType(typename "
+        "SwiftExistentialType::uninit_t{}) {}\n";
+  os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName()
+     << "::_impl_" << compositionName << ";\n";
+  os << "};\n";
+
+  // _impl helper class.
+  os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
+  os << "class _impl_" << compositionName << " {\n";
+  os << "public:\n";
+
+  // _fromExistential factory.
+  os << "  static ";
+  printer.printInlineForThunk();
+  os << compositionName << " _fromExistential("
+        "void *_Nonnull typeMetadata, "
+        "void *_Nonnull projectedValue";
+  for (size_t i = 0; i < wtProtocols.size(); ++i)
+    os << ", const void *_Nonnull wt" << i;
+  os << ") {\n";
+  os << "    " << compositionName << " result;\n";
+  os << "    result._type = typeMetadata;\n";
+  os << "    result._initializeWithValue(projectedValue);\n";
+  for (size_t i = 0; i < wtProtocols.size(); ++i)
+    os << "    result._witnessTables[" << i << "] = wt" << i << ";\n";
+  os << "    return result;\n";
+  os << "  }\n";
+
+  // getOpaquePointer (const + non-const).
+  os << "  static ";
+  printer.printInlineForThunk();
+  os << "const char * _Nonnull getOpaquePointer(const " << compositionName
+     << " &object) { return reinterpret_cast<const char *>(&object); }\n";
+  os << "  static ";
+  printer.printInlineForThunk();
+  os << "char * _Nonnull getOpaquePointer(" << compositionName
+     << " &object) { return reinterpret_cast<char *>(&object); }\n";
+
+  // returnNewValue.
+  os << "  template <class T>\n";
+  os << "  static ";
+  printer.printInlineForHelperFunction();
+  os << compositionName << " returnNewValue(T callable) {\n";
+  os << "    " << compositionName << " result;\n";
+  os << "    callable(reinterpret_cast<char *>(&result));\n";
+  os << "    return result;\n";
+  os << "  }\n";
+
+  os << "};\n";
+  os << "} // namespace " << cxx_synthesis::getCxxImplNamespaceName() << "\n";
+
+  os << "#endif // SWIFT_CXX_EXISTENTIAL_INTEROP && __cpp_concepts\n";
+}
+
+void ClangExistentialTypePrinter::emitCompositionMethodsForProtocol(
+    const ProtocolDecl *PD, size_t wtIndex,
+    llvm::SmallPtrSetImpl<const FuncDecl *> &emittedMethods,
+    DeclAndTypePrinter &declAndTypePrinter) {
+  size_t currentOffset = 1;
+
+  auto requirements = PD->getRequirementSignature().getRequirements();
+  for (const auto &reqt : requirements) {
+    if (reqt.getKind() != RequirementKind::Conformance)
+      continue;
+    auto protocol = reqt.getProtocolDecl();
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
+      continue;
+    currentOffset++;
+  }
+
+  for (auto *assocType : PD->getAssociatedTypeMembers()) {
+    if (assocType->getOverriddenDecls().empty())
+      currentOffset++;
+  }
+
+  for (Decl *member : PD->getABIMembers()) {
+    if (!member->isAvailableDuringLowering())
+      continue;
+
+    if (auto *FD = dyn_cast<FuncDecl>(member)) {
+      if (isa<AccessorDecl>(FD))
+        continue;
+      if (!FD->requiresNewWitnessTableEntry())
+        continue;
+
+      size_t methodOffset = currentOffset;
+      currentOffset++;
+
+      if (!canEmitExistentialMethod(FD, declAndTypePrinter))
+        continue;
+      if (!emittedMethods.insert(FD).second)
+        continue;
+
+      uint16_t ptrAuthDisc =
+          llvm::getPointerAuthStableSipHash(SILDeclRef(FD).mangle());
+
+      emitCompositionMethod(FD, methodOffset, ptrAuthDisc, wtIndex,
+                            declAndTypePrinter);
+    } else if (auto *ASD = dyn_cast<AbstractStorageDecl>(member)) {
+      ASD->visitOpaqueAccessors([&](AccessorDecl *accessor) {
+        if (accessor->requiresNewWitnessTableEntry())
+          currentOffset++;
+      });
+    } else if (auto *CD = dyn_cast<ConstructorDecl>(member)) {
+      if (CD->requiresNewWitnessTableEntry())
+        currentOffset++;
+    }
+  }
+}
+
+void ClangExistentialTypePrinter::emitCompositionMethod(
+    const FuncDecl *FD, size_t methodOffset, uint16_t ptrAuthDisc,
+    size_t wtIndex, DeclAndTypePrinter &declAndTypePrinter) {
+  ClangSyntaxPrinter printer(FD->getASTContext(), os);
+
+  auto methodTy = FD->getMethodInterfaceType()->castTo<FunctionType>();
+  auto resultCxxName =
+      getCxxTypeName(methodTy->getResult(), declAndTypePrinter);
+
+  os << "  ";
+  printer.printInlineForThunk();
+  os << *resultCxxName << " ";
+  os << FD->getBaseIdentifier().str() << "(";
+
+  bool firstParam = true;
+  for (auto *param : *FD->getParameters()) {
+    if (!firstParam)
+      os << ", ";
+    firstParam = false;
+    auto paramCxxName =
+        getCxxTypeName(param->getInterfaceType(), declAndTypePrinter);
+    os << *paramCxxName << " " << param->getNameStr();
+  }
+
+  os << ") const {\n";
+
+  os << "    struct _w { _w() = delete; static SWIFT_CALL " << *resultCxxName
+     << " call(";
+  bool firstTyParam = true;
+  for (auto *param : *FD->getParameters()) {
+    if (!firstTyParam)
+      os << ", ";
+    firstTyParam = false;
+    auto paramCxxName =
+        getCxxTypeName(param->getInterfaceType(), declAndTypePrinter);
+    os << *paramCxxName;
+  }
+  if (!firstTyParam)
+    os << ", ";
+  os << "void *_Nonnull, const void *_Nonnull, "
+        "SWIFT_CONTEXT void *_Nonnull); };\n";
+
+  os << "    return _loadWitness<" << methodOffset << ", " << ptrAuthDisc
+     << ", decltype(&_w::call)>(_witnessTables[" << wtIndex << "])(";
+
+  for (auto *param : *FD->getParameters())
+    os << param->getNameStr() << ", ";
+
+  os << "_type, _witnessTables[" << wtIndex << "], _projectValue());\n";
+  os << "  }\n";
+}

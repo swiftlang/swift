@@ -3199,6 +3199,16 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return true;
 }
 
+std::string DeclAndTypePrinter::ensureCompositionEmitted(
+    ArrayRef<const ProtocolDecl *> protocols) {
+  auto name = ClangExistentialTypePrinter::getCompositionName(protocols);
+  if (emittedCompositions.insert(name).second) {
+    ClangExistentialTypePrinter(os, outOfLineDefinitionsOS)
+        .printCompositionTypeDecl(protocols, name, *this);
+  }
+  return name;
+}
+
 bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {
   if (decl->isResilient())
     return false;

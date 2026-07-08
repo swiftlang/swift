@@ -44,6 +44,72 @@ int main() {
     }
 // CHECK-NEXT: bestDrawable().draw() = 49
 
+    // Test 3: makeDrawableAndResizable() composition return + method dispatch.
+    {
+        auto comp = ProtoDispatch::makeDrawableAndResizable();
+        swift::Int drawResult = comp.draw();
+        printf("comp.draw() = %ld\n", drawResult);
+        assert(drawResult == 25);
+
+        bool resizeResult = comp.resize(3);
+        printf("comp.resize(3) = %s\n", resizeResult ? "true" : "false");
+        assert(resizeResult == true);
+    }
+// CHECK-NEXT: comp.draw() = 25
+// CHECK-NEXT: comp.resize(3) = true
+
+    // Test 4: drawAndResize() composition parameter (derived-to-base).
+    {
+        auto comp = ProtoDispatch::makeDrawableAndResizable();
+        swift::Int result = ProtoDispatch::drawAndResize(comp);
+        printf("drawAndResize() = %ld\n", result);
+        assert(result == 26);  // draw()=25 + resize(to:3)=true=1
+    }
+// CHECK-NEXT: drawAndResize() = 26
+
+    // Test 5: asDrawable() extracts single-protocol Drawable from composition.
+    {
+        auto comp = ProtoDispatch::makeDrawableAndResizable();
+        ProtoDispatch::Drawable drawable = comp.asDrawable();
+        swift::Int result = drawable.draw();
+        printf("asDrawable().draw() = %ld\n", result);
+        assert(result == 25);
+    }
+// CHECK-NEXT: asDrawable().draw() = 25
+
+    // Test 6: asResizable() extracts single-protocol Resizable from composition.
+    {
+        auto comp = ProtoDispatch::makeDrawableAndResizable();
+        ProtoDispatch::Resizable resizable = comp.asResizable();
+        bool result = resizable.resize(3);
+        printf("asResizable().resize(3) = %s\n", result ? "true" : "false");
+        assert(result == true);
+    }
+// CHECK-NEXT: asResizable().resize(3) = true
+
+    // Test 7: Extracted Drawable passed to drawTwice() -- composition extraction
+    // feeds single-protocol function dispatch.
+    {
+        auto comp = ProtoDispatch::makeDrawableAndResizable();
+        ProtoDispatch::Drawable drawable = comp.asDrawable();
+        swift::Int result = ProtoDispatch::drawTwice(drawable);
+        printf("drawTwice(asDrawable()) = %ld\n", result);
+        assert(result == 50);  // 25 + 25
+    }
+// CHECK-NEXT: drawTwice(asDrawable()) = 50
+
+    // Test 8: Composition copy construction preserves both WTs.
+    {
+        auto comp = ProtoDispatch::makeDrawableAndResizable();
+        auto copy(comp);
+        printf("copy.draw() = %ld\n", copy.draw());
+        printf("copy.resize(3) = %s\n", copy.resize(3) ? "true" : "false");
+        assert(copy.draw() == 25);
+        assert(copy.resize(3) == true);
+    }
+// CHECK-NEXT: copy.draw() = 25
+// CHECK-NEXT: copy.resize(3) = true
+
     printf("done\n");
 // CHECK-NEXT: done
     return 0;
