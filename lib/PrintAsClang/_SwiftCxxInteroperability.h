@@ -285,6 +285,10 @@ struct BoxPair {
 };
 extern "C" BoxPair swift_allocBox(void *_Nonnull type) noexcept;
 extern "C" void *_Nonnull swift_projectBox(void *_Nonnull object) noexcept;
+extern "C" const void *_Nullable swift_getWitnessTable(
+    const void *_Nonnull conformanceDescriptor,
+    const void *_Nonnull typeMetadata,
+    const void *_Nullable const *_Nullable instantiationArgs) noexcept;
 
 // --- Tag traits for existential type parameters ---
 //
@@ -523,6 +527,14 @@ protected:
 #if defined(SWIFT_CXX_EXISTENTIAL_INTEROP) && __cplusplus >= 201703L
 /// Swift.Any -- the unconstrained existential type.
 using Any = _impl::SwiftExistentialType<>;
+#endif // SWIFT_CXX_EXISTENTIAL_INTEROP && __cplusplus >= 201703L
+
+#if defined(SWIFT_CXX_EXISTENTIAL_INTEROP) && __cplusplus >= 201703L
+// Primary templates for the stdlib conformance records; the generated
+// header holds an explicit specialization per conforming type.
+template <typename T> struct EquatableConformance;
+template <typename T> struct HashableConformance;
+template <typename T> struct ComparableConformance;
 #endif // SWIFT_CXX_EXISTENTIAL_INTEROP && __cplusplus >= 201703L
 
 /// Swift's Int type.

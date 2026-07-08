@@ -74,7 +74,17 @@ int main() {
     }
 // CHECK-NEXT: asDrawable().draw() = 147
 
-    // Test 5: VWT copy construction (opaque existential).
+    // Test 5: Container<swift::Int> PAT class template via boxing.
+    {
+        auto arr = ProtoDispatch::IntArray::init(5);
+        ProtoDispatch::Container<swift::Int> container(arr);
+        swift::Int n = container.count();
+        printf("container.count() = %ld\n", n);
+        assert(n == 5);
+    }
+// CHECK-NEXT: container.count() = 5
+
+    // Test 6: VWT copy construction (opaque existential).
     {
         auto circle = ProtoDispatch::Circle::init(5);
         ProtoDispatch::Drawable original(circle);
@@ -85,7 +95,7 @@ int main() {
     }
 // CHECK-NEXT: copy.draw() = 25
 
-    // Test 6: VWT copy assignment.
+    // Test 7: VWT copy assignment.
     {
         auto c1 = ProtoDispatch::Circle::init(5);
         ProtoDispatch::Drawable assigned(c1);
@@ -100,7 +110,7 @@ int main() {
 // CHECK-NEXT: before assign: 25
 // CHECK-NEXT: after assign: 9
 
-    // Test 7: Move construction. Value is transferred, source is
+    // Test 8: Move construction. Value is transferred, source is
     // left in a moved-from state (opaque existential).
     {
         auto circle = ProtoDispatch::Circle::init(6);
@@ -112,7 +122,7 @@ int main() {
     }
 // CHECK-NEXT: moved.draw() = 36
 
-    // Test 8: Move assignment (opaque existential).
+    // Test 9: Move assignment (opaque existential).
     {
         auto c1 = ProtoDispatch::Circle::init(4);
         ProtoDispatch::Drawable target(c1);
@@ -125,7 +135,7 @@ int main() {
     }
 // CHECK-NEXT: move-assigned.draw() = 64
 
-    // Test 9: Class-bound protocol boxing, dispatch, copy, move.
+    // Test 10: Class-bound protocol boxing, dispatch, copy, move.
     {
         auto canvas = ProtoDispatch::Canvas::init(21);
         ProtoDispatch::Renderable renderable(canvas);
@@ -159,7 +169,7 @@ int main() {
 // CHECK-NEXT: copy-assigned.render() = 42
 // CHECK-NEXT: move-assigned.render() = 42
 
-    // Test 10: Multi-requirement protocol at offsets 1 and 2.
+    // Test 11: Multi-requirement protocol at offsets 1 and 2.
     {
         auto pair = ProtoDispatch::Pair::init(10, 20);
         ProtoDispatch::MultiReq mr(pair);
@@ -171,7 +181,7 @@ int main() {
 // CHECK-NEXT: first() = 10
 // CHECK-NEXT: second() = 20
 
-    // Test 11: Large value type exceeds inline buffer (4 words > 3-word buffer),
+    // Test 12: Large value type exceeds inline buffer (4 words > 3-word buffer),
     // exercises VWT outline storage (swift_allocBox / swift_projectBox).
     {
         auto large = ProtoDispatch::LargeDrawable::init(1, 2, 3, 4);

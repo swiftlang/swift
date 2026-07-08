@@ -8,6 +8,11 @@
 
 // expected-no-diagnostics
 
+public protocol Container<Element> {
+    associatedtype Element
+    func count() -> Int
+}
+
 public protocol Drawable {
     func draw() -> Int
 }
@@ -43,6 +48,37 @@ public struct Circle: Drawable {
 }
 
 // CHECK-LABEL: namespace Protocols
+
+// --- Protocol with primary associated type: Container<Element> ---
+
+// CHECK-LABEL: class _impl_Container;
+
+// Tag struct for Container.
+// CHECK:       struct ContainerTag {
+// CHECK-NEXT:    using WitnessTable = const void *_Nonnull;
+// CHECK-NEXT:  };
+
+// CHECK:       template <typename Element = swift::Any>
+// CHECK-NEXT:  class
+// CHECK-SAME:  Container final : public swift::_impl::SwiftExistentialType<_impl::ContainerTag> {
+// CHECK-NEXT:  public:
+// CHECK:         swift::Int count() const {
+// CHECK:       private:
+// CHECK:         Container() noexcept : SwiftExistentialType(typename SwiftExistentialType::uninit_t{}) {}
+// CHECK:         friend class _impl::_impl_Container;
+// CHECK:       };
+
+// CHECK:       class _impl_Container {
+// CHECK-NEXT:  public:
+// CHECK:         template <typename Element>
+// CHECK-NEXT:    static {{.*}} Container<Element> _fromExistential(void *_Nonnull typeMetadata, void *_Nonnull projectedValue, const void *_Nonnull wt) {
+// CHECK-NEXT:      Container<Element> result;
+// CHECK:         template <typename Element>
+// CHECK-NEXT:    static {{.*}} const char * _Nonnull getOpaquePointer(const Container<Element> &object)
+// CHECK:         template <typename Element>
+// CHECK-NEXT:    static {{.*}} char * _Nonnull getOpaquePointer(Container<Element> &object)
+// CHECK:         static {{.*}} Container<Element> returnNewValue(T callable) {
+// CHECK:       };
 
 // --- Non-marker protocol: Drawable ---
 

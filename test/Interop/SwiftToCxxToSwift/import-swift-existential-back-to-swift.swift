@@ -37,6 +37,27 @@ SwiftMod::Renderable passThroughRenderable(const SwiftMod::Renderable& r);
 // INTERFACE: func passRenderable(_ r: any Renderable)
 // INTERFACE: func passThroughRenderable(_ r: any Renderable) -> any Renderable
 
+// --- PAT protocol round-trip ---
+SwiftMod::Container<swift::Int> createIntContainer();
+
+void passIntContainer(const SwiftMod::Container<swift::Int>& c);
+
+SwiftMod::Container<swift::Int> firstIntContainer(
+    const SwiftMod::Container<swift::Int>& a,
+    const SwiftMod::Container<swift::Int>& b);
+
+// Default template arg (swift::Any) => unconstrained existential
+SwiftMod::Container<> createAnyContainer();
+
+// Nested existential PAT arg
+SwiftMod::Container<SwiftMod::Drawable> createDrawableContainer();
+
+// INTERFACE: func createIntContainer() -> any Container<Int>
+// INTERFACE: func passIntContainer(_ c: any Container<Int>)
+// INTERFACE: func firstIntContainer(_ a: any Container<Int>, _ b: any Container<Int>) -> any Container<Int>
+// INTERFACE: func createAnyContainer() -> any Container
+// INTERFACE: func createDrawableContainer() -> any Container<any Drawable>
+
 #endif
 
 //--- module.modulemap
@@ -54,6 +75,11 @@ public protocol Drawable {
 
 public protocol Renderable: AnyObject {
     func render() -> Int
+}
+
+public protocol Container<Element> {
+    associatedtype Element
+    func count() -> Int
 }
 
 public struct Circle: Drawable {

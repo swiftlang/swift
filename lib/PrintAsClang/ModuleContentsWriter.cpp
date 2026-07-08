@@ -32,6 +32,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Strings.h"
 
@@ -413,6 +414,8 @@ class ModuleWriter {
   PrimitiveTypeMapping typeMapping;
   std::string outOfLineDefinitions;
   llvm::raw_string_ostream outOfLineDefinitionsOS;
+  std::string globalScopeDefinitions;
+  llvm::raw_string_ostream globalScopeDefinitionsOS;
   DeclAndTypePrinter printer;
   OutputLanguageMode outputLangMode;
   bool dependsOnStdlib = false;
@@ -426,12 +429,20 @@ public:
                OutputLanguageMode outputLang)
       : os(os), imports(imports), M(mod),
         outOfLineDefinitionsOS(outOfLineDefinitions),
+        globalScopeDefinitionsOS(globalScopeDefinitions),
         printer(M, os, prologueOS, outOfLineDefinitionsOS, objcDelayedMembers,
                 topLevelEmissionScope, typeMapping, interopContext, access,
                 requiresExposedAttribute, exposedModules, outputLang),
         outputLangMode(outputLang) {}
 
   PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
+
+  /// Returns definitions that must be emitted at global scope
+  /// (outside the module namespace), such as conformance record
+  /// template specializations.
+  llvm::StringRef getGlobalScopeDefinitions() {
+    return globalScopeDefinitionsOS.str();
+  }
 
   /// Returns true if a Stdlib dependency was seen during the emission of this module.
   bool isStdlibRequired() const {
@@ -972,6 +983,109 @@ public:
     return true;
   }
 
+  void emitStdlibConformanceRecords() {
+    if (M.isStdlibModule())
+      return;
+
+    auto &ctx = M.getASTContext();
+
+    struct StdlibProto {
+      ProtocolDecl *proto;
+      const char *recordName;
+    };
+    SmallVector<StdlibProto, 3> stdlibProtos;
+    if (auto *p = ctx.getProtocol(KnownProtocolKind::Equatable))
+      stdlibProtos.push_back({p, "EquatableConformance"});
+    if (auto *p = ctx.getProtocol(KnownProtocolKind::Hashable))
+      stdlibProtos.push_back({p, "HashableConformance"});
+    if (auto *p = ctx.getProtocol(KnownProtocolKind::Comparable))
+      stdlibProtos.push_back({p, "ComparableConformance"});
+
+    if (stdlibProtos.empty())
+      return;
+
+    SmallVector<Decl *, 64> decls;
+    M.getTopLevelDeclsWithAuxiliaryDecls(decls);
+
+    struct ConformanceRecord {
+      NominalTypeDecl *type;
+      std::string confDescSymbol;
+      const char *recordName;
+    };
+    SmallVector<ConformanceRecord, 8> records;
+
+    for (auto *D : decls) {
+      auto *NTD = dyn_cast<NominalTypeDecl>(D);
+      if (!NTD || isa<ProtocolDecl>(NTD) || isa<ClassDecl>(NTD))
+        continue;
+      if (NTD->getModuleContext() != &M)
+        continue;
+      if (!printer.shouldInclude(NTD))
+        continue;
+
+      for (auto &sp : stdlibProtos) {
+        SmallVector<ProtocolConformance *, 1> conformances;
+        if (!NTD->lookupConformance(sp.proto, conformances))
+          continue;
+        if (conformances.empty())
+          continue;
+
+        auto *conf = conformances.front()->getRootConformance();
+        auto confDescEntity =
+            irgen::LinkEntity::forProtocolConformanceDescriptor(conf);
+        records.push_back(
+            {NTD, confDescEntity.mangleAsString(ctx), sp.recordName});
+      }
+    }
+
+    if (records.empty())
+      return;
+
+    auto moduleName = M.getName().str();
+
+    // Conformance descriptor extern declarations go inside the module
+    // namespace (which outOfLineDefinitionsOS is already inside of),
+    // wrapped in _impl.
+    outOfLineDefinitionsOS << "// Conformance records for stdlib protocols.\n";
+    outOfLineDefinitionsOS << "namespace "
+                           << cxx_synthesis::getCxxImplNamespaceName()
+                           << " {\n";
+    for (auto &r : records) {
+      outOfLineDefinitionsOS << "SWIFT_EXTERN const char " << r.confDescSymbol
+                             << "[];\n";
+    }
+    outOfLineDefinitionsOS << "} // namespace "
+                           << cxx_synthesis::getCxxImplNamespaceName()
+                           << "\n\n";
+
+    // Conformance record specializations must be at global scope
+    // (outside the module namespace) to specialize swift:: templates.
+    ClangSyntaxPrinter syntaxPrinter(ctx, globalScopeDefinitionsOS);
+    globalScopeDefinitionsOS << "#pragma clang diagnostic push\n";
+    globalScopeDefinitionsOS
+        << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
+    for (auto &r : records) {
+      globalScopeDefinitionsOS << "template<>\n";
+      globalScopeDefinitionsOS << "struct swift::" << r.recordName << "<"
+                             << moduleName << "::";
+      syntaxPrinter.printBaseName(r.type);
+      globalScopeDefinitionsOS << "> {\n";
+      globalScopeDefinitionsOS
+          << "  static inline const void* getWitnessTable() {\n"
+          << "    static const void *wt = swift::_impl::swift_getWitnessTable("
+          << moduleName << "::"
+          << cxx_synthesis::getCxxImplNamespaceName() << "::" << r.confDescSymbol
+          << ", swift::TypeMetadataTrait<" << moduleName << "::";
+      syntaxPrinter.printBaseName(r.type);
+      globalScopeDefinitionsOS
+          << ">::getTypeMetadata(), nullptr);\n"
+          << "    return wt;\n"
+          << "  }\n";
+      globalScopeDefinitionsOS << "};\n\n";
+    }
+    globalScopeDefinitionsOS << "#pragma clang diagnostic pop\n";
+  }
+
   void write() {
     SmallVector<Decl *, 64> decls;
     M.getTopLevelDeclsWithAuxiliaryDecls(decls);
@@ -1097,6 +1211,13 @@ public:
             make_range(groupBegin, objcDelayedMembers.end()));
       }
 
+    // Emit conformance records for stdlib protocols
+    // (Equatable, Hashable, Comparable) before the out-of-line
+    // definitions are flushed.
+    if (outputLangMode == OutputLanguageMode::Cxx &&
+        M.getASTContext().LangOpts.hasFeature(Feature::CxxExistentialInterop))
+      emitStdlibConformanceRecords();
+
     // Print any out of line definitions.
     os << outOfLineDefinitionsOS.str();
 
@@ -1124,13 +1245,26 @@ public:
         llvm::remove_if(
             removedVDList,
             [&](const ValueDecl *vd) {
-              return !printer.isVisible(vd) || vd->isObjC() ||
-                     (vd->isStdlibDecl() && !vd->getName().isSpecial() &&
-                      vd->getBaseIdentifier().hasUnderscoredNaming()) ||
-                     (vd->isStdlibDecl() && isa<StructDecl>(vd)) ||
-                     (vd->isStdlibDecl() &&
-                      vd->getASTContext().getErrorDecl() == vd) ||
-                     swift::hasExposeNotCxxAttr(vd);
+              if (!printer.isVisible(vd) || vd->isObjC() ||
+                  (vd->isStdlibDecl() && !vd->getName().isSpecial() &&
+                   vd->getBaseIdentifier().hasUnderscoredNaming()) ||
+                  (vd->isStdlibDecl() && isa<StructDecl>(vd)) ||
+                  (vd->isStdlibDecl() &&
+                   vd->getASTContext().getErrorDecl() == vd) ||
+                  swift::hasExposeNotCxxAttr(vd))
+                return true;
+              if (auto *PD = dyn_cast<ProtocolDecl>(vd)) {
+                if (M.getASTContext().LangOpts.hasFeature(
+                        Feature::CxxExistentialInterop)) {
+                  if (auto kind = PD->getKnownProtocolKind()) {
+                    if (*kind == KnownProtocolKind::Equatable ||
+                        *kind == KnownProtocolKind::Hashable ||
+                        *kind == KnownProtocolKind::Comparable)
+                      return true;
+                  }
+                }
+              }
+              return false;
             }),
         removedVDList.end());
     // Sort the unavaiable decls by their name and kind.
@@ -1348,6 +1482,12 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
           [&](raw_ostream &os) { os << moduleOS.str(); },
           ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate, &M);
   os << "#pragma clang diagnostic pop\n";
+
+  // Emit global-scope definitions (conformance record specializations)
+  // after the module namespace is closed.
+  auto globalDefs = writer.getGlobalScopeDefinitions();
+  if (!globalDefs.empty())
+    os << "\n" << globalDefs;
 
   if (M.isStdlibModule()) {
     os << "#pragma clang diagnostic pop\n";
