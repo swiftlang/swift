@@ -71,6 +71,7 @@ public struct UnownedJob: Sendable {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Create an `UnownedJob` whose lifetime must be managed carefully until it is run exactly once.
   @available(StdlibDeploymentTarget 5.9, *)
+  @diagnose(DeprecatedDeclaration, as: ignored)
   public init(_ job: __owned Job) { // must remain '__owned' in order to not break ABI
     self.context = job.context
   }
@@ -248,6 +249,7 @@ public struct Job: Sendable, ~Copyable {
 }
 
 @available(SwiftStdlib 5.9, *)
+@diagnose(DeprecatedDeclaration, as: ignored)
 extension Job {
 
   /// Run this job on the passed in executor.
@@ -289,6 +291,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
     self.context = job._context
   }
 
+  @diagnose(DeprecatedDeclaration, as: ignored)
   public init(_ job: __owned Job) {
     self.context = job.context
   }

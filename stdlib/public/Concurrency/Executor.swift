@@ -501,11 +501,13 @@ extension Executor {
   }
 
   @inlinable
+  @diagnose(DeprecatedDeclaration, as: ignored)
   public func enqueue(_ job: consuming ExecutorJob) {
     self.enqueue(Job(job))
   }
 
   @inlinable
+  @diagnose(DeprecatedDeclaration, as: ignored)
   public func enqueue(_ job: consuming Job) {
     self.enqueue(UnownedJob(job))
   }
