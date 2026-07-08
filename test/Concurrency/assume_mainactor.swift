@@ -299,6 +299,17 @@ class SubKlass: Klass {
   // CHECK: // SubKlass.init()
   // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor8SubKlassCACycfc : $@convention(method) (@owned SubKlass) -> @owned SubKlass {
+
+  // Implicit deinit
+  // CHECK: // SubKlass.deinit
+  // CHECK-NEXT: // Isolation: global_actor. type: MainActor
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor8SubKlassCfd : $@convention(method) (@guaranteed SubKlass) -> @owned Builtin.NativeObject {
+
+  // Implicit deallocating deinit
+  // CHECK: // SubKlass.__deallocating_deinit
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor8SubKlassCfD : $@convention(method) (@owned SubKlass) -> () {
+  // CHECK: swift_task_deinitOnExecutor
 }
 
 class NonisolatedBase {
@@ -331,4 +342,35 @@ class OverrideSub: NonisolatedBase {
   // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor11OverrideSubCyS2icis : $@convention(method) (Int, Int, @guaranteed OverrideSub) -> () {
   override subscript(i: Int) -> Int { get { 0 } set {} }
+}
+
+class MainActorBase {
+  func method() {}
+}
+
+// Overridden methods should remain MainActor.
+class MainActorSub: MainActorBase {
+  // CHECK: // MainActorSub.method()
+  // CHECK-NEXT: // Isolation: global_actor. type: MainActor
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor12MainActorSubC6methodyyF : $@convention(method) (@guaranteed MainActorSub) -> () {
+  override func method() {}
+}
+
+@CustomActor
+class CustomActorBase {
+  func isolatedMethod() {}
+  nonisolated func nonisolatedMethod() {}
+}
+
+// Overrides inherit the superclass's global actor, not the MainActor default.
+class CustomActorSub: CustomActorBase {
+  // CHECK: // CustomActorSub.isolatedMethod()
+  // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor14CustomActorSubC14isolatedMethodyyF : $@convention(method) (@guaranteed CustomActorSub) -> () {
+  override func isolatedMethod() {}
+
+  // CHECK: // CustomActorSub.nonisolatedMethod()
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor14CustomActorSubC17nonisolatedMethodyyF : $@convention(method) (@guaranteed CustomActorSub) -> () {
+  override func nonisolatedMethod() {}
 }
