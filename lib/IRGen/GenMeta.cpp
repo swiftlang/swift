@@ -8218,6 +8218,27 @@ llvm::GlobalValue *irgen::emitCoroFunctionPointer(IRGenModule &IGM,
       IGM.defineCoroFunctionPointer(entity, builder.finishAndCreateFuture()));
 }
 
+// Same as above, but can be used for synthetic functions that
+// don't have a matching SIL function.
+llvm::Constant *irgen::emitLocalCoroFunctionPointer(IRGenModule &IGM,
+                                                    llvm::Function *function,
+                                                    llvm::StringRef name) {
+  ConstantInitBuilder initBuilder(IGM);
+  ConstantStructBuilder builder(
+      initBuilder.beginStruct(IGM.CoroFunctionPointerTy));
+  builder.addCompactFunctionReference(function);
+  builder.addInt32(0);
+  auto *typeId = IGM.getMallocTypeId(function);
+  ASSERT(typeId->getIntegerType() == IGM.Int64Ty);
+  builder.addInt64(typeId->getLimitedValue());
+  // Internal linkage: each module that needs it gets its own copy, so there is
+  // no external symbol to resolve.
+  auto *var = builder.finishAndCreateGlobal(name, IGM.getPointerAlignment(),
+                                            /*constant*/ true,
+                                            llvm::GlobalValue::InternalLinkage);
+  return var;
+}
+
 static FormalLinkage getExistentialShapeLinkage(CanGenericSignature genSig,
                                                 CanType shapeType) {
   auto typeLinkage = getTypeLinkage(shapeType);
