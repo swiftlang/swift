@@ -137,8 +137,8 @@ public struct HeapObject {
 @_extern(c, "_swift_allocate")
 public func _swift_allocate(_ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong) -> UnsafeMutableRawPointer?
 
-@_extern(c, "_swift_free")
-public func _swift_free(_ p: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong)
+@_extern(c, "_swift_deallocate")
+public func _swift_deallocate(_ p: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong)
 
 @_extern(c, "_swift_generateRandom")
 public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
@@ -197,7 +197,7 @@ public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPo
 @c
 public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int) {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  unsafe _swift_free(ptr, size, alignMask, 0)
+  unsafe _swift_deallocate(ptr, size, alignMask, 0)
 #else
   unsafe free(ptr)
 #endif
