@@ -24,6 +24,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_dependencies(embedded-libraries embedded-single-threaded-shim)
   add_custom_target(embedded-multi-threaded-posix-shim)
   add_dependencies(embedded-libraries embedded-multi-threaded-posix-shim)
+  add_custom_target(embedded-multi-threaded-darwin-shim)
+  add_dependencies(embedded-libraries embedded-multi-threaded-darwin-shim)
 
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
@@ -147,5 +149,40 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     set_property(TARGET embedded-multi-threaded-posix-shim-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
 
     add_dependencies(embedded-multi-threaded-posix-shim embedded-multi-threaded-posix-shim-${mod})
+
+    # The Darwin-specific `os_unfair_lock` shim is only meaningful on Apple
+    # target triples.
+    if("${triple}" MATCHES "-apple-")
+      add_swift_target_library_single(
+        embedded-multi-threaded-darwin-shim-${mod}
+        swiftEmbeddedPlatformMultiThreadedDarwin
+        STATIC
+        IS_FRAGILE
+        PARTIAL_SOURCES_INTENDED
+
+        EmbeddedPlatformMultiThreadedDarwin.c
+
+        C_COMPILE_FLAGS ${extra_c_compile_flags} -I${CMAKE_CURRENT_SOURCE_DIR}/swift
+        MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+        SDK "embedded"
+        ARCHITECTURE "${mod}"
+        DEPENDS embedded-stdlib-${mod}
+        INSTALL_IN_COMPONENT stdlib
+        )
+      swift_install_in_component(
+        TARGETS embedded-multi-threaded-darwin-shim-${mod}
+        DESTINATION "lib/swift/embedded/${mod}"
+        COMPONENT "stdlib"
+        )
+      swift_install_in_component(
+        FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswiftEmbeddedPlatformMultiThreadedDarwin.a"
+        DESTINATION "lib/swift/embedded/${mod}/"
+        COMPONENT "stdlib"
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+        )
+      set_property(TARGET embedded-multi-threaded-darwin-shim-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+
+      add_dependencies(embedded-multi-threaded-darwin-shim embedded-multi-threaded-darwin-shim-${mod})
+    endif()
   endforeach()
 endif()
