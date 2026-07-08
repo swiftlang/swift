@@ -225,7 +225,7 @@ public func swift_allocObjectTyped(metadata: Builtin.RawPointer, requiredSize: I
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutablePointer<ClassMetadata>(metadata))
   unsafe object.pointee.refcount = 1
-  return unsafe p._rawValue
+  return p._rawValue
 #else
   swift_allocObject(metadata: metadata, requiredSize: requiredSize, requiredAlignmentMask: requiredAlignmentMask)
 #endif
@@ -1005,7 +1005,7 @@ public func swift_getPlatformLayerVersion(
   _ minor: UnsafeMutablePointer<Int>
 ) {
   unsafe major.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR
-  unsafe minor.pointee = 0 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
+  unsafe minor.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
 }
 #endif
 
