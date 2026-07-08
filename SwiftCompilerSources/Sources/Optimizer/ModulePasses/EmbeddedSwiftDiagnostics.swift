@@ -111,12 +111,9 @@ private struct FunctionChecker {
       }
 
     case let kpi as KeyPathInst:
-      if !context.options.hasFeature(.EmbeddedKeyPaths) ||
-          !kpi.supportedInEmbeddedSwift {
+      guard let context.options.hasFeature(.EmbeddedKeyPaths), kpi.supportedInEmbeddedSwift else {
         throw Diagnostic(.embedded_swift_keypath, at: instruction.location)
       }
-
-      break
 
     case is CheckedCastAddrBranchInst,
          is UnconditionalCheckedCastAddrInst:
