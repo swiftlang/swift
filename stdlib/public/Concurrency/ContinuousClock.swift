@@ -114,10 +114,42 @@ extension ContinuousClock: Clock {
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    if #available(StdlibDeploymentTarget 6.3, *) {
-      try await Task._sleep(until: deadline,
-                            tolerance: tolerance,
-                            clock: self)
+    if #available(StdlibDeploymentTarget 9999, *) {
+      guard let executor = Task.currentContinuousClockExecutor else {
+        fatalError("No active ContinuousClockExecutor found")
+      }
+
+      // Split-continuation form (install-after): enqueue the resume half *first*,
+      // then install the cancellation / escalation handlers around the await of
+      // the await half. This orders `enqueue` strictly before any handler can
+      // fire, so a `cancel` can never arrive before `enqueue`.
+      //
+      // The `~Escapable` awaiter can't be consumed directly through the nested
+      // handler closures, so we move it into a local `Optional` var and
+      // `take()` it back out inside the innermost closure -- a mutating access
+      // to the captured var rather than a consume of the capture.
+      try await withExecutorContinuation(
+        of: Void.self, throwing: (any Error).self
+      ) { (
+        producer: consuming ExecutorContinuation<Void, CancellationError>,
+        awaiter: consuming ExecutorContinuationAwaiter<Void, CancellationError>
+      ) in
+        let token = executor.enqueue(
+          producer,
+          at: deadline,
+          tolerance: tolerance
+        )
+        var awaiterBox = Optional(awaiter)
+        return try await withTaskCancellationHandler {
+          try await withTaskPriorityEscalationHandler {
+            try await awaiterBox.take()!.wait()
+          } onPriorityEscalated: { (_, newPriority) in
+            executor.escalatePriority(of: token, to: newPriority)
+          }
+        } onCancel: {
+          executor.cancel(token)
+        }
+      }
     } else {
       fatalError("we should never get here; if we have, availability is broken")
     }

@@ -28,6 +28,7 @@
 ///
 ///===------------------------------------------------------------------===///
 
+#include <atomic>
 #include <cstddef>
 
 #include "swift/Basic/Casting.h"
@@ -198,18 +199,6 @@ static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
   return queue;
 }
 
-// Get a queue suitable for dispatch_after. Use the cooperative queues on OS
-// versions where they work with dispatch_after, and use a standard global
-// queue where cooperative queues don't work.
-static dispatch_queue_t getTimerQueue(SwiftJobPriority priority) {
-  // On newer OSes, we can use the cooperative queues.
-  if (__builtin_available(macOS 12.3, iOS 15.4, tvOS 15.4, watchOS 8.5, *))
-    return getGlobalQueue(priority);
-
-  // On older OSes, use a standard global queue.
-  return dispatch_get_global_queue((dispatch_qos_class_t)priority, /*flags*/ 0);
-}
-
 extern "C" SWIFT_CC(swift)
 void swift_dispatchEnqueueGlobal(SwiftJob *job) {
   assert(job && "no job provided");
@@ -254,19 +243,6 @@ void swift_dispatchEnqueueGlobal(SwiftJob *job) {
 #define DISPATCH_WALLTIME_MASK  (1ULL << 62)
 #define DISPATCH_TIME_MAX_VALUE (DISPATCH_WALLTIME_MASK - 1)
 
-struct __swift_job_source {
-  dispatch_source_t source;
-  SwiftJob *job;
-};
-
-static void _swift_run_job_leeway(struct __swift_job_source *jobSource) {
-  dispatch_source_t source = jobSource->source;
-  dispatch_release(source);
-  SwiftJob *job = jobSource->job;
-  swift_job_dealloc(job, jobSource);
-  __swift_run_job(job);
-}
-
 #if defined(__i386__) || defined(__x86_64__) || !defined(__APPLE__)
 #define TIME_UNIT_USES_NANOSECONDS 1
 #else
@@ -303,8 +279,7 @@ platform_time(uint64_t nsec) {
 #endif
 #endif
 
-static inline dispatch_time_t
-clock_and_value_to_time(int clock, long long sec, long long nsec) {
+static inline uint64_t deadline_from_sec_nsec(long long sec, long long nsec) {
   uint64_t deadline;
   if (sec < 0 || (sec == 0 && nsec < 0))
     deadline = 0;
@@ -312,6 +287,12 @@ clock_and_value_to_time(int clock, long long sec, long long nsec) {
       || __builtin_add_overflow(nsec, deadline, &deadline)) {
     deadline = UINT64_MAX;
   }
+  return deadline;
+}
+
+static inline dispatch_time_t clock_and_value_to_time(int clock, long long sec,
+                                                      long long nsec) {
+  uint64_t deadline = deadline_from_sec_nsec(sec, nsec);
   uint64_t value = platform_time((uint64_t)deadline);
   if (value >= DISPATCH_TIME_MAX_VALUE) {
     return DISPATCH_TIME_FOREVER;
@@ -332,62 +313,77 @@ clock_and_value_to_time(int clock, long long sec, long long nsec) {
   __builtin_unreachable();
 }
 
+// ==== Per-clock timer for the Swift-owned scheduler ========================
+//
+// A minimal dispatch timer that owns *no* scheduling state: it simply fires
+// at the deadline it was last set to and calls back into Swift, which owns
+// the pending-job map, the deadline ordering, cancellation, and single
+// delivery.  There is one of these per clock (continuous / suspending /
+// walltime), created once and re-armed as the earliest deadline changes.
+
+struct swift_dispatch_timer {
+  dispatch_source_t source;
+  void (*fire)(void *);
+  void *context;
+  int clock;
+};
+
+static void _swift_dispatch_timer_fire(void *ptr) {
+  auto *timer = static_cast<swift_dispatch_timer *>(ptr);
+  timer->fire(timer->context);
+}
+
 extern "C" SWIFT_CC(swift)
-void swift_dispatchEnqueueWithDeadline(bool global,
-                                       long long sec,
-                                       long long nsec,
-                                       long long tsec,
-                                       long long tnsec,
-                                       int clock, SwiftJob *job) {
-  assert(job && "no job provided");
+void *swift_dispatchTimerCreate(int clock, int qos, void (*fire)(void *), void *context) {
+  auto *timer =
+      static_cast<swift_dispatch_timer *>(malloc(sizeof(swift_dispatch_timer)));
+  timer->fire = fire;
+  timer->context = context;
+  timer->clock = clock;
 
-  SwiftJobPriority priority = swift_job_getPriority(job);
-
+  // qos < 0 is the sentinel for "the main queue"; otherwise it is a
+  // dispatch_qos_class_t and we target the matching global concurrent queue so
+  // that a resumed continuation is donated on a worker of the right QoS.
   dispatch_queue_t queue;
-
-  if (global) {
-    queue = getTimerQueue(priority);
-
-    job->schedulerPrivate[SwiftJobDispatchQueueIndex] =
-      DISPATCH_QUEUE_GLOBAL_EXECUTOR;
-  } else {
+  if (qos < 0) {
     queue = dispatch_get_main_queue();
-
-    job->schedulerPrivate[SwiftJobDispatchQueueIndex] = queue;
-  }
-
-  dispatch_time_t when = clock_and_value_to_time(clock, sec, nsec);
-
-  if (tnsec != -1) {
-    uint64_t leeway;
-    if (tsec < 0 || (tsec == 0 && tnsec < 0))
-      leeway = 0;
-    else if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
-             || __builtin_add_overflow(tnsec, leeway, &leeway)) {
-      leeway = UINT64_MAX;
-    }
-
-    dispatch_source_t source =
-      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
-    dispatch_source_set_timer(source, when, DISPATCH_TIME_FOREVER, leeway);
-
-    size_t sz = sizeof(struct __swift_job_source);
-
-    struct __swift_job_source *jobSource =
-      (struct __swift_job_source *)swift_job_alloc(job, sz);
-
-    jobSource->job = job;
-    jobSource->source = source;
-
-    dispatch_set_context(source, jobSource);
-    dispatch_source_set_event_handler_f(source,
-      (dispatch_function_t)&_swift_run_job_leeway);
-
-    dispatch_activate(source);
   } else {
-    dispatch_after_f(when, queue, (void *)job,
-      (dispatch_function_t)&__swift_run_job);
+    queue = dispatch_get_global_queue((dispatch_qos_class_t)qos, 0);
+    if (!queue)
+      queue = dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0);
   }
+  dispatch_source_t source =
+      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+  // Start disarmed.
+  dispatch_source_set_timer(source, DISPATCH_TIME_FOREVER,
+                            DISPATCH_TIME_FOREVER, 0);
+  timer->source = source;
+  dispatch_set_context(source, timer);
+  dispatch_source_set_event_handler_f(source, _swift_dispatch_timer_fire);
+  dispatch_activate(source);
+  return timer;
+}
+
+extern "C" SWIFT_CC(swift)
+void swift_dispatchTimerSet(void *ptr, long long sec, long long nsec,
+                            long long leewaySec, long long leewayNsec) {
+  auto *timer = static_cast<swift_dispatch_timer *>(ptr);
+  dispatch_time_t when = clock_and_value_to_time(timer->clock, sec, nsec);
+  uint64_t leeway;
+  if (leewaySec < 0 || (leewaySec == 0 && leewayNsec < 0)) {
+    leeway = 0;
+  } else if (__builtin_mul_overflow(leewaySec, NSEC_PER_SEC, &leeway) ||
+             __builtin_add_overflow(leewayNsec, leeway, &leeway)) {
+    leeway = UINT64_MAX;
+  }
+  dispatch_source_set_timer(timer->source, when, DISPATCH_TIME_FOREVER, leeway);
+}
+
+extern "C" SWIFT_CC(swift)
+void swift_dispatchTimerDisarm(void *ptr) {
+  auto *timer = static_cast<swift_dispatch_timer *>(ptr);
+  dispatch_source_set_timer(timer->source, DISPATCH_TIME_FOREVER,
+                            DISPATCH_TIME_FOREVER, 0);
 }
 
 extern "C" SWIFT_CC(swift)

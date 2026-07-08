@@ -66,7 +66,6 @@ Perform asynchronous and parallel operations.
 - ``Swift/UnownedTaskExecutor``
 - ``Swift/UnimplementedMainExecutor``
 - ``Swift/UnimplementedTaskExecutor``
-- ``SchedulingExecutor``
 - ``Swift/globalConcurrentExecutor``
 - ``Swift/withTaskExecutorPreference(_:isolation:operation:)``
 

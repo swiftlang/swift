@@ -92,60 +92,27 @@ internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
 }
 
 #if !$Embedded
+// Global job scheduling with a delay/deadline is not supported by the
+// continuation-native executor.  Time-based suspension is now expressed through
+// the clock executors' *continuation* `enqueue` (see `Clock.sleep`).  These
+// legacy runtime hooks remain only for ABI stability; a future design may
+// reintroduce job-based deadline scheduling via the clock executors' job
+// `enqueue` requirement.
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueGlobalWithDelayImpl")
-@diagnose(UselessAvailabilityCheck, as: ignored)
 internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,
                                       job unownedJob: UnownedJob) {
-  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  if #available(StdlibDeploymentTarget 6.3, *) {
-    Task.defaultExecutor.asSchedulingExecutor!.enqueue(ExecutorJob(unownedJob),
-                                                       after: .nanoseconds(delay),
-                                                       clock: .continuous)
-  } else {
-    fatalError("this should never happen")
-  }
-  #else
-  fatalError("swift_task_enqueueGlobalWithDelay() not supported for task-to-thread")
-  #endif
+  fatalError("swift_task_enqueueGlobalWithDelay is not supported")
 }
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueGlobalWithDeadlineImpl")
-@diagnose(UselessAvailabilityCheck, as: ignored)
 internal func enqueueOnGlobalExecutor(seconds: CLongLong,
                                       nanoseconds: CLongLong,
                                       leewaySeconds: CLongLong,
                                       leewayNanoseconds: CLongLong,
                                       clock: CInt,
                                       job unownedJob: UnownedJob) {
-  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  let delay = Duration.seconds(seconds) + Duration.nanoseconds(nanoseconds)
-  let leeway = Duration.seconds(leewaySeconds) + Duration.nanoseconds(leewayNanoseconds)
-  if #available(StdlibDeploymentTarget 6.3, *) {
-    switch clock {
-      case _ClockID.suspending.rawValue:
-        Task.defaultExecutor.asSchedulingExecutor!.enqueue(
-          ExecutorJob(unownedJob),
-          after: delay,
-          tolerance: leeway,
-          clock: .suspending
-        )
-      case _ClockID.continuous.rawValue:
-        Task.defaultExecutor.asSchedulingExecutor!.enqueue(
-          ExecutorJob(unownedJob),
-          after: delay,
-          tolerance: leeway,
-          clock: .continuous
-        )
-      default:
-        fatalError("Unknown clock ID \(clock)")
-    }
-  } else {
-    fatalError("this should never happen")
-  }
-  #else
-  fatalError("swift_task_enqueueGlobalWithDeadline() not supported for task-to-thread")
-  #endif
+  fatalError("swift_task_enqueueGlobalWithDeadline is not supported")
 }
 #endif

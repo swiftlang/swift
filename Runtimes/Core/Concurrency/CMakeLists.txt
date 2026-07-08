@@ -73,6 +73,10 @@ add_library(swift_Concurrency
   DiscardingTaskGroup.swift
   Errors.swift
   Executor.swift
+  ContinuousClockExecutor.swift
+  ExecutorContinuation.swift
+  OperationExecutor.swift
+  SuspendingClockExecutor.swift
   ExecutorAssertions.swift
   ExecutorBridge.swift
   GlobalActor.swift
@@ -146,7 +150,6 @@ target_link_libraries(swift_Concurrency PRIVATE
   swiftConcurrencyInternalShims
   $<$<BOOL:${BUILD_SHARED_LIBS}>:swiftThreading>
   $<$<PLATFORM_ID:Android>:log>
-  $<$<PLATFORM_ID:Windows>:Synchronization>
   $<$<PLATFORM_ID:Windows>:mincore>
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
   # Link to the runtime that we are just building.
