@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/objc_sending_execution.m -c -o %t/objc_sending_execution.o
-// RUN: %target-build-swift -import-objc-header %S/Inputs/objc_sending_execution.h -Xlinker %t/objc_sending_execution.o %s -o %t/a.out
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -import-objc-header %S/Inputs/objc_sending_execution.h -Xlinker %t/objc_sending_execution.o %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
@@ -12,7 +12,7 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %target-clang -O3 -fobjc-arc %S/Inputs/objc_sending_execution.m -c -o %t/objc_sending_execution.o
-// RUN: %target-build-swift -O -import-objc-header %S/Inputs/objc_sending_execution.h -Xlinker %t/objc_sending_execution.o %s -o %t/a.out
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -O -import-objc-header %S/Inputs/objc_sending_execution.h -Xlinker %t/objc_sending_execution.o %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
