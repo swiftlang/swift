@@ -19,6 +19,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/Linking.h"
@@ -283,9 +284,25 @@ void ClangExistentialTypePrinter::printImplFromExistentialFactory(
     const ProtocolDecl *PD, DeclAndTypePrinter &declAndTypePrinter) {
   ClangSyntaxPrinter printer(PD->getASTContext(), os);
 
+  auto pats = PD->getPrimaryAssociatedTypes();
+  if (!pats.empty()) {
+    os << "  template <";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << "typename " << pat->getNameStr();
+    });
+    os << ">\n";
+  }
+
   os << "  static ";
   printer.printInlineForThunk();
   printer.printBaseName(PD);
+  if (!pats.empty()) {
+    os << "<";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << pat->getNameStr();
+    });
+    os << ">";
+  }
   if (isClassBound) {
     os << " _fromExistential("
           "void *_Nullable classPtr, "
@@ -298,6 +315,13 @@ void ClangExistentialTypePrinter::printImplFromExistentialFactory(
   }
   os << "    ";
   printer.printBaseName(PD);
+  if (!pats.empty()) {
+    os << "<";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << pat->getNameStr();
+    });
+    os << ">";
+  }
   os << " result;\n";
   if (isClassBound) {
     os << "    result._value = classPtr;\n";
@@ -455,6 +479,15 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
 
     // Existential wrapper class: subclass of SwiftExistentialType
     // or SwiftClassExistentialType for class-bound protocols.
+    // Protocols with primary associated types become class templates.
+    auto pats = PD->getPrimaryAssociatedTypes();
+    if (!pats.empty()) {
+      os << "template <";
+      llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+        os << "typename " << pat->getNameStr() << " = swift::Any";
+      });
+      os << ">\n";
+    }
     os << "class";
     declAndTypePrinter.printAvailability(os, PD);
     ClangSyntaxPrinter(PD->getASTContext(), os).printSymbolUSRAttribute(PD);
@@ -515,33 +548,82 @@ void ClangExistentialTypePrinter::printExistentialTypeDecl(
 void ClangExistentialTypePrinter::printImplGetOpaquePointer(
     const ProtocolDecl *PD) {
   ClangSyntaxPrinter printer(PD->getASTContext(), os);
+  auto pats = PD->getPrimaryAssociatedTypes();
+  auto printProtoName = [&]() {
+    printer.printBaseName(PD);
+    if (!pats.empty()) {
+      os << "<";
+      llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+        os << pat->getNameStr();
+      });
+      os << ">";
+    }
+  };
+
   // const overload
+  if (!pats.empty()) {
+    os << "  template <";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << "typename " << pat->getNameStr();
+    });
+    os << ">\n";
+  }
   os << "  static ";
   printer.printInlineForThunk();
   os << "const char * _Nonnull getOpaquePointer(const ";
-  printer.printBaseName(PD);
+  printProtoName();
   os << " &object) { return reinterpret_cast<const char *>(&object); }\n";
 
   // non-const overload
+  if (!pats.empty()) {
+    os << "  template <";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << "typename " << pat->getNameStr();
+    });
+    os << ">\n";
+  }
   os << "  static ";
   printer.printInlineForThunk();
   os << "char * _Nonnull getOpaquePointer(";
-  printer.printBaseName(PD);
+  printProtoName();
   os << " &object) { return reinterpret_cast<char *>(&object); }\n";
 }
 
 void ClangExistentialTypePrinter::printImplReturnNewValue(
     const ProtocolDecl *PD) {
   ClangSyntaxPrinter printer(PD->getASTContext(), os);
+  auto pats = PD->getPrimaryAssociatedTypes();
 
-  os << "  template <class T>\n";
+  os << "  template <";
+  bool needsComma = false;
+  for (auto *pat : pats) {
+    if (needsComma) os << ", ";
+    os << "typename " << pat->getNameStr();
+    needsComma = true;
+  }
+  if (needsComma) os << ", ";
+  os << "class T>\n";
 
   os << "  static ";
   printer.printInlineForHelperFunction();
   printer.printBaseName(PD);
+  if (!pats.empty()) {
+    os << "<";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << pat->getNameStr();
+    });
+    os << ">";
+  }
   os << " returnNewValue(T callable) {\n";
   os << "    ";
   printer.printBaseName(PD);
+  if (!pats.empty()) {
+    os << "<";
+    llvm::interleaveComma(pats, os, [&](const AssociatedTypeDecl *pat) {
+      os << pat->getNameStr();
+    });
+    os << ">";
+  }
   os << " result;\n";
   os << "    callable(reinterpret_cast<char *>(&result));\n";
   os << "    return result;\n";
@@ -555,6 +637,8 @@ void ClangExistentialTypePrinter::printBoxingConstructors(
   ClangSyntaxPrinter printer(PD->getASTContext(), os);
   ClangSyntaxPrinter ooPrinter(PD->getASTContext(), outOfLineOS);
 
+  auto pats = PD->getPrimaryAssociatedTypes();
+
   for (auto &c : boxingConformances) {
     // Inline declaration (forward-declared type is enough).
     os << "  ";
@@ -567,9 +651,27 @@ void ClangExistentialTypePrinter::printBoxingConstructors(
     // Out-of-line definition (emitted after all types are declared).
     outOfLineOS << "#if defined(SWIFT_CXX_EXISTENTIAL_INTEROP) && "
                    "defined(__cpp_concepts) && __cpp_concepts >= 202002L\n";
+    // For protocols with primary associated types (class templates),
+    // emit a template prefix and qualified name with template args.
+    if (!pats.empty()) {
+      outOfLineOS << "  template <";
+      llvm::interleaveComma(pats, outOfLineOS,
+                            [&](const AssociatedTypeDecl *pat) {
+                              outOfLineOS << "typename " << pat->getNameStr();
+                            });
+      outOfLineOS << ">\n";
+    }
     outOfLineOS << "  ";
     ooPrinter.printInlineForThunk();
     ooPrinter.printBaseName(PD);
+    if (!pats.empty()) {
+      outOfLineOS << "<";
+      llvm::interleaveComma(pats, outOfLineOS,
+                            [&](const AssociatedTypeDecl *pat) {
+                              outOfLineOS << pat->getNameStr();
+                            });
+      outOfLineOS << ">";
+    }
     outOfLineOS << "::";
     ooPrinter.printBaseName(PD);
     outOfLineOS << "(const ";

@@ -10,6 +10,11 @@ public protocol Stylable: Drawable {
     func style() -> Bool
 }
 
+public protocol Container<Element> {
+    associatedtype Element
+    func count() -> Int
+}
+
 public protocol Renderable: AnyObject {
     func render() -> Int
 }
@@ -31,6 +36,13 @@ public struct StyledCircle: Stylable {
     public init(radius: Int) { self.radius = radius }
     public func draw() -> Int { return radius * radius * 3 }
     public func style() -> Bool { return radius > 5 }
+}
+
+public struct IntArray: Container {
+    public typealias Element = Int
+    var n: Int
+    public init(count: Int) { self.n = count }
+    public func count() -> Int { return n }
 }
 
 public class Canvas: Renderable {
