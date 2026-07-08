@@ -149,7 +149,7 @@ need the complete `ValueWitnessTable` type and ptrauth discriminators.
    (e.g., `Container<Element = swift::Any>`).
 
 ```c++
-class Any : public _impl::SwiftExistentialType {
+class Any : public _impl::SwiftExistentialType<> {
 protected:
   Any() noexcept : SwiftExistentialType(uninit_t{}) {}
 };
@@ -161,30 +161,37 @@ APIs for unboxing.
 #### Per-protocol wrapper classes
 
 Each non-marker protocol `P` emits a `final` class inheriting from
-`SwiftExistentialType`. The class adds a single `_witnessTable` pointer
-(not an array -- protocol inheritance does NOT add witness tables; multiple
-WTs only arise from ad-hoc compositions like `any A & B`).
+`SwiftExistentialType<_impl::PTag>`. The tag struct's `WitnessTable`
+member type indicates the protocol contributes one witness table slot.
+The `_witnessTables` array is in the base class template, sized by the
+number of WT-bearing tags in the pack.
 
 ```c++
+// Tag struct in _impl namespace:
+struct DrawableTag {
+  using WitnessTable = const void *_Nonnull;
+};
+
 // Generated for: public protocol Drawable { func draw() -> Int }
-class Drawable final : public swift::_impl::SwiftExistentialType {
+class Drawable final : public swift::_impl::SwiftExistentialType<_impl::DrawableTag> {
 public:
   swift::Int draw() const {
     struct _w { /* witness function signature */ };
-    return _loadWitness<1, DISC, decltype(&_w::call)>(_witnessTable)(
-        _type, _witnessTable, _projectValue());
+    return _loadWitness<1, DISC, decltype(&_w::call)>(_witnessTables[0])(
+        _type, _witnessTables[0], _projectValue());
   }
   Drawable(const Circle &value) noexcept;  // boxing constructor
 
 private:
-  Drawable() noexcept : SwiftExistentialType(uninit_t{}) {}
-  const void *_witnessTable;
+  Drawable() noexcept : SwiftExistentialType(typename SwiftExistentialType::uninit_t{}) {}
   friend class _impl::_impl_Drawable;
 };
 ```
 
-**Layout:** `[buffer: 3 * sizeof(void*)] [type metadata] [witness table]`
--- 40 bytes total for a single-protocol existential on 64-bit platforms.
+**Layout:** `[buffer: 3 * sizeof(void*)] [type metadata] [witness tables...]`
+-- 40 bytes for a single-protocol existential on 64-bit platforms (one WT slot).
+Protocol inheritance does NOT add witness tables; multiple WT slots only
+arise from ad-hoc compositions like `any A & B`.
 
 **No C++ inheritance between protocol wrappers.** Existential-to-existential
 conversion (e.g., `Stylable` to `Drawable`) is a value copy into a new
@@ -194,12 +201,18 @@ compositions have different container sizes.
 #### Marker protocols
 
 Marker protocols (declared with `@_marker`) have no witness tables and no
-protocol requirements. They emit as `final` subclasses of `swift::Any`:
+protocol requirements. Their tag struct has `static constexpr bool IsMarker = true`
+instead of a `WitnessTable` member. They emit as `final` subclasses of
+`SwiftExistentialType` with a marker tag:
 
 ```c++
-class Priority final : public swift::Any {
+struct PriorityTag {
+  static constexpr bool IsMarker = true;
+};
+
+class Priority final : public swift::_impl::SwiftExistentialType<_impl::PriorityTag> {
 private:
-  Priority() noexcept : Any() {}
+  Priority() noexcept : SwiftExistentialType(typename SwiftExistentialType::uninit_t{}) {}
   friend class _impl::_impl_Priority;
 };
 ```
@@ -218,8 +231,8 @@ swift::Int draw() const {
   struct _w { _w() = delete;
     static SWIFT_CALL swift::Int call(
         void *, const void *, SWIFT_CONTEXT void *); };
-  return _loadWitness<1, DISC, decltype(&_w::call)>(_witnessTable)(
-      _type, _witnessTable, _projectValue());
+  return _loadWitness<1, DISC, decltype(&_w::call)>(_witnessTables[0])(
+      _type, _witnessTables[0], _projectValue());
 }
 ```
 
@@ -240,11 +253,11 @@ container layout:
 
 ```c++
 template <typename Element = swift::Any>
-class Container final : public swift::_impl::SwiftExistentialType {
+class Container final : public swift::_impl::SwiftExistentialType<_impl::ContainerTag> {
 public:
   swift::Int count() const { /* witness dispatch */ }
 private:
-  const void *_witnessTable;
+  friend class _impl::_impl_Container;
 };
 ```
 
@@ -256,10 +269,10 @@ existential wrappers from concrete types:
 ```c++
 // Generated when Circle: Drawable in the same module
 Drawable::Drawable(const Circle &value) noexcept
-    : SwiftExistentialType(uninit_t{}) {
+    : SwiftExistentialType(typename SwiftExistentialType::uninit_t{}) {
   _type = swift::TypeMetadataTrait<Circle>::getTypeMetadata();
-  _witnessTable = reinterpret_cast<const void *>(_impl::$sCircleDrawableWP);
   _initializeWithValue(_impl::_impl_Circle::getOpaquePointer(value));
+  _witnessTables[0] = reinterpret_cast<const void *>(_impl::$sCircleDrawableWP);
 }
 ```
 
@@ -275,12 +288,125 @@ conformances with statically known witness table symbols are supported.
 
 #### Ad-hoc protocol compositions
 
-Ad-hoc compositions (`any A & B`) are not yet supported -- they require
-multiple witness table pointers which changes the container layout. A
-typealias like `typealias AB = A & B` does NOT help because it still
-resolves to a composition type with multiple WTs. The workaround is to
-declare a new protocol: `protocol AB: A, B {}`, which gets a single WT
-with base conformance slots.
+Ad-hoc compositions like `any Drawable & Resizable` emit named wrapper
+classes inheriting from `SwiftExistentialType<DrawableTag, ResizableTag>`.
+The wrapper gets methods from all constituent protocols plus `asFoo()`
+extraction methods:
+
+```c++
+class AnyDrawableAndResizable final
+    : public swift::_impl::SwiftExistentialType<_impl::DrawableTag, _impl::ResizableTag> {
+public:
+  swift::Int draw() const { /* dispatch via _witnessTables[0] */ }
+  bool resize(swift::Int factor) const { /* dispatch via _witnessTables[1] */ }
+
+  Drawable asDrawable() const;
+  Resizable asResizable() const;
+
+private:
+  AnyDrawableAndResizable() noexcept
+      : SwiftExistentialType(typename SwiftExistentialType::uninit_t{}) {}
+  friend class _impl::_impl_AnyDrawableAndResizable;
+};
+```
+
+**Naming.** The class name is `Any` + sorted protocol names joined with
+`And` (e.g., `AnyDrawableAndResizable`). The canonical protocol ordering
+comes from `ExistentialLayout::getProtocols()` -- `any Drawable & Resizable`
+and `any Resizable & Drawable` produce the same type and wrapper.
+
+**WT ordering.** Witness tables in `_witnessTables[]` follow the same
+canonical ordering. For `AnyDrawableAndResizable`, slot 0 is Drawable's
+WT and slot 1 is Resizable's.
+
+**Lazy emission.** Composition wrappers are emitted lazily by
+`DeclAndTypePrinter::ensureCompositionEmitted()` when a function
+signature first references the composition type. A `StringSet<>` ensures
+each composition is emitted at most once per module header.
+
+**`asFoo()` extraction.** Each constituent protocol gets an `asFoo()`
+method that copies the existential buffer into a single-protocol
+wrapper with the corresponding WT. These are needed because C++ has no
+implicit base-to-derived conversion -- the generic subset conversion
+operator (below) produces the base `SwiftExistentialType<Tag>`, not
+the named wrapper class.
+
+**No boxing constructors.** Composition wrappers do not have boxing
+constructors. Compositions are obtained from Swift function returns.
+
+##### Composition parameter convention
+
+Swift functions taking a composition parameter use the base template
+type in C++ rather than the named wrapper class:
+
+```c++
+// Swift: func drawAndResize(_ x: any Drawable & Resizable) -> Int
+swift::Int drawAndResize(
+    const swift::_impl::SwiftExistentialType<
+        Module::_impl::DrawableTag, Module::_impl::ResizableTag>& x);
+```
+
+This allows implicit derived-to-base conversion from any wrapper that
+inherits from the same base, including wider compositions. Return types
+use the named wrapper class so callers get method access:
+
+```c++
+Module::AnyDrawableAndResizable makeDrawableAndResizable();
+```
+
+#### Inverse tags
+
+Protocols that opt out of `Copyable` or `Escapable` via `~Copyable` or
+`~Escapable` get inverse tags appended to their template parameter list:
+
+```c++
+// public protocol Resource: ~Copyable { func use() -> Int }
+class Resource final
+    : public swift::_impl::SwiftExistentialType<_impl::ResourceTag, swift::_impl::NonCopyable> {
+  // ...
+};
+```
+
+`NonCopyable` and `NonEscapable` are tag structs satisfying the
+`InverseTag` concept. They contribute no WT slots. The `Traits` struct
+template uses them to set `IsCopyable = false` / `IsEscapable = false`,
+which disables copy/move special members and the subset conversion
+operator.
+
+Detection uses `ProtocolDecl::canConformTo(InvertibleProtocolKind)` --
+a return value of `Never` means the protocol has opted out. For
+compositions, `NonCopyable` is appended if any constituent protocol
+opts out of `Copyable` (likewise for `NonEscapable`).
+
+#### Generic subset conversion
+
+`SwiftExistentialType<Tags...>` provides a templated conversion operator
+for implicit narrowing from wider compositions to narrower ones:
+
+```c++
+template <typename... TargetTags>
+  requires (sizeof...(TargetTags) < sizeof...(Tags) &&
+            Traits::IsCopyable &&
+            ((ProtocolTag<TargetTags> || MarkerTag<TargetTags> ||
+              InverseTag<TargetTags>) && ...) &&
+            ((std::is_same_v<TargetTags, Tags> || ...) && ...))
+operator SwiftExistentialType<TargetTags...>() const noexcept;
+```
+
+The operator copies the existential buffer and selects WT slots using
+`_wtIndexOf<T, Tags...>()`, a constexpr helper that finds a tag's
+position in the source pack. The `IsCopyable` constraint prevents
+narrowing non-copyable existentials.
+
+**Conversion to Any.** When `TargetTags` is empty, the result is
+`SwiftExistentialType<>` (i.e., `Any`). The constraint
+`sizeof...(TargetTags) < sizeof...(Tags)` is satisfied as long as the
+source has at least one tag.
+
+**Class-bound existentials.** `SwiftClassExistentialType<Tags...>` has
+an analogous operator that converts to `SwiftExistentialType<TargetTags...>`
+(not `SwiftClassExistentialType`), because the result may not be
+class-bound.
 
 #### Class-bound protocol existentials
 
@@ -295,23 +421,22 @@ Opaque existential:      [buffer: 24] [type: 8] [WT: 8] = 40 bytes
 Class-bound existential: [class ptr: 8] [WT: 8]         = 16 bytes
 ```
 
-These wrappers inherit from `SwiftClassExistentialType` instead of
+These wrappers inherit from `SwiftClassExistentialType<RenderableTag>` instead of
 `SwiftExistentialType`:
 
 ```c++
 // Generated for: public protocol Renderable: AnyObject { func render() -> Int }
-class Renderable final : public swift::_impl::SwiftClassExistentialType {
+class Renderable final : public swift::_impl::SwiftClassExistentialType<_impl::RenderableTag> {
 public:
   swift::Int render() const {
     struct _w { /* witness function signature */ };
-    return _loadWitness<1, DISC, decltype(&_w::call)>(_witnessTable)(
-        _getType(), _witnessTable, _projectValue());
+    return _loadWitness<1, DISC, decltype(&_w::call)>(_witnessTables[0])(
+        _getType(), _witnessTables[0], _projectValue());
   }
   Renderable(const Canvas &value) noexcept;  // boxing constructor
 
 private:
-  Renderable() noexcept : SwiftClassExistentialType(uninit_t{}) {}
-  const void *_witnessTable;
+  Renderable() noexcept : SwiftClassExistentialType(typename SwiftClassExistentialType::uninit_t{}) {}
   friend class _impl::_impl_Renderable;
 };
 ```
@@ -332,6 +457,7 @@ Key differences from opaque existentials:
   rather than packing a value buffer with VWT.
 
 ```c++
+template <typename... Tags>
 class SwiftClassExistentialType {
 public:
   SwiftClassExistentialType(const SwiftClassExistentialType &other) noexcept;
