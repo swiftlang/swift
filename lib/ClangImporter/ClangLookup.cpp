@@ -1090,6 +1090,7 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorBool(
   Method->setImplicit();
 
   {
+    clang::Sema::SFINAETrap trap(Sema);
     clang::Sema::SynthesizedFunctionScope Scope(Sema, Method);
 
     auto This = Sema.ActOnCXXThis(Loc);
