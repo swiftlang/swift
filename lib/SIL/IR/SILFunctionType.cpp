@@ -185,13 +185,6 @@ SILFunctionType::getDirectFormalResultsType(SILModule &M,
                                             TypeExpansionContext context,
                                             bool loweredAddresses) {
   CanType type;
-
-  if (hasAddressResult(loweredAddresses)) {
-    assert(getNumDirectFormalResults() == 1);
-    return SILType::getPrimitiveAddressType(
-        getSingleDirectFormalResult().getReturnValueType(M, this, context));
-  }
-
   if (getNumDirectFormalResults() == 0) {
     type = getASTContext().TheEmptyTupleType;
   } else if (getNumDirectFormalResults() == 1) {
@@ -209,6 +202,12 @@ SILFunctionType::getDirectFormalResultsType(SILModule &M,
       cache = type;
     }
   }
+
+  if (hasAddressResult()) {
+    assert(getNumDirectFormalResults() == 1);
+    return SILType::getPrimitiveAddressType(type);
+  }
+
   return SILType::getPrimitiveObjectType(type);
 }
 

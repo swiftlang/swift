@@ -3016,8 +3016,7 @@ forwardFunctionArguments(SILGenFunction &SGF, SILLocation loc,
     if (isGuaranteedParameterInCallee(argTy.getConvention())) {
       auto forwardedArg =
           SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue();
-      if (forwardedArg->getType().isObject() &&
-          fTy->hasGuaranteedResult(/*loweredAddresses*/ true)) {
+      if (forwardedArg->getType().isObject() && fTy->hasGuaranteedResult()) {
         forwardedArg = SGF.B.createUncheckedOwnership(loc, forwardedArg);
       }
       forwardedArgs.push_back(forwardedArg);
