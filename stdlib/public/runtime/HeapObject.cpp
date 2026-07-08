@@ -269,12 +269,15 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredAlignmentMask) {
   assert(isAlignmentMask(requiredAlignmentMask));
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
-  auto object = reinterpret_cast<HeapObject *>(swift_slowAllocTyped(
-      requiredSize, requiredAlignmentMask, getMallocTypeId(metadata)));
+  auto allocation = swift_slowAllocTyped(requiredSize, requiredAlignmentMask,
+                                          getMallocTypeId(metadata));
 #else
-  auto object = reinterpret_cast<HeapObject *>(
-      swift_slowAlloc(requiredSize, requiredAlignmentMask));
+  auto allocation = swift_slowAlloc(requiredSize, requiredAlignmentMask);
 #endif
+
+  size_t offset = getInstanceAddressPoint(metadata);
+  HeapObject *object =
+      reinterpret_cast<HeapObject *>(reinterpret_cast<char *>(allocation) + offset);
 
   // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
   // check on the placement new allocator which we have observed on Windows,
