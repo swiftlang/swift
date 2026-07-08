@@ -29,7 +29,6 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
-#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Threading/ThreadLocalStorage.h"
 #include <cinttypes>
@@ -62,47 +61,6 @@ static const char *getAccessName(ExclusivityFlags flags) {
   default: return "unknown";
   }
 }
-
-// In asserts builds if the environment variable
-// SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING is set, emit logging information.
-#ifndef NDEBUG
-
-static inline bool isExclusivityLoggingEnabled() {
-  return runtime::environment::SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING();
-}
-
-static inline void _flockfile_stderr() {
-#if defined(_WIN32)
-  _lock_file(stderr);
-#elif defined(__wasi__)
-  // FIXME: WebAssembly/WASI doesn't support file locking yet (https://github.com/apple/swift/issues/54533).
-#else
-  flockfile(stderr);
-#endif
-}
-
-static inline void _funlockfile_stderr() {
-#if defined(_WIN32)
-  _unlock_file(stderr);
-#elif defined(__wasi__)
-  // FIXME: WebAssembly/WASI doesn't support file locking yet (https://github.com/apple/swift/issues/54533).
-#else
-  funlockfile(stderr);
-#endif
-}
-
-/// Used to ensure that logging printfs are deterministic.
-static inline void withLoggingLock(std::function<void()> func) {
-  assert(isExclusivityLoggingEnabled() &&
-         "Should only be called if exclusivity logging is enabled!");
-
-  _flockfile_stderr();
-  func();
-  fflush(stderr);
-  _funlockfile_stderr();
-}
-
-#endif
 
 SWIFT_ALWAYS_INLINE
 static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
@@ -180,12 +138,3 @@ void _swift_setExclusivityTLSImpl(void * _Nullable newValue) {
   AccessSetValue.set(newValue);
 }
 
-// Declare two internal helpers from the Swift implementation that are used by
-// the concurrency-specific code.
-extern "C" void _swift_exclusivityAccessSetNext(void *access,
-                                                void *_Nullable next);
-extern "C" void *_swift_exclusivityAccessGetParent(void *access,
-                                                   void *_Nullable child);
-
-// Bring in the concurrency-specific exclusivity code.
-#include "ConcurrencyExclusivity.inc"
