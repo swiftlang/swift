@@ -1,0 +1,182 @@
+// RUN: %target-sil-opt -test-runner %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+class C {}
+
+// A single-predecessor phi is trivially replaced by its unique incoming value.
+
+// CHECK-LABEL: sil [ossa] @redundant_owned_phi :
+// CHECK:       bb0(%0 : @owned $C):
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'redundant_owned_phi'
+sil [ossa] @redundant_owned_phi : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  specify_test "replace_phis_with_incoming_values"
+  br bb1(%0)
+
+bb1(%1 : @owned $C):
+  return %1
+}
+
+// A guaranteed phi with a single unique incoming value from two predecessors
+// is replaced by the borrow it re-borrows.
+
+// CHECK-LABEL: sil [ossa] @redundant_guaranteed_phi :
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK-NOT:   : @guaranteed $C
+// CHECK:         end_borrow [[B]]
+// CHECK:       } // end sil function 'redundant_guaranteed_phi'
+sil [ossa] @redundant_guaranteed_phi : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "replace_phis_with_incoming_values"
+  %1 = begin_borrow %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%1)
+
+bb2:
+  br bb3(%1)
+
+bb3(%3 : @guaranteed $C):
+  %4 = borrowed %3 from (%0)
+  end_borrow %4
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// After replacing %5, the incoming values of %9 become identical too, so
+// %9 must be replaced in a second iteration of the fixed-point loop.
+
+// CHECK-LABEL: sil [ossa] @cascading_redundant_phis :
+// CHECK:       bb0(%0 : @owned $C):
+// CHECK-NOT:   : @owned $C):
+// CHECK:         destroy_value %0
+// CHECK:       } // end sil function 'cascading_redundant_phis'
+sil [ossa] @cascading_redundant_phis : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "replace_phis_with_incoming_values"
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0)
+
+bb2:
+  br bb3(%0)
+
+bb3(%5 : @owned $C):
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb6(%5)
+
+bb5:
+  br bb6(%5)
+
+bb6(%9 : @owned $C):
+  br bb7(%9)
+
+bb7(%11 : @owned $C):
+  destroy_value %11
+  %r = tuple ()
+  return %r
+}
+
+// A phi that is not redundant (different incoming values) must not be
+// replaced.
+
+// CHECK-LABEL: sil [ossa] @non_redundant_phi :
+// CHECK:       bb3([[A:%.*]] : @owned $C):
+// CHECK-NEXT:    destroy_value [[A]]
+// CHECK:       } // end sil function 'non_redundant_phi'
+sil [ossa] @non_redundant_phi : $@convention(thin) (@owned C, @owned C) -> () {
+bb0(%0 : @owned $C, %1 : @owned $C):
+  specify_test "replace_phis_with_incoming_values"
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1
+  br bb3(%0)
+
+bb2:
+  destroy_value %0
+  br bb3(%1)
+
+bb3(%5 : @owned $C):
+  destroy_value %5
+  %r = tuple ()
+  return %r
+}
+
+// The back edge feeds the phi with its own value, which must be ignored
+// when looking for a unique incoming value. The only "real" incoming value
+// is %0, so the phi is redundant and gets replaced by %0.
+
+// CHECK-LABEL: sil [ossa] @phi_self_cycle :
+// CHECK:       bb0(%0 : @owned $C):
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb1
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'phi_self_cycle'
+sil [ossa] @phi_self_cycle : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "replace_phis_with_incoming_values"
+  br bb1(%0)
+
+bb1(%2 : @owned $C):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%2)
+
+bb3:
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// Same as above, but for a guaranteed phi with a borrowed-from instruction.
+// The back edge feeds the phi with its own borrowed-from instruction, which
+// must be ignored (via `lookThroughBorrowedFrom`) when looking for a unique
+// incoming value. The only "real" incoming value is %1, so the phi and its
+// borrowed-from instruction are replaced by %1.
+
+// CHECK-LABEL: sil [ossa] @guaranteed_phi_self_cycle :
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb1
+// CHECK:       bb3:
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'guaranteed_phi_self_cycle'
+sil [ossa] @guaranteed_phi_self_cycle : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "replace_phis_with_incoming_values"
+  %1 = begin_borrow %0
+  br bb1(%1)
+
+bb1(%2 : @reborrow $C):
+  %3 = borrowed %2 from (%0)
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%3)
+
+bb3:
+  end_borrow %3
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
