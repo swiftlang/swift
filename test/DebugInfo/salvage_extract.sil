@@ -1,7 +1,8 @@
 // RUN: %target-sil-opt -sil-print-types %s -sil-combine -sil-print-debuginfo | %FileCheck %s
 
-// Test salvaging of struct_extract, tuple_extract, destructure_struct,
-// and destructure_tuple instructions into debug reconstruction blocks.
+// Test salvaging of struct_extract, tuple_extract, unchecked_enum_data,
+// destructure_struct, and destructure_tuple instructions into debug
+// reconstruction blocks.
 
 sil_stage canonical
 
@@ -18,6 +19,7 @@ sil_scope 2 { loc "test.swift":10:1 parent @test_tuple_extract : $@convention(th
 sil_scope 3 { loc "test.swift":20:1 parent @test_destructure_struct : $@convention(thin) (TwoFields) -> () }
 sil_scope 4 { loc "test.swift":30:1 parent @test_destructure_tuple : $@convention(thin) ((Builtin.Int64, Builtin.Int64)) -> () }
 sil_scope 5 { loc "test.swift":40:1 parent @test_fragment_and_debugbb : $@convention(thin) ((Builtin.Int64, Builtin.Int64)) -> () }
+sil_scope 6 { loc "test.swift":50:1 parent @test_unchecked_enum_data : $@convention(thin) (Optional<Builtin.Int64>) -> () }
 
 // CHECK-LABEL: sil @test_struct_extract
 // CHECK:       bb0([[VAL:%[0-9]+]] : $Int64):
@@ -126,6 +128,23 @@ bb0(%0 : $(Builtin.Int64, Builtin.Int64)):
   %2 = tuple_extract %0 : $(Builtin.Int64, Builtin.Int64), 1
   %3 = tuple (%1 : $Builtin.Int64, %2 : $Builtin.Int64)
   debug_value %3 : $(Builtin.Int64, Builtin.Int64), let, name "copy", loc "test.swift":40:1, scope 5
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @test_unchecked_enum_data
+// CHECK:       bb0(%0 : $Optional<Builtin.Int64>):
+// CHECK:         debug_value %0 : $Optional<Builtin.Int64>, let, name "payload", {{.*}}transform {
+// CHECK:           bb0(%0 : $Optional<Builtin.Int64>):
+// CHECK:             %1 = unchecked_enum_data %0 : $Optional<Builtin.Int64>, #Optional.some!enumelt
+// CHECK:             return %1 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_unchecked_enum_data'
+sil @test_unchecked_enum_data : $@convention(thin) (Optional<Builtin.Int64>) -> () {
+bb0(%0 : $Optional<Builtin.Int64>):
+  %1 = unchecked_enum_data %0 : $Optional<Builtin.Int64>, #Optional.some!enumelt
+  debug_value %1 : $Builtin.Int64, let, name "payload", loc "test.swift":50:1, scope 6
   %t = tuple ()
   return %t : $()
 }
