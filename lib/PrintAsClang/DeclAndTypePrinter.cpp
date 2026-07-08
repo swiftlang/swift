@@ -15,6 +15,7 @@
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangClassType.h"
+#include "PrintClangExistentialType.h"
 #include "PrintClangFunction.h"
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
@@ -38,6 +39,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Feature.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
@@ -465,6 +467,16 @@ private:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     printDocumentationComment(PD);
+
+    if (outputLang == OutputLanguageMode::Cxx) {
+      if (!PD->isObjC() &&
+          getASTContext().LangOpts.hasFeature(
+              Feature::CxxExistentialInterop)) {
+        ClangExistentialTypePrinter(os, owningPrinter.outOfLineDefinitionsOS)
+            .printExistentialTypeDecl(PD, owningPrinter);
+      }
+      return;
+    }
 
     StringRef customName = getNameForObjC(PD, CustomNamesOnly);
     if (customName.empty()) {

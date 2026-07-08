@@ -21,6 +21,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -86,6 +87,11 @@ static void writePtrauthPrologue(raw_ostream &os, ASTContext &ctx) {
                 os << "# endif\n";
                 os << "# ifndef __ptrauth_swift_class_method_pointer\n";
                 os << "#  define __ptrauth_swift_class_method_pointer(x)\n";
+                os << "# endif\n";
+                os << "# ifndef "
+                      "__ptrauth_swift_protocol_witness_function_pointer\n";
+                os << "#  define "
+                      "__ptrauth_swift_protocol_witness_function_pointer(x)\n";
                 os << "# endif\n";
               });
           os << "#endif\n";
@@ -670,6 +676,8 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
       exposedModules.insert(mod.moduleName);
 
     // Include the shim header only in the C++ mode.
+    if (M->getASTContext().LangOpts.hasFeature(Feature::CxxExistentialInterop))
+      os << "#define SWIFT_CXX_EXISTENTIAL_INTEROP 1\n";
     ClangSyntaxPrinter(M->getASTContext(), os).printIncludeForShimHeader(
         "_SwiftCxxInteroperability.h");
 

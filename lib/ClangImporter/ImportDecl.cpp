@@ -3362,7 +3362,8 @@ namespace {
           Impl.SwiftContext.evaluator,
           CxxRecordSemantics({decl, Impl.SwiftContext}), {});
 
-      if (cxxRecordsemanticsKind == CxxRecordSemanticsKind::SwiftClassType) {
+      if (cxxRecordsemanticsKind == CxxRecordSemanticsKind::SwiftClassType ||
+          cxxRecordsemanticsKind == CxxRecordSemanticsKind::SwiftExistentialType) {
         // FIXME: add a diagnostic here for unsupported imported use of Swift
         // type?
         return nullptr;

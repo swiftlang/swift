@@ -1009,7 +1009,12 @@ public:
           success = writeFunc(FD);
         else if (auto SD = dyn_cast<StructDecl>(D))
           success = writeStruct(SD);
-        else if (auto *vd = dyn_cast<ValueDecl>(D))
+        else if (auto PD = dyn_cast<ProtocolDecl>(D);
+                 PD && M.getASTContext().LangOpts.hasFeature(
+                            Feature::CxxExistentialInterop)) {
+          printer.print(PD);
+          success = true;
+        } else if (auto *vd = dyn_cast<ValueDecl>(D))
           topLevelEmissionScope.additionalUnrepresentableDeclarations.insert(
               {vd, ""});
       } else if (isa<ValueDecl>(D)) {

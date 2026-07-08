@@ -2342,6 +2342,19 @@ applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
   return type;
 }
 
+/// Build the Swift existential type for a protocol that was round-tripped
+/// through C++.
+static Type
+buildExistentialTypeForProtocol(ProtocolDecl *pd,
+                                const clang::CXXRecordDecl *recordDecl,
+                                ClangImporter::Implementation &impl) {
+  auto clangRecordType =
+      recordDecl->getASTContext().getRecordType(recordDecl);
+  impl.SwiftContext.registerClangTypeForIRGen(
+      ExistentialType::get(pd->getDeclaredInterfaceType()), clangRecordType);
+  return ExistentialType::get(pd->getDeclaredInterfaceType());
+}
+
 ImportedType ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     bool allowNSUIntegerAsInt) {
@@ -2440,12 +2453,16 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
 
   // Import the underlying result type.
   if (clangDecl) {
-    if (auto recordType = returnType->getAsCXXRecordDecl()) {
+    if (auto recordDecl = returnType->getAsCXXRecordDecl()) {
       if (auto *vd = evaluateOrDefault(
               SwiftContext.evaluator,
-              CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
+              CxxRecordAsSwiftType({recordDecl, SwiftContext}), nullptr)) {
         if (auto *cd = dyn_cast<ClassDecl>(vd)) {
           Type t = ClassType::get(cd, Type(), SwiftContext);
+          return ImportedType(t, /*implicitlyUnwraps=*/false);
+        }
+        if (auto *pd = dyn_cast<ProtocolDecl>(vd)) {
+          Type t = buildExistentialTypeForProtocol(pd, recordDecl, *this);
           return ImportedType(t, /*implicitlyUnwraps=*/false);
         }
       }
@@ -2503,6 +2520,22 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   returnType = desugarIfBoundsAttributed(returnType);
 
   ImportedType importedType = importer::findOptionSetEnum(returnType, *this);
+
+  // Check if the return type is a Swift type round-tripped through C++.
+  if (!importedType) {
+    if (auto recordDecl = returnType->getAsCXXRecordDecl()) {
+      if (auto *vd = evaluateOrDefault(
+              SwiftContext.evaluator,
+              CxxRecordAsSwiftType({recordDecl, SwiftContext}), nullptr)) {
+        if (auto *cd = dyn_cast<ClassDecl>(vd)) {
+          importedType = {ClassType::get(cd, Type(), SwiftContext), false};
+        } else if (auto *pd = dyn_cast<ProtocolDecl>(vd)) {
+          importedType = {buildExistentialTypeForProtocol(pd, recordDecl, *this),
+                          false};
+        }
+      }
+    }
+  }
 
   if (auto templateType =
           dyn_cast<clang::TemplateTypeParmType>(returnType)) {
@@ -2724,6 +2757,8 @@ ClangImporter::Implementation::importParameterType(
         if (auto *cd = dyn_cast<ClassDecl>(vd)) {
 
           swiftParamTy = ClassType::get(cd, Type(), SwiftContext);
+        } else if (auto *pd = dyn_cast<ProtocolDecl>(vd)) {
+          swiftParamTy = buildExistentialTypeForProtocol(pd, recordType, *this);
         }
       }
     }
