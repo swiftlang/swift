@@ -209,8 +209,17 @@ private func getSpecializedParamDeclForEnumCase(
   for (elementIndex, oldElementType) in oldPayloadTupleElementTypes.enumerated() {
     var newElementType: AST.`Type`
     let closuresInBTEForCaseAndPayloadIndex = closuresInBTEForCase.filter({ $0.indexInPayload == elementIndex })
-    assert(closuresInBTEForCaseAndPayloadIndex.count <= 1)
-    if let closureInBTE = closuresInBTEForCaseAndPayloadIndex.singleElement {
+
+    if closuresInBTEForCaseAndPayloadIndex.count > 1 {
+      let closureInBTE = closuresInBTEForCaseAndPayloadIndex.first!
+      for currentClosureInBTE in closuresInBTEForCaseAndPayloadIndex {
+        assert(closureInBTE.closure == currentClosureInBTE.closure)
+        assert(closureInBTE.subsetThunk == currentClosureInBTE.subsetThunk)
+        assert(closureInBTE.optionalWrapper == currentClosureInBTE.optionalWrapper)
+        assert(closureInBTE.enumCase == currentClosureInBTE.enumCase)
+      }
+    }
+    if let closureInBTE = closuresInBTEForCaseAndPayloadIndex.first {
       nameSuffix += "_\(elementIndex)"
       newElementType = getCapturedArgTypesTupleForClosure(
         closure: closureInBTE.closure, context: context)
