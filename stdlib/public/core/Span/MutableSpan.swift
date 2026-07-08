@@ -1343,6 +1343,12 @@ extension MutableSpan: Iterable where Element: ~Copyable {
 
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
+  public var underestimatedCount: Int {
+    self.count
+  }
+
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   @_lifetime(borrow self)
   public func makeBorrowingIterator() -> Span<Element>.BorrowingIterator {
     .init(self.span)

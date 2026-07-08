@@ -90,6 +90,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
   @_alwaysEmitIntoClient
   @_lifetime(self: copy self)
   public mutating func skip(by offset: Int) throws(Failure) -> Int {
+    _precondition(offset >= 0, "Can't skip by a negative offset")
     var remainder = offset
     while remainder > 0 {
       let span = try nextSpan(maxCount: remainder)
@@ -142,6 +143,7 @@ extension Span where Element: ~Copyable {
     @_alwaysEmitIntoClient
     @_lifetime(self: copy self)
     public mutating func skip(by offset: Int) -> Int {
+      _precondition(offset >= 0, "Can't skip by a negative offset")
       let c = Swift.min(offset, _count)
       defer {
         _start &+= c

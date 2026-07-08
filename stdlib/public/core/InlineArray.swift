@@ -639,6 +639,12 @@ extension InlineArray: Iterable where Element: ~Copyable {
 
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
+  public var underestimatedCount: Int {
+    self.count
+  }
+
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   @_lifetime(borrow self)
   public func makeBorrowingIterator() -> BorrowingIterator {
     Span.BorrowingIterator(self.span)

@@ -256,6 +256,17 @@ suite.test("Span.BorrowingIterator/skip-zero")
   expectEqual(iterSpan[0], 1)
 }
 
+suite.test("Span.BorrowingIterator/skip-negative")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let arr = [1, 2, 3]
+  let span = arr.span
+  var iter = Span.BorrowingIterator(span)
+  expectCrashLater()
+  let skipped = iter.skip(by: -10)
+}
+
 suite.test("Span.BorrowingIterator/skip-then-partial-read")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
