@@ -1633,6 +1633,15 @@ private:                                                                       \
 
   llvm::Constant *FixLifetimeFn = nullptr;
 
+  /// A local stub function that simply calls swift_deletedMethodError(),
+  /// used to fill dead-method vtable/witness slots (see emitVTableStubs()).
+  llvm::Function *DeadMethodErrorStub = nullptr;
+  llvm::Function *getOrCreateDeadMethodErrorStub();
+  /// A Coroutine Function Pointer wrapping the above, suited for
+  /// filling vtable/witness slots that point to "callee-allocated"
+  /// (new ABI) coroutines.
+  llvm::Constant *DeletedCalleeAllocatedCoroutineMethodErrorCoroFP = nullptr;
+
   mutable std::optional<SpareBitVector> HeapPointerSpareBits;
 
   //--- Generic ---------------------------------------------------------------
