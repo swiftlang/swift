@@ -119,36 +119,40 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
     add_dependencies(embedded-single-threaded-shim embedded-single-threaded-shim-${mod})
 
-    add_swift_target_library_single(
-      embedded-multi-threaded-posix-shim-${mod}
-      swiftEmbeddedPlatformMultiThreadedPOSIX
-      STATIC
-      IS_FRAGILE
-      PARTIAL_SOURCES_INTENDED
+    # The POSIX pthread-based shim only makes sense on hosted POSIX targets;
+    # skip bare-metal and Windows triples that lack a pthread implementation.
+    if(NOT "${triple}" MATCHES "-none-|-windows-")
+      add_swift_target_library_single(
+        embedded-multi-threaded-posix-shim-${mod}
+        swiftEmbeddedPlatformMultiThreadedPOSIX
+        STATIC
+        IS_FRAGILE
+        PARTIAL_SOURCES_INTENDED
 
-      EmbeddedPlatformMultiThreadedPOSIX.c
+        EmbeddedPlatformMultiThreadedPOSIX.c
 
-      C_COMPILE_FLAGS ${extra_c_compile_flags} -I${CMAKE_CURRENT_SOURCE_DIR}/swift
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-      SDK "embedded"
-      ARCHITECTURE "${mod}"
-      DEPENDS embedded-stdlib-${mod}
-      INSTALL_IN_COMPONENT stdlib
-      )
-    swift_install_in_component(
-      TARGETS embedded-multi-threaded-posix-shim-${mod}
-      DESTINATION "lib/swift/embedded/${mod}"
-      COMPONENT "stdlib"
-      )
-    swift_install_in_component(
-      FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswiftEmbeddedPlatformMultiThreadedPOSIX.a"
-      DESTINATION "lib/swift/embedded/${mod}/"
-      COMPONENT "stdlib"
-      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-      )
-    set_property(TARGET embedded-multi-threaded-posix-shim-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+        C_COMPILE_FLAGS ${extra_c_compile_flags} -I${CMAKE_CURRENT_SOURCE_DIR}/swift
+        MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+        SDK "embedded"
+        ARCHITECTURE "${mod}"
+        DEPENDS embedded-stdlib-${mod}
+        INSTALL_IN_COMPONENT stdlib
+        )
+      swift_install_in_component(
+        TARGETS embedded-multi-threaded-posix-shim-${mod}
+        DESTINATION "lib/swift/embedded/${mod}"
+        COMPONENT "stdlib"
+        )
+      swift_install_in_component(
+        FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswiftEmbeddedPlatformMultiThreadedPOSIX.a"
+        DESTINATION "lib/swift/embedded/${mod}/"
+        COMPONENT "stdlib"
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+        )
+      set_property(TARGET embedded-multi-threaded-posix-shim-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
 
-    add_dependencies(embedded-multi-threaded-posix-shim embedded-multi-threaded-posix-shim-${mod})
+      add_dependencies(embedded-multi-threaded-posix-shim embedded-multi-threaded-posix-shim-${mod})
+    endif()
 
     # The Darwin-specific `os_unfair_lock` shim is only meaningful on Apple
     # target triples.
