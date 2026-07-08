@@ -245,6 +245,58 @@ _swift_embedded_metadata_destroy(const void *metadata, void *value) {
   fullmeta->vwt->destroyFn(value, metadata);
 }
 
+// Calling-convention bridge for invoking a key-path accessor thunk from
+// the embedded runtime walker.  A key-path getter thunk has SIL type
+// `@convention(keypath_accessor_getter) (@in_guaranteed T) -> @out T`,
+// which at the LLVM level lowers to
+// `void SWIFT_CC(swift)(sret out, in base, args ptr, args size)`.  From
+// Swift we only have a raw function pointer and untyped memory pointers,
+// so we can't express that ABI directly in Swift's type system.  This
+// shim takes the pointers as regular C args and internally casts the
+// function pointer to a swiftcc type with an `SWIFT_INDIRECT_RESULT`
+// parameter — clang then rewrites the call so `out` is passed via the
+// architecture's indirect-result register (x8 on arm64, rdi on x86_64),
+// matching the callee's expectations.
+//
+// `arg` / `argSize` correspond to the KP thunk's trailing "index
+// argument" pair — always `(NULL, 0)` for the components the embedded
+// static-instance emitter produces (no captured subscript indices).
+static inline void
+_swift_embedded_kp_invokeGetter(void *_Nonnull fn,
+                                void *_Nonnull out,
+                                const void *_Nonnull base,
+                                const void *_Nullable arg,
+                                __swift_size_t argSize) {
+  typedef void SWIFT_CC_swift (*Getter)(void *SWIFT_INDIRECT_RESULT,
+                                        const void *, const void *,
+                                        __swift_size_t);
+  ((Getter)fn)(out, base, arg, argSize);
+}
+
+// Companion to `_swift_embedded_kp_invokeGetter` for the setter side of
+// a KP writeback.  A KP setter thunk has SIL type
+// `@convention(keypath_accessor_setter) (@in_guaranteed NewValue,
+//                                        @{in_guaranteed|inout} CurValue) -> ()`,
+// which at the LLVM level lowers to
+// `void SWIFT_CC(swift)(ptr value_in, ptr base_in_or_inout,
+//                       ptr args, size_t args_size)`.  Both mutating and
+// nonmutating setters produce the same LLVM signature — the mutating-vs-
+// nonmutating distinction is purely a source-level statement about
+// aliasing of the base parameter.  Neither uses sret (no return value),
+// so we can call it via a plain-pointer C signature: on arm64/x86_64 the
+// register assignment (x0-x3 / rdi-rcx) matches swiftcc for four
+// pointer/integer args with no return.
+static inline void
+_swift_embedded_kp_invokeSetter(void *_Nonnull fn,
+                                const void *_Nonnull value,
+                                void *_Nonnull base,
+                                const void *_Nullable arg,
+                                __swift_size_t argSize) {
+  typedef void SWIFT_CC_swift (*Setter)(const void *, void *,
+                                        const void *, __swift_size_t);
+  ((Setter)fn)(value, base, arg, argSize);
+}
+
 // Swift implementation of error box destroy logic (defined in EmbeddedRuntime.swift).
 // Takes the object as a regular swiftcc parameter (x0/rdi on arm64/x86_64).
 SWIFT_CC_swift extern void _swift_embedded_error_destroy_impl(void * _Nonnull object);

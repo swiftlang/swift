@@ -3554,11 +3554,43 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       // introduce a class boundary either (tuples live inline in their
       // parent).
       break;
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method: {
+      // Reject captured subscript indices and external decl references —
+      // they'd require additional pattern-instantiation state we don't
+      // handle statically yet.
+      if (!comp.getArguments().empty() || comp.getExternalDecl())
+        return SILType();
+      // Bail on generic accessors — we take their addresses via
+      // `getAddrOfSILFunction`, which doesn't apply substitutions.
+      if (comp.getComputedPropertyForGettable()->isGeneric())
+        return SILType();
+      if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
+          comp.getComputedPropertyForSettable()->isGeneric())
+        return SILType();
+
+      // Get-only / method components demote the chain to read-only
+      // `KeyPath`.  Settable-computed intermediates preserve writable
+      // capability via the embedded writeback machinery in
+      // `_projectMutableAddress`:
+      //   * mutating setter (struct default): stays WritableKeyPath (or
+      //     inherits ReferenceWritableKeyPath if already crossed a class
+      //     boundary)
+      //   * nonmutating setter (class default, or `nonmutating set` on a
+      //     struct): promotes WritableKeyPath → ReferenceWritableKeyPath
+      if (comp.getKind() != KeyPathPatternComponent::Kind::SettableProperty) {
+        keyPathClass = ctx.getKeyPathDecl();
+      } else if (!comp.isComputedSettablePropertyMutating() &&
+                 keyPathClass == ctx.getWritableKeyPathDecl()) {
+        keyPathClass = ctx.getReferenceWritableKeyPathDecl();
+      }
+      break;
+    }
     default:
-      // Computed / method / optional components aren't representable in
-      // an embedded multi-component chain, because the runtime walker
-      // only knows how to advance by a fixed offset or dereference a
-      // class reference.
+      // Optional components aren't representable in an embedded
+      // multi-component chain: the runtime walker doesn't have a way to
+      // read the Optional tag from raw memory of an unknown type.
       return SILType();
     }
 
