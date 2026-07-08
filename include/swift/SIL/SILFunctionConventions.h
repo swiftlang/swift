@@ -87,6 +87,12 @@ class SILAddressConventions {
 
   static bool isIndirectSILResult(SILResultInfo result, bool loweredAddresses);
 
+  static bool isAddressResult(SILResultInfo result,
+                              bool loweredAddresses);
+
+  static bool isGuaranteedResult(SILResultInfo result,
+                                 bool loweredAddresses);
+
   static SILType getSILParamInterfaceType(SILParameterInfo yield,
                                           bool loweredAddresses);
 
@@ -180,6 +186,14 @@ public:
     return isIndirectSILResult(result, loweredAddresses);
   }
 
+  bool isAddressResult(SILResultInfo result) const {
+    return isAddressResult(result, loweredAddresses);
+  }
+
+  bool isGuaranteedResult(SILResultInfo result) const {
+    return isGuaranteedResult(result, loweredAddresses);
+  }
+
   SILType getSILType(SILParameterInfo param, CanSILFunctionType funcTy,
                      TypeExpansionContext context) const {
     auto interfaceTy = getSILParamInterfaceType(param, loweredAddresses);
@@ -238,6 +252,10 @@ public:
     return silConv.isSILIndirect(result);
   }
 
+  bool isAddressResult(SILResultInfo result) const {
+    return silConv.isAddressResult(result);
+  }
+
   SILType getSILType(SILParameterInfo param,
                      TypeExpansionContext context) const {
     return silConv.getSILType(param, funcTy, context);
@@ -262,8 +280,10 @@ public:
       return funcTy->getDirectFormalResultsType(silConv.getModule(), context,
                                                 /*loweredAddresses=*/true);
 
-    if (funcTy->hasAddressResult(silConv.useLoweredAddresses())) {
-      assert(funcTy->getNumDirectFormalResults() == 1);
+    // getAllResultsSubstType always returns an object-category SILType, but
+    // there are some result types that are addresses prior to AddressLowering.
+    if (funcTy->getNumResults() == 1 &&
+        silConv.isAddressResult(funcTy->getSingleResult())) {
       return SILType::getPrimitiveAddressType(
           funcTy->getSingleDirectFormalResult().getReturnValueType(
               silConv.getModule(), funcTy, context));
@@ -379,34 +399,32 @@ public:
     if (funcTy->getNumResults() != 1) {
       return false;
     }
-    auto resultConvention = funcTy->getResults()[0].getConvention();
-    if (silConv.useLoweredAddresses()) {
-      return resultConvention == ResultConvention::Guaranteed;
-    }
-    return resultConvention == ResultConvention::Guaranteed ||
-           resultConvention == ResultConvention::GuaranteedAddress;
+    return silConv.isGuaranteedResult(funcTy->getSingleResult());
   }
 
   bool hasAddressResult() const {
-    return hasGuaranteedAddressResult() || hasInoutResult();
+    if (funcTy->getNumResults() != 1) {
+      return false;
+    }
+    return silConv.isAddressResult(funcTy->getSingleResult());
   }
 
+  // Prior to AddressLowering, this will return false, as "GuaranteedAddress"
+  // is not actually an address.
   bool hasGuaranteedAddressResult() const {
     if (funcTy->getNumResults() != 1) {
       return false;
     }
-    if (!silConv.useLoweredAddresses()) {
-      return false;
-    }
-    auto resultConvention = funcTy->getResults()[0].getConvention();
-    return resultConvention == ResultConvention::GuaranteedAddress;
+    auto resultInfo = funcTy->getSingleResult();
+    return silConv.isAddressResult(resultInfo) &&
+           resultInfo.getConvention() == ResultConvention::GuaranteedAddress;
   }
 
   bool hasInoutResult() const {
     if (funcTy->getNumResults() != 1) {
       return false;
     }
-    auto resultConvention = funcTy->getResults()[0].getConvention();
+    auto resultConvention = funcTy->getSingleResult().getConvention();
     return resultConvention == ResultConvention::Inout;
   }
 
@@ -759,6 +777,46 @@ inline bool SILAddressConventions::isIndirectSILResult(SILResultInfo result,
   llvm_unreachable("Unhandled ResultConvention in switch.");
 }
 
+inline bool SILAddressConventions::isAddressResult(SILResultInfo result,
+                                                    bool loweredAddresses) {
+  switch (result.getConvention()) {
+  case ResultConvention::Inout:
+    return true;
+  case ResultConvention::GuaranteedAddress:
+    return loweredAddresses;
+  case ResultConvention::Guaranteed:
+  case ResultConvention::Indirect:
+  case ResultConvention::Pack:
+  case ResultConvention::Owned:
+  case ResultConvention::Unowned:
+  case ResultConvention::UnownedInnerPointer:
+  case ResultConvention::Autoreleased:
+    return false;
+  }
+
+  llvm_unreachable("Unhandled ResultConvention in switch.");
+}
+
+inline bool SILAddressConventions::isGuaranteedResult(SILResultInfo result,
+                                                       bool loweredAddresses) {
+  switch (result.getConvention()) {
+  case ResultConvention::Guaranteed:
+    return true;
+  case ResultConvention::GuaranteedAddress:
+    return !loweredAddresses;
+  case ResultConvention::Inout:
+  case ResultConvention::Indirect:
+  case ResultConvention::Pack:
+  case ResultConvention::Owned:
+  case ResultConvention::Unowned:
+  case ResultConvention::UnownedInnerPointer:
+  case ResultConvention::Autoreleased:
+    return false;
+  }
+
+  llvm_unreachable("Unhandled ResultConvention in switch.");
+}
+
 inline SILType SILAddressConventions::getSILParamInterfaceType(
                                                      SILParameterInfo param,
                                                      bool loweredAddresses) {
@@ -776,10 +834,11 @@ inline SILType SILAddressConventions::getSILYieldInterfaceType(
 inline SILType
 SILAddressConventions::getSILResultInterfaceType(SILResultInfo result,
                                                 bool loweredAddresses) {
-  return SILAddressConventions::isIndirectSILResult(result, loweredAddresses) ||
-                 result.isAddressResult(loweredAddresses)
-             ? SILType::getPrimitiveAddressType(result.getInterfaceType())
-             : SILType::getPrimitiveObjectType(result.getInterfaceType());
+  if (SILAddressConventions::isIndirectSILResult(result, loweredAddresses) ||
+      SILAddressConventions::isAddressResult(result, loweredAddresses)) {
+    return SILType::getPrimitiveAddressType(result.getInterfaceType());
+  }
+  return SILType::getPrimitiveObjectType(result.getInterfaceType());
 }
 
 inline SILType
