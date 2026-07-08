@@ -44,7 +44,7 @@ func check(_ condition: Bool) {
 }
 
 func withMutexStorage(_ body: (UnsafeMutableRawPointer) -> Void) {
-  var storage: [6 of UInt] = [0, 0, 0, 0, 0, 0]
+  var storage: [8 of UInt] = [0, 0, 0, 0, 0, 0, 0, 0]
   withUnsafeMutablePointer(to: &storage) {
     body(UnsafeMutableRawPointer($0))
   }
