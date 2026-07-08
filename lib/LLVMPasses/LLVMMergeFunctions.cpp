@@ -1312,6 +1312,20 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
       AllReplaced = false;
       continue;
     }
+    // The new arguments are appended at the positions defined by the callee's
+    // signature (see the argument-forwarding loops below). This assumes the
+    // call site was emitted with the same signature as the callee definition.
+    // That is not guaranteed: a `@_silgen_name` declaration whose C prototype
+    // omits part of the Swift ABI (e.g. the indirect error result of a large
+    // typed `throws`) produces a call whose function type has fewer parameters
+    // than the definition. Appending the constant to such a call places it in
+    // the wrong argument position, producing a call whose register assignment
+    // disagrees with the merged callee. Fall back to a thunk in that case; the
+    // thunk forwards the definition's own arguments and is therefore correct.
+    if (CI->getFunctionType() != Old->getFunctionType()) {
+      AllReplaced = false;
+      continue;
+    }
     Callers.push_back(CI);
   }
   if (!AllReplaced)
