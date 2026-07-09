@@ -1,35 +1,22 @@
-// A callee-allocated (yield_once_2) coroutine accessor whose frame cannot be
-// stack-allocated is an allocation.  Here the coroutine calling convention is
-// disabled, forcing a heap (Malloc) coroutine-frame allocator, so calling such
-// an accessor is rejected under -no-allocations.  (When the frame can be stack
-// allocated -- the common case -- the call is allowed; see coroutines-and-testing.swift.)
+// A callee-allocated (yield_once_2) coroutine accessor allocates its frame on
+// the caller's stack, so using one is allowed under -no-allocations -- whether
+// it is inlined, dispatched through a class vtable, or reached via a protocol
+// conformance's (forwarding) witness thunk.  (A yield_once_1 accessor, which
+// uses a heap-allocated frame, is still rejected; see
+// no-allocations-coroutine-legacy.swift.)
 
-// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -enable-experimental-feature CoroutineAccessors -no-allocations -disable-arm64-corocc -disable-x86_64-corocc -wmo -verify -verify-ignore-unknown
+// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -enable-experimental-feature CoroutineAccessors -no-allocations -wmo
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_CoroutineAccessors
 
-public struct NC: ~Copyable { var x: Int = 0 }
-
-open class Base {
-  var _s = NC()
-  open var s: NC {
-    yielding borrow { yield _s }
-    yielding mutate { yield &_s }
-  }
-}
+public struct NC: ~Copyable { var x = 0 }
 
 func bump(_ x: inout NC) { x.x += 1 }
 
-public func f(_ b: Base) {
-  bump(&b.s) // expected-error {{cannot use co-routines (like accessors) in -no-allocations mode}}
-}
-
-// A non-virtual accessor is inlined away before IRGen, leaving no coroutine
-// frame to allocate, so it is allowed even here (the old pre-inlining check
-// rejected it).
+// Non-virtual: the accessor is inlined away.
 public struct S: ~Copyable {
   var _x = NC()
   var x: NC {
@@ -37,18 +24,23 @@ public struct S: ~Copyable {
     yielding mutate { yield &_x }
   }
 }
+public func viaStruct(_ s: inout S) { bump(&s.x) }
 
-public func g(_ s: inout S) {
-  bump(&s.x) // no error
+// Virtual (class vtable): the accessor survives inlining.
+open class Base {
+  var _s = NC()
+  open var s: NC {
+    yielding borrow { yield _s }
+    yielding mutate { yield &_s }
+  }
 }
+public func viaClass(_ b: Base) { bump(&b.s) }
 
-// A protocol conformance's coroutine-accessor witness thunk merely forwards its
-// caller's allocator (it doesn't allocate a frame itself), so it must not be
-// diagnosed -- this is the shape that originally regressed.
+// Protocol conformance: the coroutine-accessor witness thunk forwards its
+// caller's allocator.
 public protocol Q {
   var v: Int { yielding borrow set }
 }
-
 public struct Conformer: Q {
   var _v = 0
   public var v: Int {
@@ -56,4 +48,3 @@ public struct Conformer: Q {
     yielding mutate { yield &_v }
   }
 }
-
