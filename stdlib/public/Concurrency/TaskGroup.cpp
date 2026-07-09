@@ -476,6 +476,11 @@ public:
   /// Cancel the group and all of its child tasks recursively.
   /// This also sets the cancelled bit in the group status.
   bool cancelAll(AsyncTask *task);
+
+  /// Cancel the group and all of its child tasks recursively, recording the
+  /// given cancellation reason on each affected child task.
+  bool cancelAllWithReason(AsyncTask *task,
+                           swift_task_cancellation_reason reason);
 };
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
@@ -2119,13 +2124,27 @@ static bool swift_taskGroup_isCancelledImpl(TaskGroup *group) {
 
 SWIFT_CC(swift)
 static void swift_taskGroup_cancelAllImpl(TaskGroup *group) {
+  swift_taskGroup_cancelAllWithReason(
+      group, swift_task_cancellation_reason_TaskCancelled);
+}
+
+SWIFT_CC(swift)
+static void swift_taskGroup_cancelAllWithReasonImpl(
+    TaskGroup *group, swift_task_cancellation_reason reason) {
   // TaskGroup is not a Sendable type, so this can only be called from the
   // owning task.
-  asBaseImpl(group)->cancelAll(swift_task_getCurrent());
+  asBaseImpl(group)->cancelAllWithReason(swift_task_getCurrent(), reason);
 }
 
 bool TaskGroupBase::cancelAll(AsyncTask *owningTask) {
-  SWIFT_TASK_DEBUG_LOG("cancel all tasks in group = %p", this);
+  return cancelAllWithReason(owningTask,
+                             swift_task_cancellation_reason_TaskCancelled);
+}
+
+bool TaskGroupBase::cancelAllWithReason(
+    AsyncTask *owningTask, swift_task_cancellation_reason reason) {
+  SWIFT_TASK_DEBUG_LOG("cancel all tasks in group = %p reason = %u",
+                       this, (unsigned)reason);
 
   // Flag the task group itself as cancelled.  If this was already
   // done, any existing child tasks should already have been cancelled,
@@ -2139,7 +2158,8 @@ bool TaskGroupBase::cancelAll(AsyncTask *owningTask) {
   // Cancel all the child tasks.  TaskGroup is not a Sendable type,
   // so cancelAll() can only be called from the owning task.  This
   // satisfies the precondition on cancel_unlocked().
-  _swift_taskGroup_cancel_unlocked(asAbstract(this), owningTask);
+  _swift_taskGroup_cancelWithReason_unlocked(asAbstract(this), owningTask,
+                                             reason);
 
   return true;
 }

@@ -40,6 +40,12 @@ extension SuspendingClock.Instant: Codable {
 }
 #endif
 
+@available(SwiftStdlib 6.5, *)
+@_unavailableInEmbedded
+extension SuspendingClock: Identifiable {
+  public var id: SystemClockID { .suspending }
+}
+
 @available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
 extension Clock where Self == SuspendingClock {

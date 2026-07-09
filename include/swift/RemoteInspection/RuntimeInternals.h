@@ -107,13 +107,16 @@ struct ActiveTaskStatusWithoutEscalation {
 
 struct ActiveTaskStatusFlags {
   static const uint32_t PriorityMask = 0xFF;
-  static const uint32_t IsCancelled = 0x100;
   static const uint32_t IsStatusRecordLocked = 0x200;
   static const uint32_t IsEscalated = 0x400;
   static const uint32_t IsRunning = 0x800;
   static const uint32_t IsEnqueued = 0x1000;
   static const uint32_t IsComplete = 0x2000;
   static const uint32_t HasTaskDependency = 0x4000;
+  /// Two-bit cancellation reason field. See ActiveTaskStatus::CancellationReason.
+  static const uint32_t CancellationReasonShift = 17;
+  static const uint32_t CancellationReasonMask = 0x3u << CancellationReasonShift;
+  static const uint32_t IsCancelled = CancellationReasonMask;
 };
 
 template <typename Runtime, typename ActiveTaskStatus>

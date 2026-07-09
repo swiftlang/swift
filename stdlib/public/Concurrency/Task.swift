@@ -252,6 +252,20 @@ extension Task {
   public func cancel() {
     unsafe _taskCancel(_AsyncTask(_task))
   }
+
+  /// Indicates that the task should stop running, recording the reason for
+  /// cancellation in the task's status. The reason is observable via
+  /// the `reason` property on `CancellationError` thrown from the task and
+  /// is delivered to handlers registered via `withTaskCancellationHandler`.
+  ///
+  /// Calling `cancel(reason:)` on a task that is already cancelled has no
+  /// effect: the first reason recorded wins.
+  ///
+  /// - Parameter reason: The reason the task is being cancelled.
+  @available(SwiftStdlib 6.5, *)
+  public func cancel(reason: CancellationError.Reason) {
+    _taskCancelWithReason(_task, reason: reason._rawValue)
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -918,6 +932,16 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
   public func cancel() {
     unsafe _taskCancel(_rawTask)
+  }
+
+  /// Cancel the current task, recording the reason for cancellation in the
+  /// task's status so that observers can distinguish between, for example,
+  /// an explicit cancellation and a deadline expiration.
+  ///
+  /// - Parameter reason: The reason the task is being cancelled.
+  @available(SwiftStdlib 6.5, *)
+  public func cancel(reason: CancellationError.Reason) {
+    unsafe _taskCancelWithReason(_task, reason: reason._rawValue)
   }
 
   /// Checks if this task is executing in a scope with a task cancellation shield activated by the
