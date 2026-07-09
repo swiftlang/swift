@@ -154,9 +154,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       add_dependencies(embedded-multi-threaded-posix-shim embedded-multi-threaded-posix-shim-${mod})
     endif()
 
-    # The Darwin-specific `os_unfair_lock` shim is only meaningful on Apple
-    # target triples.
-    if("${triple}" MATCHES "-apple-")
+    # The Darwin-specific `os_unfair_lock` shim is only meaningful on hosted
+    # Apple target triples; bare-metal `-apple-none-*` triples have no OS SDK
+    # and therefore no `<os/lock.h>`.
+    if("${triple}" MATCHES "-apple-" AND NOT "${triple}" MATCHES "-apple-none-")
       add_swift_target_library_single(
         embedded-multi-threaded-darwin-shim-${mod}
         swiftEmbeddedPlatformMultiThreadedDarwin
