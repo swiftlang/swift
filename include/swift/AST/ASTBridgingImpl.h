@@ -555,6 +555,10 @@ bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
 
+bool BridgedASTType::hasExistentialArchetype() const {
+  return unbridged()->hasOpenedExistential();
+}
+
 bool BridgedASTType::hasDynamicSelf() const {
   return unbridged()->hasDynamicSelfType();
 }
@@ -1096,9 +1100,8 @@ swift::GenericEnvironment * _Nonnull BridgedGenericEnvironment::unbridged() cons
   return env;
 }
 
-bool BridgedGenericEnvironment::hasEqualGenericSignature(BridgedGenericEnvironment other) const {
-  return unbridged()->getGenericSignature().getPointer()
-      == other.unbridged()->getGenericSignature().getPointer();
+BridgedGenericSignature BridgedGenericEnvironment::getGenericSignature() const {
+  return {unbridged()->getGenericSignature().getPointer()};
 }
 
 //===----------------------------------------------------------------------===//

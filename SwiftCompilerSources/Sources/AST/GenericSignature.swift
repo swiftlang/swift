@@ -41,6 +41,12 @@ public struct GenericSignature: CustomStringConvertible, NoReflectionChildren {
   }
 }
 
+extension GenericSignature: Equatable {
+  public static func == (lhs: GenericSignature, rhs: GenericSignature) -> Bool {
+    lhs.bridged.impl == rhs.bridged.impl
+  }
+}
+
 public struct CanonicalGenericSignature {
   public let bridged: BridgedCanGenericSignature
 
@@ -63,10 +69,14 @@ public struct GenericEnvironment {
     self.bridged = bridged
   }
 
+  public var genericSignature: GenericSignature {
+    GenericSignature(bridged: bridged.getGenericSignature())
+  }
+
   /// True if `self` and `other` have identical local-archetype requirements
   /// (conformances, superclass, layout constraint) and can therefore be
-  /// safely remapped onto one another, e.g. by `LocalArchetypeCloner`.
+  /// safely remapped onto one another, e.g. by `Cloner`.
   public func hasEqualGenericSignature(to other: GenericEnvironment) -> Bool {
-    bridged.hasEqualGenericSignature(other.bridged)
+    genericSignature == other.genericSignature
   }
 }

@@ -272,6 +272,8 @@ extension TypeProperties {
   public var hasArchetype: Bool { rawType.bridged.hasArchetype() }
   public var hasTypeParameter: Bool { rawType.bridged.hasTypeParameter() }
   public var hasLocalArchetype: Bool { rawType.bridged.hasLocalArchetype() }
+  /// True if this type mentions an existential (opened existential) archetype.
+  public var hasExistentialArchetype: Bool { rawType.bridged.hasExistentialArchetype() }
   public var hasDynamicSelf: Bool { rawType.bridged.hasDynamicSelf() }
   public var isEscapable: Bool { rawType.bridged.isEscapable() }
   public var isNoEscape: Bool { rawType.bridged.isNoEscape() }

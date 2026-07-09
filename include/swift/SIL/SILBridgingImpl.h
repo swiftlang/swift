@@ -352,10 +352,6 @@ bool BridgedType::isAddress() const {
   return unbridged().isAddress();
 }
 
-bool BridgedType::hasOpenedExistential() const {
-  return unbridged().hasOpenedExistential();
-}
-
 BridgedType BridgedType::mapTypeOutOfEnvironment() const {
   return unbridged().mapTypeOutOfEnvironment();
 }
@@ -2151,9 +2147,11 @@ BridgedArgument BridgedBasicBlock::addBlockArgument(BridgedType type, BridgedVal
 
 BridgedArgument
 BridgedBasicBlock::insertPhiArgument(SwiftInt index, BridgedType type,
-                                     BridgedValue::Ownership ownership) const {
+                                     BridgedValue::Ownership ownership,
+                                     OptionalBridgedDeclObj decl) const {
   return {unbridged()->insertPhiArgument(index, type.unbridged(),
-                                         BridgedValue::unbridge(ownership))};
+                                         BridgedValue::unbridge(ownership),
+                                         decl.getAs<swift::ValueDecl>())};
 }
 
 BridgedArgument BridgedBasicBlock::addFunctionArgument(BridgedType type) const {
@@ -2166,15 +2164,6 @@ BridgedArgument BridgedBasicBlock::insertFunctionArgument(SwiftInt atPosition, B
   return {unbridged()->insertFunctionArgument((unsigned)atPosition, type.unbridged(),
                                               BridgedValue::unbridge(ownership),
                                               decl.getAs<swift::ValueDecl>())};
-}
-
-BridgedArgument
-BridgedBasicBlock::replacePhiArgumentAndReplaceAllUses(SwiftInt index, BridgedType type,
-                                                       BridgedValue::Ownership ownership,
-                                                       OptionalBridgedDeclObj decl) const {
-  return {unbridged()->replacePhiArgumentAndReplaceAllUses(
-      (unsigned)index, type.unbridged(), BridgedValue::unbridge(ownership),
-      decl.getAs<swift::ValueDecl>())};
 }
 
 void BridgedBasicBlock::eraseArgument(SwiftInt index) const {

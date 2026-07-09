@@ -165,20 +165,20 @@ private func processBlock(
       if !context.continueWithNextSubpassRun(for: inst) {
         return false
       }
-      if let ai = inst as? ApplyInst, isOptimizableLazyPropertyGetter(ai) {
+      switch inst {
+      case let ai as ApplyInst where isOptimizableLazyPropertyGetter(ai):
         lazyPropertyGetters.append(ai)
         continue
-      }
-      if let openExistential = inst as? OpenExistentialRefInst {
-        guard
-          processOpenExistentialRef(
-            openExistential, into: availInst as! OpenExistentialRefInst,
-            map, runsOnHighLevelSil, context
-          )
-        else {
+      case let openExistential as OpenExistentialRefInst:
+        if !processOpenExistentialRef(
+          openExistential, into: availInst as! OpenExistentialRefInst,
+          map, runsOnHighLevelSil, context
+        ) {
           map.insert(ref)
           continue
         }
+      default:
+        break
       }
       tryCSEReplace(inst: inst, with: availInst, context)
       continue
@@ -350,13 +350,13 @@ private func tryCSEReplace(
 /// according to the provided type substitution map.
 private func updateBasicBlockArgTypes(
   _ block: BasicBlock,
-  _ cloner: LocalArchetypeCloner<FunctionPassContext>,
+  _ cloner: Cloner<FunctionPassContext>,
   _ usersToHandle: inout InstructionWorklist,
   _ context: FunctionPassContext
 ) {
   for index in 0..<block.arguments.count {
     let arg = block.arguments[index]
-    if !arg.type.hasOpenedExistential {
+    if !arg.type.hasExistentialArchetype {
       continue
     }
     // Try to apply the archetype remapping to this argument's type. If it
@@ -369,7 +369,12 @@ private func updateBasicBlockArgTypes(
     let newArg = block.replacePhiArgumentAndReplaceAllUses(
       at: index, type: newArgType, ownership: arg.ownership, decl: arg.decl, context
     )
-    usersToHandle.pushIfNotVisited(contentsOf: newArg.uses.users)
+    // The old argument's borrowed-from instruction (if any) still refers to
+    // the stale archetype and was not carried over by the replacement above.
+    if newArg.ownership == .guaranteed, let phi = Phi(newArg) {
+      updateGuaranteedPhis(phis: [phi], context)
+    }
+    usersToHandle.pushIfNotVisited(contentsOf: newArg.users)
   }
 }
 
@@ -378,7 +383,7 @@ private func updateBasicBlockArgTypes(
 /// Returns true if uses of open_existential_ref can
 /// be replaced by a dominating instruction.
 private func processOpenExistentialRef(
-  _ inst: OpenExistentialRefInst,
+  _ openExistential: OpenExistentialRefInst,
   into dominating: OpenExistentialRefInst,
   _ map: ScopedHashMap,
   _ runsOnHighLevelSil: Bool,
@@ -389,9 +394,12 @@ private func processOpenExistentialRef(
 
   // Collect all direct users that may contain opened archetypes that need to
   // be replaced.
-  for use in inst.uses {
+  for use in openExistential.uses {
     let user = use.instruction
-    if !user.typeDependentOperands.isEmpty,
+    // Bail if a type-dependent use of `openExistential` is itself already
+    // recorded as an available CSE candidate: cloning it below would leave
+    // a stale entry for the old archetype in `map`.
+    if use.isTypeDependent,
       let ref = InstructionReference(
         inst: user, runsOnHighLevelSil: runsOnHighLevelSil, calleeAnalysis: context.calleeAnalysis
       ),
@@ -402,14 +410,23 @@ private func processOpenExistentialRef(
     usersToHandle.pushIfNotVisited(user)
   }
 
-  let oldEnv = inst.definedGenericEnvironment
+  let oldEnv = openExistential.definedGenericEnvironment
   let newEnv = dominating.definedGenericEnvironment
 
   // Use a cloner. It makes copying the instruction and remapping of opened
   // archetypes trivial.
-  var cloner = LocalArchetypeCloner(in: inst.parentFunction, context)
+  var cloner = Cloner(in: openExistential.parentFunction, context)
   defer { cloner.deinitialize() }
   cloner.registerLocalArchetypeRemapping(from: oldEnv, to: newEnv)
+  // This cloner only remaps *types* containing local archetypes; it reuses
+  // SSA operands verbatim unless the operand's own defining instruction is
+  // itself cloned in this session. So direct (non-type-dependent) uses of
+  // `openExistential` must be redirected to `dominating` before any user
+  // gets cloned below. Otherwise a clone whose result type is derived from
+  // its operand's type at construction time (e.g. `copy_value`) would bake
+  // in the stale (old-archetype) type, and a later RAUW of the operand
+  // cannot retroactively fix that already-cached type.
+  openExistential.uses.ignoreTypeDependence.replaceAll(with: dominating, context)
 
   // Now clone each candidate and replace the opened archetype by the
   // dominating one.
@@ -424,11 +441,13 @@ private func processOpenExistentialRef(
     }
 
     // Compute if this candidate depends on the old opened archetype. It
-    // always does if it has any type-dependent operands.
-    var dependsOnOldOpenedArchetype = !user.typeDependentOperands.isEmpty
+    // always does if it has a type-dependent operand on `openExistential`.
+    var dependsOnOldOpenedArchetype = user.operands.contains {
+      $0.isTypeDependent && $0.value == openExistential
+    }
 
     // Look for dependencies propagated via the candidate's results.
-    for result in user.results where !result.uses.isEmpty && result.type.hasOpenedExistential {
+    for result in user.results where !result.uses.isEmpty && result.type.hasExistentialArchetype {
       // Check if the result type depends on this specific opened existential.
       if result.type.canonicalType.hasLocalArchetype(from: oldEnv) {
         dependsOnOldOpenedArchetype = true
