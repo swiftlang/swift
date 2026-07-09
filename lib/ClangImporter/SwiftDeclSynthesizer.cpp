@@ -1107,11 +1107,14 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
     cGetterDecl->setParams(cGetterSelf);
 
     auto cGetterSelfExpr =
-        createClangDeclRefExpr(Ctx, cGetterSelf, recordType);
-    auto cGetterExpr = clang::MemberExpr::CreateImplicit(
+        createClangDeclRefExpr(Ctx, cGetterSelf, recordType, clang::VK_LValue);
+    auto cGetterMemberExpr = clang::MemberExpr::CreateImplicit(
         Ctx, cGetterSelfExpr,
-        /*isarrow=*/false, fieldDecl, fieldType, clang::VK_PRValue,
+        /*isarrow=*/false, fieldDecl, fieldType, clang::VK_LValue,
         clang::OK_BitField);
+    auto cGetterExpr = clang::ImplicitCastExpr::Create(
+        Ctx, fieldType, clang::CK_LValueToRValue, cGetterMemberExpr,
+        /*BasePath=*/nullptr, clang::VK_PRValue, clang::FPOptionsOverride());
 
     cGetterDecl->setBody(createClangReturnStmt(Ctx, cGetterExpr));
   }
