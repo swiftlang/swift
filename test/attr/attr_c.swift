@@ -114,9 +114,9 @@ func acceptedPointers(_ x: UnsafeMutablePointer<Int>,
                         u: OpaquePointer) {}
 
 @c(rejectedPointers)
-func rejectedPointers( // expected-error 6 {{global function cannot be marked '@c' because the type of the parameter}}
+func rejectedPointers( // expected-error 5 {{global function cannot be marked '@c' because the type of the parameter}}
     x: UnsafePointer<String>, // expected-note {{Swift structs cannot be represented in C}}
-    y: CVaListPointer, // expected-note {{Swift structs cannot be represented in C}}
+    y: CVaListPointer,
     z: UnsafeBufferPointer<Int>, // expected-note {{Swift structs cannot be represented in C}}
     u: UnsafeMutableBufferPointer<Int>, // expected-note {{Swift structs cannot be represented in C}}
     v: UnsafeRawBufferPointer, // expected-note {{Swift structs cannot be represented in C}}
