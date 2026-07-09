@@ -5899,13 +5899,6 @@ bool ConstraintSystem::repairFailures(
 
         ConstraintFix *fix = nullptr;
         if (result.isFailure()) {
-          // If this is a "destination" argument to a mutating operator
-          // like `+=`, let's consider it contextual and only attempt
-          // to fix type mismatch on the "source" right-hand side of
-          // such operators.
-          if (isOperatorArgument(loc) && argConv->getArgIdx() == 0)
-            break;
-
           fix = AllowArgumentMismatch::create(*this, lhs, rhs, loc);
         } else {
           fix = AllowInOutConversion::create(*this, lhs, rhs, loc);
@@ -15820,7 +15813,26 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                : SolutionKind::Solved;
   }
 
-  case FixKind::AllowArgumentTypeMismatch:
+  case FixKind::AllowArgumentTypeMismatch: {
+    auto *loc = fix->getLocator();
+    // If this is a "destination" argument to a mutating operator
+    // like `+=`, let's give it a higher impact to make sure that
+    // if a different overload choice has a mismatch at the "source"
+    // it would always be preferred instead of causing an ambiguity
+    // since `inout` doesn't support conversions and only the "source"
+    // can be fixed.
+    if (auto argLoc = loc->findLast<LocatorPathElt::ApplyArgToParam>()) {
+      if (argLoc->getArgIdx() == 0 && isOperatorArgument(loc) &&
+          loc->isLastElement<LocatorPathElt::LValueConversion>()) {
+        return recordFix(fix, /*impact=*/3)
+                   ? SolutionKind::Error
+                   : SolutionKind::Solved;
+      }
+    }
+
+    LLVM_FALLTHROUGH;
+  }
+
   case FixKind::IgnoreDefaultExprTypeMismatch: {
     auto impact = 2;
     // If there are any other argument mismatches already detected for this
