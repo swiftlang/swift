@@ -594,7 +594,6 @@ public:
     enum : unsigned {
 #define SWIFT_REFLECTION_SECTION(Name, Field) idx_##Name,
 #include "ELFReflectionSections.def"
-#undef SWIFT_REFLECTION_SECTION
       kELFReflectionSectionCount
     };
 
@@ -605,7 +604,6 @@ public:
   sections[idx_##Name] = readTableSection(idx_##Name);                         \
   populated |= bool(sections[idx_##Name]);
 #include "ELFReflectionSections.def"
-#undef SWIFT_REFLECTION_SECTION
 
     if (!populated)
       return std::nullopt;
@@ -614,7 +612,6 @@ public:
 #define SWIFT_REFLECTION_SECTION(Name, Field)                                  \
   {sections[idx_##Name].contents, sections[idx_##Name].size},
 #include "ELFReflectionSections.def"
-#undef SWIFT_REFLECTION_SECTION
         PotentialModuleNames,
     };
 
