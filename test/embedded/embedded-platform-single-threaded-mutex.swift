@@ -16,7 +16,6 @@
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/destroy-locked.o %target-embedded-single-threaded-shim %target-embedded-posix-shim -o %t/destroy-locked.out -dead_strip
 // RUN: %target-not-crash %target-run %t/destroy-locked.out
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
