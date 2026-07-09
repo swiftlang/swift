@@ -7,8 +7,11 @@
 
 // RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -enable-experimental-feature CoroutineAccessors -no-allocations -wmo
 
+// The callee-allocated (yield_once_2) coroutine ABI (which makes coroutine
+// accessors possible in no-allocations mode) is only enabled on Darwin and
+// Linux (see CoroutineAccessorsUseYieldOnce2 in CompilerInvocation).
+// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_CoroutineAccessors
 
