@@ -1033,6 +1033,11 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorBool(
   auto &Ctx = getClangASTContext();
   auto &Sema = getClangSema();
 
+  if (!Sema.hasReachableDefinition(CXXRecord))
+    // Importing this operator requires reachable receiver object class
+    return nullptr;
+
+  // Look for operator bool() const
   clang::CXXConversionDecl *OpBool = nullptr;
 
   auto Conversions = CXXRecord->getVisibleConversionFunctions();
@@ -1085,6 +1090,7 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorBool(
   Method->setImplicit();
 
   {
+    clang::Sema::SFINAETrap trap(Sema);
     clang::Sema::SynthesizedFunctionScope Scope(Sema, Method);
 
     auto This = Sema.ActOnCXXThis(Loc);
