@@ -111,7 +111,7 @@ private struct FunctionChecker {
       }
 
     case let kpi as KeyPathInst:
-      guard let context.options.hasFeature(.EmbeddedKeyPaths), kpi.supportedInEmbeddedSwift else {
+      guard context.options.hasFeature(.EmbeddedKeyPaths), kpi.supportedInEmbeddedSwift else {
         throw Diagnostic(.embedded_swift_keypath, at: instruction.location)
       }
 
