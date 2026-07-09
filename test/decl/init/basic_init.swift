@@ -37,7 +37,9 @@ struct InitStruct {
   let foo: Int
 }
 extension InitStruct {
-  init(foo: Int) {} // expected-error{{invalid redeclaration of synthesized memberwise 'init(foo:)'}}
+  // A matching initializer in a same-file extension takes the place of the
+  // synthesized memberwise initializer.
+  init(foo: Int) { self.foo = foo }
 }
 
 // <rdar://problem/17564699> QoI: Structs should get convenience initializers

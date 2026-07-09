@@ -37,6 +37,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallString.h"
@@ -208,12 +209,11 @@ enum class ImplicitConstructorKind {
   Memberwise,
 };
 
-static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
-                                                SourceLoc paramLoc,
-                                                VarDecl *var) {
-  auto &ctx = var->getASTContext();
+/// Compute the interface type of the parameter that a memberwise
+/// initializer would have for the given property.
+static Type getMemberwiseParamInterfaceType(VarDecl *var,
+                                            bool &isAutoClosure) {
   auto varInterfaceType = var->getValueInterfaceType();
-  bool isAutoClosure = false;
 
   if (var->getAttrs().hasAttribute<LazyAttr>()) {
     // If var is a lazy property, its value is provided for the underlying
@@ -253,6 +253,17 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
       varInterfaceType = FunctionType::get({}, varInterfaceType, extInfo);
     }
   }
+
+  return varInterfaceType;
+}
+
+static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
+                                                SourceLoc paramLoc,
+                                                VarDecl *var) {
+  auto &ctx = var->getASTContext();
+  bool isAutoClosure = false;
+  auto varInterfaceType = getMemberwiseParamInterfaceType(var, isAutoClosure);
+  Type resultBuilderType = var->getResultBuilderType();
 
   // Create the parameter.
   auto *arg = new (ctx) ParamDecl(SourceLoc(), paramLoc, var->getName(),
@@ -584,6 +595,71 @@ static bool hasClangImplementation(const NominalTypeDecl *decl) {
 static bool isInMainBody(ValueDecl *member, NominalTypeDecl *ty) {
   return member->getDeclContext() ==
               ty->getImplementationContext()->getAsGenericContext();
+}
+
+/// True if an explicit initializer declared in an unconstrained extension of
+/// \p decl within the same source file has the given argument labels and
+/// parameter types. Such an initializer would be a redeclaration of a
+/// synthesized initializer with that signature, so it takes the synthesized
+/// initializer's place instead.
+static bool hasExtensionInitMatching(NominalTypeDecl *decl,
+                                     ArrayRef<Identifier> argumentLabels,
+                                     ArrayRef<Type> paramTypes) {
+  auto *sourceFile = decl->getParentSourceFile();
+
+  for (auto *member : decl->lookupDirect(DeclBaseName::createConstructor())) {
+    if (member->isImplicit())
+      continue;
+
+    // Initializers in the main body suppress synthesis entirely; here we
+    // only look for ones in extensions in the same source file. For a
+    // deserialized type there is no source file, but a matching initializer
+    // in a same-module extension can only have come from the same file, or
+    // the module would not have compiled.
+    auto *ext = dyn_cast<ExtensionDecl>(member->getDeclContext());
+    if (!ext || ext->getParentModule() != decl->getParentModule())
+      continue;
+    if (sourceFile && ext->getParentSourceFile() != sourceFile)
+      continue;
+
+    // An initializer in a constrained extension has a different generic
+    // signature, so it can coexist with the synthesized initializer.
+    if (ext->isConstrainedExtension())
+      continue;
+
+    if (!ABIRoleInfo(member).providesAPI())
+      continue;
+
+    auto *ctor = cast<ConstructorDecl>(member);
+    if (ctor->getName().getArgumentNames() != argumentLabels)
+      continue;
+
+    auto *methodTy = ctor->getMethodInterfaceType()->getAs<AnyFunctionType>();
+    if (!methodTy)
+      continue;
+
+    auto params = methodTy->getParams();
+    if (params.size() != paramTypes.size())
+      continue;
+
+    auto matches = [&]() -> bool {
+      for (auto i : indices(params)) {
+        // inout and variadic parameters change the signature enough that
+        // the initializer is a valid overload of the synthesized one.
+        if (params[i].isInOut() || params[i].isVariadic())
+          return false;
+
+        if (params[i].getPlainType()->getCanonicalType() !=
+            paramTypes[i]->getCanonicalType())
+          return false;
+      }
+      return true;
+    };
+    if (matches())
+      return true;
+  }
+
+  return false;
 }
 
 static void
@@ -1525,6 +1601,22 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
       return false;
   }
 
+  // If an explicit initializer declared in a same-file extension has the
+  // signature the memberwise initializer would have, it takes the place of
+  // the memberwise initializer rather than conflicting with it.
+  {
+    SmallVector<Identifier, 8> argumentLabels;
+    SmallVector<Type, 8> paramTypes;
+    for (auto *var : decl->getMemberwiseInitProperties(initKind)) {
+      argumentLabels.push_back(var->getName());
+      bool isAutoClosure = false;
+      paramTypes.push_back(getMemberwiseParamInterfaceType(var, isAutoClosure));
+    }
+    if (!argumentLabels.empty() &&
+        hasExtensionInitMatching(decl, argumentLabels, paramTypes))
+      return false;
+  }
+
   std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
   decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
 
@@ -1750,6 +1842,14 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
   // If the user has already defined a designated initializer, then don't
   // synthesize a default init.
   if (hasUserDefinedDesignatedInit(evaluator, decl))
+    return false;
+
+  // If an explicit zero-argument initializer is declared in a same-file
+  // extension of a struct, it takes the place of the default initializer
+  // rather than conflicting with it.
+  if (isa<StructDecl>(decl) &&
+      hasExtensionInitMatching(decl, /*argumentLabels=*/{},
+                               /*paramTypes=*/{}))
     return false;
 
   // Regardless of whether all of the properties are initialized or
