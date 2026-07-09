@@ -211,6 +211,9 @@ extension Set: ExpressibleByArrayLiteral {
   ///     }
   ///     // Prints "Whatever it is, it's bound to be delicious!"
   ///
+  /// - Note: If the array literal contains duplicate elements, only the
+  ///   first occurrence is kept, and subsequent duplicates are ignored.
+  ///
   /// - Parameter elements: A variadic list of elements of the new set.
   @inlinable
   @inline(__always)
@@ -224,7 +227,6 @@ extension Set: ExpressibleByArrayLiteral {
 
   @export(implementation)
   internal init(_nonEmptyArrayLiteral elements: [Element]) {
-    // FIXME: Duplicate elements are silently dropped. Should we trap instead?
     let native = elements.withUnsafeBufferPointer { buffer in
       unsafe _NativeSet(buffer)
     }
