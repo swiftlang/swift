@@ -18,12 +18,12 @@ import Builtin
 import Swift
 import SwiftShims
 
-public protocol IterableIteratorProtocol<Element, Failure> : ~Copyable, ~Escapable {
+public protocol BorrowingIteratorProtocol<Element, Failure> : ~Copyable, ~Escapable {
   associatedtype Element : ~Copyable
   associatedtype Failure : Error = Never
 }
 
-struct Iterator<T> : ~Copyable, ~Escapable, IterableIteratorProtocol {
+struct Iterator<T> : ~Copyable, ~Escapable, BorrowingIteratorProtocol {
   typealias Element = T
   @_hasStorage let t: T { get }
 
@@ -40,7 +40,7 @@ struct List<T> : ~Escapable {
   init(t: borrowing T)
 }
 
-sil @iteratorNextSpan : $@convention(method) <τ_0_0 where τ_0_0 : IterableIteratorProtocol, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_0.Element : ~Copyable> (@lifetime(copy 0) @inout τ_0_0) -> (@lifetime(borrow address_for_deps 0) @owned Span<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
+sil @iteratorNextSpan : $@convention(method) <τ_0_0 where τ_0_0 : BorrowingIteratorProtocol, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_0.Element : ~Copyable> (@lifetime(copy 0) @inout τ_0_0) -> (@lifetime(borrow address_for_deps 0) @owned Span<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
 sil @makeList : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @lifetime(borrow address_for_deps 0) @out List<τ_0_0>
 sil @makeListIterator : $@convention(method) <τ_0_0> (@in_guaranteed List<τ_0_0>) -> @lifetime(borrow address_for_deps 0) @out Iterator<τ_0_0>
 sil @spanCount : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> Int
@@ -60,9 +60,9 @@ bb0(%0 : $*T):
   mark_dependence_addr [unresolved] %6 on %2
   %10 = begin_access [modify] [static] %6
 
-  %11 = function_ref @iteratorNextSpan : $@convention(method) <τ_0_0 where τ_0_0 : IterableIteratorProtocol, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_0.Element : ~Copyable> (@lifetime(copy 0) @inout τ_0_0) -> (@lifetime(borrow address_for_deps 0) @owned Span<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
+  %11 = function_ref @iteratorNextSpan : $@convention(method) <τ_0_0 where τ_0_0 : BorrowingIteratorProtocol, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_0.Element : ~Copyable> (@lifetime(copy 0) @inout τ_0_0) -> (@lifetime(borrow address_for_deps 0) @owned Span<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
   %12 = alloc_stack $Never
-  try_apply %11<Iterator<T>>(%12, %10) : $@convention(method) <τ_0_0 where τ_0_0 : IterableIteratorProtocol, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_0.Element : ~Copyable> (@lifetime(copy 0) @inout τ_0_0) -> (@lifetime(borrow address_for_deps 0) @owned Span<τ_0_0.Element>, @error_indirect τ_0_0.Failure), normal bb1, error bb2
+  try_apply %11<Iterator<T>>(%12, %10) : $@convention(method) <τ_0_0 where τ_0_0 : BorrowingIteratorProtocol, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_0.Element : ~Copyable> (@lifetime(copy 0) @inout τ_0_0) -> (@lifetime(borrow address_for_deps 0) @owned Span<τ_0_0.Element>, @error_indirect τ_0_0.Failure), normal bb1, error bb2
 
 bb1(%14 : @owned $Span<T>):
   mark_dependence_addr [unresolved] %12 on %10

@@ -576,4 +576,22 @@ extension OutputSpan where Element: Copyable {
     }
   }
 }
-#endif // !SPAN_COMPATIBILITY_STUB
+
+@available(SwiftStdlib 6.4, *)
+extension OutputSpan: Iterable {
+  @available(SwiftStdlib 6.4, *)
+  public typealias Failure = Never
+
+  @export(implementation)
+  public var underestimatedCount: Int {
+    self.count
+  }
+
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_lifetime(borrow self)
+  public func makeBorrowingIterator() -> Span<Element>.BorrowingIterator {
+    .init(self.span)
+  }
+}
+#endif
