@@ -8,27 +8,27 @@
 // RUN: %diff %t/expansions.out %t/expansions.expected
 
 //--- test.swift
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), nullableAsEmptySpan: true)
 public func nonnullUnsafeRawBufferPointer(_ ptr: OpaquePointer, _ size: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), nullableAsEmptySpan: true)
 public func nullableUnsafeRawBufferPointer(_ ptr: OpaquePointer?, _ size: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), nullableAsEmptySpan: true)
 public func impNullableUnsafeRawBufferPointer(_ ptr: OpaquePointer!, _ size: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)), nullableAsEmptySpan: true)
 public func nonnullSpan(_ ptr: OpaquePointer, _ size: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)), nullableAsEmptySpan: true)
 public func nullableSpan(_ ptr: OpaquePointer?, _ size: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)), nullableAsEmptySpan: true)
 public func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
 }
 

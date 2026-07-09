@@ -1181,8 +1181,9 @@ static void collectNonOveriddenSuperclassInits(
   superclassDecl->synthesizeSemanticMembersIfNeeded(
     DeclBaseName::createConstructor());
 
-  NLOptions subOptions =
-      (NL_QualifiedDefault | NL_IgnoreAccessControl | NL_IgnoreMissingImports);
+  NLOptions subOptions = {NLFlags::QualifiedDefault,
+                          NLFlags::IgnoreAccessControl,
+                          NLFlags::IgnoreMissingImports};
   SmallVector<ValueDecl *, 4> lookupResults;
   subclass->lookupQualified(
       superclassDecl, DeclNameRef::createConstructor(),
@@ -1318,7 +1319,20 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
     if (auto ctor = createDesignatedInitOverride(
                       decl, superclassCtor, kind, ctx)) {
-      decl->getImplementationContext()->addMember(ctor);
+      auto *implCtx = decl->getImplementationContext();
+
+      // In an '@objc @implementation' class a stub initializer is still
+      // reachable from Objective-C (e.g. '[Class new]') and traps at runtime if
+      // it's invoked, so warn the author to implement it. (Non-required
+      // designated inits; required ones are handled by
+      // diagnoseMissingRequiredInitializer above.)
+      if (kind == DesignatedInitKind::Stub &&
+          implCtx->getDecl()->isObjCImplementation())
+        ctx.Diags.diagnose(implCtx->getDecl(),
+                           diag::objc_implementation_missing_inherited_init,
+                           superclassCtor);
+
+      implCtx->addMember(ctor);
     }
   }
 }

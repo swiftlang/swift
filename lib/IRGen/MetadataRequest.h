@@ -672,6 +672,14 @@ llvm::Value *emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
                                       DynamicMetadataRequest request,
                                       bool allowUninitialized = false);
 
+/// Emit a reference to the ObjC metatype for a class or protocol.
+///
+/// Only requests whose response status can be ignored can be used.
+///
+llvm::Value *emitObjCMetatypeRef(IRGenFunction &IGF, CanType type,
+                                 DynamicMetadataRequest request,
+                                 bool allowUninitialized = false);
+
 /// Emit a reference to the (initialized) ObjC heap metadata for a class.
 ///
 /// \returns a value of type ObjCClassPtrTy
@@ -689,6 +697,11 @@ llvm::Value *emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
 llvm::Value *emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
                                                  llvm::Value *metatype,
                                                  CanType type);
+
+/// Given a metatype, produce the appropriate ObjC metatype for it.
+llvm::Value *emitObjCMetatypeForMetatype(IRGenFunction &IGF,
+                                         llvm::Value *metatype,
+                                         CanType type);
 
 /// Emit a reference to a type layout record for the given type. The referenced
 /// data is enough to lay out an aggregate containing a value of the type, but

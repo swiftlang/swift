@@ -3,6 +3,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_ObjCImplementation
+// REQUIRES: SWIFT_STDLIB_ARCH=x86_64
 
 @objc @implementation extension ObjCImplSubclass {
   // expected-error@-1 {{'@implementation' of an Objective-C class requires a minimum deployment target of at least macOS 10.14.4}}

@@ -165,7 +165,7 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
 }
 
 extension EmptyCollection {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func withContiguousStorageIfAvailable<R: ~Copyable, E: Error>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R? {
@@ -186,12 +186,12 @@ extension EmptyCollection: Sendable { }
 extension EmptyCollection.Iterator: Sendable { }
 
 extension EmptyCollection {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(0)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var hashValue: Int { // Prevent compiler from synthesizing hashValue.
     var hasher = Hasher()
     self.hash(into: &hasher)

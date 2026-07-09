@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-sil -O  -Xllvm -sil-inline-generics=false -Xllvm -sil-partial-specialization=false -primary-file %s -o - | %FileCheck %s
 
 // check if the compiler does not crash if a function is specialized

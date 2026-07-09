@@ -394,7 +394,6 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       new (C) StructDecl(synthesizedLoc, C.Id_TangentVector, synthesizedLoc,
                          /*Inherited*/ C.AllocateCopy(tvDesiredProtoInherited),
                          /*GenericParams*/ {}, parentDC);
-  structDecl->setBraces({synthesizedLoc, synthesizedLoc});
   structDecl->setImplicit();
   structDecl->setSynthesized();
   structDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);

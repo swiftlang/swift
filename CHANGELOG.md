@@ -189,6 +189,20 @@
   }
   ```
 
+* [SE-0508][]:
+  Trailing closures syntax is now supported following array literals. This enables support for
+  calling `Array` and `Dictionary` trailing closure initializers using sugared type syntax:
+
+  ```swift
+  let value = [String] {
+    "a"
+  }
+
+  let value = [String: Int] {
+    (key: "a", value: 42)
+  }
+  ```
+
 * [SE-0504][]:
   Introduced Task Cancellation Shields which temporarily prevent the observation of task
   cancellation in a given scope. This functionality is intended for use with cleanup actions which
@@ -11202,6 +11216,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0493]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0493-defer-async.md
 [SE-0503]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0503-suppressed-associated-types.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
+[SE-0508]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0508-array-expression-trailing-closures.md
 [SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
 [SE-0522]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0522-source-warning-control.md
 [#64927]: <https://github.com/apple/swift/issues/64927>

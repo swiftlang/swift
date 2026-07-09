@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN:%target-swift-frontend -emit-silgen %s -enable-sil-opaque-values | %FileCheck %s
 
 

@@ -145,7 +145,7 @@ public struct Task<Success: Sendable, Failure: Error>: Sendable {
   @available(SwiftStdlib 5.1, *)
   internal let _task: Builtin.NativeObject
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(_ task: Builtin.NativeObject) {
     self._task = task
   }
@@ -168,7 +168,7 @@ extension Task {
   ///
   /// - Returns: The task's result.
   public var value: Success {
-    @_alwaysEmitIntoClient
+    @export(implementation)
     // This name is slightly different purely to avoid a clash with
     // the original property and keep the mangling concise.
     @_silgen_name("$sScT6_valuexvg")
@@ -332,7 +332,7 @@ public struct TaskPriority: RawRepresentable, Sendable {
 
   public static let high: TaskPriority = .init(rawValue: 0x19)
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var medium: TaskPriority {
     .init(rawValue: 0x15)
   }
@@ -562,7 +562,7 @@ struct JobFlags {
 
 /// Form task creation flags for use with the createAsyncTask builtins.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 func taskCreateFlags(
   priority: TaskPriority?, isChildTask: Bool, copyTaskLocals: Bool,
   inheritContext: Bool, enqueueJob: Bool,
@@ -835,7 +835,7 @@ public struct UnsafeCurrentTask {
   /// There is no way to uncancel a task.
   ///
   /// This property returns the actual cancellation state of the task, regardless of whether
-  /// a cancellation shield is active. Use ``Task/isCancelled`` (the static property)
+  /// a cancellation shield is active. Use ``Task/isCancelled-type.property`` (the static property)
   /// if you need cancellation checking that respects active shields.
   ///
   /// ### Instance property isCancelled ignores Task Cancellation Shields
@@ -866,13 +866,13 @@ public struct UnsafeCurrentTask {
   /// Task.isCancelled
   /// ```
   ///
-  /// Prefer using `Task.isCancelled` (the static property) in most situations when checking
-  /// the cancellation status from inside the task.
+  /// Prefer using ``Task/isCancelled-type.property`` (the static property) in most
+  /// situations when checking the cancellation status from inside the task.
   ///
-  /// - SeeAlso: ``Task/isCancelled``
+  /// - SeeAlso: ``Task/isCancelled-type.property``
   /// - SeeAlso: ``Task/checkCancellation()``
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public var isCancelled: Bool {
     if #available(SwiftStdlib 6.4, *) {
       unsafe _isCancelled(ignoreTaskCancellationShield: true)
@@ -883,7 +883,7 @@ public struct UnsafeCurrentTask {
 
   /// Check if the task is cancelled, optionally ignoring active cancellation shields.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _isCancelled(ignoreTaskCancellationShield: Bool) -> Bool {
     let flags: UInt64 = ignoreTaskCancellationShield ? 0x1 : 0x0
     return unsafe _taskIsCancelledWithFlags(_rawTask, flags: flags)
@@ -914,17 +914,17 @@ public struct UnsafeCurrentTask {
   /// Note that cancellation may not be observed if a task is currently executing with an
   /// active task cancellation shield. Refer to cancellation shield documentation for detailed semantics.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
-  /// - SeeAlso: ``Task/hasActiveTaskCancellationShield``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
+  /// - SeeAlso: ``Task/hasActiveCancellationShield``
   public func cancel() {
     unsafe _taskCancel(_rawTask)
   }
 
   /// Checks if this task is executing in a scope with a task cancellation shield activated by the
-  /// ``withTaskCancellationShield(operation:)`` function.
+  /// ``withTaskCancellationShield(operation:)-(()->Value)`` function.
   ///
   /// An active task cancellation shield prevents a task's ability to observe if it was cancelled,
-  /// i.e. the ``Task/isCancelled`` property will always return `false` when the task is executing
+  /// i.e. the ``Task/isCancelled-type.property`` property will always return `false` when the task is executing
   /// with an active shield.
   ///
   /// This property is primarily aimed at debugging and understanding cancellation behavior
@@ -935,12 +935,12 @@ public struct UnsafeCurrentTask {
   /// Cancellation shields are not automatically inherited by child tasks; each child task must install
   /// its own shield if needed if it, independently, wanted to ignore cancellation during a specific scope.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var hasActiveCancellationShield: Bool {
-    @_alwaysEmitIntoClient
+    @export(implementation)
     get {
       unsafe _taskHasActiveCancellationShield(_rawTask)
     }
@@ -1233,8 +1233,7 @@ extension Task where Failure == Never {
 @available(SwiftStdlib 5.8, *)
 extension Task where Failure == Error {
   @available(SwiftStdlib 5.8, *)
-  @_alwaysEmitIntoClient
-  @usableFromInline
+  @export(implementation)
   internal static func _runInlineHelper<T>(
     body: () async -> Result<T, Error>,
     rescue: (Result<T, Error>) throws -> T
@@ -1273,8 +1272,7 @@ extension Task where Failure == Error {
 /// Intrinsic used by SILGen to launch a task for bridging a Swift async method
 /// which was called through its ObjC-exported completion-handler-based API.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
-@usableFromInline
+@export(implementation)
 internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
 #if compiler(>=5.6)
   Task(operation: body)

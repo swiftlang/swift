@@ -198,6 +198,37 @@ BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
       atLoc, range, platform, cVersion.unbridged(), /*Implicit=*/false);
 }
 
+static swift::COMThreadingModel unbridge(BridgedCOMThreadingModel value) {
+  switch (value) {
+    case BridgedCOMThreadingModelSingle:
+      return swift::COMThreadingModel::Single;
+    case BridgedCOMThreadingModelApartment:
+      return swift::COMThreadingModel::Apartment;
+    case BridgedCOMThreadingModelFree:
+      return swift::COMThreadingModel::Free;
+    case BridgedCOMThreadingModelBoth:
+      return swift::COMThreadingModel::Both;
+    case BridgedCOMThreadingModelNeutral:
+      return swift::COMThreadingModel::Neutral;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+
+BridgedCOMAttr BridgedCOMAttr_createParsed(BridgedASTContext context,
+                                           swift::SourceLoc location,
+                                           swift::SourceRange range,
+                                           BridgedStringRef interface,
+                                           BridgedStringRef implementation,
+                                           BridgedCOMThreadingModel threading) {
+  std::optional<StringRef> CLSID;
+  if (implementation.unbridged().data())
+    CLSID = implementation.unbridged();
+  return new (context.unbridged()) COMAttr(location, range,
+                                           interface.unbridged(), CLSID,
+                                           unbridge(threading));
+}
+
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                SourceLoc atLoc,
                                                SourceRange range,

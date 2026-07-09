@@ -560,6 +560,10 @@ struct AnySwiftNameAttr {
   friend bool operator==(AnySwiftNameAttr lhs, AnySwiftNameAttr rhs) {
     return lhs.name == rhs.name && lhs.isAsync == rhs.isAsync;
   }
+
+  friend bool operator!=(AnySwiftNameAttr lhs, AnySwiftNameAttr rhs) {
+    return !(lhs == rhs);
+  }
 };
 
 /// Aggregate struct for the common members of clang::SwiftVersionedAdditionAttr and
@@ -1159,6 +1163,65 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
   return false;
 }
 
+static bool overridesVirtualMethods(const clang::CXXMethodDecl *method) {
+  return method->isVirtual() && method->size_overridden_methods() > 0;
+}
+
+static std::pair<std::optional<AnySwiftNameAttr>, bool>
+getOverridingMethodSwiftName(const clang::CXXMethodDecl *method,
+                             ImportNameVersion version) {
+  bool seen = false;
+  std::optional<AnySwiftNameAttr> firstName;
+  for (const auto *overridden : method->overridden_methods()) {
+    auto [name, ambiguous] =
+        overridesVirtualMethods(overridden)
+            ? getOverridingMethodSwiftName(overridden, version)
+            : std::make_pair(findSwiftNameAttr(overridden, version), false);
+
+    if (ambiguous)
+      return {std::nullopt, true};
+
+    if (!seen) {
+      firstName = name;
+      seen = true;
+    } else if (name != firstName) {
+      return {std::nullopt, true};
+    }
+  }
+  return {firstName, false};
+}
+
+bool ClangImporter::Implementation::isAmbiguouslyOverridden(
+    const clang::CXXRecordDecl *Record, const clang::CXXMethodDecl *Method) {
+  if (!Method->isVirtual())
+    // This isn't virtual, so it can't be overridden.
+    return false;
+
+  auto [it, inserted] = ambiguousVirtualOverrides.try_emplace(Record);
+  if (!inserted)
+    return it->second.contains(Method);
+
+  // First time we are looking this up in Record. Build the set of ambiguously
+  // overridden virtual methods for it and cache the result.
+  bool result = false;
+  for (const auto *RecordMethod : Record->methods()) {
+    if (!overridesVirtualMethods(RecordMethod))
+      continue;
+
+    auto [_, ambiguous] =
+        getOverridingMethodSwiftName(RecordMethod, CurrentVersion);
+
+    if (ambiguous) {
+      for (const auto *overridden : RecordMethod->overridden_methods()) {
+        it->second.insert(overridden);
+        if (overridden == Method)
+          result = true;
+      }
+    }
+  }
+  return result;
+}
+
 std::optional<ForeignErrorConvention::Info>
 NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
                                   StringRef &baseName,
@@ -1531,17 +1594,6 @@ addDefaultArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
     argumentNames.emplace_back();
 }
 
-static StringRef renameUnsafeMethod(ASTContext &ctx,
-                                    const clang::NamedDecl *decl,
-                                    StringRef name) {
-  if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl, ctx}), {})) {
-    return ctx.getIdentifier(("__" + name + "Unsafe").str()).str();
-  }
-
-  return name;
-}
-
 std::optional<StringRef>
 NameImporter::findCustomName(const clang::Decl *decl,
                              ImportNameVersion version) {
@@ -1708,6 +1760,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (!parsedName || parsedName.isOperator())
       return result;
 
+    // swift_name can't rename a declaration to `deinit`; forming a FuncDecl
+    // with that special name asserts. Ignore it and import under the original
+    // name.
+    if (parsedName.BaseNameKind == DeclBaseName::Kind::Destructor) {
+      skipCustomName = true;
+      result.info.hasInvalidCustomName = true;
+    }
+
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
     // convention for factory methods), make sure that it can be
@@ -1748,6 +1808,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         if (cxxMethod->isVirtual() && cxxMethod->size_overridden_methods() > 0)
           skipCustomName = true;
       }
+
+      // `swift_name` attribute is not supported in virtual methods overrides
+      if (auto method = dyn_cast<clang::CXXMethodDecl>(D);
+          method && overridesVirtualMethods(method))
+        skipCustomName = true;
 
       if (!skipCustomName &&
           parsedName.BaseNameKind == DeclBaseName::Kind::Constructor &&
@@ -2396,40 +2461,21 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       newName = baseName.substr(StringRef("__synthesizedVirtualCall_").size());
       baseName = newName;
     }
-    if (method->isVirtual()) {
-      // The name should be imported from the base method
-      if (method->size_overridden_methods() > 0) {
-        DeclName overriddenName;
-        bool foundDivergentMethod = false;
-        for (auto overriddenMethod : method->overridden_methods()) {
-          ImportedName importedName =
-              importName(overriddenMethod, version, givenName);
-          if (!overriddenName) {
-            overriddenName = importedName.getDeclName();
-          } else if (overriddenName.compare(importedName.getDeclName())) {
-            importerImpl->insertUnavailableMethod(method->getParent(),
-                                                  importedName.getDeclName());
-            foundDivergentMethod = true;
-          }
-        }
 
-        if (foundDivergentMethod) {
-          // The method we want to mark as unavailable will be generated
-          // lazily, when we clone the methods from base classes to the derived
-          // class method->getParent().
-          // Since we don't have the actual method here, we store this
-          // information to be accessed when we generate the actual method.
-          importerImpl->insertUnavailableMethod(method->getParent(),
-                                                overriddenName);
+    if (overridesVirtualMethods(method)) {
+      auto [effectiveName, isAmbiguous] =
+          getOverridingMethodSwiftName(method, version);
+      if (isAmbiguous)
+        return ImportedName();
+
+      if (effectiveName) {
+        ParsedDeclName parsed = parseDeclName(effectiveName->name);
+        if (!parsed)
           return ImportedName();
-        }
-
-        baseName = overriddenName.getBaseIdentifier().str();
-        // Also inherit argument names from base method
+        baseName = parsed.BaseName;
         argumentNames.clear();
-        llvm::for_each(overriddenName.getArgumentNames(), [&](Identifier arg) {
-          argumentNames.push_back(arg.str());
-        });
+        for (auto label : parsed.ArgumentLabels)
+          argumentNames.push_back(label);
       }
     }
   }
@@ -2526,8 +2572,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       baseName = swiftPrivateScratch;
     }
   }
-
-  baseName = renameUnsafeMethod(swiftCtx, D, baseName);
 
   result.declName =
       formDeclName(swiftCtx, baseName, argumentNames, isFunction,

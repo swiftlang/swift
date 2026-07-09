@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -parse-as-library %s -module-name A | %FileCheck %s
 
 func foo(_ a: _const Int) {}

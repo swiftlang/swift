@@ -32,7 +32,7 @@ extension DistributedActor {
   ///
   /// - Note: Because this check is performed against the actor's serial executor,
   ///   if another actor uses the same serial executor--by using
-  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
+  ///   that actor's serial executor as its own `Actor.unownedExecutor`--this
   ///   check will succeed.  From a concurrency safety perspective, the
   ///   serial executor guarantees mutual exclusion of those two actors.
   ///
@@ -79,7 +79,7 @@ extension DistributedActor {
   ///
   /// - Note: This check is performed against the actor's serial executor,
   ///   meaning that / if another actor uses the same serial executor--by using
-  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
+  ///   that actor's serial executor as its own `Actor.unownedExecutor`--this
   ///   check will succeed , as from a concurrency safety perspective, the
   ///   serial executor guarantees mutual exclusion of those two actors.
   ///
@@ -129,7 +129,7 @@ extension DistributedActor {
   ///
   /// If the current context is not running on the actor's serial executor,
   /// this method will crash with a fatal error (similar
-  /// to ``preconditionIsolated()``).
+  /// to ``preconditionIsolated(_:file:line:)``).
   ///
   /// This method can only be used from synchronous functions, as asynchronous
   /// functions should instead perform a normal method call to the actor, which
@@ -153,7 +153,7 @@ extension DistributedActor {
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
   @available(SwiftStdlib 5.9, *)
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'distributed actor' instead")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated func assumeIsolated<T : Sendable>(
       _ operation: (isolated Self) throws -> T,
       file: StaticString = #fileID, line: UInt = #line

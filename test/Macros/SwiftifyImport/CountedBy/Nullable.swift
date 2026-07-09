@@ -8,19 +8,19 @@
 // RUN: %diff %t/expansions.out %t/expansions.expected
 
 //--- test.swift
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), nullableAsEmptySpan: true)
 public func myFunc(_ ptr: UnsafePointer<CInt>?, _ len: CInt) {
 }
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), nullableAsEmptySpan: true)
 public func myFunc2(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) {
 }
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedBy(pointer: .param(3), count: "len2"), .nonescaping(pointer: .param(3)))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedBy(pointer: .param(3), count: "len2"), .nonescaping(pointer: .param(3)), nullableAsEmptySpan: true)
 public func myFunc3(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt, _ ptr2: UnsafeMutablePointer<CInt>?, _ len2: CInt) {
 }
 
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
 public func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePointer<CInt>? {
 // expected-error@+1{{missing return in global function expected to return 'UnsafeMutablePointer<CInt>?' (aka 'Optional<UnsafeMutablePointer<Int32>>')}}
 }

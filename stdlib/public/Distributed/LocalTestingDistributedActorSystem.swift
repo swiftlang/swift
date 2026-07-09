@@ -244,7 +244,7 @@ fileprivate class _Lock {
   private let underlying: UnsafeMutablePointer<os_unfair_lock>
   #elseif os(Windows)
   private let underlying: UnsafeMutablePointer<SRWLOCK>
-  #elseif os(WASI)
+  #elseif os(WASI) || os(Emscripten)
   // pthread is currently not available on WASI
   #elseif os(Cygwin) || os(FreeBSD) || os(OpenBSD)
   private let underlying: UnsafeMutablePointer<pthread_mutex_t?>
@@ -259,7 +259,7 @@ fileprivate class _Lock {
     #elseif os(Windows)
     unsafe self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
     unsafe InitializeSRWLock(self.underlying)
-    #elseif os(WASI)
+    #elseif os(WASI) || os(Emscripten)
     // WASI environment has only a single thread
     #else
     unsafe self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
@@ -274,7 +274,7 @@ fileprivate class _Lock {
     // `os_unfair_lock`s do not need to be explicitly destroyed
     #elseif os(Windows)
     // `SRWLOCK`s do not need to be explicitly destroyed
-    #elseif os(WASI)
+    #elseif os(WASI) || os(Emscripten)
     // WASI environment has only a single thread
     #else
     guard unsafe pthread_mutex_destroy(self.underlying) == 0 else {
@@ -282,7 +282,7 @@ fileprivate class _Lock {
     }
     #endif
 
-    #if !os(WASI)
+    #if !os(WASI) && !os(Emscripten)
     unsafe self.underlying.deinitialize(count: 1)
     unsafe self.underlying.deallocate()
     #endif
@@ -295,7 +295,7 @@ fileprivate class _Lock {
     unsafe os_unfair_lock_lock(self.underlying)
     #elseif os(Windows)
     unsafe AcquireSRWLockExclusive(self.underlying)
-    #elseif os(WASI)
+    #elseif os(WASI) || os(Emscripten)
     // WASI environment has only a single thread
     #else
     guard unsafe pthread_mutex_lock(self.underlying) == 0 else {
@@ -308,7 +308,7 @@ fileprivate class _Lock {
       unsafe os_unfair_lock_unlock(self.underlying)    
       #elseif os(Windows)
       unsafe ReleaseSRWLockExclusive(self.underlying)
-      #elseif os(WASI)
+      #elseif os(WASI) || os(Emscripten)
       // WASI environment has only a single thread
       #else
       guard unsafe pthread_mutex_unlock(self.underlying) == 0 else {

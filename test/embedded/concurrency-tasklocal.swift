@@ -4,7 +4,6 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx || OS=wasip1

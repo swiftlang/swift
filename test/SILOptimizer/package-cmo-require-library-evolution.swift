@@ -19,7 +19,6 @@
 // RUN: %llvm-bcanalyzer %t/Lib.swiftmodule | %FileCheck %s -check-prefix=CHECK-BC
 // CHECK-BC: SERIALIZE_PACKAGE_ENABLED
 
-// REQUIRES: swift_in_compiler
 
 public struct S {
   public init() {}

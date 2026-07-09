@@ -6,7 +6,6 @@
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -Xllvm -sil-print-types -Xllvm -sil-print-transform-blocks=false -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -Xllvm -sil-print-types -Xllvm -sil-print-transform-blocks=false -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
-// REQUIRES: swift_in_compiler
 
 import External
 import External2
@@ -416,7 +415,7 @@ struct PAEM : P4EM {
 }
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$s1A2PAVAA2P4A2aDP4testyyFTW
-// CHECK:   [[V:%.*]] = load %0 : $*PA
+// CHECK:   [[V:%.*]] = struct $PA ()
 // CHECK:   [[F:%.*]] = function_ref @$s1A2PAV4testyyF
 // CHECK:   apply [[F]]([[V]])
 

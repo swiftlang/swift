@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -module-name a -swift-version 5  -target %target-swift-5.1-abi-triple -Xllvm -sil-print-debuginfo -emit-verbose-sil -parse-as-library
 // RUN: %target-swift-frontend -emit-silgen %s -module-name a -swift-version 5  -target %target-swift-5.1-abi-triple -Xllvm -sil-print-debuginfo -emit-verbose-sil -parse-as-library | %FileCheck %s
 // REQUIRES: concurrency
 

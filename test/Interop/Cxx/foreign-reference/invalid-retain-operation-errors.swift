@@ -295,8 +295,6 @@ public func testBadAnonymousStruct(x: BadAnonymousStruct) { }
 @available(macOS 13.3, *)
 public func testRetainReleaseAsNonFunction(x: BadFRT) {}
 
-// CHECK: error: multiple functions 'retain' found; there must be exactly one retain function for reference type 'MultipleRetainReleaseFRT'
-// CHECK: error: multiple functions 'release' found; there must be exactly one release function for reference type 'MultipleRetainReleaseFRT'
 @available(macOS 13.3, *)
 public func testMultipleRetainRelease(x: MultipleRetainReleaseFRT) {}
 

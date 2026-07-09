@@ -8,11 +8,11 @@
 // UNSUPPORTED: LinuxDistribution=amzn-2
 
 import StdlibUnittest
-import CustomBorrowingSequence
+import CustomIterable
 
-var CxxBorrowingSequenceTestSuite = TestSuite("CxxSequence")
+var CxxIterableTestSuite = TestSuite("CxxSequence")
 
-CxxBorrowingSequenceTestSuite.test("SimpleNonCopyableSequence as Swift.BorrowingSequence") {
+CxxIterableTestSuite.test("SimpleNonCopyableSequence as Swift.Iterable") {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let seq = SimpleNonCopyableSequence()
@@ -31,7 +31,7 @@ CxxBorrowingSequenceTestSuite.test("SimpleNonCopyableSequence as Swift.Borrowing
   expectEqual(counter, 4)
 }
 
-CxxBorrowingSequenceTestSuite.test("SimpleNonCopArrayWrapper as Swift.BorrowingSequence") {
+CxxIterableTestSuite.test("SimpleNonCopArrayWrapper as Swift.Iterable") {
   guard #available(SwiftStdlib 6.4, *) else { return }
   let seq = SimpleNonCopArrayWrapper()
   let arr : [Int32] = [10, 20, 30, 40, 50]
@@ -49,7 +49,7 @@ CxxBorrowingSequenceTestSuite.test("SimpleNonCopArrayWrapper as Swift.BorrowingS
   expectEqual(counter, 5)
 }
 
-CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.BorrowingSequence") {
+CxxIterableTestSuite.test("ContiguousNonCopyableSequence as Swift.Iterable") {
   guard #available(SwiftStdlib 6.4, *) else { return }
   let seq = ContiguousNonCopyableSequence()
   let arr : [Int32] = [10, 20, 30, 40, 50]
@@ -71,7 +71,7 @@ CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.Borro
   expectEqual(outerCounter, 1)
 }
 
-CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.BorrowingSequence, with maximumCount") {
+CxxIterableTestSuite.test("ContiguousNonCopyableSequence as Swift.Iterable, with maximumCount") {
   guard #available(SwiftStdlib 6.4, *) else { return }
   let seq = ContiguousNonCopyableSequence()
   let arr : [Int32] = [10, 20, 30, 40, 50]
@@ -80,7 +80,7 @@ CxxBorrowingSequenceTestSuite.test("ContiguousNonCopyableSequence as Swift.Borro
   var innerCounter = 0
   var outerCounter = 0
   while true {
-    let span = iterator.nextSpan(maximumCount: 3)
+    let span = iterator.nextSpan(maxCount: 3)
     if (span.count == 0) { break }
     for i in 0..<span.count {
       expectEqual(span[i], arr[innerCounter])

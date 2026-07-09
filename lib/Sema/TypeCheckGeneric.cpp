@@ -969,6 +969,11 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // Self or its associated types will infer default requirements in
     // ordinary extensions of that protocol, so the signature can differ there.
     if (auto *proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
+      // Metatype extensions have no generic signature.  Their members are
+      // statically dispatched and cannot reference Self.
+      if (ext->isMetatypeExtension())
+        return nullptr;
+
       if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
           proto->getInverseRequirements().empty()) {
         return extendedNominal->getGenericSignatureOfContext();

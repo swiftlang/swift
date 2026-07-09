@@ -64,7 +64,9 @@
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/FrontendTool/Dependencies.h"
 #include "swift/IRGen/TBDGen.h"
+#if SWIFT_BUILD_IMMEDIATE_MODE
 #include "swift/Immediate/Immediate.h"
+#endif
 #include "swift/Index/IndexRecord.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
@@ -96,6 +98,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
@@ -259,6 +262,54 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
     SM.getEntireTextForBuffer(SF->getBufferID()).count('\n');
 }
 
+/// Emit the per-module Clang memory breakdown as a dedicated JSON file in the
+/// stats output directory. The fixed FRONTEND_STATISTIC schema can only hold
+/// aggregate scalars, so the variable-length per-module data goes here. This is
+/// best-effort: a failure to write must not fail the compilation.
+///
+/// The driver forwards a single -stats-output-dir to every frontend job, so the
+/// filename is made unique per job (module name + pid) to avoid clobbering in
+/// multi-file / batch builds. The name deliberately does not match the
+/// `stats-*.json` pattern that process-stats-dir.py loads, so it is ignored
+/// there.
+static void writeClangModuleMemoryJSON(
+    StringRef statsDir, StringRef moduleName,
+    const ClangImporter::ClangMemoryStats &stats) {
+  SmallString<256> fileName;
+  llvm::raw_svector_ostream(fileName)
+      << "clang-module-memory-" << moduleName << "-"
+      << llvm::sys::Process::getProcessId() << ".json";
+  SmallString<256> path(statsDir);
+  llvm::sys::path::append(path, fileName);
+  std::error_code EC;
+  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::OF_Text);
+  if (EC)
+    return;
+
+  llvm::json::OStream J(out, /*IndentSize=*/2);
+  J.object([&] {
+    J.attribute("clangASTContextBytes", stats.astContextBytes);
+    J.attribute("moduleBufferBytesMMap", stats.moduleBufferMMapBytes);
+    J.attribute("moduleBufferBytesMalloc", stats.moduleBufferMallocBytes);
+    J.attribute("numLoadedModules", stats.numLoadedModules);
+    J.attribute("numMaterializedDecls", stats.numMaterializedDecls);
+    J.attributeArray("modules", [&] {
+      for (const auto &m : stats.perModule) {
+        J.object([&] {
+          J.attribute("module", m.moduleName);
+          J.attribute("inMemoryBufferBytes", m.inMemoryBufferBytes);
+          J.attribute("bufferKind", m.bufferIsMMapped ? "mmap" : "malloc");
+          J.attribute("onDiskDecls", m.onDiskDecls);
+          J.attribute("onDiskTypes", m.onDiskTypes);
+          J.attribute("onDiskIdentifiers", m.onDiskIdentifiers);
+          J.attribute("onDiskMacros", m.onDiskMacros);
+          J.attribute("materializedDecls", m.materializedDecls);
+        });
+      }
+    });
+  });
+}
+
 static void countASTStats(UnifiedStatsReporter &Stats,
                           CompilerInstance& Instance) {
   auto &C = Stats.getFrontendCounters();
@@ -268,6 +319,29 @@ static void countASTStats(UnifiedStatsReporter &Stats,
 
   auto const &AST = Instance.getASTContext();
   C.NumLoadedModules = AST.getNumLoadedModules();
+
+  // Memory metrics. Swift ASTContext bytes (all arenas), and the Clang
+  // importer's aggregate + per-module memory. Snapshots taken here at
+  // end-of-pipeline while both ASTContexts and the importer are still alive.
+  C.SwiftASTContextBytes = AST.getTotalMemory();
+  if (auto *clangImporter =
+          static_cast<ClangImporter *>(AST.getClangModuleLoader())) {
+    auto clangStats = clangImporter->getClangMemoryStats();
+    C.ClangASTContextBytes = clangStats.astContextBytes;
+    C.ClangModuleBufferBytesMMap = clangStats.moduleBufferMMapBytes;
+    C.ClangModuleBufferBytesMalloc = clangStats.moduleBufferMallocBytes;
+    C.NumLoadedClangModules = clangStats.numLoadedModules;
+    C.NumMaterializedClangDecls = clangStats.numMaterializedDecls;
+    // Convenience sum; mmap buffers excluded (file-backed, not necessarily
+    // resident).
+    C.ClangTotalBytes =
+        clangStats.astContextBytes + clangStats.moduleBufferMallocBytes;
+
+    const auto &FEOpts = Instance.getInvocation().getFrontendOptions();
+    if (!FEOpts.StatsOutputDir.empty())
+      writeClangModuleMemoryJSON(FEOpts.StatsOutputDir, FEOpts.ModuleName,
+                                 clangStats);
+  }
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
@@ -1308,10 +1382,10 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
     observer->performedSemanticAnalysis(Instance);
 
   switch (opts.CrashMode) {
-  case FrontendOptions::DebugCrashMode::AssertAfterParse:
+  case FrontendOptions::DebugCrashMode::AssertAfterTypeChecking:
     debugFailWithAssertion();
     return true;
-  case FrontendOptions::DebugCrashMode::CrashAfterParse:
+  case FrontendOptions::DebugCrashMode::CrashAfterTypeChecking:
     debugFailWithCrash();
     return true;
   case FrontendOptions::DebugCrashMode::None:
@@ -1430,11 +1504,13 @@ static bool performAction(CompilerInstance &Instance, int &ReturnValue,
                                   return Instance.getASTContext().hadError();
                                 });
   case FrontendOptions::ActionType::Immediate: {
+#if SWIFT_BUILD_IMMEDIATE_MODE
     const auto &Ctx = Instance.getASTContext();
     if (Ctx.LangOpts.hasFeature(Feature::LazyImmediate)) {
       ReturnValue = RunImmediatelyFromAST(Instance);
       return Ctx.hadError();
     }
+#endif
     return withSemanticAnalysis(
         Instance, observer, [&](CompilerInstance &Instance) {
           assert(FrontendOptions::doesActionGenerateSIL(opts.RequestedAction) &&
@@ -1444,6 +1520,7 @@ static bool performAction(CompilerInstance &Instance, int &ReturnValue,
         });
   }
   case FrontendOptions::ActionType::EmitSILGen:
+  case FrontendOptions::ActionType::EmitSILGenOSSA:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:
   case FrontendOptions::ActionType::EmitLoweredSIL:
@@ -1918,6 +1995,7 @@ generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
       parallelIROutputFilenames, &HashGlobal, casBackend, cacheKeyForJob);
 }
 
+#if SWIFT_BUILD_IMMEDIATE_MODE
 static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
                                                 std::unique_ptr<SILModule> &&SM,
                                                 ModuleOrSourceFile MSF,
@@ -1940,6 +2018,7 @@ static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
                      std::move(SM));
   return Instance.getASTContext().hadError();
 }
+#endif
 
 static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
                                 ModuleOrSourceFile MSF,
@@ -2201,8 +2280,17 @@ static bool performCompileStepsPostSILGen(
   SM->setSerializeSILAction(SerializeSILModuleAction);
 
   // Perform optimizations and mandatory/diagnostic passes.
-  if (Instance.performSILProcessing(SM.get()))
+  if (Instance.performSILProcessing(SM.get())) {
+
+    // If requested, the performSILProcessing stopped at the first point
+    // it reached OSSA SIL, so emit that.
+    if (Action == FrontendOptions::ActionType::EmitSILGenOSSA) {
+      return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
+    }
+
+    // Some other error occurred.
     return true;
+  }
 
   if (observer)
     observer->performedSILProcessing(*SM);
@@ -2280,9 +2368,17 @@ static bool performCompileStepsPostSILGen(
   if (Action == FrontendOptions::ActionType::DumpTypeInfo)
     return performDumpTypeInfo(IRGenOpts, *SM);
 
+#if SWIFT_BUILD_IMMEDIATE_MODE
   if (Action == FrontendOptions::ActionType::Immediate)
     return processCommandLineAndRunImmediately(
         Instance, std::move(SM), MSF, observer, ReturnValue);
+#else
+  if (Action == FrontendOptions::ActionType::Immediate) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::error_immediate_mode_unsupported_build);
+    return true;
+  }
+#endif
 
   StringRef OutputFilename = PSPs.OutputFilename;
   std::vector<std::string> ParallelOutputFilenames =

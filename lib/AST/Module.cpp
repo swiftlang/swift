@@ -3951,10 +3951,9 @@ bool SourceFile::FileIDStr::matches(const SourceFile *file) const {
          fileName == llvm::sys::path::filename(file->getFilename());
 }
 
-std::optional<DefaultIsolation> SourceFile::getDefaultIsolation() const {
-  auto &ctx = getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, DefaultIsolationInSourceFileRequest{this}, std::nullopt);
+FileDefaults SourceFile::getFileDefaults() const {
+  return evaluateOrDefault(getASTContext().evaluator, FileDefaultsRequest{this},
+                           {});
 }
 
 namespace {

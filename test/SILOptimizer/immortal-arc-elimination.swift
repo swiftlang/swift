@@ -6,7 +6,6 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
-// REQUIRES: swift_in_compiler
 
 // Check that the optimizer can remove "unbalanced" retains for immortal objects.
 // But only with a Swift 5.1 runtime (which supports immortal objects).

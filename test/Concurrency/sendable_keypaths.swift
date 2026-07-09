@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability -solver-enable-enumerate-supertypes
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability -solver-disable-enumerate-supertypes
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
@@ -311,5 +312,34 @@ do {
 
   final class Test: @unchecked Sendable {
     @Wrapper var value: Int = 0 // Ok
+  }
+}
+
+// A couple of problems exposed by bugs in type join support that were previously
+// not covered by tests
+do {
+  struct S {}
+
+  struct G<Input, Output> {}
+
+  struct F {
+    var g: G<S, Int>? = nil
+  }
+
+  func f<Input, Output, KeyPath: WritableKeyPath<F, G<Input, Output>?>>(_ keyPath: KeyPath, block: (Input) -> Output) {}
+
+  func test(fn: () -> Int) {
+    f(\.g) { _ in fn() }
+  }
+}
+
+do {
+  class C {
+    var x: Int? { nil }
+    var y: Int? { nil }
+  }
+
+  func f(b: Bool) {
+    let _: KeyPath<C, Int?> = b ? \.x : \.y
   }
 }

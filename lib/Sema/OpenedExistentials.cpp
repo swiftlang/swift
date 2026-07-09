@@ -531,6 +531,12 @@ swift::isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member) {
     return ExistentialMemberAccessLimitation::None;
   }
 
+  // Metatype extension members are non-generic and don't reference Self.
+  if (auto *ext = dyn_cast<ExtensionDecl>(dc)) {
+    if (ext->isMetatypeExtension())
+      return ExistentialMemberAccessLimitation::None;
+  }
+
   auto &ctx = member->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(baseTy);
 

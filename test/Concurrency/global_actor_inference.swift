@@ -3,9 +3,8 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
-// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete- -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-experimental-feature FlowIsolationGlobalActor
+// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
-// REQUIRES: swift_feature_FlowIsolationGlobalActor
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
@@ -27,6 +26,9 @@ struct OtherGlobalActor {
 @globalActor
 struct GenericGlobalActor<T> {
   static var shared: SomeActor { SomeActor() }
+  // expected-warning@-1{{GlobalActor witness static property 'shared' may return different actor instances, which would lead to global actor isolation violations}}
+  // expected-note@-2{{declare it as 'static let' to guarantee a stable instance}}
+  // expected-note@-3{{if this property always returns the same instance, silence the warning with '@diagnose(UnstableGlobalActorShared, as: ignored)'}}
 }
 
 // ----------------------------------------------------------------------

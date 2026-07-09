@@ -25,6 +25,10 @@ struct FunctionPassContext : MutatingContext {
     return bridgedPassContext.continueWithNextSubpassRun(inst.bridged)
   }
 
+  func continueWithNextSubpassRun(forValue value: Value?) -> Bool {
+    return bridgedPassContext.continueWithNextSubpassRun(value.bridged)
+  }
+
   func createSimplifyContext(preserveDebugInfo: Bool,
                              notifyInstructionChanged: @escaping (Instruction) -> ()
   ) -> SimplifyContext {

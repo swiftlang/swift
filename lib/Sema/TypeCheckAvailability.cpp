@@ -1679,9 +1679,6 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
     }
   }
 
-  if (shouldIgnoreDeprecationOfConcurrencyDecl(DeprecatedDecl, ReferenceDC))
-    return;
-
   auto Domain = Attr->getDomain();
   auto DeprecatedRange = Attr->getDeprecatedRange(Context).value();
   auto Message = Attr->getMessage();

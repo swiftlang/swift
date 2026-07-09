@@ -53,7 +53,7 @@ extension _RigidArray where Element: ~Copyable {
   /// - Complexity: O(`self.count` + `newItemCount`) in addition to the complexity
   ///    of the callback invocations.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func replaceSubrange<E: Error>(
     _ subrange: Range<Int>,
     addingCount newItemCount: Int,
@@ -70,7 +70,7 @@ extension _RigidArray where Element: ~Copyable {
       initializingWith: initializer)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _uncheckedReplaceSubrange<E: Error>(
     _ subrange: Range<Int>,
     addingCount newItemCount: Int,
@@ -125,7 +125,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
     moving newElements: UnsafeMutableBufferPointer<Element>,
@@ -164,7 +164,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`self.count` + `items.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
     moving items: inout OutputSpan<Element>
@@ -206,7 +206,7 @@ extension _RigidArray where Element: Copyable {
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
     copying newElements: UnsafeBufferPointer<Element>
@@ -245,7 +245,7 @@ extension _RigidArray where Element: Copyable {
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
     copying newElements: UnsafeMutableBufferPointer<Element>
@@ -282,7 +282,7 @@ extension _RigidArray where Element: Copyable {
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
     copying newElements: Span<Element>
@@ -292,7 +292,7 @@ extension _RigidArray where Element: Copyable {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _replaceSubrange(
     _ subrange: Range<Int>,
     copyingCollection newElements: __owned some Collection<Element>,
@@ -345,7 +345,7 @@ extension _RigidArray where Element: Copyable {
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
     copying newElements: consuming some Collection<Element>

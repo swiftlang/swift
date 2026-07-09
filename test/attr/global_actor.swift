@@ -15,6 +15,9 @@ struct GA1 {
 
 @globalActor
 struct GenericGlobalActor<T> {
+  // 'let' is not possible on a generic type; silence the warning since
+  // this witness shape is only used here for global-actor attribute tests.
+  @diagnose(UnstableGlobalActorShared, as: ignored)
   static var shared: SomeActor { SomeActor() }
 }
 

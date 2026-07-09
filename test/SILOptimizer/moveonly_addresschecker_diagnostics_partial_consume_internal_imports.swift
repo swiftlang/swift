@@ -21,6 +21,13 @@
 // RUN:     -sil-verify-all                                         \
 // RUN:     -I %t
 
+// RUN: %target-swift-frontend                                      \
+// RUN:     %t/Downstream.swift                                     \
+// RUN:     -emit-sil -verify                                       \
+// RUN:     -sil-verify-all                                         \
+// RUN:     -enable-sil-opaque-values                               \
+// RUN:     -I %t
+
 //--- Library.swift
 
 public struct Source: ~Copyable {

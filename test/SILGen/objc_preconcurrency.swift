@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name objc_preconcurrency -sdk %S/Inputs -I %S/Inputs -enable-source-import -import-objc-header %S/Inputs/objc_preconcurrency.h %s -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name objc_preconcurrency -sdk %S/Inputs -I %S/Inputs -enable-source-import -import-objc-header %S/Inputs/objc_preconcurrency.h %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: objc_interop

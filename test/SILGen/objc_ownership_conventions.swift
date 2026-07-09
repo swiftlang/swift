@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name objc_ownership_conventions -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name objc_ownership_conventions -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop | %FileCheck %s
 
 import gizmo

@@ -148,6 +148,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   TaskLocal.swift
   TaskSleep.swift
   AsyncStreamBuffer.swift
+  AsyncStreamShims.swift
   AsyncStream.swift
   AsyncThrowingStream.swift
   Deque/_DequeBuffer.swift
@@ -353,6 +354,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
           list(APPEND extra_c_compile_flags -DTARGET_CPU_X86_64=1)
         endif()
       endif()
+    endif()
+
+    if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
+      list(APPEND extra_c_compile_flags "-DSWIFT_USE_EMBEDDED_SWIFT_PLATFORM=1")
     endif()
 
     if("${arch}" MATCHES "wasm32")

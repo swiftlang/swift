@@ -983,12 +983,52 @@ usage() {
     echo "  create an installable package operates on install-destdir as normal."
 }
 
+# Emit a JSON list describing every entry in KNOWN_SETTINGS.
+# Used by `build-script --dump-options` to expose the bash layer's flags
+# alongside the Python layer's flags.
+dump_options_json() {
+    local s
+    json_escape() {
+        s="$1"
+        s="${s//\\/\\\\}"
+        s="${s//\"/\\\"}"
+        s="${s//$'\n'/\\n}"
+        s="${s//$'\r'/\\r}"
+        s="${s//$'\t'/\\t}"
+        printf '%s' "$s"
+    }
+
+    printf '['
+    local first=1
+    for ((i = 0; i < ${#KNOWN_SETTINGS[@]}; i += 3)); do
+        if (( first )); then
+            first=0
+        else
+            printf ','
+        fi
+        local name="${KNOWN_SETTINGS[i]}"
+        local default_value="${KNOWN_SETTINGS[$((i+1))]}"
+        local desc="${KNOWN_SETTINGS[$((i+2))]}"
+        printf '{"name":"%s","option":"--%s","default":"%s","help":"%s"}' \
+            "$(json_escape "${name}")" \
+            "$(json_escape "${name}")" \
+            "$(json_escape "${default_value}")" \
+            "$(json_escape "${desc}")"
+    done
+    printf ']\n'
+}
+
 # Scan all command-line arguments
 while [[ "$1" ]] ; do
     case "$1" in
         -h | --help )
             usage
             exit
+            ;;
+
+        --dump-options )
+            dump_options_json
+            exit 0
             ;;
 
         --* )

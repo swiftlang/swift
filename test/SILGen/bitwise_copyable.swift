@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend %s -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values -target %target-swift-5.1-abi-triple -enable-experimental-feature Sensitive -enable-builtin-module
 // RUN: %target-swift-frontend                         \
 // RUN:     %s                                         \
 // RUN:     -emit-silgen                               \

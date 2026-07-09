@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -module-name test -swift-version 5 -target %target-swift-5.1-abi-triple -parse-stdlib -sil-verify-all
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s -module-name test -swift-version 5 -target %target-swift-5.1-abi-triple -parse-stdlib -sil-verify-all | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
 

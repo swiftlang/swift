@@ -87,6 +87,10 @@ class TestGeneric<T> {
   @_borrowed @_hasStorage var borrowedGeneric: T { get set }
 }
 
+struct NCG<T> : ~Copyable {
+  var value: T
+}
+
 precedencegroup ComparisonPrecedence {
   assignment: true
   associativity: right
@@ -2701,6 +2705,31 @@ exit:
   return %retval : $()
 }
 
+sil hidden [ossa] @borrow_use_NCG : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> () {
+bb0(%0 : @guaranteed $NCG<T>):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_elide_borrow_copy :
+// CHECK:       bb0(%0 : $*NCG<T>):
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     copy_addr
+// CHECK:         mark_unresolved_non_copyable_value [no_consume_or_assign] %0 : $*NCG<T>
+// CHECK-NOT:     destroy_addr
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'test_elide_borrow_copy'
+sil hidden [ossa] @test_elide_borrow_copy : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> () {
+bb0(%0 : @guaranteed $NCG<T>):
+  %1 = copy_value %0 : $NCG<T>
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $NCG<T>
+  %f = function_ref @borrow_use_NCG : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> ()
+  %3 = apply %f<T>(%2) : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> ()
+  destroy_value %2 : $NCG<T>
+  %4 = tuple ()
+  return %4 : $()
+}
+
 // Verify that the init_enum_data_addr instruction is created before its first
 // use.  Although the opaque values are visited in forward order, their
 // uses are visited at the same time.  At that point, addresses are
@@ -2858,6 +2887,38 @@ entry(%tmo : @guaranteed $@moveOnly T):
   apply %borrowT<T>(%t) : $@convention(thin) <T> (@in_guaranteed T) -> ()
   %retval = tuple ()
   return %retval : $()
+}
+
+// Don't apply the isMarkUnresolvedCopy def-projection optimization when the
+// mark has a transitive copy_value user. visitCopyValueInst's deletion of
+// the mark's destroy_value would shrink the mark's pruned-liveness boundary
+// and invalidate the isStoreCopy classification of the transitive copy.
+// This input is malformed (the move-only checker will diagnose the consume
+// in a later pass), but address-lowering must not crash on it.
+//
+// CHECK-LABEL: sil hidden [ossa] @test_no_elide_borrow_copy_with_transitive_copy :
+// CHECK-LABEL: } // end sil function 'test_no_elide_borrow_copy_with_transitive_copy'
+sil hidden [ossa] @test_no_elide_borrow_copy_with_transitive_copy : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> () {
+bb0(%0 : @guaranteed $NCG<T>):
+  %1 = copy_value %0 : $NCG<T>
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $NCG<T>
+  %stack = alloc_stack $NCG<T>
+  %3 = copy_value %2 : $NCG<T>
+  store %3 to [init] %stack : $*NCG<T>
+  destroy_addr %stack : $*NCG<T>
+  dealloc_stack %stack : $*NCG<T>
+  destroy_value %2 : $NCG<T>
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_no_implicit_copy_arg_flag_preserved :
+// CHECK:       bb0(%0 : @noImplicitCopy $*T):
+// CHECK-LABEL: } // end sil function 'test_no_implicit_copy_arg_flag_preserved'
+sil hidden [ossa] @test_no_implicit_copy_arg_flag_preserved : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $T):
+  %1 = tuple ()
+  return %1 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @test_open_pack_element_dominance : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}, Builtin.Word) -> () {

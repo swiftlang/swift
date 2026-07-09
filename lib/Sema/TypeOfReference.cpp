@@ -2014,6 +2014,11 @@ ConstraintSystem::getTypeOfMemberReferencePre(
                                   preparedOverload);
         }
       }
+    } else if (auto *ext = dyn_cast<ExtensionDecl>(outerDC);
+               ext && ext->isMetatypeExtension()) {
+      // Metatype extension members do not require existential opening.
+      // The member belongs to the protocol metatype itself, not a
+      // conforming type.
     } else {
       // Open the existential.
       auto openedArchetype =
@@ -2029,7 +2034,8 @@ ConstraintSystem::getTypeOfMemberReferencePre(
   assert(openedParams.size() == 1);
 
   bool isDynamicLookup = (choice.getKind() == OverloadChoiceKind::DeclViaDynamic);
-  bool skipProtocolSelfConstraint = isDynamicLookup || isRequirementOrWitness(locator);
+  bool skipProtocolSelfConstraint =
+      isDynamicLookup || isRequirementOrWitness(locator);
 
   Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
   if (outerDC->getSelfProtocolDecl()) {
@@ -2270,12 +2276,10 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember()) {
         auto baseTy = overload.getBaseType();
-        if (!baseTy)
-          return Type();
 
-        baseTy = baseTy->getRValueType();
-        if (!baseTy->getAnyNominal() && !baseTy->is<ExistentialType>() &&
-            !baseTy->is<OpaqueTypeArchetypeType>())
+        // Unapplied instance member references are not supported here
+        // for now.
+        if (!baseTy || baseTy->getRValueType()->is<AnyMetatypeType>())
           return Type();
       }
 
@@ -2478,7 +2482,8 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
       }();
       if (lookupDepth > ctx.TypeCheckerOpts.DynamicMemberLookupDepthLimit) {
         (void)recordFix(TooManyDynamicMemberLookups::create(
-            *this, DeclNameRef(choice.getName()), locator));
+                            *this, DeclNameRef(choice.getName()), locator),
+                        FixImpact::InvalidReference);
         recordTypeVariablesAsHoles(memberTy);
       } else {
         addValueMemberConstraint(

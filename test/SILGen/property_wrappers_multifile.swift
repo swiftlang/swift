@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -primary-file %s %S/Inputs/property_wrappers_multifile_other.swift
 // RUN: %target-swift-emit-silgen -primary-file %s %S/Inputs/property_wrappers_multifile_other.swift | %FileCheck %s
 
 public class YourClass : MyClass {}

@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -o /dev/null %s
 // REQUIRES: asserts
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

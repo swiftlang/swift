@@ -10,15 +10,17 @@
 // RUN: %target-swift-frontend -c -O %t/Client.swift -I %t \
 // RUN:   -validate-tbd-against-ir=none -swift-version 5
 
-// Replace headers, changing the type of `foo`.
+// Replace headers, changing the type of `foo`. The client must recover with a
+// normal diagnostic instead of aborting with a deserialization failure.
 // RUN: mv %t/A_DifferentAPI.h %t/A.h
-// RUN: not --crash %target-swift-frontend -c -O %t/Client.swift -I %t \
+// RUN: not %target-swift-frontend -c -O %t/Client.swift -I %t \
 // RUN:   -validate-tbd-against-ir=none -swift-version 5 2>&1 \
 // RUN:   -diagnostic-style llvm | %FileCheck %s
 // CHECK: error: reference to declaration 'foo' broken by a context change; the declaration kind of 'foo' from 'A' changed since building 'LibWithXRef'
 // CHECK: note: the declaration was expected to be found in module 'A' at '{{.*}}module.modulemap'
 // CHECK: note: the declaration was actually found in module 'A' at '{{.*}}module.modulemap'
 // CHECK: note: a candidate was filtered out because of a type mismatch; expected: '() -> ()', found: '() -> Float'
+// CHECK-NOT: *** DESERIALIZATION FAILURE ***
 
 //--- module.modulemap
 module A {

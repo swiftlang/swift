@@ -1055,9 +1055,14 @@ namespace {
 
       // Unbound instance method references always build a thunk, even if
       // we apply the arguments (eg, SomeClass.method(self)(a)), to avoid
-      // representational issues.
-      if (!baseIsInstance && member->isInstanceMember())
+      // representational issues.  Metatype extension instance members are
+      // bound directly since the metatype value is the instance.
+      if (!baseIsInstance && member->isInstanceMember()) {
+        if (auto *ext = dyn_cast<ExtensionDecl>(member->getDeclContext()))
+          if (ext->isMetatypeExtension())
+            return false;
         return true;
+      }
 
       // Bound member references that are '@objc optional' or found via dynamic
       // lookup are always represented via DynamicMemberRefExpr instead of a
@@ -1869,8 +1874,12 @@ namespace {
         return forceUnwrapIfExpected(ref, memberLocator);
       }
 
+      const bool isMetatypeExtMember =
+          isa<ExtensionDecl>(member->getDeclContext()) &&
+          cast<ExtensionDecl>(member->getDeclContext())->isMetatypeExtension();
       const bool isUnboundInstanceMember =
-          (!baseIsInstance && member->isInstanceMember());
+          (!baseIsInstance && member->isInstanceMember() &&
+           !isMetatypeExtMember);
       const bool needsCurryThunk =
           shouldBuildCurryThunk(choice, baseIsInstance);
 
@@ -1934,7 +1943,11 @@ namespace {
       }
 
       auto isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-      if (baseIsInstance) {
+      if (isMetatypeExtMember) {
+        // For metatype extension members, the metatype value IS the instance.
+        // The base is already the right type; just coerce to an rvalue.
+        base = cs.coerceToRValue(base);
+      } else if (baseIsInstance) {
         // Convert the base to the appropriate container type, turning it
         // into an lvalue if required.
 
@@ -2365,6 +2378,17 @@ namespace {
             llvm_unreachable("unknown key path class!");
           }
         } else {
+          if (keyPathTy->is<ArchetypeType>()) {
+            keyPathTy = keyPathTy->getSuperclass();
+            ASSERT(keyPathTy);
+          }
+
+          // Situations like `any KeyPath<...> & Sendable`.
+          if (keyPathTy->isExistentialType()) {
+            keyPathTy = keyPathTy->getSuperclass();
+            ASSERT(keyPathTy);
+          }
+
           auto keyPathBGT = keyPathTy->castTo<BoundGenericType>();
           baseTy = keyPathBGT->getGenericArgs()[0];
 
@@ -8481,6 +8505,16 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           OpenExistentialExpr(existential, opaqueValue, callSubExpr,
                               resultTy);
         cs.setType(replacement, resultTy);
+
+        // Embedded Swift prohibits opened existentials.
+        if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+                dc, apply->getLoc())) {
+          ctx.Diags.diagnose(apply->getLoc(),
+                             diag::open_existential_in_embedded_swift,
+                             existentialInstanceTy)
+            .limitBehavior(*behavior);
+        }
+
         return replacement;
       }
       

@@ -112,11 +112,9 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
 /// block and deletes it.
 ///
 void SILInstruction::eraseFromParent() {
-#ifndef NDEBUG
   for (auto result : getResults()) {
-    assert(result->use_empty() && "Uses of SILInstruction remain at deletion.");
+    ASSERT(result->use_empty() && "Uses of SILInstruction remain at deletion.");
   }
-#endif
   getParent()->erase(this);
 }
 
@@ -476,13 +474,11 @@ namespace {
     }
     
     bool visitDestroyValueInst(const DestroyValueInst *RHS) {
-      auto *left = cast<DestroyValueInst>(LHS);
-      return left->poisonRefs() == RHS->poisonRefs();
+      return true;
     }
 
     bool visitDebugValue(const DebugValueInst *RHS) {
-      auto *left = cast<DebugValueInst>(LHS);
-      return left->poisonRefs() == RHS->poisonRefs();
+      return true;
     }
 
     bool visitBeginCOWMutationInst(const BeginCOWMutationInst *RHS) {

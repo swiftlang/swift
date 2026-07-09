@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -disable-availability-checking -emit-module %S/Inputs/opaque_result_type_private_substitution_other.swift -emit-module-path %t/opaque_result_type_private_substitution_other.swiftmodule
+// RUN: %target-swift-frontend -disable-availability-checking -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -I %t -DMODULE
 // RUN: %target-swift-frontend -disable-availability-checking -emit-silgen %s -I %t -DMODULE
 
 // RUN: %target-swift-frontend -disable-availability-checking -emit-module %S/Inputs/opaque_result_type_private_substitution_other.swift -emit-module-path %t/opaque_result_type_private_substitution_other.swiftmodule -enable-library-evolution

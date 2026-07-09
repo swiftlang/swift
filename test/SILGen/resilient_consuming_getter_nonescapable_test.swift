@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/ResilientLib.swiftmodule -module-name=ResilientLib %S/Inputs/resilient_consuming_getter_nonescapable.swift -enable-experimental-feature Lifetimes -enable-experimental-feature UnderscoreOwned
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -I %t -enable-experimental-feature Lifetimes -enable-experimental-feature UnderscoreOwned
 // RUN: %target-swift-emit-silgen %s -I %t -enable-experimental-feature Lifetimes -enable-experimental-feature UnderscoreOwned | %FileCheck %s
 // RUN: %target-swift-emit-sil %s -I %t -enable-experimental-feature Lifetimes -enable-experimental-feature UnderscoreOwned -verify
 

@@ -114,18 +114,18 @@ protected:
   }
 
   Type getContextualType(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualType(anchor, /*forConstraint=*/false);
+    return getSolution().getContextualType(anchor);
   }
 
   TypeLoc getContextualTypeLoc(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualTypeLoc(anchor);
+    auto &solution = getSolution();
+    if (auto contextualInfo = solution.getContextualTypeInfo(anchor))
+      return contextualInfo->typeLoc;
+    return TypeLoc();
   }
 
   ContextualTypePurpose getContextualTypePurpose(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualTypePurpose(anchor);
+    return getSolution().getContextualTypePurpose(anchor);
   }
 
   DeclContext *getDC() const {
@@ -663,8 +663,7 @@ public:
             locator->isForContextualType()
                 ? locator->castLastElementTo<LocatorPathElt::ContextualType>()
                       .getPurpose()
-                : solution.getConstraintSystem().getContextualTypePurpose(
-                      locator->getAnchor()),
+                : solution.getContextualTypePurpose(locator->getAnchor()),
             lhs, rhs, locator, fixBehavior) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
@@ -1616,6 +1615,7 @@ public:
         PrevArgIdx(prevArgIdx), Bindings(bindings.begin(), bindings.end()) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 /// Diagnose an attempt to destructure a single tuple closure parameter
@@ -2243,15 +2243,14 @@ public:
 /// func bar(_ v: Int) { foo(v) } // `Int` is not convertible to `String`
 /// ```
 class ArgumentMismatchFailure : public ContextualFailure {
-  FunctionArgApplyInfo Info;
+  std::optional<FunctionArgApplyInfo> Info;
 
 public:
   ArgumentMismatchFailure(const Solution &solution, Type argType,
                           Type paramType, ConstraintLocator *locator,
-                          FixBehavior fixBehavior =
-                              FixBehavior::Error)
+                          FixBehavior fixBehavior = FixBehavior::Error)
       : ContextualFailure(solution, argType, paramType, locator, fixBehavior),
-        Info(getFunctionArgApplyInfo(getLocator()).value()) {}
+        Info(getFunctionArgApplyInfo(locator)) {}
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
@@ -2297,10 +2296,10 @@ public:
 
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.
-  unsigned getArgPosition() const { return Info.getArgPosition(); }
+  unsigned getArgPosition() const { return Info->getArgPosition(); }
 
   /// \returns The position of the parameter being diagnosed, starting at 1.
-  unsigned getParamPosition() const { return Info.getParamPosition(); }
+  unsigned getParamPosition() const { return Info->getParamPosition(); }
 
   /// Returns the argument expression being diagnosed.
   ///
@@ -2310,7 +2309,7 @@ protected:
   /// the conversion from T to U may fail. In this case, \c getArgExpr() will
   /// return the (T, U) expression, whereas \c getAnchor() will return the T
   /// expression.
-  Expr *getArgExpr() const { return Info.getArgExpr(); }
+  Expr *getArgExpr() const { return Info->getArgExpr(); }
 
   /// Returns the argument type for the conversion being diagnosed.
   ///
@@ -2323,25 +2322,25 @@ protected:
   /// In this case, \c getArgType() will return T?, whereas \c getFromType()
   /// will return T.
   Type getArgType(bool withSpecifier = false) const {
-    return Info.getArgType(withSpecifier);
+    return Info->getArgType(withSpecifier);
   }
 
   /// \returns A textual description of the argument suitable for diagnostics.
   /// For an argument with an unambiguous label, this will the label. Otherwise
   /// it will be its position in the argument list.
   StringRef getArgDescription(SmallVectorImpl<char> &scratch) const {
-    return Info.getArgDescription(scratch);
+    return Info->getArgDescription(scratch);
   }
 
   /// \returns The interface type for the function being applied.
-  Type getFnInterfaceType() const { return Info.getFnInterfaceType(); }
+  Type getFnInterfaceType() const { return Info->getFnInterfaceType(); }
 
   /// \returns The function type being applied, including any generic
   /// substitutions.
-  FunctionType *getFnType() const { return Info.getFnType(); }
+  FunctionType *getFnType() const { return Info->getFnType(); }
 
   /// \returns The callee for the argument conversion, if any.
-  const ValueDecl *getCallee() const { return Info.getCallee(); }
+  const ValueDecl *getCallee() const { return Info->getCallee(); }
 
   /// \returns The full name of the callee, or a null decl name if there is no
   /// callee.
@@ -2357,7 +2356,7 @@ protected:
   ///
   /// Note this may differ from \c getToType(), see the note on \c getArgType().
   Type getParamType(bool lookThroughAutoclosure = true) const {
-    return Info.getParamType(lookThroughAutoclosure);
+    return Info->getParamType(lookThroughAutoclosure);
   }
 
   /// Returns the type of the parameter involved in the mismatch.
@@ -2367,17 +2366,17 @@ protected:
   ///
   /// Note this may differ from \c getToType(), see the note on \c getArgType().
   Type getParamInterfaceType(bool lookThroughAutoclosure = true) const {
-    return Info.getParamInterfaceType(lookThroughAutoclosure);
+    return Info->getParamInterfaceType(lookThroughAutoclosure);
   }
 
   /// \returns The flags of the parameter involved in the mismatch.
   ParameterTypeFlags getParameterFlags() const {
-    return Info.getParameterFlags();
+    return Info->getParameterFlags();
   }
 
   /// \returns The flags of a parameter at a given index.
   ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
-    return Info.getParameterFlagsAtIndex(idx);
+    return Info->getParameterFlagsAtIndex(idx);
   }
 };
 
@@ -2402,15 +2401,6 @@ class ExtraneousCallFailure final : public FailureDiagnostic {
 public:
   ExtraneousCallFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
-
-  bool diagnoseAsError() override;
-};
-
-class InvalidUseOfTrailingClosure final : public ArgumentMismatchFailure {
-public:
-  InvalidUseOfTrailingClosure(const Solution &solution, Type argType,
-                              Type paramType, ConstraintLocator *locator)
-      : ArgumentMismatchFailure(solution, argType, paramType, locator) {}
 
   bool diagnoseAsError() override;
 };
@@ -3423,6 +3413,23 @@ public:
                                 ProtocolConformance *conformance,
                                 ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), conformance(conformance) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations when a key path dynamic member lookup expects
+/// a `ReferenceWritableKeyPath` but the base is not a class and so
+/// the argument is `WritableKeyPath`.
+class NonClassBaseInDynamicMemberLookup final : public FailureDiagnostic {
+  Type BaseType;
+  ValueDecl *Member;
+
+public:
+  NonClassBaseInDynamicMemberLookup(const Solution &solution, Type baseType,
+                                    ValueDecl *member,
+                                    ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), BaseType(resolveType(baseType)),
+        Member(member) {}
 
   bool diagnoseAsError() override;
 };

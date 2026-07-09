@@ -370,10 +370,10 @@ namespace sil_block {
 
     SILTypeCategoryField, /// operand type category
     SILTypeCategoryField, /// debug var type category
-    BCFixed<12>,          /// poison, movableValueDebuginfo, trace,
-                          /// hasDebugVar, isLet, isDenseMapSingleton(two
-                          /// bits), hasSource, hasLoc, hasExpr,
-                          /// hasReconstructionBlock
+    BCFixed<11>,          /// hasReconstructionBlock, movableValueDebuginfo,
+                          /// trace, hasDebugVar, isLet,
+                          /// isDenseMapSingleton(two bits), hasType,
+                          /// hasScope, hasLoc, hasExpr
     BCArray<ValueIDField> /// operand info: operand, type, debug var info:
                           /// name, argno, optional stuff: typeid
   >;
@@ -562,6 +562,7 @@ namespace sil_block {
     SIL_INST_APPLY,
     BCFixed<3>,           // ApplyKind
     BCFixed<2>,           // ApplyOptions
+    BCFixed<1>,           // HasArgumentLocs (1 = NumCallArguments source-loc records follow)
     SubstitutionMapIDField,  // substitution map
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type

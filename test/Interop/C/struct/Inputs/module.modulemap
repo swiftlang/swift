@@ -19,6 +19,10 @@ module NoncopyableStructs {
   header "noncopyable-struct.h"
 }
 
+module NoncopyableDestroyRenamed {
+  header "noncopyable-destroy-renamed.h"
+}
+
 module NoncopyableMethod {
   header "noncopyable-method.h"
 }

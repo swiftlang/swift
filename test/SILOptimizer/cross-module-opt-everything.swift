@@ -5,7 +5,6 @@
 // RUN: %target-swift-frontend -emit-ir %t/Main.swift -I%t -experimental-performance-annotations -enable-cmo-everything -wmo
 
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx || OS=linux-gnu
 
 // BEGIN Module.swift

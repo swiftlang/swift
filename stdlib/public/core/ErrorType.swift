@@ -192,8 +192,7 @@ func _willThrowTypedImpl<E: Error>(_ error: E)
 ///
 /// On older platforms, the error will not be passed into the runtime, because
 /// doing so would require memory allocation (to create the 'any Error').
-@inlinable
-@_alwaysEmitIntoClient
+@export(implementation)
 @_silgen_name("swift_willThrowTyped")
 public func _willThrowTyped<E: Error>(_ error: E) {
   if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
@@ -228,8 +227,7 @@ public func _unexpectedError(
 /// Invoked by the compiler when the subexpression of a `try!` expression
 /// throws an error.
 @_silgen_name("swift_unexpectedErrorTyped")
-@_alwaysEmitIntoClient
-@inlinable
+@export(implementation)
 public func _unexpectedErrorTyped<E: Error>(
   _ error: __owned E,
   filenameStart: Builtin.RawPointer,
@@ -258,7 +256,7 @@ public func _errorInMain(_ error: Error) {
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught, typed error.
-@_alwaysEmitIntoClient
+@export(implementation)
 public func _errorInMainTyped<Failure: Error>(_ error: Failure) -> Never {
   #if !$Embedded
   fatalError("Error raised at top level: \(String(reflecting: error))")

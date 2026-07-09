@@ -827,26 +827,24 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
                                          SubstitutionMap substitutions,
                                          ArrayRef<ManagedValue> args,
                                          SGFContext C) {
-  assert(args.size() == 1 && "reinterpretCast should be given one argument");
   assert(substitutions.getReplacementTypes().size() == 2 &&
          "reinterpretCast should have two subs");
   
   auto &fromTL = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
   auto &toTL = SGF.getTypeLowering(substitutions.getReplacementTypes()[1]);
-  
+
+  assert(args.size() == RValue::getRValueSize(fromTL.getLoweredType()
+                                                .getASTType())
+          && "reinterpretCast should be given one (exploded) argument");
+
+  // Build the value to be stored, reconstructing tuples if needed.
+  auto in = RValue(SGF, args, fromTL.getLoweredType().getASTType());
+
   // If casting between address types, cast the address.
   if (fromTL.isAddress() || toTL.isAddress()) {
-    SILValue fromAddr;
-
-    // If the from value is not an address, move it to a buffer.
-    if (!fromTL.isAddress()) {
-      fromAddr = SGF.emitTemporaryAllocation(loc, args[0].getValue()->getType());
-      fromTL.emitStore(SGF.B, loc, args[0].getValue(), fromAddr,
-                       StoreOwnershipQualifier::Init);
-    } else {
-      fromAddr = args[0].getValue();
-    }
-    auto toAddr = SGF.B.createUncheckedAddrCast(loc, fromAddr,
+    ManagedValue fromAddr = std::move(in).ensurePlusOne(SGF, loc)
+                                             .materialize(SGF, loc);
+    auto toAddr = SGF.B.createUncheckedAddrCast(loc, fromAddr.getValue(),
                                       toTL.getLoweredType().getAddressType());
     
     // Load and retain the destination value if it's loadable. Leave the cleanup
@@ -867,11 +865,12 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
                                IsInitialization);
         });
   }
-  // Create the appropriate bitcast based on the source and dest types.
-  ManagedValue in = args[0];
 
+  // Create the appropriate bitcast based on the source and dest types.
   SILType resultTy = toTL.getLoweredType();
-  return SGF.B.createUncheckedBitCast(loc, in, resultTy);
+  return SGF.B.createUncheckedBitCast(loc,
+                                      std::move(in).getAsSingleValue(SGF, loc),
+                                      resultTy);
 }
 
 /// Specialized emitter for Builtin.castToBridgeObject.

@@ -20,9 +20,7 @@ actor Custom {
 
 @globalActor
 struct CustomActor {
-    static var shared: Custom {
-        return Custom()
-    }
+    static let shared = Custom()
 }
 
 func useValue<T>(_ t: T) {}

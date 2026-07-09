@@ -36,19 +36,6 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
     case heapIterationFailed
   }
 
-  struct RemoteSymbol {
-    let addr: UInt64?
-    let name: String
-    init(_ name: String, _ symbolCache: SymbolCache) {
-      self.name = name
-      if let symbolRange = symbolCache.address(of: name) {
-        self.addr = symbolRange.start
-      } else {
-        self.addr = nil
-      }
-    }
-  }
-
   // We call mmap/munmap in the remote process to alloc/free memory for our own
   // use without impacting existing allocations in the remote process.
   lazy var mmapSymbol: RemoteSymbol = RemoteSymbol("mmap", self.symbolCache)

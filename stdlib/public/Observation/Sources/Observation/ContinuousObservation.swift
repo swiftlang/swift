@@ -161,16 +161,11 @@ extension ContinuousObservation.State {
   }
 
   @diagnose(
-    DeprecatedDeclaration,
-    as: ignored,
-    reason: "https://github.com/swiftlang/swift/issues/89045"
-  )
-  @diagnose(
     ConversionFromIsolatedAnyToSynchronous,
     as: ignored,
     reason: "https://github.com/swiftlang/swift/issues/89361"
   )
-  fileprivate static func track(
+  fileprivate nonisolated(nonsending) static func track(
     _ state: _ManagedCriticalState<ContinuousObservation.State>,
     options: ObservationTracking.Options,
     apply:
@@ -180,7 +175,7 @@ extension ContinuousObservation.State {
   ) async -> Bool {
     return await withTaskCancellationHandler(
       operation: {
-        return await withUnsafeContinuation(isolation: apply.isolation) {
+        return await withUnsafeContinuation {
           continuation in
           guard
             ContinuousObservation.State.populate(state, continuation: continuation)
@@ -213,8 +208,7 @@ extension ContinuousObservation.State {
       },
       onCancel: {
         ContinuousObservation.State.cancel(state)
-      },
-      isolation: apply.isolation
+      }
     )
   }
 }

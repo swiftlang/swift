@@ -40,6 +40,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/AST/Type.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -72,6 +73,9 @@ class ParmVarDecl;
 class Parser;
 class QualType;
 class TypedefNameDecl;
+namespace serialization {
+class ModuleFile;
+} // namespace serialization
 } // namespace clang
 
 namespace swift {
@@ -577,6 +581,20 @@ public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
 
+  /// Per-module count of Clang decls actually deserialized (materialized) into
+  /// the shared ASTContext, keyed by the owning serialized module. Populated by
+  /// the deserialization listener's DeclRead callback only when
+  /// \c CollectMemoryStats is set; used to attribute in-RAM AST cost per module
+  /// (the deserialized AST bytes themselves live in one shared allocator and
+  /// cannot be split).
+  llvm::DenseMap<const clang::serialization::ModuleFile *, uint64_t>
+      MaterializedDeclsPerModule;
+
+  /// When set, the deserialization listener records per-module materialized decl
+  /// counts. Enabled by \c -stats-output-dir or \c -print-clang-stats; off by
+  /// default to avoid per-decl overhead in normal builds.
+  bool CollectMemoryStats = false;
+
   /// The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
   ///
@@ -702,14 +720,6 @@ private:
   llvm::DenseMap<ValueDecl *, ValueDecl *> clonedMembers;
   llvm::DenseSet<const ValueDecl *> membersSynthesizedPerType;
 
-  // Keep track of methods that are unavailale in each class.
-  // We need this set because these methods will be imported lazily. We don't
-  // have the corresponding Swift method when the availability check is
-  // performed, so instead we store the information in this set and then, when
-  // the method is finally generated, we check if it's present here
-  llvm::DenseSet<std::pair<const clang::CXXRecordDecl *, DeclName>>
-      unavailableMethods;
-
 public:
   /// Attempt to lookup and import the synthesized .pointee computed property.
   /// It also synthesizes __operatorStar(), which is used as the getter and
@@ -787,7 +797,7 @@ public:
   static bool isSwiftFunctionWrapper(const clang::RecordDecl *decl);
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
-                                  ClangInheritanceInfo inheritance);
+                                  ClangInheritanceInfo inherit);
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
@@ -817,17 +827,14 @@ public:
     return getNameImporter().getEnumKind(decl);
   }
 
-  bool findUnavailableMethod(const clang::CXXRecordDecl *classDecl,
-                             DeclName name) {
-    return unavailableMethods.contains({classDecl, name});
-  }
+private:
+  llvm::DenseMap<const clang::CXXRecordDecl *,
+                 llvm::SmallDenseSet<const clang::CXXMethodDecl *>>
+      ambiguousVirtualOverrides;
 
-  void insertUnavailableMethod(const clang::CXXRecordDecl *classDecl,
-                               DeclName name) {
-    unavailableMethods.insert({classDecl, name});
-  }
-
-  void handleAmbiguousSwiftName(ValueDecl *decl);
+public:
+  bool isAmbiguouslyOverridden(const clang::CXXRecordDecl *Record,
+                               const clang::CXXMethodDecl *Method);
 
 private:
   /// A mapping from imported declarations to their "alternate" declarations,
@@ -1899,6 +1906,12 @@ public:
 
   void swiftify(AbstractFunctionDecl *MappedDecl);
 
+  /// Tracks whether we have already warned the user that the loaded
+  /// _SwiftifyImport macro plugin lacks the `nullableAsEmptySpan`
+  /// parameter required by the `SafeInteropWrappersNullAsEmptySpan` feature.
+  /// Used to avoid emitting the same warning once per imported function.
+  bool DiagnosedMissingNullableAsEmptySpanParam = false;
+
   /// Find the lookup table that corresponds to the given Clang module.
   ///
   /// \param clangModule The module, or null to indicate that we're talking
@@ -2331,6 +2344,18 @@ bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
 /// Note that \p Node cannot itself be a clang::Module.
 const clang::Module *getClangOwningModule(ClangNode Node,
                                           const clang::ASTContext &ClangCtx);
+
+enum class RetainReleaseOperationKind {
+  notAfunction,
+  notAnInstanceFunction,
+  invalidReturnType,
+  invalidParameters,
+  valid
+};
+
+RetainReleaseOperationKind checkRetainReleaseOperationValidity(
+    const ClassDecl *classDecl, ValueDecl *operation,
+    CustomRefCountingOperationKind operationKind);
 } // end namespace importer
 } // end namespace swift
 

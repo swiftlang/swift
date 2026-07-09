@@ -14,7 +14,7 @@ import _Concurrency
 final class Hoo {
   actor Impl {}
   typealias ActorType = Impl
-  static var shared: Impl { Impl() }
+  static let shared = Impl()
 }
 
 @main struct Main {

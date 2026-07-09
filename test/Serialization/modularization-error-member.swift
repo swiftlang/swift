@@ -12,14 +12,14 @@
 
 // Replace headers, changing the type of `foo`.
 // RUN: cp %t/A_Changed.h %t/A.h
-// RUN: not --crash %target-swift-frontend -c -O %t/Client.swift -I %t \
+// RUN: not %target-swift-frontend -c -O %t/Client.swift -I %t \
 // RUN:   -validate-tbd-against-ir=none -swift-version 5 \
 // RUN:   -diagnostic-style llvm 2> %t/out
 // RUN: %FileCheck %t/A_Changed.h --input-file %t/out
 
 // Replace headers, disappearing `foo`.
 // RUN: cp %t/A_Disappeared.h %t/A.h
-// RUN: not --crash %target-swift-frontend -c -O %t/Client.swift -I %t \
+// RUN: not %target-swift-frontend -c -O %t/Client.swift -I %t \
 // RUN:   -validate-tbd-against-ir=none -swift-version 5 \
 // RUN:   -diagnostic-style llvm 2> %t/out
 // RUN: %FileCheck %t/A_Disappeared.h --input-file %t/out
@@ -41,6 +41,7 @@ struct S *create() __attribute__((swift_name("S.init()")));
 // CHECK: error: reference to declaration 'S.foo' broken by a context change; 'S.foo' is not found, it was expected to be in 'A'
 // CHECK: note: the declaration was expected to be found in module 'A' at '{{.*}}module.modulemap'
 // CHECK-NOT: actually found
+// CHECK-NOT: *** DESERIALIZATION FAILURE ***
 
 //--- A_Changed.h
 struct S {};
@@ -50,6 +51,7 @@ float foo(struct S *data) __attribute__((swift_name("S.foo(self:)")));
 // CHECK: error: reference to declaration 'S.foo' broken by a context change; the declaration kind of 'S.foo' from 'A' changed since building 'LibWithXRef'
 // CHECK: note: the declaration was expected to be found in module 'A' at '{{.*}}module.modulemap'
 // CHECK: note: a candidate was filtered out because of a type mismatch; expected: '(inout S) -> () -> Double', found: '(inout S) -> () -> Float'
+// CHECK-NOT: *** DESERIALIZATION FAILURE ***
 
 //--- LibWithXRef.swift
 import A

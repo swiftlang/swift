@@ -319,6 +319,17 @@ extension Optional where Wrapped == Instruction {
   }
 }
 
+extension Optional where Wrapped == ApplySite {
+  /// Bridges an optional ApplySite to OptionalBridgedInstruction. Used by
+  /// the Builder.createApply / createTryApply / createBeginApply /
+  /// createPartialApply factories so they can take an optional source-apply
+  /// hint for per-argument SILLocations without forcing every caller to
+  /// materialize the bridged value themselves.
+  public var bridged: OptionalBridgedInstruction {
+    OptionalBridgedInstruction(self?.bridged.obj)
+  }
+}
+
 public class SingleValueInstruction : Instruction, Value {
   final public var definingInstruction: Instruction? { self }
 
@@ -1336,6 +1347,23 @@ final public class KeyPathInst : SingleValueInstruction {
 
   public var hasPattern: Bool {
     bridged.KeyPathInst_hasPattern()
+  }
+
+  public var supportedInEmbeddedSwift: Bool {
+    // The `EmbeddedSwiftDiagnostics` pass uses this predicate to decide
+    // whether to reject a `keypath` inst with `err_embedded_swift_keypath`.
+    // A pattern is supported iff IRGen can turn it into a static immortal
+    // instance, so gate this on the same predicate IRGen consults.
+    return staticInstanceClassType != nil
+  }
+
+  /// If this key path will be statically instantiated in Embedded Swift,
+  /// returns the concrete key path class type (`KeyPath<Root, Value>` /
+  /// `WritableKeyPath<Root, Value>` / `ReferenceWritableKeyPath<Root,
+  /// Value>`) that IRGen will use as the object's isa.  Nil if the key path
+  /// isn't statically instantiable.
+  public var staticInstanceClassType: Type? {
+    return bridged.KeyPathInst_getStaticInstanceClassType().typeOrNil
   }
 
   public override func visitReferencedFunctions(_ cl: (Function) -> ()) {

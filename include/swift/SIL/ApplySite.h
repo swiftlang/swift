@@ -334,7 +334,37 @@ public:
   unsigned getOperandIndexOfFirstArgument() const {
     FOREACH_IMPL_RETURN(getArgumentOperandNumber());
   }
+
+  /// Returns the SILLocation associated with the argument at \p argIdx,
+  /// falling back to the apply's anchor location when no per-argument
+  /// override has been stored.
+  SILLocation getArgumentLoc(unsigned argIdx) const {
+    FOREACH_IMPL_RETURN(getArgumentLoc(argIdx));
+  }
+
+  /// Set the per-argument location for the argument at \p argIdx. Requires
+  /// that the apply was constructed with per-argument location storage;
+  /// \p loc must be a valid (non-null) SILLocation.
+  void setArgumentLoc(unsigned argIdx, SILLocation loc) const {
+    FOREACH_IMPL_RETURN(setArgumentLoc(argIdx, loc));
+  }
+
+  /// Returns the per-argument SILLocations stored on this apply, parallel
+  /// to `getArguments()`. `std::nullopt` when no per-argument storage was
+  /// reserved at construction time.
+  std::optional<ArrayRef<SILLocation>> getArgumentLocs() const {
+    FOREACH_IMPL_RETURN(getArgumentLocs());
+  }
 #undef FOREACH_IMPL_RETURN
+
+  /// Returns the SILLocation associated with the apply argument referred to
+  /// by \p op, with anchor fallback. \p op must be an argument operand of
+  /// this apply (not the callee or a type-dependent operand).
+  SILLocation getArgumentLoc(const Operand *op) const {
+    assert(op->getUser() == Inst && "operand is not from this apply");
+    assert(isArgumentOperand(*op) && "operand is not an argument operand");
+    return getArgumentLoc(getAppliedArgIndex(*op));
+  }
 
   /// Returns true if \p oper is an argument operand and not the callee
   /// operand.

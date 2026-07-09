@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 4 -module-name generic_casts -Xllvm -sil-full-demangle %s | %FileCheck %s
 

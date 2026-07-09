@@ -54,17 +54,29 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
                         "swift": "main",
                     },
                 },
+                "rebranch": {
+                    "aliases": ["rebranch"],
+                    "repos": {
+                        "repo1": "rebranch1",
+                        "repo2": "main",
+                        "swift": "main",
+                    },
+                },
             },
         }
 
         super().setUp()
 
-        self.call(self.update_checkout_base_args + ["--clone"])
+    def get_branch(self, *, rev_scheme_name: str, repo_name: str):
+        return self.config["branch-schemes"][rev_scheme_name]["repos"][repo_name]
 
     def set_up_pr_merge_ref(
         self,
         *,
         repo_name: str,
+        # The revision scheme (aka branch scheme) is used to determine the base
+        # branch for our imaginary PR.
+        rev_scheme_name: str,
         pr_id: int,
         stale: bool,
         conflicts_with_base: bool = False,
@@ -72,51 +84,64 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         # Conflict is only relevant for the stale case.
         self.assertTrue(stale is True or conflicts_with_base is False)
 
-        repo_path = os.path.join(self.local_path, repo_name)
-        conflict_filename = "conflict.txt"
-        conflict_file_path = os.path.join(repo_path, conflict_filename)
+        pr_base_branch = self.get_branch(
+            rev_scheme_name=rev_scheme_name, repo_name=repo_name
+        )
+        pr_head_branch = "pr_head_branch"
+        pr_merge_branch = f"pull/{pr_id}/merge"
 
         # Goal:
-        #   C---D (my_branch)
-        #  /   /
-        # A---B---E (main)
+        #       .---C (pr_head_branch)
+        #      /     \
+        #     /   .---D (pr_merge_branch)
+        #    /   /
+        # --o---B---------E (pr_base_branch)
         #
         # We will use commit D for the PR merge ref. Commit E is created if
         # the `stale` argument is true.
 
-        # Create commit B. Commit A should already exist from initial setup.
-        self.call(
-            ["git", "commit", "--allow-empty", "-m", "B"],
-            cwd=repo_path,
-        )
+        repo_path = os.path.join(self.local_path, repo_name)
 
-        # Create my_branch.
-        self.call(["git", "checkout", "-b", "my_branch", "HEAD~1"], cwd=repo_path)
+        # Create and checkout pr_base_branch if it does not exist (e.g. because
+        # we cloned using a different branch scheme).
+        self.call(["git", "checkout", "-B", pr_base_branch, "HEAD"], cwd=repo_path)
 
-        # Arrange for an eventual conflict between commits E and D if asked to.
+        # Create commit B.
+        self.call(["git", "commit", "--allow-empty", "-m", "B"], cwd=repo_path)
+
+        # Create and checkout pr_head_branch.
+        self.call(["git", "checkout", "-b", pr_head_branch, "HEAD~1"], cwd=repo_path)
+
+        # NOTE: This file is not dead weight.
+        change_file_path = os.path.join(repo_path, "change.txt")
+
+        # If asked to, arrange for an eventual conflict between commits E and D.
         if conflicts_with_base:
-            with open(conflict_file_path, "w") as f:
+            with open(change_file_path, "w") as f:
                 f.write("pr-version\n")
-            self.call(["git", "add", conflict_filename], cwd=repo_path)
+            self.call(["git", "add", "."], cwd=repo_path)
 
-        # Create commit C and the merge commit D.
+        # Create commit C.
+        self.call(["git", "commit", "--allow-empty", "-m", "C"], cwd=repo_path)
+
+        # Create and checkout pr_merge_branch.
         self.call(
-            ["git", "commit", "--allow-empty", "-m", "C"],
-            cwd=repo_path,
+            ["git", "checkout", "-b", pr_merge_branch, pr_base_branch], cwd=repo_path
         )
-        self.call(["git", "merge", "--no-ff", "-m", "D", "main"], cwd=repo_path)
 
-        # Advance main (create commit E) to make the merge commit D stale if
-        # asked to.
+        # Create commit D (merge pr_head_branch into pr_merge_branch).
+        self.call(["git", "merge", "--no-ff", "-m", "D", pr_head_branch], cwd=repo_path)
+
+        # If asked to, advance pr_base_branch (create commit E) to make the
+        # merge commit D stale.
         if stale:
-            self.call(["git", "checkout", "main"], cwd=repo_path)
+            self.call(["git", "checkout", pr_base_branch], cwd=repo_path)
 
-            # Arrange for an eventual conflict between commits E and D if
-            # asked to.
-            if conflicts_with_base:
-                with open(conflict_file_path, "w") as f:
-                    f.write("main-version\n")
-                self.call(["git", "add", conflict_filename], cwd=repo_path)
+            # Always add an actual change to this commit so that soft-resetting
+            # it has an effect on the working directory.
+            with open(change_file_path, "w") as f:
+                f.write("base-version\n")
+            self.call(["git", "add", "."], cwd=repo_path)
 
             # Create commit E.
             self.call(
@@ -124,20 +149,36 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
                 cwd=repo_path,
             )
 
-        # Push main and the PR merge ref to the remote.
+        # Push pr_base_branch and the PR merge ref to the remote.
         self.call(
-            ["git", "push", "origin", "main", f"my_branch:refs/pull/{pr_id}/merge"],
+            [
+                "git",
+                "push",
+                "origin",
+                pr_base_branch,
+                f"{pr_merge_branch}:refs/{pr_merge_branch}",
+            ],
             cwd=repo_path,
         )
 
     # When the merge ref is stale, update-checkout is expected to check it out
     # and merge the tip of the base branch into it.
-    def verify_head_for_stale_pr_merge_ref(self, *, repo_name: str, pr_id: int):
+    def verify_head_for_stale_pr_merge_ref(
+        self, *, repo_name: str, rev_scheme_name: str, pr_id: int
+    ):
         repo_path = os.path.join(self.source_root, repo_name)
         remote_path = self.remote_path(repo_name=repo_name)
+        pr_base_branch = self.get_branch(
+            rev_scheme_name=rev_scheme_name, repo_name=repo_name
+        )
 
         expected_parent_commits = self.call(
-            ["git", "rev-parse", f"refs/pull/{pr_id}/merge", "refs/heads/main"],
+            [
+                "git",
+                "rev-parse",
+                f"refs/pull/{pr_id}/merge",
+                f"refs/heads/{pr_base_branch}",
+            ],
             cwd=remote_path,
         ).split()
 
@@ -163,39 +204,160 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         self.assertEqual(expected_head, actual_head)
 
     def test_checkout_stale_pr_merge_ref(self):
-        pr_id = 1
-        self.set_up_pr_merge_ref(repo_name="repo1", pr_id=pr_id, stale=True)
-        self.call(
-            self.update_checkout_base_args
-            + [
-                "--github-comment",
-                f"""
-                https://github.com/apple/repo1/pull/{pr_id}
-                @swift-ci please test
-                """,
-            ]
-        )
-        self.verify_head_for_stale_pr_merge_ref(repo_name="repo1", pr_id=pr_id)
-
-    def test_checkout_stale_pr_merge_ref_swift(self):
-        pr_id = 1
-        self.set_up_pr_merge_ref(repo_name="swift", pr_id=pr_id, stale=True)
-        self.call(
-            self.update_checkout_base_args
-            + [
-                "--github-comment",
-                f"""
-                https://github.com/swiftlang/swift/pull/{pr_id}
-                @swift-ci please test
-                """,
-            ]
-        )
-        self.verify_head_for_stale_pr_merge_ref(repo_name="swift", pr_id=pr_id)
-
-    def test_checkout_stale_pr_merge_ref_conflict_with_base_branch(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
+        repo_name = "repo1"
+        rev_scheme = "main"
         pr_id = 1
         self.set_up_pr_merge_ref(
-            repo_name="repo1", pr_id=pr_id, stale=True, conflicts_with_base=True
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--scheme",
+                rev_scheme,
+                "--github-comment",
+                f"""
+                https://github.com/apple/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )
+
+    def test_checkout_stale_pr_merge_ref_shallow_clone(self):
+        self.call(self.update_checkout_base_args + ["--clone", "--skip-history"])
+        repo_name = "repo1"
+        rev_scheme = "main"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--scheme",
+                rev_scheme,
+                "--github-comment",
+                f"""
+                https://github.com/apple/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )
+
+    def test_checkout_stale_pr_merge_ref_during_clone(self):
+        repo_name = "repo1"
+        rev_scheme = "main"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--clone",
+                "--scheme",
+                rev_scheme,
+                "--github-comment",
+                f"""
+                https://github.com/apple/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )
+
+    def test_checkout_stale_pr_merge_ref_during_shallow_clone(self):
+        repo_name = "repo1"
+        rev_scheme = "main"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--clone",
+                "--skip-history",
+                "--scheme",
+                rev_scheme,
+                "--github-comment",
+                f"""
+                https://github.com/apple/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )
+
+    def test_checkout_stale_pr_merge_ref_other_rev_scheme(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
+        repo_name = "repo1"
+        rev_scheme = "rebranch"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--scheme",
+                rev_scheme,
+                "--github-comment",
+                f"""
+                https://github.com/apple/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )
+
+    def test_checkout_stale_pr_merge_ref_swift(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
+        repo_name = "swift"
+        rev_scheme = "main"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--scheme",
+                rev_scheme,
+                "--github-comment",
+                f"""
+                https://github.com/swiftlang/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )
+
+    def test_checkout_stale_pr_merge_ref_conflict_with_base_branch(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
+        rev_scheme = "main"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name="repo1",
+            rev_scheme_name=rev_scheme,
+            pr_id=pr_id,
+            stale=True,
+            conflicts_with_base=True,
         )
 
         # update-checkout should fail because re-merging main into the PR
@@ -204,6 +366,8 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
             self.call(
                 self.update_checkout_base_args
                 + [
+                    "--scheme",
+                    rev_scheme,
                     "--github-comment",
                     f"""
                     https://github.com/apple/repo1/pull/{pr_id}
@@ -222,33 +386,122 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         self.assertEqual(status_output.strip(), "")
 
     def test_checkout_multiple_stale_pr_merge_ref(self):
-        self.set_up_pr_merge_ref(repo_name="repo1", pr_id=1, stale=True)
-        self.set_up_pr_merge_ref(repo_name="repo2", pr_id=2, stale=True)
+        self.call(self.update_checkout_base_args + ["--clone"])
+        pr1_id = 1
+        pr2_id = 2
+        repo1_name = "repo1"
+        repo2_name = "repo2"
+        rev_scheme = "main"
+        self.set_up_pr_merge_ref(
+            repo_name=repo1_name, rev_scheme_name=rev_scheme, pr_id=pr1_id, stale=True
+        )
+        self.set_up_pr_merge_ref(
+            repo_name=repo2_name, rev_scheme_name=rev_scheme, pr_id=pr2_id, stale=True
+        )
         self.call(
             self.update_checkout_base_args
             + [
+                "--scheme",
+                rev_scheme,
                 "--github-comment",
                 f"""
-                https://github.com/apple/repo1/pull/1
+                https://github.com/apple/{repo1_name}/pull/{pr1_id}
                 @swift-ci please test
-                https://github.com/swiftlang/repo2/pull/2
+                https://github.com/swiftlang/{repo2_name}/pull/{pr2_id}
                 """,
             ]
         )
-        self.verify_head_for_stale_pr_merge_ref(repo_name="repo1", pr_id=1)
-        self.verify_head_for_stale_pr_merge_ref(repo_name="repo2", pr_id=2)
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo1_name, rev_scheme_name=rev_scheme, pr_id=pr1_id
+        )
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo2_name, rev_scheme_name=rev_scheme, pr_id=pr2_id
+        )
 
     def test_checkout_up_to_date_pr_merge_ref(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
+        repo_name = "repo1"
+        rev_scheme = "main"
         pr_id = 1
-        self.set_up_pr_merge_ref(repo_name="repo1", pr_id=pr_id, stale=False)
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=False
+        )
         self.call(
             self.update_checkout_base_args
             + [
+                "--scheme",
+                rev_scheme,
                 "--github-comment",
                 f"""
-                https://github.com/apple/repo1/pull/{pr_id}
+                https://github.com/apple/{repo_name}/pull/{pr_id}
                 @swift-ci please test
                 """,
             ]
         )
-        self.verify_head_for_up_to_date_pr_merge_ref(repo_name="repo1", pr_id=pr_id)
+        self.verify_head_for_up_to_date_pr_merge_ref(repo_name=repo_name, pr_id=pr_id)
+
+    def test_checkout_stale_pr_merge_ref_idempotency(self):
+        self.call(self.update_checkout_base_args + ["--clone"])
+        repo_name = "repo1"
+        rev_scheme = "main"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+
+        update_checkout_args = self.update_checkout_base_args + [
+            "--scheme",
+            rev_scheme,
+            "--github-comment",
+            f"""
+            https://github.com/apple/{repo_name}/pull/{pr_id}
+            @swift-ci please test
+            """,
+        ]
+        # Calling repeatedly should not affect the result.
+        self.call(update_checkout_args)
+        self.call(update_checkout_args)
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )
+
+    # Make sure we do check PR merge ref staleness against
+    # 'refs/heads/base_branch', and not some other 'refs/heads/*/base_branch'.
+    # This failure mode can occur when 'git-ls-remote' is asked to enumerate
+    # refs matching just 'base_branch' instead of 'refs/heads/base_branch'.
+    def test_no_branch_ambiguity_in_staleness_check(self):
+        repo_name = "repo1"
+        rev_scheme = "main"
+        pr_id = 1
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id, stale=True
+        )
+
+        # To simulate the scenario described above, create a branch that, if
+        # mistaken for the actual base branch, would cause update-checkout to
+        # conclude that the merge ref is up to date.
+        base_branch = self.get_branch(rev_scheme_name=rev_scheme, repo_name=repo_name)
+        not_base_branch = f"foo/{base_branch}"
+        repo_path = os.path.join(self.local_path, repo_name)
+        self.call(
+            ["git", "branch", not_base_branch, f"pull/{pr_id}/merge^1"], cwd=repo_path
+        )
+        self.call(["git", "push", "origin", not_base_branch], cwd=repo_path)
+
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--clone",
+                "--scheme",
+                rev_scheme,
+                "--github-comment",
+                f"""
+                https://github.com/apple/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        # Check that update-checkout took the path for a stale merge ref.
+        self.verify_head_for_stale_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
+        )

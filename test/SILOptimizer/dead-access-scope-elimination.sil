@@ -5,6 +5,11 @@ sil_stage canonical
 import Swift
 import Builtin
 
+class MyClass {
+  var x: Builtin.Int64
+  var y: Builtin.Int64
+}
+
 sil_global @g1: $Int
 sil_global @g2: $Int
 
@@ -305,5 +310,88 @@ bb0:
   end_access %2
   end_access %1
   return %3
+}
+
+// A non-dead dynamic access on a locally allocated class is eliminated: the class instance
+// cannot be reached by any caller, so no conflicting access can originate outside this function.
+// CHECK-LABEL: sil [ossa] @local_class_non_dead :
+// CHECK-NOT:     begin_access
+// CHECK-NOT:     end_access
+// CHECK:       } // end sil function 'local_class_non_dead'
+sil [ossa] @local_class_non_dead : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $MyClass
+  %borrow = begin_borrow %obj : $MyClass
+  %addr = ref_element_addr %borrow : $MyClass, #MyClass.x
+  %val = integer_literal $Builtin.Int64, 0
+  %access = begin_access [modify] [dynamic] %addr : $*Builtin.Int64
+  store %val to [trivial] %access : $*Builtin.Int64
+  end_access %access : $*Builtin.Int64
+  end_borrow %borrow : $MyClass
+  destroy_value %obj : $MyClass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Two sequential (non-nested) accesses on a locally allocated class: both are eliminated.
+// CHECK-LABEL: sil [ossa] @local_class_two_sequential :
+// CHECK-NOT:     begin_access
+// CHECK-NOT:     end_access
+// CHECK:       } // end sil function 'local_class_two_sequential'
+sil [ossa] @local_class_two_sequential : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %obj = alloc_ref $MyClass
+  %borrow = begin_borrow %obj : $MyClass
+  %addr = ref_element_addr %borrow : $MyClass, #MyClass.x
+  %val = integer_literal $Builtin.Int64, 42
+  %access1 = begin_access [modify] [dynamic] %addr : $*Builtin.Int64
+  store %val to [trivial] %access1 : $*Builtin.Int64
+  end_access %access1 : $*Builtin.Int64
+  %access2 = begin_access [read] [dynamic] %addr : $*Builtin.Int64
+  %loaded = load [trivial] %access2 : $*Builtin.Int64
+  end_access %access2 : $*Builtin.Int64
+  end_borrow %borrow : $MyClass
+  destroy_value %obj : $MyClass
+  return %loaded : $Builtin.Int64
+}
+
+// Nested conflicting (modify + read) accesses on a locally allocated class are NOT eliminated:
+// the intra-function conflict is real regardless of where the class is allocated.
+// CHECK-LABEL: sil [ossa] @local_class_conflicting_nested :
+// CHECK:         begin_access [modify]
+// CHECK:         begin_access [read]
+// CHECK:       } // end sil function 'local_class_conflicting_nested'
+sil [ossa] @local_class_conflicting_nested : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %obj = alloc_ref $MyClass
+  %borrow = begin_borrow %obj : $MyClass
+  %addr = ref_element_addr %borrow : $MyClass, #MyClass.x
+  %val = integer_literal $Builtin.Int64, 42
+  %access1 = begin_access [modify] [dynamic] %addr : $*Builtin.Int64
+  store %val to [trivial] %access1 : $*Builtin.Int64
+  %access2 = begin_access [read] [dynamic] %addr : $*Builtin.Int64
+  %loaded = load [trivial] %access2 : $*Builtin.Int64
+  end_access %access2 : $*Builtin.Int64
+  end_access %access1 : $*Builtin.Int64
+  end_borrow %borrow : $MyClass
+  destroy_value %obj : $MyClass
+  return %loaded : $Builtin.Int64
+}
+
+// A non-dead dynamic access on a class received as a function parameter is NOT eliminated:
+// the class is not locally allocated, so callers may hold a conflicting access.
+// CHECK-LABEL: sil [ossa] @non_local_class_not_eliminated :
+// CHECK:         begin_access [modify]
+// CHECK:         end_access
+// CHECK:       } // end sil function 'non_local_class_not_eliminated'
+sil [ossa] @non_local_class_not_eliminated : $@convention(thin) (@guaranteed MyClass) -> () {
+bb0(%arg : @guaranteed $MyClass):
+  %addr = ref_element_addr %arg : $MyClass, #MyClass.x
+  %val = integer_literal $Builtin.Int64, 0
+  %access = begin_access [modify] [dynamic] %addr : $*Builtin.Int64
+  store %val to [trivial] %access : $*Builtin.Int64
+  end_access %access : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
 }
 

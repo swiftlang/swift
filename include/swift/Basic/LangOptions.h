@@ -329,6 +329,9 @@ namespace swift {
     /// configuration options.
     bool EnableObjCInterop = true;
 
+    /// Enable COM interop code generation and build configuration options.
+    bool EnableCOMInterop = false;
+
     /// Enable C++ interop code generation and build configuration
     /// options. Disabled by default because there is no way to control the
     /// language mode of clang on a per-header or even per-module basis. Also
@@ -426,6 +429,9 @@ namespace swift {
 
     /// Disable the implicit import of the _StringProcessing module.
     bool DisableImplicitStringProcessingModuleImport = false;
+
+    /// Disable the implicit import of the COM module.
+    bool DisableImplicitCOMModuleImport = false;
 
     /// Disable the implicit import of the Cxx module.
     bool DisableImplicitCxxModuleImport = false;
@@ -1059,17 +1065,13 @@ namespace swift {
     /// Enable generation of transitive conformance constraints.
     bool SolverEnableTransitiveConformance = true;
 
-    /// Enable experimental optimization to speed up binding of type variables.
-    bool SolverEnableBindingOptimizations = true;
-
     /// Enable experimental optimization to skip contradictory disjunction
     /// choices.
     bool SolverPruneDisjunctions = true;
 
-    /// Enable experimental optimization to skip operators defined in protocol
-    /// extensions if they are a refinement of a protocol requirement that also
-    /// appears in the disjunction.
-    bool SolverOptimizeOperatorDefaults = true;
+    /// Enable an inefficient form of inference, which will sometimes prevent
+    /// exact binding promotion from taking place.
+    bool SolverEnableEnumerateSupertypes = true;
   };
 
   /// Options for controlling the behavior of the Clang importer.

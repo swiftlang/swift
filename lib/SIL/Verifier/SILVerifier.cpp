@@ -658,7 +658,17 @@ void verifyKeyPathComponent(SILModule &M,
         auto opIndex = index.Operand;
         auto contextType =
           index.LoweredType.subst(M, patternSubs);
-        require(contextType == operands[opIndex].get()->getType(),
+        auto operandType = operands[opIndex].get()->getType();
+        // The operand normally matches the pattern's lowered type exactly.
+        // In opaque-values mode, SILGen records address-only indices'
+        // LoweredType in the pattern as the address form (since the keypath
+        // runtime ABI passes them by address), but the operand is still at
+        // object type until AddressLowering rewrites it. Accept that
+        // intermediate shape.
+        require(contextType == operandType ||
+                    (!M.useLoweredAddresses() &&
+                     (contextType.isAddress() && operandType.isObject() &&
+                      contextType.getObjectType() == operandType)),
                 "operand must match type required by pattern");
         SILType loweredType = index.LoweredType;
         require(
@@ -3106,7 +3116,7 @@ public:
                                   LinearLiveness::DoNotIncludeExtensions);
     linearLiveness.compute();
     auto &liveness = linearLiveness.getLiveness();
-    require(!liveness.isWithinBoundary(I, /*deadEndBlocks=*/nullptr),
+    require(!liveness.isWithinBoundary(I),
             "extend_lifetime use within unextended linear liveness boundary!?");
     PrunedLivenessBoundary boundary;
     liveness.computeBoundary(boundary);
@@ -3202,8 +3212,7 @@ public:
       if (scopedAddress.isScopeEndingUse(use)) {
         continue;
       }
-      if (!scopedAddressLiveness->isWithinBoundary(user,
-                                                   /*deadEndBlocks=*/nullptr)) {
+      if (!scopedAddressLiveness->isWithinBoundary(user)) {
         llvm::errs() << "User found outside scope: " << *user;
         return false;
       }
@@ -3425,8 +3434,7 @@ public:
               scopedAddress, &scopedAddressLiveness, DEBlocks.get()),
             "Ill formed store_borrow scope");
 
-    require(!success || !hasOtherStoreBorrowsInLifetime(
-              SI, &scopedAddressLiveness, DEBlocks.get()),
+    require(!success || !hasOtherStoreBorrowsInLifetime(SI, &scopedAddressLiveness),
             "A store_borrow cannot be nested within another "
             "store_borrow to its destination");
 
@@ -7358,6 +7366,10 @@ public:
   void visitSILBasicBlock(SILBasicBlock *BB) {
     SILInstructionVisitor::visitSILBasicBlock(BB);
     verifyDebugScopeHoles(BB);
+
+    for (SILInstruction &inst : *BB) {
+      inst.verifyOperandOwnership(&fnConv.silConv);
+    }
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -import-objc-header %S/Inputs/keypaths_import_as_member.h
 // RUN: %target-swift-emit-silgen %s -import-objc-header %S/Inputs/keypaths_import_as_member.h | %FileCheck %s
 
 // CHECK-LABEL: sil {{.*}} @$s{{.*}}23keyPathToImportedMember

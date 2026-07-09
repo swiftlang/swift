@@ -3445,10 +3445,10 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
     auto dc = var->getDeclContext();
     if (dc->isTypeContext()) {
       dc->lookupQualified(dc->getSelfNominalTypeDecl(), projectionName,
-                          var->getLoc(), NL_QualifiedDefault, declsFound);
+                          var->getLoc(), NLFlags::QualifiedDefault, declsFound);
     } else if (dc->isModuleScopeContext()) {
       dc->lookupQualified(dc->getParentModule(), projectionName,
-                          var->getLoc(), NL_QualifiedDefault, declsFound);
+                          var->getLoc(), NLFlags::QualifiedDefault, declsFound);
     } else {
       llvm_unreachable("Property wrappers don't work in local contexts");
     }
@@ -3752,6 +3752,9 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
     // The backing storage is 'private'.
     backingVar->overwriteAccess(AccessLevel::Private);
     backingVar->overwriteSetterAccess(AccessLevel::Private);
+
+    // The backing storage must be as available as the wrapped property.
+    AvailabilityInference::applyInferredAvailableAttrs(backingVar, {var});
 
     addMemberToContextIfNeeded(backingVar, dc, var);
   }
@@ -4407,7 +4410,6 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasYieldingMutate = storage->getParsedAccessor(AccessorKind::YieldingMutate);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
   bool hasInit = storage->getParsedAccessor(AccessorKind::Init);
-  auto *borrow = storage->getParsedAccessor(AccessorKind::Borrow);
   auto *mutate = storage->getParsedAccessor(AccessorKind::Mutate);
 
   // 'get', 'read', 'borrow' and a non-mutable addressor are all exclusive.
@@ -4508,31 +4510,6 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   } else {
     writeImpl = WriteImplKind::Immutable;
     readWriteImpl = ReadWriteImplKind::Immutable;
-  }
-
-  if (borrow || mutate) {
-    if (auto *extDecl = dyn_cast<ExtensionDecl>(DC)) {
-      auto extNominal = extDecl->getExtendedNominal();
-      if (extNominal && !isa<StructDecl>(extNominal) &&
-          !isa<EnumDecl>(extNominal) && !isa<ClassDecl>(extNominal)) {
-        if (borrow) {
-          storage->getASTContext().Diags.diagnose(
-              borrow->getLoc(),
-              diag::borrow_mutate_accessor_not_supported_in_decl,
-              getAccessorNameForDiagnostic(borrow->getAccessorKind(),
-                                           /*article*/ true,
-                                           /*underscored*/ false));
-        }
-        if (mutate) {
-          storage->getASTContext().Diags.diagnose(
-              mutate->getLoc(),
-              diag::borrow_mutate_accessor_not_supported_in_decl,
-              getAccessorNameForDiagnostic(mutate->getAccessorKind(),
-                                           /*article*/ true,
-                                           /*underscored*/ false));
-        }
-      }
-    }
   }
 
   StorageImplInfo info(readImpl, writeImpl, readWriteImpl);

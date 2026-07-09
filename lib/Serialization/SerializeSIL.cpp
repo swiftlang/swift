@@ -364,6 +364,7 @@ namespace {
     /// Serialize and write SILDebugScope graph in post order.
     void writeDebugScopes(const SILDebugScope *Scope, const SourceManager &SM);
     void writeSourceLoc(SILLocation SLoc, const SourceManager &SM);
+    void writeApplyArgLocs(ApplySite AS, const SourceManager &SM);
 
     void writeNoOperandLayout(const SILInstruction *I) {
       unsigned abbrCode = SILAbbrCodes[SILInstNoOperandLayout::Code];
@@ -1127,12 +1128,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     if (!Options.SerializeDebugInfoSIL)
      return;
     auto DVI = cast<DebugValueInst>(&SI);
-    unsigned attrs = unsigned(DVI->poisonRefs() & 0x1);
+    unsigned attrs = 0;
+    bool hasReconstructionBlock = DVI->getDebugReconstructionBlock() != nullptr;
+    attrs |= unsigned(hasReconstructionBlock);
     attrs |= unsigned(DVI->usesMoveableValueDebugInfo()) << 1;
     attrs |= unsigned(DVI->hasTrace()) << 2;
-
-    bool hasReconstructionBlock = DVI->getDebugReconstructionBlock() != nullptr;
-    attrs |= unsigned(hasReconstructionBlock) << 11;
 
     if (hasReconstructionBlock)
       DebugBBWorklist.push_back(const_cast<DebugValueInst *>(DVI));
@@ -1466,7 +1466,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code], SIL_BUILTIN,
-        0, S.addSubstitutionMapRef(BI->getSubstitutions()),
+        0, /*HasArgumentLocs=*/0,
+        S.addSubstitutionMapRef(BI->getSubstitutions()),
         S.addTypeRef(BI->getType().getRawASTType()),
         (unsigned)BI->getType().getCategory(),
         S.addDeclBaseNameRef(BI->getName()),
@@ -1496,10 +1497,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code], SIL_APPLY,
         unsigned(AI->getApplyOptions().toRaw()),
+        unsigned(AI->getArgumentLocs().has_value()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
         unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+    writeApplyArgLocs(ApplySite(const_cast<ApplyInst *>(AI)),
+                      SI.getModule().getSourceManager());
     break;
   }
   case SILInstructionKind::BeginApplyInst: {
@@ -1524,10 +1528,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
         SIL_BEGIN_APPLY, unsigned(AI->getApplyOptions().toRaw()),
+        unsigned(AI->getArgumentLocs().has_value()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
         unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+    writeApplyArgLocs(ApplySite(const_cast<BeginApplyInst *>(AI)),
+                      SI.getModule().getSourceManager());
     break;
   }
   case SILInstructionKind::TryApplyInst: {
@@ -1555,10 +1562,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
         SIL_TRY_APPLY, unsigned(AI->getApplyOptions().toRaw()),
+        unsigned(AI->getArgumentLocs().has_value()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
         unsigned(callerIsolation), unsigned(calleeIsolation), Args);
+    writeApplyArgLocs(ApplySite(const_cast<TryApplyInst *>(AI)),
+                      SI.getModule().getSourceManager());
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -1573,13 +1583,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                         : IsNestedEncoding::IsNotNested) << 0;
     SILInstApplyLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
-        SIL_PARTIAL_APPLY, 0,
+        SIL_PARTIAL_APPLY, 0, unsigned(PAI->getArgumentLocs().has_value()),
         S.addSubstitutionMapRef(PAI->getSubstitutionMap()),
         S.addTypeRef(PAI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(PAI->getType().getRawASTType()),
-        addValueRef(PAI->getCallee()),
-        flags,
+        addValueRef(PAI->getCallee()), flags,
         unsigned(swift::ActorIsolation::Unspecified), Args);
+    writeApplyArgLocs(ApplySite(const_cast<PartialApplyInst *>(PAI)),
+                      SI.getModule().getSourceManager());
     break;
   }
   case SILInstructionKind::AllocGlobalInst: {
@@ -1884,7 +1895,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *HTE = dyn_cast<HopToExecutorInst>(&SI)) {
       Attr = HTE->isMandatory();
     } else if (auto *DVI = dyn_cast<DestroyValueInst>(&SI)) {
-      Attr = unsigned(DVI->poisonRefs()) | (unsigned(DVI->isDeadEnd()) << 1);
+      Attr = unsigned(DVI->isDeadEnd());
     } else if (auto *BCMI = dyn_cast<BeginCOWMutationInst>(&SI)) {
       Attr = BCMI->isNative();
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {
@@ -3551,6 +3562,31 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
   SourceLocLayout::emitRecord(Out, ScratchRecord,
                               SILAbbrCodes[SourceLocLayout::Code], Row, Column,
                               FNameID, LocationKind, (unsigned)Loc.isImplicit());
+}
+
+void SILSerializer::writeApplyArgLocs(ApplySite AS, const SourceManager &SM) {
+  if (!Options.SerializeDebugInfoSIL)
+    return;
+
+  // Per the in-memory invariant, an apply either has trailing per-argument
+  // location storage (every slot a valid SILLocation) or none at all. The
+  // SILInstApplyLayout HasArgumentLocs bit captures which case applies; we
+  // only emit the trailing records when storage is present.
+  auto argLocs = AS.getArgumentLocs();
+  if (!argLocs)
+    return;
+
+  assert(argLocs->size() == AS.getNumArguments() &&
+         "argLocs storage must be parallel to args when present");
+
+  // Emit one SIL_SOURCE_LOC / SIL_SOURCE_LOC_REF record per argument, in
+  // argument order. The SILInstApplyLayout HasArgumentLocs bit on the
+  // preceding apply record signals the deserializer to consume exactly
+  // NumCallArguments such records inline. Reuses writeSourceLoc so per-
+  // argument locations share the same encoding (and OpaquePtr-based
+  // cache) as instruction debug-loc overrides.
+  for (auto loc : *argLocs)
+    writeSourceLoc(loc, SM);
 }
 
 void SILSerializer::writeExtraStringIfNonEmpty(

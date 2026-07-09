@@ -10,9 +10,6 @@
 // RUN: comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt
 // RUN: test ! -s %t/extra.txt
 
-// Expects the POSIX-based dependencies, not the Embedded Swift platform ones.
-// XFAIL: swift_embedded_platform
-
 //--- allowed-dependencies_macos.txt
 ___assert_rtn
 ___stack_chk_fail
@@ -37,7 +34,6 @@ _vsnprintf
 //--- test.swift
 // RUN: %target-run %t/a.out | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx

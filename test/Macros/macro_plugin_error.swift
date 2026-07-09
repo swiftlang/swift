@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_Macros
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -8,7 +7,7 @@
 
 // RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
 // RUN:   -typecheck -verify \
-// RUN:   -swift-version 5 -enable-experimental-feature Macros \
+// RUN:   -swift-version 5 \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -module-name MyApp \
 // RUN:   %t/test.swift \

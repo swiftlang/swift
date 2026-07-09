@@ -20,28 +20,28 @@ public struct _MutexHandle: ~Copyable {
   let value: _Cell<umutex>
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init() {
     value = _Cell(umutex())
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _lock() {
     unsafe _umtx_op(value._address, UMTX_OP_MUTEX_LOCK, 0, nil, nil)
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _tryLock() -> Bool {
     unsafe _umtx_op(value._address, UMTX_OP_MUTEX_TRYLOCK, 0, nil, nil) != -1
   }
 
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func _unlock() {
     unsafe _umtx_op(value._address, UMTX_OP_MUTEX_UNLOCK, 0, nil, nil)

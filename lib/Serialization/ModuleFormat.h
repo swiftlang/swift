@@ -58,7 +58,8 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1006; // debug reconstruction blocks
+const uint16_t SWIFTMODULE_VERSION_MINOR =
+    1010; // metatype extension flag
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2016,6 +2017,7 @@ namespace decls_block {
     DeclIDField, // extended nominal
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit flag
+    BCFixed<1>,  // isMetatypeExtension flag
     GenericSignatureIDField,  // generic environment
     BCVBR<4>,    // # of protocol conformances
     BCVBR<4>,    // number of inherited types
@@ -2418,6 +2420,7 @@ namespace decls_block {
                      BCFixed<1>,         // hasInheritLifetimeParamIndices
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
                      BCFixed<1>,         // hasAddressableParamIndices
+                     BCFixed<1>,         // hasConditionallyAddressableParamIndices
                      BCArray<BCFixed<1>> // concatenated param indices
                      >;
 
@@ -2696,6 +2699,12 @@ namespace decls_block {
     Nonexhaustive_DECL_ATTR,
     BCFixed<2>  // mode
   >;
+
+  using COMDeclAttrLayout = BCRecordLayout<COM_DECL_ATTR,
+                                           BCFixed<1>,  // implicit flag
+                                           BCFixed<1>,  // interface
+                                           BCFixed<3>,  // threading model
+                                           BCBlob>;     // IID/CLSID
 
   // clang-format on
 

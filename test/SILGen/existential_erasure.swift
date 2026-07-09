@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name existential_erasure %s | %FileCheck %s
 
 protocol P {

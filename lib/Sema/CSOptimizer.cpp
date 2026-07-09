@@ -19,7 +19,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
@@ -28,6 +27,7 @@
 #include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
@@ -216,7 +216,28 @@ static bool isUnboundDictionaryType(Type type) {
   return false;
 }
 
-static bool isSupportedOperator(Constraint *disjunction, bool hacks) {
+static bool isSIMDOperator(ValueDecl *value) {
+  if (!value)
+    return false;
+
+  auto func = dyn_cast<FuncDecl>(value);
+  if (!func)
+    return false;
+
+  if (!func->isOperator())
+    return false;
+
+  auto nominal = func->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  if (nominal->getName().empty())
+    return false;
+
+  return nominal->getName().str().starts_with_insensitive("simd");
+}
+
+static bool isSupportedOperator(Constraint *disjunction) {
   if (!isOperatorDisjunction(disjunction))
     return false;
 
@@ -229,10 +250,8 @@ static bool isSupportedOperator(Constraint *disjunction, bool hacks) {
     return true;
   }
 
-  if (!hacks) {
-    if (name.isStandardInfixLogicalOperator())
-      return true;
-  }
+  if (name.isStandardInfixLogicalOperator())
+    return true;
 
   // Operators like &<<, &>>, &+, .== etc.
   if (llvm::any_of(choices, [](Constraint *choice) {
@@ -259,14 +278,6 @@ static bool isStandardComparisonOperator(Constraint *disjunction) {
   if (auto *decl = getOverloadChoiceDecl(choice))
     return decl->isOperator() &&
            decl->getBaseIdentifier().isStandardComparisonOperator();
-  return false;
-}
-
-static bool isStandardInfixLogicalOperator(Constraint *disjunction) {
-  auto *choice = disjunction->getNestedConstraints()[0];
-  if (auto *decl = getOverloadChoiceDecl(choice))
-    return decl->isOperator() &&
-           decl->getBaseIdentifier().isStandardInfixLogicalOperator();
   return false;
 }
 
@@ -318,11 +329,11 @@ static bool isSupportedGenericOverloadChoice(ValueDecl *decl,
   });
 }
 
-static bool isSupportedDisjunction(Constraint *disjunction, bool hacks) {
+static bool isSupportedDisjunction(Constraint *disjunction) {
   auto choices = disjunction->getNestedConstraints();
 
   if (isOperatorDisjunction(disjunction))
-    return isSupportedOperator(disjunction, hacks);
+    return isSupportedOperator(disjunction);
 
   if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
           getOverloadChoiceDecl(choices.front()))) {
@@ -397,77 +408,6 @@ static ValueDecl *isViableOverloadChoice(ConstraintSystem &cs,
     return nullptr;
 
   return decl;
-}
-
-/// Given the type variable that represents a result type of a
-/// function call, check whether that call is to an initializer
-/// and based on that deduce possible type for the result.
-///
-/// @return A type and a flag that indicates whether there
-/// are any viable failable overloads and empty pair if the
-/// type variable isn't a result of an initializer call.
-static llvm::PointerIntPair<Type, 1, bool>
-inferTypeFromInitializerResultType(ConstraintSystem &cs,
-                                   TypeVariableType *typeVar,
-                                   ArrayRef<Constraint *> disjunctions) {
-  assert(typeVar->getImpl().isFunctionResult());
-
-  auto *resultLoc = typeVar->getImpl().getLocator();
-  auto *call = getAsExpr<CallExpr>(resultLoc->getAnchor());
-  if (!call)
-    return {};
-
-  auto *fn = call->getFn()->getSemanticsProvidingExpr();
-
-  Type instanceTy;
-  ConstraintLocator *ctorLocator = nullptr;
-  if (auto *typeExpr = getAsExpr<TypeExpr>(fn)) {
-    instanceTy = cs.getType(typeExpr)->getMetatypeInstanceType();
-    ctorLocator =
-        cs.getConstraintLocator(call, {LocatorPathElt::ApplyFunction(),
-                                       LocatorPathElt::ConstructorMember()});
-  } else if (auto *UDE = getAsExpr<UnresolvedDotExpr>(fn)) {
-    if (!UDE->getName().getBaseName().isConstructor())
-      return {};
-    instanceTy = cs.getType(UDE->getBase())->getMetatypeInstanceType();
-    ctorLocator = cs.getConstraintLocator(UDE, LocatorPathElt::Member());
-  }
-
-  if (!instanceTy || !ctorLocator)
-    return {};
-
-  auto initRef =
-      llvm::find_if(disjunctions, [&ctorLocator](Constraint *disjunction) {
-        return disjunction->getLocator() == ctorLocator;
-      });
-
-  if (initRef == disjunctions.end())
-    return {};
-
-  unsigned numFailable = 0;
-  unsigned total = 0;
-  for (auto *choice : (*initRef)->getNestedConstraints()) {
-    auto *decl = isViableOverloadChoice(cs, choice, ctorLocator);
-    if (!decl || !isa<ConstructorDecl>(decl))
-      continue;
-
-    auto *ctor = cast<ConstructorDecl>(decl);
-    if (ctor->isFailable())
-      ++numFailable;
-
-    ++total;
-  }
-
-  if (numFailable > 0) {
-    // If all of the active choices are failable, produce an optional
-    // type only.
-    if (numFailable == total)
-      return {instanceTy->wrapInOptionalType(), /*hasFailable=*/false};
-    // Otherwise there are two options.
-    return {instanceTy, /*hasFailable*/ true};
-  }
-
-  return {instanceTy, /*hasFailable=*/false};
 }
 
 /// If the given expression represents a chain of operators that have
@@ -802,57 +742,6 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 }
 
 } // end anonymous namespace
-
-/// Determine whether the candidate type is a subclass of the superclass
-/// type. This check is approximate, because it disregards generic
-/// arguments.
-///
-/// FIXME: This should be a common utility somewhere instead of being
-/// re-implemented in several places in the compiler.
-static bool isSubclassOf(Type candidateType, Type superclassType) {
-  auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
-  if (!superclassDecl)
-    return false;
-
-  auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
-  if (!subclassDecl) {
-    candidateType = candidateType->getSuperclass();
-    if (!candidateType)
-      return false;
-    subclassDecl = candidateType->getClassOrBoundGenericClass();
-    if (!subclassDecl)
-      return false;
-  }
-
-  return superclassDecl->isSuperclassOf(subclassDecl);
-}
-
-/// Determine whether the candidate type can be erased to the given
-/// existential type. This check is approximate, because it disregards
-/// conditional conformance and parameterized protocol types.
-///
-/// FIXME: This should be a common utility somewhere instead of being
-/// re-implemented in several places in the compiler.
-static bool isSubtypeOfExistentialType(Type candidateType, Type existentialType) {
-  auto layout = existentialType->getExistentialLayout();
-
-  if (auto layoutConstraint = layout.getLayoutConstraint()) {
-    if (layoutConstraint->isClass() &&
-        !(candidateType->isClassExistentialType() ||
-          candidateType->mayHaveSuperclass()))
-      return false;
-  }
-
-  if (layout.explicitSuperclass &&
-      !isSubclassOf(candidateType, layout.explicitSuperclass))
-    return false;
-
-  return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
-    auto result = TypeChecker::containsProtocol(candidateType, P,
-                                                /*allowMissing=*/false);
-    return result.first || result.second;
-  });
-}
 
 enum class MatchFlag {
   OnParam = 0x01,
@@ -1344,8 +1233,7 @@ static DisjunctionInfo computeDisjunctionInfo(
     return info.value();
   }
 
-  bool hacks = cs.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks;
-  if (!isSupportedDisjunction(disjunction, hacks))
+  if (!isSupportedDisjunction(disjunction))
     return DisjunctionInfo();
 
   SmallVector<FunctionType::Param, 8> argsWithLabels;
@@ -1473,23 +1361,6 @@ static DisjunctionInfo computeDisjunctionInfo(
                 cs, resultLoc->getAnchor())) {
           types.push_back({type, /*fromLiteral=*/true});
         }
-
-
-        if (cs.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
-          auto binding =
-              inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
-
-          if (auto instanceTy = binding.getPointer()) {
-            types.push_back({instanceTy,
-                             /*fromLiteral=*/false,
-                             /*fromInitializerCall=*/true});
-
-            if (binding.getInt())
-              types.push_back({instanceTy->wrapInOptionalType(),
-                               /*fromLiteral=*/false,
-                               /*fromInitializerCall=*/true});
-          }
-        }
       }
     } else {
       types.push_back({argType, /*fromLiteral=*/false});
@@ -1533,18 +1404,21 @@ static DisjunctionInfo computeDisjunctionInfo(
       resultTypes.push_back(binding.BindingType);
     }
 
-    // Infer bindings for each side of a ternary condition.
-    bindingSet.forEachAdjacentVariable(
-        [&cs, &resultTypes](TypeVariableType *adjacentVar) {
-          auto *adjacentLoc = adjacentVar->getImpl().getLocator();
-          // This is one of the sides of a ternary operator.
-          if (adjacentLoc->directlyAt<TernaryExpr>()) {
-            auto adjacentBindings = cs.getBindingsFor(adjacentVar);
+    const auto &potentialBindings = cs.getConstraintGraph()[typeVar]
+        .getPotentialBindings();
 
-            for (const auto &binding : adjacentBindings.Bindings)
-              resultTypes.push_back(binding.BindingType);
-          }
-        });
+    // Infer bindings for each side of a ternary condition.
+    for (auto pair : potentialBindings.SubtypeOf) {
+      auto *adjacentVar = pair.first;
+      auto *adjacentLoc = adjacentVar->getImpl().getLocator();
+      // This is one of the sides of a ternary operator.
+      if (adjacentLoc->directlyAt<TernaryExpr>()) {
+        auto adjacentBindings = cs.getBindingsFor(adjacentVar);
+
+        for (const auto &binding : adjacentBindings.Bindings)
+          resultTypes.push_back(binding.BindingType);
+      }
+    }
   } else {
     resultTypes.push_back(resultType);
   }
@@ -1985,18 +1859,6 @@ ConstraintSystem::selectDisjunction() {
     bool isFirstOperator = isOperatorDisjunction(first);
     bool isSecondOperator = isOperatorDisjunction(second);
 
-    if (getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
-      // Infix logical operators are usually not overloaded and don't
-      // form disjunctions, but when they do, let's prefer them over
-      // other operators when they have fewer choices because it helps
-      // to split operator chains.
-      if (isFirstOperator && isSecondOperator) {
-        if (isStandardInfixLogicalOperator(first) !=
-            isStandardInfixLogicalOperator(second))
-          return firstActive < secondActive;
-      }
-    }
-
     // Not all of the non-operator disjunctions are supported by the
     // ranking algorithm, so to prevent eager selection of operators
     // when nothing concrete is known about them, let's reset the score
@@ -2015,26 +1877,6 @@ ConstraintSystem::selectDisjunction() {
       // based on number of favored/active choices.
       if (*firstScore != *secondScore)
         return *firstScore > *secondScore;
-
-      if (getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
-        // If the scores are the same and both disjunctions are operators
-        // they could be ranked purely based on whether the candidates
-        // were speculative or not. The one with more context always wins.
-        //
-        // Consider the following situation:
-        //
-        // func test(_: Int) { ... }
-        // func test(_: String) { ... }
-        //
-        // test("a" + "b" + "c")
-        //
-        // In this case we should always prefer ... + "c" over "a" + "b"
-        // because it would fail and prune the other overload if parameter
-        // type (aka contextual type) is `Int`.
-        if (isFirstOperator && isSecondOperator &&
-            firstFavorings.IsSpeculative != secondFavorings.IsSpeculative)
-          return secondFavorings.IsSpeculative;
-      }
     }
 
     // Use favored choices only if disjunction score is higher

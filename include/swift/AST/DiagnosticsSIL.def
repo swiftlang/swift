@@ -824,11 +824,6 @@ ERROR(builtin_get_function_isolation_bad_argument, none,
       "function type",
       ())
 
-ERROR(box_to_stack_cannot_promote_box_to_stack_due_to_escape_alloc, none,
-      "Can not promote value from heap to stack due to value escaping", ())
-NOTE(box_to_stack_cannot_promote_box_to_stack_due_to_escape_location, none,
-     "value escapes here", ())
-
 WARNING(semantic_function_improper_nesting, none, "'@_semantics' function calls non-'@_semantics' function with nested '@_semantics' calls", ())
 
 // SDK mismatch diagnostics
@@ -1079,7 +1074,7 @@ NOTE(regionbasedisolation_named_nosend_send_into_result, none,
      (bool, StringRef, Identifier, StringRef, bool))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
      "Passing %0 value of non-Sendable type %1 as a 'sending' parameter risks "
-     "causing races inbetween %0 uses and uses reachable from the callee",
+     "causing races in between %0 uses and uses reachable from the callee",
      (StringRef, Type))
 
 GROUPED_ERROR(regionbasedisolation_typed_tns_passed_sending_closure, SendingClosureRisksDataRace, none,
@@ -1118,7 +1113,7 @@ NOTE(regionbasedisolation_closure_captures_actor, none,
      (DeclName, StringRef))
 
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_callee, none,
-     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %kind2 risks causing races inbetween %0 uses and uses reachable from %2",
+     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %kind2 risks causing races in between %0 uses and uses reachable from %2",
      (StringRef, Type, const ValueDecl *))
 
 NOTE(regionbasedisolation_named_send_nt_asynclet_capture, none,
@@ -1285,6 +1280,23 @@ NOTE(rbi_merge_failure_value_note_named, none,
 NOTE(rbi_merge_failure_value_note_bare, none,
      "value is exposed to %select{%0 code|code in the current isolation context}1",
      (StringRef, bool))
+
+GROUPED_NOTE(regionbasedisolation_value_became_part_of_isolated_region,
+     RegionIsolationIsolationHistory, none,
+     "value was merged into %select{%0 code|code in the current isolation "
+     "context}1 region here",
+     (StringRef, bool))
+
+GROUPED_NOTE(regionbasedisolation_chain_value_exposed,
+     RegionIsolationIsolationHistory, none,
+     "%0 is connected to %1",
+     (Identifier, Identifier))
+
+GROUPED_NOTE(regionbasedisolation_chain_value_exposed_to_isolated_named,
+     RegionIsolationIsolationHistory, none,
+     "%0 is connected to %1 which is accessible to "
+     "%select{%2 code|code in the current isolation context}3",
+     (Identifier, Identifier, StringRef, bool))
 
 // Concurrency related diagnostics
 ERROR(executor_factory_must_conform, none,

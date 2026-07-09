@@ -36,9 +36,9 @@ distributed actor MyServiceImpl: MyService {
 // The witness table must still contain entries for the distributed func and thunk:
 // CHECK-LABEL: sil_witness_table hidden MyServiceImpl: MyService module dead_function_elimination_distributed {
 // protocol witness (TW):
-// CHECK:   method #MyService.distributedMethod!distributed({{.*}}): <Self where Self : MyService> (isolated Self) -> () async throws -> String : @$s37dead_function_elimination_distributed13MyServiceImplCAA0eF0A2aDP0D6MethodSSyYaKFTW
+// CHECK:   method #MyService.distributedMethod!distributed: <Self where Self : MyService> (isolated Self) -> () async throws -> String : @$s37dead_function_elimination_distributed13MyServiceImplCAA0eF0A2aDP0D6MethodSSyYaKFTW
 // protocol thunk witness (TWTE):
-// CHECK:   method #MyService.distributedMethod!distributed_thunk({{.*}}): <Self where Self : MyService> (Self) -> () async throws -> String : @$s37dead_function_elimination_distributed13MyServiceImplCAA0eF0A2aDP0D6MethodSSyYaKFTWTE
+// CHECK:   method #MyService.distributedMethod!distributed_thunk: <Self where Self : MyService> (Self) -> () async throws -> String : @$s37dead_function_elimination_distributed13MyServiceImplCAA0eF0A2aDP0D6MethodSSyYaKFTWTE
 
 // The not used not-distributed method witness was dead eliminated:
 // CHECK:   method #MyService.nonDistributedMethod: <Self where Self : MyService> (isolated Self) -> () -> () : nil

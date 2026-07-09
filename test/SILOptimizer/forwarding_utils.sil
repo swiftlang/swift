@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -test-runner -enable-sil-opaque-values %s -o /dev/null 2>&1 | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 sil_stage raw
 

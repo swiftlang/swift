@@ -4,7 +4,7 @@
   case Zim, Zang, Zung
 }
 
-@objc enum Generic<T>: Int32 { // expected-error{{'@objc' enum cannot be generic}} {{1-7=}}
+@objc enum Generic<T>: Int32 { // expected-error{{enum cannot be marked '@objc' because it is generic}} {{1-7=}}
   case Zim, Zang, Zung
 }
 

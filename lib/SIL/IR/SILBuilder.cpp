@@ -640,7 +640,6 @@ void SILBuilder::emitDestructureValueOperation(
 
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
-                                             PoisonRefs_t poisonRefs,
                                              UsesMoveableValueDebugInfo_t moved,
                                              bool trace, bool overrideLoc) {
   if (shouldDropVariable(Var, Loc))
@@ -659,7 +658,7 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
 
   return insert(DebugValueInst::create(DebugLoc, src, getModule(),
                                        *substituteAnonymousArgs(Name, Var, Loc),
-                                       poisonRefs, moved, trace));
+                                       moved, trace));
 }
 
 void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,

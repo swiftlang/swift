@@ -33,7 +33,6 @@
 // RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -Xllvm -sil-print-types -emit-sil -O %t/main.swift -o %t/Main-non-res.sil
 // RUN: %FileCheck %s --check-prefixes=CHECK-MAIN-COMMON,CHECK-MAIN-NONRES < %t/Main-non-res.sil
 
-// REQUIRES: swift_in_compiler
 
 //--- main.swift
 

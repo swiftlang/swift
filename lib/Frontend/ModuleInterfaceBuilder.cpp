@@ -287,7 +287,8 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   SerializationOpts.OutputPath = OutPathStr.c_str();
   SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
   SerializationOpts.AutolinkForceLoad =
-      !Invocation.getIRGenOptions().ForceLoadSymbolName.empty();
+      !Invocation.getIRGenOptions().ForceLoadSymbolName.empty() &&
+      !Invocation.getIRGenOptions().DisableForceLoadSymbols;
   SerializationOpts.PublicDependentLibraries =
       Invocation.getIRGenOptions().PublicLinkLibraries;
   SerializationOpts.UserModuleVersion = FEOpts.UserModuleVersion;

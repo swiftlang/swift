@@ -305,10 +305,10 @@ do {
   class C {}
   struct S {
     func genericallyNonOptional<T: AnyObject>(_ a: T, _ b: T, _ c: T) { }
-    // expected-note@-1 {{where 'T' = 'Optional<C>'}}
+    // expected-note@-1 {{where 'T' = 'C?'}}
 
     func f(_ a: C?, _ b: C?, _ c: C) {
-      genericallyNonOptional(a, b, c) // expected-error {{instance method 'genericallyNonOptional' requires that 'Optional<C>' be a class type}}
+      genericallyNonOptional(a, b, c) // expected-error {{instance method 'genericallyNonOptional' requires that 'C?' be a class type}}
       // expected-note @-1 {{wrapped type 'C' satisfies this requirement}}
     }
   }
@@ -1175,8 +1175,7 @@ func rdar76058892() {
   func experiment(arr: [S]?) {
     test { // expected-error {{contextual closure type '() -> String' expects 0 arguments, but 1 was used in closure body}}
       if let arr = arr {
-        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}} // expected-error {{generic parameter 'T' could not be inferred}}
-        // expected-error@-1 {{generic parameter 'E' could not be inferred}}
+        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}}
       }
     }
   }

@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend -I %t %t/Application.swift -g -enable-experimental-feature Embedded -enable-experimental-feature Lifetimes -c -o %t/main.o
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-posix-shim -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Lifetimes

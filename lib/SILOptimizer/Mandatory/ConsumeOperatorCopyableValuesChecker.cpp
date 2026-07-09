@@ -120,6 +120,7 @@ bool CheckerLivenessInfo::compute() {
         break;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
+      case OperandOwnership::DebugUse:
       case OperandOwnership::BitwiseEscape:
         liveness->updateForUse(user, /*lifetimeEnding*/ false);
         break;
@@ -508,8 +509,7 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
         mvi->setAllowsDiagnostics(false);
 
         LLVM_DEBUG(llvm::dbgs() << "Move Value: " << *mvi);
-        if (livenessInfo.liveness->isWithinBoundary(
-                mvi, /*deadEndBlocks=*/nullptr)) {
+        if (livenessInfo.liveness->isWithinBoundary(mvi)) {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: Yes!\n");
           emitDiagnosticForMove(lexicalValue, varName, mvi);
         } else {
@@ -523,7 +523,7 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
             builder.setCurrentDebugScope(dbgVarInst->getDebugScope());
             builder.createDebugValue(
                 dbgVarInst->getLoc(), SILUndef::get(mvi->getOperand()),
-                *varInfo, DontPoisonRefs, UsesMoveableValueDebugInfo);
+                *varInfo, UsesMoveableValueDebugInfo);
           }
           validMoves.push_back(mvi);
         }

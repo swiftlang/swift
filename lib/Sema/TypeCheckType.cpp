@@ -2194,9 +2194,9 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
     LookupResult memberLookup;
     // Let's try to look any member of the parent type with the given name,
     // even if it is not a type, allowing for a more precise diagnostic.
-    NLOptions memberLookupOptions = (NL_QualifiedDefault |
-                                     NL_IgnoreAccessControl |
-                                     NL_IgnoreMissingImports);
+    NLOptions memberLookupOptions = {NLFlags::QualifiedDefault,
+                                     NLFlags::IgnoreAccessControl,
+                                     NLFlags::IgnoreMissingImports};
     SmallVector<ValueDecl *, 2> results;
     dc->lookupQualified(parentType, repr->getNameRef(), repr->getLoc(),
                         memberLookupOptions, results);
@@ -2293,9 +2293,9 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
   }
 }
 
-/// Diagnose when this is one of the BorrowingSequence types, which currently require
+/// Diagnose when this is one of the Iterable types, which currently require
 /// an experimental feature to use.
-static void diagnoseBorrowingSequenceType(TypeDecl *typeDecl, SourceLoc loc,
+static void diagnoseIterableType(TypeDecl *typeDecl, SourceLoc loc,
                              const DeclContext *dc) {
   if (loc.isInvalid())
     return;
@@ -2308,7 +2308,7 @@ static void diagnoseBorrowingSequenceType(TypeDecl *typeDecl, SourceLoc loc,
     return;
 
   auto nameString = typeDecl->getName().str();
-  if (nameString != "BorrowingSequence" && nameString != "BorrowingIteratorProtocol"
+  if (nameString != "Iterable" && nameString != "BorrowingIteratorProtocol"
       && nameString != "SpanIterator" && nameString != "BorrowingIteratorAdapter")
     return;
 
@@ -2423,7 +2423,7 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       return ErrorType::get(ctx);
     }
 
-    diagnoseBorrowingSequenceType(currentDecl, repr->getLoc(), DC);
+    diagnoseIterableType(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -2653,7 +2653,7 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
 
-    diagnoseBorrowingSequenceType(member, repr->getLoc(), DC);
+    diagnoseIterableType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);

@@ -82,7 +82,7 @@ extension MainActor {
   }
 
   /// Execute the given body closure on the main actor.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func run<T: Sendable>(
     resultType: T.Type = T.self,
     body: @MainActor @Sendable () throws -> T
@@ -106,7 +106,7 @@ extension MainActor {
   ///
   /// If the current context is not running on the actor's serial executor, or
   /// if the actor is a reference to a remote actor, this method will crash
-  /// with a fatal error (similar to ``preconditionIsolated()``).
+  /// with a fatal error (similar to ``preconditionIsolated(_:file:line:)``).
   ///
   /// This method can only be used from synchronous functions, as asynchronous
   /// functions should instead perform a normal method call to the actor, which
@@ -129,7 +129,7 @@ extension MainActor {
   /// - Returns: the return value of the `operation`
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
   @available(SwiftStdlib 5.1, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_unavailableFromAsync(message: "await the call to the @MainActor closure directly")
   public static func assumeIsolated<T : Sendable>(
       _ operation: @MainActor () throws -> T,
@@ -175,7 +175,7 @@ extension MainActor {
 internal func pthread_main_np() -> CInt
 
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @_silgen_name("swift_task_deinitOnExecutorMainActorBackDeploy")
 public func _deinitOnExecutorMainActorBackDeploy(
   _ object: __owned AnyObject,

@@ -399,6 +399,7 @@ struct BridgedOperand {
     TrivialUse,
     InstantaneousUse,
     UnownedInstantaneousUse,
+    DebugUse,
     ForwardingUnowned,
     PointerEscape,
     BitwiseEscape,
@@ -581,6 +582,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool hasValidLinkageForFragileRef(SerializedKind) const;
   BRIDGED_INLINE ThunkKind isThunk() const;
   BRIDGED_INLINE void setThunk(ThunkKind) const;
+  BRIDGED_INLINE bool isWithoutActuallyEscapingThunk() const;
   BRIDGED_INLINE bool needsStackProtection() const;
   BRIDGED_INLINE bool shouldOptimize() const;
   BRIDGED_INLINE bool isReferencedInModule() const;
@@ -934,6 +936,14 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool KeyPathInst_hasPattern() const;
   BRIDGED_INLINE SwiftInt KeyPathInst_getNumComponents() const;
   BRIDGED_INLINE void KeyPathInst_getReferencedFunctions(SwiftInt componentIdx, KeyPathFunctionResults * _Nonnull results) const;
+  /// If this `keypath_inst` will be emitted as a statically-instantiated
+  /// immortal object in Embedded Swift, returns the concrete key path class
+  /// type (`KeyPath<Root, Value>` / `WritableKeyPath<Root, Value>` /
+  /// `ReferenceWritableKeyPath<Root, Value>`) picked by IRGen for the
+  /// object's isa.  Callers (Swift-side embedded passes) use this to force
+  /// specialization of that class's vtable before IRGen runs.  Returns an
+  /// invalid type if the key path isn't statically instantiable.
+  SWIFT_IMPORT_UNSAFE BridgedType KeyPathInst_getStaticInstanceClassType() const;
   BRIDGED_INLINE void GlobalAddrInst_clearToken() const;
   BRIDGED_INLINE bool GlobalValueInst_isBare() const;
   BRIDGED_INLINE void GlobalValueInst_setIsBare() const;
@@ -962,6 +972,9 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType ApplySite_getSubstitutedCalleeType() const;
   BRIDGED_INLINE SwiftInt ApplySite_getNumArguments() const;
   BRIDGED_INLINE bool ApplySite_isCalleeNoReturn() const;
+  BRIDGED_INLINE bool ApplySite_hasArgumentLocations() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation
+  ApplySite_getArgumentLocation(BridgedOperand operand) const;
   BRIDGED_INLINE SwiftInt FullApplySite_numIndirectResultArguments() const;
   BRIDGED_INLINE bool ConvertFunctionInst_withoutActuallyEscaping() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType TypeValueInst_getParamType() const;
@@ -1328,6 +1341,8 @@ struct BridgedBuilder{
                                                                                 BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedValueCast(BridgedValue op,
                                                                                  BridgedType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedTrivialBitCast(BridgedValue op,
+                                                                                      BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUpcast(BridgedValue op, BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCheckedCastAddrBranch(
       BridgedValue source, BridgedCanType sourceFormalType,
@@ -1372,20 +1387,22 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDebugValue(BridgedValue src,
                                                                          BridgedSILDebugVariable var) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDebugStep() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createApply(BridgedValue function,
-                                          BridgedSubstitutionMap subMap,
-                                          BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
-                                          BridgedGenericSpecializationInformation specInfo) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createTryApply(BridgedValue function,
-                                          BridgedSubstitutionMap subMap,
-                                          BridgedValueArray arguments,
-                                          BridgedBasicBlock normalBB, BridgedBasicBlock errorBB,
-                                          bool isNonAsync,
-                                          BridgedGenericSpecializationInformation specInfo) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBeginApply(BridgedValue function,
-                                          BridgedSubstitutionMap subMap,
-                                          BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
-                                          BridgedGenericSpecializationInformation specInfo) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
+  createApply(BridgedValue function, BridgedSubstitutionMap subMap,
+              BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
+              BridgedGenericSpecializationInformation specInfo,
+              OptionalBridgedInstruction argLocsFrom) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
+  createTryApply(BridgedValue function, BridgedSubstitutionMap subMap,
+                 BridgedValueArray arguments, BridgedBasicBlock normalBB,
+                 BridgedBasicBlock errorBB, bool isNonAsync,
+                 BridgedGenericSpecializationInformation specInfo,
+                 OptionalBridgedInstruction argLocsFrom) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBeginApply(
+      BridgedValue function, BridgedSubstitutionMap subMap,
+      BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
+      BridgedGenericSpecializationInformation specInfo,
+      OptionalBridgedInstruction argLocsFrom) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createWitnessMethod(BridgedCanType lookupType,
                                           BridgedConformance conformance,
                                           BridgedDeclRef member, BridgedType methodType) const;
@@ -1413,13 +1430,12 @@ struct BridgedBuilder{
                                           BridgedType resultType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createThinToThickFunction(BridgedValue fn,
                                                                                   BridgedType resultType) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createPartialApply(BridgedValue fn,
-                                                                           BridgedValueArray bridgedCapturedArgs,
-                                                                           BridgedArgumentConvention calleeConvention,
-                                                                           BridgedSubstitutionMap bridgedSubstitutionMap,
-                                                                           bool hasUnknownIsolation,
-                                                                           bool isOnStack,
-                                                                           bool isNested) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
+  createPartialApply(BridgedValue fn, BridgedValueArray bridgedCapturedArgs,
+                     BridgedArgumentConvention calleeConvention,
+                     BridgedSubstitutionMap bridgedSubstitutionMap,
+                     bool hasUnknownIsolation, bool isOnStack, bool isNested,
+                     OptionalBridgedInstruction argLocsFrom) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBranch(BridgedBasicBlock destBlock,
                                                                      BridgedValueArray arguments) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCondBranch(BridgedValue condition,

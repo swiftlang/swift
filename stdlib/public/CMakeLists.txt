@@ -245,6 +245,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
     if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
       list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
         "armv4t   armv4t-none-none-eabi     armv4t-none-none-eabi"
+        "armv5te  armv5te-none-none-eabi    armv5te-none-none-eabi"
         "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
         "armv6m   armv6m-none-none-eabi     armv6m-none-none-eabi"
         "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
@@ -295,6 +296,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
       "arm64    arm64-apple-macos         arm64-apple-macos14"
       "arm64e   arm64e-apple-macos        arm64e-apple-macos14"
     )
+    if(SWIFT_ENABLE_MACCATALYST)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "x86_64   x86_64-apple-ios-macabi  x86_64-apple-ios18-macabi"
+        "arm64    arm64-apple-ios-macabi   arm64-apple-ios18-macabi"
+        "arm64e   arm64e-apple-ios-macabi  arm64e-apple-ios18-macabi"
+      )
+    endif()
   elseif (SWIFT_HOST_VARIANT STREQUAL "windows")
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       # Without specifying the `windows` component LLVM refuses to

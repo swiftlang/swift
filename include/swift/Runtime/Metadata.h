@@ -566,6 +566,9 @@ SWIFT_RUNTIME_EXPORT
 const ClassMetadata *
 swift_getObjCClassFromMetadata(const Metadata *theClass);
 
+SWIFT_RUNTIME_EXPORT
+id swift_getObjCMetatypeFromMetadata(const Metadata *metadata);
+
 // Get the ObjC class object from class type metadata,
 // or nullptr if the type isn't an ObjC class.
 const ClassMetadata *

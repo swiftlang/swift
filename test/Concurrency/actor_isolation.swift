@@ -3,9 +3,8 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -target %target-swift-5.1-abi-triple
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -target %target-swift-5.1-abi-triple -parse-as-library
 
-// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-experimental-feature FlowIsolationGlobalActor -parse-as-library -emit-sil -o /dev/null -verify -verify-ignore-unrelated -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
+// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -verify-ignore-unrelated -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
 
-// REQUIRES: swift_feature_FlowIsolationGlobalActor
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
@@ -422,6 +421,9 @@ struct SomeOtherGlobalActor {
 @available(SwiftStdlib 5.1, *)
 struct GenericGlobalActor<T> {
   static var shared: SomeActor { SomeActor() }
+  // expected-warning@-1{{GlobalActor witness static property 'shared' may return different actor instances, which would lead to global actor isolation violations}}
+  // expected-note@-2{{declare it as 'static let' to guarantee a stable instance}}
+  // expected-note@-3{{if this property always returns the same instance, silence the warning with '@diagnose(UnstableGlobalActorShared, as: ignored)'}}
 }
 
 @available(SwiftStdlib 5.1, *)
