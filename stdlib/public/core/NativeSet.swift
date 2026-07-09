@@ -44,7 +44,7 @@ internal struct _NativeSet<Element: Hashable> {
     }
   }
 
-  @inlinable
+  @export(implementation)
   @unsafe
   internal init(_ buffer: UnsafeBufferPointer<Element>) {
     self.init(capacity: buffer.count)
