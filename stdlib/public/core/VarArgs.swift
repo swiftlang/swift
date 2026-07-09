@@ -49,12 +49,49 @@ public protocol CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   var _cVarArgEncoding: [Int] { get }
+
+#if $Embedded
+  // In Embedded Swift, non-class existentials cannot be dynamically cast,
+  // so `CVarArg`'s conformance-refinement protocols (`_CVarArgPassedAsDouble`,
+  // `_CVarArgAligned`) cannot be probed with `arg as? _CVarArgPassedAsDouble`
+  // or `arg is _CVarArgAligned`. Instead, the two flavor bits are surfaced
+  // as requirements on `CVarArg` itself, and the refinement protocols
+  // provide their overrides via the witness table.
+
+  /// Whether this value should be encoded into the C `va_list` in an
+  /// FP-register slot rather than a GP-register / stack slot. Types that
+  /// conform to `_CVarArgPassedAsDouble` should return `true`; everything
+  /// else uses the default `false`.
+  var _cVarArgIsPassedAsDouble: Bool { get }
+
+  /// The required alignment in bytes of the value returned by
+  /// `_cVarArgEncoding`, or `nil` if it does not need alignment stronger
+  /// than `Int`. Types that conform to `_CVarArgAligned` should return
+  /// their `_cVarArgAlignment`.
+  var _cVarArgOptionalAlignment: Int? { get }
+#endif
 }
+
+#if $Embedded
+extension CVarArg {
+  @inlinable
+  public var _cVarArgIsPassedAsDouble: Bool { return false }
+  @inlinable
+  public var _cVarArgOptionalAlignment: Int? { return nil }
+}
+#endif
 
 /// Floating point types need to be passed differently on x86_64
 /// systems.  CoreGraphics uses this to make CGFloat work properly.
 public // SPI(CoreGraphics)
 protocol _CVarArgPassedAsDouble: CVarArg {}
+
+#if $Embedded
+extension _CVarArgPassedAsDouble {
+  @inlinable
+  public var _cVarArgIsPassedAsDouble: Bool { return true }
+}
+#endif
 
 /// Some types require alignment greater than Int on some architectures.
 public // SPI(CoreGraphics)
@@ -64,7 +101,14 @@ protocol _CVarArgAligned: CVarArg {
   var _cVarArgAlignment: Int { get }
 }
 
-#if !_runtime(_ObjC)
+#if $Embedded
+extension _CVarArgAligned {
+  @inlinable
+  public var _cVarArgOptionalAlignment: Int? { return _cVarArgAlignment }
+}
+#endif
+
+#if !_runtime(_ObjC) && !$Embedded
 /// Some pointers require an alternate object to be retained.  The object
 /// that is returned will be used with _cVarArgEncoding and held until
 /// the closure is complete.  This is required since autoreleased storage
@@ -489,7 +533,7 @@ final internal class __VaListBuilder {
   @safe
   internal var storage: ContiguousArray<Int>
 
-#if !_runtime(_ObjC)
+#if !_runtime(_ObjC) && !$Embedded
   @usableFromInline // c-abi
   @safe
   internal var retainer = [CVarArg]()
@@ -506,7 +550,7 @@ final internal class __VaListBuilder {
 
   @inlinable // c-abi
   internal func append(_ arg: CVarArg) {
-#if !_runtime(_ObjC)
+#if !_runtime(_ObjC) && !$Embedded
     var arg = arg
 
     // We may need to retain an object that provides a pointer value.
@@ -519,7 +563,11 @@ final internal class __VaListBuilder {
     var encoded = arg._cVarArgEncoding
 
 #if arch(x86_64) || arch(arm64)
+#if $Embedded
+    let isDouble = arg._cVarArgIsPassedAsDouble
+#else
     let isDouble = arg is _CVarArgPassedAsDouble
+#endif
 
     if isDouble && fpRegistersUsed < _countFPRegisters {
       #if arch(arm64)
@@ -604,7 +652,7 @@ final internal class __VaListBuilder {
 
   @inlinable // c-abi
   internal func append(_ arg: CVarArg) {
-#if !_runtime(_ObjC)
+#if !_runtime(_ObjC) && !$Embedded
     var arg = arg
 
     // We may need to retain an object that provides a pointer value.
@@ -620,6 +668,16 @@ final internal class __VaListBuilder {
     // as non-iOS ARM. Note that we can't use alignof because it
     // differs from ABI alignment on some architectures.
 #if (arch(arm) && !os(iOS)) || arch(arm64_32) || arch(wasm32)
+#if $Embedded
+    if let alignment = arg._cVarArgOptionalAlignment {
+      let alignmentInWords = alignment / MemoryLayout<Int>.size
+      let misalignmentInWords = unsafe count % alignmentInWords
+      if misalignmentInWords != 0 {
+        let paddingInWords = alignmentInWords - misalignmentInWords
+        unsafe appendWords([Int](repeating: -1, count: paddingInWords))
+      }
+    }
+#else
     if let arg = arg as? _CVarArgAligned {
       let alignmentInWords = arg._cVarArgAlignment / MemoryLayout<Int>.size
       let misalignmentInWords = unsafe count % alignmentInWords
@@ -628,6 +686,7 @@ final internal class __VaListBuilder {
         unsafe appendWords([Int](repeating: -1, count: paddingInWords))
       }
     }
+#endif
 #endif
 
     // Write the argument's value itself.
@@ -719,7 +778,7 @@ final internal class __VaListBuilder {
   @usableFromInline // c-abi
   internal var storage: UnsafeMutablePointer<Int>?
 
-#if !_runtime(_ObjC)
+#if !_runtime(_ObjC) && !$Embedded
   @usableFromInline // c-abi
   internal var retainer = [CVarArg]()
 #endif
