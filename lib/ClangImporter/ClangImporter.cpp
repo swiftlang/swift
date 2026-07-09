@@ -8478,7 +8478,9 @@ static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
     return false;
 
   // Ensure that the baseclass is swift::RefCountedClass.
-  auto baseDecl = decl;
+  auto baseDecl = decl->getDefinition();
+  if (!baseDecl)
+    return false;
   do {
     if (baseDecl->getNumBases() != 1)
       return false;
@@ -8487,7 +8489,9 @@ static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
     auto nextBaseDecl = Ty->getAsCXXRecordDecl();
     if (!nextBaseDecl)
       return false;
-    baseDecl = nextBaseDecl;
+    baseDecl = nextBaseDecl->getDefinition();
+    if (!baseDecl)
+      return false;
   } while (baseDecl->getName() != "RefCountedClass");
 
   return true;
