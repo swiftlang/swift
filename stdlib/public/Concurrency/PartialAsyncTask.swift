@@ -46,6 +46,10 @@ internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
 internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
                                          _ serialExecutor: UnownedSerialExecutor,
                                          _ taskExecutor: UnownedTaskExecutor) -> ()
+@available(StdlibDeploymentTarget 9999, *)
+@_silgen_name("swift_job_destroy")
+@usableFromInline
+internal func _swiftJobDestroy(_ job: UnownedJob)
 
 // ==== -----------------------------------------------------------------------
 // MARK: UnownedJob
@@ -176,6 +180,14 @@ public struct UnownedJob: Sendable {
     unsafe _swiftJobRunOnTaskExecutor(self, serialExecutor, taskExecutor)
   }
 
+  /// Retrieve the id of this job
+  @_spi(ExperimentalScheduling)
+  @available(SwiftStdlib 5.9, *)
+  @_alwaysEmitIntoClient
+  @inlinable
+  public var id: UInt64 {
+    return _getJobTaskId(self)
+  }
 }
 
 @_unavailableInEmbedded
@@ -338,7 +350,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
   @frozen
-  public struct Kind: Sendable, RawRepresentable {
+  public struct Kind: Sendable, RawRepresentable, Equatable {
     public typealias RawValue = UInt8
 
     /// The raw job kind value.
@@ -354,6 +366,13 @@ public struct ExecutorJob: Sendable, ~Copyable {
 
     // Job kinds >= 192 are private to the implementation.
     public static let firstReserved = Kind(rawValue: RawValue(192))!
+
+    static let defaultActorInline    = Kind(rawValue: RawValue(192))!
+    static let defaultActorSeparate  = Kind(rawValue: RawValue(193))!
+    static let defaultActorOverride  = Kind(rawValue: RawValue(194))!
+    static let nullaryContinuation   = Kind(rawValue: RawValue(195))!
+    static let isolatedDeinit        = Kind(rawValue: RawValue(196))!
+    static let scheduledContinuation = Kind(rawValue: RawValue(197))!
   }
 
   /// What kind of job this is.
@@ -361,6 +380,12 @@ public struct ExecutorJob: Sendable, ~Copyable {
   @available(StdlibDeploymentTarget 6.3, *)
   public var kind: Kind {
     return Kind(rawValue: _jobGetKind(self.context))!
+  }
+
+  @_spi(ExperimentalScheduling)
+  @available(StdlibDeploymentTarget 9999, *)
+  public var id: UInt64 {
+    return _getJobTaskId(UnownedJob(context: self.context))
   }
 
   // TODO: move only types cannot conform to protocols, so we can't conform to CustomStringConvertible;
@@ -451,6 +476,25 @@ extension ExecutorJob {
   }
 }
 
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 9999, *)
+extension ExecutorJob {
+
+  /// Destroy this job.
+  ///
+  /// This is an unsafe operation; it will simply release the job itself,
+  /// without allowing the job to run, which may result in your program
+  /// making no further progress.
+  ///
+  /// You should not use this function unless you know the job can be
+  /// safely cancelled in this manner.
+  ///
+  consuming public func destroy() {
+    unsafe _swiftJobDestroy(UnownedJob(self))
+  }
+
+}
+
 // Helper to create a trampoline job to execute a job on a specified
 // executor.
 @_spi(ExperimentalCustomExecutors)
@@ -505,11 +549,12 @@ extension ExecutorJob {
   ///
   /// If the job does not support allocation, this property will be `nil`.
   public var allocator: LocalAllocator? {
-    guard self.kind == .task else {
-      return nil
+    switch self.kind {
+      case .task, .nullaryContinuation, .scheduledContinuation:
+        return LocalAllocator(context: self.context)
+      default:
+        return nil
     }
-
-    return LocalAllocator(context: self.context)
   }
 
   /// A job-local stack-disciplined allocator.

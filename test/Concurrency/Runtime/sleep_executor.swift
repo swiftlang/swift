@@ -15,6 +15,10 @@
 import Dispatch
 import StdlibUnittest
 @_spi(ExperimentalScheduling) import _Concurrency
+import Synchronization
+
+@available(SwiftStdlib 9999, *)
+let enqueueCount = Atomic<Int>(0)
 
 @available(SwiftStdlib 6.3, *)
 actor MyActor {
@@ -23,25 +27,29 @@ actor MyActor {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 9999, *)
 final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable {
   var asScheduling: SchedulingExecutor? {
     return self
   }
 
   public func enqueue(_ _job: consuming ExecutorJob) {
+    enqueueCount.add(1, ordering: .relaxed)
     let job = UnownedJob(_job)
     DispatchQueue.main.async {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
   }
 
-  public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
+  public func enqueue<C: Clock>(
+    _ _job: consuming ExecutorJob,
+    run at: FireTime<C>,
+    clock: C,
+    tolerance: C.Duration? = nil,
+    onCancellation behavior: CancellationBehavior)
+  -> JobCancellationToken {
     // Convert to `Swift.Duration`
-    let duration = delay as! Swift.Duration
+    let duration = at.asDuration(clock: clock) as! Swift.Duration
 
     // Now turn that into nanoseconds
     let (seconds, attoseconds) = duration.components
@@ -52,14 +60,24 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
       + .seconds(Int(seconds))
       + .nanoseconds(Int(nanoseconds))
 
+    let jobId = _job.id
     let job = UnownedJob(_job)
     DispatchQueue.main.asyncAfter(deadline: deadline) {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
+
+    return JobCancellationToken(
+      executor: self, jobID: jobId, opaqueData: [0, 0],
+      onCancellation: behavior, cleanUp: nil
+    )
+  }
+
+  public func cancel(jobWithToken: consuming JobCancellationToken) {
+    // Do nothing
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 9999, *)
 @main struct Main {
   static func main() async {
     let tests = TestSuite("sleep_executor")
@@ -88,6 +106,16 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
 
     tests.test("Task.sleep on an actor") {
       await MyActor().doSleep()
+    }
+
+    tests.test("Task.sleep does not enqueue") {
+      let oldEnqueueCount = enqueueCount.load(ordering: .relaxed)
+
+      try! await Task.sleep(for: .seconds(0.1))
+
+      let newEnqueueCount = enqueueCount.load(ordering: .relaxed)
+
+      assert(oldEnqueueCount == newEnqueueCount)
     }
 
     await runAllTestsAsync()

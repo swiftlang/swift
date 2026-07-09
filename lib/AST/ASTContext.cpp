@@ -1528,6 +1528,8 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::TaskExecutor:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::ExecutorFactory:
+  case KnownProtocolKind::SchedulingExecutor:
+  case KnownProtocolKind::Clock:
     M = getLoadedModule(Id_Concurrency);
     break;
   case KnownProtocolKind::DistributedActor:

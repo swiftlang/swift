@@ -123,6 +123,36 @@ struct PriorityQueue<T> {
     return result
   }
 
+  /// Remove the specified item from the queue.
+  ///
+  /// Parameters:
+  ///
+  /// - value: The item to remove from the queue.
+  ///
+  mutating func remove(at ndx: Int) -> T? {
+    storage.swapAt(ndx, storage.count - 1)
+    let result = storage.removeLast()
+    if !storage.isEmpty {
+      downHeap(ndx: ndx)
+    }
+    return result
+  }
+
+  /// Remove the first item from the queue matching the specified condition.
+  ///
+  /// Parameters:
+  ///
+  /// - where: The condition.
+  ///
+  mutating func removeFirst(`where` condition: (borrowing T) -> Bool) -> T? {
+    for ndx in 0..<storage.count {
+      if condition(storage[ndx]) {
+        return remove(at: ndx)
+      }
+    }
+    return nil
+  }
+
   /// Fix the heap condition by iterating upwards.
   ///
   /// Iterate upwards from the specified entry, exchanging it with
@@ -208,5 +238,21 @@ extension PriorityQueue where T: Comparable {
   ///
   init() {
     self.init(compare: >)
+  }
+}
+
+extension PriorityQueue where T: Equatable {
+  /// Remove the specified item from the queue.
+  ///
+  /// Parameters:
+  ///
+  /// - value: The item to remove from the queue.
+  ///
+  mutating func removeFirst(_ value: T) -> T? {
+    guard let ndx = storage.firstIndex(of: value) else {
+      return nil
+    }
+
+    return remove(at: ndx)
   }
 }

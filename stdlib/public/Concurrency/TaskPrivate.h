@@ -156,6 +156,9 @@ SWIFT_CC(swift)
 void
 swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task, JobPriority newPriority);
 
+// Create a CancellationError.
+extern "C" SWIFT_CC(swift) SwiftError *_swift_makeCancellationError();
+
 /*************** Methods for Status records manipulation ******************/
 
 /// Add a status record to the input task.
@@ -1078,9 +1081,10 @@ inline uint32_t AsyncTask::flagAsRunning() {
       newStatus = newStatus.withoutStoredPriorityEscalation();
       newStatus = newStatus.withoutEnqueued();
 
-      if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
-               /* success */ std::memory_order_relaxed,
-               /* failure */ std::memory_order_relaxed)) {
+      if (_private()._status().compare_exchange_weak(
+              oldStatus, newStatus,
+              /* success */ std::memory_order_acquire,
+              /* failure */ std::memory_order_relaxed)) {
         newStatus.traceStatusChanged(this, oldStatus, true);
         adoptTaskVoucher(this);
         swift_task_enterThreadLocalContext(
@@ -1344,6 +1348,25 @@ inline bool AsyncTask::hasTaskExecutorPreferenceRecord() const {
 inline void AsyncTask::flagAsDestroyed() {
   SWIFT_TASK_DEBUG_LOG("task destroyed %p", this);
 }
+
+// ==== Executor tracking and enqueuing ---------------------------------------
+
+/// Should we yield the thread?
+inline bool shouldYieldThread() {
+  // return dispatch_swift_job_should_yield();
+  return false;
+}
+
+bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
+                     SerialExecutorRef newSerialExecutor,
+                     TaskExecutorRef currentTaskExecutor,
+                     TaskExecutorRef newTaskExecutor);
+
+class ExecutorTrackingInfo;
+
+SWIFT_CC(swiftasync)
+void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
+                        ExecutorTrackingInfo *oldTracking);
 
 // ==== Task Local Values -----------------------------------------------------
 

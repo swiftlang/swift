@@ -13,25 +13,39 @@ import _Concurrency
 // FIXME: should not depend on Dispatch
 import Dispatch
 
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 5.7, *)
 @main struct Main {
   static let pause = 500_000_000 // 500ms
 
   static func main() async {
-    await testSleepDuration()
+    await testSleepDurationSuspending()
+    await testSleepDurationContinuous()
     await testSleepDoesNotBlock()
     await testSleepHuge()
-    if #available(SwiftStdlib 5.7, *) {
-      await testSleepNegative()
-    }
+    await testSleepNegative()
   }
 
-  static func testSleepDuration() async {
-    let start = DispatchTime.now()
+  static func testSleepDurationSuspending() async {
+    let start = SuspendingClock.now
 
-    await Task.sleep(UInt64(pause))
+    try! await Task.sleep(for: .nanoseconds(pause), clock: .suspending)
 
-    let stop = DispatchTime.now()
+    let stop = SuspendingClock.now
+
+    print("SUSPENDING: start: \(start), stop: \(stop), duration: \(stop - start)")
+
+    // assert that at least the specified time passed since calling `sleep`
+    assert(stop >= (start + .nanoseconds(pause)))
+  }
+
+  static func testSleepDurationContinuous() async {
+    let start = ContinuousClock.now
+
+    try! await Task.sleep(for: .nanoseconds(pause), clock: .continuous)
+
+    let stop = ContinuousClock.now
+
+    print("CONTINUOUS: start: \(start), stop: \(stop), duration: \(stop - start)")
 
     // assert that at least the specified time passed since calling `sleep`
     assert(stop >= (start + .nanoseconds(pause)))
@@ -86,7 +100,6 @@ import Dispatch
                                     attosecondsComponent: 0)
     let negativeTime = unsafe unsafeBitCast(negativeDuration,
                                             to: ContinuousClock.Instant.self)
-
     let task = Task.detached {
       try await Task.sleep(until: negativeTime)
     }
@@ -99,7 +112,7 @@ import Dispatch
     do {
       _ = try await task.value
     } catch {
-      fatalError("Sleep tried to wait for a negative time")
+      fatalError("Sleep tried to wait for a negative time \(error)")
     }
   }
 }

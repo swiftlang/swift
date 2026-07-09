@@ -23,6 +23,7 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "Debug.h"
 #include "Error.h"
+#include "ExecutorTracking.h"
 #include "TaskGroupPrivate.h"
 #include "TaskLocal.h"
 #include "TaskPrivate.h"
@@ -32,10 +33,11 @@
 #include "swift/ABI/TaskOptions.h"
 #include "swift/Basic/Casting.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/ObjectCache.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
-#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <new>
@@ -109,6 +111,9 @@ void FutureFragment::destroy() {
     break;
   }
 }
+
+SWIFT_CC(swift)
+static void swift_continuation_resumeMaybeInline(AsyncTask *task);
 
 FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
                                              AsyncContext *waitingTaskContext,
@@ -224,18 +229,35 @@ InitialTaskExecutorOwnedPreferenceTaskOptionRecord::getExecutorRefFromUnownedTas
     return executorRef;
 }
 
+static ShardedObjectCache<NullaryContinuationJob> nullaryJobCache;
+static ShardedObjectCache<ScheduledContinuationJob> scheduledJobCache;
+
 void NullaryContinuationJob::process(Job *_job) {
   auto *job = cast<NullaryContinuationJob>(_job);
 
   auto *continuation = job->Continuation;
 
-  swift_cxx_deleteObject(job);
+  nullaryJobCache.put_back(job);
 
   auto *context =
     static_cast<ContinuationAsyncContext*>(continuation->ResumeContext);
 
   context->setErrorResult(nullptr);
   swift_continuation_resume(continuation);
+}
+
+void ScheduledContinuationJob::process(Job *_job) {
+  auto *job = cast<ScheduledContinuationJob>(_job);
+
+  auto *continuation = job->Continuation;
+
+  scheduledJobCache.put_back(job);
+
+  auto *context =
+      static_cast<ContinuationAsyncContext *>(continuation->ResumeContext);
+
+  context->setErrorResult(nullptr);
+  swift_continuation_resumeMaybeInline(continuation);
 }
 
 void AsyncTask::completeFuture(AsyncContext *context) {
@@ -1701,7 +1723,8 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
 }
 
 static void resumeTaskAfterContinuation(AsyncTask *task,
-                                        ContinuationAsyncContext *context) {
+                                        ContinuationAsyncContext *context,
+                                        bool allowInlineResume = false) {
   auto &sync = context->AwaitSynchronization;
 
   auto status = sync.load(std::memory_order_acquire);
@@ -1742,6 +1765,27 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
   sync.store(ContinuationStatus::Resumed, std::memory_order_relaxed);
   context->Cond->signal();
 #else
+  if (allowInlineResume) {
+    auto resumeExecutor = context->ResumeToExecutor;
+    auto trackingInfo = ExecutorTrackingInfo::current();
+    auto currentExecutor = (trackingInfo ? trackingInfo->getActiveExecutor()
+                                         : SerialExecutorRef::generic());
+    auto currentTaskExecutor = (trackingInfo ? trackingInfo->getTaskExecutor()
+                                             : TaskExecutorRef::undefined());
+    auto newTaskExecutor = task->getPreferredTaskExecutor();
+
+    if (!mustSwitchToRun(currentExecutor, resumeExecutor, currentTaskExecutor,
+                         newTaskExecutor) &&
+        !shouldYieldThread()) {
+      _swift_tsan_acquire(static_cast<Job *>(task));
+      // We're already on a compatible executor — run the resumed task inline
+      // instead of round-tripping through the executor's queue.
+      task->flagAsRunning();
+      _swift_task_setCurrent(task);
+      return runOnAssumedThread(task, resumeExecutor, trackingInfo);
+    }
+  }
+
   // TODO: maybe in some mode we should set the status to Resumed here
   // to make a stronger best-effort attempt to catch racing attempts to
   // resume the continuation?
@@ -1755,6 +1799,14 @@ static void swift_continuation_resumeImpl(AsyncTask *task) {
   auto context = static_cast<ContinuationAsyncContext*>(task->ResumeContext);
   concurrency::trace::task_continuation_resume(context, false);
   resumeTaskAfterContinuation(task, context);
+}
+
+SWIFT_CC(swift)
+static void swift_continuation_resumeMaybeInline(AsyncTask *task) {
+  continuationChecking::willResume(task);
+  auto context = static_cast<ContinuationAsyncContext *>(task->ResumeContext);
+  concurrency::trace::task_continuation_resume(context, false);
+  resumeTaskAfterContinuation(task, context, /*allowInlineResume=*/true);
 }
 
 SWIFT_CC(swift)
@@ -1896,8 +1948,18 @@ static NullaryContinuationJob*
 swift_task_createNullaryContinuationJobImpl(
     size_t priority,
     AsyncTask *continuation) {
-  auto *job = swift_cxx_newObject<NullaryContinuationJob>(swift_task_getCurrent(),
+  auto *job = nullaryJobCache.allocate(swift_task_getCurrent(),
         static_cast<JobPriority>(priority), continuation);
+
+  return job;
+}
+
+SWIFT_CC(swift)
+static ScheduledContinuationJob *
+swift_task_createScheduledContinuationJobImpl(size_t priority,
+                                              AsyncTask *continuation) {
+  auto *job = scheduledJobCache.allocate(
+      static_cast<JobPriority>(priority), continuation);
 
   return job;
 }
@@ -1930,6 +1992,8 @@ static void swift_task_startOnMainActorImpl(AsyncTask* task) {
   swift_job_run(task, mainExecutor);
   _swift_task_setCurrent(originalTask);
 }
+
+extern "C" SWIFT_CC(swift) void swift_job_destroy(Job *job) { job->destroy(); }
 
 // ==== Load-time setup code ----------------------------------------------------
 //

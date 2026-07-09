@@ -173,6 +173,10 @@ public:
     Flags.setPriority(priority);
   }
 
+  JobKind getKind() const {
+    return Flags.getKind();
+  }
+
   uint32_t getJobId() const {
     return Id;
   }
@@ -189,6 +193,14 @@ public:
   SWIFT_CC(swiftasync)
   void runSimpleInFullyEstablishedContext() {
     return RunJob(this); // 'return' forces tail call
+  }
+
+  /// Destroy a job (unsafe).
+  void destroy() {
+    if (auto task = dyn_cast<AsyncTask>(this))
+      swift_cxx_deleteObject(task);
+    else
+      swift_cxx_deleteObject(this);
   }
 };
 
@@ -220,6 +232,31 @@ public:
   static bool classof(const Job *job) {
     return job->Flags.getKind() == JobKind::NullaryContinuation;
   }
+
+  AsyncTask *getContinuation() const { return Continuation; }
+};
+
+/// This is similar to NullaryContinuationJob, but with the twist that the
+/// target continuation may be executed inline (rather than enqueued for
+/// later execution), assuming the current executor is compatible.
+class ScheduledContinuationJob : public Job {
+
+private:
+  AsyncTask *Continuation;
+
+public:
+  ScheduledContinuationJob(JobPriority priority, AsyncTask *continuation)
+      : Job({JobKind::ScheduledContinuation, priority}, &process),
+        Continuation(continuation) {}
+
+  SWIFT_CC(swiftasync)
+  static void process(Job *job);
+
+  static bool classof(const Job *job) {
+    return job->Flags.getKind() == JobKind::ScheduledContinuation;
+  }
+
+  AsyncTask *getContinuation() const { return Continuation; }
 };
 
 /// Describes type information and offers value methods for an arbitrary concrete

@@ -99,10 +99,12 @@ internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
 internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,
                                       job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  if #available(StdlibDeploymentTarget 6.3, *) {
-    Task.defaultExecutor.asSchedulingExecutor!.enqueue(ExecutorJob(unownedJob),
-                                                       after: .nanoseconds(delay),
-                                                       clock: .continuous)
+  if #available(StdlibDeploymentTarget 9999, *) {
+    _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
+      ExecutorJob(unownedJob),
+      run: .after(.nanoseconds(delay)),
+      clock: .continuous
+    )
   } else {
     fatalError("this should never happen")
   }
@@ -123,21 +125,21 @@ internal func enqueueOnGlobalExecutor(seconds: CLongLong,
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   let delay = Duration.seconds(seconds) + Duration.nanoseconds(nanoseconds)
   let leeway = Duration.seconds(leewaySeconds) + Duration.nanoseconds(leewayNanoseconds)
-  if #available(StdlibDeploymentTarget 6.3, *) {
+  if #available(StdlibDeploymentTarget 9999, *) {
     switch clock {
       case _ClockID.suspending.rawValue:
-        Task.defaultExecutor.asSchedulingExecutor!.enqueue(
+        _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
           ExecutorJob(unownedJob),
-          after: delay,
-          tolerance: leeway,
-          clock: .suspending
+          run: .after(delay),
+          clock: .suspending,
+          tolerance: leeway
         )
       case _ClockID.continuous.rawValue:
-        Task.defaultExecutor.asSchedulingExecutor!.enqueue(
+        _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
           ExecutorJob(unownedJob),
-          after: delay,
-          tolerance: leeway,
-          clock: .continuous
+          run: .after(delay),
+          clock: .continuous,
+          tolerance: leeway
         )
       default:
         fatalError("Unknown clock ID \(clock)")

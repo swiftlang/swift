@@ -547,6 +547,16 @@ BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinu
 /// Force the current task to be rescheduled on the specified actor.
 BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 
+/// suspend<E: SchedulingExecutor, C: Clock>(
+///     on: E, until: FireTime<C>, tolerance: C.Duration?, clock: C,
+///     onSchedule: (JobCancellationToken) -> ()) async -> ()
+///
+/// Suspend the current async function and reschedule its resumption on the
+/// given scheduling executor with the given deadline.  Once the wake-up is
+/// scheduled on the executor, the `whenScheduled` closure will be called
+/// with the a cancellation token that can be used to cancel the suspension.
+BUILTIN_SIL_OPERATION(Suspend, "suspend", Special)
+
 /// packLength: <each T>(_: repeat each T) -> Int
 ///
 /// Returns the number of items in a pack.

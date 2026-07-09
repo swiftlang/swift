@@ -25,6 +25,7 @@ import Darwin
 // This test specifically checks that our reference counting accounts for existence of
 // objective-c types as TaskExecutors -- which was a bug where we'd swift_release
 // obj-c excecutors by accident (rdar://131151645).
+@available(SwiftStdlib 9999, *)
 final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulingExecutor, @unchecked Sendable {
   public func enqueue(_ _job: consuming ExecutorJob) {
     let job = UnownedJob(_job)
@@ -33,31 +34,43 @@ final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulingExecutor, @unch
     }
   }
 
-  public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
+  public func enqueue<C: Clock>(
+    _ _job: consuming ExecutorJob,
+    run at: FireTime<C>,
+    clock: C,
+    tolerance: C.Duration? = nil,
+    onCancellation behavior: CancellationBehavior)
+  -> JobCancellationToken {
     // Convert to `Swift.Duration`
-    let duration = delay as! Swift.Duration
+    let duration = at.asDuration(clock: clock) as! Swift.Duration
 
     // Now turn that into nanoseconds
     let (seconds, attoseconds) = duration.components
     let nanoseconds = attoseconds / 1_000_000_000
 
     // Get a Dispatch time
-    let deadline = DispatchTime.now().advanced(
-      by: .seconds(Int(seconds))
-    ).advanced(
-      by: .nanoseconds(Int(nanoseconds))
-    )
+    let deadline = DispatchTime.now()
+      + .seconds(Int(seconds))
+      + .nanoseconds(Int(nanoseconds))
 
+    let jobId = _job.id
     let job = UnownedJob(_job)
     DispatchQueue.main.asyncAfter(deadline: deadline) {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
+
+    return JobCancellationToken(
+      executor: self, jobID: jobId, opaqueData: [0, 0],
+      onCancellation: .executeImmediately, cleanUp: nil
+    )
+  }
+
+  public func cancel(jobWithToken: consuming JobCancellationToken) {
+    // Do nothing
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @main struct Main {
   static func main() async {
     var taskExecutor: (any TaskExecutor)? = NSQueueTaskExecutor()

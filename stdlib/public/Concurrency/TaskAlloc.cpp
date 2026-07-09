@@ -70,18 +70,33 @@ void swift::_swift_task_dealloc_specific(AsyncTask *task, void *ptr) {
 void swift::swift_task_dealloc_through(void *ptr) {
   allocator(swift_task_getCurrent()).deallocThrough(ptr);
 }
+
+static AsyncTask *task_from_job(Job *job) {
+  switch (job->getKind()) {
+  case JobKind::Task:
+    return static_cast<AsyncTask *>(job);
+  case JobKind::NullaryContinuation:
+    return static_cast<NullaryContinuationJob *>(job)->getContinuation();
+  case JobKind::ScheduledContinuation:
+    return static_cast<ScheduledContinuationJob *>(job)->getContinuation();
+  default:
+    return nullptr;
+  }
+}
+
 void *swift::swift_job_allocate(Job *job, size_t size) {
-  if (!job->isAsyncTask())
+  AsyncTask *task = task_from_job(job);
+
+  if (!task)
     return nullptr;
 
-  return allocator(static_cast<AsyncTask *>(job)).alloc(size);
+  return allocator(task).alloc(size);
 }
 
 void swift::swift_job_deallocate(Job *job, void *ptr) {
-  if (!job->isAsyncTask())
-    return;
+  AsyncTask *task = task_from_job(job);
 
-  allocator(static_cast<AsyncTask *>(job)).dealloc(ptr);
+  allocator(task).dealloc(ptr);
 }
 
 #if !SWIFT_CONCURRENCY_EMBEDDED

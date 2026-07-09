@@ -222,6 +222,11 @@ OVERRIDE_TASK(task_createNullaryContinuationJob, NullaryContinuationJob *,
               (size_t priority,
                AsyncTask *continuation), (priority, continuation))
 
+OVERRIDE_TASK(task_createScheduledContinuationJob, ScheduledContinuationJob *,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (size_t priority,
+               AsyncTask *continuation), (priority, continuation))
+
 HOOKED_OVERRIDE_TASK_NORETURN(task_asyncMainDrainQueue,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, ,)

@@ -81,6 +81,8 @@ list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-strict-memory-safety")
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "AllowUnsafeAttribute")
 
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "RawLayout")
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "StaticExclusiveOnly")
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "Extern")
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS

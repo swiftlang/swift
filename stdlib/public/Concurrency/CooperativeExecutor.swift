@@ -14,10 +14,12 @@
 
 import Swift
 
+fileprivate let OpaqueDataClockId = 0
+
 // Store the Timestamp in the executor private data, if it will fit; otherwise,
 // use the allocator to allocate space for it and stash a pointer in the private
 // data area.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension ExecutorJob {
   fileprivate var cooperativeExecutorTimestampIsIndirect: Bool {
     return MemoryLayout<(Int, Int)>.size
@@ -99,7 +101,7 @@ extension ExecutorJob {
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// A wait queue is a specialised priority queue used to run a timer.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 struct WaitQueue {
   var queue: PriorityQueue<UnownedJob>
   var clock: _ClockID
@@ -140,6 +142,13 @@ struct WaitQueue {
     }
   }
 
+  mutating func cancel(jobID: UInt64) -> ExecutorJob? {
+    if let job = queue.removeFirst(where: { $0.id == jobID }) {
+      return ExecutorJob(job)
+    }
+    return nil
+  }
+
   var timeToNextJob: CooperativeExecutor.Duration? {
     if let job = queue.top {
       let deadline = ExecutorJob(job).cooperativeExecutorTimestamp
@@ -157,7 +166,7 @@ struct WaitQueue {
 
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 final class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -243,8 +252,11 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
   public var isMainExecutor: Bool { true }
 }
 
+fileprivate let enqueuedOnContinuousClock = 1
+fileprivate let enqueuedOnSuspendingClock = 2
+
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: SchedulingExecutor {
 
   func currentTime(clock: _ClockID) -> Timestamp {
@@ -255,28 +267,81 @@ extension CooperativeExecutor: SchedulingExecutor {
     return now
   }
 
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
+  public func enqueue<C: Clock>(
+    _ job: consuming ExecutorJob,
+    run at: FireTime<C>,
+    clock: C,
+    tolerance: C.Duration?,
+    onCancellation behavior: CancellationBehavior
+  ) -> JobCancellationToken {
+    let jobID = job.id
+
     // If it's a clock we know, get the duration to wait
     if let _ = clock as? ContinuousClock {
-      let continuousDuration = delay as! ContinuousClock.Duration
+      let continuousDuration =
+        at.asDuration(clock: clock) as! ContinuousClock.Duration
       let duration = Duration(from: continuousDuration)
       continuousWaitQueue.enqueue(job, after: duration)
+      return JobCancellationToken(
+        executor: self,
+        jobID: jobID,
+        opaqueData: [enqueuedOnContinuousClock, 0],
+        onCancellation: behavior
+      )
     } else if let _ = clock as? SuspendingClock {
-      let suspendingDuration = delay as! SuspendingClock.Duration
+      let suspendingDuration = 
+        at.asDuration(clock: clock) as! SuspendingClock.Duration
       let duration = Duration(from: suspendingDuration)
       suspendingWaitQueue.enqueue(job, after: duration)
+      return JobCancellationToken(
+        executor: self,
+        jobID: jobID,
+        opaqueData: [enqueuedOnSuspendingClock, 0],
+        onCancellation: behavior
+      )
+    } else if let enqueueingClock = clock as? any EnqueueingClock {
+      return _openAndEnqueue(
+        job,
+        run: at,
+        tolerance: tolerance,
+        clock: clock,
+        onCancellation: behavior,
+        enqueueingClock: enqueueingClock
+      )
     } else {
       fatalError("Sorry, cannot schedule on an unknown clock")
     }
   }
 
+  public func cancel(jobWithToken token: consuming JobCancellationToken) {
+    let job: ExecutorJob?
+    if token.opaqueData[OpaqueDataClockId] == enqueuedOnContinuousClock {
+      job = continuousWaitQueue.cancel(jobID: token.jobID)
+    } else if token.opaqueData[OpaqueDataClockId] == enqueuedOnSuspendingClock {
+      job = suspendingWaitQueue.cancel(jobID: token.jobID)
+    } else {
+      job = nil
+    }
+
+    guard let job else {
+      return
+    }
+
+    switch token.cancellationBehavior {
+      case .drop:
+        job.destroy()
+      case .executeImmediately:
+        runQueue.push(UnownedJob(job))
+    }
+  }
+
+  internal var asSchedulingExecutor: (any SchedulingExecutor)? {
+    return self
+  }
 }
 #endif
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: RunLoopExecutor {
   public func run() throws {
     try runUntil { false }
@@ -334,13 +399,13 @@ extension CooperativeExecutor: RunLoopExecutor {
   }
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: SerialExecutor {}
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: TaskExecutor {}
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: MainExecutor {}
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
