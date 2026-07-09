@@ -1,71 +1,82 @@
 # Actors can't conform to global actor protocols (ActorConformanceToGlobalActorProtocol)
 
+## Overview
+
 Adding a protocol conformance to an actor will emit a compiler error if that protocol requires a global actor isolation. For example:
 
 ```swift
-@MainActor protocol SampleProtocol {
-    func foo(value: Int)
+@MainActor protocol Exhibit {
+    func display()
 }
 
-actor MyModel: SampleProtocol { // ❌ Actor 'MyModel' cannot conform to global actor isolated protocol 'SampleProtocol'
-    func foo(value: Int) {
+actor Terrarium: Exhibit { // error: actor 'Terrarium' cannot conform to global-actor-isolated protocol 'Exhibit'
+    func display() {
         // ...
     }
-    func bar(value: Int) {
+    func water() {
         // ...
     }
 }
 ```
 
-A protocol requiring global actor isolation (like `SampleProtocol` above) makes all methods and properties on conforming types inherit that global actor's isolation. But methods and properties in actor types (like `MyModel`) already inherit that actor's isolation!
+A protocol requiring global actor isolation (like `Exhibit` above) makes all methods and properties on conforming types inherit that global actor's isolation. But methods and properties in actor types (like `Terrarium`) already inherit that actor's isolation!
 
-This makes actors incompatible with protocols that require a global actor isolation: methods can't be isolated to both the actor instance and the global actor. Consider the `foo()` method in the example above. Should it be isolated to the `@MainActor`, or to an instance of the `MyModel` actor? What about `bar()`?
+This makes actors incompatible with protocols that require a global actor isolation: methods can't be isolated to both the actor instance and the global actor. Consider the `display()` method in the example above. Should it be isolated to the `@MainActor`, or to an instance of the `Terrarium` actor? What about `water()`?
 
 The most common solution is to ensure both the protocol and the implementation are in the same concurrency domain. For example, by applying the same global actor isolation to both, instead of using an actor instance for the latter:
+
 ```swift
-@MainActor protocol SampleProtocol {
-    func foo()
+@MainActor protocol Exhibit {
+    func display()
 }
 
-@MainActor final class MyModel: SampleProtocol { // ✅
-    func foo(value: Int) {
+@MainActor final class Terrarium: Exhibit { // OK
+    func display() {
         // ...
     }
-    func bar(value: Int) {
+    func water() {
         // ...
     }
 }
 ```
 
 Alternatively, you can move the global actor isolation annotation to individual protocol requirements, and have the implementation use the same isolation for those methods:
+
 ```swift
-protocol SampleProtocol {
-    @MainActor func foo()
+protocol Exhibit {
+    @MainActor func display()
 }
 
-actor MyModel: SampleProtocol { // ✅
-    @MainActor func foo(value: Int) {
+actor Terrarium: Exhibit { // OK
+    @MainActor func display() {
         // ...
     }
-    func bar(value: Int) {
+    func water() {
         // ...
     }
 }
 ```
 
-If the protocol requirements are all `async` functions with `Sendable` parameters and results, it's possible to have an implementation in a different concurrency region:
+If the protocol requirements are all `async` functions with `Sendable` parameters and results, it's possible to have an implementation in a different concurrency domain:
+
 ```swift
-protocol SampleProtocol {
-    @MainActor func foo(value: Int) async
+protocol Exhibit {
+    @MainActor func display() async
 }
 
-actor MyModel: SampleProtocol { // ✅
-    func foo(value: Int) async {
+actor Terrarium: Exhibit { // OK
+    func display() async {
         // ...
     }
-    func bar() {
+    func water() {
         // ...
     }
 }
 ```
-This is possible because `async` methods require a suspension point at the call site. After the caller suspends, the implementation can be resumed on a different concurrency region —as long as all parameters and result types are `Sendable`— and, once completed, suspend again and return to the caller.
+
+This is possible because `async` methods require a suspension point at the call site. After the caller suspends, the implementation can be resumed on a different concurrency domain —as long as all parameters and result types are `Sendable`— and, once completed, suspend again and return to the caller.
+
+## See Also
+
+- [Protocol conformances crossing into actor-isolated code (ConformanceIsolation)](conformance-isolation.md)
+- [Isolated conformances (IsolatedConformances)](isolated-conformances.md)
