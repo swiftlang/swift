@@ -7,6 +7,8 @@
 // RUN: %target-run %t/anyobject-cast-crash-opt
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // Test that it doesn't crash
 
