@@ -62,6 +62,10 @@ private struct VTableSpecializer {
       if baseTypesOfMethods[entry.implementation] == nil {
         baseTypesOfMethods[entry.implementation] = classType
       }
+      // Ensure the SIL body of every vtable entry is loaded from the
+      // defining module.
+      _ = context.loadFunction(function: entry.implementation,
+                               loadCalleesRecursively: true)
     }
 
     if classType.isGenericAtAnyLevel {
