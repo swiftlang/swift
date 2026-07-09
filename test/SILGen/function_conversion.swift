@@ -664,26 +664,15 @@ struct FunctionConversionParameterSubstToOrigReabstractionTest {
 }
 
 
-//   TODO: we really ought to be able to fully peephole this into the
-//   emission of the closure.
-// CHECK-LABEL: sil {{.*}} [ossa] @$sS4SIgggoo_SS3key_SS5valuets11AnyHashableV_ypts5NeverOIegnrzr_TR
-// CHECK: bb0(%0 : $*(AnyHashable, Any), %1 : $*Never, %2 : $*(key: String, value: String), %3 : @guaranteed $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)):
-// CHECK:  [[KEY_ADDR:%.*]] = tuple_element_addr %2 : $*(key: String, value: String), 0
-// CHECK:  [[KEY:%.*]] = load_borrow [[KEY_ADDR]] :
-// CHECK:  [[VALUE_ADDR:%.*]] = tuple_element_addr %2 : $*(key: String, value: String), 1
-// CHECK:  [[VALUE:%.*]] = load_borrow [[VALUE_ADDR]] :
-// CHECK:  [[OUT_KEY_ADDR:%.*]] = tuple_element_addr %0 : $*(AnyHashable, Any), 0
-// CHECK:  [[OUT_VALUE_ADDR:%.*]] = tuple_element_addr %0 : $*(AnyHashable, Any), 1
-// CHECK:  [[TUPLE:%.*]] = apply %3([[KEY]], [[VALUE]]) : $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)
-// CHECK:  ([[LHS:%.*]], [[RHS:%.*]]) = destructure_tuple [[TUPLE]]
-// CHECK:  [[ADDR:%.*]] = alloc_stack $String
-// CHECK:  store [[LHS]] to [init] [[ADDR]] : $*String
-// CHECK:  [[CVT:%.*]] = function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
-// CHECK:  apply [[CVT]]<String>([[OUT_KEY_ADDR]], [[ADDR]])
-// CHECK:  [[OUT_VALUE_BUF:%.*]] = init_existential_addr [[OUT_VALUE_ADDR]] : $*Any, $String
-// CHECK:  store [[RHS]] to [init] [[OUT_VALUE_BUF]]
-// CHECK: } // end sil function '$sS4SIgggoo_SS3key_SS5valuets11AnyHashableV_ypts5NeverOIegnrzr_TR'
+// We perform all conversions inside the closure.
 
+// CHECK-LABEL: sil hidden [ossa] @$s19function_conversion9dontCrashyyF : $@convention(thin) () -> () {
+// CHECK: [[FN:%.*]] = function_ref @$s19function_conversion9dontCrashyyFs11AnyHashableV_yptSS3key_SS5valuet_tXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <(key: String, value: String), Never, (AnyHashable, Any)>
+// CHECK: [[THICK:%.*]] = thin_to_thick_function [[FN]] : $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <(key: String, value: String), Never, (AnyHashable, Any)> to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <(key: String, value: String), Never, (AnyHashable, Any)>
+// CHECK: [[MAP_FN:%.*]] = function_ref @$sSlsE3mapySayqd__Gqd__7ElementQzqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lF : $@convention(method) <τ_0_0 where τ_0_0 : Collection><τ_1_0, τ_1_1 where τ_1_1 : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <τ_0_0.Element, τ_1_1, τ_1_0>, @in_guaranteed τ_0_0) -> (@owned Array<τ_1_0>, @error_indirect τ_1_1)
+// CHECK: [[ERROR:%.*]] = alloc_stack $Never
+// CHECK: try_apply [[MAP_FN]]<Dictionary<String, String>, (AnyHashable, Any), Never>([[ERROR]], [[THICK]], {{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : Collection><τ_1_0, τ_1_1 where τ_1_1 : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <τ_0_0.Element, τ_1_1, τ_1_0>, @in_guaranteed τ_0_0) -> (@owned Array<τ_1_0>, @error_indirect τ_1_1), normal bb1, error bb2
+// CHECK: return
 func dontCrash() {
   let userInfo = ["hello": "world"]
   let d = [AnyHashable: Any](uniqueKeysWithValues: userInfo.map { ($0.key, $0.value) })

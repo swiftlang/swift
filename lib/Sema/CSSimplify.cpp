@@ -7259,9 +7259,6 @@ static bool isDependentMemberTypeWithBaseThatContainsUnresolvedPackExpansions(
 
 ConstraintSystem::ImpliedResultConversionKind
 ConstraintSystem::getImpliedResultConversionKind(ConstraintLocator *locator) {
-  if (locator->isLastElement<LocatorPathElt::ClosureResult>())
-    return ImpliedResultConversionKind::ToVoid;
-
   if (locator->isLastElement<LocatorPathElt::ClosureBody>() ||
       locator->isForContextualType(CTP_ReturnStmt) ||
       locator->isForContextualType(CTP_ClosureResult) ||
@@ -7858,45 +7855,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           ((nominal1->isCGFloat() || nominal2->isCGFloat()) &&
            (nominal1->isDouble() || nominal2->isDouble()))) {
         ConstraintLocatorBuilder location{locator};
-        // Look through all value-to-optional promotions to allow
-        // conversions like Double -> CGFloat?? and vice versa.
-        // T -> Optional<T>
-        if (location.endsWith<LocatorPathElt::OptionalInjection>() ||
-            location.endsWith<LocatorPathElt::GenericArgument>()) {
-          SmallVector<LocatorPathElt, 4> path;
-          auto anchor = location.getLocatorParts(path);
-
-          // Drop all of the applied `value-to-optional` and
-          // `optional-to-optional` conversions.
-          path.erase(llvm::remove_if(
-                         path,
-                         [](const LocatorPathElt &elt) {
-                           return elt.is<LocatorPathElt::OptionalInjection>() ||
-                                  elt.is<LocatorPathElt::GenericArgument>();
-                         }),
-                     path.end());
-
-          location = getConstraintLocator(anchor, path);
-        }
-
-        // Support implicit Double<->CGFloat conversions only for
-        // something which could be directly represented in the AST
-        // e.g. argument-to-parameter, contextual conversions etc.
-        if (!location.trySimplifyToExpr()) {
-          return SolutionKind::Error;
-        }
 
         SmallVector<LocatorPathElt, 4> path;
         auto anchor = location.getLocatorParts(path);
 
-        // Try implicit CGFloat conversion only if:
-        // - This is not:
+        // Try implicit CGFloat conversion only if this is not:
         //     - an explicit call to a CGFloat initializer;
         //     - an explicit coercion;
         //     - a runtime type check (via `is` expression);
         //     - a checked or conditional cast;
-        // - This is a first type such conversion is attempted for
-        //   for a given path (AST element).
 
         auto isCGFloatInit = [&](ASTNode location) {
           if (auto *call = getAsExpr<CallExpr>(location)) {
