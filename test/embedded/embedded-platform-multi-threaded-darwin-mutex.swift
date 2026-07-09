@@ -9,6 +9,7 @@
 // REQUIRES: synchronization
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_embedded_platform
 
 import Synchronization
 

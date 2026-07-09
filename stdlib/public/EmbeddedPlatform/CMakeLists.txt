@@ -121,7 +121,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
     # The POSIX pthread-based shim only makes sense on hosted POSIX targets;
     # skip bare-metal and Windows triples that lack a pthread implementation.
-    if(NOT "${triple}" MATCHES "-none-|-windows-")
+    # Also skip Apple targets when the host is not macOS: cross-compiling to
+    # Apple from Linux/Windows without an Apple SDK picks up the host libc's
+    # `<pthread.h>`, which fails.
+    if(NOT "${triple}" MATCHES "-none-|-windows-" AND
+       (NOT "${triple}" MATCHES "-apple-" OR SWIFT_HOST_VARIANT STREQUAL "macosx"))
       add_swift_target_library_single(
         embedded-multi-threaded-posix-shim-${mod}
         swiftEmbeddedPlatformMultiThreadedPOSIX
@@ -155,9 +159,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     endif()
 
     # The Darwin-specific `os_unfair_lock` shim is only meaningful on hosted
-    # Apple target triples; bare-metal `-apple-none-*` triples have no OS SDK
-    # and therefore no `<os/lock.h>`.
-    if("${triple}" MATCHES "-apple-" AND NOT "${triple}" MATCHES "-apple-none-")
+    # Apple target triples, and can only be compiled when the host has an
+    # Apple SDK (i.e. macOS). Skip bare-metal `-apple-none-*` triples and
+    # non-macOS hosts.
+    if("${triple}" MATCHES "-apple-" AND
+       NOT "${triple}" MATCHES "-apple-none-" AND
+       SWIFT_HOST_VARIANT STREQUAL "macosx")
       add_swift_target_library_single(
         embedded-multi-threaded-darwin-shim-${mod}
         swiftEmbeddedPlatformMultiThreadedDarwin
