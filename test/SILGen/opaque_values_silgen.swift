@@ -1019,3 +1019,21 @@ func forceIndirectErrorThunk<T: Error>(_ x: () throws(T) -> Void) throws {
 // CHECK:       [[ERROR_BB]]({{%[^,]+}} : @owned $T):
 // CHECK:         throw {{%[^,]+}} : $any Error
 // CHECK-LABEL: } // end sil function '$sxIgzr_s5Error_pIegzo_sAARzlTR'
+
+
+
+struct CCC {
+  var members: [Member]
+  var isInverted: Bool
+}
+enum Member {
+  case atom(Int)
+  case custom(CCC)
+  indirect case intersection(CCC, CCC)
+}
+
+// Ensure we treat infinite types as non-trivial & loadable (rdar://180569048)
+// CHECK-LABEL: sil {{.*}}3CCCV7membersSayAA6MemberOGvs : $@convention(method) (@owned Array<Member>, @inout CCC) -> () {
+// CHECK: bb0(%0 : @owned $Array<Member>
+// CHECK:   destroy_value %0
+// CHECK: } // end sil function

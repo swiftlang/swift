@@ -59,6 +59,7 @@ bool ForwardingOperation::hasSameRepresentation() const {
   case SILInstructionKind::TupleExtractInst:
   case SILInstructionKind::TuplePackExtractInst:
   case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
+  case SILInstructionKind::UncheckedOwnershipInst:
     return true;
   }
 }
