@@ -7209,6 +7209,12 @@ void IRGenSILFunction::visitBeginUnpairedAccessInst(
     return;
 
   case SILAccessEnforcement::Dynamic: {
+    // In Embedded Swift, suppress the swift_beginAccess call if dynamic
+    // exclusivity is not enabled.
+    if (getSILModule().getOptions().EmbeddedSwift &&
+        !getSILModule().getOptions().EnforceExclusivityDynamic)
+      return;
+
     llvm::Value *scratch = getLoweredAddress(access->getBuffer()).getAddress();
 
     llvm::Value *pointer =
@@ -7335,6 +7341,12 @@ void IRGenSILFunction::visitEndUnpairedAccessInst(EndUnpairedAccessInst *i) {
     return;
 
   case SILAccessEnforcement::Dynamic: {
+    // In Embedded Swift, suppress the swift_endAccess call if dynamic
+    // exclusivity is not enabled.
+    if (getSILModule().getOptions().EmbeddedSwift &&
+        !getSILModule().getOptions().EnforceExclusivityDynamic)
+      return;
+
     auto scratch = getLoweredAddress(i->getBuffer()).getAddress();
 
     auto call =
@@ -7994,6 +8006,19 @@ void IRGenSILFunction::visitFunctionExtractIsolationInst(
 }
 
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
+  // In embedded Swift, key paths whose pattern is fully-known at compile
+  // time (no substitutions, no captured operands, only supported component
+  // kinds) get emitted as immortal constant globals rather than being
+  // instantiated at runtime through `swift_getKeyPath` (which isn't
+  // available in embedded builds anyway).
+  if (IGM.canEmitStaticKeyPathInstance(I)) {
+    llvm::Constant *staticInstance = IGM.emitStaticKeyPathInstance(I);
+    Explosion e;
+    e.add(staticInstance);
+    setLoweredExplosion(I, e);
+    return;
+  }
+
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
   // Build up the argument vector to instantiate the pattern here.
   std::optional<StackAddress> dynamicArgsBuf;

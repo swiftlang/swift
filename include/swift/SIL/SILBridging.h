@@ -936,6 +936,14 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool KeyPathInst_hasPattern() const;
   BRIDGED_INLINE SwiftInt KeyPathInst_getNumComponents() const;
   BRIDGED_INLINE void KeyPathInst_getReferencedFunctions(SwiftInt componentIdx, KeyPathFunctionResults * _Nonnull results) const;
+  /// If this `keypath_inst` will be emitted as a statically-instantiated
+  /// immortal object in Embedded Swift, returns the concrete key path class
+  /// type (`KeyPath<Root, Value>` / `WritableKeyPath<Root, Value>` /
+  /// `ReferenceWritableKeyPath<Root, Value>`) picked by IRGen for the
+  /// object's isa.  Callers (Swift-side embedded passes) use this to force
+  /// specialization of that class's vtable before IRGen runs.  Returns an
+  /// invalid type if the key path isn't statically instantiable.
+  SWIFT_IMPORT_UNSAFE BridgedType KeyPathInst_getStaticInstanceClassType() const;
   BRIDGED_INLINE void GlobalAddrInst_clearToken() const;
   BRIDGED_INLINE bool GlobalValueInst_isBare() const;
   BRIDGED_INLINE void GlobalValueInst_setIsBare() const;
