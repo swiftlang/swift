@@ -1783,6 +1783,50 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
   return macroSourceFile;
 }
 
+bool swift::accessorMacroOnlyIntroducesObservers(
+    MacroDecl *macro,
+    const MacroRoleAttr *attr
+) {
+  // Will this macro introduce observers?
+  bool foundObserver = false;
+  for (auto name : attr->getNames()) {
+    if (name.getKind() == MacroIntroducedDeclNameKind::Named &&
+        (name.getName().getBaseName().userFacingName() == "willSet" ||
+         name.getName().getBaseName().userFacingName() == "didSet" ||
+         name.getName().getBaseName().isConstructor())) {
+      foundObserver = true;
+    } else {
+      // Introduces something other than an observer.
+      return false;
+    }
+  }
+
+  if (foundObserver)
+    return true;
+
+  // WORKAROUND: Older versions of the Observation library make
+  // `ObservationIgnored` an accessor macro that implies that it makes a
+  // stored property computed. Override that, because we know it produces
+  // nothing.
+  if (macro->getName().getBaseName().userFacingName() == "ObservationIgnored") {
+    return true;
+  }
+
+  return false;
+}
+
+bool swift::accessorMacroIntroducesInitAccessor(
+    MacroDecl *macro, const MacroRoleAttr *attr
+) {
+  for (auto name : attr->getNames()) {
+    if (name.getKind() == MacroIntroducedDeclNameKind::Named &&
+        (name.getName().getBaseName().isConstructor()))
+      return true;
+  }
+
+  return false;
+}
+
 std::optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
                                                CustomAttr *attr,
                                                MacroDecl *macro) {
