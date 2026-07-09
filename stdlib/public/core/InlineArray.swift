@@ -630,15 +630,23 @@ extension InlineArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension InlineArray: BorrowingSequence where Element: ~Copyable {
+extension InlineArray: Iterable where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
-  public typealias BorrowingIterator = SpanIterator<Element>
+  public typealias BorrowingIterator = Span<Element>.BorrowingIterator
   
   @available(SwiftStdlib 6.4, *)
-  @inlinable
+  public typealias Failure = Never
+
+  @export(implementation)
+  public var underestimatedCount: Int {
+    self.count
+  }
+
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
   @_lifetime(borrow self)
-  public func makeBorrowingIterator() -> SpanIterator<Element> {
-    SpanIterator(self.span)
+  public func makeBorrowingIterator() -> BorrowingIterator {
+    Span.BorrowingIterator(self.span)
   }
 }
 
