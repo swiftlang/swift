@@ -71,7 +71,6 @@ Or upgrade all warnings except deprecated declaration to errors:
 
 ## Topics
 - <doc:dynamic-callable-requirements>
-- <doc:actor-isolation-violations-in-protocol-conformances-and-overrides>
 - <doc:actors-cannot-conform-to-global-actor-protocols>
 - <doc:add-preconcurrency-import>
 - <doc:always-available-domain>
@@ -105,6 +104,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:multiple-inheritance>
 - <doc:nominal-types>
 - <doc:non-sendable-types-and-objective-c-interoperability>
+- <doc:non-sendable-values-in-async-conformances-and-overrides>
 - <doc:oslog>
 - <doc:option-obsoleted-by-module-selectors>
 - <doc:exclusivity-violation>
