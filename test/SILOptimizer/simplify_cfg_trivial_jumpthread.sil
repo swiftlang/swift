@@ -88,6 +88,10 @@ class C {
   init()
 }
 
+class C2 {
+  @_hasStorage final let k: C
+}
+
 // func testThread2(a : Int32) -> Int32 {
 //   enum b = (a ? _true : _false)
 //   if b == _true { return 42 } else { return 17 }
@@ -140,4 +144,107 @@ bb6:
 
 bb7(%19 : $Int64):
   return %19 : $Int64
+}
+
+// Ensure no crash in compiler
+sil [ossa] @eliminate_redundant_ssaupdater_phis : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C2
+  %1 = copy_value %0
+  br bb1(%0, %1)
+
+bb1(%3 : @owned $C2, %4 : @owned $C2):
+  cond_br undef, bb2, bb25
+
+bb2:
+  %6 = integer_literal $Builtin.Int1, 0
+  br bb3(%6)
+
+bb3(%8 : $Builtin.Int1):
+  %9 = begin_borrow [lexical] %3
+  cond_br undef, bb4, bb5
+
+bb4:
+  destroy_value %4
+  br bb6
+
+bb5:
+  %13 = ref_element_addr [immutable] %9, #C2.k
+  %14 = load_borrow %13
+  cond_br undef, bb7, bb8
+
+bb6:
+  end_borrow %9
+  destroy_value %3
+  %18 = tuple ()
+  return %18
+
+bb7:
+  destroy_value %4
+  br bb9
+
+bb8:
+  cond_br undef, bb10, bb11
+
+bb9:
+  fix_lifetime %14
+  end_borrow %14
+  br bb6
+
+bb10:
+  br bb13
+
+bb11:
+  cond_br undef, bb12, bb24
+
+bb12:
+  br bb19
+
+bb13:
+  br bb14
+
+bb14:
+  cond_br undef, bb15, bb16
+
+bb15:
+  cond_br undef, bb17, bb18
+
+bb16:
+  end_borrow %14
+  end_borrow %9
+  destroy_value [dead_end] %3
+  destroy_value [dead_end] %4
+  unreachable
+
+bb17:
+  br bb19
+
+bb18:
+  destroy_value %4
+  br bb9
+
+bb19:
+  cond_br undef, bb20, bb21
+
+bb20:
+  cond_br undef, bb22, bb23
+
+bb21:
+  destroy_value %4
+  br bb9
+
+bb22:
+  br bb19
+
+bb23:
+  destroy_value %4
+  br bb9
+
+bb24:
+  destroy_value %4
+  br bb9
+
+bb25:
+  %49 = integer_literal $Builtin.Int1, 0
+  br bb3(%49)
 }
