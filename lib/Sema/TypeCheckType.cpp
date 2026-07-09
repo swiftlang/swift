@@ -2293,33 +2293,6 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
   }
 }
 
-/// Diagnose when this is one of the Iterable types, which currently require
-/// an experimental feature to use.
-static void diagnoseIterableType(TypeDecl *typeDecl, SourceLoc loc,
-                             const DeclContext *dc) {
-  if (loc.isInvalid())
-    return;
-
-  if (!typeDecl->isStdlibDecl())
-    return;
-
-  ASTContext &ctx = typeDecl->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::BorrowingSequence))
-    return;
-
-  auto nameString = typeDecl->getName().str();
-  if (nameString != "Iterable" && nameString != "BorrowingIteratorProtocol"
-      && nameString != "SpanIterator" && nameString != "BorrowingIteratorAdapter")
-    return;
-
-  // Don't require this in the standard library or _Concurrency library.
-  auto module = dc->getParentModule();
-  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
-    return;
-
-  ctx.Diags.diagnose(loc, diag::borrowingsequence_experimental, nameString);
-}
-
 NeverNullType
 TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
                                               TypeResolutionOptions options) {
@@ -2422,8 +2395,6 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
-
-    diagnoseIterableType(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -2652,8 +2623,6 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
     member = memberTypes.back().Member;
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
-
-    diagnoseIterableType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);

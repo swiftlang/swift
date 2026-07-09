@@ -1,6 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterable -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -module-cache-path %t -enable-experimental-feature BorrowingSequence | %FileCheck %s
-
-// REQUIRES: swift_feature_BorrowingSequence
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterable -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -module-cache-path %t | %FileCheck %s
 
 // CHECK:     struct SimpleNonCopyableSequence : ~Copyable, CxxIterable {
 // CHECK:       typealias Element = ConstIterator.Pointee

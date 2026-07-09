@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: not %target-swift-emit-ir %s -module-name main -parse-as-library 2>&1 | %FileCheck %s
 // RUN: %target-swift-emit-ir %s -module-name main -parse-as-library -enable-experimental-feature BorrowingSequence
+// RUN: %target-swift-emit-ir %s -module-name main -parse-as-library
 
 // REQUIRES: swift_feature_BorrowingSequence
 
@@ -12,7 +12,3 @@ extension BorrowingIteratorProtocol {}
 
 @available(SwiftStdlib 6.4, *)
 extension BorrowingIteratorAdapter {}
-
-// CHECK: 'Iterable' requires -enable-experimental-feature BorrowingSequence
-// CHECK: 'BorrowingIteratorProtocol' requires -enable-experimental-feature BorrowingSequence
-// CHECK: 'BorrowingIteratorAdapter' requires -enable-experimental-feature BorrowingSequence

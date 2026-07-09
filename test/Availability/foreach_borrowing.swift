@@ -1,8 +1,6 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:     -enable-experimental-feature BorrowingSequence \
 // RUN:     -verify-ignore-unrelated
 
-// REQUIRES: swift_feature_BorrowingSequence
 // REQUIRES: OS=macosx
 
 // Tests for the availability check in DesugarForEachStmt.

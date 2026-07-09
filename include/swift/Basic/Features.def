@@ -628,7 +628,7 @@ EXPERIMENTAL_FEATURE(Reparenting, true)
 EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
 
 /// Allow access to the Iterable protocols/types outside the stdlib.
-EXPERIMENTAL_FEATURE(BorrowingSequence, true)
+LANGUAGE_FEATURE(BorrowingSequence, 516, "Iterable protocol")
 
 /// Turns some source breaking access control warnings into errors.
 EXPERIMENTAL_FEATURE(StrictAccessControl, true)

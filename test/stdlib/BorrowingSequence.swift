@@ -10,12 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature BorrowingSequence -enable-experimental-feature BorrowingForLoop -enable-experimental-feature Lifetimes)
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature Lifetimes)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
-// REQUIRES: swift_feature_BorrowingSequence
-// REQUIRES: swift_feature_BorrowingForLoop
 // REQUIRES: swift_feature_Lifetimes
 
 import StdlibUnittest
