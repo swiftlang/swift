@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
+
+from update_checkout.update_checkout.cli_arguments import CliArguments
+from update_checkout.update_checkout.git_command import Git, iter_git_repositories
+from update_checkout.update_checkout.parallel_runner import ParallelRunner
+from update_checkout.update_checkout.runner_arguments import RunnerArguments
+from update_checkout.update_checkout.update_checkout import (
+    SCRIPT_DIR,
+    SkippedReason,
+    get_scheme_map,
+    merge_config,
+    output_prefix,
+    update_all_repositories,
+    validate_config,
+)
+
+
+@dataclass
+class AddWorktreeRunnerArguments(RunnerArguments):
+    worktree_dir: Path
+
+
+class AddWorktreeCliArguments(argparse.Namespace):
+    worktree_dir: Path
+    source_root: Path
+    scheme: Optional[str]
+    llvm_branch: Optional[str]
+    swift_branch: Optional[str]
+    configs: List[str]
+    n_processes: int
+    verbose: bool
+
+    @staticmethod
+    def parse_args() -> "AddWorktreeCliArguments":
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description="""
+Create a set of Git worktrees for the Swift project. A detached worktree is
+created inside the worktree directory for each repository found in the source
+root, so they can be built independently of the primary checkout.
+
+If '--scheme' is passed, 'update-checkout' is then invoked on the worktrees to
+switch them to the branches of the given branch-scheme. '--llvm-branch' and
+'--swift-branch' check out (or create) a branch in the 'llvm-project' and
+'swift' worktrees respectively.
+    """,
+        )
+        parser.add_argument(
+            "worktree_dir",
+            help="The directory in which to create the worktrees.",
+            type=Path,
+        )
+        parser.add_argument(
+            "--source-root",
+            help="The root directory of the primary checkout to create worktrees "
+            "from.",
+            default=SWIFT_SOURCE_ROOT,
+            type=Path,
+        )
+        parser.add_argument(
+            "--scheme",
+            help="Switch the worktrees to the specified branch-scheme by running "
+            "update-checkout on them.",
+            metavar="BRANCH-SCHEME",
+        )
+        parser.add_argument(
+            "--llvm-branch",
+            help="Check out this branch in the 'llvm-project' worktree, creating it "
+            "if it does not already exist.",
+            metavar="BRANCH",
+        )
+        parser.add_argument(
+            "--swift-branch",
+            help="Check out this branch in the 'swift' worktree, creating it if it "
+            "does not already exist.",
+            metavar="BRANCH",
+        )
+        parser.add_argument(
+            "--config",
+            help="""The update-checkout configuration file to use when '--scheme'
+            is passed. Can be specified multiple times, each config will be merged
+            together with a 'last-wins' strategy.""",
+            action="append",
+            default=[],
+            dest="configs",
+        )
+        parser.add_argument(
+            "-j",
+            "--jobs",
+            type=int,
+            help="Number of threads to run at once",
+            default=0,
+            dest="n_processes",
+        )
+        parser.add_argument(
+            "-v",
+            "--verbose",
+            help="Increases the script's verbosity.",
+            action="store_true",
+        )
+
+        return parser.parse_args(namespace=AddWorktreeCliArguments())
+
+
+def create_worktree(pool_args: AddWorktreeRunnerArguments):
+    """Creates a detached worktree for a single repository.
+
+    Args:
+        pool_args (AddWorktreeRunnerArguments): arguments for the repository to process.
+    """
+
+    repo_name = pool_args.repo_name
+    prefix = output_prefix(repo_name)
+    primary_repo_path = pool_args.source_root.joinpath(repo_name)
+    worktree_repo_path = pool_args.worktree_dir.joinpath(repo_name)
+
+    if worktree_repo_path.exists():
+        if pool_args.verbose:
+            print(f"{prefix}Worktree already exists at '{worktree_repo_path}'")
+        return
+
+    Git.run(
+        primary_repo_path,
+        ["worktree", "add", "--detach", str(worktree_repo_path)],
+        echo=pool_args.verbose,
+        prefix=prefix,
+    )
+
+
+def create_all_worktrees(args: AddWorktreeCliArguments) -> int:
+    """Creates a detached worktree for every repository in the source root.
+
+    Args:
+        args (AddWorktreeCliArguments): the parsed command-line arguments.
+
+    Returns:
+        int: the number of repositories that failed to create a worktree.
+    """
+
+    pool_args = [
+        AddWorktreeRunnerArguments(
+            repo_name=repo_path.name,
+            output_prefix="Creating a worktree for",
+            source_root=args.source_root,
+            verbose=args.verbose,
+            worktree_dir=args.worktree_dir,
+        )
+        for repo_path in iter_git_repositories(args.source_root)
+    ]
+
+    if not pool_args:
+        print(f"No Git repositories found in '{args.source_root}'.")
+        return 1
+
+    results = ParallelRunner(create_worktree, pool_args, args.n_processes).run()
+    return ParallelRunner.check_results(results, "WORKTREE")
+
+
+def update_worktrees_to_scheme(args: AddWorktreeCliArguments, scheme_name: str) -> int:
+    """Switches the worktrees to a branch-scheme by invoking update-checkout.
+
+    Args:
+        args (AddWorktreeCliArguments): the parsed command-line arguments.
+        scheme_name (str): name of the branch-scheme to switch to.
+
+    Returns:
+        int: the number of repositories that failed to update.
+    """
+
+    configs = args.configs
+    if not configs:
+        configs = [str(SCRIPT_DIR.parent.joinpath("update-checkout-config.json"))]
+    config: Dict[str, Any] = {}
+    for config_path in configs:
+        with open(config_path) as f:
+            config = merge_config(config, json.load(f))
+    validate_config(config)
+    scheme_map = get_scheme_map(config, scheme_name)
+
+    # update_all_repositories expects a populated update-checkout argument
+    # namespace. Only the fields it reads are set here.
+    update_args = CliArguments()
+    update_args.source_root = args.worktree_dir
+    update_args.skip_repository_list = []
+    update_args.match_timestamp = False
+    update_args.tag = None
+    update_args.reset_to_remote = False
+    update_args.clean = False
+    update_args.stash = False
+    update_args.skip_history = False
+    update_args.partial_clone = False
+    update_args.verbose = args.verbose
+    update_args.n_processes = args.n_processes
+
+    skipped_repositories, results = update_all_repositories(
+        update_args, config, scheme_name, scheme_map, {}
+    )
+    SkippedReason.print_skipped_repositories(skipped_repositories, "update")
+    return ParallelRunner.check_results(results, "UPDATE")
+
+
+def checkout_branch_in_repo(
+    worktree_dir: Path, repo_name: str, branch: str, verbose: bool
+) -> int:
+    """Checks out a branch in a repository worktree, creating it if needed.
+
+    Args:
+        worktree_dir (Path): the directory containing the worktrees.
+        repo_name (str): name of the repository to check out the branch in.
+        branch (str): name of the branch to check out or create.
+        verbose (bool): whether to echo the executed commands.
+
+    Returns:
+        int: 0 on success, 1 if the repository worktree does not exist.
+    """
+
+    prefix = output_prefix(repo_name)
+    repo_path = worktree_dir.joinpath(repo_name)
+    if not repo_path.is_dir():
+        print(f"{prefix}No worktree at '{repo_path}' to check out '{branch}'")
+        return 1
+
+    existing_branch, _, _ = Git.run(repo_path, ["branch", "--list", branch])
+    if existing_branch:
+        checkout_args = ["checkout", branch]
+    else:
+        checkout_args = ["checkout", "-b", branch]
+    Git.run(repo_path, checkout_args, echo=verbose, prefix=prefix)
+    return 0
+
+
+def print_cleanup_hint(args: AddWorktreeCliArguments):
+    """Prints instructions for removing the created worktrees.
+
+    Args:
+        args (AddWorktreeCliArguments): the parsed command-line arguments.
+    """
+
+    print(
+        "To remove these worktrees, delete the worktree directory and prune:\n"
+        f"  rm -rf {args.worktree_dir}\n"
+        f"  for repo in {args.source_root}/*; do "
+        'git -C "$repo" worktree prune; done'
+    )
+
+
+def main() -> int:
+    args = AddWorktreeCliArguments.parse_args()
+    args.worktree_dir = args.worktree_dir.resolve()
+    args.worktree_dir.mkdir(parents=True, exist_ok=True)
+
+    fail_count = create_all_worktrees(args)
+
+    if fail_count == 0 and args.scheme:
+        fail_count += update_worktrees_to_scheme(args, args.scheme)
+
+    if fail_count == 0 and args.llvm_branch:
+        fail_count += checkout_branch_in_repo(
+            args.worktree_dir, "llvm-project", args.llvm_branch, args.verbose
+        )
+
+    if fail_count == 0 and args.swift_branch:
+        fail_count += checkout_branch_in_repo(
+            args.worktree_dir, "swift", args.swift_branch, args.verbose
+        )
+
+    if fail_count > 0:
+        print("add-worktree failed, fix errors and try again")
+    else:
+        print("add-worktree succeeded")
+        print_cleanup_hint(args)
+    return fail_count
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -9,7 +9,7 @@ from ..cli_arguments import CliArguments
 from ..git_command import (
     Git,
     is_any_repository_locked,
-    is_git_repository,
+    iter_git_repositories,
 )
 
 
@@ -27,9 +27,7 @@ class StatusCommand:
     def __init__(self, args: CliArguments):
         self._args = args
         self._pool_args = []
-        for repo_path in args.source_root.iterdir():
-            if not is_git_repository(repo_path):
-                continue
+        for repo_path in iter_git_repositories(args.source_root):
             repo_name = repo_path.name
 
             my_args = RunnerArguments(
