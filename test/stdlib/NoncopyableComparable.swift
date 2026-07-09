@@ -9,7 +9,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift(-enable-experimental-feature Lifetimes)
+// The emission of runtime metadata for inverted requirements needs a 5.8+
+// target, so build the test targeting 5.8 and mark the tests as requiring 5.8.
+// RUN: %target-run-simple-swift(-target %target-swift-5.8-abi-triple -enable-experimental-feature Lifetimes)
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Lifetimes
 
@@ -64,7 +66,7 @@ extension InlineArray where Element: Comparable & ~Copyable {
 	}
 }
 
-NoncopyableComparableTests.test("comparing noncopyables") {
+NoncopyableComparableTests.test("comparing noncopyables").require(.stdlib_5_8).code {
   let a = Noncopyable(wrapped: 0)
   let b = Noncopyable(wrapped: 1)
   let c = Noncopyable(wrapped: 2)
@@ -96,7 +98,7 @@ NoncopyableComparableTests.test("comparing noncopyables") {
   expectFalse(array.inReverseOrder())
 }
 
-NoncopyableComparableTests.test("comparing nonescapables") {
+NoncopyableComparableTests.test("comparing nonescapables").require(.stdlib_5_8).code {
   let a = Noncopyable<Nonescapable>(wrapped: .init(wrapped: 0))
   let b = Noncopyable<Nonescapable>(wrapped: .init(wrapped: 1))
   let c = Noncopyable<Nonescapable>(wrapped: .init(wrapped: 2))
