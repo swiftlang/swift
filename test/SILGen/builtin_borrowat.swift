@@ -1,5 +1,4 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes %s
 
 // RUN: %target-swift-emit-silgen -module-name main \
 // RUN: -enable-experimental-feature BuiltinModule \
