@@ -310,3 +310,30 @@ func test_invalid_inout_with_restrictions(lhs: inout any BinaryInteger, rhs: any
   var other: (any BinaryInteger)? = nil
   other = &rhs // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 }
+
+func test_invalid_inout_base_of_mutating_operator() {
+  @propertyWrapper
+  struct FakeState<Value> {
+    final class Box { var value: Value; init(_ value: Value) { self.value = value } }
+    private let box: Box
+    init(wrappedValue: Value) { box = Box(wrappedValue) }
+    var wrappedValue: Value {
+      get { box.value }
+      nonmutating set { box.value = newValue }
+    }
+  }
+
+  struct Test {
+    @FakeState var member: Any
+
+    func test() {
+      member += 1 // expected-error {{cannot convert value of type 'Any' to expected argument type 'Int'}}
+    }
+
+    func local(p: inout Any) {
+      var v: Any = 4
+      v += 1 // expected-error {{cannot convert value of type 'Any' to expected argument type 'Int'}}
+      p += 1 // expected-error {{cannot convert value of type 'Any' to expected argument type 'Int'}}
+    }
+  }
+}
