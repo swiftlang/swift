@@ -229,16 +229,16 @@ extension UniqueArray: Iterable where Element: ~Copyable {
   public typealias Failure = Never
 
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
-  @_lifetime(borrow self)
-  public func makeBorrowingIterator() -> BorrowingIterator {
-    Span.BorrowingIterator(self.span)
-  }
-
-  @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var underestimatedCount: Int {
     self.count
+  }
+
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_lifetime(borrow self)
+  public func makeBorrowingIterator() -> BorrowingIterator {
+    Span.BorrowingIterator(self.span)
   }
 }

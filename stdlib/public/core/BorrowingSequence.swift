@@ -195,22 +195,22 @@ extension Iterable where Self: ~Copyable & ~Escapable, Element: ~Copyable {
 @available(SwiftStdlib 6.4, *)
 extension Sequence where Self: Iterable {
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var underestimatedCount: Int { 0 }
   
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func _customContainsEquatableElement(_ element: Element) -> Bool? { nil }
 }
 
 @available(SwiftStdlib 6.4, *)
 extension Collection where Self: Iterable {
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var underestimatedCount: Int { self.count }
   
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func _customContainsEquatableElement(_ element: Element) -> Bool? { nil }
 }
 

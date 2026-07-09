@@ -1059,14 +1059,13 @@ extension RawSpan: Iterable {
   @available(SwiftStdlib 6.4, *)
   public typealias Failure = Never
 
-  @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var underestimatedCount: Int {
     self.byteCount
   }
 
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow self)
   public func makeBorrowingIterator() -> Span<UInt8>.BorrowingIterator {
     .init(Span(viewing: self))
