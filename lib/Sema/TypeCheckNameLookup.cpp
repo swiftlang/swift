@@ -672,6 +672,13 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     if (!isPlausibleTypo(refKind, corrections.WrittenName, decl))
       return;
 
+    // Metatype extension members are not visible on conforming types.
+    if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+      if (ext->isMetatypeExtension() && baseTypeOrNull &&
+          !baseTypeOrNull->isExistentialType())
+        return;
+    }
+
     const auto candidateName = decl->getName();
 
     // Don't waste time computing edit distances that are more than

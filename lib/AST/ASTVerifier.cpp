@@ -3347,9 +3347,15 @@ public:
         return;
 
       // If this function is generic or is within a generic context, it should
-      // have an interface type.
-      if (AFD->isGenericContext() !=
-          AFD->getInterfaceType()->is<GenericFunctionType>()) {
+      // have an interface type.  Metatype extension members are an exception:
+      // they live in a protocol extension but have no generic signature.
+      bool isInMetatypeExt = false;
+      if (auto *ext = dyn_cast<ExtensionDecl>(AFD->getDeclContext()))
+        isInMetatypeExt = ext->isMetatypeExtension();
+
+      if (!isInMetatypeExt &&
+          AFD->isGenericContext() !=
+              AFD->getInterfaceType()->is<GenericFunctionType>()) {
         Out << "Functions in generic context must have an interface type\n";
         AFD->dump(Out);
         abort();
@@ -3357,8 +3363,9 @@ public:
 
       // If the function has a generic interface type, it should also have a
       // generic signature.
-      if (AFD->isGenericContext() !=
-          (!AFD->getGenericSignature().isNull())) {
+      if (!isInMetatypeExt &&
+          AFD->isGenericContext() !=
+              (!AFD->getGenericSignature().isNull())) {
         Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
         abort();

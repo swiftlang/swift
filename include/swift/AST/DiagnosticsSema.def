@@ -2237,6 +2237,11 @@ NOTE(attr_com_iswiftobject_implied, none,
 ERROR(com_module_missing_type, none,
       "type '%0' not found in the 'COM' module", (StringRef))
 
+ERROR(metatype_extension_com_only, none,
+      "protocol metatype extensions are reserved for COM interop", ())
+ERROR(metatype_extension_non_protocol, none,
+      "metatype extension can only extend a protocol, not %0", (Type))
+
 // @_staticExclusiveOnly
 ERROR(attr_static_exclusive_only_disabled,none,
       "attribute requires '-enable-experimental feature StaticExclusiveOnly'", ())
