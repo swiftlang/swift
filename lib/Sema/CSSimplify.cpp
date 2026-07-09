@@ -27,6 +27,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackExpansionMatcher.h"
 #include "swift/AST/ParameterList.h"
@@ -11196,14 +11197,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // can include them in the unviable candidates list.
   if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
       includeInaccessibleMembers) {
-    NameLookupOptions lookupOptions =
+    NLOptions lookupOptions =
         defaultConstraintSolverMemberLookupOptions;
 
     // Local function that looks up additional candidates using the given lookup
     // options, recording the results as unviable candidates.
     auto lookupUnviable =
         [&](DeclNameRef memberName,
-            NameLookupOptions lookupOptions,
+            NLOptions lookupOptions,
             MemberLookupResult::UnviableReason reason) -> bool {
       auto lookup = TypeChecker::lookupMember(DC, instanceTy, memberName,
                                               memberLoc, lookupOptions);
@@ -11241,7 +11242,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // Ignore access control so we get candidates that might have been missed
     // before.
     if (lookupUnviable(memberName,
-                       lookupOptions | NameLookupFlags::IgnoreAccessControl,
+                       lookupOptions | NLFlags::IgnoreAccessControl,
                        MemberLookupResult::UR_Inaccessible))
       return result;
   }

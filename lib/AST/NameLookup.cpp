@@ -4527,6 +4527,7 @@ void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
     FLAG(NLFlags::OnlyMacros)
     FLAG(NLFlags::IgnoreMissingImports)
     FLAG(NLFlags::ABIProviding)
+    FLAG(NLFlags::IncludeOuterResults)
 #undef FLAG
   };
 

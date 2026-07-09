@@ -39,6 +39,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
@@ -2147,7 +2148,7 @@ void swift::introduceUnsafeInheritExecutorReplacements(
   Identifier newIdentifier = ctx.getIdentifier(
       ("_unsafeInheritExecutor_" + baseName.getIdentifier().str()).str());
 
-  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  NLOptions lookupOptions = defaultUnqualifiedLookupOptions;
   LookupResult lookup = TypeChecker::lookupUnqualified(
       const_cast<DeclContext *>(dc), DeclNameRef(newIdentifier), loc,
       lookupOptions);
@@ -4233,7 +4234,7 @@ namespace {
                                                     SourceLoc loc) {
       Identifier name =
           ctx.getIdentifier("_unsafeInheritExecutor_withUnsafeContinuation");
-      NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+      NLOptions lookupOptions = defaultUnqualifiedLookupOptions;
       LookupResult lookup = TypeChecker::lookupUnqualified(
           dc, DeclNameRef(name), loc, lookupOptions);
       return !lookup.empty();

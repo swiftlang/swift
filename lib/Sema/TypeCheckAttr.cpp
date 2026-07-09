@@ -38,6 +38,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -6503,7 +6504,7 @@ enum class AbstractFunctionDeclLookupErrorKind {
 static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     DeclAttribute *attr, Type baseType,
     const DeclNameRefWithLoc &funcNameWithLoc, DeclContext *lookupContext,
-    NameLookupOptions lookupOptions,
+    NLOptions lookupOptions,
     const llvm::function_ref<std::optional<AbstractFunctionDeclLookupErrorKind>(
         AbstractFunctionDecl *)> &isValidCandidate,
     AnyFunctionType *expectedOriginalFnType) {
@@ -8074,7 +8075,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
                                : defaultUnqualifiedLookupOptions) |
-      NameLookupFlags::IgnoreAccessControl;
+      NLFlags::IgnoreAccessControl;
   auto transposeTypeCtx = transpose->getInnermostTypeContext();
   if (!transposeTypeCtx) transposeTypeCtx = transpose->getParent();
   assert(transposeTypeCtx);
