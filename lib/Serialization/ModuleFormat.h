@@ -59,7 +59,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
 const uint16_t SWIFTMODULE_VERSION_MINOR =
-    1009; // serialize conditionally-addressable lifetime dependence indices
+    1010; // metatype extension flag
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2017,6 +2017,7 @@ namespace decls_block {
     DeclIDField, // extended nominal
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit flag
+    BCFixed<1>,  // isMetatypeExtension flag
     GenericSignatureIDField,  // generic environment
     BCVBR<4>,    // # of protocol conformances
     BCVBR<4>,    // number of inherited types
