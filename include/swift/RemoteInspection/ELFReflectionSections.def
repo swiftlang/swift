@@ -22,3 +22,5 @@ SWIFT_REFLECTION_SECTION(swift5_typeref,               TypeReference)
 SWIFT_REFLECTION_SECTION(swift5_reflstr,               ReflectionString)
 SWIFT_REFLECTION_SECTION(swift5_protocol_conformances, Conformance)
 SWIFT_REFLECTION_SECTION(swift5_mpenum,                MultiPayloadEnum)
+
+#undef SWIFT_REFLECTION_SECTION
