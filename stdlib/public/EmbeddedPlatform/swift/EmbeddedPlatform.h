@@ -322,8 +322,8 @@ void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
  * Parameters:
  *   - `mutex`: opaque caller-owned mutex storage initialized by this function
  *     and later passed to the other `_swift_mutex_*` functions. The contents
- *     are private to the platform implementation. The storage is at least six
- *     pointer-sized words and has pointer alignment.
+ *     are private to the platform implementation. The storage is at least
+ *     eight pointer-sized words and has pointer alignment.
  *   - `flags`: flags controlling mutex behavior.
  *
  * This function is required when using Synchronization.Mutex.
