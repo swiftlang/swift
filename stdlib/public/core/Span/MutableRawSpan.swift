@@ -1400,12 +1400,20 @@ extension MutableRawSpan {
 
 #if !SPAN_COMPATIBILITY_STUB
 @available(SwiftStdlib 6.4, *)
-extension MutableRawSpan: BorrowingSequence {
+extension MutableRawSpan: Iterable {
   @available(SwiftStdlib 6.4, *)
-  @inlinable
+  public typealias Failure = Never
+
+  @export(implementation)
+  public var underestimatedCount: Int {
+    self.byteCount
+  }
+
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
   @_lifetime(borrow self)
-  public func makeBorrowingIterator() -> SpanIterator<UInt8> {
-    SpanIterator(Span(viewing: self.bytes))
+  public func makeBorrowingIterator() -> Span<UInt8>.BorrowingIterator {
+    .init(Span(viewing: self.bytes))
   }
 }
 #endif
