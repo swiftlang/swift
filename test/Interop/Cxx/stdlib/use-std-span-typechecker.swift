@@ -39,6 +39,6 @@ for _ in s2 {}
 takesSequence(s2)
 // expected-error@-1 {{global function 'takesSequence' requires that 'SpanOfNonCopyable'}} conform to 'Sequence'
 takesIterable(s2)
-// expected-error@-1 {{'takesIterable' is only available}}
-// expected-note@-2 {{add 'if #available' version check}}
+// expected-darwin-error@-1 {{'takesIterable' is only available}}
+// expected-darwin-note@-2 {{add 'if #available' version check}}
 takesSpan(s2)
