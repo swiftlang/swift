@@ -607,6 +607,11 @@ bool BridgedInstruction::maySynchronize() const {
   return ::maySynchronize(unbridged());
 }
 
+BridgedType
+BridgedInstruction::KeyPathInst_getStaticInstanceClassType() const {
+  return getAs<swift::KeyPathInst>()->getStaticInstanceClassType();
+}
+
 //===----------------------------------------------------------------------===//
 //                               BridgedBuilder
 //===----------------------------------------------------------------------===//
