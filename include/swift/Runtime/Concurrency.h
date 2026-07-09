@@ -598,6 +598,41 @@ swift_task_pushTaskExecutorPreference(TaskExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record);
 
+/// Push a cancellation scope record onto the current task.
+///
+/// Unlike deadlines, cancellation scope records are never subsumed: every
+/// call always installs its own independent record. The returned pointer is
+/// owned by the runtime and must be handed back to
+/// `swift_task_popCancellationScope` when the scope exits.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+CancellationScopeRecord * swift_task_pushCancellationScope();
+
+/// Remove a single cancellation scope record from the current task.
+///
+/// Must be passed the record intended to be removed (as returned by
+/// `swift_task_pushCancellationScope`).
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_popCancellationScope(CancellationScopeRecord *record);
+
+/// Cancel a cancellation scope.
+///
+/// This is a purely local operation on the scope's own state: it does not
+/// set the enclosing task's cancellation flag and does not invoke any
+/// `withTaskCancellationHandler` handlers registered outside the scope's
+/// dynamic extent. Handlers installed inside the scope's dynamic extent
+/// (i.e. between the scope record and the innermost record) do fire, so
+/// that operations like `Task.sleep` observe the scope cancellation.
+///
+/// May be called from any thread, any number of times.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_cancelCancellationScope(CancellationScopeRecord *record);
+
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
 

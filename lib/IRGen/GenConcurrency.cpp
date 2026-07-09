@@ -383,6 +383,30 @@ void irgen::emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF) {
   call->setCallingConv(IGF.IGM.SwiftCC);
 }
 
+llvm::Value *irgen::emitBuiltinCancellationScopePush(IRGenFunction &IGF) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPushCancellationScopeFunctionPointer(), {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return call;
+}
+
+void irgen::emitBuiltinCancellationScopePop(IRGenFunction &IGF,
+                                            llvm::Value *record) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPopCancellationScopeFunctionPointer(), {record});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+void irgen::emitBuiltinCancellationScopeCancel(IRGenFunction &IGF,
+                                               llvm::Value *record) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskCancelCancellationScopeFunctionPointer(), {record});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
 void irgen::emitFinishAsyncLet(IRGenFunction &IGF,
                                llvm::Value *asyncLet,
                                llvm::Value *resultBuffer) {

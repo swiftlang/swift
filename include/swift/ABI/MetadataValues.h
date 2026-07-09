@@ -2907,6 +2907,10 @@ enum class TaskStatusRecordKind : uint8_t {
   /// Deprecated: A human-readable task name, replaced by `NameFragment`.
   // DEPRECATED: TaskName = 6,
 
+  /// A CancellationScopeRecord, which represents a scoped cancellation
+  /// domain that is independent of whole-task cancellation.
+  CancellationScope = 8,
+
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
   Private_RecordLock = 192

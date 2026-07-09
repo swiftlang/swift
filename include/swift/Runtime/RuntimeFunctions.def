@@ -2733,6 +2733,36 @@ FUNCTION(TaskRemovePriorityEscalationHandler,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
+// CancellationScopeRecord* swift_task_pushCancellationScope();
+FUNCTION(TaskPushCancellationScope,
+        _Concurrency, swift_task_pushCancellationScope, SwiftCC,
+        ConcurrencyAvailability,
+        RETURNS(Int8PtrTy),
+        ARGS(),
+        ATTRS(NoUnwind),
+        EFFECT(RuntimeEffect::Concurrency),
+        UNKNOWN_MEMEFFECTS)
+
+// void swift_task_popCancellationScope(CancellationScopeRecord *record);
+FUNCTION(TaskPopCancellationScope,
+         _Concurrency, swift_task_popCancellationScope, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_task_cancelCancellationScope(CancellationScopeRecord *record);
+FUNCTION(TaskCancelCancellationScope,
+         _Concurrency, swift_task_cancelCancellationScope, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
 // void swift_task_localValuePush(const HeapObject *key,
 //                                /* +1 */ OpaqueValue *value,
 //                                const Metadata *valueType);

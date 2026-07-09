@@ -662,6 +662,138 @@ static void swift_task_popTaskExecutorPreferenceImpl(
   swift_task_dealloc(record);
 }
 
+/**************************************************************************/
+/************************** CANCELLATION SCOPES **************************/
+/**************************************************************************/
+
+SWIFT_CC(swift)
+SWIFT_EXPORT_FROM(swift_Concurrency)
+CancellationScopeRecord *
+swift_task_pushCancellationScope() {
+  auto task = swift_task_getCurrent();
+  if (!task) {
+    // No current task means no scope for the record to be attached to.
+    return nullptr;
+  }
+
+  void *allocation =
+      _swift_task_alloc_specific(task, sizeof(class CancellationScopeRecord));
+  auto record = ::new (allocation) CancellationScopeRecord(task);
+  SWIFT_TASK_DEBUG_LOG("[CancellationScope] Create scope record:%p for task:%p",
+                       record, task);
+
+  addStatusRecord(task, record,
+                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    // Set the "has cancellation scope" flag so isCancelled()
+                    // can bail out without walking the record chain when
+                    // there are no scopes installed.
+                    newStatus = newStatus.withCancellationScope();
+                    return true; // always add the record
+                  });
+
+  return record;
+}
+
+SWIFT_CC(swift)
+static void
+swift_task_popCancellationScopeImpl(CancellationScopeRecord *record) {
+  auto task = swift_task_getCurrent();
+  if (!task || !record)
+    return;
+
+  SWIFT_TASK_DEBUG_LOG("[CancellationScope] Remove scope record:%p from task:%p",
+                       record, task);
+
+  // Track how many scope records are still installed after removing the
+  // target one, so we can clear the fast-path flag once none remain.
+  int remainingScopes = 0;
+  removeStatusRecordWhere(
+      task,
+      /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
+        assert(status.hasCancellationScope() && "does not have record!");
+        if (cur->getKind() != TaskStatusRecordKind::CancellationScope)
+          return false;
+
+        if (cur == record)
+          return true; // remove this record
+
+        remainingScopes += 1;
+        return false;
+      },
+      /*updateStatus=*/[&](ActiveTaskStatus oldStatus,
+                            ActiveTaskStatus &newStatus) {
+        if (remainingScopes == 0) {
+          assert(oldStatus.hasCancellationScope());
+          newStatus = newStatus.withoutCancellationScope();
+        }
+      });
+
+  swift_task_dealloc(record);
+}
+
+SWIFT_CC(swift)
+static void
+swift_task_cancelCancellationScopeImpl(CancellationScopeRecord *record) {
+  // Cancelling a scope is a local operation on the scope's own atomic flag.
+  // Unlike `swift_task_cancel`, it does NOT set the task's own IsCancelled
+  // flag. To make code that reacts to cancellation via
+  // `withTaskCancellationHandler` (including `Task.sleep`, `URLSession`
+  // handlers, etc.) wake up when the scope is cancelled, we also fire any
+  // `CancellationNotificationStatusRecord`s that were installed inside the
+  // scope's dynamic extent - i.e., records that live on the chain between
+  // the innermost record and the scope record itself (records pushed while
+  // the scope was active).
+  //
+  // This function may be called from ANY thread / task context (the scope
+  // handle is `Sendable`), so we use the record's stored `OwningTask`
+  // pointer, NOT `swift_task_getCurrent()`.
+  if (!record)
+    return;
+
+  record->cancel();
+
+  auto task = record->getOwningTask();
+  if (!task)
+    return;
+
+  // Walk the chain under the record lock. The chain is push-ordered
+  // (innermost first). Anything between the head and the scope was
+  // installed while the scope was active - stop when we hit the scope.
+  withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+    for (auto cur : status.records()) {
+      if (cur == record)
+        break; // reached the scope; anything past this pre-dates the scope
+
+      if (cur->getKind() != TaskStatusRecordKind::CancellationNotification)
+        continue;
+
+      // A cancellation shield is a within-task feature and only makes sense
+      // for whole-task cancellation. Scope cancellation always fires
+      // handlers registered inside the scope.
+      auto notification =
+          cast<CancellationNotificationStatusRecord>(cur);
+      notification->run();
+    }
+  });
+}
+
+bool swift::_swift_task_hasCancelledScope(AsyncTask *task) {
+  // The `HasCancellationScope` flag must have been checked by the caller;
+  // this walker takes the record lock unconditionally.
+  bool found = false;
+  withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+    for (auto record : status.records()) {
+      if (record->getKind() != TaskStatusRecordKind::CancellationScope)
+        continue;
+      if (cast<CancellationScopeRecord>(record)->isCancelled()) {
+        found = true;
+        return;
+      }
+    }
+  });
+  return found;
+}
+
 // Since the header would have incomplete declarations, we instead instantiate a concrete version of the function here
 template SWIFT_CC(swift)
 CancellationNotificationStatusRecord* swift::popStatusRecordOfType<CancellationNotificationStatusRecord>(AsyncTask *);
@@ -950,6 +1082,12 @@ static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord 
   case TaskStatusRecordKind::TaskExecutorPreference:
     break;
 
+  // Whole-task cancellation must not implicitly cancel independent
+  // cancellation scopes; scopes are only cancelled via their own
+  // `CancellationScope.cancel()`.
+  case TaskStatusRecordKind::CancellationScope:
+    break;
+
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:
     break;
@@ -1049,6 +1187,9 @@ static void performEscalationAction(AsyncTask *task, TaskStatusRecord *record,
     return;
   /// Executor preference we can ignore.
   case TaskStatusRecordKind::TaskExecutorPreference:
+    return;
+  // Cancellation scopes do not participate in priority escalation.
+  case TaskStatusRecordKind::CancellationScope:
     return;
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:

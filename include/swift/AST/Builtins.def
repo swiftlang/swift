@@ -1249,6 +1249,30 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddPriorityEscalationHandler,
 BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
                        "taskRemovePriorityEscalationHandler", "", Special)
 
+/// Equivalent to calling swift_task_pushCancellationScope.
+///
+/// Pushes a cancellation scope record onto the current task, returning the
+/// record pointer that must be handed back to cancellationScopePop. Unlike
+/// deadlines, this is never subsumed - every call always installs its own
+/// independent record.
+///
+/// Signature: () -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION(CancellationScopePush, "cancellationScopePush", "", Special)
+
+/// Equivalent to calling swift_task_popCancellationScope.
+///
+/// Signature: (record: UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(CancellationScopePop, "cancellationScopePop", "", Special)
+
+/// Equivalent to calling swift_task_cancelCancellationScope.
+///
+/// Cancels the given scope only - does not affect the enclosing task's own
+/// cancellation state and does not invoke withTaskCancellationHandler
+/// handlers. May be called from any thread, any number of times.
+///
+/// Signature: (record: UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(CancellationScopeCancel, "cancellationScopeCancel", "", Special)
+
 /// Equivalent to calling swift_task_localValuePush. Deprecated because
 /// it doesn't properly pair the allocation and deallocation with a
 /// use-def relationship. We no longer use this in the standard library,

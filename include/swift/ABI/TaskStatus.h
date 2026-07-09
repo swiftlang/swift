@@ -237,12 +237,24 @@ private:
   FunctionType *__ptrauth_swift_cancellation_notification_function Function;
   void *Argument;
 
+  /// Handlers must run at most once per registration, even when both a
+  /// scoped cancellation (via `CancellationScopeRecord`) and whole-task
+  /// cancellation (via `swift_task_cancel`) reach this record. This flag
+  /// is flipped exactly once by the first caller of `run()`.
+  std::atomic<bool> Fired{false};
+
 public:
   CancellationNotificationStatusRecord(FunctionType *fn, void *arg)
       : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
         Function(fn), Argument(arg) {}
 
   void run() {
+    // Ensure the handler fires at most once, even if we're driven by both
+    // a scope cancel and a subsequent whole-task cancel.
+    bool expected = false;
+    if (!Fired.compare_exchange_strong(expected, true,
+                                       std::memory_order_relaxed))
+      return;
     Function(Argument);
   }
 
@@ -438,6 +450,37 @@ public:
 
   // Assumes that this record is of kind WaitingOnTask
   AsyncTask *&getNextWaitingTask();
+};
+
+/// A status record which represents a scoped cancellation domain that is
+/// independent of whole-task cancellation. Cancelling the scope is a local
+/// operation: it does not set the task's own cancellation flag and does not
+/// invoke `CancellationNotificationStatusRecord`s registered outside the
+/// scope's dynamic extent. Handlers registered INSIDE the scope's dynamic
+/// extent (records installed on the chain between the scope record and the
+/// innermost record at cancellation time) are fired so operations like
+/// `Task.sleep` that rely on `withTaskCancellationHandler` wake up.
+class CancellationScopeRecord : public TaskStatusRecord {
+  /// The task that installed this scope. Stored so that
+  /// `swift_task_cancelCancellationScope` can be called from any thread /
+  /// task context; the scope's owning task is well-defined at push time and
+  /// does not change over the record's lifetime.
+  AsyncTask *OwningTask;
+
+  std::atomic<bool> Cancelled{false};
+
+public:
+  explicit CancellationScopeRecord(AsyncTask *owningTask)
+      : TaskStatusRecord(TaskStatusRecordKind::CancellationScope),
+        OwningTask(owningTask) {}
+
+  AsyncTask *getOwningTask() const { return OwningTask; }
+  bool isCancelled() const { return Cancelled.load(std::memory_order_relaxed); }
+  void cancel() { Cancelled.store(true, std::memory_order_relaxed); }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::CancellationScope;
+  }
 };
 
 } // end namespace swift

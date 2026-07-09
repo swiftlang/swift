@@ -1585,6 +1585,20 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     out.add(emitBuiltinTaskAddHandler(IGF, Builtin.ID, func, context));
     return;
   }
+  case BuiltinValueKind::CancellationScopePush: {
+    out.add(emitBuiltinCancellationScopePush(IGF));
+    return;
+  }
+  case BuiltinValueKind::CancellationScopePop: {
+    auto *record = args.claimNext();
+    emitBuiltinCancellationScopePop(IGF, record);
+    return;
+  }
+  case BuiltinValueKind::CancellationScopeCancel: {
+    auto *record = args.claimNext();
+    emitBuiltinCancellationScopeCancel(IGF, record);
+    return;
+  }
   case BuiltinValueKind::RemoveTaskLocalValue:
   case BuiltinValueKind::TaskLocalValuePop:
     // removeTaskLocalValue technically takes an argument, but we ignore

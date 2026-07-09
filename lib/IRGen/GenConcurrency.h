@@ -140,6 +140,19 @@ llvm::Value *emitBuiltinTaskCancellationShieldPush(IRGenFunction &IGF);
 
 void emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF);
 
+/// Emit IR for the cancellationScopePush builtin.
+///
+/// \returns the record pointer to hand back to
+/// emitBuiltinCancellationScopePop.
+llvm::Value *emitBuiltinCancellationScopePush(IRGenFunction &IGF);
+
+/// Emit IR for the cancellationScopePop builtin.
+void emitBuiltinCancellationScopePop(IRGenFunction &IGF, llvm::Value *record);
+
+/// Emit IR for the cancellationScopeCancel builtin.
+void emitBuiltinCancellationScopeCancel(IRGenFunction &IGF,
+                                        llvm::Value *record);
+
 } // end namespace irgen
 } // end namespace swift
 
