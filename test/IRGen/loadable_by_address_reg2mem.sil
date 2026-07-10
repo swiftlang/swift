@@ -476,6 +476,8 @@ struct W {
 sil @read_w : $@yield_once @convention(thin) () -> @yields W
 sil @use_big : $@convention(thin) (@in_guaranteed Big) -> ()
 
+// Check that when the begin_apply now yields an address, we immediately load from that
+// address (copy_addr [take]) into a stack location that is still valid after the end_apply.
 // CHECK-LABEL: sil @test_yield_struct_extract
 // CHECK:         [[STK:%.*]] = alloc_stack $W
 // CHECK:         ([[YIELD:%.*]], [[TOKEN:%.*]]) = begin_apply
