@@ -6626,6 +6626,24 @@ bool ConstraintSystem::repairFailures(
         return true;
       }
 
+      if (loc->directlyAt<ArrayExpr>() && lhs->isArray() &&
+          (rhs->isInlineArray() || rhs->is_InlineArray())) {
+        auto literalCount = castToExpr<ArrayExpr>(anchor)->getNumElements();
+        if (auto inlineCount = rhs->castTo<BoundGenericStructType>()
+                                   ->getGenericArgs()[0]
+                                   ->getAs<IntegerType>()) {
+          if (inlineCount->getValue() != literalCount) {
+            conversionsOrFixes.push_back(
+                AllowInlineArrayLiteralCountMismatch::create(
+                    *this, inlineCount,
+                    IntegerType::get(std::to_string(literalCount),
+                                     /*isNegative=*/false, getASTContext()),
+                    loc));
+            return true;
+          }
+        }
+      }
+
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
       break;
@@ -16012,6 +16030,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return SolutionKind::Solved;
   }
 
+  case FixKind::AllowInlineArrayLiteralCountMismatch:
+    return recordFix(fix, /*impact=*/2) ? SolutionKind::Error
+                                        : SolutionKind::Solved;
+
   case FixKind::UseSubscriptOperator:
   case FixKind::ExplicitlyEscaping:
   case FixKind::MarkGlobalActorFunction:
@@ -16047,7 +16069,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidPlaceholder:
   case FixKind::IgnoreOutOfPlaceThenStmt:
   case FixKind::IgnoreMissingEachKeyword:
-  case FixKind::AllowInlineArrayLiteralCountMismatch:
   case FixKind::TooManyDynamicMemberLookups:
   case FixKind::IgnoreNonMetatypeDynamicType:
   case FixKind::IgnoreIsolatedConformance:
