@@ -60,7 +60,7 @@ let nestedMismatch: InlineArray<2, InlineArray<(1 + 1), Int>> = [[1, 2], [3, 4, 
 // expected-error@-1 {{cannot convert value of type '[Int]' to expected element type 'InlineArray<2, Int>'}}
 
 let nestedMismatch2: [(1 + 1) of [(2 + 1) of Int]] = [[1, 2, 3], [4, 5]]
-// expected-error@-1 {{cannot convert value of type '[Int]' to expected element type '[3 of Int]'}}
+// expected-error@-1 {{expected '3' elements in inline array literal, but got '2'}}
 
 let divZero: InlineArray<(1/0), Int>
 // expected-error@-1 {{division by zero}}

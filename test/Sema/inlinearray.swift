@@ -18,8 +18,8 @@ let _: [_ of _] = ["", "", ""] // Ok, InlineArray<3, String>
 
 let _: [3 of [3 of Int]] = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 let _: [3 of [3 of Int]] = [[1, 2], [3, 4, 5, 6]]
-// expected-error@-1 {{expected '3' elements in inline array literal, but got '2'}}
-// expected-error@-2 2 {{cannot convert value of type '[Int]' to expected element type '[3 of Int]'}}
+// expected-error@-1 2 {{expected '3' elements in inline array literal, but got '2'}}
+// expected-error@-2 {{expected '3' elements in inline array literal, but got '4'}}
 
 let _ = [3 of [3 of Int]](repeating: [1, 2]) // expected-error {{expected '3' elements in inline array literal, but got '2'}}
 let _ = [3 of [_ of Int]](repeating: [1, 2])
