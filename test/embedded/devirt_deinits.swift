@@ -4,7 +4,6 @@
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/a.o %target-embedded-posix-shim -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck -check-prefix CHECK-OUTPUT %S/../SILOptimizer/devirt_deinits.swift
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: VENDOR=apple
