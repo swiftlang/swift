@@ -5135,6 +5135,26 @@ ClangImporter::Implementation::findLookupTable(const clang::Decl *decl) {
   return findLookupTable(owningModule);
 }
 
+void ClangImporter::Implementation::registerSynthesizedClangDecl(
+    clang::FunctionDecl *synthesizedDecl, const clang::Decl *anchorDecl) {
+  synthesizedAndAlwaysVisibleDecls.insert(synthesizedDecl);
+
+  auto *contextTable = findLookupTable(anchorDecl);
+  if (contextTable)
+    addEntryToLookupTable(*contextTable, synthesizedDecl, getNameImporter());
+
+  auto *owningModule =
+      importer::getClangOwningModule(anchorDecl, anchorDecl->getASTContext());
+  auto *moduleTable = findLookupTable(owningModule);
+  if (moduleTable && moduleTable != contextTable)
+    addEntryToLookupTable(*moduleTable, synthesizedDecl, getNameImporter());
+}
+
+void ClangImporter::registerSynthesizedClangDecl(
+    clang::FunctionDecl *synthesizedDecl, const clang::Decl *anchorDecl) {
+  Impl.registerSynthesizedClangDecl(synthesizedDecl, anchorDecl);
+}
+
 bool ClangImporter::Implementation::forEachLookupTable(
        llvm::function_ref<bool(SwiftLookupTable &table)> fn) {
   // Visit the bridging header's lookup table.

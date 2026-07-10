@@ -401,23 +401,6 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
   return dyn_cast_or_null<FuncDecl>(result);
 }
 
-/// Register a synthesized declaration in the lookup tables and mark it as
-/// always visible. Declarations are added to two lookup tables (the one for
-/// the record's context and the one for its owning module) to handle the case
-/// where a C++ namespace spans across multiple Clang modules.
-static void registerSynthesizedDecl(ClangImporter::Implementation &impl,
-                                    const clang::CXXRecordDecl *classDecl,
-                                    clang::FunctionDecl *decl) {
-  impl.synthesizedAndAlwaysVisibleDecls.insert(decl);
-  auto *lookupTable1 = impl.findLookupTable(classDecl);
-  addEntryToLookupTable(*lookupTable1, decl, impl.getNameImporter());
-  auto *owningModule =
-      importer::getClangOwningModule(classDecl, classDecl->getASTContext());
-  auto *lookupTable2 = impl.findLookupTable(owningModule);
-  if (lookupTable1 != lookupTable2)
-    addEntryToLookupTable(*lookupTable2, decl, impl.getNameImporter());
-}
-
 static clang::FunctionDecl *
 instantiateTemplatedOperator(ClangImporter::Implementation &impl,
                              const clang::CXXRecordDecl *classDecl,
@@ -446,7 +429,7 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
                                           best)) {
   case clang::OR_Success: {
     if (auto clangCallee = best->Function) {
-      registerSynthesizedDecl(impl, classDecl, clangCallee);
+      impl.registerSynthesizedClangDecl(clangCallee, classDecl);
       return clangCallee;
     }
     break;
@@ -532,7 +515,7 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
 
   equalEqualDecl->setBody(createClangReturnStmt(clangCtx, underlyingCall));
 
-  registerSynthesizedDecl(impl, classDecl, equalEqualDecl);
+  impl.registerSynthesizedClangDecl(equalEqualDecl, classDecl);
   return true;
 }
 
