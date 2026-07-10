@@ -91,6 +91,11 @@ func setBox(_ size: Int) {
   setBox = Set(Set(0 ..< size).map(Box.init))
 }
 
+// Inputs for measuring `Set.init` from an array.
+// Large to expose the per-element cost of building the set.
+let initSize = 10_000
+let initArrayInt = Array(0 ..< initSize)
+let initArrayBox = initArrayInt.map(Box.init)
 
 public let benchmarks = [
   // Mnemonic: number after name is percentage of common elements in input sets.
@@ -718,6 +723,26 @@ public let benchmarks = [
     runFunction: { n in run_SetFilterInt100(n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { set(28_000) }),
+  BenchmarkInfo(
+    name: "Set.init.Int",
+    runFunction: { n in run_SetInitInt(initArrayInt, initSize, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole(initArrayInt) }),
+  BenchmarkInfo(
+    name: "Set.init.Int.Unspecialized",
+    runFunction: { n in run_SetInitUnspecializedInt(initArrayInt, initSize, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole(initArrayInt) }),
+  BenchmarkInfo(
+    name: "Set.init.Box",
+    runFunction: { n in run_SetInitBox(initArrayBox, initSize, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole(initArrayBox) }),
+  BenchmarkInfo(
+    name: "Set.init.Box.Unspecialized",
+    runFunction: { n in run_SetInitUnspecializedBox(initArrayBox, initSize, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole(initArrayBox) }),
 
   // Legacy benchmarks, kept for continuity with previous releases.
   BenchmarkInfo(
@@ -1145,4 +1170,58 @@ func run_SetIsDisjointSeqBox(
         let isDisjoint = a.isDisjoint(with: identity(b))
         check(isDisjoint == r)
     }
+}
+
+// Build a set through a generic boundary the optimizer can't specialize
+// to model the case where Set.init is reached from unspecialized generic
+// code (for example, across a module boundary).
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func makeSetUnspecialized<Element: Hashable>(
+  _ elements: Array<Element>) -> Set<Element> {
+  return Set(elements)
+}
+
+@inline(never)
+func run_SetInitInt(
+  _ a: Array<Int>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let set = Set(identity(a))
+    check(set.count == r)
+  }
+}
+
+@inline(never)
+func run_SetInitUnspecializedInt(
+  _ a: Array<Int>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let set = makeSetUnspecialized(identity(a))
+    check(set.count == r)
+  }
+}
+
+@inline(never)
+func run_SetInitBox(
+  _ a: Array<Box<Int>>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let set = Set(identity(a))
+    check(set.count == r)
+  }
+}
+
+@inline(never)
+func run_SetInitUnspecializedBox(
+  _ a: Array<Box<Int>>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let set = makeSetUnspecialized(identity(a))
+    check(set.count == r)
+  }
 }
