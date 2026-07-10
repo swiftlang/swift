@@ -1244,7 +1244,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       identical = false;
       
       // A declaration found directly beats any declaration found via dynamic
-      // lookup, bridging, or optional unwrapping.
+      // lookup, bridging, or optional unwrapping. (A function-result
+      // look-through reads as a plain Decl here and is ranked below a direct
+      // member by SK_UnresolvedMemberViaFunctionResult instead.)
       if ((choice1.getKind() == OverloadChoiceKind::Decl) &&
           (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic ||
            choice2.getKind() == OverloadChoiceKind::DeclViaBridge ||

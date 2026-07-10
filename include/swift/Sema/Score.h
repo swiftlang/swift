@@ -45,6 +45,12 @@ enum ScoreKind: unsigned int {
   SK_DisfavoredOverload,
   /// A member for an \c UnresolvedMemberExpr found via unwrapped optional base.
   SK_UnresolvedMemberViaOptional,
+  /// A member for an \c UnresolvedMemberExpr found by looking through a
+  /// function-typed context to a static member of its return type. This is
+  /// strictly lower priority than any member found directly on the expected
+  /// type, so the new lookup only wins where the direct lookup has no
+  /// viable candidate.
+  SK_UnresolvedMemberViaFunctionResult,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// An implicit conversion from a value of one type (lhs)
@@ -202,6 +208,10 @@ struct Score {
 
     case SK_UnresolvedMemberViaOptional:
       return "unwrapping optional at unresolved member base";
+
+    case SK_UnresolvedMemberViaFunctionResult:
+      return "looking through function-typed context to its return type at "
+             "unresolved member base";
 
     case SK_ForceUnchecked:
       return "force of an implicitly unwrapped optional";

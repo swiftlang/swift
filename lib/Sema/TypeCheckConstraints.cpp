@@ -1152,6 +1152,8 @@ void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
   switch (getKind()) {
   case OverloadChoiceKind::Decl:
     printDecl();
+    if (isDeclViaFunctionResult())
+      out << " via function result";
     break;
 
   case OverloadChoiceKind::DeclViaDynamic:

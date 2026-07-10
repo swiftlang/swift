@@ -3287,6 +3287,15 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
   if (choice.isFallbackMemberOnUnwrappedBase()) {
     increaseScore(SK_UnresolvedMemberViaOptional, locator);
   }
+
+  // A member found by looking through a function-typed context to its return
+  // type is strictly lower priority than any member found directly, so that a
+  // direct candidate always wins when one exists. This is the one place that
+  // distinguishes such a choice from an ordinary Decl (see
+  // OverloadChoice::isDeclViaFunctionResult).
+  if (choice.isDeclViaFunctionResult()) {
+    increaseScore(SK_UnresolvedMemberViaFunctionResult, locator);
+  }
 }
 
 void ConstraintSystem::verifyThatArgumentIsHashable(unsigned index,
