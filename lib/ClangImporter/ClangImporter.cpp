@@ -6193,6 +6193,11 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
                                clangCtx, body, clang::FPOptionsOverride(),
                                clang::SourceLocation(), clang::SourceLocation())
                          : body[0]);
+
+  // Register the synthesized accessor so that it can be resolved when
+  // deserializing SIL that was serialized under cross-module optimization.
+  impl.registerSynthesizedClangDecl(newMethod, derivedClass);
+
   return newMethod;
 }
 
