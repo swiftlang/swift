@@ -211,6 +211,9 @@ extension Set: ExpressibleByArrayLiteral {
   ///     }
   ///     // Prints "Whatever it is, it's bound to be delicious!"
   ///
+  /// - Note: If the array literal contains duplicate elements, only the
+  ///   first occurrence is kept, and subsequent duplicates are ignored.
+  ///
   /// - Parameter elements: A variadic list of elements of the new set.
   @inlinable
   @inline(__always)
@@ -224,14 +227,8 @@ extension Set: ExpressibleByArrayLiteral {
 
   @export(implementation)
   internal init(_nonEmptyArrayLiteral elements: [Element]) {
-    let native = _NativeSet<Element>(capacity: elements.count)
-    for element in elements {
-      let (bucket, found) = native.find(element)
-      if found {
-        // FIXME: Shouldn't this trap?
-        continue
-      }
-      unsafe native._unsafeInsertNew(element, at: bucket)
+    let native = elements.withUnsafeBufferPointer { buffer in
+      unsafe _NativeSet(buffer)
     }
     self.init(_native: native)
   }
@@ -702,11 +699,22 @@ extension Set: SetAlgebra {
       // If this sequence is actually a `Set`, then we can quickly
       // adopt its storage and let COW handle uniquing only if necessary.
       self = s
-    } else {
-      self.init(minimumCapacity: sequence.underestimatedCount)
-      for item in sequence {
-        insert(item)
+      return
+    }
+    // Fast path: build directly from the buffer, avoiding the storage-
+    // uniqueness check performed on each `insert` and, when unspecialized,
+    // witness-table dispatch through the `Source` iterator.
+    let native: _NativeSet<Element>? =
+      sequence.withContiguousStorageIfAvailable { buffer in
+        unsafe _NativeSet(buffer)
       }
+    if let native {
+      self.init(_native: native)
+      return
+    }
+    self.init(minimumCapacity: sequence.underestimatedCount)
+    for item in sequence {
+      insert(item)
     }
   }
 
