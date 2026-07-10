@@ -726,6 +726,9 @@ public:
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 
+  void registerSynthesizedClangDecl(clang::FunctionDecl *synthesizedDecl,
+                                    const clang::Decl *anchorDecl) override;
+
   /// Returns a decl that was imported earlier or null if it was not found in
   /// the cache.
   virtual Decl *lookupImportedDecl(const clang::NamedDecl *decl) override;
