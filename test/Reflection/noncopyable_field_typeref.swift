@@ -8,7 +8,6 @@
 
 // rdar://100805115
 // UNSUPPORTED: CPU=arm64e
-// UNSUPPORTED: OS=linux-android
 // UNSUPPORTED: CPU=armv7k && OS=watchos
 
 // RUN: %empty-directory(%t)

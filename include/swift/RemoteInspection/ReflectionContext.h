@@ -214,6 +214,8 @@ public:
     std::vector<StoredPointer> WaitingTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
     StoredPointer ResumeAsyncContext;
+
+    std::string Name;
   };
 
   struct ActorInfo {
@@ -594,7 +596,6 @@ public:
     enum : unsigned {
 #define SWIFT_REFLECTION_SECTION(Name, Field) idx_##Name,
 #include "ELFReflectionSections.def"
-#undef SWIFT_REFLECTION_SECTION
       kELFReflectionSectionCount
     };
 
@@ -605,7 +606,6 @@ public:
   sections[idx_##Name] = readTableSection(idx_##Name);                         \
   populated |= bool(sections[idx_##Name]);
 #include "ELFReflectionSections.def"
-#undef SWIFT_REFLECTION_SECTION
 
     if (!populated)
       return std::nullopt;
@@ -614,7 +614,6 @@ public:
 #define SWIFT_REFLECTION_SECTION(Name, Field)                                  \
   {sections[idx_##Name].contents, sections[idx_##Name].size},
 #include "ELFReflectionSections.def"
-#undef SWIFT_REFLECTION_SECTION
         PotentialModuleNames,
     };
 
@@ -2031,6 +2030,19 @@ private:
           readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
       if (ChildFragmentObj)
         Info.ParentTask = ChildFragmentObj->Parent;
+    }
+
+    // Read the task's name, if any
+    if (JobFlags.task_hasInitialTaskName() && asyncTaskSize != 0) {
+      RemoteAddress NameFragmentAddr = nameFragmentAddr(AsyncTaskPtr, JobFlags);
+      auto NameFragmentObj = readObj<NameFragment<Runtime>>(NameFragmentAddr);
+      if (NameFragmentObj && NameFragmentObj->Name != 0) {
+        RemoteAddress NameAddr(NameFragmentObj->Name,
+                               RemoteAddress::DefaultAddressSpace);
+        std::string NameStr;
+        if (this->getReader().readString(NameAddr, NameStr))
+          Info.Name = std::move(NameStr);
+      }
     }
 
     // Find all child tasks.

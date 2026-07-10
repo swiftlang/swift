@@ -2,7 +2,7 @@
 // RUN: %target-build-swift %S/Inputs/Crash.swift -parse-as-library -O %swift-debug-flags -o %t/CrashOpt.exe
 // RUN: %target-codesign %t/CrashOpt.exe
 
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOpt.exe > %t/Optimized.out 2>&1 || true
+// RUN: env %env-SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOpt.exe %t/CrashOpt.exe.dSYM > %t/Optimized.out 2>&1 || true
 // RUN: %FileCheck %s --ignore-case --check-prefix OPTIMIZED < %t/Optimized.out
 
 // UNSUPPORTED: use_os_stdlib

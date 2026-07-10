@@ -3,11 +3,11 @@
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-posix-shim -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s --implicit-check-not=unexpected
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: synchronization
 // REQUIRES: swift_feature_Embedded
+// UNSUPPORTED: OS=wasip1
 
 import Synchronization
 

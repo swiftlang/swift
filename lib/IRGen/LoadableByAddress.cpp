@@ -4396,9 +4396,11 @@ protected:
   }
 
   void visitLoadInst(LoadInst *load) {
+    auto *defInst = load->getOperand()->getDefiningInstruction();
     // Forward the address of the load if its sole user immediately follows the
-    // load instructions.
-    if (isSoleUserOf(load, &*++load->getIterator())) {
+    // load instructions and if it was not the result of a coroutine.
+    if (isSoleUserOf(load, &*++load->getIterator()) &&
+        (!defInst || !isa<BeginApplyInst>(defInst))) {
       assignment.markForDeletion(load);
       assignment.mapValueToAddress(origValue, load->getOperand());
       return;

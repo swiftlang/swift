@@ -197,7 +197,7 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_allocate(__swift_size_t alignment, __swift
  * 
  * This function can be implemented as a direct call to `free`.
  */
-void _swift_free(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_free_flags_t flags);
+void _swift_deallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_free_flags_t flags);
 
 /**
  * Allocates memory with a given type and returns the resulting pointer.
@@ -322,8 +322,8 @@ void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
  * Parameters:
  *   - `mutex`: opaque caller-owned mutex storage initialized by this function
  *     and later passed to the other `_swift_mutex_*` functions. The contents
- *     are private to the platform implementation. The storage is at least six
- *     pointer-sized words and has pointer alignment.
+ *     are private to the platform implementation. The storage is at least
+ *     eight pointer-sized words and has pointer alignment.
  *   - `flags`: flags controlling mutex behavior.
  *
  * This function is required when using Synchronization.Mutex.

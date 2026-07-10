@@ -2842,6 +2842,24 @@ SetTestSuite.test("init(Sequence:)") {
     2020, 2020, 2020, 3030, 3030, 3030
   ])
   expectEqual(s1, s3)
+
+  let s4 = Set(MinimalSequence(elements: [
+    1010, 1010, 2020, 2020, 3030, 3030
+  ]))
+  expectEqual(s1, s4)
+}
+
+SetTestSuite.test("init(Sequence:).ContiguousStorage") {
+  var expected = Set<Int>()
+  expected.insert(1010)
+  expected.insert(2020)
+  expected.insert(3030)
+
+  let withDuplicates = [1010, 1010, 2020, 2020, 3030, 3030]
+  expectEqual(expected, Set(ContiguousArray(withDuplicates)))
+
+  let padded = [9999, 1010, 1010, 2020, 2020, 3030, 3030, 9999]
+  expectEqual(expected, Set(padded[1..<7]))
 }
 
 SetTestSuite.test("init(arrayLiteral:)") {

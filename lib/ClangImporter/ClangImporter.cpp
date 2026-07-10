@@ -5135,6 +5135,26 @@ ClangImporter::Implementation::findLookupTable(const clang::Decl *decl) {
   return findLookupTable(owningModule);
 }
 
+void ClangImporter::Implementation::registerSynthesizedClangDecl(
+    clang::FunctionDecl *synthesizedDecl, const clang::Decl *anchorDecl) {
+  synthesizedAndAlwaysVisibleDecls.insert(synthesizedDecl);
+
+  auto *contextTable = findLookupTable(anchorDecl);
+  if (contextTable)
+    addEntryToLookupTable(*contextTable, synthesizedDecl, getNameImporter());
+
+  auto *owningModule =
+      importer::getClangOwningModule(anchorDecl, anchorDecl->getASTContext());
+  auto *moduleTable = findLookupTable(owningModule);
+  if (moduleTable && moduleTable != contextTable)
+    addEntryToLookupTable(*moduleTable, synthesizedDecl, getNameImporter());
+}
+
+void ClangImporter::registerSynthesizedClangDecl(
+    clang::FunctionDecl *synthesizedDecl, const clang::Decl *anchorDecl) {
+  Impl.registerSynthesizedClangDecl(synthesizedDecl, anchorDecl);
+}
+
 bool ClangImporter::Implementation::forEachLookupTable(
        llvm::function_ref<bool(SwiftLookupTable &table)> fn) {
   // Visit the bridging header's lookup table.
@@ -8478,7 +8498,9 @@ static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
     return false;
 
   // Ensure that the baseclass is swift::RefCountedClass.
-  auto baseDecl = decl;
+  auto baseDecl = decl->getDefinition();
+  if (!baseDecl)
+    return false;
   do {
     if (baseDecl->getNumBases() != 1)
       return false;
@@ -8487,7 +8509,9 @@ static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
     auto nextBaseDecl = Ty->getAsCXXRecordDecl();
     if (!nextBaseDecl)
       return false;
-    baseDecl = nextBaseDecl;
+    baseDecl = nextBaseDecl->getDefinition();
+    if (!baseDecl)
+      return false;
   } while (baseDecl->getName() != "RefCountedClass");
 
   return true;

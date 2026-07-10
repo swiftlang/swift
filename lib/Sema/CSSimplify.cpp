@@ -27,6 +27,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackExpansionMatcher.h"
 #include "swift/AST/ParameterList.h"
@@ -5959,13 +5960,6 @@ bool ConstraintSystem::repairFailures(
 
         ConstraintFix *fix = nullptr;
         if (result == SolutionKind::Error) {
-          // If this is a "destination" argument to a mutating operator
-          // like `+=`, let's consider it contextual and only attempt
-          // to fix type mismatch on the "source" right-hand side of
-          // such operators.
-          if (isOperatorArgument(loc) && argConv->getArgIdx() == 0)
-            break;
-
           fix = AllowArgumentMismatch::create(*this, lhs, rhs, loc);
         } else {
           fix = AllowInOutConversion::create(*this, lhs, rhs, loc);
@@ -11196,14 +11190,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // can include them in the unviable candidates list.
   if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
       includeInaccessibleMembers) {
-    NameLookupOptions lookupOptions =
+    NLOptions lookupOptions =
         defaultConstraintSolverMemberLookupOptions;
 
     // Local function that looks up additional candidates using the given lookup
     // options, recording the results as unviable candidates.
     auto lookupUnviable =
         [&](DeclNameRef memberName,
-            NameLookupOptions lookupOptions,
+            NLOptions lookupOptions,
             MemberLookupResult::UnviableReason reason) -> bool {
       auto lookup = TypeChecker::lookupMember(DC, instanceTy, memberName,
                                               memberLoc, lookupOptions);
@@ -11241,7 +11235,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // Ignore access control so we get candidates that might have been missed
     // before.
     if (lookupUnviable(memberName,
-                       lookupOptions | NameLookupFlags::IgnoreAccessControl,
+                       lookupOptions | NLFlags::IgnoreAccessControl,
                        MemberLookupResult::UR_Inaccessible))
       return result;
   }
@@ -15961,7 +15955,26 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                : SolutionKind::Solved;
   }
 
-  case FixKind::AllowArgumentTypeMismatch:
+  case FixKind::AllowArgumentTypeMismatch: {
+    auto *loc = fix->getLocator();
+    // If this is a "destination" argument to a mutating operator
+    // like `+=`, let's give it a higher impact to make sure that
+    // if a different overload choice has a mismatch at the "source"
+    // it would always be preferred instead of causing an ambiguity
+    // since `inout` doesn't support conversions and only the "source"
+    // can be fixed.
+    if (auto argLoc = loc->findLast<LocatorPathElt::ApplyArgToParam>()) {
+      if (argLoc->getArgIdx() == 0 && isOperatorArgument(loc) &&
+          loc->isLastElement<LocatorPathElt::LValueConversion>()) {
+        return recordFix(fix, FixImpact::TypeMismatch + 1)
+                   ? SolutionKind::Error
+                   : SolutionKind::Solved;
+      }
+    }
+
+    LLVM_FALLTHROUGH;
+  }
+
   case FixKind::IgnoreDefaultExprTypeMismatch: {
     auto impact = FixImpact::TypeMismatch;
     // If there are any other argument mismatches already detected for this
