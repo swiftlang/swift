@@ -2300,7 +2300,7 @@ Parser::parseMacroRoleAttribute(
   bool sawRole = false;
   bool sawConformances = false;
   bool sawNames = false;
-  bool sawInitializer = false;
+  bool sawInitialization = false;
   SmallVector<MacroIntroducedDeclName, 2> names;
   SmallVector<Expr *, 2> conformances;
   std::optional<MacroInitializerContextKind> initializerContext = std::nullopt;
@@ -2332,24 +2332,19 @@ Parser::parseMacroRoleAttribute(
         SourceLoc fieldNameLoc;
         parseOptionalArgumentLabel(fieldName, fieldNameLoc);
 
-        // If there is a field name, it better be one of 'names', 'conformances', or 'initializer'.
+        // If there is a field name, it better be one of 'names', 'conformances', or 'initialization'.
         if (!(fieldName.empty() || fieldName.is("names")
                                 || fieldName.is("conformances")
-                                || (fieldName.is("initializer") && role == MacroRole::Accessor))) {
-          if (isAttached && role && fieldName.is("initializer")) {
-            diagnose(fieldNameLoc, diag::macro_attribute_unsupported_label,
-                     fieldName, "accessor", swift::getMacroRoleString(*role));
-          } else {
-            diagnose(fieldNameLoc, diag::macro_attribute_unknown_label,
-                     isAttached, fieldName);
-          }
+                                || (fieldName.is("initialization")))) {
+          diagnose(fieldNameLoc, diag::macro_attribute_unknown_label,
+                   isAttached, fieldName);
           status.setIsParseError();
           return status;
         }
 
         // If there is no field name and we haven't seen either names or the
         // role, this is the role.
-        if (fieldName.empty() && !sawConformances && !sawNames && !sawRole && !sawInitializer) {
+        if (fieldName.empty() && !sawConformances && !sawNames && !sawRole) {
           // Whether we saw anything we tried to treat as a role.
           sawRole = true;
 
@@ -2415,22 +2410,22 @@ Parser::parseMacroRoleAttribute(
           return status;
         }
         
-        // Accessor macros have an optional `initializer` argument
+        // Accessor macros have an optional `initialization` argument
         // that may be either `.lazy` or `.eager`, e.g:
         //
-        //     @attached(accessor, initializer: .lazy, names: ...)
-        if (fieldName.is("initializer")) {
-          e << "  • Field 'initializer:'\n";
-          if (fieldName.is("initializer") && sawInitializer) {
+        //     @attached(accessor, initialization: .lazy, names: ...)
+        if (fieldName.is("initialization")) {
+          e << "  • Field 'initialization:'\n";
+          if (sawInitialization) {
             diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),
                      diag::macro_attribute_duplicate_label, isAttached,
-                     "initializer");
+                     "initialization");
           }
           
-          sawInitializer = true;
+          sawInitialization = true;
           
-          Identifier initializerContextIdentifier;
-          SourceLoc initializerContextLoc;
+          Identifier initializationContextIdentifier;
+          SourceLoc initializationContextLoc;
           if (consumeIf(tok::code_complete)) {
             status.setHasCodeCompletionAndIsError();
             if (this->CodeCompletionCallbacks) {
@@ -2442,21 +2437,37 @@ Parser::parseMacroRoleAttribute(
               this->CodeCompletionCallbacks->completeDeclAttrParam(
                   getParameterizedDeclAttributeKind(isAttached), /*index*/1, /*HasLabel=*/true);
             }
-          } else if (parseIdentifier(initializerContextIdentifier, initializerContextLoc,
+          } else if (parseIdentifier(initializationContextIdentifier, initializationContextLoc,
                                      diag::macro_attribute_initializer_unknown_argument, /*diagnoseDollarPrefix=*/true)) {
             status.setIsParseError();
             return status;
           }
           
-          auto initializerContextKind = getMacroInitializerContextKind(initializerContextIdentifier);
+          // 'initialization:' is not supported unless macro role is 'accessor'.
+          if (role != MacroRole::Accessor) {
+            SourceRange range = SourceRange(fieldNameLoc, initializationContextLoc);
+            Token token = Tok;
+            e << "current token: " << token.getRawText() << "\n";
+            auto diag = diagnose(fieldNameLoc,
+                                 diag::macro_attribute_unsupported_label,
+                                 fieldName, "accessor", swift::getMacroRoleString(*role));
+            diag.highlight(range);
+            diag.fixItRemove(range);
+            status.setIsParseError();
+            return status;
+          }
+          
+          // TODO: More renaming of `initializer` -> `initialization`
+          
+          auto initializerContextKind = getMacroInitializerContextKind(initializationContextIdentifier);
           if (!initializerContextKind) {
-            diagnose(initializerContextLoc, diag::macro_attribute_initializer_unknown_argument);
+            diagnose(initializationContextLoc, diag::macro_attribute_initializer_unknown_argument);
             status.setIsParseError();
             return status;
           }
           
           initializerContext = initializerContextKind;
-          e << "    value = '" << initializerContextIdentifier << "'\n";
+          e << "    value = '" << initializationContextIdentifier << "'\n";
           return status;
         }
 
@@ -2561,8 +2572,9 @@ Parser::parseMacroRoleAttribute(
     return makeParserError();
   }
   
-  // Initializer context of accessor macros should be `eager` by default:
-  // Existing macros will behave the same as before.
+  // Initializer context of accessor macros are `eager` by default:
+  // Existing macros will behave the same as before initializer context
+  // was introduced.
   if (role == MacroRole::Accessor && !initializerContext.has_value()) {
     initializerContext = MacroInitializerContextKind::Eager;
   }
