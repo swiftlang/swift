@@ -214,6 +214,8 @@ public:
     std::vector<StoredPointer> WaitingTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
     StoredPointer ResumeAsyncContext;
+
+    std::string Name;
   };
 
   struct ActorInfo {
@@ -2028,6 +2030,19 @@ private:
           readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
       if (ChildFragmentObj)
         Info.ParentTask = ChildFragmentObj->Parent;
+    }
+
+    // Read the task's name, if any
+    if (JobFlags.task_hasInitialTaskName() && asyncTaskSize != 0) {
+      RemoteAddress NameFragmentAddr = nameFragmentAddr(AsyncTaskPtr, JobFlags);
+      auto NameFragmentObj = readObj<NameFragment<Runtime>>(NameFragmentAddr);
+      if (NameFragmentObj && NameFragmentObj->Name != 0) {
+        RemoteAddress NameAddr(NameFragmentObj->Name,
+                               RemoteAddress::DefaultAddressSpace);
+        std::string NameStr;
+        if (this->getReader().readString(NameAddr, NameStr))
+          Info.Name = std::move(NameStr);
+      }
     }
 
     // Find all child tasks.
