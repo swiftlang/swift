@@ -6606,6 +6606,9 @@ bool ConstraintSystem::repairFailures(
       return true;
     }
 
+    if (hasAnyRestriction())
+      return false;
+
     if (isExpr<ArrayExpr>(anchor) || isExpr<DictionaryExpr>(anchor)) {
       // If we could record a generic arguments mismatch instead of this fix,
       // don't record a ContextualMismatch here.
@@ -15955,6 +15958,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch) {
       if (type2->isAny() || type2->isAnyHashable())
         ++impact;
+    }
+
+    if (fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch &&
+        locator->isForCollectionElement()) {
+      auto *collection = castToExpr<CollectionExpr>(locator->getAnchor());
+      // If the literal is passed to a call or subscript or used in a nested
+      // position, let's attempt to prefer a fix for a contextual mismatch.
+      // For example, `test([1])` if none of the overloads match it's better
+      // to prefer an argument type  mismatch over a collection element type
+      // mismatch because that points to an ambiguity with the `test` instead
+      // of the collection literal.
+      if (getSemanticsProvidingParentExpr(collection))
+        impact = 4;
     }
 
     if (recordFix(fix, impact))
