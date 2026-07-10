@@ -6593,6 +6593,9 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     if (auto stdlib = getStdlibModule()) {
       addTrivial(getIdentifier("OpaquePointer"), stdlib, true);
 
+      // CVaListPointer is the Swift stand-in for C's `va_list`.
+      addTrivial(getIdentifier("CVaListPointer"), stdlib);
+
       // Builtin types
       // FIXME: Layering violation to use the ClangImporter's define.
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \

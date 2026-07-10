@@ -954,7 +954,7 @@ extension Slice {
     return unsafe startIndex.advanced(by: distance)
   }
 
-  /// Updates this buffer slice's initialized memory initialized memory by
+  /// Updates this buffer slice's initialized memory by
   /// moving every element from the source buffer slice,
   /// leaving the source memory uninitialized.
   ///

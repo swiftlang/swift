@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -wmo %s -c -o %t/main.o
+// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Extern -enable-experimental-feature Embedded -wmo %s -c -o %t/main.o
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-posix-shim -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
@@ -7,9 +7,13 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_Extern
 
-// Bind to libc's `vprintf` directly.
-@_silgen_name("vprintf")
+// Bind to libc's `vprintf` directly. Use @_extern(c) rather than
+// @_silgen_name so the call uses the C calling convention: on aarch64
+// Linux, CVaListPointer is a 32-byte struct that AAPCS64 requires to be
+// passed by hidden pointer, and Swift's default convention doesn't match.
+@_extern(c)
 func vprintf(_ fmt: UnsafePointer<CChar>, _ va: CVaListPointer) -> CInt
 
 // A Swift wrapper that takes CVarArg values and forwards them into vprintf.
