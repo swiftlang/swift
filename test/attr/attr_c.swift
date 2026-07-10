@@ -63,7 +63,7 @@ enum SwiftEnum { case A, B }
 // expected-error @-1 {{'@c' enum must declare an integer raw type}}
 
 @c(CEnumStringRawType) enum CEnumStringRawType: String { case A, B }
-// expected-error @-1 {{'@c' enum raw type 'String' is not an integer type}}
+// expected-error @-1 {{'@c' enum raw type 'String' must be an integer type expressible in C}}
 
 @c enum CEnumGeneric<T>: CInt { case A, B }
 // expected-error @-1 {{enum cannot be marked '@c' because it is generic}}
