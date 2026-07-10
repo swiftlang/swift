@@ -1487,7 +1487,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
 }
 
 extension UnsafeMutableBufferPointer {
-  /// Updates this buffer's initialized memory initialized memory by
+  /// Updates this buffer's initialized memory by
   /// moving every element from the source buffer slice,
   /// leaving the source memory uninitialized.
   ///

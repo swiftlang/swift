@@ -127,10 +127,10 @@ extension GlobalActor {
   /// * In `-O` builds (the default for Xcode's Release configuration), stops
   ///   program execution.
   ///
-  /// - Note: This check is performed against the actor's serial executor,
-  ///   meaning that / if another actor uses the same serial executor--by using
+  /// - Note: Because this check is performed against the actor's serial executor,
+  ///   if another actor uses the same serial executor--by using
   ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
-  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   check will succeed.  From a concurrency safety perspective, the
   ///   serial executor guarantees mutual exclusion of those two actors.
   ///
   /// - Parameters:
@@ -167,10 +167,10 @@ extension SerialExecutor {
   /// * In `-O` builds (the default for Xcode's Release configuration),
   ///   the isolation check is not performed and there are no effects.
   ///
-  /// - Note: This check is performed against the actor's serial executor,
-  ///   meaning that / if another actor uses the same serial executor--by using
+  /// - Note: Because this check is performed against the actor's serial executor,
+  ///   if another actor uses the same serial executor--by using
   ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
-  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   check will succeed.  From a concurrency safety perspective, the
   ///   serial executor guarantees mutual exclusion of those two actors.
   ///
   /// - Parameters:
@@ -214,10 +214,10 @@ extension Actor {
   /// * In `-O` builds (the default for Xcode's Release configuration),
   ///   the isolation check is not performed and there are no effects.
   ///
-  /// - Note: This check is performed against the actor's serial executor,
-  ///   meaning that / if another actor uses the same serial executor--by using
+  /// - Note: Because this check is performed against the actor's serial executor,
+  ///   if another actor uses the same serial executor--by using
   ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
-  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   check will succeed.  From a concurrency safety perspective, the
   ///   serial executor guarantees mutual exclusion of those two actors.
   ///
   /// - Parameters:
@@ -260,10 +260,10 @@ extension GlobalActor {
   /// * In `-O` builds (the default for Xcode's Release configuration),
   ///   the isolation check is not performed and there are no effects.
   ///
-  /// - Note: This check is performed against the actor's serial executor,
-  ///   meaning that / if another actor uses the same serial executor--by using
+  /// - Note: Because his check is performed against the actor's serial executor,
+  ///   if another actor uses the same serial executor--by using
   ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
-  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   check will succeed.  From a concurrency safety perspective, the
   ///   serial executor guarantees mutual exclusion of those two actors.
   ///
   /// - Parameters:
@@ -314,10 +314,10 @@ extension Actor {
   /// functions should instead perform a normal method call to the actor, which
   /// will hop task execution to the target actor if necessary.
   ///
-  /// - Note: This check is performed against the actor's serial executor,
-  ///   meaning that / if another actor uses the same serial executor--by using
+  /// - Note: Because this check is performed against the actor's serial executor,
+  ///   if another actor uses the same serial executor--by using
   ///   another actor's executor as its own ``Actor/unownedExecutor``
-  ///   --this check will succeed , as from a concurrency safety perspective,
+  ///   --this check will succeed.  Fom a concurrency safety perspective,
   ///   the serial executor guarantees mutual exclusion of those two actors.
   ///
   /// - Parameters:
