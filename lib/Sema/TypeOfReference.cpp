@@ -2014,8 +2014,7 @@ ConstraintSystem::getTypeOfMemberReferencePre(
                                   preparedOverload);
         }
       }
-    } else if (auto *ext = dyn_cast<ExtensionDecl>(outerDC);
-               ext && ext->isMetatypeExtension()) {
+    } else if (outerDC->isMetatypeExtension()) {
       // Metatype extension members do not require existential opening.
       // The member belongs to the protocol metatype itself, not a
       // conforming type.

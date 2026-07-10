@@ -1058,9 +1058,8 @@ namespace {
       // representational issues.  Metatype extension instance members are
       // bound directly since the metatype value is the instance.
       if (!baseIsInstance && member->isInstanceMember()) {
-        if (auto *ext = dyn_cast<ExtensionDecl>(member->getDeclContext()))
-          if (ext->isMetatypeExtension())
-            return false;
+        if (member->getDeclContext()->isMetatypeExtension())
+          return false;
         return true;
       }
 
@@ -1875,8 +1874,7 @@ namespace {
       }
 
       const bool isMetatypeExtMember =
-          isa<ExtensionDecl>(member->getDeclContext()) &&
-          cast<ExtensionDecl>(member->getDeclContext())->isMetatypeExtension();
+          member->getDeclContext()->isMetatypeExtension();
       const bool isUnboundInstanceMember =
           (!baseIsInstance && member->isInstanceMember() &&
            !isMetatypeExtMember);
