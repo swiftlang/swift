@@ -244,17 +244,40 @@ HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_tryRetain)(HeapObject *object) =
 
 #endif // SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
 
+namespace {
+inline size_t getInstanceAddressPoint(const HeapMetadata *metadata) {
+  return metadata->getKind() == MetadataKind::Class
+       ? static_cast<const ClassMetadata *>(metadata)->getInstanceAddressPoint()
+       : 0;
+}
+
+// Return a heap object's backing allocation to the allocator.
+//
+// A class instance's pointer may be interior, where the class metadata records
+// an instance address point: the number of bytes reserved before the object
+// pointer within the allocation. Funnel recovering the allocation base here
+// keeps that adjustment from being duplicated across the deinit and
+// unowned-release paths.
+inline void deallocateHeapObject(HeapObject *object, size_t size, size_t align) {
+  size_t offset = getInstanceAddressPoint(object->metadata);
+  swift_slowDealloc(reinterpret_cast<char *>(object) - offset, size, align);
+}
+}
+
 static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,
                                        size_t requiredAlignmentMask) {
   assert(isAlignmentMask(requiredAlignmentMask));
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
-  auto object = reinterpret_cast<HeapObject *>(swift_slowAllocTyped(
-      requiredSize, requiredAlignmentMask, getMallocTypeId(metadata)));
+  auto allocation = swift_slowAllocTyped(requiredSize, requiredAlignmentMask,
+                                          getMallocTypeId(metadata));
 #else
-  auto object = reinterpret_cast<HeapObject *>(
-      swift_slowAlloc(requiredSize, requiredAlignmentMask));
+  auto allocation = swift_slowAlloc(requiredSize, requiredAlignmentMask);
 #endif
+
+  size_t offset = getInstanceAddressPoint(metadata);
+  HeapObject *object =
+      reinterpret_cast<HeapObject *>(reinterpret_cast<char *>(allocation) + offset);
 
   // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
   // check on the placement new allocator which we have observed on Windows,
@@ -669,9 +692,8 @@ void swift::swift_unownedRelease(HeapObject *object) {
 
   if (object->refCounts.decrementUnownedShouldFree(1)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
-
-    swift_slowDealloc(object, classMetadata->getInstanceSize(),
-                      classMetadata->getInstanceAlignMask());
+    deallocateHeapObject(object, classMetadata->getInstanceSize(),
+                         classMetadata->getInstanceAlignMask());
   }
 #endif
 }
@@ -694,9 +716,8 @@ void swift::swift_nonatomic_unownedRelease(HeapObject *object) {
 
   if (object->refCounts.decrementUnownedShouldFreeNonAtomic(1)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
-
-    swift_slowDealloc(object, classMetadata->getInstanceSize(),
-                       classMetadata->getInstanceAlignMask());
+    deallocateHeapObject(object, classMetadata->getInstanceSize(),
+                         classMetadata->getInstanceAlignMask());
   }
 }
 
@@ -725,8 +746,8 @@ void swift::swift_unownedRelease_n(HeapObject *object, int n) {
 
   if (object->refCounts.decrementUnownedShouldFree(n)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
-    swift_slowDealloc(object, classMetadata->getInstanceSize(),
-                      classMetadata->getInstanceAlignMask());
+    deallocateHeapObject(object, classMetadata->getInstanceSize(),
+                         classMetadata->getInstanceAlignMask());
   }
 #endif
 }
@@ -749,8 +770,8 @@ void swift::swift_nonatomic_unownedRelease_n(HeapObject *object, int n) {
 
   if (object->refCounts.decrementUnownedShouldFreeNonAtomic(n)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
-    swift_slowDealloc(object, classMetadata->getInstanceSize(),
-                      classMetadata->getInstanceAlignMask());
+    deallocateHeapObject(object, classMetadata->getInstanceSize(),
+                         classMetadata->getInstanceAlignMask());
   }
 }
 
@@ -1082,7 +1103,7 @@ static inline void swift_deallocObjectImpl(HeapObject *object,
 
   if (object->refCounts.canBeFreedNow()) {
     // object state DEINITING -> DEAD
-    swift_slowDealloc(object, allocatedSize, allocatedAlignMask);
+    deallocateHeapObject(object, allocatedSize, allocatedAlignMask);
   } else {
     // object state DEINITING -> DEINITED
     swift_unownedRelease(object);
