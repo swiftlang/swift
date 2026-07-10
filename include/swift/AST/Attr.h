@@ -3394,13 +3394,6 @@ class MacroRoleAttr final
                 ArrayRef<MacroIntroducedDeclName> names,
                 ArrayRef<Expr *> conformances, SourceLoc rParenLoc,
                 bool implicit);
-                                      
-//  MacroRoleAttr(SourceLoc atLoc, SourceRange range,
-//                MacroSyntax syntax, SourceLoc lParenLoc,
-//                MacroRole role,
-//                ArrayRef<MacroIntroducedDeclName> names,
-//                ArrayRef<Expr *> conformances, SourceLoc rParenLoc,
-//                bool implicit);
 
 public:
   static MacroRoleAttr *create(ASTContext &ctx, SourceLoc atLoc,

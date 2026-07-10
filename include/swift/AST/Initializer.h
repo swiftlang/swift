@@ -108,10 +108,6 @@ public:
 
   /// If this initializes a single @lazy variable, return it.
   VarDecl *getInitializedLazyVar() const;
-  
-//  /// Check if an accessor macro converts the given
-//  /// `var` into a lazily computed property
-//  bool macroSubsumesInitializerLazily(VarDecl *var) const;
 
   /// If this initializes a single @lazy variable, lazily create a self
   /// declaration for it to refer to.

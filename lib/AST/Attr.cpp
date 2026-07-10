@@ -3400,15 +3400,6 @@ MacroRoleAttr::MacroRoleAttr(SourceLoc atLoc, SourceRange range,
                           trailingConformancesBuffer);
 }
 
-//MacroRoleAttr::MacroRoleAttr(SourceLoc atLoc, SourceRange range,
-//                             MacroSyntax syntax, SourceLoc lParenLoc,
-//                             MacroRole role,
-//                             ArrayRef<MacroIntroducedDeclName> names,
-//                             ArrayRef<Expr *> conformances, SourceLoc rParenLoc,
-//                             bool implicit)
-//    : MacroRoleAttr(atLoc, range, syntax, lParenLoc, role, /*initializerContext*/std::nullopt,
-//                    names, conformances, rParenLoc, implicit) {}
-
 MacroRoleAttr *MacroRoleAttr::create(ASTContext &ctx, SourceLoc atLoc,
                                      SourceRange range, MacroSyntax syntax,
                                      SourceLoc lParenLoc, MacroRole role,
