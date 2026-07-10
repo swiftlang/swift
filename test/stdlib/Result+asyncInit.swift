@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple)
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: concurrency_runtime
 
 // FIXME: wasi-wasm32 traps in Result<T, any Error>'s value-witness copy
 // after returning from the new Result.init(catching:) async.
