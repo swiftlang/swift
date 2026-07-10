@@ -7,6 +7,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: synchronization
 // REQUIRES: swift_feature_Embedded
+// UNSUPPORTED: OS=wasip1
 
 import Synchronization
 
