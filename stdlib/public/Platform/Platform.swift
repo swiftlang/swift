@@ -79,15 +79,15 @@ public var stdout: OpaquePointer { return OpaquePointer(_swift_stdlib_stdout()) 
 public var stderr: OpaquePointer { return OpaquePointer(_swift_stdlib_stderr()) }
 #elseif os(Windows)
 public var stdin: UnsafeMutablePointer<FILE> {
-  return unsafe __acrt_iob_func(0)
+  return _swift_stdlib_stdin()
 }
 
 public var stdout: UnsafeMutablePointer<FILE> {
-  return unsafe __acrt_iob_func(1)
+  return _swift_stdlib_stdout()
 }
 
 public var stderr: UnsafeMutablePointer<FILE> {
-  return unsafe __acrt_iob_func(2)
+  return _swift_stdlib_stderr()
 }
 
 public var STDIN_FILENO: Int32 {
