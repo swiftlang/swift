@@ -117,7 +117,7 @@ struct SwiftReflectionSections {
   {static_cast<const void *>(&__start_##name),                                 \
    static_cast<const void *>(&__stop_##name)}
 
-extern "C" __attribute__((__used__, __visibility__("default")))
+extern "C" __attribute__((__used__, __retain__, __visibility__("default")))
 const SwiftReflectionSections __swift5_reflection_sections = {
     SWIFT_REFLECTION_SECTIONS_VERSION,
     SWIFT_REFLECTION_SECTION_BOUNDS(swift5_fieldmd),
