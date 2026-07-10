@@ -161,3 +161,19 @@ func testNonSendableDiagnostics(
   let _: @MyActor () async -> NonSendable = globalActor2
   // expected-error@-1 {{cannot convert value actor-isolated to 'MainActor' to specified type actor-isolated to 'MyActor'}}
 }
+
+do {
+  func parallelMap<E, T>(
+    _: nonisolated(nonsending) @Sendable @escaping (E) async throws -> T
+  ) async rethrows {
+  }
+
+  struct Test {
+    init(x: Int) async throws {}
+
+    func test() async throws {
+      try await parallelMap(Self.init(x:))
+      // expected-warning@-1 {{converting non-Sendable function value to 'nonisolated(nonsending) @Sendable (Int) async throws -> Test' may introduce data races}}
+    }
+  }
+}
