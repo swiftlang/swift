@@ -395,19 +395,7 @@ private func processOpenExistentialRef(
   // Collect all direct users that may contain opened archetypes that need to
   // be replaced.
   for use in openExistential.uses {
-    let user = use.instruction
-    // Bail if a type-dependent use of `openExistential` is itself already
-    // recorded as an available CSE candidate: cloning it below would leave
-    // a stale entry for the old archetype in `map`.
-    if use.isTypeDependent,
-      let ref = InstructionReference(
-        inst: user, runsOnHighLevelSil: runsOnHighLevelSil, calleeAnalysis: context.calleeAnalysis
-      ),
-      map.lookup(ref) != nil
-    {
-      return false
-    }
-    usersToHandle.pushIfNotVisited(user)
+    usersToHandle.pushIfNotVisited(use.instruction)
   }
 
   let oldEnv = openExistential.definedGenericEnvironment
