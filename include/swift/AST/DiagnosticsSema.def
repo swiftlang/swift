@@ -3986,7 +3986,7 @@ NOTE(enum_raw_type_here,none,
 ERROR(objc_enum_no_raw_type,none,
       "'%0' enum must declare an integer raw type", (DeclAttribute))
 ERROR(objc_enum_raw_type_not_integer,none,
-      "'%0' enum raw type %1 is not an integer type", (DeclAttribute, Type))
+      "'%0' enum raw type %1 must be an integer type expressible in %2", (DeclAttribute, Type, StringRef))
 ERROR(enum_non_integer_raw_value_auto_increment,none,
       "enum case must declare a raw value when the preceding raw value is not an integer", ())
 ERROR(enum_non_integer_convertible_raw_type_no_value,none,
