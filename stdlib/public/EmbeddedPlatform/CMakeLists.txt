@@ -39,6 +39,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     swiftEmbeddedPlatformPOSIX
     PARTIAL_SOURCES_INTENDED
     INSTALL_BINARY
+    NON_EMPTY_OBJECT_FILE
 
     EmbeddedPlatformPOSIX.swift
 
@@ -54,6 +55,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     swiftEmbeddedPlatformSingleThreaded
     PARTIAL_SOURCES_INTENDED
     INSTALL_BINARY
+    NON_EMPTY_OBJECT_FILE
 
     EmbeddedPlatformSingleThreaded.swift
 
@@ -79,6 +81,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     swiftEmbeddedPlatformMultiThreadedPOSIX
     PARTIAL_SOURCES_INTENDED
     INSTALL_BINARY
+    NON_EMPTY_OBJECT_FILE
 
     EmbeddedPlatformMultiThreadedPOSIX.c
 
@@ -100,6 +103,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       swiftEmbeddedPlatformMultiThreadedDarwin
       PARTIAL_SOURCES_INTENDED
       INSTALL_BINARY
+      NON_EMPTY_OBJECT_FILE
 
       EmbeddedPlatformMultiThreadedDarwin.c
 

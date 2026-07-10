@@ -854,6 +854,7 @@ function(add_swift_target_library_single target name)
         NO_SWIFTMODULE
         NO_LINK_NAME
         NO_FREESTANDING_CXX
+        NON_EMPTY_OBJECT_FILE
         INSTALL_WITH_SHARED
         IS_FRAGILE)
   set(SWIFTLIB_SINGLE_single_parameter_options
@@ -1080,9 +1081,15 @@ function(add_swift_target_library_single target name)
       # Flags required to build embedded libraries
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-ffreestanding;-enable-experimental-feature;Embedded)
 
-      # Embedded Swift builds with empty object files by default. Everything
-      # is emitted into the client.
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-emit-empty-object-file)
+      # Embedded Swift libraries default to producing an empty object file:
+      # they only serve as a swiftmodule for client compilation, and the
+      # client emits the actual code. Libraries that are meant to be linked
+      # in without their swiftmodule ever being imported (e.g. the
+      # EmbeddedPlatform shim archives) must opt out with
+      # NON_EMPTY_OBJECT_FILE so their .a files actually contain code.
+      if(NOT SWIFTLIB_SINGLE_NON_EMPTY_OBJECT_FILE)
+        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-emit-empty-object-file)
+      endif()
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -enable-experimental-feature;CodeGenerationModel=implementation)
   endif()
 
@@ -3667,6 +3674,7 @@ endfunction()
 #     [PARTIAL_SOURCES_INTENDED]
 #     [INSTALL_BINARY]
 #     [NO_FREESTANDING_CXX]
+#     [NON_EMPTY_OBJECT_FILE]
 #     <sources>...
 #     [GYB_SOURCES <sources>...]
 #     [SWIFT_COMPILE_FLAGS <flags>...]
@@ -3691,12 +3699,17 @@ endfunction()
 # C/C++ compile flag is suppressed for this library. The Swift driver's
 # -Xcc;-ffreestanding (which affects the clang importer) is left untouched.
 #
+# When NON_EMPTY_OBJECT_FILE is set, the embedded default
+# -Xfrontend;-emit-empty-object-file is suppressed. Use this for libraries
+# whose swiftmodule is never imported by clients but whose object code must
+# be linked in (e.g. the EmbeddedPlatform shim archives).
+#
 # SKIP_*_REGEX and ONLY_*_REGEX are both multi-valued. An entry is processed
 # only when *every* ONLY_*_REGEX category that has at least one pattern has
 # at least one match, AND no SKIP_*_REGEX pattern matches.
 function(add_embedded_swift_target_library prefix library_name)
   cmake_parse_arguments(EMBLIB
-    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX"
+    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE"
     "INSTALL_IN_COMPONENT;ARCHITECTURE_KEY"
     "GYB_SOURCES;SWIFT_COMPILE_FLAGS;C_COMPILE_FLAGS;FILE_DEPENDS;DEPENDS;SKIP_ARCH_REGEX;SKIP_MOD_REGEX;SKIP_TRIPLE_REGEX;ONLY_ARCH_REGEX;ONLY_MOD_REGEX;ONLY_TRIPLE_REGEX"
     ${ARGN})
@@ -3711,6 +3724,8 @@ function(add_embedded_swift_target_library prefix library_name)
                  EMBLIB_PARTIAL_SOURCES_INTENDED_keyword)
   translate_flag(${EMBLIB_NO_FREESTANDING_CXX}    "NO_FREESTANDING_CXX"
                  EMBLIB_NO_FREESTANDING_CXX_keyword)
+  translate_flag(${EMBLIB_NON_EMPTY_OBJECT_FILE}  "NON_EMPTY_OBJECT_FILE"
+                 EMBLIB_NON_EMPTY_OBJECT_FILE_keyword)
 
   if(NOT EMBLIB_ARCHITECTURE_KEY)
     set(EMBLIB_ARCHITECTURE_KEY "arch")
@@ -3814,6 +3829,7 @@ function(add_embedded_swift_target_library prefix library_name)
       STATIC
       ${EMBLIB_PARTIAL_SOURCES_INTENDED_keyword}
       ${EMBLIB_NO_FREESTANDING_CXX_keyword}
+      ${EMBLIB_NON_EMPTY_OBJECT_FILE_keyword}
       ${EMBLIB_UNPARSED_ARGUMENTS}
       GYB_SOURCES ${EMBLIB_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS ${EMBLIB_SWIFT_COMPILE_FLAGS}
