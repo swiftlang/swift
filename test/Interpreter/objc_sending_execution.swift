@@ -18,6 +18,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: concurrency_runtime
 
 import Foundation
 import StdlibUnittest
