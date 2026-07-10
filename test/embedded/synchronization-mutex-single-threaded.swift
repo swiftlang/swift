@@ -3,7 +3,6 @@
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-single-threaded-shim %target-embedded-posix-shim -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: synchronization

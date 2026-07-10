@@ -197,7 +197,7 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_allocate(__swift_size_t alignment, __swift
  * 
  * This function can be implemented as a direct call to `free`.
  */
-void _swift_free(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_free_flags_t flags);
+void _swift_deallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_free_flags_t flags);
 
 /**
  * Allocates memory with a given type and returns the resulting pointer.
