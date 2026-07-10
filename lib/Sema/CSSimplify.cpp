@@ -10616,7 +10616,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         // score cutoff and disjunction-favoring already prune -- so it isn't
         // worth the added machinery.
         for (const auto &choice : resultLookup.ViableCandidates) {
-          if (choice.getKind() != OverloadChoiceKind::Decl)
+          // Only a plain, first-level declaration reference. Optional unwrapping
+          // and function-result look-through both now read as
+          // OverloadChoiceKind::Decl, so exclude them explicitly (a bare
+          // getKind() check no longer does) to preserve the no-second-hop rule
+          // documented above -- e.g. don't resolve '.b' against '(Int) -> E?' by
+          // unwrapping the optional return type.
+          if (choice.getKind() != OverloadChoiceKind::Decl ||
+              choice.isDeclViaUnwrappedOptional() ||
+              choice.isDeclViaFunctionResult())
             continue;
 
           result.addViable(OverloadChoice::getDeclViaFunctionResult(
@@ -12273,9 +12281,7 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
   auto *calleeLocator = cs.getCalleeLocator(cs.getConstraintLocator(locator));
   auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
   if (!(selectedOverload &&
-        (selectedOverload->choice.getKind() == OverloadChoiceKind::Decl ||
-         selectedOverload->choice.getKind() ==
-             OverloadChoiceKind::DeclViaUnwrappedOptional)))
+        selectedOverload->choice.getKind() == OverloadChoiceKind::Decl))
     return Type();
 
   auto *choice = selectedOverload->choice.getDecl();

@@ -1154,6 +1154,8 @@ void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
     printDecl();
     if (isDeclViaFunctionResult())
       out << " via function result";
+    else if (isDeclViaUnwrappedOptional())
+      out << " unwrapped";
     break;
 
   case OverloadChoiceKind::DeclViaDynamic:
@@ -1164,11 +1166,6 @@ void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
   case OverloadChoiceKind::DeclViaBridge:
     printDecl();
     out << " bridged";
-    break;
-
-  case OverloadChoiceKind::DeclViaUnwrappedOptional:
-    printDecl();
-    out << " unwrapped";
     break;
 
   case OverloadChoiceKind::KeyPathApplication:
@@ -1471,7 +1468,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
       case OverloadChoiceKind::Decl:
       case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::DeclViaBridge:
-      case OverloadChoiceKind::DeclViaUnwrappedOptional:
         if (choice.getBaseType())
           out << choice.getBaseType()->getString(PO) << ".";
         out << choice.getDecl()->getBaseName() << ": "

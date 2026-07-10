@@ -3632,7 +3632,6 @@ namespace {
       }
 
       case OverloadChoiceKind::Decl:
-      case OverloadChoiceKind::DeclViaUnwrappedOptional:
       case OverloadChoiceKind::DeclViaDynamic:
         return buildMemberRef(base, dotLoc, selected, nameLoc,
                               cs.getConstraintLocator(expr), memberLocator,
