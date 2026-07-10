@@ -85,7 +85,7 @@ void _swift_mutex_destroy(void *mutex) {
   if (m->flags & SWIFT_MUTEX_RECURSIVE) {
     trap_if(pthread_mutex_destroy(m->u.heap) != 0);
     _swift_deallocate(m->u.heap, _Alignof(pthread_mutex_t),
-                      sizeof(pthread_mutex_t), SWIFT_FREE_NONE);
+                      sizeof(pthread_mutex_t), SWIFT_DEALLOC_NONE);
     m->u.heap = NULL;
   }
   // Non-recursive: `os_unfair_lock` has no destroy step.
