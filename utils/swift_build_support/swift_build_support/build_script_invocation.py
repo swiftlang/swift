@@ -695,6 +695,7 @@ class BuildScriptInvocation(object):
                                  is_enabled=self.args.build_foundation)
 
         # Build Swift Testing here because it has to come before XCTest but after Foundation
+        # NOTE: The Swift Testing harness must build after Swift Package Manager
         builder.begin_pipeline()
         builder.add_product(products.SwiftTestingMacros,
                             is_enabled=self.args.build_swift_testing_macros)
@@ -715,6 +716,8 @@ class BuildScriptInvocation(object):
 
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
+        builder.add_product(products.SwiftTestingHarness,
+                            is_enabled=self.args.build_swift_harness)
 
         builder.add_product(products.WasmKit,
                             is_enabled=self.args.build_wasmkit)
