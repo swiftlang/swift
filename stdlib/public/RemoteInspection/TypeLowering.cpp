@@ -1228,6 +1228,9 @@ class ExistentialTypeInfoBuilder {
       // Don't look up field info for imported Objective-C protocols.
       if (OP) {
         ObjC = true;
+        // @objc protocols are class-constrained, so they class-constrain the
+        // whole existential.
+        Representation = ExistentialTypeRepresentation::Class;
         continue;
       }
 
@@ -1241,6 +1244,7 @@ class ExistentialTypeInfoBuilder {
         case FieldDescriptorKind::ObjCProtocol:
           // Objective-C protocols do not have any witness tables.
           ObjC = true;
+          Representation = ExistentialTypeRepresentation::Class;
           continue;
         case FieldDescriptorKind::ClassProtocol:
           Representation = ExistentialTypeRepresentation::Class;
@@ -1370,13 +1374,14 @@ public:
       return nullptr;
 
     if (ObjC) {
-      if (WitnessTableCount > 0) {
-        TC.setError("@objc existential with witness tables");
-        return nullptr;
-      }
+      // A pure-@objc existential is a single retainable pointer.
+      if (WitnessTableCount == 0)
+        return TC.getReferenceTypeInfo(ReferenceKind::Strong, Refcounting);
 
-      return TC.getReferenceTypeInfo(ReferenceKind::Strong,
-                                     Refcounting);
+      // A mixed existential — one or more @objc protocols combined with one or
+      // more Swift protocols that do carry witness tables.
+      assert(Representation == ExistentialTypeRepresentation::Class &&
+             "@objc existential is always class-constrained");
     }
 
     RecordKind Kind;
@@ -1442,12 +1447,14 @@ public:
       return nullptr;
 
     if (ObjC) {
-      if (WitnessTableCount > 0) {
-        markInvalid("@objc existential with witness tables");
-        return nullptr;
-      }
+      // A pure-@objc existential is a single retainable pointer.
+      if (WitnessTableCount == 0)
+        return TC.getReferenceTypeInfo(ReferenceKind::Strong, Refcounting);
 
-      return TC.getAnyMetatypeTypeInfo();
+      // A mixed existential — one or more @objc protocols combined with one or
+      // more Swift protocols that do carry witness tables.
+      assert(Representation == ExistentialTypeRepresentation::Class &&
+             "@objc existential metatype is always class-constrained");
     }
 
     RecordTypeInfoBuilder builder(TC, RecordKind::ExistentialMetatype);
