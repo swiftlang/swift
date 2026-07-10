@@ -728,8 +728,8 @@ static ExecutablePath getExecutablePath(void) {
       // The first character was a slash, so we'll assume that argv[0] is an
       // absolute path.
       result = argv[0];
-      if (checkExecutablePath(result.c_str())) {
-        return result;
+      if (!checkExecutablePath(result.c_str())) {
+        return "";
       }
     } else {
       // There's a slash _after_ the first character _or_ there's no slash at
@@ -738,8 +738,8 @@ static ExecutablePath getExecutablePath(void) {
         result = cwd;
         result += '/';
         result += argv[0];
-        if (checkExecutablePath(result.c_str())) {
-          return result;
+        if (!checkExecutablePath(result.c_str())) {
+          return "";
         }
       }
     }
