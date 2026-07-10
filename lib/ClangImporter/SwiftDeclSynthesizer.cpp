@@ -2650,6 +2650,9 @@ synthesizeDefaultArgumentBody(AbstractFunctionDecl *afd, void *context) {
   defaultArgFuncDecl->setAccess(clang::AccessSpecifier::AS_public);
   defaultArgFuncDecl->setBody(defaultArgReturnStmt);
 
+  ctx.getClangModuleLoader()->registerSynthesizedClangDecl(defaultArgFuncDecl,
+                                                           defaultArgFuncDecl);
+
   // Import `func __cxx__defaultArg_XYZ() -> ParamTY` into Swift.
   auto defaultArgGenerator = dyn_cast_or_null<FuncDecl>(
       ctx.getClangModuleLoader()->importDeclDirectly(defaultArgFuncDecl));
