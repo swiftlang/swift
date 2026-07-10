@@ -7,7 +7,7 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %t/main.swift -L %t -I %t -lBase -o %t/reflect_extension_parent_class %target-rpath(%t)
 // RUN: %target-codesign %t/reflect_extension_parent_class
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_extension_parent_class | tee /dev/stderr | %FileCheck %s --dump-input=fail
+// RUN: env %env-_EXTRA_DYLIB=%t/%target-library-name(Base) %target-run %target-swift-reflection-test %t/reflect_extension_parent_class | tee /dev/stderr | %FileCheck %s --dump-input=fail
 
 // REQUIRES: executable_test
 // REQUIRES: reflection_test_support
