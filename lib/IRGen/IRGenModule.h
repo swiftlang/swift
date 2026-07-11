@@ -1251,6 +1251,16 @@ public:
                                    ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                           SILLocation diagLoc);
+  /// In embedded Swift, statically instantiate a key path object as an
+  /// immortal constant global instead of calling `swift_getKeyPath` at
+  /// runtime.  Returns a bitcast pointer to the key path class, or null if
+  /// this instruction's pattern isn't statically instantiable.
+  llvm::Constant *emitStaticKeyPathInstance(KeyPathInst *KPI);
+  /// True if `KPI` can be emitted as a static immortal constant in the
+  /// current compilation.  Currently limited to Embedded Swift, keypaths
+  /// with a single StoredProperty component, no substitutions, and no
+  /// captured operands.
+  bool canEmitStaticKeyPathInstance(KeyPathInst *KPI);
   llvm::Constant *getAddrOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaqueType,
                                                 ConstantInit forDefinition);
   llvm::Constant *
@@ -1446,6 +1456,10 @@ private:
   llvm::DenseMap<ProtocolDecl *, llvm::Constant *> ObjCProtocolSymRefs;
   llvm::SmallVector<ProtocolDecl*, 4> LazyObjCProtocolDefinitions;
   llvm::DenseMap<KeyPathPattern*, llvm::GlobalVariable*> KeyPathPatterns;
+  /// Cache of statically-instantiated key path objects (embedded Swift).
+  /// Keyed by the (uniqued) `KeyPathPattern *` so multiple `keypath_inst`s
+  /// referring to the same pattern share one immortal global.
+  llvm::DenseMap<KeyPathPattern*, llvm::Constant*> StaticKeyPathInstances;
 
   /// Uniquing key for a fixed type layout record.
   struct FixedLayoutKey {

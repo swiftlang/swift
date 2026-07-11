@@ -405,9 +405,11 @@ class ForeignReferenceTypeInfoRequest
     : public SimpleRequest<ForeignReferenceTypeInfoRequest,
                            ForeignReferenceTypeInfo(
                                ForeignReferenceTypeInfoDescriptor),
-                           RequestFlags::Uncached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
+
+  bool isCached() const { return true; }
 
   SourceLoc getNearestLoc() const { return SourceLoc(); };
 

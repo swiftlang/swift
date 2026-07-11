@@ -22,12 +22,8 @@
 import AST
 import SIL
 
-private let verbose = false
-
-private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
-  if verbose {
-    debugLog(prefix: prefix, message())
-  }
+private func log(_ message: @autoclosure () -> String) {
+  llvmDebug("lifetime-dependence-diagnostics", message())
 }
 
 // @noescape functions cannot yet compose other types, but they can be wrapped in an arbitrary number of Optionals.
@@ -49,7 +45,7 @@ extension AST.`Type` {
 let lifetimeDependenceDiagnosticsPass = FunctionPass(
   name: "lifetime-dependence-diagnostics")
 { (function: Function, context: FunctionPassContext) in
-  log(prefix: false, "\n--- Diagnosing lifetime dependence in \(function.name)")
+  log("\n--- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
   log("\(function.convention)")
 

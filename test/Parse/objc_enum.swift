@@ -16,7 +16,7 @@
   case Zim, Zang, Zung
 }
 
-@objc enum NonIntegerRawType: Float { // expected-error{{'@objc' enum raw type 'Float' is not an integer type}}
+@objc enum NonIntegerRawType: Float { // expected-error{{'@objc' enum raw type 'Float' must be an integer type expressible in Objective-C}}
   case Zim = 1.0, Zang = 1.5, Zung = 2.0
 }
 

@@ -1194,7 +1194,7 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
     return true;
   }
 
-  auto CTP = getConstraintSystem().getContextualTypePurpose(AE);
+  auto CTP = FailureDiagnostic::getContextualTypePurpose(AE);
   emitDiagnostic(diag::should_use_dictionary_literal,
                  getToType()->lookThroughAllOptionalTypes(),
                  CTP == CTP_Initialization);

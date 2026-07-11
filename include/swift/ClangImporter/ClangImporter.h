@@ -213,6 +213,7 @@ public:
   create(ASTContext &ctx, const IRGenOptions *IRGenOpts = nullptr,
          StringRef swiftPCHHash = "", std::string casidForPCH = "",
          DependencyTracker *tracker = nullptr, bool ignoreFileMapping = false,
+         bool needCodeGenTargetOpts = true,
          std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr,
          std::shared_ptr<llvm::cas::ActionCache> Cache = nullptr);
 
@@ -724,6 +725,9 @@ public:
 
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
+
+  void registerSynthesizedClangDecl(clang::FunctionDecl *synthesizedDecl,
+                                    const clang::Decl *anchorDecl) override;
 
   /// Returns a decl that was imported earlier or null if it was not found in
   /// the cache.

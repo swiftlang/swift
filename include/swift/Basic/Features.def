@@ -590,7 +590,7 @@ EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 LANGUAGE_FEATURE(BorrowAndMutateAccessors, 507, "borrow and mutate accessors")
 
 /// Enable borrowing for-in loops
-EXPERIMENTAL_FEATURE(BorrowingForLoop, true)
+LANGUAGE_FEATURE(BorrowingForLoop, 0, "borrowing for-in loops")
 
 /// Allow use of @inline(always) attribute
 SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
@@ -605,6 +605,9 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
 
+/// Allow enabling dynamic keypaths in Embedded Swift.
+EXPERIMENTAL_FEATURE(EmbeddedKeyPaths, true)
+
 /// Emit typed allocation calls in Embedded Swift.
 EXPERIMENTAL_FEATURE(TypedAllocation, true)
 
@@ -615,6 +618,11 @@ EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
 /// report references to implementation-only imported modules.
 EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
 
+/// Make @_implementationOnly safe by serializing hidden type layout information
+/// so that clients can correctly manipulate types from @_implementationOnly
+/// imports without access to the defining module.
+EXPERIMENTAL_FEATURE(SafeImplementationOnly, true)
+
 /// Check that use sites have the required @_spi import for operators.
 EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
 
@@ -624,8 +632,8 @@ EXPERIMENTAL_FEATURE(Reparenting, true)
 /// Allows a `get` returning a noncopyable type have owned semantics in opaque interfaces.
 EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
 
-/// Allow access to the BorrowingSequence protocols/types outside the stdlib.
-EXPERIMENTAL_FEATURE(BorrowingSequence, true)
+/// Allow access to the Iterable protocols/types outside the stdlib.
+LANGUAGE_FEATURE(BorrowingSequence, 516, "Iterable protocol")
 
 /// Turns some source breaking access control warnings into errors.
 EXPERIMENTAL_FEATURE(StrictAccessControl, true)

@@ -23,6 +23,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -33,27 +34,6 @@
 
 using namespace swift;
 
-void swift::simple_display(llvm::raw_ostream &out, NameLookupOptions options) {
-  using Flag = std::pair<NameLookupFlags, StringRef>;
-  Flag possibleFlags[] = {
-      {NameLookupFlags::IgnoreAccessControl, "IgnoreAccessControl"},
-      {NameLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
-      {NameLookupFlags::IncludeUsableFromInline, "IncludeUsableFromInline"},
-      {NameLookupFlags::ExcludeMacroExpansions, "ExcludeMacroExpansions"},
-      {NameLookupFlags::IgnoreMissingImports, "IgnoreMissingImports"},
-      {NameLookupFlags::ABIProviding, "ABIProviding"},
-  };
-
-  auto flagsToPrint = llvm::make_filter_range(
-      possibleFlags, [&](Flag flag) { return options.contains(flag.first); });
-
-  out << "{ ";
-  interleave(
-      flagsToPrint, [&](Flag flag) { out << flag.second; },
-      [&] { out << ", "; });
-  out << " }";
-}
-
 namespace {
   /// Builder that helps construct a lookup result from the raw lookup
   /// data.
@@ -61,7 +41,7 @@ namespace {
     LookupResult &Result;
     DeclContext *DC;
     Identifier ModuleSelector;
-    NameLookupOptions Options;
+    NLOptions Options;
 
     /// The vector of found declarations.
     SmallVector<ValueDecl *, 4> FoundDecls;
@@ -73,11 +53,11 @@ namespace {
 
   public:
     LookupResultBuilder(LookupResult &result, DeclContext *dc,
-                        Identifier moduleSelector, NameLookupOptions options)
+                        Identifier moduleSelector, NLOptions options)
       : Result(result), DC(dc), ModuleSelector(moduleSelector), Options(options)
     {
       if (dc->getASTContext().isAccessControlDisabled())
-        Options |= NameLookupFlags::IgnoreAccessControl;
+        Options |= NLFlags::IgnoreAccessControl;
     }
 
     ~LookupResultBuilder() {
@@ -219,7 +199,7 @@ namespace {
         // not the witness. In this case, just return the requirement;
         // we will perform virtual dispatch on the concrete type.
         if (witness &&
-            !Options.contains(NameLookupFlags::IgnoreAccessControl) &&
+            !Options.contains(NLFlags::IgnoreAccessControl) &&
             !witness->isAccessibleFrom(DC)) {
           addResult(found);
           return;
@@ -241,19 +221,19 @@ namespace {
 } // end anonymous namespace
 
 static UnqualifiedLookupOptions
-convertToUnqualifiedLookupOptions(NameLookupOptions options) {
+convertToUnqualifiedLookupOptions(NLOptions options) {
   UnqualifiedLookupOptions newOptions = UnqualifiedLookupFlags::AllowProtocolMembers;
-  if (options.contains(NameLookupFlags::IgnoreAccessControl))
+  if (options.contains(NLFlags::IgnoreAccessControl))
     newOptions |= UnqualifiedLookupFlags::IgnoreAccessControl;
-  if (options.contains(NameLookupFlags::IncludeOuterResults))
+  if (options.contains(NLFlags::IncludeOuterResults))
     newOptions |= UnqualifiedLookupFlags::IncludeOuterResults;
-  if (options.contains(NameLookupFlags::IncludeUsableFromInline))
+  if (options.contains(NLFlags::IncludeUsableFromInline))
     newOptions |= UnqualifiedLookupFlags::IncludeUsableFromInline;
-  if (options.contains(NameLookupFlags::ExcludeMacroExpansions))
+  if (options.contains(NLFlags::ExcludeMacroExpansions))
     newOptions |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
-  if (options.contains(NameLookupFlags::IgnoreMissingImports))
+  if (options.contains(NLFlags::IgnoreMissingImports))
     newOptions |= UnqualifiedLookupFlags::IgnoreMissingImports;
-  if (options.contains(NameLookupFlags::ABIProviding))
+  if (options.contains(NLFlags::ABIProviding))
     newOptions |= UnqualifiedLookupFlags::ABIProviding;
 
   return newOptions;
@@ -284,7 +264,7 @@ static void synthesizeCodingKeysIfNeededForUnqualifiedLookup(ASTContext &ctx,
 
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
                                             SourceLoc loc,
-                                            NameLookupOptions options) {
+                                            NLOptions options) {
   auto &ctx = dc->getASTContext();
 
   // HACK: Synthesize CodingKeys if needed.
@@ -331,7 +311,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
 LookupResult
 TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclNameRef name,
                                    SourceLoc loc,
-                                   NameLookupOptions options) {
+                                   NLOptions options) {
   auto &ctx = dc->getASTContext();
 
   auto ulOptions = convertToUnqualifiedLookupOptions(options) |
@@ -371,17 +351,11 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclNameRef name,
 LookupResult TypeChecker::lookupMember(DeclContext *dc,
                                        Type type, DeclNameRef name,
                                        SourceLoc loc,
-                                       NameLookupOptions options) {
+                                       NLOptions options) {
   assert(type->mayHaveMembers());
 
   LookupResult result;
-  NLOptions subOptions = {NLFlags::QualifiedDefault, NLFlags::ProtocolMembers};
-  if (options.contains(NameLookupFlags::IgnoreAccessControl))
-    subOptions |= NLFlags::IgnoreAccessControl;
-  if (options.contains(NameLookupFlags::IgnoreMissingImports))
-    subOptions |= NLFlags::IgnoreMissingImports;
-  if (options.contains(NameLookupFlags::ABIProviding))
-    subOptions |= NLFlags::ABIProviding;
+  NLOptions subOptions = options | NLFlags::QualifiedDefault | NLFlags::ProtocolMembers;
 
   // We handle our own overriding/shadowing filtering.
   subOptions -= NLFlags::RemoveOverridden;
@@ -469,23 +443,14 @@ TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
 LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
                                                Type type, DeclNameRef name,
                                                SourceLoc loc,
-                                               NameLookupOptions options) {
+                                               NLOptions options) {
   LookupTypeResult result;
 
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
-  NLOptions subOptions = {NLFlags::QualifiedDefault,
-                          NLFlags::OnlyTypes,
-                          NLFlags::ProtocolMembers};
-
-  if (options.contains(NameLookupFlags::IgnoreAccessControl))
-    subOptions |= NLFlags::IgnoreAccessControl;
-  if (options.contains(NameLookupFlags::IgnoreMissingImports))
-    subOptions |= NLFlags::IgnoreMissingImports;
-  if (options.contains(NameLookupFlags::IncludeUsableFromInline))
-    subOptions |= NLFlags::IncludeUsableFromInline;
-  if (options.contains(NameLookupFlags::ABIProviding))
-    subOptions |= NLFlags::ABIProviding;
+  NLOptions subOptions = options | NLFlags::QualifiedDefault
+                                 | NLFlags::OnlyTypes
+                                 | NLFlags::ProtocolMembers;
 
   // Make sure we've resolved implicit members, if we need them.
   namelookup::installSemanticMembersIfNeeded(type, name);
@@ -647,7 +612,7 @@ static bool isPlausibleTypo(DeclRefKind refKind, DeclNameRef typedName,
 
 void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         Type baseTypeOrNull,
-                                        NameLookupOptions lookupOptions,
+                                        NLOptions lookupOptions,
                                         TypoCorrectionResults &corrections,
                                         GenericSignature genericSig,
                                         unsigned maxResults) {
@@ -671,6 +636,13 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     // not a plausible typo.
     if (!isPlausibleTypo(refKind, corrections.WrittenName, decl))
       return;
+
+    // Metatype extension members are not visible on conforming types.
+    if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+      if (ext->isMetatypeExtension() && baseTypeOrNull &&
+          !baseTypeOrNull->isExistentialType())
+        return;
+    }
 
     const auto candidateName = decl->getName();
 

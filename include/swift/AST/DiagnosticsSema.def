@@ -2230,6 +2230,17 @@ ERROR(attr_com_protocol_unexpected_arg, none,
       "'@com' on a protocol must only have 'interface:'; '%0' is not allowed", (StringRef))
 ERROR(attr_com_class_unexpected_iid, none,
       "'@com' on a class must not have 'interface:'; use 'implementation:' instead", ())
+ERROR(attr_com_explicit_iswiftobject, none,
+      "'ISwiftObject' conformance is compiler-managed and cannot be declared explicitly", ())
+NOTE(attr_com_iswiftobject_implied, none,
+     "'@com' automatically provides 'ISwiftObject' conformance", ())
+ERROR(com_module_missing_type, none,
+      "type '%0' not found in the 'COM' module", (StringRef))
+
+ERROR(metatype_extension_com_only, none,
+      "protocol metatype extensions are reserved for COM interop", ())
+ERROR(metatype_extension_non_protocol, none,
+      "metatype extension can only extend a protocol, not %0", (Type))
 
 // @_staticExclusiveOnly
 ERROR(attr_static_exclusive_only_disabled,none,
@@ -3370,6 +3381,11 @@ ERROR(ambiguous_associated_type_from_parameterized_protocols,none,
      (const AssociatedTypeDecl *, const ProtocolDecl *))
 NOTE(associated_type_candidate_from_parameterized_protocol,none,
      "candidate inferred from parameterized protocol here", ())
+ERROR(associated_type_inference_too_complex,none,
+     "the compiler is unable to infer the associated types in this "
+     "conformance of %0 to %1 in reasonable time",
+     (Type, const ProtocolDecl *))
+
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
 NOTE(protocol_witness_non_sendable,none,
@@ -3975,7 +3991,7 @@ NOTE(enum_raw_type_here,none,
 ERROR(objc_enum_no_raw_type,none,
       "'%0' enum must declare an integer raw type", (DeclAttribute))
 ERROR(objc_enum_raw_type_not_integer,none,
-      "'%0' enum raw type %1 is not an integer type", (DeclAttribute, Type))
+      "'%0' enum raw type %1 must be an integer type expressible in %2", (DeclAttribute, Type, StringRef))
 ERROR(enum_non_integer_raw_value_auto_increment,none,
       "enum case must declare a raw value when the preceding raw value is not an integer", ())
 ERROR(enum_non_integer_convertible_raw_type_no_value,none,
@@ -8691,10 +8707,6 @@ ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
 ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
-
-ERROR(borrowingsequence_experimental,none,
-      "'%0' requires -enable-experimental-feature BorrowingSequence",
-      (StringRef))
 
 ERROR(for_loop_sequence_conformance_unavailable,none,
       "for-in loop requires %0 to conform to %1, which is "

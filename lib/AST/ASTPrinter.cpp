@@ -3770,14 +3770,14 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
   });
 }
 
-// Returns true if the given declaration is CxxBorrowingSequence,
+// Returns true if the given declaration is CxxIterable,
 // CxxBorrowingIterator or an extension of one of these.
-static bool isCxxBorrowingSequenceOrIterator(Decl *decl) {
+static bool isCxxIterableOrIterator(Decl *decl) {
   if (auto *ext = dyn_cast<ExtensionDecl>(decl))
     decl = ext->getExtendedNominal();
 
   if (auto *proto = dyn_cast<ProtocolDecl>(decl))
-    return proto->getNameStr() == "CxxBorrowingSequence";
+    return proto->getNameStr() == "CxxIterable";
   if (auto *sd = dyn_cast<StructDecl>(decl))
     return sd->getNameStr() == "CxxBorrowingIterator";
   return false;
@@ -3845,12 +3845,12 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
     return;
   }
 
-  // CxxBorrowingSequence and CxxBorrowingIterator, defined in the Cxx overlay,
-  // conform to BorrowingSequence and BorrowingIteratorProtocol. When a newer
+  // CxxIterable and CxxBorrowingIterator, defined in the Cxx overlay,
+  // conform to Iterable and BorrowingIteratorProtocol. When a newer
   // compiler is used with an older SDK, the Cxx module interface may reference
   // these Swift stdlib protocols even though they don't exist in the SDK's
   // stdlib. To handle this, we guard them behind a Swift version.
-  if (isCxxBorrowingSequenceOrIterator(decl)) {
+  if (isCxxIterableOrIterator(decl)) {
     printer << "#if canImport(Swift, _version: 6.4.0.12)\n";
     printBody();
     printer.printNewline();
@@ -6430,14 +6430,18 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
-  /// If \p TyDecl belongs to a submodule, return the \c ModuleDecl for that
-  /// submodule; otherwise just return the parent module.
+  /// If \p TyDecl belongs to an explicit submodule, return the \c ModuleDecl
+  /// for that submodule; otherwise just return the parent module.
   ModuleDecl *getParentSubModuleOrModule(GenericTypeDecl *TyDecl) {
     // Only clang declarations can belong to a submodule
     if (auto clangNode = TyDecl->getClangNode()) {
       auto importer = TyDecl->getASTContext().getClangModuleLoader();
       if (auto clangMod = importer->getClangOwningModule(clangNode)) {
-        return importer->getWrapperForModule(clangMod);
+        // Explicit submodules are only visible if specifically imported;
+        // everything else has the visibility of its top-level module.
+        if (clangMod->isSubModule() && clangMod->IsExplicit) {
+          return importer->getWrapperForModule(clangMod);
+        }
       }
     }
 

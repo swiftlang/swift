@@ -463,3 +463,39 @@ bb2(%7 : $X):
   %13 = tuple ()
   return %13 : $()
 }
+
+struct Big {
+  var x: Int
+  var p: (Int, Int, Int, Int, Int, Int, Int)
+}
+
+struct W {
+  var inner: Big
+}
+
+sil @read_w : $@yield_once @convention(thin) () -> @yields W
+sil @use_big : $@convention(thin) (@in_guaranteed Big) -> ()
+
+// CHECK-LABEL: sil @test_yield_struct_extract
+// CHECK:         [[STK:%.*]] = alloc_stack $W
+// CHECK:         ([[YIELD:%.*]], [[TOKEN:%.*]]) = begin_apply
+// CHECK:         copy_addr [take] [[YIELD]] to [init] [[STK]]
+// CHECK:         struct_element_addr [[STK]]
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:       } // end sil function 'test_yield_struct_extract'
+
+sil @test_yield_struct_extract : $@convention(thin) () -> () {
+bb0:
+  %read = function_ref @read_w : $@yield_once @convention(thin) () -> @yields W
+  (%w, %token) = begin_apply %read() : $@yield_once @convention(thin) () -> @yields W
+  %inner = struct_extract %w, #W.inner
+  %end = end_apply %token as $()
+  %stack = alloc_stack $Big
+  store %inner to %stack : $*Big
+  %use = function_ref @use_big : $@convention(thin) (@in_guaranteed Big) -> ()
+  apply %use(%stack) : $@convention(thin) (@in_guaranteed Big) -> ()
+  dealloc_stack %stack : $*Big
+  %ret = tuple ()
+  return %ret : $()
+}
+

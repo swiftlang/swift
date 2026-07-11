@@ -53,11 +53,15 @@ public class AnyKeyPath: _AppendKeyPath {
     return _rootAndValueType.value
   }
 
+#if !hasFeature(Embedded)
   /// Used to store the offset from the root to the value
   /// in the case of a pure struct KeyPath.
   /// It's a regular kvcKeyPathStringPtr otherwise.
+  ///
+  /// With Embedded Swift, there is no KVC keypath string, and each key path has
+  /// 0 or 1 components, so there is no need for this field.
   internal final var _kvcKeyPathStringPtr: UnsafePointer<CChar>?
-  
+
   /*
   The following pertains to 32-bit architectures only.
   We assume everything is a valid pointer to a potential
@@ -73,7 +77,6 @@ public class AnyKeyPath: _AppendKeyPath {
   of AnyKeyPath by 8 bytes.
   TODO: Find a better method of refactoring this variable if possible.
   */
-
   final func assignOffsetToStorage(offset: Int) {
     let maximumOffsetOn32BitArchitecture = 4094
 
@@ -137,7 +140,8 @@ public class AnyKeyPath: _AppendKeyPath {
       return unsafe String(validatingCString: ptr)
     }
   }
-  
+#endif
+
   // MARK: Implementation details
   
   // Prevent normal initialization. We use tail allocation via
@@ -190,14 +194,15 @@ public class AnyKeyPath: _AppendKeyPath {
       Int32.self
     )
 
+#if !hasFeature(Embedded)
     unsafe result._kvcKeyPathStringPtr = nil
+#endif
     let base = UnsafeMutableRawPointer(Builtin.projectTailElems(result,
                                                                 Int32.self))
     unsafe body(UnsafeMutableRawBufferPointer(start: base, count: bytes))
     return result
   }
   
-  @_unavailableInEmbedded
   final internal func withBuffer<T>(_ f: (KeyPathBuffer) throws -> T) rethrows -> T {
     defer { _fixLifetime(self) }
     
@@ -207,7 +212,6 @@ public class AnyKeyPath: _AppendKeyPath {
 
   @usableFromInline // Exposed as public API by MemoryLayout<Root>.offset(of:)
   internal var _storedInlineOffset: Int? {
-    #if !$Embedded
     return unsafe withBuffer {
       var buffer = unsafe $0
 
@@ -230,16 +234,16 @@ public class AnyKeyPath: _AppendKeyPath {
       }
       fatalError()
     }
-    #else
-    // compiler optimizes _storedInlineOffset into a direct offset computation,
-    // and in embedded Swift we don't allow runtime keypaths, so this fatalError
-    // is unreachable at runtime
-    fatalError()
-    #endif
   }
+
+#if hasFeature(Embedded)
+  @usableFromInline
+  internal func _projectReadOnlyAsAny(fromAny root: Any) -> Any? {
+    _abstract()
+  }
+#endif
 }
 
-@_unavailableInEmbedded
 extension AnyKeyPath: Hashable {
   /// The hash value.
   final public var hashValue: Int {
@@ -315,7 +319,14 @@ extension AnyKeyPath: Hashable {
 
 /// A partially type-erased key path, from a concrete root type to any
 /// resulting value type.
-public class PartialKeyPath<Root>: AnyKeyPath { }
+public class PartialKeyPath<Root>: AnyKeyPath {
+#if hasFeature(Embedded)
+  @usableFromInline
+  internal func _projectReadOnlyAsAny(from root: Root) -> Any {
+    _abstract()
+  }
+#endif
+}
 
 // MARK: Concrete implementations
 internal enum KeyPathKind { case readOnly, value, reference }
@@ -366,18 +377,21 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   }
   
   @usableFromInline
-  @_unavailableInEmbedded
   internal final func _projectReadOnly(from root: Root) -> Value {
     let (rootType, valueType) = Self._rootAndValueType
 
+#if !hasFeature(Embedded)
     // One performance improvement is to skip right to Value
     // if this keypath traverses through structs only.
+    // In Embedded Swift, we only allow single-component key paths, so this
+    // optimization isn't worthwhile.
     if let offset = getOffsetFromStorage() {
       return unsafe _withUnprotectedUnsafeBytes(of: root) {
         let pointer = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked + offset
         return unsafe pointer.assumingMemoryBound(to: Value.self).pointee
       }
     }
+#endif
 
     return unsafe withBuffer {
       var buffer = unsafe $0
@@ -401,6 +415,35 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
         }
       }
 
+#if hasFeature(Embedded)
+      // Multi-component key paths in Embedded Swift are always chains of
+      // fixed-offset stored / tuple components (enforced by the IRGen
+      // static-instance emitter — see `KeyPathInst::
+      // getStaticInstanceClassType`).  Walk them with byte-level pointer
+      // arithmetic, without generic dispatch on `Any.Type`.  Class-typed
+      // intermediates stay alive because the outer container (the root
+      // value, or an outer class we've already walked through) still
+      // holds a strong reference to them for the duration of `root`'s
+      // lifetime.
+      return unsafe withUnsafePointer(to: root) { rootPtr in
+        var current = unsafe UnsafeRawPointer(rootPtr)
+        while unsafe !buffer.data.isEmpty {
+          let (rawComponent, _) = unsafe buffer.next()
+          switch unsafe rawComponent.value {
+          case .struct(let offset):
+            unsafe current = unsafe current.advanced(by: offset)
+          case .class(let offset):
+            let obj = unsafe current.load(as: AnyObject.self)
+            unsafe current = unsafe UnsafeRawPointer(
+              Builtin.bridgeToRawPointer(obj)).advanced(by: offset)
+          default:
+            fatalError(
+              "Embedded Swift multi-component key path must be stored/tuple")
+          }
+        }
+        return unsafe current.load(as: Value.self)
+      }
+#else
       let maxSize = unsafe buffer.maxSize
       let roundedMaxSize = 1 &<< (Int.bitWidth &- maxSize.leadingZeroBitCount)
 
@@ -471,15 +514,28 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
         }
         fatalError()
       }
+#endif
     }
   }
-  
+
+#if hasFeature(Embedded)
+  @usableFromInline
+  internal override func _projectReadOnlyAsAny(from root: Root) -> Any {
+    return _projectReadOnly(from: root)
+  }
+
+  @usableFromInline
+  internal override func _projectReadOnlyAsAny(fromAny root: Any) -> Any? {
+    guard let typedRoot = root as? Root else {
+      return nil
+    }
+
+    return _projectReadOnlyAsAny(from: typedRoot)
+  }
+#endif
+
   deinit {
-    #if !$Embedded
     unsafe withBuffer { unsafe $0.destroy() }
-    #else
-    fatalError() // unreachable, keypaths in embedded Swift are compile-time
-    #endif
   }
 }
 
@@ -492,13 +548,13 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   // `base` is assumed to be undergoing a formal access for the duration of the
   // call, so must not be mutated by an alias
   @usableFromInline
-  @_unavailableInEmbedded
   internal func _projectMutableAddress(from base: UnsafePointer<Root>)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
    
     // One performance improvement is to skip right to Value
     // if this keypath traverses through structs only.
           
+#if !hasFeature(Embedded)
     // Don't declare "p" above this if-statement; it may slow things down.
     if let offset = getOffsetFromStorage()
     {
@@ -506,6 +562,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
       return unsafe (pointer: UnsafeMutablePointer(
         mutating: p.assumingMemoryBound(to: Value.self)), owner: nil)
     }
+#endif
     var p = unsafe UnsafeRawPointer(base)
     var type: Any.Type = Root.self
     var keepAlive: AnyObject?
@@ -541,10 +598,31 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
                 owner: keepAlive)
       }
 
+#if hasFeature(Embedded)
+      // Multi-component walker for chains of fixed-offset stored/tuple
+      // components.  All writable-KP chains projected here are pure struct
+      // / tuple (no class jump), because a chain that crosses a class
+      // boundary is a `ReferenceWritableKeyPath`.  So we can walk with
+      // plain pointer arithmetic — no writeback / keep-alive needed.
+      while true {
+        let (rawComponent, optNextType) = unsafe buffer.next()
+        switch unsafe rawComponent.value {
+        case .struct(let offset):
+          unsafe p = unsafe p.advanced(by: offset)
+        default:
+          fatalError(
+            "Embedded Swift WritableKeyPath chain must be stored struct/tuple")
+        }
+        if optNextType == nil { break }
+      }
+      let typedPointer = unsafe p.assumingMemoryBound(to: Value.self)
+      return unsafe (pointer: UnsafeMutablePointer(mutating: typedPointer),
+              owner: keepAlive)
+#else
       while true {
         let (rawComponent, optNextType) = unsafe buffer.next()
         let nextType = optNextType ?? Value.self
-        
+
         func project<CurValue>(_: CurValue.Type) {
           func project2<NewValue>(_: NewValue.Type) {
             unsafe p = unsafe rawComponent._projectMutableAddress(p,
@@ -556,7 +634,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
           _openExistential(nextType, do: project2)
         }
         _openExistential(type, do: project)
-        
+
         if optNextType == nil { break }
         type = nextType
       }
@@ -566,6 +644,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
       let typedPointer = unsafe p.assumingMemoryBound(to: Value.self)
       return unsafe (pointer: UnsafeMutablePointer(mutating: typedPointer),
               owner: keepAlive)
+#endif
     }
   }
 }
@@ -580,7 +659,6 @@ public class ReferenceWritableKeyPath<
   internal final override class var kind: Kind { return .reference }
   
   @usableFromInline
-  @_unavailableInEmbedded
   internal final func _projectMutableAddress(from origBase: Root)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
     var keepAlive: AnyObject?
@@ -606,6 +684,39 @@ public class ReferenceWritableKeyPath<
         return unsafe UnsafeMutablePointer(mutating: p)
       }
 
+#if hasFeature(Embedded)
+      // Multi-component walker for chains of fixed-offset stored/tuple
+      // components (enforced by the IRGen static-instance emitter).  A
+      // `ReferenceWritableKeyPath` chain crosses at least one class
+      // boundary, so `keepAlive` will be set to the last class we
+      // dereferenced — that class owns the heap storage the returned
+      // pointer points into.
+      var origBase2 = origBase
+      let final: UnsafeMutablePointer<Value> =
+        unsafe withUnsafeMutableBytes(of: &origBase2) { baseBytes in
+          var p = unsafe UnsafeRawPointer(baseBytes.baseAddress
+              ._unsafelyUnwrappedUnchecked)
+          while true {
+            let (rawComponent, optNextType) = unsafe buffer.next()
+            switch unsafe rawComponent.value {
+            case .struct(let offset):
+              unsafe p = unsafe p.advanced(by: offset)
+            case .class(let offset):
+              let obj = unsafe p.load(as: AnyObject.self)
+              keepAlive = obj
+              unsafe p = unsafe UnsafeRawPointer(
+                Builtin.bridgeToRawPointer(obj)).advanced(by: offset)
+            default:
+              fatalError(
+                "Embedded Swift RWK chain must be stored struct/tuple/class")
+            }
+            if optNextType == nil { break }
+          }
+          let typed = unsafe p.assumingMemoryBound(to: Value.self)
+          return unsafe UnsafeMutablePointer(mutating: typed)
+        }
+      return unsafe final
+#else
       // 16 is the max alignment allowed on practically every platform we deploy
       // to.
       let base: Any = unsafe _withUnprotectedUnsafeTemporaryAllocation(
@@ -698,6 +809,7 @@ public class ReferenceWritableKeyPath<
         }
       }
       return _openExistential(base, do: unsafe formalMutation(_:))
+#endif
     }
     
     return unsafe (address, keepAlive)
@@ -745,7 +857,6 @@ internal struct ComputedPropertyID: Hashable {
   }
 }
 
-@_unavailableInEmbedded
 @safe
 internal struct ComputedAccessorsPtr {
 #if INTERNAL_CHECKS_ENABLED
@@ -828,7 +939,6 @@ internal struct ComputedAccessorsPtr {
   }
 }
 
-@_unavailableInEmbedded
 @unsafe
 internal struct ComputedArgumentWitnessesPtr {
   internal let _value: UnsafeRawPointer
@@ -905,7 +1015,6 @@ internal struct ComputedArgumentWitnessesPtr {
   }
 }
 
-@_unavailableInEmbedded
 @safe
 internal enum KeyPathComponent {
   @unsafe
@@ -955,7 +1064,6 @@ internal enum KeyPathComponent {
   case optionalWrap
 }
 
-@_unavailableInEmbedded
 extension KeyPathComponent: @unsafe Hashable {
   internal static func ==(a: KeyPathComponent, b: KeyPathComponent) -> Bool {
     switch (a, b) {
@@ -1107,7 +1215,6 @@ internal final class ClassHolder<ProjectionType> {
 }
 
 // A class that triggers writeback to a pointer when destroyed.
-@_unavailableInEmbedded
 @unsafe
 internal final class MutatingWritebackBuffer<CurValue, NewValue> {
   internal let previous: AnyObject?
@@ -1137,7 +1244,6 @@ internal final class MutatingWritebackBuffer<CurValue, NewValue> {
 }
 
 // A class that triggers writeback to a non-mutated value when destroyed.
-@_unavailableInEmbedded
 @unsafe
 internal final class NonmutatingWritebackBuffer<CurValue, NewValue> {
   internal let previous: AnyObject?
@@ -1186,11 +1292,9 @@ internal enum KeyPathComputedIDResolution {
   case functionCall
 }
 
-@_unavailableInEmbedded
 internal struct ComputedArgumentSize {
   var value: UInt
 
-  @_unavailableInEmbedded
   static var sizeMask: UInt {
 #if _pointerBitWidth(_64)
     0x3FFF_FFFF_FFFF_FFFF
@@ -1202,7 +1306,6 @@ internal struct ComputedArgumentSize {
 #endif
   }
 
-  @_unavailableInEmbedded
   static var paddingMask: UInt {
 #if _pointerBitWidth(_64)
     0x4000_0000_0000_0000
@@ -1214,7 +1317,6 @@ internal struct ComputedArgumentSize {
 #endif
   }
 
-  @_unavailableInEmbedded
   static var paddingShift: UInt {
 #if _pointerBitWidth(_64)
     62
@@ -1226,7 +1328,6 @@ internal struct ComputedArgumentSize {
 #endif
   }
 
-  @_unavailableInEmbedded
   static var alignmentMask: UInt {
 #if _pointerBitWidth(_64)
     0x8000_0000_0000_0000
@@ -1238,7 +1339,6 @@ internal struct ComputedArgumentSize {
 #endif
   }
 
-  @_unavailableInEmbedded
   static var alignmentShift: UInt {
 #if _pointerBitWidth(_64)
     63
@@ -1293,7 +1393,6 @@ internal struct ComputedArgumentSize {
   // argument had less than or equal to the platform's pointer alignment. The
   // only valid values of this on 64 bit are 16 and 0, while on 32 it is 16, 8,
   // and 0. Top bit on 64 bit platforms and top 2 bits on 32 bit platforms.
-  @_unavailableInEmbedded
   var alignment: Int {
     get {
       let mask = value & Self.alignmentMask
@@ -1343,7 +1442,6 @@ internal struct ComputedArgumentSize {
   }
 }
 
-@_unavailableInEmbedded
 @safe
 internal struct RawKeyPathComponent {
   @safe internal var header: Header
@@ -2124,6 +2222,7 @@ internal struct RawKeyPathComponent {
       )
 
     case .optionalChain:
+#if !hasFeature(Embedded)
       _internalInvariant(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
       _internalInvariant(_isOptional(LeafValue.self),
@@ -2150,8 +2249,12 @@ internal struct RawKeyPathComponent {
           tag._value
         )
       }
+#else
+      fatalError("Embedded Swift does not allow optionals in key paths")
+#endif
 
     case .optionalForce:
+#if !hasFeature(Embedded)
       _internalInvariant(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
 
@@ -2166,8 +2269,12 @@ internal struct RawKeyPathComponent {
       }
 
       _preconditionFailure("unwrapped nil optional")
+#else
+      fatalError("Embedded Swift does not allow optionals in key paths")
+#endif
 
     case .optionalWrap:
+#if !hasFeature(Embedded)
       _internalInvariant(NewValue.self == Optional<CurValue>.self,
                    "should be wrapping optional value")
 
@@ -2177,6 +2284,9 @@ internal struct RawKeyPathComponent {
       Builtin.injectEnumTag(&new, tag._value)
 
       unsafe pointer.initialize(to: new)
+#else
+      fatalError("Embedded Swift does not allow optionals in key paths")
+#endif
     }
   }
 
@@ -2287,7 +2397,6 @@ internal func _pop<T : BitwiseCopyable>(from: inout UnsafeRawBufferPointer,
   return unsafe result
 }
   
-@_unavailableInEmbedded
 @unsafe
 internal struct KeyPathBuffer {
   internal var data: UnsafeRawBufferPointer
@@ -2478,26 +2587,31 @@ internal struct KeyPathBuffer {
 // MARK: Library intrinsics for projecting key paths.
 
 @_silgen_name("swift_getAtPartialKeyPath")
-@_unavailableInEmbedded
 public // COMPILER_INTRINSIC
 func _getAtPartialKeyPath<Root>(
   root: Root,
   keyPath: PartialKeyPath<Root>
 ) -> Any {
+#if hasFeature(Embedded)
+  return keyPath._projectReadOnlyAsAny(from: root)
+#else
   func open<Value>(_: Value.Type) -> Any {
     return unsafe _getAtKeyPath(root: root,
       keyPath: unsafeDowncast(keyPath, to: KeyPath<Root, Value>.self))
   }
   return _openExistential(type(of: keyPath).valueType, do: open)
+#endif
 }
 
 @_silgen_name("swift_getAtAnyKeyPath")
-@_unavailableInEmbedded
 public // COMPILER_INTRINSIC
 func _getAtAnyKeyPath<RootValue>(
   root: RootValue,
   keyPath: AnyKeyPath
 ) -> Any? {
+#if hasFeature(Embedded)
+  return keyPath._projectReadOnlyAsAny(fromAny: root)
+#else
   let (keyPathRoot, keyPathValue) = type(of: keyPath)._rootAndValueType
   func openRoot<KeyPathRoot>(_: KeyPathRoot.Type) -> Any? {
     guard let rootForKeyPath = root as? KeyPathRoot else {
@@ -2510,10 +2624,10 @@ func _getAtAnyKeyPath<RootValue>(
     return _openExistential(keyPathValue, do: openValue)
   }
   return _openExistential(keyPathRoot, do: openRoot)
+#endif
 }
 
 @_silgen_name("swift_getAtKeyPath")
-@_unavailableInEmbedded
 public // COMPILER_INTRINSIC
 func _getAtKeyPath<Root, Value>(
   root: Root,
@@ -2522,11 +2636,27 @@ func _getAtKeyPath<Root, Value>(
   return keyPath._projectReadOnly(from: root)
 }
 
+// SILGen emits calls to `swift_readAtKeyPath`, `swift_modifyAtWritableKeyPath`
+// and `swift_modifyAtReferenceWritableKeyPath` for key path subscript accesses
+// (see `getKeyPathProjectionCoroutine` in lib/SILGen/SILGen.cpp).
+//
+// In non-embedded Swift these are thin yield-once coroutine ramp functions
+// whose ABI is fixed; they live in the C++ runtime (see
+// stdlib/public/runtime/KeyPaths.cpp) and call back into the Swift `_impl`
+// helpers below.
+//
+// In embedded Swift the C++ runtime is not compiled in.  Instead, the entry
+// points are provided directly by `_read`/`_modify` accessors on
+// `KeyPath`/`WritableKeyPath`/`ReferenceWritableKeyPath`, emitted with
+// `@convention(method)`; SILGen selects that convention when the `Embedded`
+// feature is enabled.
+
+#if !hasFeature(Embedded)
+
 // The release that ends the access scope is guaranteed to happen
 // immediately at the end_apply call because the continuation is a
 // runtime call with a manual release (access scopes cannot be extended).
 @_silgen_name("_swift_modifyAtWritableKeyPath_impl")
-@_unavailableInEmbedded
 public // runtime entrypoint
 func _modifyAtWritableKeyPath_impl<Root, Value>(
   root: inout Root,
@@ -2546,7 +2676,6 @@ func _modifyAtWritableKeyPath_impl<Root, Value>(
 // immediately at the end_apply call because the continuation is a
 // runtime call with a manual release (access scopes cannot be extended).
 @_silgen_name("_swift_modifyAtReferenceWritableKeyPath_impl")
-@_unavailableInEmbedded
 public // runtime entrypoint
 func _modifyAtReferenceWritableKeyPath_impl<Root, Value>(
   root: Root,
@@ -2555,8 +2684,72 @@ func _modifyAtReferenceWritableKeyPath_impl<Root, Value>(
   return unsafe keyPath._projectMutableAddress(from: root)
 }
 
+#else // hasFeature(Embedded)
+
+extension KeyPath {
+  @unsafe
+  @usableFromInline
+  internal subscript(_borrowedProjection root: Root) -> Value {
+    @_silgen_name("swift_readAtKeyPath")
+    _read {
+      yield _projectReadOnly(from: root)
+    }
+  }
+}
+
+extension WritableKeyPath {
+  @unsafe
+  @usableFromInline
+  internal subscript(_mutableProjection root: Root) -> Value {
+    get { return _projectReadOnly(from: root) }
+    // FIXME: Unlike the non-embedded C++ ramp function's opaque
+    // continuation, this accessor's `.resume` is Swift-visible IR.
+    // The ARC optimizer can hoist `owner`'s release past `end_apply`,
+    // which in turn extends the exclusivity access scope. This needs
+    // to be solved (e.g. via an opaque release barrier) before the
+    // `EmbeddedDynamicExclusivity` feature can be safely combined
+    // with keypath-driven modifies through class-stored properties.
+    @_silgen_name("swift_modifyAtWritableKeyPath")
+    _modify {
+      if type(of: self).kind == .reference {
+        let refKP = unsafe _unsafeUncheckedDowncast(
+          self, to: ReferenceWritableKeyPath<Root, Value>.self)
+        let (addr, owner) = unsafe refKP._projectMutableAddress(from: root)
+        defer { _fixLifetime(owner) }
+        yield unsafe &addr.pointee
+      } else {
+        let (addr, owner) = unsafe _withUnprotectedUnsafePointer(to: root) {
+          unsafe _projectMutableAddress(from: $0)
+        }
+        defer { _fixLifetime(owner) }
+        yield unsafe &addr.pointee
+      }
+    }
+  }
+}
+
+extension ReferenceWritableKeyPath {
+  @unsafe
+  @usableFromInline
+  internal subscript(_referenceMutableProjection root: Root) -> Value {
+    get { return _projectReadOnly(from: root) }
+    // FIXME: Same caveat as `WritableKeyPath._mutableProjection` above:
+    // `owner`'s release lives in a Swift-visible `.resume` and can be
+    // extended past `end_apply` by ARC, extending the access scope.
+    // Needs an opaque release barrier before `EmbeddedDynamicExclusivity`
+    // combined with keypath modify chains can be trusted.
+    @_silgen_name("swift_modifyAtReferenceWritableKeyPath")
+    _modify {
+      let (addr, owner) = unsafe _projectMutableAddress(from: root)
+      defer { _fixLifetime(owner) }
+      yield unsafe &addr.pointee
+    }
+  }
+}
+
+#endif
+
 @_silgen_name("swift_setAtWritableKeyPath")
-@_unavailableInEmbedded
 public // COMPILER_INTRINSIC
 func _setAtWritableKeyPath<Root, Value>(
   root: inout Root,
@@ -2580,7 +2773,6 @@ func _setAtWritableKeyPath<Root, Value>(
 }
 
 @_silgen_name("swift_setAtReferenceWritableKeyPath")
-@_unavailableInEmbedded
 public // COMPILER_INTRINSIC
 func _setAtReferenceWritableKeyPath<Root, Value>(
   root: Root,
@@ -2854,16 +3046,19 @@ extension _AppendKeyPath /* where Self == ReferenceWritableKeyPath<T,U> */ {
 /// only structs to get to the final value, and all other types.
 /// This is done for performance reasons.
 /// Other type information may be handled in the future to improve performance.
+@_unavailableInEmbedded
 internal func _processOffsetForAppendedKeyPath(
   appendedKeyPath: inout AnyKeyPath,
   root: AnyKeyPath,
   leaf: AnyKeyPath
 ) {
+#if !hasFeature(Embedded)
   if let rootOffset = root.getOffsetFromStorage(),
     let leafOffset = leaf.getOffsetFromStorage()
   {
     appendedKeyPath.assignOffsetToStorage(offset: rootOffset + leafOffset)
   }
+#endif
 }
 
 @usableFromInline
@@ -2977,6 +3172,7 @@ internal func calculateAppendedKeyPathSize(
   // KVC-compatible.
   let appendedKVCLength: Int, rootKVCLength: Int, leafKVCLength: Int
 
+#if !hasFeature(Embedded)
   if root.getOffsetFromStorage() == nil, leaf.getOffsetFromStorage() == nil,
     let rootPtr = unsafe root._kvcKeyPathStringPtr,
     let leafPtr = unsafe leaf._kvcKeyPathStringPtr {
@@ -2989,6 +3185,11 @@ internal func calculateAppendedKeyPathSize(
     leafKVCLength = 0
     appendedKVCLength = 0
   }
+#else
+  rootKVCLength = 0
+  leafKVCLength = 0
+  appendedKVCLength = 0
+#endif
 
   // Immediately following is the tail-allocated space for the KVC string.
   let totalResultSize = MemoryLayout<Int32>._roundingUpToAlignment(result &+ appendedKVCLength)
@@ -3129,6 +3330,7 @@ internal func _appendingKeyPaths<
                      "did not fill entire result buffer")
       }
 
+#if !hasFeature(Embedded)
       // Build the KVC string if there is one.
       if root.getOffsetFromStorage() == nil,
         leaf.getOffsetFromStorage() == nil {
@@ -3151,6 +3353,7 @@ internal func _appendingKeyPaths<
             .storeBytes(of: 0 /* '\0' */, as: CChar.self)
         }
       }
+#endif
       return unsafe unsafeDowncast(result, to: Result.self)
     }
   }
@@ -3265,6 +3468,7 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   let kvcStringBase = unsafe patternPtr.advanced(by: 12)
   let kvcStringOffset = unsafe kvcStringBase.load(as: Int32.self)
 
+#if !hasFeature(Embedded)
   if kvcStringOffset == 0 {
     // Null pointer.
     unsafe instance._kvcKeyPathStringPtr = nil
@@ -3276,6 +3480,8 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   if unsafe instance._kvcKeyPathStringPtr == nil, let offset = pureStructOffset {
     instance.assignOffsetToStorage(offset: Int(offset))
   }
+#endif
+
   // If we can cache this instance as a shared instance, do so.
   if let oncePtr = unsafe oncePtr {
     // Try to replace a null pointer in the cache variable with the instance
@@ -4793,7 +4999,6 @@ fileprivate func dynamicLibraryAddress<Base, Leaf>(
 #endif
 
 @available(SwiftStdlib 5.8, *)
-@_unavailableInEmbedded
 extension AnyKeyPath: CustomDebugStringConvertible {
   
 #if SWIFT_ENABLE_REFLECTION

@@ -27,6 +27,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackExpansionMatcher.h"
 #include "swift/AST/ParameterList.h"
@@ -184,12 +185,17 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
          "Expected a member reference");
 
   // For a reference to an instance method on a metatype, we want to keep the
-  // curried self.
+  // curried self.  Metatype extension instance members are an exception: the
+  // metatype value IS self, so the curried self is applied.
   if (decl->isInstanceMember()) {
     assert(baseTy);
     if (isa<AbstractFunctionDecl>(decl) &&
-        baseTy->getRValueType()->is<AnyMetatypeType>())
+        baseTy->getRValueType()->is<AnyMetatypeType>()) {
+      if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext()))
+        if (ext->isMetatypeExtension())
+          return true;
       return false;
+    }
   }
 
   // Otherwise the reference applies self.
@@ -5954,13 +5960,6 @@ bool ConstraintSystem::repairFailures(
 
         ConstraintFix *fix = nullptr;
         if (result == SolutionKind::Error) {
-          // If this is a "destination" argument to a mutating operator
-          // like `+=`, let's consider it contextual and only attempt
-          // to fix type mismatch on the "source" right-hand side of
-          // such operators.
-          if (isOperatorArgument(loc) && argConv->getArgIdx() == 0)
-            break;
-
           fix = AllowArgumentMismatch::create(*this, lhs, rhs, loc);
         } else {
           fix = AllowInOutConversion::create(*this, lhs, rhs, loc);
@@ -10053,10 +10052,10 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
   auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
   auto isBorrowing =
-      shouldUseBorrowingSequence(ctx, seqTy, isAsync, anchor.getStartLoc(), DC);
+      shouldUseIterable(ctx, seqTy, isAsync, anchor.getStartLoc(), DC);
 
   if (isBorrowing) {
-    seqProto = ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
+    seqProto = ctx.getProtocol(KnownProtocolKind::Iterable);
   }
 
   auto *contextualLoc = getConstraintLocator(
@@ -10757,11 +10756,28 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
     };
 
+    // Metatype extension members are only accessible on the protocol
+    // metatype itself, not on conforming types.
+    if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+      if (ext->isMetatypeExtension() && !instanceTy->isExistentialType())
+        return;
+    }
+
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
 
     if (decl->isInstanceMember()) {
       if (baseObjTy->is<AnyMetatypeType>()) {
+        // Metatype extension instance members are instance members of the
+        // metatype type itself.  They are accessed directly on the protocol
+        // metatype value (e.g. P.value), not on an instance of the protocol.
+        if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+          if (ext->isMetatypeExtension()) {
+            result.addViable(candidate);
+            return;
+          }
+        }
+
         // `AnyObject` has special semantics, so let's just let it be.
         // Otherwise adjust base type and reference kind to make it
         // look as if lookup was done on the instance, that helps
@@ -10843,6 +10859,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                     ->hasTypeParameter()) {
 
       /* We're OK */
+    } else if (instanceTy->isExistentialType() &&
+               isa<ExtensionDecl>(decl->getDeclContext()) &&
+               cast<ExtensionDecl>(decl->getDeclContext())->isMetatypeExtension()) {
+      // Metatype extension members are directly accessible on the
+      // protocol metatype without requiring Self to be bound.
     } else if (hasStaticMembers && baseObjTy->is<MetatypeType>() &&
                instanceTy->isExistentialType()) {
       // Static member lookup on protocol metatype in generic context
@@ -11169,14 +11190,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // can include them in the unviable candidates list.
   if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
       includeInaccessibleMembers) {
-    NameLookupOptions lookupOptions =
+    NLOptions lookupOptions =
         defaultConstraintSolverMemberLookupOptions;
 
     // Local function that looks up additional candidates using the given lookup
     // options, recording the results as unviable candidates.
     auto lookupUnviable =
         [&](DeclNameRef memberName,
-            NameLookupOptions lookupOptions,
+            NLOptions lookupOptions,
             MemberLookupResult::UnviableReason reason) -> bool {
       auto lookup = TypeChecker::lookupMember(DC, instanceTy, memberName,
                                               memberLoc, lookupOptions);
@@ -11214,7 +11235,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // Ignore access control so we get candidates that might have been missed
     // before.
     if (lookupUnviable(memberName,
-                       lookupOptions | NameLookupFlags::IgnoreAccessControl,
+                       lookupOptions | NLFlags::IgnoreAccessControl,
                        MemberLookupResult::UR_Inaccessible))
       return result;
   }
@@ -15934,7 +15955,26 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                : SolutionKind::Solved;
   }
 
-  case FixKind::AllowArgumentTypeMismatch:
+  case FixKind::AllowArgumentTypeMismatch: {
+    auto *loc = fix->getLocator();
+    // If this is a "destination" argument to a mutating operator
+    // like `+=`, let's give it a higher impact to make sure that
+    // if a different overload choice has a mismatch at the "source"
+    // it would always be preferred instead of causing an ambiguity
+    // since `inout` doesn't support conversions and only the "source"
+    // can be fixed.
+    if (auto argLoc = loc->findLast<LocatorPathElt::ApplyArgToParam>()) {
+      if (argLoc->getArgIdx() == 0 && isOperatorArgument(loc) &&
+          loc->isLastElement<LocatorPathElt::LValueConversion>()) {
+        return recordFix(fix, FixImpact::TypeMismatch + 1)
+                   ? SolutionKind::Error
+                   : SolutionKind::Solved;
+      }
+    }
+
+    LLVM_FALLTHROUGH;
+  }
+
   case FixKind::IgnoreDefaultExprTypeMismatch: {
     auto impact = FixImpact::TypeMismatch;
     // If there are any other argument mismatches already detected for this

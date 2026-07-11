@@ -5435,13 +5435,15 @@ public:
     DeclID extendedNominalID;
     DeclContextID contextID;
     bool isImplicit;
+    bool isMetatypeExtension;
     GenericSignatureID genericSigID;
     unsigned numConformances, numInherited;
     ArrayRef<uint64_t> data;
 
     decls_block::ExtensionLayout::readRecord(scratch, extendedTypeID,
                                              extendedNominalID, contextID,
-                                             isImplicit, genericSigID,
+                                             isImplicit, isMetatypeExtension,
+                                             genericSigID,
                                              numConformances, numInherited,
                                              data);
 
@@ -5467,6 +5469,7 @@ public:
 
     auto extension = ExtensionDecl::create(ctx, SourceLoc(), nullptr, { },
                                            DC, nullptr);
+    extension->setIsMetatypeExtension(isMetatypeExtension);
     declOrOffset = extension;
 
     // Generic parameter lists are written from outermost to innermost.
@@ -5512,7 +5515,7 @@ public:
     }
 
 #ifndef NDEBUG
-    if (outerParams) {
+    if (outerParams && !extension->isMetatypeExtension()) {
       unsigned paramCount = 0;
       for (auto *paramList = outerParams;
            paramList != nullptr;

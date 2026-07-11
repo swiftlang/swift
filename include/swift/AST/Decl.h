@@ -866,7 +866,7 @@ protected:
     NumPathElements : 8
   );
 
-  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1,
+  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1+1,
     /// An encoding of the default and maximum access level for this extension.
     /// The value 4 corresponds to AccessLevel::Public
     ///
@@ -876,7 +876,11 @@ protected:
     DefaultAndMaxAccessLevel : 4,
 
     /// Whether there is are lazily-loaded conformances for this extension.
-    HasLazyConformances : 1
+    HasLazyConformances : 1,
+
+    /// Whether this is a `metatype extension` whose members live on the
+    /// protocol metatype and are not inherited by conforming types.
+    IsMetatypeExtension : 1
   );
 
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
@@ -2149,6 +2153,13 @@ public:
   SourceRange getBraces() const { return Braces; }
   void setBraces(SourceRange braces) { Braces = braces; }
 
+  bool isMetatypeExtension() const {
+    return Bits.ExtensionDecl.IsMetatypeExtension;
+  }
+  void setIsMetatypeExtension(bool value = true) {
+    Bits.ExtensionDecl.IsMetatypeExtension = value;
+  }
+
   bool hasBeenBound() const { return ExtendedNominal.getInt(); }
 
   void setExtendedNominal(NominalTypeDecl *n) {
@@ -2185,6 +2196,7 @@ public:
   /// Repr would not be available if the extension was been loaded
   /// from a serialized module.
   TypeRepr *getExtendedTypeRepr() const { return ExtendedTypeRepr; }
+  void setExtendedTypeRepr(TypeRepr *repr) { ExtendedTypeRepr = repr; }
                               
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).

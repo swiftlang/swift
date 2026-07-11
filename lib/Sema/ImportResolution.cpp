@@ -28,6 +28,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/Basic/Module.h"
@@ -347,6 +348,8 @@ void swift::performImportResolutionForClangMacroBuffer(
 //===----------------------------------------------------------------------===//
 
 void ImportResolver::visitImportDecl(ImportDecl *ID) {
+  PrettyStackTraceDecl debugStack("resolving", ID);
+
   assert(unboundImports.empty());
 
   // `CxxStdlib` is the only accepted spelling of the C++ stdlib module name.
@@ -380,6 +383,7 @@ void ImportResolver::bindPendingImports() {
 
 void ImportResolver::bindImport(UnboundImport &&I) {
   auto ID = I.getImportDecl();
+  PrettyStackTraceDecl debugStack("binding", ID.getPtrOrNull());
 
   if (!I.checkNotTautological(SF)) {
     // No need to process this import further.

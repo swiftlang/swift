@@ -2797,6 +2797,13 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       if (options.contains(NLFlags::OnlyMacros) && !isa<MacroDecl>(decl))
         continue;
 
+      // Metatype extension members are only visible when looking up directly
+      // on the protocol, not when reached via a conforming type.
+      if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+        if (ext->isMetatypeExtension() && !llvm::is_contained(typeDecls, current))
+          continue;
+      }
+
       if (isAcceptableLookupResult(DC, options, decl, onlyCompleteObjectInits,
                                    requireImport))
         decls.push_back(decl);
@@ -4520,6 +4527,7 @@ void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
     FLAG(NLFlags::OnlyMacros)
     FLAG(NLFlags::IgnoreMissingImports)
     FLAG(NLFlags::ABIProviding)
+    FLAG(NLFlags::IncludeOuterResults)
 #undef FLAG
   };
 

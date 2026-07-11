@@ -12,9 +12,11 @@
 
 /// A type that provides borrowed access to the values of a borrowing sequence.
 @available(SwiftStdlib 6.4, *)
-public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
+public protocol BorrowingIteratorProtocol<Element, Failure>: ~Copyable, ~Escapable {
   associatedtype Element: ~Copyable
 
+  associatedtype Failure: Error = Never
+  
   /// Returns a span over the next group of elements that are ready to by visited,
   /// up to the specifed maximum.
   ///
@@ -27,9 +29,9 @@ public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
   /// survive beyond the next invocation of this method.
   ///
   /// If the iterator has not yet reached the end of the underlying elements,
-  /// then this method returns a non-empty span of at most `maximumCount`
+  /// then this method returns a non-empty span of at most `maxCount`
   /// elements and updates the iterator's current position to the element
-  /// following the last item in the returned span. The `maximumCount`
+  /// following the last item in the returned span. The `maxCount`
   /// argument allows callers to avoid getting more items than they are
   /// able to process in one go, simplifying usage, and
   /// avoiding materializing more elements than needed.
@@ -43,7 +45,7 @@ public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
   ///
   ///     var it = items.makeBorrowingIterator()
   ///     while true {
-  ///       let span = it.nextSpan(maximumCount: .max)
+  ///       let span = it.nextSpan(maxCount: .max)
   ///       if span.isEmpty { break }
   ///       // Process items in `span`
   ///     }
@@ -55,40 +57,43 @@ public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
   /// example to repeat their contents.
   @_lifetime(&self)
   @_lifetime(self: copy self)
-  mutating func nextSpan(maximumCount: Int) -> Span<Element>
+  mutating func nextSpan(maxCount: Int) throws(Failure) -> Span<Element>
 
   /// Advances the position of this iterator by the specified offset, or until
   /// the end of the underlying type's elements.
   ///
-  /// - Parameter maximumOffset: The maximum number of elements
-  ///   to offset the position of this iterator. `maximumOffset` must be
+  /// - Parameter maxOffset: The maximum number of elements
+  ///   to offset the position of this iterator. `maxOffset` must be
   ///   nonnegative.
   /// - Returns: The number of items that were skipped. If the returned count
-  ///   is less than `maximumOffset`, then the underlying type did not have
+  ///   is less than `maxOffset`, then the underlying type did not have
   ///   enough elements left to skip the requested number of items.
   ///   In that case, the iterator's position is set to the end of the underlying type.
   @_lifetime(self: copy self)
-  mutating func skip(by maximumOffset: Int) -> Int
+  mutating func skip(by maxOffset: Int) throws(Failure) -> Int
 }
 
 @available(SwiftStdlib 6.4, *)
 extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   /// Returns a span over the next group of elements that are ready to by visited,
   /// up to the specifed maximum.
+  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_lifetime(&self)
   @_lifetime(self: copy self)
   @_transparent
-  public mutating func nextSpan() -> Span<Element> {
-    nextSpan(maximumCount: Int.max)
+  public mutating func nextSpan() throws(Failure) -> Span<Element> {
+    try nextSpan(maxCount: Int.max)
   }
   
+  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_lifetime(self: copy self)
-  public mutating func skip(by offset: Int) -> Int {
+  public mutating func skip(by offset: Int) throws(Failure) -> Int {
+    _precondition(offset >= 0, "Can't skip by a negative offset")
     var remainder = offset
     while remainder > 0 {
-      let span = nextSpan(maximumCount: remainder)
+      let span = try nextSpan(maxCount: remainder)
       if span.isEmpty { break }
       remainder &-= span.count
     }
@@ -97,58 +102,70 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
 }
 
 @available(SwiftStdlib 6.4, *)
-public struct SpanIterator<Element>: BorrowingIteratorProtocol, ~Copyable, ~Escapable
-  where Element: ~Copyable
-{
-  @usableFromInline
-  internal var _span: Span<Element>
-  @usableFromInline
-  internal var _start: Int
-  @usableFromInline
-  internal var _count: Int
-  
-  @_lifetime(copy elements)
-  public init(_ elements: Span<Element>) {
-    _span = elements
-    _start = 0
-    _count = elements.count
-  }
-  
-  @export(implementation)
-  @_lifetime(&self)
-  @_lifetime(self: copy self)
-  @_transparent
-  public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
-    let c = Swift.min(maximumCount, _count)
-    defer {
-      _start &+= c
-      _count &-= c
+extension Span where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  @frozen
+  public struct BorrowingIterator: BorrowingIteratorProtocol, ~Copyable, ~Escapable {
+    @usableFromInline
+    internal var _span: Span<Element>
+    @usableFromInline
+    internal var _start: Int
+    @usableFromInline
+    internal var _count: Int
+    
+    @available(SwiftStdlib 6.4, *)
+    public typealias Failure = Never
+    
+    @available(SwiftStdlib 6.4, *)
+    @_lifetime(copy elements)
+    @inlinable
+    public init(_ elements: Span<Element>) {
+      _span = elements
+      _start = 0
+      _count = elements.count
     }
-    return _span.extracting(droppingFirst: _start).extracting(first: c)
-  }
-  
-  @export(implementation)
-  @_lifetime(self: copy self)
-  public mutating func skip(by offset: Int) -> Int {
-    let c = Swift.min(offset, _count)
-    defer {
-      _start &+= c
-      _count &-= c
+    
+    @available(SwiftStdlib 6.4, *)
+    @export(implementation)
+    @_lifetime(&self)
+    @_lifetime(self: copy self)
+    @_transparent
+    public mutating func nextSpan(maxCount: Int) -> Span<Element> {
+      let c = Swift.min(maxCount, _count)
+      defer {
+        _start &+= c
+        _count &-= c
+      }
+      return _span.extracting(droppingFirst: _start).extracting(first: c)
     }
-    return c
+    
+    @available(SwiftStdlib 6.4, *)
+    @export(implementation)
+    @_lifetime(self: copy self)
+    public mutating func skip(by offset: Int) -> Int {
+      _precondition(offset >= 0, "Can't skip by a negative offset")
+      let c = Swift.min(offset, _count)
+      defer {
+        _start &+= c
+        _count &-= c
+      }
+      return c
+    }
   }
 }
 
 /// A type that provides sequential, borrowing access to its elements.
 @available(SwiftStdlib 6.4, *)
 @reparentable
-public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
+public protocol Iterable<Element, Failure>: ~Copyable, ~Escapable {
   /// A type representing the sequence's elements.
   associatedtype Element: ~Copyable
 
+  associatedtype Failure: Error = Never
+  
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
-  associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable
+  associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element, Failure> & ~Copyable & ~Escapable
 
   /// Returns a borrowing iterator over the elements of this sequence.
   @_lifetime(borrow self)
@@ -163,33 +180,37 @@ public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable {
+extension Iterable where Self: ~Copyable & ~Escapable, Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
   @inlinable
   public var underestimatedCount: Int { 0 }
+
+  @available(SwiftStdlib 6.4, *)
   @inlinable
   public func _customContainsEquatableElement(_ element: borrowing Element) -> Bool? { nil }
 }
 
-// FIXME: Elminate these overloads once Sequence is reparented, they break ambiguity for
-// types that conform to both BorrowingSequence and Sequence or Collection.
+// Ambiguity breakers for types that conform to both `Iterable` and `Sequence`/`Collection`
 
 @available(SwiftStdlib 6.4, *)
-extension Sequence where Self: BorrowingSequence {
+extension Sequence where Self: Iterable {
   @available(SwiftStdlib 6.4, *)
-  @inlinable
+  @export(implementation)
   public var underestimatedCount: Int { 0 }
+  
   @available(SwiftStdlib 6.4, *)
-  @inlinable
+  @export(implementation)
   public func _customContainsEquatableElement(_ element: Element) -> Bool? { nil }
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Collection where Self: BorrowingSequence {
+extension Collection where Self: Iterable {
   @available(SwiftStdlib 6.4, *)
-  @inlinable
-  public var underestimatedCount: Int { 0 }
+  @export(implementation)
+  public var underestimatedCount: Int { self.count }
+  
   @available(SwiftStdlib 6.4, *)
-  @inlinable
+  @export(implementation)
   public func _customContainsEquatableElement(_ element: Element) -> Bool? { nil }
 }
 
@@ -197,32 +218,49 @@ extension Collection where Self: BorrowingSequence {
 @frozen
 public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIteratorProtocol {
   @usableFromInline
-  var iterator: Iterator
+  internal var _iterator: Iterator
   @usableFromInline
-  var curValue: Iterator.Element?
+  internal var _currentValue: Iterator.Element? = nil
 
+  @available(SwiftStdlib 6.4, *)
   public typealias Element = Iterator.Element
 
+  @available(SwiftStdlib 6.4, *)
+  public typealias Failure = Never
+  
+  @available(SwiftStdlib 6.4, *)
   @_transparent
   public init(iterator: Iterator) {
-    self.iterator = iterator
-    curValue = nil
+    self._iterator = iterator
   }
 
+  @available(SwiftStdlib 6.4, *)
   @_transparent
   @_lifetime(&self)
-  public mutating func nextSpan(maximumCount: Int) -> Span<Iterator.Element> {
-    curValue = iterator.next()
-    return curValue._span()
+  public mutating func nextSpan(maxCount: Int) -> Span<Iterator.Element> {
+    _currentValue = _iterator.next()
+    return _currentValue._span()
   }
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Sequence where Self: BorrowingSequence {
+extension Sequence where Self: Iterable {
   @available(SwiftStdlib 6.4, *)
   @_disfavoredOverload
   @_transparent
   public func makeBorrowingIterator() -> BorrowingIteratorAdapter<Iterator> {
     BorrowingIteratorAdapter(iterator: makeIterator())
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension Iterable
+  where Self: BorrowingIteratorProtocol & ~Escapable, Self.BorrowingIterator == Self
+{
+  @available(SwiftStdlib 6.4, *)
+  @inlinable
+  @_lifetime(borrow self)
+  public func makeBorrowingIterator() -> Self {
+    self
   }
 }

@@ -2302,7 +2302,8 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I))
     salvageNullaryInst(cast<SingleValueInstruction>(I));
 
-  if (isa<StructExtractInst>(I) || isa<TupleExtractInst>(I))
+  if (isa<StructExtractInst>(I) || isa<TupleExtractInst>(I) ||
+      isa<UncheckedEnumDataInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
 
   if (isa<DestructureStructInst>(I) || isa<DestructureTupleInst>(I))

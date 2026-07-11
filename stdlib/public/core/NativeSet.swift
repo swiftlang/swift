@@ -44,6 +44,19 @@ internal struct _NativeSet<Element: Hashable> {
     }
   }
 
+  @export(implementation)
+  @unsafe
+  internal init(_ buffer: UnsafeBufferPointer<Element>) {
+    self.init(capacity: buffer.count)
+    for index in 0..<buffer.count {
+      let element = unsafe buffer[index]
+      let (bucket, found) = find(element)
+      // Keep only the first occurrence of equal elements.
+      guard !found else { continue }
+      unsafe _unsafeInsertNew(element, at: bucket)
+    }
+  }
+
 #if _runtime(_ObjC)
   @inlinable
   internal init(_ cocoa: __owned __CocoaSet) {

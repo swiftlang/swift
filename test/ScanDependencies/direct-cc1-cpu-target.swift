@@ -7,7 +7,8 @@
 
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json A | %FileCheck %s
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json Test | %FileCheck %s
-// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:B | %FileCheck %s
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:B > %t/clangB.rsp
+// RUN: %FileCheck %s --input-file %t/clangB.rsp
 
 /// ios26 is default to a12 CPU and ios18 is a10 CPU. -Xcc is selecting frontend parsing target options so it should be a12.
 // CHECK: target-cpu
@@ -15,6 +16,10 @@
 // CHECK-NEXT: apple-a12
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py %swift_frontend_plain %t/deps.json -o %t/Test.cmd
+
+// RUN: %swift_frontend_plain @%t/clangB.rsp -dump-clang-diagnostics 2>&1 | %FileCheck %s --check-prefix CLANG-DIAG
+
+// CLANG-DIAG-NOT: clang importer driver args:
 
 // RUN: %swift-frontend-plain -target arm64-apple-ios18 -clang-target arm64-apple-ios26 \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-builtin-module \

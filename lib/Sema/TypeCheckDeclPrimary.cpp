@@ -48,6 +48,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/MacroDefinition.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -1602,7 +1603,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       auto result =
           TypeChecker::lookupMember(superclassDecl, superclassType, initFrom,
                                     classDecl->getLoc(),
-                                    NameLookupFlags::IgnoreAccessControl);
+                                    NLFlags::IgnoreAccessControl);
 
       if (!result.empty() && !result.front().getValueDecl()->isImplicit())
         diagDest = result.front().getValueDecl();
@@ -2229,6 +2230,17 @@ static void dumpGenericSignature(ASTContext &ctx, GenericContext *GC) {
 }
 
 namespace {
+
+/// A metatype extension is a COM construct when it extends a COM interface
+/// — a protocol marked @com. The @com marker, not derivation from IUnknown,
+/// is the key: COM-model frameworks like IOKit use QI/AddRef/Release without
+/// deriving from a shared IUnknown, so keying on the marker (which the Clang
+/// importer can also apply to imported interfaces) is what makes this correct.
+static bool isCOMMetatypeExtension(const ExtensionDecl *ED) {
+  auto *proto = dyn_cast_or_null<ProtocolDecl>(ED->getExtendedNominal());
+  return proto && proto->getAttrs().hasAttribute<COMAttr>();
+}
+
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
   ASTContext &Ctx;
@@ -3985,6 +3997,20 @@ public:
         visit(Member);
 
       return;
+    }
+
+    // Validate metatype extension constraints.
+    if (ED->isMetatypeExtension()) {
+      if (!isCOMMetatypeExtension(ED)) {
+        ED->diagnose(diag::metatype_extension_com_only);
+        ED->setInvalid();
+        return;
+      }
+      if (!isa<ProtocolDecl>(nominal)) {
+        ED->diagnose(diag::metatype_extension_non_protocol, extType);
+        ED->setInvalid();
+        return;
+      }
     }
 
     if (!extType->hasError()) {

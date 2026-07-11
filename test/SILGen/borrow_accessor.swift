@@ -1,5 +1,5 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
+// FIXME: unexpected error diagnostic under opaque values
+// RUN: not %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN:%target-swift-frontend -emit-silgen %s | %FileCheck %s
 // RUN:%target-swift-frontend -c %s -Xllvm -sil-print-after=SILGenCleanup 2>&1 | %FileCheck %s --check-prefixes=CHECK-SIL

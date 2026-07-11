@@ -1474,12 +1474,11 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   return CI;
 }
 
-std::unique_ptr<ClangImporter>
-ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
-                      StringRef swiftPCHHash, std::string casidForPCH,
-                      DependencyTracker *tracker, bool ignoreFileMapping,
-                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
-                      std::shared_ptr<llvm::cas::ActionCache> Cache) {
+std::unique_ptr<ClangImporter> ClangImporter::create(
+    ASTContext &ctx, const IRGenOptions *IRGenOpts, StringRef swiftPCHHash,
+    std::string casidForPCH, DependencyTracker *tracker, bool ignoreFileMapping,
+    bool needCodeGenTargetOpts, std::shared_ptr<llvm::cas::ObjectStore> CAS,
+    std::shared_ptr<llvm::cas::ActionCache> Cache) {
   std::unique_ptr<ClangImporter> importer{new ClangImporter(ctx, tracker)};
   auto &importerOpts = ctx.ClangImporterOpts;
 
@@ -1593,7 +1592,7 @@ ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
   clangDiags.setFatalsAsError(ctx.Diags.getShowDiagnosticsAfterFatalError());
 
   // Use Clang to configure/save options for Swift IRGen/CodeGen
-  if (ctx.LangOpts.ClangTarget.has_value()) {
+  if (ctx.LangOpts.ClangTarget.has_value() && needCodeGenTargetOpts) {
     // If '-clang-target' is set, create a mock invocation with the Swift triple
     // to configure CodeGen and Target options for Swift compilation.
     auto swiftTargetClangInvocation = importer->createClangInvocation(
@@ -5136,6 +5135,26 @@ ClangImporter::Implementation::findLookupTable(const clang::Decl *decl) {
   return findLookupTable(owningModule);
 }
 
+void ClangImporter::Implementation::registerSynthesizedClangDecl(
+    clang::FunctionDecl *synthesizedDecl, const clang::Decl *anchorDecl) {
+  synthesizedAndAlwaysVisibleDecls.insert(synthesizedDecl);
+
+  auto *contextTable = findLookupTable(anchorDecl);
+  if (contextTable)
+    addEntryToLookupTable(*contextTable, synthesizedDecl, getNameImporter());
+
+  auto *owningModule =
+      importer::getClangOwningModule(anchorDecl, anchorDecl->getASTContext());
+  auto *moduleTable = findLookupTable(owningModule);
+  if (moduleTable && moduleTable != contextTable)
+    addEntryToLookupTable(*moduleTable, synthesizedDecl, getNameImporter());
+}
+
+void ClangImporter::registerSynthesizedClangDecl(
+    clang::FunctionDecl *synthesizedDecl, const clang::Decl *anchorDecl) {
+  Impl.registerSynthesizedClangDecl(synthesizedDecl, anchorDecl);
+}
+
 bool ClangImporter::Implementation::forEachLookupTable(
        llvm::function_ref<bool(SwiftLookupTable &table)> fn) {
   // Visit the bridging header's lookup table.
@@ -6174,6 +6193,11 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
                                clangCtx, body, clang::FPOptionsOverride(),
                                clang::SourceLocation(), clang::SourceLocation())
                          : body[0]);
+
+  // Register the synthesized accessor so that it can be resolved when
+  // deserializing SIL that was serialized under cross-module optimization.
+  impl.registerSynthesizedClangDecl(newMethod, derivedClass);
+
   return newMethod;
 }
 
@@ -8479,7 +8503,9 @@ static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
     return false;
 
   // Ensure that the baseclass is swift::RefCountedClass.
-  auto baseDecl = decl;
+  auto baseDecl = decl->getDefinition();
+  if (!baseDecl)
+    return false;
   do {
     if (baseDecl->getNumBases() != 1)
       return false;
@@ -8488,7 +8514,9 @@ static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
     auto nextBaseDecl = Ty->getAsCXXRecordDecl();
     if (!nextBaseDecl)
       return false;
-    baseDecl = nextBaseDecl;
+    baseDecl = nextBaseDecl->getDefinition();
+    if (!baseDecl)
+      return false;
   } while (baseDecl->getName() != "RefCountedClass");
 
   return true;

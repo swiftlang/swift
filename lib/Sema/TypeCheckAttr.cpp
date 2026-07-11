@@ -38,6 +38,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -2487,7 +2488,7 @@ void AttributeChecker::visitCOMAttr(COMAttr *attr) {
       attr->setInvalid();
       return;
     }
-  } else if (isa<ClassDecl>(D)) {
+  } else if (auto *CD = dyn_cast<ClassDecl>(D)) {
     if (!attr->IID.empty()) {
       diagnose(attr->getLocation(), diag::attr_com_class_unexpected_iid);
       attr->setInvalid();
@@ -2500,9 +2501,26 @@ void AttributeChecker::visitCOMAttr(COMAttr *attr) {
       attr->setInvalid();
       return;
     }
-  }
 
-  // TODO(compnerd) ensure that `ISwiftObject` is not conformed to.
+    const ProtocolDecl *ISO = Ctx.getProtocol(KnownProtocolKind::ISwiftObject);
+    if (!ISO) {
+      diagnose(SourceLoc(), diag::com_module_missing_type, "ISwiftObject");
+      return;
+    }
+
+    bool AnyObject = false;
+    InvertibleProtocolSet inverses;
+    auto inherited =
+        getDirectlyInheritedNominalTypeDecls(CD, inverses, AnyObject);
+    const auto &entry =
+        llvm::find_if(inherited, [ISO](const auto &E) { return E.Item == ISO; });
+    if (entry != inherited.end()) {
+      diagnose(entry->Loc, diag::attr_com_explicit_iswiftobject);
+      diagnose(attr->getLocation(), diag::attr_com_iswiftobject_implied);
+      attr->setInvalid();
+      return;
+    }
+  }
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
@@ -6486,7 +6504,7 @@ enum class AbstractFunctionDeclLookupErrorKind {
 static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     DeclAttribute *attr, Type baseType,
     const DeclNameRefWithLoc &funcNameWithLoc, DeclContext *lookupContext,
-    NameLookupOptions lookupOptions,
+    NLOptions lookupOptions,
     const llvm::function_ref<std::optional<AbstractFunctionDeclLookupErrorKind>(
         AbstractFunctionDecl *)> &isValidCandidate,
     AnyFunctionType *expectedOriginalFnType) {
@@ -8057,7 +8075,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
                                : defaultUnqualifiedLookupOptions) |
-      NameLookupFlags::IgnoreAccessControl;
+      NLFlags::IgnoreAccessControl;
   auto transposeTypeCtx = transpose->getInnermostTypeContext();
   if (!transposeTypeCtx) transposeTypeCtx = transpose->getParent();
   assert(transposeTypeCtx);

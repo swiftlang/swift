@@ -1921,6 +1921,14 @@ public:
   /// Find the lookup table that should contain the given Clang declaration.
   SwiftLookupTable *findLookupTable(const clang::Decl *decl);
 
+  /// Register a Clang declaration synthesized by the importer so that it is
+  /// discoverable by Swift name lookup and resolvable when a cross-reference
+  /// to it is deserialized. Marks it always-visible and adds it to the lookup
+  /// table(s) for \p anchorDecl (and its owning module, to handle
+  /// namespace-spanning C++ declarations).
+  void registerSynthesizedClangDecl(clang::FunctionDecl *synthesizedDecl,
+                                    const clang::Decl *anchorDecl);
+
   /// Visit each of the lookup tables in some deterministic order.
   ///
   /// \param fn Invoke the given visitor for each table. If the
