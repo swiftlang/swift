@@ -8708,10 +8708,6 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
 
-ERROR(borrowingsequence_experimental,none,
-      "'%0' requires -enable-experimental-feature BorrowingSequence",
-      (StringRef))
-
 ERROR(for_loop_sequence_conformance_unavailable,none,
       "for-in loop requires %0 to conform to %1, which is "
       "only available in %2 %3 or newer",

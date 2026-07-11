@@ -1,6 +1,5 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default -Xcc -std=c++20 -enable-experimental-feature BorrowingSequence)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default -Xcc -std=c++20)
 //
-// REQUIRES: swift_feature_BorrowingSequence
 // REQUIRES: executable_test
 // Ubuntu 20.04 ships with an old version of libstdc++, which does not provide
 // std::contiguous_iterator_tag from C++20.

@@ -1,11 +1,7 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:     -enable-experimental-feature BorrowingForLoop \
-// RUN:     -enable-experimental-feature BorrowingSequence \
 // RUN:     -enable-experimental-feature Lifetimes \
 // RUN:     -verify-ignore-unrelated
 
-// REQUIRES: swift_feature_BorrowingForLoop
-// REQUIRES: swift_feature_BorrowingSequence
 // REQUIRES: swift_feature_Lifetimes
 
 @available(SwiftStdlib 6.4, *)

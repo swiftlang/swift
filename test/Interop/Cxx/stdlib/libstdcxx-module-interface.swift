@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t -enable-experimental-feature ImportCxxMembersLazily -enable-experimental-feature BorrowingSequence > %t/interface.swift
+// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t -enable-experimental-feature ImportCxxMembersLazily > %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-STD < %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-SIZE-T < %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-TO-STRING < %t/interface.swift
@@ -13,7 +13,6 @@
 // The RHS of basic_string's typealias value_type depends on how eagerly/lazily
 // we import type members
 // REQUIRES: swift_feature_ImportCxxMembersLazily
-// REQUIRES: swift_feature_BorrowingSequence
 
 // CHECK-STD: enum std {
 // CHECK-STRING:   struct basic_string<CChar, std{{(.__cxx11)?}}.char_traits<CChar>, std{{(.__cxx11)?}}.allocator<CChar>> : CxxMutableRandomAccessCollection, CxxIterable {

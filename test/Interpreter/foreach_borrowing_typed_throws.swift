@@ -1,11 +1,7 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature BorrowingForLoop \
-// RUN: -enable-experimental-feature BorrowingSequence \
-// RUN: -enable-experimental-feature Lifetimes \
+// RUN: %target-run-simple-swift(-enable-experimental-feature Lifetimes \
 // RUN: -Xfrontend -disable-availability-checking) \
 // RUN: %s | %FileCheck %s
 
-// REQUIRES: swift_feature_BorrowingForLoop
-// REQUIRES: swift_feature_BorrowingSequence
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
