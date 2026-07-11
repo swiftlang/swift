@@ -7682,6 +7682,17 @@ bool swift::checkSendableConformance(
       // means the superclass is non-`Sendable`. Subclass cannot safely inherit
       // unprotected state.
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
+        // If the superclass actually conforms to Sendable (e.g. through
+        // @MainActor isolation), skip the diagnostic. The conformance
+        // may not have been inherited due to ordering in the conformance
+        // lookup table, but the superclass is still Sendable.
+        bool superclassConformsToSendable = false;
+        if (auto superclassTy = classDecl->getSuperclass()) {
+          auto superConf = lookupConformance(superclassTy,
+              conformance->getProtocol(), /*allowMissing=*/false);
+          superclassConformsToSendable = superConf.isConcrete();
+        }
+
         // `NSObject` is permitted as a superclass for Objective-C interop.
         // TODO: can `NSObject` be `Sendable` or `~Sendable` instead?
         // Synthesizing a Sendable conformance for global-actor-isolated
@@ -7689,7 +7700,8 @@ bool swift::checkSendableConformance(
         // maintain it for source compatibility. When the conformance
         // is implicit (the user never wrote Sendable), skip the
         // diagnostic entirely.
-        if (!superclassDecl->isNSObject() &&
+        if (!superclassConformsToSendable &&
+            !superclassDecl->isNSObject() &&
             !(isGlobalActorIsolated && isImplicitSendableCheck(check))) {
           // Inheritance checking for global-actor-isolated classes was
           // historically skipped, so we need to downgrade this to a warning to
