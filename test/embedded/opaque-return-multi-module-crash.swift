@@ -13,7 +13,7 @@
 
 // It must also build and run end to end:
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -c -I%t %t/Main.swift -o %t/Main.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/Main.o %t/MyModule.o %target-embedded-posix-shim -o %t/a.out
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/Main.o %t/MyModule.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %t/Main.swift
 
 // REQUIRES: executable_test

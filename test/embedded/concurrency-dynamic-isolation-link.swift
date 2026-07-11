@@ -6,7 +6,7 @@
 
 // Swift 5: compile, link, and run (should succeed — no dynamic isolation check emitted)
 // RUN: %target-swift-frontend -c -I %t %t/Main.swift -enable-experimental-feature Embedded -o %t/a5.o -parse-as-library -swift-version 5
-// RUN: %target-clang %t/a5.o -o %t/a5.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
+// RUN: %target-embedded-link %t/a5.o -o %t/a5.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
 // RUN: %target-run %t/a5.out | %FileCheck %s
 
 // Swift 6: compile, link, and run should all succeed. Dynamic isolation checking
@@ -14,7 +14,7 @@
 // from libswift_Concurrency.a. Actor.cpp.o must not reference full-runtime symbols
 // (like _swift_shouldReportFatalErrorsToDebugger) that are unavailable in embedded mode.
 // RUN: %target-swift-frontend -c -I %t %t/Main.swift -enable-experimental-feature Embedded -o %t/a6.o -parse-as-library -swift-version 6
-// RUN: %target-clang %t/a6.o -o %t/a6.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
+// RUN: %target-embedded-link %t/a6.o -o %t/a6.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
 // RUN: %target-run %t/a6.out | %FileCheck %s
 
 // swift_task_reportUnexpectedExecutor should be referenced in Swift 6 (dynamic
