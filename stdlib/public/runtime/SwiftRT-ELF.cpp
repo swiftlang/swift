@@ -35,9 +35,9 @@ static const void *__backtraceRef __attribute__((used, retain))
 #define BOUNDS_VISIBILITY __attribute__((__visibility__("hidden"), \
                                          __aligned__(1)))
 
-#define DECLARE_BOUNDS(name)                            \
-  BOUNDS_VISIBILITY extern const char __start_##name;   \
-  BOUNDS_VISIBILITY extern const char __stop_##name;
+#define DECLARE_BOUNDS(name)                                                   \
+  BOUNDS_VISIBILITY extern const char __start_##name __attribute__((weak));    \
+  BOUNDS_VISIBILITY extern const char __stop_##name __attribute__((weak));
 
 #define DECLARE_SWIFT_SECTION(name)             \
   DECLARE_EMPTY_METADATA_SECTION(name, "aR")    \
