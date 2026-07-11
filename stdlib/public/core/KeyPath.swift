@@ -425,11 +425,11 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
       // value, or an outer class we've already walked through) still
       // holds a strong reference to them for the duration of `root`'s
       // lifetime.
-      return unsafe withUnsafePointer(to: root) { rootPtr in
+      return withUnsafePointer(to: root) { rootPtr in
         var current = unsafe UnsafeRawPointer(rootPtr)
         while unsafe !buffer.data.isEmpty {
           let (rawComponent, _) = unsafe buffer.next()
-          switch unsafe rawComponent.value {
+          switch rawComponent.value {
           case .struct(let offset):
             unsafe current = unsafe current.advanced(by: offset)
           case .class(let offset):
@@ -606,7 +606,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
       // plain pointer arithmetic — no writeback / keep-alive needed.
       while true {
         let (rawComponent, optNextType) = unsafe buffer.next()
-        switch unsafe rawComponent.value {
+        switch rawComponent.value {
         case .struct(let offset):
           unsafe p = unsafe p.advanced(by: offset)
         default:
@@ -693,12 +693,12 @@ public class ReferenceWritableKeyPath<
       // pointer points into.
       var origBase2 = origBase
       let final: UnsafeMutablePointer<Value> =
-        unsafe withUnsafeMutableBytes(of: &origBase2) { baseBytes in
+        withUnsafeMutableBytes(of: &origBase2) { baseBytes in
           var p = unsafe UnsafeRawPointer(baseBytes.baseAddress
               ._unsafelyUnwrappedUnchecked)
           while true {
             let (rawComponent, optNextType) = unsafe buffer.next()
-            switch unsafe rawComponent.value {
+            switch rawComponent.value {
             case .struct(let offset):
               unsafe p = unsafe p.advanced(by: offset)
             case .class(let offset):
