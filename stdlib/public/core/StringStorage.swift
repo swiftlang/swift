@@ -838,26 +838,6 @@ final internal class __SharedStringStorage
     _breadcrumbs != nil
   }
 
-  internal init(
-    _mortal ptr: UnsafePointer<UInt8>,
-    countAndFlags: _StringObject.CountAndFlags
-  ) {
-    // ptr *must* be the start of an allocation
-    self._owner = nil
-    unsafe self.start = ptr
-    self.immortal = false
-#if _pointerBitWidth(_64)
-    self._countAndFlags = countAndFlags
-#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
-    self._count = countAndFlags.count
-    self._countFlags = countAndFlags.flags
-#else
-#error("Unknown platform")
-#endif
-    super.init()
-    self._invariantCheck()
-  }
-
   deinit {
     if (_owner == nil) && !immortal {
       unsafe start.deallocate()
