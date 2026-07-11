@@ -1191,12 +1191,15 @@ class AssociatedTypeInference {
   Type failedDefaultedWitness;
   CheckTypeWitnessResult failedDefaultedResult = CheckTypeWitnessResult::forSuccess();
 
-  // Which type witness was missing?
+  /// Which type witness was missing?
   AssociatedTypeDecl *missingTypeWitness = nullptr;
 
-  // Was there a conflict in type witness deduction?
+  /// Was there a conflict in type witness deduction?
   std::optional<TypeWitnessConflict> typeWitnessConflict;
   unsigned numTypeWitnessesBeforeConflict = 0;
+
+  /// Number of iterations remaining before we give up.
+  unsigned RemainingIterations = 0;
 
 public:
   AssociatedTypeInference(ASTContext &ctx,
@@ -1292,13 +1295,16 @@ private:
       ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes, unsigned reqDepth);
 
   /// Top-level operation to find solutions for the given unresolved
-  /// associated types.
-  void findSolutions(
+  /// associated types. Returns true if the problem instance is too complex.
+  [[nodiscard]]
+  bool findSolutions(
                  ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
                  SmallVectorImpl<InferredTypeWitnessesSolution> &solutions);
 
   /// Explore the solution space to find both viable and non-viable solutions.
-  void findSolutionsRec(
+  /// Returns true if the problem instance is too complex.
+  [[nodiscard]]
+  bool findSolutionsRec(
          ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
          SmallVectorImpl<InferredTypeWitnessesSolution> &solutions,
          SmallVectorImpl<InferredTypeWitnessesSolution> &nonViableSolutions,
@@ -1336,6 +1342,10 @@ private:
                 ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
                 SmallVectorImpl<InferredTypeWitnessesSolution> &solutions);
 
+  /// Emit a diagnostic that associated type inference reached the iteration
+  /// limit.
+  void diagnoseTooComplex();
+
 public:
   /// Describes a mapping from associated type declarations to their
   /// type witnesses (as interface types).
@@ -1353,7 +1363,9 @@ public:
 AssociatedTypeInference::AssociatedTypeInference(
     ASTContext &ctx, NormalProtocolConformance *conformance)
     : ctx(ctx), conformance(conformance), proto(conformance->getProtocol()),
-      dc(conformance->getDeclContext()), adoptee(conformance->getType()) {}
+      dc(conformance->getDeclContext()), adoptee(conformance->getType()) {
+  RemainingIterations = ctx.LangOpts.AssociatedTypeInferenceIterations;
+}
 
 namespace {
 
@@ -3369,7 +3381,8 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
   return nullptr;
 }
 
-void AssociatedTypeInference::findSolutions(
+/// Returns true if the problem instance was too complex.
+bool AssociatedTypeInference::findSolutions(
                    ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
                    SmallVectorImpl<InferredTypeWitnessesSolution> &solutions) {
   FrontendStatsTracer StatsTracer(getASTContext().Stats,
@@ -3377,8 +3390,14 @@ void AssociatedTypeInference::findSolutions(
 
   SmallVector<InferredTypeWitnessesSolution, 4> nonViableSolutions;
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 4> valueWitnesses;
-  findSolutionsRec(unresolvedAssocTypes, solutions, nonViableSolutions,
-                   valueWitnesses, 0, 0, 0);
+  bool tooComplex
+      = findSolutionsRec(unresolvedAssocTypes, solutions, nonViableSolutions,
+                         valueWitnesses, 0, 0, 0);
+
+  if (tooComplex) {
+    LLVM_DEBUG(llvm::dbgs() << "=== Iteration limit reached\n");
+    return true;
+  }
 
   for (auto solution : solutions) {
     LLVM_DEBUG(llvm::dbgs() << "=== Valid solution:\n";);
@@ -3389,9 +3408,13 @@ void AssociatedTypeInference::findSolutions(
     LLVM_DEBUG(llvm::dbgs() << "=== Invalid solution:\n";);
     LLVM_DEBUG(solution.dump(llvm::dbgs()));
   }
+
+  return false;
 }
 
-void AssociatedTypeInference::findSolutionsRec(
+/// Explore the solution space to find both viable and non-viable solutions.
+/// Returns true if the problem instance is too complex.
+bool AssociatedTypeInference::findSolutionsRec(
           ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
           SmallVectorImpl<InferredTypeWitnessesSolution> &solutions,
           SmallVectorImpl<InferredTypeWitnessesSolution> &nonViableSolutions,
@@ -3399,12 +3422,19 @@ void AssociatedTypeInference::findSolutionsRec(
           unsigned numTypeWitnesses,
           unsigned numValueWitnessesInProtocolExtensions,
           unsigned reqDepth) {
+  // The problem is NP-hard so we have to give up at some point if we haven't
+  // yet found all the solutions.
+  if (RemainingIterations == 0)
+    return true;
+
+  --RemainingIterations;
+
   // If this solution is going to be worse than what we've already recorded,
-  // give up now.
+  // skip it.
   if (!solutions.empty() &&
       solutions.front().NumValueWitnessesInProtocolExtensions
           < numValueWitnessesInProtocolExtensions) {
-    return;
+    return false;
   }
 
   using TypeWitnessesScope = decltype(typeWitnesses)::ScopeTy;
@@ -3442,7 +3472,7 @@ void AssociatedTypeInference::findSolutionsRec(
 
           LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
                      << "+ Recorded an erroneous type witness\n";);
-          return;
+          return false;
         }
       }
     }
@@ -3458,7 +3488,7 @@ void AssociatedTypeInference::findSolutionsRec(
 
       LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
                  << "+ Failed to infer abstract witnesses\n";);
-      return;
+      return false;
     }
 
     ++NumSolutionStates;
@@ -3466,7 +3496,7 @@ void AssociatedTypeInference::findSolutionsRec(
     if (simplifyCurrentTypeWitnesses()) {
       LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
                  << "+ Unsubstituted witnesses remain\n";);
-      return;
+      return false;
     }
 
     /// Check the current set of type witnesses.
@@ -3500,11 +3530,11 @@ void AssociatedTypeInference::findSolutionsRec(
         LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
                    << "+ Duplicate invalid solution found\n";);
         ++NumDuplicateSolutionStates;
-        return;
+        return false;
       }
 
       nonViableSolutions.push_back(std::move(solution));
-      return;
+      return false;
     }
 
     // For valid solutions, we want to find the best solution if one exists.
@@ -3519,7 +3549,7 @@ void AssociatedTypeInference::findSolutionsRec(
       LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
                  << "+ Solution is worse than some existing solution\n";);
       ++NumDuplicateSolutionStates;
-      return;
+      return false;
     }
 
     // If any existing solutions are clearly worse than this solution,
@@ -3537,7 +3567,7 @@ void AssociatedTypeInference::findSolutionsRec(
 
     solutions.push_back(std::move(solution));
 
-    return;
+    return false;
   }
 
   // Iterate over the potential witnesses for this requirement,
@@ -3559,12 +3589,17 @@ void AssociatedTypeInference::findSolutionsRec(
       if (!isa<TypeDecl>(inferredReq.first))
         ++numValueWitnessesInProtocolExtensions;
       valueWitnesses.push_back({inferredReq.first, nullptr});
-      findSolutionsRec(unresolvedAssocTypes, solutions, nonViableSolutions,
-                       valueWitnesses, numTypeWitnesses,
-                       numValueWitnessesInProtocolExtensions, reqDepth + 1);
+      bool tooComplex
+        = findSolutionsRec(unresolvedAssocTypes, solutions, nonViableSolutions,
+                           valueWitnesses, numTypeWitnesses,
+                           numValueWitnessesInProtocolExtensions, reqDepth + 1);
       valueWitnesses.pop_back();
       if (!isa<TypeDecl>(inferredReq.first))
         --numValueWitnessesInProtocolExtensions;
+
+      if (tooComplex)
+        return true;
+
       continue;
     }
 
@@ -3587,10 +3622,14 @@ void AssociatedTypeInference::findSolutionsRec(
         typeWitnesses.insert(typeWitness.first, {typeWitness.second, reqDepth});
 
         valueWitnesses.push_back({inferredReq.first, witnessReq.Witness});
-        findSolutionsRec(unresolvedAssocTypes, solutions, nonViableSolutions,
-                         valueWitnesses, numTypeWitnesses,
-                         numValueWitnessesInProtocolExtensions, reqDepth + 1);
+        bool tooComplex
+            = findSolutionsRec(unresolvedAssocTypes, solutions, nonViableSolutions,
+                               valueWitnesses, numTypeWitnesses,
+                               numValueWitnessesInProtocolExtensions, reqDepth + 1);
         valueWitnesses.pop_back();
+
+        if (tooComplex)
+          return true;
       }
 
       continue;
@@ -3688,10 +3727,16 @@ void AssociatedTypeInference::findSolutionsRec(
       continue;
 
     // Recurse
-    findSolutionsRec(unresolvedAssocTypes, solutions, nonViableSolutions,
-                     valueWitnesses, numTypeWitnesses,
-                     numValueWitnessesInProtocolExtensions, reqDepth + 1);
+    bool tooComplex
+        = findSolutionsRec(unresolvedAssocTypes, solutions, nonViableSolutions,
+                           valueWitnesses, numTypeWitnesses,
+                           numValueWitnessesInProtocolExtensions, reqDepth + 1);
+
+    if (tooComplex)
+      return true;
   }
+
+  return false;
 }
 
 static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
@@ -4233,6 +4278,15 @@ bool AssociatedTypeInference::diagnoseAmbiguousSolutions(
   return false;
 }
 
+void AssociatedTypeInference::diagnoseTooComplex() {
+  ctx.addDelayedConformanceDiag(conformance, true,
+    [](NormalProtocolConformance *conformance) {
+      conformance->getDeclContext()->getAsDecl()
+          ->diagnose(diag::associated_type_inference_too_complex,
+                     conformance->getType(), conformance->getProtocol());
+    });
+}
+
 auto AssociatedTypeInference::solve() -> std::optional<InferredTypeWitnesses> {
   LLVM_DEBUG(llvm::dbgs() << "============ Start " << conformance->getType()
                           << ": " << conformance->getProtocol()->getName()
@@ -4301,7 +4355,23 @@ auto AssociatedTypeInference::solve() -> std::optional<InferredTypeWitnesses> {
 
   // Compute the set of solutions.
   SmallVector<InferredTypeWitnessesSolution, 4> solutions;
-  findSolutions(unresolvedAssocTypes.getArrayRef(), solutions);
+  bool tooComplex
+      = findSolutions(unresolvedAssocTypes.getArrayRef(), solutions);
+
+  // If we exceeded the iteration limit, diagnose and immediately give up.
+  //
+  // We intentionally don't even look at any of the solutions we found,
+  // because we can't be sure we've found them all.
+  if (tooComplex) {
+    diagnoseTooComplex();
+
+    // Save the missing type witnesses for later diagnosis.
+    for (auto assocType : unresolvedAssocTypes) {
+      ctx.addDelayedMissingWitness(conformance, {assocType, {}});
+    }
+
+    return std::nullopt;
+  }
 
   // Go make sure that type declarations that would act as witnesses
   // did not get injected while we were performing checks above. This
