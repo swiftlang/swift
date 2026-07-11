@@ -6,12 +6,11 @@
 // contiguous iterators.
 //
 // RUN: %if !(LinuxDistribution=ubuntu-20.04 || LinuxDistribution=amzn-2) %{ \
-// RUN:   %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++20 -enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature BorrowingSequence -DCPP20 -verify-additional-prefix cpp20- \
+// RUN:   %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++20 -enable-experimental-feature SuppressedAssociatedTypesWithDefaults -DCPP20 -verify-additional-prefix cpp20- \
 // RUN: %}
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature SuppressedAssociatedTypesWithDefaults -enable-experimental-feature BorrowingSequence
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
 
 // REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
-// REQUIRES: swift_feature_BorrowingSequence
 
 import CustomIterator
 

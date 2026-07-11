@@ -3704,10 +3704,6 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 bool swift::shouldUseIterable(ASTContext &ctx, Type seqTy,
                                        bool isAsync, SourceLoc loc,
                                        DeclContext *dc) {
-  if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
-    return false;
-  }
-
   if (isAsync || seqTy->isExistentialType()) {
     return false;
   }
