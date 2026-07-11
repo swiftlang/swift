@@ -590,7 +590,7 @@ EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 LANGUAGE_FEATURE(BorrowAndMutateAccessors, 507, "borrow and mutate accessors")
 
 /// Enable borrowing for-in loops
-EXPERIMENTAL_FEATURE(BorrowingForLoop, true)
+LANGUAGE_FEATURE(BorrowingForLoop, 0, "borrowing for-in loops")
 
 /// Allow use of @inline(always) attribute
 SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
@@ -633,7 +633,7 @@ EXPERIMENTAL_FEATURE(Reparenting, true)
 EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
 
 /// Allow access to the Iterable protocols/types outside the stdlib.
-EXPERIMENTAL_FEATURE(BorrowingSequence, true)
+LANGUAGE_FEATURE(BorrowingSequence, 516, "Iterable protocol")
 
 /// Turns some source breaking access control warnings into errors.
 EXPERIMENTAL_FEATURE(StrictAccessControl, true)
