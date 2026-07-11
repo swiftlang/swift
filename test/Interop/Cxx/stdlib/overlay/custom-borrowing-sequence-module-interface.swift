@@ -1,7 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterable -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -module-cache-path %t -I %swift_src_root/lib/ClangImporter/SwiftBridging | %FileCheck %s
 
-// REQUIRES: swift_feature_BorrowingSequence
-
 // CHECK:     struct SimpleNonCopyableSequence : ~Copyable, CxxIterable {
 // CHECK:       typealias Element = ConstIterator.Pointee
 // CHECK:       typealias RawIterator = ConstIterator

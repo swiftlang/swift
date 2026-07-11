@@ -1033,9 +1033,6 @@ static void conformToCxxIterableIfNeeded(
   PrettyStackTraceDecl trace("trying to conform to CxxIterable", decl);
   ASTContext &ctx = decl->getASTContext();
 
-  if (!ctx.LangOpts.hasFeature(Feature::BorrowingSequence))
-    return;
-
   ProtocolDecl *cxxIteratorProto =
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
   ProtocolDecl *cxxIterableProto =

@@ -1,11 +1,14 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -g -Xllvm -sil-print-debuginfo-verbose %s
+
+// RUN: not --crash %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values -o /dev/null %s
+
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
 // RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
-// RUN:     -enable-experimental-feature BorrowingForLoop \
-// RUN:     -enable-experimental-feature BorrowingSequence \
-// RUN:     %s | %FileCheck %s
-
-// REQUIRES: swift_feature_BorrowingForLoop
-// REQUIRES: swift_feature_BorrowingSequence
+// RUN:     %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ADDR
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
+// RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
+// RUN:     -enable-sil-opaque-values \
+// RUN:     %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPAQUE
 
 struct NoncopyableInt: ~Copyable {
   var value: Int
