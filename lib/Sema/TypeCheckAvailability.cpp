@@ -2654,11 +2654,6 @@ public:
                               DeclAvailabilityFlags flags = std::nullopt) const;
 
 private:
-  bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R) const;
-  bool diagnoseMemoryLayoutMigration(const ValueDecl *D, SourceRange R,
-                                     SemanticAvailableAttr,
-                                     const ApplyExpr *call) const;
-
   /// Walks up from a potential callee to the enclosing ApplyExpr.
   const ApplyExpr *getEnclosingApplyExpr() const {
     ArrayRef<const Expr *> parents = ExprStack;
@@ -3024,14 +3019,6 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   if (D->getModuleContext()->isBuiltinModule())
     return false;
 
-  if (auto attr = D->getUnavailableAttr()) {
-    if (diagnoseIncDecRemoval(D, R))
-      return true;
-    if (isa_and_nonnull<ApplyExpr>(call) &&
-        diagnoseMemoryLayoutMigration(D, R, *attr, cast<ApplyExpr>(call)))
-      return true;
-  }
-
   if (diagnoseDeclAvailability(
           D, R, call, Where,
           Flags | DeclAvailabilityFlag::DisableUnsafeChecking))
@@ -3225,142 +3212,6 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 
   return !Flags.contains(
       DeclAvailabilityFlag::ContinueOnPotentialUnavailability);
-}
-
-/// Return true if the specified type looks like an integer of floating point
-/// type.
-static bool isIntegerOrFloatingPointType(Type ty) {
-  return (TypeChecker::conformsToKnownProtocol(
-            ty, KnownProtocolKind::ExpressibleByIntegerLiteral) ||
-          TypeChecker::conformsToKnownProtocol(
-            ty, KnownProtocolKind::ExpressibleByFloatLiteral));
-}
-
-
-/// If this is a call to an unavailable ++ / -- operator, try to diagnose it
-/// with a fixit hint and return true.  If not, or if we fail, return false.
-bool
-ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R) const {
-  // We can only produce a fixit if we're talking about ++ or --.
-  bool isInc = D->getBaseName() == "++";
-  if (!isInc && D->getBaseName() != "--")
-    return false;
-
-  // We can only handle the simple cases of lvalue++ and ++lvalue.  This is
-  // always modeled as:
-  //   (postfix_unary_expr (declrefexpr ++), (inoutexpr (lvalue)))
-  // if not, bail out.
-  if (ExprStack.size() != 2 ||
-      !isa<DeclRefExpr>(ExprStack[1]) ||
-      !(isa<PostfixUnaryExpr>(ExprStack[0]) ||
-        isa<PrefixUnaryExpr>(ExprStack[0])))
-    return false;
-
-  auto call = cast<ApplyExpr>(ExprStack[0]);
-
-  // If the expression type is integer or floating point, then we can rewrite it
-  // to "lvalue += 1".
-  std::string replacement;
-  if (isIntegerOrFloatingPointType(call->getType()))
-    replacement = isInc ? " += 1" : " -= 1";
-  else {
-    // Otherwise, it must be an index type.  Rewrite to:
-    // "lvalue = lvalue.successor()".
-    auto &SM = Context.SourceMgr;
-    auto CSR = Lexer::getCharSourceRangeFromSourceRange(
-        SM, call->getArgs()->getSourceRange());
-    replacement = " = " + SM.extractText(CSR).str();
-    replacement += isInc ? ".successor()" : ".predecessor()";
-  }
-  
-  if (!replacement.empty()) {
-    // If we emit a deprecation diagnostic, produce a fixit hint as well.
-    auto diag =
-        Context.Diags.diagnose(R.Start, diag::availability_decl_unavailable, D,
-                               true, AvailabilityDomain::forSwiftLanguageMode(),
-                               "it has been removed in Swift 3");
-    if (isa<PrefixUnaryExpr>(call)) {
-      // Prefix: remove the ++ or --.
-      diag.fixItRemove(call->getFn()->getSourceRange());
-      diag.fixItInsertAfter(call->getArgs()->getEndLoc(), replacement);
-    } else {
-      // Postfix: replace the ++ or --.
-      diag.fixItReplace(call->getFn()->getSourceRange(), replacement);
-    }
-
-    return true;
-  }
-
-
-  return false;
-}
-
-/// If this is a call to an unavailable sizeof family function, diagnose it
-/// with a fixit hint and return true. If not, or if we fail, return false.
-bool
-ExprAvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
-                                                      SourceRange R,
-                                                      SemanticAvailableAttr Attr,
-                                                      const ApplyExpr *call) const {
-
-  if (!D->getModuleContext()->isStdlibModule())
-    return false;
-
-  StringRef Property;
-  if (D->getBaseName() == "sizeof") {
-    Property = "size";
-  } else if (D->getBaseName() == "alignof") {
-    Property = "alignment";
-  } else if (D->getBaseName() == "strideof") {
-    Property = "stride";
-  }
-
-  if (Property.empty())
-    return false;
-
-  auto *args = call->getArgs();
-  auto *subject = args->getUnlabeledUnaryExpr();
-  if (!subject)
-    return false;
-
-  EncodedDiagnosticMessage EncodedMessage(Attr.getMessage());
-  auto diag = Context.Diags.diagnose(
-      R.Start, diag::availability_decl_unavailable, D, true,
-      AvailabilityDomain::forSwiftLanguageMode(), EncodedMessage.Message);
-  diag.highlight(R);
-
-  StringRef Prefix = "MemoryLayout<";
-  StringRef Suffix = ">.";
-
-  if (auto DTE = dyn_cast<DynamicTypeExpr>(subject)) {
-    // Replace `sizeof(type(of: x))` with `MemoryLayout<X>.size`, where `X` is
-    // the static type of `x`. The previous spelling misleadingly hinted that
-    // `sizeof(_:)` might return the size of the *dynamic* type of `x`, when
-    // it is not the case.
-    auto valueType = DTE->getBase()->getType()->getRValueType();
-    if (!valueType || valueType->hasError()) {
-      // If we don't have a suitable argument, we can't emit a fixit.
-      return true;
-    }
-    // Note that in rare circumstances we may be destructively replacing the
-    // source text. For example, we'd replace `sizeof(type(of: doSomething()))`
-    // with `MemoryLayout<T>.size`, if T is the return type of `doSomething()`.
-    diag.fixItReplace(call->getSourceRange(),
-                   (Prefix + valueType->getString() + Suffix + Property).str());
-  } else {
-    SourceRange PrefixRange(call->getStartLoc(), args->getLParenLoc());
-    SourceRange SuffixRange(args->getRParenLoc());
-
-    // We must remove `.self`.
-    if (auto *DSE = dyn_cast<DotSelfExpr>(subject))
-      SuffixRange.Start = DSE->getDotLoc();
-
-    diag
-      .fixItReplace(PrefixRange, Prefix)
-      .fixItReplace(SuffixRange, (Suffix + Property).str());
-  }
-
-  return true;
 }
 
 /// Diagnose uses of unavailable declarations.
