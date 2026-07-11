@@ -463,3 +463,12 @@ func callCopyClosureNE(ne: NE) -> NE {
   let neo = explicitCopyClosureNE { ne }
   return neo
 }
+
+struct HasStaticMethod {
+  static func takesInoutNE(_ x: inout NE) {}
+}
+func takesInoutNE(_ x: inout NE) {}
+func id<T>(_ x: T) -> T {}
+
+var _: (inout NE) -> Void = id(takesInoutNE)
+var _: (inout NE) -> Void = id(HasStaticMethod.takesInoutNE)
