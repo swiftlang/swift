@@ -653,6 +653,9 @@ namespace swift {
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 
+    /// Maximum iteration count for associated type inference.
+    unsigned AssociatedTypeInferenceIterations = 1000000;
+
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
 

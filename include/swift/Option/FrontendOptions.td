@@ -553,6 +553,10 @@ def max_substitution_count : Joined<["-"], "max-substitution-count=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum step count for type substitution operations">;
 
+def max_associated_type_inference_iterations : Joined<["-"], "max-associated-type-inference-iterations=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Maximum number of iterations to attempt in the type witness solver">;
+
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 
