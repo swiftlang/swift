@@ -1,0 +1,810 @@
+// RUN: %target-sil-opt %s -test-runner -sil-verify-none | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class Kl {}
+class Sub : Kl {}
+struct Wrapper { var k: Kl }
+
+sil @getK : $@convention(thin) () -> @owned Kl
+sil @useK : $@convention(thin) (@guaranteed Kl) -> ()
+sil @consumeK : $@convention(thin) (@owned Kl) -> ()
+sil @consumeTwoK : $@convention(thin) (@owned Kl, @owned Kl) -> ()
+sil @barrierK : $@convention(thin) () -> ()
+sil @useRawPtr : $@convention(thin) (Builtin.RawPointer) -> ()
+
+
+
+// CHECK-LABEL: sil [ossa] @test_copy_before_interior_consume :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[V]]
+// CHECK-NEXT: apply {{%.*}}([[COPY]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_copy_before_interior_consume : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// CHECK-LABEL: sil [ossa] @test_use_before_final_consume :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NOT:  destroy_value
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_use_before_final_consume : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// CHECK-LABEL: sil [ossa] @test_hoist_destroy_across_branch :
+// CHECK: [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+
+// CHECK: bb1:
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: br bb3
+
+// CHECK: bb2:
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-NEXT: br bb3
+
+// CHECK-NOT:  destroy_value
+// CHECK: } // end sil function
+sil [ossa] @test_hoist_destroy_across_branch : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  br bb3
+
+bb2:
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  br bb3
+
+bb3:
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// CHECK-LABEL: sil [ossa] @test_copy_and_hoist_across_branch :
+// CHECK: [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+
+// CHECK: bb1:
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[V]]
+// CHECK-NEXT: apply {{%.*}}([[COPY]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-NEXT: br bb3
+
+// CHECK: bb2:
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: br bb3
+
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function
+sil [ossa] @test_copy_and_hoist_across_branch : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  br bb3
+
+bb2:
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  br bb3
+
+bb3:
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// CHECK-LABEL: sil [ossa] @test_hoist_into_dead_end :
+// CHECK: [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+
+// CHECK: bb1:
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: br bb3
+
+// CHECK: bb2:
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: destroy_value [dead_end] [[V]]
+// CHECK-NEXT: apply
+// CHECK-NEXT: unreachable
+
+// CHECK-NOT:  destroy_value
+// CHECK: } // end sil function
+sil [ossa] @test_hoist_into_dead_end : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %failFn = function_ref @barrierK : $@convention(thin) () -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  br bb3
+
+bb2:
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  apply %failFn() : $@convention(thin) () -> ()
+  unreachable
+
+bb3:
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// CHECK-LABEL: sil [ossa] @test_consume_inside_loop :
+// CHECK: [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+
+// CHECK: bb1:
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[V]]
+// CHECK-NEXT: apply {{%.*}}([[COPY]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: cond_br undef, bb1, bb2
+
+// CHECK: bb2:
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK: } // end sil function
+sil [ossa] @test_consume_inside_loop : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  br bb1
+
+bb1:
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// CHECK-LABEL: sil [ossa] @test_copy_before_assign :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[ADDR:%.*]] = alloc_stack $Kl
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[V]]
+// CHECK-NEXT: assign [[COPY]] to [[ADDR]]
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-NEXT: destroy_addr [[ADDR]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_copy_before_assign : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %addr = alloc_stack $Kl
+  specify_test "lifetime_resolution_resolve %0"
+  assign %0 to %addr : $*Kl
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  destroy_value %0
+  destroy_addr %addr : $*Kl
+  dealloc_stack %addr : $*Kl
+  %t = tuple ()
+  return %t
+}
+
+
+
+// CHECK-LABEL: sil [ossa] @test_hoist_destroy_across_assign_branch :
+// CHECK: [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK: [[ADDR:%.*]] = alloc_stack $Kl
+
+// CHECK: bb1:
+// CHECK-NEXT: assign [[V]] to [[ADDR]]
+// CHECK-NEXT: br bb3
+
+// CHECK: bb2:
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-NEXT: br bb3
+
+// CHECK: bb3:
+// CHECK-NOT:  destroy_value
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_hoist_destroy_across_assign_branch : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %addr = alloc_stack $Kl
+  specify_test "lifetime_resolution_resolve %0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  assign %0 to %addr : $*Kl
+  br bb3
+
+bb2:
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  br bb3
+
+bb3:
+  destroy_value %0
+  destroy_addr %addr : $*Kl
+  dealloc_stack %addr : $*Kl
+  %t = tuple ()
+  return %t
+}
+
+
+// A deinit barrier appearing between the lifetime end-point of a lexical value and a final consume
+// forces that consume to only consume a copy, keeping the original value live.
+
+// CHECK-LABEL: sil [ossa] @test_deinit_barrier_forces_boundary_consume_copy :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[LEX:%.*]] = move_value [lexical] [[V]]
+// CHECK-NEXT: [[LEX_COPY:%.*]] = copy_value [[LEX]]
+// CHECK-NEXT: apply {{%.*}}([[LEX_COPY]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: apply {{%.*}}() : $@convention(thin) () -> ()
+// CHECK-NEXT: destroy_value [[LEX]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_deinit_barrier_forces_boundary_consume_copy : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %consumeFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %barrierFn = function_ref @barrierK : $@convention(thin) () -> ()
+  %raw = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %0 = move_value [lexical] %raw
+  specify_test "lifetime_resolution_resolve %0"
+  apply %consumeFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  apply %barrierFn() : $@convention(thin) () -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+// A lexical value's destroy must not be hoisted across a deinit barrier that lies
+// between its last non-consuming use and its original scope-end destroy.
+
+// CHECK-LABEL: sil [ossa] @test_lexical_no_hoist_across_barrier :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[LEX:%.*]] = move_value [lexical] [[V]]
+// CHECK-NEXT: apply {{%.*}}([[LEX]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: apply {{%.*}}() : $@convention(thin) () -> ()
+// CHECK-NEXT: destroy_value [[LEX]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_lexical_no_hoist_across_barrier : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %barrierFn = function_ref @barrierK : $@convention(thin) () -> ()
+  %raw = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %0 = move_value [lexical] %raw
+  specify_test "lifetime_resolution_resolve %0"
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  apply %barrierFn() : $@convention(thin) () -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+// Similar to above, but now we have no use of the value, yet there is a deinit barrier
+// before the destroy:
+
+// CHECK-LABEL: sil [ossa] @test_dead_def_lexical_barrier :
+// CHECK:      [[LEX:%.*]] = move_value [lexical]
+// CHECK:      apply {{%.*}}() : $@convention(thin) () -> ()
+// CHECK-NEXT: destroy_value [[LEX]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_dead_def_lexical_barrier : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %barrierFn = function_ref @barrierK : $@convention(thin) () -> ()
+  %raw = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %0 = move_value [lexical] %raw
+  specify_test "lifetime_resolution_resolve %0"
+  apply %barrierFn() : $@convention(thin) () -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// Contrast with the above: absent a real deinit barrier, a lexical value's destroy
+// still hoists to its last non-consuming use, same as a non-lexical value would.
+
+// CHECK-LABEL: sil [ossa] @test_lexical_hoist_without_barrier :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[LEX:%.*]] = move_value [lexical] [[V]]
+// CHECK-NEXT: apply {{%.*}}([[LEX]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: destroy_value [[LEX]]
+// CHECK-NEXT: tuple ()
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_lexical_hoist_without_barrier : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %raw = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %0 = move_value [lexical] %raw
+  specify_test "lifetime_resolution_resolve %0"
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  %ignore = tuple ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// Branching version: one arm consumes the lexical value outright (no destroy needed
+// there), the other has a non-consuming use followed by a deinit barrier before the
+// merge point's shared destroy. The barrier must block hoisting on the using arm only.
+
+// CHECK-LABEL: sil [ossa] @test_lexical_hoist_across_branch_with_barrier :
+// CHECK: [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[LEX:%.*]] = move_value [lexical] [[V]]
+
+// CHECK: bb1:
+// CHECK-NEXT: apply {{%.*}}([[LEX]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: br bb3
+
+// CHECK: bb2:
+// CHECK-NEXT: apply {{%.*}}([[LEX]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: apply {{%.*}}() : $@convention(thin) () -> ()
+// CHECK-NEXT: destroy_value [[LEX]]
+// CHECK-NEXT: br bb3
+
+// CHECK: bb3:
+// CHECK-NOT: destroy_value
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_lexical_hoist_across_branch_with_barrier : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %barrierFn = function_ref @barrierK : $@convention(thin) () -> ()
+  %raw = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %0 = move_value [lexical] %raw
+  specify_test "lifetime_resolution_resolve %0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  br bb3
+
+bb2:
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  apply %barrierFn() : $@convention(thin) () -> ()
+  br bb3
+
+bb3:
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+// Similar to above, but now the barrier is at the join point.
+// Since we cannot destroy the lexical value before the barrier, a copy is required on the consuming side.
+
+// CHECK-LABEL: sil [ossa] @test_lexical_hoist_join_point_barrier :
+// CHECK: [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[LEX:%.*]] = move_value [lexical] [[V]]
+
+// CHECK: bb1:
+// CHECK-NEXT: [[LEX_COPY:%.*]] = copy_value [[LEX]]
+// CHECK-NEXT: apply {{%.*}}([[LEX_COPY]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: br bb3
+
+// CHECK: bb2:
+// CHECK-NEXT: apply {{%.*}}([[LEX]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: br bb3
+
+// CHECK: bb3:
+// CHECK-NEXT: apply {{%.*}}() : $@convention(thin) () -> ()
+// CHECK-NEXT: destroy_value [[LEX]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_lexical_hoist_join_point_barrier : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %barrierFn = function_ref @barrierK : $@convention(thin) () -> ()
+  %raw = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %0 = move_value [lexical] %raw
+  specify_test "lifetime_resolution_resolve %0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  br bb3
+
+bb2:
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  br bb3
+
+bb3:
+  apply %barrierFn() : $@convention(thin) () -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+// CHECK-LABEL: sil [ossa] @test_use_before_branch_consume :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: cond_br
+
+// CHECK: bb1:
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: br bb3
+
+// CHECK: bb2:
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-NEXT: br bb3
+// CHECK-NOT:  destroy_value
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_use_before_branch_consume : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+// CHECK-LABEL: sil [ossa] @test_interior_destroy :
+// CHECK:      [[V:%.*]] = mark_uninitialized [rootself] %0
+// CHECK-NEXT: return [[V]]
+// CHECK-NEXT: } // end sil function
+sil [ossa] @test_interior_destroy : $@convention(method) (@owned Kl) -> @owned Kl {
+bb0(%0 : @owned $Kl):
+  debug_value %0, let, name "self", argno 1
+  %2 = mark_uninitialized [rootself] %0
+  specify_test "lifetime_resolution_resolve %2"
+  destroy_value %2
+  return %2
+}
+
+
+// A borrow scope is an interval, not a point: the destroy must land after the `end_borrow`,
+// never inside the scope.
+
+// CHECK-LABEL: sil [ossa] @test_borrow_scope :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[B:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT: apply {{%.*}}([[B]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: end_borrow [[B]]
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_borrow_scope : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %b = begin_borrow %0
+  apply %useFn(%b) : $@convention(thin) (@guaranteed Kl) -> ()
+  end_borrow %b
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// CHECK-LABEL: sil [ossa] @test_borrow_scope_then_consume :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[B:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT: apply {{%.*}}([[B]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: end_borrow [[B]]
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NOT:  destroy_value
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_borrow_scope_then_consume : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %b = begin_borrow %0
+  apply %useFn(%b) : $@convention(thin) (@guaranteed Kl) -> ()
+  end_borrow %b
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// Consumed on one path with no non-consuming use anywhere: the other path still needs a
+// destroy, which lands at its entry.
+
+// CHECK-LABEL: sil [ossa] @test_consume_one_path_no_use :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+
+// CHECK: bb1:
+// CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: br bb3
+
+// CHECK: bb2:
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-NEXT: br bb3
+
+// CHECK: bb3:
+// CHECK-NOT:  destroy_value
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_consume_one_path_no_use : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// The root's only use is a forwarding consume, so it needs no destroy of its own; the
+// forwarded aggregate keeps its.
+
+// CHECK-LABEL: sil [ossa] @test_forwarding_consume_only :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[W:%.*]] = struct $Wrapper ([[V]])
+// CHECK-NEXT: destroy_value [[W]]
+// CHECK-NOT:  destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_forwarding_consume_only : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %1 = struct $Wrapper (%0 : $Kl)
+  destroy_value %1
+  %t = tuple ()
+  return %t
+}
+
+
+
+// A lexical value consumed at every boundary point needs no destroy, even though a deinit
+// barrier sits below the consume.
+
+// CHECK-LABEL: sil [ossa] @test_lexical_barrier_below_consume :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: [[LEX:%.*]] = move_value [lexical] [var_decl] [[V]]
+// CHECK-NEXT: apply {{%.*}}([[LEX]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: destroy_value [[LEX]]
+// CHECK-NOT:  destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_lexical_barrier_below_consume : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  %1 = move_value [lexical] [var_decl] %0
+  apply %useFn(%1) : $@convention(thin) (@guaranteed Kl) -> ()
+  destroy_value %1
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @test_lexical_barrier_below_consume_branch :
+// CHECK:      [[LEX:%.*]] = move_value [lexical]
+
+// CHECK: bb1:
+// CHECK-NEXT: [[LEX_COPY:%.*]] = copy_value [[LEX]]
+// CHECK-NEXT: apply {{%.*}}([[LEX_COPY]]) : $@convention(thin) (@owned Kl) -> ()
+// CHECK-NEXT: apply {{%.*}}() : $@convention(thin) () -> ()
+// CHECK-NEXT: destroy_value [[LEX]]
+// CHECK-NEXT: br bb3
+
+// CHECK: bb2:
+// CHECK-NEXT: apply {{%.*}}([[LEX]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: apply {{%.*}}() : $@convention(thin) () -> ()
+// CHECK-NEXT: destroy_value [[LEX]]
+// CHECK-NEXT: br bb3
+
+// CHECK: bb3:
+// CHECK-NOT:  destroy_value
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_lexical_barrier_below_consume_branch : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %barrierFn = function_ref @barrierK : $@convention(thin) () -> ()
+  %raw = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %0 = move_value [lexical] %raw
+  specify_test "lifetime_resolution_resolve %0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %consFn(%0) : $@convention(thin) (@owned Kl) -> ()
+  apply %barrierFn() : $@convention(thin) () -> ()
+  br bb3
+
+bb2:
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  apply %barrierFn() : $@convention(thin) () -> ()
+  br bb3
+
+bb3:
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @test_no_use_destroy :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK: } // end sil function
+sil [ossa] @test_no_use_destroy : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @test_dead_def_distant_destroy :
+// CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
+// CHECK:      destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_dead_def_distant_destroy : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %barrierFn = function_ref @barrierK : $@convention(thin) () -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  specify_test "lifetime_resolution_resolve %0"
+  apply %barrierFn() : $@convention(thin) () -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+
+// CHECK-LABEL: sil [ossa] @test_dead_def_block_arg :
+// CHECK: bb2([[V:%.*]] : @owned $Kl):
+// CHECK:      destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_dead_def_block_arg : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
+  checked_cast_br Kl in %0 to Sub, bb1, bb2
+
+bb1(%1 : @owned $Sub):
+  destroy_value %1
+  br bb3
+
+bb2(%2 : @owned $Kl):
+  specify_test "lifetime_resolution_resolve @argument"
+  destroy_value %2
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t
+}
+
+// An `@owned` block argument has no defining instruction, but is still resolved. It is
+// lexical, so the barrier below its use blocks hoisting.
+
+// CHECK-LABEL: sil [ossa] @test_owned_block_arg :
+// CHECK: bb0([[V:%.*]] : @owned $Kl):
+// CHECK:      apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
+// CHECK-NEXT: apply {{%.*}}() : $@convention(thin) () -> ()
+// CHECK-NEXT: destroy_value [[V]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_owned_block_arg : $@convention(thin) (@owned Kl) -> () {
+bb0(%0 : @owned $Kl):
+  %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
+  %barrierFn = function_ref @barrierK : $@convention(thin) () -> ()
+  specify_test "lifetime_resolution_resolve @argument[0]"
+  apply %useFn(%0) : $@convention(thin) (@guaranteed Kl) -> ()
+  apply %barrierFn() : $@convention(thin) () -> ()
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+
+// CHECK-LABEL: sil [ossa] @test_trivial_root :
+// CHECK:      integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: tuple ()
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_trivial_root : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  specify_test "lifetime_resolution_resolve %0"
+  %t = tuple ()
+  return %t
+}
