@@ -65,6 +65,17 @@ protected:
 public:
   SmallVector<MatchedPair, 4> pairs;
 
+  /// Check whether two parameter flags are compatible for pack matching.
+  /// Ownership conversions (e.g. borrowing <-> consuming) are valid and
+  /// should not break matching; only truly incompatible flags (inout,
+  /// variadic, autoclosure) must differ.
+  static bool areFlagsCompatible(ParameterTypeFlags lhs,
+                                 ParameterTypeFlags rhs) {
+    return lhs.isInOut() == rhs.isInOut() &&
+           lhs.isVariadic() == rhs.isVariadic() &&
+           lhs.isAutoClosure() == rhs.isAutoClosure();
+  }
+
   [[nodiscard]] bool match() {
     ArrayRef<Element> lhsElts(lhsElements);
     ArrayRef<Element> rhsElts(rhsElements);
@@ -84,7 +95,8 @@ public:
       if (getElementLabel(lhsElt) != getElementLabel(rhsElt))
         break;
 
-      if (getElementFlags(lhsElt) != getElementFlags(rhsElt))
+      if (!areFlagsCompatible(getElementFlags(lhsElt),
+                               getElementFlags(rhsElt)))
         break;
 
       auto lhsType = getElementType(lhsElt);
@@ -109,7 +121,8 @@ public:
       auto lhsElt = lhsElts[lhsIdx];
       auto rhsElt = rhsElts[rhsIdx];
 
-      if (getElementFlags(lhsElt) != getElementFlags(rhsElt))
+      if (!areFlagsCompatible(getElementFlags(lhsElt),
+                               getElementFlags(rhsElt)))
         break;
 
       if (getElementLabel(lhsElt) != getElementLabel(rhsElt))
@@ -153,7 +166,7 @@ public:
           if (!getElementLabel(rhsElt).empty())
             return true;
 
-          if (getElementFlags(rhsElt) != lhsFlags)
+          if (!areFlagsCompatible(getElementFlags(rhsElt), lhsFlags))
             return true;
 
           rhsTypes.push_back(getElementType(rhsElt));
@@ -180,7 +193,7 @@ public:
           if (!getElementLabel(lhsElt).empty())
             return true;
 
-          if (getElementFlags(lhsElt) != rhsFlags)
+          if (!areFlagsCompatible(getElementFlags(lhsElt), rhsFlags))
             return true;
 
           lhsTypes.push_back(getElementType(lhsElt));
