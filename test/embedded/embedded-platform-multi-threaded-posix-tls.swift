@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern -wmo %s -c -o %t/main.o
-// RUN: %target-clang -std=c11 -I %swift_obj_root/include -c %S/Inputs/embedded-platform-threading.c -o %t/threading.o
+// RUN: %target-clang -x c -std=c11 -I %swift_obj_root/include -c %S/Inputs/embedded-platform-threading.c -o %t/threading.o
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %t/threading.o %target-embedded-multi-threaded-posix-shim %target-embedded-posix-shim -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out
 
