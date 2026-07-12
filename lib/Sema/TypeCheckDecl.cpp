@@ -3104,6 +3104,16 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     return error();
   }
 
+  // A protocol metatype extension `extension P.Protocol` extends the metatype
+  // of a protocol existential.  Accept it here — the metatype and non-nominal
+  // checks below would otherwise reject it — leaving the extended nominal (the
+  // protocol `P`) to be resolved separately.  Whether such an extension is
+  // permitted (only for `@com` protocols) is enforced during extension
+  // validation.
+  if (auto *metatype = extendedType->getAs<MetatypeType>())
+    if (metatype->getInstanceType()->isExistentialType())
+      return extendedType;
+
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
