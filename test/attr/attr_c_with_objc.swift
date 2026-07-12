@@ -38,3 +38,15 @@ enum SwiftEnum { case A, B }
 @_cdecl("swiftEnumUseInObjc") func swiftEnumUseInObjc(a: SwiftEnum) { }
 // expected-error @-1 {{global function cannot be marked '@_cdecl' because the type of the parameter cannot be represented in Objective-C}}
 // expected-note @-2 {{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
+
+/// AnyClass maps to the C runtime type Class.
+@c(anyClassParam) func anyClassParam(a: AnyClass) { }
+@c(anyClassReturn) func anyClassReturn() -> AnyClass { fatalError() }
+
+/// The object form (AnyObject) and protocol-qualified class metatypes (P.Type,
+/// i.e. C's Class<P>) are still rejected: only bare AnyClass is representable.
+@c(anyObjectParam) func anyObjectParam(a: AnyObject) { }
+// expected-error @-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{protocols cannot be represented in C}}
+@c(objcProtoMetatype) func objcProtoMetatype(a: ObjCProtocol.Type) { }
+// expected-error @-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
