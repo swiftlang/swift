@@ -856,3 +856,70 @@ bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
   return %4
 }
 
+// CHECK-LABEL: sil @int1_cmp_ne_false_is_identity :
+// CHECK-NOT:     cmp_ne_Int1
+// CHECK:         return %0
+// CHECK:       } // end sil function 'int1_cmp_ne_false_is_identity'
+sil @int1_cmp_ne_false_is_identity : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = builtin "cmp_ne_Int1"(%0, %1) : $Builtin.Int1
+  return %2
+}
+
+// CHECK-LABEL: sil @int1_cmp_eq_true_is_identity :
+// CHECK-NOT:     cmp_eq_Int1
+// CHECK:         return %0
+// CHECK:       } // end sil function 'int1_cmp_eq_true_is_identity'
+sil @int1_cmp_eq_true_is_identity : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = builtin "cmp_eq_Int1"(%0, %1) : $Builtin.Int1
+  return %2
+}
+
+// CHECK-LABEL: sil @int1_cmp_eq_false_is_negation :
+// CHECK-NOT:     cmp_eq_Int1
+// CHECK:         [[L:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         [[X:%.*]] = builtin "xor_Int1"(%0 : $Builtin.Int1, [[L]] : $Builtin.Int1)
+// CHECK:         return [[X]]
+// CHECK:       } // end sil function 'int1_cmp_eq_false_is_negation'
+sil @int1_cmp_eq_false_is_negation : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = builtin "cmp_eq_Int1"(%0, %1) : $Builtin.Int1
+  return %2
+}
+
+// CHECK-LABEL: sil @int1_cmp_ne_true_is_negation :
+// CHECK-NOT:     cmp_ne_Int1
+// CHECK:         [[L:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         [[X:%.*]] = builtin "xor_Int1"(%0 : $Builtin.Int1, [[L]] : $Builtin.Int1)
+// CHECK:         return [[X]]
+// CHECK:       } // end sil function 'int1_cmp_ne_true_is_negation'
+sil @int1_cmp_ne_true_is_negation : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = builtin "cmp_ne_Int1"(%0, %1) : $Builtin.Int1
+  return %2
+}
+
+// CHECK-LABEL: sil @no_simplify_wide_integer :
+// CHECK:         builtin "cmp_ne_Int64"
+// CHECK:       } // end sil function 'no_simplify_wide_integer'
+sil @no_simplify_wide_integer : $@convention(thin) (Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = builtin "cmp_ne_Int64"(%0, %1) : $Builtin.Int1
+  return %2
+}
+
+// CHECK-LABEL: sil @no_simplify_non_constant :
+// CHECK:         builtin "cmp_ne_Int1"
+// CHECK:       } // end sil function 'no_simplify_non_constant'
+sil @no_simplify_non_constant : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %2 = builtin "cmp_ne_Int1"(%0, %1) : $Builtin.Int1
+  return %2
+}
+

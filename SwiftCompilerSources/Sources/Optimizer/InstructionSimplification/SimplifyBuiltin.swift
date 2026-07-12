@@ -50,9 +50,13 @@ extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable {
            .IsPOD:
         optimizeArgumentToThinMetatype(argument: 0, context)
       case .ICMP_EQ:
-        constantFoldIntegerEquality(isEqual: true, context)
+        if !simplifyInt1Comparison(context) {
+          constantFoldIntegerEquality(isEqual: true, context)
+        }
       case .ICMP_NE:
-        constantFoldIntegerEquality(isEqual: false, context)
+        if !simplifyInt1Comparison(context) {
+          constantFoldIntegerEquality(isEqual: false, context)
+        }
       case .Xor:
         simplifyNegation(context)
       default:
@@ -256,6 +260,38 @@ private extension BuiltinInst {
       return true
     }
     return false
+  }
+
+  /// Replaces a comparison of a `Builtin.Int1` with a boolean constant
+  /// ```
+  ///   %2 = integer_literal $Builtin.Int1, 0
+  ///   %3 = builtin "cmp_ne_Int1"(%1, %2) : $Builtin.Int1
+  /// ```
+  /// with the value itself (`%1` here), or with its negation
+  /// `builtin "xor_Int1"(%1, -1)` for `cmp_eq_Int1(%1, 0)`.
+  func simplifyInt1Comparison(_ context: SimplifyContext) -> Bool {
+    let value = arguments[0]
+    guard value.type.isBuiltinInteger(withFixedWidth: 1),
+          !(value is IntegerLiteralInst),
+          let literal = arguments[1] as? IntegerLiteralInst,
+          let constant = literal.value,
+          constant == 0 || constant == -1
+    else {
+      return false
+    }
+
+    let isEqual = (id == .ICMP_EQ)
+    let constantIsTrue = (constant == -1)
+    if isEqual == constantIsTrue {
+      replace(with: value, context)
+    } else {
+      let builder = Builder(before: self, context)
+      let allOnes = builder.createBoolLiteral(true)
+      let negated = builder.createBuiltinBinaryFunction(name: "xor",
+          operandType: value.type, resultType: type, arguments: [value, allOnes])
+      replace(with: negated, context)
+    }
+    return true
   }
 
   /// Replaces a builtin "xor", which negates its operand comparison
