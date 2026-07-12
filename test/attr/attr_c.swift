@@ -140,6 +140,11 @@ func tupleParam(a: (Int, Float)) {}
 // expected-error @-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
 // expected-note @-2 {{tuples cannot be represented in C}}
 
+// Without ObjC interop, 'Class' has no meaning, so AnyClass is not representable in C.
+@c(anyClassNoInterop)
+func anyClassNoInterop(a: AnyClass) {}
+// expected-error @-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+
 @c(emptyTupleReturn)
 func emptyTupleReturn() -> () {}
 
