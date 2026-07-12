@@ -16,6 +16,7 @@
 ///===----------------------------------------------------------------------===///
 
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/DispatchShims.h"
 #include <atomic>
 #include <new>
 #if __has_feature(ptrauth_calls)
@@ -212,6 +213,41 @@ ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace
 
+/// This function establishes the Task's context and attempts to invoke
+/// it. The invocation may fail and the Task may not be run if the
+/// passed in exclusion value is not what is in the ActiveTaskStatus
+/// during the cas loop to mark the Task as running. If Task
+/// priority escalation is not enabled, this will always succeed.
+SWIFT_ALWAYS_INLINE
+static inline void taskInvokeWithExclusionValue(
+    AsyncTask *task, SerialExecutorRef serialExecutor,
+    TaskExecutorRef taskExecutor,
+    AsyncTask::ExclusionValue allowedStealerExclusionValue,
+    AsyncTask::InvokeFlags invokeFlags = AsyncTask::InvokeFlagsFromTask) {
+  // Update the task status to say that it's running on the current
+  // thread.  If the task suspends somewhere, it should update the
+  // task status appropriately; we don't need to update it afterwards.
+  [[maybe_unused]] auto [mayRun, dispatchOpaquePriority] =
+      task->tryStartRunning(allowedStealerExclusionValue, invokeFlags);
+  if (mayRun) {
+    // Update the active task in the current thread.
+    auto oldTask = ActiveTask::swap(task);
+
+    auto traceHandle =
+        concurrency::trace::job_run_begin(task, serialExecutor, taskExecutor);
+    task->runInFullyEstablishedContext();
+    concurrency::trace::job_run_end(traceHandle);
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    swift_dispatch_thread_reset_override_self(dispatchOpaquePriority);
+#endif
+
+    assert(ActiveTask::get() == nullptr &&
+           "active task wasn't cleared before suspending?");
+    if (oldTask) ActiveTask::set(oldTask);
+  }
+}
+
 void swift::runJobInEstablishedExecutorContext(Job *job,
                                                SerialExecutorRef serialExecutor,
                                                TaskExecutorRef taskExecutor) {
@@ -223,28 +259,9 @@ void swift::runJobInEstablishedExecutorContext(Job *job,
 #endif
 
   if (auto task = dyn_cast<AsyncTask>(job)) {
-    // Update the active task in the current thread.
-    auto oldTask = ActiveTask::swap(task);
-
-    // Update the task status to say that it's running on the
-    // current thread.  If the task suspends somewhere, it should
-    // update the task status appropriately; we don't need to update
-    // it afterwards.
-    [[maybe_unused]]
-    uint32_t dispatchOpaquePriority = task->flagAsRunning();
-
-    auto traceHandle =
-        concurrency::trace::job_run_begin(job, serialExecutor, taskExecutor);
-    task->runInFullyEstablishedContext();
-    concurrency::trace::job_run_end(traceHandle);
-
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    swift_dispatch_thread_reset_override_self(dispatchOpaquePriority);
-#endif
-
-    assert(ActiveTask::get() == nullptr &&
-           "active task wasn't cleared before suspending?");
-    if (oldTask) ActiveTask::set(oldTask);
+    taskInvokeWithExclusionValue(task, serialExecutor, taskExecutor,
+                                 task->_private().LocalStealerExclusionValue,
+                                 AsyncTask::InvokeFlagsFromTask);
   } else {
     // There's no extra bookkeeping to do for simple jobs besides swapping in
     // the voucher.
@@ -255,6 +272,25 @@ void swift::runJobInEstablishedExecutorContext(Job *job,
 #if SWIFT_OBJC_INTEROP
   objc_autoreleasePoolPop(pool);
 #endif
+}
+
+/// Runs the Task embedded in the stealer using the stealer's exclusion value.
+/// The stealer holds a reference to the Task which is released here. Stealers
+/// are not reference counted so the object is directly destroyed here.
+inline void AsyncTaskStealer::process(Job *_job) {
+  auto *stealer = cast<AsyncTaskStealer>(_job);
+  SWIFT_TASK_DEBUG_LOG("Running stealer %p for Task %p", _job, stealer->Task);
+
+  auto *trackingInfo = ExecutorTrackingInfo::current();
+
+  taskInvokeWithExclusionValue(stealer->Task, trackingInfo->getActiveExecutor(),
+                               trackingInfo->getTaskExecutor(),
+                               stealer->ExclusionValue,
+                               AsyncTask::InvokeFlagsFromStealer);
+
+  swift_release(stealer->Task);
+
+  swift_cxx_deleteObject(stealer);
 }
 
 void swift::adoptTaskVoucher(AsyncTask *task) {
@@ -1514,6 +1550,9 @@ TaskExecutorRef TaskExecutorRef::fromTaskExecutorPreference(Job *job) {
   if (auto task = dyn_cast<AsyncTask>(job)) {
     return task->getPreferredTaskExecutor();
   }
+  if (auto stealer = dyn_cast<AsyncTaskStealer>(job)) {
+    return stealer->Task->getPreferredTaskExecutor();
+  }
   return TaskExecutorRef::undefined();
 }
 
@@ -1871,11 +1910,8 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
         break;
       }
     } else {
-      auto taskExecutor = TaskExecutorRef::undefined();
-      if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-        taskExecutor = task->getPreferredTaskExecutor();
-        trackingInfo.setTaskExecutor(taskExecutor);
-      }
+      auto taskExecutor = TaskExecutorRef::fromTaskExecutorPreference(job);
+      trackingInfo.setTaskExecutor(taskExecutor);
 
       // This thread is now going to follow the task on this actor.
       // It may hop off the actor
@@ -2493,6 +2529,15 @@ static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
     asImpl(executor.getDefaultActor())->unlock(true);
 }
 
+#if SWIFT_TASK_DEBUG_LOG_ENABLED
+static inline const char *safeGetIdentityDebugName(SerialExecutorRef exec) {
+  if (exec.isGeneric())
+    return exec.isForSynchronousStart() ? " (GenericExecutor/SynchronousStart)"
+                                        : " (GenericExecutor)";
+  return "";
+}
+#endif
+
 SWIFT_CC(swiftasync)
 static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
                                   TaskContinuationFunction *resumeFunction,
@@ -2507,17 +2552,15 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   auto currentTaskExecutor = (trackingInfo ? trackingInfo->getTaskExecutor()
                                            : TaskExecutorRef::undefined());
   auto newTaskExecutor = task->getPreferredTaskExecutor();
-  SWIFT_TASK_DEBUG_LOG("Task %p trying to switch executors: executor %p%s to "
-                       "new serial executor: %p%s; task executor: from %p%s to %p%s",
-                       task,
-                       currentExecutor.getIdentity(),
-                       currentExecutor.getIdentityDebugName(),
-                       newExecutor.getIdentity(),
-                       newExecutor.getIdentityDebugName(),
-                       currentTaskExecutor.getIdentity(),
-                       currentTaskExecutor.isDefined() ? "" : " (undefined)",
-                       newTaskExecutor.getIdentity(),
-                       newTaskExecutor.isDefined() ? "" : " (undefined)");
+  SWIFT_TASK_DEBUG_LOG(
+      "Task %p trying to switch executors: executor %p%s to "
+      "new serial executor: %p%s; task executor: from %p%s to %p%s",
+      task, currentExecutor.getIdentity(),
+      safeGetIdentityDebugName(currentExecutor), newExecutor.getIdentity(),
+      newExecutor.getIdentityDebugName(), currentTaskExecutor.getIdentity(),
+      currentTaskExecutor.isDefined() ? "" : " (undefined)",
+      newTaskExecutor.getIdentity(),
+      newTaskExecutor.isDefined() ? "" : " (undefined)");
 
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
@@ -2732,13 +2775,11 @@ extern "C" SWIFT_CC(swift) void _swift_task_makeAnyTaskExecutor(
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef) {
 #ifndef NDEBUG
-  auto _taskExecutorRef = TaskExecutorRef::undefined();
-  if (auto task = dyn_cast<AsyncTask>(job)) {
-    _taskExecutorRef = task->getPreferredTaskExecutor();
-  }
-  SWIFT_TASK_DEBUG_LOG("enqueue job %p on serial serialExecutor %p, taskExecutor = %p", job,
-                       serialExecutorRef.getIdentity(),
-                       _taskExecutorRef.getIdentity());
+  [[maybe_unused]]
+  auto _taskExecutorRef = TaskExecutorRef::fromTaskExecutorPreference(job);
+  SWIFT_TASK_DEBUG_LOG(
+      "enqueue job %p on serial serialExecutor %p, taskExecutor = %p", job,
+      serialExecutorRef.getIdentity(), taskExecutorRef.getIdentity());
 #endif
 
   assert(job && "no job provided");
@@ -2748,22 +2789,19 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
   _swift_tsan_release(job);
 
   if (serialExecutorRef.isGeneric()) {
-    if (auto task = dyn_cast<AsyncTask>(job)) {
-      auto taskExecutorRef = task->getPreferredTaskExecutor();
-      if (taskExecutorRef.isDefined()) {
+    auto taskExecutorRef = TaskExecutorRef::fromTaskExecutorPreference(job);
+    if (taskExecutorRef.isDefined()) {
 #if SWIFT_CONCURRENCY_EMBEDDED
-        swift_unreachable("task executors not supported in embedded Swift");
+      swift_unreachable("task executors not supported in embedded Swift");
 #else
-        auto taskExecutorIdentity = taskExecutorRef.getIdentity();
-        auto taskExecutorType = swift_getObjectType(taskExecutorIdentity);
-        auto taskExecutorWtable = taskExecutorRef.getTaskExecutorWitnessTable();
+      auto taskExecutorIdentity = taskExecutorRef.getIdentity();
+      auto taskExecutorType = swift_getObjectType(taskExecutorIdentity);
+      auto taskExecutorWtable = taskExecutorRef.getTaskExecutorWitnessTable();
 
-        return _swift_task_enqueueOnTaskExecutor(
-            job,
-            taskExecutorIdentity, taskExecutorType, taskExecutorWtable);
+      return _swift_task_enqueueOnTaskExecutor(
+          job, taskExecutorIdentity, taskExecutorType, taskExecutorWtable);
 #endif // SWIFT_CONCURRENCY_EMBEDDED
-      } // else, fall-through to the default global enqueue
-    }
+    } // else, fall-through to the default global enqueue
     return swift_task_enqueueGlobal(job);
   }
 
@@ -2799,13 +2837,33 @@ swift_actor_escalate(DefaultActorImpl *actor, AsyncTask *task, JobPriority newPr
 SWIFT_CC(swift)
 void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
   JobPriority newPriority) {
-  if (executor.isGeneric()) {
-    // TODO (rokhinip): We'd push a stealer job for the task on the executor.
-    return;
-  }
+  SWIFT_TASK_DEBUG_LOG("Escalating executor %p to %#x",
+                       (void *)executor.getIdentity(), newPriority);
 
   if (executor.isDefaultActor()) {
     return swift_actor_escalate(asImpl(executor.getDefaultActor()), task, newPriority);
+  }
+
+  // If the task is enqueued on any other executor, we can enqueue
+  // a task stealer job on that executor. For now, don't do this if it's
+  // a custom executor, just in case the custom executor has a
+  // problem with enqueuing non-task jobs.
+  if (executor.isGeneric() && !task->hasTaskExecutorPreferenceRecord()) {
+    SWIFT_TASK_DEBUG_LOG("Enqueuing stealer for %p on %p", (void *)task,
+                         (void *)executor.getIdentity());
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    // Even though we are in the "enqueue stealer" path, this could
+    // enqueue the original Task if another stealer had previously
+    // been enqueued and still is but the original Task did manage to
+    // run at some point (while rare, this wouldn't be unexpected)
+    //
+    // Because this is in the escalation path, this stealer is being added
+    // in order to escalate the Task while it is enqueued on an executor
+    // so it is only an optimization and not manditory like the normal
+    // enqueue path is
+    swift_task_enqueueSelfOrStealer(task, executor, EnqueueFlagsForEscalation);
+#endif
+    return;
   }
 
   // TODO (rokhinip): This is either the main actor or an actor with a custom
