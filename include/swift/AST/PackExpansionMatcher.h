@@ -84,7 +84,8 @@ public:
       if (getElementLabel(lhsElt) != getElementLabel(rhsElt))
         break;
 
-      // FIXME: Check flags
+      if (getElementFlags(lhsElt) != getElementFlags(rhsElt))
+        break;
 
       auto lhsType = getElementType(lhsElt);
       auto rhsType = getElementType(rhsElt);
@@ -93,8 +94,6 @@ public:
           IsPackExpansionType(rhsType)) {
         break;
       }
-
-      // FIXME: Check flags
 
       pairs.emplace_back(lhsType, rhsType, lhsIdx, rhsIdx);
       ++prefixLength;
@@ -110,7 +109,8 @@ public:
       auto lhsElt = lhsElts[lhsIdx];
       auto rhsElt = rhsElts[rhsIdx];
 
-      // FIXME: Check flags
+      if (getElementFlags(lhsElt) != getElementFlags(rhsElt))
+        break;
 
       if (getElementLabel(lhsElt) != getElementLabel(rhsElt))
         break;
@@ -146,17 +146,20 @@ public:
         unsigned lhsIdx = prefixLength;
         unsigned rhsIdx = prefixLength;
 
+        auto lhsFlags = getElementFlags(lhsElts[0]);
+
         SmallVector<Type, 2> rhsTypes;
         for (auto rhsElt : rhsElts) {
           if (!getElementLabel(rhsElt).empty())
             return true;
 
-          // FIXME: Check rhs flags
+          if (getElementFlags(rhsElt) != lhsFlags)
+            return true;
+
           rhsTypes.push_back(getElementType(rhsElt));
         }
         auto rhs = createPackBinding(rhsTypes);
 
-        // FIXME: Check lhs flags
         pairs.emplace_back(lhsType, rhs, lhsIdx, rhsIdx);
         return false;
       }
@@ -170,17 +173,20 @@ public:
         unsigned lhsIdx = prefixLength;
         unsigned rhsIdx = prefixLength;
 
+        auto rhsFlags = getElementFlags(rhsElts[0]);
+
         SmallVector<Type, 2> lhsTypes;
         for (auto lhsElt : lhsElts) {
           if (!getElementLabel(lhsElt).empty())
             return true;
 
-          // FIXME: Check lhs flags
+          if (getElementFlags(lhsElt) != rhsFlags)
+            return true;
+
           lhsTypes.push_back(getElementType(lhsElt));
         }
         auto lhs = createPackBinding(lhsTypes);
 
-        // FIXME: Check rhs flags
         pairs.emplace_back(lhs, rhsType, lhsIdx, rhsIdx);
         return false;
       }
