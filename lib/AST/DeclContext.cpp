@@ -14,8 +14,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -1833,6 +1833,6 @@ bool DeclContext::isAlwaysAvailableConformanceContext() const {
   // target.
   auto &ctx = getASTContext();
   auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
-  auto constraints = getAvailabilityConstraintsForDecl(ext, deploymentTarget);
-  return !constraints.getPrimaryConstraint();
+  auto restrictions = getAvailabilityRestrictionsForDecl(ext, deploymentTarget);
+  return !restrictions.getPrimaryRestriction();
 }

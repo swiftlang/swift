@@ -3775,9 +3775,9 @@ public:
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
     if (!ctx.LangOpts.DisableAvailabilityChecking) {
-      if (auto constraint = seqConformanceRef.getAvailabilityConstraint(
+      if (auto restriction = seqConformanceRef.getAvailabilityRestriction(
               dc, stmt->getForLoc())) {
-        emitDiagnosticsForUnavailableConformance(seqType, constraint.value());
+        emitDiagnosticsForUnavailableConformance(seqType, restriction.value());
         return nullptr;
       }
     }
@@ -3799,13 +3799,12 @@ public:
   }
 
 private:
-  void
-  emitDiagnosticsForUnavailableConformance(Type seqType,
-                                           AvailabilityConstraint constraint) {
+  void emitDiagnosticsForUnavailableConformance(
+      Type seqType, AvailabilityRestriction restriction) {
     auto loc = stmt->getForLoc();
     auto protoDecl = seqConformanceRef.getProtocol();
 
-    auto domainAndRange = constraint.getDomainAndRange(ctx);
+    auto domainAndRange = restriction.getDomainAndRange(ctx);
     auto domain = domainAndRange.getDomain();
     auto range = domainAndRange.getRange();
     if (domain.isVersioned() && range.hasMinimumVersion()) {
@@ -3813,7 +3812,7 @@ private:
                          seqType, protoDecl,
                          domain.getNameForAttributePrinting(),
                          range.getVersionString());
-      fixAvailability(loc, dc, constraint.getFixItDomainAndRange(ctx), ctx);
+      fixAvailability(loc, dc, restriction.getFixItDomainAndRange(ctx), ctx);
     } else {
       ctx.Diags.diagnose(
           loc, diag::for_loop_sequence_conformance_unavailable_unconditionally,

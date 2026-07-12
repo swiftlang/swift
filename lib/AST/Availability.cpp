@@ -16,11 +16,11 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 // FIXME: [availability] Remove this when possible
@@ -423,10 +423,10 @@ bool Decl::isUnavailableInCurrentSwiftVersion() const {
 
 std::optional<SemanticAvailableAttr> Decl::getUnavailableAttr() const {
   auto context = AvailabilityContext::forDeploymentTarget(getASTContext());
-  if (auto constraint = getAvailabilityConstraintsForDecl(this, context)
-                            .getPrimaryConstraint()) {
-    if (constraint->isUnavailable())
-      return constraint->getAttr();
+  if (auto restriction = getAvailabilityRestrictionsForDecl(this, context)
+                             .getPrimaryRestriction()) {
+    if (restriction->isUnavailable())
+      return restriction->getAttr();
   }
 
   return std::nullopt;
@@ -478,23 +478,23 @@ computeDeclRuntimeAvailability(const Decl *decl) {
   auto rootTargetDomains = getRootTargetDomains(ctx);
   auto remainingTargetDomains = rootTargetDomains;
 
-  AvailabilityConstraintFlags flags;
+  AvailabilityRestrictionFlags flags;
 
   // Semantic availability was already computed separately for any enclosing
   // extension.
-  flags |= AvailabilityConstraintFlag::SkipEnclosingExtension;
+  flags |= AvailabilityRestrictionFlag::SkipEnclosingExtension;
 
   // FIXME: [availability] Replace IncludeAllDomains with a RuntimeAvailability
-  // flag that includes the target variant constraints and keeps all constraints
-  // from active platforms.
-  flags |= AvailabilityConstraintFlag::IncludeAllDomains;
+  // flag that includes the target variant restrictions and keeps all
+  // restrictions from active platforms.
+  flags |= AvailabilityRestrictionFlag::IncludeAllDomains;
 
-  auto constraints = getAvailabilityConstraintsForDecl(
+  auto restrictions = getAvailabilityRestrictionsForDecl(
       decl, AvailabilityContext::forInliningTarget(ctx), flags);
 
-  // First, collect the unavailable domains from the constraints.
+  // First, collect the unavailable domains from the restrictions.
   llvm::SmallVector<AvailabilityDomain, 8> unavailableDomains;
-  getRuntimeUnavailableDomains(constraints, unavailableDomains, ctx);
+  getRuntimeUnavailableDomains(restrictions, unavailableDomains, ctx);
 
   // Check whether there are any available attributes that would make the
   // decl available in descendants of the unavailable domains.
@@ -812,7 +812,7 @@ SemanticAvailableAttr::getIntroducedDomainAndRange(
     return std::nullopt;
 
   // For version-less domains, an attribute that does not indicate some other
-  // kind of unconditional availability constraint implicitly specifies that
+  // kind of unconditional availability restriction implicitly specifies that
   // the decl is available in all versions of the domain.
   switch (attr->getKind()) {
   case AvailableAttr::Kind::Default:
