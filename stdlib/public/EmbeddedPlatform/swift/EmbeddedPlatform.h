@@ -412,6 +412,12 @@ void _swift_tls_set(__swift_tls_key_t key,
                     void * EMBEDDED_SWIFT_NULLABLE value);
 
 /**
+ * Returns nonzero when the current execution context is the platform's main
+ * execution context.
+ */
+__swift_ptrdiff_t _swift_thread_isMain(void);
+
+/**
  * Exit the program.
  *
  * Parameters:

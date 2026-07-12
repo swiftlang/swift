@@ -97,3 +97,8 @@ public func _swift_tls_get(_ key: Int) -> UnsafeMutableRawPointer? {
 public func _swift_tls_set(_ key: Int, _ value: UnsafeMutableRawPointer?) {
   SingleThreadedTLS.values[key] = value
 }
+
+@implementation @c
+public func _swift_thread_isMain() -> Int {
+  1
+}

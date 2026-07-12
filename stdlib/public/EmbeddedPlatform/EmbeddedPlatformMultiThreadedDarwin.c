@@ -151,3 +151,7 @@ void *_swift_tls_get(__swift_tls_key_t key) {
 void _swift_tls_set(__swift_tls_key_t key, void *value) {
   trap_if(pthread_setspecific(swift_embedded_platform_tls_key(key), value) != 0);
 }
+
+__swift_ptrdiff_t _swift_thread_isMain(void) {
+  return pthread_main_np() != 0;
+}
