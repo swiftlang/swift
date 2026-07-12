@@ -594,4 +594,3 @@ extension OutputSpan: Iterable {
     .init(self.span)
   }
 }
-#endif

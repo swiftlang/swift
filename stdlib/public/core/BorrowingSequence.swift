@@ -237,9 +237,9 @@ public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIte
   @available(SwiftStdlib 6.4, *)
   @_transparent
   @lifetime(&self)
-  public mutating func nextSpan(maximumCount: Int) -> Span<Iterator.Element> {
-    curValue = iterator.next()
-    return curValue._span()
+  public mutating func nextSpan(maxCount: Int) -> Span<Iterator.Element> {
+    _currentValue = _iterator.next()
+    return _currentValue._span()
   }
 }
 
