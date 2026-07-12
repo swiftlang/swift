@@ -1,0 +1,253 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=switch_enum | %FileCheck %s
+
+import Builtin
+import Swift
+
+class C {}
+
+enum E {
+  case a(C)
+  case b
+}
+
+struct TwoPointers {
+  var p: Builtin.RawPointer
+  var q: Builtin.RawPointer
+}
+
+struct NonCopyablePtr : ~Copyable {
+  var p: Builtin.RawPointer
+}
+
+// A comparison of a non-optional class reference with an optional one folds into a single
+// pointer comparison, removing the `switch_enum`.
+// CHECK-LABEL: sil [ossa] @optional_class_ref_eq :
+// CHECK:       bb0(%0 : @guaranteed $C, %1 : @guaranteed $Optional<C>):
+// CHECK-NOT:     switch_enum
+// CHECK:         [[A:%.*]] = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+// CHECK:         [[OR:%.*]] = unchecked_ref_cast %1 : $Optional<C> to $C
+// CHECK:         [[O:%.*]] = ref_to_raw_pointer [[OR]] : $C to $Builtin.RawPointer
+// CHECK:         [[R:%.*]] = builtin "cmp_eq_RawPointer"([[A]] : $Builtin.RawPointer, [[O]] : $Builtin.RawPointer)
+// CHECK:         br bb1([[R]] : $Builtin.Int1)
+// CHECK:       } // end sil function 'optional_class_ref_eq'
+sil [ossa] @optional_class_ref_eq : $@convention(thin) (@guaranteed C, @guaranteed Optional<C>) -> Builtin.Int1 {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $Optional<C>):
+  switch_enum %1 : $Optional<C>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%3 : @guaranteed $C):
+  %4 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+  %5 = ref_to_raw_pointer %3 : $C to $Builtin.RawPointer
+  %6 = builtin "cmp_eq_RawPointer"(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer) : $Builtin.Int1
+  br bb3(%6 : $Builtin.Int1)
+bb2:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+bb3(%10 : $Builtin.Int1):
+  return %10 : $Builtin.Int1
+}
+
+// The same for a raw pointer (a single-field pointer struct): looking through the single
+// `struct_extract` field is sound, and the trivial value is reinterpreted with a bit-cast.
+// CHECK-LABEL: sil [ossa] @optional_pointer_eq :
+// CHECK:       bb0(%0 : $UnsafeRawPointer, %1 : $Optional<UnsafeRawPointer>):
+// CHECK-NOT:     switch_enum
+// CHECK:         [[A:%.*]] = unchecked_trivial_bit_cast %0 : $UnsafeRawPointer to $Builtin.RawPointer
+// CHECK:         [[O:%.*]] = unchecked_trivial_bit_cast %1 : $Optional<UnsafeRawPointer> to $Builtin.RawPointer
+// CHECK:         [[R:%.*]] = builtin "cmp_eq_RawPointer"([[A]] : $Builtin.RawPointer, [[O]] : $Builtin.RawPointer)
+// CHECK:         br bb1([[R]] : $Builtin.Int1)
+// CHECK:       } // end sil function 'optional_pointer_eq'
+sil [ossa] @optional_pointer_eq : $@convention(thin) (UnsafeRawPointer, Optional<UnsafeRawPointer>) -> Builtin.Int1 {
+bb0(%0 : $UnsafeRawPointer, %1 : $Optional<UnsafeRawPointer>):
+  switch_enum %1 : $Optional<UnsafeRawPointer>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%3 : $UnsafeRawPointer):
+  %4 = struct_extract %0 : $UnsafeRawPointer, #UnsafeRawPointer._rawValue
+  %5 = struct_extract %3 : $UnsafeRawPointer, #UnsafeRawPointer._rawValue
+  %6 = builtin "cmp_eq_RawPointer"(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer) : $Builtin.Int1
+  br bb3(%6 : $Builtin.Int1)
+bb2:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+bb3(%10 : $Builtin.Int1):
+  return %10 : $Builtin.Int1
+}
+
+// Bail out: the `none` case must yield `false` (a non-optional reference is never null).
+// CHECK-LABEL: sil [ossa] @dont_optimize_none_is_true :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_optimize_none_is_true'
+sil [ossa] @dont_optimize_none_is_true : $@convention(thin) (@guaranteed C, @guaranteed Optional<C>) -> Builtin.Int1 {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $Optional<C>):
+  switch_enum %1 : $Optional<C>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%3 : @guaranteed $C):
+  %4 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+  %5 = ref_to_raw_pointer %3 : $C to $Builtin.RawPointer
+  %6 = builtin "cmp_eq_RawPointer"(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer) : $Builtin.Int1
+  br bb3(%6 : $Builtin.Int1)
+bb2:
+  %8 = integer_literal $Builtin.Int1, -1
+  br bb3(%8 : $Builtin.Int1)
+bb3(%10 : $Builtin.Int1):
+  return %10 : $Builtin.Int1
+}
+
+// Bail out: a side effect in the payload block prevents removing it.
+// CHECK-LABEL: sil [ossa] @dont_optimize_side_effect :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_optimize_side_effect'
+sil [ossa] @dont_optimize_side_effect : $@convention(thin) (@guaranteed C, @guaranteed Optional<C>) -> Builtin.Int1 {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $Optional<C>):
+  switch_enum %1 : $Optional<C>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%3 : @guaranteed $C):
+  %f = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %a = apply %f(%3) : $@convention(thin) (@guaranteed C) -> ()
+  %4 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+  %5 = ref_to_raw_pointer %3 : $C to $Builtin.RawPointer
+  %6 = builtin "cmp_eq_RawPointer"(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer) : $Builtin.Int1
+  br bb3(%6 : $Builtin.Int1)
+bb2:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+bb3(%10 : $Builtin.Int1):
+  return %10 : $Builtin.Int1
+}
+
+// Bail out: the enum is not an `Optional`, so its memory layout is unknown.
+// CHECK-LABEL: sil [ossa] @dont_optimize_non_optional_enum :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_optimize_non_optional_enum'
+sil [ossa] @dont_optimize_non_optional_enum : $@convention(thin) (@guaranteed C, @guaranteed E) -> Builtin.Int1 {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $E):
+  switch_enum %1 : $E, case #E.a!enumelt: bb1, case #E.b!enumelt: bb2
+bb1(%3 : @guaranteed $C):
+  %4 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+  %5 = ref_to_raw_pointer %3 : $C to $Builtin.RawPointer
+  %6 = builtin "cmp_eq_RawPointer"(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer) : $Builtin.Int1
+  br bb3(%6 : $Builtin.Int1)
+bb2:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+bb3(%10 : $Builtin.Int1):
+  return %10 : $Builtin.Int1
+}
+
+// Bail out: the non-optional operand is not a function argument, so re-materializing a
+// `ref_to_raw_pointer` in front of the `switch_enum` might not be valid.
+// CHECK-LABEL: sil [ossa] @dont_optimize_local_reference :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_optimize_local_reference'
+sil [ossa] @dont_optimize_local_reference : $@convention(thin) (@guaranteed Optional<C>) -> Builtin.Int1 {
+bb0(%1 : @guaranteed $Optional<C>):
+  %0 = alloc_ref $C
+  switch_enum %1 : $Optional<C>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%3 : @guaranteed $C):
+  %4 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+  %5 = ref_to_raw_pointer %3 : $C to $Builtin.RawPointer
+  %6 = builtin "cmp_eq_RawPointer"(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer) : $Builtin.Int1
+  br bb3(%6 : $Builtin.Int1)
+bb2:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+bb3(%10 : $Builtin.Int1):
+  destroy_value %0 : $C
+  return %10 : $Builtin.Int1
+}
+
+// Bail out: the some- and none-case branch to different blocks.
+// CHECK-LABEL: sil [ossa] @dont_optimize_different_targets :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_optimize_different_targets'
+sil [ossa] @dont_optimize_different_targets : $@convention(thin) (@guaranteed C, @guaranteed Optional<C>) -> Builtin.Int1 {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $Optional<C>):
+  switch_enum %1 : $Optional<C>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%3 : @guaranteed $C):
+  %4 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+  %5 = ref_to_raw_pointer %3 : $C to $Builtin.RawPointer
+  %6 = builtin "cmp_eq_RawPointer"(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer) : $Builtin.Int1
+  br bb3(%6 : $Builtin.Int1)
+bb2:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb4(%8 : $Builtin.Int1)
+bb3(%10 : $Builtin.Int1):
+  br bb5(%10 : $Builtin.Int1)
+bb4(%12 : $Builtin.Int1):
+  br bb5(%12 : $Builtin.Int1)
+bb5(%14 : $Builtin.Int1):
+  return %14 : $Builtin.Int1
+}
+
+// Bail out: the compared pointers don't come from a handled cast, so we don't look through them.
+// CHECK-LABEL: sil [ossa] @dont_optimize_other_cast :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_optimize_other_cast'
+sil [ossa] @dont_optimize_other_cast : $@convention(thin) (UnsafeRawPointer, Optional<UnsafeRawPointer>) -> Builtin.Int1 {
+bb0(%0 : $UnsafeRawPointer, %1 : $Optional<UnsafeRawPointer>):
+  switch_enum %1 : $Optional<UnsafeRawPointer>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%3 : $UnsafeRawPointer):
+  %4 = unchecked_trivial_bit_cast %0 : $UnsafeRawPointer to $Builtin.RawPointer
+  %5 = unchecked_trivial_bit_cast %3 : $UnsafeRawPointer to $Builtin.RawPointer
+  %6 = builtin "cmp_eq_RawPointer"(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer) : $Builtin.Int1
+  br bb3(%6 : $Builtin.Int1)
+bb2:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+bb3(%10 : $Builtin.Int1):
+  return %10 : $Builtin.Int1
+}
+
+// Bail out: `struct_extract` of a multi-field struct would compare the whole struct, not the field.
+// CHECK-LABEL: sil [ossa] @dont_optimize_multifield_struct :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_optimize_multifield_struct'
+sil [ossa] @dont_optimize_multifield_struct : $@convention(thin) (TwoPointers, Optional<TwoPointers>) -> Builtin.Int1 {
+bb0(%0 : $TwoPointers, %1 : $Optional<TwoPointers>):
+  switch_enum %1 : $Optional<TwoPointers>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%3 : $TwoPointers):
+  %4 = struct_extract %0 : $TwoPointers, #TwoPointers.p
+  %5 = struct_extract %3 : $TwoPointers, #TwoPointers.p
+  %6 = builtin "cmp_eq_RawPointer"(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer) : $Builtin.Int1
+  br bb3(%6 : $Builtin.Int1)
+bb2:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+bb3(%10 : $Builtin.Int1):
+  return %10 : $Builtin.Int1
+}
+
+// Bail out: `struct_extract` of a non-trivial (`~Copyable`) struct can't be bit-cast to a pointer.
+// CHECK-LABEL: sil [ossa] @dont_optimize_noncopyable_struct :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_optimize_noncopyable_struct'
+sil [ossa] @dont_optimize_noncopyable_struct : $@convention(thin) (@guaranteed NonCopyablePtr, @guaranteed Optional<NonCopyablePtr>) -> Builtin.Int1 {
+bb0(%0 : @guaranteed $NonCopyablePtr, %1 : @guaranteed $Optional<NonCopyablePtr>):
+  switch_enum %1 : $Optional<NonCopyablePtr>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%3 : @guaranteed $NonCopyablePtr):
+  %4 = struct_extract %0 : $NonCopyablePtr, #NonCopyablePtr.p
+  %5 = struct_extract %3 : $NonCopyablePtr, #NonCopyablePtr.p
+  %6 = builtin "cmp_eq_RawPointer"(%4 : $Builtin.RawPointer, %5 : $Builtin.RawPointer) : $Builtin.Int1
+  br bb3(%6 : $Builtin.Int1)
+bb2:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+bb3(%10 : $Builtin.Int1):
+  return %10 : $Builtin.Int1
+}
+
+// Bail out: a conversion in another block could be in a borrow scope ending before the `switch_enum`.
+// CHECK-LABEL: sil [ossa] @dont_optimize_conversion_in_other_block :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'dont_optimize_conversion_in_other_block'
+sil [ossa] @dont_optimize_conversion_in_other_block : $@convention(thin) (@guaranteed C, @guaranteed Optional<C>) -> Builtin.Int1 {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $Optional<C>):
+  %2 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+  switch_enum %1 : $Optional<C>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%4 : @guaranteed $C):
+  %5 = ref_to_raw_pointer %4 : $C to $Builtin.RawPointer
+  %6 = builtin "cmp_eq_RawPointer"(%2 : $Builtin.RawPointer, %5 : $Builtin.RawPointer) : $Builtin.Int1
+  br bb3(%6 : $Builtin.Int1)
+bb2:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb3(%8 : $Builtin.Int1)
+bb3(%10 : $Builtin.Int1):
+  return %10 : $Builtin.Int1
+}
+
+sil @use : $@convention(thin) (@guaranteed C) -> ()

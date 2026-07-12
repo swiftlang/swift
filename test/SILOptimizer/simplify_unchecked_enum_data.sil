@@ -120,3 +120,46 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @forward_switch_enum_payload :
+// CHECK:       bb1([[ARG:%.*]] : $Int):
+// CHECK-NOT:     unchecked_enum_data
+// CHECK:         br bb3([[ARG]])
+// CHECK:       } // end sil function 'forward_switch_enum_payload'
+sil [ossa] @forward_switch_enum_payload : $@convention(thin) (Optional<Int>) -> Int {
+bb0(%0 : $Optional<Int>):
+  switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%2 : $Int):
+  %3 = unchecked_enum_data %0 : $Optional<Int>, #Optional.some!enumelt
+  br bb3(%3 : $Int)
+
+bb2:
+  %5 = integer_literal $Builtin.Int64, 0
+  %6 = struct $Int (%5 : $Builtin.Int64)
+  br bb3(%6 : $Int)
+
+bb3(%r : $Int):
+  return %r : $Int
+}
+
+// The `unchecked_enum_data` operand differs from the `switch_enum` operand.
+// CHECK-LABEL: sil [ossa] @dont_forward_different_enum :
+// CHECK:         unchecked_enum_data
+// CHECK:       } // end sil function 'dont_forward_different_enum'
+sil [ossa] @dont_forward_different_enum : $@convention(thin) (Optional<Int>, Optional<Int>) -> Int {
+bb0(%0 : $Optional<Int>, %1 : $Optional<Int>):
+  switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : $Int):
+  %4 = unchecked_enum_data %1 : $Optional<Int>, #Optional.some!enumelt
+  br bb3(%4 : $Int)
+
+bb2:
+  %6 = integer_literal $Builtin.Int64, 0
+  %7 = struct $Int (%6 : $Builtin.Int64)
+  br bb3(%7 : $Int)
+
+bb3(%r : $Int):
+  return %r : $Int
+}
+
