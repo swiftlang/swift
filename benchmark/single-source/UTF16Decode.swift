@@ -176,16 +176,16 @@ public func run_UTF16Decode_InitDecoding_ascii(_ N: Int) {
 // entry points ever diverge (e.g. validating falling back to a slower loop).
 @inline(never)
 public func run_UTF16Decode_InitValidating(_ N: Int) {
-  guard #available(SwiftStdlib 6.0, *) else { return }
-  for _ in 0..<2*N {
+  guard #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) else { return }
+  for _ in 0..<25*N {
     blackHole(String(validating: allStringsCodeUnits, as: UTF16.self))
   }
 }
 
 @inline(never)
 public func run_UTF16Decode_InitValidating_ascii(_ N: Int) {
-  guard #available(SwiftStdlib 6.0, *) else { return }
-  for _ in 0..<N {
+  guard #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) else { return }
+  for _ in 0..<50*N {
     blackHole(String(validating: asciiCodeUnits, as: UTF16.self))
   }
 }
