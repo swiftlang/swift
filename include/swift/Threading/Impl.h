@@ -69,4 +69,12 @@ struct stack_bounds {
 #error You need to implement Threading/Impl.h for your threading package.
 #endif
 
+#ifndef SWIFT_THREADING_HAS_LAZY_MUTEX
+#error Selected threading implementation must define SWIFT_THREADING_HAS_LAZY_MUTEX.
+#endif
+
+#ifndef SWIFT_THREADING_HAS_CONDITION_VARIABLE
+#error Selected threading implementation must define SWIFT_THREADING_HAS_CONDITION_VARIABLE.
+#endif
+
 #endif // SWIFT_THREADING_IMPL_H
