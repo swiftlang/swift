@@ -14,12 +14,34 @@ import SIL
 
 extension UncheckedEnumDataInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
-    guard let enumInst = self.enum as? EnumInst else {
+    if let enumInst = self.enum as? EnumInst {
+      if caseIndex == enumInst.caseIndex {
+        context.tryReplaceRedundantInstructionPair(first: enumInst, second: self, with: enumInst.payload!)
+      }
       return
     }
-    if caseIndex != enumInst.caseIndex {
+    replaceWithSwitchEnumPayloadArgument(context)
+  }
+
+  /// Replaces an `unchecked_enum_data` in a `switch_enum` case block with the block's payload
+  /// argument, if it projects the same case of the same enum, e.g.
+  ///
+  ///   switch_enum %e, case #C: bb1
+  /// bb1(%payload):
+  ///   %d = unchecked_enum_data %e, #C
+  /// ->
+  ///   %payload
+  ///
+  private func replaceWithSwitchEnumPayloadArgument(_ context: SimplifyContext) {
+    let block = parentBlock
+    guard let pred = block.singlePredecessor,
+          let switchEnum = pred.terminator as? SwitchEnumInst,
+          switchEnum.enumOp == self.enum,
+          switchEnum.getUniqueCase(forSuccessor: block) == caseIndex,
+          block.arguments.count == 1
+    else {
       return
     }
-    context.tryReplaceRedundantInstructionPair(first: enumInst, second: self, with: enumInst.payload!)
+    self.replace(with: block.arguments[0], context)
   }
 }

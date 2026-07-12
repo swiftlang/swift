@@ -119,6 +119,9 @@ public class NominalTypeDecl: GenericTypeDecl {
 }
 
 final public class EnumDecl: NominalTypeDecl {
+  public static let optionalNoneCaseIndex = 0
+  public static let optionalSomeCaseIndex = 1
+
   public var rawType: Type? { Type(bridgedOrNil: bridged.Enum_getRawType()) }
 
   public static func create(
