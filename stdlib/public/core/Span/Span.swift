@@ -998,7 +998,10 @@ extension Span where Element == UInt8 {
 
 #if !SPAN_COMPATIBILITY_STUB
 @available(SwiftStdlib 6.4, *)
-extension Span: BorrowingSequence where Element: ~Copyable {
+extension Span: Iterable where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  public typealias Failure = Never
+
   @available(SwiftStdlib 6.4, *)
   @inlinable
   @lifetime(borrow self)

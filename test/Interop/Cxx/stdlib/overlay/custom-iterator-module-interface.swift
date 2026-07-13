@@ -113,7 +113,7 @@
 // CHECK:   var pointee: Int32
 // CHECK: }
 
-// CHECK: struct HasNestedIterator : CxxConvertibleToCollection, CxxBorrowingSequence {
+// CHECK: struct HasNestedIterator : CxxConvertibleToCollection, CxxIterable {
 // CHECK:   struct NestedIterator : UnsafeCxxInputIterator {
 // CHECK:     func __operatorStar() -> HasNestedIterator.NestedIterator.reference
 // CHECK:     var ptr: UnsafePointer<Int32>!

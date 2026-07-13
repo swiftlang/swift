@@ -714,7 +714,7 @@ StdSpanTestSuite.test("Convert between Swift and C++ span types")
   }
 }
 
-StdSpanTestSuite.test("CxxSpan conforms to CxxBorrowingSequence")
+StdSpanTestSuite.test("CxxSpan conforms to CxxIterable")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
@@ -736,7 +736,7 @@ StdSpanTestSuite.test("CxxSpan conforms to CxxBorrowingSequence")
 
 #if hasFeature(BorrowingForLoop)
 
-StdSpanTestSuite.test("CxxSpan of noncopyable conforms to CxxBorrowingSequence")
+StdSpanTestSuite.test("CxxSpan of noncopyable conforms to CxxIterable")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
