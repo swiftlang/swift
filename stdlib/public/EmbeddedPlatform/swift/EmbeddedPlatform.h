@@ -134,8 +134,8 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
   /**
    * No options.
    */
-  SWIFT_FREE_NONE EMBEDDED_SWIFT_NAME(none) = 0,
-} swift_free_flags_t EMBEDDED_SWIFT_NAME(SwiftFreeFlags);
+  SWIFT_DEALLOC_NONE EMBEDDED_SWIFT_NAME(none) = 0,
+} swift_dealloc_flags_t EMBEDDED_SWIFT_NAME(SwiftDeallocFlags);
 
 /**
  * Options provided to the Swift mutex initialization function.
@@ -178,17 +178,17 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
 void * EMBEDDED_SWIFT_NULLABLE _swift_allocate(__swift_size_t alignment, __swift_size_t size, swift_alloc_flags_t flags);
 
 /**
- * Frees the memory referenced by `ptr`.
+ * Deallocates the memory referenced by `ptr`.
  *
  * Parameters:
- *   - `ptr`: The pointer to be freed. If it is NULL, the operation does
+ *   - `ptr`: The pointer to be deallocated. If it is NULL, the operation does
  *     nothing.
  *   - `size`: the number of allocated bytes, which may be -1 if it is not
  *     known.
  *   - `alignment`: the minimum alignment of the resulting pointer, which must
  *     be a power of at least as large as `sizeof(void *)`, or be zero to
  *     indicate that the alignment is not known.
- *   - `flags`: flags to control the behavior of the free.
+ *   - `flags`: flags to control the behavior of the deallocation.
  *
  * This function is required when using any Embedded Swift facility that
  * requires memory allocation from the heap, whether explicitly (e.g., via the
@@ -197,7 +197,7 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_allocate(__swift_size_t alignment, __swift
  * 
  * This function can be implemented as a direct call to `free`.
  */
-void _swift_deallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_free_flags_t flags);
+void _swift_deallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_dealloc_flags_t flags);
 
 /**
  * Allocates memory with a given type and returns the resulting pointer.
