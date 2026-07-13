@@ -5,8 +5,17 @@ func posix_memalign(_: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _: Int, _
 @_extern(c, "free")
 func free(_ p: UnsafeMutableRawPointer?)
 
+// Randomness source. `arc4random_buf` covers Darwin, wasi-libc, and most other
+// libcs, but it only entered glibc in 2.36, so on Linux use `getentropy`
+// (glibc >= 2.25, musl), mirroring the platform split in
+// stdlib/public/stubs/Random.cpp.
+#if os(Linux)
+@_extern(c, "getentropy")
+func getentropy(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) -> CInt
+#else
 @_extern(c, "arc4random_buf")
 func arc4random_buf(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
+#endif
 
 @_extern(c, "putchar")
 func putchar(_: CInt) -> CInt
@@ -47,16 +56,36 @@ public func _swift_deallocate(_ pointer: UnsafeMutableRawPointer, _ alignment: I
   free(pointer)
 }
 
+// Fills `buf` with `nbytes` bytes from the platform RNG; traps on failure.
+@inline(never)
+private func generateRandomBytes(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
+#if os(Linux)
+  // `getentropy` returns at most 256 bytes per call and either fills the whole
+  // request or fails (no partial reads). Fail closed rather than hand back
+  // uninitialized memory as randomness (cf. the fatalError in Random.cpp).
+  var offset = 0
+  while offset < nbytes {
+    let count = min(nbytes - offset, 256)
+    guard unsafe getentropy(buf.advanced(by: offset), count) == 0 else {
+      fatalError("getentropy failed")
+    }
+    offset += count
+  }
+#else
+  unsafe arc4random_buf(buf, nbytes)
+#endif
+}
+
 @export(interface)
 @implementation @c
 public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
-  arc4random_buf(buf, nbytes)
+  unsafe generateRandomBytes(buf, nbytes)
 }
 
 @export(interface)
 @implementation @c
 public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
-  arc4random_buf(buf, nbytes)
+  unsafe generateRandomBytes(buf, nbytes)
 }
 
 @export(interface)

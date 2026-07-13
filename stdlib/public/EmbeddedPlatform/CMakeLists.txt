@@ -48,6 +48,14 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     endif()
     list(APPEND extra_c_compile_flags -nostdinc++)
 
+    # EmbeddedReadLine.swift needs a hosted libc (getline + stdin). Exclude every
+    # bare-metal triple (the "-none-" OS: wasm/elf/eabi/macho); keep it for hosted
+    # targets (apple-macos/ios, linux-gnu, wasip1, emscripten).
+    set(posix_shim_sources EmbeddedPlatformPOSIX.swift)
+    if(NOT "${triple}" MATCHES "-none-")
+      list(APPEND posix_shim_sources EmbeddedReadLine.swift)
+    endif()
+
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
@@ -62,7 +70,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       IS_FRAGILE
       PARTIAL_SOURCES_INTENDED
 
-      EmbeddedPlatformPOSIX.swift
+      ${posix_shim_sources}
 
       C_COMPILE_FLAGS ${extra_c_compile_flags}
       SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded "-import-bridging-header" ${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h -enable-experimental-feature Extern -enable-experimental-feature AllowRuntimeSymbolDeclarations "-disable-bridging-pch"
