@@ -2272,8 +2272,6 @@ ParserResult<MacroRoleAttr>
 Parser::parseMacroRoleAttribute(
     MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc)
 {
-  auto &e = llvm::errs();
-  e << "Parsing macro role attribute...\n";
   StringRef attrName;
   bool isAttached;
   switch (syntax) {
@@ -2364,8 +2362,6 @@ Parser::parseMacroRoleAttribute(
 
           if (!role)
             role = getMacroRole(roleName.str());
-          
-          e << "  • Role '" << roleName << "'\n";
 
           if (!role) {
             diagnose(roleNameLoc, diag::macro_role_attr_expected_kind,
@@ -2399,7 +2395,6 @@ Parser::parseMacroRoleAttribute(
                      "conformances");
           }
 
-          e << "  • Field 'conformances:'\n";
           sawConformances = true;
 
           // Parse the introduced conformances
@@ -2415,7 +2410,6 @@ Parser::parseMacroRoleAttribute(
         //
         //     @attached(accessor, initialization: .lazy, names: ...)
         if (fieldName.is("initialization")) {
-          e << "  • Field 'initialization:'\n";
           if (sawInitialization) {
             diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),
                      diag::macro_attribute_duplicate_label, isAttached,
@@ -2446,8 +2440,6 @@ Parser::parseMacroRoleAttribute(
           // 'initialization:' is not supported unless macro role is 'accessor'.
           if (role != MacroRole::Accessor) {
             SourceRange range = SourceRange(fieldNameLoc, initializationContextLoc);
-            Token token = Tok;
-            e << "current token: " << token.getRawText() << "\n";
             auto diag = diagnose(fieldNameLoc,
                                  diag::macro_attribute_unsupported_label,
                                  fieldName, "accessor", swift::getMacroRoleString(*role));
@@ -2457,8 +2449,6 @@ Parser::parseMacroRoleAttribute(
             return status;
           }
           
-          // TODO: More renaming of `initializer` -> `initialization`
-          
           auto initializerContextKind = getMacroInitializerContextKind(initializationContextIdentifier);
           if (!initializerContextKind) {
             diagnose(initializationContextLoc, diag::macro_attribute_initializer_unknown_argument);
@@ -2467,7 +2457,6 @@ Parser::parseMacroRoleAttribute(
           }
           
           initializerContext = initializerContextKind;
-          e << "    value = '" << initializationContextIdentifier << "'\n";
           return status;
         }
 
@@ -2479,7 +2468,6 @@ Parser::parseMacroRoleAttribute(
                             : diag::macro_attribute_missing_label,
                    isAttached, "names");
         }
-        e << "  • Field 'names:'\n";
         sawNames = true;
 
         // Parse the introduced name kind.
@@ -2553,9 +2541,6 @@ Parser::parseMacroRoleAttribute(
         names.push_back(
             MacroIntroducedDeclName(*introducedKind, name.getFullName()));
 
-        e << "    names = [";
-        llvm::interleaveComma(names, e, [&](auto ty) { e << ty.getName(); });
-        e << "]\n";
         return status;
       });
 
