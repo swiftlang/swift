@@ -2861,8 +2861,9 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
 }
 
 AllowInlineArrayLiteralCountMismatch *
-AllowInlineArrayLiteralCountMismatch::create(ConstraintSystem &cs, Type lhsCount,
-                                             Type rhsCount,
+AllowInlineArrayLiteralCountMismatch::create(ConstraintSystem &cs,
+                                             unsigned lhsCount,
+                                             unsigned rhsCount,
                                              ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowInlineArrayLiteralCountMismatch(cs, lhsCount, rhsCount, locator);

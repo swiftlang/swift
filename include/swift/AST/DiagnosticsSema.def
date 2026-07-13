@@ -9032,7 +9032,8 @@ ERROR(integer_generic_expr_closure_not_supported,none,
 //===----------------------------------------------------------------------===//
 
 ERROR(inlinearray_literal_incorrect_count,none,
-      "expected %0 elements in inline array literal, but got %1", (Type, Type))
+      "expected %0 elements in inline array literal, but got %1",
+      (unsigned, unsigned))
 
 ERROR(inline_array_type_backwards,none,
       "element count must precede inline array element type", ())
