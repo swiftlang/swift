@@ -79,7 +79,7 @@ endfunction()
 #   DEPLOYMENT_VERSION_TVOS version
 #   DEPLOYMENT_VERSION_WATCHOS version
 #   DEPLOYMENT_VERSION_XROS version
-#   NO_FREESTANDING_CXX # If TRUE, do not pass -ffreestanding for the embedded SDK.
+#   NO_FREESTANDING_CXX # Option: when passed, do not add -ffreestanding for the embedded SDK.
 #
 # )
 function(_add_target_variant_c_compile_link_flags)
@@ -87,10 +87,9 @@ function(_add_target_variant_c_compile_link_flags)
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     DEPLOYMENT_VERSION_XROS
     MACCATALYST_BUILD_FLAVOR
-    NO_FREESTANDING_CXX
   )
   cmake_parse_arguments(CFLAGS
-    ""
+    "NO_FREESTANDING_CXX"
     "${oneValueArgs}"
     ""
     ${ARGN})
@@ -202,10 +201,9 @@ function(_add_target_variant_c_compile_flags)
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     DEPLOYMENT_VERSION_XROS
     RESULT_VAR_NAME ENABLE_LTO
-    MACCATALYST_BUILD_FLAVOR
-    NO_FREESTANDING_CXX)
+    MACCATALYST_BUILD_FLAVOR)
   cmake_parse_arguments(CFLAGS
-    ""
+    "NO_FREESTANDING_CXX"
     "${oneValueArgs}"
     ""
     ${ARGN})
@@ -225,6 +223,9 @@ function(_add_target_variant_c_compile_flags)
     endif()
   endif()
 
+  translate_flag(${CFLAGS_NO_FREESTANDING_CXX} "NO_FREESTANDING_CXX"
+                 CFLAGS_NO_FREESTANDING_CXX_keyword)
+
   _add_target_variant_c_compile_link_flags(
     SDK "${CFLAGS_SDK}"
     ARCH "${CFLAGS_ARCH}"
@@ -240,7 +241,7 @@ function(_add_target_variant_c_compile_flags)
     DEPLOYMENT_VERSION_XROS "${CFLAGS_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME result
     MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}"
-    NO_FREESTANDING_CXX "${CFLAGS_NO_FREESTANDING_CXX}")
+    ${CFLAGS_NO_FREESTANDING_CXX_keyword})
 
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
   if(optimized)
@@ -1602,6 +1603,9 @@ function(add_swift_target_library_single target name)
   set(enable_assertions "${SWIFT_STDLIB_ASSERTIONS}")
   set(lto_type "${SWIFT_STDLIB_ENABLE_LTO}")
 
+  translate_flag(${SWIFTLIB_SINGLE_NO_FREESTANDING_CXX} "NO_FREESTANDING_CXX"
+                 SWIFTLIB_SINGLE_NO_FREESTANDING_CXX_keyword)
+
   _add_target_variant_c_compile_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
     ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
@@ -1617,7 +1621,7 @@ function(add_swift_target_library_single target name)
     DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME c_compile_flags
     MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
-    NO_FREESTANDING_CXX "${SWIFTLIB_SINGLE_NO_FREESTANDING_CXX}"
+    ${SWIFTLIB_SINGLE_NO_FREESTANDING_CXX_keyword}
     )
 
   if(SWIFTLIB_SINGLE_SDK STREQUAL "WINDOWS")
