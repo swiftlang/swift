@@ -65,28 +65,16 @@ function(deployment_version result_var_name)
   set("${result_var_name}" "${DEPLOYMENT_VERSION}" PARENT_SCOPE)
 endfunction()
 
-# Usage:
-# _add_target_variant_c_compile_link_flags(
-#   SDK sdk
-#   ARCH arch
-#   BUILD_TYPE build_type
-#   ENABLE_LTO enable_lto
-#   ANALYZE_CODE_COVERAGE analyze_code_coverage
-#   RESULT_VAR_NAME result_var_name
-#   DEPLOYMENT_VERSION_OSX version # If provided, overrides the default value of the OSX deployment target set by the Swift project for this compilation only.
-#   DEPLOYMENT_VERSION_MACCATALYST version
-#   DEPLOYMENT_VERSION_IOS version
-#   DEPLOYMENT_VERSION_TVOS version
-#   DEPLOYMENT_VERSION_WATCHOS version
-#   DEPLOYMENT_VERSION_XROS version
-#
-# )
-function(_add_target_variant_c_compile_link_flags)
-  set(oneValueArgs SDK ARCH BUILD_TYPE RESULT_VAR_NAME ENABLE_LTO ANALYZE_CODE_COVERAGE
+function(_add_target_variant_sdk_flags)
+  set(oneValueArgs SDK ARCH RESULT_VAR_NAME
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     DEPLOYMENT_VERSION_XROS
     MACCATALYST_BUILD_FLAVOR
   )
+  # This logic has been refactored from
+  # _add_target_variant_c_compile_link_flags,
+  # and as a result we preserved the original prefix
+  # to ease review of the matching PR
   cmake_parse_arguments(CFLAGS
     ""
     "${oneValueArgs}"
@@ -152,6 +140,83 @@ function(_add_target_variant_c_compile_link_flags)
   elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${_sysroot}" STREQUAL "/")
     list(APPEND result "--sysroot=${_sysroot}")
   endif()
+
+  set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
+endfunction()
+
+
+function(_add_target_variant_asm_compile_flags)
+  set(oneValueArgs SDK ARCH RESULT_VAR_NAME
+    DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
+    DEPLOYMENT_VERSION_XROS
+    MACCATALYST_BUILD_FLAVOR
+  )
+  cmake_parse_arguments(ASMFLAGS
+    ""
+    "${oneValueArgs}"
+    ""
+    ${ARGN})
+
+  set(result ${${ASMFLAGS_RESULT_VAR_NAME}})
+
+  _add_target_variant_sdk_flags(
+    SDK ${ASMFLAGS_SDK}
+    ARCH ${ASMFLAGS_ARCH}
+    RESULT_VAR_NAME result
+    DEPLOYMENT_VERSION_OSX ${ASMFLAGS_DEPLOYMENT_VERSION_OSX}
+    DEPLOYMENT_VERSION_MACCATALYST ${ASMFLAGS_DEPLOYMENT_VERSION_MACCATALYST}
+    DEPLOYMENT_VERSION_IOS ${ASMFLAGS_DEPLOYMENT_VERSION_IOS}
+    DEPLOYMENT_VERSION_TVOS ${ASMFLAGS_DEPLOYMENT_VERSION_TVOS}
+    DEPLOYMENT_VERSION_WATCHOS ${ASMFLAGS_DEPLOYMENT_VERSION_WATCHOS}
+    DEPLOYMENT_VERSION_XROS ${ASMFLAGS_DEPLOYMENT_VERSION_XROS}
+    MACCATALYST_BUILD_FLAVOR ${ASMFLAGS_MACCATALYST_BUILD_FLAVOR}
+  )
+
+  set("${ASMFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
+endfunction()
+
+# Usage:
+# _add_target_variant_c_compile_link_flags(
+#   SDK sdk
+#   ARCH arch
+#   BUILD_TYPE build_type
+#   ENABLE_LTO enable_lto
+#   ANALYZE_CODE_COVERAGE analyze_code_coverage
+#   RESULT_VAR_NAME result_var_name
+#   DEPLOYMENT_VERSION_OSX version # If provided, overrides the default value of the OSX deployment target set by the Swift project for this compilation only.
+#   DEPLOYMENT_VERSION_MACCATALYST version
+#   DEPLOYMENT_VERSION_IOS version
+#   DEPLOYMENT_VERSION_TVOS version
+#   DEPLOYMENT_VERSION_WATCHOS version
+#   DEPLOYMENT_VERSION_XROS version
+#
+# )
+function(_add_target_variant_c_compile_link_flags)
+  set(oneValueArgs SDK ARCH BUILD_TYPE RESULT_VAR_NAME ENABLE_LTO ANALYZE_CODE_COVERAGE
+    DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
+    DEPLOYMENT_VERSION_XROS
+    MACCATALYST_BUILD_FLAVOR
+  )
+  cmake_parse_arguments(CFLAGS
+    ""
+    "${oneValueArgs}"
+    ""
+    ${ARGN})
+
+  set(result ${${CFLAGS_RESULT_VAR_NAME}})
+
+  _add_target_variant_sdk_flags(
+    SDK ${CFLAGS_SDK}
+    ARCH ${CFLAGS_ARCH}
+    RESULT_VAR_NAME result
+    DEPLOYMENT_VERSION_OSX ${CFLAGS_DEPLOYMENT_VERSION_OSX}
+    DEPLOYMENT_VERSION_MACCATALYST ${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST}
+    DEPLOYMENT_VERSION_IOS ${CFLAGS_DEPLOYMENT_VERSION_IOS}
+    DEPLOYMENT_VERSION_TVOS ${CFLAGS_DEPLOYMENT_VERSION_TVOS}
+    DEPLOYMENT_VERSION_WATCHOS ${CFLAGS_DEPLOYMENT_VERSION_WATCHOS}
+    DEPLOYMENT_VERSION_XROS ${CFLAGS_DEPLOYMENT_VERSION_XROS}
+    MACCATALYST_BUILD_FLAVOR ${CFLAGS_MACCATALYST_BUILD_FLAVOR}
+  )
 
   if("${CFLAGS_SDK}" STREQUAL "LINUX_STATIC")
     list(APPEND result "-isystem" "${SWIFT_MUSL_PATH}/${CFLAGS_ARCH}/usr/include/c++/v1")
@@ -1558,6 +1623,19 @@ function(add_swift_target_library_single target name)
       list(APPEND c_compile_flags -D_WINDLL)
     endif()
   endif()
+
+  _add_target_variant_asm_compile_flags(
+    SDK "${SWIFTLIB_SINGLE_SDK}"
+    ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
+    DEPLOYMENT_VERSION_OSX "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_MACCATALYST "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_MACCATALYST}"
+    DEPLOYMENT_VERSION_IOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_IOS}"
+    DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_TVOS}"
+    DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}"
+    RESULT_VAR_NAME asm_compile_flags
+    MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
+    )
   _add_target_variant_link_flags(
     SDK "${SWIFTLIB_SINGLE_SDK}"
     ARCH "${SWIFTLIB_SINGLE_ARCHITECTURE}"
@@ -1638,6 +1716,8 @@ function(add_swift_target_library_single target name)
 
   target_compile_options(${target} PRIVATE
     "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${c_compile_flags}>")
+  target_compile_options(${target} PRIVATE
+    "$<$<COMPILE_LANGUAGE:ASM>:${asm_compile_flags}>")
   target_link_options(${target} PRIVATE
     ${link_flags})
   if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -3029,6 +3109,16 @@ function(_add_swift_target_executable_single name)
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
     DEPLOYMENT_VERSION_XROS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME c_compile_flags)
+  _add_target_variant_asm_compile_flags(
+    SDK "${SWIFTEXE_SINGLE_SDK}"
+    ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
+    DEPLOYMENT_VERSION_OSX "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_MACCATALYST "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_MACCATALYST}"
+    DEPLOYMENT_VERSION_IOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_IOS}"
+    DEPLOYMENT_VERSION_TVOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_TVOS}"
+    DEPLOYMENT_VERSION_WATCHOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_XROS}"
+    RESULT_VAR_NAME asm_compile_flags)
   _add_target_variant_link_flags(
     SDK "${SWIFTEXE_SINGLE_SDK}"
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
@@ -3132,6 +3222,8 @@ function(_add_swift_target_executable_single name)
 
   target_compile_options(${name} PRIVATE
     "$<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${c_compile_flags}>")
+  target_compile_options(${name} PRIVATE
+    "$<$<COMPILE_LANGUAGE:ASM>:${asm_compile_flags}>")
   target_link_directories(${name} PRIVATE
     ${library_search_directories})
   target_link_options(${name} PRIVATE
