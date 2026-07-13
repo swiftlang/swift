@@ -163,8 +163,6 @@ public func compareComparable<T:Comparable>(_ x: T, _ y:T) -> Bool {
 // Check that a call of inherited Equatable.== can be devirtualized.
 // CHECK-LABEL: sil @$s28devirt_inherited_conformance17testCompareEqualsSbyF : $@convention(thin) () -> Bool {
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef : $D, let, name "self"
-// CHECK-NEXT: debug_value undef : $D, let, name "self"
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: struct $Bool
 // CHECK: return
@@ -178,8 +176,6 @@ public func testCompareEquals() -> Bool {
 // Check that a call of inherited Simple.== can be devirtualized.
 // CHECK-LABEL: sil @$s28devirt_inherited_conformance014testCompareMinfF0SbyF : $@convention(thin) () -> Bool {
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef : $D, let, name "self"
-// CHECK-NEXT: debug_value undef : $D, let, name "self"
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: struct $Bool
 // CHECK: return
@@ -190,8 +186,6 @@ public func testCompareMinMinMin() -> Bool {
 // Check that a call of inherited Comparable.== can be devirtualized.
 // CHECK-LABEL: sil @$s28devirt_inherited_conformance21testCompareComparableSbyF : $@convention(thin) () -> Bool {
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef : $D, let, name "self"
-// CHECK-NEXT: debug_value undef : $D, let, name "self"
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: struct $Bool
 // CHECK: return
@@ -206,8 +200,6 @@ public func BooCall<T:Simple>(_ x:T, _ y:T) -> Bool {
 // Check that a call of inherited Simple.boo can be devirtualized.
 // CHECK-LABEL: sil @$s28devirt_inherited_conformance11testBooCallSbyF : $@convention(thin) () -> Bool {
 // CHECK: bb0
-// CHECK-NEXT: debug_value undef : $D, let, name "self"
-// CHECK-NEXT: debug_value undef : $D, let, name "self"
 // CHECK-NEXT: integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: struct $Bool
 // CHECK: return

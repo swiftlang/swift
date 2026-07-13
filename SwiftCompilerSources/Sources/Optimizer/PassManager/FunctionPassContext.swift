@@ -73,14 +73,6 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func eliminateDeadAllocations(in function: Function) -> Bool {
-    if bridgedPassContext.eliminateDeadAllocations(function.bridged) {
-      notifyInstructionsChanged()
-      return true
-    }
-    return false
-  }
-
   func specializeClassMethodInst(_ cm: ClassMethodInst) -> Bool {
     if bridgedPassContext.specializeClassMethodInst(cm.bridged) {
       notifyInstructionsChanged()

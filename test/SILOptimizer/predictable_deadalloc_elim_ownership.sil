@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -predictable-deadalloc-elim \
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-dead-object-elimination \
 // RUN: -enable-experimental-feature LifetimeDependence \
 // RUN: | %FileCheck %s
 
@@ -46,32 +46,6 @@ bb0(%0 : $Builtin.Int32):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @simple_trivial_init_box : $@convention(thin) (Builtin.Int32) -> () {
-// CHECK-NOT: alloc_box
-// CHECK: } // end sil function 'simple_trivial_init_box'
-sil [ossa] @simple_trivial_init_box : $@convention(thin) (Builtin.Int32) -> () {
-bb0(%0 : $Builtin.Int32):
-  %1 = alloc_box ${ var Builtin.Int32 }
-  %2 = project_box %1 : ${ var Builtin.Int32 }, 0
-  store %0 to [trivial] %2 : $*Builtin.Int32
-  destroy_value %1 : ${ var Builtin.Int32 }
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @simple_trivial_uninit_box : $@convention(thin) (Builtin.Int32) -> () {
-// CHECK-NOT: alloc_box
-// CHECK: } // end sil function 'simple_trivial_uninit_box'
-sil [ossa] @simple_trivial_uninit_box : $@convention(thin) (Builtin.Int32) -> () {
-bb0(%0 : $Builtin.Int32):
-  %1 = alloc_box ${ var Builtin.Int32 }
-  %2 = project_box %1 : ${ var Builtin.Int32 }, 0
-  store %0 to [trivial] %2 : $*Builtin.Int32
-  dealloc_box %1 : ${ var Builtin.Int32 }
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 // CHECK-LABEL: sil [ossa] @simple_nontrivial_stack : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK-NEXT: destroy_value [[ARG]]
@@ -106,40 +80,9 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @simple_nontrivial_uninit_box : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: bb0([[ARG:%.*]] :
-// CHECK-NEXT: destroy_value [[ARG]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-// CHECK: } // end sil function 'simple_nontrivial_uninit_box'
-sil [ossa] @simple_nontrivial_uninit_box : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $Builtin.NativeObject):
-  %1 = alloc_box ${ var Builtin.NativeObject }
-  %2 = project_box %1 : ${ var Builtin.NativeObject }, 0
-  store %0 to [init] %2 : $*Builtin.NativeObject
-  destroy_addr %2 : $*Builtin.NativeObject
-  dealloc_box %1 : ${ var Builtin.NativeObject }
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 //////////////////
 // Assign Tests //
 //////////////////
-
-// Make sure that we do eliminate this allocation
-// CHECK-LABEL: sil [ossa] @simple_assign_take_trivial : $@convention(thin) (Builtin.Int32, @in Builtin.Int32) -> () {
-// CHECK-NOT: alloc_stack
-// CHECK: } // end sil function 'simple_assign_take_trivial'
-sil [ossa] @simple_assign_take_trivial : $@convention(thin) (Builtin.Int32, @in Builtin.Int32) -> () {
-bb0(%0 : $Builtin.Int32, %1 : $*Builtin.Int32):
-  %2 = alloc_stack $Builtin.Int32
-  store %0 to [trivial] %2 : $*Builtin.Int32
-  copy_addr [take] %1 to %2 : $*Builtin.Int32
-  dealloc_stack %2 : $*Builtin.Int32
-  %9999 = tuple()
-  return %9999 : $()
-}
 
 // In this case, we perform an init, copy. Since we do not want to lose the +1
 // on the argument, we do not eliminate this (even though with time perhaps we
@@ -154,26 +97,6 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : $*Builtin.NativeObject):
   store %0 to [init] %2 : $*Builtin.NativeObject
   destroy_addr %2 : $*Builtin.NativeObject
   copy_addr %1 to [init] %2 : $*Builtin.NativeObject
-  destroy_addr %2 : $*Builtin.NativeObject
-  dealloc_stack %2 : $*Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// This we can promote successfully.
-// CHECK-LABEL: sil [ossa] @simple_init_take : $@convention(thin) (@owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
-// CHECK: bb0([[ARG0:%.*]] : @owned $Builtin.NativeObject, [[ARG1:%.*]] : $*Builtin.NativeObject):
-// CHECK-NOT: alloc_stack
-// CHECK:  destroy_value [[ARG0]]
-// CHECK:  [[L:%.*]] = load [take] [[ARG1]]
-// CHECK:  destroy_value [[L]]
-// CHECK: } // end sil function 'simple_init_take'
-sil [ossa] @simple_init_take : $@convention(thin) (@owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
-bb0(%0 : @owned $Builtin.NativeObject, %1 : $*Builtin.NativeObject):
-  %2 = alloc_stack $Builtin.NativeObject
-  store %0 to [init] %2 : $*Builtin.NativeObject
-  destroy_addr %2 : $*Builtin.NativeObject
-  copy_addr [take] %1 to [init] %2 : $*Builtin.NativeObject
   destroy_addr %2 : $*Builtin.NativeObject
   dealloc_stack %2 : $*Builtin.NativeObject
   %9999 = tuple()
@@ -266,45 +189,14 @@ bb3:
   return %9999 : $()
 }
 
-// Today PMO can not handle different available values coming from different
-// BBs. With time it can be taught to do that if necessary. That being said,
-// this test shows that we /tried/ and failed with the available value test
-// instead of failing earlier due to the copy_addr being an assign since we
-// explode the copy_addr.
-//
-// CHECK-LABEL: sil [ossa] @simple_diamond_with_assign_remove : $@convention(thin) (@owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
-// CHECK: alloc_stack
-// CHECK-NOT: copy_addr
-// CHECK: } // end sil function 'simple_diamond_with_assign_remove'
-sil [ossa] @simple_diamond_with_assign_remove : $@convention(thin) (@owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
-bb0(%0 : @owned $Builtin.NativeObject, %1 : $*Builtin.NativeObject):
-  %2 = alloc_stack $Builtin.NativeObject
-  store %0 to [init] %2 : $*Builtin.NativeObject
-  cond_br undef, bb1, bb2
-
-bb1:
-  destroy_addr %2 : $*Builtin.NativeObject
-  copy_addr [take] %1 to [init] %2 : $*Builtin.NativeObject
-  br bb3
-
-bb2:
-  destroy_addr %1 : $*Builtin.NativeObject
-  br bb3
-
-bb3:
-  destroy_addr %2 : $*Builtin.NativeObject
-  dealloc_stack %2 : $*Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 // Make sure that we can handle structs, tuples that are not fully available
 // themselves, but whose components are fully available.
 // CHECK-LABEL: sil [ossa] @multiple_inits_1 : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass, @owned Klass) -> () {
 // CHECK: bb0([[ARG0:%.*]] : @owned $Klass, [[ARG1:%.*]] : @owned $Klass, [[ARG2:%.*]] : @owned $Klass, [[ARG3:%.*]] : @owned $Klass):
-// CHECK:   [[TUP:%.*]] = tuple ([[ARG1]] : $Klass, [[ARG2]] : $Klass)
-// CHECK:   [[STRUCT:%.*]] = struct $KlassWithKlassTuple ([[ARG0]] : $Klass, [[TUP]] : $(Klass, Klass), [[ARG3]] : $Klass)
-// CHECK:   destroy_value [[STRUCT]]
+// CHECK:   destroy_value [[ARG0]]
+// CHECK:   destroy_value [[ARG1]]
+// CHECK:   destroy_value [[ARG2]]
+// CHECK:   destroy_value [[ARG3]]
 // CHECK: } // end sil function 'multiple_inits_1'
 sil [ossa] @multiple_inits_1 : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass, @owned Klass) -> () {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass, %3 : @owned $Klass):
@@ -328,10 +220,9 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass, %3 : @owned $Kla
 
 // CHECK-LABEL: sil [ossa] @multiple_inits_2 : $@convention(thin) (@owned Klass, @owned (Klass, Klass), @owned Klass) -> () {
 // CHECK: bb0([[ARG0:%.*]] : @owned $Klass, [[ARG1:%.*]] : @owned $(Klass, Klass), [[ARG2:%.*]] : @owned $Klass):
-// CHECK:   ([[LHS:%.*]], [[RHS:%.*]]) = destructure_tuple [[ARG1]]
-// CHECK:   [[TUP:%.*]] = tuple ([[LHS]] : $Klass, [[RHS]] : $Klass)
-// CHECK:   [[STRUCT:%.*]] = struct $KlassWithKlassTuple ([[ARG0]] : $Klass, [[TUP]] : $(Klass, Klass), [[ARG2]] : $Klass)
-// CHECK:   destroy_value [[STRUCT]]
+// CHECK:   destroy_value [[ARG0]]
+// CHECK:   destroy_value [[ARG1]]
+// CHECK:   destroy_value [[ARG2]]
 // CHECK: } // end sil function 'multiple_inits_2'
 sil [ossa] @multiple_inits_2 : $@convention(thin) (@owned Klass, @owned (Klass, Klass), @owned Klass) -> () {
 bb0(%0 : @owned $Klass, %1 : @owned $(Klass, Klass), %2 : @owned $Klass):
@@ -350,12 +241,8 @@ bb0(%0 : @owned $Klass, %1 : @owned $(Klass, Klass), %2 : @owned $Klass):
   return %9999 : $()
 }
 
-// We can not promote this since we have destroy_addr that are not fully
-// available. This would mean that we would need to split up the store which is
-// unsupported today.
-//
 // CHECK-LABEL: sil [ossa] @destroy_addr_not_fully_available : $@convention(thin) (@owned KlassWithKlassTuple) -> () {
-// CHECK: alloc_stack
+// CHECK-NOT: alloc_stack
 // CHECK: } // end sil function 'destroy_addr_not_fully_available'
 sil [ossa] @destroy_addr_not_fully_available : $@convention(thin) (@owned KlassWithKlassTuple) -> () {
 bb0(%0 : @owned $KlassWithKlassTuple):
@@ -418,11 +305,12 @@ bb3:
   return %9999 : $()
 }
 
-// We should do nothing here since we do not have a fully available value.
-//
 // CHECK-LABEL: sil [ossa] @promote_partial_store_assign : $@convention(thin) (@owned NativeObjectPair, @owned Builtin.NativeObject) -> () {
-// CHECK: alloc_stack
-// CHECK: } // end sil function 'promote_partial_store_assign'
+// CHECK:         (%2, %3) = destructure_struct %0
+// CHECK:         %4 = struct $NativeObjectPair (%1 : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
+// CHECK:         destroy_value %2
+// CHECK:         destroy_value %4
+// CHECK:       } // end sil function 'promote_partial_store_assign'
 sil [ossa] @promote_partial_store_assign : $@convention(thin) (@owned NativeObjectPair, @owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $NativeObjectPair, %1 : @owned $Builtin.NativeObject):
   %2 = alloc_stack $NativeObjectPair
@@ -677,10 +565,11 @@ bb0(%arg : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @bail_on_forwardingunowned_use : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: alloc_stack
-// CHECK: } // end sil function 'bail_on_forwardingunowned_use'
-sil [ossa] @bail_on_forwardingunowned_use : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [ossa] @forwardingunowned_use : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT:     alloc_stack
+// CHECK:         destroy_value %0
+// CHECK:       } // end sil function 'forwardingunowned_use'
+sil [ossa] @forwardingunowned_use : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%arg : @owned $Builtin.NativeObject):
   br bb1(%arg : $Builtin.NativeObject)
 
@@ -762,7 +651,7 @@ bb6:
 }
 
 // CHECK-LABEL: sil [ossa] @testStoredOnlyExistential :
-// CHECK:         alloc_stack
+// CHECK-NOT:     alloc_stack
 // CHECK:       } // end sil function 'testStoredOnlyExistential'
 sil [ossa] @testStoredOnlyExistential : $@convention(thin) (S) -> () {
 bb0(%0 : $S):
@@ -775,9 +664,7 @@ bb0(%0 : $S):
 // Preserve ownership for empty ~Escapable structs.
 //
 // CHECK-LABEL: sil hidden [ossa] @testEmptyNonEscapable : $@convention(method) (@guaranteed NE) -> @lifetime(copy 0) @owned NE {
-// CHECK: bb0(%0 : @guaranteed $NE):
-// CHECK-NEXT:   %1 = copy_value %0 : $NE
-// CHECK-NEXT:   return %1 : $NE
+// We currently don't optimize empty types.
 // CHECK-LABEL: } // end sil function 'testEmptyNonEscapable'
 sil hidden [ossa] @testEmptyNonEscapable : $@convention(method) (@guaranteed NE) -> @lifetime(copy 0) @owned NE {
 bb0(%0 : @guaranteed $NE):

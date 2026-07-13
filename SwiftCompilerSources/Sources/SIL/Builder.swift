@@ -76,6 +76,16 @@ public struct Builder {
     self.init(after: insPnt, location: insPnt.location, context)
   }
 
+  public init(afterDefinitionOf value: Value, _ context: some MutatingContext) {
+    if let definingInstruction = value.definingInstruction {
+      self.init(after: definingInstruction, context)
+    } else if let arg = value as? Argument {
+      self.init(atBeginOf: arg.parentBlock, context)
+    } else {
+      fatalError("wrong value kind for Builder.(afterDefinitionOf:)")
+    }
+  }
+
   /// Creates a builder which inserts at the end of `block`, using a custom `location`.
   public init(atEndOf block: BasicBlock, location: Location, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: block.parentFunction)
@@ -834,6 +844,13 @@ public struct Builder {
 
   public func createMarkDependence(value: Value, base: Value, kind: MarkDependenceKind) -> MarkDependenceInst {
     let markDependence = bridged.createMarkDependence(value.bridged, base.bridged,
+                                                      BridgedInstruction.MarkDependenceKind(rawValue: kind.rawValue)!)
+    return notifyNew(markDependence.getAs(MarkDependenceInst.self))
+  }
+
+  public func createMarkDependence(value: Value, base: Value, ownership: Ownership,
+                                   kind: MarkDependenceKind) -> MarkDependenceInst {
+    let markDependence = bridged.createMarkDependence(value.bridged, base.bridged, ownership._bridged,
                                                       BridgedInstruction.MarkDependenceKind(rawValue: kind.rawValue)!)
     return notifyNew(markDependence.getAs(MarkDependenceInst.self))
   }
