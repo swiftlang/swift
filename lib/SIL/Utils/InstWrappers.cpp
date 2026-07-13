@@ -105,6 +105,7 @@ bool ForwardingOperation::visitForwardedValues(
 bool swift::isFixedStorageSemanticsCallKind(SILFunction *function) {
   for (auto &attr : function->getSemanticsAttrs()) {
     if (attr == "fixed_storage.check_index" ||
+        attr == "fixed_storage.check_capacity" ||
         attr == "fixed_storage.get_count") {
       return true;
     }

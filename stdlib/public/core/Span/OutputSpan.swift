@@ -291,13 +291,25 @@ extension OutputSpan where Element: ~Copyable {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
+  // SILOptimizer looks for fixed_storage.check_capacity semantics for bounds
+  // check optimizations. Distinct from `_checkIndex` because `capacity` is
+  // invariant for the lifetime of the storage, so successive checks across
+  // mutations of `self` may be merged. Only called with `_count`, which is
+  // non-negative by invariant, so no lower-bound check is needed.
+  @_semantics("fixed_storage.check_capacity")
+  @inline(__always)
+  @_alwaysEmitIntoClient
+  internal func _checkCanAppend(_ index: Int) {
+    _precondition(index < capacity, "OutputSpan capacity overflow")
+  }
+
   /// Append a single element to this span.
   ///
   /// - Parameter value: The element to append.
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func append(_ value: consuming Element) {
-    _precondition(_count < capacity, "OutputSpan capacity overflow")
+    _checkCanAppend(_count)
     unsafe _tail().initializeMemory(as: Element.self, to: value)
     _count &+= 1
   }
