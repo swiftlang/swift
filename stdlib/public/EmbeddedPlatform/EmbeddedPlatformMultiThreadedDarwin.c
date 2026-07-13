@@ -41,9 +41,10 @@ typedef struct {
   } u;
 } swift_darwin_mutex_t;
 
-_Static_assert(sizeof(swift_darwin_mutex_t) <= 8 * sizeof(void *),
+_Static_assert(sizeof(swift_darwin_mutex_t) <= EMBEDDED_SWIFT_MUTEX_NUM_WORDS * sizeof(void *),
                "swift_darwin_mutex_t does not fit in the Embedded Swift "
-               "Platform mutex storage (8 pointer-sized words)");
+               "Platform mutex storage (EMBEDDED_SWIFT_MUTEX_NUM_WORDS "
+               "pointer-sized words)");
 _Static_assert(_Alignof(swift_darwin_mutex_t) <= _Alignof(void *),
                "swift_darwin_mutex_t requires stronger alignment than the "
                "Embedded Swift Platform mutex storage provides");

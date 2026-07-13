@@ -25,7 +25,7 @@
 #include <pthread.h>
 
 #if __STDC_VERSION__ >= 201112L
-_Static_assert(sizeof(pthread_mutex_t) <= 8 * sizeof(void *),
+_Static_assert(sizeof(pthread_mutex_t) <= EMBEDDED_SWIFT_MUTEX_NUM_WORDS * sizeof(void *),
                "pthread_mutex_t does not fit in the Embedded Swift Platform "
                "mutex storage (8 pointer-sized words)");
 _Static_assert(_Alignof(pthread_mutex_t) <= _Alignof(void *),

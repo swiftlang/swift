@@ -12,7 +12,7 @@
 
 // Private inline storage for EmbeddedPlatform's opaque mutex hooks.
 @usableFromInline
-internal typealias _SwiftEmbeddedMutex = [8 of UInt]
+internal typealias _SwiftEmbeddedMutex = [(EMBEDDED_SWIFT_MUTEX_NUM_WORDS) of UInt]
 
 @_extern(c, "_swift_mutex_init")
 @usableFromInline
