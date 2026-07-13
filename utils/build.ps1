@@ -283,6 +283,14 @@ $KnownPlatforms = @{
     BinaryDir = "bin64a";
     Cache = @{};
     LinkModes = $WindowsSDKLinkModes;
+    DebugFormat = $DebugFormat;
+    SwiftLinkerFlags = { param([string] $Format)
+      if ($Format -eq "dwarf") {
+        @("-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
+      } else {
+        @("-Xlinker", "/DEBUG")
+      }
+    };
   };
 
   WindowsX64 = @{
@@ -297,6 +305,14 @@ $KnownPlatforms = @{
     BinaryDir = "bin64";
     Cache = @{};
     LinkModes = $WindowsSDKLinkModes;
+    DebugFormat = $DebugFormat;
+    SwiftLinkerFlags = { param([string] $Format)
+      if ($Format -eq "dwarf") {
+        @("-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
+      } else {
+        @("-Xlinker", "/DEBUG")
+      }
+    };
   };
 
   WindowsX86  = @{
@@ -311,6 +327,14 @@ $KnownPlatforms = @{
     BinaryDir = "bin32";
     Cache = @{};
     LinkModes = $WindowsSDKLinkModes;
+    DebugFormat = $DebugFormat;
+    SwiftLinkerFlags = { param([string] $Format)
+      if ($Format -eq "dwarf") {
+        @("-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
+      } else {
+        @("-Xlinker", "/DEBUG")
+      }
+    };
   };
 
   AndroidARMv7 = @{
@@ -325,6 +349,11 @@ $KnownPlatforms = @{
     BinaryDir = "bin32a";
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
+    DebugFormat = "dwarf";
+    SwiftLinkerFlags = { param([string] $Format)
+      if ($Format -ne "dwarf") { throw "Android targets only support DWARF debug info, got '$Format'" }
+      @()
+    };
   };
 
   AndroidARM64 = @{
@@ -339,6 +368,11 @@ $KnownPlatforms = @{
     BinaryDir = "bin64a";
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
+    DebugFormat = "dwarf";
+    SwiftLinkerFlags = { param([string] $Format)
+      if ($Format -ne "dwarf") { throw "Android targets only support DWARF debug info, got '$Format'" }
+      @()
+    };
   };
 
   AndroidX86 = @{
@@ -353,6 +387,11 @@ $KnownPlatforms = @{
     BinaryDir = "bin32";
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
+    DebugFormat = "dwarf";
+    SwiftLinkerFlags = { param([string] $Format)
+      if ($Format -ne "dwarf") { throw "Android targets only support DWARF debug info, got '$Format'" }
+      @()
+    };
   };
 
   AndroidX64 = @{
@@ -367,6 +406,11 @@ $KnownPlatforms = @{
     BinaryDir = "bin64";
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
+    DebugFormat = "dwarf";
+    SwiftLinkerFlags = { param([string] $Format)
+      if ($Format -ne "dwarf") { throw "Android targets only support DWARF debug info, got '$Format'" }
+      @()
+    };
   };
 }
 
@@ -1855,9 +1899,9 @@ $Compilers = @{
       Flags             = @()
       DebugFlags        = { param([string] $Format)
         if ($Format -eq "dwarf") {
-          return @("-g", "-debug-info-format=dwarf", "-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
+          return @("-g", "-debug-info-format=dwarf") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
         }
-        return @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
+        return @("-g", "-debug-info-format=codeview") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
       }
       AssumeFunctional  = $false
     }
@@ -1909,11 +1953,10 @@ $Compilers = @{
       DriverStyle       = [DriverStyle]::Swift
       Flags             = @()
       DebugFlags        = { param([string] $Format)
-        if ($Format -eq $null) { return @("-gnone") }
         if ($Format -eq "dwarf") {
-          return @("-g", "-debug-info-format=dwarf", "-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
+          return @("-g", "-debug-info-format=dwarf") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
         }
-        return @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
+        return @("-g", "-debug-info-format=codeview") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
       }
       AssumeFunctional  = $true
     }
@@ -1967,9 +2010,9 @@ $Compilers = @{
       DebugFlags        = { param([string] $Format)
         if ($Format -eq $null) { return @("-gnone") }
         if ($Format -eq "dwarf") {
-          return @("-g", "-debug-info-format=dwarf", "-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
+          return @("-g", "-debug-info-format=dwarf") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
         }
-        return @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
+        return @("-g", "-debug-info-format=codeview") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
       }
       AssumeFunctional  = $true
     }
@@ -2058,6 +2101,8 @@ function Build-CMakeProject {
     $UseCXX = $CXXCompiler -ne $null
     $UseSwift = $SwiftCompiler -ne $null
     $UseMSVC = ($UseC -and $CCompiler.DriverStyle -eq [DriverStyle]::CL) -or ($UseCXX -and $CXXCompiler.DriverStyle -eq [DriverStyle]::CL)
+
+    $PlatformDebugFormat = $Platform.DebugFormat
 
     # Starting with CMake 3.30, CMake propagates linker flags to Swift.
     $CMakePassesSwiftLinkerFlags = $CMakeVersion -ge [version]'3.30'
@@ -2164,7 +2209,7 @@ function Build-CMakeProject {
             # the Embedded format. Provide the mapping before setting the global
             # CMAKE_MSVC_DEBUG_INFORMATION_FORMAT below.
             Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded `
-              $(& $Assembler.DebugFlags $DebugFormat)
+              $(& $Assembler.DebugFlags $PlatformDebugFormat)
           }
         }
 
@@ -2185,7 +2230,7 @@ function Build-CMakeProject {
           Add-FlagsDefine $Defines CMAKE_C_FLAGS $CCompiler.Flags
 
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_C_FLAGS $(& $CCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_C_FLAGS $(& $CCompiler.DebugFlags $PlatformDebugFormat)
           }
         }
 
@@ -2207,7 +2252,7 @@ function Build-CMakeProject {
           }
 
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $(& $CXXCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $(& $CXXCompiler.DebugFlags $PlatformDebugFormat)
           }
         }
 
@@ -2226,7 +2271,8 @@ function Build-CMakeProject {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-sdk", $SwiftSDK)
           }
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $(& $SwiftCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $(& $SwiftCompiler.DebugFlags $PlatformDebugFormat)
+            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $(& $Platform.SwiftLinkerFlags $PlatformDebugFormat)
           } else {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-gnone")
           }
@@ -2267,7 +2313,7 @@ function Build-CMakeProject {
             # `lld-link.exe` argument, not `link.exe`, so this can only be enabled when we use
             # `lld-link.exe` for linking.
             # TODO: Investigate supporting fission with PE/COFF, this should avoid this warning.
-            if ($DebugFormat -eq "dwarf" -and -not $UseMSVC) {
+            if ($PlatformDebugFormat -eq "dwarf" -and -not $UseMSVC) {
               Add-LinkerFlagsDefine $Defines @("/IGNORE:longsections")
             }
           }
@@ -2291,7 +2337,7 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_TARGET $Platform.Triple
           Add-FlagsDefine $Defines CMAKE_C_FLAGS $CCompiler.Flags
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_C_FLAGS $(& $CCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_C_FLAGS $(& $CCompiler.DebugFlags $PlatformDebugFormat)
           }
         }
 
@@ -2299,7 +2345,7 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_TARGET $Platform.Triple
           Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXCompiler.Flags
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $(& $CXXCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $(& $CXXCompiler.DebugFlags $PlatformDebugFormat)
           }
         }
 
@@ -2324,7 +2370,7 @@ function Build-CMakeProject {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-sdk", $SwiftSDK, "-sysroot", $AndroidSysroot)
           }
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS (& $SwiftCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $(& $SwiftCompiler.DebugFlags $PlatformDebugFormat)
           } else {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-gnone")
           }
