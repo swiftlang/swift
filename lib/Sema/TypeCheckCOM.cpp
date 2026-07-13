@@ -34,50 +34,26 @@
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/StringExtras.h"
 
-using namespace swift;
-
-ProtocolConformance *
-swift::com::deriveImplicitConformance(NominalTypeDecl *NTD,
-                                      KnownProtocolKind KP) {
-  const auto *CD = dyn_cast<ClassDecl>(NTD);
-  if (CD == nullptr)
-    return nullptr;
-
-  if (!CD->getAttrs().hasAttribute<COMAttr>())
-    return nullptr;
-
-  ASTContext &context = NTD->getASTContext();
-  auto *protocol = context.getProtocol(KP);
-  if (protocol == nullptr)
-    return nullptr;
-
-  // Ensure that `ISwiftObject` is always compiler managed.
-  if (KP == KnownProtocolKind::ISwiftObject) {
-    llvm::SmallVector<ProtocolConformance *, 2> conformances;
-    NTD->lookupConformance(protocol, conformances);
-    if (!conformances.empty()) {
-      context.Diags.diagnose(CD->getLoc(), diag::attr_com_explicit_iswiftobject);
-      if (auto *A = CD->getAttrs().getAttribute<COMAttr>())
-        context.Diags.diagnose(A->getLocation(),
-                               diag::attr_com_iswiftobject_implied);
-      return conformances.front();
-    }
-  }
-
-  auto conformance =
-      context.getNormalConformance(NTD->getDeclaredInterfaceType(), protocol,
-                                   NTD->getLoc(), /*inheritedTypeRepr=*/nullptr,
-                                   /*conformanceDC=*/NTD,
-                                   ProtocolConformanceState::Complete,
-                                   ProtocolConformanceOptions());
-  conformance->setSourceKindAndImplyingConformance(ConformanceEntryKind::Synthesized,
-                                                   nullptr);
-  NTD->registerProtocolConformance(conformance, /*synthesized=*/true);
-  return conformance;
-}
 
 namespace {
 namespace com {
+
+using namespace swift;
+
+/// The protocol an `@com` class conforms to as its COM root under \p model, or
+/// none when no model is in effect.
+std::optional<KnownProtocolKind>
+getRootProtocol(std::optional<LangOptions::COMInteropModel> model) {
+  if (!model)
+    return std::nullopt;
+
+  switch (*model) {
+  case LangOptions::COMInteropModel::Microsoft:
+  case LangOptions::COMInteropModel::CoreFoundation:
+    return KnownProtocolKind::IUnknown;
+  }
+  llvm_unreachable("unhandled COMInteropModel");
+}
 
 /// Look up a type by name from the \c COM module.  Emits a diagnostic on
 /// failure.
@@ -284,6 +260,58 @@ VarDecl *lookupCOMImplementationID(ClassDecl *CD) {
 }
 }
 
+namespace swift {
+ProtocolConformance *
+com::deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP) {
+  const auto *CD = dyn_cast<ClassDecl>(NTD);
+  if (CD == nullptr)
+    return nullptr;
+
+  if (!CD->getAttrs().hasAttribute<COMAttr>())
+    return nullptr;
+
+  ASTContext &context = NTD->getASTContext();
+  auto *protocol = context.getProtocol(KP);
+  if (protocol == nullptr)
+    return nullptr;
+
+  // Synthesize the COM root conformance the interop model selects.
+  // `ISwiftObject` is compiler-managed and synthesized regardless.
+  llvm::SmallVector<KnownProtocolKind, 2> supported;
+  if (auto RP = ::com::getRootProtocol(context.LangOpts.COMModel))
+    supported = { *RP, KnownProtocolKind::ISwiftObject };
+  else
+    supported = { KnownProtocolKind::ISwiftObject };
+
+  if (llvm::none_of(supported,
+                    [KP](const KnownProtocolKind P) { return KP == P; }))
+    return nullptr;
+
+  // Ensure that `ISwiftObject` is always compiler managed.
+  if (KP == KnownProtocolKind::ISwiftObject) {
+    llvm::SmallVector<ProtocolConformance *, 2> conformances;
+    NTD->lookupConformance(protocol, conformances);
+    if (!conformances.empty()) {
+      context.Diags.diagnose(CD->getLoc(), diag::attr_com_explicit_iswiftobject);
+      if (const swift::COMAttr *A = CD->getAttrs().getAttribute<COMAttr>())
+        context.Diags.diagnose(A->getLocation(),
+                               diag::attr_com_iswiftobject_implied);
+      return conformances.front();
+    }
+  }
+
+  auto conformance =
+      context.getNormalConformance(NTD->getDeclaredInterfaceType(), protocol,
+                                   NTD->getLoc(), /*inheritedTypeRepr=*/nullptr,
+                                   /*conformanceDC=*/NTD,
+                                   ProtocolConformanceState::Complete,
+                                   ProtocolConformanceOptions());
+  conformance->setSourceKindAndImplyingConformance(ConformanceEntryKind::Synthesized,
+                                                   nullptr);
+  NTD->registerProtocolConformance(conformance, /*synthesized=*/true);
+  return conformance;
+}
+
 VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
                                                    ProtocolDecl *PD) const {
   auto &ASTContext = PD->getASTContext();
@@ -297,8 +325,8 @@ VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
   // synthesized extension, so find its `IID` by name lookup; re-synthesizing
   // would duplicate it, or fabricate a member absent from an older interface.
   if (!PD->isInSwiftSourceFile())
-    return com::lookupCOMInterfaceID(PD);
-  return com::synthesizeIIDProperty(PD, ASTContext, attr->IID);
+    return ::com::lookupCOMInterfaceID(PD);
+  return ::com::synthesizeIIDProperty(PD, ASTContext, attr->IID);
 }
 
 VarDecl *SynthesizeCOMImplementationIDRequest::evaluate(Evaluator &evaluator,
@@ -312,6 +340,7 @@ VarDecl *SynthesizeCOMImplementationIDRequest::evaluate(Evaluator &evaluator,
   // Synthesize only for a source-file class; recover the imported member by
   // name lookup (see SynthesizeCOMInterfaceIDRequest).
   if (!CD->isInSwiftSourceFile())
-    return com::lookupCOMImplementationID(CD);
-  return com::synthesizeCLSIDProperty(CD, ASTContext, *attr->CLSID);
+    return ::com::lookupCOMImplementationID(CD);
+  return ::com::synthesizeCLSIDProperty(CD, ASTContext, *attr->CLSID);
+}
 }
