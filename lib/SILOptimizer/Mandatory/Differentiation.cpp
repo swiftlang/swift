@@ -139,9 +139,14 @@ private:
   /// corresponding to the function being wrapped in the thunk.
   SILFunction *getUnwrappedCurryThunkFunction(SILFunction *originalFn);
 
+  /// Emits a call to a default derivative of kind `kind` in the function `fn`
+  /// converting / reabstracting arguments and results as needed. Returns
+  /// `false` on failure (e.g. when witness does exist but there is no default
+  /// derivative of corresponding kind).
   bool emitDefaultDerivative(SILDifferentiabilityWitness *origWitness,
                              SILDifferentiabilityWitness *defaultWitness,
-                             SILFunction *vjp);
+                             SILFunction *fn,
+                             AutoDiffDerivativeFunctionKind kind);
 
 public:
   /// Construct an `DifferentiationTransformer` for the given module.
@@ -1101,7 +1106,7 @@ static void emitFatalError(ADContext &context, SILFunction *f,
 }
 
 static SILDifferentiabilityWitness *
-getDefaultDerivative(SILDifferentiabilityWitness *witness) {
+getDefaultDerivativeWitness(SILDifferentiabilityWitness *witness) {
   auto originalFn = witness->getOriginalFunction();
 
   if (auto *originalAFD = findAbstractFunctionDecl(originalFn)) {
@@ -1152,11 +1157,14 @@ static SubstitutionMap getRequirementToWitnessThunkSubs(SILFunction *witness) {
   return {};
 }
 
+// Emit a call to default derivative of kind `kind` performing reabstractions
+// as necessary
 bool DifferentiationTransformer::emitDefaultDerivative(
     SILDifferentiabilityWitness *origWitness,
-    SILDifferentiabilityWitness *defaultWitness, SILFunction *vjp) {
-  auto loc = vjp->getLocation();
-  auto &module = vjp->getModule();
+    SILDifferentiabilityWitness *defaultWitness, SILFunction *fn,
+    AutoDiffDerivativeFunctionKind kind) {
+  auto loc = fn->getLocation();
+  auto &module = fn->getModule();
 
   auto originalFn = origWitness->getOriginalFunction();
   auto wtThunkSubMap = getRequirementToWitnessThunkSubs(originalFn);
@@ -1164,52 +1172,60 @@ bool DifferentiationTransformer::emitDefaultDerivative(
   if (!wtThunkSubMap)
     return false;
 
+  SILFunction *defaultDerivative = nullptr;
+  if (kind == AutoDiffDerivativeFunctionKind::JVP)
+    defaultDerivative = defaultWitness->getJVP();
+  else if (kind == AutoDiffDerivativeFunctionKind::VJP)
+    defaultDerivative = defaultWitness->getVJP();
+
+  if (!defaultDerivative)
+    return false;
+
   auto sm = SubstitutionMap::get(
       defaultWitness->getDerivativeGenericSignature(),
       QuerySubstitutionMap{wtThunkSubMap}, LookUpConformanceInModule());
 
-  auto *entry = vjp->createBasicBlock();
-  createEntryArguments(vjp);
+  auto *entry = fn->createBasicBlock();
+  createEntryArguments(fn);
   SILBuilder builder(entry);
   SILOptFunctionBuilder fb(context.getTransform());
 
-  auto *defaultDerivRef =
-      builder.createFunctionRef(loc, defaultWitness->getVJP());
+  auto *defaultDerivRef = builder.createFunctionRef(loc, defaultDerivative);
   SILValue defaultDeriv = builder.createPartialApply(
       loc, defaultDerivRef, sm, {}, ParameterConvention::Direct_Guaranteed);
 
   auto fromType = defaultDeriv->getType().getAs<SILFunctionType>();
   auto toType =
-      vjp->getLoweredFunctionType()
+      fn->getLoweredFunctionType()
           ->getWithRepresentation(SILFunctionTypeRepresentation::Thick)
-          ->substGenericArgs(module, vjp->getForwardingSubstitutionMap(),
-                             vjp->getTypeExpansionContext());
+          ->substGenericArgs(module, fn->getForwardingSubstitutionMap(),
+                             fn->getTypeExpansionContext());
   auto unsubstFromType = fromType->getUnsubstitutedType(module);
   auto unsubstToType = toType->getUnsubstitutedType(module);
 
-  auto *thunk = getOrCreateReabstractionThunk(
-      fb, module, vjp->getLocation(), vjp, unsubstFromType, unsubstToType);
+  auto *thunk = getOrCreateReabstractionThunk(fb, module, fn->getLocation(), fn,
+                                              unsubstFromType, unsubstToType);
   if (fromType != unsubstFromType)
     defaultDeriv = builder.createConvertFunction(
         loc, defaultDeriv, SILType::getPrimitiveObjectType(unsubstFromType),
         /*withoutActuallyEscaping*/ false);
 
   auto *thunkRef = builder.createFunctionRef(loc, thunk);
-  SmallVector<SILValue, 4> args(vjp->getArguments());
+  SmallVector<SILValue, 4> args(fn->getArguments());
   args.push_back(defaultDeriv);
 
   auto vjpResult = builder.createApply(
-      loc, thunkRef, vjp->getForwardingSubstitutionMap(), args);
+      loc, thunkRef, fn->getForwardingSubstitutionMap(), args);
   builder.emitDestroyValueOperation(loc, defaultDeriv);
   builder.createReturn(loc, vjpResult);
 
 #ifndef NDEBUG
-  vjp->verify();
+  fn->verify();
 #endif
 
   auto *pm = &context.getPassManager();
-  pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(vjp);
-  completeAllLifetimes(pm, vjp);
+  pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(fn);
+  completeAllLifetimes(pm, fn);
   pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
 
   return true;
@@ -1267,34 +1283,42 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     witness->setJVP(jvp);
     context.recordGeneratedFunction(jvp);
 
-    // For now, only do JVP generation if the flag is enabled and if custom VJP
-    // does not exist. If custom VJP exists but custom JVP does not, skip JVP
-    // generation because generated JVP may not match semantics of custom VJP.
-    // Instead, create an empty JVP.
-    if (context.getASTContext()
-            .LangOpts.hasFeature(Feature::ForwardModeDifferentiation) &&
-        !witness->getVJP()) {
-      // JVP and differential generation do not currently support functions with
-      // multiple basic blocks.
-      if (orig->size() > 1) {
-        context.emitNondifferentiabilityError(orig->getLocation().getSourceLoc(),
-                                              invoker,
-                                              diag::autodiff_jvp_control_flow_not_supported);
-        return true;
+    // See, if we can delegate to default derivative
+    auto *defaultWitness = getDefaultDerivativeWitness(witness);
+    bool noDefault =
+        !defaultWitness ||
+        !emitDefaultDerivative(witness, defaultWitness, jvp,
+                               AutoDiffDerivativeFunctionKind::JVP);
+
+    if (noDefault) {
+      // For now, only do JVP generation if the flag is enabled and if custom
+      // VJP does not exist. If custom VJP exists but custom JVP does not, skip
+      // JVP generation because generated JVP may not match semantics of custom
+      // VJP. Instead, create an empty JVP.
+      if (context.getASTContext().LangOpts.hasFeature(
+              Feature::ForwardModeDifferentiation) &&
+          !witness->getVJP()) {
+        // JVP and differential generation do not currently support functions
+        // with multiple basic blocks.
+        if (orig->size() > 1) {
+          context.emitNondifferentiabilityError(
+              orig->getLocation().getSourceLoc(), invoker,
+              diag::autodiff_jvp_control_flow_not_supported);
+          return true;
+        }
+        // Emit JVP function.
+        JVPCloner cloner(context, witness, jvp, invoker);
+        if (cloner.run())
+          return true;
+      } else {
+        // If JVP generation is disabled or a user-defined custom VJP function
+        // exists, fatal error with a nice message.
+        emitFatalError(context, jvp,
+                       "_fatalErrorForwardModeDifferentiationDisabled");
+        LLVM_DEBUG(getADDebugStream()
+                   << "Generated empty JVP for " << getIRName(orig) << ":\n"
+                   << *jvp);
       }
-      // Emit JVP function.
-      JVPCloner cloner(context, witness, jvp, invoker);
-      if (cloner.run())
-        return true;
-    } else {
-      // If JVP generation is disabled or a user-defined custom VJP function
-      // exists, fatal error with a nice message.
-      emitFatalError(context, jvp,
-                     "_fatalErrorForwardModeDifferentiationDisabled");
-      LLVM_DEBUG(getADDebugStream()
-                 << "Generated empty JVP for "
-                 << getIRName(orig) << ":\n"
-                 << *jvp);
     }
   }
 
@@ -1313,8 +1337,9 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     context.recordGeneratedFunction(vjp);
 
     // See, if we can delegate to default derivative
-    if (auto *defaultWitness = getDefaultDerivative(witness)) {
-      if (emitDefaultDerivative(witness, defaultWitness, vjp))
+    if (auto *defaultWitness = getDefaultDerivativeWitness(witness)) {
+      if (emitDefaultDerivative(witness, defaultWitness, vjp,
+                                AutoDiffDerivativeFunctionKind::VJP))
         return false;
     }
 
