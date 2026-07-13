@@ -191,9 +191,8 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
     assert(baseTy);
     if (isa<AbstractFunctionDecl>(decl) &&
         baseTy->getRValueType()->is<AnyMetatypeType>()) {
-      if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext()))
-        if (ext->isMetatypeExtension())
-          return true;
+      if (decl->getDeclContext()->isMetatypeExtension())
+        return true;
       return false;
     }
   }
@@ -10779,10 +10778,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
     // Metatype extension members are only accessible on the protocol
     // metatype itself, not on conforming types.
-    if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
-      if (ext->isMetatypeExtension() && !instanceTy->isExistentialType())
-        return;
-    }
+    if (decl->getDeclContext()->isMetatypeExtension() &&
+        !instanceTy->isExistentialType())
+      return;
 
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
@@ -10792,11 +10790,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         // Metatype extension instance members are instance members of the
         // metatype type itself.  They are accessed directly on the protocol
         // metatype value (e.g. P.value), not on an instance of the protocol.
-        if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
-          if (ext->isMetatypeExtension()) {
-            result.addViable(candidate);
-            return;
-          }
+        if (decl->getDeclContext()->isMetatypeExtension()) {
+          result.addViable(candidate);
+          return;
         }
 
         // `AnyObject` has special semantics, so let's just let it be.
@@ -10881,8 +10877,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
       /* We're OK */
     } else if (instanceTy->isExistentialType() &&
-               isa<ExtensionDecl>(decl->getDeclContext()) &&
-               cast<ExtensionDecl>(decl->getDeclContext())->isMetatypeExtension()) {
+               decl->getDeclContext()->isMetatypeExtension()) {
       // Metatype extension members are directly accessible on the
       // protocol metatype without requiring Self to be bound.
     } else if (hasStaticMembers && baseObjTy->is<MetatypeType>() &&
