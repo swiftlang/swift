@@ -127,6 +127,8 @@ void ClangImporter::getBridgingHeaderOptions(
   // configuration path (and therefore the same `clang::CodeGenOptions`) as the
   // compilations that later consume the PCH.
   if (ctx.LangOpts.ClangTarget.has_value()) {
+    swiftArgs.push_back("-target");
+    swiftArgs.push_back(ctx.LangOpts.Target.str());
     swiftArgs.push_back("-clang-target");
     swiftArgs.push_back(ctx.LangOpts.ClangTarget->str());
   }

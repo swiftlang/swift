@@ -1624,7 +1624,11 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
     // prefer to set the AST-benign ones here unless they are computed
     // after this point or may var per inputs.
     auto &CGO = importer->getCodeGenOpts();
-    CGO.OptimizationLevel = IRGenOpts->shouldOptimize() ? 3 : 0;
+    // Reflect the Swift optimization mode in the Clang optimization level, but
+    // only raise it: preserving a nonzero level from the cc1 '-O' arguments
+    // keeps '__OPTIMIZE__' defined when Swift itself is not optimizing.
+    if (IRGenOpts->shouldOptimize())
+      CGO.OptimizationLevel = 3;
     CGO.DebugTypeExtRefs = !IRGenOpts->DisableClangModuleSkeletonCUs;
     switch (IRGenOpts->DebugInfoLevel) {
     case IRGenDebugInfoLevel::None:
@@ -1677,6 +1681,13 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
       ctx.Diags.diagnose(SourceLoc(), diag::non_pic_without_embedded);
       return nullptr;
     }
+
+    // With '-clang-target', getCodeGenOpts() is a separate instance used for
+    // Swift IRGen; the Clang invocation is what the bridging-header PCH is
+    // serialized against, so keep its optimization level in lock-step.
+    auto &invocationCGO = importer->Impl.Invocation->getCodeGenOpts();
+    if (&invocationCGO != &CGO && IRGenOpts->shouldOptimize())
+      invocationCGO.OptimizationLevel = 3;
   }
 
   // Set up PCH content CASID.
