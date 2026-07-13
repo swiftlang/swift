@@ -54,6 +54,11 @@ class WASISysroot(product.Product):
             enable_wasi_threads=True,
             compiler_rt_os_dir='wasip1',
             target_triple='wasm32-wasip1-threads')
+        self._build_target(
+            host_target,
+            enable_wasi_threads=False,
+            compiler_rt_os_dir='wasip2',
+            target_triple='wasm32-wasip2')
 
     def _toolchain_paths(self, host_target):
         if self.args.build_runtime_with_host_compiler:
