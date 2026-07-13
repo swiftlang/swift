@@ -5319,6 +5319,10 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
         // Nothing to do.
         break;
 
+      case MacroDefinition::Kind::Internal:
+        // Internal macros are compiler-synthesized and never printed.
+        break;
+
       case MacroDefinition::Kind::External: {
         auto external = def.getExternalMacro();
         Printer << " = #externalMacro(module: \"" << external.moduleName
