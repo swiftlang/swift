@@ -1725,12 +1725,18 @@ do {
 
   let baz: Int? = nil
 
-  func foo<T: Equatable>(
-    _ a: @autoclosure () throws -> T,
-    _ b: @autoclosure () throws -> T
+  func foo1<T: Equatable>(
+    _ a: @autoclosure () -> T,
+    _ b: @autoclosure () -> T
   ) {}
 
-  foo(Foo().bar, [baz])
+  func foo2<T: Equatable>(
+    _ a: T,
+    _ b: T
+  ) {}
+
+  foo1(Foo().bar, [baz])
+  foo2(Foo().bar, [baz])
 }
 
 // https://github.com/apple/swift/issues/55681
@@ -1829,4 +1835,21 @@ do {
   // expected-error@+1:8 {{cannot convert value of type 'String' to expected argument type 'Int'}}
   f(0, "")
   // expected-error@-1:4 {{missing argument label 'p:' in call}}{{5-5=p: }}
+}
+
+do {
+  func testNamed(_: String, a: Int? = nil, b: Int? = nil, action: () -> Void = {}) {}
+  // expected-note@-1 {{candidate expects argument 'a' must precede argument 'b'}}
+  func testNamed(d labeled: String, b: Int? = nil, a: Int? = nil, action: () -> Void = {}) {}
+  // expected-note@-1 {{incorrect labels for candidate (have: '(_:b:a:)', expected: '(d:b:a:)')}}
+
+  testNamed("", b: 0, a: 0)
+  // expected-error@-1 {{no exact matches in call to local function 'testNamed'}}
+
+  func testUnnamed(_: String, a: Int? = nil, _: Int? = nil, action: () -> Void = {}) {}
+  func testUnNamed(d labeled: String, _: Int? = nil, a: Int? = nil, action: () -> Void = {}) {}
+
+  testUnnamed("", 0, a: 0) // expected-error {{argument 'a' must precede unnamed argument #2}}
+  testUnnamed("", b: 0, a: 0) // expected-error {{incorrect argument labels in call (have '_:b:a:', expected '_:a:_:action:')}}
+  testUnnamed(d: "", 0, a: 0) // expected-error {{incorrect argument labels in call (have 'd:_:a:', expected '_:a:_:action:')}}
 }

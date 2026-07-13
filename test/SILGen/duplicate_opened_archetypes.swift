@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend %s -enable-objc-interop -import-objc-header %S/Inputs/duplicate_opened_archetypes.h -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values -o /dev/null
 // RUN: %target-swift-frontend %s -enable-objc-interop -import-objc-header %S/Inputs/duplicate_opened_archetypes.h -emit-sil -o /dev/null
 
 // REQUIRES: objc_interop

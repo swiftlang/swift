@@ -24,13 +24,13 @@ extension Task where Success == Never, Failure == Never {
   public typealias Handle = _Concurrency.Task
 
   @available(*, deprecated, message: "Task.CancellationError has been removed; use CancellationError")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func CancellationError() -> _Concurrency.CancellationError {
     return _Concurrency.CancellationError()
   }
 
   @available(*, deprecated, renamed: "yield()")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func suspend() async {
     await yield()
   }
@@ -39,20 +39,20 @@ extension Task where Success == Never, Failure == Never {
 @available(SwiftStdlib 5.1, *)
 extension TaskPriority {
   @available(*, deprecated, message: "unspecified priority will be removed; use nil")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var unspecified: TaskPriority {
     .init(rawValue: 0x00)
   }
 
   @available(*, deprecated, message: "userInteractive priority will be removed")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var userInteractive: TaskPriority {
     .init(rawValue: 0x21)
   }
 }
 
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @available(*, deprecated, renamed: "withTaskCancellationHandler(operation:onCancel:)")
 public func withTaskCancellationHandler<T>(
   handler: @Sendable () -> Void,
@@ -65,7 +65,7 @@ public func withTaskCancellationHandler<T>(
 // in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
 // to the type checker.
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @_unsafeInheritExecutor
 @available(*, deprecated, renamed: "withTaskCancellationHandler(operation:onCancel:)")
 public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
@@ -78,7 +78,7 @@ public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
 @available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
   @available(*, deprecated, message: "`Task.withCancellationHandler` has been replaced by `withTaskCancellationHandler` and will be removed shortly.")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func withCancellationHandler<T>(
     handler: @Sendable () -> Void,
     operation: () async throws -> T
@@ -93,7 +93,7 @@ extension Task where Success == Never, Failure == Never {
   public typealias Group<TaskResult: Sendable> = ThrowingTaskGroup<TaskResult, Error>
 
   @available(*, deprecated, message: "`Task.withGroup` was replaced by `withThrowingTaskGroup` and `withTaskGroup` and will be removed shortly.")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func withGroup<TaskResult: Sendable, BodyResult>(
     resultType: TaskResult.Type,
     returning returnType: BodyResult.Type = BodyResult.self,
@@ -108,13 +108,13 @@ extension Task where Success == Never, Failure == Never {
 @available(SwiftStdlib 5.1, *)
 extension Task {
   @available(*, deprecated, message: "get() has been replaced by .value")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func get() async throws -> Success {
     return try await value
   }
 
   @available(*, deprecated, message: "getResult() has been replaced by .result")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func getResult() async -> Result<Success, Failure>  {
     return await result
   }
@@ -123,7 +123,7 @@ extension Task {
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
   @available(*, deprecated, message: "get() has been replaced by .value")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func get() async -> Success {
     return await value
   }
@@ -133,7 +133,7 @@ extension Task where Failure == Never {
 @available(SwiftStdlib 5.1, *)
 extension TaskGroup {
   @available(*, deprecated, renamed: "addTask(priority:operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func add(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
@@ -144,7 +144,7 @@ extension TaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTask(priority:operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func spawn(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
@@ -153,7 +153,7 @@ extension TaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTaskUnlessCancelled(priority:operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func spawnUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
@@ -162,7 +162,7 @@ extension TaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTask(priority:operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func async(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
@@ -171,7 +171,7 @@ extension TaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTaskUnlessCancelled(priority:operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func asyncUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
@@ -191,7 +191,7 @@ extension TaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func add(
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) async -> Bool {
@@ -209,7 +209,7 @@ extension TaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTask(operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func spawn(
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
@@ -225,7 +225,7 @@ extension TaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func spawnUnlessCancelled(
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) -> Bool {
@@ -241,7 +241,7 @@ extension TaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTask(operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func async(
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
@@ -257,7 +257,7 @@ extension TaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func asyncUnlessCancelled(
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) -> Bool {
@@ -270,7 +270,7 @@ extension TaskGroup {
 @available(SwiftStdlib 5.1, *)
 extension ThrowingTaskGroup {
   @available(*, deprecated, renamed: "addTask(priority:operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func add(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
@@ -281,7 +281,7 @@ extension ThrowingTaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTask(priority:operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func spawn(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
@@ -290,7 +290,7 @@ extension ThrowingTaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTaskUnlessCancelled(priority:operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func spawnUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
@@ -299,7 +299,7 @@ extension ThrowingTaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTask(priority:operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func async(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
@@ -308,7 +308,7 @@ extension ThrowingTaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTaskUnlessCancelled(priority:operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func asyncUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
@@ -328,7 +328,7 @@ extension ThrowingTaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func add(
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) async -> Bool {
@@ -346,7 +346,7 @@ extension ThrowingTaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTask(operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func spawn(
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
@@ -362,7 +362,7 @@ extension ThrowingTaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func spawnUnlessCancelled(
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) -> Bool {
@@ -378,7 +378,7 @@ extension ThrowingTaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTask(operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func async(
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
@@ -394,7 +394,7 @@ extension ThrowingTaskGroup {
   }
 
   @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func asyncUnlessCancelled(
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) -> Bool {

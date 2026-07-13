@@ -65,3 +65,18 @@ struct ImplicitMembers {
 func implicit(_ i: inout ImplicitMembers) {
     if i =% .optional {}
 }
+
+do {
+  struct Property<R, T> {
+    static var `default`: Property<Loader, Int> { .init() }
+  }
+
+  struct Loader {
+    func load<T>(_: Property<Self, T>) -> T {
+    }
+  }
+
+  func test(loader: Loader) {
+    let _: Double = loader.load(.default) // expected-error {{cannot convert value of type 'Int' to specified type 'Double'}}
+  }
+}

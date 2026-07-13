@@ -41,6 +41,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -3033,8 +3034,15 @@ namespace {
 
     void visitModuleDecl(ModuleDecl *MD, Label label) {
       printCommon(MD, "module", label);
-      printFlag(MD->isNonSwiftModule(), "non_swift");
       printAttributes(MD);
+      printFlag(MD->isNonSwiftModule(), "non_swift");
+      if (auto clangMod = MD->findUnderlyingClangModule()) {
+        printFlag(clangMod->isSubModule(), "is_submodule");
+        if (clangMod->isSubModule()) {
+          printFieldQuoted(clangMod->getFullModuleName(),
+                           Label::always("clang_full_name"));
+        }
+      }
       printFoot();
     }
 
@@ -5685,6 +5693,34 @@ public:
       printFieldQuoted(Attr->Reason, Label::always("reason:"));
     printFoot();
   }
+
+  void visitCOMAttr(COMAttr *Attr, Label label) {
+    printCommon(Attr, "com_attr", label);
+    if (!Attr->IID.empty())
+      printFieldQuoted(Attr->IID, Label::always("IID"));
+    if (Attr->CLSID && !Attr->CLSID->empty())
+      printFieldQuoted(Attr->CLSID, Label::always("CLSID"));
+    const char *Model;
+    switch (Attr->getThreadingModel()) {
+    case COMThreadingModel::Single:
+      Model = "single";
+      break;
+    case COMThreadingModel::Apartment:
+      Model = "apartment";
+      break;
+    case COMThreadingModel::Free:
+      Model = "free";
+      break;
+    case COMThreadingModel::Both:
+      Model = "both";
+      break;
+    case COMThreadingModel::Neutral:
+      Model = "neutral";
+      break;
+    }
+    printField(StringRef{Model}, Label::always("threading"));
+    printFoot();
+  }
 };
 
 } // end anonymous namespace
@@ -6486,6 +6522,13 @@ namespace {
       printCommon("module_type", label);
       printDeclName(T->getModule(), Label::always("module"));
       printFlag(T->getModule()->isNonSwiftModule(), "foreign");
+      if (auto clangMod = T->getModule()->findUnderlyingClangModule()) {
+        printFlag(clangMod->isSubModule(), "is_submodule");
+        if (clangMod->isSubModule()) {
+          printFieldQuoted(clangMod->getFullModuleName(),
+                           Label::always("clang_full_name"));
+        }
+      }
       printFoot();
     }
 

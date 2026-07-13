@@ -23,14 +23,14 @@ public struct UniqueBox<Value: ~Copyable>: ~Copyable {
   /// - Parameter initialValue: The initial value to initialize the unqiue box
   ///                           with.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public init(_ initialValue: consuming Value) {
     unsafe pointer = UnsafeMutablePointer<Value>.allocate(capacity: 1)
     unsafe pointer.initialize(to: initialValue)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   deinit {
     unsafe pointer.deinitialize(count: 1)
@@ -46,7 +46,7 @@ extension UniqueBox where Value: ~Copyable {
   /// Dereferences the unique box allowing for in-place reads and writes to the
   /// stored `Value`.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var value: Value {
     @_transparent
     @_unsafeSelfDependentResult
@@ -64,7 +64,7 @@ extension UniqueBox where Value: ~Copyable {
   /// Consumes the unique box and returns the instance of `Value` that was
   /// within the box.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public consuming func consume() -> Value {
     let result = unsafe pointer.move()
@@ -82,7 +82,7 @@ extension UniqueBox where Value: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var span: Span<Value> {
     @_lifetime(borrow self)
     @_transparent
@@ -97,7 +97,7 @@ extension UniqueBox where Value: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var mutableSpan: MutableSpan<Value> {
     @_lifetime(&self)
     @_transparent
@@ -112,7 +112,7 @@ extension UniqueBox where Value: Copyable {
   /// Copies the value within the unqiue box and returns it in a new unique
   /// instance.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func clone() -> Self {
     UniqueBox(value)
   }

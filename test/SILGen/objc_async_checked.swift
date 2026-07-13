@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values -swift-version 6 -I %S/Inputs/custom-modules -target %target-swift-5.1-abi-triple %s -verify
+
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -emit-silgen -swift-version 6 -I %S/Inputs/custom-modules -target %target-swift-5.1-abi-triple %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 
 // REQUIRES: concurrency

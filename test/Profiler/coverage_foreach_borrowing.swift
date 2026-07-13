@@ -1,7 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -suppress-warnings -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_foreach_borrowing -enable-experimental-feature BorrowingForLoop %s | %FileCheck %s
-// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir -enable-experimental-feature BorrowingForLoop %s
-
-// REQUIRES: swift_feature_BorrowingForLoop
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -suppress-warnings -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_foreach_borrowing %s | %FileCheck %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_foreach_borrowing.forEachBasic
 @available(SwiftStdlib 6.4, *)

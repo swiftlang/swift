@@ -1,4 +1,5 @@
 
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk) -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name retaining_globals -import-objc-header %S/Inputs/globals.h %s
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -module-name retaining_globals -import-objc-header %S/Inputs/globals.h %s | %FileCheck %s
 // REQUIRES: objc_interop
 

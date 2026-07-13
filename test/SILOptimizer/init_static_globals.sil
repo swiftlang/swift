@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -enable-experimental-feature RawLayout -initialize-static-globals | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_RawLayout
 
 sil_stage canonical

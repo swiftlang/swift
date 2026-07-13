@@ -334,7 +334,7 @@ bb3:
 sil @no_init_c_union : $@convention(thin) () -> (@out EmptyCUnion)
 
 // CHECK-LABEL: sil @test_empty_c_union : $@convention(thin) () -> () {
-// CHECK: inject_enum_addr
+// CHECK-NOT: inject_enum_addr
 // CHECK-LABEL: } // end sil function 'test_empty_c_union'
 sil @test_empty_c_union : $@convention(thin) () -> () {
 bb0:
@@ -364,7 +364,7 @@ struct NestedUnreferenceableStorage {
 sil @no_init_nested_c_union : $@convention(thin) () -> (@out NestedUnreferenceableStorage)
 
 // CHECK-LABEL: sil @test_empty_nested_c_union : $@convention(thin) () -> () {
-// CHECK: inject_enum_addr
+// CHECK-NOT: inject_enum_addr
 // CHECK-LABEL: } // end sil function 'test_empty_nested_c_union'
 sil @test_empty_nested_c_union : $@convention(thin) () -> () {
 bb0:

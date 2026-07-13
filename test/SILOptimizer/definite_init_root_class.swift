@@ -4,7 +4,6 @@
 // output. At least until -enable-copy-propagation has been around
 // long enough in the same form to be worth rewriting CHECK lines.
 
-// REQUIRES: swift_in_compiler
 
 class OtherClass {}
 

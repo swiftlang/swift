@@ -134,6 +134,20 @@ static inline void *_swift_stdlib_stderr(void) {
 }
 #endif
 
+#if defined(_WIN32)
+static inline FILE *_swift_stdlib_stdin(void) {
+  return stdin;
+}
+
+static inline FILE *_swift_stdlib_stdout(void) {
+  return stdout;
+}
+
+static inline FILE *_swift_stdlib_stderr(void) {
+  return stderr;
+}
+#endif
+
 #if __has_feature(nullability)
 #pragma clang assume_nonnull end
 #endif

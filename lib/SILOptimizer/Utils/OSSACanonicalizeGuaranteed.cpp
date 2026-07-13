@@ -301,6 +301,7 @@ bool OSSACanonicalizeGuaranteed::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::Borrow:
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
+      case OperandOwnership::DebugUse:
       case OperandOwnership::BitwiseEscape:
       case OperandOwnership::DestroyingConsume:
         if (!visitor.visitUse(use)) {

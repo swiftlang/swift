@@ -236,7 +236,8 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
 
     // For example, type dependent operands are non-use. It is not interesting
     // from an ownership perspective.
-    if (op->getOperandOwnership() == OperandOwnership::NonUse)
+    if (op->getOperandOwnership() == OperandOwnership::NonUse ||
+        op->getOperandOwnership() == OperandOwnership::DebugUse)
       continue;
 
     // First check if this recursive use is compatible with our values ownership
@@ -350,9 +351,10 @@ bool SILValueOwnershipChecker::gatherUsers(
       return false;
     }
 
-    // If this op is a type dependent operand, skip it. It is not interesting
+    // For example, type dependent operands are non-use. It is not interesting
     // from an ownership perspective.
-    if (user->isTypeDependentOperand(*op))
+    if (op->getOperandOwnership() == OperandOwnership::NonUse ||
+        op->getOperandOwnership() == OperandOwnership::DebugUse)
       continue;
 
     // First check if this recursive use is compatible with our values
@@ -548,7 +550,7 @@ bool SILValueOwnershipChecker::checkDeadEnds(
   }
   auto allWithinBoundary = true;
   for (auto *use : regularUses) {
-    if (!liveness.isWithinBoundary(use->getUser(), /*deadEndBlocks=*/nullptr)) {
+    if (!liveness.isWithinBoundary(use->getUser())) {
       allWithinBoundary |= errorBuilder.handleMalformedSIL([&] {
         llvm::errs()
             << "Owned value without lifetime ending uses whose regular use "
@@ -1004,29 +1006,16 @@ void SILModule::verifyOwnership() const {
     return;
 
   for (const SILFunction &function : *this) {
-#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
     function.verifyOwnership();
-#else
-    DeadEndBlocks deBlocks(const_cast<SILFunction *>(&function));
-    function.verifyOwnership(&deBlocks);
-#endif
   }
 }
 
 void SILFunction::verifyOwnership() const {
-#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
   verifyOwnership(nullptr);
-#else
-  auto deBlocks =
-      std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(this));
-  verifyOwnership(deBlocks.get());
-#endif
 }
 
 void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
-#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
   deadEndBlocks = nullptr;
-#endif
 
   if (!getModule().getOptions().VerifySILOwnership)
     return;

@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -enable-library-evolution -emit-silgen %S/Inputs/accessibility_vtables_package_helper.swift -package-name Package | %FileCheck %s --check-prefix=LIBRARY
 
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/accessibility_vtables_package_helper.swift -package-name Package
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -primary-file %s -I %t -package-name Package
 // RUN: %target-swift-emit-silgen -primary-file %s -I %t -package-name Package | %FileCheck %s --check-prefix=CLIENT
 
 // RUN: %target-swift-frontend -enable-library-evolution -emit-module -o %t %S/Inputs/accessibility_vtables_package_helper.swift -package-name Package

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // rdar://problem/20714534 -- we need to canonicalize an associated type's

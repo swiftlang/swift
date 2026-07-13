@@ -5,7 +5,6 @@
 // RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo %s -Osize -assert-config Debug | %FileCheck %s --check-prefix=CHECK-MESSAGE
 
 // XFAIL: CPU=wasm32
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: swift_feature_Embedded

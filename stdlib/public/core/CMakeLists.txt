@@ -273,7 +273,7 @@ split_embedded_sources(
   EMBEDDED UnsafePointer.swift
   EMBEDDED UnsafeRawPointer.swift
   EMBEDDED ValidUTF8Buffer.swift
-    NORMAL VarArgs.swift
+  EMBEDDED VarArgs.swift
   EMBEDDED WriteBackMutableSlice.swift
   EMBEDDED Zip.swift
   EMBEDDED _InlineArray.swift
@@ -291,7 +291,6 @@ split_embedded_sources(
   EMBEDDED FloatingPointToString.swift
   EMBEDDED FloatingPointTypes.swift.gyb
   EMBEDDED IntegerTypes.swift.gyb
-  EMBEDDED LegacyInt128.swift.gyb
   EMBEDDED UnsafeBufferPointer.swift.gyb
   EMBEDDED UnsafeRawBufferPointer.swift.gyb
   EMBEDDED Tuple.swift.gyb

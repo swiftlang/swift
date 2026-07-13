@@ -23,7 +23,6 @@
 // RUN: %llvm-nm --undefined-only %t/a6.o | %FileCheck %s --check-prefix=SWIFT6
 // RUN: %llvm-nm --undefined-only %t/a5.o | %FileCheck %s --check-prefix=SWIFT5
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=wasip1

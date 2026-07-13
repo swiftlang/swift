@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -enable-experimental-feature Embedded -Osize -wmo -parse-as-library
 // RUN: %target-swift-frontend -emit-sil -I %t %t/Main.swift -enable-experimental-feature Embedded -parse-as-library | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 // BEGIN MyModule.swift

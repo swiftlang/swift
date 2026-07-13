@@ -28,6 +28,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/OptionSet.h"
@@ -152,54 +153,22 @@ inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
   return TypeCheckExprOptions(flag1) | flag2;
 }
 
-/// Flags that can be used to control name lookup.
-enum class NameLookupFlags {
-  /// Whether to ignore access control for this lookup, allowing inaccessible
-  /// results to be returned.
-  IgnoreAccessControl = 1 << 0,
-  /// Whether to include results from outside the innermost scope that has a
-  /// result.
-  IncludeOuterResults = 1 << 1,
-  // Whether to include results that are marked @inlinable or @usableFromInline.
-  IncludeUsableFromInline = 1 << 2,
-  /// This lookup should exclude any names introduced by macro expansions.
-  ExcludeMacroExpansions = 1 << 3,
-  /// Whether to include members that would otherwise be filtered out because
-  /// they come from a module that has not been imported.
-  IgnoreMissingImports = 1 << 4,
-  /// If @abi attributes are present, return the decls representing the ABI,
-  /// not the API.
-  ABIProviding = 1 << 5,
-
-  // Reminder: If you add a flag, make sure you update simple_display() below
-};
-
-/// A set of options that control name lookup.
-using NameLookupOptions = OptionSet<NameLookupFlags>;
-
-void simple_display(llvm::raw_ostream &out, NameLookupOptions opts);
-
-inline NameLookupOptions operator|(NameLookupFlags flag1,
-                                   NameLookupFlags flag2) {
-  return NameLookupOptions(flag1) | flag2;
-}
-
 /// Default options for member name lookup.
-const NameLookupOptions defaultMemberLookupOptions;
+const NLOptions defaultMemberLookupOptions;
 
 /// Default options for member name lookup in the constraint solver.
 /// Overloads which come from modules that have not been imported should be
 /// deprioritized by ranking and diagnosed by MiscDiagnostics, so we allow
 /// them to be found in constraint solver lookups to improve diagnostics
 /// overall.
-const NameLookupOptions defaultConstraintSolverMemberLookupOptions(
-    NameLookupFlags::IgnoreMissingImports);
+const NLOptions defaultConstraintSolverMemberLookupOptions(
+    NLFlags::IgnoreMissingImports);
 
 /// Default options for member type lookup.
-const NameLookupOptions defaultMemberTypeLookupOptions;
+const NLOptions defaultMemberTypeLookupOptions;
 
 /// Default options for unqualified name lookup.
-const NameLookupOptions defaultUnqualifiedLookupOptions;
+const NLOptions defaultUnqualifiedLookupOptions;
 
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.
@@ -939,7 +908,7 @@ TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
 /// \param options Options that control name lookup.
 LookupResult lookupUnqualified(
     DeclContext *dc, DeclNameRef name, SourceLoc loc,
-    NameLookupOptions options = defaultUnqualifiedLookupOptions);
+    NLOptions options = defaultUnqualifiedLookupOptions);
 
 /// Perform unqualified type lookup at the given source location
 /// within a particular declaration context.
@@ -950,7 +919,7 @@ LookupResult lookupUnqualified(
 /// \param options Options that control name lookup.
 LookupResult lookupUnqualifiedType(
     DeclContext *dc, DeclNameRef name, SourceLoc loc,
-    NameLookupOptions options = defaultUnqualifiedLookupOptions);
+    NLOptions options = defaultUnqualifiedLookupOptions);
 
 /// Lookup a member in the given type.
 ///
@@ -963,7 +932,7 @@ LookupResult lookupUnqualifiedType(
 LookupResult
 lookupMember(DeclContext *dc, Type type, DeclNameRef name,
              SourceLoc loc = SourceLoc(),
-             NameLookupOptions options = defaultMemberLookupOptions);
+             NLOptions options = defaultMemberLookupOptions);
 
 /// Look up a member type within the given type.
 ///
@@ -979,7 +948,7 @@ lookupMember(DeclContext *dc, Type type, DeclNameRef name,
 LookupTypeResult
 lookupMemberType(DeclContext *dc, Type type, DeclNameRef name,
                  SourceLoc loc = SourceLoc(),
-                 NameLookupOptions options = defaultMemberTypeLookupOptions);
+                 NLOptions options = defaultMemberTypeLookupOptions);
 
 /// Given an expression that's known to be an infix operator,
 /// look up its precedence group.
@@ -1224,7 +1193,7 @@ enum : unsigned {
 /// Check for a typo correction.
 void performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                            Type baseTypeOrNull,
-                           NameLookupOptions lookupOptions,
+                           NLOptions lookupOptions,
                            TypoCorrectionResults &corrections,
                            GenericSignature genericSig = GenericSignature(),
                            unsigned maxResults = 4);
@@ -1536,10 +1505,10 @@ bool maybeDiagnoseMissingImportForMember(
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
 
-// Guide ForEachStmt type-checking by indicating whether the BorrowingSequence
+// Guide ForEachStmt type-checking by indicating whether the Iterable
 // protocol should be used, thus enabling Borrowing iteration for a given
 // sequence type.
-bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync,
+bool shouldUseIterable(ASTContext &ctx, Type seqTy, bool isAsync,
                                 SourceLoc loc, DeclContext *dc);
 
 } // end namespace swift

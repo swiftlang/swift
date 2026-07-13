@@ -54,7 +54,7 @@ public protocol SIMDStorage {
 
 extension SIMDStorage {
   /// The number of scalars, or elements, in a vector of this type.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var scalarCount: Int {
     // Wouldn't it make more sense to define the instance var in terms of the
     // static var? Yes, probably, but by doing it this way we make the static
@@ -269,7 +269,7 @@ extension SIMD {
   /// The elements of the index vector are wrapped modulo the count of elements
   /// in this vector. Because of this, the index is always in-range and no trap
   /// can occur.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript<Index>(index: SIMD2<Index>) -> SIMD2<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD2<Scalar>()
@@ -284,7 +284,7 @@ extension SIMD {
   /// The elements of the index vector are wrapped modulo the count of elements
   /// in this vector. Because of this, the index is always in-range and no trap
   /// can occur.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript<Index>(index: SIMD3<Index>) -> SIMD3<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD3<Scalar>()
@@ -299,7 +299,7 @@ extension SIMD {
   /// The elements of the index vector are wrapped modulo the count of elements
   /// in this vector. Because of this, the index is always in-range and no trap
   /// can occur.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript<Index>(index: SIMD4<Index>) -> SIMD4<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD4<Scalar>()
@@ -314,7 +314,7 @@ extension SIMD {
   /// The elements of the index vector are wrapped modulo the count of elements
   /// in this vector. Because of this, the index is always in-range and no trap
   /// can occur.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript<Index>(index: SIMD8<Index>) -> SIMD8<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD8<Scalar>()
@@ -329,7 +329,7 @@ extension SIMD {
   /// The elements of the index vector are wrapped modulo the count of elements
   /// in this vector. Because of this, the index is always in-range and no trap
   /// can occur.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript<Index>(index: SIMD16<Index>) -> SIMD16<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD16<Scalar>()
@@ -344,7 +344,7 @@ extension SIMD {
   /// The elements of the index vector are wrapped modulo the count of elements
   /// in this vector. Because of this, the index is always in-range and no trap
   /// can occur.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript<Index>(index: SIMD32<Index>) -> SIMD32<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD32<Scalar>()
@@ -359,7 +359,7 @@ extension SIMD {
   /// The elements of the index vector are wrapped modulo the count of elements
   /// in this vector. Because of this, the index is always in-range and no trap
   /// can occur.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript<Index>(index: SIMD64<Index>) -> SIMD64<Scalar>
   where Index: FixedWidthInteger {
     var result = SIMD64<Scalar>()
@@ -392,15 +392,25 @@ extension SIMD where Scalar: Comparable {
   }
   
   /// The least element in the vector.
-  @_alwaysEmitIntoClient
+  @export(implementation)
+  @_transparent
   public func min() -> Scalar {
-    return indices.reduce(into: self[0]) { $0 = Swift.min($0, self[$1]) }
+    var result = self[0]
+    for i in 1 ..< scalarCount {
+      result = Swift.min(result, self[i])
+    }
+    return result
   }
-  
+
   /// The greatest element in the vector.
-  @_alwaysEmitIntoClient
+  @export(implementation)
+  @_transparent
   public func max() -> Scalar {
-    return indices.reduce(into: self[0]) { $0 = Swift.max($0, self[$1]) }
+    var result = self[0]
+    for i in 1 ..< scalarCount {
+      result = Swift.max(result, self[i])
+    }
+    return result
   }
 }
 
@@ -547,12 +557,12 @@ extension SIMD where Scalar: Comparable {
     return a .> Self(repeating: b)
   }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func clamp(lowerBound: Self, upperBound: Self) {
     self = self.clamped(lowerBound: lowerBound, upperBound: upperBound)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func clamped(lowerBound: Self, upperBound: Self) -> Self {
     return pointwiseMin(upperBound, pointwiseMax(lowerBound, self))
   }
@@ -566,7 +576,7 @@ extension SIMD where Scalar: FixedWidthInteger {
   }
   
   /// A vector with one in all lanes.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var one: Self {
     return Self(repeating: 1)
   }
@@ -625,17 +635,17 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   /// A vector with one in all lanes.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static var one: Self {
     return Self(repeating: 1)
   }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func clamp(lowerBound: Self, upperBound: Self) {
     self = self.clamped(lowerBound: lowerBound, upperBound: upperBound)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func clamped(lowerBound: Self, upperBound: Self) -> Self {
     return pointwiseMin(upperBound, pointwiseMax(lowerBound, self))
   }
@@ -854,7 +864,8 @@ extension SIMD where Scalar: FixedWidthInteger {
   /// addition.
   ///
   /// Equivalent to `indices.reduce(into: 0) { $0 &+= self[$1] }`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
+  @_transparent
   public func wrappedSum() -> Scalar {
     var result: Scalar = 0
     for i in indices {
@@ -919,19 +930,29 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   /// The least scalar in the vector.
-  @_alwaysEmitIntoClient
+  @export(implementation)
+  @_transparent
   public func min() -> Scalar {
-    return indices.reduce(into: self[0]) { $0 = Scalar.minimum($0, self[$1]) }
+    var result = self[0]
+    for i in 1 ..< scalarCount {
+      result = Scalar.minimum(result, self[i])
+    }
+    return result
   }
-  
+
   /// The greatest scalar in the vector.
-  @_alwaysEmitIntoClient
+  @export(implementation)
+  @_transparent
   public func max() -> Scalar {
-    return indices.reduce(into: self[0]) { $0 = Scalar.maximum($0, self[$1]) }
+    var result = self[0]
+    for i in 1 ..< scalarCount {
+      result = Scalar.maximum(result, self[i])
+    }
+    return result
   }
   
   /// The sum of the scalars in the vector.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func sum() -> Scalar {
     // Implementation note: this eventually be defined to lower to either
     // llvm.experimental.vector.reduce.fadd or an explicit tree-sum. Open-
@@ -1537,13 +1558,15 @@ extension SIMDMask {
 }
 
 /// True if any lane of mask is true.
-@_alwaysEmitIntoClient
+@export(implementation)
+@_transparent
 public func any<Storage>(_ mask: SIMDMask<Storage>) -> Bool {
   return mask._storage.min() < 0
 }
 
 /// True if every lane of mask is true.
-@_alwaysEmitIntoClient
+@export(implementation)
+@_transparent
 public func all<Storage>(_ mask: SIMDMask<Storage>) -> Bool {
   return mask._storage.max() < 0
 }
@@ -1552,7 +1575,7 @@ public func all<Storage>(_ mask: SIMDMask<Storage>) -> Bool {
 ///
 /// Each element of the result is the minimum of the corresponding elements
 /// of the inputs.
-@_alwaysEmitIntoClient
+@export(implementation)
 public func pointwiseMin<T>(_ a: T, _ b: T) -> T
 where T: SIMD, T.Scalar: Comparable {
   var result = T()
@@ -1566,7 +1589,7 @@ where T: SIMD, T.Scalar: Comparable {
 ///
 /// Each element of the result is the minimum of the corresponding elements
 /// of the inputs.
-@_alwaysEmitIntoClient
+@export(implementation)
 public func pointwiseMax<T>(_ a: T, _ b: T) -> T
 where T: SIMD, T.Scalar: Comparable {
   var result = T()
@@ -1581,7 +1604,7 @@ where T: SIMD, T.Scalar: Comparable {
 ///
 /// Each element of the result is the minimum of the corresponding elements
 /// of the inputs.
-@_alwaysEmitIntoClient
+@export(implementation)
 public func pointwiseMin<T>(_ a: T, _ b: T) -> T
 where T: SIMD, T.Scalar: FloatingPoint {
   var result = T()
@@ -1595,7 +1618,7 @@ where T: SIMD, T.Scalar: FloatingPoint {
 ///
 /// Each element of the result is the maximum of the corresponding elements
 /// of the inputs.
-@_alwaysEmitIntoClient
+@export(implementation)
 public func pointwiseMax<T>(_ a: T, _ b: T) -> T
 where T: SIMD, T.Scalar: FloatingPoint {
   var result = T()
@@ -1607,12 +1630,12 @@ where T: SIMD, T.Scalar: FloatingPoint {
 
 // Break the ambiguity between AdditiveArithmetic and SIMD for += and -=
 extension SIMD where Self: AdditiveArithmetic, Self.Scalar: FloatingPoint {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func +=(a: inout Self, b: Self) {
     a = a + b
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func -=(a: inout Self, b: Self) {
     a = a - b
   }

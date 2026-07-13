@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -emit-silgen %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BuiltinModule

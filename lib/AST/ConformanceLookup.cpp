@@ -706,10 +706,21 @@ LookupConformanceRequest::evaluate(Evaluator &evaluator,
   // extension macro can generate a conformance to the
   // given protocol, but conformance macros do not specify
   // that information upfront.
-  (void)evaluateOrDefault(
-      ctx.evaluator,
-      ExpandExtensionMacros{nominal},
-      { });
+  //
+  // As a special case, skip the expansion when looking up an invertible
+  // protocol (Copyable/Escapable) conformance on a Clang-imported type. An
+  // invertible conformance must be declared in the same source file as the
+  // type (see diag::invertible_conformance_other_source_file), so a
+  // macro-generated extension can never introduce one for an imported type.
+  // Skipping the expansion here also breaks a cycle: expanding extension macros
+  // on a Clang-imported type pretty-prints the declaration, which computes the
+  // interface types of its members, which queries invertible conformances,
+  // which would otherwise re-enter extension macro expansion.
+  auto knownProtocol = protocol->getKnownProtocolKind();
+  if (!(nominal->hasClangNode() && knownProtocol &&
+        getInvertibleProtocolKind(*knownProtocol))) {
+    (void)evaluateOrDefault(ctx.evaluator, ExpandExtensionMacros{nominal}, {});
+  }
 
   // Find the root conformance in the nominal type declaration's
   // conformance lookup table.
@@ -757,6 +768,19 @@ LookupConformanceRequest::evaluate(Evaluator &evaluator,
           nominal, KnownProtocolKind::BitwiseCopyable};
       if (auto conformance =
               evaluateOrDefault(ctx.evaluator, request, nullptr)) {
+        conformances.clear();
+        conformances.push_back(conformance);
+      } else {
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
+    } else if (protocol->isSpecificProtocol(KnownProtocolKind::IUnknown) ||
+               protocol->isSpecificProtocol(KnownProtocolKind::ISwiftObject)) {
+      // Synthesize COM protocol conformances for @com classes.
+      auto KP = protocol->isSpecificProtocol(KnownProtocolKind::IUnknown)
+                    ? KnownProtocolKind::IUnknown
+                    : KnownProtocolKind::ISwiftObject;
+      ImplicitKnownProtocolConformanceRequest request{nominal, KP};
+      if (auto conformance = evaluateOrDefault(ctx.evaluator, request, nullptr)) {
         conformances.clear();
         conformances.push_back(conformance);
       } else {

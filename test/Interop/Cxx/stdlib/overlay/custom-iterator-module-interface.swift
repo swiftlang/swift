@@ -1,6 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterator -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature BorrowingSequence | %FileCheck %s
-
-// REQUIRES: swift_feature_BorrowingSequence
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterator -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default | %FileCheck %s
 
 // CHECK: struct ConstIterator : UnsafeCxxInputIterator {
 // CHECK:   func __operatorStar() -> UnsafePointer<Int32>
@@ -113,7 +111,7 @@
 // CHECK:   var pointee: Int32
 // CHECK: }
 
-// CHECK: struct HasNestedIterator : CxxConvertibleToCollection, CxxBorrowingSequence {
+// CHECK: struct HasNestedIterator : CxxConvertibleToCollection, CxxIterable {
 // CHECK:   struct NestedIterator : UnsafeCxxInputIterator {
 // CHECK:     func __operatorStar() -> HasNestedIterator.NestedIterator.reference
 // CHECK:     var ptr: UnsafePointer<Int32>!

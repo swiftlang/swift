@@ -17,7 +17,7 @@ struct Point {
 
 class HasCenter {
   let centerPoint: Point = Point(x: 0, y: 0)
-  public func getCenter() -> Int64
+  public func getCenter() -> Builtin.Int64
 }
 
 sil hidden [ossa] @$s19let_properties_opts5PointV1x1yACSi_SitcfC : $@convention(method) (Int64, Int64, @thin Point.Type) -> Point {
@@ -51,19 +51,23 @@ bb0(%0 : @guaranteed $HasCenter):
 }
 
 // HasCenter.getCenter()
-// CHECK-LABEL: sil hidden [ossa] @$s19let_properties_opts9HasCenterC9getCenterSiyF : $@convention(method) (@guaranteed HasCenter) -> Int64 {
+// CHECK-LABEL: sil hidden [ossa] @$s19let_properties_opts9HasCenterC9getCenterSiyF :
 // CHECK: [[LIT:%.*]] = integer_literal $Builtin.Int64, 0
 // CHECK: [[INT:%.*]] = struct $Int64 ([[LIT]] : $Builtin.Int64)
 // CHECK: [[PNT:%.*]] = struct $Point ([[INT]] : $Int64, [[INT]] : $Int64)
 // CHECK: [[X:%.*]] = struct_extract [[PNT]] : $Point, #Point.x
-// CHECK: return [[X]] : $Int64
+// CHECK: [[V:%.*]] = struct_extract [[X]] : $Int64, #Int64._value
+// CHECK: return [[V]]
 // CHECK-LABEL: } // end sil function '$s19let_properties_opts9HasCenterC9getCenterSiyF'
-sil hidden [ossa] @$s19let_properties_opts9HasCenterC9getCenterSiyF : $@convention(method) (@guaranteed HasCenter) -> Int64 {
+sil hidden [ossa] @$s19let_properties_opts9HasCenterC9getCenterSiyF : $@convention(method) (@guaranteed HasCenter) -> Builtin.Int64 {
 bb0(%0 : @guaranteed $HasCenter):
   %1 = ref_element_addr %0 : $HasCenter, #HasCenter.centerPoint
   %2 = struct_element_addr %1 : $*Point, #Point.x
-  %3 = load [trivial] %2 : $*Int64
-  return %3 : $Int64
+  %3 = struct_element_addr %2, #Int64._value
+  debug_value %3, var, name "z"
+  debug_value %2, var, name "x"
+  %4 = load [trivial] %3
+  return %4
 }
 
 // HasCenter.init()

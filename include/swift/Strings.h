@@ -35,6 +35,8 @@ constexpr static const StringLiteral SWIFT_DISTRIBUTED_NAME = "Distributed";
 constexpr static const StringLiteral SWIFT_STRING_PROCESSING_NAME = "_StringProcessing";
 /// The name of the SwiftShims module, which contains private stdlib decls.
 constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
+/// The name of the COM module, which supports COM interop.
+constexpr static const StringLiteral COM_MODULE_NAME = "COM";
 /// The name of the CxxShim module, which contains a cxx casting utility.
 constexpr static const StringLiteral CXX_SHIM_NAME = "CxxShim";
 /// The name of the CxxStdlibShim module, which contains utilities for the C++ stdlib overlay.

@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -O \
 // RUN:   -disable-availability-checking | %FileCheck %s  --check-prefix=CHECK-IR
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
 // CHECK-IR shape differs on wasm32: optimized vector-reduce form not produced, trap retained

@@ -8,6 +8,7 @@
 // should end up with the same type-checked AST.
 
 // RUN: %empty-directory(%t)
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen -solver-disable-enumerate-supertypes
 // RUN: %target-swift-frontend-dump-ast -enable-experimental-feature ParserASTGen -verify \
 // RUN:   | %sanitize-address > %t/astgen.ast
 // RUN: not %target-swift-frontend-dump-ast \

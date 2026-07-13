@@ -966,9 +966,9 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     for (auto *ctx : superContexts) {
       ctx->synthesizeSemanticMembersIfNeeded(membersName);
     }
-    auto lookupOptions = NL_QualifiedDefault;
+    NLOptions lookupOptions = NLFlags::QualifiedDefault;
     if (ignoreMissingImports)
-      lookupOptions |= NL_IgnoreMissingImports;
+      lookupOptions |= NLFlags::IgnoreMissingImports;
 
     dc->lookupQualified(superContexts, DeclNameRef(membersName), decl->getLoc(),
                         lookupOptions, members);
@@ -1601,6 +1601,7 @@ namespace  {
     UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(Borrowing)
     UNINTERESTING_ATTR(CDecl)
+    UNINTERESTING_ATTR(COM)
     UNINTERESTING_ATTR(Concurrent)
     UNINTERESTING_ATTR(Consuming)
     UNINTERESTING_ATTR(Documentation)

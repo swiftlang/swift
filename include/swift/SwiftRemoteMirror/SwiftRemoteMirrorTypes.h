@@ -268,6 +268,8 @@ typedef struct swift_async_task_info {
 
   unsigned AsyncBacktraceFramesCount;
   swift_reflection_ptr_t *AsyncBacktraceFrames;
+
+  const char *Name;
 } swift_async_task_info_t;
 
 typedef struct swift_actor_info {

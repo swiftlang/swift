@@ -22,12 +22,8 @@
 import AST
 import SIL
 
-private let verbose = false
-
-private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
-  if verbose {
-    debugLog(prefix: prefix, message())
-  }
+private func log(_ message: @autoclosure () -> String) {
+  llvmDebug("lifetime-dependence-diagnostics", message())
 }
 
 // @noescape functions cannot yet compose other types, but they can be wrapped in an arbitrary number of Optionals.
@@ -49,13 +45,11 @@ extension AST.`Type` {
 let lifetimeDependenceDiagnosticsPass = FunctionPass(
   name: "lifetime-dependence-diagnostics")
 { (function: Function, context: FunctionPassContext) in
-  log(prefix: false, "\n--- Diagnosing lifetime dependence in \(function.name)")
+  log("\n--- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
   log("\(function.convention)")
 
-  for argument in function.arguments
-      where !argument.type.isEscapable(in: function) && !argument.type.rawType.fullyUnwrappedType.isLoweredFunction
-  {
+  for argument in function.arguments where !argument.type.isEscapable(in: function) {
     // Indirect results are not checked here. Type checking ensures
     // that they have a lifetime dependence.
     if let lifetimeDep = LifetimeDependence(argument, context) {
@@ -66,10 +60,21 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
     if let markDep = instruction as? MarkDependenceInstruction, markDep.isUnresolved {
       if let lifetimeDep = LifetimeDependence(markDep, context) {
         if analyze(dependence: lifetimeDep, context) {
+          // A mark_dependence that forwards an escapable value currently must be marked "escaping". Marking it
+          // nonescaping requires proving that all of the dependent uses including projections are discoverable (it
+          // cannot have any "pointer-escape" uses), and all those uses are within the base lifetime. The
+          // LifetimeDependenceDefUseWalker, however, simply ignores escapable values and reports success. Until we have
+          // a separate analysis for escapable values, conservatively mark them as "escaping" even when lifetime
+          // dependence analysis succeeded.
+          let objectType = markDep.valueOrAddress.type.objectType
+          if (objectType.mayEscape(in: function) && !objectType.isTrivial(in: function)) {
+            markDep.settleToEscaping(context)
+            continue
+          }
           // Note: This promotes the mark_dependence flag but does not invalidate analyses; preserving analyses is good,
           // although the change won't appear in -sil-print-function. Ideally, we could notify context of a flag change
           // without invalidating analyses.
-          lifetimeDep.resolve(context)
+          markDep.resolveToNonEscaping(context)
           continue
         }
       }

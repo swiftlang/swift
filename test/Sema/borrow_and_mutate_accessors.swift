@@ -206,3 +206,25 @@ struct S10 {
   }
 }
 
+protocol CxxStorage: AnyObject {
+  associatedtype State: ~Copyable
+
+  @unsafe
+  var swiftStateRawSlot: UnsafeMutableRawPointer? { get set }
+}
+
+extension CxxStorage where State: ~Copyable {
+  @export(interface)
+  @safe
+  var state: State {
+    @_unsafeSelfDependentResult
+    borrow {
+      unsafe self.swiftStateRawSlot!.assumingMemoryBound(to: State.self).pointee
+    }
+    @_unsafeSelfDependentResult
+    mutate {
+      unsafe &self.swiftStateRawSlot!.assumingMemoryBound(to: State.self).pointee
+    }
+  }
+}
+

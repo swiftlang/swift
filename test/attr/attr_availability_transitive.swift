@@ -219,7 +219,9 @@ struct ExtendMe {}
 
 @available(*, unavailable)
 extension ExtendMe {
-  func never_available_extension_available_method() {} // expected-note {{has been explicitly marked unavailable here}}
+  func never_available_extension_available_method() {} // expected-note * {{has been explicitly marked unavailable here}}
+
+  typealias AvailableAliasInNeverAvailableExtension = Self // expected-note * {{'AvailableAliasInNeverAvailableExtension' has been explicitly marked unavailable here}}
 
   func never_available_extension_available_method( // expected-note * {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,
@@ -275,7 +277,9 @@ extension ExtendMe {
 
 @available(swift, obsoleted: 4)
 extension ExtendMe {
-  func unavailable_in_swift4_extension_available_method() {} // expected-note {{'unavailable_in_swift4_extension_available_method()' was obsoleted in Swift 4}}
+  func unavailable_in_swift4_extension_available_method() {} // expected-note * {{'unavailable_in_swift4_extension_available_method()' was obsoleted in Swift 4}}
+
+  typealias AvailableAliasInSwift4ObsoletedExtension = Self // expected-note * {{'AvailableAliasInSwift4ObsoletedExtension' was obsoleted in Swift 4}}
 
   @available(*, unavailable)
   func unavailable_in_swift4_extension_never_available_method(
@@ -293,7 +297,9 @@ extension ExtendMe {
 
 @available(swift, introduced: 99)
 extension ExtendMe {
-  func available_in_future_swift_extension_available_method() {} // expected-note {{'available_in_future_swift_extension_available_method()' was introduced in Swift 99}}
+  func available_in_future_swift_extension_available_method() {} // expected-note * {{'available_in_future_swift_extension_available_method()' was introduced in Swift 99}}
+
+  typealias AvailableAliasInSwift99Extension = Self // expected-note * {{'AvailableAliasInSwift99Extension' was introduced in Swift 99}}
 
   @available(*, unavailable)
   func available_in_future_swift_extension_never_available_method(
@@ -309,7 +315,24 @@ extension ExtendMe {
   }
 }
 
-func available_func_call_extension_methods(_ e: ExtendMe) {
+func available_func_call_extension_methods(
+  _ e: ExtendMe,
+  _: ExtendMe.AvailableAliasInNeverAvailableExtension, // expected-error {{'AvailableAliasInNeverAvailableExtension' is unavailable}}
+  _: ExtendMe.AvailableAliasInSwift4ObsoletedExtension, // expected-error {{'AvailableAliasInSwift4ObsoletedExtension' is unavailable}}
+  _: ExtendMe.AvailableAliasInSwift99Extension, // expected-error {{'AvailableAliasInSwift99Extension' is unavailable in Swift}}
+) {
+  e.never_available_extension_available_method() // expected-error {{'never_available_extension_available_method()' is unavailable}}
+  e.unavailable_in_swift4_extension_available_method() //  expected-error {{'unavailable_in_swift4_extension_available_method()' is unavailable}}
+  e.available_in_future_swift_extension_available_method() //  expected-error {{'available_in_future_swift_extension_available_method()' is unavailable}}
+}
+
+@available(*, unavailable)
+func unavailable_func_call_extension_methods(
+  _ e: ExtendMe,
+  _: ExtendMe.AvailableAliasInNeverAvailableExtension,
+  _: ExtendMe.AvailableAliasInSwift4ObsoletedExtension,
+  _: ExtendMe.AvailableAliasInSwift99Extension,
+) {
   e.never_available_extension_available_method() // expected-error {{'never_available_extension_available_method()' is unavailable}}
   e.unavailable_in_swift4_extension_available_method() //  expected-error {{'unavailable_in_swift4_extension_available_method()' is unavailable}}
   e.available_in_future_swift_extension_available_method() //  expected-error {{'available_in_future_swift_extension_available_method()' is unavailable}}

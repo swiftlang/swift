@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s -verify -sil-verify-all | %FileCheck %s --check-prefixes CHECK,REG
 // RUN: %target-swift-emit-silgen %s -verify -sil-verify-all -enable-sil-opaque-values | %FileCheck %s --check-prefixes CHECK,OV
 

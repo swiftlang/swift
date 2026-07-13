@@ -13,7 +13,7 @@
 //===--- Compiler conversion/casting entry points for Dictionary<K, V> ----===//
 
 extension Dictionary {
-  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @export(implementation) // Introduced in 5.1
   @inline(__always)
   internal init?<C: Collection>(
     _mapping source: C,

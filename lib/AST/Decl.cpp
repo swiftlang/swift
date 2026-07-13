@@ -2057,6 +2057,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 {
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
   Bits.ExtensionDecl.HasLazyConformances = false;
+  Bits.ExtensionDecl.IsMetatypeExtension = false;
   setTrailingWhereClause(trailingWhereClause);
 }
 
@@ -5069,7 +5070,7 @@ abi_role_detail::Storage abi_role_detail::computeStorage(Decl *decl) {
 }
 
 ABIRole::ABIRole(NLOptions opts)
-  : value(opts & NL_ABIProviding ? ProvidesABI : ProvidesAPI)
+  : value(opts.contains(NLFlags::ABIProviding) ? ProvidesABI : ProvidesAPI)
 { }
 
 VarDecl *PatternBindingDecl::
@@ -6841,7 +6842,7 @@ NominalTypeDecl::getExecutorOwnedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -6880,7 +6881,7 @@ NominalTypeDecl::getExecutorLegacyOwnedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -6919,7 +6920,7 @@ NominalTypeDecl::getExecutorLegacyUnownedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -7880,7 +7881,8 @@ void ProtocolDecl::computeKnownProtocolKind() const {
       !module->getName().is("_Differentiation") &&
       !module->getName().is("_Concurrency") &&
       !module->getName().is("Distributed") && 
-      !module->getName().is("Cxx")) {
+      !module->getName().is("Cxx") &&
+      !module->getName().is("COM")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -9613,6 +9615,22 @@ Type DeclContext::getSelfInterfaceType() const {
       return builtinTupleDecl->getTupleSelfType(dyn_cast<ExtensionDecl>(this));
 
     if (isa<ProtocolDecl>(nominalDecl)) {
+      // For metatype extensions, Self is the metatype of the existential
+      // type.  Members are instance members of the metatype, so their self
+      // parameter has type (any P).Type.
+      for (auto *dc = this; dc; dc = dc->getParent()) {
+        if (auto *ext = dyn_cast<ExtensionDecl>(dc)) {
+          if (ext->isMetatypeExtension()) {
+            auto existentialTy =
+                ExistentialType::get(nominalDecl->getDeclaredInterfaceType());
+            return MetatypeType::get(existentialTy);
+          }
+          break;
+        }
+        if (isa<NominalTypeDecl>(dc))
+          break;
+      }
+
       auto *genericParams = nominalDecl->getGenericParams();
       return genericParams->getParams().front()
           ->getDeclaredInterfaceType();
@@ -12464,7 +12482,7 @@ const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   this->lookupQualified(getSelfNominalTypeDecl(),
                         DeclNameRef(C.Id_unownedExecutor),
-                        getLoc(), NL_ProtocolMembers,
+                        getLoc(), NLFlags::ProtocolMembers,
                         results);
 
   for (auto candidate: results) {

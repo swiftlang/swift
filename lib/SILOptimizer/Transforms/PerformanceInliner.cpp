@@ -431,7 +431,7 @@ bool SILPerformanceInliner::isTupleWithAllocsOrPartialApplies(SILValue val) {
 // TODO: VJPs of differentiable functions with custom silgen names are not
 // recognized as VJPs by this function. However, this is not a hard limitation
 // and can be fixed.
-bool isFunctionAutodiffVJP(SILFunction *callee) {
+static bool isFunctionAutodiffVJP(SILFunction *callee) {
   swift::Demangle::Context Ctx;
   if (auto *Root = Ctx.demangleSymbolAsNode(callee->getName())) {
     if (auto *node = Root->findByKind(
@@ -446,6 +446,14 @@ bool isFunctionAutodiffVJP(SILFunction *callee) {
     }
   }
 
+  // Best-effort attempt to detect an explicit VJP
+  if (auto *afd = callee->getDeclRef().getAbstractFunctionDecl()) {
+    if (auto *derivativeAttr = afd->getAttrs().getAttribute<DerivativeAttr>()) {
+      return derivativeAttr->getDerivativeKind() ==
+             AutoDiffDerivativeFunctionKind::VJP;
+    }
+  }
+
   return false;
 }
 
@@ -457,13 +465,116 @@ bool isAllocator(SILFunction *callee) {
   return false;
 }
 
-bool isProfitableToInlineAutodiffVJP(SILFunction *vjp, SILFunction *caller,
-                                     InlineSelection whatToInline,
-                                     StringRef stageName) {
+// Check if we match one of the following patterns:
+// (I):
+//   %resAndPb = apply %vjp(...)
+//   (..., %pb) = destructure_tuple %resAndPb
+//   %topPb = partial_apply(..., %pb, ...)
+//   %tuple = tuple(..., %topPb)
+//   return %tuple
+// (II):
+//   %resAndPb = apply %vjp(...)
+//   %pb = tuple_extract %resAndPb, lastTupleIndex
+//   %topPb = partial_apply(..., %pb, ...)
+//   %tuple = tuple(..., %topPb)
+//   return %tuple
+// (III):
+//   %pb = apply %vjp(...)
+//   %topPb = partial_apply(..., %pb, ...)
+//   %tuple = tuple(..., %topPb)
+//   return %tuple
+static bool hasPullbackOnlyDirectUses(FullApplySite applySiteOfVJP) {
+  auto *applyOfVJP = dyn_cast<ApplyInst>(applySiteOfVJP.getInstruction());
+  if (applyOfVJP == nullptr)
+    return false;
+
+  SILValue calleePullback = nullptr;
+  if (applyOfVJP->getType().isTuple()) {
+    auto numTupleElements = applyOfVJP->getType().getNumTupleElements();
+    assert(numTupleElements > 0);
+    for (auto user : applyOfVJP->getUsers()) {
+      if (auto *tei = dyn_cast<TupleExtractInst>(user)) {
+        if (tei->getFieldIndex() + 1 == numTupleElements) {
+          calleePullback = tei;
+          break;
+        }
+      } else if (auto *dti = dyn_cast<DestructureTupleInst>(user)) {
+        calleePullback = dti->getResult(numTupleElements - 1);
+        break;
+      } else {
+        return false;
+      }
+    }
+  } else {
+    calleePullback = applyOfVJP;
+  }
+  assert(calleePullback != nullptr);
+  assert(calleePullback->getType().isFunction());
+
+  auto getSingleUser = [](SILValue val) -> SILInstruction * {
+    auto *use = val->getSingleUse();
+    return use ? use->getUser() : nullptr;
+  };
+
+  auto *pai = dyn_cast_or_null<PartialApplyInst>(getSingleUser(calleePullback));
+  if (!pai)
+    return false;
+
+  auto *ti = dyn_cast_or_null<TupleInst>(getSingleUser(pai));
+  if (!ti)
+    return false;
+
+  auto *ri = dyn_cast_or_null<ReturnInst>(getSingleUser(ti));
+  if (!ri)
+    return false;
+
+  return true;
+}
+
+// Treat VJP as trivial if both statements below hold.
+// 1. Callees for all full apply sites are known and are not VJPs.
+// 2. The only partial_apply is the one for top-level pullback.
+static bool isTrivialVJP(SILFunction *vjp) {
+  auto getSingleUser = [](SILValue val) -> SILInstruction * {
+    auto *use = val->getSingleUse();
+    return use ? use->getUser() : nullptr;
+  };
+
+  for (auto &bb : *vjp) {
+    for (auto &inst : bb) {
+      if (auto applySite = FullApplySite::isa(&inst)) {
+        SILFunction *callee = applySite.getCalleeFunction();
+        if (!callee)
+          return false;
+        if (isFunctionAutodiffVJP(callee))
+          return false;
+        continue;
+      }
+
+      auto *pai = dyn_cast<PartialApplyInst>(&inst);
+      if (!pai)
+        continue;
+
+      auto *ti = dyn_cast_or_null<TupleInst>(getSingleUser(pai));
+      if (!ti)
+        return false;
+
+      auto *ri = dyn_cast_or_null<ReturnInst>(getSingleUser(ti));
+      if (!ri)
+        return false;
+    }
+  }
+
+  return true;
+}
+
+static bool isProfitableToInlineAutodiffVJP(FullApplySite applySiteOfVJP,
+                                            StringRef stageName) {
+  SILFunction *caller = applySiteOfVJP.getFunction();
+  SILFunction *calleeVJP = applySiteOfVJP.getReferencedFunctionOrNull();
+  assert(calleeVJP);
+
   bool isLowLevelFunctionPassPipeline = stageName == "LowLevel,Function";
-  auto isHighLevelFunctionPassPipeline =
-      stageName == "HighLevel,Function+EarlyLoopOpt";
-  auto calleeHasControlFlow = vjp->size() > 1;
   auto isCallerVJP = isFunctionAutodiffVJP(caller);
   auto callerHasControlFlow = caller->size() > 1;
 
@@ -474,23 +585,36 @@ bool isProfitableToInlineAutodiffVJP(SILFunction *vjp, SILFunction *caller,
     return true;
   }
 
-  // If callee has control-flow it will definitely not be handled by the
-  // Autodiff closure-spec optimization. Therefore, we should consider it for
-  // inlining.
-  if (calleeHasControlFlow) {
+  // Always consider derivative thunks for inlining. It does not harm ADCS since
+  // explicit derivative is by itself subject for ADCS optimization.
+  if (calleeVJP->isThunk() == IsThunk_t::IsThunk) {
     return true;
   }
 
-  // If this is the EarlyPerfInline pass we want to have the Autodiff
-  // closure-spec optimization pass optimize VJPs in isolation before they are
-  // inlined into other VJPs.
-  if (isHighLevelFunctionPassPipeline) {
+  // Inlining of VJPs which are guaranteed to gain no optimization effect from
+  // ADCS does not harm ADCS effectiveness (we know in advance that it would not
+  // be effective). Always consider for inlining.
+  if (isTrivialVJP(calleeVJP)) {
+    return true;
+  }
+
+  // After inlining to a non-VJP caller, we can no longer run ADCS for the
+  // callee VJP. Skip inlining for now.
+  if (!isCallerVJP) {
     return false;
   }
 
-  // If this is not the EarlyPerfInline pass, VJPs should only be inlined into
-  // other VJPs that do not contain any control-flow.
-  if (!isCallerVJP || (isCallerVJP && callerHasControlFlow)) {
+  if (isCallerVJP && callerHasControlFlow) {
+    // If pullback extracted from this VJP call result is only passed to
+    // top-level pullback of caller VJP, consider this callee VJP for inlining.
+    // It does not harm ADCS effectiveness since it properly handles nested
+    // inlining by running multiple specialization rounds and immediately
+    // folding partial_apply+apply pairs in the specialized caller pullback.
+    if (hasPullbackOnlyDirectUses(applySiteOfVJP))
+      return true;
+
+    // TODO: allow inlining into VJP callers with control flow when ADCS handles
+    // this properly.
     return false;
   }
 
@@ -541,8 +665,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   bool IsGeneric = AI.hasSubstitutions();
 
   if (isFunctionAutodiffVJP(Callee) &&
-      !isProfitableToInlineAutodiffVJP(Callee, AI.getFunction(), WhatToInline,
-                                       this->pm->getStageName())) {
+      !isProfitableToInlineAutodiffVJP(AI, this->pm->getStageName())) {
     return false;
   }
 

@@ -22,7 +22,7 @@ public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
   /// creates a mutable reference to that value preventing writes to the
   /// original value while this mutable reference is still active.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&value)
   @_transparent
   public init(_ value: inout Value) {
@@ -33,13 +33,13 @@ public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
   /// 'unsafeAddress' as the mutable reference based on the mutating lifetime of
   /// the given 'owner' argument.
   ///
-  /// - Parameter unsafeAddress: The address to use to mutably reference an
-  ///                            instance of type `Value`.
+  /// - Parameter pointer: The address to use to mutably reference an
+  ///                      instance of type `Value`.
   /// - Parameter owner: The owning instance that this `MutableRef` instance's
   ///                    lifetime is based on.
   @available(SwiftStdlib 6.4, *)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&owner)
   @_transparent
   public init<Owner: ~Copyable & ~Escapable>(
@@ -58,7 +58,7 @@ extension MutableRef where Value: ~Copyable {
   /// Dereferences the mutable reference allowing for in-place reads and writes
   /// to the underlying value.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var value: Value {
     @_unsafeSelfDependentResult

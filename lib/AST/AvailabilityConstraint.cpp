@@ -302,22 +302,27 @@ activePlatformDomainForDecl(const Decl *decl) {
   return activeDomain;
 }
 
+/// Generates availability constraints that restrict the use of \p origDecl
+/// based on the attributes attached to \p sourceDecl (these declarations may be
+/// different since \p origDecl may inherit attributes from another declaration
+/// lexically).
 static void getAvailabilityConstraintsForDecl(
-    llvm::SmallVector<AvailabilityConstraint, 4> &constraints, const Decl *decl,
+    llvm::SmallVector<AvailabilityConstraint, 4> &constraints,
+    const Decl *targetDecl, const Decl *sourceDecl,
     const AvailabilityContext &context, AvailabilityConstraintFlags flags) {
-  auto &ctx = decl->getASTContext();
-  auto activePlatformDomain = activePlatformDomainForDecl(decl);
+  auto &ctx = sourceDecl->getASTContext();
+  auto activePlatformDomain = activePlatformDomainForDecl(sourceDecl);
   bool includeAllDomains =
       flags.contains(AvailabilityConstraintFlag::IncludeAllDomains);
 
-  for (auto attr : decl->getSemanticAvailableAttrs(includeAllDomains)) {
+  for (auto attr : sourceDecl->getSemanticAvailableAttrs(includeAllDomains)) {
     auto domain = attr.getDomain();
     if (!includeAllDomains && domain.isPlatform() && activePlatformDomain &&
         !activePlatformDomain->contains(domain))
       continue;
 
     if (auto constraint =
-            getAvailabilityConstraintForAttr(decl, attr, context, flags))
+            getAvailabilityConstraintForAttr(targetDecl, attr, context, flags))
       addConstraint(constraints, *constraint, ctx);
   }
 }
@@ -334,7 +339,7 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
 
   decl = decl->getAbstractSyntaxDeclForAttributes();
 
-  getAvailabilityConstraintsForDecl(constraints, decl, context, flags);
+  getAvailabilityConstraintsForDecl(constraints, decl, decl, context, flags);
 
   // For requirements of reparentable protocols, add constraints from the
   // enclosing protocol itself. We don't need to do this for ordinary protocols
@@ -343,7 +348,8 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
   // already carries the same or stricter constraints than its ancestors.
   if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
     if (proto->getAttrs().hasAttribute<ReparentableAttr>())
-      getAvailabilityConstraintsForDecl(constraints, proto, context, flags);
+      getAvailabilityConstraintsForDecl(constraints, decl, proto, context,
+                                        flags);
   }
 
   if (flags.contains(AvailabilityConstraintFlag::SkipEnclosingExtension))
@@ -361,7 +367,8 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
 
   auto parent = decl->parentDeclForAvailability();
   if (auto extension = dyn_cast_or_null<ExtensionDecl>(parent))
-    getAvailabilityConstraintsForDecl(constraints, extension, context, flags);
+    getAvailabilityConstraintsForDecl(constraints, decl, extension, context,
+                                      flags);
 
   return constraints;
 }

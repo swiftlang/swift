@@ -628,6 +628,8 @@ BridgedOperand::OperandOwnership BridgedOperand::getOperandOwnership() const {
     return OperandOwnership::InstantaneousUse;
   case swift::OperandOwnership::UnownedInstantaneousUse:
     return OperandOwnership::UnownedInstantaneousUse;
+  case swift::OperandOwnership::DebugUse:
+    return OperandOwnership::DebugUse;
   case swift::OperandOwnership::ForwardingUnowned:
     return OperandOwnership::ForwardingUnowned;
   case swift::OperandOwnership::PointerEscape:
@@ -943,6 +945,10 @@ BridgedFunction::ThunkKind BridgedFunction::isThunk() const {
 
 void BridgedFunction::setThunk(ThunkKind kind) const {
   getFunction()->setThunk((swift::IsThunk_t)kind);
+}
+
+bool BridgedFunction::isWithoutActuallyEscapingThunk() const {
+  return getFunction()->isWithoutActuallyEscapingThunk();
 }
 
 BridgedFunction::SerializedKind BridgedFunction::getSerializedKind() const {
@@ -2644,6 +2650,11 @@ BridgedInstruction BridgedBuilder::createUncheckedValueCast(BridgedValue op, Bri
                                               type.unbridged())};
 }
 
+BridgedInstruction BridgedBuilder::createUncheckedTrivialBitCast(BridgedValue op, BridgedType type) const {
+  return {unbridged().createUncheckedTrivialBitCast(regularLoc(), op.getSILValue(),
+                                                    type.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType type) const {
   return {unbridged().createUpcast(regularLoc(), op.getSILValue(),
                                    type.unbridged())};
@@ -2771,7 +2782,7 @@ BridgedInstruction BridgedBuilder::createCopyAddr(BridgedValue from, BridgedValu
 }
 
 BridgedInstruction BridgedBuilder::createDestroyValue(BridgedValue op, bool isDeadEnd) const {
-  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(), swift::DontPoisonRefs,
+  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(),
                                          swift::IsDeadEnd_t(isDeadEnd))};
 }
 

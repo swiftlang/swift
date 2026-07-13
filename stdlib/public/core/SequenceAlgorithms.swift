@@ -604,7 +604,7 @@ extension Sequence {
   ///   the element should be included in the count.
   /// - Returns: The number of elements in the sequence that satisfy the given
   ///   predicate.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func count<E>(
     where predicate: (Element) throws(E) -> Bool
   ) throws(E) -> Int {
@@ -664,7 +664,7 @@ extension Sequence {
   ///   the result is `initialResult`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func reduce<Result: ~Copyable>(
     _ initialResult: consuming Result,
     _ nextPartialResult:

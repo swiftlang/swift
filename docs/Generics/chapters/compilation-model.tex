@@ -673,11 +673,11 @@ Declaration contexts will be \IndexSource{declaration context}introduced in \Cha
 \end{itemize}
 
 \apiref{NLOptions}{enum}
-Similar to \texttt{UnqualifiedLookupFlags}, but for \texttt{DeclContext::lookupQualified()}.
+Similar to \texttt{UnqualifiedLookupFlags}, but for \texttt{DeclContext::lookupQualified()} and consisting of \texttt{NLFlags}.
 \begin{itemize}
-\item \verb|NL_OnlyTypes|: if set, lookup ignores declarations other than type declarations. This is used in type resolution.
-\item \verb|NL_ProtocolMembers|: if set, lookup finds members of protocols and protocol extensions. Generally should always be set, except to avoid request cycles in cases where it is known the result of the lookup cannot appear in a protocol or protocol extension.
-\item \verb|NL_IgnoreAccessControl|: if set, lookup ignores access control. Generally should never be set, except when recovering from errors in diagnostics.
+\item \verb|NLFlags::OnlyTypes|: if set, lookup ignores declarations other than type declarations. This is used in type resolution.
+\item \verb|NLFlags::ProtocolMembers|: if set, lookup finds members of protocols and protocol extensions. Generally should always be set, except to avoid request cycles in cases where it is known the result of the lookup cannot appear in a protocol or protocol extension.
+\item \verb|NLFlags::IgnoreAccessControl|: if set, lookup ignores access control. Generally should never be set, except when recovering from errors in diagnostics.
 \end{itemize}
 
 \IndexSource{direct lookup}

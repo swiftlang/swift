@@ -1,10 +1,12 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types  -enable-builtin-module %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types  -enable-builtin-module %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop -o %t/builtins.silgen
 // RUN: %FileCheck -input-file %t/builtins.silgen %s
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types  -enable-builtin-module -Onone %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop -o %t/builtins.sil
 // RUN: %FileCheck -input-file %t/builtins.sil -check-prefix=CANONICAL %s
 
-// REQUIRES: swift_in_compiler
 
 import Builtin
 
@@ -939,8 +941,7 @@ func once(control: Builtin.RawPointer) {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins19valueToBridgeObjectyBbSuF : $@convention(thin) (UInt) -> @owned Builtin.BridgeObject {
 // CHECK: bb0([[UINT:%.*]] : $UInt):
 // CHECK:   [[BI:%.*]] = struct_extract [[UINT]] : $UInt, #UInt._value
-// CHECK:   [[CAST:%.*]] = value_to_bridge_object [[BI]]
-// CHECK:   [[RET:%.*]] = copy_value [[CAST]] : $Builtin.BridgeObject
+// CHECK:   [[RET:%.*]] = value_to_bridge_object [[BI]]
 // CHECK:   return [[RET]] : $Builtin.BridgeObject
 // CHECK: } // end sil function '$s8builtins19valueToBridgeObjectyBbSuF'
 func valueToBridgeObject(_ x: UInt) -> Builtin.BridgeObject {

@@ -439,6 +439,8 @@ AvailabilityScope::getExplicitAvailabilityRange(AvailabilityDomain domain,
                                                 ASTContext &ctx) const {
   switch (getReason()) {
   case Reason::Root:
+  case Reason::SwitchStmt:
+  case Reason::SwitchStmtCaseBody:
     return std::nullopt;
 
   case Reason::Decl: {
@@ -459,8 +461,6 @@ AvailabilityScope::getExplicitAvailabilityRange(AvailabilityDomain domain,
   case Reason::GuardStmtFallthrough:
   case Reason::GuardStmtElseBranch:
   case Reason::WhileStmtBody:
-  case Reason::SwitchStmt:
-  case Reason::SwitchStmtCaseBody:
     // Availability is inherently explicit for all of these nodes.
     return getAvailabilityContext().getAvailabilityRange(domain, ctx);
   }

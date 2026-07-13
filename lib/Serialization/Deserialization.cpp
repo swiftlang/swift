@@ -354,17 +354,19 @@ ModularizationError::diagnose(const ModuleFile *MF,
   // decls moving between both modules.
   if (errorKind == Kind::DeclMoved ||
       errorKind == Kind::DeclKindChanged) {
-    StringRef foundModuleName = foundModule->getName().str();
-    StringRef expectedModuleName = expectedModule->getName().str();
-    if (foundModuleName != expectedModuleName &&
-        (foundModuleName.starts_with(expectedModuleName) ||
-         expectedModuleName.starts_with(foundModuleName)) &&
-        (expectedUnderlying ||
-         expectedModule->findUnderlyingClangModule())) {
-      std::string name = path.getFullName();
-      ctx.Diags.diagnose(loc,
-                         diag::modularization_issue_related_modules,
-                         declIsType, name);
+    if (foundModule) {
+      StringRef foundModuleName = foundModule->getName().str();
+      StringRef expectedModuleName = expectedModule->getName().str();
+      if (foundModuleName != expectedModuleName &&
+          (foundModuleName.starts_with(expectedModuleName) ||
+           expectedModuleName.starts_with(foundModuleName)) &&
+          (expectedUnderlying ||
+           expectedModule->findUnderlyingClangModule())) {
+        std::string name = path.getFullName();
+        ctx.Diags.diagnose(loc,
+                           diag::modularization_issue_related_modules,
+                           declIsType, name);
+      }
     }
   }
 
@@ -2227,7 +2229,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                getIdentifier(privateDiscriminator));
     } else {
       baseModule->lookupQualified(baseModule, DeclNameRef(name),
-                                  SourceLoc(), NL_RemoveOverridden,
+                                  SourceLoc(), NLFlags::RemoveOverridden,
                                   values);
     }
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
@@ -2437,7 +2439,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                    getIdentifier(privateDiscriminator));
         } else {
           otherModule->lookupQualified(otherModule, DeclNameRef(name),
-                                       SourceLoc(), NL_RemoveOverridden,
+                                       SourceLoc(), NLFlags::RemoveOverridden,
                                        values);
         }
 
@@ -5433,13 +5435,15 @@ public:
     DeclID extendedNominalID;
     DeclContextID contextID;
     bool isImplicit;
+    bool isMetatypeExtension;
     GenericSignatureID genericSigID;
     unsigned numConformances, numInherited;
     ArrayRef<uint64_t> data;
 
     decls_block::ExtensionLayout::readRecord(scratch, extendedTypeID,
                                              extendedNominalID, contextID,
-                                             isImplicit, genericSigID,
+                                             isImplicit, isMetatypeExtension,
+                                             genericSigID,
                                              numConformances, numInherited,
                                              data);
 
@@ -5465,6 +5469,7 @@ public:
 
     auto extension = ExtensionDecl::create(ctx, SourceLoc(), nullptr, { },
                                            DC, nullptr);
+    extension->setIsMetatypeExtension(isMetatypeExtension);
     declOrOffset = extension;
 
     // Generic parameter lists are written from outermost to innermost.
@@ -5510,7 +5515,7 @@ public:
     }
 
 #ifndef NDEBUG
-    if (outerParams) {
+    if (outerParams && !extension->isMetatypeExtension()) {
       unsigned paramCount = 0;
       for (auto *paramList = outerParams;
            paramList != nullptr;
@@ -6577,6 +6582,24 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         }
         }
         Attr = new (ctx) ExternAttr(moduleName, declName, (ExternKind)rawKind, isImplicit);
+        break;
+      }
+
+      case decls_block::COM_DECL_ATTR: {
+        bool implicit;
+        bool interface;
+        unsigned model;
+
+        serialization::decls_block::COMDeclAttrLayout::readRecord(
+            scratch, implicit, interface, model);
+
+        StringRef iid = interface ? blobData : "";
+        std::optional<StringRef> clsid =
+            !interface && !blobData.empty() ? std::optional<StringRef>(blobData)
+                                            : std::nullopt;
+        Attr = new (ctx) COMAttr(SourceLoc(), SourceRange(), iid, clsid,
+                                 model ? static_cast<COMThreadingModel>(model - 1)
+                                       : COMThreadingModel::Apartment, implicit);
         break;
       }
 
@@ -9638,16 +9661,19 @@ ModuleFile::maybeReadLifetimeDependence() {
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
   bool hasAddressableParamIndices;
+  bool hasConditionallyAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
       scratch, targetIndex, paramIndicesLength, hasImmortalSpecifier,
       isFromAnnotation, hasCaptures, hasInheritLifetimeParamIndices,
       hasScopeLifetimeParamIndices, hasAddressableParamIndices,
+      hasConditionallyAddressableParamIndices,
       lifetimeDependenceData);
 
   SmallBitVector inheritLifetimeParamIndices(paramIndicesLength, false);
   SmallBitVector scopeLifetimeParamIndices(paramIndicesLength, false);
   SmallBitVector addressableParamIndices(paramIndicesLength, false);
+  SmallBitVector conditionallyAddressableParamIndices(paramIndicesLength, false);
 
   unsigned startIndex = 0;
   auto pushData = [&](SmallBitVector &bits) {
@@ -9668,6 +9694,9 @@ ModuleFile::maybeReadLifetimeDependence() {
   if (hasAddressableParamIndices) {
     pushData(addressableParamIndices);
   }
+  if (hasConditionallyAddressableParamIndices) {
+    pushData(conditionallyAddressableParamIndices);
+  }
 
   ASTContext &ctx = getContext();
   return LifetimeDependenceInfo(
@@ -9681,7 +9710,9 @@ ModuleFile::maybeReadLifetimeDependence() {
       hasAddressableParamIndices
           ? IndexSubset::get(ctx, addressableParamIndices)
           : nullptr,
-      nullptr,
+      hasConditionallyAddressableParamIndices
+          ? IndexSubset::get(ctx, conditionallyAddressableParamIndices)
+          : nullptr,
       LifetimeFlags()
           .withImmortalSpecifier(hasImmortalSpecifier)
           .withAnnotated(isFromAnnotation)

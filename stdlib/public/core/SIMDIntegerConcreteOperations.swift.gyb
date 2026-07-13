@@ -26,7 +26,7 @@ vectorscalarCounts = storagescalarCounts + [3]
 %  Builtin = "Vec" + str(storageN) + "xInt" + str(int.bits)
 %  MaskExt = "Builtin.sext_Vec" + str(storageN) + "xInt1_" + Builtin
 extension SIMD${n} where Scalar == ${Scalar} {
-  @_alwaysEmitIntoClient @_transparent
+  @export(implementation) @_transparent
   internal init(_ _builtin: Builtin.${Builtin}) {
     _storage = ${Scalar}.SIMD${storageN}Storage(_builtin)
   }
@@ -40,7 +40,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
   ///   result[i] = scalar
   /// }
   /// ```
-  @_alwaysEmitIntoClient @_transparent
+  @export(implementation) @_transparent
   public init(repeating scalar: ${Scalar}) {
     let asVector = Builtin.insertelement_${Builtin}_Int${int.bits}_Int32(
       Builtin.zeroInitializer(), scalar._value, Builtin.zeroInitializer()
@@ -68,7 +68,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
   ///   result[${n//2}+i] = highHalf[i]
   /// }
   /// ```
-  @_alwaysEmitIntoClient @_transparent
+  @export(implementation) @_transparent
   public init(
     lowHalf: SIMD${n//2}<${Scalar}>,
     highHalf: SIMD${n//2}<${Scalar}>
@@ -78,7 +78,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
   
 %  end
   /// A vector mask with the result of a pointwise equality comparison.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func .==(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     SIMDMask<MaskStorage>(${MaskExt}(
       Builtin.cmp_eq_${Builtin}(a._storage._value, b._storage._value)
@@ -86,7 +86,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
   
   /// A vector mask with the result of a pointwise inequality comparison.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func .!=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     SIMDMask<MaskStorage>(${MaskExt}(
       Builtin.cmp_ne_${Builtin}(a._storage._value, b._storage._value)
@@ -94,7 +94,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
   
   /// A vector mask with the result of a pointwise less-than comparison.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func .<(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     SIMDMask<MaskStorage>(${MaskExt}(
       Builtin.cmp_${s}lt_${Builtin}(a._storage._value, b._storage._value)
@@ -102,7 +102,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
   
   /// A vector mask with the result of a pointwise less-than-or-equal-to comparison.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func .<=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     SIMDMask<MaskStorage>(${MaskExt}(
       Builtin.cmp_${s}le_${Builtin}(a._storage._value, b._storage._value)
@@ -110,7 +110,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
   
   /// A vector mask with the result of a pointwise greater-than comparison.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func .>(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     SIMDMask<MaskStorage>(${MaskExt}(
       Builtin.cmp_${s}gt_${Builtin}(a._storage._value, b._storage._value)
@@ -118,7 +118,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
   
   /// A vector mask with the result of a pointwise greater-than-or-equal-to comparison.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func .>=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     SIMDMask<MaskStorage>(${MaskExt}(
       Builtin.cmp_${s}ge_${Builtin}(a._storage._value, b._storage._value)
@@ -126,36 +126,36 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
     
   /// The wrapping sum of two vectors.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func &+(a: Self, b: Self) -> Self {
     Self(Builtin.add_${Builtin}(a._storage._value, b._storage._value))
   }
     
   /// The wrapping difference of two vectors.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func &-(a: Self, b: Self) -> Self {
     Self(Builtin.sub_${Builtin}(a._storage._value, b._storage._value))
   }
     
   /// The pointwise wrapping product of two vectors.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func &*(a: Self, b: Self) -> Self {
     Self(Builtin.mul_${Builtin}(a._storage._value, b._storage._value))
   }
         
   /// Updates the left hand side with the wrapping sum of the two
   /// vectors.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func &+=(a: inout Self, b: Self) { a = a &+ b }
     
   /// Updates the left hand side with the wrapping difference of the two
   /// vectors.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func &-=(a: inout Self, b: Self) { a = a &- b }
     
   /// Updates the left hand side with the pointwise wrapping product of two
   /// vectors.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func &*=(a: inout Self, b: Self) { a = a &* b }
 }
 

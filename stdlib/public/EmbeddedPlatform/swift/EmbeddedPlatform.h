@@ -93,7 +93,7 @@ typedef unsigned long long __swift_options_t;
  * entrypoints might be optional, where the entrypoint is needed only when
  * certain Swift functionality is used.
  */
-#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 0
+#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 1
 
 /**
  * Determine the version of the platform abstraction layer that the Embedded
@@ -138,6 +138,26 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
 } swift_free_flags_t EMBEDDED_SWIFT_NAME(SwiftFreeFlags);
 
 /**
+ * Options provided to the Swift mutex initialization function.
+ */
+typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
+  /**
+   * No options.
+   */
+  SWIFT_MUTEX_NONE EMBEDDED_SWIFT_NAME(none) = 0,
+
+  /**
+   * Diagnose mutex misuse when the platform can do so cheaply.
+   */
+  SWIFT_MUTEX_CHECKED EMBEDDED_SWIFT_NAME(checked) = 0x01,
+
+  /**
+   * Allow the same execution context to acquire the mutex recursively.
+   */
+  SWIFT_MUTEX_RECURSIVE EMBEDDED_SWIFT_NAME(recursive) = 0x02
+} swift_mutex_flags_t EMBEDDED_SWIFT_NAME(SwiftMutexFlags);
+
+/**
  * Allocates memory and returns the resulting pointer.
  *
  * Parameters:
@@ -177,7 +197,7 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_allocate(__swift_size_t alignment, __swift
  * 
  * This function can be implemented as a direct call to `free`.
  */
-void _swift_free(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_free_flags_t flags);
+void _swift_deallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_free_flags_t flags);
 
 /**
  * Allocates memory with a given type and returns the resulting pointer.
@@ -297,6 +317,43 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_getExclusivityTLS(void);
 void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
 
 /**
+ * Initializes a mutex.
+ *
+ * Parameters:
+ *   - `mutex`: opaque caller-owned mutex storage initialized by this function
+ *     and later passed to the other `_swift_mutex_*` functions. The contents
+ *     are private to the platform implementation. The storage is at least
+ *     eight pointer-sized words and has pointer alignment.
+ *   - `flags`: flags controlling mutex behavior.
+ *
+ * This function is required when using Synchronization.Mutex.
+ */
+void _swift_mutex_init(void * EMBEDDED_SWIFT_NONNULL mutex,
+                       swift_mutex_flags_t flags);
+
+/**
+ * Destroys a mutex initialized by `_swift_mutex_init`.
+ */
+void _swift_mutex_destroy(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Acquires a mutex, blocking or spinning until ownership is obtained.
+ */
+void _swift_mutex_lock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Releases a mutex held by the current execution context.
+ */
+void _swift_mutex_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Attempts to acquire a mutex without blocking.
+ *
+ * Returns nonzero if the mutex was acquired, or zero if it was not acquired.
+ */
+__swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
  * Exit the program.
  *
  * Parameters:
@@ -309,11 +366,6 @@ void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
  */
 void _swift_exit(__swift_ptrdiff_t code);
 
-#undef EMBEDDED_SWIFT_SINGLE
-#undef EMBEDDED_SWIFT_SIZED_BY
-#undef EMBEDDED_SWIFT_COUNTED_BY
-#undef EMBEDDED_SWIFT_NULLABLE
-#undef EMBEDDED_SWIFT_NONNULL
 #undef EMBEDDED_SWIFT_NAME
 #undef EMBEDDED_SWIFT_OPTION_SET
 

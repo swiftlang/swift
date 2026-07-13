@@ -114,18 +114,18 @@ protected:
   }
 
   Type getContextualType(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualType(anchor, /*forConstraint=*/false);
+    return getSolution().getContextualType(anchor);
   }
 
   TypeLoc getContextualTypeLoc(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualTypeLoc(anchor);
+    auto &solution = getSolution();
+    if (auto contextualInfo = solution.getContextualTypeInfo(anchor))
+      return contextualInfo->typeLoc;
+    return TypeLoc();
   }
 
   ContextualTypePurpose getContextualTypePurpose(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualTypePurpose(anchor);
+    return getSolution().getContextualTypePurpose(anchor);
   }
 
   DeclContext *getDC() const {
@@ -663,8 +663,7 @@ public:
             locator->isForContextualType()
                 ? locator->castLastElementTo<LocatorPathElt::ContextualType>()
                       .getPurpose()
-                : solution.getConstraintSystem().getContextualTypePurpose(
-                      locator->getAnchor()),
+                : solution.getContextualTypePurpose(locator->getAnchor()),
             lhs, rhs, locator, fixBehavior) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
@@ -1616,6 +1615,7 @@ public:
         PrevArgIdx(prevArgIdx), Bindings(bindings.begin(), bindings.end()) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 /// Diagnose an attempt to destructure a single tuple closure parameter
@@ -2401,15 +2401,6 @@ class ExtraneousCallFailure final : public FailureDiagnostic {
 public:
   ExtraneousCallFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
-
-  bool diagnoseAsError() override;
-};
-
-class InvalidUseOfTrailingClosure final : public ArgumentMismatchFailure {
-public:
-  InvalidUseOfTrailingClosure(const Solution &solution, Type argType,
-                              Type paramType, ConstraintLocator *locator)
-      : ArgumentMismatchFailure(solution, argType, paramType, locator) {}
 
   bool diagnoseAsError() override;
 };
@@ -3422,6 +3413,23 @@ public:
                                 ProtocolConformance *conformance,
                                 ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), conformance(conformance) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations when a key path dynamic member lookup expects
+/// a `ReferenceWritableKeyPath` but the base is not a class and so
+/// the argument is `WritableKeyPath`.
+class NonClassBaseInDynamicMemberLookup final : public FailureDiagnostic {
+  Type BaseType;
+  ValueDecl *Member;
+
+public:
+  NonClassBaseInDynamicMemberLookup(const Solution &solution, Type baseType,
+                                    ValueDecl *member,
+                                    ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), BaseType(resolveType(baseType)),
+        Member(member) {}
 
   bool diagnoseAsError() override;
 };

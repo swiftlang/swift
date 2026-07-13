@@ -1,9 +1,10 @@
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_SafeInteropWrappersNullAsEmptySpan
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature Lifetimes -strict-memory-safety -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness \
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -enable-experimental-feature Lifetimes -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -strict-memory-safety -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness \
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -eager-macro-checking
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __counted_by __noescape parameters.
@@ -362,7 +363,7 @@ module Test {
 }
 
 //--- test.swift
-// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature Lifetimes -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
+// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature Lifetimes -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
 // GENERATED-HASH: 128efbe7a5be73505200148ea3391340cc832336a447e19d8d69ff58487f9c18
 import Test
 

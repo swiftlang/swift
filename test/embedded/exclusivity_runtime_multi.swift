@@ -6,7 +6,6 @@
 // RUN: %target-run not --crash %t/a.out
 
 // REQUIRES: executable_test
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedDynamicExclusivity

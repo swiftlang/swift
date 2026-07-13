@@ -184,7 +184,7 @@ extension String {
   /// a result for String.UTF8View.withContiguousStorageIfAvailable, and always
   /// return a non-nil value from `String._utf8Span` and `String.UTF8View._span`.
   /// Contiguous strings also benefit from fast-paths and better optimizations.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var isContiguousUTF8: Bool {
     if _guts.isFastUTF8 {
 #if os(watchOS) && _pointerBitWidth(_32)
@@ -204,7 +204,7 @@ extension String {
   ///
   /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
   ///
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func makeContiguousUTF8() {
     if _fastPath(isContiguousUTF8) { return }
     self = String._copying(self)
@@ -223,7 +223,7 @@ extension String {
   ///
   /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
   ///
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public mutating func withUTF8<R, E: Error>(
     _ body: (UnsafeBufferPointer<UInt8>) throws(E) -> R
@@ -243,7 +243,7 @@ extension Substring {
   /// always return a non-nil value from `Substring._utf8Span` and
   /// `Substring.UTF8View._span`.
   /// Contiguous strings also benefit from fast-paths and better optimizations.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var isContiguousUTF8: Bool { return self.base.isContiguousUTF8 }
 
   /// If this string is not contiguous, make it so. If this mutates the
@@ -251,13 +251,13 @@ extension Substring {
   ///
   /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
   ///
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   public mutating func makeContiguousUTF8() {
     if isContiguousUTF8 { return }
     return _slowMakeContiguousUTF8()
   }
 
-  @_alwaysEmitIntoClient // Swift 5.7
+  @export(implementation) // Swift 5.7
   @inline(never)
   internal mutating func _slowMakeContiguousUTF8() {
     _internalInvariant(!isContiguousUTF8)
@@ -291,7 +291,7 @@ extension Substring {
   ///
   /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
   ///
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public mutating func withUTF8<R, E: Error>(
     _ body: (UnsafeBufferPointer<UInt8>) throws(E) -> R

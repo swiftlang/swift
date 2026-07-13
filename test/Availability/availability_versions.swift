@@ -398,7 +398,7 @@ class SubOfClassWithPotentiallyUnavailableInitializer : SuperWithWithPotentially
 // Properties
 
 class ClassWithPotentiallyUnavailableProperties {
-    // expected-note@-1 4{{add '@available' attribute to enclosing class}}
+    // expected-note@-1 3{{add '@available' attribute to enclosing class}}
 
   var nonLazyAvailableOn10_9Stored: Int = 9
 
@@ -414,20 +414,19 @@ class ClassWithPotentiallyUnavailableProperties {
 
   @available(OSX, introduced: 10.9)
   lazy var availableOn10_9Stored: Int = 9
-  
+
   @available(OSX, introduced: 51) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
   lazy var availableOn51Stored : Int = 10
 
   @available(OSX, introduced: 10.9)
   var availableOn10_9Computed: Int {
     get {
-      let _: Int = availableOn51Stored // expected-error {{'availableOn51Stored' is only available in macOS 51 or newer}}
-          // expected-note@-1 {{add 'if #available' version check}}
-      
+      let _: Int = availableOn51Stored
+
       if #available(OSX 51, *) {
         let _: Int = availableOn51Stored
       }
-      
+
       return availableOn10_9Stored
     }
     set(newVal) {
@@ -512,15 +511,13 @@ class ClassWithReferencesInInitializers {
 }
 
 func accessPotentiallyUnavailableProperties(_ o: ClassWithPotentiallyUnavailableProperties) {
-      // expected-note@-1 17{{add '@available' attribute to enclosing global function}}
+      // expected-note@-1 15{{add '@available' attribute to enclosing global function}}
   // Stored properties
   let _: Int = o.availableOn10_9Stored
-  let _: Int = o.availableOn51Stored // expected-error {{'availableOn51Stored' is only available in macOS 51 or newer}}
-      // expected-note@-1 {{add 'if #available' version check}}
-  
+  let _: Int = o.availableOn51Stored
+
   o.availableOn10_9Stored = 9
-  o.availableOn51Stored = 10 // expected-error {{'availableOn51Stored' is only available in macOS 51 or newer}}
-      // expected-note@-1 {{add 'if #available' version check}}
+  o.availableOn51Stored = 10
 
   // Computed Properties
   let _: Int = o.availableOn10_9Computed
@@ -625,13 +622,16 @@ enum CompassPoint {
   @available(OSX, introduced: 52)
   case West
 
+  @available(OSX, introduced: 52)
+  case NorthWest
+
   case WithAvailableByEnumPayload(p : EnumIntroducedOn51)
 
   // expected-error@+1 {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
   @available(OSX, introduced: 52)
   case WithAvailableByEnumElementPayload(p : EnumIntroducedOn52)
 
-  // expected-error@+1 2{{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
+  // expected-error@+1 {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
   @available(OSX, introduced: 52)
   case WithAvailableByEnumElementPayload1(p : EnumIntroducedOn52), WithAvailableByEnumElementPayload2(p : EnumIntroducedOn52)
 
@@ -647,7 +647,7 @@ enum CompassPoint {
 func functionTakingEnumIntroducedOn52(_ e: EnumIntroducedOn52) { }
 
 func useEnums() {
-      // expected-note@-1 2{{add '@available' attribute to enclosing global function}}
+      // expected-note@-1 3{{add '@available' attribute to enclosing global function}}
   let _: CompassPoint = .North // expected-error {{'CompassPoint' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
@@ -668,7 +668,7 @@ func useEnums() {
     switch (point) {
       case .North, .South, .East:
         markUsed("NSE")
-      case .West: // We do not expect an error here
+      case .West, .NorthWest: // We do not expect an error here
         markUsed("W")
 
       case .WithPotentiallyUnavailablePayload(_):
@@ -686,7 +686,8 @@ func useEnums() {
         markUsed("WithAvailableByEnumElementPayload2")
       case .WithAvailableByEnumElementPayload(let p):
         markUsed("WithAvailableByEnumElementPayload")
-        functionTakingEnumIntroducedOn52(p)
+        functionTakingEnumIntroducedOn52(p) // expected-error {{'functionTakingEnumIntroducedOn52' is only available in macOS 52 or newer}}
+        // expected-note@-1 {{add 'if #available' version check}}
     }
   }
 }
@@ -719,7 +720,7 @@ func switchStatements(point: CompassPoint) {
   // Multiple case label items that share the same availability still allow
   // refinement to that common availability.
   switch point {
-  case .WithAvailableByEnumElementPayload1(_), .WithAvailableByEnumElementPayload2(_):
+  case .West, .NorthWest:
     _ = globalFuncAvailableOn52()
   default:
     break
@@ -752,7 +753,7 @@ func switchStatements(point: CompassPoint) {
     case .West:
       _ = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-    case .WithAvailableByEnumElementPayload1(_):
+    case .NorthWest:
       _ = globalFuncAvailableOn52()
     default:
       break
@@ -1347,51 +1348,6 @@ class NestedClassTest {
   class InnerClass : WidelyAvailableBase {}
 }
 
-// Useless #available(...) checks
-
-func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
-// Default availability reflects minimum deployment: 10.9 and up
-
-  if #available(OSX 10.9, *) { // no-warning
-    let _ = globalFuncAvailableOn10_9()
-  }
-  
-  if #available(OSX 51, *) { // expected-note {{enclosing scope here}}
-    let _ = globalFuncAvailableOn51()
-    
-    if #available(OSX 51, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
-      let _ = globalFuncAvailableOn51()
-    }
-  }
-
-  if #available(OSX 10.9, *) { // expected-note {{enclosing scope here}}
-  } else {
-    // Make sure we generate a warning about an unnecessary check even if the else branch of if is dead.
-    if #available(OSX 51, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
-    }
-  }
-
-  // This 'if' is strictly to limit the scope of the guard fallthrough
-  if p {
-    guard #available(OSX 10.9, *) else { // expected-note {{enclosing scope here}}
-      // Make sure we generate a warning about an unnecessary check even if the else branch of guard is dead.
-      if #available(OSX 51, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
-      }
-    }
-  }
-
-  // We don't want * generate a warn about useless checks; the check may be required on
-  // another platform
-  if #available(iOS 8.0, *) {
-  }
-
-  if #available(OSX 51, *) {
-    // Similarly do not want '*' to generate a warning in a refined scope.
-    if #available(iOS 8.0, *) {
-    }
-  }
-}
-
 @available(OSX, unavailable)
 func explicitlyUnavailable() { } // expected-note 2{{'explicitlyUnavailable()' has been explicitly marked unavailable here}}
 
@@ -1417,40 +1373,6 @@ func functionWithUnavailableInDeadBranch() {
 
     explicitlyUnavailable() // expected-error {{'explicitlyUnavailable()' is unavailable}}
   }
-}
-
-@available(OSX, introduced: 51)
-func functionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note 2{{enclosing scope here}}
-  if #available(OSX 10.9, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
-    let _ = globalFuncAvailableOn10_9()
-  }
-  
-  if #available(OSX 51, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
-    let _ = globalFuncAvailableOn51()
-  }
-}
-
-@available(OSX, introduced: 51)
-@inlinable
-public func fragileFunctionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note {{enclosing scope here}}
-  if #available(OSX 51, *) { } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
-}
-
-public protocol Mystery { }
-public struct Secret: Mystery {
-  public init() { }
-}
-public struct SuperSecret: Mystery {
-  public init() { }
-}
-
-@available(OSX, introduced: 51)
-@inlinable
-public func fragileFunctionWithSpecifiedAvailabilityUselessCheckAndOpaqueResult() -> some Mystery {
-  if #available(OSX 51, *) {
-    return Secret()
-  }
-  return SuperSecret()
 }
 
 // #available(...) outside if statement guards

@@ -4167,7 +4167,7 @@ public:
   void visitReferencedFunctionsAndMethods(
       std::function<void (SILFunction *)> functionCallBack,
       std::function<void (SILDeclRef)> methodCallBack) const;
-    
+
   void incrementRefCounts() const;
   void decrementRefCounts() const;
 
@@ -4437,6 +4437,13 @@ public:
   }
 
   SubstitutionMap getSubstitutions() const { return Substitutions; }
+
+  /// If this `keypath_inst` can be emitted as a statically-instantiated
+  /// immortal instance in Embedded Swift, returns the concrete key path
+  /// class SILType (e.g. `$KeyPath<Foo, Bar>`, `$WritableKeyPath<Foo,
+  /// Bar>`, or `$ReferenceWritableKeyPath<Foo, Bar>`) that IRGen would use
+  /// as the object's isa.  Returns an invalid SILType otherwise.
+  SILType getStaticInstanceClassType() const;
 
   void dropReferencedPattern();
   
@@ -5716,11 +5723,6 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
-enum PoisonRefs_t : bool {
-  DontPoisonRefs = false,
-  PoisonRefs = true,
-};
-
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
 class DebugValueInst final
@@ -5740,12 +5742,11 @@ class DebugValueInst final
   SILBasicBlock *ReconstructionBlock = nullptr;
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var, PoisonRefs_t poisonRefs,
+                 SILDebugVariable Var,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
                  bool prependDeref);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
-                                PoisonRefs_t poisonRefs,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
 
@@ -5931,23 +5932,6 @@ public:
   /// If \p varType is specified, the undef will use that type (in the
   /// appropriate address/object form) instead of the current operand's type.
   void killOperand(SILType operandType = SILType());
-
-  /// True if all references within this debug value will be overwritten with a
-  /// poison sentinel at this point in the program. This is used in debug builds
-  /// when shortening non-trivial value lifetimes to ensure the debugger cannot
-  /// inspect invalid memory. These are not generated until OSSA is
-  /// lowered. They are not expected to be serialized within the module, and the
-  /// debug pipeline is not expected to do any significant code motion after
-  /// OSSA lowering. It should not be necessary to model the poison operation as
-  /// a side effect, which would violate the rule that debug_values cannot
-  /// affect optimization.
-  PoisonRefs_t poisonRefs() const {
-    return PoisonRefs_t(sharedUInt8().DebugValueInst.poisonRefs);
-  }
-
-  void setPoisonRefs(PoisonRefs_t poisonRefs = PoisonRefs) {
-    sharedUInt8().DebugValueInst.poisonRefs = poisonRefs;
-  }
 
   bool hasTrace() const { return sharedUInt8().DebugValueInst.trace; }
 
@@ -7343,8 +7327,7 @@ class EnumInst
   EnumInst(SILDebugLocation DebugLoc, SILValue Operand,
            EnumElementDecl *Element, SILType ResultTy,
            ValueOwnershipKind forwardingOwnershipKind)
-    : InstructionBase(DebugLoc, ResultTy,
-                      forwardingOwnershipKind.forwardToInit(ResultTy)),
+    : InstructionBase(DebugLoc, ResultTy, forwardingOwnershipKind),
       Element(Element) {
     sharedUInt32().EnumInst.caseIndex = InvalidCaseIndex;
 
@@ -9571,9 +9554,8 @@ class DestroyValueInst
   USE_SHARED_UINT8;
 
   DestroyValueInst(SILDebugLocation DebugLoc, SILValue operand,
-                   PoisonRefs_t poisonRefs, IsDeadEnd_t isDeadEnd)
+                   IsDeadEnd_t isDeadEnd)
       : UnaryInstructionBase(DebugLoc, operand) {
-    sharedUInt8().DestroyValueInst.poisonRefs = poisonRefs;
     sharedUInt8().DestroyValueInst.deadEnd = isDeadEnd;
   }
 
@@ -9582,22 +9564,6 @@ public:
   /// user-defined deinitializer if present. This returns false if a prior
   /// drop_deinit is present.
   bool isFullDeinitialization();
-
-  /// If true, then all references within the destroyed value will be
-  /// overwritten with a sentinel. This is used in debug builds when shortening
-  /// non-trivial value lifetimes to ensure the debugger cannot inspect invalid
-  /// memory. These semantics are part of the destroy_value instruction to
-  /// avoid representing use-after-destroy in OSSA form and so that OSSA
-  /// transformations keep the poison operation associated with the destroy
-  /// point. After OSSA, these are lowered to 'debug_values [poison]'
-  /// instructions, after which the Onone pipeline should avoid code motion.
-  PoisonRefs_t poisonRefs() const {
-    return PoisonRefs_t(sharedUInt8().DestroyValueInst.poisonRefs);
-  }
-
-  void setPoisonRefs(PoisonRefs_t poisonRefs = PoisonRefs) {
-    sharedUInt8().DestroyValueInst.poisonRefs = poisonRefs;
-  }
 
   /// If the value being destroyed is a stack allocation of a nonescaping
   /// closure, then return the PartialApplyInst that allocated the closure.

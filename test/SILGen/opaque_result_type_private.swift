@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s -disable-availability-checking | %FileCheck %s
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -primary-file %s -O -disable-availability-checking
 

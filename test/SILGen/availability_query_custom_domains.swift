@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name Test %s -verify -enable-experimental-feature CustomAvailability -define-enabled-availability-domain EnabledDomain -define-always-enabled-availability-domain AlwaysEnabledDomain -define-disabled-availability-domain DisabledDomain -define-dynamic-availability-domain DynamicDomain
 // RUN: %target-swift-emit-silgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -define-enabled-availability-domain EnabledDomain \

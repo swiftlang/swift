@@ -120,6 +120,12 @@
 @interface NSObjectFactorySub : NSObjectFactory
 @end
 
+// Fixed-result factory method in a category; must not be inherited as an
+// initializer onto subclasses.
+@interface NSObjectFactory (Extras)
++(NSObjectFactory *)factoryWithFlag:(NSInteger)flag;
+@end
+
 @interface NSHavingConvenienceFactoryAndLaterConvenienceInit : NSObject
 -(instancetype)initWithStuff:(NSObject *)stuff NS_DESIGNATED_INITIALIZER;
 

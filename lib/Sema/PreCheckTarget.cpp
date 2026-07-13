@@ -26,6 +26,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
@@ -523,7 +524,7 @@ diagnoseUnqualifiedInit(UnresolvedDeclRefExpr *initExpr, DeclContext *dc,
 /// used for the lookup. If the lookup doesn't find any results, returns
 /// `nullptr`.
 static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
-                                NameLookupOptions lookupOptions) {
+                                NLOptions lookupOptions) {
   auto &Context = DC->getASTContext();
   DeclNameRef Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
@@ -631,8 +632,8 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
 
     // For the purpose of diagnosing inaccessible results, try the lookup again
     // but ignore access control.
-    NameLookupOptions relookupOptions = lookupOptions;
-    relookupOptions |= NameLookupFlags::IgnoreAccessControl;
+    NLOptions relookupOptions = lookupOptions;
+    relookupOptions |= NLFlags::IgnoreAccessControl;
     auto inaccessibleResults =
         TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
     if (inaccessibleResults) {
@@ -872,11 +873,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   auto &Context = DC->getASTContext();
 
   // Perform standard value name lookup.
-  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  NLOptions lookupOptions = defaultUnqualifiedLookupOptions;
   // TODO: Include all of the possible members to give a solver a
   //       chance to diagnose name shadowing which requires explicit
   //       name/module qualifier to access top-level name.
-  lookupOptions |= NameLookupFlags::IncludeOuterResults;
+  lookupOptions |= NLFlags::IncludeOuterResults;
 
   Expr *result = ::resolveDeclRefExpr(UDRE, DC, lookupOptions);
   if (!result && Context.LangOpts.hasFeature(Feature::MemberImportVisibility,
@@ -884,7 +885,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     // If we didn't find a result, try again but this time relax
     // MemberImportVisibility restrictions. Note that diagnosing the missing
     // import is already handled by resolveDeclRefExpr().
-    lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    lookupOptions |= NLFlags::IgnoreMissingImports;
     result = ::resolveDeclRefExpr(UDRE, DC, lookupOptions);
   }
 

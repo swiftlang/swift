@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -enable-lexical-lifetimes=false -module-name borrow -parse-stdlib %s | %FileCheck %s
 
 // CHECK-LABEL: sil {{.*}}[lexical_lifetimes] [ossa] @funky : {{.*}} {

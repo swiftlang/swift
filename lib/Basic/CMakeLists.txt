@@ -1,6 +1,6 @@
 
 # On non-Darwin require UUID.
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(UUID_INCLUDE "")
   set(UUID_LIBRARIES "")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")

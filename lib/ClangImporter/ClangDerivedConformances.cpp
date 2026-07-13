@@ -401,23 +401,6 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
   return dyn_cast_or_null<FuncDecl>(result);
 }
 
-/// Register a synthesized declaration in the lookup tables and mark it as
-/// always visible. Declarations are added to two lookup tables (the one for
-/// the record's context and the one for its owning module) to handle the case
-/// where a C++ namespace spans across multiple Clang modules.
-static void registerSynthesizedDecl(ClangImporter::Implementation &impl,
-                                    const clang::CXXRecordDecl *classDecl,
-                                    clang::FunctionDecl *decl) {
-  impl.synthesizedAndAlwaysVisibleDecls.insert(decl);
-  auto *lookupTable1 = impl.findLookupTable(classDecl);
-  addEntryToLookupTable(*lookupTable1, decl, impl.getNameImporter());
-  auto *owningModule =
-      importer::getClangOwningModule(classDecl, classDecl->getASTContext());
-  auto *lookupTable2 = impl.findLookupTable(owningModule);
-  if (lookupTable1 != lookupTable2)
-    addEntryToLookupTable(*lookupTable2, decl, impl.getNameImporter());
-}
-
 static clang::FunctionDecl *
 instantiateTemplatedOperator(ClangImporter::Implementation &impl,
                              const clang::CXXRecordDecl *classDecl,
@@ -446,7 +429,7 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
                                           best)) {
   case clang::OR_Success: {
     if (auto clangCallee = best->Function) {
-      registerSynthesizedDecl(impl, classDecl, clangCallee);
+      impl.registerSynthesizedClangDecl(clangCallee, classDecl);
       return clangCallee;
     }
     break;
@@ -532,7 +515,7 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
 
   equalEqualDecl->setBody(createClangReturnStmt(clangCtx, underlyingCall));
 
-  registerSynthesizedDecl(impl, classDecl, equalEqualDecl);
+  impl.registerSynthesizedClangDecl(equalEqualDecl, classDecl);
   return true;
 }
 
@@ -983,28 +966,25 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
 }
 
-static void conformToCxxBorrowingSequenceIfNeeded(
+static void conformToCxxIterableIfNeeded(
     ClangImporter::Implementation &impl, NominalTypeDecl *decl,
     const clang::CXXRecordDecl *clangDecl,
     const ProtocolConformance *rawIteratorConformance) {
-  PrettyStackTraceDecl trace("trying to conform to CxxBorrowingSequence", decl);
+  PrettyStackTraceDecl trace("trying to conform to CxxIterable", decl);
   ASTContext &ctx = decl->getASTContext();
-
-  if (!ctx.LangOpts.hasFeature(Feature::BorrowingSequence))
-    return;
 
   ProtocolDecl *cxxIteratorProto =
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
-  ProtocolDecl *cxxBorrowingSequenceProto =
-      ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence);
-  if (!cxxIteratorProto || !cxxBorrowingSequenceProto)
+  ProtocolDecl *cxxIterableProto =
+      ctx.getProtocol(KnownProtocolKind::CxxIterable);
+  if (!cxxIteratorProto || !cxxIterableProto)
     return;
 
   // Take the default definition of `BorrowingIterator` from
-  // CxxBorrowingSequence protocol. This type is currently
+  // CxxIterable protocol. This type is currently
   // `CxxBorrowingIterator<Self>`.
-  auto borrowingIteratorDecl = cxxBorrowingSequenceProto->getAssociatedType(
-      ctx.getIdentifier("BorrowingIterator"));
+  auto borrowingIteratorDecl = cxxIterableProto->getAssociatedType(
+      ctx.Id_BorrowingIterator);
   if (!borrowingIteratorDecl)
     return;
   auto borrowingIteratorNominal =
@@ -1024,12 +1004,12 @@ static void conformToCxxBorrowingSequenceIfNeeded(
       rawIteratorConformance->getTypeWitness(dereferenceResultDecl);
 
   if (dereferenceResultTy && dereferenceResultTy->getAnyPointerElementType()) {
-    // Only conform to CxxBorrowingSequence if `__operatorStar` returns
+    // Only conform to CxxIterable if `__operatorStar` returns
     // `UnsafePointer<Pointee>`. Otherwise, we can't create a span for pointee.
-    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("BorrowingIterator"),
+    impl.addSynthesizedTypealias(decl, ctx.Id_BorrowingIterator,
                                  borrowingIteratorTy);
     impl.addSynthesizedProtocolAttrs(decl,
-                                     {KnownProtocolKind::CxxBorrowingSequence});
+                                     {KnownProtocolKind::CxxIterable});
   }
 }
 
@@ -1065,7 +1045,17 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
     // begin() and end() need to have the same return type
     return;
 
-  if (!iterTy->isPointerOrReferenceType()) {
+  if (iterTy->isPointerOrReferenceType()) {
+    auto pointeeQualType = iterTy->getPointeeType().getCanonicalType();
+    if (auto *pointeeRecord = pointeeQualType->getAsCXXRecordDecl()) {
+      auto info = evaluateOrDefault(
+          ctx.evaluator, ForeignReferenceTypeInfoRequest({pointeeRecord}), {});
+      // If begin()/end() return a pointer to an FRT, the pointer will be
+      // stripped to the bare FRT class in Swift, which is not a usable iterator
+      if (info.isReference())
+        return;
+    }
+  } else {
     // Check if begin() returns an iterator.
     auto *iterDecl = iterTy->getAsCXXRecordDecl();
     if (!iterDecl || !iterDecl->hasDefinition())
@@ -1113,7 +1103,7 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
 
-  conformToCxxBorrowingSequenceIfNeeded(impl, decl, clangDecl,
+  conformToCxxIterableIfNeeded(impl, decl, clangDecl,
                                         rawIteratorConformance);
 
   // `CxxSequence` and `CxxRandomAccessCollection` protocols require `Element`

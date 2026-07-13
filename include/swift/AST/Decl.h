@@ -34,6 +34,7 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -100,7 +101,6 @@ namespace swift {
   class MacroDefinition;
   class ModuleDecl;
   class NamedPattern;
-  enum NLOptions : unsigned;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
@@ -866,7 +866,7 @@ protected:
     NumPathElements : 8
   );
 
-  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1,
+  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1+1,
     /// An encoding of the default and maximum access level for this extension.
     /// The value 4 corresponds to AccessLevel::Public
     ///
@@ -876,7 +876,11 @@ protected:
     DefaultAndMaxAccessLevel : 4,
 
     /// Whether there is are lazily-loaded conformances for this extension.
-    HasLazyConformances : 1
+    HasLazyConformances : 1,
+
+    /// Whether this is a `metatype extension` whose members live on the
+    /// protocol metatype and are not inherited by conforming types.
+    IsMetatypeExtension : 1
   );
 
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
@@ -2149,6 +2153,13 @@ public:
   SourceRange getBraces() const { return Braces; }
   void setBraces(SourceRange braces) { Braces = braces; }
 
+  bool isMetatypeExtension() const {
+    return Bits.ExtensionDecl.IsMetatypeExtension;
+  }
+  void setIsMetatypeExtension(bool value = true) {
+    Bits.ExtensionDecl.IsMetatypeExtension = value;
+  }
+
   bool hasBeenBound() const { return ExtendedNominal.getInt(); }
 
   void setExtendedNominal(NominalTypeDecl *n) {
@@ -2185,6 +2196,7 @@ public:
   /// Repr would not be available if the extension was been loaded
   /// from a serialized module.
   TypeRepr *getExtendedTypeRepr() const { return ExtendedTypeRepr; }
+  void setExtendedTypeRepr(TypeRepr *repr) { ExtendedTypeRepr = repr; }
                               
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
@@ -4893,7 +4905,7 @@ public:
 
   SourceLoc getStartLoc() const { return EnumLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(EnumLoc, getBraces().End);
+    return SourceRange::combine(EnumLoc, getBraces().End);
   }
 
 public:
@@ -5097,7 +5109,7 @@ public:
 
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(StructLoc, getBraces().End);
+    return SourceRange::combine(StructLoc, getBraces().End);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -5253,7 +5265,7 @@ public:
 
   SourceLoc getStartLoc() const { return ClassLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(ClassLoc, getBraces().End);
+    return SourceRange::combine(ClassLoc, getBraces().End);
   }
 
   /// Determine whether the member area of this class's metadata (which consists
@@ -5741,7 +5753,7 @@ public:
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(ProtocolLoc, getBraces().End);
+    return SourceRange::combine(ProtocolLoc, getBraces().End);
   }
 
   /// True if this protocol can only be conformed to by class types.

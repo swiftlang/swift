@@ -361,6 +361,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
 // ON_MEMBER_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // ON_MEMBER_LAST-DAG: Keyword/None:                       diagnose[#Declaration Attribute#]; name=diagnose
+// ON_MEMBER_LAST-DAG: Keyword/None:                       com[#Declaration Attribute#]; name=com
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -438,6 +439,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
 // KEYWORD_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // KEYWORD_LAST-DAG: Keyword/None:                       diagnose[#Declaration Attribute#]; name=diagnose
+// KEYWORD_LAST-DAG: Keyword/None:                       com[#Declaration Attribute#]; name=com
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper

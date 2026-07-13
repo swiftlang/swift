@@ -1,6 +1,5 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -module-name Swift | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 // Some verification is blocked on string lookup succeeding.

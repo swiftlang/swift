@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name Swift -parse-stdlib -parse-as-library %s
 // RUN: %target-swift-emit-silgen -module-name Swift -parse-stdlib -parse-as-library %s
 
 // This files contains a minimal implementation for Swift to emit foreach loops

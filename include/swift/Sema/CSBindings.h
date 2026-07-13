@@ -346,6 +346,8 @@ struct PotentialBindings {
   void reset();
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
+
+  void printVars(llvm::raw_ostream &out, unsigned indent, bool showVia) const;
 };
 
 
@@ -664,12 +666,6 @@ public:
   void forEachLiteralRequirement(
       llvm::function_ref<void(KnownProtocolKind)> callback) const;
 
-  void forEachAdjacentVariable(
-      llvm::function_ref<void(TypeVariableType *)> callback) const {
-    for (auto *typeVar : AdjacentVars)
-      callback(typeVar);
-  }
-
   /// Return a literal requirement that has the most impact on the binding
   /// score.
   LiteralBindingKind getLiteralForScore() const;
@@ -767,6 +763,9 @@ private:
 
   SubsumeBindingResult subsumeBinding(const PotentialBinding &binding,
                                       const PotentialBinding &existing);
+
+  void inferTransitiveKeyPathBindingFrom(const PotentialBinding &binding,
+                                         TypeVariableType *keyPathTy);
 
   void addDefault(Constraint *constraint);
 

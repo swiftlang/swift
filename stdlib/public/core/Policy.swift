@@ -376,8 +376,8 @@ public typealias AnyClass = AnyObject.Type
 ///   primarily intended to enable `case` statement pattern matching.
 ///
 /// - Parameters:
-///   - lhs: A value to compare.
-///   - rhs: Another value to compare.
+///   - a: A value to compare.
+///   - b: Another value to compare.
 @_transparent
 public func ~= <T: Equatable>(a: T, b: T) -> Bool {
   return a == b

@@ -23,7 +23,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @discardableResult
   internal mutating func remove(at index: Int) -> Element {
     _checkItemIndex(index)
@@ -37,7 +37,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(*n*), where *n* is the original count of the array.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func removeAll() {
     unsafe _items.deinitialize()
     _count = 0
@@ -51,7 +51,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @discardableResult
   internal mutating func removeLast() -> Element {
     _precondition(!isEmpty, "Cannot remove last element from an empty array")
@@ -72,7 +72,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`k`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func removeLast(_ k: Int) {
     if k == 0 { return }
     _precondition(
@@ -94,7 +94,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func removeSubrange(_  bounds: Range<Int>) {
     _checkValidBounds(bounds)
     guard !bounds.isEmpty else { return }
@@ -110,7 +110,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func removeSubrange(_  bounds: some RangeExpression<Int>) {
     // FIXME: Remove this in favor of a standard algorithm.
     removeSubrange(bounds.relative(to: indices))
@@ -126,7 +126,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func popLast() -> Element? {
     // FIXME: Remove this in favor of a standard algorithm.
     if isEmpty { return nil }

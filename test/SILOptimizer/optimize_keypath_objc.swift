@@ -7,7 +7,6 @@
 // RUN: %FileCheck %s < %t/output.sil
 
 // REQUIRES: objc_interop
-// REQUIRES: swift_in_compiler
 
 import Foundation
 

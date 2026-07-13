@@ -3,7 +3,6 @@
 import Swift
 import Builtin
 
-// REQUIRES: swift_in_compiler
 
 // CHECK-LABEL: sil @test_enum_with_initialize :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -experimental-skip-non-inlinable-function-bodies-without-types %s -emit-module-path %t/skip_local_function_bodies.swiftmodule
 

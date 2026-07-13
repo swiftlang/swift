@@ -64,7 +64,6 @@
 // RUN: %target-run %t/Application | %FileCheck %s
 
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
 

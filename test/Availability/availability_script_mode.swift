@@ -25,7 +25,7 @@ var availableOn50Var: Available50 = .init() // Ok
 // them to be unavailable.
 
 @available(macOS, introduced: 51) // expected-error {{global variable cannot be marked potentially unavailable with '@available' in script mode}}
-var potentiallyUnavailableVar: Available51 = .init()
+var potentiallyUnavailableVar: Available51 = .init() // expected-error {{'Available51' is only available in macOS 51 or newer}} expected-note {{add 'if #available' version check}}
 
 @available(macOS, unavailable) // expected-error {{global variable cannot be marked unavailable with '@available' in script mode}}
 var unavailableOnMacOSVar: UnavailableOnMacOS = .init() // expected-error {{'UnavailableOnMacOS' is unavailable in macOS}}

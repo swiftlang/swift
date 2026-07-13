@@ -1,4 +1,4 @@
-// RUN: %target-build-swift %s -cxx-interoperability-mode=default -target arm64-apple-macos11.0
+// RUN: %target-build-swift %s -cxx-interoperability-mode=default -target %target-cpu-apple-macos11.0
 
 // REQUIRES: OS=macosx
 
