@@ -56,7 +56,7 @@ public struct _MutexHandle: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public init() {
-    storage = _Cell([0, 0, 0, 0, 0, 0, 0, 0])
+    storage = _Cell(.init(repeating: 0))
     unsafe _swift_mutex_init(UnsafeMutableRawPointer(storage._address), 0)
   }
 
