@@ -453,6 +453,13 @@ function(_compile_swift_files
   precondition(SWIFTFILE_ARCHITECTURE MESSAGE "Should specify an architecture")
   precondition(SWIFTFILE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
 
+  # Route embedded-stdlib Swift compilations through a bounded ninja job
+  # pool defined in the top-level CMakeLists.txt.
+  set(_swiftfile_job_pool_args)
+  if("${SWIFTFILE_SDK}" STREQUAL "embedded")
+    set(_swiftfile_job_pool_args JOB_POOL swift_embedded_compile_job_pool)
+  endif()
+
   # Determine if/what macCatalyst build variant we are
   get_maccatalyst_build_flavor(maccatalyst_build_flavor
     "${SWIFTFILE_SDK}" "${SWIFTFILE_MACCATALYST_BUILD_FLAVOR}")
@@ -1113,6 +1120,7 @@ function(_compile_swift_files
         ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
         ${copy_legacy_layouts_dep}
+      ${_swiftfile_job_pool_args}
       COMMENT "Compiling ${first_output}")
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
 
@@ -1160,6 +1168,7 @@ function(_compile_swift_files
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
           ${copy_legacy_layouts_dep}
+        ${_swiftfile_job_pool_args}
         COMMENT "Generating ${module_file}")
 
     if(SWIFTFILE_STATIC)
@@ -1240,6 +1249,7 @@ function(_compile_swift_files
           ${swift_ide_test_dependency}
           ${obj_dirs_dependency_target}
           ${copy_legacy_layouts_dep}
+        ${_swiftfile_job_pool_args}
         COMMENT
           "Generating ${maccatalyst_module_file}")
 

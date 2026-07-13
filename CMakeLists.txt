@@ -1442,6 +1442,26 @@ if(SWIFT_PARALLEL_LINK_JOBS)
   endif()
 endif()
 
+# Cap concurrency for embedded-stdlib Swift compilations.
+#
+# `SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS` defaults to a small fraction of
+# the host's logical cores so the C++ build phase still gets to run at
+# full parallelism; only the embedded Swift compilations queue up through
+# this pool.
+if(CMAKE_MAKE_PROGRAM MATCHES "ninja")
+  if(NOT DEFINED SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS)
+    cmake_host_system_information(
+      RESULT _swift_embedded_pool_cores QUERY NUMBER_OF_LOGICAL_CORES)
+    math(EXPR SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS
+         "(${_swift_embedded_pool_cores} + 3) / 4")
+    if(SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS LESS 1)
+      set(SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS 1)
+    endif()
+  endif()
+  set_property(GLOBAL APPEND PROPERTY
+    JOB_POOLS swift_embedded_compile_job_pool=${SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS})
+endif()
+
 # Set the CMAKE_OSX_* variables in a way that minimizes conflicts.
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
