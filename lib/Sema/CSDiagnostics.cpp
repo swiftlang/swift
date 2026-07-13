@@ -45,6 +45,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/TypeVariableType.h"
@@ -963,6 +964,8 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   while (!path.empty()) {
     auto last = path.back();
     if (last.is<LocatorPathElt::OptionalInjection>() ||
+        last.is<LocatorPathElt::OpenedGeneric>() ||
+        last.is<LocatorPathElt::AnyRequirement>() ||
         last.is<LocatorPathElt::GenericType>() ||
         last.is<LocatorPathElt::GenericArgument>()) {
       path = path.drop_back();
