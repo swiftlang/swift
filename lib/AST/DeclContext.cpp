@@ -92,6 +92,12 @@ ProtocolDecl *DeclContext::getExtendedProtocolDecl() const {
   return nullptr;
 }
 
+bool DeclContext::isMetatypeExtension() const {
+  if (auto *ED = dyn_cast<ExtensionDecl>(this))
+    return ED->isMetatypeExtension();
+  return false;
+}
+
 VarDecl *DeclContext::getNonLocalVarDecl() const {
   if (auto *init = dyn_cast<PatternBindingInitializer>(this)) {
     if (auto binding = init->getBinding()) {

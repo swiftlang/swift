@@ -638,11 +638,9 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
       return;
 
     // Metatype extension members are not visible on conforming types.
-    if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
-      if (ext->isMetatypeExtension() && baseTypeOrNull &&
-          !baseTypeOrNull->isExistentialType())
-        return;
-    }
+    if (decl->getDeclContext()->isMetatypeExtension() && baseTypeOrNull &&
+        !baseTypeOrNull->isExistentialType())
+      return;
 
     const auto candidateName = decl->getName();
 

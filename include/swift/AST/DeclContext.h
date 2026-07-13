@@ -339,6 +339,11 @@ public:
   /// Returns whether this context is an extension constrained to a class type.
   bool isClassConstrainedProtocolExtension() const;
 
+  /// Returns whether this context is a protocol metatype extension
+  /// (`extension P.Protocol { ... }`), i.e. an \c ExtensionDecl whose members
+  /// attach to the extended protocol's metatype.
+  bool isMetatypeExtension() const;
+
   /// Determines whether this context is itself a local scope in a
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.
