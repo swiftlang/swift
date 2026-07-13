@@ -82,11 +82,12 @@ static bool seemsUseful(SILInstruction *I) {
       return true;
   }
 
-  // Is useful if it's associating with a function argument
-  // If undef, it is useful and it doesn't cost anything.
+  // A debug value should never be marked useful, they are handled specially,
+  // and should not propagate liveness of operands.
+  // For function arguments, without this, the argument is RAUW'ed with undef.
+  // Keeping them alive doesn't cost anything.
   if (isa<DebugValueInst>(I))
-    return isa<SILFunctionArgument>(I->getOperand(0))
-      || isa<SILUndef>(I->getOperand(0));
+    return isa<SILFunctionArgument>(I->getOperand(0));
 
 
   // Don't delete allocation instructions in DCE.
