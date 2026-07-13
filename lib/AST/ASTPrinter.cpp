@@ -15,13 +15,12 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "FeatureSet.h"
-#include "swift/AST/InlinableText.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
@@ -34,6 +33,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -209,10 +209,10 @@ static bool shouldSkipDeclInPublicInterface(const Decl *D) {
   if (!SF)
     return false;
 
-  auto constraints = getAvailabilityConstraintsForDecl(
+  auto restrictions = getAvailabilityRestrictionsForDecl(
       D, AvailabilityContext::forDeploymentTarget(ctx));
   llvm::SmallVector<AvailabilityDomain, 4> unavailableDomains;
-  getRuntimeUnavailableDomains(constraints, unavailableDomains, ctx);
+  getRuntimeUnavailableDomains(restrictions, unavailableDomains, ctx);
 
   for (auto domain : unavailableDomains) {
     if (auto *domainDecl = domain.getDecl()) {

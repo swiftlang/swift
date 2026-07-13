@@ -2351,9 +2351,9 @@ private:
       if (!nominal)
         return false;
 
-      auto constraint = getUnsatisfiedAvailabilityConstraint(
+      auto restriction = getUnsatisfiedAvailabilityRestriction(
           nominal, context.getAsDeclContext(), loc);
-      if (constraint && !constraint->isUnavailable()) {
+      if (restriction && !restriction->isUnavailable()) {
         auto &ctx = getASTContext();
         ctx.Diags.diagnose(loc,
                            diag::result_builder_missing_limited_availability,

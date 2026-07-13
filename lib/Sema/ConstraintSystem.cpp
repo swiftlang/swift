@@ -4819,7 +4819,7 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
       loc = getLoc(anchor);
   }
 
-  auto result = getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
+  auto result = getUnsatisfiedAvailabilityRestriction(D, DC, loc).has_value();
   const_cast<ConstraintSystem *>(this)->UnavailableDecls.insert(
       std::make_pair(std::make_pair(D, locator), result));
   return result;
@@ -5019,7 +5019,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    if (getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc))
+    if (getUnsatisfiedAvailabilityRestriction(setter, DC, referenceLoc))
       return true;
   }
 

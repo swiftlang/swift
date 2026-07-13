@@ -1994,7 +1994,7 @@ static bool checkWitnessAccess(DeclContext *dc,
   return false;
 }
 
-static std::optional<AvailabilityConstraint>
+static std::optional<AvailabilityRestriction>
 checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
                          const DeclContext *dc,
                          AvailabilityContext &requiredContext) {
@@ -2038,12 +2038,12 @@ checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
 
   // In order to maintain source compatibility, universally unavailable decls
   // are allowed to witness universally unavailable requirements.
-  AvailabilityConstraintFlags flags;
-  flags |= AvailabilityConstraintFlag::
+  AvailabilityRestrictionFlags flags;
+  flags |= AvailabilityRestrictionFlag::
       AllowUniversallyUnavailableInCompatibleContexts;
 
-  return getAvailabilityConstraintsForDecl(witness, requiredContext, flags)
-      .getPrimaryConstraint();
+  return getAvailabilityRestrictionsForDecl(witness, requiredContext, flags)
+      .getPrimaryRestriction();
 }
 
 RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
@@ -4709,7 +4709,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
               ASTContext &ctx = witness->getASTContext();
               auto &diags = ctx.Diags;
               auto diagLoc = getLocForDiagnosingWitness(conformance, witness);
-              auto attr = check.getAvailabilityConstraint().getAttr();
+              auto attr = check.getAvailabilityRestriction().getAttr();
               auto domain = attr.getDomain();
               auto requiredRange =
                   check.getRequiredAvailabilityContext().getAvailabilityRange(
@@ -4738,7 +4738,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
              check](NormalProtocolConformance *conformance) {
               auto &diags = witness->getASTContext().Diags;
               auto diagLoc = getLocForDiagnosingWitness(conformance, witness);
-              auto attr = check.getAvailabilityConstraint().getAttr();
+              auto attr = check.getAvailabilityRestriction().getAttr();
               EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
               diags.diagnose(diagLoc, diag::witness_unavailable, witness,
                              conformance->getProtocol(),

@@ -25,8 +25,8 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AbstractLayout.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -58,7 +58,7 @@ using namespace swift;
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 static bool diagnoseExplicitUnavailability(
-    SourceLoc loc, const AvailabilityConstraint &constraint,
+    SourceLoc loc, const AvailabilityRestriction &restriction,
     const RootProtocolConformance *rootConf, const ExtensionDecl *ext,
     const ExportContext &where,
     bool warnIfConformanceUnavailablePreSwift6 = false,
@@ -67,8 +67,9 @@ static bool diagnoseExplicitUnavailability(
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 static bool diagnoseExplicitUnavailability(
-    const ValueDecl *D, SourceRange R, const AvailabilityConstraint &constraint,
-    const ExportContext &Where, DeclAvailabilityFlags Flags,
+    const ValueDecl *D, SourceRange R,
+    const AvailabilityRestriction &restriction, const ExportContext &Where,
+    DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &, StringRef)>
         attachRenameFixIts);
 
@@ -1798,17 +1799,17 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
     return;
   }
 
-  // FIXME: [availability] Take an unsatisfied constraint as input instead of
+  // FIXME: [availability] Take an unsatisfied restriction as input instead of
   // recomputing it.
   ExportContext where = ExportContext::forDeclSignature(override);
-  auto constraint =
-      getAvailabilityConstraintsForDecl(base, where.getAvailability())
-          .getPrimaryConstraint();
-  if (!constraint)
+  auto restriction =
+      getAvailabilityRestrictionsForDecl(base, where.getAvailability())
+          .getPrimaryRestriction();
+  if (!restriction)
     return;
 
   diagnoseExplicitUnavailability(
-      base, override->getLoc(), *constraint, where,
+      base, override->getLoc(), *restriction, where,
       /*Flags*/ std::nullopt,
       [&override, &ctx](InFlightDiagnostic &diag, StringRef rename) {
         ParsedDeclName parsedName = parseDeclName(rename);
@@ -1841,19 +1842,21 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
-static bool diagnoseExplicitUnavailability(
-    const ValueDecl *D, SourceRange R, const AvailabilityConstraint &constraint,
-    const ExportContext &Where, const Expr *call, DeclAvailabilityFlags Flags) {
+static bool
+diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
+                               const AvailabilityRestriction &restriction,
+                               const ExportContext &Where, const Expr *call,
+                               DeclAvailabilityFlags Flags) {
   return diagnoseExplicitUnavailability(
-      D, R, constraint, Where, Flags,
+      D, R, restriction, Where, Flags,
       [=](InFlightDiagnostic &diag, StringRef rename) {
         fixItAvailableAttrRename(diag, R, D, rename, call);
       });
 }
 
-bool shouldHideDomainNameForConstraintDiagnostic(
-    const AvailabilityConstraint &constraint) {
-  switch (constraint.getDomain().getKind()) {
+bool shouldHideDomainNameForRestrictionDiagnostic(
+    const AvailabilityRestriction &restriction) {
+  switch (restriction.getDomain().getKind()) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::Embedded:
   case AvailabilityDomain::Kind::Custom:
@@ -1863,25 +1866,25 @@ bool shouldHideDomainNameForConstraintDiagnostic(
   case AvailabilityDomain::Kind::Platform:
     return false;
   case AvailabilityDomain::Kind::SwiftLanguageMode:
-    switch (constraint.getReason()) {
-    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+    switch (restriction.getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
       return false;
-    case AvailabilityConstraint::Reason::Unintroduced:
-    case AvailabilityConstraint::Reason::UnavailableObsolete:
+    case AvailabilityRestriction::Reason::Unintroduced:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
       return true;
     }
   }
 }
 
 bool diagnoseExplicitUnavailability(SourceLoc loc,
-                                    const AvailabilityConstraint &constraint,
+                                    const AvailabilityRestriction &restriction,
                                     const RootProtocolConformance *rootConf,
                                     const ExtensionDecl *ext,
                                     const ExportContext &where,
                                     bool warnIfConformanceUnavailablePreSwift6,
                                     bool preconcurrency) {
-  if (!constraint.isUnavailable())
+  if (!restriction.isUnavailable())
     return false;
 
   // Invertible protocols are never unavailable.
@@ -1893,8 +1896,8 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
 
   auto type = rootConf->getType();
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-  auto domainAndRange = constraint.getDomainAndRange(ctx);
-  auto attr = constraint.getAttr();
+  auto domainAndRange = restriction.getDomainAndRange(ctx);
+  auto attr = restriction.getAttr();
 
   // Downgrade unavailable Sendable conformance diagnostics where
   // appropriate.
@@ -1904,52 +1907,52 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
   EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
   diags
       .diagnose(loc, diag::conformance_availability_unavailable, type, proto,
-                shouldHideDomainNameForConstraintDiagnostic(constraint),
+                shouldHideDomainNameForRestrictionDiagnostic(restriction),
                 domainAndRange.getDomain(), EncodedMessage.Message)
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6,
                                LanguageMode::v6);
 
-  switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+  switch (restriction.getReason()) {
+  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
     diags
         .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
                   proto)
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
                    type, proto, domainAndRange.getDomain(),
                    domainAndRange.getRange());
     break;
-  case AvailabilityConstraint::Reason::UnavailableObsolete:
+  case AvailabilityRestriction::Reason::UnavailableObsolete:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
                   domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Reason::Unintroduced:
-    llvm_unreachable("unexpected constraint");
+  case AvailabilityRestriction::Reason::Unintroduced:
+    llvm_unreachable("unexpected restriction");
   }
   return true;
 }
 
-std::optional<AvailabilityConstraint>
-swift::getUnsatisfiedAvailabilityConstraint(const Decl *decl,
-                                            const DeclContext *referenceDC,
-                                            SourceLoc referenceLoc) {
-  AvailabilityConstraintFlags flags;
+std::optional<AvailabilityRestriction>
+swift::getUnsatisfiedAvailabilityRestriction(const Decl *decl,
+                                             const DeclContext *referenceDC,
+                                             SourceLoc referenceLoc) {
+  AvailabilityRestrictionFlags flags;
 
   // In implicit code, allow references to universally unavailable declarations
   // as long as the context is also universally unavailable.
   if (referenceLoc.isInvalid())
-    flags |= AvailabilityConstraintFlag::
+    flags |= AvailabilityRestrictionFlag::
         AllowUniversallyUnavailableInCompatibleContexts;
 
-  return getAvailabilityConstraintsForDecl(
+  return getAvailabilityRestrictionsForDecl(
              decl, AvailabilityContext::forLocation(referenceLoc, referenceDC),
              flags)
-      .getPrimaryConstraint();
+      .getPrimaryRestriction();
 }
 
 /// Check if this is a subscript declaration inside String or
@@ -2276,14 +2279,15 @@ static void checkFunctionConversionAvailability(Type srcType, Type destType,
 }
 
 bool diagnoseExplicitUnavailability(
-    const ValueDecl *D, SourceRange R, const AvailabilityConstraint &constraint,
-    const ExportContext &Where, DeclAvailabilityFlags Flags,
+    const ValueDecl *D, SourceRange R,
+    const AvailabilityRestriction &restriction, const ExportContext &Where,
+    DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &, StringRef)>
         attachRenameFixIts) {
-  if (!constraint.isUnavailable())
+  if (!restriction.isUnavailable())
     return false;
 
-  auto Attr = constraint.getAttr();
+  auto Attr = restriction.getAttr();
   if (Attr.getDomain().isSwiftLanguageMode() && !Attr.isVersionSpecific()) {
     if (shouldAllowReferenceToUnavailableInSwiftDeclaration(D, Where))
       return false;
@@ -2292,7 +2296,7 @@ bool diagnoseExplicitUnavailability(
   SourceLoc Loc = R.Start;
   ASTContext &ctx = D->getASTContext();
   auto &diags = ctx.Diags;
-  auto domainAndRange = constraint.getDomainAndRange(ctx);
+  auto domainAndRange = restriction.getDomainAndRange(ctx);
 
   // TODO: Consider removing this.
   // ObjC keypaths components weren't checked previously, so errors are demoted
@@ -2333,32 +2337,32 @@ bool diagnoseExplicitUnavailability(
     EncodedDiagnosticMessage EncodedMessage(message);
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D,
-                  shouldHideDomainNameForConstraintDiagnostic(constraint),
+                  shouldHideDomainNameForRestrictionDiagnostic(restriction),
                   domainAndRange.getDomain(), EncodedMessage.Message)
         .highlight(R)
         .limitBehavior(limit);
   }
 
   auto sourceRange = Attr.getParsedAttr()->getRange();
-  switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+  switch (restriction.getReason()) {
+  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
     diags.diagnose(D, diag::availability_marked_unavailable, D)
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D,
                   domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Reason::UnavailableObsolete:
+  case AvailabilityRestriction::Reason::UnavailableObsolete:
     diags
         .diagnose(D, diag::availability_obsoleted, D,
                   domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Reason::Unintroduced:
-    llvm_unreachable("unexpected constraint");
+  case AvailabilityRestriction::Reason::Unintroduced:
+    llvm_unreachable("unexpected restriction");
     break;
   }
   return true;
@@ -3148,12 +3152,12 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   auto *DC = Where.getDeclContext();
   auto &ctx = DC->getASTContext();
 
-  auto constraint =
-      getAvailabilityConstraintsForDecl(D, Where.getAvailability())
-          .getPrimaryConstraint();
+  auto restriction =
+      getAvailabilityRestrictionsForDecl(D, Where.getAvailability())
+          .getPrimaryRestriction();
 
-  if (constraint) {
-    if (diagnoseExplicitUnavailability(D, R, *constraint, Where, call, Flags))
+  if (restriction) {
+    if (diagnoseExplicitUnavailability(D, R, *restriction, Where, call, Flags))
       return true;
   }
 
@@ -3186,11 +3190,11 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     return false;
 
   // Diagnose (and possibly signal) for potential unavailability
-  if (!constraint || constraint->isUnavailable())
+  if (!restriction || restriction->isUnavailable())
     return false;
 
-  auto domainAndRange = constraint->getDomainAndRange(ctx);
-  auto fixItDomainAndRange = constraint->getFixItDomainAndRange(ctx);
+  auto domainAndRange = restriction->getDomainAndRange(ctx);
+  auto fixItDomainAndRange = restriction->getFixItDomainAndRange(ctx);
   auto domain = domainAndRange.getDomain();
   auto requiredRange = domainAndRange.getRange();
 
@@ -3571,20 +3575,20 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       return true;
     }
 
-    auto constraint =
-        getAvailabilityConstraintsForDecl(ext, where.getAvailability())
-            .getPrimaryConstraint();
-    if (constraint) {
-      if (diagnoseExplicitUnavailability(loc, *constraint, rootConf, ext, where,
-                                         warnIfConformanceUnavailablePreSwift6,
-                                         preconcurrency)) {
+    auto restriction =
+        getAvailabilityRestrictionsForDecl(ext, where.getAvailability())
+            .getPrimaryRestriction();
+    if (restriction) {
+      if (diagnoseExplicitUnavailability(
+              loc, *restriction, rootConf, ext, where,
+              warnIfConformanceUnavailablePreSwift6, preconcurrency)) {
         maybeEmitAssociatedTypeNote();
         return true;
       }
 
       // Diagnose (and possibly signal) for potential unavailability
-      auto domainAndRange = constraint->getDomainAndRange(ctx);
-      auto fixItDomainAndRange = constraint->getFixItDomainAndRange(ctx);
+      auto domainAndRange = restriction->getDomainAndRange(ctx);
+      auto fixItDomainAndRange = restriction->getFixItDomainAndRange(ctx);
       if (diagnosePotentialUnavailability(
               rootConf, ext, loc, DC, domainAndRange, fixItDomainAndRange)) {
         maybeEmitAssociatedTypeNote();

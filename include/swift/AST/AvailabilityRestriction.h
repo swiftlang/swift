@@ -1,4 +1,4 @@
-//===--- AvailabilityConstraint.h - Swift Availability Constraints ------*-===//
+//===--- AvailabilityRestriction.h - Swift Availability Restrictions ----*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the AvailabilityConstraint class.
+// This file defines the AvailabilityRestriction class.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_AVAILABILITY_CONSTRAINT_H
-#define SWIFT_AST_AVAILABILITY_CONSTRAINT_H
+#ifndef SWIFT_AST_AVAILABILITY_RESTRICTION_H
+#define SWIFT_AST_AVAILABILITY_RESTRICTION_H
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityDomain.h"
@@ -33,15 +33,15 @@ class Decl;
 
 /// Represents the reason a declaration is considered not available in a
 /// specific `AvailabilityContext`.
-class AvailabilityConstraint {
+class AvailabilityRestriction {
 public:
   /// The reason that a declaration is not available in a context. Broadly, the
   /// declaration may either be "unintroduced" or "unavailable" depending on its
   /// `@available` attributes. A declaration that is unintroduced can become
-  /// available if availability constraints are added to the context. For
+  /// available if availability restrictions are added to the context. For
   /// unavailable declarations, on the other hand, either changing the
   /// deployment target or making the context itself unavailable are necessary
-  /// to satisfy the constraint.
+  /// to satisfy the restriction.
   ///
   /// For example, take the following declaration `f()`:
   ///
@@ -49,7 +49,7 @@ public:
   ///     func f() { ... }
   ///
   /// In contexts that may run on earlier OSes, references to `f()` yield
-  /// an `Unintroduced` constraint:
+  /// an `Unintroduced` restriction:
   ///
   ///     @available(macOS 10.15, *)
   ///     func g() {
@@ -64,7 +64,7 @@ public:
   ///
   /// On the other hand, in contexts where deployment target is high enough to
   /// make `f()` obsolete, references to it yield an `UnavailableObsolete`
-  /// constraint:
+  /// restriction:
   ///
   ///     // compiled with -target arm64-apple-macos14
   ///     func h() {
@@ -78,7 +78,7 @@ public:
   ///                                           UnavailableObsolete
   ///
   /// References to declarations that are unavailable in all versions of a
-  /// domain generate `UnavailableUnconditional` constraints unless the context
+  /// domain generate `UnavailableUnconditional` restrictions unless the context
   /// is also unavailable under the same conditions:
   ///
   ///     @available(macOS, unavailable)
@@ -117,36 +117,36 @@ public:
 
     /// The declaration has not yet been introduced, e.g. because of
     /// `@available(macOS 14, *)` in a context that may run on macOS 13 or
-    /// later. The constraint may be satisfied adding an `@available` attribute
-    /// or an `if #available(...)` query with sufficient introduction
-    /// constraints to the context.
+    /// later. The restriction may be satisfied adding an `@available`
+    /// attribute or an `if #available(...)` query with sufficient introduction
+    /// restrictions to the context.
     Unintroduced,
   };
 
 private:
   llvm::PointerIntPair<SemanticAvailableAttr, 2, Reason> attrAndReason;
 
-  AvailabilityConstraint(Reason reason, SemanticAvailableAttr attr)
+  AvailabilityRestriction(Reason reason, SemanticAvailableAttr attr)
       : attrAndReason(attr, reason) {};
 
 public:
-  static AvailabilityConstraint
+  static AvailabilityRestriction
   unavailableUnconditionally(SemanticAvailableAttr attr) {
-    return AvailabilityConstraint(Reason::UnavailableUnconditionally, attr);
+    return AvailabilityRestriction(Reason::UnavailableUnconditionally, attr);
   }
 
-  static AvailabilityConstraint
+  static AvailabilityRestriction
   unavailableObsolete(SemanticAvailableAttr attr) {
-    return AvailabilityConstraint(Reason::UnavailableObsolete, attr);
+    return AvailabilityRestriction(Reason::UnavailableObsolete, attr);
   }
 
-  static AvailabilityConstraint
+  static AvailabilityRestriction
   unavailableUnintroduced(SemanticAvailableAttr attr) {
-    return AvailabilityConstraint(Reason::UnavailableUnintroduced, attr);
+    return AvailabilityRestriction(Reason::UnavailableUnintroduced, attr);
   }
 
-  static AvailabilityConstraint unintroduced(SemanticAvailableAttr attr) {
-    return AvailabilityConstraint(Reason::Unintroduced, attr);
+  static AvailabilityRestriction unintroduced(SemanticAvailableAttr attr) {
+    return AvailabilityRestriction(Reason::Unintroduced, attr);
   }
 
   Reason getReason() const { return attrAndReason.getInt(); }
@@ -154,7 +154,7 @@ public:
     return static_cast<SemanticAvailableAttr>(attrAndReason.getPointer());
   }
 
-  /// Returns true if the constraint cannot be satisfied using a runtime
+  /// Returns true if the restriction cannot be satisfied using a runtime
   /// availability query (`if #available(...)`).
   bool isUnavailable() const {
     switch (getReason()) {
@@ -167,12 +167,12 @@ public:
     }
   }
 
-  /// Returns the domain that the constraint applies to.
+  /// Returns the domain that the restriction applies to.
   AvailabilityDomain getDomain() const { return getAttr().getDomain(); }
 
   /// Returns the domain and range (remapped if necessary) in which the
-  /// constraint must be satisfied. How the range should be interpreted depends
-  /// on the reason for the constraint.
+  /// restriction must be satisfied. How the range should be interpreted
+  /// depends on the reason for the restriction.
   AvailabilityDomainAndRange getDomainAndRange(const ASTContext &ctx) const;
 
   /// Returns the domain and range to use in availability fix-its. This may be
@@ -181,46 +181,46 @@ public:
   AvailabilityDomainAndRange
   getFixItDomainAndRange(const ASTContext &ctx) const;
 
-  /// Some availability constraints are active for type-checking but cannot
+  /// Some availability restrictions are active for type-checking but cannot
   /// be translated directly into an `if #available(...)` runtime query.
   bool isActiveForRuntimeQueries(const ASTContext &ctx) const;
 
   void print(raw_ostream &os) const;
 };
 
-/// Represents a set of availability constraints that restrict use of a
-/// declaration in a particular context. There can only be one active constraint
-/// for a given `AvailabilityDomain`, but there may be multiple active
-/// constraints from separate domains.
-class DeclAvailabilityConstraints {
-  using Storage = llvm::SmallVector<AvailabilityConstraint, 4>;
-  Storage constraints;
+/// Represents a set of availability restrictions that apply to use of a
+/// declaration in a particular context. There can only be one active
+/// restriction for a given `AvailabilityDomain`, but there may be multiple
+/// active restrictions from separate domains.
+class DeclAvailabilityRestrictions {
+  using Storage = llvm::SmallVector<AvailabilityRestriction, 4>;
+  Storage restrictions;
 
 public:
-  DeclAvailabilityConstraints() {}
-  DeclAvailabilityConstraints(const Storage &&constraints)
-      : constraints(constraints) {}
+  DeclAvailabilityRestrictions() {}
+  DeclAvailabilityRestrictions(const Storage &&restrictions)
+      : restrictions(restrictions) {}
 
-  /// Returns the strongest availability constraint or `std::nullopt` if empty.
-  std::optional<AvailabilityConstraint> getPrimaryConstraint() const;
+  /// Returns the strongest availability restriction or `std::nullopt` if empty.
+  std::optional<AvailabilityRestriction> getPrimaryRestriction() const;
 
   using const_iterator = Storage::const_iterator;
-  const_iterator begin() const { return constraints.begin(); }
-  const_iterator end() const { return constraints.end(); }
+  const_iterator begin() const { return restrictions.begin(); }
+  const_iterator end() const { return restrictions.end(); }
 
   void print(raw_ostream &os) const;
 };
 
-enum class AvailabilityConstraintFlag : uint8_t {
-  /// By default, the availability constraints for the members of extensions
-  /// include the constraints for `@available` attributes that were written on
+enum class AvailabilityRestrictionFlag : uint8_t {
+  /// By default, the availability restrictions for the members of extensions
+  /// include the restrictions for `@available` attributes that were written on
   /// the enclosing extension, since these members can be referred to without
   /// referencing the extension. When this flag is specified, though, only the
   /// attributes directly attached to the declaration are considered.
   SkipEnclosingExtension = 1 << 0,
 
-  /// Include constraints for all domains, regardless of whether they are active
-  /// or relevant to type checking.
+  /// Include restrictions for all domains, regardless of whether they are
+  /// active or relevant to type checking.
   IncludeAllDomains = 1 << 1,
 
   /// By default, non-type declarations that are universally unavailable are
@@ -229,29 +229,30 @@ enum class AvailabilityConstraintFlag : uint8_t {
   /// references are allowed.
   AllowUniversallyUnavailableInCompatibleContexts = 1 << 2,
 };
-using AvailabilityConstraintFlags = OptionSet<AvailabilityConstraintFlag>;
+using AvailabilityRestrictionFlags = OptionSet<AvailabilityRestrictionFlag>;
 
-/// Returns the set of availability constraints that restricts use of \p decl
+/// Returns the set of availability restrictions that restricts use of \p decl
 /// when it is referenced from the given context. In other words, it is the
 /// collection of `@available` attributes with unsatisfied conditions.
-DeclAvailabilityConstraints getAvailabilityConstraintsForDecl(
+DeclAvailabilityRestrictions getAvailabilityRestrictionsForDecl(
     const Decl *decl, const AvailabilityContext &context,
-    AvailabilityConstraintFlags flags = std::nullopt);
+    AvailabilityRestrictionFlags flags = std::nullopt);
 
-/// Returns the availability constraints that restricts use of \p decl
+/// Returns the availability restriction that restricts use of \p decl
 /// in \p domain when it is referenced from the given context. In other words,
 /// it is the unsatisfied `@available` attribute  that applies to \p domain in
 /// the given context.
-std::optional<AvailabilityConstraint> getAvailabilityConstraintForDeclInDomain(
+std::optional<AvailabilityRestriction>
+getAvailabilityRestrictionForDeclInDomain(
     const Decl *decl, const AvailabilityContext &context,
     AvailabilityDomain domain,
-    AvailabilityConstraintFlags flags = std::nullopt);
+    AvailabilityRestrictionFlags flags = std::nullopt);
 
-/// Computes the set of constraints that indicate whether a decl is "runtime
+/// Computes the set of restrictions that indicate whether a decl is "runtime
 /// unavailable" (can never be reached at runtime) and adds the domain for each
-/// of those constraints to the \p domains vector.
+/// of those restrictions to the \p domains vector.
 void getRuntimeUnavailableDomains(
-    const DeclAvailabilityConstraints &constraints,
+    const DeclAvailabilityRestrictions &restrictions,
     llvm::SmallVectorImpl<AvailabilityDomain> &domains, const ASTContext &ctx);
 
 } // end namespace swift
@@ -260,15 +261,15 @@ namespace llvm {
 
 inline llvm::raw_ostream &
 operator<<(llvm::raw_ostream &os,
-           const swift::AvailabilityConstraint &constraint) {
-  constraint.print(os);
+           const swift::AvailabilityRestriction &restriction) {
+  restriction.print(os);
   return os;
 }
 
 inline llvm::raw_ostream &
 operator<<(llvm::raw_ostream &os,
-           const swift::DeclAvailabilityConstraints &constraints) {
-  constraints.print(os);
+           const swift::DeclAvailabilityRestrictions &restrictions) {
+  restrictions.print(os);
   return os;
 }
 

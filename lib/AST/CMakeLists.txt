@@ -27,10 +27,10 @@ add_swift_host_library(swiftAST STATIC
   Attr.cpp
   AutoDiff.cpp
   Availability.cpp
-  AvailabilityConstraint.cpp
   AvailabilityContext.cpp
   AvailabilityDomain.cpp
   AvailabilityQuery.cpp
+  AvailabilityRestriction.cpp
   AvailabilityScope.cpp
   AvailabilityScopeBuilder.cpp
   AvailabilitySpec.cpp
