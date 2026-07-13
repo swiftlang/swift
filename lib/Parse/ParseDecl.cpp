@@ -2405,10 +2405,11 @@ Parser::parseMacroRoleAttribute(
           return status;
         }
         
-        // Accessor macros have an optional `initialization` argument
-        // that may be either `.lazy` or `.eager`, e.g:
+        // Accessor macros have an optional `initialization` argument.
+        // It may be either `lazy` or `eager`. For example:
         //
-        //     @attached(accessor, initialization: .lazy, names: ...)
+        //     @attached(accessor, initialization: lazy, names: ...)
+        //
         if (fieldName.is("initialization")) {
           if (sawInitialization) {
             diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),
@@ -2557,7 +2558,7 @@ Parser::parseMacroRoleAttribute(
     return makeParserError();
   }
   
-  // Initializer context of accessor macros are `eager` by default:
+  // Initializer context of accessor macros are `eager` by default.
   // Existing macros will behave the same as before initializer context
   // was introduced.
   if (role == MacroRole::Accessor && !initializerContext.has_value()) {
