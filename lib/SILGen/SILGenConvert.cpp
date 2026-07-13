@@ -811,6 +811,19 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     assert(existentialTL.isLoadable());
 
     ManagedValue sub = F(SGFContext());
+
+    // Unwrap the wrapper according to the value's ownership,
+    // since moveOnly wrapper only appears in SIL, but not
+    // in formal type. This will create issue when SILVerifier
+    // performs check on sub's type against the concreteFormalType
+    if (sub.getType().isMoveOnlyWrapped()) {
+      if (sub.isPlusOne(*this)) {
+        sub = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, sub);
+      } else {
+        sub = B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, sub);
+      }
+    }
+
     return B.createInitExistentialRef(loc, existentialTL.getLoweredType(),
                                       concreteFormalType, sub, conformances);
   }
