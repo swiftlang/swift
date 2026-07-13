@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import SwiftWASILibc // Clang module
+import SwiftOverlayShims
 
 //  Constants defined by <math.h>
 @available(swift, deprecated: 3.0, message: "Please use 'Double.pi' or '.pi' to get the value of correct type and avoid casting.")
@@ -64,3 +65,15 @@ public let ${prefix}_TRUE_MIN = ${type}.leastNonzeroMagnitude
 
 public let MAP_FAILED: UnsafeMutableRawPointer! = UnsafeMutableRawPointer(bitPattern: -1)
 
+// FILE is an opaque type on WASI libc (struct _IO_FILE is only
+// forward-declared), so these are OpaquePointers rather than
+// UnsafeMutablePointer<FILE>.
+nonisolated(unsafe) public var stdin: OpaquePointer {
+  OpaquePointer(_swift_stdlib_stdin())
+}
+nonisolated(unsafe) public var stdout: OpaquePointer {
+  OpaquePointer(_swift_stdlib_stdout())
+}
+nonisolated(unsafe) public var stderr: OpaquePointer {
+  OpaquePointer(_swift_stdlib_stderr())
+}
