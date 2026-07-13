@@ -347,8 +347,8 @@ public:
                             const ASTContext &ctx) const;
 
   /// Returns true for a domain that is permanently always available, and
-  /// therefore availability constraints in the domain are effectively the same
-  /// as constraints in the `*` domain. This is used to diagnose unnecessary
+  /// therefore availability restrictions in the domain are effectively the same
+  /// as restrictions in the `*` domain. This is used to diagnose unnecessary
   /// `@available` attributes and `if #available` statements.
   bool isPermanentlyAlwaysEnabled() const;
 

@@ -2240,17 +2240,17 @@ static std::optional<std::pair<SemanticAvailableAttr, const Decl *>>
 getSemanticAvailableRangeDeclAndAttr(const Decl *decl,
                                      AvailabilityDomain domain) {
   auto &ctx = decl->getASTContext();
-  AvailabilityConstraintFlags flags =
-      AvailabilityConstraintFlag::SkipEnclosingExtension;
-  if (auto constraint = swift::getAvailabilityConstraintForDeclInDomain(
+  AvailabilityRestrictionFlags flags =
+      AvailabilityRestrictionFlag::SkipEnclosingExtension;
+  if (auto restriction = swift::getAvailabilityRestrictionForDeclInDomain(
           decl, AvailabilityContext::forAlwaysAvailable(ctx), domain, flags)) {
-    switch (constraint->getReason()) {
-    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    case AvailabilityConstraint::Reason::UnavailableObsolete:
+    switch (restriction->getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
       break;
-    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
-    case AvailabilityConstraint::Reason::Unintroduced:
-      return std::make_pair(constraint->getAttr(), decl);
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+    case AvailabilityRestriction::Reason::Unintroduced:
+      return std::make_pair(restriction->getAttr(), decl);
     }
   }
 
@@ -5639,7 +5639,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
 
-  // Compute availability constraints for the decl, relative to its parent
+  // Compute availability restrictions for the decl, relative to its parent
   // declaration or to the deployment target.
   auto availabilityContext = AvailabilityContext::forDeploymentTarget(Ctx);
   if (auto parent = D->parentDeclForAvailability()) {
@@ -5647,16 +5647,16 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
     availabilityContext.constrainWithContext(parentAvailability, Ctx);
   }
 
-  auto availabilityConstraint =
-      getAvailabilityConstraintsForDecl(D, availabilityContext)
-          .getPrimaryConstraint();
-  if (!availabilityConstraint)
+  auto availabilityRestriction =
+      getAvailabilityRestrictionsForDecl(D, availabilityContext)
+          .getPrimaryRestriction();
+  if (!availabilityRestriction)
     return;
 
   // If the decl is unavailable relative to its parent and it's not a
   // declaration that is allowed to be unavailable, diagnose.
-  if (availabilityConstraint->isUnavailable()) {
-    auto attr = availabilityConstraint->getAttr();
+  if (availabilityRestriction->isUnavailable()) {
+    auto attr = availabilityRestriction->getAttr();
     if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D, attr)) {
       diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
                             *diag);
@@ -5666,8 +5666,8 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
 
   // If the decl is potentially unavailable relative to its parent and it's
   // not a declaration that is allowed to be potentially unavailable, diagnose.
-  if (!availabilityConstraint->isUnavailable()) {
-    auto attr = availabilityConstraint->getAttr();
+  if (!availabilityRestriction->isUnavailable()) {
+    auto attr = availabilityRestriction->getAttr();
     if (auto diag =
             TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D))
       diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),

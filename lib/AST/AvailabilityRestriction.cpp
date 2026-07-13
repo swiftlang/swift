@@ -1,4 +1,4 @@
-//===--- AvailabilityConstraint.cpp - Swift Availability Constraints ------===//
+//===--- AvailabilityRestriction.cpp - Swift Availability Restrictions ----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Decl.h"
@@ -18,7 +18,7 @@
 using namespace swift;
 
 AvailabilityDomainAndRange
-AvailabilityConstraint::getDomainAndRange(const ASTContext &ctx) const {
+AvailabilityRestriction::getDomainAndRange(const ASTContext &ctx) const {
   switch (getReason()) {
   case Reason::UnavailableUnconditionally:
   case Reason::UnavailableObsolete:
@@ -30,7 +30,7 @@ AvailabilityConstraint::getDomainAndRange(const ASTContext &ctx) const {
 }
 
 AvailabilityDomainAndRange
-AvailabilityConstraint::getFixItDomainAndRange(const ASTContext &ctx) const {
+AvailabilityRestriction::getFixItDomainAndRange(const ASTContext &ctx) const {
   auto attrDomain = getAttr().getDomain();
   if (attrDomain.contains(
           AvailabilityDomain::forPlatform(PlatformKind::anyAppleOS))) {
@@ -48,7 +48,7 @@ AvailabilityConstraint::getFixItDomainAndRange(const ASTContext &ctx) const {
   return getDomainAndRange(ctx);
 }
 
-bool AvailabilityConstraint::isActiveForRuntimeQueries(
+bool AvailabilityRestriction::isActiveForRuntimeQueries(
     const ASTContext &ctx) const {
   if (getAttr().getPlatform() == PlatformKind::none)
     return true;
@@ -58,8 +58,8 @@ bool AvailabilityConstraint::isActiveForRuntimeQueries(
                                  /*forRuntimeQuery=*/true);
 }
 
-void AvailabilityConstraint::print(llvm::raw_ostream &os) const {
-  os << "AvailabilityConstraint(";
+void AvailabilityRestriction::print(llvm::raw_ostream &os) const {
+  os << "AvailabilityRestriction(";
   getAttr().getDomain().print(os);
   os << ", ";
 
@@ -84,70 +84,70 @@ void AvailabilityConstraint::print(llvm::raw_ostream &os) const {
   os << ")";
 }
 
-static bool constraintIsStronger(const AvailabilityConstraint &lhs,
-                                 const AvailabilityConstraint &rhs) {
+static bool restrictionIsStronger(const AvailabilityRestriction &lhs,
+                                  const AvailabilityRestriction &rhs) {
   DEBUG_ASSERT(lhs.getDomain() == rhs.getDomain());
 
-  // If the constraints have matching domains but different reasons, the
-  // constraint with the lowest reason is "strongest".
+  // If the restrictions have matching domains but different reasons, the
+  // restriction with the lowest reason is "strongest".
   if (lhs.getReason() != rhs.getReason())
     return lhs.getReason() < rhs.getReason();
 
   switch (lhs.getReason()) {
-  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
     // Just keep the first.
     return false;
 
-  case AvailabilityConstraint::Reason::UnavailableObsolete:
+  case AvailabilityRestriction::Reason::UnavailableObsolete:
     // Pick the larger obsoleted range.
     return lhs.getAttr().getObsoleted().value() <
            rhs.getAttr().getObsoleted().value();
 
-  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
-  case AvailabilityConstraint::Reason::Unintroduced:
+  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+  case AvailabilityRestriction::Reason::Unintroduced:
     // Pick the smaller introduced range.
     return lhs.getAttr().getIntroduced().value_or(llvm::VersionTuple()) >
            rhs.getAttr().getIntroduced().value_or(llvm::VersionTuple());
   }
 }
 
-void addConstraint(llvm::SmallVector<AvailabilityConstraint, 4> &constraints,
-                   const AvailabilityConstraint &constraint,
-                   const ASTContext &ctx) {
+void addRestriction(llvm::SmallVector<AvailabilityRestriction, 4> &restrictions,
+                    const AvailabilityRestriction &restriction,
+                    const ASTContext &ctx) {
 
   auto iter = llvm::find_if(
-      constraints, [&constraint](AvailabilityConstraint &existing) {
-        return constraint.getDomain() == existing.getDomain();
+      restrictions, [&restriction](AvailabilityRestriction &existing) {
+        return restriction.getDomain() == existing.getDomain();
       });
 
-  // There's no existing constraint for the same domain so just add it.
-  if (iter == constraints.end()) {
-    constraints.emplace_back(constraint);
+  // There's no existing restriction for the same domain so just add it.
+  if (iter == restrictions.end()) {
+    restrictions.emplace_back(restriction);
     return;
   }
 
-  if (constraintIsStronger(constraint, *iter)) {
-    constraints.erase(iter);
-    constraints.emplace_back(constraint);
+  if (restrictionIsStronger(restriction, *iter)) {
+    restrictions.erase(iter);
+    restrictions.emplace_back(restriction);
   }
 }
 
-std::optional<AvailabilityConstraint>
-DeclAvailabilityConstraints::getPrimaryConstraint() const {
-  std::optional<AvailabilityConstraint> result;
+std::optional<AvailabilityRestriction>
+DeclAvailabilityRestrictions::getPrimaryRestriction() const {
+  std::optional<AvailabilityRestriction> result;
 
-  auto isStrongerConstraint = [](const AvailabilityConstraint &lhs,
-                                 const AvailabilityConstraint &rhs) {
-    // Constraint reasons are defined in descending order of strength.
+  auto isStrongerRestriction = [](const AvailabilityRestriction &lhs,
+                                  const AvailabilityRestriction &rhs) {
+    // Restriction reasons are defined in descending order of strength.
     if (lhs.getReason() != rhs.getReason())
       return lhs.getReason() < rhs.getReason();
 
     if (lhs.getDomain() != rhs.getDomain()) {
-      // Constraints in the universal domain are the strongest.
+      // Restrictions in the universal domain are the strongest.
       if (rhs.getDomain().isUniversal())
         return true;
 
-      // Otherwise, pick the constraint from the broader domain.
+      // Otherwise, pick the restriction from the broader domain.
       if (lhs.getDomain() != rhs.getDomain())
         return rhs.getDomain().contains(lhs.getDomain());
     }
@@ -155,72 +155,72 @@ DeclAvailabilityConstraints::getPrimaryConstraint() const {
     return false;
   };
 
-  // Pick the strongest constraint.
-  for (auto const &constraint : constraints) {
-    if (!result || isStrongerConstraint(constraint, *result))
-      result.emplace(constraint);
+  // Pick the strongest restriction.
+  for (auto const &restriction : restrictions) {
+    if (!result || isStrongerRestriction(restriction, *result))
+      result.emplace(restriction);
   }
 
   return result;
 }
 
-void DeclAvailabilityConstraints::print(llvm::raw_ostream &os) const {
+void DeclAvailabilityRestrictions::print(llvm::raw_ostream &os) const {
   os << "{\n";
   llvm::interleave(
-      constraints,
-      [&os](const AvailabilityConstraint &constraint) {
-        os << "  " << constraint;
+      restrictions,
+      [&os](const AvailabilityRestriction &restriction) {
+        os << "  " << restriction;
       },
       [&os] { os << ",\n"; });
   os << "\n}";
 }
 
-static bool canIgnoreConstraintInUnavailableContexts(
-    const Decl *decl, const AvailabilityConstraint &constraint,
-    const AvailabilityConstraintFlags flags) {
-  auto domain = constraint.getDomain();
+static bool canIgnoreRestrictionInUnavailableContexts(
+    const Decl *decl, const AvailabilityRestriction &restriction,
+    const AvailabilityRestrictionFlags flags) {
+  auto domain = restriction.getDomain();
 
   // Always reject uses of universally unavailable declarations, regardless
   // of context, since there are no possible compilation configurations in
   // which they are available. However, make an exception for types and
   // conformances, which can sometimes be awkward to avoid references to.
-  if (!flags.contains(AvailabilityConstraintFlag::
-                      AllowUniversallyUnavailableInCompatibleContexts)) {
+  if (!flags.contains(AvailabilityRestrictionFlag::
+                          AllowUniversallyUnavailableInCompatibleContexts)) {
     if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
       if (domain.isUniversal() || domain.isSwiftLanguageMode())
         return false;
     }
   }
 
-  switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+  switch (restriction.getReason()) {
+  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
     return true;
 
-  case AvailabilityConstraint::Reason::Unintroduced:
-  case AvailabilityConstraint::Reason::UnavailableObsolete:
-  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+  case AvailabilityRestriction::Reason::Unintroduced:
+  case AvailabilityRestriction::Reason::UnavailableObsolete:
+  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
     return domain.isVersioned();
   }
 }
 
 static bool
-shouldIgnoreConstraintInContext(const Decl *decl,
-                                const AvailabilityConstraint &constraint,
-                                const AvailabilityContext &context,
-                                const AvailabilityConstraintFlags flags) {
+shouldIgnoreRestrictionInContext(const Decl *decl,
+                                 const AvailabilityRestriction &restriction,
+                                 const AvailabilityContext &context,
+                                 const AvailabilityRestrictionFlags flags) {
   if (!context.isUnavailable())
     return false;
 
-  if (!canIgnoreConstraintInUnavailableContexts(decl, constraint, flags))
+  if (!canIgnoreRestrictionInUnavailableContexts(decl, restriction, flags))
     return false;
 
-  // If the constraint's domain is a superset of the compilation's target
+  // If the restriction's domain is a superset of the compilation's target
   // availability domain, use the more specific target availability domain
   // instead. This allows declarations that are @available(macOS, unavailable)
   // to be used in contexts that are @available(macOSApplicationExtension,
   // unavailable), for example.
   auto &ctx = decl->getASTContext();
-  auto domain = constraint.getDomain();
+  auto domain = restriction.getDomain();
   auto targetDomain = ctx.getTargetAvailabilityDomain();
   if (domain.isSupersetOf(targetDomain))
     domain = targetDomain;
@@ -228,17 +228,17 @@ shouldIgnoreConstraintInContext(const Decl *decl,
   return context.isUnavailableForDomain(domain);
 }
 
-/// Returns the `AvailabilityConstraint` that describes how \p attr restricts
+/// Returns the `AvailabilityRestriction` that describes how \p attr restricts
 /// use of \p decl in \p context or `std::nullopt` if there is no restriction.
-static std::optional<AvailabilityConstraint>
-getAvailabilityConstraintForAttr(const Decl *decl,
-                                 const SemanticAvailableAttr &attr,
-                                 const AvailabilityContext &context,
-                                 const AvailabilityConstraintFlags flags) {
-  auto getConstraint = [&]() -> std::optional<AvailabilityConstraint> {
+static std::optional<AvailabilityRestriction>
+getAvailabilityRestrictionForAttr(const Decl *decl,
+                                  const SemanticAvailableAttr &attr,
+                                  const AvailabilityContext &context,
+                                  const AvailabilityRestrictionFlags flags) {
+  auto getRestriction = [&]() -> std::optional<AvailabilityRestriction> {
     // Is the decl unconditionally unavailable?
     if (attr.isUnconditionallyUnavailable())
-      return AvailabilityConstraint::unavailableUnconditionally(attr);
+      return AvailabilityRestriction::unavailableUnconditionally(attr);
 
     auto &ctx = decl->getASTContext();
     auto domain = attr.getDomain();
@@ -257,26 +257,26 @@ getAvailabilityConstraintForAttr(const Decl *decl,
     if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
       if (availableRange && !availableRange->isKnownUnreachable() &&
           availableRange->isContainedIn(*obsoletedRange))
-        return AvailabilityConstraint::unavailableObsolete(attr);
+        return AvailabilityRestriction::unavailableObsolete(attr);
     }
 
     // Is the decl not yet introduced in this context?
     if (auto introducedRange = attr.getIntroducedRange(ctx)) {
       if (!availableRange || !availableRange->isContainedIn(*introducedRange))
         return domainSupportsRefinement
-                   ? AvailabilityConstraint::unintroduced(attr)
-                   : AvailabilityConstraint::unavailableUnintroduced(attr);
+                   ? AvailabilityRestriction::unintroduced(attr)
+                   : AvailabilityRestriction::unavailableUnintroduced(attr);
     }
 
     return std::nullopt;
   };
 
-  auto constraint = getConstraint();
-  if (constraint &&
-      shouldIgnoreConstraintInContext(decl, *constraint, context, flags))
+  auto restriction = getRestriction();
+  if (restriction &&
+      shouldIgnoreRestrictionInContext(decl, *restriction, context, flags))
     return std::nullopt;
 
-  return constraint;
+  return restriction;
 }
 
 /// Returns the most specific platform domain from the availability attributes
@@ -302,18 +302,18 @@ activePlatformDomainForDecl(const Decl *decl) {
   return activeDomain;
 }
 
-/// Generates availability constraints that restrict the use of \p origDecl
+/// Generates availability restrictions that apply to the use of \p origDecl
 /// based on the attributes attached to \p sourceDecl (these declarations may be
 /// different since \p origDecl may inherit attributes from another declaration
 /// lexically).
-static void getAvailabilityConstraintsForDecl(
-    llvm::SmallVector<AvailabilityConstraint, 4> &constraints,
+static void getAvailabilityRestrictionsForDecl(
+    llvm::SmallVector<AvailabilityRestriction, 4> &restrictions,
     const Decl *targetDecl, const Decl *sourceDecl,
-    const AvailabilityContext &context, AvailabilityConstraintFlags flags) {
+    const AvailabilityContext &context, AvailabilityRestrictionFlags flags) {
   auto &ctx = sourceDecl->getASTContext();
   auto activePlatformDomain = activePlatformDomainForDecl(sourceDecl);
   bool includeAllDomains =
-      flags.contains(AvailabilityConstraintFlag::IncludeAllDomains);
+      flags.contains(AvailabilityRestrictionFlag::IncludeAllDomains);
 
   for (auto attr : sourceDecl->getSemanticAvailableAttrs(includeAllDomains)) {
     auto domain = attr.getDomain();
@@ -321,39 +321,39 @@ static void getAvailabilityConstraintsForDecl(
         !activePlatformDomain->contains(domain))
       continue;
 
-    if (auto constraint =
-            getAvailabilityConstraintForAttr(targetDecl, attr, context, flags))
-      addConstraint(constraints, *constraint, ctx);
+    if (auto restriction =
+            getAvailabilityRestrictionForAttr(targetDecl, attr, context, flags))
+      addRestriction(restrictions, *restriction, ctx);
   }
 }
 
-DeclAvailabilityConstraints
-swift::getAvailabilityConstraintsForDecl(const Decl *decl,
-                                         const AvailabilityContext &context,
-                                         AvailabilityConstraintFlags flags) {
-  llvm::SmallVector<AvailabilityConstraint, 4> constraints;
+DeclAvailabilityRestrictions
+swift::getAvailabilityRestrictionsForDecl(const Decl *decl,
+                                          const AvailabilityContext &context,
+                                          AvailabilityRestrictionFlags flags) {
+  llvm::SmallVector<AvailabilityRestriction, 4> restrictions;
 
   // Generic parameters are always available.
   if (isa<GenericTypeParamDecl>(decl))
-    return DeclAvailabilityConstraints();
+    return DeclAvailabilityRestrictions();
 
   decl = decl->getAbstractSyntaxDeclForAttributes();
 
-  getAvailabilityConstraintsForDecl(constraints, decl, decl, context, flags);
+  getAvailabilityRestrictionsForDecl(restrictions, decl, decl, context, flags);
 
-  // For requirements of reparentable protocols, add constraints from the
+  // For requirements of reparentable protocols, add restrictions from the
   // enclosing protocol itself. We don't need to do this for ordinary protocols
   // because of the rule that a protocol P cannot inherit from Q if Q is less
   // available than P. Thus, the availability of the most derived protocol
-  // already carries the same or stricter constraints than its ancestors.
+  // already carries the same or stricter restrictions than its ancestors.
   if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
     if (proto->getAttrs().hasAttribute<ReparentableAttr>())
-      getAvailabilityConstraintsForDecl(constraints, decl, proto, context,
-                                        flags);
+      getAvailabilityRestrictionsForDecl(restrictions, decl, proto, context,
+                                         flags);
   }
 
-  if (flags.contains(AvailabilityConstraintFlag::SkipEnclosingExtension))
-    return constraints;
+  if (flags.contains(AvailabilityRestrictionFlag::SkipEnclosingExtension))
+    return restrictions;
 
   // If decl is an extension member, query the attributes of the extension, too.
   //
@@ -363,30 +363,30 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
   // protocol is directly or indirectly adopted, no matter its availability
   // and the availability of other categories. rdar://problem/53956555
   if (decl->getClangNode())
-    return constraints;
+    return restrictions;
 
   auto parent = decl->parentDeclForAvailability();
   if (auto extension = dyn_cast_or_null<ExtensionDecl>(parent))
-    getAvailabilityConstraintsForDecl(constraints, decl, extension, context,
-                                      flags);
+    getAvailabilityRestrictionsForDecl(restrictions, decl, extension, context,
+                                       flags);
 
-  return constraints;
+  return restrictions;
 }
 
-std::optional<AvailabilityConstraint>
-swift::getAvailabilityConstraintForDeclInDomain(
+std::optional<AvailabilityRestriction>
+swift::getAvailabilityRestrictionForDeclInDomain(
     const Decl *decl, const AvailabilityContext &context,
-    AvailabilityDomain domain, AvailabilityConstraintFlags flags) {
-  auto constraints = getAvailabilityConstraintsForDecl(decl, context, flags);
-  for (auto const &constraint : constraints) {
-    if (constraint.getDomain().isRelated(domain))
-      return constraint;
+    AvailabilityDomain domain, AvailabilityRestrictionFlags flags) {
+  auto restrictions = getAvailabilityRestrictionsForDecl(decl, context, flags);
+  for (auto const &restriction : restrictions) {
+    if (restriction.getDomain().isRelated(domain))
+      return restriction;
   }
 
   return std::nullopt;
 }
 
-/// Returns true if unsatisfied `@available(..., unavailable)` constraints for
+/// Returns true if unsatisfied `@available(..., unavailable)` restrictions for
 /// \p domain make code unreachable at runtime
 static bool
 domainCanBeUnconditionallyUnavailableAtRuntime(AvailabilityDomain domain,
@@ -421,7 +421,7 @@ domainCanBeUnconditionallyUnavailableAtRuntime(AvailabilityDomain domain,
   }
 }
 
-/// Returns true if unsatisfied introduction constraints for \p domain make
+/// Returns true if unsatisfied introduction restrictions for \p domain make
 /// code unreachable at runtime.
 static bool
 domainIsUnavailableAtRuntimeIfUnintroduced(AvailabilityDomain domain,
@@ -449,25 +449,25 @@ domainIsUnavailableAtRuntimeIfUnintroduced(AvailabilityDomain domain,
   }
 }
 
-static bool constraintIndicatesRuntimeUnavailability(
-    const AvailabilityConstraint &constraint, const ASTContext &ctx) {
-  auto domain = constraint.getDomain();
-  switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnavailableUnconditionally:
+static bool restrictionIndicatesRuntimeUnavailability(
+    const AvailabilityRestriction &restriction, const ASTContext &ctx) {
+  auto domain = restriction.getDomain();
+  switch (restriction.getReason()) {
+  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
     return domainCanBeUnconditionallyUnavailableAtRuntime(domain, ctx);
-  case AvailabilityConstraint::Reason::UnavailableObsolete:
-  case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+  case AvailabilityRestriction::Reason::UnavailableObsolete:
+  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
     return false;
-  case AvailabilityConstraint::Reason::Unintroduced:
+  case AvailabilityRestriction::Reason::Unintroduced:
     return domainIsUnavailableAtRuntimeIfUnintroduced(domain, ctx);
   }
 }
 
 void swift::getRuntimeUnavailableDomains(
-    const DeclAvailabilityConstraints &constraints,
+    const DeclAvailabilityRestrictions &restrictions,
     llvm::SmallVectorImpl<AvailabilityDomain> &domains, const ASTContext &ctx) {
-  for (auto constraint : constraints) {
-    if (constraintIndicatesRuntimeUnavailability(constraint, ctx))
-      domains.push_back(constraint.getDomain());
+  for (auto restriction : restrictions) {
+    if (restrictionIndicatesRuntimeUnavailability(restriction, ctx))
+      domains.push_back(restriction.getDomain());
   }
 }
