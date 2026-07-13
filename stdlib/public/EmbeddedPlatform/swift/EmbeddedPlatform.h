@@ -106,7 +106,13 @@ typedef unsigned long long __swift_options_t;
  * consistent throughout the build to prevent ABI mismatches.
  */
 #ifndef EMBEDDED_SWIFT_MUTEX_NUM_WORDS
+#if defined(__APPLE__) && __SIZEOF_POINTER__ == 4
+// On 32-bit Apple targets (e.g., watchOS armv7k / arm64_32) `pthread_mutex_t`
+// is 40 bytes, which doesn't fit in 8 four-byte words.
+#define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)12
+#else
 #define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)8
+#endif
 #endif
 
 /**
