@@ -163,13 +163,11 @@ public func replacePhiWithIncomingValue(phi: Phi, _ context: some MutatingContex
   if phi.predecessors.isEmpty {
     return false
   }
-  let uniqueIncomingValue = phi.incomingValues.first!
-  if !uniqueIncomingValue.parentFunction.hasOwnership {
-    // For the SSAUpdater it's only required to simplify phis in OSSA.
-    // This avoids that we need to handle cond_br instructions below.
-    return false
-  }
-  if phi.incomingValues.contains(where: { $0 != uniqueIncomingValue }) {
+  guard let uniqueIncomingValue = getUniqueIncomingValue(of: phi, context),
+        // For the SSAUpdater it's only required to simplify phis in OSSA.
+        // This avoids that we need to handle `cond_br` instructions below.
+        uniqueIncomingValue.parentFunction.hasOwnership
+  else {
     return false
   }
   if let borrowedFrom = phi.borrowedFrom {
@@ -187,6 +185,22 @@ public func replacePhiWithIncomingValue(phi: Phi, _ context: some MutatingContex
   }
   block.eraseArgument(at: phi.value.index, context)
   return true
+}
+
+private func getUniqueIncomingValue(of phi: Phi, _ context: some MutatingContext) -> Value? {
+  var uniqueIncomingValue: Value? = nil
+
+  for incomingValue in phi.incomingValues {
+    if incomingValue.lookThroughBorrowedFrom == phi.value {
+      // Ignore self-cycles of phi-terms in loops.
+      continue
+    }
+    if let existingValue = uniqueIncomingValue, incomingValue != existingValue {
+      return nil
+    }
+    uniqueIncomingValue = incomingValue
+  }
+  return uniqueIncomingValue
 }
 
 /// Replaces phis with the unique incoming values if all incoming values are the same.
@@ -272,4 +286,18 @@ let updateBorrowedFromTest = Test("update_borrowed_from") {
   function, arguments, context in
 
   updateBorrowedFrom(in: function, context)
+}
+
+let replacePhisWithIncomingValuesTest = Test("replace_phis_with_incoming_values") {
+  function, arguments, context in
+
+  var phis = [Phi]()
+  for block in function.blocks {
+    for arg in block.arguments {
+      if let phi = Phi(arg) {
+        phis.append(phi)
+      }
+    }
+  }
+  replacePhisWithIncomingValues(phis: phis, context)
 }
