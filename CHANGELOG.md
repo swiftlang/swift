@@ -3,7 +3,7 @@
 > [!NOTE]
 > This is in reverse chronological order, so newer entries are added to the top.
 
-## Swift (next)
+## Swift 6.4
 
 * [SE-0522][]: Introduced the `@diagnose` declaration attribute for source-level
   control over compiler warning behavior. `@diagnose(GroupID, as: error|warning|ignored)`
