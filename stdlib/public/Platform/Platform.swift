@@ -32,7 +32,7 @@ public var errno : Int32 {
 //===----------------------------------------------------------------------===//
 
 #if os(FreeBSD) || os(PS4)
-public var stdin : UnsafeMutablePointer<FILE> {
+nonisolated(unsafe) public var stdin : UnsafeMutablePointer<FILE> {
   get {
     return __stdinp
   }
@@ -41,7 +41,7 @@ public var stdin : UnsafeMutablePointer<FILE> {
   }
 }
 
-public var stdout : UnsafeMutablePointer<FILE> {
+nonisolated(unsafe) public var stdout : UnsafeMutablePointer<FILE> {
   get {
     return __stdoutp
   }
@@ -50,7 +50,7 @@ public var stdout : UnsafeMutablePointer<FILE> {
   }
 }
 
-public var stderr : UnsafeMutablePointer<FILE> {
+nonisolated(unsafe) public var stderr : UnsafeMutablePointer<FILE> {
   get {
     return __stderrp
   }
@@ -74,19 +74,19 @@ public func snprintf(ptr: UnsafeMutablePointer<Int8>, _ len: Int, _ format: Unsa
 #endif
 
 #elseif os(OpenBSD)
-public var stdin: OpaquePointer { return OpaquePointer(_swift_stdlib_stdin()) }
-public var stdout: OpaquePointer { return OpaquePointer(_swift_stdlib_stdout()) }
-public var stderr: OpaquePointer { return OpaquePointer(_swift_stdlib_stderr()) }
+nonisolated(unsafe) public var stdin: OpaquePointer { return OpaquePointer(_swift_stdlib_stdin()) }
+nonisolated(unsafe) public var stdout: OpaquePointer { return OpaquePointer(_swift_stdlib_stdout()) }
+nonisolated(unsafe) public var stderr: OpaquePointer { return OpaquePointer(_swift_stdlib_stderr()) }
 #elseif os(Windows)
-public var stdin: UnsafeMutablePointer<FILE> {
+nonisolated(unsafe) public var stdin: UnsafeMutablePointer<FILE> {
   return _swift_stdlib_stdin()
 }
 
-public var stdout: UnsafeMutablePointer<FILE> {
+nonisolated(unsafe) public var stdout: UnsafeMutablePointer<FILE> {
   return _swift_stdlib_stdout()
 }
 
-public var stderr: UnsafeMutablePointer<FILE> {
+nonisolated(unsafe) public var stderr: UnsafeMutablePointer<FILE> {
   return _swift_stdlib_stderr()
 }
 
