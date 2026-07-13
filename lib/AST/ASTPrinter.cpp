@@ -2711,6 +2711,23 @@ void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
   printBraceStmt(decl->getBody(), /*newlineIfEmpty*/!isa<AccessorDecl>(decl));
 }
 
+static StringRef getPrintedSelfOwnershipModifier(SelfAccessKind kind,
+                                                 const PrintOptions &options) {
+  switch (kind) {
+  case SelfAccessKind::Consuming:
+    return options.excludeAttrKind(DeclAttrKind::Consuming) ? "" : "consuming";
+  case SelfAccessKind::LegacyConsuming:
+    return options.excludeAttrKind(DeclAttrKind::LegacyConsuming) ? ""
+                                                                  : "__consuming";
+  case SelfAccessKind::Borrowing:
+    return options.excludeAttrKind(DeclAttrKind::Borrowing) ? "" : "borrowing";
+  case SelfAccessKind::Mutating:
+  case SelfAccessKind::NonMutating:
+    return "";
+  }
+  llvm_unreachable("covered switch");
+}
+
 void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   if (!Options.PrintSelfAccessKindKeyword)
     return;
@@ -2729,17 +2746,14 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
       Printer.printKeyword("nonmutating", Options, " ");
     break;
   case SelfAccessKind::LegacyConsuming:
-    if (!Options.excludeAttrKind(DeclAttrKind::LegacyConsuming))
-      Printer.printKeyword("__consuming", Options, " ");
-    break;
   case SelfAccessKind::Consuming:
-    if (!Options.excludeAttrKind(DeclAttrKind::Consuming))
-      Printer.printKeyword("consuming", Options, " ");
+  case SelfAccessKind::Borrowing: {
+    StringRef keyword =
+        getPrintedSelfOwnershipModifier(FD->getSelfAccessKind(), Options);
+    if (!keyword.empty())
+      Printer.printKeyword(keyword, Options, " ");
     break;
-  case SelfAccessKind::Borrowing:
-    if (!Options.excludeAttrKind(DeclAttrKind::Borrowing))
-      Printer.printKeyword("borrowing", Options, " ");
-    break;
+  }
   }
 }
 
@@ -2839,6 +2853,15 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 
     Printer << " {";
     if (mutatingGetter) printWithSpace("mutating");
+
+    if (Options.PrintSelfAccessKindKeyword) {
+      if (auto *getter = ASD->getAccessor(AccessorKind::Get)) {
+        StringRef keyword =
+            getPrintedSelfOwnershipModifier(getter->getSelfAccessKind(), Options);
+        if (!keyword.empty())
+          printWithSpace(keyword);
+      }
+    }
 
     if (ASD->getParsedAccessor(AccessorKind::Borrow)) {
       printWithSpace("borrow");
