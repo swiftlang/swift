@@ -230,7 +230,6 @@ struct BridgedPassContext {
   BridgedOwnedString mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const;
 
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
-  BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
   void eraseFunction(BridgedFunction function) const;
 
   BRIDGED_INLINE bool shouldExpand(BridgedType type) const;

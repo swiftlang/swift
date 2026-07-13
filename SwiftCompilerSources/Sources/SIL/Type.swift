@@ -206,6 +206,10 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return EnumCases(enumType: self, function: function)
   }
 
+  public func getEnumCasePayload(of enumCase: EnumElementDecl, in function: Function) -> Type? {
+    return bridged.getEnumCasePayload(enumCase.bridged, function.bridged).typeOrNil
+  }
+
   public func getIndexOfEnumCase(withName name: String) -> Int? {
     let idx = name._withBridgedStringRef {
       bridged.getCaseIdxOfEnumType($0)
