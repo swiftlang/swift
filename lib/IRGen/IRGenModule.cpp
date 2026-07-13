@@ -32,6 +32,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
@@ -2224,14 +2225,34 @@ void IRGenModule::emitLazyPrivateDefinitions() {
   emitLazyObjCProtocolDefinitions();
 }
 
-llvm::MDNode *IRGenModule::createProfileWeights(uint64_t TrueCount,
-                                                uint64_t FalseCount) const {
-  uint64_t MaxWeight = std::max(TrueCount, FalseCount);
-  uint64_t Scale = (MaxWeight > UINT32_MAX) ? UINT32_MAX : 1;
-  uint32_t ScaledTrueCount = (TrueCount / Scale) + 1;
-  uint32_t ScaledFalseCount = (FalseCount / Scale) + 1;
+llvm::MDNode *IRGenModule::createProfileWeights(
+    ArrayRef<ProfileCounter> counts) const {
+  SmallVector<uint64_t, 8> rawWeights;
+
+  bool hadAny = false;
+  for (auto count : counts) {
+    if (count) {
+      hadAny = true;
+      rawWeights.push_back(count.getValue());
+    } else {
+      rawWeights.push_back(0);
+    }
+  }
+
+  // If there was no profiling data, don't produce all-zero weights.
+  if (!hadAny)
+    return nullptr;
+
+  // Scale down only if values exceed uint32_t range; +1 avoids zero weights.
+  uint64_t max = *std::max_element(rawWeights.begin(), rawWeights.end());
+  uint64_t scale = max > UINT32_MAX ? max / UINT32_MAX : 1;
+  SmallVector<uint32_t, 8> weights;
+  weights.reserve(rawWeights.size());
+  for (auto w : rawWeights)
+    weights.push_back(static_cast<uint32_t>(w / scale) + 1);
+
   llvm::MDBuilder MDHelper(getLLVMContext());
-  return MDHelper.createBranchWeights(ScaledTrueCount, ScaledFalseCount);
+  return MDHelper.createBranchWeights(weights);
 }
 
 void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {

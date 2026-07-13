@@ -1960,6 +1960,10 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f,
   if (f->hasSemanticsAttr(semantics::USE_FRAME_POINTER))
     CurFn->addFnAttr("frame-pointer", "all");
 
+  // If we have a @_semantics("cold"), mark this function as cold.
+  if (f->hasSemanticsAttr(semantics::COLD))
+    CurFn->addFnAttr(llvm::Attribute::Cold);
+
   // Disable inlining of coroutine functions until we split.
   if (f->getLoweredFunctionType()->isCoroutine()) {
     CurFn->addFnAttr(llvm::Attribute::NoInline);
@@ -4075,12 +4079,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     Builder.CreatePtrToInt(errorValue, IGM.IntPtrTy);
 
     // Emit profile metadata if available.
-    llvm::MDNode *Weights = nullptr;
-    auto NormalBBCount = tryApplyInst->getNormalBBCount();
-    auto ErrorBBCount = tryApplyInst->getErrorBBCount();
-    if (NormalBBCount || ErrorBBCount)
-      Weights = IGM.createProfileWeights(ErrorBBCount ? ErrorBBCount.getValue() : 0,
-                                         NormalBBCount ? NormalBBCount.getValue() : 0);
+    llvm::MDNode *Weights = IGM.createProfileWeights(
+        {tryApplyInst->getErrorBBCount(), tryApplyInst->getNormalBBCount()});
 
     Builder.CreateCondBr(hasError,
                          typedErrorLoadBB ? typedErrorLoadBB : errorDest.bb,
@@ -5071,11 +5071,16 @@ static void addIncomingSILArgumentsToPHINodes(IRGenSILFunction &IGF,
   }
 }
 
+/// \param counters is 1:1 with dests, representing counts for those cases, thus
+///                 it excludes the default.
 static llvm::BasicBlock *emitBBMapForSwitchEnum(
     IRGenSILFunction &IGF,
     SmallVectorImpl<std::pair<EnumElementDecl *, llvm::BasicBlock *>> &dests,
+    SmallVectorImpl<ProfileCounter> &counters,
     SwitchEnumTermInst inst) {
   for (unsigned i = 0, e = inst.getNumCases(); i < e; ++i) {
+    counters.push_back(inst.getCaseCount(i));
+
     auto casePair = inst.getCase(i);
 
     // If the destination BB accepts the case argument, set up a waypoint BB so
@@ -5096,17 +5101,113 @@ static llvm::BasicBlock *emitBBMapForSwitchEnum(
   return defaultDest;
 }
 
+/// A SIL SwitchEnumInst may be lowered to either an LLVM branch or switch.
+/// It may in fact be lowered to multiple levels of conditional tests.
+///
+/// This function attaches !prof branch weight metadata to the LLVM terminator
+/// that the SIL SwitchEnumInst was lowered to, if it is simple to do so.
+template <typename SwitchEnumTy>
+static void emitSwitchEnumProfileWeights(IRGenSILFunction &IGF,
+    llvm::BasicBlock *switchBlock,
+    SwitchEnumTy *inst,
+    ArrayRef<std::pair<EnumElementDecl*, llvm::BasicBlock*>> dests,
+    ArrayRef<ProfileCounter> counters,
+    llvm::BasicBlock *defaultDest) {
+
+  // If there's no ProfileCounter data, there's no weights to add.
+  if ((!defaultDest || !inst->getDefaultCount()) &&
+      llvm::all_of(counters, [](auto c){ return !c.hasValue(); })) {
+    return;
+  }
+
+  // Don't rely on the order of the successors in the terminator lining up
+  // exactly with the order of our `dests`; it may not be guaranteed, as in the
+  // case of a multi-payload enum or any more complex pattern matching.
+  //
+  // We rely on the map to exclude those cases, as the successor blocks of this
+  // terminator won't all be found in the map..
+  llvm::SmallDenseMap<llvm::BasicBlock *, ProfileCounter> countMap;
+  countMap.reserve(dests.size() + 1);
+
+  if (defaultDest)
+    countMap.insert({defaultDest, inst->getDefaultCount()});
+
+  for (size_t i = 0; i < dests.size(); i++)
+    countMap.insert({dests[i].second, counters[i]});
+
+  auto lookup = [&](llvm::BasicBlock * bb) -> std::optional<ProfileCounter> {
+    auto it = countMap.find(bb);
+    if (it == countMap.end())
+      return std::nullopt;
+    return it->second;
+  };
+
+  // Handle the various kinds of LLVM terminators we might've lowered-to.
+  auto *term = switchBlock->getTerminator();
+  if (auto *bi = dyn_cast<llvm::BranchInst>(term)) {
+    if (!bi->isConditional())
+      return;
+
+    auto trueCount = lookup(bi->getSuccessor(0));
+    auto falseCount = lookup(bi->getSuccessor(1));
+    if (!trueCount || !falseCount)
+      return;
+
+    auto *weights = IGF.IGM.createProfileWeights({*trueCount, *falseCount});
+    if (!weights)
+      return;
+
+    bi->setMetadata(llvm::LLVMContext::MD_prof, weights);
+    return;
+  }
+
+  if (auto *si = dyn_cast<llvm::SwitchInst>(term)) {
+    // Counts must be ordered as [default, case0, case1, ...] for switches.
+    SmallVector<ProfileCounter, 8> orderedCounts;
+    auto defaultCount = lookup(si->getDefaultDest());
+    if (!defaultCount)
+      return;
+
+    orderedCounts.push_back(*defaultCount);
+
+    for (auto caseHandle : si->cases()) {
+      auto *bb = caseHandle.getCaseSuccessor();
+      auto bbCount = lookup(bb);
+      if (!bbCount)
+        return;
+      orderedCounts.push_back(*bbCount);
+    }
+    auto *weights = IGF.IGM.createProfileWeights(orderedCounts);
+    if (!weights)
+      return;
+
+    si->setMetadata(llvm::LLVMContext::MD_prof, weights);
+    return;
+  }
+
+  assert(false && "unhandled switch lowering");
+  return;
+}
+
 void IRGenSILFunction::visitSwitchEnumInst(SwitchEnumInst *inst) {
   Explosion value = getLoweredExplosion(inst->getOperand(), &Builder);
-  
+
   // Map the SIL dest bbs to their LLVM bbs.
   SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
+  SmallVector<ProfileCounter, 4> counters;
   llvm::BasicBlock *defaultDest
-    = emitBBMapForSwitchEnum(*this, dests, inst);
-  
+    = emitBBMapForSwitchEnum(*this, dests, counters, inst);
+
+  // Save the block that will receive the switch/branch terminator.
+  llvm::BasicBlock *switchBlock = Builder.GetInsertBlock();
+
   // Emit the dispatch.
   auto &EIS = getEnumImplStrategy(IGM, inst->getOperand()->getType());
   EIS.emitValueSwitch(*this, value, dests, defaultDest);
+
+  // Attach profile weights to the emitted terminator if available.
+  emitSwitchEnumProfileWeights(*this, switchBlock, inst, dests, counters,
+                               defaultDest);
   
   // Bind arguments for cases that want them.
   for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
@@ -5134,15 +5235,23 @@ void IRGenSILFunction::visitSwitchEnumInst(SwitchEnumInst *inst) {
 void
 IRGenSILFunction::visitSwitchEnumAddrInst(SwitchEnumAddrInst *inst) {
   Address value = getLoweredAddress(inst->getOperand(), &Builder);
-  
+
   // Map the SIL dest bbs to their LLVM bbs.
   SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
+  SmallVector<ProfileCounter, 4> counters;
   llvm::BasicBlock *defaultDest
-    = emitBBMapForSwitchEnum(*this, dests, inst);
-  
+    = emitBBMapForSwitchEnum(*this, dests, counters, inst);
+
+  // Save the block that will receive the switch/branch terminator.
+  llvm::BasicBlock *switchBlock = Builder.GetInsertBlock();
+
   // Emit the dispatch.
   emitSwitchAddressOnlyEnumDispatch(*this, inst->getOperand()->getType(),
                                      value, dests, defaultDest);
+
+  // Attach profile weights to the emitted terminator if available.
+  emitSwitchEnumProfileWeights(*this, switchBlock, inst, dests, counters,
+                               defaultDest);
 }
 
 // FIXME: We could lower select_enum directly to LLVM select in a lot of cases.
@@ -5151,6 +5260,7 @@ static llvm::BasicBlock *emitBBMapForSelect(
     IRGenSILFunction &IGF, Explosion &resultPHI,
     SmallVectorImpl<std::pair<EnumElementDecl *, llvm::BasicBlock *>> &BBs,
     llvm::BasicBlock *&defaultBB, SelectEnumOperation inst) {
+  // TODO: emit branch weights for this, too.
   auto origBB = IGF.Builder.GetInsertBlock();
 
   // Set up a continuation BB and phi nodes to receive the result value.
@@ -5486,12 +5596,8 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
   addIncomingSILArgumentsToPHINodes(*this, trueBB, i->getTrueArgs());
   addIncomingSILArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
 
-  llvm::MDNode *Weights = nullptr;
-  auto TrueBBCount = i->getTrueBBCount();
-  auto FalseBBCount = i->getFalseBBCount();
-  if (TrueBBCount || FalseBBCount)
-    Weights = IGM.createProfileWeights(TrueBBCount ? TrueBBCount.getValue() : 0,
-        FalseBBCount ? FalseBBCount.getValue() : 0);
+  llvm::MDNode *Weights =
+      IGM.createProfileWeights({i->getTrueBBCount(), i->getFalseBBCount()});
 
   Builder.CreateCondBr(condValue, trueBB.bb, falseBB.bb, Weights);
 }
@@ -7951,9 +8057,13 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
   if (toTy->isPointerTy())
     castResult.casted = Builder.CreateBitCast(castResult.casted, toTy);
 
+  llvm::MDNode *Weights = IGM.createProfileWeights(
+      {i->getTrueBBCount(), i->getFalseBBCount()});
+
   Builder.CreateCondBr(castResult.succeeded,
                        successBB.bb,
-                       getLoweredBB(i->getFailureBB()).bb);
+                       getLoweredBB(i->getFailureBB()).bb,
+                       Weights);
   
   // Feed the cast result into the nonnull branch.
   unsigned phiIndex = 0;
@@ -7973,9 +8083,14 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
                     dest, i->getTargetFormalType(),
                     i->getConsumptionKind(), CheckedCastMode::Conditional,
                     i->getCheckedCastOptions());
+
+  llvm::MDNode *Weights = IGM.createProfileWeights(
+      {i->getTrueBBCount(), i->getFalseBBCount()});
+
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,
-                       getLoweredBB(i->getFailureBB()).bb);
+                       getLoweredBB(i->getFailureBB()).bb,
+                       Weights);
 }
 
 void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
