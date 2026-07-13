@@ -756,13 +756,12 @@ func invalidDictionaryLiteral() {
   var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}}
 }
 
-
+// Other overloads of `joined(separator:)` have multiple issues - argument is a String and element of the base should be `String` of conform to `StringProtocol`.
 [4].joined(separator: [1])
-// expected-error@-1 {{no exact matches in call to instance method 'joined'}}
-// There is one more note here - candidate requires that 'Int' conform to 'Sequence' (requirement specified as 'Self.Element' : 'Sequence') pointing to Sequence extension
+// expected-error@-1 {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'Sequence'}}
 
 [4].joined(separator: [[[1]]])
-// expected-error@-1 {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-1 {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'StringProtocol'}}
 // expected-error@-2 {{cannot convert value of type '[[[Int]]]' to expected argument type 'String'}}
 
 //===----------------------------------------------------------------------===//
