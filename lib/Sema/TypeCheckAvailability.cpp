@@ -1952,66 +1952,6 @@ swift::getUnsatisfiedAvailabilityConstraint(const Decl *decl,
       .getPrimaryConstraint();
 }
 
-/// Check if this is a subscript declaration inside String or
-/// Substring that returns String, and if so return true.
-bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
-  // Is this a subscript?
-  if (!isa<SubscriptDecl>(D))
-    return false;
-
-  // Is the subscript declared in String or Substring?
-  auto *declContext = D->getDeclContext();
-  assert(declContext && "Expected decl context!");
-
-  auto *stringDecl = Context.getStringDecl();
-  auto *substringDecl = Context.getSubstringDecl();
-
-  auto *typeDecl = declContext->getSelfNominalTypeDecl();
-  if (!typeDecl)
-    return false;
-
-  if (typeDecl != stringDecl && typeDecl != substringDecl)
-    return false;
-
-  // Is the subscript index one we want to emit a special diagnostic
-  // for, and the return type String?
-  auto fnTy = D->getInterfaceType()->getAs<AnyFunctionType>();
-  assert(fnTy && "Expected function type for subscript decl!");
-
-  // We're only going to warn for BoundGenericStructType with a single
-  // type argument that is not Int!
-  auto params = fnTy->getParams();
-  if (params.size() != 1)
-    return false;
-
-  const auto &param = params.front();
-  if (param.hasLabel() || param.isVariadic() || param.isInOut())
-    return false;
-
-  auto inputTy = param.getPlainType()->getAs<BoundGenericStructType>();
-  if (!inputTy)
-    return false;
-
-  auto genericArgs = inputTy->getGenericArgs();
-  if (genericArgs.size() != 1)
-    return false;
-
-  // The subscripts taking T<Int> do not return Substring, and our
-  // special fixit does not help here.
-  auto nominalTypeParam = genericArgs[0]->getAs<NominalType>();
-  if (!nominalTypeParam)
-    return false;
-
-  if (nominalTypeParam->isInt())
-    return false;
-
-  auto resultTy = fnTy->getResult()->getAs<NominalType>();
-  if (!resultTy)
-    return false;
-
-  return resultTy->isString();
-}
-
 static bool diagnoseParameterizedProtocolAvailability(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
   return TypeChecker::checkAvailability(
@@ -2321,14 +2261,6 @@ bool diagnoseExplicitUnavailability(
                                newName, EncodedMessage.Message);
     diag.limitBehavior(limit);
     attachRenameFixIts(diag, rename);
-  } else if (isSubscriptReturningString(D, ctx)) {
-    diags.diagnose(Loc, diag::availability_string_subscript_migration)
-      .highlight(R)
-      .fixItInsert(R.Start, "String(")
-      .fixItInsertAfter(R.End, ")");
-
-    // Skip the note emitted below.
-    return true;
   } else {
     EncodedDiagnosticMessage EncodedMessage(message);
     diags
