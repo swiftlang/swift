@@ -1692,7 +1692,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         //    func f<T>(_: @autoclosure () -> T) {}
         //
         //    f { } // OK
-        if (isExpr<ClosureExpr>(argExpr)) {
+        //    f { [v] in } // OK
+        if (isExpr<ClosureExpr>(argExpr) || isExpr<CaptureListExpr>(argExpr)) {
           cs.increaseScore(SK_FunctionToAutoClosureConversion, loc);
         }
 
