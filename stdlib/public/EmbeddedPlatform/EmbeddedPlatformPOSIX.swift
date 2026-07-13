@@ -43,7 +43,7 @@ public func _swift_allocate(_ alignment: Int, _ size: Int, _ flags: SwiftAllocat
 
 @export(interface)
 @implementation @c
-public func _swift_deallocate(_ pointer: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int, _ flags: SwiftFreeFlags) {
+public func _swift_deallocate(_ pointer: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int, _ flags: SwiftDeallocFlags) {
   free(pointer)
 }
 
