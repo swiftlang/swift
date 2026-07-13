@@ -230,16 +230,16 @@ namespace {
                                                     data_type_ref data) {
       uint32_t keyLength = key.str().size();
       assert(keyLength == static_cast<uint16_t>(keyLength));
-      uint32_t dataLength = (sizeof(uint32_t) * 2) * data.size();
+      uint64_t dataLength = (sizeof(uint32_t) * 2) * data.size();
       for (auto dataPair : data) {
         int32_t nameData = getNameDataForBase(dataPair.first);
         if (nameData > 0)
           dataLength += nameData;
       }
-      assert(dataLength == static_cast<uint16_t>(dataLength));
+      assert(llvm::isUInt<32>(dataLength) && "extension table entry too large");
       endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
