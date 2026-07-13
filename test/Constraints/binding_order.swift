@@ -106,7 +106,7 @@ do {
     let _: [any Command] = [a, b].map { $0 }
     // expected-error@-1 {{cannot convert value of type 'Super' to closure result type 'any Command'}}
     let _: [any Command] = [a, b].flatMap { [$0] }
-    // expected-error@-1 {{cannot convert value of type 'Super' to expected element type 'any Command'}}
+    // expected-error@-1 {{cannot convert value of type '[Super]' to closure result type '(any Command)?'}}
 
     #if SALVAGE
     let _: [any Command] = [[a], [b]].flatMap { $0 }

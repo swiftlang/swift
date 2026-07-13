@@ -324,6 +324,9 @@ public:
   /// Whether the locator in question is for a pattern match.
   bool isForPatternMatch() const;
 
+  /// Whether this locator identifies an element type of a collection literal.
+  bool isForCollectionElement() const;
+
   /// Returns true if \p locator is ending with either of the following
   ///  - Member
   ///  - Member -> KeyPathDynamicMember
