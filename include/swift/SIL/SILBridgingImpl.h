@@ -493,6 +493,14 @@ BridgedType BridgedType::getEnumCasePayload(SwiftInt caseIndex,
   return swift::SILType();
 }
 
+BridgedType BridgedType::getEnumCasePayload(BridgedDeclObj caseDecl,
+                                            BridgedFunction f) const {
+  auto *elt = caseDecl.getAs<swift::EnumElementDecl>();
+  if (elt->hasAssociatedValues())
+    return unbridged().getEnumElementType(elt, f.getFunction());
+  return swift::SILType();
+}
+
 SwiftInt BridgedType::getNumTupleElements() const {
   return unbridged().getNumTupleElements();
 }
@@ -3140,6 +3148,14 @@ BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, Brid
   return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(), swift::MarkDependenceKind(kind))};
 }
 
+BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base,
+                                                        BridgedValue::Ownership ownership,
+                                                        BridgedInstruction::MarkDependenceKind kind) const {
+  return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(),
+                                           BridgedValue::unbridge(ownership),
+                                           swift::MarkDependenceKind(kind))};
+}
+
 BridgedInstruction BridgedBuilder::createMarkDependenceAddr(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {
   return {unbridged().createMarkDependenceAddr(
       regularLoc(), value.getSILValue(), base.getSILValue(),
@@ -3519,9 +3535,8 @@ OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef na
   return {context->lookupStdlibFunction(name.unbridged())};
 }
 
-void BridgedContext::SSAUpdater_initialize(BridgedFunction function, BridgedType type,
-                                           BridgedValue::Ownership ownership) const {
-  context->initializeSSAUpdater(function.getFunction(), type.unbridged(), BridgedValue::unbridge(ownership));
+void BridgedContext::SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const {
+  context->initializeSSAUpdater(context->getFunction(), type.unbridged(), BridgedValue::unbridge(ownership));
 }
 
 void BridgedContext::SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {

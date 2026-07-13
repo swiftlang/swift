@@ -332,10 +332,6 @@ private extension Value {
 }
 
 private extension Instruction {
-  func endsLifetime(of value: Value) -> Bool {
-    return operands.contains { $0.value == value && $0.endsLifetime }
-  }
-
   func mayTakeOrDestroy(address: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
     switch self {
     case is BeginAccessInst, is EndAccessInst, is EndBorrowInst:

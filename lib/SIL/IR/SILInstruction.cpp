@@ -1837,6 +1837,10 @@ SILInstructionResultArray::SILInstructionResultArray(
   auto TRangeEnd = TypedRange.end();
   assert(MVResults.size() == unsigned(std::distance(TRangeBegin, TRangeEnd)));
   for (unsigned i : indices(MVResults)) {
+    // Avoid quadratic complexity for multi-value instructions with many results.
+    if (i >= 8)
+      break;
+
     assert(SILValue(&MVResults[i]) == (*this)[i]);
     assert(SILValue(&MVResults[i])->getType() == (*this)[i]->getType());
     assert(SILValue(&MVResults[i]) == (*VRangeIter));

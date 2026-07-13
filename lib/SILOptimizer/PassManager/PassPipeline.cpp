@@ -227,7 +227,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Now that we have emitted constant propagation diagnostics, try to eliminate
   // dead allocations.
-  P.addPredictableDeadAllocationElimination();
+  P.addMandatoryDeadObjectElimination();
 
   // Now that we have finished performing diagnostics that rely on lexical
   // scopes, if lexical lifetimes are not enabled, eliminate lexical lifetimes.
@@ -252,6 +252,12 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
+
+  // This is needed to clean up SIL after MandatoryDeadObjectElimination for
+  // OSLogOptimization (in the next function up the call tree). It must happen
+  // before the next module-pass (= MandatoryPerformanceOptimizations) after
+  // OSLogOptimization and MandatoryDeadObjectElimination.
+  P.addOnoneSimplification();
 
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
@@ -392,7 +398,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addLowerAggregateInstrs();
   P.addSILCombine();
   P.addEarlySROA();
-  P.addMem2Reg();
+  P.addDeadObjectElimination();
   P.addDCE();
   P.addSILCombine();
   addSimplifyCFGSILCombinePasses(P);
@@ -473,7 +479,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
 
   // Promote stack allocations to values.
-  P.addMem2Reg();
+  P.addDeadObjectElimination();
 
   // Run the existential specializer Pass.
   if (!P.getOptions().EmbeddedSwift) {
@@ -560,7 +566,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Promote stack allocations to values and eliminate redundant
   // loads.
-  P.addMem2Reg();
+  P.addDeadObjectElimination();
   P.addPerformanceConstantPropagation();
   //  Do a round of CFG simplification, followed by peepholes, then
   //  more CFG simplification.
@@ -814,7 +820,7 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   // For details see the comment for `namedReturnValueOptimization`.
   P.addNamedReturnValueOptimization();
 
-  P.addDeadObjectElimination();
+  P.addLegacyDeadObjectElimination();
   P.addObjectOutliner();
   P.addDeadStoreElimination();
   P.addDCE();
@@ -822,7 +828,7 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.addInitializeStaticGlobals();
 
   // dead-store-elimination can expose opportunities for dead object elimination.
-  P.addDeadObjectElimination();
+  P.addLegacyDeadObjectElimination();
 
   // We've done a lot of optimizations on this function, attempt to FSO.
   P.addFunctionSignatureOpts();
