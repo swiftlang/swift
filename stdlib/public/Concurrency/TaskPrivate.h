@@ -792,8 +792,8 @@ public:
   // StealerExclusion
   AsyncTask::ExclusionValue getStealerExclusionValue() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return AsyncTask::ExclusionValue{(Flags & StealerExclusionMask) >>
-                                     StealerExclusionShift};
+    return AsyncTask::ExclusionValue{static_cast<uint8_t>(
+        (Flags & StealerExclusionMask) >> StealerExclusionShift)};
 #else
     return {0};
 #endif
@@ -1217,7 +1217,7 @@ struct ThreadPriorityManager {
     // so we might need to undo setting the base priority
     if (opaquePriority.isSet()) {
       swift_dispatch_thread_reset_override_self(opaquePriority);
-      opaquePriority = 0;
+      opaquePriority = {0};
     }
   }
 };
@@ -1263,7 +1263,7 @@ inline uint32_t AsyncTask::taskFlagAsRunningWithoutDependency(
     }
   }
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-  return threadPriorityManager.opaquePriority;
+  return threadPriorityManager.opaquePriority.priority;
 #else
   return 0;
 #endif
@@ -1314,7 +1314,7 @@ inline void AsyncTask::resumeRunningAfterFailedSuspend(
       [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
         threadPriorityManager.overrideIfNeeded(oldStatus.getStoredPriority());
-        assert(threadPriorityManager.opaquePriority == 0);
+        assert(!threadPriorityManager.opaquePriority.isSet());
 #endif
         // Set self as executor and remove escalation bit if any - the task's
         // priority escalation has already been reflected on the thread.
@@ -1432,7 +1432,7 @@ AsyncTask::tryStartRunning(AsyncTask::ExclusionValue allowedExclusionValue,
   }
   SWIFT_TASK_DEBUG_LOG("tryStartRunning succeeds for %p", this);
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-  return {true, threadPriorityManager.opaquePriority};
+  return {true, threadPriorityManager.opaquePriority.priority};
 #else
   return {true, 0};
 #endif

@@ -239,7 +239,7 @@ static inline void taskInvokeWithExclusionValue(
     concurrency::trace::job_run_end(traceHandle);
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    swift_dispatch_thread_reset_override_self(dispatchOpaquePriority);
+    swift_dispatch_thread_reset_override_self({dispatchOpaquePriority});
 #endif
 
     assert(ActiveTask::get() == nullptr &&
