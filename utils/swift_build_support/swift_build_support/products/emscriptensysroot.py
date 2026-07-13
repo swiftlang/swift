@@ -60,7 +60,7 @@ class EmscriptenSysroot(product.Product):
 
         shell.call([
             sys.executable, embuilder, 'build',
-            'libc', 'libcompiler_rt', 'libc++', 'libc++abi',
+            'libc', 'libclang_rt.builtins', 'libc++', 'libc++abi',
             'crt1', 'libstubs',
             'libdlmalloc',
         ], env=env)
@@ -75,11 +75,11 @@ class EmscriptenSysroot(product.Product):
 
         # When using a prebuilt Emscripten SDK, EmscriptenLLVMRuntimeLibs is
         # skipped, but lit tests still need libclang_rt.builtins.a in the
-        # resource-dir. Create it from embuilder's libcompiler_rt.a.
+        # resource-dir. Create it from embuilder's libclang_rt.builtins.a.
         resource_dir = EmscriptenSysroot.resource_dir_install_path(
             build_root, target_triple)
         builtins_src = os.path.join(
-            sysroot_dst, 'lib', target_triple, 'libcompiler_rt.a')
+            sysroot_dst, 'lib', target_triple, 'libclang_rt.builtins.a')
         builtins_dst_dir = os.path.join(
             resource_dir, 'lib', 'wasm32-unknown-emscripten')
         if os.path.exists(builtins_src):

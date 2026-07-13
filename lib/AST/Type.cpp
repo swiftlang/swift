@@ -3197,6 +3197,21 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       return { representable, nullptr };
   }
 
+  // C represents AnyClass as the Objective-C type 'Class', mirroring how
+  // ClangImporter imports C 'Class' as AnyClass. Restrict to the AnyObject
+  // class metatype and gate on ObjC interop, since 'Class' is an ObjC runtime
+  // type. Reuse the ObjC path's result so bridging stays consistent.
+  if (language == ForeignLanguage::C &&
+      dc->getASTContext().LangOpts.EnableObjCInterop) {
+    if (auto metatype = type->getAs<ExistentialMetatypeType>()) {
+      if (metatype->getInstanceType()->isAnyObject()) {
+        auto representable = getObjCObjectRepresentable(type, dc);
+        if (representable != ForeignRepresentableKind::None)
+          return { representable, nullptr };
+      }
+    }
+  }
+
   // Function types.
   if (auto functionType = type->getAs<FunctionType>()) {
     // Cannot handle async or throwing functions.

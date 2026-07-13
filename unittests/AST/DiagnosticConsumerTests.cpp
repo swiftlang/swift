@@ -66,10 +66,10 @@ TEST(FileSpecificDiagnosticConsumer, SubconsumersFinishInOrder) {
   (void)sourceMgr.addMemBufferCopy("abcde", "A");
   (void)sourceMgr.addMemBufferCopy("vwxyz", "B");
 
-  auto consumerA =
-      std::make_unique<ExpectationDiagnosticConsumer>(nullptr, std::nullopt);
+  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
+      nullptr, ArrayRef<ExpectedDiagnostic>());
   auto consumerUnaffiliated = std::make_unique<ExpectationDiagnosticConsumer>(
-      consumerA.get(), std::nullopt);
+      consumerA.get(), ArrayRef<ExpectedDiagnostic>());
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
   consumers.emplace_back("A", std::move(consumerA));

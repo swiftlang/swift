@@ -1,0 +1,5781 @@
+// RUN: %target-sil-opt -dead-object-elimination -enable-experimental-feature RawLayout %s | %FileCheck %s
+
+// REQUIRES: swift_feature_RawLayout
+
+import Swift
+import Builtin
+import SwiftShims
+
+//////////
+// Data //
+//////////
+
+class TrivialDestructor {
+  var int : Builtin.Int32
+  var ptr : Builtin.NativeObject
+  init()
+  deinit { }
+}
+
+class Kl {}
+
+class NontrivialDestructor {
+  @_hasStorage var p : Kl 
+  @_hasStorage var i : Int 
+  init()
+}
+
+class ArrayStorage {
+  @_hasStorage var bodyField : Kl 
+  init()
+}
+
+class Kl2 {
+  @_hasStorage var i: Int64
+}
+
+class Klass {}
+
+struct SmallCodesizeStruct {
+  var cls1 : Klass
+  var cls2 : Klass
+}
+
+struct LargeCodesizeStruct {
+  var s1: SmallCodesizeStruct
+  var s2: SmallCodesizeStruct
+  var s3: SmallCodesizeStruct
+  var s4: SmallCodesizeStruct
+  var s5: SmallCodesizeStruct
+}
+
+enum FakeOptional<T> {
+case some(T)
+case none
+}
+
+protocol P { }
+struct X : P { }
+
+class C: P {}
+class D : C {}
+
+enum E {
+case one(C)
+}
+
+struct S {
+  var field: C
+}
+
+struct J {
+  var c: C
+}
+
+struct Ix {
+  var j: J
+}
+
+struct S1 {
+  var i: Ix
+}
+
+struct S2x {
+  var t: (J, J)
+}
+
+struct WrapperStruct {
+  var cls : Klass
+}
+
+struct NonTrivialStruct {
+  var val:Klass
+}
+
+public enum NonTrivialEnum {
+  case some1(Klass)
+  case some2(NonTrivialStruct)
+}
+
+enum KlassOptional {
+  case some(Klass)
+  case none
+}
+
+enum Result<S, F> {
+  case success(S)
+  case failure(F)
+}
+
+struct Sy {
+    var v1: AnyObject
+    var v2: AnyObject
+}
+
+struct S3 {
+  var v1: AnyObject
+  var v2: (AnyObject, AnyObject)
+  var v3: AnyObject
+}
+
+
+struct FileDescriptor : ~Copyable {
+  @_hasStorage private var fd: Int { get set }
+  init(_ fd: Int)
+  deinit
+}
+
+@_rawLayout(like: Int)
+struct RawLayoutStruct : ~Copyable {
+  deinit
+}
+
+protocol P2 {
+  func bar()
+}
+
+struct SP2 : P2 {
+  var i: Int
+  func bar()
+}
+
+struct Pair {
+  var o: AnyObject
+  var i: Int
+}
+
+struct Triple {
+  var a: AnyObject
+  var b: AnyObject
+  var c: AnyObject
+}
+
+
+sil [ossa] @$s4main17TrivialDestructorCfD : $@convention(method) (@owned TrivialDestructor) -> () {
+bb0(%0 : @owned $TrivialDestructor):
+  // Alloc/Dealloc stack should not disrupt elimination of the
+  // alloc_ref.
+  %1 = alloc_stack $Builtin.Int64
+  dealloc_stack %1
+
+  // Storing into the struct should not disrupt elimination of the
+  // alloc_ref.
+  %b = begin_borrow %0
+  %2 = ref_element_addr %b, #TrivialDestructor.int
+  %3 = integer_literal $Builtin.Int32, 1
+  store %3 to [trivial] %2
+  end_borrow %b
+
+  // Calling a builtin without side effects should not disrupt
+  // elimination of the alloc_ref.
+  %4 = integer_literal $Builtin.Int32, 0
+  %6 = builtin "xor_Int32" (%4, %3) : $Builtin.Int32
+
+  fix_lifetime %0
+
+  // Calling dealloc ref on self should not disrupt elimination of the
+  // alloc_ref.
+  dealloc_ref %0
+
+  %7 = tuple()
+  return %7
+}
+
+// Fake destructor for NontrivialDestructor
+sil [ossa] @$s4main20NontrivialDestructorCfD : $@convention(method) (@owned NontrivialDestructor) -> () {
+bb0(%0 : @owned $NontrivialDestructor):
+  %1 = apply undef() : $@convention(thin) () -> ()
+  dealloc_ref %0 : $NontrivialDestructor
+  %7 = tuple()
+  return %7 : $()
+}
+
+sil [ossa] @$s4main3Kl2CfD : $@convention(method) (@owned Kl2) -> () {
+bb0(%0 : @owned $Kl2):
+  %1 = begin_borrow %0
+  %2 = unchecked_ref_cast %1 to $Builtin.NativeObject
+  %3 = unchecked_ownership_conversion %2, @guaranteed to @owned
+  end_borrow %1
+  end_lifetime %0
+  %6 = unchecked_ref_cast %3 to $Kl2
+  dealloc_ref %6
+  %8 = tuple ()
+  return %8
+}
+
+sil @ptr_user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @int_user : $@convention(thin) (Builtin.Int32) -> ()
+
+///////////
+// Tests //
+///////////
+
+// Trivial case. Remove the alloc_ref.
+//
+// CHECK-LABEL: sil [ossa] @trivial_destructor_trivial : $@convention(thin) () -> () {
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @trivial_destructor_trivial : $@convention(thin) () -> () {
+  %0 = alloc_ref $TrivialDestructor
+  destroy_value %0 : $TrivialDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @non_trivial_destructor : $@convention(thin) () -> () {
+// CHECK:         alloc_ref
+// CHECK-LABEL: } // end sil function 'non_trivial_destructor'
+sil [ossa] @non_trivial_destructor : $@convention(thin) () -> () {
+  %0 = alloc_ref $NontrivialDestructor
+  destroy_value %0
+  %r = tuple()
+  return %r
+}
+
+// If the destructor is not called, we don't care about it.
+//
+// CHECK-LABEL: sil [ossa] @devirtualized_destructor : $@convention(thin) () -> () {
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @devirtualized_destructor : $@convention(thin) () -> () {
+  %0 = alloc_ref $NontrivialDestructor
+  %1 = begin_dealloc_ref %0 : $NontrivialDestructor of %0 : $NontrivialDestructor
+  fix_lifetime %1 : $NontrivialDestructor
+  dealloc_ref %1 : $NontrivialDestructor
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @store_to_non_trivial_property1
+// CHECK-NOT:   alloc_ref [stack] $NontrivialDestructor
+// CHECK: } // end sil function 'store_to_non_trivial_property1'
+sil [ossa] @store_to_non_trivial_property1 : $@convention(thin) () -> () {
+bb0:
+  %0 = apply undef () : $@convention(thin) () -> @owned Kl
+  %1 = alloc_ref [stack] $NontrivialDestructor
+  %2 = begin_borrow %1 : $NontrivialDestructor
+  %3 = ref_element_addr %2 : $NontrivialDestructor, #NontrivialDestructor.p
+  store %0 to [init] %3 : $*Kl
+  end_borrow %2 : $NontrivialDestructor
+  %6 = begin_dealloc_ref %1 : $NontrivialDestructor of %1 : $NontrivialDestructor
+  dealloc_ref %6 : $NontrivialDestructor
+  dealloc_stack_ref %1 : $NontrivialDestructor
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @store_to_trivial_property
+// CHECK:         alloc_ref
+// CHECK:       } // end sil function 'store_to_trivial_property'
+sil [ossa] @store_to_trivial_property : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_ref [stack] $NontrivialDestructor
+  %2 = begin_borrow %1 : $NontrivialDestructor
+  %3 = ref_element_addr %2 : $NontrivialDestructor, #NontrivialDestructor.i
+  %4 = begin_access [modify] [dynamic] %3 : $*Int
+  store %0 to [trivial] %4 : $*Int
+  end_access %4 : $*Int
+  end_borrow %2 : $NontrivialDestructor
+  %6 = begin_dealloc_ref %1 : $NontrivialDestructor of %1 : $NontrivialDestructor
+  dealloc_ref %6 : $NontrivialDestructor
+  dealloc_stack_ref %1 : $NontrivialDestructor
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// We load/use a pointer from the alloc_ref, do nothing.
+//
+// CHECK-LABEL: sil [ossa] @trivial_destructor_load :
+// CHECK-NOT:     alloc_ref
+// CHECK:         = apply %{{[0-9]+}}(%0)
+// CHECK:       } // end sil function 'trivial_destructor_load'
+sil [ossa] @trivial_destructor_load : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%a : $Builtin.Int32):
+  %0 = alloc_ref $TrivialDestructor
+  %1 = begin_borrow %0 : $TrivialDestructor
+  %2 = ref_element_addr %1 : $TrivialDestructor, #TrivialDestructor.int
+  store %a to [trivial] %2
+  %3 = load [trivial] %2 : $*Builtin.Int32
+  %4 = function_ref @int_user : $@convention(thin) (Builtin.Int32) -> ()
+  apply %4 (%3) : $@convention(thin) (Builtin.Int32) -> ()
+  end_borrow %1 : $TrivialDestructor
+  destroy_value %0 : $TrivialDestructor
+  %r = tuple()
+  return %r : $()
+}
+
+// We store into the alloc_ref, eliminate it!
+//
+// CHECK-LABEL: sil [ossa] @trivial_destructor_store_into : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_ref
+// CHECK-LABEL: } // end sil function 'trivial_destructor_store_into'
+sil [ossa] @trivial_destructor_store_into : $@convention(thin) () -> () {
+  %0 = alloc_ref $TrivialDestructor
+  %b = begin_borrow %0 : $TrivialDestructor
+  %1 = ref_element_addr %b : $TrivialDestructor, #TrivialDestructor.int
+  %2 = integer_literal $Builtin.Int32, 5
+  store %2 to [trivial] %1 : $*Builtin.Int32
+  end_borrow %b : $TrivialDestructor
+  destroy_value %0 : $TrivialDestructor
+  %4 = tuple()
+  return %4 : $()
+}
+
+// We store a pointer from the alloc_ref, don't do anything!
+//
+// CHECK-LABEL: sil [ossa] @trivial_destructor_store_ptr
+// CHECK: alloc_ref
+// CHECK-LABEL: } // end sil function 'trivial_destructor_store_ptr'
+sil [ossa] @trivial_destructor_store_ptr : $@convention(thin) (@inout Builtin.RawPointer) -> () {
+bb0(%0 : $*Builtin.RawPointer):
+  %1 = alloc_ref $TrivialDestructor
+  %b = begin_borrow %1 : $TrivialDestructor
+  %2 = ref_element_addr %b : $TrivialDestructor, #TrivialDestructor.int
+  %3 = address_to_pointer %2 : $*Builtin.Int32 to $Builtin.RawPointer
+  store %3 to [trivial] %0 : $*Builtin.RawPointer
+  end_borrow %b : $TrivialDestructor
+  destroy_value %1 : $TrivialDestructor
+  %4 = tuple()
+  return %4 : $()
+}
+
+// We are returning the alloc_ref, do nothing.
+//
+// CHECK-LABEL: sil [ossa] @trivial_destructor_return_value_use :
+// CHECK: alloc_ref
+// CHECK-LABEL: } // end sil function 'trivial_destructor_return_value_use'
+sil [ossa] @trivial_destructor_return_value_use : $@convention(thin) () -> @owned TrivialDestructor {
+  %0 = alloc_ref $TrivialDestructor
+  return %0 : $TrivialDestructor
+}
+
+// CHECK-LABEL: sil [ossa] @copy_and_destroy :
+// CHECK:         alloc_ref
+// CHECK-LABEL: } // end sil function 'copy_and_destroy'
+sil [ossa] @copy_and_destroy : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_ref $TrivialDestructor
+  %2 = begin_borrow %1
+  %3 = ref_element_addr %2, #TrivialDestructor.ptr
+  store %0 to [init] %3
+  end_borrow %2
+  %6 = copy_value %1
+  destroy_value %1
+  destroy_value %6
+  %r = tuple()
+  return %r
+}
+
+class NonTrivialDestructor {
+  var ptr : Builtin.NativeObject
+
+  init()
+  deinit { }
+}
+
+sil [ossa] @_TFC4main17NonTrivialDestructorD : $@convention(method) (@owned NonTrivialDestructor) -> () {
+bb0(%0 : @owned $NonTrivialDestructor):
+  %b = begin_borrow %0 : $NonTrivialDestructor
+  %1 = ref_element_addr %b : $NonTrivialDestructor, #NonTrivialDestructor.ptr
+  %2 = load [copy] %1 : $*Builtin.NativeObject
+  end_borrow %b : $NonTrivialDestructor
+  destroy_value %2 : $Builtin.NativeObject
+  dealloc_ref %0 : $NonTrivialDestructor
+  %3 = tuple()
+  return %3 : $()
+}
+
+class NonTrivialDestructor2 {
+  var ptr : NonTrivialDestructor
+
+  init()
+  deinit { }
+}
+
+// Test if dealloc_ref on a different value disrupts the algorithm.
+sil [ossa] @_TFC4main17NonTrivialDestructor2D : $@convention(method) (@owned NonTrivialDestructor2) -> () {
+bb0(%0 : @owned $NonTrivialDestructor2):
+  %b = begin_borrow %0 : $NonTrivialDestructor2
+  %1 = ref_element_addr %b : $NonTrivialDestructor2, #NonTrivialDestructor2.ptr
+  %2 = load [copy] %1 : $*NonTrivialDestructor
+  end_borrow %b : $NonTrivialDestructor2
+  dealloc_ref %2 : $NonTrivialDestructor
+  dealloc_ref %0 : $NonTrivialDestructor2
+  %3 = tuple()
+  return %3 : $()
+}
+
+class NonTrivialDestructor3 {
+  var ptr : Builtin.NativeObject
+
+  init()
+  deinit { }
+}
+
+// Make sure a non-builtin apply disrupts the algorithm.
+sil [ossa] @_TFC4main17NonTrivialDestructor3D : $@convention(method) (@owned NonTrivialDestructor3) -> () {
+bb0(%0 : @owned $NonTrivialDestructor3):
+  %b = begin_borrow %0 : $NonTrivialDestructor3
+  %1 = ref_element_addr %b : $NonTrivialDestructor3, #NonTrivialDestructor3.ptr
+  %2 = load [take] %1 : $*Builtin.NativeObject
+  %3 = function_ref @ptr_user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %3 (%2) : $@convention(thin) (Builtin.NativeObject) -> ()
+  destroy_value %2 : $Builtin.NativeObject
+  end_borrow %b : $NonTrivialDestructor3
+  dealloc_ref %0 : $NonTrivialDestructor3
+  %4 = tuple()
+  return %4 : $()
+}
+
+class NonTrivialObjCDestructor {
+  var ptr : Builtin.NativeObject
+
+  init() { }
+  deinit { }
+}
+
+// Make sure we do not handle objc_methods
+sil [ossa] @_TFC4main17NonTrivialObjCDestructorD : $@convention(objc_method) (@owned NonTrivialObjCDestructor) -> () {
+bb0(%0 : @owned $NonTrivialObjCDestructor):
+  dealloc_ref %0 : $NonTrivialObjCDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @non_trivial_destructor_objc_destructor : $@convention(thin) () -> () {
+// CHECK: alloc_ref
+// CHECK-LABEL: } // end sil function 'non_trivial_destructor_objc_destructor'
+sil [ossa] @non_trivial_destructor_objc_destructor : $@convention(thin) () -> () {
+  %0 = alloc_ref $NonTrivialObjCDestructor
+  destroy_value %0 : $NonTrivialObjCDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @non_trivial_destructor_on_stack : $@convention(thin) () -> () {
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = tuple ()
+// CHECK-NEXT:   return %0
+sil [ossa] @non_trivial_destructor_on_stack : $@convention(thin) () -> () {
+  %0 = alloc_stack $NonTrivialDestructor
+  dealloc_stack %0 : $*NonTrivialDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil [ossa] @non_trivial_destructor_on_stack_with_stores1 : $@convention(thin) (@owned NonTrivialDestructor) -> () {
+bb0(%0 : @owned $NonTrivialDestructor):
+  %copy = copy_value %0 : $NonTrivialDestructor
+  %1 = alloc_stack $NonTrivialDestructor
+  store %0 to [init] %1 : $*NonTrivialDestructor
+  store %copy to [assign] %1 : $*NonTrivialDestructor
+  destroy_addr %1 : $*NonTrivialDestructor
+  dealloc_stack %1 : $*NonTrivialDestructor
+  %2 = tuple()
+  return %2 : $()
+}
+
+sil [ossa] @non_trivial_destructor_on_stack_with_stores2 : $@convention(thin) (@owned NonTrivialDestructor, @owned NonTrivialDestructor) -> () {
+bb0(%0 : @owned $NonTrivialDestructor, %1 : @owned $NonTrivialDestructor):
+  %2 = alloc_stack $NonTrivialDestructor
+  store %0 to [init] %2 : $*NonTrivialDestructor
+  store %1 to [assign] %2 : $*NonTrivialDestructor
+  destroy_addr %2 : $*NonTrivialDestructor
+  dealloc_stack %2 : $*NonTrivialDestructor
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @trivial_destructor_on_stack : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+// CHECK: return
+sil [ossa] @trivial_destructor_on_stack : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int
+  destroy_addr %0 : $*Int
+  dealloc_stack %0 : $*Int
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_dead_enum_stackloc :
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = tuple ()
+// CHECK-NEXT:   return %0
+sil [ossa] @remove_dead_enum_stackloc : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $FloatingPointRoundingRule
+  inject_enum_addr %0 : $*FloatingPointRoundingRule, #FloatingPointRoundingRule.toNearestOrEven!enumelt
+  destroy_addr %0 : $*FloatingPointRoundingRule
+  dealloc_stack %0 : $*FloatingPointRoundingRule
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_dead_optional_existential :
+// CHECK:      bb0(%0 : $X):
+// CHECK-NEXT:   %1 = tuple ()
+// CHECK-NEXT:   return %1
+sil [ossa] @remove_dead_optional_existential : $@convention(thin) (X) -> () {
+bb0(%0 : $X):
+  %3 = alloc_stack $Optional<P>
+  %4 = init_enum_data_addr %3 : $*Optional<P>, #Optional.some!enumelt
+  %5 = init_existential_addr %4 : $*P, $X
+  store %0 to [trivial] %5 : $*X
+  inject_enum_addr %3 : $*Optional<P>, #Optional.some!enumelt
+  destroy_addr %3 : $*Optional<P>
+  dealloc_stack %3 : $*Optional<P>
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// If we have an instruction that mayTrap that uses the alloc_ref, we can't
+// eliminate it.
+//
+// CHECK-LABEL: sil [ossa] @trivial_destructor_may_trap : $@convention(thin) () -> () {
+// CHECK: alloc_ref
+sil [ossa] @trivial_destructor_may_trap : $@convention(thin) () -> () {
+  %0 = alloc_ref $TrivialDestructor
+  %1 = unconditional_checked_cast %0 : $TrivialDestructor to AnyObject
+  destroy_value %1 : $AnyObject
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_dead_array_with_destroy_simple
+// CHECK-NOT:   alloc_ref
+// CHECK:      } // end sil function 'remove_dead_array_with_destroy_simple'
+sil [ossa] @remove_dead_array_with_destroy_simple : $@convention(thin) () -> () {
+bb0:
+  %0 = apply undef () : $@convention(thin) () -> @owned Kl
+  %copy = copy_value %0 : $Kl
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = alloc_ref [tail_elems $Kl * %3 : $Builtin.Word] $ArrayStorage
+  %5 = begin_borrow %4 : $ArrayStorage
+  %11 = ref_tail_addr %5 : $ArrayStorage, $Kl
+  %12 = integer_literal $Builtin.Word, 0
+  %13 = index_addr [projection] %11 : $*Kl, %12 : $Builtin.Word
+  store %0 to [init] %13 : $*Kl
+  %27 = integer_literal $Builtin.Word, 1
+  %28 = index_addr [projection] %11 : $*Kl, %27 : $Builtin.Word
+  store %copy to [init] %28 : $*Kl
+  end_borrow %5 : $ArrayStorage
+  %6 = begin_dealloc_ref %4 : $ArrayStorage of %4 : $ArrayStorage
+  %7 = begin_borrow %6 : $ArrayStorage
+  %8 = ref_tail_addr %7 : $ArrayStorage, $Kl
+  %65 = address_to_pointer %8 : $*Kl to $Builtin.RawPointer
+  %66 = metatype $@thick Kl.Type
+  %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  end_borrow %7 : $ArrayStorage
+  dealloc_ref %6 : $ArrayStorage
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_dead_array_with_destroy_complex
+// CHECK-NOT:   alloc_ref
+// CHECK:      } // end sil function 'remove_dead_array_with_destroy_complex'
+sil [ossa] @remove_dead_array_with_destroy_complex : $@convention(thin) (@guaranteed String, Int, UInt) -> () {
+bb0(%0 : @guaranteed $String, %1 : $Int, %2 : $UInt):
+  %copy0 = copy_value %0 : $String
+  %copy1 = copy_value %0 : $String
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = alloc_ref [stack] [tail_elems $(Int, String) * %3 : $Builtin.Word] $_ContiguousArrayStorage<(Int, String)>
+  %5 = upcast %4 : $_ContiguousArrayStorage<(Int, String)> to $__ContiguousArrayStorageBase
+  %6 = struct $_SwiftArrayBodyStorage (%1 : $Int, %2 : $UInt)
+  %7 = struct $_ArrayBody (%6 : $_SwiftArrayBodyStorage)
+  %b = begin_borrow %5 : $__ContiguousArrayStorageBase
+  %9 = ref_element_addr %b : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  store %7 to [trivial] %9 : $*_ArrayBody
+  %11 = ref_tail_addr %b : $__ContiguousArrayStorageBase, $(Int, String)
+  %12 = tuple_element_addr %11 : $*(Int, String), 0
+  %13 = tuple_element_addr %11 : $*(Int, String), 1
+  store %1 to [trivial] %12 : $*Int
+  store %copy0 to [init] %13 : $*String
+  %27 = integer_literal $Builtin.Word, 1
+  %28 = index_addr [projection] %11 : $*(Int, String), %27 : $Builtin.Word
+  %29 = tuple_element_addr %28 : $*(Int, String), 0
+  %30 = tuple_element_addr %28 : $*(Int, String), 1
+  store %1 to [trivial] %29 : $*Int
+  store %copy1 to [init] %30 : $*String
+  end_borrow %b : $__ContiguousArrayStorageBase
+  %31 = begin_dealloc_ref %5 : $__ContiguousArrayStorageBase of %4 : $_ContiguousArrayStorage<(Int, String)>
+  %b2 = begin_borrow %31 : $__ContiguousArrayStorageBase
+  %64 = ref_tail_addr %b2 : $__ContiguousArrayStorageBase, $(Int, String)
+  %65 = address_to_pointer %64 : $*(Int, String) to $Builtin.RawPointer
+  %66 = metatype $@thick (Int, String).Type
+  %67 = builtin "destroyArray"<(Int, String)>(%66 : $@thick (Int, String).Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  end_borrow %b2 : $__ContiguousArrayStorageBase
+  dealloc_ref %31 : $__ContiguousArrayStorageBase
+  dealloc_stack_ref %4 : $_ContiguousArrayStorage<(Int, String)>
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil @createit : $@convention(thin) () -> @owned Kl
+
+// Check that we don't crash here.
+sil [ossa] @not_dominating_stores : $@convention(thin) () -> () {
+bb0:
+  %7 = integer_literal $Builtin.Word, 1
+  %10 = alloc_ref [stack] [tail_elems $Kl * %7 : $Builtin.Word] $_ContiguousArrayStorage<Kl>
+  %b = begin_borrow %10 : $_ContiguousArrayStorage<Kl> 
+  %11 = upcast %b : $_ContiguousArrayStorage<Kl> to $__ContiguousArrayStorageBase
+  %18 = ref_tail_addr %11 : $__ContiguousArrayStorageBase, $Kl
+  %35 = function_ref @createit : $@convention(thin) () -> @owned Kl
+  cond_br undef, bb1, bb2
+bb1:
+  %36 = apply %35() : $@convention(thin) () -> @owned Kl
+  store %36 to [init] %18 : $*Kl
+  br bb3
+bb2:
+  %46 = apply %35() : $@convention(thin) () -> @owned Kl
+  store %46 to [init] %18 : $*Kl
+  br bb3
+bb3:
+  end_borrow %b : $_ContiguousArrayStorage<Kl>
+  destroy_value %10 : $_ContiguousArrayStorage<Kl>
+  dealloc_stack_ref %10 : $_ContiguousArrayStorage<Kl>
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil [ossa] @$ss23_ContiguousArrayStorageCfD : $@convention(method) <Element> (@owned _ContiguousArrayStorage<Element>) -> () {
+bb0(%0 : @owned $_ContiguousArrayStorage<Element>):
+  %b = begin_borrow %0 : $_ContiguousArrayStorage<Element>
+  %1 = ref_tail_addr %b : $_ContiguousArrayStorage<Element>, $Element
+  %2 = address_to_pointer %1 : $*Element to $Builtin.RawPointer
+  %10 = metatype $@thick Element.Type
+  %12 = builtin "destroyArray"<Element>(%10 : $@thick Element.Type, %2 : $Builtin.RawPointer, undef : $Builtin.Word) : $()
+  end_borrow %b :  $_ContiguousArrayStorage<Element>
+  dealloc_ref %0 : $_ContiguousArrayStorage<Element>
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dead_alloc_with_complex_ossa_destructor
+// CHECK-NOT:     alloc_ref
+// CHECK:       } // end sil function 'dead_alloc_with_complex_ossa_destructor'
+sil [ossa] @dead_alloc_with_complex_ossa_destructor : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = alloc_ref $Kl2
+  %1 = move_value [lexical] %0
+  %2 = end_init_let_ref %1
+  %3 = begin_borrow %2
+  %4 = integer_literal $Builtin.Int64, 27
+  %5 = struct $Int64 (%4)
+  %6 = ref_element_addr %3, #Kl2.i
+  store %5 to [trivial] %6
+  end_borrow %3
+  %9 = move_value [lexical] [var_decl] %2
+  debug_value %9, let, name "k"
+  destroy_value %9
+  return %5
+}
+
+struct UInt64 {
+  var _value: Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_store_read_via_address_to_pointer :
+// CHECK:         [[S:%[0-9]+]] = alloc_stack
+// CHECK:         tuple_element_addr [[S]]{{.*}}, 0
+// CHECK:         store
+// CHECK:         tuple_element_addr [[S]]{{.*}}, 1
+// CHECK:         store
+// CHECK:       } // end sil function 'dont_remove_store_read_via_address_to_pointer'
+sil [ossa] @dont_remove_store_read_via_address_to_pointer : $@convention(thin) (UInt64, UInt64) -> Builtin.Int64 {
+bb0(%0 : $UInt64, %1 : $UInt64):
+  %2 = alloc_stack $(UInt64, UInt64)
+  %3 = tuple_element_addr %2, 0
+  store %0 to [trivial] %3
+  %5 = tuple_element_addr %2, 1
+  store %1 to [trivial] %5
+  %7 = address_to_pointer [stack_protection] %2 to $Builtin.RawPointer
+  %8 = pointer_to_address %7 to $*UInt64
+  %9 = struct_element_addr %8, #UInt64._value
+  %10 = load [trivial] %9
+  dealloc_stack %2
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @store_only_allocas :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'store_only_allocas'
+// simple.foo0 (c : Swift.Int64) -> ()
+sil [ossa] @store_only_allocas : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"
+  store %0 to [trivial] %1 : $*Int64
+  // function_ref Swift.print (val : Swift.Int64) -> ()
+  %3 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (Int64) -> ()
+  dealloc_stack %1 : $*Int64
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// Swift.print (val : Swift.Int64) -> ()
+sil [ossa] @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals'
+// simple.foo1 (c : Swift.Int64) -> Swift.Int64
+sil [ossa] @multiple_store_vals : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_stack $Int64, var, name "x"
+  %4 = integer_literal $Builtin.Int64, 2
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3 : $*Int64
+  %7 = integer_literal $Builtin.Int64, 5
+  %8 = integer_literal $Builtin.Int1, 0
+  %9 = struct $Int64 (%7 : $Builtin.Int64)
+  cond_fail %8 : $Builtin.Int1
+  store %9 to [trivial] %3 : $*Int64
+  store %9 to [trivial] %3 : $*Int64
+  dealloc_stack %3 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %9 : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals2 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals2'
+// simple.foo2 (c : Swift.Int64) -> Swift.Int64
+sil [ossa] @multiple_store_vals2 : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Int64>, var, name "x"
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Int64>, 0
+  %4 = integer_literal $Builtin.Int64, 2
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3a : $*Int64
+  %8 = struct_extract %0 : $Int64, #Int64._value
+  %9 = builtin "cmp_sgt_Int64"(%8 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %9, bb1, bb2
+
+bb1:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Int64>
+  br bb3(%5 : $Int64)
+
+bb2:
+  %13 = integer_literal $Builtin.Int64, 5
+  %14 = struct $Int64 (%13 : $Builtin.Int64)
+  cond_fail %9 : $Builtin.Int1
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Int64>
+  br bb3(%14 : $Int64)
+
+bb3(%18 : $Int64):
+  dealloc_stack %1 : $*Int64
+  return %18 : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @with_loads2 :
+// CHECK: bb3([[RET:%[0-9]+]] : $Int64):
+// CHECK-LABEL: } // end sil function 'with_loads2'
+// simple.foo2 (c : Swift.Int64) -> Swift.Int64
+sil [ossa] @with_loads2 : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Int64>, var, name "x"
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Int64>, 0
+  %4 = integer_literal $Builtin.Int64, 2
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3a : $*Int64
+  %8 = struct_extract %0 : $Int64, #Int64._value
+  %9 = builtin "cmp_sgt_Int64"(%8 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %9, bb1, bb2
+
+bb1:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Int64>
+  br bb3(%5 : $Int64)
+
+bb2:
+  %13 = integer_literal $Builtin.Int64, 5
+  %14 = struct $Int64 (%13 : $Builtin.Int64)
+  cond_fail %9 : $Builtin.Int1
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Int64>
+  br bb3(%14 : $Int64)
+
+bb3(%18 : $Int64):
+  %20 = load [trivial] %1 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %18 : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @basic_block_with_loads_and_stores :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'basic_block_with_loads_and_stores'
+// test.foo3 (c : Swift.Int64) -> ()
+sil [ossa] @basic_block_with_loads_and_stores : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_stack $Int64, var, name "x"
+  %4 = integer_literal $Builtin.Int64, 3
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3 : $*Int64
+  %7 = integer_literal $Builtin.Int64, 3
+  %9 = struct_extract %0 : $Int64, #Int64._value
+  %10 = builtin "cmp_sgt_Int64"(%9 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+
+  %12 = integer_literal $Builtin.Int64, 2
+  %13 = struct $Int64 (%12 : $Builtin.Int64)
+  store %13 to [trivial] %3 : $*Int64
+
+  // function_ref Swift.print (val : Swift.Int64) -> ()
+  %16 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
+  %17 = load [trivial] %3 : $*Int64
+  %18 = apply %16(%17) : $@convention(thin) (Int64) -> ()
+  dealloc_stack %3 : $*Int64
+  dealloc_stack %1 : $*Int64
+  %21 = tuple ()
+  return %21 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_uninitialized_empty :
+// CHECK:         load
+// CHECK-LABEL: } // end sil function 'load_uninitialized_empty'
+sil [ossa] @load_uninitialized_empty : $@convention(thin) (@inout ()) -> () {
+bb0(%0 : $*()):
+  %1 = alloc_stack $()
+  %2 = load [trivial] %1 : $*()
+  store %2 to [trivial] %0 : $*()
+  dealloc_stack %1 : $*()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mem2reg_debug_value :
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: debug_value {{.*}} expr op_deref
+// CHECK: debug_value %0
+// CHECK-LABEL: } // end sil function 'mem2reg_debug_value'
+sil [ossa] @mem2reg_debug_value : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1 : $*Int
+  debug_value %1 : $*Int, expr op_deref
+  %2 = load [trivial] %1 : $*Int
+  dealloc_stack %1 : $*Int
+  return %2 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @mem2reg_struct_addr :
+// CHECK-NOT: alloc_stack
+// CHECK: struct_extract
+// CHECK-LABEL: } // end sil function 'mem2reg_struct_addr'
+sil [ossa] @mem2reg_struct_addr : $@convention(thin) (Int64) -> Builtin.Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  store %0 to [trivial] %1 : $*Int64
+  %2 = struct_element_addr %1 : $*Int64, #Int64._value
+  %3 = load [trivial] %2 : $*Builtin.Int64
+  dealloc_stack %1 : $*Int64
+  return %3 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @mem2reg_tuple_addr :
+// CHECK-NOT: alloc_stack
+// CHECK: tuple_extract {{.*}}, 0
+// CHECK-LABEL: } // end sil function 'mem2reg_tuple_addr'
+sil [ossa] @mem2reg_tuple_addr : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $(Int64, Int64)
+  %2 = tuple (%0 : $Int64, %0 : $Int64)
+  store %2 to [trivial] %1 : $*(Int64, Int64)
+  %4 = tuple_element_addr %1 : $*(Int64, Int64), 0
+  %5 = load [trivial] %4 : $*Int64
+  dealloc_stack %1 : $*(Int64, Int64)
+  return %5 : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @struct_extract_if_then_else :
+// CHECK-NOT: alloc_stack
+sil [ossa] @struct_extract_if_then_else : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  store %0 to [trivial] %1 : $*Int64
+  %3 = integer_literal $Builtin.Int64, 2
+  %4 = struct_extract %0 : $Int64, #Int64._value
+  %5 = builtin "cmp_sgt_Int64"(%4 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  %6 = struct_element_addr %1 : $*Int64, #Int64._value
+  cond_br %5, bb1, bb2
+
+// CHECK: bb1:
+// CHECK: struct_extract %0
+bb1:
+  %8 = load [trivial] %6 : $*Builtin.Int64
+  %9 = integer_literal $Builtin.Int64, 1
+  %10 = integer_literal $Builtin.Int1, 0
+  %11 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int64, %9 : $Builtin.Int64, %10 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0
+  br bb3(%12 : $Builtin.Int64)
+
+// CHECK: bb2:
+// CHECK: struct_extract %0
+bb2:
+  %14 = load [trivial] %6 : $*Builtin.Int64
+  %15 = integer_literal $Builtin.Int64, 2
+  %16 = integer_literal $Builtin.Int1, 0
+  %17 = builtin "sadd_with_overflow_Int64"(%14 : $Builtin.Int64, %15 : $Builtin.Int64, %16 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 0
+  br bb3(%18 : $Builtin.Int64)
+
+// CHECK-NOT: dealloc_stack
+bb3(%20 : $Builtin.Int64):
+  dealloc_stack %1 : $*Int64
+  %22 = struct $Int64 (%20 : $Builtin.Int64)
+  return %22 : $Int64
+}
+// CHECK-LABEL: } // end sil function 'struct_extract_if_then_else'
+
+sil [ossa] @first : $@convention(thin) () -> Int
+sil [ossa] @second : $@convention(thin) () -> Int
+
+// CHECK: sil [ossa] @promote_function_refs :
+sil [ossa] @promote_function_refs : $@convention(thin) (Bool) -> Int {
+// CHECK: bb0
+bb0(%0 : $Bool):
+// CHECK-NOT: [[STACK:%.*]] = alloc_stack
+  %1 = alloc_stack $@callee_owned () -> Int
+  debug_value %0 : $Bool
+  %3 = struct_extract %0 : $Bool, #Bool._value
+  cond_br %3, bb1, bb2
+
+// CHECK: bb1
+bb1:
+// CHECK: [[FIRSTREF:%.*]] = function_ref @first
+  %5 = function_ref @first : $@convention(thin) () -> Int
+// CHECK: [[FIRSTTHICK:%.*]] =  thin_to_thick_function [[FIRSTREF]]
+  %6 = thin_to_thick_function %5 : $@convention(thin) () -> Int to $@callee_owned () -> Int
+// CHECK-NOT: store
+  store %6 to [init] %1 : $*@callee_owned () -> Int
+// CHECK: br bb3([[FIRSTTHICK]])
+  br bb3
+
+// CHECK: bb2
+bb2:
+// CHECK: [[SECONDREF:%.*]] = function_ref @second
+  %9 = function_ref @second : $@convention(thin) () -> Int
+// CHECK: [[SECONDTHICK:%.*]] =  thin_to_thick_function [[SECONDREF]]
+  %10 = thin_to_thick_function %9 : $@convention(thin) () -> Int to $@callee_owned () -> Int
+// CHECK-NOT: store
+  store %10 to [init] %1 : $*@callee_owned () -> Int
+// CHECK: br bb3([[SECONDTHICK]])
+  br bb3
+
+// CHECK: bb3([[ARG:%.*]] : @owned $@callee_owned () -> Int):
+bb3:
+// CHECK-NOT: load
+  %13 = load [copy] %1 : $*@callee_owned () -> Int
+// CHECK: [[COPY:%.*]] = copy_value [[ARG]]
+// CHECK: [[RESULT:%.*]] = apply [[COPY]]
+  %15 = apply %13() : $@callee_owned () -> Int
+  br bb4
+
+  // NOTE: This block and the branch above exist to ensure that we
+  //       test what happens when %1 hasn't already been loaded in this
+  //       block.
+// CHECK: bb4
+bb4:
+// CHECK-NOT: destroy_addr
+//      : destroy_value [[ARG]]
+// The above destroy is eliminated by owned value canonicalization.
+  destroy_addr %1 : $*@callee_owned () -> Int
+// CHECK-NOT: dealloc_stack
+  dealloc_stack %1 : $*@callee_owned () -> Int
+  return %15 : $Int
+}
+// CHECK-LABEL: } // end sil function 'promote_function_refs'
+
+// Test cases where the only use is a debug_value_addr
+// CHECK-LABEL: sil [ossa] @no_real_uses :
+sil [ossa] @no_real_uses : $@convention(thin) () -> () {
+// CHECK: bb0
+bb0:
+  // CHECK-NOT: alloc_stack
+  %0 = alloc_stack [dynamic_lifetime] $Builtin.Int32
+  // CHECK-NOT: debug_value {{.*}} expr op_deref
+  debug_value %0 : $*Builtin.Int32, let, name "x", argno 1, expr op_deref
+  // CHECK-NOT: dealloc_stack
+  dealloc_stack %0 : $*Builtin.Int32
+  %1 = tuple ()
+  return %1 : $()
+}
+// CHECK-LABEL: } // end sil function 'no_real_uses'
+
+// CHECK-LABEL: sil [ossa] @keep_release :
+// CHECK: destroy_value %0
+// CHECK-LABEL: } // end sil function 'keep_release'
+sil [ossa] @keep_release : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = alloc_stack $AnyObject
+  store %0 to [init] %1 : $*AnyObject
+  destroy_addr %1 : $*AnyObject
+  dealloc_stack %1 : $*AnyObject
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Test cases where there are dead address instructions.
+// CHECK-LABEL: sil [ossa] @dead_use :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'dead_use'
+sil [ossa] @dead_use : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int64
+  %1 = struct_element_addr %0 : $*Int64, #Int64._value
+  dealloc_stack %0 : $*Int64
+  %2 = alloc_stack $(Int64, Int64)
+  %3 = tuple_element_addr %2 : $*(Int64, Int64), 0
+  dealloc_stack %2 : $*(Int64, Int64)
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_crash_on_dead_arg_use :
+// CHECK: bb0{{.*}}:
+// CHECK:      tuple ()
+// CHECK-LABEL: } // end sil function 'dont_crash_on_dead_arg_use'
+sil [ossa] @dont_crash_on_dead_arg_use : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %2 = alloc_stack $Int64
+  %1 = struct_element_addr %0 : $*Int64, #Int64._value
+  %3 = struct_element_addr %2 : $*Int64, #Int64._value
+  dealloc_stack %2 : $*Int64
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// Make sure that we do expand destroy_addr appropriately for code-size
+// trade-offs.
+// CHECK-LABEL: sil [ossa] @large_struct_test :
+// CHECK: bb0([[ARG0:%.*]] : @owned $LargeCodesizeStruct):
+// CHECK:   destroy_value [[ARG0]]
+// CHECK: } // end sil function 'large_struct_test'
+sil [ossa] @large_struct_test : $@convention(thin) (@owned LargeCodesizeStruct) -> () {
+bb0(%0 : @owned $LargeCodesizeStruct):
+  %1 = alloc_stack $LargeCodesizeStruct
+  store %0 to [init] %1 : $*LargeCodesizeStruct
+  destroy_addr %1 : $*LargeCodesizeStruct
+  dealloc_stack %1 : $*LargeCodesizeStruct
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @small_struct_test :
+// CHECK: bb0([[ARG0:%.*]] : @owned $SmallCodesizeStruct):
+// CHECK:   destroy_value [[ARG0]]
+// CHECK: } // end sil function 'small_struct_test'
+sil [ossa] @small_struct_test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+bb0(%0 : @owned $SmallCodesizeStruct):
+  %1 = alloc_stack $SmallCodesizeStruct
+  store %0 to [init] %1 : $*SmallCodesizeStruct
+  destroy_addr %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @small_struct_multi_test :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[COPY:%.*]] = copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    begin_borrow [[COPY]]
+// CHECK-NEXT:    debug_value
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    destroy_value [[COPY]]
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0
+// CHECK-LABEL: } // end sil function 'small_struct_multi_test'
+sil [ossa] @small_struct_multi_test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+bb0(%0 : @owned $SmallCodesizeStruct):
+  %1 = alloc_stack $SmallCodesizeStruct
+  store %0 to [init] %1 : $*SmallCodesizeStruct
+  cond_br undef, bb1, bb2
+  
+bb1:
+  %3 = load [copy] %1 : $*SmallCodesizeStruct
+  destroy_addr %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  %4 = begin_borrow %3 : $SmallCodesizeStruct
+  debug_value %4 : $SmallCodesizeStruct
+  end_borrow %4 : $SmallCodesizeStruct
+  destroy_value %3 : $SmallCodesizeStruct
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  br bb3
+  
+bb3:
+  %7 = tuple ()
+  return %7 : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @dead_address_projections :
+// CHECK-NOT: alloc_stack
+// CHECK: } // end sil function 'dead_address_projections'
+sil [ossa] @dead_address_projections : $@convention(thin) (((), ())) -> ((), ()) {
+bb0(%0 : $((), ())):
+  %1 = alloc_stack $((), ())
+  %200 = tuple_element_addr %1 : $*((), ()), 0
+  %300 = tuple_element_addr %1 : $*((), ()), 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %0 to [trivial] %1 : $*((), ())
+  dealloc_stack %1 : $*((), ())
+  br bb3
+
+bb2:
+  dealloc_stack %1 : $*((), ())
+  br bb3
+
+bb3:
+  return %0
+}
+
+// CHECK-LABEL: sil [ossa] @load_tuple_of_void :
+// CHECK:         alloc_stack
+// CHECK:       } // end sil function 'load_tuple_of_void'
+sil [ossa] @load_tuple_of_void : $@convention(thin) () -> ((), ()) {
+bb0:
+  %1 = alloc_stack $((), ())
+  %16 = load [trivial] %1 : $*((), ())
+  dealloc_stack %1 : $*((), ())
+  return %16 : $((), ())
+}
+
+// CHECK-LABEL: sil [ossa] @test_optional_in_multiple_blocks :
+// CHECK-NOT:         alloc_stack
+// CHECK:       } // end sil function 'test_optional_in_multiple_blocks'
+sil [ossa] @test_optional_in_multiple_blocks : $@convention(method) (@guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  %1 = copy_value %0 : $FakeOptional<Klass>
+  %32 = alloc_stack $FakeOptional<Klass>
+  store %1 to [init] %32 : $*FakeOptional<Klass>
+  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb6, case #FakeOptional.none!enumelt: bb5
+
+bb5:
+  dealloc_stack %32 : $*FakeOptional<Klass>
+  br bb7
+
+bb6(%50 : @guaranteed $Klass):
+  %53 = load [copy] %32 : $*FakeOptional<Klass>
+  destroy_value %53 : $FakeOptional<Klass>
+  destroy_addr %32 : $*FakeOptional<Klass>
+  dealloc_stack %32 : $*FakeOptional<Klass>
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_optional_in_multiple_blocks_lexical :
+// CHECK-NOT:         alloc_stack
+// CHECK:       } // end sil function 'test_optional_in_multiple_blocks_lexical'
+sil [ossa] @test_optional_in_multiple_blocks_lexical : $@convention(method) (@guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  %1 = copy_value %0 : $FakeOptional<Klass>
+  %32 = alloc_stack [lexical] $FakeOptional<Klass>
+  store %1 to [init] %32 : $*FakeOptional<Klass>
+  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb6, case #FakeOptional.none!enumelt: bb5
+
+bb5:
+  dealloc_stack %32 : $*FakeOptional<Klass>
+  br bb7
+
+bb6(%50 : @guaranteed $Klass):
+  %53 = load [copy] %32 : $*FakeOptional<Klass>
+  destroy_value %53 : $FakeOptional<Klass>
+  destroy_addr %32 : $*FakeOptional<Klass>
+  dealloc_stack %32 : $*FakeOptional<Klass>
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_optional_in_multiple_blocks_lexical_storedvalue :
+// CHECK-NOT:         alloc_stack
+// CHECK:       } // end sil function 'test_optional_in_multiple_blocks_lexical_storedvalue'
+sil [ossa] @test_optional_in_multiple_blocks_lexical_storedvalue : $@convention(method) (@owned FakeOptional<Klass>) -> () {
+bb0(%0 : @owned $FakeOptional<Klass>):
+  %1 = copy_value %0 : $FakeOptional<Klass>
+  %32 = alloc_stack $FakeOptional<Klass>
+  store %0 to [init] %32 : $*FakeOptional<Klass>
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb6, case #FakeOptional.none!enumelt: bb5
+
+bb5:
+  dealloc_stack %32 : $*FakeOptional<Klass>
+  br bb7
+
+bb6(%50 : @owned $Klass):
+  %53 = load [copy] %32 : $*FakeOptional<Klass>
+  destroy_value %53 : $FakeOptional<Klass>
+  destroy_value %50 : $Klass
+  destroy_addr %32 : $*FakeOptional<Klass>
+  dealloc_stack %32 : $*FakeOptional<Klass>
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @optimize_optional_in_single_block :
+// CHECK-NOT:     alloc_stack
+// CHECK:       } // end sil function 'optimize_optional_in_single_block'
+sil [ossa] @optimize_optional_in_single_block : $@convention(method) (@guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb6, case #FakeOptional.none!enumelt: bb5
+
+bb5:
+  br bb7
+
+bb6(%50 : @guaranteed $Klass):
+  %32 = alloc_stack $FakeOptional<Klass>
+  %1 = copy_value %0 : $FakeOptional<Klass>
+  store %1 to [init] %32 : $*FakeOptional<Klass>
+  %53 = load [take] %32 : $*FakeOptional<Klass>
+  destroy_value %53 : $FakeOptional<Klass>
+  dealloc_stack %32 : $*FakeOptional<Klass>
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @switch_enum_out_of_new_phi_block : {{.*}} {
+// CHECK-NOT:     alloc_stack
+// CHECK:       } // end sil function 'switch_enum_out_of_new_phi_block'
+sil [ossa] @switch_enum_out_of_new_phi_block : $() -> () {
+entry:
+  %addr = alloc_stack $FakeOptional<Klass>
+  cond_br undef, store_none, agg_either
+
+store_none:
+  %none1 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none1 to [init] %addr : $*FakeOptional<Klass>
+  br switcheroo
+
+agg_either:
+  cond_br undef, agg_some, agg_none
+
+agg_some:
+  %Klass = apply undef() : $@convention(thin) () -> (@owned Klass)
+  %some = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %Klass : $Klass
+  br store_maybe(%some : $FakeOptional<Klass>)
+
+agg_none:
+  %none2 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br store_maybe(%none2 : $FakeOptional<Klass>)
+
+store_maybe(%maybe : @owned $FakeOptional<Klass>):
+  store %maybe to [init] %addr : $*FakeOptional<Klass>
+  br switcheroo
+
+switcheroo:
+  %borrow = load_borrow %addr : $*FakeOptional<Klass>
+  switch_enum %borrow : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb14, case #FakeOptional.none!enumelt: bb15
+
+bb14(%some_borrowed : @guaranteed $Klass):
+  end_borrow %borrow : $FakeOptional<Klass>
+  destroy_addr %addr : $*FakeOptional<Klass>
+  br bb16
+
+bb15:
+  end_borrow %borrow : $FakeOptional<Klass>
+  br bb16
+
+bb16:
+  dealloc_stack %addr : $*FakeOptional<Klass>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// This is optimized by `load` and `store_borrow` simplification
+// CHECK-LABEL: sil [ossa] @debug_value_of_store_borrow_addr_multi_block : {{.*}} {
+// CHECK:         store_borrow
+// CHECK-LABEL: } // end sil function 'debug_value_of_store_borrow_addr_multi_block'
+sil [ossa] @debug_value_of_store_borrow_addr_multi_block : $@convention(thin) (@owned S) -> () {
+entry(%instance : @owned $S):
+  br header
+
+header:
+  %lifetime = begin_borrow %instance : $S
+  %stack = alloc_stack $S
+  %stack_borrow = store_borrow %lifetime to %stack : $*S
+  debug_value %stack_borrow : $*S, expr op_deref
+  br body
+
+body:
+  %field_addr = struct_element_addr %stack_borrow : $*S, #S.field
+  %field = load [copy] %field_addr : $*C
+  end_borrow %stack_borrow : $*S
+  dealloc_stack %stack : $*S
+  end_borrow %lifetime : $S
+  destroy_value %field : $C
+  cond_br undef, backedge, exit
+
+backedge:
+  br header
+
+exit:
+  destroy_value %instance : $S
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// This is optimized by `load` and `store_borrow` simplification
+// CHECK-LABEL: sil [ossa] @debug_value_of_store_borrow_addr_single_block : {{.*}} {
+// CHECK:         store_borrow
+// CHECK-LABEL: } // end sil function 'debug_value_of_store_borrow_addr_single_block'
+sil [ossa] @debug_value_of_store_borrow_addr_single_block : $@convention(thin) (@owned S) -> () {
+entry(%instance : @owned $S):
+  br header
+
+header:
+  %lifetime = begin_borrow %instance : $S
+  %stack = alloc_stack $S
+  %stack_borrow = store_borrow %lifetime to %stack : $*S
+  debug_value %stack_borrow : $*S, expr op_deref
+  %field_addr = struct_element_addr %stack_borrow : $*S, #S.field
+  %field = load [copy] %field_addr : $*C
+  end_borrow %stack_borrow : $*S
+  dealloc_stack %stack : $*S
+  end_borrow %lifetime : $S
+  destroy_value %field : $C
+  cond_br undef, backedge, exit
+
+backedge:
+  br header
+
+exit:
+  destroy_value %instance : $S
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_canonicalize_undef : {{.*}} {
+// CHECK:         [[RETVAL:%[^,]+]] = tuple
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'dont_canonicalize_undef'
+sil [ossa] @dont_canonicalize_undef : $@convention(thin) () -> () {
+  %addr = alloc_stack $()
+  store undef to [trivial] %addr : $*()
+  dealloc_stack %addr : $*()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_canonicalize_erased_copy : {{.*}} {
+// CHECK:       bb0(%0 :
+// CHECK:         destroy_value %0
+// CHECK-LABEL: } // end sil function 'dont_canonicalize_erased_copy'
+sil [ossa] @dont_canonicalize_erased_copy : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %stack = alloc_stack $C
+  %copy = copy_value %instance : $C
+  store %copy to [init] %stack : $*C
+  %loaded_copy = load [take] %stack : $*C
+  destroy_value %loaded_copy : $C
+  store %instance to [init] %stack : $*C
+  %loaded_instance = load [take] %stack : $*C
+  destroy_value %loaded_instance : $C
+  dealloc_stack %stack : $*C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @no_promo_proj_uac_1 : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'no_promo_proj_uac_1'
+sil [ossa] @no_promo_proj_uac_1 : $@convention(thin) () -> () {
+bb0:
+  %s = apply undef() : $@convention(thin) () -> (@owned S1)
+  %addr = alloc_stack $S1
+  store %s to [init] %addr
+  %i_addr = unchecked_addr_cast %addr to $*Ix
+  %j_addr = struct_element_addr %i_addr, #Ix.j
+  %j = load [copy] %j_addr
+  destroy_addr %addr
+  dealloc_stack %addr
+  apply undef(%j) : $@convention(thin) (@owned J) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @no_promo_proj_uac_2 : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'no_promo_proj_uac_2'
+sil [ossa] @no_promo_proj_uac_2 : $@convention(thin) () -> () {
+bb0:
+  %s = apply undef() : $@convention(thin) () -> (@owned S2x)
+  %addr = alloc_stack $S2x
+  store %s to [init] %addr
+  %t_addr = unchecked_addr_cast %addr to $*(J, J)
+  %j_addr = tuple_element_addr %t_addr, 0
+  %j = load [copy] %j_addr
+  destroy_addr %addr
+  dealloc_stack %addr
+  apply undef(%j) : $@convention(thin) (@owned J) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @no_promo_uac_uac : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'no_promo_uac_uac'
+sil [ossa] @no_promo_uac_uac : $@convention(thin) () -> () {
+bb0:
+  %s = apply undef() : $@convention(thin) () -> (@owned S1)
+  %addr = alloc_stack $S1
+  store %s to [init] %addr
+  %i_addr = unchecked_addr_cast %addr to $*Ix
+  %j_addr = unchecked_addr_cast %i_addr to $*J
+  %j = load [copy] %j_addr
+  destroy_addr %addr
+  dealloc_stack %addr
+  apply undef(%j) : $@convention(thin) (@owned J) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @dead_end_only_store_non_lexical :
+// CHECK-NOT:     alloc_stack
+// CHECK:         destroy_value [dead_end] %0
+// CHECK-LABEL: } // end sil function 'dead_end_only_store_non_lexical'
+sil [ossa] @dead_end_only_store_non_lexical : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_stack $C
+  store %0 to [init] %1
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @write_only_in_dead_end :
+// CHECK:       bb2:
+// CHECK-NEXT:    [[L:%.*]] = load [take] %0
+// CHECK-NEXT:    dealloc_stack %0
+// CHECK-NEXT:    destroy_value [dead_end] [[L]]
+// CHECK-LABEL: } // end sil function 'write_only_in_dead_end'
+sil [ossa] @write_only_in_dead_end : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $any Error
+  %1 = alloc_stack $any Error
+  try_apply undef(%1) : $@noescape @callee_guaranteed () -> ((), @error_indirect any Error), normal bb1, error bb2
+
+bb1(%3 : $()):
+  dealloc_stack %1
+  dealloc_stack %0
+  return %3
+
+bb2:
+  %7 = load [take] %1
+  dealloc_stack %1
+  store %7 to [init] %0
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @write_only_in_single_block_dead_end :
+// CHECK:         apply
+// CHECK-NEXT:    [[L:%.*]] = load [take] %0
+// CHECK-NEXT:    dealloc_stack %0
+// CHECK-NEXT:    end_lifetime [[L]]
+// CHECK-LABEL: } // end sil function 'write_only_in_single_block_dead_end'
+sil [ossa] @write_only_in_single_block_dead_end : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $AnyObject
+  %1 = alloc_stack $AnyObject
+  %2 = apply undef(%1) : $@noescape @callee_guaranteed () -> @out AnyObject
+  %7 = load [take] %1
+  dealloc_stack %1
+  store %7 to [init] %0
+  dealloc_stack %0
+  unreachable
+}
+
+sil shared [noinline] @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @store_only_allocas2 :
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function 'store_only_allocas2'
+sil [ossa] @store_only_allocas2 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = load [take] %1 : $*Klass
+  %4 = apply %2(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  dealloc_stack %1 : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals_b :
+// CHECK-NOT: alloc_stack
+// CHECK: destroy_value %0
+// CHECK: [[FUNC:%.*]] = function_ref @blackhole_spl :
+// CHECK: apply [[FUNC]](%1) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: destroy_value %1
+// CHECK-LABEL: } // end sil function 'multiple_store_vals_b'
+sil [ossa] @multiple_store_vals_b : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  store %1 to [assign] %2 : $*Klass
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %2 : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %2 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals2b :
+// CHECK-NOT: alloc_stack
+// CHECK: destroy_value %0
+// CHECK: [[FUNC:%.*]] = function_ref @blackhole_spl :
+// CHECK: apply [[FUNC]](%1) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: destroy_value %1
+// CHECK-LABEL: } // end sil function 'multiple_store_vals2b'
+sil [ossa] @multiple_store_vals2b : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  destroy_addr %2 : $*Klass
+  store %1 to [init] %2 : $*Klass
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %2 : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %2 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals3 :
+// CHECK-NOT: alloc_stack
+// The COPY0 copy/destroy is eliminated by owned value canonicalization.
+//      : [[COPY0:%.*]] = copy_value %0
+// CHECK: [[COPY1:%.*]] = copy_value %1
+//      : destroy_value [[COPY0]]
+// CHECK: [[FUNC:%.*]] = function_ref @blackhole_spl :
+// CHECK: apply [[FUNC]]([[COPY1]]) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: destroy_value [[COPY1]]
+// CHECK-LABEL: } // end sil function 'multiple_store_vals3'
+sil [ossa] @multiple_store_vals3 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %2 = alloc_stack $Klass
+  %copy0 = copy_value %0 : $Klass
+  store %copy0 to [init] %2 : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  %copy1 = copy_value %1 : $Klass
+  store %copy1 to [assign] %2 : $*Klass
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %2 : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %2 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals4 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals4'
+sil [ossa] @multiple_store_vals4 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Klass>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Klass>, 0
+  store %1 to [assign] %2 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb2:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb3:
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals5 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals5'
+sil [ossa] @multiple_store_vals5 : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  store %0 to [init] %stk : $*Klass
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Klass>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Klass>, 0
+  store %1 to [assign] %stk : $*Klass
+  store %2 to [assign] %stk : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb2:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb3:
+  destroy_addr %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals6 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals6'
+sil [ossa] @multiple_store_vals6 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  br bb1
+
+bb1:
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  store %1 to [assign] %2 : $*Klass
+  br bb2
+
+bb2:
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %2 : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %2 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals7 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals7'
+sil [ossa] @multiple_store_vals7 : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  store %0 to [init] %stk : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  br bb1
+
+bb1:
+  store %1 to [assign] %stk : $*Klass
+  store %2 to [assign] %stk : $*Klass
+  br bb2
+
+bb2:
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %stk : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %stk : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals8 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals8'
+sil [ossa] @multiple_store_vals8 : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  store %0 to [init] %stk : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  br bb1
+
+bb1:
+  store %1 to [assign] %stk : $*Klass
+  destroy_addr %stk : $*Klass
+  store %2 to [init] %stk : $*Klass
+  br bb2
+
+bb2:
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %stk : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %stk : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @with_loads :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'with_loads'
+sil [ossa] @with_loads : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Klass>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Klass>, 0
+  store %1 to [assign] %2 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb2:
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Klass>
+  br bb3
+
+bb3:
+  %ret = load [take] %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  return %ret : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @basic_block_with_loads_and_stores2 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'basic_block_with_loads_and_stores2'
+sil [ossa] @basic_block_with_loads_and_stores2 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = alloc_stack $Klass
+  store %1 to [init] %3 : $*Klass
+  %local = alloc_ref $Klass
+  store %local to [assign] %3 : $*Klass
+  %func = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %arg = load [take] %3 : $*Klass
+  %applyres = apply %func(%arg) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %arg : $Klass
+  destroy_addr %2 : $*Klass
+  dealloc_stack %3 : $*Klass
+  dealloc_stack %2 : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @basic_block_with_loads_copy_and_take :
+// CHECK-NOT: alloc_stack
+// The COPY/destroy pair is eliminated by owned value canonicalization.
+//      : [[COPY:%.*]] = copy_value %0
+//      : destroy_value [[COPY]]
+// CHECK: destroy_value %0
+// CHECK-LABEL: } // end sil function 'basic_block_with_loads_copy_and_take'
+sil [ossa] @basic_block_with_loads_copy_and_take : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %copy = load [copy] %1 : $*Klass
+  %take = load [take] %1 : $*Klass
+  destroy_value %copy : $Klass
+  destroy_value %take : $Klass
+  dealloc_stack %1 : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// load [copy] is not used as RunningVal
+// StackAllocationPromoter::fixBranchesAndUses will delete the loads and replace with %0
+// CHECK-LABEL: sil [ossa] @multi_basic_block_with_loads_copy_and_take_1 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_basic_block_with_loads_copy_and_take_1'
+sil [ossa] @multi_basic_block_with_loads_copy_and_take_1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  br bb1
+bb1:
+  %copy = load [copy] %1 : $*Klass
+  %take = load [take] %1 : $*Klass
+  destroy_value %copy : $Klass
+  destroy_value %take : $Klass
+  dealloc_stack %1 : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// load [copy] is not used as RunningVal
+// StackAllocationPromoter::fixBranchesAndUses will delete the loads and replace with %0
+// CHECK-LABEL: sil [ossa] @multi_basic_block_with_loads_copy_and_take_2 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_basic_block_with_loads_copy_and_take_2'
+sil [ossa] @multi_basic_block_with_loads_copy_and_take_2 : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  br bb1
+bb1:
+  %copy = load [copy] %1 : $*Klass
+  %take = load [take] %1 : $*Klass
+  destroy_value %take : $Klass
+  dealloc_stack %1 : $*Klass
+  return %copy : $Klass
+}
+
+// load [take] is used as RunningVal in bb1
+// CHECK-LABEL: sil [ossa] @multi_basic_block_with_loads_copy_and_take_3 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_basic_block_with_loads_copy_and_take_3'
+sil [ossa] @multi_basic_block_with_loads_copy_and_take_3 : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  br bb1
+bb1:
+  %take = load [take] %1 : $*Klass
+  %copy = copy_value %take : $Klass
+  destroy_value %take : $Klass
+  dealloc_stack %1 : $*Klass
+  return %copy : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @multi_basic_block_with_store_assign :
+// CHECK-NOT: alloc_stack
+// CHECK: destroy_value %0
+// CHECK-LABEL: } // end sil function 'multi_basic_block_with_store_assign'
+sil [ossa] @multi_basic_block_with_store_assign : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1: @owned $Klass):
+  %stk = alloc_stack $Klass
+  store %0 to [init] %stk : $*Klass
+  br bb1
+bb1:
+  store %1 to [assign] %stk : $*Klass
+  %res = load [take] %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  return %res : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @multi_basic_block_with_phiarg :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: bb1:
+// CHECK: br bb3(%1)
+// CHECK-LABEL: bb2:
+// CHECK: br bb3(%0)
+// CHECK-LABEL: } // end sil function 'multi_basic_block_with_phiarg'
+sil [ossa] @multi_basic_block_with_phiarg : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  cond_br undef, bb1, bb2
+bb1:
+  store %1 to [init] %stk : $*Klass
+  destroy_value %0 : $Klass
+  br bb3
+bb2:
+  store %0 to [init] %stk : $*Klass
+  destroy_value %1 : $Klass
+  br bb3
+bb3:
+  %val = load [take] %stk : $*Klass
+  destroy_value %val : $Klass
+  dealloc_stack %stk : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multi_asi_basic_block_with_phiarg :
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: bb1:
+// CHECK:         br bb3(%1, %0)
+// CHECK-LABEL: bb2:
+// CHECK:         br bb3(%0, %1)
+// CHECK:       bb3([[PHI1:%.*]] : @owned $Klass, [[PHI2:%.*]] : @owned $Klass):
+// CHECK:         destroy_value [[PHI1]]
+// CHECK:         destroy_value [[PHI2]]
+// CHECK-LABEL: } // end sil function 'multi_asi_basic_block_with_phiarg'
+sil [ossa] @multi_asi_basic_block_with_phiarg : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk1 = alloc_stack $Klass
+  %stk2 = alloc_stack $Klass
+  cond_br undef, bb1, bb2
+bb1:
+  store %1 to [init] %stk1 : $*Klass
+  store %0 to [init] %stk2 : $*Klass
+  br bb3
+bb2:
+  store %1 to [init] %stk2 : $*Klass
+  store %0 to [init] %stk1 : $*Klass
+  br bb3
+bb3:
+  %val1 = load [take] %stk1 : $*Klass
+  destroy_value %val1 : $Klass
+  %val2 = load [take] %stk2 : $*Klass
+  destroy_value %val2 : $Klass
+  dealloc_stack %stk2 : $*Klass
+  dealloc_stack %stk1 : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// Test to check no dead args are passed to bb3 as phi arg
+// CHECK-LABEL: sil [ossa] @multi_basic_block_stack_deallocated_phiarg :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: bb2:
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK-LABEL: } // end sil function 'multi_basic_block_stack_deallocated_phiarg'
+sil [ossa] @multi_basic_block_stack_deallocated_phiarg : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  cond_br undef, bb1, bb2
+bb1:
+  dealloc_stack %stk : $*Klass
+  destroy_value %0 : $Klass
+  br bb3
+bb2:
+  store %0 to [init] %stk : $*Klass
+  %val = load [take] %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  destroy_value %val : $Klass
+  br bb3
+bb3:
+  %res = tuple ()
+  return %res : $()
+}
+
+// Test to check no dead args are passed to bb3 as phi arg
+// CHECK-LABEL: sil [ossa] @multi_asi_basic_block_stack_deallocated_phiarg :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: bb2:
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK-LABEL: } // end sil function 'multi_asi_basic_block_stack_deallocated_phiarg'
+sil [ossa] @multi_asi_basic_block_stack_deallocated_phiarg : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk1 = alloc_stack $Klass
+  %stk2 = alloc_stack $Klass
+  cond_br undef, bb1, bb2
+bb1:
+  dealloc_stack %stk2 : $*Klass
+  dealloc_stack %stk1 : $*Klass
+  destroy_value %0 : $Klass
+  destroy_value %1 : $Klass
+  br bb3
+bb2:
+  store %0 to [init] %stk1 : $*Klass
+  %val1 = load [take] %stk1 : $*Klass
+  store %1 to [init] %stk2 : $*Klass
+  %val2 = load [take] %stk2 : $*Klass
+  destroy_value %val1 : $Klass
+  destroy_value %val2 : $Klass
+  dealloc_stack %stk2 : $*Klass
+  dealloc_stack %stk1 : $*Klass
+  br bb3
+bb3:
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multi_basic_block_destroyed_last_stored_val_phiarg :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: bb3:
+// CHECK-LABEL: } // end sil function 'multi_basic_block_destroyed_last_stored_val_phiarg'
+sil [ossa] @multi_basic_block_destroyed_last_stored_val_phiarg : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_value %0 : $Klass
+  br bb3
+bb2:
+  store %0 to [init] %stk : $*Klass
+  %val = load [take] %stk : $*Klass
+  destroy_value %val : $Klass
+  br bb3
+bb3:
+  dealloc_stack %stk : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mem2reg_debug_value2 :
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: debug_value {{.*}} expr op_deref
+// CHECK: debug_value %0
+// CHECK-LABEL: } // end sil function 'mem2reg_debug_value2'
+sil [ossa] @mem2reg_debug_value2 : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  debug_value %1 : $*Klass, expr op_deref
+  %2 = load [take] %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  return %2 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @mem2reg_struct_addr2 :
+// CHECK-NOT: alloc_stack
+// CHECK: [[BORROW:%.*]] = begin_borrow %0
+// CHECK: [[ELE:%.*]] = struct_extract [[BORROW]]
+// CHECK: [[COPY:%.*]] = copy_value [[ELE]]
+// CHECK: end_borrow [[BORROW]]
+// CHECK: return [[COPY]]
+// CHECK-LABEL: } // end sil function 'mem2reg_struct_addr2'
+sil [ossa] @mem2reg_struct_addr2 : $@convention(thin) (@owned SmallCodesizeStruct) -> @owned Klass {
+bb0(%0 : @owned $SmallCodesizeStruct):
+  %1 = alloc_stack $SmallCodesizeStruct
+  store %0 to [init] %1 : $*SmallCodesizeStruct
+  %2 = struct_element_addr %1 : $*SmallCodesizeStruct, #SmallCodesizeStruct.cls1
+  %3 = load [copy] %2 : $*Klass
+  destroy_addr %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  return %3 : $Klass
+}
+
+// SILMem2Reg is disabled when there is a load [take] with struct_element_addr/tuple_element_addr
+// CHECK-LABEL: sil [ossa] @mem2reg_struct_addr_load_take :
+// CHECK:         %1 = destructure_struct %0
+// CHECK:         destroy_value %1
+// CHECK-NEXT:    tuple
+// CHECK-LABEL: } // end sil function 'mem2reg_struct_addr_load_take'
+sil [ossa] @mem2reg_struct_addr_load_take : $@convention(thin) (@owned WrapperStruct) -> () {
+bb0(%0 : @owned $WrapperStruct):
+  %1 = alloc_stack $WrapperStruct
+  store %0 to [init] %1 : $*WrapperStruct
+  %2 = struct_element_addr %1 : $*WrapperStruct, #WrapperStruct.cls
+  %3 = load [take] %2 : $*Klass
+  destroy_value %3 : $Klass
+  dealloc_stack %1 : $*WrapperStruct
+  %tup = tuple ()
+  return %tup : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mem2reg_tuple_addr2 :
+// CHECK-NOT: alloc_stack
+// CHECK: [[TUP:%.*]] = tuple (%0, %1)
+// CHECK: [[BORROW:%.*]] = begin_borrow [[TUP]]
+// CHECK: [[ELE:%.*]] = tuple_extract [[BORROW]]
+// CHECK: [[COPY:%.*]] = copy_value [[ELE]]
+// CHECK: end_borrow [[BORROW]]
+// CHECK: return [[COPY]]
+// CHECK-LABEL: } // end sil function 'mem2reg_tuple_addr2'
+sil [ossa] @mem2reg_tuple_addr2 : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk = alloc_stack $(Klass, Klass)
+  %2 = tuple (%0 : $Klass, %1 : $Klass)
+  store %2 to [init] %stk : $*(Klass, Klass)
+  %4 = tuple_element_addr %stk : $*(Klass, Klass), 0
+  %5 = load [copy] %4 : $*Klass
+  destroy_addr %stk : $*(Klass, Klass)
+  dealloc_stack %stk : $*(Klass, Klass)
+  return %5 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @struct_extract_if_then_else2 :
+// CHECK-NOT: alloc_stack
+sil [ossa] @struct_extract_if_then_else2 : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  store %0 to [trivial] %1 : $*Int64
+  %3 = integer_literal $Builtin.Int64, 2
+  %4 = struct_extract %0 : $Int64, #Int64._value
+  %5 = builtin "cmp_sgt_Int64"(%4 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  %6 = struct_element_addr %1 : $*Int64, #Int64._value
+  cond_br %5, bb1, bb2
+
+// CHECK: bb1:
+// CHECK: struct_extract %0
+bb1:
+  %8 = load [trivial] %6 : $*Builtin.Int64
+  %9 = integer_literal $Builtin.Int64, 1
+  %10 = integer_literal $Builtin.Int1, 0
+  %11 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int64, %9 : $Builtin.Int64, %10 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0
+  br bb3(%12 : $Builtin.Int64)
+
+// CHECK: bb2:
+// CHECK: struct_extract %0
+bb2:
+  %14 = load [trivial] %6 : $*Builtin.Int64
+  %15 = integer_literal $Builtin.Int64, 2
+  %16 = integer_literal $Builtin.Int1, 0
+  %17 = builtin "sadd_with_overflow_Int64"(%14 : $Builtin.Int64, %15 : $Builtin.Int64, %16 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 0
+  br bb3(%18 : $Builtin.Int64)
+
+// CHECK-NOT: dealloc_stack
+bb3(%20 : $Builtin.Int64):
+  dealloc_stack %1 : $*Int64
+  %22 = struct $Int64 (%20 : $Builtin.Int64)
+  return %22 : $Int64
+}
+// CHECK-LABEL: } // end sil function 'struct_extract_if_then_else2'
+
+// Test cases where the only use is a debug_value_addr
+// CHECK-LABEL: sil [ossa] @no_real_uses2 :
+sil [ossa] @no_real_uses2 : $@convention(thin) () -> () {
+// CHECK: bb0
+bb0:
+  // CHECK-NOT: alloc_stack
+  %0 = alloc_stack $Klass
+  %local = alloc_ref $Klass
+  store %local to [init] %0 : $*Klass
+  // CHECK-NOT: debug_value {{.*}} expr op_deref
+  debug_value %0 : $*Klass, expr op_deref
+  destroy_addr %0 : $*Klass
+  // CHECK-NOT: dealloc_stack
+  dealloc_stack %0 : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+// CHECK-LABEL: } // end sil function 'no_real_uses2'
+
+// CHECK-LABEL: sil [ossa] @half_trivial
+// CHECK:         %1 = copy_value %0
+// CHECK-NEXT:    destroy_value %1
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK-LABEL: } // end sil function 'half_trivial'
+sil [ossa] @half_trivial : $@convention(thin) (@owned (Builtin.BridgeObject, Builtin.Int32)) -> () {
+bb0(%0 : @owned $(Builtin.BridgeObject, Builtin.Int32)):
+  %1 = alloc_stack $(Builtin.BridgeObject, Builtin.Int32)
+  store %0 to [init] %1 : $*(Builtin.BridgeObject, Builtin.Int32)
+  %3 = load [copy] %1 : $*(Builtin.BridgeObject, Builtin.Int32)
+  destroy_value %3 : $(Builtin.BridgeObject, Builtin.Int32)
+  destroy_addr %1 : $*(Builtin.BridgeObject, Builtin.Int32)
+  dealloc_stack %1 : $*(Builtin.BridgeObject, Builtin.Int32)
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_debug_value :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_debug_value'
+sil [ossa] @multiple_debug_value : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  debug_value %0 : $Klass
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  debug_value %2 : $*Klass, expr op_deref
+  %5 = load [take] %2 : $*Klass
+  destroy_value %5 : $Klass
+  dealloc_stack %2 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multi_basic_block_bug1 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_basic_block_bug1'
+sil [ossa] @multi_basic_block_bug1 : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk1 = alloc_stack $Klass
+  store %0 to [init] %stk1 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %new1 = load [take] %stk1 : $*Klass
+  destroy_value %1 : $Klass
+  dealloc_stack %stk1 : $*Klass
+  br bbret(%new1 : $Klass)
+
+bb2:
+  store %1 to [assign] %stk1 : $*Klass
+  %new2 = load [take] %stk1 : $*Klass
+  dealloc_stack %stk1 : $*Klass
+  br bbret(%new2 : $Klass)
+
+bbret(%new : @owned $Klass):
+  return %new : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @multi_basic_block_bug2 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_basic_block_bug2'
+sil [ossa] @multi_basic_block_bug2 : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %stk1 = alloc_stack $Klass
+  store %0 to [init] %stk1 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %new1 = load [take] %stk1 : $*Klass
+  destroy_value %1 : $Klass
+  br bbret(%new1 : $Klass)
+
+bb2:
+  store %1 to [assign] %stk1 : $*Klass
+  %new2 = load [take] %stk1 : $*Klass
+  br bbret(%new2 : $Klass)
+
+bbret(%new : @owned $Klass):
+  dealloc_stack %stk1 : $*Klass
+  return %new : $Klass
+}
+
+sil [ossa] @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+sil [ossa] @get_nontrivialenum : $@convention(thin) () -> @owned NonTrivialEnum
+sil [ossa] @get_optionalnontrivialstruct : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
+sil [ossa] @take_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+sil @get : $@convention(thin) () -> @owned FakeOptional<Klass>
+sil @use : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_dynamiclifetime1 :
+// CHECK: alloc_stack [dynamic_lifetime]
+// CHECK-LABEL: } // end sil function 'test_dynamiclifetime1'
+sil [ossa] @test_dynamiclifetime1 : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_stack $Builtin.Int1
+  %3 = alloc_stack [dynamic_lifetime] $NonTrivialStruct
+  %4 = integer_literal $Builtin.Int1, 0
+  store %4 to [trivial] %2 : $*Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %func = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %val = apply %func() : $@convention(thin) () -> @owned NonTrivialStruct
+  %27 = integer_literal $Builtin.Int1, -1
+  store %27 to [trivial] %2 : $*Builtin.Int1
+  store %val to [init] %3 : $*NonTrivialStruct
+  br bb3
+
+bb3:
+  %32 = load [trivial] %2 : $*Builtin.Int1
+  cond_br %32, bb4, bb5
+
+bb4:
+  %34 = load [take] %3 : $*NonTrivialStruct
+  destroy_value %34 : $NonTrivialStruct
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  dealloc_stack %3 : $*NonTrivialStruct
+  dealloc_stack %2 : $*Builtin.Int1
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_dynamiclifetime2 :
+// CHECK: alloc_stack [dynamic_lifetime]
+// CHECK-LABEL: } // end sil function 'test_dynamiclifetime2'
+sil [ossa] @test_dynamiclifetime2 : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_stack $Builtin.Int1
+  %3 = alloc_stack [dynamic_lifetime] $NonTrivialStruct
+  %4 = integer_literal $Builtin.Int1, 0
+  store %4 to [trivial] %2 : $*Builtin.Int1
+  %func1 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %val1 = apply %func1() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %val1 to [init] %3 : $*NonTrivialStruct
+  %ld1 = load [take] %3 : $*NonTrivialStruct
+  %func2 = function_ref @take_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  apply %func2(%ld1) : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %val = apply %func1() : $@convention(thin) () -> @owned NonTrivialStruct
+  %27 = integer_literal $Builtin.Int1, -1
+  store %27 to [trivial] %2 : $*Builtin.Int1
+  store %val to [init] %3 : $*NonTrivialStruct
+  br bb3
+
+bb3:
+  %32 = load [trivial] %2 : $*Builtin.Int1
+  cond_br %32, bb4, bb5
+
+bb4:
+  %ld2 = load [take] %3 : $*NonTrivialStruct
+  destroy_value %ld2 : $NonTrivialStruct
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  dealloc_stack %3 : $*NonTrivialStruct
+  dealloc_stack %2 : $*Builtin.Int1
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_deadphi1 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_deadphi1'
+sil [ossa] @test_deadphi1 : $@convention(thin)  () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb1a, bb6
+
+bb1a:
+  br bb2
+
+bb2:
+  %stk = alloc_stack $NonTrivialStruct
+  cond_br undef, bb3, bb4
+
+bb3:
+  %func = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %val = apply %func() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %val to [init] %stk : $*NonTrivialStruct
+  %lval1 = load [copy] %stk : $*NonTrivialStruct
+  destroy_value %lval1 : $NonTrivialStruct
+  %lval2 = load [take] %stk : $*NonTrivialStruct
+  destroy_value %lval2 : $NonTrivialStruct
+  dealloc_stack %stk : $*NonTrivialStruct
+  cond_br undef, bb3a, bb3b
+
+bb3a:
+  br bb1
+
+bb3b:
+  br bb5
+
+bb4:
+  dealloc_stack %stk : $*NonTrivialStruct
+  unreachable
+
+bb5:
+  br bb2
+
+bb6:
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_deadphi2 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_deadphi2'
+sil [ossa] @test_deadphi2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $NonTrivialStruct
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %3 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %4 = apply %3() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %4 to [init] %0 : $*NonTrivialStruct
+  cond_br undef, bb4, bb5
+
+bb3:
+  dealloc_stack %0 : $*NonTrivialStruct
+  br bb7
+
+bb4:
+  %lval1 = load [take] %0 : $*NonTrivialStruct
+  destroy_value %lval1 : $NonTrivialStruct
+  dealloc_stack %0 : $*NonTrivialStruct
+  br bb7
+
+bb5:
+  %lval2 = load [take] %0 : $*NonTrivialStruct
+  destroy_value %lval2 : $NonTrivialStruct
+  dealloc_stack %0 : $*NonTrivialStruct
+  br bb7
+
+bb6:
+  %17 = tuple ()
+  return %17 : $()
+
+bb7:
+  br bb6
+}
+
+// CHECK-LABEL: sil [ossa] @test_deadphi3 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_deadphi3'
+sil [ossa] @test_deadphi3 : $@convention(thin) (@owned NonTrivialEnum) -> () {
+bb0(%0 : @owned $NonTrivialEnum):
+  %1 = alloc_stack $NonTrivialStruct
+  switch_enum %0 : $NonTrivialEnum, case #NonTrivialEnum.some1!enumelt: bb1, case #NonTrivialEnum.some2!enumelt: bb5
+
+bb1(%3 : @owned $Klass):
+  destroy_value %3 : $Klass
+  %5 = function_ref @get_optionalnontrivialstruct : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
+  %6 = apply %5() : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
+  switch_enum %6 : $FakeOptional<NonTrivialStruct>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb3:
+  unreachable
+
+bb4(%10 : @owned $NonTrivialStruct):
+  store %10 to [init] %1 : $*NonTrivialStruct
+  br bb9
+
+bb5(%13 : @owned $NonTrivialStruct):
+  destroy_value %13 : $NonTrivialStruct
+  %15 = function_ref @get_optionalnontrivialstruct : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
+  %16 = apply %15() : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
+  switch_enum %16 : $FakeOptional<NonTrivialStruct>, case #FakeOptional.some!enumelt: bb8, case #FakeOptional.none!enumelt: bb6
+
+bb6:
+  br bb7
+
+bb7:
+  unreachable
+
+bb8(%20 : @owned $NonTrivialStruct):
+  store %20 to [init] %1 : $*NonTrivialStruct
+  br bb9
+
+bb9:
+  %23 = function_ref @get_nontrivialenum : $@convention(thin) () -> @owned NonTrivialEnum
+  %24 = apply %23() : $@convention(thin) () -> @owned NonTrivialEnum
+  switch_enum %24 : $NonTrivialEnum, case #NonTrivialEnum.some1!enumelt: bb10, case #NonTrivialEnum.some2!enumelt: bb11
+
+bb10(%26 : @owned $Klass):
+  %27 = load [copy] %1 : $*NonTrivialStruct
+  destroy_value %27 : $NonTrivialStruct
+  destroy_value %26 : $Klass
+  br bb12
+
+bb11(%31 : @owned $NonTrivialStruct):
+  %32 = load [copy] %1 : $*NonTrivialStruct
+  destroy_value %32 : $NonTrivialStruct
+  destroy_value %31 : $NonTrivialStruct
+  br bb12
+
+bb12:
+  %36 = load [take] %1 : $*NonTrivialStruct
+  destroy_value %36 : $NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  %39 = tuple ()
+  return %39 : $()
+}
+
+sil @return_optional_or_error : $@convention(thin) () -> (@owned KlassOptional, @error Error)
+
+// CHECK-LABEL: sil [ossa] @test_deadphi4 :
+// CHECK-NOT:         alloc_stack
+// CHECK-LABEL: } // end sil function 'test_deadphi4'
+sil [ossa] @test_deadphi4 : $@convention(thin) (@owned KlassOptional) -> () {
+bb0(%0 : @owned $KlassOptional):
+  %stk = alloc_stack $KlassOptional
+  switch_enum %0 : $KlassOptional, case #KlassOptional.some!enumelt: bb2, case #KlassOptional.none!enumelt: bb1
+
+bb1:
+  dealloc_stack %stk : $*KlassOptional
+  br bb7
+
+bb2(%some : @owned $Klass):
+  destroy_value %some : $Klass
+  %19 = function_ref @return_optional_or_error : $@convention(thin) () -> (@owned KlassOptional, @error Error)
+  try_apply %19() : $@convention(thin) () -> (@owned KlassOptional, @error Error), normal bb3, error bb8
+
+bb3(%callresult : @owned $KlassOptional):
+  store %callresult to [init] %stk : $*KlassOptional
+  %29 = load [take] %stk : $*KlassOptional
+  switch_enum %29 : $KlassOptional, case #KlassOptional.some!enumelt: bb5, case #KlassOptional.none!enumelt: bb4
+
+bb4:
+  dealloc_stack %stk : $*KlassOptional
+  br bb7
+
+bb5(%33 : @owned $Klass):
+  destroy_value %33 : $Klass
+  dealloc_stack %stk : $*KlassOptional
+  br bb6
+
+bb6:
+  %39 = tuple ()
+  return %39 : $()
+
+bb7:
+  br bb6
+
+bb8(%err : @owned $Error):
+  destroy_value [dead_end] %err
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_deadphi5 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_deadphi5'
+sil [ossa] @test_deadphi5 : $@convention(thin) () -> () {
+bb0:
+  %stk = alloc_stack $NonTrivialStruct
+  cond_br undef, bb2, bb1
+
+bb1:
+  %func1 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %val1 = apply %func1() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %val1 to [init] %stk : $*NonTrivialStruct
+  br bb5
+
+bb2:
+  %func2 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %val2 = apply %func2() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %val2 to [init] %stk : $*NonTrivialStruct
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb5
+
+bb4:
+  %lval1 = load [take] %stk : $*NonTrivialStruct
+  destroy_value %lval1 : $NonTrivialStruct
+  dealloc_stack %stk : $*NonTrivialStruct
+  br bb9
+
+bb5:
+  cond_br undef, bb6, bb7
+
+bb6:
+  %lval2 = load [take] %stk : $*NonTrivialStruct
+  destroy_value %lval2 : $NonTrivialStruct
+  br bb8
+
+bb7:
+  %lval3 = load [take] %stk : $*NonTrivialStruct
+  destroy_value %lval3 : $NonTrivialStruct
+  br bb8
+
+bb8:
+  dealloc_stack %stk : $*NonTrivialStruct
+  br bb9
+
+bb9:
+  %res = tuple ()
+  return %res : $()
+}
+
+// Test that a load [take] of an unchecked_addr_cast doesn't get promoted.
+//
+// CHECK-LABEL: sil [ossa] @load_take_unchecked_addr_cast : {{.*}} {
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'load_take_unchecked_addr_cast'
+sil [ossa] @load_take_unchecked_addr_cast : $@convention(thin) (@guaranteed AnyObject) -> () {
+entry(%instance : @guaranteed $AnyObject):
+  %copy = copy_value %instance : $AnyObject
+  %storage = alloc_stack $AnyObject
+  store %copy to [init] %storage : $*AnyObject
+  %cast_addr = unchecked_addr_cast %storage : $*AnyObject to $*Klass
+  %value = load [take] %cast_addr : $*Klass
+  dealloc_stack %storage : $*AnyObject
+  destroy_value %value : $Klass    
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Don't bail if the original address is destroyed even if we see a cast.
+//
+// CHECK-LABEL: sil [ossa] @destroy_original_storage : {{.*}} {
+// CHECK:         destroy_value
+// CHECK-LABEL: } // end sil function 'destroy_original_storage'
+sil [ossa] @destroy_original_storage : $@convention(thin) (@guaranteed AnyObject) -> () {
+entry(%instance : @guaranteed $AnyObject):
+  %copy = copy_value %instance : $AnyObject
+  %storage = alloc_stack $AnyObject
+  store %copy to [init] %storage : $*AnyObject
+  %cast_addr = unchecked_addr_cast %storage : $*AnyObject to $*Klass
+  %value = load [copy] %cast_addr : $*Klass
+  destroy_addr %storage : $*AnyObject
+  dealloc_stack %storage : $*AnyObject
+  destroy_value %value : $Klass    
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Bail if the address produced by an unchecked_addr_cast is destroyed.
+//
+// CHECK-LABEL: sil [ossa] @destroy_addr_unchecked_addr_cast : {{.*}} {
+// CHECK:         unchecked_addr_cast
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'destroy_addr_unchecked_addr_cast'
+sil [ossa] @destroy_addr_unchecked_addr_cast : $@convention(thin) (@guaranteed AnyObject) -> () {
+entry(%instance : @guaranteed $AnyObject):
+  %copy = copy_value %instance : $AnyObject
+  %storage = alloc_stack $AnyObject
+  store %copy to [init] %storage : $*AnyObject
+  %cast_addr = unchecked_addr_cast %storage : $*AnyObject to $*Klass
+  %value = load [copy] %cast_addr : $*Klass
+  destroy_addr %cast_addr : $*Klass
+  dealloc_stack %storage : $*AnyObject
+  destroy_value %value : $Klass    
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Bail if there's a load [take] of one of multiple non-trivial fields.
+//
+// CHECK-LABEL: sil [ossa] @load_take_one_of_two_nontrivial_struct_fields : {{.*}} {
+// CHECK:         load [take]
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'load_take_one_of_two_nontrivial_struct_fields'
+sil [ossa] @load_take_one_of_two_nontrivial_struct_fields : $@convention(thin) (@guaranteed Sy) -> () {
+entry(%instance : @guaranteed $Sy):
+  %copy = copy_value %instance : $Sy
+  %storage = alloc_stack $Sy
+  store %copy to [init] %storage : $*Sy
+  %v1_addr = struct_element_addr %storage : $*Sy, #Sy.v1
+  %cast_addr = unchecked_addr_cast %v1_addr : $*AnyObject to $*Klass
+  %value = load [take] %cast_addr : $*Klass
+  %v2_addr = struct_element_addr %storage : $*Sy, #Sy.v2
+  destroy_addr %v2_addr : $*AnyObject
+  dealloc_stack %storage : $*Sy
+  destroy_value %value : $Klass    
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_take_original_despite_cast : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'load_take_original_despite_cast'
+sil [ossa] @load_take_original_despite_cast : $@convention(thin) (@owned AnyObject) -> () {
+entry(%instance : @owned $AnyObject):
+  %74 = alloc_stack $AnyObject
+  store %instance to [init] %74 : $*AnyObject
+  %76 = unchecked_addr_cast %74 : $*AnyObject to $*UInt8
+  %77 = load [trivial] %76 : $*UInt8
+  %79 = load [take] %74 : $*AnyObject
+  destroy_value %79 : $AnyObject
+  dealloc_stack %74 : $*AnyObject
+  %82 = tuple ()
+  return %82 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_enum_store_borrow_none :
+// CHECK:       alloc_stack
+// CHECK:       alloc_stack
+// CHECK:       dealloc_stack
+// CHECK-LABEL: } // end sil function 'test_enum_store_borrow_none'
+sil [ossa] @test_enum_store_borrow_none : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %2 = store_borrow %none to %1 : $*FakeOptional<Klass>
+  %3 = alloc_stack $FakeOptional<Klass>
+  %4 = load [copy] %2 : $*FakeOptional<Klass>
+  store %4 to [init] %3 : $*FakeOptional<Klass>
+  switch_enum_addr %3 : $*FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1:
+  %7 = unchecked_inplace_enum_data_addr %3 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %8 = load [take] %7 : $*Klass
+  destroy_value %8 : $Klass
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb2:
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb3:
+  end_borrow %2 : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_enum_store_none :
+// CHECK:       alloc_stack
+// CHECK-NOT:   alloc_stack
+// CHECK:       dealloc_stack
+// CHECK-LABEL: } // end sil function 'test_enum_store_none'
+sil [ossa] @test_enum_store_none : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  %3 = alloc_stack $FakeOptional<Klass>
+  %4 = load [copy] %1 : $*FakeOptional<Klass>
+  store %4 to [init] %3 : $*FakeOptional<Klass>
+  switch_enum_addr %3 : $*FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1:
+  %7 = unchecked_inplace_enum_data_addr %3 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %8 = load [take] %7 : $*Klass
+  destroy_value %8 : $Klass
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb2:
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_storeborrow_trivial_none_to_lexical_storeborrow_only : $@convention(thin) () -> () {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'test_storeborrow_trivial_none_to_lexical_storeborrow_only'
+sil [ossa] @test_storeborrow_trivial_none_to_lexical_storeborrow_only : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %sbi = store_borrow %none to  %1 : $*FakeOptional<Klass>
+  end_borrow %sbi : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_storeborrow_trivial_none_to_lexical_optional1 : $@convention(thin) () -> () {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'test_storeborrow_trivial_none_to_lexical_optional1'
+sil [ossa] @test_storeborrow_trivial_none_to_lexical_optional1 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %sbi = store_borrow %none to  %1 : $*FakeOptional<Klass>
+  %ld = load [copy] %sbi : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  end_borrow %sbi : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_storeborrow_trivial_none_to_lexical_optional2 : $@convention(thin) () -> () {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'test_storeborrow_trivial_none_to_lexical_optional2'
+sil [ossa] @test_storeborrow_trivial_none_to_lexical_optional2 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %sbi = store_borrow %none to  %1 : $*FakeOptional<Klass>
+  %ld = load [copy] %sbi : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  br bb1
+
+bb1:
+  end_borrow %sbi : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_storeonly : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_storeonly'
+sil [ossa] @test_store_trivial_none_to_lexical_storeonly : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [trivial] %1 : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional1 : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional1'
+sil [ossa] @test_store_trivial_none_to_lexical_optional1 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [trivial] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional2 : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional2'
+sil [ossa] @test_store_trivial_none_to_lexical_optional2 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [trivial] %1 : $*FakeOptional<Klass>
+  br bb1
+
+bb1:
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional3 : $@convention(thin) () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional3'
+sil [ossa] @test_store_trivial_none_to_lexical_optional3 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional4 : {{.*}} {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional4'
+sil [ossa] @test_store_trivial_none_to_lexical_optional4 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none1 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none1 to [init] %1 : $*FakeOptional<Klass>
+  %none2 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none2 to [assign] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional5 : {{.*}} {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional5'
+sil [ossa] @test_store_trivial_none_to_lexical_optional5 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  store %none to [assign] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional6 : {{.*}} {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional6'
+sil [ossa] @test_store_trivial_none_to_lexical_optional6 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  destroy_addr %1 : $*FakeOptional<Klass>
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial_none_to_lexical_optional7 : {{.*}} {
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_store_trivial_none_to_lexical_optional7'
+sil [ossa] @test_store_trivial_none_to_lexical_optional7 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb1
+bb1:
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  destroy_addr %1 : $*FakeOptional<Klass>
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [ossa] @test_store_trivial_none_to_lexical_optional8 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb1
+bb1:
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  %ld = load [take] %1 : $*FakeOptional<Klass>
+  apply undef(%ld) : $@convention(thin) (@owned FakeOptional<Klass>) -> ()
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// Ensure no verification failure
+sil [ossa] @test_store_enum_value_in_multiple_locs1 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get : $@convention(thin) () -> @owned FakeOptional<Klass>
+  %1 = apply %0() : $@convention(thin) () -> @owned FakeOptional<Klass>
+  %2 = begin_borrow [lexical] %1
+  cond_br undef, bb2, bb1
+
+bb1:
+  br bb3
+
+bb2:
+  %5 = alloc_stack [lexical] $FakeOptional<Klass>
+  %6 = store_borrow %2 to %5
+  cond_br undef, bb8, bb9
+
+bb3:
+  cond_br undef, bb5, bb4
+
+bb4:
+  end_borrow %2
+  destroy_value [dead_end] %1
+  unreachable
+
+bb5:
+  %11 = alloc_stack $FakeOptional<Klass>
+  %12 = store_borrow %2 to %11
+  %14 = load_borrow %12
+  %15 = begin_borrow [lexical] %14
+  %16 = alloc_stack $FakeOptional<Klass>
+  %17 = store_borrow %15 to %16
+  cond_br undef, bb6, bb7
+
+bb6:
+  fix_lifetime %17
+  end_borrow %17
+  dealloc_stack %16
+  end_borrow %15
+  end_borrow %14
+  end_borrow %12
+  dealloc_stack %11
+  end_borrow %2
+  destroy_value %1
+  %29 = tuple ()
+  return %29
+
+bb7:
+  end_borrow %17
+  dealloc_stack %16
+  end_borrow %15
+  end_borrow %14
+  end_borrow %12
+  end_borrow %2
+  destroy_value [dead_end] %1
+  unreachable
+
+bb8:
+  end_borrow %6
+  dealloc_stack %5
+  end_borrow %2
+  destroy_value [dead_end] %1
+  unreachable
+
+bb9:
+  end_borrow %6
+  dealloc_stack %5
+  br bb3
+}
+
+// CHECK-LABEL: sil [ossa] @test_end_lifetime_of_trivial_enum_case :
+// CHECK-NOT:     alloc_stack
+// CHECK:       bb2(%{{[0-9]+}} : $Int): 
+// CHECK:         fix_lifetime
+// CHECK:         end_borrow
+// CHECK:         end_lifetime %1
+// CHECK:       bb3:
+// CHECK-LABEL: } // end sil function 'test_end_lifetime_of_trivial_enum_case'
+sil [ossa] @test_end_lifetime_of_trivial_enum_case : $@convention(thin) (@inout C, @owned Result<C, Int>) -> () {
+bb0(%0 : $*C, %1 : @owned $Result<C, Int>):
+  %2 = alloc_stack $Result<C, Int>
+  store %1 to [init] %2
+  %3 = load_borrow %2
+  switch_enum %3, case #Result.success!enumelt: bb1, case #Result.failure!enumelt: bb2
+
+bb1(%10 : @guaranteed $C):
+  end_borrow %3
+  %12 = load [take] %2
+  %13 = unchecked_enum_data %12 : $Result<C, Int>, #Result.success!enumelt
+  store %13 to [assign] %0
+  br bb3
+
+bb2(%20 : $Int):
+  end_borrow %3
+  %22 = load_borrow %2
+  %23 = unchecked_enum_data %22, #Result.failure!enumelt
+  fix_lifetime %23
+  end_borrow %22
+  br bb3
+
+bb3:
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack : {{.*}} {
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[IN:%[^,]+]] = load [copy]
+// CHECK:         [[IN_BORROW:%[^,]+]] = begin_borrow [[IN]]
+// CHECK:         switch_enum [[IN_BORROW]], case #Result.success!enumelt: bb1
+// CHECK:       bb1({{%[^,]+}} : $Int):
+// CHECK:         end_borrow [[IN_BORROW]]
+// CHECK:         [[C:%.*]] = copy_value [[IN]]
+// CHECK:         end_lifetime [[C]]
+// CHECK:       bb4:
+// CHECK-NEXT:    destroy_value [[IN]]
+// CHECK-LABEL: } // end sil function 'end_lifetime_at_trivial_case_dealloc_stack'
+sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack : $@convention(thin) (@in_guaranteed Result<Int, C>) -> () {
+entry(%in_addr : $*Result<Int, C>):
+  %main_addr = alloc_stack $Result<Int, C>
+  %in = load [copy] %in_addr
+  store %in to [init] %main_addr
+  %in_borrow = load_borrow %main_addr
+  switch_enum %in_borrow,
+      case #Result.success!enumelt: int,
+      case #Result.failure!enumelt: full
+
+int(%6 : $Int):
+  end_borrow %in_borrow
+  %temp = alloc_stack $Result<Int, C>
+  %in_copy = load [copy] %main_addr
+  store %in_copy to [init] %temp
+  br int2
+
+int2:
+  dealloc_stack %temp
+  br exit
+
+full(%13 : @guaranteed $C):
+  end_borrow %in_borrow
+  br exit
+
+exit:
+  destroy_addr %main_addr
+  dealloc_stack %main_addr
+  %18 = tuple ()
+  return %18
+}
+
+// CHECK-LABEL: sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack_2 : {{.*}} {
+// CHECK:       bb0([[IN_ADDR:%[^,]+]] :
+// CHECK:         [[IN_COPY:%[^,]+]] = load [copy] [[IN_ADDR]]
+// CHECK:         [[IN_BORROW:%[^,]+]] = begin_borrow [[IN_COPY]]
+// CHECK:         switch_enum [[IN_BORROW]], case #Result.success!enumelt: bb1
+// CHECK:       bb1({{%[^,]+}} : $Int):
+// CHECK:         end_borrow [[IN_BORROW]]
+// CHECK:         [[C:%.*]] = copy_value [[IN_COPY]]
+// CHECK:         end_lifetime [[C]]
+// CHECK-LABEL: } // end sil function 'end_lifetime_at_trivial_case_dealloc_stack_2'
+sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack_2 : $@convention(thin) (@in_guaranteed Result<Int, C>) -> () {
+entry(%in_addr : $*Result<Int, C>):
+  %main_addr = alloc_stack $Result<Int, C>
+  %temp = alloc_stack $Result<Int, C>
+  %in = load [copy] %in_addr
+  store %in to [init] %main_addr
+  %in_borrow = load_borrow %main_addr
+  switch_enum %in_borrow,
+      case #Result.success!enumelt: int,
+      case #Result.failure!enumelt: x
+
+int(%int : $Int):
+  end_borrow %in_borrow
+  %in_copy = load [copy] %main_addr
+  store %in_copy to [init] %temp
+  br int2
+
+int2:
+  br exit
+
+x(%13 : @guaranteed $C):
+  end_borrow %in_borrow
+  br exit
+
+exit:
+  destroy_addr %main_addr
+  dealloc_stack %temp
+  dealloc_stack %main_addr
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack_3 : {{.*}} {
+// CHECK:       bb0([[IN_ADDR:%[^,]+]] :
+// CHECK:         [[IN_BORROW:%[^,]+]] = load_borrow [[IN_ADDR]]
+// CHECK:         switch_enum [[IN_BORROW]]
+// CHECK:             case #Result.success!enumelt: [[INT:bb[0-9]+]]
+// CHECK:       [[INT]]
+// CHECK:         end_borrow [[IN_BORROW]]
+// CHECK:         [[IN_COPY:%[^,]+]] = load [copy] [[IN_ADDR]]
+// CHECK:         end_lifetime [[IN_COPY]]
+// CHECK-LABEL: } // end sil function 'end_lifetime_at_trivial_case_dealloc_stack_3'
+sil [ossa] @end_lifetime_at_trivial_case_dealloc_stack_3 : $@convention(thin) (@in_guaranteed Result<Int, C>) -> () {
+entry(%in_addr : $*Result<Int, C>):
+  %in_borrow = load_borrow %in_addr
+  switch_enum %in_borrow,
+      case #Result.success!enumelt: int,
+      case #Result.failure!enumelt: x
+
+int(%int : $Int):
+  end_borrow %in_borrow
+  %temp = alloc_stack $Result<Int, C>
+  %in_copy = load [copy] %in_addr
+  store %in_copy to [init] %temp
+  dealloc_stack %temp
+  br int2
+
+int2:
+  br exit
+
+x(%13 : @guaranteed $C):
+  end_borrow %in_borrow
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @fd_deinit :
+// CHECK-NOT:     drop_deinit
+// CHECK:         end_lifetime %0
+// CHECK-NOT:     drop_deinit
+// CHECK-LABEL: } // end sil function 'fd_deinit'
+sil [ossa] @fd_deinit : $@convention(method) (@owned FileDescriptor) -> () {
+bb0(%0 : @owned $FileDescriptor):
+  %1 = alloc_stack $FileDescriptor, let, name "self", argno 1
+  store %0 to [init] %1
+  %3 = drop_deinit %1
+  %4 = tuple ()
+  dealloc_stack %1
+  %6 = tuple ()
+  return %6
+}
+
+sil [ossa] @get_owned : $@convention(thin) () -> @owned Klass
+sil [ossa] @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_no_storeborrow1 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_no_storeborrow1'
+sil [ossa] @test_no_storeborrow1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  store %0 to [init] %stk : $*Klass
+  %ld = load_borrow %stk : $*Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%ld) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %ld : $Klass
+  destroy_addr %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_no_storeborrow2 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_no_storeborrow2'
+sil [ossa] @test_no_storeborrow2 : $@convention(method) (@owned Klass) -> () { 
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  store %0 to [init] %stk : $*Klass
+  %ld1 = load_borrow %stk : $*Klass
+  %f = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%ld1) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %ld1 : $Klass
+  cond_br undef, bb3, bb1
+
+bb1:
+  %ld2 = load_borrow %stk : $*Klass
+  apply %f(%ld2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %ld2 : $Klass
+  %tk1 = load [take] %stk : $*Klass
+  destroy_value %tk1 : $Klass
+  dealloc_stack %stk : $*Klass
+  br bb4
+
+bb3:
+  %tk2 = load [take] %stk : $*Klass
+  destroy_value %tk2 : $Klass
+  dealloc_stack %stk : $*Klass
+  br bb4
+
+bb4:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_no_storeborrow3 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_no_storeborrow3'
+sil [ossa] @test_no_storeborrow3 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load_borrow %1 : $*Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @test_control_flow2 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_control_flow2'
+sil [ossa] @test_control_flow2 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %stk = alloc_stack $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $Klass
+  store %copy1 to [init] %stk : $*Klass
+  br bb3
+
+bb2:
+  %copy2 = copy_value %1 : $Klass
+  store %copy2 to [init] %stk : $*Klass
+  br bb3
+
+bb3:
+  %2 = load_borrow %stk : $*Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $Klass
+  destroy_addr %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_control_flow3 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_control_flow3'
+sil [ossa] @test_control_flow3 : $@convention(thin) () -> () {
+bb0:
+  %4 = alloc_stack [lexical] $Klass
+  %f = function_ref @get_owned : $@convention(thin) () -> @owned Klass
+  %5 = apply %f() : $@convention(thin) () -> @owned Klass
+  store %5 to [init] %4 : $*Klass
+  %7 = load_borrow %4 : $*Klass
+  end_borrow %7 : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %28 = load_borrow %4 : $*Klass
+  end_borrow %28 : $Klass
+  br bb3
+
+bb3:
+  destroy_addr %4 : $*Klass
+  dealloc_stack %4 : $*Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_control_flow4 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_control_flow4'
+sil [ossa] @test_control_flow4 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $Klass
+  store %copy1 to [init] %stk : $*Klass
+  br bb3
+
+bb2:
+  %copy2 = copy_value %1 : $Klass
+  store %copy2 to [init] %stk : $*Klass
+  br bb3
+
+bb3:
+  %2 = load_borrow %stk : $*Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $Klass
+  destroy_addr %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_load_borrow_with_reborrow :
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'test_load_borrow_with_reborrow'
+sil [ossa] @test_load_borrow_with_reborrow : $@convention(thin) () -> () {
+bb0:
+  %owned = apply undef() : $@convention(thin) () -> (@owned Klass)
+  %stack = alloc_stack [lexical] $Klass
+  store %owned to [init] %stack : $*Klass
+  br bb1
+
+bb1:
+  %ld = load [take] %stack : $*Klass
+  destroy_value %ld
+  %owned_other = apply undef() : $@convention(thin) () -> (@owned Klass)
+  store %owned_other to [init] %stack : $*Klass
+  %lb = load_borrow %stack
+  br bb2(%lb)
+
+bb2(%reborrow : @reborrow $Klass):
+  %bf = borrowed %reborrow from ()
+  end_borrow %bf : $Klass
+  destroy_addr %stack : $*Klass
+  dealloc_stack %stack : $*Klass
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @getC : $@convention(thin) () -> @owned C
+sil [ossa] @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
+sil [ossa] @callee_error_owned : $@convention(thin) (@owned C) -> @error Error
+sil [ossa] @callee_void_to_void : $@convention(thin) () -> ()
+
+// basic_N {{ functions consisting of a single block
+
+// An owned instance of C is passed in, stored to the stack, used
+// non-consumingly once, and destroyed.
+//
+// CHECK-LABEL: sil [ossa] @basic_1 : $@convention(thin) (@owned C) -> () {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         [[RETVAL:%[^,]+]] = apply [[CALLEE]]([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'basic_1'
+sil [ossa] @basic_1 : $(@owned C) -> () {
+entry(%instance : @owned $C):
+    %scope = alloc_stack [lexical] $C
+    store %instance to [init] %scope : $*C
+    %thing = load [take] %scope : $*C
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %res = apply %callee_guaranteed(%thing) : $@convention(thin) (@guaranteed C) -> ()
+    destroy_value %thing : $C
+    dealloc_stack %scope : $*C
+    return %res : $()
+}
+
+// A guaranteed instance of C is passed in, copied, stored to the stack, used
+// non-consumingly once, and deallocated.
+//
+// CHECK-LABEL: sil [ossa] @basic_3 : $@convention(thin) (@guaranteed C) -> () {
+// CHECK:       bb0([[INSTANCE_GUARANTEED:%[^,]+]] : @guaranteed $C):
+// CHECK:         [[INSTANCE:%[^,]+]] = copy_value [[INSTANCE_GUARANTEED]]
+// CHECK:         [[CALLEE:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         [[RETVAL:%[^,]+]] = apply [[CALLEE]]([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'basic_3'
+sil [ossa] @basic_3 : $(@guaranteed C) -> () {
+entry(%instance_guaranteed : @guaranteed $C):
+    %scope = alloc_stack [lexical] $C
+    %instance = copy_value %instance_guaranteed : $C
+    store %instance to [init] %scope : $*C
+    %thing = load [take] %scope : $*C
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %res = apply %callee_guaranteed(%thing) : $@convention(thin) (@guaranteed C) -> ()
+    destroy_value %thing : $C
+    dealloc_stack %scope : $*C
+    return %res : $()
+}
+
+// An owned instance of C is passed in, stored to the stack, and used
+// consumingly.
+//
+// CHECK-LABEL: sil [ossa] @basic_4 : $@convention(thin) (@owned C) -> () {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE:%[^,]+]] = function_ref @callee_owned
+// CHECK:         [[RETVAL:%[^,]+]] = apply [[CALLEE]]([[INSTANCE]])
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'basic_4'
+sil [ossa] @basic_4 : $(@owned C) -> () {
+entry(%instance : @owned $C):
+    %scope = alloc_stack [lexical] $C
+    store %instance to [init] %scope : $*C
+    %thing = load [take] %scope : $*C
+    %callee = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+    %res = apply %callee(%thing) : $@convention(thin) (@owned C) -> ()
+    dealloc_stack %scope : $*C
+    return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @basic_5 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'basic_5'
+sil [ossa] @basic_5 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr : $*C
+  store %instance_2 to [assign] %addr : $*C
+  destroy_addr %addr : $*C
+  dealloc_stack %addr : $*C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @basic_6 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[WORK:bb[0-9]+]]
+// CHECK:       [[WORK]]:
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'basic_6' 
+sil [ossa] @basic_6 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  br work
+work:
+  store %instance_1 to [init] %addr : $*C
+  store %instance_2 to [assign] %addr : $*C
+  destroy_addr %addr : $*C
+  dealloc_stack %addr : $*C
+  br exit
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @basic_7 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[WORK:bb[0-9]+]]
+// CHECK:       [[WORK]]:
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'basic_7'
+sil [ossa] @basic_7 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr : $*C
+  br work
+work:
+  store %instance_2 to [assign] %addr : $*C
+  destroy_addr %addr : $*C
+  dealloc_stack %addr : $*C
+  br exit
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// basic_N }}
+
+// after_N {{ uses of the loaded value after dealloc_stack
+
+// CHECK-LABEL: sil [ossa] @after_1 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void
+// CHECK:         apply [[CALLEE_VOID_TO_VOID]]
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'after_1'
+sil [ossa] @after_1 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  %instance_loaded = load [take] %addr : $*C
+  dealloc_stack %addr : $*C
+  %callee_void_to_void = function_ref @callee_void_to_void : $@convention(thin) () -> ()
+  %ok = apply %callee_void_to_void() : $@convention(thin) () -> ()
+  return %instance_loaded : $C
+}
+
+// CHECK-LABEL: sil [ossa] @after_2 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         apply [[CALLEE_GUARANTEED]]([[INSTANCE_2]]) 
+// CHECK:         destroy_value [[INSTANCE_2]] 
+// CHECK:         return [[INSTANCE_1]] 
+// CHECK-LABEL: } // end sil function 'after_2' 
+sil [ossa] @after_2 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr : $*C
+  %instance_1_loaded = load [take] %addr : $*C
+  store %instance_2 to [init] %addr : $*C
+  %instance_2_loaded = load [take] %addr : $*C
+  dealloc_stack %addr : $*C
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %ok2 = apply %callee_guaranteed(%instance_2_loaded) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %instance_2_loaded : $C
+  return %instance_1_loaded : $C
+}
+
+// CHECK-LABEL: sil [ossa] @after_3 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void 
+// CHECK:         apply [[CALLEE_VOID_TO_VOID]]() 
+// CHECK:         return [[INSTANCE]] 
+// CHECK-LABEL: } // end sil function 'after_3'
+sil [ossa] @after_3 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  %instance_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  dealloc_stack %addr : $*C
+  %callee_void_to_void = function_ref @callee_void_to_void : $@convention(thin) () -> ()
+  %ok = apply %callee_void_to_void() : $@convention(thin) () -> ()
+  return %instance_loaded : $C
+}
+
+// CHECK-LABEL: sil [ossa] @after_4 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         br bb1
+// CHECK:       bb1:
+// CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void 
+// CHECK:         apply [[CALLEE_VOID_TO_VOID]]() 
+// CHECK:         return [[INSTANCE]] 
+// CHECK-LABEL: } // end sil function 'after_4'
+sil [ossa] @after_4 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  %instance_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  %callee_void_to_void = function_ref @callee_void_to_void : $@convention(thin) () -> ()
+  %ok = apply %callee_void_to_void() : $@convention(thin) () -> ()
+  dealloc_stack %addr : $*C
+  return %instance_loaded : $C
+}
+
+// CHECK-LABEL: sil [ossa] @after_5 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         [[RETVAL:%[^,]+]] = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'after_5'
+sil [ossa] @after_5 : $@convention(thin) (@owned C) -> () {
+bb0(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  %instance_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  dealloc_stack %addr : $*C
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %retval = apply %callee_guaranteed(%instance_loaded) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %instance_loaded : $C
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @after_6 : $@convention(thin) (@owned C, @owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C, [[INSTANCE_3:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         apply [[CALLEE_GUARANTEED]]([[INSTANCE_2]])
+// CHECK:         apply [[CALLEE_GUARANTEED]]([[INSTANCE_1]])
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         destroy_value [[INSTANCE_3]]
+// CHECK:         return [[INSTANCE_1]]
+// CHECK-LABEL: } // end sil function 'after_6'
+sil [ossa] @after_6 : $@convention(thin) (@owned C, @owned C, @owned C) -> @owned C {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C, %instance_3 : @owned $C):
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr : $*C
+  %instance_1_loaded = load [take] %addr : $*C
+  store %instance_2 to [init] %addr : $*C
+  %instance_2_loaded = load [take] %addr : $*C
+  %ok2 = apply %callee_guaranteed(%instance_2_loaded) : $@convention(thin) (@guaranteed C) -> ()
+  %ok1 = apply %callee_guaranteed(%instance_1_loaded) : $@convention(thin) (@guaranteed C) -> ()
+  store %instance_3 to [init] %addr : $*C
+  %instance_3_loaded = load [take] %addr : $*C
+  dealloc_stack %addr : $*C
+  destroy_value %instance_2_loaded : $C
+  destroy_value %instance_3_loaded : $C
+  return %instance_1_loaded : $C
+}
+
+// CHECK-LABEL: sil [ossa] @after_7 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void 
+// CHECK:         apply [[CALLEE_VOID_TO_VOID]]() 
+// CHECK:         return [[INSTANCE]] 
+// CHECK-LABEL: } // end sil function 'after_7'
+sil [ossa] @after_7 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  %instance_loaded = load [take] %addr : $*C
+  %callee_void_to_void = function_ref @callee_void_to_void : $@convention(thin) () -> ()
+  %ok = apply %callee_void_to_void() : $@convention(thin) () -> ()
+  dealloc_stack %addr : $*C
+  return %instance_loaded : $C
+}
+
+// CHECK-LABEL: sil [ossa] @after_8 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]] 
+// CHECK:         destroy_value [[INSTANCE]] 
+// CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void 
+// CHECK:         apply [[CALLEE_VOID_TO_VOID]]() 
+// CHECK:         return [[COPY]] 
+// CHECK-LABEL: } // end sil function 'after_8'
+sil [ossa] @after_8 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  %instance_loaded = load [copy] %addr : $*C
+  destroy_addr %addr : $*C
+  %callee_void_to_void = function_ref @callee_void_to_void : $@convention(thin) () -> ()
+  %ok = apply %callee_void_to_void() : $@convention(thin) () -> ()
+  dealloc_stack %addr : $*C
+  return %instance_loaded : $C
+}
+
+// CHECK-LABEL: sil [ossa] @after_9 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[INSTANCE_2]] 
+// CHECK:         return [[INSTANCE_1]] 
+// CHECK-LABEL: } // end sil function 'after_9'
+sil [ossa] @after_9 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr : $*C
+  %instance_1_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  store %instance_2 to [init] %addr : $*C
+  %instance_2_loaded = load [take] %addr : $*C
+  dealloc_stack %addr : $*C
+  destroy_value %instance_2_loaded : $C
+  return %instance_1_loaded : $C
+}
+
+// CHECK-LABEL: sil [ossa] @after_10 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[WORK:bb[0-9]+]]
+// CHECK:       [[WORK]]:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE_1]] 
+// CHECK:         destroy_value [[INSTANCE_1]] 
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[INSTANCE_2]] 
+// CHECK:         return [[COPY]] 
+// CHECK-LABEL: } // end sil function 'after_10'
+sil [ossa] @after_10 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  br work
+work:
+  store %instance_1 to [init] %addr : $*C
+  %instance_1_loaded = load [copy] %addr : $*C
+  store %instance_2 to [assign] %addr : $*C
+  %instance_2_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  dealloc_stack %addr : $*C
+  destroy_value %instance_2_loaded : $C
+  return %instance_1_loaded : $C
+}
+
+// CHECK-LABEL: sil [ossa] @after_11 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[WORK:bb[0-9]+]]
+// CHECK:       [[WORK]]:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE_1]]
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         return [[COPY]]
+// CHECK-LABEL: } // end sil function 'after_11'
+sil [ossa] @after_11 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr : $*C
+  br work
+work:
+  %instance_1_loaded = load [copy] %addr : $*C
+  store %instance_2 to [assign] %addr : $*C
+  %instance_2_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  dealloc_stack %addr : $*C
+  destroy_value %instance_2_loaded : $C
+  return %instance_1_loaded : $C
+}
+
+// after_N }}
+
+// deferred_N {{ // scope closure isn't done immediately because it can't be
+
+// Check that an initial store [assign] becomes a scope end.
+// CHECK-LABEL: sil [ossa] @deferred_1 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[WORK:bb[0-9]+]]
+// CHECK:       [[WORK]]:
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE_1]]
+// CHECK-LABEL: } // end sil function 'deferred_1' 
+sil [ossa] @deferred_1 : $@convention(thin) (@owned C,@owned C) -> @owned C {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_2 to [init] %addr : $*C
+  br work
+work:
+  store %instance_1 to [assign] %addr : $*C
+  %instance_1_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  dealloc_stack %addr : $*C
+  return %instance_1_loaded : $C
+}
+
+// Ensure that a store [assign] following an initial load [copy] gets a deferred
+// scope end.
+// CHECK-LABEL: sil [ossa] @deferred_2 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[WORK:bb[0-9]+]]
+// CHECK:       [[WORK]]:
+// CHECK:         [[COPY_2:%[^,]+]] = copy_value [[INSTANCE_2]]
+// CHECK:         destroy_value [[COPY_2]]
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE_1]]
+// CHECK-LABEL: } // end sil function 'deferred_2'
+sil [ossa] @deferred_2 : $@convention(thin) (@owned C,@owned C) -> @owned C {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_2 to [init] %addr : $*C
+  br work
+work:
+  %instance_2_loaded = load [copy] %addr : $*C
+  destroy_value %instance_2_loaded : $C
+  store %instance_1 to [assign] %addr : $*C
+  %instance_1_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  dealloc_stack %addr : $*C
+  return %instance_1_loaded : $C
+}
+
+// Ensure that an initial deferred destroy_addr becomes a scope end.
+// CHECK-LABEL: sil [ossa] @deferred_3 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[WORK:bb[0-9]+]]
+// CHECK:       [[WORK]]:
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE_1]]
+// CHECK-LABEL: } // end sil function 'deferred_3'
+sil [ossa] @deferred_3 : $@convention(thin) (@owned C,@owned C) -> @owned C {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_2 to [init] %addr : $*C
+  br work
+work:
+  destroy_addr %addr : $*C
+  store %instance_1 to [init] %addr : $*C
+  %instance_1_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  dealloc_stack %addr : $*C
+  return %instance_1_loaded : $C
+}
+
+// Ensure that a destroy_addr following an initial load [copy] gets a deferred
+// scope end.
+// CHECK-LABEL: sil [ossa] @deferred_4 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[WORK:bb[0-9]+]]
+// CHECK:       [[WORK]]:
+// CHECK:         [[COPY_2:%[^,]+]] = copy_value [[INSTANCE_2]]
+// CHECK:         destroy_value [[COPY_2]]
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE_1]]
+// CHECK-LABEL: } // end sil function 'deferred_4'
+sil [ossa] @deferred_4 : $@convention(thin) (@owned C,@owned C) -> @owned C {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_2 to [init] %addr : $*C
+  br work
+work:
+  %instance_2_loaded = load [copy] %addr : $*C
+  destroy_value %instance_2_loaded : $C
+  destroy_addr %addr : $*C
+  store %instance_1 to [init] %addr : $*C
+  %instance_1_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  dealloc_stack %addr : $*C
+  return %instance_1_loaded : $C
+}
+
+// Ensure that an initial load [take] gets a deferred scope end.
+// CHECK-LABEL: sil [ossa] @deferred_5 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[WORK:bb[0-9]+]]
+// CHECK:       [[WORK]]:
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         return [[INSTANCE_1]]
+// CHECK-LABEL: } // end sil function 'deferred_5'
+sil [ossa] @deferred_5 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr : $*C
+  br work
+work:
+  %instance_1_loaded = load [take] %addr : $*C
+  store %instance_2 to [init] %addr : $*C
+  %instance_2_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  dealloc_stack %addr : $*C
+  destroy_value %instance_2_loaded : $C
+  return %instance_1_loaded : $C
+}
+
+// Ensure that a load [take] following an initial load [copy] gets a deferred
+// scope end.
+// CHECK-LABEL: sil [ossa] @deferred_6 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         br [[WORK:bb[0-9]+]]
+// CHECK:       [[WORK]]:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'deferred_6'
+sil [ossa] @deferred_6 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance_1 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr : $*C
+  br work
+work:
+  %temporary = load [copy] %addr : $*C
+  %instance_1_loaded = load [take] %addr : $*C
+  br exit
+exit:
+  dealloc_stack %addr : $*C
+  destroy_value %temporary : $C
+  return %instance_1_loaded : $C
+}
+
+// CHECK-LABEL: sil [ossa] @deferred_7 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[WORK:bb[0-9]+]]
+// CHECK:       [[WORK]]:
+// CHECK:         [[COPY_2:%[^,]+]] = copy_value [[INSTANCE_2]]
+// CHECK:         destroy_value [[COPY_2]]
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'deferred_7'
+sil [ossa] @deferred_7 : $@convention(thin) (@owned C,@owned C) -> () {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_2 to [init] %addr : $*C
+  br work
+work:
+  %instance_2_loaded = load [copy] %addr : $*C
+  destroy_value %instance_2_loaded : $C
+  store %instance_1 to [assign] %addr : $*C
+  %instance_1_loaded = load [take] %addr : $*C
+  store %instance_1_loaded to [init] %addr : $*C
+  destroy_addr %addr : $*C  
+  br exit
+exit:
+  dealloc_stack %addr : $*C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// deferred_N }}
+
+// term_N {{ the last use of the stored value is a terminator
+
+// CHECK-LABEL: sil [ossa] @term_1 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'term_1'
+sil [ossa] @term_1 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    store %instance to [init] %addr : $*C
+    %result = load [take] %addr : $*C
+    dealloc_stack %addr : $*C
+    return %result : $C
+}
+
+// CHECK-LABEL: sil [ossa] @term_2 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         br [[EXIT:bb[^,]+]]([[INSTANCE_1]])
+// CHECK:       [[EXIT]]([[OUTSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         return [[OUTSTANCE]]
+// CHECK-LABEL: } // end sil function 'term_2'
+sil [ossa] @term_2 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    store %instance to [init] %addr : $*C
+    %result = load [take] %addr : $*C
+    br exit(%result : $C)
+exit(%outstance : @owned $C):
+    dealloc_stack %addr : $*C
+    return %outstance : $C
+}
+
+// CHECK-LABEL: sil [ossa] @term_3 : $@convention(thin) (@owned E) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[EITHER:%[^,]+]] : @owned $E):
+// CHECK:         switch_enum [[INSTANCE]], case #E.one!enumelt: [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'term_3'
+sil [ossa] @term_3 : $@convention(thin) (@owned E) -> @owned C {
+entry(%either : @owned $E):
+    %addr = alloc_stack [lexical] $E
+    store %either to [init] %addr : $*E
+    %either2 = load [take] %addr : $*E
+    dealloc_stack %addr : $*E
+    switch_enum %either2 : $E, case #E.one!enumelt: one
+one(%instance : @owned $C):
+    return %instance : $C
+}
+
+// CHECK-LABEL: sil [ossa] @term_4 : $@convention(thin) (@owned C, @owned D) -> @owned D {
+// CHECK:       {{bb[^,]+}}([[SUPER_IN:%[^,]+]] : @owned $C, [[SUB_IN:%[^,]+]] : @owned $D):
+// CHECK:         checked_cast_br C in [[SUPER_IN]] to D, [[SUPER_IS_SUB:bb[^,]+]], [[SUPER_IS_SUPER:bb[0-9]+]]
+// CHECK:       [[SUPER_IS_SUB]]([[SUPER_AS_SUB:%[^,]+]] : @owned $D):
+// CHECK:         destroy_value [[SUB_IN]]
+// CHECK:         br [[EXIT:bb[^,]+]]([[SUPER_AS_SUB]])
+// CHECK:       [[SUPER_IS_SUPER]]([[SUPER_AS_SUPER:%[^,]+]] : @owned $C):
+// CHECK:         destroy_value [[SUPER_AS_SUPER]]
+// CHECK:         br [[EXIT]]([[SUB_IN]])
+// CHECK:       [[EXIT]]([[SUB_OUT:%[^,]+]] : @owned $D):
+// CHECK:         return [[SUB_OUT]]
+// CHECK-LABEL: } // end sil function 'term_4'
+sil [ossa] @term_4 : $@convention(thin) (@owned C, @owned D) -> @owned D {
+bb0(%super_in : @owned $C, %sub_in : @owned $D):
+    %addr = alloc_stack [lexical] $C
+    store %super_in to [init] %addr : $*C
+    %super_load = load [take] %addr : $*C
+    checked_cast_br C in %super_load : $C to D, super_is_sub, super_is_super
+super_is_sub(%super_as_sub : @owned $D):
+    destroy_value %sub_in : $D
+    br exit(%super_as_sub : $D)
+super_is_super(%super_as_super : @owned $C):
+    destroy_value %super_as_super : $C
+    br exit(%sub_in : $D)
+exit(%sub_out : @owned $D):
+    dealloc_stack %addr : $*C
+    return %sub_out : $D
+}
+
+// CHECK-LABEL: sil hidden [ossa] @term_5 : $@convention(thin) (@owned C) -> @error any Error {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE_ERROR_OWNED:%[^,]+]] = function_ref @callee_error_owned
+// CHECK:         try_apply [[CALLEE_ERROR_OWNED]]([[INSTANCE]]) : $@convention(thin) (@owned C) -> @error any Error, normal [[REGULAR_BLOCK:bb[^,]+]], error [[THROW_BLOCK:bb[0-9]+]]
+// CHECK:       [[REGULAR_BLOCK]]({{%[^,]+}} : $()):
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[THROW_BLOCK]]([[ERROR:%[^,]+]] : @owned $any Error):
+// CHECK:         destroy_value [[ERROR]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'term_5' 
+sil hidden [ossa] @term_5 : $@convention(thin) (@owned C) -> @error Error {
+bb0(%instance : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    store %instance to [init] %addr : $*C
+    %instance_load = load [take] %addr : $*C
+    %callee_error_owned = function_ref @callee_error_owned : $@convention(thin) (@owned C) -> @error Error
+    try_apply %callee_error_owned(%instance_load) : $@convention(thin) (@owned C) -> @error Error, normal regular_block, error throw_block
+regular_block(%7 : $()):
+    br exit
+throw_block(%error : @owned $Error):
+    destroy_value %error : $Error
+    br exit
+exit:
+    dealloc_stack %addr : $*C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @term_6 : $@yield_once @convention(method) (@owned C) -> @yields C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         yield [[INSTANCE]], resume [[RESUME_BLOCK:bb[^,]+]], unwind [[UNWIND_BLOCK:bb[0-9]+]]
+// CHECK:       [[RESUME_BLOCK]]:
+// CHECK:         destroy_value [[INSTANCE]] 
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]] 
+// CHECK:       [[UNWIND_BLOCK]]:
+// CHECK:         destroy_value [[INSTANCE]] 
+// CHECK:         unwind
+// CHECK-LABEL: } // end sil function 'term_6'
+sil [ossa] @term_6 : $@yield_once @convention(method) (@owned C) -> @yields C {
+entry(%instance : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    store %instance to [init] %addr : $*C
+    %instance_load = load [take] %addr : $*C
+    yield %instance_load : $C, resume resume_block, unwind unwind_block
+resume_block:
+    destroy_value %instance_load : $C
+    dealloc_stack %addr : $*C
+    %result = tuple ()
+    return %result : $()
+unwind_block:
+    destroy_value %instance_load : $C
+    dealloc_stack %addr : $*C
+    unwind
+}
+
+// CHECK-LABEL: sil [ossa] @term_7 : $@convention(thin) (@owned C) -> @error C {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
+// CHECK:       [[THROW_BLOCK]]:
+// CHECK:         throw [[INSTANCE]] 
+// CHECK:       [[REGULAR_BLOCK]]:
+// CHECK:         destroy_value [[INSTANCE]] 
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]] 
+// CHECK-LABEL: } // end sil function 'term_7'
+sil [ossa] @term_7 : $@convention(thin) (@owned C) -> @error C {
+bb0(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  %instance_load = load [take] %addr : $*C
+  cond_br undef, bb1, bb2
+bb1:
+  dealloc_stack %addr : $*C
+  throw %instance_load : $C
+bb2:
+  destroy_value %instance_load : $C
+  dealloc_stack %addr : $*C
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// term_N }}
+
+// unreachable_N {{ ending of scopes in blocks that terminate in unreachable
+
+// CHECK-LABEL: sil [ossa] @unreachable_1 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         br [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_1'
+sil [ossa] @unreachable_1 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %one to [init] %addr : $*C
+  br work
+work:
+  %one_loaded = load [take] %addr : $*C
+  destroy_value %one_loaded : $C
+  store %two to [init] %addr : $*C
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_2 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_2'
+sil [ossa] @unreachable_2 : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_3 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_3'
+sil [ossa] @unreachable_3 : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  %instance_loaded = load [take] %addr : $*C
+  destroy_value [dead_end] %instance_loaded
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_4 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_4'
+sil [ossa] @unreachable_4 : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  %instance_loaded = load [take] %addr : $*C
+  store %instance_loaded to [init] %addr : $*C
+  unreachable
+}
+
+
+// End lifetime before unreachable inst.
+// CHECK-LABEL: sil [ossa] @unreachable_5 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_5'
+sil [ossa] @unreachable_5 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr :$*C
+  br exit
+exit:
+  unreachable
+}
+
+// Bail out if alloc_stack is in unreachable block.
+// CHECK-LABEL: sil @unreachable_6 : $@convention(thin) (@owned C) -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'unreachable_6'
+sil @unreachable_6 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : $C):
+  br exit
+unr:
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to %addr :$*C
+  br die
+die:
+  unreachable
+exit:
+  %res = tuple ()
+  return %res : $()
+}
+
+
+// Bail out if alloc_stack is in unreachable block.
+// CHECK-LABEL: sil @unreachable_7 : $@convention(thin) (@owned C) -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'unreachable_7'
+sil @unreachable_7 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : $C):
+  cond_br undef, exit, die_later
+unr:
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to %addr :$*C
+  br die_later_2
+die_later_2:
+  br die
+die_later:
+  br die
+die:
+  unreachable
+exit:
+  %res = tuple ()
+  return %res : $()
+}
+
+// Bail out if alloc_stack is in unreachable block.
+// CHECK-LABEL: sil @unreachable_8 : $@convention(thin) (@owned C) -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'unreachable_8'
+sil @unreachable_8 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : $C):
+  cond_br undef, exit, die_later
+unr:
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to %addr : $*C
+  cond_br undef, die_later_2_a, die_later_2_b
+die_later_2_a:
+  br die_later_2
+die_later_2_b:
+  br die_later_2
+die_later_2:
+  br die
+die_later:
+  br die
+die:
+  unreachable
+exit:
+  %res = tuple ()
+  return %res : $()
+}
+
+// End lifetime after loop which is followed by unreachable.
+// CHECK-LABEL: sil [ossa] @unreachable_loop_1 : $@convention(thin) () -> () {
+// CHECK:       {{bb[0-9]+}}:
+// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC : $@convention(thin) () -> @owned C
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]() : $@convention(thin) () -> @owned C
+// CHECK:         br [[LOOP_HEADER:bb[0-9]+]]
+// CHECK:       [[LOOP_HEADER]]:
+// CHECK:         br [[LOOP_BODY:bb[0-9]+]]
+// CHECK:       [[LOOP_BODY]]:
+// CHECK:         br [[LOOP_EXIT:bb[0-9]+]]
+// CHECK:       [[LOOP_EXIT]]:
+// CHECK:         cond_br undef, [[LOOP_BACKEDGE:bb[0-9]+]], [[DIE:bb[0-9]+]]
+// CHECK:       [[LOOP_BACKEDGE]]:
+// CHECK:         br [[LOOP_HEADER]]
+// CHECK:       [[DIE]]:
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_loop_1'
+sil [ossa] @unreachable_loop_1 : $@convention(thin) () -> () {
+entry:
+  %delegate_var = alloc_stack [lexical] $C
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %delegate = apply %getC() : $@convention(thin) () -> @owned C
+  store %delegate to [init] %delegate_var : $*C
+  br loop_header
+loop_header:
+  br loop_body
+loop_body:
+  br loop_exit
+loop_exit:
+  cond_br undef, loop_backedge, die
+loop_backedge:
+  br loop_header
+die:
+  unreachable
+}
+
+// Bail out if alloc_stack is in unreachable block.
+// CHECK-LABEL: sil @unreachable_loop_2 : $@convention(thin) () -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'unreachable_loop_2'
+sil @unreachable_loop_2 : $@convention(thin) () -> () {
+entry:
+  br loop_header
+unr:
+  %delegate_var = alloc_stack [lexical] $C
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %delegate = apply %getC() : $@convention(thin) () -> @owned C
+  store %delegate to %delegate_var : $*C
+  br loop_header
+loop_header:
+  br loop_body
+loop_body:
+  br loop_exit
+loop_exit:
+  cond_br undef, loop_backedge, die
+loop_backedge:
+  br loop_header
+die:
+  unreachable
+}
+
+// Bail out if alloc_stack is in unreachable block.
+// CHECK-LABEL: sil @unreachable_loop_3 : $@convention(thin) () -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'unreachable_loop_3'
+sil @unreachable_loop_3 : $@convention(thin) () -> () {
+entry:
+  br die_entry
+die_entry:
+  br die
+unr:
+  %delegate_var = alloc_stack [lexical] $C
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %delegate = apply %getC() : $@convention(thin) () -> @owned C
+  store %delegate to %delegate_var : $*C
+  br loop_header
+loop_header:
+  br loop_body
+loop_body:
+  br loop_exit
+loop_exit:
+  cond_br undef, loop_backedge, die_loop
+loop_backedge:
+  br loop_header
+die_loop:
+  br die
+die:
+  unreachable
+}
+
+// }} unreachable_N
+
+// diamond_N {{ the usages of the alloc_stack occur over a diamond of blocks
+
+// CHECK-LABEL: sil [ossa] @diamond_1 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
+// CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         br [[EXIT:bb[^,]+]]([[INSTANCE_1]])
+// CHECK:       [[RIGHT]]:
+// CHECK:         br [[EXIT]]([[INSTANCE_2]])
+// CHECK:       [[EXIT]]([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[RESULT:%[^,]+]] = tuple ()
+// CHECK:         return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'diamond_1'
+sil [ossa] @diamond_1 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    cond_br undef, left, right
+left:
+    destroy_value %two : $C
+    store %one to [init] %addr : $*C
+    br exit
+right:
+    destroy_value %one : $C
+    store %two to [init] %addr : $*C
+    br exit
+exit:
+    %value = load [take] %addr : $*C
+    %callee = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee(%value) : $@convention(thin) (@guaranteed C) -> ()
+    destroy_value %value : $C
+    dealloc_stack %addr : $*C
+    %result = tuple ()
+    return %result : $()
+}
+
+// Store and load the value to the alloc stack only on one branch.
+//
+// CHECK-LABEL: sil [ossa] @diamond_2 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_0:%[^,]+]] : @owned $C, [[INSTANCE_1:%[^,]+]] : @owned $C):
+// CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         destroy_value [[INSTANCE_0]]
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         destroy_value [[INSTANCE_0]]
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE_1]])
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'diamond_2'
+sil [ossa] @diamond_2 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    cond_br undef, left, right
+left:
+    destroy_value %one : $C
+    destroy_value %two : $C
+    br exit
+right:
+    destroy_value %one : $C
+    store %two to [init] %addr : $*C
+    %value = load [take] %addr : $*C
+    %callee = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee(%value) : $@convention(thin) (@guaranteed C) -> ()
+    destroy_value %value : $C
+    br exit
+
+exit:
+    dealloc_stack %addr : $*C
+    %result = tuple ()
+    return %result : $()
+}
+
+// Ensure that the lifetime is extended to the final destroy_addr even when
+// there are no uses after the middle blocks.
+//
+// CHECK-LABEL: sil [ossa] @diamond_3 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[ONE:%[^,]+]] : @owned $C, [[TWO:%[^,]+]] : @owned $C):
+// CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         destroy_value [[TWO]]
+// CHECK:         br [[EXIT:bb[^,]+]]([[ONE]])
+// CHECK:       [[RIGHT]]:
+// CHECK:         destroy_value [[ONE]]
+// CHECK:         br [[EXIT]]([[TWO]])
+// CHECK:       [[EXIT]]([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'diamond_3'
+sil [ossa] @diamond_3 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    cond_br undef, left, right
+left:
+    destroy_value %two : $C
+    store %one to [init] %addr : $*C
+    br exit
+right:
+    destroy_value %one : $C
+    store %two to [init] %addr : $*C
+    br exit
+exit:
+    destroy_addr %addr : $*C
+    dealloc_stack %addr : $*C
+    %result = tuple ()
+    return %result : $()
+}
+
+// Ensure that the value stored to the alloc_stack is kept alive until the
+// destroy_addr in a subsequent block even when there are no uses.
+//
+// CHECK-LABEL: sil [ossa] @diamond_4 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[ONE:%[^,]+]] : @owned $C, [[TWO:%[^,]+]] : @owned $C):
+// CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         destroy_value [[TWO]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         destroy_value [[ONE]]
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[ONE]]
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'diamond_4' 
+sil [ossa] @diamond_4 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    cond_br undef, left, right
+left:
+    destroy_value %two : $C
+    store %one to [init] %addr : $*C
+    br exit
+right:
+    destroy_value %one : $C
+    store %two to [init] %addr : $*C
+    unreachable
+exit:
+    destroy_addr %addr : $*C
+    dealloc_stack %addr : $*C
+    %result = tuple ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @diamond_5 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[ONE:%[^,]+]] : @owned $C, [[TWO:%[^,]+]] : @owned $C):
+// CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         destroy_value [[TWO]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         destroy_value [[ONE]]
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[ONE]]
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'diamond_5' 
+sil [ossa] @diamond_5 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    cond_br undef, left, right
+left:
+    destroy_value %two : $C
+    store %one to [init] %addr : $*C
+    br exit
+right:
+    destroy_value %one : $C
+    store %two to [init] %addr : $*C
+    unreachable
+exit:
+    destroy_addr %addr : $*C
+    dealloc_stack %addr : $*C
+    %result = tuple ()
+    return %result : $()
+}
+
+// Verify that a dead-end which succeeds the introduction of a borrow_scope ends
+// the borrow scope before the unreachable.
+// CHECK-LABEL: sil [ossa] @diamond_6 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[ORIGINAL:%[^,]+]] : @owned $C):
+// CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
+// CHECK:       [[THROW_BLOCK]]:
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[REGULAR_BLOCK]]:
+// CHECK:         unreachable
+// CHECK:       [[EXIT:bb[^,]+]]:
+// CHECK:         destroy_value [[ORIGINAL]]
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'diamond_6' 
+sil [ossa] @diamond_6 : $@convention(thin) (@owned C) -> () {
+entry(%original : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    store %original to [init] %addr : $*C
+    cond_br undef, left, right
+left:
+    br exit
+right:
+    unreachable
+exit:
+    destroy_addr %addr : $*C
+    dealloc_stack %addr : $*C
+    %result = tuple ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @diamond_7 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         apply [[CALLEE_GUARANTEED]]([[COPY]])
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         unreachable
+// CHECK:       [[RIGHT]]:
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'diamond_7' 
+sil [ossa] @diamond_7 : $@convention(thin) (@owned C) -> () {
+entry(%one : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    store %one  to [init] %addr : $*C
+    %value2 = load [copy] %addr : $*C
+    %callee2 = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_2 = apply %callee2(%value2) : $@convention(thin) (@guaranteed C) -> ()
+    destroy_value %value2 : $C
+    destroy_addr %addr : $*C
+    cond_br undef, left, right
+left:
+    unreachable
+right:
+    dealloc_stack %addr : $*C
+    %result = tuple ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @diamond_8 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         apply [[CALLEE_GUARANTEED]]([[COPY]])
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'diamond_8'
+sil [ossa] @diamond_8 : $@convention(thin) (@owned C) -> () {
+entry(%one : @owned $C):
+    %addr = alloc_stack [lexical] $C
+    store %one  to [init] %addr : $*C
+    %value2 = load [copy] %addr : $*C
+    %callee2 = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_2 = apply %callee2(%value2) : $@convention(thin) (@guaranteed C) -> ()
+    destroy_value %value2 : $C
+    cond_br undef, left, right
+left:
+    unreachable
+right:
+    destroy_addr %addr : $*C
+    dealloc_stack %addr : $*C
+    %result = tuple ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @diamond_9 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         cond_br undef, [[BB1:bb[0-9]+]], [[BB4:bb[0-9]+]]
+// CHECK:       [[BB1]]:
+// CHECK:         cond_br undef, [[BB2:bb[0-9]+]], [[BB3:bb[0-9]+]]
+// CHECK:       [[BB2]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[BB5:bb[0-9]+]]
+// CHECK:       [[BB3]]:
+// CHECK:         br [[BB5]]
+// CHECK:       [[BB4]]:
+// CHECK:         br [[BB5]]
+// CHECK:       [[BB5]]:
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'diamond_9'
+sil [ossa] @diamond_9 : $@convention(thin) (@owned C) -> () {
+bb0(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  cond_br undef, bb1, bb4
+bb1:
+  store %instance to [init] %addr : $*C
+  cond_br undef, bb2, bb3
+bb2:
+  destroy_addr %addr : $*C
+  br bb5
+bb3:
+  destroy_addr %addr : $*C
+  br bb5
+bb4:
+  destroy_value [dead_end] %instance
+  br bb5
+bb5:
+  unreachable
+}
+
+// diamond_N }}
+
+// CHECK-LABEL: sil [ossa] @test_no_storeborrow4 :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_no_storeborrow4'
+sil [ossa] @test_no_storeborrow4 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load_borrow %1 : $*Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_control_flow5 :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_control_flow5'
+sil [ossa] @test_control_flow5 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %stk = alloc_stack [lexical] $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $Klass
+  store %copy1 to [init] %stk : $*Klass
+  br bb3
+
+bb2:
+  %copy2 = copy_value %1 : $Klass
+  store %copy2 to [init] %stk : $*Klass
+  br bb3
+
+bb3:
+  %2 = load_borrow %stk : $*Klass
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $Klass
+  destroy_addr %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil [ossa] @use_owned : $@convention(thin) (@owned Klass) -> ()
+
+// Test no ownership verifier error
+// CHECK-LABEL: sil [ossa] @test_control_flow6 :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_control_flow6'
+sil [ossa] @test_control_flow6 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get_owned : $@convention(thin) () -> @owned Klass
+  %1 = alloc_stack [lexical] $Klass
+  %2 = apply %0() : $@convention(thin) () -> @owned Klass
+  store %2 to [init] %1 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = apply %0() : $@convention(thin) () -> @owned Klass
+  store %5 to [assign] %1 : $*Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9 = load_borrow %1 : $*Klass
+  end_borrow %9 : $Klass
+  br bb4
+
+bb4:
+  cond_br undef, bb8, bb9
+
+bb8:
+  br bb4
+
+bb9:
+  cond_br undef, bb10, bb11
+
+bb10:
+  br bb12
+
+bb11:
+  %19 = load [copy] %1 : $*Klass
+  %20 = function_ref @use_owned : $@convention(thin) (@owned Klass) -> ()
+  %21 = apply %20(%19) : $@convention(thin) (@owned Klass) -> ()
+  br bb12
+
+bb12:
+  %23 = apply %0() : $@convention(thin) () -> @owned Klass
+  store %23 to [assign] %1 : $*Klass
+  cond_br undef, bb13, bb14
+
+bb13:
+  %26 = load [take] %1 : $*Klass
+  destroy_value %26 : $Klass
+  dealloc_stack %1 : $*Klass
+  %29 = tuple ()
+  return %29 : $()
+
+bb14:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_control_flow7 :
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_control_flow7'
+sil [ossa] @test_control_flow7 : $@convention(thin) () -> () {
+bb0:
+  %4 = alloc_stack [lexical] $Klass
+  %f = function_ref @get_owned : $@convention(thin) () -> @owned Klass
+  %5 = apply %f() : $@convention(thin) () -> @owned Klass
+  store %5 to [init] %4 : $*Klass
+  %7 = load_borrow %4 : $*Klass
+  end_borrow %7 : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %28 = load_borrow %4 : $*Klass
+  end_borrow %28 : $Klass
+  br bb3
+
+bb3:
+  destroy_addr %4 : $*Klass
+  dealloc_stack %4 : $*Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @printC : $@convention(thin) (@guaranteed C) -> ()
+
+// CHECK-LABEL: sil [ossa] @liveness0 :
+// CHECK-NOT: alloc_stack
+sil [ossa] @liveness0 : $@convention(thin) (@owned C, @owned C, @owned C, @owned C) -> () {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C, %instance_3 : @owned $C, %instance_4 : @owned $C):
+  %addr_x = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr_x : $*C
+  cond_br undef, bb1, bb5
+
+bb1:
+  %addr_y = alloc_stack [lexical] $C
+  store %instance_2 to [init] %addr_y : $*C
+  cond_br undef, bb2, bb3
+
+bb2:
+  destroy_value %instance_4 : $C
+  store %instance_3 to [assign] %addr_y : $*C
+  br bb4
+
+bb3:
+  destroy_value %instance_3 : $C
+  store %instance_4 to [assign] %addr_y : $*C
+  br bb4
+
+bb4:
+  %print = function_ref @printC : $@convention(thin) (@guaranteed C) -> ()
+  %26 = load [take] %addr_y : $*C
+  %36 = apply %print(%26) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %26 : $C
+  dealloc_stack %addr_y : $*C
+  br bb6
+
+bb5:
+  destroy_value %instance_2 : $C
+  destroy_value %instance_3 : $C
+  destroy_value %instance_4 : $C
+  br bb6
+
+// We don't need a PHI node here because the value is dead!
+// CHECK: bb5:
+bb6:
+  destroy_addr %addr_x : $*C
+  dealloc_stack %addr_x : $*C
+  %40 = tuple ()
+  return %40 : $()
+}
+// CHECK-LABEL: } // end sil function 'liveness0'
+
+// CHECK-LABEL: sil [ossa] @liveness1 :
+// CHECK-NOT: alloc_stack
+sil [ossa] @liveness1 : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "x"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = integer_literal $Builtin.Int64, 10
+  %5 = struct_extract %0 : $Int64, #Int64._value
+  %6 = builtin "cmp_eq_Int64"(%5 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %6, bb1, bb5
+
+bb1:
+  %8 = alloc_stack $Int64, var, name "y"
+  %9 = integer_literal $Builtin.Int64, 20
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  store %10 to [trivial] %8 : $*Int64
+  %12 = integer_literal $Builtin.Int64, 3
+  %14 = struct_extract %0 : $Int64, #Int64._value
+  %15 = builtin "cmp_sgt_Int64"(%14 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %15, bb2, bb3
+
+bb2:
+  %17 = integer_literal $Builtin.Int64, 0
+  %18 = struct $Int64 (%17 : $Builtin.Int64)
+  store %18 to [trivial] %8 : $*Int64
+  br bb4
+
+bb3:
+  %21 = integer_literal $Builtin.Int64, 2
+  %22 = struct $Int64 (%21 : $Builtin.Int64)
+  store %22 to [trivial] %8 : $*Int64
+  br bb4
+
+bb4:
+  // function_ref
+  %25 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
+  %26 = load [trivial] %8 : $*Int64
+  %27 = integer_literal $Builtin.Int64, 2
+  %28 = integer_literal $Builtin.Int1, -1
+  %30 = struct_extract %26 : $Int64, #Int64._value
+  %31 = builtin "sadd_with_overflow_Int64"(%30 : $Builtin.Int64, %27 : $Builtin.Int64, %28 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %32 = tuple_extract %31 : $(Builtin.Int64, Builtin.Int1), 0
+  %33 = tuple_extract %31 : $(Builtin.Int64, Builtin.Int1), 1
+  %34 = struct $Int64 (%32 : $Builtin.Int64)
+  cond_fail %33 : $Builtin.Int1
+  %36 = apply %25(%34) : $@convention(thin) (Int64) -> ()
+  dealloc_stack %8 : $*Int64
+  br bb6
+
+bb5:
+  br bb6
+
+// We don't need a PHI node here because the value is dead!
+// CHECK: bb5:
+bb6:
+  dealloc_stack %1 : $*Int64
+  %40 = tuple ()
+  return %40 : $()
+}
+// CHECK-LABEL: } // end sil function 'liveness1'
+
+// func foo(v : Int) -> Int {
+//   var x : Int = 0
+//   if v == 3 { x = 3 } else {
+//     if (v == 2) { x = 2 }
+//   }
+//   var i : Int = 0
+//   while (i < 10) { i = i+1 }
+//   return x
+// }
+
+// CHECK: sil [ossa] @place_phi :
+// CHECK-NOT: alloc_stack
+sil [ossa] @place_phi : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "v"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_stack $Int64, var, name "x"
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3 : $*Int64
+  %7 = integer_literal $Builtin.Int64, 3
+  %9 = struct_extract %0 : $Int64, #Int64._value
+  %10 = builtin "cmp_eq_Int64"(%9 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %10, bb1, bb2
+
+bb1:
+  %12 = struct $Int64 (%7 : $Builtin.Int64)
+  store %12 to [trivial] %3 : $*Int64
+  br bb6
+
+bb2:
+  %15 = integer_literal $Builtin.Int64, 2
+  %16 = builtin "cmp_eq_Int64"(%9 : $Builtin.Int64, %15 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %16, bb3, bb4
+
+bb3:
+  %18 = struct $Int64 (%15 : $Builtin.Int64)
+  store %18 to [trivial] %3 : $*Int64
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  br bb6
+
+// CHECK: bb6([[PHI:%[0-9]+]] : $Int64):
+// CHECK-NOT: alloc_stack
+bb6:
+  %22 = alloc_stack $Int64, var, name "i"
+  store %5 to [trivial] %22 : $*Int64
+  br bb7
+
+// CHECK: bb7([[PHI2:%[0-9]+]] : $Int64):
+bb7:
+  // CHECK: struct_extract [[PHI2]]
+  %25 = struct_element_addr %22 : $*Int64, #Int64._value
+  %26 = load [trivial] %25 : $*Builtin.Int64
+  %27 = integer_literal $Builtin.Int64, 10
+  %29 = builtin "cmp_slt_Int64"(%26 : $Builtin.Int64, %27 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %29, bb8, bb9
+
+bb8:
+  // CHECK: struct_extract [[PHI2]]
+  %31 = struct_element_addr %22 : $*Int64, #Int64._value
+  %32 = load [trivial] %31 : $*Builtin.Int64
+  %33 = integer_literal $Builtin.Int64, 1
+  %35 = builtin "sadd_with_overflow_Int64"(%32 : $Builtin.Int64, %33 : $Builtin.Int64, %29 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %36 = tuple_extract %35 : $(Builtin.Int64, Builtin.Int1), 0
+  %37 = tuple_extract %35 : $(Builtin.Int64, Builtin.Int1), 1
+  %38 = struct $Int64 (%36 : $Builtin.Int64)
+  cond_fail %37 : $Builtin.Int1
+  store %38 to [trivial] %22 : $*Int64
+  br bb7
+
+bb9:
+  %42 = load [trivial] %3 : $*Int64
+  dealloc_stack %22 : $*Int64
+  dealloc_stack %3 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %42 : $Int64
+}
+// CHECK-LABEL: } // end sil function 'place_phi'
+
+// func loop(c : Int) -> Int {
+//   var x : Int = 0
+//   while (x < c) { x = x + 1 }
+//   return x
+// }
+
+// CHECK: sil [ossa] @func_loop :
+// CHECK-NOT: alloc_stack
+sil [ossa] @func_loop: $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_stack $Int64, var, name "x"
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3 : $*Int64
+  br bb1
+
+// CHECK: bb1([[VAR:%[0-9]+]] : $Int64):
+bb1:
+  %8 = load [trivial] %3 : $*Int64
+  %10 = struct_extract %8 : $Int64, #Int64._value
+  %11 = struct_extract %0 : $Int64, #Int64._value
+  %12 = builtin "cmp_slt_Int64"(%10 : $Builtin.Int64, %11 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %12, bb2, bb3
+
+bb2:
+  %14 = load [trivial] %3 : $*Int64
+  %15 = integer_literal $Builtin.Int64, 1
+  %16 = integer_literal $Builtin.Int1, -1
+  %18 = struct_extract %14 : $Int64, #Int64._value
+  %19 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %15 : $Builtin.Int64, %16 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %20 = tuple_extract %19 : $(Builtin.Int64, Builtin.Int1), 0
+  %21 = tuple_extract %19 : $(Builtin.Int64, Builtin.Int1), 1
+  %22 = struct $Int64 (%20 : $Builtin.Int64)
+  cond_fail %21 : $Builtin.Int1
+  store %22 to [trivial] %3 : $*Int64
+  br bb1
+
+bb3:
+  %26 = load [trivial] %3 : $*Int64
+  dealloc_stack %3 : $*Int64
+  dealloc_stack %1 : $*Int64
+// CHECK-NOT: dealloc_stack
+  return %26 : $Int64
+}
+// CHECK-LABEL: } // end sil function 'func_loop'
+
+// func nest(c : Int) -> Int {
+// var x : Int = 0
+//   if (c > 1) { if (c > 2) { if (c > 3) { if (c > 4) {
+//   if (c > 5) { if (c > 6) { if (c > 7) { if (c > 8) {
+//   if (c > 9) { if (c > 10) { if (c > 11) { if (c > 12) {
+//   if (c > 13) { if (c > 14) { if (c > 15) { if (c > 16) {
+//   if (c > 17) { x = 7 }}}}}}}}}}}}}}}}} return x
+// }
+
+// This test should kill exponential algorithms.
+// CHECK: sil [ossa] @high_nest :
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+// CHECK-LABEL: } // end sil function 'high_nest'
+sil [ossa] @high_nest : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_stack $Int64, var, name "x"
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3 : $*Int64
+  %7 = integer_literal $Builtin.Int64, 1
+  %9 = struct_extract %0 : $Int64, #Int64._value
+  %10 = builtin "cmp_sgt_Int64"(%9 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %10, bb1, bb34
+
+bb1:
+  %12 = integer_literal $Builtin.Int64, 2
+  %14 = struct_extract %0 : $Int64, #Int64._value
+  %15 = builtin "cmp_sgt_Int64"(%14 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %15, bb2, bb33
+
+bb2:
+  %17 = integer_literal $Builtin.Int64, 3
+  %19 = struct_extract %0 : $Int64, #Int64._value
+  %20 = builtin "cmp_sgt_Int64"(%19 : $Builtin.Int64, %17 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %20, bb3, bb32
+
+bb3:
+  %22 = integer_literal $Builtin.Int64, 4
+  %24 = struct_extract %0 : $Int64, #Int64._value
+  %25 = builtin "cmp_sgt_Int64"(%24 : $Builtin.Int64, %22 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %25, bb4, bb31
+
+bb4:
+  %27 = integer_literal $Builtin.Int64, 5
+  %29 = struct_extract %0 : $Int64, #Int64._value
+  %30 = builtin "cmp_sgt_Int64"(%29 : $Builtin.Int64, %27 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %30, bb5, bb30
+
+bb5:
+  %32 = integer_literal $Builtin.Int64, 6
+  %34 = struct_extract %0 : $Int64, #Int64._value
+  %35 = builtin "cmp_sgt_Int64"(%34 : $Builtin.Int64, %32 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %35, bb6, bb29
+
+bb6:
+  %37 = integer_literal $Builtin.Int64, 7
+  %39 = struct_extract %0 : $Int64, #Int64._value
+  %40 = builtin "cmp_sgt_Int64"(%39 : $Builtin.Int64, %37 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %40, bb7, bb28
+
+bb7:
+  %42 = integer_literal $Builtin.Int64, 8
+  %44 = struct_extract %0 : $Int64, #Int64._value
+  %45 = builtin "cmp_sgt_Int64"(%44 : $Builtin.Int64, %42 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %45, bb8, bb27
+
+bb8:
+  %47 = integer_literal $Builtin.Int64, 9
+  %49 = struct_extract %0 : $Int64, #Int64._value
+  %50 = builtin "cmp_sgt_Int64"(%49 : $Builtin.Int64, %47 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %50, bb9, bb26
+
+bb9:
+  %52 = integer_literal $Builtin.Int64, 10
+  %54 = struct_extract %0 : $Int64, #Int64._value
+  %55 = builtin "cmp_sgt_Int64"(%54 : $Builtin.Int64, %52 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %55, bb10, bb25
+
+bb10:
+  %57 = integer_literal $Builtin.Int64, 11
+  %59 = struct_extract %0 : $Int64, #Int64._value
+  %60 = builtin "cmp_sgt_Int64"(%59 : $Builtin.Int64, %57 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %60, bb11, bb24
+
+bb11:
+  %62 = integer_literal $Builtin.Int64, 12
+  %64 = struct_extract %0 : $Int64, #Int64._value
+  %65 = builtin "cmp_sgt_Int64"(%64 : $Builtin.Int64, %62 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %65, bb12, bb23
+
+bb12:
+  %67 = integer_literal $Builtin.Int64, 13
+  %69 = struct_extract %0 : $Int64, #Int64._value
+  %70 = builtin "cmp_sgt_Int64"(%69 : $Builtin.Int64, %67 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %70, bb13, bb22
+
+
+bb13:
+  %72 = integer_literal $Builtin.Int64, 14
+  %74 = struct_extract %0 : $Int64, #Int64._value
+  %75 = builtin "cmp_sgt_Int64"(%74 : $Builtin.Int64, %72 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %75, bb14, bb21
+
+bb14:
+  %77 = integer_literal $Builtin.Int64, 15
+  %79 = struct_extract %0 : $Int64, #Int64._value
+  %80 = builtin "cmp_sgt_Int64"(%79 : $Builtin.Int64, %77 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %80, bb15, bb20
+
+bb15:
+  %82 = integer_literal $Builtin.Int64, 16
+  %84 = struct_extract %0 : $Int64, #Int64._value
+  %85 = builtin "cmp_sgt_Int64"(%84 : $Builtin.Int64, %82 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %85, bb16, bb19
+
+bb16:
+  %87 = integer_literal $Builtin.Int64, 17
+  %89 = struct_extract %0 : $Int64, #Int64._value
+  %90 = builtin "cmp_sgt_Int64"(%89 : $Builtin.Int64, %87 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %90, bb17, bb18
+
+bb17:
+  %92 = integer_literal $Builtin.Int64, 7
+  %93 = struct $Int64 (%92 : $Builtin.Int64)
+  store %93 to [trivial] %3 : $*Int64
+  br bb35
+
+bb18:
+  br bb35
+bb35:
+  br bb36
+
+bb19:
+  br bb36
+bb36:
+  br bb37
+
+bb20:
+  br bb37
+bb37:
+  br bb38
+
+bb21:
+  br bb38
+bb38:
+  br bb39
+
+bb22:
+  br bb39
+bb39:
+  br bb40
+
+bb23:
+  br bb40
+bb40:
+  br bb41
+
+bb24:
+  br bb41
+bb41:
+  br bb42
+
+bb25:
+  br bb42
+bb42:
+  br bb43
+
+bb26:
+  br bb43
+bb43:
+  br bb44
+
+bb27:
+  br bb44
+bb44:
+  br bb45
+
+bb28:
+  br bb45
+bb45:
+  br bb46
+
+bb29:
+  br bb46
+bb46:
+  br bb47
+
+bb30:
+  br bb47
+bb47:
+  br bb48
+
+bb31:
+  br bb48
+bb48:
+  br bb49
+
+bb32:
+  br bb49
+bb49:
+  br bb50
+
+bb33:
+  br bb50
+bb50:
+  br bb51
+
+bb34:
+  br bb51
+
+bb51:
+  %112 = load [trivial] %3 : $*Int64
+  dealloc_stack %3 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %112 : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @simple_if :
+// CHECK-NOT: alloc_stack
+sil [ossa] @simple_if : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_stack $Int64, var, name "x"
+  %4 = integer_literal $Builtin.Int64, 0
+// CHECK: [[INIT:%[0-9]+]] = struct $Int64
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3 : $*Int64
+  %8 = struct_extract %0 : $Int64, #Int64._value
+  %9 = builtin "cmp_sgt_Int64"(%4 : $Builtin.Int64, %8 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %9, bb1, bb2
+
+bb1:
+  %11 = integer_literal $Builtin.Int64, 2
+// CHECK: [[INIT2:%[0-9]+]] = struct $Int64
+  %12 = struct $Int64 (%11 : $Builtin.Int64)
+  store %12 to [trivial] %3 : $*Int64
+// CHECK: br bb3([[INIT2]])
+  br bb3
+
+bb2:
+// CHECK: br bb3([[INIT]])
+  br bb3
+
+bb3:
+  %15 = load [trivial] %3 : $*Int64
+  dealloc_stack %3 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %15 : $Int64
+}
+// CHECK-LABEL: } // end sil function 'simple_if'
+
+enum E3 {
+  case One
+  case Two
+  case Three
+}
+
+// CHECK-LABEL: sil [ossa] @test_switch :
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+sil [ossa] @test_switch: $@convention(thin) (Int64, E3) -> Int64 {
+bb0(%0 : $Int64, %1 : $E3):
+  %2 = alloc_stack $Int64, var, name "xi"
+  %3 = alloc_stack $E3, var, name "c"
+  store %0 to [trivial] %2 : $*Int64
+  store %1 to [trivial] %3 : $*E3
+  %6 = alloc_stack $Int64, var, name "x"
+  store %0 to [trivial] %6 : $*Int64
+  %8 = tuple ()
+  switch_enum %1 : $E3, case #E3.One!enumelt: bb1, case #E3.Two!enumelt: bb3, case #E3.Three!enumelt: bb5
+
+bb1:
+  br bb2
+
+bb2:
+  %11 = integer_literal $Builtin.Int64, 3
+  %12 = struct $Int64 (%11 : $Builtin.Int64)
+  store %12 to [trivial] %6 : $*Int64
+  br bb7
+
+bb3:
+  br bb4
+
+bb4:
+  %16 = integer_literal $Builtin.Int64, 2
+  %17 = struct $Int64 (%16 : $Builtin.Int64)
+  store %17 to [trivial] %6 : $*Int64
+  br bb7
+
+bb5:
+  br bb6
+
+bb6:
+  %21 = integer_literal $Builtin.Int64, 1
+  %22 = struct $Int64 (%21 : $Builtin.Int64)
+  store %22 to [trivial] %6 : $*Int64
+  br bb7
+
+bb7:
+  %25 = load [trivial] %6 : $*Int64
+  dealloc_stack %6 : $*Int64
+  dealloc_stack %3 : $*E3
+  dealloc_stack %2 : $*Int64
+  return %25 : $Int64
+}
+// CHECK-LABEL: } // end sil function 'test_switch'
+
+
+// CHECK-LABEL: sil [ossa] @non_materializable_load_projection :
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'non_materializable_load_projection'
+sil [ossa] @non_materializable_load_projection : $@convention(thin) (FakeOptional<Int>) -> Int {
+bb0(%0 : $FakeOptional<Int>):
+  %1 = alloc_stack $FakeOptional<Int>
+  store %0 to [trivial] %1
+  %2 = unchecked_inplace_enum_data_addr %1, #FakeOptional.some!enumelt
+  %3 = load [trivial] %2
+  dealloc_stack %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence :
+// CHECK:         %1 = apply undef()
+// CHECK:         %2 = mark_dependence %1 on %0
+// CHECK-LABEL: } // end sil function 'mark_dependence'
+sil [ossa] @mark_dependence : $@convention(thin) (Builtin.RawPointer) -> @owned C {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = alloc_stack $Builtin.RawPointer
+  store %0 to [trivial] %1
+  %3 = apply undef() : $@convention(thin) () -> @owned C
+  %4 = mark_dependence %3 on %1
+  dealloc_stack %1
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_value :
+// CHECK:         %2 = mark_dependence %0 on %1
+// CHECK-NEXT:    return %2
+// CHECK-LABEL: } // end sil function 'mark_dependence_value'
+sil [ossa] @mark_dependence_value : $@convention(thin) (Builtin.RawPointer, @guaranteed Kl) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : @guaranteed $Kl):
+  %2 = alloc_stack $Builtin.RawPointer
+  store %0 to [trivial] %2
+  %3 = mark_dependence %2 on %1
+  %4 = load [trivial] %3
+  dealloc_stack %2
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_base_and_value :
+// CHECK:         %1 = mark_dependence %0 on %0
+// CHECK-NEXT:    return %1
+// CHECK-LABEL: } // end sil function 'mark_dependence_base_and_value'
+sil [ossa] @mark_dependence_base_and_value : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = alloc_stack $Builtin.RawPointer
+  store %0 to [trivial] %1
+  %3 = mark_dependence %1 on %1
+  %4 = load [trivial] %3
+  dealloc_stack %1
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence_addr :
+// CHECK:         %1 = alloc_stack $C
+// CHECK:         %2 = apply undef(%1)
+// CHECK:         mark_dependence_addr %1 on %0
+// CHECK-LABEL: } // end sil function 'mark_dependence_addr'
+sil [ossa] @mark_dependence_addr : $@convention(thin) (Builtin.RawPointer) -> @owned C {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = alloc_stack $C
+  %2 = alloc_stack $Builtin.RawPointer
+  store %0 to [trivial] %2
+  %4 = apply undef(%1) : $@convention(thin) () -> @out C
+  mark_dependence_addr %1 on %2
+  dealloc_stack %2
+  %7 = load [take] %1
+  dealloc_stack %1
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @raw_layout :
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function 'raw_layout'
+sil [ossa] @raw_layout : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack [lexical] $RawLayoutStruct
+  %2 = builtin "prepareInitialization"(%1) : $()
+  %3 = builtin "addressOfRawLayout"<RawLayoutStruct>(%1) : $Builtin.RawPointer
+  %4 = pointer_to_address %3 to [strict] $*Int
+  store %0 to [trivial] %4
+  %6 = drop_deinit %1
+  dealloc_stack %1
+  %9 = tuple ()
+  return %9
+}
+
+// CHECK-LABEL: sil [ossa] @type_dependenct_operand :
+// CHECK:         alloc_stack
+// CHECK:         witness_method
+// CHECK:         apply
+// CHECK-LABEL: } // end sil function 'type_dependenct_operand'
+sil [ossa] @type_dependenct_operand : $@convention(thin) (SP2) -> () {
+bb0(%0 : $SP2):
+  %1 = alloc_stack [lexical] $any P2
+  %3 = init_existential_addr %1, $SP2
+  store %0 to [trivial] %3
+  %6 = open_existential_addr immutable_access %1 to $*@opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self
+  %19 = witness_method $@opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self, #P2.bar : <Self where Self : P2> (Self) -> () -> (), %6 : $*@opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self : $@convention(witness_method: P2) (@in_guaranteed @opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self) -> ()
+  %20 = apply %19(undef) : $@convention(witness_method: P2) (@in_guaranteed @opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self) -> ()
+  destroy_addr %1
+  dealloc_stack %1
+  %25 = tuple ()
+  return %25
+}
+
+// CHECK-LABEL: sil [ossa] @load_take :
+// CHECK:         (%1, %2, %3) = destructure_struct %0
+// CHECK-NOT:     alloc_stack
+// CHECK:         destroy_value %1
+// CHECK-NEXT:    destroy_value
+// CHECK-NEXT:    destroy_value
+// CHECK-NEXT:    destroy_value
+// CHECK-LABEL: } // end sil function 'load_take'
+sil [ossa] @load_take : $@convention(thin) (@owned S3) -> () {
+bb0(%0 : @owned $S3):
+  %1 = alloc_stack [lexical] $S3
+  store %0 to [init] %1
+  %3 = struct_element_addr %1, #S3.v1
+  %4 = load [take] %3
+  %5 = struct_element_addr %1, #S3.v2
+  %5a = tuple_element_addr %5, 0
+  %6a = load [take] %5a
+  %5b = tuple_element_addr %5, 1
+  %6b = load [take] %5b
+  %7 = struct_element_addr %1, #S3.v3
+  %8 = load [take] %7
+  dealloc_stack %1
+  destroy_value %4
+  destroy_value %6a
+  destroy_value %6b
+  destroy_value %8
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @mismatching_existential_type_borrow :
+// Currently not optimized
+// CHECK-LABEL: } // end sil function 'mismatching_existential_type_borrow'
+sil [ossa] @mismatching_existential_type_borrow : $@convention(thin) (@owned D) -> () {
+bb0(%0 : @owned $D):
+  %1 = alloc_stack [lexical] $any P
+  %2 = init_existential_addr %1, $D
+  store %0 to [init] %2
+  %4 = open_existential_addr immutable_access %1 to $*@opened("592F4C30-5E4F-11F1-B22D-0EA13E3AABB3", any P) Self
+  %5 = unchecked_addr_cast %4 to $*C
+  %6 = load_borrow %5
+  %7 = apply undef(%6) : $@convention(method) (@guaranteed C) -> ()
+  end_borrow %6
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @split_store :
+// CHECK:         ({{.*}}, [[V2A:%.*]]) = destructure_struct undef
+// CHECK:         [[S1:%.*]] = struct $Sy (%0, [[V2A]])
+// CHECK:         ([[V1B:%.*]], [[V2B:%.*]]) = destructure_struct [[S1]]
+// CHECK:         [[S2:%.*]] = struct $Sy ([[V1B]], %1)
+// CHECK:         end_lifetime [[V2B]]
+// CHECK:         return [[S2]]
+// CHECK-LABEL: } // end sil function 'split_store'
+sil [ossa] @split_store : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> @owned Sy {
+bb0(%0 : @owned $AnyObject, %1 : @owned $AnyObject):
+  %2 = alloc_stack $Sy
+  %3 = struct_element_addr %2, #Sy.v1
+  store %0 to [init] %3
+  %5 = struct_element_addr %2, #Sy.v2
+  store %1 to [init] %5
+  %7 = load [take] %2
+  dealloc_stack %2
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @split_store_with_phi_argument :
+// CHECK:       bb1:
+// CHECK:         ({{.*}}, [[V2A:%.*]]) = destructure_struct undef
+// CHECK:         [[S1:%.*]] = struct $Sy (%0, [[V2A]])
+// CHECK:         ([[V1B:%.*]], [[V2B:%.*]]) = destructure_struct [[S1]]
+// CHECK:         [[S2A:%.*]] = struct $Sy ([[V1B]], %1)
+// CHECK:         end_lifetime [[V2B]]
+// CHECK:         br bb3([[S2A]])
+// CHECK:       bb2:
+// CHECK:         [[S2B:%.*]] = struct $Sy (%0, %1)
+// CHECK:         br bb3([[S2B]])
+// CHECK:       bb3([[PHI:%.*]] : @owned $Sy):
+// CHECK:         return [[PHI]]
+// CHECK-LABEL: } // end sil function 'split_store_with_phi_argument'
+sil [ossa] @split_store_with_phi_argument : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> @owned Sy {
+bb0(%0 : @owned $AnyObject, %1 : @owned $AnyObject):
+  %2 = alloc_stack $Sy
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = struct_element_addr %2, #Sy.v1
+  store %0 to [init] %3
+  %5 = struct_element_addr %2, #Sy.v2
+  store %1 to [init] %5
+  br bb3
+
+bb2:
+  %8 = struct $Sy (%0, %1)
+  store %8 to [init] %2
+  br bb3
+
+bb3:
+  %11 = load [take] %2
+  dealloc_stack %2
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_trivial1 :
+// CHECK-NOT:     alloc_stack
+// CHECK:         return %0
+// CHECK-LABEL: } // end sil function 'destroy_trivial1'
+sil [ossa] @destroy_trivial1 : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1
+  %3 = load [trivial] %1
+  destroy_addr %1
+  dealloc_stack %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_trivial2 :
+// CHECK-NOT:     alloc_stack
+// CHECK:         (%1, %2) = destructure_struct %0
+// CHECK:         destroy_value %1
+// CHECK-LABEL: } // end sil function 'destroy_trivial2'
+sil [ossa] @destroy_trivial2 : $@convention(thin) (@owned Pair) -> () {
+bb0(%0 : @owned $Pair):
+  %1 = alloc_stack $Pair
+  store %0 to [init] %1
+  %3 = struct_element_addr %1, #Pair.o
+  destroy_addr %3
+  %5 = struct_element_addr %1, #Pair.i
+  destroy_addr %5
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @triple_stores :
+// CHECK:       bb1:
+// CHECK:         [[T1:%.*]] = struct $Triple (%0
+// CHECK-NEXT:    br bb3([[T1]])
+// CHECK:       bb2:
+// CHECK:         [[T2:%.*]] = struct $Triple (%0
+// CHECK-NEXT:    br bb3([[T2]])
+// CHECK:       bb3([[P:%.*]] : @owned $Triple):
+// CHECK:         ([[A1:%.*]], [[B1:%.*]], [[C1:%.*]]) = destructure_struct [[P]]
+// CHECK:         [[R1:%.*]] = struct $Triple ([[A1]], %1, [[C1]])
+// CHECK:         end_lifetime [[B1]]
+// CHECK:         ([[A2:%.*]], [[B2:%.*]], [[C2:%.*]]) = destructure_struct [[R1]]
+// CHECK:         [[R2:%.*]] = struct $Triple ([[A2]], [[B2]], %2)
+// CHECK:         end_lifetime [[C2]]
+// CHECK:         return [[R2]]
+// CHECK-LABEL: } // end sil function 'triple_stores'
+sil [ossa] @triple_stores : $@convention(thin) (@owned AnyObject, @owned AnyObject, @owned AnyObject) -> @owned Triple {
+bb0(%0 : @owned $AnyObject, %1 : @owned $AnyObject, %2 : @owned $AnyObject):
+  %3 = alloc_stack $Triple
+  %4 = struct_element_addr %3, #Triple.a
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %0 to [init] %4
+  br bb3
+
+bb2:
+  store %0 to [init] %4
+  br bb3
+
+bb3:
+  %6 = struct_element_addr %3, #Triple.b
+  store %1 to [init] %6
+  %8 = struct_element_addr %3, #Triple.c
+  store %2 to [init] %8
+  %10 = load [take] %3
+  dealloc_stack %3
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @incomplete_tuple_element_lifetime :
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function 'incomplete_tuple_element_lifetime'
+sil [ossa] @incomplete_tuple_element_lifetime : $@convention(thin) (@owned FakeOptional<Kl>, @owned FakeOptional<Kl>) -> () {
+bb0(%0 : @owned $FakeOptional<Kl>, %1 : @owned $FakeOptional<Kl>):
+  %2 = alloc_stack $(FakeOptional<Kl>, FakeOptional<Kl>)
+  %3 = tuple_element_addr %2, 0
+  store %0 to [init] %3
+  %5 = tuple_element_addr %2, 1
+  store %1 to [init] %5
+  cond_br undef, bb1, bb2
+
+bb1:
+  %8 = load [take] %2
+  destroy_value %8
+  br bb3
+
+bb2:
+  %11 = load [take] %3
+  destroy_value %11
+  br bb3
+
+bb3:
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// Dynamic begin_access on an alloc_stack address prevents elimination.
+//
+// CHECK-LABEL: sil [ossa] @begin_access_dynamic_bailout :
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'begin_access_dynamic_bailout'
+sil [ossa] @begin_access_dynamic_bailout : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  store %0 to [init] %stk : $*Klass
+  %access = begin_access [modify] [dynamic] %stk : $*Klass
+  end_access %access : $*Klass
+  destroy_addr %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Store to the root path, then overwrite one field via struct_element_addr, then
+// load the whole struct. The old field value is destroyed and the result is
+// rebuilt with the new field value.
+//
+// CHECK-LABEL: sil [ossa] @root_store_field_override :
+// CHECK:       bb0(%0 : @owned $Sy, %1 : @owned $AnyObject):
+// CHECK-NOT:     alloc_stack
+// CHECK:         ([[V1:%.*]], [[OLD_V2:%.*]]) = destructure_struct %0
+// CHECK:         [[RESULT:%.*]] = struct $Sy ([[V1]], %1)
+// CHECK:         destroy_value [[OLD_V2]]
+// CHECK:         return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'root_store_field_override'
+sil [ossa] @root_store_field_override : $@convention(thin) (@owned Sy, @owned AnyObject) -> @owned Sy {
+bb0(%0 : @owned $Sy, %1 : @owned $AnyObject):
+  %stk = alloc_stack $Sy
+  store %0 to [init] %stk : $*Sy
+  %v2_addr = struct_element_addr %stk : $*Sy, #Sy.v2
+  store %1 to [assign] %v2_addr : $*AnyObject
+  %result = load [take] %stk : $*Sy
+  dealloc_stack %stk : $*Sy
+  return %result : $Sy
+}
+
+// CHECK-LABEL: sil [ossa] @projected_load_borrow_overlap :
+// Currently not optimized
+// CHECK-LABEL: } // end sil function 'projected_load_borrow_overlap'
+sil [ossa] @projected_load_borrow_overlap : $@convention(thin) (@owned Kl, @owned Kl) -> () {
+bb0(%0 : @owned $Kl, %1 : @owned $Kl):
+  %2 = alloc_stack $(Kl, Kl)
+  %3 = tuple_element_addr %2, 0
+  store %0 to [init] %3
+  %5 = tuple_element_addr %2, 1
+  store %1 to [init] %5
+  cond_br undef, bb1, bb2
+
+bb1:
+  %8 = load [take] %2
+  destroy_value %8
+  br bb3
+
+bb2:
+  %10 = load_borrow %5
+  %11 = load [take] %3
+  destroy_value %11
+  end_borrow %10
+  %14 = load [take] %5
+  destroy_value %14
+  br bb3
+
+bb3:
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @enum_with_empty_payload :
+// Currently not optimized
+// CHECK-NOT:     switch_enum undef
+// CHECK-LABEL: } // end sil function 'enum_with_empty_payload'
+sil [ossa] @enum_with_empty_payload : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $FakeOptional<()>
+  inject_enum_addr %0, #FakeOptional.some!enumelt
+  %2 = load [trivial] %0
+  switch_enum %2, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%99 : $()):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dealloc_partial_ref :
+// CHECK-NOT:     alloc_ref
+// CHECK:         destroy_value %0
+// CHECK-LABEL: } // end sil function 'dealloc_partial_ref'
+sil [ossa] @dealloc_partial_ref : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_ref $TrivialDestructor
+  %2 = begin_borrow %1
+  %3 = ref_element_addr %2, #TrivialDestructor.ptr
+  store %0 to [init] %3
+  end_borrow %2
+  %4 = metatype $@thick TrivialDestructor.Type
+  dealloc_partial_ref %1, %4
+  %r = tuple()
+  return %r
+}
+

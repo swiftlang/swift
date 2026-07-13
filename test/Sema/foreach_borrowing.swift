@@ -1,10 +1,5 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:     -enable-experimental-feature BorrowingForLoop \
-// RUN:     -enable-experimental-feature BorrowingSequence \
 // RUN:     -verify-ignore-unrelated
-
-// REQUIRES: swift_feature_BorrowingForLoop
-// REQUIRES: swift_feature_BorrowingSequence
 
 @available(SwiftStdlib 6.4, *)
 struct DualConformanceSeq: Sequence, Iterable {

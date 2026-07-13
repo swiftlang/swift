@@ -690,7 +690,7 @@ public:
   bool diagnoseAsNote() override;
 
   /// If the type of a key path literal is read-only due to setter
-  /// availability constraints but the context requires a writable
+  /// availability restrictions but the context requires a writable
   /// key path, let's produce a tailed availability diagnostic that
   /// points to the offending setter.
   bool diagnoseKeyPathLiteralMutabilityMismatch() const;

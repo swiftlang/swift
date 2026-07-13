@@ -169,6 +169,54 @@ extension Value {
     }
   }
 
+  /// Projects into `self` along `path`, replacing the sub-value found there with `replacement`.
+  ///
+  /// Returns a tuple of:
+  /// - `oldProjected`: the original value at `path` (forwarded out of `self` via destructuring)
+  /// - `updated`: a reconstructed aggregate equal to `self` but with the field at `path`
+  ///   replaced by `replacement`
+  ///
+  /// Each aggregate along the path is split with `destructure_struct`/`destructure_tuple` and
+  /// then rebuilt with `struct`/`tuple`, so `self` must be an owned value. Structs that have a
+  /// value-type destructor are wrapped in a `drop_deinit` before destructuring. The path must
+  /// be materializable (only `.structField` and `.tupleField` components are supported).
+  func createProjectionAndReplace(with replacement: Value,
+                                  path: SmallProjectionPath, builder: Builder
+  ) -> (oldProjected: Value, updated: Value) {
+    let (kind, index, subPath) = path.pop()
+    switch kind {
+    case .root:
+      assert(type == replacement.type, "wrong type when replacing a projected value")
+      return (oldProjected: self, updated: replacement)
+    case .structField:
+      let v: Value
+      if (type.nominal as! StructDecl).valueTypeDestructor != nil {
+        v = builder.createDropDeinit(of: self)
+      } else {
+        v = self
+      }
+      let ds = builder.createDestructureStruct(struct: v)
+      var elements = Array(ds.results)
+      let (oldSubValue, updatedSubValue) = elements[index].createProjectionAndReplace(with: replacement,
+                                                                                      path: subPath,
+                                                                                      builder: builder)
+      elements[index] = updatedSubValue
+      let updatedStruct = builder.createStruct(type: type, elements: elements)
+      return (oldProjected: oldSubValue, updated: updatedStruct)
+    case .tupleField:
+      let ds = builder.createDestructureTuple(tuple: self)
+      var elements = Array(ds.results)
+      let (oldSubValue, updatedSubValue) = elements[index].createProjectionAndReplace(with: replacement,
+                                                                                      path: subPath,
+                                                                                      builder: builder)
+      elements[index] = updatedSubValue
+      let updatedTuple = builder.createTuple(type: type, elements: elements)
+      return (oldProjected: oldSubValue, updated: updatedTuple)
+    default:
+      fatalError("path is not materializable")
+    }
+  }
+
   func createProjectionAndCopy(path: SmallProjectionPath, builder: Builder) -> Value {
     if path.isEmpty {
       return self.copyIfNotTrivial(builder)
@@ -417,6 +465,10 @@ extension Value {
 }
 
 extension Instruction {
+  func endsLifetime(of value: Value) -> Bool {
+    return operands.contains { $0.value == value && $0.endsLifetime }
+  }
+
   var isTriviallyDead: Bool {
     if results.contains(where: { !$0.uses.isEmpty }) {
       return false
@@ -1181,6 +1233,35 @@ extension Type {
   func shouldExpand(_ context: some Context) -> Bool {
     return context.bridgedPassContext.shouldExpand(self.bridged)
   }
+
+  /// Returns the type of the sub-value which `path` projects out of a value of `self`'s type,
+  /// or nil if `path` cannot be applied to `self`.
+  ///
+  /// Only struct and tuple field components are supported; any other path component (e.g.
+  /// enum cases, class fields, or "any"-kinds) causes the projection to fail.
+  func project(path: SmallProjectionPath, in function: Function) -> Type? {
+    let (kind, index, subPath) = path.pop()
+    switch kind {
+    case .root:
+      return self
+    case .structField:
+      guard let fields = getNominalFields(in: function),
+            index < fields.count
+      else {
+        return nil
+      }
+      return fields[index].project(path: subPath, in: function)
+    case .tupleField:
+      guard isTuple,
+            index < tupleElements.count
+      else {
+        return nil
+      }
+      return tupleElements[index].project(path: subPath, in: function)
+    default:
+      return nil
+    }
+  }
 }
 
 /// Used by TempLValueElimination and TempRValueElimination to make the optimization work by both,
@@ -1274,5 +1355,39 @@ let destroyBarrierTest = FunctionTest("destroy_barrier") { function, arguments, 
     } else {
       print("transparent: \(inst)")
     }
+  }
+}
+
+/// If the memory location depends on something, insert a dependency for the loaded value:
+///
+///     %2 = mark_dependence %1 on %0
+///     %3 = load %2
+/// ->
+///     %2 = mark_dependence %1 on %0 // not needed anymore, can be removed eventually
+///     %3 = load %2
+///     %4 = mark_dependence %3 on %0
+///     // replace %3 with %4
+///
+func insertMarkDependencies(for load: LoadInstruction, _ context: FunctionPassContext) {
+  var inserter = MarkDependenceInserter(load: load, context: context)
+  _ = inserter.walkUp(address: load.address, path: UnusedWalkingPath())
+}
+
+private struct MarkDependenceInserter : AddressUseDefWalker {
+  let load: LoadInstruction
+  let context: FunctionPassContext
+
+  mutating func walkUp(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    if let mdi = address as? MarkDependenceInst {
+      let builder = Builder(after: load, context)
+      let newMdi = builder.createMarkDependence(value: load, base: mdi.base, kind: mdi.dependenceKind)
+      let svi = load as SingleValueInstruction
+      svi.uses.ignore(user: newMdi).replaceAll(with: newMdi, context)
+    }
+    return walkUpDefault(address: address, path: path)
+  }
+
+  mutating func rootDef(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    return .continueWalk
   }
 }

@@ -39,10 +39,10 @@ using namespace swift;
 /// be kept in sync with importEnumCaseAlias in the ClangImporter library.
 static EnumElementDecl *extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
                                            const VarDecl *constant) {
-  if (auto constraint =
-          getUnsatisfiedAvailabilityConstraint(constant, DC, UseLoc)) {
+  if (auto restriction =
+          getUnsatisfiedAvailabilityRestriction(constant, DC, UseLoc)) {
     // Only diagnose explicit unavailability.
-    if (constraint->isUnavailable())
+    if (restriction->isUnavailable())
       diagnoseDeclAvailability(constant, UseLoc, nullptr,
                                ExportContext::forFunctionBody(DC, UseLoc));
   }

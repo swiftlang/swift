@@ -1,11 +1,12 @@
-// RUN: %target-typecheck-verify-swift -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap -enable-experimental-feature ObjCImplementation -target %target-stable-abi-triple -debug-diagnostic-names
+// RUN: %target-typecheck-verify-swift -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap -enable-experimental-feature ObjCImplementation -target %target-stable-abi-triple
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_ObjCImplementation
+// REQUIRES: OS=macosx
 
 import objc_implementation_internal
 
 // FIXME: [availability] An implementation that is less available than the interface it implements should be diagnosed
-@available(*, unavailable)
+@available(macOS, unavailable)
 @objc @implementation extension ObjCPropertyTest {
   let prop1: Int32
 

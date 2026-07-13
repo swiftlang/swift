@@ -20,7 +20,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeChecker.h"
-#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -244,30 +244,32 @@ checkAvailability(const EnumElementDecl *elt,
                   AvailabilityContext availabilityContext,
                   std::optional<RuntimeVersionCheck> &versionCheck) {
   auto &C = elt->getASTContext();
-  auto constraint = getAvailabilityConstraintsForDecl(elt, availabilityContext)
-                        .getPrimaryConstraint();
+  auto restriction =
+      getAvailabilityRestrictionsForDecl(elt, availabilityContext)
+          .getPrimaryRestriction();
 
   // Is it always available?
-  if (!constraint)
+  if (!restriction)
     return true;
 
   // Is it never available?
-  if (constraint->isUnavailable())
+  if (restriction->isUnavailable())
     return false;
 
-  // Some constraints are active for type checking but can't translate to
+  // Some restrictions are active for type checking but can't translate to
   // runtime restrictions.
-  if (!constraint->isActiveForRuntimeQueries(C))
+  if (!restriction->isActiveForRuntimeQueries(C))
     return true;
 
-  auto domainAndRange = constraint->getDomainAndRange(C);
+  auto domainAndRange = restriction->getDomainAndRange(C);
 
-  // Only platform version constraints are supported currently.
+  // Only platform version restrictions are supported currently.
   // FIXME: [availability] Support non-platform domain availability checks
   if (!domainAndRange.getDomain().isPlatform())
     return true;
 
-  // It's conditionally available; create a version constraint and return true.
+  // It's conditionally available; create a version restriction and return
+  // true.
   versionCheck.emplace(domainAndRange.getDomain().getPlatformKind(),
                        domainAndRange.getRange().getRawMinimumVersion());
   return true;

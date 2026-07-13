@@ -1,19 +1,18 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -enable-experimental-feature BorrowingSequence)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -Xcc -std=c++20 -enable-experimental-feature BorrowingSequence)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20 -enable-experimental-feature BorrowingSequence)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -Xcc -std=c++20)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20)
 
 // Also test this with a bridging header instead of the StdVector module.
 // RUN: %empty-directory(%t2)
 // RUN: cp %S/Inputs/std-vector.h %t2/std-vector-bridging-header.h
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -enable-experimental-feature BorrowingSequence)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=swift-6 -Xcc -std=c++20 -enable-experimental-feature BorrowingSequence)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20 -enable-experimental-feature BorrowingSequence)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=swift-6 -Xcc -std=c++20)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20)
 
 // Ubuntu 20.04 ships with an old version of libstdc++, which does not provide
 // std::contiguous_iterator_tag from C++20.
 // REQUIRES: OS=macosx || OS=windows-msvc
 
-// REQUIRES: swift_feature_BorrowingSequence
 // REQUIRES: executable_test
 
 import StdlibUnittest

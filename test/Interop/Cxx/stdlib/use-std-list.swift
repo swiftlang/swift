@@ -1,7 +1,6 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature BorrowingSequence)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 // Test iterating through a list using the borrowing iterators (currently behind a feature flag).
 
-// REQUIRES: swift_feature_BorrowingSequence
 // REQUIRES: executable_test
 
 import StdlibUnittest

@@ -224,7 +224,7 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       changed = true
     }
 
-    changed = context.eliminateDeadAllocations(in: function) || changed
+    changed = removeDeadStackAllocations(in: function, context) || changed
   }
 
   if function.isGlobalInitOnceFunction {

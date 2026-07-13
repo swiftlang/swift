@@ -3381,6 +3381,11 @@ ERROR(ambiguous_associated_type_from_parameterized_protocols,none,
      (const AssociatedTypeDecl *, const ProtocolDecl *))
 NOTE(associated_type_candidate_from_parameterized_protocol,none,
      "candidate inferred from parameterized protocol here", ())
+ERROR(associated_type_inference_too_complex,none,
+     "the compiler is unable to infer the associated types in this "
+     "conformance of %0 to %1 in reasonable time",
+     (Type, const ProtocolDecl *))
+
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
 NOTE(protocol_witness_non_sendable,none,
@@ -8702,10 +8707,6 @@ ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
 ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
-
-ERROR(borrowingsequence_experimental,none,
-      "'%0' requires -enable-experimental-feature BorrowingSequence",
-      (StringRef))
 
 ERROR(for_loop_sequence_conformance_unavailable,none,
       "for-in loop requires %0 to conform to %1, which is "

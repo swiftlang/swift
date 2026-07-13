@@ -1,12 +1,8 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
-// RUN:     -enable-experimental-feature BorrowingForLoop \
-// RUN:     -enable-experimental-feature BorrowingSequence \
 // RUN:     -enable-experimental-feature Lifetimes \
 // RUN:     -module-name test \
 // RUN:     %s | %FileCheck %s
 
-// REQUIRES: swift_feature_BorrowingForLoop
-// REQUIRES: swift_feature_BorrowingSequence
 // REQUIRES: swift_feature_Lifetimes
 
 enum IterationError: Error {

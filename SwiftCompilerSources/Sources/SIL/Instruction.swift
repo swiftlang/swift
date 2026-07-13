@@ -68,6 +68,11 @@ public class Instruction : CustomStringConvertible, Hashable {
       context.notifyCallsChanged()
     }
     context.notifyInstructionsChanged()
+
+    if let definingInst = value.definingInstruction {
+      assert(!definingInst.isDeleted, "tried to set operand of a deleted instruction")
+    }
+
     bridged.setOperand(index, value.bridged)
     context.notifyInstructionChanged(self)
   }
@@ -257,6 +262,8 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   private static func getListIndices(lhs: Instruction, rhs: Instruction) -> (Int, Int) {
     precondition(lhs.parentBlock == rhs.parentBlock)
+    precondition(!lhs.isDeleted)
+    precondition(!rhs.isDeleted)
     if let lhsIdx = lhs.rawIndexInBlock, let rhsIdx = rhs.rawIndexInBlock {
       return (lhsIdx, rhsIdx)
     }
