@@ -3034,8 +3034,8 @@ bool ContextualFailure::diagnoseKeyPathLiteralMutabilityMismatch() const {
       continue;
 
     if (auto *setter = storageDecl->getOpaqueAccessor(AccessorKind::Set)) {
-      if (getUnsatisfiedAvailabilityConstraint(setter, S.getDC(),
-                                               component.getLoc())) {
+      if (getUnsatisfiedAvailabilityRestriction(setter, S.getDC(),
+                                                component.getLoc())) {
         auto where =
             ExportContext::forFunctionBody(S.getDC(), component.getLoc());
         return diagnoseDeclAvailability(setter, component.getLoc(),

@@ -12,8 +12,8 @@
 
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContextStorage.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -367,24 +367,24 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
   bool isDeprecated = storage->isDeprecated;
   isConstrained |= constrainBool(isDeprecated, decl->isDeprecated());
 
-  // Compute the availability constraints for the decl when used in this context
-  // and then map those constraints to domain infos. The result will be merged
-  // into the existing domain infos for this context.
+  // Compute the availability restrictions for the decl when used in this
+  // context and then map those restrictions to domain infos. The result will
+  // be merged into the existing domain infos for this context.
   llvm::SmallVector<DomainInfo, 4> declDomainInfos;
-  AvailabilityConstraintFlags flags =
-      AvailabilityConstraintFlag::SkipEnclosingExtension;
-  auto constraints =
-      swift::getAvailabilityConstraintsForDecl(decl, *this, flags);
-  for (auto constraint : constraints) {
-    auto attr = constraint.getAttr();
+  AvailabilityRestrictionFlags flags =
+      AvailabilityRestrictionFlag::SkipEnclosingExtension;
+  auto restrictions =
+      swift::getAvailabilityRestrictionsForDecl(decl, *this, flags);
+  for (auto restriction : restrictions) {
+    auto attr = restriction.getAttr();
     auto domain = attr.getDomain();
-    switch (constraint.getReason()) {
-    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    case AvailabilityConstraint::Reason::UnavailableObsolete:
-    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+    switch (restriction.getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
       declDomainInfos.push_back(DomainInfo::unavailable(domain));
       break;
-    case AvailabilityConstraint::Reason::Unintroduced:
+    case AvailabilityRestriction::Reason::Unintroduced:
       if (auto introducedRange = attr.getIntroducedRange(ctx)) {
         if (domain.isActivePlatform(ctx)) {
           isConstrained |= constrainRange(platformRange, *introducedRange);

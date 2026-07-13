@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the AvailabilityContext data structure, which summarizes
-// availability constraints for a specific scope.
+// availability restrictions for a specific scope.
 //
 //===----------------------------------------------------------------------===//
 
@@ -33,7 +33,7 @@ class AvailabilityScope;
 class Decl;
 class DeclContext;
 
-/// An `AvailabilityContext` summarizes the availability constraints for a
+/// An `AvailabilityContext` summarizes the availability restrictions for a
 /// specific scope, such as within a declaration or at a particular source
 /// location in a function body. This context is sufficient to determine whether
 /// a declaration is available or not in that scope.
