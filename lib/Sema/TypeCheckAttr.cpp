@@ -2242,8 +2242,8 @@ getSemanticAvailableRangeDeclAndAttr(const Decl *decl,
   auto &ctx = decl->getASTContext();
   AvailabilityRestrictionFlags flags =
       AvailabilityRestrictionFlag::SkipEnclosingExtension;
-  if (auto restriction = swift::getAvailabilityRestrictionForDeclInDomain(
-          decl, AvailabilityContext::forAlwaysAvailable(ctx), domain, flags)) {
+  if (auto restriction = AvailabilityContext::forAlwaysAvailable(ctx)
+                             .restrictionForDeclInDomain(decl, domain, flags)) {
     switch (restriction->getReason()) {
     case AvailabilityRestriction::Reason::UnavailableUnconditionally:
     case AvailabilityRestriction::Reason::UnavailableObsolete:
@@ -5647,9 +5647,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
     availabilityContext.constrainWithContext(parentAvailability, Ctx);
   }
 
-  auto availabilityRestriction =
-      getAvailabilityRestrictionsForDecl(D, availabilityContext)
-          .getPrimaryRestriction();
+  auto availabilityRestriction = availabilityContext.restrictionForDecl(D);
   if (!availabilityRestriction)
     return;
 
