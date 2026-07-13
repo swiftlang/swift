@@ -27,6 +27,7 @@
 namespace swift {
 
 class ASTContext;
+class InternalMacro;
 
 /// A reference to an external macro definition that is understood by ASTGen.
 class ExternalMacroDefinition {
@@ -135,6 +136,10 @@ public:
     /// A builtin macro definition, which has a separate builtin kind.
     Builtin,
 
+    /// A macro that is implemented directly within the compiler, expanded by
+    /// invoking a virtual function with direct access to the AST.
+    Internal,
+
     /// A macro that is defined as an expansion of another macro.
     Expanded,
   };
@@ -145,6 +150,7 @@ private:
   union Data {
     ExternalMacroReference external;
     BuiltinMacroKind builtin;
+    InternalMacro *internalMacro;
     ExpandedMacroDefinition expanded;
 
     Data() : builtin(BuiltinMacroKind::ExternalMacro) { }
@@ -158,6 +164,10 @@ private:
 
   MacroDefinition(BuiltinMacroKind builtinKind) : kind(Kind::Builtin) {
     data.builtin = builtinKind;
+  }
+
+  MacroDefinition(InternalMacro *internalMacro) : kind(Kind::Internal) {
+    data.internalMacro = internalMacro;
   }
 
   MacroDefinition(ExpandedMacroDefinition expanded) : kind(Kind::Expanded) {
@@ -184,6 +194,11 @@ public:
     return MacroDefinition(builtinKind);
   }
 
+  /// Create a representation of a compiler-internal macro definition.
+  static MacroDefinition forInternal(InternalMacro *internalMacro) {
+    return MacroDefinition(internalMacro);
+  }
+
   /// Create a representation of an expanded macro definition.
   static MacroDefinition forExpanded(
       ASTContext &ctx,
@@ -202,6 +217,12 @@ public:
   BuiltinMacroKind getBuiltinKind() const {
     assert(kind == Kind::Builtin);
     return data.builtin;
+  }
+
+  /// Retrieve the compiler-internal macro implementation.
+  InternalMacro *getInternalMacro() const {
+    assert(kind == Kind::Internal);
+    return data.internalMacro;
   }
 
   ExpandedMacroDefinition getExpanded() const {

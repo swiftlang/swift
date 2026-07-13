@@ -5427,6 +5427,11 @@ public:
       case MacroDefinition::Kind::Undefined:
         break;
 
+      case MacroDefinition::Kind::Internal:
+        // Internal macros are synthesized by the compiler on demand and are
+        // never serialized.
+        break;
+
       case MacroDefinition::Kind::External: {
         auto external = def.getExternalMacro();
         externalModuleNameID = S.addDeclBaseNameRef(external.moduleName);
