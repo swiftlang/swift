@@ -1,7 +1,6 @@
 
 // RUN: %target-swift-frontend -module-name devirt_protocol_method_invocations -O -Xllvm -sil-disable-pass=ExistentialSpecializer -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 protocol PPP {
     func f()

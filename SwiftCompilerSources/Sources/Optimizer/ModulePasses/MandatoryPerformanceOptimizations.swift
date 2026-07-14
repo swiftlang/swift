@@ -130,6 +130,15 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         specializeVTable(for: cast.type, instruction: cast)
       case let cast as UncheckedRefCastInst:
         specializeVTable(for: cast.type, instruction: cast)
+      case let kpi as KeyPathInst:
+        // In embedded Swift, IRGen may emit a `keypath` inst as an immortal
+        // static object of a specific concrete `KeyPath` subclass (chosen
+        // per the pattern's mutability/root kind).  IRGen requests the
+        // class's metadata when emitting the object, which requires a
+        // specialized vtable — force it here before IRGen runs.
+        if let classType = kpi.staticInstanceClassType {
+          specializeVTable(for: classType, instruction: kpi)
+        }
       case let classMethod as ClassMethodInst:
         if context.options.enableEmbeddedSwift {
           _ = context.specializeClassMethodInst(classMethod)
@@ -215,7 +224,7 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       changed = true
     }
 
-    changed = context.eliminateDeadAllocations(in: function) || changed
+    changed = removeDeadStackAllocations(in: function, context) || changed
   }
 
   if function.isGlobalInitOnceFunction {

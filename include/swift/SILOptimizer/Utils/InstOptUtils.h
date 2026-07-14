@@ -584,11 +584,6 @@ bool tryEliminateOnlyOwnershipUsedForwardingInst(
 IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
                                                   SILBuilder &builder);
 
-/// Performs "predictable" dead allocation optimizations.
-///
-/// See the PredictableDeadAllocationElimination pass.
-bool eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo);
-
 bool specializeClassMethodInst(ClassMethodInst *cm);
 bool specializeWitnessMethodInst(WitnessMethodInst *wm);
 

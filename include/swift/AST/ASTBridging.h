@@ -25,6 +25,7 @@
 #include "swift/AST/GenericTypeParamKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LayoutConstraintKind.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/WarningGroupBehavior.h"
@@ -936,6 +937,22 @@ BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
     swift::SourceRange range, swift::PlatformKind platform,
     BridgedVersionTuple cVersion);
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCOMThreadingModel {
+  BridgedCOMThreadingModelSingle,
+  BridgedCOMThreadingModelApartment,
+  BridgedCOMThreadingModelFree,
+  BridgedCOMThreadingModelBoth,
+  BridgedCOMThreadingModelNeutral,
+};
+
+SWIFT_NAME("BridgedCOMAttr.createParsed(_:atLoc:range:interface:implementation:threading:)")
+BridgedCOMAttr BridgedCOMAttr_createParsed(BridgedASTContext context,
+                                           swift::SourceLoc location,
+                                           swift::SourceRange range,
+                                           BridgedStringRef interface,
+                                           BridgedStringRef implementation,
+                                           BridgedCOMThreadingModel threading);
+
 SWIFT_NAME("BridgedCDeclAttr.createParsed(_:atLoc:range:name:underscored:)")
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                swift::SourceLoc atLoc,
@@ -1553,6 +1570,9 @@ void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl decl,
                                            BridgedArrayRef members,
                                            BridgedFingerprint fingerprint);
 
+SWIFT_NAME("BridgedExtensionDecl.setIsMetatypeExtension(self:)")
+void BridgedExtensionDecl_setIsMetatypeExtension(BridgedExtensionDecl decl);
+
 SWIFT_NAME(
     "BridgedEnumDecl.createParsed(_:declContext:enumKeywordLoc:name:nameLoc:"
     "genericParamList:inheritedTypes:genericWhereClause:braceRange:)")
@@ -1707,18 +1727,13 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     swift::SourceLoc importKeywordLoc, BridgedImportKind cImportKind,
     swift::SourceLoc importKindLoc, BridgedArrayRef cImportPathElements);
 
-enum ENUM_EXTENSIBILITY_ATTR(open) BridgedUsingSpecifier {
-  BridgedUsingSpecifierMainActor,
-  BridgedUsingSpecifierNonisolated,
-};
-
 SWIFT_NAME("BridgedUsingDecl.createParsed(_:declContext:usingKeywordLoc:"
-           "specifierLoc:specifier:)")
-BridgedUsingDecl BridgedUsingDecl_createParsed(BridgedASTContext cContext,
-                                               BridgedDeclContext cDeclContext,
-                                               swift::SourceLoc usingKeywordLoc,
-                                               swift::SourceLoc specifierLoc,
-                                               BridgedUsingSpecifier specifier);
+           "specifiedAttributes:)")
+BridgedUsingDecl
+BridgedUsingDecl_createParsed(BridgedASTContext cContext,
+                              BridgedDeclContext cDeclContext,
+                              swift::SourceLoc usingKeywordLoc,
+                              BridgedDeclAttributes cSpecifiedAttributes);
 
 SWIFT_NAME("BridgedSubscriptDecl.createParsed(_:declContext:staticLoc:"
            "staticSpelling:subscriptKeywordLoc:genericParamList:parameterList:"

@@ -1107,11 +1107,14 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
     cGetterDecl->setParams(cGetterSelf);
 
     auto cGetterSelfExpr =
-        createClangDeclRefExpr(Ctx, cGetterSelf, recordType);
-    auto cGetterExpr = clang::MemberExpr::CreateImplicit(
+        createClangDeclRefExpr(Ctx, cGetterSelf, recordType, clang::VK_LValue);
+    auto cGetterMemberExpr = clang::MemberExpr::CreateImplicit(
         Ctx, cGetterSelfExpr,
-        /*isarrow=*/false, fieldDecl, fieldType, clang::VK_PRValue,
+        /*isarrow=*/false, fieldDecl, fieldType, clang::VK_LValue,
         clang::OK_BitField);
+    auto cGetterExpr = clang::ImplicitCastExpr::Create(
+        Ctx, fieldType, clang::CK_LValueToRValue, cGetterMemberExpr,
+        /*BasePath=*/nullptr, clang::VK_PRValue, clang::FPOptionsOverride());
 
     cGetterDecl->setBody(createClangReturnStmt(Ctx, cGetterExpr));
   }
@@ -1825,6 +1828,14 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   bool useAddress =
       rawElementTy->getAnyPointerElementType() && elementIsNoncopyable;
 
+  // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
+  // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
+  // can synthesize a valid setter for.
+  //
+  // ty->isForeignReferenceType() implies !ty->getAnyPointerElementType().
+  if (rawElementTy->isForeignReferenceType())
+    setterImpl = nullptr;
+
   AccessorDecl *getterDecl = AccessorDecl::create(
       ctx, getterImpl->getLoc(), getterImpl->getLoc(),
       useAddress ? AccessorKind::Address : AccessorKind::Get, subscript,
@@ -1926,6 +1937,14 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
   bool useAddress =
       rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
+
+  // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
+  // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
+  // can synthesize a valid setter for.
+  //
+  // ty->isForeignReferenceType() implies !ty->getAnyPointerElementType().
+  if (rawElementTy->isForeignReferenceType())
+    setterImpl = nullptr;
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
@@ -2649,6 +2668,9 @@ synthesizeDefaultArgumentBody(AbstractFunctionDecl *afd, void *context) {
       createClangFunctionDecl(clangCtx, clangDeclContext, clangDeclName, funcTy);
   defaultArgFuncDecl->setAccess(clang::AccessSpecifier::AS_public);
   defaultArgFuncDecl->setBody(defaultArgReturnStmt);
+
+  ctx.getClangModuleLoader()->registerSynthesizedClangDecl(defaultArgFuncDecl,
+                                                           defaultArgFuncDecl);
 
   // Import `func __cxx__defaultArg_XYZ() -> ParamTY` into Swift.
   auto defaultArgGenerator = dyn_cast_or_null<FuncDecl>(

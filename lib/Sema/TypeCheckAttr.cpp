@@ -38,6 +38,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -417,6 +418,7 @@ public:
   void visitAvailableAttr(AvailableAttr *attr);
 
   void visitCDeclAttr(CDeclAttr *attr);
+  void visitCOMAttr(COMAttr *attr);
   void visitExposeAttr(ExposeAttr *attr);
   void visitExternAttr(ExternAttr *attr);
   void visitUsedAttr(UsedAttr *attr);
@@ -1566,8 +1568,14 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     if (!Ext->getSelfClassDecl())
       error = diag::objc_extension_not_class;
   } else if (auto ED = dyn_cast<EnumDecl>(D)) {
-    if (ED->isGenericContext())
-      error = diag::objc_enum_generic;
+    // @objc (and @c) enums cannot be generic.
+    if (ED->isGenericContext()) {
+      diagnoseAndRemoveAttr(attr, diag::objc_enum_generic, ED,
+                            getObjCDiagnosticAttrKind(reason))
+          .limitBehavior(behavior);
+      reason.describe(D);
+      return;
+    }
   } else if (auto EED = dyn_cast<EnumElementDecl>(D)) {
     auto ED = EED->getParentEnum();
     if (!ED->getAttrs().hasAttribute<ObjCAttr>())
@@ -2232,17 +2240,17 @@ static std::optional<std::pair<SemanticAvailableAttr, const Decl *>>
 getSemanticAvailableRangeDeclAndAttr(const Decl *decl,
                                      AvailabilityDomain domain) {
   auto &ctx = decl->getASTContext();
-  AvailabilityConstraintFlags flags =
-      AvailabilityConstraintFlag::SkipEnclosingExtension;
-  if (auto constraint = swift::getAvailabilityConstraintForDeclInDomain(
-          decl, AvailabilityContext::forAlwaysAvailable(ctx), domain, flags)) {
-    switch (constraint->getReason()) {
-    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    case AvailabilityConstraint::Reason::UnavailableObsolete:
+  AvailabilityRestrictionFlags flags =
+      AvailabilityRestrictionFlag::SkipEnclosingExtension;
+  if (auto restriction = AvailabilityContext::forAlwaysAvailable(ctx)
+                             .restrictionForDeclInDomain(decl, domain, flags)) {
+    switch (restriction->getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
       break;
-    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
-    case AvailabilityConstraint::Reason::Unintroduced:
-      return std::make_pair(constraint->getAttr(), decl);
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+    case AvailabilityRestriction::Reason::Unintroduced:
+      return std::make_pair(restriction->getAttr(), decl);
     }
   }
 
@@ -2440,9 +2448,78 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
              attr, "func");
   }
 
+  // @c (and @objc) enums cannot be generic.
+  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+    if (ED->isGenericContext()) {
+      unsigned reasonKind = attr->Underscored
+                                ? unsigned(ObjCReason::ExplicitlyUnderscoreCDecl)
+                                : unsigned(ObjCReason::ExplicitlyCDecl);
+      diagnoseAndRemoveAttr(attr, diag::objc_enum_generic, ED, reasonKind);
+    }
+  }
+
   // Reject using both @c and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
+  }
+}
+
+void AttributeChecker::visitCOMAttr(COMAttr *attr) {
+  if (!Ctx.LangOpts.EnableCOMInterop) {
+    diagnoseAndRemoveAttr(attr, diag::attr_com_requires_flag);
+    return;
+  }
+
+  if (isa<ProtocolDecl>(D)) {
+    if (attr->IID.empty()) {
+      diagnose(attr->getLocation(), diag::attr_com_protocol_requires_iid);
+      attr->setInvalid();
+      return;
+    }
+
+    if (attr->CLSID && !attr->CLSID->empty()) {
+      diagnose(attr->getLocation(), diag::attr_com_protocol_unexpected_arg, "CLSID");
+      attr->setInvalid();
+      return;
+    }
+
+    if (!UUID::fromString(attr->IID.str().c_str())) {
+      diagnose(attr->getLocation(), diag::attr_com_invalid_guid, attr->IID);
+      attr->setInvalid();
+      return;
+    }
+  } else if (auto *CD = dyn_cast<ClassDecl>(D)) {
+    if (!attr->IID.empty()) {
+      diagnose(attr->getLocation(), diag::attr_com_class_unexpected_iid);
+      attr->setInvalid();
+      return;
+    }
+
+    if (attr->CLSID && (attr->CLSID->empty() ||
+                        !UUID::fromString(attr->CLSID->str().c_str()))) {
+      diagnose(attr->getLocation(), diag::attr_com_invalid_guid, *attr->CLSID);
+      attr->setInvalid();
+      return;
+    }
+
+    const ProtocolDecl *ISO = Ctx.getProtocol(KnownProtocolKind::ISwiftObject);
+    if (!ISO) {
+      diagnose(SourceLoc(), diag::com_module_missing_type, "ISwiftObject");
+      return;
+    }
+
+    bool AnyObject = false;
+    InvertibleProtocolSet inverses;
+    auto inherited =
+        getDirectlyInheritedNominalTypeDecls(CD, inverses, AnyObject);
+    const auto &entry =
+        llvm::find_if(inherited, [ISO](const auto &E) { return E.Item == ISO; });
+    if (entry != inherited.end()) {
+      diagnose(entry->Loc, diag::attr_com_explicit_iswiftobject);
+      diagnose(attr->getLocation(), diag::attr_com_iswiftobject_implied);
+      attr->setInvalid();
+      return;
+    }
   }
 }
 
@@ -2976,7 +3053,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
                                SF, attr->getLocation(),
-                               NL_QualifiedDefault);
+                               NLFlags::QualifiedDefault);
     if (decls.size() == 1)
       ApplicationDelegateProto = dyn_cast<ProtocolDecl>(decls[0]);
   }
@@ -3902,9 +3979,9 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
   if (!typeCtx)
     typeCtx = cast<ExtensionDecl>(declCtxt->getAsDecl())->getExtendedNominal();
 
-  auto options = NL_QualifiedDefault;
+  NLOptions options = NLFlags::QualifiedDefault;
   if (declCtxt->isInSpecializeExtensionContext())
-    options |= NL_IncludeUsableFromInline;
+    options |= NLFlags::IncludeUsableFromInline;
 
   if (typeCtx)
     moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
@@ -5002,11 +5079,11 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
 
       auto builderType = nominal->getDeclaredType();
       nominal->lookupQualified(builderType, DeclNameRef(buildPartialBlockFirst),
-                               attr->getLocation(), NL_QualifiedDefault,
+                               attr->getLocation(), NLFlags::QualifiedDefault,
                                buildPartialBlockFirstMatches);
       nominal->lookupQualified(
           builderType, DeclNameRef(buildPartialBlockAccumulated),
-          attr->getLocation(), NL_QualifiedDefault,
+          attr->getLocation(), NLFlags::QualifiedDefault,
           buildPartialBlockAccumulatedMatches);
 
       hasAccessibleBuildPartialBlockFirst = llvm::any_of(
@@ -5562,7 +5639,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
 
-  // Compute availability constraints for the decl, relative to its parent
+  // Compute availability restrictions for the decl, relative to its parent
   // declaration or to the deployment target.
   auto availabilityContext = AvailabilityContext::forDeploymentTarget(Ctx);
   if (auto parent = D->parentDeclForAvailability()) {
@@ -5570,16 +5647,14 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
     availabilityContext.constrainWithContext(parentAvailability, Ctx);
   }
 
-  auto availabilityConstraint =
-      getAvailabilityConstraintsForDecl(D, availabilityContext)
-          .getPrimaryConstraint();
-  if (!availabilityConstraint)
+  auto availabilityRestriction = availabilityContext.restrictionForDecl(D);
+  if (!availabilityRestriction)
     return;
 
   // If the decl is unavailable relative to its parent and it's not a
   // declaration that is allowed to be unavailable, diagnose.
-  if (availabilityConstraint->isUnavailable()) {
-    auto attr = availabilityConstraint->getAttr();
+  if (availabilityRestriction->isUnavailable()) {
+    auto attr = availabilityRestriction->getAttr();
     if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D, attr)) {
       diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
                             *diag);
@@ -5589,11 +5664,12 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
 
   // If the decl is potentially unavailable relative to its parent and it's
   // not a declaration that is allowed to be potentially unavailable, diagnose.
-  if (!availabilityConstraint->isUnavailable()) {
-    auto attr = availabilityConstraint->getAttr();
+  if (!availabilityRestriction->isUnavailable()) {
+    auto attr = availabilityRestriction->getAttr();
     if (auto diag =
             TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D))
-      diagnose(attr.getParsedAttr()->getLocation(), diag.value());
+      diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
+                            *diag);
   }
 }
 
@@ -5895,6 +5971,25 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   return ReferenceStorageType::get(type, ownershipKind, var->getASTContext());
 }
 
+// The raw values of this enum must be kept in sync with the select clause
+// in diag::availability_stored_property_no_potential and
+// diag::availability_stored_property_no_unavailable.
+enum NoAvailableAttrDiagnosticPropertyKind : unsigned {
+  StoredProperty,
+  ComputedPropertyWithInitialValue,
+};
+
+static std::optional<NoAvailableAttrDiagnosticPropertyKind>
+getPropertyKindForAvailableAttrDiagnostic(const VarDecl *VD) {
+  if (VD->hasStorageOrWrapsStorage())
+    return StoredProperty;
+
+  if (VD->hasInitialValue())
+    return ComputedPropertyWithInitialValue;
+
+  return std::nullopt;
+}
+
 std::optional<Diagnostic>
 TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
@@ -5910,7 +6005,8 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    if (!VD->hasStorageOrWrapsStorage())
+    auto disallowedKind = ::getPropertyKindForAvailableAttrDiagnostic(VD);
+    if (!disallowedKind)
       return std::nullopt;
 
     // Do not permit potential availability of script-mode global variables;
@@ -5922,7 +6018,8 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     // Globals and statics are lazily initialized, so they are safe
     // for potential unavailability.
     if (!VD->isStatic() && !DC->isModuleScopeContext())
-      return diag::availability_stored_property_no_potential;
+      return Diagnostic(diag::availability_stored_property_no_potential,
+                        unsigned(*disallowedKind));
 
   } else if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
     // An enum element with an associated value cannot be potentially
@@ -5984,7 +6081,8 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    if (!VD->hasStorageOrWrapsStorage())
+    auto disallowedKind = ::getPropertyKindForAvailableAttrDiagnostic(VD);
+    if (!disallowedKind)
       return std::nullopt;
 
     if (parentIsUnavailable(D))
@@ -6008,7 +6106,8 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
     // Globals and statics are lazily initialized, so they are safe for
     // unavailability.
     if (!VD->isStatic() && !D->getDeclContext()->isModuleScopeContext())
-      return diag::availability_stored_property_no_unavailable;
+      return Diagnostic(diag::availability_stored_property_no_unavailable,
+                        unsigned(*disallowedKind));
   }
 
   return std::nullopt;
@@ -6426,7 +6525,7 @@ enum class AbstractFunctionDeclLookupErrorKind {
 static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     DeclAttribute *attr, Type baseType,
     const DeclNameRefWithLoc &funcNameWithLoc, DeclContext *lookupContext,
-    NameLookupOptions lookupOptions,
+    NLOptions lookupOptions,
     const llvm::function_ref<std::optional<AbstractFunctionDeclLookupErrorKind>(
         AbstractFunctionDecl *)> &isValidCandidate,
     AnyFunctionType *expectedOriginalFnType) {
@@ -7997,7 +8096,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
                                : defaultUnqualifiedLookupOptions) |
-      NameLookupFlags::IgnoreAccessControl;
+      NLFlags::IgnoreAccessControl;
   auto transposeTypeCtx = transpose->getInnermostTypeContext();
   if (!transposeTypeCtx) transposeTypeCtx = transpose->getParent();
   assert(transposeTypeCtx);
@@ -9139,7 +9238,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
     SmallVector<ValueDecl *, 1> lookupResults;
     attachedContext->lookupQualified(attachedContext->getParentModule(),
                                      nameRef.withoutArgumentLabels(ctx),
-                                     attr->getLocation(), NL_OnlyTypes,
+                                     attr->getLocation(), NLFlags::OnlyTypes,
                                      lookupResults);
     if (lookupResults.size() == 1)
       return lookupResults[0];
@@ -9294,4 +9393,161 @@ ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
     return ctx.AllocateCopy(ArrayRef<VarDecl *>());
 
   return ctx.AllocateCopy(results);
+}
+
+FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
+                                           const SourceFile *file) const {
+  auto &ctx = file->getASTContext();
+  FileDefaults result;
+
+  std::optional<Decl *> firstNonImportDecl;
+
+  for (auto *D : file->getTopLevelDecls()) {
+    auto *UD = dyn_cast<UsingDecl>(D);
+    if (!UD) {
+      if (!firstNonImportDecl && !isa<ImportDecl>(D)) {
+        firstNonImportDecl = D;
+      }
+      continue;
+    }
+
+    if (firstNonImportDecl) {
+      UD->diagnose(diag::using_decl_must_precede_other_decls);
+      firstNonImportDecl.value()->diagnose(
+          diag::using_decl_must_precede_other_decls_previous);
+      // TODO: emit a fix-it
+    }
+
+    std::optional<DeclAttrKind> seen;
+    for (auto *attr : UD->getSpecifiedAttributes()) {
+      // It shouldn't be possible to get here with multiple attributes (it
+      // shouldn't parse), but make sure. @available can end up being multiple
+      // attributes though.
+      ASSERT((!seen || (seen == DeclAttrKind::Available &&
+                        attr->getKind() == DeclAttrKind::Available)) &&
+             "'using' should only have one specified attribute");
+      seen = attr->getKind();
+
+      if (isa<DiagnoseAttr>(attr)) {
+        // `@diagnose` is handled via the swift-syntax region tree.
+        continue;
+      }
+
+      // TODO: call validation when it exists! For example, validate the
+      // the structure of `@available`, if we do it for normal attrs.
+
+      if (auto *availAttr = dyn_cast<AvailableAttr>(attr)) {
+        result.availability.push_back(availAttr);
+        continue;
+      }
+
+      auto setDefaultIsolation = [&](DefaultIsolation isolation) {
+        if (result.isolation) {
+          UD->diagnose(diag::invalid_redecl_of_file_isolation);
+          result.isolation.value().source->diagnose(
+              diag::invalid_redecl_of_file_isolation_prev);
+        } else {
+          result.isolation = {isolation, UD};
+        }
+      };
+
+      if (isa<NonisolatedAttr>(attr)) {
+        setDefaultIsolation(DefaultIsolation::Nonisolated);
+        continue;
+      }
+
+      if (auto *custom = dyn_cast<CustomAttr>(attr)) {
+        auto type = evaluateOrDefault(
+            ctx.evaluator,
+            CustomAttrTypeRequest{custom, UD->getDeclContext(),
+                                  CustomAttrTypeKind::GlobalActor},
+            Type());
+        if (type) {
+          if (type->hasError()) {
+            // CustomAttrTypeRequest already produced an error. Instead of
+            // piling on, we can attach a note.
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::using_decl_invalid_attribute_note);
+            continue;
+          }
+
+          if (type->isEqual(ctx.getMainActorType())) {
+            setDefaultIsolation(DefaultIsolation::MainActor);
+            continue;
+          }
+
+          auto *nominal = type->getAnyNominal();
+          if (nominal && nominal->isGlobalActor()) {
+            // Some non MainActor global actor, diagnose.
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::invalid_actor_for_file_isolation, type);
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::invalid_actor_for_file_isolation_note);
+            continue;
+          }
+        }
+        // Not a global actor (some other illegal attribute) so fall through to
+        // the generic diagnostic.
+      }
+
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::using_decl_invalid_attribute, attr);
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::using_decl_invalid_attribute_note);
+    }
+  }
+
+  return result;
+}
+
+bool ApplyFileDefaultsRequest::appliesTo(const Decl *decl) {
+  auto *dc = decl->getDeclContext();
+  return dc->isModuleScopeContext() &&
+         (isa<ValueDecl>(decl) || isa<ExtensionDecl>(decl)) &&
+         dc->getParentSourceFile();
+}
+
+evaluator::SideEffect ApplyFileDefaultsRequest::evaluate(Evaluator &evaluator,
+                                                         Decl *decl) const {
+  // Decl::applyFileDefaults() gates on appliesTo() before requesting, but
+  // nobody should call without checking to not waste time and cache.
+  //
+  // TODO: Would this be better served by a new `precondition` API for requests?
+  if (!appliesTo(decl)) {
+    DEBUG_ASSERT(false && "ApplyFileDefaultsRequest on a decl that can't have "
+                          "file defaults; caller should have checked");
+    return {};
+  }
+
+  // Known to exist thanks to appliesTo.
+  auto *file = decl->getDeclContext()->getParentSourceFile();
+  auto defaults = file->getFileDefaults();
+  if (defaults.availability.empty())
+    return {};
+
+  auto &ctx = decl->getASTContext();
+  auto &attrs = decl->getAttrs();
+
+  // Put defaults on the tail of the linked list, so explicit attrs take
+  // priority. With no attrs, use \c add to set the head.
+
+  DeclAttribute *tail = nullptr;
+  for (auto *existing : attrs)
+    tail = existing;
+
+  auto append = [&](DeclAttribute *attr) {
+    if (tail)
+      *tail->getMutableNext() = attr;
+    else
+      attrs.add(attr);
+    tail = attr;
+  };
+
+  // We append in reverse, since printing will reverse again, to get the printed
+  // order and priority order to correctly reflect the top to bottom order of
+  // the file-level defaults.
+  for (auto *attr : llvm::reverse(defaults.availability))
+    append(attr->clone(ctx, /*implicit=*/true));
+
+  return {};
 }

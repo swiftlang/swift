@@ -18,7 +18,7 @@
 import Swift
 
 #if os(anyAppleOS)
-internal import BacktracingImpl.OS.Darwin
+@_implementationOnly import BacktracingImpl.OS.Darwin
 #endif
 
 #if os(anyAppleOS)
@@ -30,7 +30,7 @@ internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
 #endif
-internal import BacktracingImpl.Runtime
+@_implementationOnly import BacktracingImpl.Runtime
 
 @available(BacktracingDT 6.2, *)
 struct SimpleImageRef: SymbolLoader.Image {

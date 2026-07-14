@@ -211,22 +211,32 @@ public:
                                        Address src,
                                        SILType T,
                                        bool isOutlined) const override {
-    return ReferentTI.getExtraInhabitantIndex(IGF, src, T, isOutlined);
+    auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
+    auto referentTy =
+        SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+    return ReferentTI.getExtraInhabitantIndex(IGF, src, referentTy, isOutlined);
   }
 
   void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                             Address dest, SILType T,
                             bool isOutlined) const override {
-    return ReferentTI.storeExtraInhabitant(IGF, index, dest, T, isOutlined);
+    auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
+    auto referentTy =
+        SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+    return ReferentTI.storeExtraInhabitant(IGF, index, dest, referentTy,
+                                           isOutlined);
   }
 
   APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
     return ReferentTI.getFixedExtraInhabitantMask(IGM);
   }
-  
+
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
                                         bool useStructLayouts) const override {
-    return ReferentTI.buildTypeLayoutEntry(IGM, T, useStructLayouts);
+    auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
+    auto referentTy =
+        SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+    return ReferentTI.buildTypeLayoutEntry(IGM, referentTy, useStructLayouts);
   }
 
   static bool classof(const BorrowByPointerTypeInfo *) { return true; }

@@ -6,7 +6,6 @@
 // then consider moving all tests with 'unreachable' into a separate file with the flag
 // -disable-ownership-verification
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 sil_stage canonical

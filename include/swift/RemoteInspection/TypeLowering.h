@@ -583,7 +583,8 @@ public:
 
   // Add a field of a record type, such as a struct.
   void addField(const std::string &Name, const TypeRef *TR,
-                remote::TypeInfoProvider *ExternalTypeInfo);
+                remote::TypeInfoProvider *ExternalTypeInfo,
+                bool artificial = false);
 
   const RecordTypeInfo *build();
 

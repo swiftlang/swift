@@ -629,13 +629,19 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   {
     SmallPtrSet<ImportModuleTy, 8> imports;
     llvm::raw_string_ostream cModuleContents{moduleContentsScratch};
-    printModuleContentsAsC(cModuleContents, imports, *M, interopContext,
-                           frontendOpts.ClangHeaderMinAccess);
+    bool requiresObjCRuntimeHeader = printModuleContentsAsC(
+        cModuleContents, imports, *M, interopContext,
+        frontendOpts.ClangHeaderMinAccess);
 
     llvm::StringMap<StringRef> exposedModuleHeaderNames;
     writeImports(os, imports, *M, bridgingHeader, frontendOpts,
                  clangHeaderSearchInfo, exposedModuleHeaderNames,
                  /*useCxxImport=*/false, /*useNonModularIncludes*/true);
+
+    // A @c declaration may use AnyClass, printed as the ObjC type 'Class'.
+    // Include <objc/objc.h> so it stays usable from plain C.
+    if (requiresObjCRuntimeHeader)
+      os << "#include <objc/objc.h>\n";
 
     writePostImportPrologue(os, *M);
     emitExternC(os, [&] { os << "\n" << cModuleContents.str(); });

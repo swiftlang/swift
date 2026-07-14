@@ -437,7 +437,6 @@ SILType AllocBoxInst::getAddressType() const {
 
 DebugValueInst::DebugValueInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILDebugVariable Var,
-    PoisonRefs_t poisonRefs,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace, bool prependDeref)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
@@ -447,7 +446,6 @@ DebugValueInst::DebugValueInst(
               getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
               getTrailingObjects<SILDIExprElement>()) {
-  setPoisonRefs(poisonRefs);
   if (usesMoveableValueDebugInfo || Operand->getType().isMoveOnly())
     setUsesMoveableValueDebugInfo();
   setTrace(trace);
@@ -458,7 +456,6 @@ DebugValueInst::DebugValueInst(
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILModule &M,
                                        SILDebugVariable Var,
-                                       PoisonRefs_t poisonRefs,
                                        UsesMoveableValueDebugInfo_t wasMoved,
                                        bool trace) {
   // Don't store the same information twice.
@@ -476,7 +473,7 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
   }
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
   return ::new (buf)
-    DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace, prependDeref);
+    DebugValueInst(DebugLoc, Operand, Var, wasMoved, trace, prependDeref);
 }
 
 void DebugValueInst::prependDeref() {
@@ -816,11 +813,13 @@ ApplyInst::ApplyInst(SILDebugLocation loc, SILValue callee,
                      SILType substCalleeTy, SILType result,
                      SubstitutionMap subs, ArrayRef<SILValue> args,
                      ArrayRef<SILValue> typeDependentOperands,
+                     std::optional<ArrayRef<SILLocation>> argLocs,
                      ApplyOptions options,
                      const GenericSpecializationInformation *specializationInfo,
                      std::optional<ApplyIsolationCrossing> isolationCrossing)
     : InstructionBase(isolationCrossing, loc, callee, substCalleeTy, subs, args,
-                      typeDependentOperands, specializationInfo, result) {
+                      typeDependentOperands, argLocs, specializationInfo,
+                      result) {
   setApplyOptions(options);
   assert(!substCalleeTy.castTo<SILFunctionType>()->isCoroutine());
 }
@@ -831,7 +830,8 @@ ApplyInst::create(SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
                   std::optional<SILModuleConventions> moduleConventions,
                   SILFunction &parentFunction,
                   const GenericSpecializationInformation *specializationInfo,
-                  std::optional<ApplyIsolationCrossing> isolationCrossing) {
+                  std::optional<ApplyIsolationCrossing> isolationCrossing,
+                  std::optional<ArrayRef<SILLocation>> argLocs) {
   SILType substCalleeSILTy = callee->getType().substGenericArgs(
       parentFunction.getModule(), subs,
       parentFunction.getTypeExpansionContext());
@@ -847,10 +847,14 @@ ApplyInst::create(SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, parentFunction,
                                substCalleeSILTy.getASTType(), subs);
-  void *buffer = allocateTrailingInst<ApplyInst, Operand>(
-      parentFunction, getNumAllOperands(args, typeDependentOperands));
+  // Per the all-or-nothing contract: reserve trailing storage for argLocs
+  // only when the caller actually supplied a non-empty array.
+  bool reserveArgLocs = argLocs.has_value() && !argLocs->empty();
+  void *buffer = allocateTrailingInst<ApplyInst, Operand, SILLocation>(
+      parentFunction, getNumAllOperands(args, typeDependentOperands),
+      reserveArgLocs ? args.size() : 0);
   return ::new (buffer) ApplyInst(loc, callee, substCalleeSILTy, result, subs,
-                                  args, typeDependentOperands, options,
+                                  args, typeDependentOperands, argLocs, options,
                                   specializationInfo, isolationCrossing);
 }
 
@@ -859,11 +863,11 @@ BeginApplyInst::BeginApplyInst(
     ArrayRef<SILType> allResultTypes,
     ArrayRef<ValueOwnershipKind> allResultOwnerships, SubstitutionMap subs,
     ArrayRef<SILValue> args, ArrayRef<SILValue> typeDependentOperands,
-    ApplyOptions options,
+    std::optional<ArrayRef<SILLocation>> argLocs, ApplyOptions options,
     const GenericSpecializationInformation *specializationInfo,
     std::optional<ApplyIsolationCrossing> isolationCrossing)
     : InstructionBase(isolationCrossing, loc, callee, substCalleeTy, subs, args,
-                      typeDependentOperands, specializationInfo),
+                      typeDependentOperands, argLocs, specializationInfo),
       MultipleValueInstructionTrailingObjects(this, allResultTypes,
                                               allResultOwnerships) {
   setApplyOptions(options);
@@ -876,7 +880,8 @@ BeginApplyInst *BeginApplyInst::create(
     std::optional<SILModuleConventions> moduleConventions,
     SILFunction &parentFunction,
     const GenericSpecializationInformation *specializationInfo,
-    std::optional<ApplyIsolationCrossing> isolationCrossing) {
+    std::optional<ApplyIsolationCrossing> isolationCrossing,
+    std::optional<ArrayRef<SILLocation>> argLocs) {
   SILType substCalleeSILType = callee->getType().substGenericArgs(
       parentFunction.getModule(), subs,
       parentFunction.getTypeExpansionContext());
@@ -918,15 +923,16 @@ BeginApplyInst *BeginApplyInst::create(
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, parentFunction,
                                substCalleeType, subs);
-  void *buffer =
-      allocateTrailingInst<BeginApplyInst, Operand, MultipleValueInstruction *,
-                           MultipleValueInstructionResult>(
-          parentFunction, getNumAllOperands(args, typeDependentOperands), 1,
-          resultTypes.size());
+  bool reserveArgLocs = argLocs.has_value() && !argLocs->empty();
+  void *buffer = allocateTrailingInst<BeginApplyInst, Operand, SILLocation,
+                                      MultipleValueInstruction *,
+                                      MultipleValueInstructionResult>(
+      parentFunction, getNumAllOperands(args, typeDependentOperands),
+      reserveArgLocs ? args.size() : 0, 1, resultTypes.size());
   return ::new (buffer)
       BeginApplyInst(loc, callee, substCalleeSILType, resultTypes,
                      resultOwnerships, subs, args, typeDependentOperands,
-                     options, specializationInfo, isolationCrossing);
+                     argLocs, options, specializationInfo, isolationCrossing);
 }
 
 void BeginApplyInst::getCoroutineEndPoints(
@@ -980,7 +986,8 @@ bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
 PartialApplyInst::PartialApplyInst(
     SILDebugLocation Loc, SILValue Callee, SILType SubstCalleeTy,
     SubstitutionMap Subs, ArrayRef<SILValue> Args,
-    ArrayRef<SILValue> TypeDependentOperands, SILType ClosureType,
+    ArrayRef<SILValue> TypeDependentOperands,
+    std::optional<ArrayRef<SILLocation>> ArgLocs, SILType ClosureType,
     StackAllocationIsNested_t IsNested,
     const GenericSpecializationInformation *SpecializationInfo)
     // FIXME: the callee should have a lowered SIL function type, and
@@ -988,7 +995,8 @@ PartialApplyInst::PartialApplyInst(
     // should derive the type of its result by partially applying the callee's
     // type.
     : InstructionBase(Loc, Callee, SubstCalleeTy, Subs, Args,
-                      TypeDependentOperands, SpecializationInfo, ClosureType) {
+                      TypeDependentOperands, ArgLocs, SpecializationInfo,
+                      ClosureType) {
   sharedUInt8().PartialApplyInst.isNested = uint8_t(IsNested);
 }
 
@@ -997,7 +1005,8 @@ PartialApplyInst *PartialApplyInst::create(
     SubstitutionMap Subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation, SILFunction &F,
     const GenericSpecializationInformation *specializationInfo,
-    OnStackKind onStack, StackAllocationIsNested_t isNested) {
+    OnStackKind onStack, StackAllocationIsNested_t isNested,
+    std::optional<ArrayRef<SILLocation>> ArgLocs) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
 
@@ -1008,13 +1017,13 @@ PartialApplyInst *PartialApplyInst::create(
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
                                SubstCalleeTy.getASTType(), Subs);
-  void *Buffer =
-    allocateTrailingInst<PartialApplyInst, Operand>(
-      F, getNumAllOperands(Args, TypeDependentOperands));
-  return ::new(Buffer) PartialApplyInst(Loc, Callee, SubstCalleeTy,
-                                        Subs, Args,
-                                        TypeDependentOperands, ClosureType,
-                                        isNested, specializationInfo);
+  bool reserveArgLocs = ArgLocs.has_value() && !ArgLocs->empty();
+  void *Buffer = allocateTrailingInst<PartialApplyInst, Operand, SILLocation>(
+      F, getNumAllOperands(Args, TypeDependentOperands),
+      reserveArgLocs ? Args.size() : 0);
+  return ::new (Buffer) PartialApplyInst(
+      Loc, Callee, SubstCalleeTy, Subs, Args, TypeDependentOperands, ArgLocs,
+      ClosureType, isNested, specializationInfo);
 }
 
 TryApplyInstBase::TryApplyInstBase(SILInstructionKind kind,
@@ -1029,15 +1038,15 @@ TryApplyInstBase::TryApplyInstBase(SILInstructionKind kind,
 TryApplyInst::TryApplyInst(
     SILDebugLocation loc, SILValue callee, SILType substCalleeTy,
     SubstitutionMap subs, ArrayRef<SILValue> args,
-    ArrayRef<SILValue> typeDependentOperands, SILBasicBlock *normalBB,
+    ArrayRef<SILValue> typeDependentOperands,
+    std::optional<ArrayRef<SILLocation>> argLocs, SILBasicBlock *normalBB,
     SILBasicBlock *errorBB, ApplyOptions options,
     const GenericSpecializationInformation *specializationInfo,
     std::optional<ApplyIsolationCrossing> isolationCrossing,
-    ProfileCounter normalCount,
-    ProfileCounter errorCount)
+    ProfileCounter normalCount, ProfileCounter errorCount)
     : InstructionBase(isolationCrossing, loc, callee, substCalleeTy, subs, args,
-                      typeDependentOperands, specializationInfo, normalBB,
-                      errorBB, normalCount, errorCount) {
+                      typeDependentOperands, argLocs, specializationInfo,
+                      normalBB, errorBB, normalCount, errorCount) {
   setApplyOptions(options);
 }
 
@@ -1048,8 +1057,8 @@ TryApplyInst::create(SILDebugLocation loc, SILValue callee,
                      ApplyOptions options, SILFunction &parentFunction,
                      const GenericSpecializationInformation *specializationInfo,
                      std::optional<ApplyIsolationCrossing> isolationCrossing,
-                     ProfileCounter normalCount,
-                     ProfileCounter errorCount) {
+                     ProfileCounter normalCount, ProfileCounter errorCount,
+                     std::optional<ArrayRef<SILLocation>> argLocs) {
   SILType substCalleeTy = callee->getType().substGenericArgs(
       parentFunction.getModule(), subs,
       parentFunction.getTypeExpansionContext());
@@ -1068,11 +1077,13 @@ TryApplyInst::create(SILDebugLocation loc, SILValue callee,
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, parentFunction,
                                substCalleeTy.getASTType(), subs);
-  void *buffer = allocateTrailingInst<TryApplyInst, Operand>(
-      parentFunction, getNumAllOperands(args, typeDependentOperands));
+  bool reserveArgLocs = argLocs.has_value() && !argLocs->empty();
+  void *buffer = allocateTrailingInst<TryApplyInst, Operand, SILLocation>(
+      parentFunction, getNumAllOperands(args, typeDependentOperands),
+      reserveArgLocs ? args.size() : 0);
   return ::new (buffer) TryApplyInst(
-      loc, callee, substCalleeTy, subs, args, typeDependentOperands, normalBB,
-      errorBB, options, specializationInfo, isolationCrossing,
+      loc, callee, substCalleeTy, subs, args, typeDependentOperands, argLocs,
+      normalBB, errorBB, options, specializationInfo, isolationCrossing,
       normalCount, errorCount);
 }
 
@@ -1758,7 +1769,7 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
                        ArrayRef<SILValue> Elems,
                        ValueOwnershipKind forwardingOwnershipKind)
     : InstructionBaseWithTrailingOperands(
-      Elems, Loc, Ty, forwardingOwnershipKind.forwardToInit(Ty))
+      Elems, Loc, Ty, forwardingOwnershipKind)
 {
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
@@ -3466,6 +3477,150 @@ BoundGenericType *KeyPathInst::getKeyPathType() const {
 KeyPathPattern *KeyPathInst::getPattern() const {
   assert(Pattern && "pattern was reset!");
   return Pattern;
+}
+
+SILType KeyPathInst::getStaticInstanceClassType() const {
+  // The concrete `keypath_inst` type must be fully substituted: no
+  // archetypes.
+  if (getKeyPathType()->hasArchetype())
+    return SILType();
+  if (getSubstitutions().getRecursiveProperties().hasArchetype())
+    return SILType();
+
+  // Captured operands would require dynamic materialization (indices
+  // copied from arguments).
+  if (!getAllOperands().empty())
+    return SILType();
+
+  auto *pattern = getPattern();
+  if (!pattern)
+    return SILType();
+  auto components = pattern->getComponents();
+
+  auto keyPathTy = getKeyPathType();
+  auto rootTy = keyPathTy->getGenericArgs()[0]->getCanonicalType();
+  auto valueTy = keyPathTy->getGenericArgs()[1]->getCanonicalType();
+  auto &ctx = getModule().getASTContext();
+
+  // Identity key path (0 components) — matches the runtime walker's
+  // starting `capability = .value` in
+  // `_getKeyPathClassAndInstanceSizeFromPattern`.
+  if (components.empty()) {
+    auto identityTy = BoundGenericType::get(ctx.getWritableKeyPathDecl(),
+                                            /*parent=*/swift::Type(),
+                                            {rootTy, valueTy})
+                          ->getCanonicalType();
+    return SILType::getPrimitiveObjectType(identityTy);
+  }
+
+  // Single-component patterns: allow the full set of supported component
+  // kinds (stored, tuple, gettable/settable computed, method).
+  if (components.size() == 1) {
+    const auto &comp = components[0];
+    NominalTypeDecl *keyPathClass = nullptr;
+    switch (comp.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty: {
+      auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
+      if (property->isLet()) {
+        keyPathClass = ctx.getKeyPathDecl();
+      } else if (rootTy->getClassOrBoundGenericClass()) {
+        keyPathClass = ctx.getReferenceWritableKeyPathDecl();
+      } else {
+        keyPathClass = ctx.getWritableKeyPathDecl();
+      }
+      break;
+    }
+    case KeyPathPatternComponent::Kind::TupleElement:
+      keyPathClass = ctx.getWritableKeyPathDecl();
+      break;
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method: {
+      // Reject captured subscript indices and external decl references.
+      if (!comp.getArguments().empty() || comp.getExternalDecl())
+        return SILType();
+      // Bail on generic accessors — we take their addresses via
+      // `getAddrOfSILFunction`, which doesn't apply substitutions.
+      if (comp.getComputedPropertyForGettable()->isGeneric())
+        return SILType();
+      if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
+          comp.getComputedPropertyForSettable()->isGeneric())
+        return SILType();
+
+      if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
+          comp.isComputedSettablePropertyMutating()) {
+        keyPathClass = ctx.getWritableKeyPathDecl();
+      } else if (comp.getKind() ==
+                 KeyPathPatternComponent::Kind::SettableProperty) {
+        keyPathClass = ctx.getReferenceWritableKeyPathDecl();
+      } else {
+        keyPathClass = ctx.getKeyPathDecl();
+      }
+      break;
+    }
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalForce:
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+      return SILType();
+    }
+    assert(keyPathClass && "unhandled component kind above?");
+    auto concreteTy = BoundGenericType::get(keyPathClass,
+                                            /*parent=*/swift::Type(),
+                                            {rootTy, valueTy})
+                          ->getCanonicalType();
+    return SILType::getPrimitiveObjectType(concreteTy);
+  }
+
+  // Multi-component chains: every component must be a fixed-offset
+  // stored-property or tuple-element access.  Walk the chain and pick the
+  // most specialized `KeyPath` subclass:
+  //   * start as WritableKeyPath (mirroring `capability = .value`)
+  //   * any `let` demotes permanently to KeyPath
+  //   * crossing a class boundary (component root is a class type) while
+  //     still writable promotes WritableKeyPath → ReferenceWritableKeyPath
+  NominalTypeDecl *keyPathClass = ctx.getWritableKeyPathDecl();
+  auto subs = getSubstitutions();
+  CanType currentRoot = rootTy;
+
+  for (const auto &comp : components) {
+    bool rootIsClass = (bool)currentRoot->getClassOrBoundGenericClass();
+
+    switch (comp.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty: {
+      auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
+      if (property->isLet()) {
+        keyPathClass = ctx.getKeyPathDecl();
+      } else if (rootIsClass &&
+                 keyPathClass == ctx.getWritableKeyPathDecl()) {
+        keyPathClass = ctx.getReferenceWritableKeyPathDecl();
+      }
+      break;
+    }
+    case KeyPathPatternComponent::Kind::TupleElement:
+      // Tuple elements are always mutable; no let-demote.  They don't
+      // introduce a class boundary either (tuples live inline in their
+      // parent).
+      break;
+    default:
+      // Computed / method / optional components aren't representable in
+      // an embedded multi-component chain, because the runtime walker
+      // only knows how to advance by a fixed offset or dereference a
+      // class reference.
+      return SILType();
+    }
+
+    // Advance to the next root type by substituting the pattern
+    // component's declared component type into the KP's substitution
+    // map.
+    currentRoot =
+        comp.getComponentType().subst(subs)->getCanonicalType();
+  }
+
+  auto concreteTy =
+      BoundGenericType::get(keyPathClass, /*parent=*/swift::Type(),
+                            {rootTy, valueTy})
+          ->getCanonicalType();
+  return SILType::getPrimitiveObjectType(concreteTy);
 }
 
 void KeyPathInst::dropReferencedPattern() {

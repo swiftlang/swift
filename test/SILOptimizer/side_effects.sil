@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt %s -parse-serialized-sil -module-name test -compute-side-effects | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 import Builtin
 import Swift

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 // CHECK: sil_global {{.*}}[[DSO:@__dso_handle|@__ImageBase]] : $Builtin.RawPointer

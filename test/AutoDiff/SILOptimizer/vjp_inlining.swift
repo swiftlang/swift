@@ -3,7 +3,6 @@
 // RUN: %target-swift-frontend -emit-sil -O -verify -Xllvm -debug-only=sil-inliner %s 2>&1 | %FileCheck %s
 
 // REQUIRES: asserts
-// REQUIRES: swift_in_compiler
 // UNSUPPORTED: OS=windows-msvc
 
 import _Differentiation
@@ -32,8 +31,6 @@ func with_control_flow(_ x: Float) -> Float {
 func caller_of_with_control_flow(x: Float) -> Float {
     gradient(at: x, of: with_control_flow)
 }
-// CHECK-LABEL: decision {{.*}} $s12vjp_inlining17with_control_flowyS2fFTJrSpSr
-// CHECK-NEXT: "reverse-mode derivative of vjp_inlining.with_control_flow(_:)" inlined into "caller_of_with_control_flow"
 
 // =============================================================== //
 // VJPs with control-flow are inlined into VJP callers
@@ -45,6 +42,9 @@ func wrapperOnWithControlFlow(x: Float) -> Float {
 }
 // CHECK-LABEL: decision {{.*}} $s12vjp_inlining17with_control_flowyS2fFTJrSpSr
 // CHECK-NEXT: "reverse-mode derivative of vjp_inlining.with_control_flow(_:)" inlined into "reverse-mode derivative of vjp_inlining.wrapperOnWithControlFlow(x:)"
+
+// CHECK-LABEL: decision {{.*}} $s12vjp_inlining17with_control_flowyS2fFTJrSpSr
+// CHECK-NEXT: "reverse-mode derivative of vjp_inlining.with_control_flow(_:)" inlined into "caller_of_with_control_flow"
 
 // =============================================================== //
 // VJPs without control-flow are not inlined into non-VJP callers

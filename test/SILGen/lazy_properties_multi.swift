@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -primary-file %s %S/Inputs/lazy_properties_other.swift -module-name lazy_properties_multi
 // RUN: %target-swift-emit-silgen -primary-file %s %S/Inputs/lazy_properties_other.swift -module-name lazy_properties_multi | %FileCheck %s
 // RUN: %target-swift-emit-silgen %S/Inputs/lazy_properties_other.swift -primary-file %s -module-name lazy_properties_multi | %FileCheck %s
 // RUN: %target-swift-emit-silgen %S/Inputs/lazy_properties_other.swift %s -module-name lazy_properties_multi | %FileCheck %s

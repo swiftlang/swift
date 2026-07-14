@@ -415,10 +415,9 @@ func test13_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test13_3SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test13_3() -> Bool {
     return cast13(A() as P)
@@ -457,10 +456,9 @@ func test15_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test15_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test15_2() -> Bool {
     return cast15(A() as P)
@@ -478,10 +476,9 @@ func test16_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test16_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test16_2() -> Bool {
     return cast16(A() as P)
@@ -548,10 +545,9 @@ func test20_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test20_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test20_2() -> Bool {
     return cast20(U())
@@ -570,10 +566,9 @@ func test21_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test21_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: debug_value
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 func test21_2() -> Bool {
     return cast21(A() as P)
@@ -935,10 +930,9 @@ public func test40b() -> Bool {
 
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test40c{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// CHECK-NEXT: debug_value
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
 @inline(never)
 public func test40c() -> Bool {
   return cast40((1, S()))

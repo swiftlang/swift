@@ -1594,17 +1594,6 @@ addDefaultArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
     argumentNames.emplace_back();
 }
 
-static StringRef renameUnsafeMethod(ASTContext &ctx,
-                                    const clang::NamedDecl *decl,
-                                    StringRef name) {
-  if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl, ctx}), {})) {
-    return ctx.getIdentifier(("__" + name + "Unsafe").str()).str();
-  }
-
-  return name;
-}
-
 std::optional<StringRef>
 NameImporter::findCustomName(const clang::Decl *decl,
                              ImportNameVersion version) {
@@ -1770,6 +1759,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     ParsedDeclName parsedName = parseDeclName(nameAttr->name);
     if (!parsedName || parsedName.isOperator())
       return result;
+
+    // swift_name can't rename a declaration to `deinit`; forming a FuncDecl
+    // with that special name asserts. Ignore it and import under the original
+    // name.
+    if (parsedName.BaseNameKind == DeclBaseName::Kind::Destructor) {
+      skipCustomName = true;
+      result.info.hasInvalidCustomName = true;
+    }
 
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
@@ -2575,8 +2572,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       baseName = swiftPrivateScratch;
     }
   }
-
-  baseName = renameUnsafeMethod(swiftCtx, D, baseName);
 
   result.declName =
       formDeclName(swiftCtx, baseName, argumentNames, isFunction,

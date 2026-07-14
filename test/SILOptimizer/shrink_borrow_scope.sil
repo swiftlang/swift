@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 import Builtin
 import Swift

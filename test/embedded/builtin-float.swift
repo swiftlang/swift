@@ -7,7 +7,6 @@
 // RUN: %target-swift-frontend -target armv8.1m.main-none-none-eabi -emit-ir %t/Main.swift -enable-experimental-feature Embedded -module-cache-path %t/ModuleCache -Xcc -I%t/include
 
 // UNSUPPORTED: CPU=wasm32
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM
 // REQUIRES: embedded_stdlib_cross_compiling

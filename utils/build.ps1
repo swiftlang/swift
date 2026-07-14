@@ -1798,14 +1798,6 @@ function Get-SDKLibexecDir([Hashtable] $Platform, [string] $SDKRoot, [bool] $Ins
   return [IO.Path]::Combine($SDKRoot, "usr", "libexec")
 }
 
-function Resolve-SDKRuntimeBin([Hashtable] $Platform, [string] $SDKRoot, [bool] $InstallRuntimeToStage = $true) {
-  $RuntimeBin = Get-SDKRuntimeBin $Platform $SDKRoot $InstallRuntimeToStage
-  if (Test-Path $RuntimeBin -PathType Container) {
-    return $RuntimeBin
-  }
-  return [IO.Path]::Combine($SDKRoot, "usr", "bin")
-}
-
 enum DriverStyle {
   CL
   ClangCL
@@ -2531,7 +2523,7 @@ function Build-SPMProject {
   Invoke-IsolatingEnvVars {
 
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
-    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     $env:Path = "$HostRuntimeBin;$($HostPlatform.ToolchainInstallRoot)\usr\bin;${env:Path}"
     $env:SDKROOT = $HostSDKRoot
     $env:SWIFTCI_USE_LOCAL_DEPS = "1"
@@ -3278,7 +3270,7 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
 function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift) {
   Invoke-IsolatingEnvVars {
     $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
-    $SwiftRuntime = Resolve-SDKRuntimeBin $Platform $SwiftSDK
+    $SwiftRuntime = Get-SDKRuntimeBin $Platform $SwiftSDK
     $Stage2BinDir = [IO.Path]::Combine((Get-ProjectBinaryCache $Platform Stage2Compilers), "bin")
     $CDispatchBinaryCache = Get-ProjectBinaryCache $Platform DynamicCDispatch
     $env:Path = "$SwiftRuntime;$Stage2BinDir;$CDispatchBinaryCache;$CDispatchBinaryCache\bin;$(Get-CMarkBinaryCache $Platform)\src;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
@@ -3328,6 +3320,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
         # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
         LLDB_TEST_USER_ARGS = "--skip-category=watchpoint;--sysroot=$SwiftSDK";
         LLDB_TEST_SWIFT_DRIVER_EXTRA_FLAGS = "-sdk '$SwiftSDK'"
+        LLDB_TEST_INFERIOR_RUNTIME_BIN = "$SwiftRuntime";
         # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
         LLVM_LIT_ARGS = "-v --no-gtest-sharding --time-tests";
         # LLDB Unit tests link against this library
@@ -4752,6 +4745,7 @@ function Build-Build([Hashtable] $Platform,
       LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
       SwiftDriver_DIR = (Get-ProjectCMakeModules $Platform Driver);
       SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
+      SwiftSubprocess_DIR = (Get-ProjectCMakeModules $Platform Subprocess);
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
       SwiftToolsProtocols_DIR = (Get-ProjectCMakeModules $Platform ToolsProtocols);
       SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
@@ -4987,6 +4981,7 @@ function Build-PackageManager([Hashtable] $Platform,
       CMAKE_Swift_FLAGS = @("-DCRYPTO_v2");
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
+      SwiftSubprocess_DIR = (Get-ProjectCMakeModules $Platform Subprocess);
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
       LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
@@ -5666,6 +5661,7 @@ function Build-Installer([Hashtable] $Platform) {
 
 function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   # Save the installer binary log
+  if (-not $Package) { return }
   Copy-File "$BinaryCache\$($Platform.Triple)\msi\$($Platform.Architecture.VSName)-$([System.IO.Path]::GetFileNameWithoutExtension("bundle\installer.wixproj")).binlog" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.cab" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.msi" $Stage
@@ -5937,7 +5933,7 @@ if ($Toolchain) {
 
   if ($HostPlatform.OS -eq [OS]::Windows) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
-    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;
@@ -6018,7 +6014,7 @@ if ($Windows) {
   # copies after the final runtime image is in place.
   if ($Toolchain -and $RebuiltHostDynamicRuntime) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
-    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;
@@ -6110,7 +6106,7 @@ if ($Stage) {
 if (-not $IsCrossCompiling) {
   if (-not $Toolchain -and $HostPlatform.OS -eq [OS]::Windows -and $Test.Count -gt 0) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
-    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;

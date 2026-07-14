@@ -39,6 +39,7 @@
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackExpansionMatcher.h"
@@ -658,7 +659,7 @@ private:
   /// that correction failed.
   NeverNullType diagnoseUnknownType(Type parentType, SourceRange parentRange,
                                     DeclRefTypeRepr *repr,
-                                    NameLookupOptions lookupOptions,
+                                    NLOptions lookupOptions,
                                     TypeResolutionOptions options);
 
   void maybeDiagnoseBadConformanceRef(Type parentTy, SourceLoc loc,
@@ -1997,7 +1998,7 @@ static std::string getDeclNameFromContext(DeclContext *dc,
 NeverNullType
 TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
                                   DeclRefTypeRepr *repr,
-                                  NameLookupOptions lookupOptions,
+                                  NLOptions lookupOptions,
                                   TypeResolutionOptions options) {
   assert(parentType || isa<UnqualifiedIdentTypeRepr>(repr));
 
@@ -2050,8 +2051,7 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
     }
 
     // Try ignoring access control.
-    NameLookupOptions relookupOptions = lookupOptions;
-    relookupOptions |= NameLookupFlags::IgnoreAccessControl;
+    NLOptions relookupOptions = lookupOptions | NLFlags::IgnoreAccessControl;
     auto inaccessibleResults = TypeChecker::lookupUnqualifiedType(
         dc, repr->getNameRef(), repr->getLoc(), relookupOptions);
     if (!inaccessibleResults.empty()) {
@@ -2161,8 +2161,7 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
   }
 
   // Try ignoring access control.
-  NameLookupOptions relookupOptions = lookupOptions;
-  relookupOptions |= NameLookupFlags::IgnoreAccessControl;
+  NLOptions relookupOptions = lookupOptions | NLFlags::IgnoreAccessControl;
   auto inaccessibleMembers = TypeChecker::lookupMemberType(
       dc, parentType, repr->getNameRef(),
       repr->getLoc(), relookupOptions);
@@ -2194,9 +2193,9 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
     LookupResult memberLookup;
     // Let's try to look any member of the parent type with the given name,
     // even if it is not a type, allowing for a more precise diagnostic.
-    NLOptions memberLookupOptions = (NL_QualifiedDefault |
-                                     NL_IgnoreAccessControl |
-                                     NL_IgnoreMissingImports);
+    NLOptions memberLookupOptions = {NLFlags::QualifiedDefault,
+                                     NLFlags::IgnoreAccessControl,
+                                     NLFlags::IgnoreMissingImports};
     SmallVector<ValueDecl *, 2> results;
     dc->lookupQualified(parentType, repr->getNameRef(), repr->getLoc(),
                         memberLookupOptions, results);
@@ -2293,33 +2292,6 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
   }
 }
 
-/// Diagnose when this is one of the BorrowingSequence types, which currently require
-/// an experimental feature to use.
-static void diagnoseBorrowingSequenceType(TypeDecl *typeDecl, SourceLoc loc,
-                             const DeclContext *dc) {
-  if (loc.isInvalid())
-    return;
-
-  if (!typeDecl->isStdlibDecl())
-    return;
-
-  ASTContext &ctx = typeDecl->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::BorrowingSequence))
-    return;
-
-  auto nameString = typeDecl->getName().str();
-  if (nameString != "BorrowingSequence" && nameString != "BorrowingIteratorProtocol"
-      && nameString != "SpanIterator" && nameString != "BorrowingIteratorAdapter")
-    return;
-
-  // Don't require this in the standard library or _Concurrency library.
-  auto module = dc->getParentModule();
-  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
-    return;
-
-  ctx.Diags.diagnose(loc, diag::borrowingsequence_experimental, nameString);
-}
-
 NeverNullType
 TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
                                               TypeResolutionOptions options) {
@@ -2350,9 +2322,9 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
     }
   }
 
-  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  NLOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
-    lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
+    lookupOptions |= NLFlags::IncludeUsableFromInline;
   auto globals =
       TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(), lookupOptions);
 
@@ -2361,7 +2333,7 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
   bool didIgnoreMissingImports = false;
   if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
                                           /*allowMigration=*/true)) {
-    lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    lookupOptions |= NLFlags::IgnoreMissingImports;
     globals = TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(),
                                                  lookupOptions);
     didIgnoreMissingImports = true;
@@ -2422,8 +2394,6 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
-
-    diagnoseBorrowingSequenceType(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -2599,9 +2569,9 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
   // Phase 1: Find and bind the type declaration.
 
   // Look for member types with the given name.
-  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+  NLOptions lookupOptions = defaultMemberLookupOptions;
   if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
-    lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
+    lookupOptions |= NLFlags::IncludeUsableFromInline;
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers()) {
     memberTypes = TypeChecker::lookupMemberType(
@@ -2610,7 +2580,7 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
     // If no members were found, try ignoring missing imports.
     if (!memberTypes && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
                                                 /*allowMigration=*/true)) {
-      lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+      lookupOptions |= NLFlags::IgnoreMissingImports;
       memberTypes = TypeChecker::lookupMemberType(
           DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
 
@@ -2652,8 +2622,6 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
     member = memberTypes.back().Member;
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
-
-    diagnoseBorrowingSequenceType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);

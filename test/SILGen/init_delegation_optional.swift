@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -swift-version 5 %s
+
 // 'try?' on delegations to 'Optional' initializers should never flatten
 // optionals, or else we do not discern the difference between a failure and a
 // constructed value. Run in compatibility modes that disable and enable

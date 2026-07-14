@@ -34,6 +34,7 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -100,7 +101,6 @@ namespace swift {
   class MacroDefinition;
   class ModuleDecl;
   class NamedPattern;
-  enum NLOptions : unsigned;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
@@ -283,16 +283,6 @@ enum class MemberwiseInitKind {
   /// initialized variables. This only exists for migration purposes, and will
   /// be removed in a future language mode.
   Compatibility
-};
-
-enum class UsingSpecifier : uint8_t {
-  MainActor,
-  Nonisolated,
-  LastSpecifier = Nonisolated,
-};
-enum : unsigned {
-  NumUsingSpecifierBits =
-      countBitsUsed(static_cast<unsigned>(UsingSpecifier::LastSpecifier))
 };
 
 /// Diagnostic printing of \c SelfAccessKind.
@@ -876,11 +866,7 @@ protected:
     NumPathElements : 8
   );
 
-  SWIFT_INLINE_BITFIELD(UsingDecl, Decl, NumUsingSpecifierBits,
-    Specifier : NumUsingSpecifierBits
-  );
-
-  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1,
+  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1+1,
     /// An encoding of the default and maximum access level for this extension.
     /// The value 4 corresponds to AccessLevel::Public
     ///
@@ -890,7 +876,11 @@ protected:
     DefaultAndMaxAccessLevel : 4,
 
     /// Whether there is are lazily-loaded conformances for this extension.
-    HasLazyConformances : 1
+    HasLazyConformances : 1,
+
+    /// Whether this is a `metatype extension` whose members live on the
+    /// protocol metatype and are not inherited by conforming types.
+    IsMetatypeExtension : 1
   );
 
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
@@ -1091,6 +1081,11 @@ public:
   /// including attributes that are generated as the result of member
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
+
+  /// If this is a top-level value declaration or extension, materialize any
+  /// applicable file-level `using` defaults onto this declaration. Otherwise do
+  /// nothing.
+  void applyFileDefaults();
 
   /// Set this declaration's attributes to the specified attribute list,
   /// applying any post-processing logic appropriate for attributes parsed
@@ -2158,6 +2153,13 @@ public:
   SourceRange getBraces() const { return Braces; }
   void setBraces(SourceRange braces) { Braces = braces; }
 
+  bool isMetatypeExtension() const {
+    return Bits.ExtensionDecl.IsMetatypeExtension;
+  }
+  void setIsMetatypeExtension(bool value = true) {
+    Bits.ExtensionDecl.IsMetatypeExtension = value;
+  }
+
   bool hasBeenBound() const { return ExtendedNominal.getInt(); }
 
   void setExtendedNominal(NominalTypeDecl *n) {
@@ -2194,6 +2196,7 @@ public:
   /// Repr would not be available if the extension was been loaded
   /// from a serialized module.
   TypeRepr *getExtendedTypeRepr() const { return ExtendedTypeRepr; }
+  void setExtendedTypeRepr(TypeRepr *repr) { ExtendedTypeRepr = repr; }
                               
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
@@ -4902,7 +4905,7 @@ public:
 
   SourceLoc getStartLoc() const { return EnumLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(EnumLoc, getBraces().End);
+    return SourceRange::combine(EnumLoc, getBraces().End);
   }
 
 public:
@@ -5106,7 +5109,7 @@ public:
 
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(StructLoc, getBraces().End);
+    return SourceRange::combine(StructLoc, getBraces().End);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -5262,7 +5265,7 @@ public:
 
   SourceLoc getStartLoc() const { return ClassLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(ClassLoc, getBraces().End);
+    return SourceRange::combine(ClassLoc, getBraces().End);
   }
 
   /// Determine whether the member area of this class's metadata (which consists
@@ -5750,7 +5753,7 @@ public:
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(ProtocolLoc, getBraces().End);
+    return SourceRange::combine(ProtocolLoc, getBraces().End);
   }
 
   /// True if this protocol can only be conformed to by class types.
@@ -6505,6 +6508,14 @@ public:
   /// Return a distributed thunk if this computed property is marked as
   /// 'distributed' and and nullptr otherwise.
   FuncDecl *getDistributedThunk() const;
+
+  /// Return the 'resolvable proxy adapter' thunk for this computed
+  /// property, if a distributed thunk includes an `any P` / `some P`
+  /// where the P is a distributed `@Resolvable protocol`, and must
+  /// therefore be mapped to the proxy type `$P` that we use as wire
+  /// format to erase the actual implementation type (underlying the
+  /// `any P`), which may not be available on the remote peer.
+  FuncDecl *getDistributedResolvableProxyAdapterThunk() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -8142,6 +8153,11 @@ public:
   /// \return the synthesized thunk, or null if the base of the call has
   ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
+
+  /// Get the 'resolvable proxy adapter' thunk used on the recipient side
+  /// of a remote call to bridge between the wire-level `@Resolvable`
+  /// proxy types (`$P`) and the user-facing `any P` / `some P` types.
+  FuncDecl *getDistributedResolvableProxyAdapterThunk() const;
 
   /// Detect whether this function declaration is an unstructured task
   /// factory: a `Task` initializer or one of the `detached`,
@@ -10035,23 +10051,31 @@ class UsingDecl : public Decl {
   friend class Decl;
 
 private:
-  SourceLoc UsingLoc, SpecifierLoc;
+  SourceLoc UsingLoc;
 
-  UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
-            UsingSpecifier specifier, DeclContext *parent);
+  DeclAttributes SpecifiedAttributes;
+
+  UsingDecl(SourceLoc usingLoc, DeclAttributes specifiedAttributes,
+            DeclContext *parent);
 
 public:
-  UsingSpecifier getSpecifier() const {
-    return static_cast<UsingSpecifier>(Bits.UsingDecl.Specifier);
-  }
-
-  std::string getSpecifierName() const;
+  DeclAttributes getSpecifiedAttributes() const { return SpecifiedAttributes; }
 
   SourceLoc getLocFromSource() const { return UsingLoc; }
-  SourceRange getSourceRange() const { return {UsingLoc, SpecifierLoc}; }
+  SourceRange getSourceRange() const {
+    if (SpecifiedAttributes.isEmpty())
+      return UsingLoc;
+    // Head is most recently inserted, last in source order, and there
+    // should only be one except for @available where each synthetic
+    // attribute should point to the same attribute.
+    auto endLoc = (*SpecifiedAttributes.begin())->getEndLoc();
+    if (endLoc.isInvalid())
+      return UsingLoc;
+    return {UsingLoc, endLoc};
+  }
 
   static UsingDecl *create(ASTContext &ctx, SourceLoc usingLoc,
-                           SourceLoc specifierLoc, UsingSpecifier specifier,
+                           DeclAttributes specifiedAttributes,
                            DeclContext *parent);
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Using; }

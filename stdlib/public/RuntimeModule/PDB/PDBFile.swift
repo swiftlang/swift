@@ -27,7 +27,7 @@ internal import Glibc
 internal import Musl
 #endif
 
-internal import BacktracingImpl.ImageFormats.PDB
+@_implementationOnly import BacktracingImpl.ImageFormats.PDB
 
 extension SC2 {
   static func fromSc(_ sc: SC) -> SC2 {

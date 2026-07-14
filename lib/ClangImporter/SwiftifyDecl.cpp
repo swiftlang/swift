@@ -296,14 +296,19 @@ struct SwiftifyInfoPrinter {
   MacroDecl &SwiftifyImportDecl;
   bool firstParam = true;
   llvm::StringMap<std::string> &typeMapping;
+  bool &DiagnosedMissingNullableAsEmptySpanParam;
+  bool hasNullableCountedBy = false;
 
 protected:
   SwiftifyInfoPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
                       llvm::raw_svector_ostream &out,
                       MacroDecl &SwiftifyImportDecl,
-                      llvm::StringMap<std::string> &typeMapping)
+                      llvm::StringMap<std::string> &typeMapping,
+                      bool &DiagnosedMissingNullableAsEmptySpanParam)
       : ctx(ctx), SwiftContext(SwiftContext), out(out),
-        SwiftifyImportDecl(SwiftifyImportDecl), typeMapping(typeMapping) {}
+        SwiftifyImportDecl(SwiftifyImportDecl), typeMapping(typeMapping),
+        DiagnosedMissingNullableAsEmptySpanParam(
+            DiagnosedMissingNullableAsEmptySpanParam) {}
 
 public:
   void printTypeMapping() {
@@ -341,7 +346,8 @@ public:
     }
     out << "\"";
   }
-private:
+
+protected:
   bool hasMacroParameter(StringRef ParamName) const {
     for (auto *Param : *SwiftifyImportDecl.parameterList)
       if (Param->getArgumentName().str() == ParamName)
@@ -349,7 +355,6 @@ private:
     return false;
   }
 
-protected:
   void printSeparator() {
     if (!firstParam) {
       out << ", ";
@@ -361,13 +366,16 @@ protected:
 
 struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
   SwiftifyInfoFunctionPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
-                      llvm::raw_svector_ostream &out,
-                      MacroDecl &SwiftifyImportDecl,
-                      llvm::StringMap<std::string> &typeMapping)
-      : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl, typeMapping) {}
+                              llvm::raw_svector_ostream &out,
+                              MacroDecl &SwiftifyImportDecl,
+                              llvm::StringMap<std::string> &typeMapping,
+                              bool &DiagnosedMissingNullableAsEmptySpanParam)
+      : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl,
+                            typeMapping,
+                            DiagnosedMissingNullableAsEmptySpanParam) {}
 
   bool printCountedBy(const clang::CountAttributedType *CAT, Type swiftType,
-                      ssize_t pointerIndex) {
+                      ssize_t pointerIndex, bool isImplicitlyUnwrapped) {
     // Step 1: check if we support this attribute
     bool isSizedBy = CAT->isCountInBytes();
     if (isSizedBy ? !SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
@@ -391,6 +399,8 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     out << ", ";
     out << (isSizedBy ? "size" : "count");
     out << ": \"" << emitter.str() << "\")";
+    if (!CAT->isOrNull() && swiftType->isOptional() && !isImplicitlyUnwrapped)
+      hasNullableCountedBy = true;
     return true;
   }
 
@@ -417,6 +427,21 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
       return true;
     }
     return false;
+  }
+
+  void printNullableAsEmptySpan() {
+    if (!hasMacroParameter("nullableAsEmptySpan")) {
+      if (DiagnosedMissingNullableAsEmptySpanParam ||
+          // Don't warn when it has no impact on the result.
+          !hasNullableCountedBy)
+        return;
+      DiagnosedMissingNullableAsEmptySpanParam = true;
+      SwiftContext.Diags.diagnose(
+          SourceLoc(), diag::swiftify_nullable_as_empty_span_param_missing);
+      return;
+    }
+    printSeparator();
+    out << "nullableAsEmptySpan: true";
   }
 
 private:
@@ -763,8 +788,9 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                "free function mapped to instance method without swift_name??");
         Self.diagnose(HeaderLoc(swiftName->getLocation()),
                  diag::note_swift_name_instance_method);
-      } else if (CAT &&
-                 printer.printCountedBy(CAT, swiftParamTy, mappedIndex)) {
+      } else if (CAT && printer.printCountedBy(
+                            CAT, swiftParamTy, mappedIndex,
+                            swiftParam->isImplicitlyUnwrappedOptional())) {
         DLOG("Found bounds info '" << clangParamTy << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
@@ -845,10 +871,11 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       return false;
     (void)printer.registerStdSpanTypeMapping(
         swiftReturnTy, clangReturnTy);
-    if (CAT &&
-        printer.printCountedBy(CAT, swiftReturnTy,
-                               SwiftifyInfoPrinter::RETURN_VALUE_INDEX)) {
-      DLOG("Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
+    if (CAT && printer.printCountedBy(
+                   CAT, swiftReturnTy, SwiftifyInfoPrinter::RETURN_VALUE_INDEX,
+                   MappedDecl->isImplicitlyUnwrappedOptional())) {
+      DLOG("Found bounds info '" << clang::QualType(CAT, 0)
+                                 << "' on return value\n");
       attachMacro = true;
     }
   }
@@ -891,20 +918,31 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     return;
   }
 
+  // For projects adopting SafeInteropWrappers we preserve the original
+  // Optional-propagating signature unless they opt-in to the new one.
+  const bool LegacyOptionalRequested =
+      SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) &&
+      !SwiftContext.LangOpts.hasFeature(
+          Feature::SafeInteropWrappersNullAsEmptySpan);
+
   llvm::SmallString<128> MacroString;
   {
     llvm::raw_svector_ostream out(MacroString);
     out << "@_SwiftifyImport(";
 
     llvm::StringMap<std::string> typeMapping;
-    SwiftifyInfoFunctionPrinter printer(getClangASTContext(), SwiftContext, out,
-                                        *SwiftifyImportDecl, typeMapping);
+    SwiftifyInfoFunctionPrinter printer(
+        getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
+        typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
     if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl)) {
       DLOG("No relevant bounds or lifetime info found\n");
       return;
     }
     printer.printAvailability();
     printer.printTypeMapping();
+    if (!LegacyOptionalRequested) {
+      printer.printNullableAsEmptySpan();
+    }
     out << ")";
   }
 

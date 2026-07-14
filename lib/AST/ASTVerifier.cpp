@@ -2079,7 +2079,7 @@ public:
       PrettyStackTraceExpr debugStack(Ctx, "verifying SubscriptExpr", E);
 
       if (!E->hasDecl()) {
-        Out << "Subscript expression is missing subscript declaration";
+        Out << "Subscript expression is missing subscript declaration\n";
         abort();
       }
 
@@ -2132,8 +2132,9 @@ public:
 
     void verifyChecked(OptionalEvaluationExpr *E) {
       if (E->getType()->hasLValueType()) {
-        Out << "Optional evaluation should not produce an lvalue";
+        Out << "Optional evaluation should not produce an lvalue\n";
         E->dump(Out);
+        Out << "\n";
         abort();
       }
       checkSameType(E->getType(), E->getSubExpr()->getType(),
@@ -2272,12 +2273,12 @@ public:
 
       auto valueType = E->getType()->getOptionalObjectType();
       if (!valueType) {
-        Out << "InjectIntoOptionalExpr is not of Optional type";
+        Out << "InjectIntoOptionalExpr is not of Optional type\n";
         abort();
       }
 
       if (!E->getSubExpr()->getType()->isEqual(valueType)) {
-        Out << "InjectIntoOptionalExpr operand is not of the value type";
+        Out << "InjectIntoOptionalExpr operand is not of the value type\n";
         abort();
       }
       verifyCheckedBase(E);
@@ -2342,7 +2343,7 @@ public:
       
       // Expression type should match subexpression.
       if (!E->getType()->isEqual(E->getSubExpr()->getType())) {
-        Out << "MakeTemporarilyEscapableExpr type does not match subexpression";
+        Out << "MakeTemporarilyEscapableExpr type does not match subexpression\n";
         abort();
       }
 
@@ -3203,7 +3204,7 @@ public:
       PrettyStackTraceDecl debugStack("verifying EnumElementDecl", UED);
 
       if (!isa<EnumDecl>(UED->getDeclContext())) {
-        Out << "EnumElementDecl has wrong DeclContext";
+        Out << "EnumElementDecl has wrong DeclContext\n";
         abort();
       }
 
@@ -3213,7 +3214,7 @@ public:
     void verifyParsed(EnumCaseDecl *D) {
       PrettyStackTraceDecl debugStack("verifying EnumCaseDecl", D);
       if (!D->getAttrs().isEmpty()) {
-        Out << "EnumCaseDecl should not have attributes";
+        Out << "EnumCaseDecl should not have attributes\n";
         abort();
       }
 
@@ -3264,7 +3265,7 @@ public:
       PrettyStackTraceDecl debugStack("verifying ProtocolDecl", PD);
 
       if (PD->isObjC() && !PD->requiresClass()) {
-        Out << "@objc protocols should be class protocols as well";
+        Out << "@objc protocols should be class protocols as well\n";
         abort();
       }
       verifyCheckedBase(PD);
@@ -3333,7 +3334,7 @@ public:
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
       if (DD->hasGenericParamList()) {
-        Out << "DestructorDecl cannot be generic";
+        Out << "DestructorDecl cannot be generic\n";
         abort();
       }
       verifyParsedBase(DD);
@@ -3346,9 +3347,15 @@ public:
         return;
 
       // If this function is generic or is within a generic context, it should
-      // have an interface type.
-      if (AFD->isGenericContext() !=
-          AFD->getInterfaceType()->is<GenericFunctionType>()) {
+      // have an interface type.  Metatype extension members are an exception:
+      // they live in a protocol extension but have no generic signature.
+      bool isInMetatypeExt = false;
+      if (auto *ext = dyn_cast<ExtensionDecl>(AFD->getDeclContext()))
+        isInMetatypeExt = ext->isMetatypeExtension();
+
+      if (!isInMetatypeExt &&
+          AFD->isGenericContext() !=
+              AFD->getInterfaceType()->is<GenericFunctionType>()) {
         Out << "Functions in generic context must have an interface type\n";
         AFD->dump(Out);
         abort();
@@ -3356,8 +3363,9 @@ public:
 
       // If the function has a generic interface type, it should also have a
       // generic signature.
-      if (AFD->isGenericContext() !=
-          (!AFD->getGenericSignature().isNull())) {
+      if (!isInMetatypeExt &&
+          AFD->isGenericContext() !=
+              (!AFD->getGenericSignature().isNull())) {
         Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
         abort();

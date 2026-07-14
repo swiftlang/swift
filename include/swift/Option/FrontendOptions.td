@@ -426,6 +426,9 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     Flag<["-"], "enable-experimental-async-top-level">,
     HelpText<"Enable experimental concurrency in top-level code">;
 
+  def disable_force_load_symbols : Flag<["-"],"disable-force-load-symbols">,
+      HelpText<"Disable generation of all Swift _FORCE_LOAD symbols">;
+
   def public_autolink_library :
     Separate<["-"], "public-autolink-library">,
     HelpText<"Add public dependent library">;
@@ -471,12 +474,6 @@ def solver_enable_transitive_conformance : Flag<["-"], "solver-enable-transitive
 
 def solver_disable_transitive_conformance : Flag<["-"], "solver-disable-transitive-conformance">,
   HelpText<"Disable transitive conformance constraint optimization">;
-
-def solver_enable_binding_optimizations : Flag<["-"], "solver-enable-binding-optimizations">,
-  HelpText<"Enable experimental optimizations to speed up type variable binding">;
-
-def solver_disable_binding_optimizations : Flag<["-"], "solver-disable-binding-optimizations">,
-  HelpText<"Disable experimental optimizations to speed up type variable binding">;
 
 def disable_named_lazy_import_as_member_loading :
   Flag<["-"], "disable-named-lazy-import-as-member-loading">,
@@ -556,6 +553,10 @@ def max_substitution_count : Joined<["-"], "max-substitution-count=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum step count for type substitution operations">;
 
+def max_associated_type_inference_iterations : Joined<["-"], "max-associated-type-inference-iterations=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Maximum number of iterations to attempt in the type witness solver">;
+
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 
@@ -591,12 +592,18 @@ def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-typ
 
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
+def debug_assert_after_type_checking : Flag<["-"], "debug-assert-after-type-checking">,
+  DebugCrashOpt, HelpText<"Force an assertion failure after type checking">;
 def debug_assert_after_parse : Flag<["-"], "debug-assert-after-parse">,
-  DebugCrashOpt, HelpText<"Force an assertion failure after parsing">;
+  DebugCrashOpt, Flags<[HelpHidden]>,
+  HelpText<"Deprecated alias for -debug-assert-after-type-checking">;
 def debug_crash_immediately : Flag<["-"], "debug-crash-immediately">,
   DebugCrashOpt, HelpText<"Force a crash immediately">;
+def debug_crash_after_type_checking : Flag<["-"], "debug-crash-after-type-checking">,
+  DebugCrashOpt, HelpText<"Force a crash after type checking">;
 def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
-  DebugCrashOpt, HelpText<"Force a crash after parsing">;
+  DebugCrashOpt, Flags<[HelpHidden]>,
+  HelpText<"Deprecated alias for -debug-crash-after-type-checking">;
 
 def debug_test_dependency_scan_cache_serialization: Flag<["-"], "test-dependency-scan-cache-serialization">,
    HelpText<"After performing a dependency scan, serialize and then deserialize the scanner's internal state.">;
@@ -673,10 +680,6 @@ def disable_autolink_frameworks : Flag<["-"],"disable-autolink-frameworks">,
 
 def disable_all_autolinking : Flag<["-"],"disable-all-autolinking">,
   HelpText<"Disable all Swift autolink directives">;
-
-def disable_force_load_symbols : Flag<["-"],"disable-force-load-symbols">,
-  Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Disable generation of all Swift _FORCE_LOAD symbols">;
 
 def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
   HelpText<"Don't run diagnostic passes">;
@@ -992,19 +995,19 @@ def solver_disable_prune_disjunctions : Flag<["-"], "solver-disable-prune-disjun
 def solver_enable_prune_disjunctions : Flag<["-"], "solver-enable-prune-disjunctions">,
   HelpText<"Enable experimental disjunction pruning algorithm for lookahead in the solver">;
 
-def solver_disable_optimize_operator_defaults : Flag<["-"], "solver-disable-optimize-operator-defaults">,
-  HelpText<"Disable experimental optimization to sometimes skip operators in protocol extensions">;
-
-def solver_enable_optimize_operator_defaults : Flag<["-"], "solver-enable-optimize-operator-defaults">,
-  HelpText<"Enable experimental optimization to sometimes skip operators in protocol extensions">;
-
 def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-hacks">,
   HelpText<"Disable various constraint solver performance optimizations that have been "
            "subsumed by subsequent improvements">;
 
 def solver_enable_performance_hacks : Flag<["-"], "solver-enable-performance-hacks">,
-  HelpText<"Enble various constraint solver performance optimizations that have been "
+  HelpText<"Enable various constraint solver performance optimizations that have been "
            "subsumed by subsequent improvements">;
+
+def solver_disable_enumerate_supertypes : Flag<["-"], "solver-disable-enumerate-supertypes">,
+  HelpText<"Disable an inefficient form of inference in the solver, which allows certain optimizations">;
+
+def solver_enable_enumerate_supertypes : Flag<["-"], "solver-enable-enumerate-supertypes">,
+  HelpText<"Enable an inefficient form of inference in the solver, which prevents certain optimizations">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
@@ -1125,6 +1128,14 @@ def sil_region_isolation_assert_on_unknown_pattern :
   Flag<["-"], "sil-region-isolation-assert-on-unknown-pattern">,
   HelpText<"Abort if SIL region isolation detects an unknown pattern. "
            "For compiler developers only.">;
+
+def sil_region_isolation_emit_isolation_history
+    : Flag<["-"], "sil-region-isolation-emit-isolation-history">,
+      HelpText<
+          "Emit notes explaining why a disconnected value ended up in an "
+          "isolated region. Enables isolation-history for every function in "
+          "the module; otherwise, isolation-history is opt-in per function "
+          "via @diagnose(RegionIsolationIsolationHistory, ...).">;
 
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;

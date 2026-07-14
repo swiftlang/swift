@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -sil-print-types -wmo -enable-sil-verify-all %s -inline -sil-combine -generic-specializer  -allocbox-to-stack -lower-aggregate-instrs -mem2reg -devirtualizer -inline -dead-arg-signature-opt -dce | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -wmo -enable-sil-verify-all %s -inline -sil-combine -generic-specializer  -allocbox-to-stack -dead-object-elimination -devirtualizer -inline -dead-arg-signature-opt -dce -simplification | %FileCheck %s
+
 import Builtin
 import Swift
 import SwiftShims
@@ -160,18 +161,19 @@ bb0:
   return %8 : $()                                 
 } // end sil function '$s21existential_transform2cpyyF'
 
-sil hidden @$s21existential_transform11SomeNoClassC3foos5Int32VyF : $@convention(method) (@guaranteed SomeNoClass) -> Int32 {
-bb0(%0 : $SomeNoClass):
+sil hidden [ossa] @$s21existential_transform11SomeNoClassC3foos5Int32VyF : $@convention(method) (@guaranteed SomeNoClass) -> Int32 {
+bb0(%0 : @guaranteed $SomeNoClass):
   %1 = integer_literal $Builtin.Int32, 10         
   %2 = struct $Int32 (%1 : $Builtin.Int32)        
   return %2 : $Int32                              
 } // end sil function '$s21existential_transform11SomeNoClassC3foos5Int32VyF'
 
-sil private [transparent] [thunk] @$s21existential_transform11SomeNoClassCAA0cdE8ProtocolA2aDP3foos5Int32VyFTW : $@convention(witness_method: SomeNoClassProtocol) (@in_guaranteed SomeNoClass) -> Int32 {
+sil private [transparent] [thunk] [ossa] @$s21existential_transform11SomeNoClassCAA0cdE8ProtocolA2aDP3foos5Int32VyFTW : $@convention(witness_method: SomeNoClassProtocol) (@in_guaranteed SomeNoClass) -> Int32 {
 bb0(%0 : $*SomeNoClass):
-  %1 = load %0 : $*SomeNoClass                    
+  %1 = load_borrow %0 : $*SomeNoClass                    
   %2 = class_method %1 : $SomeNoClass, #SomeNoClass.foo : (SomeNoClass) -> () -> Int32, $@convention(method) (@guaranteed SomeNoClass) -> Int32 
   %3 = apply %2(%1) : $@convention(method) (@guaranteed SomeNoClass) -> Int32 
+  end_borrow %1
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform11SomeNoClassCAA0cdE8ProtocolA2aDP3foos5Int32VyFTW'
 
@@ -183,23 +185,23 @@ bb0(%0 : $*SomeNoClassProtocol):
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tF'
 
-// CHECK-LABEL: sil hidden [noinline] @$s21existential_transform3ncpyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [noinline] [ossa] @$s21existential_transform3ncpyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:  %[[ALLOCREF:[0-9]+]] = alloc_ref $SomeNoClass                     
 // CHECK:  debug_value %[[ALLOCREF]] : $SomeNoClass, let, name "self", argno 1 
 // CHECK:  %[[FUNC:[0-9]+]] = function_ref @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n4main0ghI0C_Tg5 : $@convention(thin) (@guaranteed SomeNoClass) -> Int32 
 // CHECK:  %[[RES:[0-9]+]] = apply %[[FUNC]](%[[ALLOCREF]]) : $@convention(thin) (@guaranteed SomeNoClass) -> Int32
-// CHECK:  strong_release %[[ALLOCREF]] : $SomeNoClass                
+// CHECK:  destroy_value %[[ALLOCREF]]
 // CHECK:  %[[RET:[0-9]+]] = tuple ()                                   
 // CHECK:  return %[[RET]] : $()                                 
 // CHECK-LABEL: } // end sil function '$s21existential_transform3ncpyyF'
-sil hidden [noinline] @$s21existential_transform3ncpyyF : $@convention(thin) () -> () {
+sil hidden [noinline] [ossa] @$s21existential_transform3ncpyyF : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $SomeNoClassProtocol, let, name "magic2" 
   %1 = alloc_ref $SomeNoClass                     
   debug_value %1 : $SomeNoClass, let, name "self", argno 1 
   %3 = init_existential_addr %0 : $*SomeNoClassProtocol, $SomeNoClass 
-  store %1 to %3 : $*SomeNoClass                  
+  store %1 to [init] %3 : $*SomeNoClass                  
   %5 = function_ref @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
   %6 = open_existential_addr mutable_access %0 : $*SomeNoClassProtocol to $*@opened("CC9800F0-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocol) Self 
   %7 = apply %5<@opened("CC9800F0-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocol) Self>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
@@ -307,23 +309,23 @@ bb0(%0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp):
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tF'
 
-// CHECK-LABEL: sil hidden [noinline] @$s21existential_transform4ncpcyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [noinline] [ossa] @$s21existential_transform4ncpcyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:  %[[ALLOCREF:[0-9]+]] = alloc_ref $SomeNoClassComp                 
 // CHECK:  debug_value %[[ALLOCREF]] : $SomeNoClassComp, let, name "self", argno 1 
 // CHECK:  %[[FUNC:[0-9]+]] = function_ref @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n4main0jklN0C_Tg5 : $@convention(thin) (@guaranteed SomeNoClassComp) -> Int32 
 // CHECK:  %[[RES:[0-9]+]] = apply %[[FUNC]](%[[ALLOCREF]]) : $@convention(thin) (@guaranteed SomeNoClassComp) -> Int32
-// CHECK:  strong_release %[[ALLOCREF]] : $SomeNoClassComp            
+// CHECK:  destroy_value %[[ALLOCREF]]
 // CHECK:  %[[RET:[0-9]+]] = tuple ()                                   
 // CHECK:  return %[[RET]] : $()                                 
 // CHECK-LABEL: } // end sil function '$s21existential_transform4ncpcyyF'
-sil hidden [noinline] @$s21existential_transform4ncpcyyF : $@convention(thin) () -> () {
+sil hidden [noinline] [ossa] @$s21existential_transform4ncpcyyF : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp, let, name "magic4" 
   %1 = alloc_ref $SomeNoClassComp                 
   debug_value %1 : $SomeNoClassComp, let, name "self", argno 1 
   %3 = init_existential_addr %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp, $SomeNoClassComp 
-  store %1 to %3 : $*SomeNoClassComp              
+  store %1 to [init] %3 : $*SomeNoClassComp              
   %5 = function_ref @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
   %6 = open_existential_addr mutable_access %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp to $*@opened("CC983AFC-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) Self 
   %7 = apply %5<@opened("CC983AFC-AC7C-11E8-B742-D0817AD4059B", SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) Self>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
@@ -537,13 +539,13 @@ bb0(%0 : $τ_0_0):
 } // end sil function '$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tFTf4e_n'
 
 
-// CHECK-LABEL: sil shared [noinline] @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n4main0ghI0C_Tg5 : $@convention(thin) (@guaranteed SomeNoClass) -> Int32 {
-// CHECK: bb0(%0 : $SomeNoClass):
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n4main0ghI0C_Tg5 : $@convention(thin) (@guaranteed SomeNoClass) -> Int32 {
+// CHECK: bb0(%0 : @guaranteed $SomeNoClass):
 // CHECK:  %1 = integer_literal $Builtin.Int32, 10         
 // CHECK:  %2 = struct $Int32 (%1 : $Builtin.Int32)        
 // CHECK:  return %2 : $Int32                              
 // CHECK-LABEL: } // end sil function '$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n4main0ghI0C_Tg5'
-sil shared [noinline] @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 {
+sil shared [noinline] [ossa] @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 {
 bb0(%0 : $*τ_0_0):
   %1 = witness_method $τ_0_0, #SomeNoClassProtocol.foo : <Self where Self : SomeNoClassProtocol> (Self) -> () -> Int32 : $@convention(witness_method: SomeNoClassProtocol) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
   %2 = apply %1<τ_0_0>(%0) : $@convention(witness_method: SomeNoClassProtocol) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
@@ -575,9 +577,9 @@ bb0(%0 : $τ_0_0):
 
 // CHECK-LABEL: sil shared [noinline] @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n4main0jklN0C_Tg5 : $@convention(thin) (@guaranteed SomeNoClassComp) -> Int32 {
 // CHECK: bb0(%0 : $SomeNoClassComp):
-// CHECK:   %1 = integer_literal $Builtin.Int32, 30
-// CHECK:   %2 = struct $Int32 (%1 : $Builtin.Int32)
-// CHECK:   return %2 : $Int32
+// CHECK:   [[L:%.*]] = integer_literal $Builtin.Int32, 30
+// CHECK:   [[I:%.*]] = struct $Int32 ([[L]] : $Builtin.Int32)
+// CHECK:   return [[I]]
 // CHECK-LABEL: } // end sil function '$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n4main0jklN0C_Tg5'
 sil shared [noinline] @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 {
 bb0(%0 : $*τ_0_0):

@@ -6,6 +6,7 @@ import itertools
 import json
 import multiprocessing
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -132,6 +133,13 @@ class ModuleFile:
         self.path = path
         self.is_expected_to_fail = is_expected_to_fail
 
+def extended(path):
+    if platform.system() == 'Windows':
+        path = os.path.abspath(path)
+        if path.startswith('\\\\'):
+            return "\\\\?\\UNC\\{0}".format(path[2:])
+        return "\\\\?\\{0}".format(path)
+    return path
 
 def collect_slices(xfails, swiftmodule_dir):
     if not os.path.isdir(swiftmodule_dir):
@@ -141,7 +149,7 @@ def collect_slices(xfails, swiftmodule_dir):
     assert extension == ".swiftmodule"
 
     is_xfail = module_name in xfails
-    for entry in os.listdir(swiftmodule_dir):
+    for entry in os.listdir(extended(swiftmodule_dir)):
         _, extension = os.path.splitext(entry)
         if extension == ".swiftinterface":
             yield ModuleFile(module_name, os.path.join(swiftmodule_dir, entry),

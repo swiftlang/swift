@@ -15,12 +15,10 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "FeatureSet.h"
-#include "swift/AST/InlinableText.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -34,6 +32,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -209,10 +208,10 @@ static bool shouldSkipDeclInPublicInterface(const Decl *D) {
   if (!SF)
     return false;
 
-  auto constraints = getAvailabilityConstraintsForDecl(
-      D, AvailabilityContext::forDeploymentTarget(ctx));
+  auto restrictions =
+      AvailabilityContext::forDeploymentTarget(ctx).allRestrictionsForDecl(D);
   llvm::SmallVector<AvailabilityDomain, 4> unavailableDomains;
-  getRuntimeUnavailableDomains(constraints, unavailableDomains, ctx);
+  getRuntimeUnavailableDomains(restrictions, unavailableDomains, ctx);
 
   for (auto domain : unavailableDomains) {
     if (auto *domainDecl = domain.getDecl()) {
@@ -2711,6 +2710,23 @@ void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
   printBraceStmt(decl->getBody(), /*newlineIfEmpty*/!isa<AccessorDecl>(decl));
 }
 
+static StringRef getPrintedSelfOwnershipModifier(SelfAccessKind kind,
+                                                 const PrintOptions &options) {
+  switch (kind) {
+  case SelfAccessKind::Consuming:
+    return options.excludeAttrKind(DeclAttrKind::Consuming) ? "" : "consuming";
+  case SelfAccessKind::LegacyConsuming:
+    return options.excludeAttrKind(DeclAttrKind::LegacyConsuming) ? ""
+                                                                  : "__consuming";
+  case SelfAccessKind::Borrowing:
+    return options.excludeAttrKind(DeclAttrKind::Borrowing) ? "" : "borrowing";
+  case SelfAccessKind::Mutating:
+  case SelfAccessKind::NonMutating:
+    return "";
+  }
+  llvm_unreachable("covered switch");
+}
+
 void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   if (!Options.PrintSelfAccessKindKeyword)
     return;
@@ -2729,17 +2745,14 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
       Printer.printKeyword("nonmutating", Options, " ");
     break;
   case SelfAccessKind::LegacyConsuming:
-    if (!Options.excludeAttrKind(DeclAttrKind::LegacyConsuming))
-      Printer.printKeyword("__consuming", Options, " ");
-    break;
   case SelfAccessKind::Consuming:
-    if (!Options.excludeAttrKind(DeclAttrKind::Consuming))
-      Printer.printKeyword("consuming", Options, " ");
+  case SelfAccessKind::Borrowing: {
+    StringRef keyword =
+        getPrintedSelfOwnershipModifier(FD->getSelfAccessKind(), Options);
+    if (!keyword.empty())
+      Printer.printKeyword(keyword, Options, " ");
     break;
-  case SelfAccessKind::Borrowing:
-    if (!Options.excludeAttrKind(DeclAttrKind::Borrowing))
-      Printer.printKeyword("borrowing", Options, " ");
-    break;
+  }
   }
 }
 
@@ -2839,6 +2852,15 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 
     Printer << " {";
     if (mutatingGetter) printWithSpace("mutating");
+
+    if (Options.PrintSelfAccessKindKeyword) {
+      if (auto *getter = ASD->getAccessor(AccessorKind::Get)) {
+        StringRef keyword =
+            getPrintedSelfOwnershipModifier(getter->getSelfAccessKind(), Options);
+        if (!keyword.empty())
+          printWithSpace(keyword);
+      }
+    }
 
     if (ASD->getParsedAccessor(AccessorKind::Borrow)) {
       printWithSpace("borrow");
@@ -3422,7 +3444,9 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 
 void PrintAST::visitUsingDecl(UsingDecl *decl) {
   Printer.printIntroducerKeyword("using", Options, " ");
-  Printer << decl->getSpecifierName();
+  for (auto attr : decl->getSpecifiedAttributes()) {
+    attr->print(Printer, Options, decl);
+  }
 }
 
 void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
@@ -3768,14 +3792,14 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
   });
 }
 
-// Returns true if the given declaration is CxxBorrowingSequence,
+// Returns true if the given declaration is CxxIterable,
 // CxxBorrowingIterator or an extension of one of these.
-static bool isCxxBorrowingSequenceOrIterator(Decl *decl) {
+static bool isCxxIterableOrIterator(Decl *decl) {
   if (auto *ext = dyn_cast<ExtensionDecl>(decl))
     decl = ext->getExtendedNominal();
 
   if (auto *proto = dyn_cast<ProtocolDecl>(decl))
-    return proto->getNameStr() == "CxxBorrowingSequence";
+    return proto->getNameStr() == "CxxIterable";
   if (auto *sd = dyn_cast<StructDecl>(decl))
     return sd->getNameStr() == "CxxBorrowingIterator";
   return false;
@@ -3843,12 +3867,12 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
     return;
   }
 
-  // CxxBorrowingSequence and CxxBorrowingIterator, defined in the Cxx overlay,
-  // conform to BorrowingSequence and BorrowingIteratorProtocol. When a newer
+  // CxxIterable and CxxBorrowingIterator, defined in the Cxx overlay,
+  // conform to Iterable and BorrowingIteratorProtocol. When a newer
   // compiler is used with an older SDK, the Cxx module interface may reference
   // these Swift stdlib protocols even though they don't exist in the SDK's
   // stdlib. To handle this, we guard them behind a Swift version.
-  if (isCxxBorrowingSequenceOrIterator(decl)) {
+  if (isCxxIterableOrIterator(decl)) {
     printer << "#if canImport(Swift, _version: 6.4.0.12)\n";
     printBody();
     printer.printNewline();
@@ -4104,7 +4128,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4135,7 +4159,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4166,7 +4190,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4226,7 +4250,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     ASTContext &Ctx = decl->getASTContext();
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
@@ -4695,7 +4719,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
 
-  if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
+  if (Options.PrintOriginalSourceText && !decl->isImplicit()) {
     SourceLoc StartLoc = decl->getStartLoc();
     SourceLoc EndLoc;
     if (decl->getResultTypeRepr()) {
@@ -5454,9 +5478,11 @@ void PrintAST::visitTypeJoinExpr(TypeJoinExpr *expr) {
 }
 
 void PrintAST::visitAssignExpr(AssignExpr *expr) {
-  visit(expr->getDest());
+  if (auto dest = expr->getDest())
+    visit(dest);
   Printer << " = ";
-  visit(expr->getSrc());
+  if (auto src = expr->getSrc())
+    visit(src);
 }
 
 void PrintAST::visitBinaryExpr(BinaryExpr *expr) {
@@ -6426,14 +6452,18 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
-  /// If \p TyDecl belongs to a submodule, return the \c ModuleDecl for that
-  /// submodule; otherwise just return the parent module.
+  /// If \p TyDecl belongs to an explicit submodule, return the \c ModuleDecl
+  /// for that submodule; otherwise just return the parent module.
   ModuleDecl *getParentSubModuleOrModule(GenericTypeDecl *TyDecl) {
     // Only clang declarations can belong to a submodule
     if (auto clangNode = TyDecl->getClangNode()) {
       auto importer = TyDecl->getASTContext().getClangModuleLoader();
       if (auto clangMod = importer->getClangOwningModule(clangNode)) {
-        return importer->getWrapperForModule(clangMod);
+        // Explicit submodules are only visible if specifically imported;
+        // everything else has the visibility of its top-level module.
+        if (clangMod->isSubModule() && clangMod->IsExplicit) {
+          return importer->getWrapperForModule(clangMod);
+        }
       }
     }
 

@@ -3,7 +3,6 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: PTRSIZE=64
-// REQUIRES: swift_in_compiler
 
 // REQUIRES: rdar97728676
 

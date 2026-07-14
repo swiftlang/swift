@@ -671,6 +671,81 @@ def add_diag(
     return new_diag
 
 
+def _split_dead_expansion_for_foreign_prefixes(line, lines, prefix):
+    """If the dead `expected-expansion` directive at `line` has surviving
+    nested entries with foreign prefixes, replace it with one new expansion
+    directive per foreign prefix at the same source location, each owning
+    only the entries with its prefix. Returns True if any new directives
+    were inserted, False otherwise."""
+    # Group surviving nested entries by their prefix, preserving source order.
+    groups = []  # list of (foreign_prefix, [Line, ...])
+    for nested_line in line.diag.nested_lines:
+        if not nested_line.diag or nested_line.diag.count == 0:
+            continue
+        nested_prefix = nested_line.diag.prefix
+        if not nested_prefix or nested_prefix == prefix:
+            continue
+        for gp, gl in groups:
+            if gp == nested_prefix:
+                gl.append(nested_line)
+                break
+        else:
+            groups.append((nested_prefix, [nested_line]))
+    if not groups:
+        return False
+
+    indent = get_indent(line.content)
+    closer_ws = (
+        line.diag.closer.diag.whitespace
+        if line.diag.closer and isinstance(line.diag.closer.diag, ExpansionDiagClose)
+        else " "
+    )
+    insertion_line_n = line.line_n
+    for foreign_prefix, nested in groups:
+        # Reset nested line_n's so they sit at their own positions within the
+        # new expansion (fold/expand later renumbers them in the main lines).
+        for i, nl in enumerate(nested):
+            nl.line_n = i + 1
+        new_line = Line(indent + "{{DIAG}}\n", insertion_line_n)
+        new_diag = Diag(
+            foreign_prefix,
+            "",
+            "expansion",
+            line.diag.parsed_target_line_n,
+            line.diag.line_is_absolute,
+            line.diag._col,
+            1,
+            new_line,
+            False,
+            line.diag.whitespace_strings,
+            # Marking as "from source" prevents remove_dead_diags's take()
+            # from absorbing this synthesized sibling into the (dead)
+            # original directive that we are about to remove.
+            True,
+            list(nested),
+        )
+        new_line.diag = new_diag
+        # Synthesize a closer that mirrors the original's whitespace.
+        closer_line = Line(indent + "{{DIAG}}\n", None)
+        closer_line.diag = ExpansionDiagClose(closer_ws, closer_line)
+        new_diag.closer = closer_line
+        # Pick a target. Normally the original parent's target Line is
+        # preserved so all split directives still resolve to the same
+        # absolute line. However, if the original target Line happens to
+        # land inside *this* new directive's own nested_lines, pointing the
+        # directive at its own body is meaningless; redirect to its closer
+        # so the rendered `@+N:C` lands just past the directive's body.
+        if line.diag.target is not None and line.diag.target in nested:
+            new_diag.set_target(closer_line)
+        elif line.diag.target is not None:
+            new_diag.set_target(line.diag.target)
+
+        add_line(new_line, lines)
+        insertion_line_n = new_line.line_n + 1
+
+    return True
+
+
 def remove_dead_diags(lines, prefix):
     for line in lines.copy():
         if line not in lines:
@@ -680,8 +755,23 @@ def remove_dead_diags(lines, prefix):
             continue
         if line.diag.category == "expansion":
             if not line.diag.prefix or line.diag.prefix == prefix:
+                # Whether the verifier already reported this expansion as
+                # missing (parent count was decremented to 0 in update_lines).
+                was_reported_missing = line.diag.count == 0
                 remove_dead_diags(line.diag.nested_lines, prefix)
-                if line.diag.nested_lines:
+                if (
+                    was_reported_missing
+                    and _split_dead_expansion_for_foreign_prefixes(
+                        line, lines, prefix
+                    )
+                ):
+                    # The dead expansion has been replaced with one new
+                    # expansion directive per foreign prefix. Drop the original
+                    # so the cleanup at the bottom of the loop removes it.
+                    line.diag.nested_lines = []
+                    line.diag.closer = None
+                    line.diag.count = 0
+                elif line.diag.nested_lines:
                     line.diag.count = 1
                 else:
                     line.diag.count = 0

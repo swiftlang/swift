@@ -1516,7 +1516,7 @@ lookupValueWitnessesViaImplementsAttr(
   auto name = req->createNameRef();
   auto *nominal = DC->getSelfNominalTypeDecl();
 
-  NLOptions subOptions = (NL_ProtocolMembers | NL_IncludeAttributeImplements);
+  NLOptions subOptions = {NLFlags::ProtocolMembers, NLFlags::IncludeAttributeImplements};
 
   nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
 
@@ -1665,8 +1665,8 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
     // to restate them in the resulting list, or else an otherwise valid
     // conformance will become ambiguous.
     const NLOptions options =
-        (doUnqualifiedLookup ? NLOptions(0) : NL_ProtocolMembers) |
-        NL_IgnoreMissingImports;
+        (doUnqualifiedLookup ? NLOptions() : NLFlags::ProtocolMembers) |
+        NLFlags::IgnoreMissingImports;
 
     auto getWitness = [req, DC](ValueDecl *witness) -> ValueDecl * {
       // Protocol members can't be witnesses.
@@ -1994,7 +1994,7 @@ static bool checkWitnessAccess(DeclContext *dc,
   return false;
 }
 
-static std::optional<AvailabilityConstraint>
+static std::optional<AvailabilityRestriction>
 checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
                          const DeclContext *dc,
                          AvailabilityContext &requiredContext) {
@@ -2038,12 +2038,11 @@ checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
 
   // In order to maintain source compatibility, universally unavailable decls
   // are allowed to witness universally unavailable requirements.
-  AvailabilityConstraintFlags flags;
-  flags |= AvailabilityConstraintFlag::
+  AvailabilityRestrictionFlags flags;
+  flags |= AvailabilityRestrictionFlag::
       AllowUniversallyUnavailableInCompatibleContexts;
 
-  return getAvailabilityConstraintsForDecl(witness, requiredContext, flags)
-      .getPrimaryConstraint();
+  return requiredContext.restrictionForDecl(witness, flags);
 }
 
 RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
@@ -4709,7 +4708,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
               ASTContext &ctx = witness->getASTContext();
               auto &diags = ctx.Diags;
               auto diagLoc = getLocForDiagnosingWitness(conformance, witness);
-              auto attr = check.getAvailabilityConstraint().getAttr();
+              auto attr = check.getAvailabilityRestriction().getAttr();
               auto domain = attr.getDomain();
               auto requiredRange =
                   check.getRequiredAvailabilityContext().getAvailabilityRange(
@@ -4738,7 +4737,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
              check](NormalProtocolConformance *conformance) {
               auto &diags = witness->getASTContext().Diags;
               auto diagLoc = getLocForDiagnosingWitness(conformance, witness);
-              auto attr = check.getAvailabilityConstraint().getAttr();
+              auto attr = check.getAvailabilityRestriction().getAttr();
               EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
               diags.diagnose(diagLoc, diag::witness_unavailable, witness,
                              conformance->getProtocol(),
@@ -6768,8 +6767,8 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
 
     static bool hasValidMethod(NominalTypeDecl *typeDecl,
                                SmallVectorImpl<InvalidMethod> &invalid) {
-      NLOptions subOptions = NL_QualifiedDefault;
-      subOptions |= NL_ProtocolMembers;
+      NLOptions subOptions = NLFlags::QualifiedDefault;
+      subOptions |= NLFlags::ProtocolMembers;
 
       DeclNameRef baseName(typeDecl->getASTContext().Id_appendInterpolation);
 
@@ -7666,10 +7665,11 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     // (canonicalized) requirement.
     if (assocType->getProtocol() != proto) {
       SmallVector<ValueDecl *, 2> found;
+      NLOptions options = {NLFlags::QualifiedDefault, NLFlags::ProtocolMembers, NLFlags::OnlyTypes};
       module->lookupQualified(
                            proto, DeclNameRef(assocType->getName()),
                            proto->getLoc(),
-                           NL_QualifiedDefault|NL_ProtocolMembers|NL_OnlyTypes,
+                           options,
                            found);
       if (found.size() == 1 && isa<AssociatedTypeDecl>(found[0]))
         assocType = cast<AssociatedTypeDecl>(found[0]);
@@ -7682,6 +7682,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
         findAssociatedTypeDefault(assocType);
     if (!defaultAssocType)
       continue;
+    ASSERT(defaultedAssocDecl);
 
     Type defaultAssocTypeInContext =
       proto->mapTypeIntoEnvironment(defaultAssocType);
@@ -7694,10 +7695,10 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       proto->diagnose(diag::assoc_type_default_conformance_failed,
                       defaultAssocType, assocType,
                       req.getFirstType(), req.getSecondType());
-      defaultedAssocDecl
-          ->diagnose(diag::assoc_type_default_here, assocType, defaultAssocType)
-          .highlight(defaultedAssocDecl->getDefaultDefinitionTypeRepr()
-                         ->getSourceRange());
+      auto diag = defaultedAssocDecl->diagnose(
+          diag::assoc_type_default_here, assocType, defaultAssocType);
+      if (auto *typeRepr = defaultedAssocDecl->getDefaultDefinitionTypeRepr())
+        diag.highlight(typeRepr->getSourceRange());
 
       continue;
     }

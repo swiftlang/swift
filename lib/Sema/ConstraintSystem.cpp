@@ -4005,14 +4005,15 @@ void ConstraintSystem::generateOverloadConstraints(
         getFix) {
   SmallVector<ValueDecl *, 1> requirements;
 
-  if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
-    for (auto choice : choices) {
-      if (auto *decl = choice.getDeclOrNull()) {
-        if (decl->isOperator() &&
-            isa<ProtocolDecl>(decl->getDeclContext()) &&
-            !isDeclUnavailable(decl, locator)) {
-          requirements.push_back(decl);
-        }
+  // Skip protocol extension operators that are refinements of a protocol
+  // requirement operator, because they never participate in a valid
+  // solution.
+  for (auto choice : choices) {
+    if (auto *decl = choice.getDeclOrNull()) {
+      if (decl->isOperator() &&
+          isa<ProtocolDecl>(decl->getDeclContext()) &&
+          !isDeclUnavailable(decl, locator)) {
+        requirements.push_back(decl);
       }
     }
   }
@@ -4029,14 +4030,12 @@ void ConstraintSystem::generateOverloadConstraints(
     // Skip protocol extension operators that are refinements of a protocol
     // requirement operator, because they never participate in a valid
     // solution.
-    if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
-      if (auto *decl = choice.getDeclOrNull()) {
-        if (decl->getDeclContext()->getExtendedProtocolDecl()) {
-          if (llvm::any_of(requirements, [&](ValueDecl *req) {
-            return TypeChecker::isDeclRefinementOf(decl, req);
-          })) {
-            continue;
-          }
+    if (auto *decl = choice.getDeclOrNull()) {
+      if (decl->getDeclContext()->getExtendedProtocolDecl()) {
+        if (llvm::any_of(requirements, [&](ValueDecl *req) {
+          return TypeChecker::isDeclRefinementOf(decl, req);
+        })) {
+          continue;
         }
       }
     }
@@ -4820,7 +4819,7 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
       loc = getLoc(anchor);
   }
 
-  auto result = getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
+  auto result = getUnsatisfiedAvailabilityRestriction(D, DC, loc).has_value();
   const_cast<ConstraintSystem *>(this)->UnavailableDecls.insert(
       std::make_pair(std::make_pair(D, locator), result));
   return result;
@@ -5020,7 +5019,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    if (getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc))
+    if (getUnsatisfiedAvailabilityRestriction(setter, DC, referenceLoc))
       return true;
   }
 
@@ -5187,7 +5186,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       if (!overload) {
         // If overload cannot be found because member is missing,
         // that's a failure.
-        if (hasFixFor(componentLoc, FixKind::DefineMemberBasedOnUse))
+        if (hasFixFor(calleeLoc, FixKind::DefineMemberBasedOnUse))
           return fail();
 
         return delay();

@@ -283,6 +283,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     }
   }
 
+  /// True if this is a reabstraction thunk of escaping function type whose
+  /// single argument is a potentially non-escaping closure.
+  public var isWithoutActuallyEscapingThunk: Bool { bridged.isWithoutActuallyEscapingThunk() }
+
   public var accessorKindName: String? {
     guard bridged.isAccessor() else {
       return nil

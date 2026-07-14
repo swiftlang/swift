@@ -37,8 +37,8 @@ internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
 #endif
-internal import BacktracingImpl.CompressionLibs
-internal import BacktracingImpl.ImageFormats.Elf
+@_implementationOnly import BacktracingImpl.CompressionLibs
+@_implementationOnly import BacktracingImpl.ImageFormats.Elf
 
 enum CompressedImageSourceError: Error {
   case unboundedImageSource

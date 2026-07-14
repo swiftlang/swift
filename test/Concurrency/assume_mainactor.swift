@@ -287,3 +287,90 @@ func onMain() async {
 
   _ = Nested.useGlobal()
 }
+
+// Synthesized init needs to match the superclass isolation.
+class SubKlass: Klass {
+  // Implicit allocating init
+  // CHECK: // SubKlass.__allocating_init()
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [exact_self_class] [ossa] @$s16assume_mainactor8SubKlassCACycfC : $@convention(method) (@thick SubKlass.Type) -> @owned SubKlass {
+
+  // Implicit designated init
+  // CHECK: // SubKlass.init()
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor8SubKlassCACycfc : $@convention(method) (@owned SubKlass) -> @owned SubKlass {
+
+  // Implicit deinit
+  // CHECK: // SubKlass.deinit
+  // CHECK-NEXT: // Isolation: global_actor. type: MainActor
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor8SubKlassCfd : $@convention(method) (@guaranteed SubKlass) -> @owned Builtin.NativeObject {
+
+  // Implicit deallocating deinit
+  // CHECK: // SubKlass.__deallocating_deinit
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor8SubKlassCfD : $@convention(method) (@owned SubKlass) -> () {
+  // CHECK: swift_task_deinitOnExecutor
+}
+
+class NonisolatedBase {
+  nonisolated func method() {}
+  nonisolated var value: Int { get { 0 } set {} }
+  nonisolated subscript(i: Int) -> Int { get { 0 } set {} }
+}
+
+// Overridden methods must not be MainActor!
+class OverrideSub: NonisolatedBase {
+  // CHECK: // OverrideSub.method()
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor11OverrideSubC6methodyyF : $@convention(method) (@guaranteed OverrideSub) -> () {
+  override func method() {}
+
+  // CHECK: // OverrideSub.value.getter
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor11OverrideSubC5valueSivg : $@convention(method) (@guaranteed OverrideSub) -> Int {
+
+  // CHECK: // OverrideSub.value.setter
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor11OverrideSubC5valueSivs : $@convention(method) (Int, @guaranteed OverrideSub) -> () {
+  override var value: Int { get { 0 } set {} }
+
+  // CHECK: // OverrideSub.subscript.getter
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor11OverrideSubCyS2icig : $@convention(method) (Int, @guaranteed OverrideSub) -> Int {
+
+  // CHECK: // OverrideSub.subscript.setter
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor11OverrideSubCyS2icis : $@convention(method) (Int, Int, @guaranteed OverrideSub) -> () {
+  override subscript(i: Int) -> Int { get { 0 } set {} }
+}
+
+class MainActorBase {
+  func method() {}
+}
+
+// Overridden methods should remain MainActor.
+class MainActorSub: MainActorBase {
+  // CHECK: // MainActorSub.method()
+  // CHECK-NEXT: // Isolation: global_actor. type: MainActor
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor12MainActorSubC6methodyyF : $@convention(method) (@guaranteed MainActorSub) -> () {
+  override func method() {}
+}
+
+@CustomActor
+class CustomActorBase {
+  func isolatedMethod() {}
+  nonisolated func nonisolatedMethod() {}
+}
+
+// Overrides inherit the superclass's global actor, not the MainActor default.
+class CustomActorSub: CustomActorBase {
+  // CHECK: // CustomActorSub.isolatedMethod()
+  // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor14CustomActorSubC14isolatedMethodyyF : $@convention(method) (@guaranteed CustomActorSub) -> () {
+  override func isolatedMethod() {}
+
+  // CHECK: // CustomActorSub.nonisolatedMethod()
+  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor14CustomActorSubC17nonisolatedMethodyyF : $@convention(method) (@guaranteed CustomActorSub) -> () {
+  override func nonisolatedMethod() {}
+}

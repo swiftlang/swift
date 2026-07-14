@@ -41,11 +41,11 @@ class OutputBackend;
 
 namespace clang {
 class DependencyCollector;
-namespace tooling {
 namespace dependencies {
 struct ModuleID;
-class DependencyScanningTool;
 }
+namespace tooling {
+class DependencyScanningTool;
 }
 }
 

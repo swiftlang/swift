@@ -18,8 +18,8 @@ let _: [_ of _] = ["", "", ""] // Ok, InlineArray<3, String>
 
 let _: [3 of [3 of Int]] = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 let _: [3 of [3 of Int]] = [[1, 2], [3, 4, 5, 6]]
-// expected-error@-1 {{'3' elements in inline array literal, but got '2'}}
-// expected-error@-2 2{{cannot convert value of type '[Int]' to expected element type '[3 of Int]'}}
+// expected-error@-1 2 {{expected '3' elements in inline array literal, but got '2'}}
+// expected-error@-2 {{expected '3' elements in inline array literal, but got '4'}}
 
 let _ = [3 of [3 of Int]](repeating: [1, 2]) // expected-error {{expected '3' elements in inline array literal, but got '2'}}
 let _ = [3 of [_ of Int]](repeating: [1, 2])
@@ -56,8 +56,8 @@ takeVectorOf2Int([1, 2, 3]) // expected-error {{expected '2' elements in inline 
 
 takeVectorOf2Int(["hello"]) // expected-error {{cannot convert value of type '[String]' to expected argument type 'InlineArray<2, Int>'}}
 
-takeVectorOf2Int(["hello", "world"]) // expected-error {{cannot convert value of type 'String' to expected element type 'Int'}}
-                                     // expected-error@-1 {{cannot convert value of type 'String' to expected element type 'Int'}}
+takeVectorOf2Int(["hello", "world"])
+// expected-error@-1 {{cannot convert value of type '[String]' to expected argument type 'InlineArray<2, Int>'}}
 
 takeVectorOf2Int(["hello", "world", "!"]) // expected-error {{cannot convert value of type '[String]' to expected argument type 'InlineArray<2, Int>'}}
 
@@ -65,7 +65,7 @@ func takeSugarVectorOf2<T>(_: [2 of T], ty: T.Type = T.self) {}
 takeSugarVectorOf2([1, 2])
 takeSugarVectorOf2(["hello"]) // expected-error {{expected '2' elements in inline array literal, but got '1'}}
 takeSugarVectorOf2(["hello"], ty: Int.self) // expected-error {{cannot convert value of type '[String]' to expected argument type '[2 of Int]'}}
-takeSugarVectorOf2(["hello", "hi"], ty: Int.self) // expected-error 2{{cannot convert value of type 'String' to expected element type 'Int'}}
+takeSugarVectorOf2(["hello", "hi"], ty: Int.self) // expected-error {{cannot convert value of type '[String]' to expected argument type '[2 of Int]'}}
 
 
 struct X {
@@ -161,10 +161,12 @@ func testPointerConversion() {
 func acceptPointer(_ pointer: UnsafeMutablePointer<Int>) {}
 
 // rdar://152143989
-struct Test3<let count1: Int> {
+struct Test3<let count1: Int> { // expected-note {{'count1' declared as parameter to type 'Test3'}}
   init(value1: InlineArray<count1, Int>) {}
 }
 struct Test1<T> { init(test2: T) {} }
 
 let _ = Test1<Test3>(test2: Test3(value1: ["x"]))
-// expected-error@-1 {{cannot convert value of type 'String' to expected element type 'Int'}}
+// expected-error@-1 {{cannot convert value of type '[String]' to expected argument type 'InlineArray<count1, Int>'}}
+// expected-error@-2 {{generic parameter 'count1' could not be inferred}}
+// expected-note@-3 {{explicitly specify the generic arguments to fix this issue}}

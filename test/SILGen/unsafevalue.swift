@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -Onone -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -O -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=OPT %s
@@ -45,18 +46,20 @@ public struct UnsafeValue<Element: AnyObject> {
   //
   // CANONICAL-LABEL: sil [transparent] @$s11unsafevalue11UnsafeValueV14unsafelyAssignACyxGxh_tcfC : $@convention(method) <Element where Element : AnyObject> (@guaranteed Element, @thin UnsafeValue<Element>.Type) -> UnsafeValue<Element> {
   // CANONICAL: bb0([[INPUT_ELEMENT:%.*]] : $Element,
-  // CANONICAL-NEXT: debug_value
-  // CANONICAL-NEXT: strong_retain [[INPUT_ELEMENT]]
-  // CANONICAL-NEXT: [[UNMANAGED_ELEMENT:%.*]] = ref_to_unmanaged [[INPUT_ELEMENT]]
-  // CANONICAL-NEXT: strong_release [[INPUT_ELEMENT]]
-  // CANONICAL-NEXT: [[RESULT:%.*]] = struct $UnsafeValue<Element> ([[UNMANAGED_ELEMENT]] : $@sil_unmanaged Element)
-  // CANONICAL-NEXT: return [[RESULT]]
+  // CANONICAL:      debug_value
+  // CANONICAL:      strong_retain [[INPUT_ELEMENT]]
+  // CANONICAL:      [[UNMANAGED_ELEMENT:%.*]] = ref_to_unmanaged [[INPUT_ELEMENT]]
+  // CANONICAL:      strong_release [[INPUT_ELEMENT]]
+  // CANONICAL:      [[RESULT:%.*]] = struct $UnsafeValue<Element> ([[UNMANAGED_ELEMENT]] : $@sil_unmanaged Element)
+  // CANONICAL:      return [[RESULT]]
   // CANONICAL: } // end sil function '$s11unsafevalue11UnsafeValueV14unsafelyAssignACyxGxh_tcfC'
   //
   // OPT-LABEL: sil [transparent] @$s11unsafevalue11UnsafeValueV14unsafelyAssignACyxGxh_tcfC : $@convention(method) <Element where Element : AnyObject> (@guaranteed Element, @thin UnsafeValue<Element>.Type) -> UnsafeValue<Element> {
   // OPT: bb0([[INPUT_ELEMENT:%.*]] : $Element,
   // OPT-NEXT: debug_value
   // OPT-NEXT: [[UNMANAGED_ELEMENT:%.*]] = ref_to_unmanaged [[INPUT_ELEMENT]]
+  // OPT-NEXT: debug_value
+  // OPT-NEXT: debug_value
   // OPT-NEXT: [[RESULT:%.*]] = struct $UnsafeValue<Element> ([[UNMANAGED_ELEMENT]] : $@sil_unmanaged Element)
   // OPT-NEXT: return [[RESULT]]
   // OPT: } // end sil function '$s11unsafevalue11UnsafeValueV14unsafelyAssignACyxGxh_tcfC'

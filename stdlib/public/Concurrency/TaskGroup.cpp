@@ -1816,17 +1816,12 @@ reevaluate_if_taskgroup_has_results:;
       assumed = TaskGroupStatus{assumedStatus};
       continue; // We raced with something, try again.
     }
-    SWIFT_TASK_DEBUG_LOG("poll, after CAS: %s", status.to_string().c_str());
+    SWIFT_TASK_DEBUG_LOG("poll, after CAS: %s", statusString().c_str());
 
     // We're going back to running the task, so if we suspended before,
     // we need to flag it as running again.
     if (hasSuspended) {
-      // This will always return zero because we were just
-      // running this Task so its BasePriority (which is
-      // immutable) should've already been set on the thread.
-      [[maybe_unused]]
-      uint32_t opaque = waitingTask->flagAsRunning();
-      assert(opaque == 0);
+      waitingTask->resumeRunningAfterFailedSuspend();
     }
 
     // Success! We are allowed to poll.
@@ -2159,9 +2154,9 @@ SWIFT_CC(swift)
 static bool swift_taskGroup_addPendingImpl(TaskGroup *_group, bool unconditionally) {
   auto group = asBaseImpl(_group);
   auto assumed = group->statusAddPendingTaskAssumeRelaxed(unconditionally);
-  SWIFT_TASK_DEBUG_LOG("add pending %s to group(%p), tasks pending = %d",
-                       unconditionally ? "unconditionally" : "",
-                       group, assumed.pendingTasks(group));
+  SWIFT_TASK_DEBUG_LOG("add pending %s to group(%p), tasks pending = %llu",
+                       unconditionally ? "unconditionally" : "", group,
+                       assumed.pendingTasks(group));
   return !assumed.isCancelled();
 }
 

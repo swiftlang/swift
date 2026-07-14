@@ -64,6 +64,23 @@ struct Region {
 namespace llvm {
 
 template <>
+struct DenseMapInfo<swift::PartitionPrimitives::Element> {
+  using Element = swift::PartitionPrimitives::Element;
+
+  static Element getEmptyKey() {
+    return Element(DenseMapInfo<unsigned>::getEmptyKey());
+  }
+  static Element getTombstoneKey() {
+    return Element(DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(Element element) {
+    return DenseMapInfo<unsigned>::getHashValue(element);
+  }
+  static bool isEqual(Element LHS, Element RHS) { return LHS == RHS; }
+};
+
+template <>
 struct DenseMapInfo<swift::PartitionPrimitives::Region> {
   using Region = swift::PartitionPrimitives::Region;
 
@@ -298,10 +315,21 @@ public:
   void pushRemoveElementFromRegion(Element otherElementInOldRegion,
                                    Element element);
 
-  /// \p elementToMergeInto is the element whose region we merge \p otherRegions
-  /// into.
-  void pushMergeElementRegions(Element elementToMergeInto,
-                               ArrayRef<Element> otherRegions);
+  /// NOTE: Assumes that \p elementInNewRegion and \p elementInOldRegion are not
+  /// in the same region.
+  ///
+  /// \arg elementInNewRegion the element that defines the region that
+  /// elementInOldRegion and otherElementsInOldRegion were merged into.
+  ///
+  /// \arg elementInOldRegion the element in the old region that was actually
+  /// said to be merged by the merge operation.
+  ///
+  /// \arg otherElementsInOldRegion the other elements in the old region that
+  /// were updated to be in the new region. Importantly these were not actually
+  /// used as the merge operand.
+  void pushMergeElementRegions(Element elementInNewRegion,
+                               Element elementInOldRegion,
+                               ArrayRef<Element> otherElementsInOldRegion);
 
   /// Assign \p elementToMerge's region to \p elementToMergeInto's region.
   void pushAssignElementRegions(Element elementToMergeInto,
@@ -316,6 +344,8 @@ public:
   }
 
   Node *pop();
+  void print(ASTContext &ctx, llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMPER(dump(ASTContext &ctx)) { print(ctx, llvm::dbgs()); }
 };
 
 class IsolationHistory::Node final
@@ -357,18 +387,18 @@ public:
   };
 
 private:
+  /// Tells what type of node that this is.
   Kind kind;
-  Node *parent;
 
-  /// Child node. Never set on construction.
-  Node *child = nullptr;
+  /// The next pointer of the linked list.
+  Node *next;
 
   /// Contains:
   ///
   /// 1. Node * if we have a CFGHistoryJoin.
   /// 2. A SILLocation if we have a SequenceBoundary.
   /// 3. An element otherwise.
-  std::variant<Element, Node *, SILLocation> subject;
+  std::variant<Element, Node *, SILLocation> data;
 
   /// Number of additional element arguments stored in the tail allocated array.
   unsigned numAdditionalElements;
@@ -378,15 +408,14 @@ private:
     return getTrailingObjects(numAdditionalElements);
   }
 
-  Node(Kind kind, Node *parent)
-      : kind(kind), parent(parent), subject(nullptr) {}
-  Node(Kind kind, Node *parent, SILLocation loc)
-      : kind(kind), parent(parent), subject(loc) {}
-  Node(Kind kind, Node *parent, Element value)
-      : kind(kind), parent(parent), subject(value), numAdditionalElements(0) {}
-  Node(Kind kind, Node *parent, Element primaryElement,
+  Node(Kind kind, Node *next) : kind(kind), next(next), data(nullptr) {}
+  Node(Kind kind, Node *next, SILLocation loc)
+      : kind(kind), next(next), data(loc) {}
+  Node(Kind kind, Node *next, Element value)
+      : kind(kind), next(next), data(value), numAdditionalElements(0) {}
+  Node(Kind kind, Node *next, Element primaryElement,
        std::initializer_list<Element> restOfTheElements)
-      : kind(kind), parent(parent), subject(primaryElement),
+      : kind(kind), next(next), data(primaryElement),
         numAdditionalElements(restOfTheElements.size()) {
     unsigned writeIndex = 0;
     for (Element restElt : restOfTheElements) {
@@ -403,33 +432,40 @@ private:
   }
 
   Node(Kind kind, Node *parent, Element lhsValue, ArrayRef<Element> rhsValue)
-      : kind(kind), parent(parent), subject(lhsValue),
+      : kind(kind), next(parent), data(lhsValue),
         numAdditionalElements(rhsValue.size()) {
     std::uninitialized_copy(rhsValue.begin(), rhsValue.end(),
                             getAdditionalElementArgs().data());
   }
 
+  Node(Kind kind, Node *parent, Element lhsValue, Element rhsValue,
+       ArrayRef<Element> otherRHSValues)
+      : kind(kind), next(parent), data(lhsValue),
+        numAdditionalElements(1 + otherRHSValues.size()) {
+    getAdditionalElementArgs().data()[0] = rhsValue;
+    std::uninitialized_copy(otherRHSValues.begin(), otherRHSValues.end(),
+                            &getAdditionalElementArgs().data()[1]);
+  }
+
   Node(Kind kind, Node *parent, Node *node)
-      : kind(kind), parent(parent), subject(node), numAdditionalElements(0) {}
+      : kind(kind), next(parent), data(node), numAdditionalElements(0) {}
 
 public:
   Kind getKind() const { return kind; }
 
-  Node *getParent() const { return parent; }
-
-  Node *getChild() const { return child; }
-  void setChild(Node *newChild) { child = newChild; }
+  Node *getNext() const { return next; }
+  void setNext(Node *newNext) { next = newNext; }
 
   Element getFirstArgAsElement() const {
     assert(kind != CFGHistoryJoin);
-    assert(std::holds_alternative<Element>(subject));
-    return std::get<Element>(subject);
+    assert(std::holds_alternative<Element>(data));
+    return std::get<Element>(data);
   }
 
   Node *getFirstArgAsNode() const {
     assert(kind == CFGHistoryJoin);
-    assert(std::holds_alternative<Node *>(subject));
-    return std::get<Node *>(subject);
+    assert(std::holds_alternative<Node *>(data));
+    return std::get<Node *>(data);
   }
 
   ArrayRef<Element> getAdditionalElementArgs() const {
@@ -452,8 +488,15 @@ public:
   std::optional<SILLocation> getHistoryBoundaryLoc() const {
     if (kind != SequenceBoundary)
       return {};
-    return std::get<SILLocation>(subject);
+    return std::get<SILLocation>(data);
   }
+
+  void print(ASTContext &ctx, llvm::raw_ostream &os,
+             unsigned whitespacePrefix) const;
+  void print(ASTContext &ctx, llvm::raw_ostream &os) const {
+    print(ctx, os, 0);
+  }
+  SWIFT_DEBUG_DUMPER(dump(ASTContext &ctx)) { print(ctx, llvm::dbgs()); }
 };
 
 class IsolationHistory::Factory {
@@ -959,11 +1002,6 @@ public:
   static Partition singleRegion(SILLocation loc, ArrayRef<Element> indices,
                                 IsolationHistory inputHistory);
 
-  /// Return a new Partition that has each element of \p indices in their own
-  /// region.
-  static Partition separateRegions(SILLocation loc, ArrayRef<Element> indices,
-                                   IsolationHistory inputHistory);
-
   /// Test two partititons for equality by first putting them in canonical form
   /// then comparing for exact equality.
   ///
@@ -1073,7 +1111,7 @@ public:
       return count;
     ++count;
 
-    while ((head = head->getParent()))
+    while ((head = head->getNext()))
       ++count;
 
     return count;
@@ -1201,7 +1239,10 @@ private:
 
   /// Walk the elementToRegionMap updating all elements in the region of \p
   /// targetElement will be changed to now point at \p newRegion.
-  void horizontalUpdate(Element targetElement, Region newRegion,
+  ///
+  /// \arg mergedElements out parameter that includes all elements in the old
+  /// region that were updated. It does not include elementInOldRegion.
+  void horizontalUpdate(Element elementInOldRegion, Region newRegion,
                         SmallVectorImpl<Element> &mergedElements);
 
   /// Push onto the history list that \p element should be added into its own
@@ -1229,10 +1270,13 @@ private:
       history.pushCFGHistoryJoin(head);
   }
 
-  /// NOTE: Assumes that \p elementToMergeInto and \p otherRegions are disjoint.
-  void pushMergeElementRegions(Element elementToMergeInto,
-                               ArrayRef<Element> otherRegions) {
-    history.pushMergeElementRegions(elementToMergeInto, otherRegions);
+  /// \see IsolationHistory::pushMergeElementRegions.
+  void
+  pushMergeElementRegions(Element elementInNewRegion,
+                          Element elementInOldRegion,
+                          ArrayRef<Element> otherElementsInOldRegion = {}) {
+    history.pushMergeElementRegions(elementInNewRegion, elementInOldRegion,
+                                    otherElementsInOldRegion);
   }
 
   /// Remove a single element without touching the region to sending inst
@@ -1247,6 +1291,20 @@ private:
     assert(result && "Failed to erase?!");
   }
 };
+
+} // namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::Partition &p) {
+  p.print(os);
+  return os;
+}
+
+} // namespace llvm
+
+namespace swift {
 
 /// Swift style enum we use to decouple and reduce boilerplate in between the
 /// diagnostic and non-diagnostic part of the infrastructure.
@@ -1882,8 +1940,17 @@ public:
     // assign an actor introducing inst.
     auto rep = getRepresentativeValue(op.getOpArg2()).getValue();
     if (dynamicRegionIsolation.isDisconnected() ||
-        staticRegionIsolation.isUnsafeNonIsolated())
+        staticRegionIsolation.isUnsafeNonIsolated()) {
+      REGIONBASEDISOLATION_VERBOSE_LOG(
+          llvm::dbgs()
+          << "    * Note: Eliding assign-into-sending-result error. "
+             "Reason: "
+          << (dynamicRegionIsolation.isDisconnected()
+                  ? "assigned region is disconnected"
+                  : "assigned value is nonisolated(unsafe)")
+          << "\n");
       return;
+    }
 
     handleError(AssignNeverSendableIntoSendingResultError(
         op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation));
@@ -1922,8 +1989,21 @@ public:
 
     // Set the boundary so that as we push, this shows when to stop processing
     // for this PartitionOp.
-    SILLocation loc = op.hasSourceInst() ? getLoc(op.getSourceInst())
-                                         : getLoc(op.getSourceOp());
+    //
+    // For PartitionOps sourced from a specific apply argument operand, prefer
+    // the apply's per-argument SILLocation when one is stored. This is the
+    // ONLY consumer of those per-argument locations today: the location ends
+    // up on a SequenceBoundary node and is read back by the
+    // IsolationHistoryNoteEmitter chain walker. When the producer (SILGen)
+    // hasn't filled in per-argument locations, getArgumentLoc() falls back to
+    // the apply's anchor location, so behavior is unchanged for functions
+    // that haven't opted in to isolation-history.
+    SILLocation loc = SILLocation::invalid();
+    if (op.hasSourceInst()) {
+      loc = getLoc(op.getSourceInst());
+    } else if (Operand *srcOp = op.getSourceOp()) {
+      loc = getLoc(srcOp);
+    }
     p.pushHistorySequenceBoundary(loc);
 
     switch (op.getKind()) {
@@ -1957,8 +2037,12 @@ public:
         // invariant when looking at other values in the region that are not
         // marked as nonisolated(unsafe).
         if (getIsolationRegionInfo(srcElement).isUnsafeNonIsolated() ||
-            getIsolationRegionInfo(destElement).isUnsafeNonIsolated())
+            getIsolationRegionInfo(destElement).isUnsafeNonIsolated()) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << "    * Note: Eliding merge error. Reason: "
+                              "src or dest element is nonisolated(unsafe)\n");
           return;
+        }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destIsolation,
             RegionMergeReason::Assign));
@@ -1996,8 +2080,12 @@ public:
         // invariant when looking at other values in the region that are not
         // marked as nonisolated(unsafe).
         if (getIsolationRegionInfo(srcElement).isUnsafeNonIsolated() ||
-            getIsolationRegionInfo(destElement).isUnsafeNonIsolated())
+            getIsolationRegionInfo(destElement).isUnsafeNonIsolated()) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << "    * Note: Eliding merge error. Reason: "
+                              "src or dest element is nonisolated(unsafe)\n");
           return;
+        }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destIsolation,
             RegionMergeReason::Assign));
@@ -2032,6 +2120,9 @@ public:
       // element. In such a case, this is also not a real send point.
       Element sentElement = op.getOpArg1();
       if (getIsolationRegionInfo(sentElement).isUnsafeNonIsolated()) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs() << "    * Note: Eliding send. Reason: "
+                            "sent element is nonisolated(unsafe)\n");
         return;
       }
 
@@ -2058,13 +2149,18 @@ public:
       // If our callee and region are both actor isolated and part of the same
       // isolation domain, do not treat this as a send.
       if (calleeIsolationInfo.isActorIsolated() &&
-          sentRegionIsolation.hasSameIsolation(calleeIsolationInfo))
+          sentRegionIsolation.hasSameIsolation(calleeIsolationInfo)) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs() << "    * Note: Eliding send. Reason: "
+                            "callee and sent region share actor isolation\n");
         return;
+      }
 
       // At this point, check if our sent value is not disconnected. If so, emit
       // a sent never sendable helper.
       if (sentRegionIsolation && !sentRegionIsolation.isDisconnected()) {
-        return handleSendNeverSentHelper(op, op.getOpArg1(), sentRegionIsolation);
+        return handleSentNeverSendableHelper(op, op.getOpArg1(),
+                                             sentRegionIsolation);
       }
 
       // Next see if we are disconnected and have the same isolation. In such a
@@ -2075,8 +2171,13 @@ public:
         if (auto fas = FullApplySite::isa(sourceInst);
             (!fas || !fas.isSending(*op.getSourceOp())) &&
             sentRegionIsolation.isDisconnected() && calleeIsolationInfo &&
-            sentRegionIsolation.hasSameIsolation(calleeIsolationInfo))
+            sentRegionIsolation.hasSameIsolation(calleeIsolationInfo)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs()
+              << "    * Note: Eliding send. Reason: disconnected value with "
+                 "matching isolation passed to a non-sending parameter\n");
           return;
+        }
       }
 
       // Mark op.getOpArg1() as sent.
@@ -2121,8 +2222,12 @@ public:
         // invariant when looking at other values in the region that are not
         // marked as nonisolated(unsafe).
         if (getIsolationRegionInfo(srcElement).isUnsafeNonIsolated() ||
-            getIsolationRegionInfo(destElement).isUnsafeNonIsolated())
+            getIsolationRegionInfo(destElement).isUnsafeNonIsolated()) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs() << "    * Note: Eliding merge error. Reason: "
+                              "src or dest element is nonisolated(unsafe)\n");
           return;
+        }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destRegIsolation,
             op.getRegionMergeReason()));
@@ -2273,7 +2378,13 @@ public:
       }
 
       // If we did not, then handle the direct return case.
-      handleDirectReturn();
+      if (!handleDirectReturn()) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs()
+            << "    * Note: Accepting disconnected 'inout sending' value at "
+               "exit. Reason: no conflicting return value in the same "
+               "region\n");
+      }
       return;
     }
     case PartitionOpKind::UnknownPatternError:
@@ -2376,6 +2487,12 @@ private:
             if (auto elt = getElement(value)) {
               SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
               if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                REGIONBASEDISOLATION_VERBOSE_LOG(
+                    llvm::dbgs()
+                    << "    * Note: Suppressing LocalUseAfterSend error. "
+                       "Reason: "
+                       "temporary alloc_stack initialized with unsafe "
+                       "nonisolated value\n");
                 return;
               }
             }
@@ -2384,8 +2501,13 @@ private:
 
         // See if we have a convert function from a `@Sendable` type. In this
         // case, we want to squelch the error.
-        if (isHiddenSendableFunctionType(equivalenceClassRep))
+        if (isHiddenSendableFunctionType(equivalenceClassRep)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs()
+              << "    * Note: Suppressing LocalUseAfterSend error. Reason: "
+                 "hidden sendable function type\n");
           return;
+        }
       }
 
       // If our instruction does not have any isolation info associated with it,
@@ -2395,8 +2517,13 @@ private:
           sentOp->getUser()->getFunction()->getActorIsolation();
       if (functionIsolation.isActorIsolated() &&
           SILIsolationInfo::get(sentOp->getUser())
-              .hasSameIsolation(functionIsolation))
+              .hasSameIsolation(functionIsolation)) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(
+            llvm::dbgs()
+            << "    * Note: Suppressing LocalUseAfterSend error. Reason: "
+               "function isolation matches sent operand isolation\n");
         return;
+      }
     }
 
     // Ok, we actually need to emit a call to the callback.
@@ -2405,7 +2532,7 @@ private:
 
   // Private helper that squelches the error if our send instruction and our
   // use have the same isolation.
-  void handleSendNeverSentHelper(
+  void handleSentNeverSendableHelper(
       const PartitionOp &op, Element elt,
       SILDynamicMergedIsolationInfo dynamicMergedIsolationInfo) {
     if (shouldTryToSquelchErrors()) {
@@ -2420,6 +2547,11 @@ private:
             if (auto elt = getElement(value)) {
               SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
               if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                REGIONBASEDISOLATION_VERBOSE_LOG(
+                    llvm::dbgs()
+                    << "    * Note: Suppressing SentNeverSendable error. "
+                       "Reason: temporary alloc_stack initialized with unsafe "
+                       "nonisolated value\n");
                 return;
               }
             }
@@ -2428,8 +2560,13 @@ private:
 
         // See if we have a convert function from a `@Sendable` type. In this
         // case, we want to squelch the error.
-        if (isHiddenSendableFunctionType(equivalenceClassRep))
+        if (isHiddenSendableFunctionType(equivalenceClassRep)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs()
+              << "    * Note: Suppressing SentNeverSendable error. Reason: "
+                 "hidden sendable function type\n");
           return;
+        }
       }
     }
 
@@ -2514,7 +2651,20 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   bool shouldTryToSquelchErrors() const { return true; }
 
   static SILLocation getLoc(SILInstruction *inst) { return inst->getLoc(); }
-  static SILLocation getLoc(Operand *op) { return op->getUser()->getLoc(); }
+  static SILLocation getLoc(Operand *op) {
+    // For PartitionOps sourced from a specific apply argument operand, prefer
+    // the apply's per-argument SILLocation when one is stored. This is the
+    // ONLY consumer of those per-argument locations today: the location ends
+    // up on a SequenceBoundary node and is read back by the
+    // IsolationHistoryNoteEmitter chain walker. When the producer (SILGen)
+    // hasn't filled in per-argument locations, getArgumentLoc() falls back to
+    // the apply's anchor location, so behavior is unchanged for functions
+    // that haven't opted in to isolation-history.
+    if (auto as = ApplySite::isa(op->getUser());
+        as && as.isArgumentOperand(*op))
+      return as.getArgumentLoc(op);
+    return op->getUser()->getLoc();
+  }
   static SILInstruction *getSourceInst(const PartitionOp &partitionOp) {
     return partitionOp.getSourceInst();
   }

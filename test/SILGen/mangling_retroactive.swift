@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/RetroactiveA.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/RetroactiveB.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -I %t %s
 // RUN: %target-swift-emit-silgen -I %t %s | %FileCheck %s
 
 

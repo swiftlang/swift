@@ -225,14 +225,25 @@ private func createEndCOWMutationIfNeeded(lifetimeDep: LifetimeDependence, _ con
       return
   }
 
-  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.dependentValue.parentFunction, context) &&
-    lifetimeDep.parentValue.type.mayHaveOptimizedCOWType(in: lifetimeDep.dependentValue.parentFunction) else {
+  // If the mark dependence instruction takes an address base, create the end_cow_mutation_addr on that address
+  // projection rather than the parent address. This narrows address users to the relevant sub-object.
+  let depBase = {
+    if let markDepBase = lifetimeDep.markDepInst?.base {
+      if markDepBase.type.isAddress {
+        return markDepBase
+      }
+    }
+    return lifetimeDep.parentValue
+  }()
+  assert(depBase.type.isAddress)
+  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.function, context) &&
+    depBase.type.mayHaveOptimizedCOWType(in: lifetimeDep.function) else {
     return
   }
 
   for endInstruction in scoped.endInstructions {
     let builder = Builder(before: endInstruction, context)
-    builder.createEndCOWMutationAddr(address: lifetimeDep.parentValue)
+    builder.createEndCOWMutationAddr(address: depBase)
   }
 }
 
@@ -772,9 +783,8 @@ extension ScopeExtension {
       // because the stack allocation effectively covers the entire unreachable path.
       for scopeEndInst in extScope.endInstructions {
         switch extendedUseRange.overlaps(pathBegin: extScope.firstInstruction, pathEnd: scopeEndInst, context) {
-        case .containsPath, .containsEnd, .disjoint:
+        case .containsPath, .containsEnd:
           // containsPath can occur when the extendable scope has the same begin as the use range.
-          // disjoint is unexpected, but if it occurs then `extScope` must be before the useRange.
           mustExtend = true
           break
         case .containsBegin, .overlappedByPath:
@@ -784,6 +794,16 @@ extension ScopeExtension {
           // to cover this scope's end instructions. The extended scope must at least cover the original scopes because
           // the original scopes may protect other operations.
           extendedUseRange.insert(scopeEndInst)
+          break
+        case .disjoint:
+          // The outer scope may contain CFG paths that never reach the inner
+          // scope. This check for overlapping paths only considers the CFG
+          // paths that end in a single scope-ending instruction. When that
+          // scope-ending instruction occurs on a path that never reaches the
+          // inner scope, the overlap check reports a disjoint path. Such paths
+          // are simply ignored since they do not contain any uses in the
+          // extendedUseRange. The outer scope will still be extended if
+          // necessary when this loop visits the other scope-ending uses.
           break
         }
       }

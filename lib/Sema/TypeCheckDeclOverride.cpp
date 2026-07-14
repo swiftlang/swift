@@ -22,7 +22,6 @@
 #include "TypeCheckUnsafe.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -252,14 +251,14 @@ static bool isUnavailableInAllVersions(ValueDecl *decl) {
   ASTContext &ctx = decl->getASTContext();
 
   auto deploymentContext = AvailabilityContext::forDeploymentTarget(ctx);
-  auto constraints = getAvailabilityConstraintsForDecl(decl, deploymentContext);
-  for (auto constraint : constraints) {
-    switch (constraint.getReason()) {
-    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
+  auto restrictions = deploymentContext.allRestrictionsForDecl(decl);
+  for (auto restriction : restrictions) {
+    switch (restriction.getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
       return true;
-    case AvailabilityConstraint::Reason::UnavailableObsolete:
-    case AvailabilityConstraint::Reason::Unintroduced:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
+    case AvailabilityRestriction::Reason::Unintroduced:
       break;
     }
   }
@@ -966,9 +965,9 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     for (auto *ctx : superContexts) {
       ctx->synthesizeSemanticMembersIfNeeded(membersName);
     }
-    auto lookupOptions = NL_QualifiedDefault;
+    NLOptions lookupOptions = NLFlags::QualifiedDefault;
     if (ignoreMissingImports)
-      lookupOptions |= NL_IgnoreMissingImports;
+      lookupOptions |= NLFlags::IgnoreMissingImports;
 
     dc->lookupQualified(superContexts, DeclNameRef(membersName), decl->getLoc(),
                         lookupOptions, members);
@@ -1601,6 +1600,7 @@ namespace  {
     UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(Borrowing)
     UNINTERESTING_ATTR(CDecl)
+    UNINTERESTING_ATTR(COM)
     UNINTERESTING_ATTR(Concurrent)
     UNINTERESTING_ATTR(Consuming)
     UNINTERESTING_ATTR(Documentation)
@@ -1839,7 +1839,7 @@ enum class OverrideAvailability {
   Ignored,
 };
 
-static std::pair<OverrideAvailability, std::optional<AvailabilityConstraint>>
+static std::pair<OverrideAvailability, std::optional<AvailabilityRestriction>>
 getOverrideAvailability(ValueDecl *override, ValueDecl *base) {
   auto &ctx = override->getASTContext();
 
@@ -1856,32 +1856,29 @@ getOverrideAvailability(ValueDecl *override, ValueDecl *base) {
 
   // In order to maintain source compatibility, universally unavailable decls
   // are allowed to override universally unavailable bases.
-  AvailabilityConstraintFlags flags;
-  flags |= AvailabilityConstraintFlag::
+  AvailabilityRestrictionFlags flags;
+  flags |= AvailabilityRestrictionFlag::
       AllowUniversallyUnavailableInCompatibleContexts;
 
-  if (auto constraint =
-          getAvailabilityConstraintsForDecl(override, baseAvailability, flags)
-              .getPrimaryConstraint()) {
-    if (constraint->isUnavailable())
-      return {OverrideAvailability::OverrideUnavailable, constraint};
+  if (auto restriction = baseAvailability.restrictionForDecl(override, flags)) {
+    if (restriction->isUnavailable())
+      return {OverrideAvailability::OverrideUnavailable, restriction};
 
-    return {OverrideAvailability::OverrideLessAvailable, constraint};
+    return {OverrideAvailability::OverrideLessAvailable, restriction};
   }
 
   // Check whether the base is unavailable from the perspective of the override.
   auto overrideAvailability = AvailabilityContext::forDeclSignature(override);
-  if (auto baseConstraint =
-          getAvailabilityConstraintsForDecl(base, overrideAvailability, flags)
-              .getPrimaryConstraint()) {
-    if (baseConstraint->isUnavailable())
-      return {OverrideAvailability::BaseUnavailable, baseConstraint};
+  if (auto baseRestriction =
+          overrideAvailability.restrictionForDecl(base, flags)) {
+    if (baseRestriction->isUnavailable())
+      return {OverrideAvailability::BaseUnavailable, baseRestriction};
   }
 
   return {OverrideAvailability::Compatible, std::nullopt};
 }
 
-static std::pair<OverrideAvailability, std::optional<AvailabilityConstraint>>
+static std::pair<OverrideAvailability, std::optional<AvailabilityRestriction>>
 checkOverrideAvailability(ValueDecl *override, ValueDecl *base) {
   auto &ctx = override->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)

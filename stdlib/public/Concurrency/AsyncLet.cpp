@@ -185,9 +185,11 @@ void swift::swift_asyncLet_begin(AsyncLet *alet,
                                  void *closureEntryPoint,
                                  HeapObject *closureContext,
                                  void *resultBuffer) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
   SWIFT_TASK_DEBUG_LOG("creating async let buffer of type %s at %p",
                        swift_getTypeName(futureResultType, true).data,
                        resultBuffer);
+#endif
 
   auto flags = TaskCreateFlags();
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk) -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -enable-objc-interop -import-objc-header %S/Inputs/modify_objc.h %s
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -enable-objc-interop -import-objc-header %S/Inputs/modify_objc.h %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -enable-objc-interop -import-objc-header %S/Inputs/modify_objc.h %s -enable-library-evolution | %FileCheck %s --check-prefix=RESILIENT
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -enable-objc-interop -import-objc-header %S/Inputs/modify_objc.h %s -enable-testing | %FileCheck %s --check-prefix=TESTING

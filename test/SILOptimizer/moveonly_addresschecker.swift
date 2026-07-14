@@ -5,6 +5,14 @@
 // RUN: -enable-experimental-feature BuiltinModule \
 // RUN: -Xllvm -sil-print-final-ossa-module %s | %FileCheck %s
 
+// RUN: %target-swift-emit-sil -sil-verify-all -verify \
+// RUN: -enable-experimental-feature NoImplicitCopy \
+// RUN: -enable-experimental-feature MoveOnlyClasses \
+// RUN: -enable-experimental-feature Lifetimes \
+// RUN: -enable-experimental-feature BuiltinModule \
+// RUN: -enable-sil-opaque-values \
+// RUN: -Xllvm -sil-print-final-ossa-module %s | %FileCheck %s
+
 // RUN: %target-swift-emit-sil -O -sil-verify-all -verify \
 // RUN: -enable-experimental-feature NoImplicitCopy \
 // RUN: -enable-experimental-feature MoveOnlyClasses \

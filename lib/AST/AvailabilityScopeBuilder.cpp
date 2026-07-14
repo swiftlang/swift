@@ -18,7 +18,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
@@ -471,9 +470,8 @@ private:
       return true;
 
     // Check whether the decl is unavailable relative to the current context.
-    if (auto constraint = getAvailabilityConstraintsForDecl(decl, context)
-                              .getPrimaryConstraint()) {
-      if (constraint->isUnavailable())
+    if (auto restriction = context.restrictionForDecl(decl)) {
+      if (restriction->isUnavailable())
         return true;
     }
 
@@ -1231,17 +1229,6 @@ private:
           // Platform unavailability queries never refine availability so don't
           // diangose them.
           if (isUnavailability.value())
-            continue;
-
-          if (currentScope->getReason() == AvailabilityScope::Reason::Root)
-            continue;
-
-          // Don't warn about checks that are always true because the enclosing
-          // scope was inferred from a switch case body's matched enum element.
-          // The inference is invisible to the developer, making the diagnostic
-          // confusing.
-          if (currentScope->getReason() ==
-              AvailabilityScope::Reason::SwitchStmtCaseBody)
             continue;
 
           // Skip diagnosing useless availability in fragile functions with

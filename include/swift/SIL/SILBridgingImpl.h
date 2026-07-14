@@ -493,6 +493,14 @@ BridgedType BridgedType::getEnumCasePayload(SwiftInt caseIndex,
   return swift::SILType();
 }
 
+BridgedType BridgedType::getEnumCasePayload(BridgedDeclObj caseDecl,
+                                            BridgedFunction f) const {
+  auto *elt = caseDecl.getAs<swift::EnumElementDecl>();
+  if (elt->hasAssociatedValues())
+    return unbridged().getEnumElementType(elt, f.getFunction());
+  return swift::SILType();
+}
+
 SwiftInt BridgedType::getNumTupleElements() const {
   return unbridged().getNumTupleElements();
 }
@@ -628,6 +636,8 @@ BridgedOperand::OperandOwnership BridgedOperand::getOperandOwnership() const {
     return OperandOwnership::InstantaneousUse;
   case swift::OperandOwnership::UnownedInstantaneousUse:
     return OperandOwnership::UnownedInstantaneousUse;
+  case swift::OperandOwnership::DebugUse:
+    return OperandOwnership::DebugUse;
   case swift::OperandOwnership::ForwardingUnowned:
     return OperandOwnership::ForwardingUnowned;
   case swift::OperandOwnership::PointerEscape:
@@ -943,6 +953,10 @@ BridgedFunction::ThunkKind BridgedFunction::isThunk() const {
 
 void BridgedFunction::setThunk(ThunkKind kind) const {
   getFunction()->setThunk((swift::IsThunk_t)kind);
+}
+
+bool BridgedFunction::isWithoutActuallyEscapingThunk() const {
+  return getFunction()->isWithoutActuallyEscapingThunk();
 }
 
 BridgedFunction::SerializedKind BridgedFunction::getSerializedKind() const {
@@ -1923,6 +1937,21 @@ bool BridgedInstruction::ApplySite_isCalleeNoReturn() const {
   return swift::ApplySite(unbridged()).isCalleeNoReturn();
 }
 
+bool BridgedInstruction::ApplySite_hasArgumentLocations() const {
+  return swift::ApplySite(unbridged()).getArgumentLocs().has_value();
+}
+
+BridgedLocation
+BridgedInstruction::ApplySite_getArgumentLocation(BridgedOperand operand) const {
+  // ApplySite::getArgumentLoc() applies the apply-anchor fallback when no
+  // per-argument location is stored, so the Swift caller never has to
+  // distinguish present-vs-absent unless they explicitly check
+  // hasArgumentLocations() first.
+  auto as = swift::ApplySite(unbridged());
+  swift::SILLocation loc = as.getArgumentLoc(operand.op);
+  return swift::SILDebugLocation(loc, unbridged()->getDebugScope());
+}
+
 SwiftInt BridgedInstruction::FullApplySite_numIndirectResultArguments() const {
   auto fas = swift::FullApplySite(unbridged());
   return fas.getNumIndirectSILResults();
@@ -2629,6 +2658,11 @@ BridgedInstruction BridgedBuilder::createUncheckedValueCast(BridgedValue op, Bri
                                               type.unbridged())};
 }
 
+BridgedInstruction BridgedBuilder::createUncheckedTrivialBitCast(BridgedValue op, BridgedType type) const {
+  return {unbridged().createUncheckedTrivialBitCast(regularLoc(), op.getSILValue(),
+                                                    type.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType type) const {
   return {unbridged().createUpcast(regularLoc(), op.getSILValue(),
                                    type.unbridged())};
@@ -2756,7 +2790,7 @@ BridgedInstruction BridgedBuilder::createCopyAddr(BridgedValue from, BridgedValu
 }
 
 BridgedInstruction BridgedBuilder::createDestroyValue(BridgedValue op, bool isDeadEnd) const {
-  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(), swift::DontPoisonRefs,
+  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(),
                                          swift::IsDeadEnd_t(isDeadEnd))};
 }
 
@@ -2781,44 +2815,85 @@ BridgedInstruction BridgedBuilder::createDebugStep() const {
   return {unbridged().createDebugStep(regularLoc())};
 }
 
-BridgedInstruction BridgedBuilder::createApply(BridgedValue function, BridgedSubstitutionMap subMap,
-                               BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
-                               BridgedGenericSpecializationInformation specInfo) const {
+// Returns the per-argument SILLocations stored on \p argLocsFrom, but only
+// when their count matches \p expectedCount. Used by the bridged Builder
+// apply factories so the Swift-side `replace(withCallTo:arguments:)` helper
+// (which rebuilds an apply via SILBuilder rather than going through
+// SILCloner) can preserve per-argument SILLocations from the apply being
+// replaced. When `argLocsFrom` is null, has no per-argument storage, or
+// has a mismatched argument count (rewriter changed the shape), returns
+// std::nullopt and the new apply is constructed without per-argument
+// storage.
+static std::optional<llvm::ArrayRef<swift::SILLocation>>
+getBridgedArgLocsFrom(OptionalBridgedInstruction argLocsFrom,
+                      unsigned expectedCount) {
+  swift::SILInstruction *fromInst = argLocsFrom.unbridged();
+  if (!fromInst)
+    return std::nullopt;
+  auto fromApply = swift::ApplySite::isa(fromInst);
+  if (!fromApply)
+    return std::nullopt;
+  std::optional<llvm::ArrayRef<swift::SILLocation>> stored =
+      fromApply.getArgumentLocs();
+  if (!stored || stored->size() != expectedCount)
+    return std::nullopt;
+  return stored;
+}
+
+BridgedInstruction BridgedBuilder::createApply(
+    BridgedValue function, BridgedSubstitutionMap subMap,
+    BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
+    BridgedGenericSpecializationInformation specInfo,
+    OptionalBridgedInstruction argLocsFrom) const {
   llvm::SmallVector<swift::SILValue, 16> argValues;
   swift::ApplyOptions applyOpts;
   if (isNonThrowing) { applyOpts |= swift::ApplyFlags::DoesNotThrow; }
   if (isNonAsync) { applyOpts |= swift::ApplyFlags::DoesNotAwait; }
 
+  llvm::ArrayRef<swift::SILValue> args = arguments.getValues(argValues);
   return {unbridged().createApply(
-      regularLoc(), function.getSILValue(), subMap.unbridged(),
-      arguments.getValues(argValues), applyOpts, specInfo.data)};
+      regularLoc(), function.getSILValue(), subMap.unbridged(), args, applyOpts,
+      specInfo.data,
+      /*isolationCrossing=*/std::nullopt,
+      getBridgedArgLocsFrom(argLocsFrom, (unsigned)args.size()))};
 }
 
-BridgedInstruction BridgedBuilder::createTryApply(BridgedValue function, BridgedSubstitutionMap subMap,
-                               BridgedValueArray arguments,
-                               BridgedBasicBlock normalBB, BridgedBasicBlock errorBB,
-                               bool isNonAsync,
-                               BridgedGenericSpecializationInformation specInfo) const {
+BridgedInstruction BridgedBuilder::createTryApply(
+    BridgedValue function, BridgedSubstitutionMap subMap,
+    BridgedValueArray arguments, BridgedBasicBlock normalBB,
+    BridgedBasicBlock errorBB, bool isNonAsync,
+    BridgedGenericSpecializationInformation specInfo,
+    OptionalBridgedInstruction argLocsFrom) const {
   llvm::SmallVector<swift::SILValue, 16> argValues;
   swift::ApplyOptions applyOpts;
   if (isNonAsync) { applyOpts |= swift::ApplyFlags::DoesNotAwait; }
 
+  llvm::ArrayRef<swift::SILValue> args = arguments.getValues(argValues);
   return {unbridged().createTryApply(
-      regularLoc(), function.getSILValue(), subMap.unbridged(),
-      arguments.getValues(argValues), normalBB.unbridged(), errorBB.unbridged(), applyOpts, specInfo.data)};
+      regularLoc(), function.getSILValue(), subMap.unbridged(), args,
+      normalBB.unbridged(), errorBB.unbridged(), applyOpts, specInfo.data,
+      /*isolationCrossing=*/std::nullopt,
+      /*normalCount=*/swift::ProfileCounter(),
+      /*errorCount=*/swift::ProfileCounter(),
+      getBridgedArgLocsFrom(argLocsFrom, (unsigned)args.size()))};
 }
 
-BridgedInstruction BridgedBuilder::createBeginApply(BridgedValue function, BridgedSubstitutionMap subMap,
-                               BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
-                               BridgedGenericSpecializationInformation specInfo) const {
+BridgedInstruction BridgedBuilder::createBeginApply(
+    BridgedValue function, BridgedSubstitutionMap subMap,
+    BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
+    BridgedGenericSpecializationInformation specInfo,
+    OptionalBridgedInstruction argLocsFrom) const {
   llvm::SmallVector<swift::SILValue, 16> argValues;
   swift::ApplyOptions applyOpts;
   if (isNonThrowing) { applyOpts |= swift::ApplyFlags::DoesNotThrow; }
   if (isNonAsync) { applyOpts |= swift::ApplyFlags::DoesNotAwait; }
 
+  llvm::ArrayRef<swift::SILValue> args = arguments.getValues(argValues);
   return {unbridged().createBeginApply(
-      regularLoc(), function.getSILValue(), subMap.unbridged(),
-      arguments.getValues(argValues), applyOpts, specInfo.data)};
+      regularLoc(), function.getSILValue(), subMap.unbridged(), args, applyOpts,
+      specInfo.data,
+      /*isolationCrossing=*/std::nullopt,
+      getBridgedArgLocsFrom(argLocsFrom, (unsigned)args.size()))};
 }
 
 BridgedInstruction BridgedBuilder::createWitnessMethod(BridgedCanType lookupType,
@@ -2883,23 +2958,25 @@ BridgedInstruction BridgedBuilder::createThinToThickFunction(BridgedValue fn, Br
                                                 resultType.unbridged())};
 }
 
-BridgedInstruction BridgedBuilder::createPartialApply(BridgedValue funcRef,
-                                                      BridgedValueArray bridgedCapturedArgs,
-                                                      BridgedArgumentConvention calleeConvention,
-                                                      BridgedSubstitutionMap bridgedSubstitutionMap,
-                                                      bool hasUnknownIsolation,
-                                                      bool isOnStack,
-                                                      bool isNested) const {
+BridgedInstruction BridgedBuilder::createPartialApply(
+    BridgedValue funcRef, BridgedValueArray bridgedCapturedArgs,
+    BridgedArgumentConvention calleeConvention,
+    BridgedSubstitutionMap bridgedSubstitutionMap, bool hasUnknownIsolation,
+    bool isOnStack, bool isNested,
+    OptionalBridgedInstruction argLocsFrom) const {
   llvm::SmallVector<swift::SILValue, 8> capturedArgs;
+  llvm::ArrayRef<swift::SILValue> args =
+      bridgedCapturedArgs.getValues(capturedArgs);
   return {unbridged().createPartialApply(
       regularLoc(), funcRef.getSILValue(), bridgedSubstitutionMap.unbridged(),
-      bridgedCapturedArgs.getValues(capturedArgs),
-      getParameterConvention(calleeConvention),
+      args, getParameterConvention(calleeConvention),
       hasUnknownIsolation ? swift::SILFunctionTypeIsolation::forUnknown()
                           : swift::SILFunctionTypeIsolation::forErased(),
       isOnStack ? swift::PartialApplyInst::OnStack
                 : swift::PartialApplyInst::NotOnStack,
-      swift::StackAllocationIsNested_t(isNested))};
+      swift::StackAllocationIsNested_t(isNested),
+      /*SpecializationInfo=*/nullptr,
+      getBridgedArgLocsFrom(argLocsFrom, (unsigned)args.size()))};
 }
 
 BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, BridgedValueArray arguments) const {
@@ -3069,6 +3146,14 @@ BridgedBuilder::createEndCOWMutationAddr(BridgedValue instance) const {
 
 BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {
   return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(), swift::MarkDependenceKind(kind))};
+}
+
+BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base,
+                                                        BridgedValue::Ownership ownership,
+                                                        BridgedInstruction::MarkDependenceKind kind) const {
+  return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(),
+                                           BridgedValue::unbridge(ownership),
+                                           swift::MarkDependenceKind(kind))};
 }
 
 BridgedInstruction BridgedBuilder::createMarkDependenceAddr(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {
@@ -3450,9 +3535,8 @@ OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef na
   return {context->lookupStdlibFunction(name.unbridged())};
 }
 
-void BridgedContext::SSAUpdater_initialize(BridgedFunction function, BridgedType type,
-                                           BridgedValue::Ownership ownership) const {
-  context->initializeSSAUpdater(function.getFunction(), type.unbridged(), BridgedValue::unbridge(ownership));
+void BridgedContext::SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const {
+  context->initializeSSAUpdater(context->getFunction(), type.unbridged(), BridgedValue::unbridge(ownership));
 }
 
 void BridgedContext::SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {

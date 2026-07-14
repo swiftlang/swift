@@ -1,0 +1,266 @@
+//===--- AvailabilityRestriction.h - Swift Availability Restrictions ----*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the AvailabilityRestriction class.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_AST_AVAILABILITY_RESTRICTION_H
+#define SWIFT_AST_AVAILABILITY_RESTRICTION_H
+
+#include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/PlatformKindUtils.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
+#include "llvm/Support/raw_ostream.h"
+
+namespace swift {
+
+class ASTContext;
+class AvailabilityContext;
+class Decl;
+
+/// Represents the reason a declaration is considered not available in a
+/// specific `AvailabilityContext`.
+class AvailabilityRestriction {
+public:
+  /// The reason that a declaration is not available in a context. Broadly, the
+  /// declaration may either be "unintroduced" or "unavailable" depending on its
+  /// `@available` attributes. A declaration that is unintroduced can become
+  /// available if availability restrictions are added to the context. For
+  /// unavailable declarations, on the other hand, either changing the
+  /// deployment target or making the context itself unavailable are necessary
+  /// to satisfy the restriction.
+  ///
+  /// For example, take the following declaration `f()`:
+  ///
+  ///     @available(macOS, introduced: 11.0, obsoleted: 14.0)
+  ///     func f() { ... }
+  ///
+  /// In contexts that may run on earlier OSes, references to `f()` yield
+  /// an `Unintroduced` restriction:
+  ///
+  ///     @available(macOS 10.15, *)
+  ///     func g() {
+  ///       f() // error: 'f()' is only available in macOS 11.0 or newer
+  ///     }
+  ///
+  ///     macOS ...            11.0                   14.0               ...
+  ///     f()   |----------------[=======================)-----------------|
+  ///     g()   |-----------[==============================================)
+  ///                       ^
+  ///                  Unintroduced
+  ///
+  /// On the other hand, in contexts where deployment target is high enough to
+  /// make `f()` obsolete, references to it yield an `UnavailableObsolete`
+  /// restriction:
+  ///
+  ///     // compiled with -target arm64-apple-macos14
+  ///     func h() {
+  ///       f() // error: 'f()' is unavailable in macOS
+  ///     }
+  ///
+  ///     macOS ...            11.0                    14.0              ...
+  ///     f()   |----------------[=======================)-----------------|
+  ///     h()   |----------------------------------------[=================)
+  ///                                                    ^
+  ///                                           UnavailableObsolete
+  ///
+  /// References to declarations that are unavailable in all versions of a
+  /// domain generate `UnavailableUnconditional` restrictions unless the context
+  /// is also unavailable under the same conditions:
+  ///
+  ///     @available(macOS, unavailable)
+  ///     func foo() { ... }
+  ///
+  ///     func bar() {
+  ///       foo() // error: 'foo()' is unavailable in macOS
+  ///     }
+  ///
+  ///     @available(macOS, unavailable)
+  ///     func baz() {
+  ///       foo() // OK
+  ///     }
+  ///
+  ///     @available(*, unavailable)
+  ///     func qux() {
+  ///       foo() // also OK
+  ///     }
+  ///
+  /// NOTE: The order of this enum matters. Reasons are defined in descending
+  /// priority order.
+  enum class Reason {
+    /// The declaration is unconditionally unavailable, e.g. because of
+    /// `@available(macOS, unavailable)`.
+    UnavailableUnconditionally,
+
+    /// The declaration is obsolete, e.g. because of
+    /// `@available(macOS, obsolete: 14.0)` in a program with a deployment
+    /// target of `macOS 14` or later.
+    UnavailableObsolete,
+
+    /// The declaration is only available for later deployment configurations,
+    /// e.g. because of `@available(swift 6)` in a program compiled with
+    /// `-swift-version 5`.
+    UnavailableUnintroduced,
+
+    /// The declaration has not yet been introduced, e.g. because of
+    /// `@available(macOS 14, *)` in a context that may run on macOS 13 or
+    /// later. The restriction may be satisfied adding an `@available`
+    /// attribute or an `if #available(...)` query with sufficient introduction
+    /// restrictions to the context.
+    Unintroduced,
+  };
+
+private:
+  llvm::PointerIntPair<SemanticAvailableAttr, 2, Reason> attrAndReason;
+
+  AvailabilityRestriction(Reason reason, SemanticAvailableAttr attr)
+      : attrAndReason(attr, reason) {};
+
+public:
+  static AvailabilityRestriction
+  unavailableUnconditionally(SemanticAvailableAttr attr) {
+    return AvailabilityRestriction(Reason::UnavailableUnconditionally, attr);
+  }
+
+  static AvailabilityRestriction
+  unavailableObsolete(SemanticAvailableAttr attr) {
+    return AvailabilityRestriction(Reason::UnavailableObsolete, attr);
+  }
+
+  static AvailabilityRestriction
+  unavailableUnintroduced(SemanticAvailableAttr attr) {
+    return AvailabilityRestriction(Reason::UnavailableUnintroduced, attr);
+  }
+
+  static AvailabilityRestriction unintroduced(SemanticAvailableAttr attr) {
+    return AvailabilityRestriction(Reason::Unintroduced, attr);
+  }
+
+  Reason getReason() const { return attrAndReason.getInt(); }
+  SemanticAvailableAttr getAttr() const {
+    return static_cast<SemanticAvailableAttr>(attrAndReason.getPointer());
+  }
+
+  /// Returns true if the restriction cannot be satisfied using a runtime
+  /// availability query (`if #available(...)`).
+  bool isUnavailable() const {
+    switch (getReason()) {
+    case Reason::UnavailableUnconditionally:
+    case Reason::UnavailableObsolete:
+    case Reason::UnavailableUnintroduced:
+      return true;
+    case Reason::Unintroduced:
+      return false;
+    }
+  }
+
+  /// Returns the domain that the restriction applies to.
+  AvailabilityDomain getDomain() const { return getAttr().getDomain(); }
+
+  /// Returns the domain and range (remapped if necessary) in which the
+  /// restriction must be satisfied. How the range should be interpreted
+  /// depends on the reason for the restriction.
+  AvailabilityDomainAndRange getDomainAndRange(const ASTContext &ctx) const;
+
+  /// Returns the domain and range to use in availability fix-its. This may be
+  /// different than the value returned by `getDomainAndRange()` depending on
+  /// which domain the underlying availability attribute was written with.
+  AvailabilityDomainAndRange
+  getFixItDomainAndRange(const ASTContext &ctx) const;
+
+  /// Some availability restrictions are active for type-checking but cannot
+  /// be translated directly into an `if #available(...)` runtime query.
+  bool isActiveForRuntimeQueries(const ASTContext &ctx) const;
+
+  void print(raw_ostream &os) const;
+};
+
+/// Represents a set of availability restrictions that apply to use of a
+/// declaration in a particular context. There can only be one active
+/// restriction for a given `AvailabilityDomain`, but there may be multiple
+/// active restrictions from separate domains.
+class DeclAvailabilityRestrictions {
+  using Storage = llvm::SmallVector<AvailabilityRestriction, 4>;
+  Storage restrictions;
+
+public:
+  DeclAvailabilityRestrictions() {}
+  DeclAvailabilityRestrictions(const Storage &&restrictions)
+      : restrictions(restrictions) {}
+
+  /// Returns the strongest availability restriction or `std::nullopt` if empty.
+  std::optional<AvailabilityRestriction> getPrimaryRestriction() const;
+
+  using const_iterator = Storage::const_iterator;
+  const_iterator begin() const { return restrictions.begin(); }
+  const_iterator end() const { return restrictions.end(); }
+
+  void print(raw_ostream &os) const;
+};
+
+enum class AvailabilityRestrictionFlag : uint8_t {
+  /// By default, the availability restrictions for the members of extensions
+  /// include the restrictions for `@available` attributes that were written on
+  /// the enclosing extension, since these members can be referred to without
+  /// referencing the extension. When this flag is specified, though, only the
+  /// attributes directly attached to the declaration are considered.
+  SkipEnclosingExtension = 1 << 0,
+
+  /// Include restrictions for all domains, regardless of whether they are
+  /// active or relevant to type checking.
+  IncludeAllDomains = 1 << 1,
+
+  /// By default, non-type declarations that are universally unavailable are
+  /// always diagnosed, regardless of whether the context of the reference
+  /// is also universally unavailable. If this flag is set, though, those
+  /// references are allowed.
+  AllowUniversallyUnavailableInCompatibleContexts = 1 << 2,
+};
+using AvailabilityRestrictionFlags = OptionSet<AvailabilityRestrictionFlag>;
+
+/// Returns the `AvailabilityRestriction` that describes how \p attr restricts
+/// use of \p decl in \p context or `std::nullopt` if there is no restriction.
+std::optional<AvailabilityRestriction> getAvailabilityRestrictionForAttr(
+    const SemanticAvailableAttr &attr, const Decl *decl,
+    const AvailabilityContext &context, AvailabilityRestrictionFlags flags);
+
+/// Computes the set of restrictions that indicate whether a decl is "runtime
+/// unavailable" (can never be reached at runtime) and adds the domain for each
+/// of those restrictions to the \p domains vector.
+void getRuntimeUnavailableDomains(
+    const DeclAvailabilityRestrictions &restrictions,
+    llvm::SmallVectorImpl<AvailabilityDomain> &domains, const ASTContext &ctx);
+
+} // end namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::AvailabilityRestriction &restriction) {
+  restriction.print(os);
+  return os;
+}
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const swift::DeclAvailabilityRestrictions &restrictions) {
+  restrictions.print(os);
+  return os;
+}
+
+} // end namespace llvm
+#endif

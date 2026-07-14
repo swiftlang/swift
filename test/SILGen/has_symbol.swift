@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library %S/Inputs/has_symbol_helper.swift -enable-library-evolution
+// RUN: %target-swift-frontend -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -I %t -module-name test
 // RUN: %target-swift-frontend -emit-silgen %s -I %t -module-name test | %FileCheck %s
 
 // UNSUPPORTED: OS=windows-msvc

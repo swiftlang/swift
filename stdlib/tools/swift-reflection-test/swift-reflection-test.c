@@ -804,6 +804,8 @@ static int reflectAsyncTaskInstance(SwiftReflectionContextRef RC,
     indented_printf(indentLevel, "id %" PRIu64 "\n", TaskInfo.Id);
     indented_printf(indentLevel, "enqueuePriority %u\n",
                     TaskInfo.EnqueuePriority);
+    if (TaskInfo.Name)
+      indented_printf(indentLevel, "name \"%s\"\n", TaskInfo.Name);
     if (TaskInfo.ChildTaskCount > 0) {
       indented_printf(indentLevel, "children = {\n");
 

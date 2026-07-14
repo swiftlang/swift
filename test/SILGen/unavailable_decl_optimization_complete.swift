@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -swift-version 5 -module-name Test -parse-as-library %s -verify
 // RUN: %target-swift-emit-silgen -swift-version 5 -module-name Test -parse-as-library %s -verify | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-STRIP
 // RUN: %target-swift-emit-silgen -swift-version 5 -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=none | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-STRIP
 // RUN: %target-swift-emit-silgen -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=complete | %FileCheck %s --check-prefixes=CHECK,CHECK-STRIP

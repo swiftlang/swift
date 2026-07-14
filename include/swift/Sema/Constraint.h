@@ -835,10 +835,6 @@ public:
     });
   }
 
-  /// Determine if this constraint represents explicit conversion,
-  /// e.g. coercion constraint "as X" which forms a disjunction.
-  bool isExplicitConversion() const;
-
   /// Determine whether this constraint should be solved in isolation
   /// from the rest of the constraint system.
   bool isIsolated() const { return IsIsolated; }

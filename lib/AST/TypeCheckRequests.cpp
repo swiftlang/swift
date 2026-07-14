@@ -52,6 +52,16 @@ void swift::simple_display(
   simple_display(out, ext);
 }
 
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const llvm::PointerUnion<ValueDecl *, ExtensionDecl *> &declOrExtension) {
+  if (auto *value = declOrExtension.dyn_cast<ValueDecl *>()) {
+    simple_display(out, value);
+    return;
+  }
+  simple_display(out, cast<ExtensionDecl *>(declOrExtension));
+}
+
 void swift::simple_display(llvm::raw_ostream &out, ASTContext *ctx) {
   out << "(AST Context)";
 }
@@ -2147,6 +2157,10 @@ void IsolationSource::printForDiagnostics(
     os << "explicit isolation";
     return;
 
+  case IsolationSource::FileDefault:
+    os << "file-level default isolation";
+    return;
+
   case IsolationSource::None:
     os << "unspecified isolation";
     return;
@@ -2620,12 +2634,17 @@ DeclAttributes SemanticDeclAttrsRequest::evaluate(Evaluator &evaluator,
     (void)getActorIsolation(vd);
     (void)vd->isDynamic();
     (void)vd->isFinal();
+  } else if (auto ed = dyn_cast<ExtensionDecl>(mutableDecl)) {
+    (void)getActorIsolation(ed);
   }
   if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
     (void)afd->isTransparent();
   } else if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
     (void)asd->hasStorage();
   }
+
+  // Materialize file-level `using ...` attributes onto top-level decls.
+  mutableDecl->applyFileDefaults();
 
   return decl->getAttrs();
 }

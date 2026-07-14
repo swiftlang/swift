@@ -24,9 +24,9 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Serialization/Validation.h"
-#include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
-#include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
-#include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
+#include "clang/DependencyScanning/DependencyScanningService.h"
+#include "clang/DependencyScanning/ModuleDepCollector.h"
+#include "clang/Tooling/DependencyScanningTool.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringSet.h"
@@ -1057,7 +1057,7 @@ using ModuleDependenciesKindMap =
     std::unordered_map<ModuleDependencyKind, ModuleNameToDependencyMap,
                        ModuleDependencyKindHash>;
 using BridgeClangDependencyCallback = llvm::function_ref<ModuleDependencyInfo(
-    const clang::tooling::dependencies::ModuleDeps &clangModuleDep)>;
+    const clang::dependencies::ModuleDeps &clangModuleDep)>;
 
 // MARK: SwiftDependencyScanningService
 /// A carrier of state shared among possibly multiple invocations of the
@@ -1073,7 +1073,7 @@ class SwiftDependencyScanningService {
   std::optional<llvm::cas::CASConfiguration> CASConfig;
 
   /// The persistent Clang dependency scanner service
-  std::optional<clang::tooling::dependencies::DependencyScanningService>
+  std::optional<clang::dependencies::DependencyScanningService>
       ClangScanningService;
 
   /// Shared state mutual-exclusivity lock
@@ -1094,7 +1094,7 @@ public:
   StringRef save(StringRef str);
 
   /// Get clang scanning service.
-  const clang::tooling::dependencies::DependencyScanningService &
+  const clang::dependencies::DependencyScanningService &
   getClangScanningService() const {
     assert(ClangScanningService);
     return *ClangScanningService;
@@ -1123,7 +1123,7 @@ private:
   /// to discover a Swift module dependency
   llvm::StringSet<> negativeSwiftDependencyCache;
   /// Set containing all of the Clang modules that have already been seen.
-  llvm::DenseSet<clang::tooling::dependencies::ModuleID> alreadySeenClangModules;
+  llvm::DenseSet<clang::dependencies::ModuleID> alreadySeenClangModules;
   /// Name of the module under scan
   std::string mainScanModuleName;
   /// The context hash of the current scanning invocation
@@ -1170,11 +1170,11 @@ public:
   /// (Textual + Binary)
   int numberOfSwiftDependencies() const;
 
-  const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &
+  const llvm::DenseSet<clang::dependencies::ModuleID> &
   getAlreadySeenClangModules() const {
     return alreadySeenClangModules;
   }
-  void addSeenClangModule(clang::tooling::dependencies::ModuleID newModule) {
+  void addSeenClangModule(clang::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
   }
 
@@ -1255,13 +1255,13 @@ public:
 
   /// Record dependencies for the given collection of Clang modules.
   void recordClangDependencies(
-      const clang::tooling::dependencies::ModuleDepsGraph &dependencies,
+      const clang::dependencies::ModuleDepsGraph &dependencies,
       DiagnosticEngine &diags,
       BridgeClangDependencyCallback bridgeClangModule);
 
   /// Record Clang module dependency.
   void recordClangDependency(
-      const clang::tooling::dependencies::ModuleDeps &dependency,
+      const clang::dependencies::ModuleDeps &dependency,
       DiagnosticEngine &diags,
       BridgeClangDependencyCallback bridgeClangModule);
 

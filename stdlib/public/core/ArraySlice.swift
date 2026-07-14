@@ -170,7 +170,7 @@ extension ArraySlice {
   }
   
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUniqueUnchecked() {
     if _slowPath(!_buffer.beginCOWMutationUnchecked()) {
@@ -183,7 +183,7 @@ extension ArraySlice {
   ///
   /// After a call to `_endMutation` the buffer must not be mutated until a call
   /// to `_makeMutableAndUnique`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("array.end_mutation")
   internal mutating func _endMutation() {
     _buffer.endCOWMutation()
@@ -1216,7 +1216,7 @@ extension ArraySlice {
   ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
@@ -1234,7 +1234,7 @@ extension ArraySlice {
   ///
   /// - Complexity: O(1)
   @available(SwiftCompatibilitySpan 5.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var span: Span<Element> {
     @_lifetime(borrow self)
     borrowing get {
@@ -1295,7 +1295,7 @@ extension ArraySlice {
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
@@ -1336,7 +1336,7 @@ extension ArraySlice {
   ///
   /// - Complexity: O(1) when the array's storage is uniquely referenced,
   ///   O(*n*) otherwise.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
     mutating get {
@@ -1615,7 +1615,7 @@ extension ArraySlice {
   // This allows us to test the `_copyContents` implementation in
   // `_SliceBuffer`. (It's like `_copyToContiguousArray` but it always makes a
   // copy.)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func _copyToNewArray() -> [Element] {
     unsafe Array(unsafeUninitializedCapacity: self.count) { buffer, count in
       var (it, c) = unsafe self._buffer._copyContents(initializing: buffer)
@@ -1661,7 +1661,7 @@ extension ArraySlice {
   /// identical.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     self._buffer.isTriviallyIdentical(to: other._buffer)
   }

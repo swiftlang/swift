@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_Macros
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -11,7 +10,7 @@
 
 // RUN: not %target-swift-frontend \
 // RUN:   -typecheck \
-// RUN:   -swift-version 5 -enable-experimental-feature Macros \
+// RUN:   -swift-version 5 \
 // RUN:   -load-plugin-executable %t/broken-plugin#TestPlugin \
 // RUN:   -module-name MyApp \
 // RUN:   -serialize-diagnostics-path %t/macro_expand.dia \

@@ -353,6 +353,20 @@ public:
           mv = SGF.B.createUncheckedBitCast(loc, mv, argType);
         }
       }
+
+      // Inverse of the @c/@_extern(c) epilog bridging: the C entry point
+      // receives an ObjC metatype ('Class') but the native body expects a thick
+      // metatype (e.g. AnyClass). No-op for every other parameter.
+      if (auto argMetaTy = argType.getAs<AnyMetatypeType>()) {
+        if (auto mvMetaTy = mv.getType().getAs<AnyMetatypeType>()) {
+          if (argMetaTy->hasRepresentation() && mvMetaTy->hasRepresentation() &&
+              argMetaTy->getRepresentation() == MetatypeRepresentation::Thick &&
+              mvMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
+            mv = ManagedValue::forObjectRValueWithoutOwnership(
+                SGF.B.createObjCToThickMetatype(loc, mv.getValue(), argType));
+          }
+        }
+      }
     }
     if (isInOut) {
       // If we are inout and are move only, insert a note to the move checker to

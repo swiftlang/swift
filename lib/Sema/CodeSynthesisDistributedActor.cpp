@@ -50,6 +50,39 @@ static void forwardParameters(AbstractFunctionDecl *afd,
   }
 }
 
+static Type getDistributedResolvableProtocolStubType(Type ty) {
+  if (!ty)
+    return Type();
+  auto match = findDistributedResolvableExistentialOrOpaqueProtocol(ty);
+  if (!match)
+    return Type();
+  auto *stub = getDistributedResolvableProtocolStubDecl(match.proto);
+  if (!stub)
+    return Type();
+  auto stubTy = stub->getDeclaredInterfaceType();
+  if (!stubTy || stubTy->hasError())
+    return Type();
+  return stubTy;
+}
+
+/// Build `try $P.resolve(id: <idExpr>, using: <systemExpr>)`.
+static Expr *createDistributedResolveCall(ASTContext &C,
+                                          Type actorTy,
+                                          Expr *idExpr,
+                                          Expr *systemExpr) {
+  auto *stubTypeExpr = TypeExpr::createImplicit(actorTy, C);
+  DeclName resolveName(C, C.getIdentifier("resolve"),
+                       {C.Id_id, C.getIdentifier("using")});
+  auto *resolveExpr =
+      UnresolvedDotExpr::createImplicit(C, stubTypeExpr, resolveName);
+  auto *resolveArgList = ArgumentList::forImplicitCallTo(
+      DeclNameRef(resolveName), {idExpr, systemExpr}, C);
+  auto *resolveCall =
+      CallExpr::createImplicit(C, resolveExpr, resolveArgList);
+  return TryExpr::createImplicit(C, SourceLoc(), resolveCall);
+}
+
+
 /// Mangle the target thunk in a way that we can look up the appropriate record.
 static llvm::StringRef
 mangleDistributedThunkForAccessorRecordName(
@@ -257,8 +290,57 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
         auto remoteCallArgumentInitDecl =
             RCA->getDistributedRemoteCallArgumentInitFunction();
-        auto boundRCAType = BoundGenericType::get(
-            RCA, Type(), {thunk->mapTypeIntoEnvironment(param->getInterfaceType())});
+
+        // If the parameter is `some P` / `any P` (or `Optional`) where
+        // P is a `@Resolvable protocol`, encode the parameter
+        // as the macro-generated `$P` stub type.
+        Type paramTy =
+            thunk->mapTypeIntoEnvironment(param->getInterfaceType());
+        Expr *argumentDeclRefExpr = new (C) DeclRefExpr(
+            ConcreteDeclRef(param), dloc, implicit,
+            AccessSemantics::Ordinary, paramTy);
+
+        // --- Automatic @Resolvable protocol proxying
+        //
+        // If @Resolvable protocol parameter, substitute with $P.resolve()'d reference
+        // Because sending a `some P` or `any P` means transferring a `$P` on the wire,
+        // as the remote peer may not know our concrete P implementation, we need to send the "proxy".
+        //
+        // This way the remote side will decode it as `$P` proxy, which conforms to `P`,
+        // so the `some/any P` parameter is correctly filled in by a `$P` instance on
+        // the recipient without ever knowing the concrete type of the sender.
+        if (auto resolvableMatch =
+                findDistributedResolvableExistentialOrOpaqueProtocol(paramTy)) {
+          if (auto *stub = getDistributedResolvableProtocolStubDecl(resolvableMatch.proto)) {
+            auto stubInterfaceTy = stub->getDeclaredInterfaceType();
+            if (stubInterfaceTy && !stubInterfaceTy->hasError()) {
+              // Important! We replace the type of the parameter with `$P`
+              paramTy = thunk->mapTypeIntoEnvironment(stubInterfaceTy);
+
+              // --- We then have to make the parameter be actually a `$P`
+              // TODO: It would be simpler if we did just create a new `$P`,
+              //  but we'd need to allow `self.id = id` inside distributed actors;
+              //  Once we allow that, we can just create an instance without this fake resolve.
+              {
+                // paramRef.id
+                auto *paramIdExpr = UnresolvedDotExpr::createImplicit(
+                    C, argumentDeclRefExpr, C.Id_id);
+
+                // Get the `system` from the actor that the call is being made on.
+                auto *systemRef = new (C) DeclRefExpr(
+                    ConcreteDeclRef(systemVar), dloc, implicit);
+
+                // try $P.resolve(id: paramRef.id, using: system)
+                // We have enforced in sema that the system must be compatible.
+                argumentDeclRefExpr = createDistributedResolveCall(
+                    C, stubInterfaceTy, paramIdExpr, systemRef);
+              }
+            }
+          }
+        }
+
+        auto boundRCAType =
+            BoundGenericType::get(RCA, Type(), {paramTy});
         auto remoteCallArgumentInitDeclRef =
             TypeExpr::createImplicit(boundRCAType, C);
 
@@ -270,10 +352,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
              // name:
              new (C) StringLiteralExpr(parameterName, SourceRange(), implicit),
              // _ argument:
-             new (C) DeclRefExpr(
-                 ConcreteDeclRef(param), dloc, implicit,
-                 AccessSemantics::Ordinary,
-                 thunk->mapTypeIntoEnvironment(param->getInterfaceType()))
+             argumentDeclRefExpr
             },
             C);
 
@@ -343,6 +422,11 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     // Result.self
     // Watch out and always map into thunk context
     auto resultType = thunk->mapTypeIntoEnvironment(func->getResultInterfaceType());
+
+    // --- `@Resolvable protocol` result: substitute `$P` for `any/some P`
+    if (Type stubTy = getDistributedResolvableProtocolStubType(resultType))
+      resultType = thunk->mapTypeIntoEnvironment(stubTy);
+
     auto *metaTypeRef = TypeExpr::createImplicit(resultType, C);
     auto *resultTypeExpr =
         new (C) DotSelfExpr(metaTypeRef, sloc, sloc, resultType);
@@ -480,6 +564,11 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
       // Result.self
       auto resultType =
           func->mapTypeIntoEnvironment(func->getResultInterfaceType());
+
+      // --- `@Resolvable protocol` result: substitute `$P` for `any/some P`
+      if (Type stubTy = getDistributedResolvableProtocolStubType(resultType))
+        resultType = func->mapTypeIntoEnvironment(stubTy);
+
       auto *metaTypeRef = TypeExpr::createImplicit(resultType, C);
       auto *resultTypeExpr =
           new (C) DotSelfExpr(metaTypeRef, sloc, sloc, resultType);
@@ -613,6 +702,277 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
     thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
 
   return thunk;
+}
+
+// ==== ----------------------------------------------------------------------
+// MARK: 'resolvable proxy adapter' thunk synthesis
+
+/// Synthesize the body of the 'resolvable proxy adapter' thunk.
+///
+/// This thunk runs on the *recipient* side of a remote call. Its parameters
+/// and result are the wire-level proxy stub types (`$P`), whereas the
+/// user-declared distributed function deals in `any P` / `some P`. This thunk:
+///
+///   1. forwards the proxy parameters to the user function -- a `$P` is
+///      implicitly erased to `any P` (it conforms to `P`), or bound to a
+///      `some P` generic parameter directly;
+///   2. invokes the user-declared distributed function on the local actor;
+///   3. if the result is a `@Resolvable` `any P` / `some P`, re-creates a
+///      proxy `$P` from the returned actor's identity, so a `$P` can be
+///      returned over the wire.
+///
+/// For example, given `distributed func echo(_ g: any P) -> any P`, the
+/// synthesized body is roughly:
+///
+///   nonisolated func echo(_ g: $P) async throws -> $P {
+///     let __result = try await self.echo(g)
+///     return try $P.resolve(id: __result.id, using: self.actorSystem)
+///   }
+static std::pair<BraceStmt *, bool>
+deriveBodyDistributed_resolvableProxyAdapterThunk(AbstractFunctionDecl *thunk,
+                                                  void *context) {
+  auto implicit = true;
+  ASTContext &C = thunk->getASTContext();
+
+  const SourceLoc sloc = SourceLoc();
+  const DeclNameLoc dloc = DeclNameLoc();
+
+  auto func = static_cast<FuncDecl *>(context);
+  auto funcDC = func->getDeclContext();
+  assert(funcDC->getSelfNominalTypeDecl() &&
+         funcDC->getSelfNominalTypeDecl()->isDistributedActor() &&
+         "Distributed function must be part of distributed actor");
+
+  auto selfDecl = thunk->getImplicitSelfDecl();
+  selfDecl->addAttribute(new (C) KnownToBeLocalAttr(implicit));
+
+  Type returnTy = func->getResultInterfaceType();
+  auto isVoidReturn = returnTy->isVoid();
+
+  // --- Build the call to the user-declared distributed function:
+  //       try await self.<func>(<forwarded args>)
+  //
+  // The adapter thunk's `@Resolvable` parameters are typed as the proxy
+  // `$P`. Passing a `$P` where the function expects `any P` is an implicit
+  // existential erasure (`$P` conforms to `P`); passing it where the
+  // function expects `some P` binds that generic parameter to the concrete
+  // `$P`. Either way the forward is well-typed.
+  Expr *call;
+  {
+    auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
+
+    if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+      auto var = accessor->getStorage();
+      Expr *localPropertyAccess = new (C) MemberRefExpr(
+          selfRefExpr, sloc, ConcreteDeclRef(var), dloc, implicit);
+      localPropertyAccess =
+          AwaitExpr::createImplicit(C, sloc, localPropertyAccess);
+      if (accessor->hasThrows())
+        localPropertyAccess =
+            TryExpr::createImplicit(C, sloc, localPropertyAccess);
+      call = localPropertyAccess;
+    } else {
+      SmallVector<Expr *, 4> forwardingParams;
+      forwardParameters(thunk, forwardingParams);
+      auto funcRef = UnresolvedDeclRefExpr::createImplicit(C, func->getName());
+      auto forwardingArgList = ArgumentList::forImplicitCallTo(
+          funcRef->getName(), forwardingParams, C);
+      auto funcDeclRef =
+          UnresolvedDotExpr::createImplicit(C, selfRefExpr, func->getBaseName());
+
+      Expr *localFuncCall =
+          CallExpr::createImplicit(C, funcDeclRef, forwardingArgList);
+      localFuncCall = AwaitExpr::createImplicit(C, sloc, localFuncCall);
+      if (func->hasThrows())
+        localFuncCall = TryExpr::createImplicit(C, sloc, localFuncCall);
+      call = localFuncCall;
+    }
+  }
+
+  // --- Does the result need to be adapted back to a proxy `$P`?
+  Type resultType =
+      thunk->mapTypeIntoEnvironment(func->getResultInterfaceType());
+  Type proxyResultTy =
+      isVoidReturn ? Type() : getDistributedResolvableProtocolStubType(resultType);
+
+  SmallVector<ASTNode, 4> stmts;
+  if (!proxyResultTy) {
+    // No proxying of the result needed - return the call result directly.
+    auto returnCall = ReturnStmt::createImplicit(C, sloc, call);
+    stmts.push_back(returnCall);
+  } else {
+    // let __result = try await self.<func>(...)
+    // The thunk body is entirely synthesized; there are no user-written locals
+    // in scope, so the `__result` name cannot collide.
+    auto *resultVar =
+        new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
+                        C.getIdentifier("__result"), thunk);
+    resultVar->setImplicit();
+    resultVar->setSynthesized();
+
+    Pattern *resultPattern = NamedPattern::createImplicit(C, resultVar);
+    auto resultPB = PatternBindingDecl::createImplicit(
+        C, StaticSpellingKind::None, resultPattern, call, thunk);
+
+    stmts.push_back(resultPB);
+    stmts.push_back(resultVar);
+
+    // return try $P.resolve(id: __result.id, using: self.actorSystem)
+    auto *resultRef =
+        new (C) DeclRefExpr(ConcreteDeclRef(resultVar), dloc, implicit);
+    auto *resultIdExpr =
+        UnresolvedDotExpr::createImplicit(C, resultRef, C.Id_id);
+
+    auto *systemRef = UnresolvedDotExpr::createImplicit(
+        C, new (C) DeclRefExpr(selfDecl, dloc, implicit), C.Id_actorSystem);
+
+    Expr *resolveCall = createDistributedResolveCall(
+        C, proxyResultTy, resultIdExpr, systemRef);
+
+    auto returnResolve = ReturnStmt::createImplicit(C, sloc, resolveCall);
+    stmts.push_back(returnResolve);
+  }
+
+  auto body = BraceStmt::create(C, sloc, stmts, sloc, implicit);
+  return {body, /*isTypeChecked=*/false};
+}
+
+/// Create the 'resolvable proxy adapter' thunk. Its signature matches the
+/// user-declared function, except that `@Resolvable` parameters (`any P`
+/// or `some P`) and a `@Resolvable` result are replaced by the proxy stub
+/// type `$P`.
+static FuncDecl *
+createDistributedResolvableProxyAdapterThunkDecl(DeclContext *DC,
+                                                 FuncDecl *func) {
+  auto &C = func->getASTContext();
+
+  // --- Prepare generic parameters.
+  //
+  // A `some P` parameter rewritten to a concrete `$P` below leaves its
+  // generic parameter unused in the thunk's signature; that is intentional
+  // and harmless.
+  // TODO(distributed): drop the unused generic parameter from the thunk's
+  //   signature when its only use was substituted away by the `$P` rewrite.
+  GenericParamList *genericParamList = nullptr;
+  if (auto genericParams = func->getGenericParams())
+    genericParamList = genericParams->clone(DC);
+
+  GenericSignature baseSignature = func->getGenericSignature();
+
+  // --- Prepare parameters
+  auto funcParams = func->getParameters();
+  SmallVector<ParamDecl *, 2> paramDecls;
+  for (unsigned i : indices(*func->getParameters())) {
+    auto funcParam = funcParams->get(i);
+
+    auto paramName = funcParam->getParameterName();
+    if (paramName.empty())
+      paramName = C.getIdentifier("p" + llvm::utostr(i));
+
+    auto paramDecl = new (C)
+        ParamDecl(SourceLoc(),
+                  /*argumentNameLoc=*/SourceLoc(), funcParam->getArgumentName(),
+                  /*parameterNameLoc=*/SourceLoc(), paramName, DC);
+    paramDecl->setImplicit();
+    paramDecl->setSending();
+    paramDecl->setSpecifier(funcParam->getSpecifier());
+
+    // If the parameter is a `@Resolvable` `any P` (existential) or `some P`
+    // (opaque / generic) parameter, the wire-level type is the proxy stub
+    // `$P`; rewrite the parameter to `$P` in either case.
+    Type paramTy = funcParam->getInterfaceType();
+    Type mappedParamTy = func->mapTypeIntoEnvironment(paramTy);
+    if (Type proxyTy = getDistributedResolvableProtocolStubType(mappedParamTy))
+      paramTy = proxyTy;
+    paramDecl->setInterfaceType(paramTy);
+
+    paramDecls.push_back(paramDecl);
+  }
+  ParameterList *params = ParameterList::create(C, paramDecls);
+
+  // --- Prepare the result type, adapting a `@Resolvable` result to `$P`.
+  Type resultTy = func->getResultInterfaceType();
+  if (Type proxyTy = getDistributedResolvableProtocolStubType(
+          func->mapTypeIntoEnvironment(resultTy)))
+    resultTy = proxyTy;
+
+  // Synthesize a distinct, stable name so this helper neither collides with
+  // the regular distributed thunk nor goes through the distributed-thunk
+  // mangling path. The `$` prefix and infix make it unspellable from
+  // user code: `$distributedProxyAdapter$<base>`. For a computed property
+  // the base is the storage (var) name.
+  Identifier baseIdent;
+  if (auto *accessor = dyn_cast<AccessorDecl>(func))
+    baseIdent = accessor->getStorage()->getBaseIdentifier();
+  else
+    baseIdent = func->getBaseIdentifier();
+
+  SmallString<64> nameBuf;
+  nameBuf += "$distributedProxyAdapter$";
+  nameBuf += baseIdent.str();
+  DeclName thunkName(C, C.getIdentifier(nameBuf),
+                     func->getName().getArgumentNames());
+
+  auto *thunk = FuncDecl::createImplicit(
+      C, swift::StaticSpellingKind::None, thunkName, SourceLoc(),
+      /*async=*/true, /*throws=*/true,
+      /*thrownType=*/Type(), genericParamList, params, resultTy, DC);
+  thunk->setSynthesized(true);
+
+  if (isa<ClassDecl>(DC))
+    thunk->addAttribute(new (C) FinalAttr(/*isImplicit=*/true));
+
+  thunk->setGenericSignature(baseSignature);
+  thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
+  // TODO(distributed): This thunk should be `nonisolated(nonsending)` so it
+  //   runs on the caller's (accessor's) executor, so we avoid an extra hop.
+  //   That makes it `@caller_isolated` (an implicit leading
+  //   `Builtin.ImplicitActor` parameter), which the hand-built distributed
+  //   target accessor in GenDistributed.cpp does not yet pass. Until the
+  //   accessor learns that ABI, match the regular distributed thunk's
+  //   isolation (`nonisolated` + `@concurrent`).
+  thunk->addAttribute(NonisolatedAttr::createImplicit(C));
+  thunk->addAttribute(new (C) ConcurrentAttr(/*IsImplicit=*/true));
+
+  return thunk;
+}
+
+static FuncDecl *
+createDistributedResolvableProxyAdapterThunkFunction(FuncDecl *func) {
+  auto DC = func->getDeclContext();
+
+  FuncDecl *thunk = createDistributedResolvableProxyAdapterThunkDecl(DC, func);
+  assert(thunk &&
+         "couldn't create a distributed resolvable proxy adapter thunk");
+
+  if (func->hasBody())
+    thunk->setBodySynthesizer(
+        deriveBodyDistributed_resolvableProxyAdapterThunk, func);
+
+  return thunk;
+}
+
+/// Determine whether \p func requires a 'resolvable proxy adapter' thunk:
+/// it does when it has a `@Resolvable` parameter (`any P` or `some P`) or
+/// a `@Resolvable` result, all of which are rewritten to the proxy stub
+/// type `$P`.
+static bool
+distributedTargetNeedsResolvableProxyAdapterThunk(AbstractFunctionDecl *func) {
+  // Does the result need a type substitution?
+  if (auto *fn = dyn_cast<FuncDecl>(func)) {
+    auto resultTy = fn->mapTypeIntoEnvironment(fn->getResultInterfaceType());
+    if (getDistributedResolvableProtocolStubType(resultTy))
+      return true;
+  }
+
+  // Do any of the parameters need type substitution?
+  for (auto *param : *func->getParameters()) {
+    auto paramTy = func->mapTypeIntoEnvironment(param->getInterfaceType());
+    if (getDistributedResolvableProtocolStubType(paramTy))
+      return true;
+  }
+
+  return false;
 }
 
 /******************************************************************************/
@@ -799,6 +1159,66 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
   }
 
   llvm_unreachable("Unable to synthesize distributed thunk");
+}
+
+FuncDecl *
+GetDistributedRecipientResolvableProxyAdapterThunkRequest::evaluate(
+    Evaluator &evaluator, Originator originator) const {
+  AbstractFunctionDecl *distributedTarget = nullptr;
+  if (auto *storage = originator.dyn_cast<AbstractStorageDecl *>()) {
+    if (!storage->isDistributed())
+      return nullptr;
+
+    if (auto *var = dyn_cast<VarDecl>(storage)) {
+      if (checkDistributedActorProperty(var, /*diagnose=*/false))
+        return nullptr;
+
+      distributedTarget = var->getAccessor(AccessorKind::Get);
+    } else {
+      llvm_unreachable("unsupported storage kind");
+    }
+  } else {
+    distributedTarget = cast<AbstractFunctionDecl *>(originator);
+    if (!distributedTarget->isDistributed())
+      return nullptr;
+  }
+  assert(distributedTarget);
+
+  // Avoid synthesizing for a target which had errors; mirrors the logic in
+  // GetDistributedThunkRequest so we never emit a thunk for an invalid decl.
+  if (swift::checkDistributedFunction(distributedTarget)) {
+    return nullptr;
+  }
+
+  auto &C = distributedTarget->getASTContext();
+
+  if (!canSynthesizeDistributedThunk(distributedTarget)) {
+    return nullptr;
+  }
+
+  if (distributedTarget->getInterfaceType()->hasError() ||
+      (!isa<AccessorDecl>(distributedTarget) &&
+       checkDistributedFunction(distributedTarget))) {
+    return nullptr;
+  }
+
+  if (auto func = dyn_cast<FuncDecl>(distributedTarget)) {
+    // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
+    // we won't be emitting the offending decl after all.
+    if (!C.getLoadedModule(C.Id_Distributed))
+      return nullptr;
+
+    // The resolvable proxy adapter thunk is only needed when a parameter or
+    // the result is `@Resolvable` `any P` / `some P` and so must be adapted
+    // to / from the proxy stub `$P`. Otherwise, the call is made directly.
+    if (!distributedTargetNeedsResolvableProxyAdapterThunk(func))
+      return nullptr;
+
+    return createDistributedResolvableProxyAdapterThunkFunction(func);
+  }
+
+  llvm_unreachable(
+      "Unable to synthesize distributed resolvable proxy adapter thunk");
 }
 
 static VarDecl *lookupDistributedActorProperty(NominalTypeDecl *decl,

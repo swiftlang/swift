@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -enable-copy-propagation=requested-passes-only -module-name consume %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 class Klass {}

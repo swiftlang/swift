@@ -19,6 +19,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExtInfo.h"
@@ -4862,7 +4863,8 @@ void ASTMangler::appendDistributedThunk(
     auto M = thunk->getModuleContext();
 
     SmallVector<ValueDecl *, 1> stubClassLookupResults;
-    Context.lookupInModule(M, llvm::Twine("$", P->getNameStr()).str(), stubClassLookupResults);
+    Context.lookupInModule(M, getDistributedResolvableProtocolStubName(P).str(),
+                           stubClassLookupResults);
 
     assert(stubClassLookupResults.size() <= 1 && "Found multiple distributed stub types!");
     if (stubClassLookupResults.size() > 0) {

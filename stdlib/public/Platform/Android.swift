@@ -11,3 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import SwiftAndroid // Clang module
+import SwiftOverlayShims
+
+nonisolated(unsafe) public var stdin: OpaquePointer {
+  OpaquePointer(_swift_stdlib_stdin())
+}
+nonisolated(unsafe) public var stdout: OpaquePointer {
+  OpaquePointer(_swift_stdlib_stdout())
+}
+nonisolated(unsafe) public var stderr: OpaquePointer {
+  OpaquePointer(_swift_stdlib_stderr())
+}

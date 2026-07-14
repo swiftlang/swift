@@ -564,6 +564,11 @@ extension ASTGenVisitor {
         return .ifConfigDecl(ifConfigDecl)
       case .switchCase(let switchCase):
         return .underlying(switchCase)
+      case .macroExpansionDecl(let node):
+        // Only '#warning'/'#error' are parsed in case position; evaluate them
+        // for their diagnostic side effect. They don't produce a case.
+        _ = self.maybeGenerateBuiltinPound(macroExpansionDecl: node)
+        return .skip
       }
     } body: { caseNode in
       allBridgedCases.append(self.generate(switchCase: caseNode))

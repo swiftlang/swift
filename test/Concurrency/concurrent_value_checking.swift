@@ -393,6 +393,34 @@ final class C14: Sendable { // expected-warning{{default initializer for 'C14' c
   @SomeActor let nc1 = NotConcurrent()
 }
 
+// Synthesizing an implicit Sendable conformance for global-actor-isolated
+// classes with non-Sendable superclasses was a mistake, but it is maintained
+// for source compatibility. When Sendable is not explicitly stated, the
+// diagnostic is suppressed.
+@MainActor
+class IsolatedNonSendable: NotSendable {}
+
+final class InheritedIsolationSubclass: IsolatedNonSendable {}
+
+func requiresSendable<T: Sendable>(_: T.Type) {}
+func testInheritedIsolationIsSendable() {
+  requiresSendable(InheritedIsolationSubclass.self)
+}
+
+// When Sendable IS explicitly requested, the diagnostic should still fire.
+protocol RefinesSendable: Sendable {}
+
+final class InheritedIsolationExplicitSendable: IsolatedNonSendable, Sendable {}
+// expected-warning @-1 {{class 'InheritedIsolationExplicitSendable' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note @-2 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note @-3 {{inherits from non-Sendable class 'IsolatedNonSendable'}}
+
+@MainActor
+final class IsolatedRefinedSendable: NotSendable, RefinesSendable {}
+// expected-warning @-1 {{class 'IsolatedRefinedSendable' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note @-2 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note @-3 {{inherits from non-Sendable class 'NotSendable'}}
+
 extension NotConcurrent {
   func f() { }
 

@@ -16,7 +16,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityInference.h"
@@ -296,6 +295,12 @@ Decl::getSemanticAvailableAttrs(bool includeInactive) const {
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return abiRole.getCounterpart()->getSemanticAvailableAttrs(includeInactive);
 
+  // Apply file defaults for availability attributes.
+  const_cast<Decl *>(this)->applyFileDefaults();
+
+  // We assume all requests that add attributes as a side effect have been made.
+  // Requesting ExpandMemberAttributeMacros or similar would be a cycle though,
+  // since it inspects availability as part of the request
   return SemanticAvailableAttributes(getAttrs(), this, includeInactive);
 }
 
@@ -417,10 +422,9 @@ bool Decl::isUnavailableInCurrentSwiftVersion() const {
 
 std::optional<SemanticAvailableAttr> Decl::getUnavailableAttr() const {
   auto context = AvailabilityContext::forDeploymentTarget(getASTContext());
-  if (auto constraint = getAvailabilityConstraintsForDecl(this, context)
-                            .getPrimaryConstraint()) {
-    if (constraint->isUnavailable())
-      return constraint->getAttr();
+  if (auto restriction = context.restrictionForDecl(this)) {
+    if (restriction->isUnavailable())
+      return restriction->getAttr();
   }
 
   return std::nullopt;
@@ -472,23 +476,24 @@ computeDeclRuntimeAvailability(const Decl *decl) {
   auto rootTargetDomains = getRootTargetDomains(ctx);
   auto remainingTargetDomains = rootTargetDomains;
 
-  AvailabilityConstraintFlags flags;
+  AvailabilityRestrictionFlags flags;
 
   // Semantic availability was already computed separately for any enclosing
   // extension.
-  flags |= AvailabilityConstraintFlag::SkipEnclosingExtension;
+  flags |= AvailabilityRestrictionFlag::SkipEnclosingExtension;
 
   // FIXME: [availability] Replace IncludeAllDomains with a RuntimeAvailability
-  // flag that includes the target variant constraints and keeps all constraints
-  // from active platforms.
-  flags |= AvailabilityConstraintFlag::IncludeAllDomains;
+  // flag that includes the target variant restrictions and keeps all
+  // restrictions from active platforms.
+  flags |= AvailabilityRestrictionFlag::IncludeAllDomains;
 
-  auto constraints = getAvailabilityConstraintsForDecl(
-      decl, AvailabilityContext::forInliningTarget(ctx), flags);
+  auto restrictions =
+      AvailabilityContext::forInliningTarget(ctx).allRestrictionsForDecl(decl,
+                                                                         flags);
 
-  // First, collect the unavailable domains from the constraints.
+  // First, collect the unavailable domains from the restrictions.
   llvm::SmallVector<AvailabilityDomain, 8> unavailableDomains;
-  getRuntimeUnavailableDomains(constraints, unavailableDomains, ctx);
+  getRuntimeUnavailableDomains(restrictions, unavailableDomains, ctx);
 
   // Check whether there are any available attributes that would make the
   // decl available in descendants of the unavailable domains.
@@ -499,10 +504,6 @@ computeDeclRuntimeAvailability(const Decl *decl) {
       continue;
 
     llvm::erase_if(unavailableDomains, [domain](auto unavailableDomain) {
-      // Unavailability in '*' cannot be superseded by an @available attribute
-      // for a more specific availability domain.
-      if (unavailableDomain.isUniversal())
-        return false;
       return unavailableDomain.contains(domain);
     });
   }
@@ -810,7 +811,7 @@ SemanticAvailableAttr::getIntroducedDomainAndRange(
     return std::nullopt;
 
   // For version-less domains, an attribute that does not indicate some other
-  // kind of unconditional availability constraint implicitly specifies that
+  // kind of unconditional availability restriction implicitly specifies that
   // the decl is available in all versions of the domain.
   switch (attr->getKind()) {
   case AvailableAttr::Kind::Default:

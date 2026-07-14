@@ -1,7 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -merge-cond_fails | %FileCheck %s
 // RUN: %target-sil-opt -enable-sil-verify-all %s -merge-cond_fails -mergeable-traps | %FileCheck %s --check-prefix CHECK-FORCE-MERGE
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

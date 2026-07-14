@@ -27,6 +27,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -149,7 +150,8 @@ addImplicitCodingKeys(NominalTypeDecl *target,
     InheritedEntry(TypeLoc::withoutLoc(codingKeyType))};
   ArrayRef<InheritedEntry> inherited = C.AllocateCopy(protoTypeLoc);
 
-  auto *enumDecl = new (C) EnumDecl(SourceLoc(), codingKeysEnumIdentifier,
+  auto anchorLoc = target->getStartLoc();
+  auto *enumDecl = new (C) EnumDecl(anchorLoc, codingKeysEnumIdentifier,
                                     SourceLoc(), inherited, nullptr, target);
   enumDecl->setImplicit();
   enumDecl->setSynthesized();

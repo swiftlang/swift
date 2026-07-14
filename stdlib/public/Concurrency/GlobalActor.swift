@@ -34,7 +34,7 @@ import Swift
 ///
 /// It is *not* necessary to override the ``sharedUnownedExecutor`` static
 /// property of the global actor, as its default implementation already
-/// delegates to the ``shared.unownedExecutor``, which is the most reasonable
+/// delegates to the `shared.unownedExecutor`, which is the most reasonable
 /// and correct implementation of this protocol requirement.
 ///
 /// You can find out more about custom executors, by referring to the

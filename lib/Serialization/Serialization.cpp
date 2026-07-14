@@ -230,16 +230,16 @@ namespace {
                                                     data_type_ref data) {
       uint32_t keyLength = key.str().size();
       assert(keyLength == static_cast<uint16_t>(keyLength));
-      uint32_t dataLength = (sizeof(uint32_t) * 2) * data.size();
+      uint64_t dataLength = (sizeof(uint32_t) * 2) * data.size();
       for (auto dataPair : data) {
         int32_t nameData = getNameDataForBase(dataPair.first);
         if (nameData > 0)
           dataLength += nameData;
       }
-      assert(dataLength == static_cast<uint16_t>(dataLength));
+      assert(llvm::isUInt<32>(dataLength) && "extension table entry too large");
       endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -2872,6 +2872,7 @@ void Serializer::writeLifetimeDependencies(
         info.isFromAnnotation(), info.hasCaptures(),
         info.hasInheritLifetimeParamIndices(),
         info.hasScopeLifetimeParamIndices(), info.hasAddressableParamIndices(),
+        info.hasConditionallyAddressableParamIndices(),
         paramIndices);
     paramIndices.clear();
   }
@@ -3724,6 +3725,20 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                               (unsigned)theAttr->getMode());
       return;
     }
+    case DeclAttrKind::COM: {
+      auto theAttr = cast<COMAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[COMDeclAttrLayout::Code];
+      bool interface = !theAttr->IID.empty();
+      StringRef id = interface ? theAttr->IID
+                               : theAttr->CLSID.value_or(StringRef());
+      // The +1 bias is used to indicate that the Threading Model does not apply
+      // (i.e. an interface).
+      unsigned model =
+          interface ? 0 : static_cast<unsigned>(theAttr->getThreadingModel()) + 1;
+      COMDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                    theAttr->isImplicit(), interface, model, id);
+      return;
+    }
     }
   }
 
@@ -4434,6 +4449,7 @@ public:
                                 S.addDeclRef(extendedNominal),
                                 contextID.getOpaqueValue(),
                                 extension->isImplicit(),
+                                extension->isMetatypeExtension(),
                                 S.addGenericSignatureRef(
                                            extension->getGenericSignature()),
                                 numConformances,

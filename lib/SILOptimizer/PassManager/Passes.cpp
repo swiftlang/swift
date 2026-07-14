@@ -41,25 +41,44 @@
 
 using namespace swift;
 
-bool swift::runSILDiagnosticPasses(SILModule &Module) {
+void swift::runSILGenPasses(SILModule &Module, bool VerifySILGen) {
   auto &opts = Module.getOptions();
 
   // Verify the module, if required.
-  // OSSA lifetimes are incomplete until the SILGenCleanup pass runs.
-  if (opts.VerifyAll)
+  // OSSA lifetimes are incomplete until after the SILGenCleanup pass runs.
+  if (opts.VerifyAll || VerifySILGen)
     Module.verifyIncompleteOSSA();
 
   // If we parsed a .sil file that is already in canonical form, don't rerun
-  // the diagnostic passes.
+  // the SILGen passes.
+  // TODO: would be nice if we had a "SILGen stage".
   if (Module.getStage() != SILStage::Raw)
-    return false;
+    return;
 
   executePassPipelinePlan(&Module,
                           SILPassPipelinePlan::getSILGenPassPipeline(opts),
                           /*isMandatory*/ true);
 
-  if (opts.VerifyAll)
+  // Check linear OSSA lifetimes.
+  if (opts.VerifyAll || VerifySILGen)
     Module.verifyOwnership();
+}
+
+bool swift::runSILDiagnosticPasses(SILModule &Module, bool RunSILGenPasses) {
+  // Callers may need us to run the pre-requisite SILGenPassPipeline first.
+  if (RunSILGenPasses)
+    runSILGenPasses(Module);
+
+  auto &opts = Module.getOptions();
+
+  // Ensure we're starting with something verified.
+  if (opts.VerifyAll)
+    Module.verify();
+
+  // If we parsed a .sil file that is already in canonical form, don't rerun
+  // the diagnostic passes.
+  if (Module.getStage() != SILStage::Raw)
+    return false;
 
   executePassPipelinePlan(&Module,
                           SILPassPipelinePlan::getDiagnosticPassPipeline(opts),

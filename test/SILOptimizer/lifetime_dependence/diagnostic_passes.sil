@@ -10,7 +10,6 @@
 //
 // This is a good place to put reduced .sil tests.
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
 
 sil_stage raw

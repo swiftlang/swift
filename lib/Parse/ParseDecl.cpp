@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/Decl.h"
@@ -3375,11 +3376,13 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       }
     }
 
-    if (!consumeIf(tok::r_paren)) {
+    SourceLoc rParenLoc;
+    if (!consumeIf(tok::r_paren, rParenLoc)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
     }
+    AttrRange = SourceRange(Loc, rParenLoc);
 
     if (!DiscardAttribute)
       Attributes.add(new (Context) DiagnoseAttr(*DiagGroupID, *BehaviorSpecifier,
@@ -3420,6 +3423,109 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     Attributes.add(new (Context) AlignmentAttr(alignmentValue, AtLoc, range,
                                                /*implicit*/ false));
     
+    break;
+  }
+
+  case DeclAttrKind::COM: {
+    if (!consumeIfAttributeLParen()) {
+      // Bare '@COM' with no arguments - COM participating, not externally
+      // instantiable (no CLSID).
+      if (!DiscardAttribute)
+        Attributes.add(new (Context) COMAttr(AtLoc, SourceRange(Loc),
+                                             /*interface=*/ "",
+                                             /*implementation=*/ std::nullopt,
+                                             COMThreadingModel::Apartment));
+      break;
+    }
+
+    StringRef Interface;
+    std::optional<StringRef> Implementation;
+    COMThreadingModel Threading = COMThreadingModel::Apartment;
+
+    auto failure = [this](const Token &Tok, auto id, auto &&...parameters) {
+      diagnose(Tok, id, std::forward<decltype(parameters)>(parameters)...);
+      skipUntilDeclStmtRBrace(tok::r_paren);
+      consumeIf(tok::r_paren);
+      return makeParserSuccess();
+    };
+
+    do {
+      struct {
+        Token token;
+        Identifier spelling;
+      } label;
+
+      if (!Tok.is(tok::identifier))
+        return failure(Tok, diag::attr_com_expected_label);
+
+      label.token = Tok;
+      consumeArgumentLabel(label.spelling, /*diagnoseDollarPrefix=*/true);
+      if (!consumeIf(tok::colon))
+        return failure(Tok, diag::attr_expected_colon_after_label,
+                       label.spelling.get());
+
+      if (label.spelling.is("interface") || label.spelling.is("implementation")) {
+        if (Tok.isNot(tok::string_literal))
+          return failure(Tok, diag::attr_expected_string_literal, AttrName);
+        std::optional<StringRef> value =
+              getStringLiteralIfNotInterpolated(Loc, ("'" + AttrName + "'").str());
+        consumeToken(tok::string_literal);
+
+        if (!value) {
+          DiscardAttribute = true;
+          break;
+        }
+
+        if (label.spelling.is("interface"))
+          Interface = *value;
+        else
+          Implementation = *value;
+      } else if (label.spelling.is("threading")) {
+        if (Tok.is(tok::identifier) && Tok.getText() == COM_MODULE_NAME &&
+            peekToken().is(tok::colon_colon)) {
+          consumeToken(tok::identifier);
+          consumeToken(tok::colon_colon);
+        }
+
+        if (Tok.isAny(tok::identifier) && Tok.getText() == "COMThreadingModel" &&
+            peekToken().is(tok::period))
+          consumeToken(tok::identifier);
+
+        if (!Tok.isAny(tok::period, tok::period_prefix))
+          return failure(Tok, diag::attr_com_expected_threading_model);
+        consumeToken();
+
+        std::optional<COMThreadingModel> Model =
+            llvm::StringSwitch<std::optional<COMThreadingModel>>(Tok.getText())
+                .Case("single", COMThreadingModel::Single)
+                .Cases({"apartment", "sta"}, COMThreadingModel::Apartment)
+                .Cases({"free", "mta"}, COMThreadingModel::Free)
+                .Case("both", COMThreadingModel::Both)
+                .Case("neutral", COMThreadingModel::Neutral)
+                .Default(std::nullopt);
+        if (!Model)
+          return failure(Tok, diag::attr_com_unknown_threading_model,
+                         Tok.getText());
+        consumeToken(tok::identifier);
+        Threading = *Model;
+      } else {
+        return failure(label.token, diag::attr_com_unknown_label,
+                       label.spelling.get());
+      }
+    } while (consumeIf(tok::comma));
+
+    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) COMAttr(AtLoc, AttrRange, Interface,
+                                           Implementation, Threading));
+
     break;
   }
 
@@ -6953,9 +7059,15 @@ ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes) {
   assert(Tok.isContextualKeyword("using"));
   DebuggerContextChange DCC(*this);
+  ParserStatus Status;
 
   if (!Context.LangOpts.hasFeature(Feature::DefaultIsolationPerFile)) {
     diagnose(Tok, diag::experimental_using_decl_disabled);
+  }
+
+  if (!Attributes.isEmpty()) {
+    diagnose((*Attributes.begin())->getStartLoc(),
+             diag::using_decl_rejects_attributes);
   }
 
   SourceLoc UsingLoc = consumeToken();
@@ -6967,42 +7079,37 @@ ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
     return makeParserCodeCompletionStatus();
   }
 
-  SourceLoc AtLoc;
-  // @<<attribute>>
-  if (Tok.is(tok::at_sign))
-    AtLoc = consumeToken();
+  DeclAttributes specifiedAttributes;
 
-  SourceLoc SpecifierLoc;
-  Identifier RawSpecifier;
-
-  if (parseIdentifier(RawSpecifier, SpecifierLoc,
-                      /*diagnoseDollarPrefix=*/false,
-                      diag::expected_identifier_in_decl, "using"))
-    return nullptr;
-
-  std::optional<UsingSpecifier> Specifier =
-      llvm::StringSwitch<std::optional<UsingSpecifier>>(RawSpecifier.str())
-          .Case("MainActor", UsingSpecifier::MainActor)
-          .Case("nonisolated", UsingSpecifier::Nonisolated)
-          .Default(std::nullopt);
-
-  if (!Specifier) {
-    diagnose(SpecifierLoc, diag::using_decl_invalid_specifier);
-    return nullptr;
+  if (Tok.is(tok::at_sign)) {
+    // @<<attribute>>
+    SourceLoc AtEndLoc = Tok.getRange().getEnd();
+    SourceLoc AtLoc = consumeToken();
+    Status |= parseDeclAttribute(specifiedAttributes, AtLoc, AtEndLoc);
+  } else if (Tok.isContextualKeyword("nonisolated")) {
+    // <modifier> (we only accept nonisolated)
+    Tok.setKind(tok::contextual_keyword);
+    Status |= parseNewDeclAttribute(specifiedAttributes, /*AtLoc=*/{},
+                                    DeclAttrKind::Nonisolated);
+  } else {
+    diagnose(Tok, diag::using_decl_invalid_specifier);
+    Status.setIsParseError();
+    return Status;
   }
 
-  // Complain the `using` not being at top-level only after the specifier
-  // has been consumed, otherwise the specifier is going to be interpreted
-  // as a start of another declaration.
-  if (!CodeCompletionCallbacks && !DCC.movedToTopLevel() &&
-      !(Flags & PD_AllowTopLevel)) {
-    diagnose(UsingLoc, diag::decl_inner_scope);
-    return nullptr;
+  if (Status.isErrorOrHasCompletion())
+    return Status;
+
+  // parseDeclAttribute can succeed with recovery in some branches, and not
+  // provide any attributes.
+  if (specifiedAttributes.isEmpty()) {
+    Status.setIsParseError();
+    return Status;
   }
 
-  auto *UD = UsingDecl::create(Context, UsingLoc, AtLoc ? AtLoc : SpecifierLoc,
-                               *Specifier, CurDeclContext);
-  return DCC.fixupParserResult(UD);
+  auto *UD =
+      UsingDecl::create(Context, UsingLoc, specifiedAttributes, CurDeclContext);
+  return DCC.fixupParserResult(Status, UD);
 }
 
 /// Parse an inheritance clause.
@@ -7457,6 +7564,14 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                              CurDeclContext,
                                              trailingWhereClause);
   ext->attachParsedAttrs(Attributes);
+
+  // Detect `extension P.Protocol { }` — a protocol metatype extension.
+  // Strip the `.Protocol` suffix so the extension binds to the protocol `P`.
+  if (auto *PTR = dyn_cast_or_null<ProtocolTypeRepr>(extendedType.getPtrOrNull())) {
+    ext->setIsMetatypeExtension();
+    ext->setExtendedTypeRepr(PTR->getBase());
+  }
+
   if (trailingWhereHadCodeCompletion && CodeCompletionCallbacks)
     CodeCompletionCallbacks->setParsedDecl(ext);
 

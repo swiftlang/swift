@@ -60,7 +60,7 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 }
 
 @_transparent
-@_alwaysEmitIntoClient // Introduced in 5.7
+@export(implementation) // Introduced in 5.7
 public // @testable
 func _isStdlibDebugChecksEnabled() -> Bool {
 #if SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
@@ -329,7 +329,7 @@ internal func _undefined<T>(
 #else
 @inline(__always)
 #endif
-@_alwaysEmitIntoClient // COMPILER_INTRINSIC
+@export(implementation) // COMPILER_INTRINSIC
 internal func _undefinedEditorPlaceholder(
   _filenameStart: Builtin.RawPointer,
   _filenameLength: Builtin.Word,

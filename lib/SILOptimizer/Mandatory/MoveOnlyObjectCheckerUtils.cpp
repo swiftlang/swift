@@ -232,6 +232,7 @@ bool MoveOnlyObjectCheckerPImpl::checkForSameInstMultipleUseErrors(
     case OperandOwnership::TrivialUse:
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::DebugUse:
       // Look through copy_value.
       if (auto *cvi = dyn_cast<CopyValueInst>(nextUse->getUser())) {
         for (auto *use : cvi->getUses())

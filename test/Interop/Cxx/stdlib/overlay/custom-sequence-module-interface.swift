@@ -1,29 +1,27 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -module-cache-path %t -enable-experimental-feature BorrowingSequence | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=default -module-cache-path %t | %FileCheck %s
 
-// REQUIRES: swift_feature_BorrowingSequence
-
-// CHECK: struct SimpleSequence : CxxConvertibleToCollection, CxxBorrowingSequence {
+// CHECK: struct SimpleSequence : CxxConvertibleToCollection, CxxIterable {
 // CHECK:   typealias Element = ConstIterator.Pointee
 // CHECK:   typealias RawIterator = ConstIterator
 // CHECK:   typealias BorrowingIterator = CxxBorrowingIterator<SimpleSequence>
 // CHECK:   typealias Iterator = CxxIterator<SimpleSequence>
 // CHECK: }
 
-// CHECK: struct SimpleSequenceWithOutOfLineEqualEqual : CxxConvertibleToCollection, CxxBorrowingSequence {
+// CHECK: struct SimpleSequenceWithOutOfLineEqualEqual : CxxConvertibleToCollection, CxxIterable {
 // CHECK:   typealias Element = ConstIteratorOutOfLineEq.Pointee
 // CHECK:   typealias RawIterator = ConstIteratorOutOfLineEq
 // CHECK:   typealias BorrowingIterator = CxxBorrowingIterator<SimpleSequenceWithOutOfLineEqualEqual>
 // CHECK:   typealias Iterator = CxxIterator<SimpleSequenceWithOutOfLineEqualEqual>
 // CHECK: }
 
-// CHECK: struct SimpleArrayWrapperNullableIterators : CxxConvertibleToCollection, CxxBorrowingSequence {
+// CHECK: struct SimpleArrayWrapperNullableIterators : CxxConvertibleToCollection, CxxIterable {
 // CHECK:   typealias Element = Optional<UnsafePointer<Int32>>.Pointee
 // CHECK:   typealias RawIterator = UnsafePointer<Int32>?
 // CHECK:   typealias BorrowingIterator = CxxBorrowingIterator<SimpleArrayWrapperNullableIterators>
 // CHECK:   typealias Iterator = CxxIterator<SimpleArrayWrapperNullableIterators>
 // CHECK: }
 
-// CHECK: struct SimpleEmptySequence : CxxConvertibleToCollection, CxxBorrowingSequence {
+// CHECK: struct SimpleEmptySequence : CxxConvertibleToCollection, CxxIterable {
 // CHECK:   typealias Element = Optional<UnsafePointer<Int32>>.Pointee
 // CHECK:   typealias RawIterator = UnsafePointer<Int32>?
 // CHECK:   typealias BorrowingIterator = CxxBorrowingIterator<SimpleEmptySequence>
@@ -69,7 +67,7 @@
 // CHECK: }
 // CHECK: typealias HasUninstantiatableIterator = HasTemplatedIterator<CInt, NoDefinition<CInt>>
 
-// CHECK: struct HasInputOutputConstIterator : CxxConvertibleToCollection, CxxBorrowingSequence {
+// CHECK: struct HasInputOutputConstIterator : CxxConvertibleToCollection, CxxIterable {
 // CHECK:   typealias Element = InputOutputConstIterator.Pointee
 // CHECK:   typealias RawIterator = HasInputOutputConstIterator.iterator
 // CHECK:   typealias BorrowingIterator = CxxBorrowingIterator<HasInputOutputConstIterator>

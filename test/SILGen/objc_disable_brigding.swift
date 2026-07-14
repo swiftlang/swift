@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t -I %S/../Inputs/ObjCBridging %S/../Inputs/ObjCBridging/Appliances.swift -I %t
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: -sdk %S/Inputs -I %t) -o /dev/null -enable-sil-opaque-values -I %S/../Inputs/ObjCBridging -disable-swift-bridge-attr -Xllvm -sil-full-demangle %s
 // RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -I %S/../Inputs/ObjCBridging -disable-swift-bridge-attr -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 // REQUIRES: objc_interop

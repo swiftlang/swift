@@ -389,7 +389,7 @@ ProtocolConformanceDescriptor::getWitnessTable(
     ConformanceExecutionContext &context
 ) const {
   // If needed, check the conditional requirements.
-  llvm::SmallVector<const void *, 8> conditionalArgs;
+  llvm::SmallVector<const void *, 2> conditionalArgs;
 
   llvm::ArrayRef<GenericParamDescriptor> genericParams;
   if (auto typeDescriptor = type->getTypeContextDescriptor())
@@ -1459,66 +1459,58 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
     return {witness, false};
   }
 
-  // Scan conformance records.
-  llvm::SmallDenseMap<const Metadata *, ConformanceLookupResult> foundWitnesses;
-  auto processSection = [&](const ConformanceSection &section) {
-    // Eagerly pull records for nondependent witnesses into our cache.
-    auto processDescriptor = [&](const ProtocolConformanceDescriptor &descriptor) {
+  auto traceState =
+      runtime::trace::protocol_conformance_scan_begin(type, protocol);
+
+  // Scan conformance records, collecting the matching (type, descriptor) pairs.
+  // The common case is a single matching conformance descriptor.
+  llvm::SmallVector<
+      std::pair<const Metadata *, const ProtocolConformanceDescriptor *>, 1>
+      foundMatches;
+  auto snapshot = C.SectionsToScan.snapshot();
+  for (const auto &section : snapshot) {
+    for (const auto &record : section) {
+      const ProtocolConformanceDescriptor &descriptor = *record.get();
+
       // We only care about conformances for this protocol.
       if (descriptor.getProtocol() != protocol)
-        return;
+        continue;
 
-      // If there's a matching type, record the positive result and return it.
-      // The matching type is exact, so they can't go stale, and we should
-      // always cache them.
+      // If there's a matching type, record it. The matching type is exact, so
+      // it can't go stale.
       ConformanceCandidate candidate(descriptor);
       const Metadata *matchingType;
       std::optional<MetadataState> finalState;
       std::tie(matchingType, finalState) =
           candidate.getMatchingType(type, instantiateSuperclassMetadata);
       noteFinalMetadataState(finalState);
-      if (matchingType) {
-        auto witness = ConformanceLookupResult::fromConformance(
-            matchingType, &descriptor);
-        bool allowSaveDescriptor = true;
-        C.cacheResult(matchingType, protocol, witness, /*always cache*/ 0, allowSaveDescriptor);
-        foundWitnesses.insert({matchingType, witness});
-      }
-    };
-
-    if (C.scanSectionsBackwards) {
-      for (const auto &record : llvm::reverse(section))
-        processDescriptor(*record.get());
-    } else {
-      for (const auto &record : section)
-        processDescriptor(*record.get());
+      if (matchingType)
+        foundMatches.push_back({matchingType, &descriptor});
     }
-  };
-
-  auto traceState =
-      runtime::trace::protocol_conformance_scan_begin(type, protocol);
-
-  auto snapshot = C.SectionsToScan.snapshot();
-  if (C.scanSectionsBackwards) {
-    for (auto &section : llvm::reverse(snapshot))
-      processSection(section);
-  } else {
-    for (auto &section : snapshot)
-      processSection(section);
   }
 
-  // Find the most specific conformance that was scanned.
-  ConformanceLookupResult foundWitness = nullptr;
+  // Find the most specific matching conformance, walking from the type up
+  // through its superclasses.
   const Metadata *foundType = nullptr;
+  const ProtocolConformanceDescriptor *foundDescriptor = nullptr;
 
   MaybeIncompleteSuperclassIterator superclassIterator{
       type, instantiateSuperclassMetadata};
   for (; auto searchType = superclassIterator.metadata; ++superclassIterator) {
-    const auto witnessIt = foundWitnesses.find(searchType);
-    if (witnessIt != foundWitnesses.end()) {
-      if (!foundType) {
-        foundWitness = witnessIt->getSecond(); // may be null
+    const ProtocolConformanceDescriptor *matchDescriptor = nullptr;
+    for (const auto &match : foundMatches) {
+      if (match.first == searchType) {
+        matchDescriptor = match.second;
+        // In forward scan order the first match for a type wins. When scanning
+        // backwards, the last-registered conformance wins instead.
+        if (!C.scanSectionsBackwards)
+          break;
+      }
+    }
+    if (matchDescriptor) {
+      if (SWIFT_LIKELY(!foundType)) {
         foundType = searchType;
+        foundDescriptor = matchDescriptor;
       } else {
         auto foundName = swift_getTypeName(foundType, true);
         auto searchName = swift_getTypeName(searchType, true);
@@ -1533,6 +1525,18 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
     }
   }
   noteFinalMetadataState(superclassIterator.state);
+
+  // Resolve the witness table for the most specific match now that the scan is
+  // complete.
+  ConformanceLookupResult foundWitness = nullptr;
+  if (foundType) {
+    foundWitness =
+        ConformanceLookupResult::fromConformance(foundType, foundDescriptor);
+    // The match is exact, so it can't go stale; always cache it and save the
+    // descriptor.
+    C.cacheResult(foundType, protocol, foundWitness, /*always cache*/ 0,
+                  /*allowSaveDescriptor*/ true);
+  }
 
   traceState.end(foundWitness.witnessTable);
 
@@ -1796,12 +1800,30 @@ bool swift::_swift_class_isSubclass(const Metadata *subclass,
   return isSubclass(subclass, superclass);
 }
 
-static std::optional<TypeLookupError>
-checkGenericRequirement(
+/// Resolve a mangled type name for a generic requirement check.
+///
+/// This is deliberately kept out-of-line: it constructs the `std::function`
+/// adaptors needed to call `swift_getTypeByMangledName` (which takes them by
+/// value) and uses demangler scratch space, none of which is live across the
+/// recursive conformance check that `checkGenericRequirement` performs
+/// afterwards. Keeping it in its own frame prevents that scratch from being
+/// held on the stack across the recursion, which matters on deeply nested
+/// conditional-conformance chains.
+static SWIFT_NOINLINE TypeLookupErrorOr<TypeInfo>
+resolveTypeForRequirementCheck(
+    llvm::StringRef mangledName, const void *const *extraArguments,
+    SubstGenericParameterRefFn substGenericParam,
+    SubstDependentWitnessTableRefFn substWitnessTable) {
+  return swift_getTypeByMangledName(MetadataState::Abstract, mangledName,
+                                    extraArguments, substGenericParam,
+                                    substWitnessTable);
+}
+
+static std::optional<TypeLookupError> checkGenericRequirement(
     const GenericRequirementDescriptor &req,
     llvm::SmallVectorImpl<const void *> &extraArguments,
-    SubstGenericParameterFn substGenericParam,
-    SubstDependentWitnessTableFn substWitnessTable,
+    SubstGenericParameterRefFn substGenericParam,
+    SubstDependentWitnessTableRefFn substWitnessTable,
     llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed,
     ConformanceExecutionContext *context) {
   assert(!req.getFlags().isPackRequirement());
@@ -1811,9 +1833,9 @@ checkGenericRequirement(
     return TypeLookupError("unknown kind");
 
   // Resolve the subject generic parameter.
-  auto result = swift_getTypeByMangledName(
-      MetadataState::Abstract, req.getParam(), extraArguments.data(),
-      substGenericParam, substWitnessTable);
+  auto result =
+      resolveTypeForRequirementCheck(req.getParam(), extraArguments.data(),
+                                     substGenericParam, substWitnessTable);
   if (result.getError())
     return *result.getError();
   const Metadata *subjectType = result.getType().getMetadata();
@@ -1842,9 +1864,9 @@ checkGenericRequirement(
 
   case GenericRequirementKind::SameType: {
     // Demangle the second type under the given substitutions.
-    auto result = swift_getTypeByMangledName(
-        MetadataState::Abstract, req.getMangledTypeName(),
-        extraArguments.data(), substGenericParam, substWitnessTable);
+    auto result = resolveTypeForRequirementCheck(
+        req.getMangledTypeName(), extraArguments.data(), substGenericParam,
+        substWitnessTable);
     if (result.getError())
       return *result.getError();
     auto otherType = result.getType().getMetadata();
@@ -1866,9 +1888,9 @@ checkGenericRequirement(
 
   case GenericRequirementKind::BaseClass: {
     // Demangle the base type under the given substitutions.
-    auto result = swift_getTypeByMangledName(
-        MetadataState::Abstract, req.getMangledTypeName(),
-        extraArguments.data(), substGenericParam, substWitnessTable);
+    auto result = resolveTypeForRequirementCheck(
+        req.getMangledTypeName(), extraArguments.data(), substGenericParam,
+        substWitnessTable);
     if (result.getError())
       return *result.getError();
     auto baseType = result.getType().getMetadata();
@@ -1914,12 +1936,12 @@ checkGenericRequirement(
                                (unsigned)req.getKind());
 }
 
-static std::optional<TypeLookupError>
+static SWIFT_NOINLINE std::optional<TypeLookupError>
 checkGenericPackRequirement(
     const GenericRequirementDescriptor &req,
     llvm::SmallVectorImpl<const void *> &extraArguments,
-    SubstGenericParameterFn substGenericParam,
-    SubstDependentWitnessTableFn substWitnessTable,
+    SubstGenericParameterRefFn substGenericParam,
+    SubstDependentWitnessTableRefFn substWitnessTable,
     llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed,
     ConformanceExecutionContext *context) {
   assert(req.getFlags().isPackRequirement());
@@ -2093,12 +2115,13 @@ checkGenericPackRequirement(
                                (unsigned)req.getKind());
 }
 
-static std::optional<TypeLookupError>
-checkGenericValueRequirement(const GenericRequirementDescriptor &req,
-                             llvm::SmallVectorImpl<const void *> &extraArguments,
-                             SubstGenericParameterFn substGenericParam,
-                             SubstDependentWitnessTableFn substWitnessTable,
-                     llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed) {
+static SWIFT_NOINLINE std::optional<TypeLookupError>
+checkGenericValueRequirement(
+    const GenericRequirementDescriptor &req,
+    llvm::SmallVectorImpl<const void *> &extraArguments,
+    SubstGenericParameterRefFn substGenericParam,
+    SubstDependentWitnessTableRefFn substWitnessTable,
+    llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed) {
   assert(req.getFlags().isValueRequirement());
 
   // Make sure we understand the requirement we're dealing with.
@@ -2381,9 +2404,9 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     llvm::ArrayRef<GenericParamDescriptor> genericParams,
     llvm::ArrayRef<GenericRequirementDescriptor> requirements,
     llvm::SmallVectorImpl<const void *> &extraArguments,
-    SubstGenericParameterFn substGenericParam,
-    SubstGenericParameterOrdinalFn substGenericParamOrdinal,
-    SubstDependentWitnessTableFn substWitnessTable,
+    SubstGenericParameterRefFn substGenericParam,
+    SubstGenericParameterOrdinalRefFn substGenericParamOrdinal,
+    SubstDependentWitnessTableRefFn substWitnessTable,
     ConformanceExecutionContext *context) {
   // The suppressed conformances for each generic parameter.
   llvm::SmallVector<InvertibleProtocolSet, 4> allSuppressed;

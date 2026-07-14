@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -parse-as-library -O -emit-sil %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // Check that values of internal and private global variables, which are provably assigned only 
 // once, are propagated into their uses and enable further optimizations like constant

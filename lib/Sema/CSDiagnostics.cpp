@@ -1194,7 +1194,7 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
     return true;
   }
 
-  auto CTP = getConstraintSystem().getContextualTypePurpose(AE);
+  auto CTP = FailureDiagnostic::getContextualTypePurpose(AE);
   emitDiagnostic(diag::should_use_dictionary_literal,
                  getToType()->lookThroughAllOptionalTypes(),
                  CTP == CTP_Initialization);
@@ -2258,7 +2258,7 @@ bool AssignmentFailure::diagnoseAsError() {
         if (auto *nominal = typeContext->getSelfNominalTypeDecl()) {
           SmallVector<ValueDecl *, 2> results;
           DC->lookupQualified(nominal, VD->createNameRef(), Loc,
-                              NL_QualifiedDefault, results);
+                              NLFlags::QualifiedDefault, results);
 
           auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
             // We're looking for a settable property that is the same type as
@@ -3034,8 +3034,8 @@ bool ContextualFailure::diagnoseKeyPathLiteralMutabilityMismatch() const {
       continue;
 
     if (auto *setter = storageDecl->getOpaqueAccessor(AccessorKind::Set)) {
-      if (getUnsatisfiedAvailabilityConstraint(setter, S.getDC(),
-                                               component.getLoc())) {
+      if (getUnsatisfiedAvailabilityRestriction(setter, S.getDC(),
+                                                component.getLoc())) {
         auto where =
             ExportContext::forFunctionBody(S.getDC(), component.getLoc());
         return diagnoseDeclAvailability(setter, component.getLoc(),
@@ -3656,8 +3656,12 @@ bool ContextualFailure::tryProtocolConformanceFixIt() const {
     }
   }
 
-  assert(!missingProtoTypeStrings.empty() &&
-         "type already conforms to all the protocols?");
+  if (missingProtoTypeStrings.empty()) {
+    // This can happen if a type is declared as implementing all the
+    // protocols, but where the conformance to one or more protocols is
+    // invalid.
+    return false;
+  }
 
   // Combine all protocol names together, separated by commas.
   std::string protoString = llvm::join(missingProtoTypeStrings, ", ");
@@ -6218,6 +6222,38 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
     addFixIts(emitDiagnosticAt(diagLoc, diag::argument_out_of_order_named_named,
                                first, second));
   }
+  return true;
+}
+
+bool OutOfOrderArgumentFailure::diagnoseAsNote() {
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *argList = getArgumentListFor(getLocator());
+  if (!argList)
+    return false;
+
+  auto first = argList->getLabel(ArgIdx);
+  auto second = argList->getLabel(PrevArgIdx);
+
+  if (first.nonempty() && second.nonempty()) {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_named, first, second);
+  } else if (first.empty() && second.empty()) {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_unnamed, ArgIdx + 1,
+                     PrevArgIdx + 1);
+  } else if (first.empty()) {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_unnamed_named, ArgIdx + 1,
+                     second);
+  } else {
+    emitDiagnosticAt(overload->choice.getDecl(),
+                     diag::argument_out_of_order_note_named_unnamed, first,
+                     PrevArgIdx + 1);
+  }
+
   return true;
 }
 
@@ -9891,6 +9927,22 @@ bool DisallowedIsolatedConformance::diagnoseAsError() {
 
   if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
     emitDiagnosticAt(decl, diag::decl_declared_here, decl);
+  }
+
+  return true;
+}
+
+bool NonClassBaseInDynamicMemberLookup::diagnoseAsError() {
+  emitDiagnostic(diag::keypath_dynamic_member_lookup_expects_class_base,
+                 BaseType, Member);
+
+  auto *loc = getLocator();
+  auto *memberLoc =
+      getConstraintLocator(loc->getAnchor(), loc->getPath().drop_back());
+
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(memberLoc)) {
+    emitDiagnostic(diag::keypath_dynamic_member_lookup_expects_class_base_note,
+                   overload->choice.getBaseType());
   }
 
   return true;

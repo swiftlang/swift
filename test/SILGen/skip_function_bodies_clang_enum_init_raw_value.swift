@@ -1,4 +1,5 @@
 // RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -module-name main -import-objc-header %S/Inputs/open_enum.h -experimental-skip-non-inlinable-function-bodies
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name main -import-objc-header %S/Inputs/open_enum.h -experimental-skip-non-inlinable-function-bodies | %FileCheck %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name main -import-objc-header %S/Inputs/open_enum.h -experimental-skip-non-inlinable-function-bodies-without-types | %FileCheck %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name main -import-objc-header %S/Inputs/open_enum.h -debug-forbid-typecheck-prefix SKIP_ALL_NO_TYPECHECK -experimental-skip-all-function-bodies | %FileCheck %s --check-prefix=CHECK-SKIP-ALL

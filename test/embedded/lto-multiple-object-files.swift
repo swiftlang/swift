@@ -9,10 +9,9 @@
 // RUN: %{python} %utils/split_file.py -o %t %s
 
 // RUN: %target-swift-frontend -Osize -lto=llvm-full %t/MyFile1.swift %t/MyFile2.swift -enable-experimental-feature Embedded -emit-bc -num-threads 2 -o %t/MyFile1.o -o %t/MyFile2.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt -Oz %t/MyFile1.o %t/MyFile2.o %target-embedded-posix-shim -o %t/a.out
+// RUN: %target-embedded-link %target-clang-resource-dir-opt -Oz %t/MyFile1.o %t/MyFile2.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=wasip1

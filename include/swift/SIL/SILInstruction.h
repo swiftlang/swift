@@ -2768,8 +2768,15 @@ class ApplyInstBase<Impl, Base, false> : public Base {
   /// Stores an ApplyOptions.
   unsigned Options: 2;
 
+  /// Whether this apply has trailing per-argument SILLocation storage.
+  /// When true, `numTrailingObjects(SILLocation)` is `NumCallArguments`
+  /// and every slot in the trailing array holds a valid (non-null)
+  /// location. When false, no SILLocation storage is allocated and
+  /// `getArgumentLoc()` always falls back to the apply's anchor.
+  unsigned HasArgumentLocs : 1;
+
   /// The number of call arguments as required by the callee.
-  unsigned NumCallArguments : 30;
+  unsigned NumCallArguments : 29;
 
   /// The total number of type-dependent operands.
   unsigned NumTypeDependentOperands;
@@ -2786,14 +2793,22 @@ protected:
                 SILValue callee, SILType substCalleeType, SubstitutionMap subs,
                 ArrayRef<SILValue> args,
                 ArrayRef<SILValue> typeDependentOperands,
+                std::optional<ArrayRef<SILLocation>> argLocs,
                 const GenericSpecializationInformation *specializationInfo,
                 BaseArgTys... baseArgs)
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
-        SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
+        SpecializationInfo(specializationInfo),
+        // The "all-or-nothing" contract: nullopt or empty ArrayRef means
+        // no per-argument storage; otherwise the array must be parallel
+        // to `args` (asserted below).
+        HasArgumentLocs(argLocs.has_value() && !argLocs->empty()),
+        NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
         Substitutions(subs.getCanonical()) {
     ASSERT(!!subs == !!callee->getType().castTo<SILFunctionType>()
         ->getInvocationGenericSignature());
+    assert((!argLocs || argLocs->empty() || argLocs->size() == args.size()) &&
+           "argLocs, when supplied, must be parallel to args");
 
     // Initialize the operands.
     auto allOperands = getAllOperands();
@@ -2804,6 +2819,20 @@ protected:
     for (size_t i : indices(typeDependentOperands)) {
       new (&allOperands[NumStaticOperands + args.size() + i])
         Operand(this, typeDependentOperands[i]);
+    }
+
+    // Initialize the per-argument locations only when storage was
+    // reserved. The invariant is "if HasArgumentLocs, every slot holds
+    // a valid (non-null) SILLocation". Asserted per-slot here so any
+    // producer that drops a null into the array trips a debug check
+    // rather than corrupting downstream consumers.
+    if (auto argLocsBuf = getArgumentLocsBuf()) {
+      for (size_t i : indices(args)) {
+        assert(!(*argLocs)[i].isNull() &&
+               "every argLoc slot must be a valid SILLocation when "
+               "per-argument location storage is allocated");
+        ::new (&(*argLocsBuf)[i]) SILLocation((*argLocs)[i]);
+      }
     }
   }
 
@@ -2817,6 +2846,29 @@ protected:
 
   unsigned numTrailingObjects(OverloadToken<Operand>) const {
     return getNumAllOperands();
+  }
+
+  unsigned numTrailingObjects(OverloadToken<SILLocation>) const {
+    return HasArgumentLocs ? NumCallArguments : 0;
+  }
+
+  /// Returns the trailing per-argument SILLocation buffer, or
+  /// `std::nullopt` when no storage was reserved on this apply. The
+  /// optional shape mirrors the in-memory invariant: an apply either
+  /// has zero per-argument location slots or it has exactly
+  /// NumCallArguments of them; "empty buffer" is not a valid state.
+  std::optional<MutableArrayRef<SILLocation>> getArgumentLocsBuf() {
+    if (!HasArgumentLocs)
+      return std::nullopt;
+    return asImpl().template getTrailingObjectsNonStrict<SILLocation>(
+        NumCallArguments);
+  }
+
+  std::optional<ArrayRef<SILLocation>> getArgumentLocsBuf() const {
+    if (!HasArgumentLocs)
+      return std::nullopt;
+    return asImpl().template getTrailingObjectsNonStrict<SILLocation>(
+        NumCallArguments);
   }
 
   static size_t getNumAllOperands(ArrayRef<SILValue> args,
@@ -3018,6 +3070,44 @@ public:
   /// Set the ith argument of this instruction.
   void setArgument(unsigned i, SILValue V) {
     return getArgumentOperands()[i].set(V);
+  }
+
+  /// Returns the per-argument SILLocations stored on this apply, parallel
+  /// to `getArguments()`. `std::nullopt` when no per-argument storage was
+  /// reserved at construction time; when present, every slot is
+  /// guaranteed to hold a valid (non-null) location for the corresponding
+  /// argument.
+  std::optional<ArrayRef<SILLocation>> getArgumentLocs() const {
+    return getArgumentLocsBuf();
+  }
+
+  /// Returns the SILLocation associated with the argument at \p argIdx,
+  /// falling back to the apply's anchor location when no per-argument
+  /// storage was allocated. Out-of-range indices also return the anchor
+  /// location — defensive for inliner / optimizer call sites that derive
+  /// `argIdx` from a callee's SIL argument list which can include
+  /// indirect-result slots not modelled in the apply's NumCallArguments.
+  SILLocation getArgumentLoc(unsigned argIdx) const {
+    if (argIdx >= NumCallArguments)
+      return this->getLoc();
+    if (auto buf = getArgumentLocsBuf())
+      return (*buf)[argIdx];
+    return this->getLoc();
+  }
+
+  /// Set the per-argument location for the argument at \p argIdx. Requires
+  /// that this apply was constructed with per-argument location storage
+  /// (i.e. `getArgumentLocs()` returns a value) and \p loc must be a
+  /// valid (non-null) SILLocation, preserving the "every slot is valid"
+  /// invariant.
+  void setArgumentLoc(unsigned argIdx, SILLocation loc) {
+    assert(argIdx < NumCallArguments);
+    assert(!loc.isNull() &&
+           "setArgumentLoc requires a valid (non-null) SILLocation");
+    auto buf = getArgumentLocsBuf();
+    assert(buf && "setArgumentLoc requires the apply to have per-argument "
+                  "location storage; pass argLocs at construction time");
+    (*buf)[argIdx] = loc;
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
@@ -3258,13 +3348,13 @@ public:
 class ApplyInst final
     : public InstructionBase<SILInstructionKind::ApplyInst,
                              ApplyInstBase<ApplyInst, SingleValueInstruction>>,
-      public llvm::TrailingObjects<ApplyInst, Operand> {
+      public llvm::TrailingObjects<ApplyInst, Operand, SILLocation> {
   friend SILBuilder;
 
   ApplyInst(SILDebugLocation debugLoc, SILValue callee, SILType substCalleeType,
             SILType returnType, SubstitutionMap substitutions,
             ArrayRef<SILValue> args, ArrayRef<SILValue> typeDependentOperands,
-            ApplyOptions options,
+            std::optional<ArrayRef<SILLocation>> argLocs, ApplyOptions options,
             const GenericSpecializationInformation *sSpecializationInfo,
             std::optional<ApplyIsolationCrossing> isolationCrossing);
 
@@ -3275,7 +3365,8 @@ class ApplyInst final
          std::optional<SILModuleConventions> moduleConventions,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
-         std::optional<ApplyIsolationCrossing> isolationCrossing);
+         std::optional<ApplyIsolationCrossing> isolationCrossing,
+         std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt);
 
 public:
   bool hasGuaranteedResult() const {
@@ -3296,10 +3387,10 @@ public:
 /// PartialApplyInst - Represents the creation of a closure object by partial
 /// application of a function value.
 class PartialApplyInst final
-    : public InstructionBase<SILInstructionKind::PartialApplyInst,
-                             ApplyInstBase<PartialApplyInst,
-                                           SingleValueInstruction>>,
-      public llvm::TrailingObjects<PartialApplyInst, Operand> {
+    : public InstructionBase<
+          SILInstructionKind::PartialApplyInst,
+          ApplyInstBase<PartialApplyInst, SingleValueInstruction>>,
+      public llvm::TrailingObjects<PartialApplyInst, Operand, SILLocation> {
   USE_SHARED_UINT8;
 
   friend SILBuilder;
@@ -3311,12 +3402,11 @@ public:
 
 private:
   PartialApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
-                   SILType SubstCalleeType,
-                   SubstitutionMap Substitutions,
+                   SILType SubstCalleeType, SubstitutionMap Substitutions,
                    ArrayRef<SILValue> Args,
                    ArrayRef<SILValue> TypeDependentOperands,
-                   SILType ClosureType,
-                   StackAllocationIsNested_t IsNested,
+                   std::optional<ArrayRef<SILLocation>> ArgLocs,
+                   SILType ClosureType, StackAllocationIsNested_t IsNested,
                    const GenericSpecializationInformation *SpecializationInfo);
 
   static PartialApplyInst *
@@ -3324,7 +3414,8 @@ private:
          SubstitutionMap Substitutions, ParameterConvention CalleeConvention,
          SILFunctionTypeIsolation ResultIsolation, SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo,
-         OnStackKind onStack, StackAllocationIsNested_t isNested);
+         OnStackKind onStack, StackAllocationIsNested_t isNested,
+         std::optional<ArrayRef<SILLocation>> ArgLocs = std::nullopt);
 
 public:
   /// Return the result function type of this partial apply.
@@ -3370,14 +3461,14 @@ using EndApplyRange = OptionalTransformRange<ValueBase::use_range,
 /// BeginApplyInst - Represents the beginning of the full application of
 /// a yield_once coroutine (up until the coroutine yields a value back).
 class BeginApplyInst final
-    : public InstructionBase<SILInstructionKind::BeginApplyInst,
-                             ApplyInstBase<BeginApplyInst,
-                                           MultipleValueInstruction>>,
+    : public InstructionBase<
+          SILInstructionKind::BeginApplyInst,
+          ApplyInstBase<BeginApplyInst, MultipleValueInstruction>>,
       public MultipleValueInstructionTrailingObjects<
           BeginApplyInst,
           // These must be earlier trailing objects because their
           // count fields are initialized by an earlier base class.
-          InitialTrailingObjects<Operand>> {
+          InitialTrailingObjects<Operand, SILLocation>> {
   friend SILBuilder;
 
   template <class, class...>
@@ -3392,7 +3483,9 @@ class BeginApplyInst final
                  SILType substCalleeType, ArrayRef<SILType> allResultTypes,
                  ArrayRef<ValueOwnershipKind> allResultOwnerships,
                  SubstitutionMap substitutions, ArrayRef<SILValue> args,
-                 ArrayRef<SILValue> typeDependentOperands, ApplyOptions options,
+                 ArrayRef<SILValue> typeDependentOperands,
+                 std::optional<ArrayRef<SILLocation>> argLocs,
+                 ApplyOptions options,
                  const GenericSpecializationInformation *specializationInfo,
                  std::optional<ApplyIsolationCrossing> isolationCrossing);
 
@@ -3403,7 +3496,8 @@ class BeginApplyInst final
          std::optional<SILModuleConventions> moduleConventions,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
-         std::optional<ApplyIsolationCrossing> isolationCrossing);
+         std::optional<ApplyIsolationCrossing> isolationCrossing,
+         std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt);
 
 public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
@@ -4073,7 +4167,7 @@ public:
   void visitReferencedFunctionsAndMethods(
       std::function<void (SILFunction *)> functionCallBack,
       std::function<void (SILDeclRef)> methodCallBack) const;
-    
+
   void incrementRefCounts() const;
   void decrementRefCounts() const;
 
@@ -4343,6 +4437,13 @@ public:
   }
 
   SubstitutionMap getSubstitutions() const { return Substitutions; }
+
+  /// If this `keypath_inst` can be emitted as a statically-instantiated
+  /// immortal instance in Embedded Swift, returns the concrete key path
+  /// class SILType (e.g. `$KeyPath<Foo, Bar>`, `$WritableKeyPath<Foo,
+  /// Bar>`, or `$ReferenceWritableKeyPath<Foo, Bar>`) that IRGen would use
+  /// as the object's isa.  Returns an invalid SILType otherwise.
+  SILType getStaticInstanceClassType() const;
 
   void dropReferencedPattern();
   
@@ -5622,11 +5723,6 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
-enum PoisonRefs_t : bool {
-  DontPoisonRefs = false,
-  PoisonRefs = true,
-};
-
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
 class DebugValueInst final
@@ -5646,12 +5742,11 @@ class DebugValueInst final
   SILBasicBlock *ReconstructionBlock = nullptr;
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var, PoisonRefs_t poisonRefs,
+                 SILDebugVariable Var,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
                  bool prependDeref);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
-                                PoisonRefs_t poisonRefs,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
 
@@ -5837,23 +5932,6 @@ public:
   /// If \p varType is specified, the undef will use that type (in the
   /// appropriate address/object form) instead of the current operand's type.
   void killOperand(SILType operandType = SILType());
-
-  /// True if all references within this debug value will be overwritten with a
-  /// poison sentinel at this point in the program. This is used in debug builds
-  /// when shortening non-trivial value lifetimes to ensure the debugger cannot
-  /// inspect invalid memory. These are not generated until OSSA is
-  /// lowered. They are not expected to be serialized within the module, and the
-  /// debug pipeline is not expected to do any significant code motion after
-  /// OSSA lowering. It should not be necessary to model the poison operation as
-  /// a side effect, which would violate the rule that debug_values cannot
-  /// affect optimization.
-  PoisonRefs_t poisonRefs() const {
-    return PoisonRefs_t(sharedUInt8().DebugValueInst.poisonRefs);
-  }
-
-  void setPoisonRefs(PoisonRefs_t poisonRefs = PoisonRefs) {
-    sharedUInt8().DebugValueInst.poisonRefs = poisonRefs;
-  }
 
   bool hasTrace() const { return sharedUInt8().DebugValueInst.trace; }
 
@@ -7249,8 +7327,7 @@ class EnumInst
   EnumInst(SILDebugLocation DebugLoc, SILValue Operand,
            EnumElementDecl *Element, SILType ResultTy,
            ValueOwnershipKind forwardingOwnershipKind)
-    : InstructionBase(DebugLoc, ResultTy,
-                      forwardingOwnershipKind.forwardToInit(ResultTy)),
+    : InstructionBase(DebugLoc, ResultTy, forwardingOwnershipKind),
       Element(Element) {
     sharedUInt32().EnumInst.caseIndex = InvalidCaseIndex;
 
@@ -9477,9 +9554,8 @@ class DestroyValueInst
   USE_SHARED_UINT8;
 
   DestroyValueInst(SILDebugLocation DebugLoc, SILValue operand,
-                   PoisonRefs_t poisonRefs, IsDeadEnd_t isDeadEnd)
+                   IsDeadEnd_t isDeadEnd)
       : UnaryInstructionBase(DebugLoc, operand) {
-    sharedUInt8().DestroyValueInst.poisonRefs = poisonRefs;
     sharedUInt8().DestroyValueInst.deadEnd = isDeadEnd;
   }
 
@@ -9488,22 +9564,6 @@ public:
   /// user-defined deinitializer if present. This returns false if a prior
   /// drop_deinit is present.
   bool isFullDeinitialization();
-
-  /// If true, then all references within the destroyed value will be
-  /// overwritten with a sentinel. This is used in debug builds when shortening
-  /// non-trivial value lifetimes to ensure the debugger cannot inspect invalid
-  /// memory. These semantics are part of the destroy_value instruction to
-  /// avoid representing use-after-destroy in OSSA form and so that OSSA
-  /// transformations keep the poison operation associated with the destroy
-  /// point. After OSSA, these are lowered to 'debug_values [poison]'
-  /// instructions, after which the Onone pipeline should avoid code motion.
-  PoisonRefs_t poisonRefs() const {
-    return PoisonRefs_t(sharedUInt8().DestroyValueInst.poisonRefs);
-  }
-
-  void setPoisonRefs(PoisonRefs_t poisonRefs = PoisonRefs) {
-    sharedUInt8().DestroyValueInst.poisonRefs = poisonRefs;
-  }
 
   /// If the value being destroyed is a stack allocation of a nonescaping
   /// closure, then return the PartialApplyInst that allocated the closure.
@@ -11745,19 +11805,19 @@ public:
 class TryApplyInst final
     : public InstructionBase<SILInstructionKind::TryApplyInst,
                              ApplyInstBase<TryApplyInst, TryApplyInstBase>>,
-      public llvm::TrailingObjects<TryApplyInst, Operand> {
+      public llvm::TrailingObjects<TryApplyInst, Operand, SILLocation> {
   friend SILBuilder;
 
   TryApplyInst(SILDebugLocation debugLoc, SILValue callee,
                SILType substCalleeType, SubstitutionMap substitutions,
                ArrayRef<SILValue> args,
                ArrayRef<SILValue> typeDependentOperands,
+               std::optional<ArrayRef<SILLocation>> argLocs,
                SILBasicBlock *normalBB, SILBasicBlock *errorBB,
                ApplyOptions options,
                const GenericSpecializationInformation *specializationInfo,
                std::optional<ApplyIsolationCrossing> isolationCrossing,
-               ProfileCounter normalCount,
-               ProfileCounter errorCount);
+               ProfileCounter normalCount, ProfileCounter errorCount);
 
   static TryApplyInst *
   create(SILDebugLocation debugLoc, SILValue callee,
@@ -11766,8 +11826,8 @@ class TryApplyInst final
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing,
-         ProfileCounter normalCount,
-         ProfileCounter errorCount);
+         ProfileCounter normalCount, ProfileCounter errorCount,
+         std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt);
 };
 
 /// DifferentiableFunctionInst - creates a `@differentiable` function-typed
