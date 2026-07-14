@@ -18,6 +18,7 @@
 // RUN: %target-swift-frontend -emit-module %t/UnusedImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/UnusedPackageImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ExtendedPackageTypeImport.swift -o %t -I %t
+// RUN: %target-swift-frontend -emit-module %t/ConstrainedExtElementImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportNotUseFromAPI.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportUsedInPackage.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ExportedUnused.swift -o %t -I %t
@@ -108,6 +109,9 @@ public struct NonPublicExtendedType {}
 
 public struct ExtendedPackageType {}
 
+//--- ConstrainedExtElementImport.swift
+public struct ConstrainedExtElement {}
+
 //--- ImportNotUseFromAPI.swift
 public struct NotAnAPIType {}
 public func notAnAPIFunc() -> NotAnAPIType { return NotAnAPIType() }
@@ -154,6 +158,7 @@ package import UnusedImport // expected-warning {{package import of 'UnusedImpor
 
 package import UnusedPackageImport // expected-warning {{package import of 'UnusedPackageImport' was not used in package declarations}} {{1-9=}}
 package import ExtendedPackageTypeImport
+package import ConstrainedExtElementImport
 public import ImportNotUseFromAPI // expected-warning {{public import of 'ImportNotUseFromAPI' was not used in public declarations or inlinable code}} {{1-8=}}
 public import ImportUsedInPackage // expected-warning {{public import of 'ImportUsedInPackage' was not used in public declarations or inlinable code}} {{1-7=package}}
 
@@ -254,6 +259,13 @@ extension Extended: Countable { // expected-remark {{struct 'Extended' is import
 
 extension ExtendedPackageType { // expected-remark {{struct 'ExtendedPackageType' is imported via 'ExtendedPackageTypeImport'}}
   package func useExtendedPackageType() { }
+}
+
+// A type used only in a where clause still counts its import as used.
+extension Array where Element == ConstrainedExtElement {
+// expected-remark @-1 {{generic struct 'Array' is imported via 'Swift'}}
+// expected-remark @-2 {{struct 'ConstrainedExtElement' is imported via 'ConstrainedExtElementImport'}}
+  package func useConstrainedExtElement() { }
 }
 
 /// Tests for imports of clang modules.
