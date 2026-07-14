@@ -347,7 +347,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       endif()
     endif()
 
-    if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
+    # Enable the embedded platform abstraction layer when either the
+    # global option is on, or this triple matches the per-triple regex.
+    if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM
+       OR (SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX
+           AND "${triple}" MATCHES
+               "${SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX}"))
       list(APPEND extra_c_compile_flags "-DSWIFT_USE_EMBEDDED_SWIFT_PLATFORM=1")
     endif()
 

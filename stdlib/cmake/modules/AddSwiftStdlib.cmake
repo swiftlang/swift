@@ -965,7 +965,22 @@ function(add_swift_target_library_single target name)
     # SWIFT_USE_EMBEDDED_SWIFT_PLATFORM for every embedded library build so
     # that the platform-conditional code paths in the embedded stdlib and
     # related libraries pick up the platform implementations.
+    #
+    # The abstraction layer is on for a given triple when either the
+    # global SWIFT_USE_SWIFT_EMBEDDED_PLATFORM is TRUE, or the triple
+    # matches SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX.
+    set(_emblib_pal_triple
+      "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}")
+    set(_emblib_use_pal FALSE)
     if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
+      set(_emblib_use_pal TRUE)
+    elseif(SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX
+           AND _emblib_pal_triple
+           AND "${_emblib_pal_triple}" MATCHES
+               "${SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX}")
+      set(_emblib_use_pal TRUE)
+    endif()
+    if(_emblib_use_pal)
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
         "-D" "SWIFT_USE_EMBEDDED_SWIFT_PLATFORM")
     endif()
