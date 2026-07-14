@@ -121,10 +121,16 @@ public:
     /// attribute or an `if #available(...)` query with sufficient introduction
     /// restrictions to the context.
     Unintroduced,
+
+    /// The declaration is deprecated, e.g. because of
+    /// `@available(macOS, deprecated: 12.0)`. Unlike the other reasons, a
+    /// deprecation restriction does not prevent use of the declaration; it
+    /// only causes a warning to be emitted.
+    Deprecated,
   };
 
 private:
-  llvm::PointerIntPair<SemanticAvailableAttr, 2, Reason> attrAndReason;
+  llvm::PointerIntPair<SemanticAvailableAttr, 3, Reason> attrAndReason;
 
   AvailabilityRestriction(Reason reason, SemanticAvailableAttr attr)
       : attrAndReason(attr, reason) {};
@@ -149,6 +155,10 @@ public:
     return AvailabilityRestriction(Reason::Unintroduced, attr);
   }
 
+  static AvailabilityRestriction deprecated(SemanticAvailableAttr attr) {
+    return AvailabilityRestriction(Reason::Deprecated, attr);
+  }
+
   Reason getReason() const { return attrAndReason.getInt(); }
   SemanticAvailableAttr getAttr() const {
     return static_cast<SemanticAvailableAttr>(attrAndReason.getPointer());
@@ -163,9 +173,13 @@ public:
     case Reason::UnavailableUnintroduced:
       return true;
     case Reason::Unintroduced:
+    case Reason::Deprecated:
       return false;
     }
   }
+
+  /// Returns true if the restriction represents deprecation of the declaration.
+  bool isDeprecated() const { return getReason() == Reason::Deprecated; }
 
   /// Returns the domain that the restriction applies to.
   AvailabilityDomain getDomain() const { return getAttr().getDomain(); }
@@ -228,6 +242,10 @@ enum class AvailabilityRestrictionFlag : uint8_t {
   /// is also universally unavailable. If this flag is set, though, those
   /// references are allowed.
   AllowUniversallyUnavailableInCompatibleContexts = 1 << 2,
+
+  /// Return restrictions for `@available` attributes indicating deprecation in
+  /// a future deployment target.
+  IncludeSoftDeprecation = 1 << 3,
 };
 using AvailabilityRestrictionFlags = OptionSet<AvailabilityRestrictionFlag>;
 

@@ -7452,7 +7452,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.deprecated: "10.1"
           }
         ],
-        key.is_deprecated: 1,
         key.is_unavailable: 1
       },
       {
@@ -7519,7 +7518,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.deprecated: "10.1"
           }
         ],
-        key.is_deprecated: 1,
         key.is_unavailable: 1
       },
       {
