@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift %s -parse-as-library -o %t/async_task_priority
+// RUN: %target-build-swift %s -import-objc-header %S/Inputs/has-dispatch-private.h -parse-as-library -o %t/async_task_priority
 // RUN: %target-codesign %t/async_task_priority
 // RUN: %target-run %t/async_task_priority
 
@@ -340,8 +340,10 @@ actor Test {
           await task2.value // Escalate task2 which should be queued behind task1 on the actor
         }
 
-        // This test will only work properly if Dispatch supports lowering the base priority of a thread
-        if #available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *) {
+        // This test will only work properly if Dispatch supports lowering the base priority of a thread rdar://88155873
+        // If we don't have swift_concurrency_private.h then the runtime doesn't have
+        // full priority escalation, so don't try to test it.
+        if #available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *), HasSwiftConcurrencyPrivateHeader() != 0 {
           tests.test("Task escalation doesn't impact qos_class_self") {
             let task = Task(priority: .utility) {
               let initialQos = DispatchQoS(
