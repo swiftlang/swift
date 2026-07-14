@@ -2145,9 +2145,17 @@ private:
             Demangle::Context Ctx;
             auto demangledRoot =
                 Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
-            assert(demangledRoot->getKind() == Node::Kind::Global);
-            std::string nodeName =
-                nodeToString(demangledRoot->getChild(0)->getChild(0));
+            if (!demangledRoot ||
+                demangledRoot->getKind() != Node::Kind::Global) {
+              Error = "Failed to demangle indirect parent context symbol.";
+              return;
+            }
+            auto globalChild = demangledRoot->getChild(0);
+            if (!globalChild || globalChild->getNumChildren() < 1) {
+              Error = "Failed to demangle indirect parent context symbol.";
+              return;
+            }
+            std::string nodeName = nodeToString(globalChild->getChild(0));
             chain.push_back(
                 ContextNameInfo{nodeName, adjustedParentTargetAddress, false});
           } else {
@@ -2382,11 +2390,19 @@ private:
           Demangle::Context Ctx;
           auto demangledRoot =
               Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
-          assert(demangledRoot->getKind() == Node::Kind::Global);
+          // The symbol name comes from the inspected image and may not
+          // demangle to the expected shape. Guard every dereference rather
+          // than relying on the asserts, which are compiled out in release
+          // builds.
+          if (!demangledRoot || demangledRoot->getKind() != Node::Kind::Global)
+            return std::nullopt;
           auto nomTypeDescriptorRoot = demangledRoot->getChild(0);
-          assert(nomTypeDescriptorRoot->getKind() ==
-                 Node::Kind::NominalTypeDescriptor);
+          if (!nomTypeDescriptorRoot || nomTypeDescriptorRoot->getKind() !=
+                                            Node::Kind::NominalTypeDescriptor)
+            return std::nullopt;
           auto typeRoot = nomTypeDescriptorRoot->getChild(0);
+          if (!typeRoot)
+            return std::nullopt;
           typeName = nodeToString(typeRoot);
 
           auto typeMangling =

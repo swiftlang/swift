@@ -1604,28 +1604,36 @@ public:
   Demangle::NodePointer
   buildContextManglingForSymbol(StringRef symbol, Demangler &dem) {
     auto demangledSymbol = dem.demangleSymbol(symbol);
+    if (!demangledSymbol)
+      return nullptr;
     if (demangledSymbol->getKind() == Demangle::Node::Kind::Global) {
       demangledSymbol = demangledSymbol->getChild(0);
+      if (!demangledSymbol)
+        return nullptr;
     }
-    
+
     switch (demangledSymbol->getKind()) {
     // Pointers to nominal type or protocol descriptors would demangle to
     // the type they represent.
     case Demangle::Node::Kind::NominalTypeDescriptor:
     case Demangle::Node::Kind::ProtocolDescriptor:
       demangledSymbol = demangledSymbol->getChild(0);
-      assert(demangledSymbol->getKind() == Demangle::Node::Kind::Type);
+      if (!demangledSymbol ||
+          demangledSymbol->getKind() != Demangle::Node::Kind::Type)
+        return nullptr;
       break;
     // Pointers to opaque type descriptors demangle to the name of the opaque
     // type declaration.
     case Demangle::Node::Kind::OpaqueTypeDescriptor:
       demangledSymbol = demangledSymbol->getChild(0);
+      if (!demangledSymbol)
+        return nullptr;
       break;
       // We don't handle pointers to other symbols yet.
     default:
       return nullptr;
     }
-  
+
     return demangledSymbol;
   }
 
