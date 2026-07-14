@@ -19,7 +19,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityInference.h"
-#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
@@ -471,8 +470,7 @@ private:
       return true;
 
     // Check whether the decl is unavailable relative to the current context.
-    if (auto restriction = getAvailabilityRestrictionsForDecl(decl, context)
-                               .getPrimaryRestriction()) {
+    if (auto restriction = context.restrictionForDecl(decl)) {
       if (restriction->isUnavailable())
         return true;
     }

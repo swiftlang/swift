@@ -2042,8 +2042,7 @@ checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
   flags |= AvailabilityRestrictionFlag::
       AllowUniversallyUnavailableInCompatibleContexts;
 
-  return getAvailabilityRestrictionsForDecl(witness, requiredContext, flags)
-      .getPrimaryRestriction();
+  return requiredContext.restrictionForDecl(witness, flags);
 }
 
 RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,

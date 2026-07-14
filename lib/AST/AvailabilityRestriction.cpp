@@ -84,54 +84,6 @@ void AvailabilityRestriction::print(llvm::raw_ostream &os) const {
   os << ")";
 }
 
-static bool restrictionIsStronger(const AvailabilityRestriction &lhs,
-                                  const AvailabilityRestriction &rhs) {
-  DEBUG_ASSERT(lhs.getDomain() == rhs.getDomain());
-
-  // If the restrictions have matching domains but different reasons, the
-  // restriction with the lowest reason is "strongest".
-  if (lhs.getReason() != rhs.getReason())
-    return lhs.getReason() < rhs.getReason();
-
-  switch (lhs.getReason()) {
-  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
-    // Just keep the first.
-    return false;
-
-  case AvailabilityRestriction::Reason::UnavailableObsolete:
-    // Pick the larger obsoleted range.
-    return lhs.getAttr().getObsoleted().value() <
-           rhs.getAttr().getObsoleted().value();
-
-  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
-  case AvailabilityRestriction::Reason::Unintroduced:
-    // Pick the smaller introduced range.
-    return lhs.getAttr().getIntroduced().value_or(llvm::VersionTuple()) >
-           rhs.getAttr().getIntroduced().value_or(llvm::VersionTuple());
-  }
-}
-
-void addRestriction(llvm::SmallVector<AvailabilityRestriction, 4> &restrictions,
-                    const AvailabilityRestriction &restriction,
-                    const ASTContext &ctx) {
-
-  auto iter = llvm::find_if(
-      restrictions, [&restriction](AvailabilityRestriction &existing) {
-        return restriction.getDomain() == existing.getDomain();
-      });
-
-  // There's no existing restriction for the same domain so just add it.
-  if (iter == restrictions.end()) {
-    restrictions.emplace_back(restriction);
-    return;
-  }
-
-  if (restrictionIsStronger(restriction, *iter)) {
-    restrictions.erase(iter);
-    restrictions.emplace_back(restriction);
-  }
-}
-
 std::optional<AvailabilityRestriction>
 DeclAvailabilityRestrictions::getPrimaryRestriction() const {
   std::optional<AvailabilityRestriction> result;
@@ -228,13 +180,9 @@ shouldIgnoreRestrictionInContext(const Decl *decl,
   return context.isUnavailableForDomain(domain);
 }
 
-/// Returns the `AvailabilityRestriction` that describes how \p attr restricts
-/// use of \p decl in \p context or `std::nullopt` if there is no restriction.
-static std::optional<AvailabilityRestriction>
-getAvailabilityRestrictionForAttr(const Decl *decl,
-                                  const SemanticAvailableAttr &attr,
-                                  const AvailabilityContext &context,
-                                  const AvailabilityRestrictionFlags flags) {
+std::optional<AvailabilityRestriction> swift::getAvailabilityRestrictionForAttr(
+    const SemanticAvailableAttr &attr, const Decl *decl,
+    const AvailabilityContext &context, AvailabilityRestrictionFlags flags) {
   auto getRestriction = [&]() -> std::optional<AvailabilityRestriction> {
     // Is the decl unconditionally unavailable?
     if (attr.isUnconditionallyUnavailable())
@@ -277,113 +225,6 @@ getAvailabilityRestrictionForAttr(const Decl *decl,
     return std::nullopt;
 
   return restriction;
-}
-
-/// Returns the most specific platform domain from the availability attributes
-/// attached to \p decl or `std::nullopt` if there are none. Platform specific
-/// `@available` attributes for other platforms should be ignored. For example,
-/// if a declaration has attributes for both iOS and macCatalyst, only the
-/// macCatalyst attributes take effect when compiling for a macCatalyst target.
-static std::optional<AvailabilityDomain>
-activePlatformDomainForDecl(const Decl *decl) {
-  std::optional<AvailabilityDomain> activeDomain;
-  for (auto attr :
-       decl->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto domain = attr.getDomain();
-    if (!domain.isPlatform())
-      continue;
-
-    if (activeDomain && domain.contains(*activeDomain))
-      continue;
-
-    activeDomain.emplace(domain);
-  }
-
-  return activeDomain;
-}
-
-/// Generates availability restrictions that apply to the use of \p origDecl
-/// based on the attributes attached to \p sourceDecl (these declarations may be
-/// different since \p origDecl may inherit attributes from another declaration
-/// lexically).
-static void getAvailabilityRestrictionsForDecl(
-    llvm::SmallVector<AvailabilityRestriction, 4> &restrictions,
-    const Decl *targetDecl, const Decl *sourceDecl,
-    const AvailabilityContext &context, AvailabilityRestrictionFlags flags) {
-  auto &ctx = sourceDecl->getASTContext();
-  auto activePlatformDomain = activePlatformDomainForDecl(sourceDecl);
-  bool includeAllDomains =
-      flags.contains(AvailabilityRestrictionFlag::IncludeAllDomains);
-
-  for (auto attr : sourceDecl->getSemanticAvailableAttrs(includeAllDomains)) {
-    auto domain = attr.getDomain();
-    if (!includeAllDomains && domain.isPlatform() && activePlatformDomain &&
-        !activePlatformDomain->contains(domain))
-      continue;
-
-    if (auto restriction =
-            getAvailabilityRestrictionForAttr(targetDecl, attr, context, flags))
-      addRestriction(restrictions, *restriction, ctx);
-  }
-}
-
-DeclAvailabilityRestrictions
-swift::getAvailabilityRestrictionsForDecl(const Decl *decl,
-                                          const AvailabilityContext &context,
-                                          AvailabilityRestrictionFlags flags) {
-  llvm::SmallVector<AvailabilityRestriction, 4> restrictions;
-
-  // Generic parameters are always available.
-  if (isa<GenericTypeParamDecl>(decl))
-    return DeclAvailabilityRestrictions();
-
-  decl = decl->getAbstractSyntaxDeclForAttributes();
-
-  getAvailabilityRestrictionsForDecl(restrictions, decl, decl, context, flags);
-
-  // For requirements of reparentable protocols, add restrictions from the
-  // enclosing protocol itself. We don't need to do this for ordinary protocols
-  // because of the rule that a protocol P cannot inherit from Q if Q is less
-  // available than P. Thus, the availability of the most derived protocol
-  // already carries the same or stricter restrictions than its ancestors.
-  if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
-    if (proto->getAttrs().hasAttribute<ReparentableAttr>())
-      getAvailabilityRestrictionsForDecl(restrictions, decl, proto, context,
-                                         flags);
-  }
-
-  if (flags.contains(AvailabilityRestrictionFlag::SkipEnclosingExtension))
-    return restrictions;
-
-  // If decl is an extension member, query the attributes of the extension, too.
-  //
-  // Skip decls imported from Clang, though, as they could be associated to the
-  // wrong extension and inherit unavailability incorrectly. ClangImporter
-  // associates Objective-C protocol members to the first category where the
-  // protocol is directly or indirectly adopted, no matter its availability
-  // and the availability of other categories. rdar://problem/53956555
-  if (decl->getClangNode())
-    return restrictions;
-
-  auto parent = decl->parentDeclForAvailability();
-  if (auto extension = dyn_cast_or_null<ExtensionDecl>(parent))
-    getAvailabilityRestrictionsForDecl(restrictions, decl, extension, context,
-                                       flags);
-
-  return restrictions;
-}
-
-std::optional<AvailabilityRestriction>
-swift::getAvailabilityRestrictionForDeclInDomain(
-    const Decl *decl, const AvailabilityContext &context,
-    AvailabilityDomain domain, AvailabilityRestrictionFlags flags) {
-  auto restrictions = getAvailabilityRestrictionsForDecl(decl, context, flags);
-  for (auto const &restriction : restrictions) {
-    if (restriction.getDomain().isRelated(domain))
-      return restriction;
-  }
-
-  return std::nullopt;
 }
 
 /// Returns true if unsatisfied `@available(..., unavailable)` restrictions for
