@@ -8,7 +8,7 @@
 
 // RUN: %target-swift-frontend -c -emit-module -o %t/Library.o %t/Library.swift -enable-experimental-feature Embedded -enable-experimental-feature Extern -parse-as-library
 // RUN: %target-swift-frontend -c -I %t -emit-module -o %t/Application.o %t/Application.swift -enable-experimental-feature Embedded -enable-experimental-feature Extern -parse-as-library
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/Library.o %t/Application.o %target-embedded-posix-shim -o %t/Application
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/Library.o %t/Application.o -o %t/Application
 // RUN: %target-run %t/Application | %FileCheck %s
 
 // REQUIRES: executable_test
