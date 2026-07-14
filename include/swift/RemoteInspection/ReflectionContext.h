@@ -457,10 +457,16 @@ public:
         savedBuffers.push_back(std::move(Buf));
 
         auto Begin = RemoteRef<void>(Addr, BufStart);
-        auto Size = COFFSec->VirtualSize;
+        uint64_t Size = COFFSec->VirtualSize;
 
         // FIXME: This code needs to be cleaned up and updated
         // to make it work for 32 bit platforms.
+        //
+        // The section is bracketed by 8-byte sentinel words at each end, so we
+        // skip the leading sentinel and drop both. If VirtualSize is too small
+        // to contain the sentinels, skip the section.
+        if (Size < 16)
+          return {nullptr, 0};
         Begin = Begin.atByteOffset(8);
         Size -= 16;
 
