@@ -247,6 +247,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
           !module->isExternallyConsumed());
           
   serializationOpts.DeterministicSourceInfo = opts.DeterministicSourceInfo;
+  if (opts.DeterministicSourceInfo) {
+    serializationOpts.SourceInfoPrefixMap = getIRGenOptions().DebugPrefixMap;
+  }
 
   serializationOpts.PathObfuscator = opts.serializedPathObfuscator;
   if (serializationOpts.SerializeOptionsForDebugging &&

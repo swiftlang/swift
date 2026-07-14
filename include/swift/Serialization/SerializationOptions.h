@@ -57,6 +57,9 @@ public:
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebuggingOptionsPrefixMap;
 
+  /// Path prefixes that should be rewritten in source info.
+  PathRemapper SourceInfoPrefixMap;
+
   /// Obfuscate the serialized paths so we don't have the actual paths encoded
   /// in the .swiftmodule file.
   PathObfuscator PathObfuscator;

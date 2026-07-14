@@ -770,29 +770,31 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
       SmallString<128> absolutePath = info.getFilePath();
       llvm::sys::fs::make_absolute(absolutePath);
 
-      std::string RemappedPath = std::string(absolutePath);
+      std::string remappedPath = std::string(absolutePath);
       if (options.DeterministicSourceInfo) {
-        const auto &PathRemapper = options.DebuggingOptionsPrefixMap;
+        const auto &PathRemapper = options.SourceInfoPrefixMap;
         const auto &PathObfuscator = options.PathObfuscator;
-        RemappedPath = PathObfuscator.obfuscate(PathRemapper.remapPath(absolutePath));
+        remappedPath =
+            PathObfuscator.obfuscate(PathRemapper.remapPath(absolutePath));
       }
 
       // Don't emit duplicated files.
-      if (!seenFilenames.insert(RemappedPath).second)
+      if (!seenFilenames.insert(remappedPath).second)
         return;
 
-      auto fileID = FWriter.getTextOffset(RemappedPath);
+      auto fileID = FWriter.getTextOffset(remappedPath);
 
       auto fingerprintStrIncludingTypeMembers =
         info.getInterfaceHashIncludingTypeMembers().getRawValue();
       auto fingerprintStrExcludingTypeMembers =
         info.getInterfaceHashExcludingTypeMembers().getRawValue();
 
-      auto timestamp = options.DeterministicSourceInfo 
-            ? 0
-            : std::chrono::duration_cast<std::chrono::nanoseconds>(
-                            info.getLastModified().time_since_epoch())
-                            .count();
+      auto timestamp =
+          options.DeterministicSourceInfo
+              ? 0
+              : std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    info.getLastModified().time_since_epoch())
+                    .count();
 
       llvm::raw_svector_ostream out(Buffer);
       endian::Writer writer(out, llvm::endianness::little);
