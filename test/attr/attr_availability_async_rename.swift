@@ -285,8 +285,9 @@ func asyncContext(t: HandlerTest) async {
   defaultedParamsEnd3(arg: 1) { }
   // expected-warning@+1{{consider using asynchronous alternative function}}
   defaultedParamsEnd4(arg: 1) { }
-  // expected-warning@+2{{consider using asynchronous alternative function}}
-  // expected-warning@+1{{'manyAttrs(completionHandler:)' is deprecated}}{{documentation-file=deprecated-declaration}}
+  // expected-warning@+3{{consider using asynchronous alternative function}}
+  // expected-warning@+2{{'manyAttrs(completionHandler:)' was deprecated in macOS 12: renamed to 'manyAttrsOld()'}}{{group-name=DeprecatedDeclaration}}
+  // expected-note@+1{{use 'manyAttrsOld()' instead}}
   manyAttrs() { }
   // expected-warning@+1{{consider using asynchronous alternative function}}
   macOSOnly() { }

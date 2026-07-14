@@ -365,7 +365,6 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
   bool isConstrained = false;
   auto platformRange = storage->platformRange;
   bool isDeprecated = storage->isDeprecated;
-  isConstrained |= constrainBool(isDeprecated, decl->isDeprecated());
 
   // Compute the availability restrictions for the decl when used in this
   // context and then map those restrictions to domain infos. The result will
@@ -391,6 +390,9 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
           declDomainInfos.push_back({domain, *introducedRange});
         }
       }
+      break;
+    case AvailabilityRestriction::Reason::Deprecated:
+      isConstrained |= constrainBool(isDeprecated, true);
       break;
     }
   }
@@ -437,6 +439,15 @@ AvailabilityContext::restrictionForDecl(const Decl *decl,
 }
 
 std::optional<AvailabilityRestriction>
+AvailabilityContext::unsatisfiedRestrictionForDecl(
+    const Decl *decl, AvailabilityRestrictionFlags flags) {
+  auto restriction = restrictionForDecl(decl, flags);
+  if (restriction && restriction->isDeprecated())
+    return std::nullopt;
+  return restriction;
+}
+
+std::optional<AvailabilityRestriction>
 AvailabilityContext::restrictionForDeclInDomain(
     const Decl *decl, AvailabilityDomain domain,
     AvailabilityRestrictionFlags flags) {
@@ -473,6 +484,20 @@ static bool restrictionIsStronger(const AvailabilityRestriction &lhs,
     // Pick the smaller introduced range.
     return lhs.getAttr().getIntroduced().value_or(llvm::VersionTuple()) >
            rhs.getAttr().getIntroduced().value_or(llvm::VersionTuple());
+
+  case AvailabilityRestriction::Reason::Deprecated:
+    // Prefer an unconditionally deprecation attribute over one that specifies a
+    // version. If both are unconditionally deprecated keep the first. If both
+    // specify a version, pick the earlier version. Fall back to last-wins.
+    if (lhs.getAttr().isUnconditionallyDeprecated() &&
+        rhs.getAttr().isUnconditionallyDeprecated())
+      return false;
+    if (lhs.getAttr().isUnconditionallyDeprecated())
+      return true;
+    if (rhs.getAttr().isUnconditionallyDeprecated())
+      return false;
+    return lhs.getAttr().getDeprecated().value() <
+           rhs.getAttr().getDeprecated().value();
   }
 }
 

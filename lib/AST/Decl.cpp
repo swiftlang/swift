@@ -12779,6 +12779,13 @@ void Decl::setClangNode(ClangNode Node) {
   *(ptr - 1) = Node.getOpaqueValue();
 }
 
+bool Decl::isClangDeclDeprecated() const {
+  if (const clang::Decl *decl = getClangDecl())
+    return decl->isDeprecated();
+
+  return false;
+}
+
 // See swift/Basic/Statistic.h for declaration: this enables tracing Decls, is
 // defined here to avoid too much layering violation / circular linkage
 // dependency.
