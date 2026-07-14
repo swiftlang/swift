@@ -136,6 +136,13 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   if (!thunk->empty())
     return thunk;
 
+  // Differentiation runs after AddressLowering, so this thunk is synthesized
+  // into an already-lowered module and its body below is emitted in
+  // lowered-address form. Record that (matching the caller) so the per-function
+  // conventions used here -- and read by later passes -- don't treat the
+  // thunk's address arguments as opaque values.
+  thunk->setHasLoweredAddresses(caller->hasLoweredAddresses());
+
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);
@@ -434,6 +441,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
+  thunk->setHasLoweredAddresses(parentThunk->hasLoweredAddresses());
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   TangentBuilder builder(entry, adContext);
@@ -785,6 +793,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
+  thunk->setHasLoweredAddresses(caller->hasLoweredAddresses());
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);
