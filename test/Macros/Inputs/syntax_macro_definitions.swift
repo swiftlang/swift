@@ -515,7 +515,7 @@ extension AccessorBlockSyntax {
 
 public struct LazyMacro {}
 
-extension LazyMacro: AccessorMacro, Macro {
+extension LazyMacro: AccessorMacro {
   public static func expansion(
     of node: SwiftSyntax.AttributeSyntax,
     providingAccessorsOf declaration: some SwiftSyntax.DeclSyntaxProtocol,
@@ -554,7 +554,7 @@ extension LazyMacro: AccessorMacro, Macro {
 
 public struct EagerMacro {}
 
-extension EagerMacro: AccessorMacro, Macro {
+extension EagerMacro: AccessorMacro {
   public static func expansion(
     of node: SwiftSyntax.AttributeSyntax,
     providingAccessorsOf declaration: some SwiftSyntax.DeclSyntaxProtocol,
