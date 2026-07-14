@@ -261,6 +261,15 @@ VarDecl *lookupCOMImplementationID(ClassDecl *CD) {
 }
 
 namespace swift {
+bool IsCOMObjectRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
+  // A class participates in the COM object model when it conforms to a COM
+  // interface, a protocol marked @com.
+  for (auto *proto : CD->getAllProtocols())
+    if (proto->getAttrs().hasAttribute<COMAttr>())
+      return true;
+  return false;
+}
+
 ProtocolConformance *
 com::deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP) {
   const auto *CD = dyn_cast<ClassDecl>(NTD);
