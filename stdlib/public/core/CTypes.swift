@@ -95,16 +95,16 @@ public typealias CDouble = Double
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// On Apple silicon, `CLongLong` is a type alias for `Float80`.
-/// On Intel, `CLongLong` is a type alias for `Double` (`Float64`).
+/// On Apple silicon, `CLongDouble` is a type alias for `Double` (`Float64`).
+/// On Intel, `CLongDouble` is a type alias for `Float80`.
 public typealias CLongDouble = Float80
 #else
 /// The C 'long double' type.
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// On Apple silicon, `CLongLong` is a type alias for `Float80`.
-/// On Intel, `CLongLong` is a type alias for `Double` (`Float64`).
+/// On Apple silicon, `CLongDouble` is a type alias for `Double` (`Float64`).
+/// On Intel, `CLongDouble` is a type alias for `Float80`.
 public typealias CLongDouble = Double
 #endif
 #elseif os(Windows)
