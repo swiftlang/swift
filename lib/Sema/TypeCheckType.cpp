@@ -3535,6 +3535,7 @@ static bool isFunctionAttribute(const TypeAttribute *attr) {
       TypeAttrKind::YieldMany,
       TypeAttrKind::Async,
       TypeAttrKind::Isolated,
+      TypeAttrKind::Called,
   };
   return llvm::any_of(FunctionAttrs,
                       [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
@@ -4741,6 +4742,22 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
+
+  if (auto called = claim<CalledTypeAttr>(attrs)) {
+    if (ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
+      if (representation != FunctionTypeRepresentation::Swift) {
+        diagnoseInvalid(repr, conventionAttr->getAtLoc(),
+                        diag::invalid_called_and_attr_attributes,
+                        conventionAttr);
+        representation = FunctionType::Representation::Swift;
+        parsedClangFunctionType = nullptr;
+      }
+    } else {
+      diagnoseInvalid(repr, called->getAttrLoc(),
+                      diag::requires_experimental_feature, "@called", false,
+                      Feature::CalledAttribute.getName());
+    }
+  }
 
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,

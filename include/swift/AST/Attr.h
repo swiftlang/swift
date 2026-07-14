@@ -4323,6 +4323,10 @@ protected:
     SWIFT_INLINE_BITFIELD_FULL(IsolatedTypeAttr, TypeAttribute, 8,
       Kind : 8
     );
+
+    SWIFT_INLINE_BITFIELD_FULL(CalledTypeAttr, TypeAttribute, 8,
+      Semantics : 8
+    );
   } Bits;
   // clang-format on
 
@@ -4614,6 +4618,33 @@ public:
     return getIsolationKindName(getIsolationKind());
   }
   static const char *getIsolationKindName(IsolationKind kind);
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+class CalledTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Called> {
+public:
+  enum class Semantics : uint8_t { Once };
+
+private:
+  SourceLoc SemanticsLoc;
+
+public:
+  CalledTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
+                 Located<Semantics> semantics)
+      : SimpleTypeAttr(atLoc, kwLoc, parensRange), SemanticsLoc(semantics.Loc) {
+    Bits.CalledTypeAttr.Semantics = uint8_t(semantics.Item);
+  }
+
+  Semantics getSemantics() const {
+    return Semantics(Bits.CalledTypeAttr.Semantics);
+  }
+  SourceLoc getSemanticsLoc() const { return SemanticsLoc; }
+
+  const char *getSemanticsName() const {
+    return getSemanticsName(getSemantics());
+  }
+  static const char *getSemanticsName(Semantics semantics);
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
