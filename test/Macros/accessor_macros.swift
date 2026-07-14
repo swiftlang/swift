@@ -25,7 +25,7 @@ macro myPropertyWrapper() =
 macro myPropertyWrapperSkipsComputed() =
     #externalMacro(module: "MacroDefinition", type: "PropertyWrapperSkipsComputedMacro")
 
-@attached(accessor, names: named(get), named(set))
+@attached(accessor, initialization: lazy, names: named(get), named(set))
 macro Lazy() =
     #externalMacro(module: "MacroDefinition", type: "LazyMacro")
 
