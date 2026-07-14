@@ -537,6 +537,9 @@ struct SILDeclRef {
   /// True if the decl ref references a thunk handling potentially distributed actor functions
   bool isDistributedThunk() const;
 
+  /// If this is a distributed-thunk decl ref, return its distributed thunk.
+  FuncDecl *getDistributedThunk() const;
+
   /// True if the decl references a 'distributed' function.
   bool isDistributed() const;
 
