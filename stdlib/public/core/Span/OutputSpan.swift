@@ -577,6 +577,7 @@ extension OutputSpan where Element: Copyable {
   }
 }
 
+#if !SPAN_COMPATIBILITY_STUB
 @available(SwiftStdlib 6.4, *)
 extension OutputSpan: Iterable {
   @available(SwiftStdlib 6.4, *)
@@ -594,3 +595,4 @@ extension OutputSpan: Iterable {
     .init(self.span)
   }
 }
+#endif

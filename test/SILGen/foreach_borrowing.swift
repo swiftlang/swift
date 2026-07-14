@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -g -Xllvm -sil-print-debuginfo-verbose %s
+// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -Xllvm -sil-print-types -g -Xllvm -sil-print-debuginfo-verbose %s
 
 // RUN: not --crash %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values -o /dev/null %s
 
