@@ -1733,10 +1733,21 @@ bool Parser::canParseGenericArguments() {
   }
 
   do {
-    if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
-        Tok.is(tok::l_paren))
+    // A generic argument may be a parenthesized value expression such as
+    // '(1 + 2)'. Treat a parenthesized group as a value expression only when
+    // it is immediately followed by ',' or '>'; otherwise parse it as a type
+    // so that parenthesized and function types like '(Int, Int) -> Bool' are
+    // still recognized.
+    bool parsedValueExpr = false;
+    if (Tok.is(tok::l_paren)) {
+      CancellableBacktrackingScope backtrack(*this);
       skipSingle();
-    else if (!canParseType())
+      if (Tok.is(tok::comma) || startsWithGreater(Tok)) {
+        backtrack.cancelBacktrack();
+        parsedValueExpr = true;
+      }
+    }
+    if (!parsedValueExpr && !canParseType())
       return false;
 
     // Parse the comma, if the list continues.
