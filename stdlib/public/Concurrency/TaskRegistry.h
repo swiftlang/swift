@@ -25,9 +25,15 @@
 
 namespace swift {
 
+#if defined(__APPLE__) && defined(__aarch64__)
+#define SWIFT_CACHE_LINE_SIZE 128
+#else
+#define SWIFT_CACHE_LINE_SIZE 64
+#endif
+
 static constexpr size_t TaskRegistryShardCount = 16;
 
-struct alignas(64) TaskRegistryShard {
+struct alignas(SWIFT_CACHE_LINE_SIZE) TaskRegistryShard {
   std::atomic<AsyncTask *> head;
 };
 

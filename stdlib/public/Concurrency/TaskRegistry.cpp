@@ -22,7 +22,7 @@ static inline size_t registryShardIndex(uint64_t taskId) {
   return static_cast<size_t>(taskId) & (TaskRegistryShardCount - 1);
 }
 
-struct alignas(64) PaddedLazyMutex {
+struct alignas(SWIFT_CACHE_LINE_SIZE) PaddedLazyMutex {
   LazyMutex mutex;
 };
 
