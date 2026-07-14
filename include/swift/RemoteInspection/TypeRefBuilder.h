@@ -2326,6 +2326,7 @@ private:
     std::string Error;
     PointerReader OpaquePointerReader;
     ByteReader OpaqueByteReader;
+    StringReader OpaqueStringReader;
     DynamicSymbolResolver OpaqueDynamicSymbolResolver;
     QualifiedContextNameReader<ObjCInteropKind, PointerSize> NameReader;
 
@@ -2334,7 +2335,7 @@ private:
         PointerReader pointerReader,
         DynamicSymbolResolver dynamicSymbolResolver)
         : Error(""), OpaquePointerReader(pointerReader),
-          OpaqueByteReader(byteReader),
+          OpaqueByteReader(byteReader), OpaqueStringReader(stringReader),
           OpaqueDynamicSymbolResolver(dynamicSymbolResolver),
           NameReader(byteReader, stringReader, pointerReader,
                      dynamicSymbolResolver) {}
@@ -2352,7 +2353,29 @@ private:
       // return class name
       if (conformanceDescriptor.getTypeKind() ==
           TypeReferenceKind::DirectObjCClassName) {
-        auto className = conformanceDescriptor.getDirectObjCClassName();
+        // The class name is a RelativeDirectPointer stored in the descriptor's
+        // TypeRef field. We only hold a local copy of the descriptor, so we
+        // must not resolve that relative pointer in place (getDirectObjCClassName
+        // would resolve the stored offset against our local buffer and read out
+        // of bounds). Instead re-derive the field's remote address and issue a
+        // bounded read, the same way the type-descriptor kinds below do.
+        auto nameFieldAddress = conformanceDescriptorAddress.applyRelativeOffset(
+            (int32_t)conformanceDescriptor.getTypeRefDescriptorOffset());
+        auto nameOffsetBytes =
+            OpaqueByteReader(nameFieldAddress, sizeof(int32_t));
+        if (!nameOffsetBytes.get()) {
+          Error = "Failed to read direct ObjC class name field in conformance "
+                  "descriptor.";
+          return std::nullopt;
+        }
+        auto nameOffset = (const int32_t *)nameOffsetBytes.get();
+        auto nameAddress = nameFieldAddress.applyRelativeOffset(*nameOffset);
+        std::string className;
+        if (!OpaqueStringReader(nameAddress, className)) {
+          Error = "Failed to read direct ObjC class name in conformance "
+                  "descriptor.";
+          return std::nullopt;
+        }
         typeName = MANGLING_MODULE_OBJC.str() + std::string(".") + className;
         return std::make_pair(mangledTypeName, typeName);
       }
