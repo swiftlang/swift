@@ -171,6 +171,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-synchronization)
   add_dependencies(embedded-libraries embedded-synchronization)
 
+  set(_embedded_synchronization_swift_flags
+    ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
+    -internal-import-bridging-header ${CMAKE_CURRENT_SOURCE_DIR}/../EmbeddedPlatform/swift/EmbeddedPlatform.h
+    -enable-experimental-feature LiteralExpressions)
+
   # wasm32 builds the full Synchronization library plus its wasm-specific
   # mutex implementation.
   add_embedded_swift_target_library(
@@ -181,7 +186,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     ${SWIFT_SYNCHRONIZATION_WASM_SOURCES}
 
     GYB_SOURCES ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
-    SWIFT_COMPILE_FLAGS ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
+    SWIFT_COMPILE_FLAGS ${_embedded_synchronization_swift_flags}
     ONLY_ARCH_REGEX "^wasm32$"
     INSTALL_IN_COMPONENT stdlib
   )
@@ -198,7 +203,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     Mutex/Mutex.swift
 
     GYB_SOURCES ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
-    SWIFT_COMPILE_FLAGS ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
+    SWIFT_COMPILE_FLAGS ${_embedded_synchronization_swift_flags}
     SKIP_ARCH_REGEX "^wasm32$" "^avr$"
     INSTALL_IN_COMPONENT stdlib
   )
