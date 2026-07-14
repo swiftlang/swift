@@ -3066,8 +3066,14 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
 
 bool PatternBindingDecl::hasSingleVarConstantFoldedInit() const {
   auto *singleVar = getSingleVar();
-  return singleVar && singleVar->isConstValue() &&
-         getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
+  if (!singleVar || !singleVar->isConstValue() ||
+      !getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions))
+    return false;
+  // Only stdlib integer constants participate in literal-expression folding.
+  // Other constant initializers (tuples, arrays, strings, etc) are left as
+  // written.
+  Type type = singleVar->getInterfaceType();
+  return type && type->isStdlibInteger();
 }
 
 Expr *PatternBindingDecl::getExecutableInit(unsigned i) const {
