@@ -2,19 +2,20 @@
 
 ## Overview
 
-Adding a protocol conformance to an actor will emit a compiler error if that protocol requires a global actor isolation. For example:
+Adding a protocol conformance to an actor will emit a compiler error if that protocol requires global actor isolation. For example:
 
 ```swift
-@MainActor protocol Exhibit {
+@MainActor
+protocol Exhibit {
     func display()
 }
 
 actor Terrarium: Exhibit { // error: actor 'Terrarium' cannot conform to global-actor-isolated protocol 'Exhibit'
     func display() {
-        // ...
+        // Terrarium instance isolated
     }
     func water() {
-        // ...
+        // Terrarium instance isolated
     }
 }
 ```
@@ -23,19 +24,21 @@ A protocol requiring global actor isolation (like `Exhibit` above) makes all met
 
 This makes actors incompatible with protocols that require a global actor isolation: methods can't be isolated to both the actor instance and the global actor. Consider the `display()` method in the example above. Should it be isolated to the `@MainActor`, or to an instance of the `Terrarium` actor? What about `water()`?
 
-The most common solution is to ensure both the protocol and the implementation are in the same concurrency domain. For example, by applying the same global actor isolation to both, instead of using an actor instance for the latter:
+The most common solution is to ensure both the protocol and the implementation have the same isolation. For example, by applying the same global actor isolation to both, instead of using an actor instance for the latter:
 
 ```swift
-@MainActor protocol Exhibit {
+@MainActor
+protocol Exhibit {
     func display()
 }
 
-@MainActor final class Terrarium: Exhibit { // OK
+@MainActor
+final class Terrarium: Exhibit { // OK
     func display() {
-        // ...
+        // MainActor isolated
     }
     func water() {
-        // ...
+        // MainActor isolated
     }
 }
 ```
@@ -49,15 +52,15 @@ protocol Exhibit {
 
 actor Terrarium: Exhibit { // OK
     @MainActor func display() {
-        // ...
+        // MainActor isolated
     }
     func water() {
-        // ...
+        // Terrarium instance isolated
     }
 }
 ```
 
-If the protocol requirements are all `async` functions with `Sendable` parameters and results, it's possible to have an implementation in a different concurrency domain:
+If the protocol requirements are all `async` functions with `Sendable` parameters and results, it's possible to have an implementation with a different isolation:
 
 ```swift
 protocol Exhibit {
@@ -66,15 +69,15 @@ protocol Exhibit {
 
 actor Terrarium: Exhibit { // OK
     func display() async {
-        // ...
+        // Terrarium instance isolated
     }
     func water() {
-        // ...
+        // Terrarium instance isolated
     }
 }
 ```
 
-This is possible because `async` methods require a suspension point at the call site. After the caller suspends, the implementation can be resumed on a different concurrency domain —as long as all parameters and result types are `Sendable`— and, once completed, suspend again and return to the caller.
+This is possible because `async` methods require a suspension point at the call site. After the caller suspends, the implementation can be resumed in a different isolation (the `Terrarium` actor instance) so long as all parameters and result types can be sent between isolations. Once completed, the implementation can suspend again and return to the caller.
 
 ## See Also
 
