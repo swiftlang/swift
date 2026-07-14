@@ -174,10 +174,11 @@ if "@SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING@" == "TRUE":
     config.available_features.add('embedded_stdlib_cross_compiling')
 
 # Regex of target triples whose embedded standard library is built in
-# interface-LTO mode. Empty means none. Mirrored into a per-test feature by
-# `test/embedded/lit.local.cfg` (`embedded_stdlib_default_codegen` /
-# `embedded_stdlib_interface_lto`).
-config.swift_embedded_interface_lto_triple_regex = "@SWIFT_EMBEDDED_INTERFACE_LTO_TRIPLE_REGEX@"
+# interface CGM or with LTO. Empty means none. Mirrored into per-test
+# features by `test/lit.cfg` (`embedded_stdlib_default_codegen` /
+# `embedded_stdlib_interface_cgm` / `embedded_stdlib_lto`).
+config.swift_embedded_stdlib_interface_cgm_triple_regex = "@SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX@"
+config.swift_embedded_stdlib_lto_triple_regex = "@SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX@"
 
 config.swift_freestanding_is_darwin = "@SWIFT_FREESTANDING_IS_DARWIN@" == "TRUE"
 config.swift_stdlib_use_relative_protocol_witness_tables = "@SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES@" == "TRUE"
