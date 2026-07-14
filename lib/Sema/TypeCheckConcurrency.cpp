@@ -5068,7 +5068,8 @@ ActorIsolationChecker::determineClosureIsolation(AbstractClosureExpr *closure,
     // isolated parameters. If our closure is nonisolated and we have a
     // conversion to nonisolated(nonsending), then we should respect that.
     if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
-        isIsolationBoundary || !normalIsolation.isGlobalActor()) {
+        explicitClosure &&
+        (isIsolationBoundary || !normalIsolation.isGlobalActor())) {
       if (auto *fce = dyn_cast_or_null<FunctionConversionExpr>(context)) {
         auto expectedIsolation =
             fce->getType()->castTo<FunctionType>()->getIsolation();
