@@ -255,6 +255,8 @@ public:
   /// debugger to use. When unset, the options will only be present if the
   /// module appears to not be a public module.
   std::optional<bool> SerializeOptionsForDebugging;
+  /// When true, generated .swiftsourceinfo files will be deterministic.
+  bool DeterministicSourceInfo = false;
 
   /// When true the debug prefix map entries will be applied to debugging
   /// options before serialization. These can be reconstructed at debug time by

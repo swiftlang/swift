@@ -131,6 +131,9 @@ def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
 def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
   HelpText<"Avoid getting source location from .swiftsourceinfo files">;
 
+def deterministic_sourceinfo : Flag<["-"], "deterministic-sourceinfo">,
+  HelpText<"Generate deterministic swiftsourceinfo files">;
+
 def merge_modules
   : Flag<["-"], "merge-modules">, ModeOpt,
     HelpText<"Merge the input modules without otherwise processing them">;

@@ -390,6 +390,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.SerializeOptionsForDebugging =
         A->getOption().matches(OPT_serialize_debugging_options);
   }
+  Opts.DeterministicSourceInfo = Args.hasArg(OPT_deterministic_sourceinfo);
 
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);

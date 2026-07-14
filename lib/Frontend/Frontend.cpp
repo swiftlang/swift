@@ -245,6 +245,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.SerializeOptionsForDebugging =
       opts.SerializeOptionsForDebugging.value_or(
           !module->isExternallyConsumed());
+          
+  serializationOpts.DeterministicSourceInfo = opts.DeterministicSourceInfo;
 
   serializationOpts.PathObfuscator = opts.serializedPathObfuscator;
   if (serializationOpts.SerializeOptionsForDebugging &&
