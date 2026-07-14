@@ -9,7 +9,15 @@
 // UNSUPPORTED: freestanding
 
 import _Concurrency
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif os(Windows)
+import CRT
+#endif
 import Foundation
 import Dispatch
 import StdlibUnittest

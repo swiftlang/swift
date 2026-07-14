@@ -15,16 +15,16 @@ import Dispatch
 import Foundation
 
 public var benchmarks: [BenchmarkInfo] {
-  guard #available(macOS 14, iOS 17, *) else { return [] }
+  guard #available(macOS 14, iOS 17, watchOS 10.0, tvOS 17.0, *) else { return [] }
   return [
     BenchmarkInfo(
       name: "TaskRegistryStress.Serial",
-      runFunction: run_serial(count: 1000),
+      runFunction: run_serial(count: 500),
       tags: [.concurrency, .runtime]
     ),
     BenchmarkInfo(
       name: "TaskRegistryStress.Parallel",
-      runFunction: run_parallel(threads: 8, tasksEach: 500),
+      runFunction: run_parallel(threads: 8, tasksEach: 250),
       tags: [.concurrency, .runtime]
     ),
     BenchmarkInfo(
@@ -34,13 +34,13 @@ public var benchmarks: [BenchmarkInfo] {
     ),
     BenchmarkInfo(
       name: "TaskRegistryStress.SlidingWindow",
-      runFunction: run_slidingWindow(windowSize: 100, iterations: 500),
+      runFunction: run_slidingWindow(windowSize: 100, iterations: 10000),
       tags: [.concurrency, .runtime]
     ),
   ]
 }
 
-@available(macOS 14, iOS 17, *)
+@available(macOS 14, iOS 17, watchOS 10.0, tvOS 17.0, *)
 private func run_serial(count: Int) -> (Int) -> Void {
   return { n in
     for _ in 0..<n {
@@ -54,7 +54,7 @@ private func run_serial(count: Int) -> (Int) -> Void {
   }
 }
 
-@available(macOS 14, iOS 17, *)
+@available(macOS 14, iOS 17, watchOS 10.0, tvOS 17.0, *)
 private func run_parallel(threads: Int, tasksEach: Int) -> (Int) -> Void {
   return { n in
     for _ in 0..<n {
@@ -76,7 +76,7 @@ private func run_parallel(threads: Int, tasksEach: Int) -> (Int) -> Void {
   }
 }
 
-@available(macOS 14, iOS 17, *)
+@available(macOS 14, iOS 17, watchOS 10.0, tvOS 17.0, *)
 private func run_liveSet(count: Int) -> (Int) -> Void {
   return { n in
     for _ in 0..<n {
@@ -109,7 +109,7 @@ private func run_liveSet(count: Int) -> (Int) -> Void {
   }
 }
 
-@available(macOS 14, iOS 17, *)
+@available(macOS 14, iOS 17, watchOS 10.0, tvOS 17.0, *)
 private func run_slidingWindow(windowSize: Int, iterations: Int) -> (Int) -> Void {
   return { n in
     let g = DispatchGroup()

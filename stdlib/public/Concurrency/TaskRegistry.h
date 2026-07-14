@@ -45,9 +45,11 @@ SWIFT_EXPORT_FROM(swift_Concurrency)
 TaskRegistryShard _swift_concurrency_task_registry[TaskRegistryShardCount];
 
 /// Register a newly created task. Must be called after full initialization.
+SWIFT_EXPORT_FROM(swift_Concurrency)
 void taskRegistryInsert(AsyncTask *task);
 
 /// Deregister a task. Must be called before swift_slowDealloc frees it.
+SWIFT_EXPORT_FROM(swift_Concurrency)
 void taskRegistryRemove(AsyncTask *task);
 
 /// Returns the count of currently registered tasks. For testing and debugging.
