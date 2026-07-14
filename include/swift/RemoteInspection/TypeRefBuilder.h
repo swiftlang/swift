@@ -105,6 +105,12 @@ public:
                                 std::string Name)
       : OriginalSize(Size), Cur(Cur), Size(Size), Name(Name) {
     if (Size != 0) {
+      if (Size < Self::getMinimumRecordSize()) {
+        // The section is too small to contain even a record header. Treat the
+        // section as empty.
+        this->Size = 0;
+        return;
+      }
       auto NextRecord = this->operator*();
       if (!NextRecord) {
         // NULL record pointer, don't attempt to proceed. Setting size to 0 will
@@ -140,6 +146,12 @@ public:
     Size -= CurSize;
 
     if (Size > 0) {
+      if (Size < Self::getMinimumRecordSize()) {
+        // The trailing bytes are too small to contain even a record header, so
+        // end iteration here.
+        Size = 0;
+        return asImpl();
+      }
       auto NextRecord = this->operator*();
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
@@ -179,6 +191,13 @@ public:
   }
 
   bool operator!=(const Self &other) const { return !(*this == other); }
+
+  // The minimum number of bytes that must remain in the section for the record
+  // header to be safely read by getCurrentRecordSize() and operator*(). The
+  // default is the full descriptor size; iterators whose descriptor ends in a
+  // flexible array member (so its sizeof is smaller than its readable header)
+  // override this.
+  static uint64_t getMinimumRecordSize() { return sizeof(Descriptor); }
 };
 
 class FieldDescriptorIterator
@@ -247,6 +266,13 @@ public:
   static uint64_t
   getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
     return MPER->getSizeInBytes();
+  }
+
+  static uint64_t getMinimumRecordSize() {
+    // MultiPayloadEnumDescriptor ends in a flexible `contents` array, so its
+    // sizeof only covers TypeName. getSizeInBytes() reads contents[0], so we
+    // need room for TypeName plus that first content word.
+    return sizeof(MultiPayloadEnumDescriptor) + sizeof(uint32_t);
   }
 };
 using MultiPayloadEnumSection =
