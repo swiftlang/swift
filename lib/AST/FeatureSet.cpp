@@ -706,6 +706,7 @@ static bool usesFeatureBorrowInout(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BuiltinDereferenceable)
+UNINTERESTING_FEATURE(CalledAttribute)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
