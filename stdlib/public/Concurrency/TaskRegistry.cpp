@@ -22,14 +22,18 @@ static inline size_t registryShardIndex(uint64_t taskId) {
   return static_cast<size_t>(taskId) & (TaskRegistryShardCount - 1);
 }
 
-std::atomic<AsyncTask *> swift::_swift_concurrency_task_registry[TaskRegistryShardCount] = {};
-static LazyMutex ShardLocks[TaskRegistryShardCount];
+struct alignas(64) PaddedLazyMutex {
+  LazyMutex mutex;
+};
+
+TaskRegistryShard swift::_swift_concurrency_task_registry[TaskRegistryShardCount] = {};
+static PaddedLazyMutex ShardLocks[TaskRegistryShardCount];
 
 void swift::taskRegistryInsert(AsyncTask *task) {
   auto shardIndex = registryShardIndex(task->getTaskId());
-  auto &shardHead = _swift_concurrency_task_registry[shardIndex];
+  auto &shardHead = _swift_concurrency_task_registry[shardIndex].head;
   
-  LazyMutex::ScopedLock guard(ShardLocks[shardIndex]);
+  LazyMutex::ScopedLock guard(ShardLocks[shardIndex].mutex);
   
   AsyncTask *head = shardHead.load(std::memory_order_relaxed);
   task->_private().registryNext.store(head, std::memory_order_relaxed);
@@ -45,9 +49,9 @@ void swift::taskRegistryInsert(AsyncTask *task) {
 
 void swift::taskRegistryRemove(AsyncTask *task) {
   auto shardIndex = registryShardIndex(task->getTaskId());
-  auto &shardHead = _swift_concurrency_task_registry[shardIndex];
+  auto &shardHead = _swift_concurrency_task_registry[shardIndex].head;
   
-  LazyMutex::ScopedLock guard(ShardLocks[shardIndex]);
+  LazyMutex::ScopedLock guard(ShardLocks[shardIndex].mutex);
   
   AsyncTask *prev = task->_private().registryPrev.load(std::memory_order_relaxed);
   AsyncTask *next = task->_private().registryNext.load(std::memory_order_relaxed);
@@ -72,8 +76,8 @@ void swift::taskRegistryRemove(AsyncTask *task) {
 size_t swift::swift_task_registryCount() {
   size_t count = 0;
   for (size_t shardIndex = 0; shardIndex < TaskRegistryShardCount; ++shardIndex) {
-    LazyMutex::ScopedLock guard(ShardLocks[shardIndex]);
-    for (auto *task = _swift_concurrency_task_registry[shardIndex].load(
+    LazyMutex::ScopedLock guard(ShardLocks[shardIndex].mutex);
+    for (auto *task = _swift_concurrency_task_registry[shardIndex].head.load(
              std::memory_order_relaxed);
          task;
          task = task->_private().registryNext.load(std::memory_order_relaxed)) {
@@ -85,8 +89,8 @@ size_t swift::swift_task_registryCount() {
 
 void swift::swift_task_registryWalk(void (*callback)(void *, void *), void *context) {
   for (size_t shardIndex = 0; shardIndex < TaskRegistryShardCount; ++shardIndex) {
-    LazyMutex::ScopedLock guard(ShardLocks[shardIndex]);
-    for (auto *task = _swift_concurrency_task_registry[shardIndex].load(
+    LazyMutex::ScopedLock guard(ShardLocks[shardIndex].mutex);
+    for (auto *task = _swift_concurrency_task_registry[shardIndex].head.load(
              std::memory_order_relaxed);
          task;
          task = task->_private().registryNext.load(std::memory_order_relaxed)) {
@@ -98,7 +102,7 @@ void swift::swift_task_registryWalk(void (*callback)(void *, void *), void *cont
 void *swift::swift_task_getShardHead(size_t shardIndex) {
   if (shardIndex >= TaskRegistryShardCount)
     return nullptr;
-  return _swift_concurrency_task_registry[shardIndex].load(std::memory_order_relaxed);
+  return _swift_concurrency_task_registry[shardIndex].head.load(std::memory_order_relaxed);
 }
 
 void *swift::swift_task_getTaskNext(void *task) {

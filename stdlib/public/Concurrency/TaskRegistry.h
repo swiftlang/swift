@@ -27,12 +27,16 @@ namespace swift {
 
 static constexpr size_t TaskRegistryShardCount = 16;
 
+struct alignas(64) TaskRegistryShard {
+  std::atomic<AsyncTask *> head;
+};
+
 /// Head pointers for the global live-task registry shards.
 /// Walk each shard via task->_private().registryNext; the low bit marks logical delete.
 /// Exported so that LLDB and swift-inspect can locate the lists without a
 /// new runtime API.
 SWIFT_EXPORT_FROM(swift_Concurrency)
-std::atomic<AsyncTask *> _swift_concurrency_task_registry[TaskRegistryShardCount];
+TaskRegistryShard _swift_concurrency_task_registry[TaskRegistryShardCount];
 
 /// Register a newly created task. Must be called after full initialization.
 void taskRegistryInsert(AsyncTask *task);

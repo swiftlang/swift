@@ -600,7 +600,7 @@ private:
   }
 };
 
-enum { NumWords_AsyncTask = 24 };
+enum { NumWords_AsyncTask = 26 };
 
 // The compiler will eventually assume these.
 static_assert(sizeof(AsyncTask) == NumWords_AsyncTask * sizeof(void*),
