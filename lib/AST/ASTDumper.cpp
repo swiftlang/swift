@@ -2765,19 +2765,13 @@ namespace {
       // triggering EnumRawValuesRequest which requres type-checking.
       if (isTypeChecked()) {
         if (auto *rawValueExpr = EED->getRawValueExpr()) {
-          if (EED->getASTContext().LangOpts.hasFeature(
-                  Feature::LiteralExpressions)) {
-            auto origRawValueExpr = EED->getOriginalRawValueExpr();
-            if (isa<LiteralExpr>(origRawValueExpr))
-              printRec(origRawValueExpr, Label::always("raw_value_expr"));
-            else {
-              printRec(EED->getOriginalRawValueExpr(),
-                       Label::always("original_raw_value_expr"));
-              printRec(EED->getRawValueExpr(),
-                       Label::always("folded_raw_value_expr"));
-            }
-          } else {
-            printRec(rawValueExpr, Label::always("raw_value_expr"));
+          auto origRawValueExpr = EED->getOriginalRawValueExpr();
+          if (isa<LiteralExpr>(origRawValueExpr))
+            printRec(origRawValueExpr, Label::always("raw_value_expr"));
+          else {
+            printRec(origRawValueExpr,
+                     Label::always("original_raw_value_expr"));
+            printRec(rawValueExpr, Label::always("folded_raw_value_expr"));
           }
         }
       } else if (auto *rawValueExpr = EED->getRawValueUnchecked())

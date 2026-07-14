@@ -2954,8 +2954,7 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
 
 bool PatternBindingDecl::hasSingleVarConstantFoldedInit() const {
   auto *singleVar = getSingleVar();
-  if (!singleVar || !singleVar->isConstValue() ||
-      !getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions))
+  if (!singleVar || !singleVar->isConstValue())
     return false;
   // Only stdlib integer constants participate in literal-expression folding.
   // Other constant initializers (tuples, arrays, strings, ...) are left as
@@ -12271,14 +12270,11 @@ LiteralExpr *EnumElementDecl::getRawValueExpr() const {
   // 'EnumRawValuesRequest' so this is meant to return the
   // cached result, if the above request was successful.
   if (RawValueExpr)
-    if (getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions))
-      return dyn_cast<LiteralExpr>(evaluateOrDefault(
-            getASTContext().evaluator,
-            ConstantFoldExpression{RawValueExpr, &getASTContext()}, {}));
-    else
-      return dyn_cast<LiteralExpr>(RawValueExpr);
-  else
-    return nullptr;
+    return dyn_cast<LiteralExpr>(evaluateOrDefault(
+        getASTContext().evaluator, ConstantFoldExpression{
+          RawValueExpr, &getASTContext(),
+          /*emitDiagnostics*/ true}, {}));
+  return nullptr;
 }
 
 void EnumElementDecl::setRawValueExpr(Expr *e) {

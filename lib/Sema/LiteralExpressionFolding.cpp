@@ -686,9 +686,8 @@ Expr *ConstantFoldExpression::evaluate(Evaluator &evaluator, const Expr *expr,
   // (non-integer literals, tuples, arrays, ...) are returned unchanged so they
   // are never routed through the integer constant-folder, which would reject
   // them with a spurious diagnostic.
-  if (ctx->LangOpts.hasFeature(Feature::LiteralExpressions) &&
-      expr->getType() && expr->getType()->isStdlibInteger()) {
-    ConstantFolder folder(*ctx);
+  if (expr->getType() && expr->getType()->isStdlibInteger()) {
+    ConstantFolder folder(*ctx, emitDiagnostics);
     if (auto result = folder.fold(expr))
       return result;
   }

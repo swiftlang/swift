@@ -1612,8 +1612,7 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
   // Look ahead to consider if this is a generic value expression
   // or possibly a tuple type with a postfix grammar
   bool shouldParseValueExpr = false;
-  if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
-      Tok.is(tok::l_paren)) {
+  if (Tok.is(tok::l_paren)) {
     BacktrackingScope backtrack(*this);
     skipSingle();
     if (Tok.is(tok::comma) || startsWithGreater(Tok) ||
@@ -1764,7 +1763,7 @@ bool Parser::canParseGenericArguments() {
     return true;
   }
 
-  do {
+  do {    
     // A generic argument may be a parenthesized value expression such as
     // '(1 + 2)'. Treat a parenthesized group as a value expression only when
     // it is immediately followed by ',' or '>'; otherwise parse it as a type
@@ -2002,8 +2001,7 @@ bool Parser::canParseStartOfInlineArrayType() {
   // expression or type. We specifically look for any type, not just integers
   // for better recovery in e.g cases where the user writes '[Int of 2]'. We
   // only do type-scalar since variadics would be ambiguous e.g 'Int...of'.
-  if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
-      Tok.is(tok::l_paren))
+  if (Tok.is(tok::l_paren))
     skipSingle(); // Assume a parentheses-delimited value expression
   else if (!canParseTypeScalar())
     return false;

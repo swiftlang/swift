@@ -5,8 +5,7 @@
 // diagnostic), and non-literal / magic-identifier raw values must be rejected
 // rather than tripping an assertion in RawValueKey.
 
-// REQUIRES: swift_feature_LiteralExpressions
-// RUN: %target-swift-frontend -typecheck %s -verify -verify-ignore-unrelated -enable-experimental-feature LiteralExpressions
+// RUN: %target-swift-frontend -typecheck %s -verify -verify-ignore-unrelated
 
 // Non-integer raw values are accepted as written (not folded).
 enum StringEnum: String { case a = "foo"; case b = "bar" }

@@ -1313,10 +1313,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
     // types (String, Float, ...) use the written literal directly. Gating on
     // an integer raw type keeps non-integer initializers from being routed
     // through the integer constant-folder, which would reject them.
-    bool literalExprEnabled =
-        ED->getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
-    bool foldIntegerRawValue =
-        literalExprEnabled && rawTy && rawTy->isStdlibInteger();
+    bool foldIntegerRawValue = rawTy && rawTy->isStdlibInteger();
     // We must reduce the expression to a LiteralExpr here so that:
     // 1. We validate the expression *is* a usable raw value.
     // 2. We can use it to compute the next automatic raw value expression.
@@ -1325,9 +1322,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
                           foldLiteralExpression(value, &ED->getASTContext()))
                     : dyn_cast<LiteralExpr>(value);
     if (!prevValue) {
-      // When the feature is disabled, non-literal raw values are already
-      // rejected during parsing; only diagnose here when it is enabled.
-      if (literalExprEnabled && value)
+      if (value)
         ED->getASTContext().Diags.diagnose(
             value->getLoc(), foldIntegerRawValue
                                  ? diag::nonliteral_int_expr_enum_case_raw_value

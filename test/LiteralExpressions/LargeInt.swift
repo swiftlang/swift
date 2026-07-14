@@ -1,7 +1,6 @@
 // Constant globals using @section initialized with literal expressions
-// REQUIRES: swift_feature_LiteralExpressions
 // REQUIRES: OS=macosx
-// RUN: %target-swift-frontend -typecheck -dump-ast %s -enable-experimental-feature LiteralExpressions -target %target-cpu-apple-macosx15.0 -verify | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -dump-ast %s -target %target-cpu-apple-macosx15.0 -verify | %FileCheck %s
 
 @section("mysection") let largeInt: Int128 = 128 + 2
 // CHECK-LABEL: (pattern_named type="Int128" "largeInt")
