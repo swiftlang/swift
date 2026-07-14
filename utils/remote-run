@@ -310,6 +310,8 @@ def strip_sep(name):
         name = name[lsep:]
     return name
 
+_PATH_TERMINATORS = frozenset(',:;\n\t\r "\'')
+
 class RemotePathSet(object):
     def __init__(self):
         self.inputs = set()
@@ -390,6 +392,30 @@ class PrefixProcessor(object):
 
         return orig_name
 
+    def process_embedded_paths(self, value):
+        result = []
+        cursor = 0
+        while cursor < len(value):
+            best_pos = -1
+            best_prefix = None
+            for prefix in (self.input_prefix, self.output_prefix):
+                if not prefix:
+                    continue
+                pos = value.find(prefix, cursor)
+                if pos >= 0 and (best_pos < 0 or pos < best_pos):
+                    best_pos = pos
+                    best_prefix = prefix
+            if best_pos < 0:
+                result.append(value[cursor:])
+                break
+            result.append(value[cursor:best_pos])
+            end = best_pos + len(best_prefix)
+            while end < len(value) and value[end] not in _PATH_TERMINATORS:
+                end += 1
+            result.append(self.process_one(value[best_pos:end]))
+            cursor = end
+        return ''.join(result)
+
 class ArgumentProcessor(PrefixProcessor):
     def __init__(self,
                  input_prefix, output_prefix,
@@ -420,7 +446,7 @@ class EnvVarProcessor(PrefixProcessor):
         self.env = dict()
 
         for key, value in self.original_env.items():
-            self.env[key] = self.process_one(value)
+            self.env[key] = self.process_embedded_paths(value)
 
 def collect_remote_env(local_env=os.environ, prefix='REMOTE_RUN_CHILD_'):
     return dict((key[len(prefix):], value)
