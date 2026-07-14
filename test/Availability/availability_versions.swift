@@ -149,27 +149,55 @@ func globalFuncAvailableOn51Obsoleted52() -> Int { return 51 } // expected-note 
 @available(OSX, unavailable, introduced: 51)
 func globalFuncUnavailableAndIntroducedOn51() -> Int { return 51 } // expected-note 3 {{'globalFuncUnavailableAndIntroducedOn51()' has been explicitly marked unavailable here}}
 
+@available(OSX, deprecated: 11, message: "11")
+@available(OSX, deprecated: 12, message: "12")
+func globalFuncDeprecatedIn11And12() -> Int { return 11 }
+
+@available(OSX, deprecated: 12, message: "12")
+@available(OSX, deprecated: 11, message: "11")
+func globalFuncDeprecatedIn12And11() -> Int { return 11 }
+
+@available(OSX, obsoleted: 51, message: "51")
+@available(OSX, obsoleted: 52, message: "52")
+func globalFuncObsoletedIn51And52() -> Int { return 51 } // expected-note 2 {{'globalFuncObsoletedIn51And52()' was obsoleted in macOS 51}}
+
+@available(OSX, obsoleted: 52, message: "52")
+@available(OSX, obsoleted: 51, message: "51")
+func globalFuncObsoletedIn52And51() -> Int { return 51 }  // expected-note 2 {{'globalFuncObsoletedIn52And51()' was obsoleted in macOS 51}}
+
 let _ = globalFuncDeprecatedAndAvailableOn51() // expected-error {{'globalFuncDeprecatedAndAvailableOn51()' is only available in macOS 51 or newer}}
 // expected-note@-1 {{add 'if #available' version check}}
-// expected-warning@-2 {{'globalFuncDeprecatedAndAvailableOn51()' is deprecated in macOS}}
 let _ = globalFuncAvailableOn51Deprecated52() // expected-error {{'globalFuncAvailableOn51Deprecated52()' is only available in macOS 51 or newer}}
 // expected-note@-1 {{add 'if #available' version check}}
 let _ = globalFuncAvailableOn51Obsoleted52() // expected-error {{'globalFuncAvailableOn51Obsoleted52()' is only available in macOS 51 or newer}}
 // expected-note@-1 {{add 'if #available' version check}}
 let _ = globalFuncUnavailableAndIntroducedOn51() // expected-error {{'globalFuncUnavailableAndIntroducedOn51()' is unavailable in macOS}}
+let _ = globalFuncDeprecatedIn11And12() // expected-warning {{'globalFuncDeprecatedIn11And12()' was deprecated in macOS 11: 11}}
+let _ = globalFuncDeprecatedIn12And11() // expected-warning {{'globalFuncDeprecatedIn12And11()' was deprecated in macOS 11: 11}}
+let _ = globalFuncObsoletedIn51And52()
+let _ = globalFuncObsoletedIn52And51()
 
 if #available(OSX 51, *) {
   let _ = globalFuncDeprecatedAndAvailableOn51() // expected-warning {{'globalFuncDeprecatedAndAvailableOn51()' is deprecated in macOS}}
   let _ = globalFuncAvailableOn51Deprecated52()
   let _ = globalFuncAvailableOn51Obsoleted52()
   let _ = globalFuncUnavailableAndIntroducedOn51() // expected-error {{'globalFuncUnavailableAndIntroducedOn51()' is unavailable in macOS}}
+  let _ = globalFuncDeprecatedIn11And12() // expected-warning {{'globalFuncDeprecatedIn11And12()' was deprecated in macOS 11: 11}}
+  let _ = globalFuncDeprecatedIn12And11() // expected-warning {{'globalFuncDeprecatedIn12And11()' was deprecated in macOS 11: 11}}
+  let _ = globalFuncObsoletedIn51And52() // expected-error {{'globalFuncObsoletedIn51And52()' is unavailable in macOS: 51}}
+  let _ = globalFuncObsoletedIn52And51() // expected-error {{'globalFuncObsoletedIn52And51()' is unavailable in macOS: 51}}
 }
 
 if #available(OSX 52, *) {
   let _ = globalFuncDeprecatedAndAvailableOn51() // expected-warning {{'globalFuncDeprecatedAndAvailableOn51()' is deprecated in macOS}}
+  // FIXME: [availability] Should be diagnosed as deprecated
   let _ = globalFuncAvailableOn51Deprecated52()
   let _ = globalFuncAvailableOn51Obsoleted52() // expected-error {{'globalFuncAvailableOn51Obsoleted52()' is unavailable in macOS}}
   let _ = globalFuncUnavailableAndIntroducedOn51() // expected-error {{'globalFuncUnavailableAndIntroducedOn51()' is unavailable in macOS}}
+  let _ = globalFuncDeprecatedIn11And12() // expected-warning {{'globalFuncDeprecatedIn11And12()' was deprecated in macOS 11: 11}}
+  let _ = globalFuncDeprecatedIn12And11() // expected-warning {{'globalFuncDeprecatedIn12And11()' was deprecated in macOS 11: 11}}
+  let _ = globalFuncObsoletedIn51And52() // expected-error {{'globalFuncObsoletedIn51And52()' is unavailable in macOS: 51}}
+  let _ = globalFuncObsoletedIn52And51() // expected-error {{'globalFuncObsoletedIn52And51()' is unavailable in macOS: 51}}
 }
 
 

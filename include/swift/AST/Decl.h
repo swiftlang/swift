@@ -1389,6 +1389,13 @@ public:
     return getClangNodeImpl().getAsMacro();
   }
 
+  /// Returns true if there is a Clang decl from which this declaration was
+  /// synthesized and that declaration was annotated as deprecated. This is
+  /// useful for distinguishing whether the source declaration was deprecated
+  /// independently of the availability of imported Swift declaration, which
+  /// may be different according to ClangImporter rules.
+  bool isClangDeclDeprecated() const;
+
   /// If this is the Swift implementation of a declaration imported from ObjC,
   /// returns the imported declaration. (If there are several, only the main
   /// class body will be returned.) Otherwise return \c nullptr.
