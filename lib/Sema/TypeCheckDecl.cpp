@@ -78,6 +78,15 @@ using namespace swift;
 
 namespace {
 
+/// Whether \p expr is a literal of a kind that can serve as an enum raw value
+/// (i.e. one handled by \c RawValueKey). This excludes literals such as
+/// \c #file and other magic identifiers, regex literals, and object literals,
+/// which type-check in some contexts but are not valid raw values.
+static bool isValidEnumRawValueLiteral(const LiteralExpr *expr) {
+  return isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr) ||
+         isa<StringLiteralExpr>(expr) || isa<BooleanLiteralExpr>(expr);
+}
+
 /// Used during enum raw value checking to identify duplicate raw values.
 /// Character, string, float, and integer literals are all keyed by value.
 /// Float and integer literals are additionally keyed by numeric equivalence.
@@ -1282,20 +1291,29 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
       }
     }
 
+    // Literal expressions are folded only for integer raw types; other raw
+    // types (String, Float, ...) use the written literal directly. Gating on
+    // an integer raw type keeps non-integer initializers from being routed
+    // through the integer constant-folder, which would reject them.
     bool literalExprEnabled =
         ED->getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
-    // We must constant-fold the expression here to reduce it to
-    // a LiteralExpr so that:
-    // 1. We validate the expression *is* foldable down to a constant
+    bool foldIntegerRawValue =
+        literalExprEnabled && rawTy && rawTy->isStdlibInteger();
+    // We must reduce the expression to a LiteralExpr here so that:
+    // 1. We validate the expression *is* a usable raw value.
     // 2. We can use it to compute the next automatic raw value expression.
-    prevValue = literalExprEnabled
+    prevValue = foldIntegerRawValue
                     ? dyn_cast<LiteralExpr>(
                           foldLiteralExpression(value, &ED->getASTContext()))
                     : dyn_cast<LiteralExpr>(value);
     if (!prevValue) {
+      // When the feature is disabled, non-literal raw values are already
+      // rejected during parsing; only diagnose here when it is enabled.
       if (literalExprEnabled && value)
         ED->getASTContext().Diags.diagnose(
-            value->getLoc(), diag::nonliteral_int_expr_enum_case_raw_value);
+            value->getLoc(), foldIntegerRawValue
+                                 ? diag::nonliteral_int_expr_enum_case_raw_value
+                                 : diag::nonliteral_enum_case_raw_value);
       continue;
     }
 
@@ -1319,6 +1337,17 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
     SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
                             ? elt->getLoc()
                             : uncheckedRawValueOf(elt)->getLoc();
+
+    // Only Integer/Float/String/Bool literals can serve as raw values. Reject
+    // any other literal -- magic identifiers such as #file/#line, regex
+    // literals, object literals -- here, since RawValueKey below only handles
+    // those four kinds.
+    if (!isValidEnumRawValueLiteral(prevValue)) {
+      Diags.diagnose(diagLoc, diag::nonliteral_enum_case_raw_value);
+      prevValue = nullptr;
+      continue;
+    }
+
     // Check that the raw value is unique.
     RawValueKey key{prevValue};
     RawValueSource source{elt, lastExplicitValueElt};

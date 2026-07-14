@@ -649,7 +649,12 @@ Expr *swift::foldLiteralExpression(const Expr *expr, ASTContext *ctx) {
 
 Expr *ConstantFoldExpression::evaluate(Evaluator &evaluator, const Expr *expr,
                                        ASTContext *ctx) const {
-  if (ctx->LangOpts.hasFeature(Feature::LiteralExpressions)) {
+  // Only integer literal expressions are folded. Expressions of other types
+  // (non-integer literals, tuples, arrays, ...) are returned unchanged so they
+  // are never routed through the integer constant-folder, which would reject
+  // them with a spurious diagnostic.
+  if (ctx->LangOpts.hasFeature(Feature::LiteralExpressions) &&
+      expr->getType() && expr->getType()->isStdlibInteger()) {
     ConstantFolder folder(*ctx);
     if (auto result = folder.fold(expr))
       return result;
