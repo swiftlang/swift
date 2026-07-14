@@ -231,22 +231,11 @@ enum class AvailabilityRestrictionFlag : uint8_t {
 };
 using AvailabilityRestrictionFlags = OptionSet<AvailabilityRestrictionFlag>;
 
-/// Returns the set of availability restrictions that restricts use of \p decl
-/// when it is referenced from the given context. In other words, it is the
-/// collection of `@available` attributes with unsatisfied conditions.
-DeclAvailabilityRestrictions getAvailabilityRestrictionsForDecl(
-    const Decl *decl, const AvailabilityContext &context,
-    AvailabilityRestrictionFlags flags = std::nullopt);
-
-/// Returns the availability restriction that restricts use of \p decl
-/// in \p domain when it is referenced from the given context. In other words,
-/// it is the unsatisfied `@available` attribute  that applies to \p domain in
-/// the given context.
-std::optional<AvailabilityRestriction>
-getAvailabilityRestrictionForDeclInDomain(
-    const Decl *decl, const AvailabilityContext &context,
-    AvailabilityDomain domain,
-    AvailabilityRestrictionFlags flags = std::nullopt);
+/// Returns the `AvailabilityRestriction` that describes how \p attr restricts
+/// use of \p decl in \p context or `std::nullopt` if there is no restriction.
+std::optional<AvailabilityRestriction> getAvailabilityRestrictionForAttr(
+    const SemanticAvailableAttr &attr, const Decl *decl,
+    const AvailabilityContext &context, AvailabilityRestrictionFlags flags);
 
 /// Computes the set of restrictions that indicate whether a decl is "runtime
 /// unavailable" (can never be reached at runtime) and adds the domain for each

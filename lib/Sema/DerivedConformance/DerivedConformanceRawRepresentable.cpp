@@ -20,7 +20,6 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeChecker.h"
-#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -244,9 +243,7 @@ checkAvailability(const EnumElementDecl *elt,
                   AvailabilityContext availabilityContext,
                   std::optional<RuntimeVersionCheck> &versionCheck) {
   auto &C = elt->getASTContext();
-  auto restriction =
-      getAvailabilityRestrictionsForDecl(elt, availabilityContext)
-          .getPrimaryRestriction();
+  auto restriction = availabilityContext.restrictionForDecl(elt);
 
   // Is it always available?
   if (!restriction)

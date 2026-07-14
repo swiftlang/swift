@@ -20,7 +20,6 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityRange.h"
-#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 // FIXME: [availability] Remove this when possible
@@ -423,8 +422,7 @@ bool Decl::isUnavailableInCurrentSwiftVersion() const {
 
 std::optional<SemanticAvailableAttr> Decl::getUnavailableAttr() const {
   auto context = AvailabilityContext::forDeploymentTarget(getASTContext());
-  if (auto restriction = getAvailabilityRestrictionsForDecl(this, context)
-                             .getPrimaryRestriction()) {
+  if (auto restriction = context.restrictionForDecl(this)) {
     if (restriction->isUnavailable())
       return restriction->getAttr();
   }
@@ -489,8 +487,9 @@ computeDeclRuntimeAvailability(const Decl *decl) {
   // restrictions from active platforms.
   flags |= AvailabilityRestrictionFlag::IncludeAllDomains;
 
-  auto restrictions = getAvailabilityRestrictionsForDecl(
-      decl, AvailabilityContext::forInliningTarget(ctx), flags);
+  auto restrictions =
+      AvailabilityContext::forInliningTarget(ctx).allRestrictionsForDecl(decl,
+                                                                         flags);
 
   // First, collect the unavailable domains from the restrictions.
   llvm::SmallVector<AvailabilityDomain, 8> unavailableDomains;

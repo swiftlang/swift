@@ -23,7 +23,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AvailabilityRange.h"
-#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -252,8 +251,7 @@ static bool isUnavailableInAllVersions(ValueDecl *decl) {
   ASTContext &ctx = decl->getASTContext();
 
   auto deploymentContext = AvailabilityContext::forDeploymentTarget(ctx);
-  auto restrictions =
-      getAvailabilityRestrictionsForDecl(decl, deploymentContext);
+  auto restrictions = deploymentContext.allRestrictionsForDecl(decl);
   for (auto restriction : restrictions) {
     switch (restriction.getReason()) {
     case AvailabilityRestriction::Reason::UnavailableUnconditionally:
@@ -1862,9 +1860,7 @@ getOverrideAvailability(ValueDecl *override, ValueDecl *base) {
   flags |= AvailabilityRestrictionFlag::
       AllowUniversallyUnavailableInCompatibleContexts;
 
-  if (auto restriction =
-          getAvailabilityRestrictionsForDecl(override, baseAvailability, flags)
-              .getPrimaryRestriction()) {
+  if (auto restriction = baseAvailability.restrictionForDecl(override, flags)) {
     if (restriction->isUnavailable())
       return {OverrideAvailability::OverrideUnavailable, restriction};
 
@@ -1874,8 +1870,7 @@ getOverrideAvailability(ValueDecl *override, ValueDecl *base) {
   // Check whether the base is unavailable from the perspective of the override.
   auto overrideAvailability = AvailabilityContext::forDeclSignature(override);
   if (auto baseRestriction =
-          getAvailabilityRestrictionsForDecl(base, overrideAvailability, flags)
-              .getPrimaryRestriction()) {
+          overrideAvailability.restrictionForDecl(base, flags)) {
     if (baseRestriction->isUnavailable())
       return {OverrideAvailability::BaseUnavailable, baseRestriction};
   }
