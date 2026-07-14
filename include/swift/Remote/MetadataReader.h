@@ -1440,40 +1440,10 @@ public:
       return ShapeRef(
           address, reinterpret_cast<const ShapeHeader *>(cached->second.get()));
 
-    ExtendedExistentialTypeShapeFlags flags;
-    if (!Reader->readBytes(address, (uint8_t *)&flags, sizeof(flags)))
-      return nullptr;
-
-    // Read the size of the requirement signature.
-    uint64_t descriptorSize;
-    {
-      auto readResult =
-          Reader->readBytes(RemoteAddress(address), sizeof(ShapeHeader));
-      if (!readResult)
-        return nullptr;
-      auto shapeHeader =
-          reinterpret_cast<const ShapeHeader *>(readResult.get());
-
-      // Read the size of the requirement signature.
-      uint64_t reqSigGenericSize = 0;
-      auto flags = shapeHeader->Flags;
-      auto &reqSigHeader = shapeHeader->ReqSigHeader;
-      reqSigGenericSize =
-          reqSigGenericSize + (reqSigHeader.NumParams + 3u & ~3u) +
-          reqSigHeader.NumRequirements *
-              sizeof(TargetGenericRequirementDescriptor<Runtime>);
-      uint64_t typeExprSize =
-          flags.hasTypeExpression() ? sizeof(StoredPointer) : 0;
-      uint64_t suggestedVWSize =
-          flags.hasSuggestedValueWitnesses() ? sizeof(StoredPointer) : 0;
-
-      descriptorSize = sizeof(shapeHeader) + typeExprSize + suggestedVWSize +
-                       reqSigGenericSize;
-    }
-    if (descriptorSize > MaxMetadataSize)
-      return nullptr;
-    auto readResult = Reader->readBytes(RemoteAddress(address), descriptorSize);
-    if (!readResult)
+    MemoryReader::ReadBytesResult readResult;
+    auto descriptorSize =
+        readFullTrailingObjects<ShapeHeader>(address, readResult, 0);
+    if (descriptorSize == 0 || descriptorSize > MaxMetadataSize || !readResult)
       return nullptr;
 
     auto descriptor = reinterpret_cast<const ShapeHeader *>(readResult.get());
