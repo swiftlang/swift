@@ -75,16 +75,6 @@ endif()
 
 add_subdirectory(SwiftShims/swift/shims)
 add_subdirectory(CommandLineSupport)
-if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
-  add_subdirectory(Cxx)
-else()
-  # SwiftCompilerSources rely on C++ interop, specifically on being able to
-  # import the C++ standard library into Swift. On Linux, this is only possible
-  # when using the modulemap that Swift provides for libstdc++. Make sure we
-  # include the libstdc++ modulemap into the build even when not building
-  # C++ interop modules.
-  add_subdirectory(Cxx/libstdcxx)
-endif()
 add_subdirectory(Threading)
 
 # This static library is shared across swiftCore and swiftRemoteInspection
@@ -365,6 +355,17 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
   message(STATUS "Building Embedded Swift standard libraries for targets: ${triples}")
   message(STATUS "")
+endif()
+
+if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
+  add_subdirectory(Cxx)
+else()
+  # SwiftCompilerSources rely on C++ interop, specifically on being able to
+  # import the C++ standard library into Swift. On Linux, this is only possible
+  # when using the modulemap that Swift provides for libstdc++. Make sure we
+  # include the libstdc++ modulemap into the build even when not building
+  # C++ interop modules.
+  add_subdirectory(Cxx/libstdcxx)
 endif()
 
 if(SWIFT_BUILD_STDLIB)
