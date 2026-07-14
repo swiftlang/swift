@@ -19,7 +19,6 @@
 #include "AbstractConformance.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityContext.h"
-#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -417,15 +416,12 @@ ProtocolConformanceRef::getAvailabilityRestriction(DeclContext *dc,
   // involve due to source compatibility exceptions. Thus, it is important to
   // verify that neither pose a restriction in the given context when checking
   // for availability of a conformance.
-  if (auto restriction =
-          getAvailabilityRestrictionsForDecl(getProtocol(), availability)
-              .getPrimaryRestriction())
+  if (auto restriction = availability.restrictionForDecl(getProtocol()))
     return restriction;
 
   auto *conformanceDC = getConcrete()->getRootConformance()->getDeclContext();
-  if (auto restriction = getAvailabilityRestrictionsForDecl(
-                             conformanceDC->getAsDecl(), availability)
-                             .getPrimaryRestriction())
+  if (auto restriction =
+          availability.restrictionForDecl(conformanceDC->getAsDecl()))
     return restriction;
 
   return std::nullopt;

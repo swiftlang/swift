@@ -26,7 +26,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AbstractLayout.h"
 #include "swift/AST/AvailabilityDomain.h"
-#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -1802,9 +1801,7 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
   // FIXME: [availability] Take an unsatisfied restriction as input instead of
   // recomputing it.
   ExportContext where = ExportContext::forDeclSignature(override);
-  auto restriction =
-      getAvailabilityRestrictionsForDecl(base, where.getAvailability())
-          .getPrimaryRestriction();
+  auto restriction = where.getAvailability().restrictionForDecl(base);
   if (!restriction)
     return;
 
@@ -1949,10 +1946,8 @@ swift::getUnsatisfiedAvailabilityRestriction(const Decl *decl,
     flags |= AvailabilityRestrictionFlag::
         AllowUniversallyUnavailableInCompatibleContexts;
 
-  return getAvailabilityRestrictionsForDecl(
-             decl, AvailabilityContext::forLocation(referenceLoc, referenceDC),
-             flags)
-      .getPrimaryRestriction();
+  return AvailabilityContext::forLocation(referenceLoc, referenceDC)
+      .restrictionForDecl(decl, flags);
 }
 
 /// Check if this is a subscript declaration inside String or
@@ -3152,9 +3147,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   auto *DC = Where.getDeclContext();
   auto &ctx = DC->getASTContext();
 
-  auto restriction =
-      getAvailabilityRestrictionsForDecl(D, Where.getAvailability())
-          .getPrimaryRestriction();
+  auto restriction = Where.getAvailability().restrictionForDecl(D);
 
   if (restriction) {
     if (diagnoseExplicitUnavailability(D, R, *restriction, Where, call, Flags))
@@ -3575,9 +3568,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       return true;
     }
 
-    auto restriction =
-        getAvailabilityRestrictionsForDecl(ext, where.getAvailability())
-            .getPrimaryRestriction();
+    auto restriction = where.getAvailability().restrictionForDecl(ext);
     if (restriction) {
       if (diagnoseExplicitUnavailability(
               loc, *restriction, rootConf, ext, where,

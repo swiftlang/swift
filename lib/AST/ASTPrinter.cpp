@@ -20,7 +20,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityContext.h"
-#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
@@ -209,8 +208,8 @@ static bool shouldSkipDeclInPublicInterface(const Decl *D) {
   if (!SF)
     return false;
 
-  auto restrictions = getAvailabilityRestrictionsForDecl(
-      D, AvailabilityContext::forDeploymentTarget(ctx));
+  auto restrictions =
+      AvailabilityContext::forDeploymentTarget(ctx).allRestrictionsForDecl(D);
   llvm::SmallVector<AvailabilityDomain, 4> unavailableDomains;
   getRuntimeUnavailableDomains(restrictions, unavailableDomains, ctx);
 

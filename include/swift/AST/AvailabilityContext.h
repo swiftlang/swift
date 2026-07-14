@@ -20,6 +20,7 @@
 
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -128,6 +129,25 @@ public:
   void
   constrainWithDeclAndPlatformRange(const Decl *decl,
                                     const AvailabilityRange &platformRange);
+
+  /// Returns the strongest availability restriction that limits use of \p decl
+  /// when it is referenced from this context, or nullopt if use of \p decl is
+  /// not restricted.
+  std::optional<AvailabilityRestriction>
+  restrictionForDecl(const Decl *decl,
+                     AvailabilityRestrictionFlags flags = std::nullopt);
+
+  /// Returns the availability restriction in \p domain that limits use of \p
+  /// decl from this context, or nullopt if use of \p decl is not restricted.
+  std::optional<AvailabilityRestriction>
+  restrictionForDeclInDomain(const Decl *decl, AvailabilityDomain domain,
+                             AvailabilityRestrictionFlags flags = std::nullopt);
+
+  /// Returns the set of availability restrictions that limit use of \p decl
+  /// when it is referenced from this context.
+  DeclAvailabilityRestrictions
+  allRestrictionsForDecl(const Decl *decl,
+                         AvailabilityRestrictionFlags flags = std::nullopt);
 
   /// Returns true if `other` is as available or is more available.
   bool isContainedIn(const AvailabilityContext other) const;
