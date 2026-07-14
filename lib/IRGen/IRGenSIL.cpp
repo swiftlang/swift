@@ -1792,6 +1792,8 @@ public:
   llvm::Value *getCallerErrorResultArgument() override {
     llvm_unreachable("should not be used");
   }
+  // Claimed lazily off the back; emitEntryPointArgumentsNativeCC binds the
+  // context first so this lands on the indirect error slot.
   llvm::Value *getCallerTypedErrorResultArgument() override {
     return allParamValues.takeLast();
   }
@@ -2211,6 +2213,40 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   }
 
   SILFunctionConventions fnConv(funcTy, IGF.getSILModule());
+
+  // Bind the self/context parameter, the last parameter of the async entry
+  // signature. Factored out so async binds it before popping the error result
+  // and the sync path after; returns true if it bound or claimed the context.
+  auto bindContextParameter = [&]() -> bool {
+    if (hasSelfContextParameter(funcTy)) {
+      SILArgument *selfParam = params.back();
+      params = params.drop_back();
+      bindParameter(
+          IGF, *emission, 0, selfParam,
+          fnConv.getSILArgumentType(fnConv.getNumSILArguments() - 1,
+                                    IGF.IGM.getMaximalTypeExpansionContext()),
+          [&](unsigned startIndex, unsigned size) {
+            assert(size == 1);
+            Explosion selfTemp;
+            selfTemp.add(emission->getContext());
+            return selfTemp;
+          });
+    } else if ((!funcTy->isAsync() && funcTy->hasErrorResult()) ||
+               funcTy->getRepresentation() ==
+                   SILFunctionTypeRepresentation::Thick) {
+      // Even without a 'self', an error result (sync) or a thick context still
+      // occupies a context slot here.
+      llvm::Value *contextPtr = emission->getContext();
+      (void)contextPtr;
+      assert(contextPtr->getType() == IGF.IGM.RefCountedPtrTy);
+    } else {
+      return false;
+    }
+    return true;
+  };
+
+  bool boundContextParameter = false;
+
   if (funcTy->isAsync()) {
     emitAsyncFunctionEntry(IGF, getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
                            LinkEntity::forSILFunction(IGF.CurSILFn),
@@ -2223,6 +2259,8 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
       // Remap the entry block.
       IGF.LoweredBBs[&*IGF.CurSILFn->begin()] = LoweredBB(IGF.Builder.GetInsertBlock(), {});
     }
+    // Bind the context before the error result is popped below.
+    boundContextParameter = bindContextParameter();
   }
 
   // Bind the error result by popping it off the parameter list.
@@ -2269,37 +2307,12 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     }
   }
 
-  SILFunctionConventions conv(funcTy, IGF.getSILModule());
+  // Sync path: bind the context after the error result (async bound it above).
+  if (!funcTy->isAsync())
+    boundContextParameter = bindContextParameter();
 
-  // The 'self' argument might be in the context position, which is
-  // now the end of the parameter list.  Bind it now.
-  if (hasSelfContextParameter(funcTy)) {
-    SILArgument *selfParam = params.back();
-    params = params.drop_back();
-
-    bindParameter(
-        IGF, *emission, 0, selfParam,
-        conv.getSILArgumentType(conv.getNumSILArguments() - 1,
-                                IGF.IGM.getMaximalTypeExpansionContext()),
-        [&](unsigned startIndex, unsigned size) {
-          assert(size == 1);
-          Explosion selfTemp;
-          selfTemp.add(emission->getContext());
-          return selfTemp;
-        });
-
-    // Even if we don't have a 'self', if we have an error result, we
-    // should have a placeholder argument here.
-    //
-    // For async functions, there will be a thick context within the async
-    // context whenever there is no self context.
-  } else if ((!funcTy->isAsync() && funcTy->hasErrorResult()) ||
-             funcTy->getRepresentation() ==
-                 SILFunctionTypeRepresentation::Thick) {
-    llvm::Value *contextPtr = emission->getContext();
-    (void)contextPtr;
-    assert(contextPtr->getType() == IGF.IGM.RefCountedPtrTy);
-  } else if (isKeyPathAccessorRepresentation(funcTy->getRepresentation())) {
+  if (!boundContextParameter &&
+      isKeyPathAccessorRepresentation(funcTy->getRepresentation())) {
     auto genericEnv = IGF.CurSILFn->getGenericEnvironment();
     SmallVector<GenericRequirement, 4> requirements;
     CanGenericSignature genericSig;
@@ -2345,7 +2358,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
         componentArgsBuf = allParamValues.takeLast();
         bindParameter(
             IGF, *emission, baseIndexOfIndicesArguments + i, indicesArg,
-            conv.getSILArgumentType(baseIndexOfIndicesArguments + i,
+            fnConv.getSILArgumentType(baseIndexOfIndicesArguments + i,
                                     IGF.IGM.getMaximalTypeExpansionContext()),
             [&](unsigned startIndex, unsigned size) {
               assert(size == 1);
@@ -2371,9 +2384,9 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   // Map the remaining SIL parameters to LLVM parameters.
   unsigned i = 0;
   for (SILArgument *param : params) {
-    auto argIdx = conv.getSILArgIndexOfFirstParam() + i;
+    auto argIdx = fnConv.getSILArgIndexOfFirstParam() + i;
     bindParameter(IGF, *emission, i, param,
-                  conv.getSILArgumentType(
+                  fnConv.getSILArgumentType(
                       argIdx, IGF.IGM.getMaximalTypeExpansionContext()),
                   [&](unsigned index, unsigned size) {
                     return emission->getArgumentExplosion(index, size);

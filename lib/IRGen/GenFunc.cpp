@@ -1158,7 +1158,7 @@ public:
     return substType->getParameters()[index];
   }
 
-  llvm::Value *getContext() { return origParams.claimNext(); }
+  virtual llvm::Value *getContext() { return origParams.claimNext(); }
 
   virtual llvm::Value *getDynamicFunctionPointer() = 0;
   virtual llvm::Value *getDynamicFunctionContext() = 0;
@@ -1408,6 +1408,10 @@ public:
     addArgument(explosion);
   }
 
+  // swiftself is the last parameter of the async entry signature, so
+  // takeLast() returns it.
+  llvm::Value *getContext() override { return origParams.takeLast(); }
+
   void forwardErrorResult() override {
     // The error result pointer is already in the appropriate position but the
     // type error address is not.
@@ -1425,8 +1429,9 @@ public:
           errorSchema.shouldReturnTypedErrorIndirectly() ||
           outConv.hasIndirectSILResults() ||
           outConv.hasIndirectSILErrorResults()) {
-        auto *typedErrorResultPtr = origParams.claimNext();
-        args.add(typedErrorResultPtr);
+        // The indirect error slot is now last, since getContext() already
+        // took swiftself.
+        args.add(origParams.takeLast());
       }
     }
   }
