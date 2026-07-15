@@ -3,13 +3,13 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature LiteralExpressions
 
 let wrongCount1: InlineArray<(2 + 3), Int> = [1, 2, 3]
-// expected-error@-1 {{expected '5' elements in inline array literal, but got '3'}}
+// expected-error@-1 {{expected 5 elements in inline array literal, but got 3}}
 
 let wrongCount2: InlineArray<(1 << 2), Int> = [1, 2, 3, 4, 5, 6]
-// expected-error@-1 {{expected '4' elements in inline array literal, but got '6'}}
+// expected-error@-1 {{expected 4 elements in inline array literal, but got 6}}
 
 let wrongCount3: [(3 * 2) of Int] = [1, 2, 3]
-// expected-error@-1 {{expected '6' elements in inline array literal, but got '3'}}
+// expected-error@-1 {{expected 6 elements in inline array literal, but got 3}}
 
 let typeMismatch1: InlineArray<(2 + 1), Int> = ["a", "b", "c"]
 // expected-error@-1 {{cannot convert value of type 'String' to expected element type 'Int'}}
@@ -60,7 +60,7 @@ let nestedMismatch: InlineArray<2, InlineArray<(1 + 1), Int>> = [[1, 2], [3, 4, 
 // expected-error@-1 {{cannot convert value of type '[Int]' to expected element type 'InlineArray<2, Int>'}}
 
 let nestedMismatch2: [(1 + 1) of [(2 + 1) of Int]] = [[1, 2, 3], [4, 5]]
-// expected-error@-1 {{expected '3' elements in inline array literal, but got '2'}}
+// expected-error@-1 {{expected 3 elements in inline array literal, but got 2}}
 
 let divZero: InlineArray<(1/0), Int>
 // expected-error@-1 {{division by zero}}

@@ -4,8 +4,8 @@ let a: InlineArray = [1, 2, 3] // Ok, InlineArray<3, Int>
 let b: InlineArray<_, Int> = [1, 2, 3] // Ok, InlineArray<3, Int>
 let c: InlineArray<3, _> = [1, 2, 3] // Ok, InlineArray<3, Int>
 
-let d: InlineArray<2, _> = [1, 2, 3] // expected-error {{expected '2' elements in inline array literal, but got '3'}}
-let e: InlineArray<2, _> = [1] // expected-error {{expected '2' elements in inline array literal, but got '1'}}
+let d: InlineArray<2, _> = [1, 2, 3] // expected-error {{expected 2 elements in inline array literal, but got 3}}
+let e: InlineArray<2, _> = [1] // expected-error {{expected 2 elements in inline array literal, but got 1}}
 
 let f: InlineArray<_, Int> = ["hello"] // expected-error {{cannot convert value of type 'String' to expected element type 'Int'}}
 
@@ -18,41 +18,41 @@ let _: [_ of _] = ["", "", ""] // Ok, InlineArray<3, String>
 
 let _: [3 of [3 of Int]] = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 let _: [3 of [3 of Int]] = [[1, 2], [3, 4, 5, 6]]
-// expected-error@-1 2 {{expected '3' elements in inline array literal, but got '2'}}
-// expected-error@-2 {{expected '3' elements in inline array literal, but got '4'}}
+// expected-error@-1 2 {{expected 3 elements in inline array literal, but got 2}}
+// expected-error@-2 {{expected 3 elements in inline array literal, but got 4}}
 
-let _ = [3 of [3 of Int]](repeating: [1, 2]) // expected-error {{expected '3' elements in inline array literal, but got '2'}}
+let _ = [3 of [3 of Int]](repeating: [1, 2]) // expected-error {{expected 3 elements in inline array literal, but got 2}}
 let _ = [3 of [_ of Int]](repeating: [1, 2])
 
 let _: [Int of 10] = [1, 2] // expected-error {{element count must precede inline array element type}} {{16-18=Int}} {{9-12=10}}
-// expected-error@-1 {{expected '10' elements in inline array literal, but got '2'}}
+// expected-error@-1 {{expected 10 elements in inline array literal, but got 2}}
 
-let _: [4 of _] = [1, 2, 3]   // expected-error {{expected '4' elements in inline array literal, but got '3'}}
-let _: [3 of Int] = [1, 2, 3, 4] // expected-error {{expected '3' elements in inline array literal, but got '4'}}
+let _: [4 of _] = [1, 2, 3]   // expected-error {{expected 4 elements in inline array literal, but got 3}}
+let _: [3 of Int] = [1, 2, 3, 4] // expected-error {{expected 3 elements in inline array literal, but got 4}}
 let _: [3 of String] = [1, 2, 3] // expected-error 3{{cannot convert value of type 'Int' to expected element type 'String'}}
 let _: [3 of String] = [1] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
-// expected-error@-1 {{expected '3' elements in inline array literal, but got '1'}}
+// expected-error@-1 {{expected 3 elements in inline array literal, but got 1}}
 
 func takeVectorOf2<T>(_: InlineArray<2, T>) {}
 
 takeVectorOf2([1, 2]) // Ok
 takeVectorOf2(["hello", "world"]) // Ok
 
-takeVectorOf2([1]) // expected-error {{expected '2' elements in inline array literal, but got '1'}}
+takeVectorOf2([1]) // expected-error {{expected 2 elements in inline array literal, but got 1}}
 
-takeVectorOf2([1, 2, 3]) // expected-error {{expected '2' elements in inline array literal, but got '3'}}
+takeVectorOf2([1, 2, 3]) // expected-error {{expected 2 elements in inline array literal, but got 3}}
 
-takeVectorOf2(["hello"]) // expected-error {{expected '2' elements in inline array literal, but got '1'}}
+takeVectorOf2(["hello"]) // expected-error {{expected 2 elements in inline array literal, but got 1}}
 
-takeVectorOf2(["hello", "world", "!"]) // expected-error {{expected '2' elements in inline array literal, but got '3'}}
+takeVectorOf2(["hello", "world", "!"]) // expected-error {{expected 2 elements in inline array literal, but got 3}}
 
 func takeVectorOf2Int(_: InlineArray<2, Int>) {}
 
 takeVectorOf2Int([1, 2]) // Ok
 
-takeVectorOf2Int([1]) // expected-error {{expected '2' elements in inline array literal, but got '1'}}
+takeVectorOf2Int([1]) // expected-error {{expected 2 elements in inline array literal, but got 1}}
 
-takeVectorOf2Int([1, 2, 3]) // expected-error {{expected '2' elements in inline array literal, but got '3'}}
+takeVectorOf2Int([1, 2, 3]) // expected-error {{expected 2 elements in inline array literal, but got 3}}
 
 takeVectorOf2Int(["hello"]) // expected-error {{cannot convert value of type '[String]' to expected argument type 'InlineArray<2, Int>'}}
 
@@ -63,7 +63,7 @@ takeVectorOf2Int(["hello", "world", "!"]) // expected-error {{cannot convert val
 
 func takeSugarVectorOf2<T>(_: [2 of T], ty: T.Type = T.self) {}
 takeSugarVectorOf2([1, 2])
-takeSugarVectorOf2(["hello"]) // expected-error {{expected '2' elements in inline array literal, but got '1'}}
+takeSugarVectorOf2(["hello"]) // expected-error {{expected 2 elements in inline array literal, but got 1}}
 takeSugarVectorOf2(["hello"], ty: Int.self) // expected-error {{cannot convert value of type '[String]' to expected argument type '[2 of Int]'}}
 takeSugarVectorOf2(["hello", "hi"], ty: Int.self) // expected-error {{cannot convert value of type '[String]' to expected argument type '[2 of Int]'}}
 

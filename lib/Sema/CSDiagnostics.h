@@ -3380,13 +3380,14 @@ public:
 /// let x: InlineArray<4, Int> = [1, 2] // expected '4' elements but got '2'
 /// \endcode
 class IncorrectInlineArrayLiteralCount final : public FailureDiagnostic {
-  Type lhsCount, rhsCount;
+  unsigned lhsCount, rhsCount;
 
 public:
-  IncorrectInlineArrayLiteralCount(const Solution &solution, Type lhsCount,
-                            Type rhsCount, ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), lhsCount(resolveType(lhsCount)),
-        rhsCount(resolveType(rhsCount)) {}
+  IncorrectInlineArrayLiteralCount(const Solution &solution, unsigned lhsCount,
+                                   unsigned rhsCount,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), lhsCount(lhsCount),
+        rhsCount(rhsCount) {}
 
   bool diagnoseAsError() override;
 };
