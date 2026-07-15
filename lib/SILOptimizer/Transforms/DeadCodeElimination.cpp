@@ -509,13 +509,6 @@ void DCE::propagateLiveness(SILInstruction *I) {
     for (auto &O : I->getAllOperands())
       markValueLive(O.get());
 
-    // Conceptually, the dependency from a debug instruction to its definition
-    // is in reverse direction: Only if its definition is alive, also the
-    // debug_value instruction is alive.
-    for (auto result : I->getResults())
-      for (Operand *DU : getDebugUses(result))
-        markInstructionLive(DU->getUser());
-
     // Handle all other reverse-dependency instructions, like cond_fail,
     // fix_lifetime, destroy_value, etc. Only if the definition is alive, the
     // user itself is alive.
