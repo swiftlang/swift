@@ -18,9 +18,50 @@ import SwiftShims
 /// autorelease pool.
 internal func _stdlib_NSSet_allObjects(_ object: AnyObject) -> _BridgingBuffer {
   let nss = unsafe unsafeBitCast(object, to: _NSSet.self)
+
+  /* We use NSFastEnumeration rather than `-getObjects:count:` in order to
+   more-reliably detect invalid NSSet instances (either incorrect subclasses or
+   heap-corrupted correct ones) */
+
   let count = nss.count
   let storage = _BridgingBuffer(count)
-  unsafe nss.getObjects(storage.baseAddress)
+  var materialized = 0
+
+  var state = unsafe _makeSwiftNSFastEnumerationState()
+  var stackBuf = unsafe _CocoaFastEnumerationStackBuf()
+  let stackBufCount = unsafe stackBuf.count
+
+  withUnsafeMutablePointer(to: &state) { statePtr in
+    withUnsafeMutablePointer(to: &stackBuf) { stackBufPtr in
+      let stackObjects = unsafe UnsafeMutableRawPointer(stackBufPtr)
+        .assumingMemoryBound(to: AnyObject.self)
+      while true {
+        let batch = unsafe nss.countByEnumerating(
+          with: statePtr,
+          objects: stackObjects,
+          count: stackBufCount)
+        if batch == 0 { break }
+
+        _precondition(batch <= count - materialized,
+          "NSSet bridging: source provided more elements than its count")
+
+        // `itemsPtr` points either into the set's own storage or into our
+        // stack buffer; copy the +0 references out without retaining.
+        let items = unsafe UnsafeMutableRawPointer(statePtr.pointee.itemsPtr!)
+          .assumingMemoryBound(to: AnyObject.self)
+        let target = UnsafeMutableRawPointer(storage.baseAddress + materialized)
+        unsafe target.copyMemory(
+          from: items,
+          byteCount: batch * MemoryLayout<AnyObject>.stride
+        )
+        materialized += batch
+      }
+    }
+  }
+  
+  extendLifetime(nss)
+  _precondition(materialized == count,
+    "NSSet bridging: source vended fewer elements than its count")
   return storage
 }
 
