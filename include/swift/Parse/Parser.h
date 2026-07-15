@@ -1755,6 +1755,12 @@ public:
   bool canParseGenericArguments();
   bool canParseGenericValueLiteral();
 
+  /// Assuming the parser is positioned at the opening '(' of a generic argument
+  /// that would otherwise be parsed as a value expression, check if the
+  /// parenthesized group contains an opaque 'some' type that requires it to be
+  /// parsed as a type instead.
+  bool parenGenericArgumentContainsTypeOnlySyntax();
+
   bool canParseTypedPattern();
 
   /// Returns true if a qualified declaration name base type can be parsed.
