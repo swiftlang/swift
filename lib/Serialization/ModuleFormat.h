@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1013; // default requirement derivatives
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1014; // @called(once) attribute support
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1411,7 +1411,8 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
-    BCFixed<1>                       // has sending result
+    BCFixed<1>,                      // has sending result
+    BCFixed<1>                       // called once
     // trailed by parameters
     // Optionally lifetime dependence info
   );
@@ -1512,7 +1513,8 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
-    BCFixed<1>,                      // has sending result
+    BCFixed<1>,                      // has sending result,
+    BCFixed<1>,                      // called once
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
