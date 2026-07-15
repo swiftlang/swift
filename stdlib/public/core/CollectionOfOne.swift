@@ -247,10 +247,10 @@ extension CollectionOfOne where Element: Hashable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
+@available(StdlibDeploymentTarget 6.4, *)
 extension CollectionOfOne: Equatable where Element: Equatable {}
 
-@available(SwiftStdlib 6.4, *)
+@available(StdlibDeploymentTarget 6.4, *)
 extension CollectionOfOne: Hashable where Element: Hashable {}
 
 extension CollectionOfOne: ConvertibleToBytes

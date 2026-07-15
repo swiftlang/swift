@@ -1715,7 +1715,7 @@ extension Dictionary.Keys {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
+@available(StdlibDeploymentTarget 6.4, *)
 extension Dictionary.Keys: Hashable {}
 
 extension Dictionary.Values {

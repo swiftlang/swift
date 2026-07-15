@@ -199,5 +199,5 @@ extension EmptyCollection {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
+@available(StdlibDeploymentTarget 6.4, *)
 extension EmptyCollection: Hashable {}
