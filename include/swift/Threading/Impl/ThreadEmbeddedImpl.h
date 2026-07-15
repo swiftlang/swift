@@ -63,7 +63,7 @@ inline std::optional<stack_bounds> thread_get_current_stack_bounds() {
 }
 
 struct mutex_handle {
-  uintptr_t storage[8] = {};
+  uintptr_t storage[EMBEDDED_SWIFT_MUTEX_NUM_WORDS] = {};
 };
 
 inline void mutex_init(mutex_handle &handle, bool checked = false) {
@@ -120,8 +120,8 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *ctx) {
   ::swift::swift_once(&predicate, fn, ctx);
 }
 
-using tls_key_t = __swift_tls_key_t;
-using tls_dtor_t = void (*)(void *);
+using tls_key_t = swift_tls_key_t;
+using tls_dtor_t = swift_tls_dtor_t;
 
 inline tls_key_t tls_get_key(swift::tls_key key) {
   return static_cast<tls_key_t>(key);
