@@ -2184,8 +2184,10 @@ public:
       	  // and acts like a non-generic (because the pointer has spare bits)
       	  ++NonGenericNonEmptyPayloadCases;
           LastPayloadCaseTR = CaseTR;
-        } else if (Case.Generic) {
-      	  // Otherwise, we never consider spare bits from generic cases
+        } else if (Case.Generic && !isa<ReferenceTypeInfo>(CaseTI)) {
+          // We never consider spare bits from generic cases of value types.
+          // Generic references DO still get spare bits, because the value of
+          // the actual type is just the reference and that is not generic.
           ++GenericPayloadCases;
           LastPayloadCaseTR = CaseTR;
         } else if (CaseTI->getSize() == 0) {
