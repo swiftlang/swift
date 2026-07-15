@@ -1210,7 +1210,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
 
   // Transform the parameter arguments.
   SmallVector<ConcreteArgumentCopy, 4> concreteArgCopies;
-  llvm::SmallMapVector<SILValue, SILValue, 4> valuesToReplace;
+  llvm::SmallMapVector<SILValue, const ConcreteExistentialInfo*, 4> valuesToReplace;
   for (unsigned EndIdx = Apply.getNumArguments(); ArgIdx < EndIdx; ++ArgIdx) {
     auto ArgIt = COAIs.find(ArgIdx);
     if (ArgIt == COAIs.end()) {
@@ -1252,7 +1252,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
       NewArgs.push_back(argSub->tempArg);
     } else {
       if (CEI.ConcreteValueNeedsFixup) {
-        valuesToReplace[OAI.OpenedArchetypeValue] = CEI.ConcreteValue;
+        valuesToReplace[OAI.OpenedArchetypeValue] = {&CEI};
       }
       NewArgs.push_back(CEI.ConcreteValue);
     }
@@ -1347,15 +1347,41 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     }
   }
   // Replace all uses of the opened existential with the unconditional cast to
-  // concrete type.
+  // concrete type. Another `apply` may share this opened existential (e.g.
+  // when CSE has merged multiple opens of the same existential) and call a
+  // `witness_method` that also depends on it. Redirecting such an instruction's
+  // operand without updating its callee would desynchronize the two: the
+  // callee's generic signature would still expect the abstract opened
+  // archetype while its operand now provides the concrete type. So
+  // devirtualize the sibling's `witness_method` with its operand.
   for (auto &valuePair : valuesToReplace) {
     auto openedExistential = valuePair.first;
-    auto uncheckedCast = valuePair.second;
+    auto uncheckedCast = valuePair.second->ConcreteValue;
+    const ConcreteExistentialInfo &CEI = *valuePair.second;
     SmallVector<Operand *> uses(openedExistential->getNonTypeDependentUses());
     for (auto use : uses) {
       auto *user = use->getUser();
       if (user == cast<SingleValueInstruction>(uncheckedCast)) {
         continue;
+      }
+      if (auto AI = FullApplySite::isa(user)) {
+        if (auto *WMI = dyn_cast<WitnessMethodInst>(AI.getCallee())) {
+          if (WMI->getLookupType() ==
+              openedExistential->getType().getASTType()) {
+            ProtocolConformanceRef conformance =
+                CEI.lookupExistentialConformance(WMI->getLookupProtocol());
+            if (!conformance) {
+              // Can't prove the concrete type satisfies this apply's
+              // requirement.
+              continue;
+            }
+            if (CEI.ConcreteType != WMI->getLookupType() ||
+                conformance != WMI->getConformance()) {
+              replaceWitnessMethodInst(WMI, BuilderCtx, CEI.ConcreteType,
+                                       conformance);
+            }
+          }
+        }
       }
       use->set(uncheckedCast);
     }
