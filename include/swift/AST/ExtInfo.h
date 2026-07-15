@@ -550,8 +550,8 @@ class ASTExtInfoBuilder {
   // If bits are added or removed, then TypeBase::NumAFTExtInfoBits
   // and NumMaskBits must be updated, and they must match.
   //
-  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |
-  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |
+  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |inout_result|called_once|
+  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |     15     |    16     |
   //
   enum : unsigned {
     RepresentationMask = 0xF << 0,
@@ -565,7 +565,8 @@ class ASTExtInfoBuilder {
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
     SendingResultMask = 1 << 14,
     InOutResultMask = 1 << 15,
-    NumMaskBits = 16
+    CalledOnceMask = 1 << 16,
+    NumMaskBits = 17
   };
 
   static_assert(FunctionTypeIsolation::Mask == 0x7, "update mask manually");
@@ -605,7 +606,8 @@ public:
                           DifferentiabilityKind::NonDifferentiable, nullptr,
                           FunctionTypeIsolation::forNonIsolated(),
                           {} /* LifetimeDependenceInfo */,
-                          false /*sendingResult*/) {}
+                          false /*sendingResult*/,
+                          false /*calledOnce*/) {}
 
   // Constructor for polymorphic type.
   ASTExtInfoBuilder(Representation rep, bool throws, Type thrownError)
@@ -613,21 +615,23 @@ public:
                           DifferentiabilityKind::NonDifferentiable, nullptr,
                           FunctionTypeIsolation::forNonIsolated(),
                           {} /* LifetimeDependenceInfo */,
-                          false /*sendingResult*/) {}
+                          false /*sendingResult*/,
+                          false /*calledOnce*/) {}
 
   // Constructor with almost no defaults.
   ASTExtInfoBuilder(Representation rep, bool isNoEscape, bool throws,
                     Type thrownError, DifferentiabilityKind diffKind,
                     const clang::Type *type, FunctionTypeIsolation isolation,
                     ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
-                    bool sendingResult)
+                    bool sendingResult, bool calledOnce)
       : ASTExtInfoBuilder(
             ((unsigned)rep) | (isNoEscape ? NoEscapeMask : 0) |
-                (throws ? ThrowsMask : 0) |
-                (((unsigned)diffKind << DifferentiabilityMaskOffset) &
-                 DifferentiabilityMask) |
-                (unsigned(isolation.getKind()) << IsolationMaskOffset) |
-                (sendingResult ? SendingResultMask : 0),
+            (throws ? ThrowsMask : 0) |
+            (((unsigned)diffKind << DifferentiabilityMaskOffset) &
+             DifferentiabilityMask) |
+            (unsigned(isolation.getKind()) << IsolationMaskOffset) |
+            (sendingResult ? SendingResultMask : 0) |
+            (calledOnce ? CalledOnceMask : 0),
             ClangTypeInfo(type), isolation.getOpaqueType(), thrownError,
             /*sendableDependentType*/ Type(), lifetimeDependencies) {}
 
@@ -650,6 +654,8 @@ public:
   constexpr bool isThrowing() const { return bits & ThrowsMask; }
 
   constexpr bool hasSendingResult() const { return bits & SendingResultMask; }
+
+  constexpr bool isCalledOnce() const { return bits & CalledOnceMask; }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
@@ -842,6 +848,13 @@ public:
                              lifetimeDependencies);
   }
 
+  [[nodiscard]] ASTExtInfoBuilder withCalledOnce(bool enabled = true) const {
+    return ASTExtInfoBuilder(enabled ? (bits | CalledOnceMask)
+                                     : (bits & ~CalledOnceMask),
+                             clangTypeInfo, globalActor, thrownError,
+                             sendableDependentType, lifetimeDependencies);
+  }
+
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddInteger(bits);
     ID.AddPointer(clangTypeInfo.getType());
@@ -947,6 +960,8 @@ public:
 
   constexpr bool hasInOutResult() const { return builder.hasInOutResult(); }
 
+  constexpr bool isCalledOnce() const { return builder.isCalledOnce(); }
+
   /// Helper method for changing the representation.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withRepresentation for chaining.
@@ -1033,6 +1048,10 @@ public:
   [[nodiscard]] ASTExtInfo withLifetimeDependencies(
       SmallVectorImpl<LifetimeDependenceInfo> lifetimeDependencies) const =
       delete;
+
+  [[nodiscard]] ASTExtInfo withCalledOnce(bool enabled = true) const {
+    return builder.withCalledOnce(enabled).build();
+  }
 
   void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }
 

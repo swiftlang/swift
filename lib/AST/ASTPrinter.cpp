@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -4358,7 +4359,7 @@ static void printParameterFlags(ASTPrinter &printer,
     if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
       printer.printAttrName("@escaping ");
   }
-
+  
   if (flags.isConstValue())
     printer.printAttrName("@const ");
 }
@@ -4495,13 +4496,16 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       auto type = TheTypeLoc.getType();
 
       bool isNonisolatedNonsending = false;
-      if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer()))
-        isNonisolatedNonsending = funcTy->getIsolation().isNonisolatedNonsending();
+      if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer())) {
+        isNonisolatedNonsending =
+            funcTy->getIsolation().isNonisolatedNonsending();
+      }
 
       // We suppress `@escaping` on enum element parameters because it cannot
       // be written explicitly in this position.
       printParameterFlags(Printer, Options, param, paramFlags,
-                          isEscaping(type) && !isEnumElement, isNonisolatedNonsending);
+                          isEscaping(type) && !isEnumElement,
+                          isNonisolatedNonsending);
     }
 
     printTypeLoc(TheTypeLoc, getNonRecursiveOptions(param));
@@ -7164,6 +7168,10 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
+    if (!Options.excludeAttrKind(TypeAttrKind::Called) && info.isCalledOnce()) {
+      Printer.printSimpleAttr("@called(once)") << " ";
+    }
+    
     // Print lifetime dependencies using Swift syntax.
     if (!Options.PrintInSILBody && fnType->hasLifetimeDependencies()) {
       ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
@@ -7428,8 +7436,8 @@ public:
         visit(type);
         Printer << "...";
       } else {
-        printParameterFlags(Printer, Options, nullptr, Param.getParameterFlags(),
-                            isEscaping(type));
+        printParameterFlags(Printer, Options, nullptr,
+                            Param.getParameterFlags(), isEscaping(type));
         visit(type);
       }
     }

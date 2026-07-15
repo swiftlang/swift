@@ -4636,6 +4636,8 @@ public:
     Bits.CalledTypeAttr.Semantics = uint8_t(semantics.Item);
   }
 
+  bool isOnce() const { return getSemantics() == Semantics::Once; }
+
   Semantics getSemantics() const {
     return Semantics(Bits.CalledTypeAttr.Semantics);
   }

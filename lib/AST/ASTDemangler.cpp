@@ -606,7 +606,8 @@ Type ASTBuilder::createFunctionType(
   auto einfo = FunctionType::ExtInfoBuilder(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
-                   /*LifetimeDependenceInfo*/ {}, extFlags.hasSendingResult())
+                   /*LifetimeDependenceInfo*/ {}, extFlags.hasSendingResult(),
+                   extFlags.isCalledOnce())
                    .withAsync(flags.isAsync())
                    .withSendable(flags.isSendable())
                    .build();

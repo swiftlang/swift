@@ -4743,6 +4743,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
+  bool isCalledOnce = false;
   if (auto called = claim<CalledTypeAttr>(attrs)) {
     if (ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
       if (representation != FunctionTypeRepresentation::Swift) {
@@ -4752,6 +4753,10 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         representation = FunctionType::Representation::Swift;
         parsedClangFunctionType = nullptr;
       }
+
+      if (!repr->isInvalid() && called->isOnce())
+        isCalledOnce = true;
+
     } else {
       diagnoseInvalid(repr, called->getAttrLoc(),
                       diag::requires_experimental_feature, "@called", false,
@@ -4762,7 +4767,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ {}, hasSendingResult);
+      /*LifetimeDependenceInfo*/ {}, hasSendingResult, isCalledOnce);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)

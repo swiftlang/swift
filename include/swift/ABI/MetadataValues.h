@@ -1290,15 +1290,17 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 template <typename int_type>
 class TargetExtendedFunctionTypeFlags {
   enum : int_type {
-    TypedThrowsMask        = 0x00000001U,
-    IsolationMask          = 0x0000000EU, // three bits
+    TypedThrowsMask = 0x00000001U,
+    IsolationMask = 0x0000000EU, // three bits
 
     // Values for the enumerated isolation kinds
-    IsolatedAny            = 0x00000002U,
-    NonIsolatedNonsending  = 0x00000004U,
+    IsolatedAny = 0x00000002U,
+    NonIsolatedNonsending = 0x00000004U,
 
     // Values if we have a sending result.
-    HasSendingResult  = 0x00000010U,
+    HasSendingResult = 0x00000010U,
+
+    IsCalledOnce = 0x00000020U,
 
     /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
@@ -1341,6 +1343,12 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
+  withCalledOnce(bool newValue = true) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+        (Data & ~IsCalledOnce) | (newValue ? IsCalledOnce : 0));
+  }
+
+  const TargetExtendedFunctionTypeFlags<int_type>
   withInvertedProtocols(InvertibleProtocolSet inverted) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
         (Data & ~InvertedProtocolMask) |
@@ -1359,6 +1367,10 @@ public:
 
   bool hasSendingResult() const {
     return bool(Data & HasSendingResult);
+  }
+
+  bool isCalledOnce() const {
+    return bool(Data & IsCalledOnce);
   }
 
   int_type getIntValue() const {

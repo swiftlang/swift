@@ -405,7 +405,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 16 };
+  enum { NumAFTExtInfoBits = 17 };
   enum { NumSILExtInfoBits = 15 };
 
   // clang-format off
@@ -4026,6 +4026,8 @@ public:
   DifferentiabilityKind getDifferentiabilityKind() const {
     return getExtInfo().getDifferentiabilityKind();
   }
+
+  bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
