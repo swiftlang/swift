@@ -16,7 +16,7 @@ extension Proto {
   func overload() -> some Proto<S1> where Assoc == S1 {
     Generic()
   }
-  func overload() -> some Proto<S1> where Assoc == Generic<Generic<S1>> {
+  func overload() -> some Proto<S1> where Assoc == Generic<Generic<S1>> { // expected-note {{'overload()' declared here}}
     Generic()
   }
 }
@@ -27,8 +27,7 @@ struct Struct: Proto {
 }
 
 func test() {
-  // FIXME: This used to crash, but it still produces a bogus diagnostic.
   let _ = Generic.foo(Generic.bar(Struct(0).overload()))
-  // expected-error@-1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  // expected-error@-1 {{referencing instance method 'overload()' on 'Struct' requires the types 'S2' and 'S1' be equivalent}}
 }
 
