@@ -119,6 +119,11 @@ struct CopyableStruct {
   var guts: AnyObject
 }
 
+struct MoveOnlyData<T> : ~Copyable {
+  @_hasStorage let value: T { get }
+  deinit
+}
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -5753,3 +5758,14 @@ bb5:
   return %44
 }
 
+// Just check that SILCombine doesn't produce illegal SIL.
+sil [ossa] @dont_convert_operand_of_drop_deinit_to_guaranteed : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%2 : @guaranteed $Klass):
+  %28 = copy_value %2
+  %33 = struct $MoveOnlyData<Klass> (%28)
+  %62 = drop_deinit %33
+  %63 = destructure_struct %62
+  destroy_value %63
+  %r = tuple ()
+  return %r
+}
