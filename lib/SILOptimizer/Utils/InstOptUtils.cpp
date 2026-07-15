@@ -1014,7 +1014,7 @@ void swift::getConsumedPartialApplyArgs(PartialApplyInst *pai,
                                         bool includeTrivialAddrArgs) {
   ApplySite applySite(pai);
   SILFunctionConventions calleeConv = applySite.getSubstCalleeConv();
-  unsigned firstCalleeArgIdx = applySite.getCalleeArgIndexOfFirstAppliedArg();
+  unsigned firstCalleeArgIdx = applySite.getSubstCalleeArgIndexOfFirstAppliedArg();
   auto argList = pai->getArgumentOperands();
   SILFunction *F = pai->getFunction();
 
@@ -1494,7 +1494,6 @@ void swift::insertDestroyOfCapturedArguments(
   assert(pai->isOnStack());
 
   ApplySite site(pai);
-  SILFunctionConventions calleeConv = site.getSubstCalleeConv();
   auto loc = CleanupLocation(origLoc);
   for (auto &arg : pai->getArgumentOperands()) {
     SILValue argValue = getValueToDestroy(arg.get());
@@ -1505,9 +1504,7 @@ void swift::insertDestroyOfCapturedArguments(
            || (argValue->getOwnershipKind().isCompatibleWith(
                  OwnershipKind::Owned)));
 
-    unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
-    assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
-    auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
+    auto paramInfo = site.getParamInfoForOperand(arg);
     releasePartialApplyCapturedArg(builder, loc, argValue, paramInfo);
   }
 }
@@ -1520,11 +1517,8 @@ void swift::insertDeallocOfCapturedArguments(
   assert(pai->isOnStack());
 
   ApplySite site(pai);
-  SILFunctionConventions calleeConv = site.getSubstCalleeConv();
   for (auto &arg : pai->getArgumentOperands()) {
-    unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
-    assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
-    auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
+    auto paramInfo = site.getParamInfoForOperand(arg);
     if (!paramInfo.isIndirectInGuaranteed())
       continue;
 

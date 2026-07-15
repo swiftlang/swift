@@ -294,9 +294,8 @@ getArgumentState(ApplySite ai, Operand *applyOperand, int callDepth) {
   if (!ai.isArgumentOperand(*applyOperand))
     return CanEscape;
 
-  SILBasicBlock *entryBlock = callee->getEntryBlock();
-  unsigned calleeIdx = ai.getCalleeArgIndex(*applyOperand);
-  auto *arg = cast<SILFunctionArgument>(entryBlock->getArgument(calleeIdx));
+  auto *arg =
+      cast<SILFunctionArgument>(ai.getCalleeArgument(callee, *applyOperand));
 
   // Check if we already cached the analysis result.
   auto iter = argumentStates.find(arg);

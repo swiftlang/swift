@@ -1448,7 +1448,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
     return nullptr;
 
   auto SelfCOEIIt =
-      COEIs.find(Apply.getCalleeArgIndex(Apply.getSelfArgumentOperand()));
+      COEIs.find(Apply.getSubstCalleeArgIndex(Apply.getSelfArgumentOperand()));
 
   // If no SelfCOEI is found, then just update the Apply with new COEIs for
   // other arguments.

@@ -347,12 +347,9 @@ findClosureUse(Operand *initialOperand) {
     if (!as)
       return {};
 
-    auto *f = as.getCalleeFunction();
-    if (!f || f->empty())
+    auto *arg = as.getCalleeArgument(*initialOperand);
+    if (!arg)
       return {};
-
-    unsigned argumentIndex = as.getCalleeArgIndex(*initialOperand);
-    auto *arg = f->getArgument(argumentIndex);
     for (auto *use : arg->getUses()) {
       worklist.emplace_back(use, arg);
       visitedOperand.insert(use);
@@ -396,8 +393,7 @@ findClosureUse(Operand *initialOperand) {
     // See if we have a callee function. In such a case, find our operand in the
     // callee and visit its uses.
     if (auto as = dyn_cast<PartialApplyInst>(op->getUser())) {
-      if (auto *f = as->getCalleeFunction(); f && !f->empty()) {
-        auto *fArg = f->getArgument(ApplySite(as).getCalleeArgIndex(*op));
+      if (auto *fArg = ApplySite(as).getCalleeArgument(*op)) {
         for (auto *use : fArg->getUses()) {
           if (visitedOperand.insert(use).second)
             worklist.emplace_back(use, fArg);
@@ -410,9 +406,8 @@ findClosureUse(Operand *initialOperand) {
     // immediately invoked. In such a case, we can emit a better diagnostic in
     // the called closure.
     if (auto fas = FullApplySite::isa(op->getUser())) {
-      if (auto *f = fas.getCalleeFunction(); f && !f->empty()) {
-        auto *fArg = cast<SILFunctionArgument>(
-            f->getArgument(fas.getCalleeArgIndex(*op)));
+      if (auto *fArg =
+              cast_or_null<SILFunctionArgument>(fas.getCalleeArgument(*op))) {
         if (fArg->isClosureCapture()) {
           for (auto *use : fArg->getUses()) {
             if (visitedOperand.insert(use).second)

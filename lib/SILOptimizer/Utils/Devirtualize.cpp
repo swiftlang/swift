@@ -1168,7 +1168,7 @@ devirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite, SILFunction *
   SILFunctionConventions substConv(
       substCalleeCanType,
       SILAddressConventions::forFunction(*applySite.getFunction()));
-  unsigned substArgIdx = applySite.getCalleeArgIndexOfFirstAppliedArg();
+  unsigned substArgIdx = applySite.getSubstCalleeArgIndexOfFirstAppliedArg();
   for (auto arg : applySite.getArguments()) {
     auto paramInfo = substConv.getSILArgumentConvention(substArgIdx);
     auto paramType =

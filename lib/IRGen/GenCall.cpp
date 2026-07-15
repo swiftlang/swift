@@ -2256,7 +2256,7 @@ hasIndirectTypedErrorResultSlot(IRGenModule &IGM, CanSILFunctionType funcTy) {
   if (!funcTy->hasErrorResult())
     return false;
 
-  SILFunctionConventions fnConv(funcTy, IGM.getSILModule());
+  SILFunctionConventions fnConv(funcTy, IGM.silConv);
   if (!fnConv.isTypedError())
     return false;
 

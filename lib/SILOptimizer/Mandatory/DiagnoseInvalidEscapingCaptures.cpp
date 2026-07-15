@@ -491,9 +491,7 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
 
     // Map an operand of an apply instruction to an argument inside
     // the callee.
-    auto args = F->getArguments();
-    auto argIndex = site.getCalleeArgIndex(*oper);
-    auto arg = args[argIndex];
+    auto *arg = site.getCalleeArgument(*oper);
 
     // Look for a usage of the callee argument.
     for (Operand *use : arg->getUses())

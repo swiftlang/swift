@@ -202,7 +202,7 @@ static SILValue getCallerArg(FullApplySite fullApply, unsigned paramIndex) {
     return SILValue();
 
   unsigned appliedIndex =
-    paramIndex - ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();
+    paramIndex - ApplySite(PAI).getSubstCalleeArgIndexOfFirstAppliedArg();
   if (appliedIndex < PAI->getNumArguments())
     return PAI->getArgument(appliedIndex);
 

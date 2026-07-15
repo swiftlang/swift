@@ -527,7 +527,7 @@ static bool canDropMetatypeArg(ApplySite apply, SILFunction *callee,
 
   // We don't drop metatype arguments of not applied arguments (in case of
   // `partial_apply`).
-  unsigned firstAppliedArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg();
+  unsigned firstAppliedArgIdx = apply.getSubstCalleeArgIndexOfFirstAppliedArg();
   if (firstAppliedArgIdx > calleeArgIdx)
       return false;
 
@@ -2272,7 +2272,7 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
   /// SIL function conventions for the original apply site with substitutions.
   SILLocation Loc = AI.getLoc();
   auto substConv = AI.getSubstCalleeConv();
-  unsigned ArgIdx = AI.getCalleeArgIndexOfFirstAppliedArg();
+  unsigned ArgIdx = AI.getSubstCalleeArgIndexOfFirstAppliedArg();
 
   auto handleConversion = [&](SILValue InputValue) {
     // Rewriting SIL arguments is only for lowered addresses.
@@ -2964,7 +2964,7 @@ ReabstractionThunkGenerator::convertReabstractionThunkArguments(
   for (unsigned origParamIdx = 0, specArgIdx = 0; origParamIdx < numParams; ++origParamIdx) {
     unsigned origArgIdx = ReInfo.param2ArgIndex(origParamIdx);
     if (ReInfo.isDroppedArgument(origArgIdx)) {
-      assert(origArgIdx >= ApplySite(OrigPAI).getCalleeArgIndexOfFirstAppliedArg() &&
+      assert(origArgIdx >= ApplySite(OrigPAI).getSubstCalleeArgIndexOfFirstAppliedArg() &&
              "cannot drop metatype argument of not applied argument");
       continue;
     }
@@ -3534,7 +3534,7 @@ void swift::trySpecializeApplyOfGeneric(
     auto *FRI = Builder.createFunctionRef(PAI->getLoc(), Thunk);
     SmallVector<SILValue, 4> Arguments;
     for (auto &Op : PAI->getArgumentOperands()) {
-      unsigned calleeArgIdx = ApplySite(PAI).getCalleeArgIndex(Op);
+      unsigned calleeArgIdx = ApplySite(PAI).getSubstCalleeArgIndex(Op);
       if (ReInfo.isDroppedArgument(calleeArgIdx))
         continue;
       Arguments.push_back(Op.get());

@@ -530,7 +530,7 @@ public:
   //
   // The argument indices below relate to full applies in which the caller and
   // callee indices match. Partial apply indices are shifted on the caller
-  // side. See ApplySite::getCalleeArgIndexOfFirstAppliedArg().
+  // side. See ApplySite::getSubstCalleeArgIndexOfFirstAppliedArg().
   //===--------------------------------------------------------------------===//
 
   unsigned getSILArgIndexOfFirstIndirectResult() const { return 0; }

@@ -837,7 +837,7 @@ void OpaqueValueVisitor::mapValueStorage() {
 /// Populate `indirectApplies`.
 void OpaqueValueVisitor::checkForIndirectApply(ApplySite applySite) {
   auto calleeConv = applySite.getSubstCalleeConv();
-  unsigned calleeArgIdx = applySite.getCalleeArgIndexOfFirstAppliedArg();
+  unsigned calleeArgIdx = applySite.getSubstCalleeArgIndexOfFirstAppliedArg();
   for (Operand &operand : applySite.getArgumentOperands()) {
     if (operand.get()->getType().isObject()) {
       auto argConv = calleeConv.getSILArgumentConvention(calleeArgIdx);
@@ -2331,7 +2331,7 @@ bool CallArgRewriter::rewriteArguments() {
           !apply.asFullApplySite()) &&
              "results should not yet be rewritten");
 
-  for (unsigned argIdx = apply.getCalleeArgIndexOfFirstAppliedArg(),
+  for (unsigned argIdx = apply.getSubstCalleeArgIndexOfFirstAppliedArg(),
                 endArgIdx = argIdx + apply.getNumArguments();
        argIdx < endArgIdx; ++argIdx) {
 

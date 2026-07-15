@@ -579,7 +579,7 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
     if (apply.isCalleeOperand(op)) {
       return SILArgumentConvention(calleeTy->getCalleeConvention());
     } else {
-      unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg()
+      unsigned calleeArgIdx = apply.getSubstCalleeArgIndexOfFirstAppliedArg()
                               + apply.getAppliedArgIndex(op);
       return silConv.getFunctionConventions(calleeTy).getSILArgumentConvention(
           calleeArgIdx);

@@ -74,7 +74,7 @@ struct AddressCapture {
   unsigned calleeArgIdx;
 
   AddressCapture(Operand &oper)
-      : site(oper.getUser()), calleeArgIdx(site.getCalleeArgIndex(oper)) {
+      : site(oper.getUser()), calleeArgIdx(site.getSubstCalleeArgIndex(oper)) {
     if (site.getOrigCalleeConv().getSILArgumentConvention(calleeArgIdx)
         != SILArgumentConvention::Indirect_InoutAliasable) {
       site = ApplySite();

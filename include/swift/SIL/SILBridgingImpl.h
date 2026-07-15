@@ -1563,7 +1563,7 @@ SwiftInt BridgedInstruction::ObjectInst_getNumBaseElements() const {
 }
 
 SwiftInt BridgedInstruction::PartialApply_getCalleeArgIndexOfFirstAppliedArg() const {
-  return swift::ApplySite(unbridged()).getCalleeArgIndexOfFirstAppliedArg();
+  return swift::ApplySite(unbridged()).getSubstCalleeArgIndexOfFirstAppliedArg();
 }
 
 bool BridgedInstruction::PartialApplyInst_isOnStack() const {
