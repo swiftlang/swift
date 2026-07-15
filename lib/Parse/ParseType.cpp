@@ -1621,6 +1621,13 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
       shouldParseValueExpr = true;
   }
 
+  // A parenthesized expression that contains type-only syntax such as an opaque
+  // 'some' type must be parsed as a type, not a value expression: opaque types
+  // have to appear as TypeReprs in the enclosing declaration.
+  if (shouldParseValueExpr && Tok.is(tok::l_paren) &&
+      parenGenericArgumentContainsTypeOnlySyntax())
+    shouldParseValueExpr = false;
+
   if (shouldParseValueExpr) {
     // Ensure that constituent references get parsed as declaration references,
     // not type references.
@@ -1633,9 +1640,29 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
     }
     return makeParserResult(
         new (Context) GenericArgumentExprTypeRepr(expr.get(), &Context));
-  } else {
-    return parseType(MessageID, reason);
   }
+  return parseType(MessageID, reason);
+}
+
+bool Parser::parenGenericArgumentContainsTypeOnlySyntax() {
+  assert(Tok.is(tok::l_paren) && "not at a parenthesized generic argument");
+  BacktrackingScope backtrack(*this);
+  unsigned depth = 0;
+  do {
+    // An opaque 'some' type can only appear as a type, never as part of a
+    // value expression.
+    if (Tok.isContextualKeyword("some")) {
+      BacktrackingScope probe(*this);
+      if (canParseType())
+        return true;
+    }
+    if (Tok.isAny(tok::l_paren, tok::l_square, tok::l_brace))
+      ++depth;
+    else if (Tok.isAny(tok::r_paren, tok::r_square, tok::r_brace))
+      --depth;
+    consumeToken();
+  } while (depth > 0 && Tok.isNot(tok::eof));
+  return false;
 }
 
 bool Parser::canParseGenericValueLiteral() {
