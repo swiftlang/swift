@@ -1516,6 +1516,7 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
   // actually implemented emit into here, so we are not changing behavior.
   ManagedValue original =
       SGF.emitRValueAsSingleValue(E->getSubExpr(), C.withFollowingProjection());
+  original = SGF.emitMoveOnlyWrapperToCopyableValueIfNeeded(E, original);
 
   // Derived-to-base casts in the AST might not be reflected as such
   // in the SIL type system, for example, a cast from DynamicSelf
@@ -3166,6 +3167,7 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
 
     Scope S(*this, loc);
     auto base = emitRValueAsSingleValue(baseExpr, SGFContext::AllowImmediatePlusZero);
+    base = emitMoveOnlyWrapperToCopyableValueIfNeeded(loc, base);
     return S.popPreservingValue(B.createValueMetatype(loc, metaTy, base))
         .getValue();
   }

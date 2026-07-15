@@ -507,6 +507,14 @@ ManagedValue Transform::transform(ManagedValue v,
   auto &expectedTL = SGF.getTypeLowering(loweredResultTy);
   loweredResultTy = expectedTL.getLoweredType();
 
+  // The moveOnly wrapper does not exist in the formal type system, so
+  // unwrap the value before dispatching on lowered types below; otherwise
+  // wrapped values from 'borrowing'/@noImplicitCopy bindings fall through
+  // the type-equality checks into unreachable/invalid conversion paths.
+  // It unwraps the moveOnly wrapper only if loweredResultTy is not wrapped
+  if (!loweredResultTy.isMoveOnlyWrapped())
+    v = SGF.emitMoveOnlyWrapperToCopyableValueIfNeeded(Loc, v);
+
   // Nothing to convert
   if (v.getType() == loweredResultTy)
     return v;

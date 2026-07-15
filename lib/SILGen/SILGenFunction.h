@@ -1625,6 +1625,23 @@ public:
   // Type conversions for expr emission and thunks
   //===--------------------------------------------------------------------===//
 
+  /// A helper function that unwraps a @moveOnly wrapped object \p value,
+  /// according to its ownership.
+  ///
+  /// The @moveOnly wrapper doesn't exist in the formal type. Thus, a wrapped
+  /// value needs to be unwrapped back to copyable before being feed into
+  /// SIL instructions that require equivalence between SIL type and formal type.
+  ManagedValue emitMoveOnlyWrapperToCopyableValueIfNeeded(SILLocation loc, ManagedValue value)  {
+    if (!value.getType().isObject() || !value.getType().isMoveOnlyWrapped()) {
+      return value;
+    }
+
+    if (value.isPlusOne(*this)) {
+      return B.createOwnedMoveOnlyWrapperToCopyableValue(loc, value);
+    }
+    return B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, value);
+  }
+
   ManagedValue emitInjectEnum(SILLocation loc,
                               MutableArrayRef<ArgumentSource> payload,
                               SILType enumTy,
