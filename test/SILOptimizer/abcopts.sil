@@ -1352,12 +1352,15 @@ bb3:
 
 
 // RANGECHECK-LABEL: sil @hoist_new_ind_pattern4 :
+// RANGECHECK: [[CB:%.*]] = function_ref @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
 // RANGECHECK: [[MINUS1:%.*]] = integer_literal $Builtin.Int1, -1
 // RANGECHECK: [[TRUE:%.*]] = struct $Bool ([[MINUS1]] : $Builtin.Int1)
 // RANGECHECK: [[ZERO:%.*]] = integer_literal $Builtin.Int32, 0
 // RANGECHECK: [[INTZERO:%.*]] = struct $Int32 ([[ZERO]] : $Builtin.Int32)
-// RANGECHECK: [[CB:%.*]] = function_ref @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
 // RANGECHECK: apply [[CB]]([[INTZERO]], [[TRUE]], %0) : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
+// RANGECHECK: apply [[CB]]
+// RANGECHECK: apply [[CB]]
+// RANGECHECK: bb1
 // RANGECHECK-NOT: apply [[CB]]
 // RANGECHECK-LABEL: } // end sil function 'hoist_new_ind_pattern4'
 //   for i in 0..<a.count
