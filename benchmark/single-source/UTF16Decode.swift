@@ -60,6 +60,16 @@ public let benchmarks = [
       tags: [.validation, .api, .String, .skip],
       setUpFunction: setUp),
     BenchmarkInfo(
+      name: "UTF16Decode.initValidating",
+      runFunction: run_UTF16Decode_InitValidating,
+      tags: [.validation, .api, .String],
+      setUpFunction: setUp),
+    BenchmarkInfo(
+      name: "UTF16Decode.initValidating.ascii",
+      runFunction: run_UTF16Decode_InitValidating_ascii,
+      tags: [.validation, .api, .String, .skip],
+      setUpFunction: setUp),
+    BenchmarkInfo(
       name: "UTF16Decode.initFromData.asciiAsAscii",
       runFunction: run_UTF16Decode_InitFromData_ascii_as_ascii,
       tags: [.validation, .api, .String, .skip],
@@ -158,6 +168,25 @@ public func run_UTF16Decode_InitFromData_ascii(_ N: Int) {
 public func run_UTF16Decode_InitDecoding_ascii(_ N: Int) {
   for _ in 0..<N {
     blackHole(String(decoding: asciiCodeUnits, as: UTF16.self))
+  }
+}
+
+// `String(validating:as:)` shares `String(decoding:as:)`'s transcoding path;
+// these mirror the `initDecoding` cases so a regression is caught if the two
+// entry points ever diverge (e.g. validating falling back to a slower loop).
+@inline(never)
+public func run_UTF16Decode_InitValidating(_ N: Int) {
+  guard #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) else { return }
+  for _ in 0..<25*N {
+    blackHole(String(validating: allStringsCodeUnits, as: UTF16.self))
+  }
+}
+
+@inline(never)
+public func run_UTF16Decode_InitValidating_ascii(_ N: Int) {
+  guard #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) else { return }
+  for _ in 0..<50*N {
+    blackHole(String(validating: asciiCodeUnits, as: UTF16.self))
   }
 }
 
