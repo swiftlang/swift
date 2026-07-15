@@ -18,6 +18,8 @@ internal final class _StringBreadcrumbs {
 
   internal var utf16Length: Int
   
+  private var crumbs: _CrumbStorage
+  
   // Has to use ContiguousArray rather than Array to fit in 8 bytes
   fileprivate enum _CrumbStorage: ~Copyable {
     
@@ -36,15 +38,21 @@ internal final class _StringBreadcrumbs {
     fileprivate struct _PackedCrumb {
       private var _bits: UInt32
 
-      /// Pack an index as `(encodedOffset << 1) | transcodedBit`. Only valid when
-      /// `_encodedOffset <= maxOffset`; larger Strings use the wide fallback.
       @inline(__always)
       internal init(_ idx: String.Index) {
+        self._bits = _PackedCrumb.pack(idx)
+      }
+
+      @inline(__always)
+      fileprivate var packedBits: UInt32 { _bits }
+
+      @inline(__always)
+      fileprivate static func pack(_ idx: String.Index) -> UInt32 {
         let off = idx._encodedOffset
         let transcoded = idx.transcodedOffset
         _internalInvariant(off >= 0 && off <= _CrumbStorage.maxOffset)
         _internalInvariant(transcoded == 0 || transcoded == 1)
-        self._bits = (UInt32(truncatingIfNeeded: off) &<< 1)
+        return (UInt32(truncatingIfNeeded: off) &<< 1)
           | UInt32(truncatingIfNeeded: transcoded)
       }
 
@@ -91,6 +99,37 @@ internal final class _StringBreadcrumbs {
         crumbs[i]
       }
     }
+
+    /// Binary-searches the half-open crumb range `from ..< to` for the position
+    /// of the last crumb that is `<= idx`
+    @inline(__always)
+    internal func lowerBoundCrumb(
+      for idx: String.Index, from: Int, to: Int
+    ) -> Int {
+      var lo = from
+      var hi = to
+      switch self {
+      case .narrow(let crumbs):
+        let key = _PackedCrumb.pack(idx)
+        while (hi &- lo) > 1 {
+          let mid = lo &+ ((hi &- lo) &>> 1)
+          // Avoid constructing a String.Index each iteration for perf
+          // packedBits compares in the same order as orderingValue would
+          let le = crumbs[mid].packedBits <= key
+          lo = le ? mid : lo
+          hi = le ? hi : mid
+        }
+      case .wide(let crumbs):
+        let key = idx.orderingValue
+        while (hi &- lo) > 1 {
+          let mid = lo &+ ((hi &- lo) &>> 1)
+          let le = crumbs[mid].orderingValue <= key
+          lo = le ? mid : lo
+          hi = le ? hi : mid
+        }
+      }
+      return lo
+    }
     
     @inline(__always)
     internal mutating func reserveCapacity(_ n: Int) {
@@ -117,8 +156,6 @@ internal final class _StringBreadcrumbs {
     }
   }
   
-  private var crumbs: _CrumbStorage
-
   // TODO: Does this need to be inout, unique, or how will we be enforcing
   // atomicity?
   internal init(_ str: String, precalculatedUTF16Count: Int? = nil) {
@@ -197,8 +234,14 @@ internal final class _StringBreadcrumbs {
 }
 
 extension _StringBreadcrumbs {
+  @inline(__always)
   internal var stride: Int {
-    @inline(__always) get { return _StringBreadcrumbs.breadcrumbStride }
+     _StringBreadcrumbs.breadcrumbStride
+  }
+  
+  @inline(__always)
+  private var count: Int {
+    crumbs.count
   }
 
   // Fetch the lower-bound index corresponding to the given offset, returning
@@ -214,20 +257,21 @@ extension _StringBreadcrumbs {
   internal func getBreadcrumb(
     forIndex idx: String.Index
   ) -> (lowerBound: String.Index, offset: Int) {
-    var lowerBound = idx._encodedOffset / 3 / stride
-    var upperBound = Swift.min(1 + (idx._encodedOffset / stride), crumbs.count)
-    _internalInvariant(crumbs[lowerBound] <= idx)
-    _internalInvariant(upperBound == crumbs.count || crumbs[upperBound] >= idx)
+    let initialLower = idx._encodedOffset / 3 / stride
+    let initialUpper = Swift.min(1 + (idx._encodedOffset / stride), count)
+    _internalInvariant(crumbs[initialLower] <= idx)
+    _internalInvariant(initialUpper == count || crumbs[initialUpper] >= idx)
 
-    while (upperBound &- lowerBound) > 1 {
-      let mid = lowerBound + ((upperBound &- lowerBound) / 2)
-      if crumbs[mid] <= idx { lowerBound = mid } else { upperBound = mid }
-    }
+    let lowerBound = crumbs.lowerBoundCrumb(
+      for: idx,
+      from: initialLower,
+      to: initialUpper
+    )
 
     let crumb = crumbs[lowerBound]
     _internalInvariant(crumb <= idx)
     _internalInvariant(
-      lowerBound == crumbs.count - 1 || crumbs[lowerBound + 1] > idx)
+      lowerBound == count - 1 || crumbs[lowerBound + 1] > idx)
 
     return (crumb, lowerBound &* stride)
   }
