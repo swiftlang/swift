@@ -142,7 +142,7 @@ struct DiagnosticSerializer {
     // has references to input files to find subconsumer.
     auto addInputToSourceMgr = [&](const InputFile &Input) {
       auto Path = remapFilePath(Input.getFileName());
-      SrcMgr.getExternalSourceBufferID(Path);
+      SrcMgr.getExternalSourceBufferID(Input.getFileName());
 
       // Fetch the source buffer from original SourceManager and create a
       // serialized file from it.
