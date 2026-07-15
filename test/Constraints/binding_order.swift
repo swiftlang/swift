@@ -36,8 +36,7 @@ do {
   let _ = Array<any Command>([Cut(), Copy(), Paste()])
   // expected-error@-1 {{no exact matches in call to initializer}}
   let _ = Array<(any Command)?>([Cut(), Copy(), Paste()])
-  // expected-error@-1 {{cannot convert value of type '[Any]' to expected argument type '[(any Command)?]'}}
-  // expected-note@-2 {{arguments to generic parameter 'Element' ('Any' and '(any Command)?') are expected to be equal}}
+  // expected-error@-1 {{no exact matches in call to initializer}}
   let _ = Array<any Command.Type>([Cut.self, Copy.self, Paste.self])
   let _ = Array<(any Command.Type)?>([Cut.self, Copy.self, Paste.self])
 
@@ -50,8 +49,7 @@ do {
 
   var commands3: [(any Command)?] = [Undo(), Cut()]
   commands3.append(contentsOf: [Copy(), Paste()])
-  // expected-error@-1 {{cannot convert value of type '[Any]' to expected argument type '[(any Command)?]'}}
-  // expected-note@-2 {{arguments to generic parameter 'Element' ('Any' and '(any Command)?') are expected to be equal}}
+  // expected-error@-1 {{no exact matches in call to instance method 'append'}}
 
   var commands4: [(any Command.Type)?] = [Undo.self, Cut.self]
   commands4.append(contentsOf: [Copy.self, Paste.self])
@@ -68,14 +66,14 @@ do {
   func perform4<S: Sequence>(_: S) where S.Element == Any.Type? {}
   perform4([Undo.self, Cut.self, Copy.self])
 
-  // expected-error@+1 {{failed to produce diagnostic for expression; please submit a bug report}}
   let _: [Int: any Command] = Dictionary(
     uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
-
-  // expected-error@+1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  // expected-error@-1 {{no exact matches in call to instance method 'map'}}
+  
   let _: [Int: (any Command)?] = Dictionary(
     uniqueKeysWithValues: [Undo(), Cut(), Copy(), Paste()].map { ($0.name, $0) })
-
+// expected-error@-1 {{no exact matches in call to instance method 'map'}}
+  
   let _: [Int: any Command.Type] = Dictionary(
     uniqueKeysWithValues: [Undo.self, Cut.self, Copy.self, Paste.self].map { ($0.id, $0) })
 
@@ -107,7 +105,7 @@ do {
     let _: [any Command] = [a, b].map { $0 }
     // expected-error@-1 {{cannot convert value of type 'Super' to closure result type 'any Command'}}
     let _: [any Command] = [a, b].flatMap { [$0] }
-    // expected-error@-1 {{cannot convert value of type 'Super' to expected element type 'any Command'}}
+    // expected-error@-1 {{cannot convert value of type '[Super]' to closure result type '(any Command)?'}}
 
     #if SALVAGE
     let _: [any Command] = [[a], [b]].flatMap { $0 }
