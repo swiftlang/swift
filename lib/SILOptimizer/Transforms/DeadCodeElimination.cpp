@@ -82,14 +82,6 @@ static bool seemsUseful(SILInstruction *I) {
       return true;
   }
 
-  // A debug value should never be marked useful, they are handled specially,
-  // and should not propagate liveness of operands.
-  // For function arguments, without this, the argument is RAUW'ed with undef.
-  // Keeping them alive doesn't cost anything.
-  if (isa<DebugValueInst>(I))
-    return isa<SILFunctionArgument>(I->getOperand(0));
-
-
   // Don't delete allocation instructions in DCE.
   if (isa<AllocRefInst>(I) || isa<AllocRefDynamicInst>(I)) {
     return true;
@@ -664,7 +656,11 @@ bool DCE::removeDead() {
       LLVM_DEBUG(llvm::dbgs() << "Removing dead argument:\n");
       LLVM_DEBUG(arg->dump());
 
-      arg->replaceAllUsesWithUndef();
+      // Function arguments cannot be removed from the signature. Don't
+      // replace their uses with undef: debug_values should keep referencing
+      // the real arg.
+      if (!isa<SILFunctionArgument>(arg))
+        arg->replaceAllUsesWithUndef();
 
       if (!F->hasOwnership() || arg->getOwnershipKind() == OwnershipKind::None) {
         i++;
