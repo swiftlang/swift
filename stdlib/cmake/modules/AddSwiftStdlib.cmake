@@ -965,7 +965,22 @@ function(add_swift_target_library_single target name)
     # SWIFT_USE_EMBEDDED_SWIFT_PLATFORM for every embedded library build so
     # that the platform-conditional code paths in the embedded stdlib and
     # related libraries pick up the platform implementations.
+    #
+    # The abstraction layer is on for a given triple when either the
+    # global SWIFT_USE_SWIFT_EMBEDDED_PLATFORM is TRUE, or the triple
+    # matches SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX.
+    set(_emblib_pal_triple
+      "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}")
+    set(_emblib_use_pal FALSE)
     if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
+      set(_emblib_use_pal TRUE)
+    elseif(SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX
+           AND _emblib_pal_triple
+           AND "${_emblib_pal_triple}" MATCHES
+               "${SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX}")
+      set(_emblib_use_pal TRUE)
+    endif()
+    if(_emblib_use_pal)
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
         "-D" "SWIFT_USE_EMBEDDED_SWIFT_PLATFORM")
     endif()
@@ -1082,16 +1097,69 @@ function(add_swift_target_library_single target name)
       # Flags required to build embedded libraries
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-ffreestanding;-enable-experimental-feature;Embedded)
 
-      # Embedded Swift libraries default to producing an empty object file:
-      # they only serve as a swiftmodule for client compilation, and the
-      # client emits the actual code. Libraries that are meant to be linked
-      # in without their swiftmodule ever being imported (e.g. the
-      # EmbeddedPlatform shim archives) must opt out with
-      # NON_EMPTY_OBJECT_FILE so their .a files actually contain code.
-      if(NOT SWIFTLIB_SINGLE_NON_EMPTY_OBJECT_FILE)
-        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-emit-empty-object-file)
+      # Two orthogonal per-triple opt-ins gate the departures from the
+      # default embedded stdlib build:
+      #
+      #   SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX
+      #     Build under CodeGenerationModel=interface. The library's
+      #     object files contain real code (not empty stubs) and clients
+      #     reference its strong external symbols. Without this, we stay
+      #     on the default Inlinable model, emit an empty object file,
+      #     and drive `CodeGenerationModel=implementation` — unless the
+      #     caller opts out with NON_EMPTY_OBJECT_FILE.
+      #
+      #   SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX
+      #     Compile Swift and C/C++ sources with LLVM LTO
+      #     (`-lto=<type>` / `-flto=<type>`). Applying LTO on top of the
+      #     default empty-object-file build is harmless but produces no
+      #     meaningful bitcode; you almost always want the same triple
+      #     set for both regexes.
+      set(_emblib_triple
+        "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}")
+
+      set(_emblib_interface_cgm FALSE)
+      if(SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX
+         AND _emblib_triple
+         AND "${_emblib_triple}" MATCHES "${SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX}")
+        set(_emblib_interface_cgm TRUE)
       endif()
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -enable-experimental-feature;CodeGenerationModel=implementation)
+
+      set(_emblib_lto FALSE)
+      if(SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX
+         AND _emblib_triple
+         AND "${_emblib_triple}" MATCHES "${SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX}")
+        set(_emblib_lto TRUE)
+      endif()
+
+      if(_emblib_interface_cgm)
+        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
+          -enable-experimental-feature;CodeGenerationModel=interface)
+      else()
+        # Embedded Swift libraries default to producing an empty object
+        # file: they only serve as a swiftmodule for client compilation,
+        # and the client emits the actual code. Libraries that are meant
+        # to be linked in without their swiftmodule ever being imported
+        # (e.g. the EmbeddedPlatform shim archives) must opt out with
+        # NON_EMPTY_OBJECT_FILE so their .a files actually contain code.
+        if(NOT SWIFTLIB_SINGLE_NON_EMPTY_OBJECT_FILE)
+          list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-emit-empty-object-file)
+        endif()
+        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -enable-experimental-feature;CodeGenerationModel=implementation)
+      endif()
+
+      if(_emblib_lto)
+        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
+          "-lto=${SWIFT_EMBEDDED_LTO_TYPE}")
+        if("${SWIFT_EMBEDDED_LTO_TYPE}" STREQUAL "llvm-thin")
+          list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-flto=thin")
+        elseif("${SWIFT_EMBEDDED_LTO_TYPE}" STREQUAL "llvm-full")
+          list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-flto=full")
+        else()
+          message(FATAL_ERROR
+            "SWIFT_EMBEDDED_LTO_TYPE must be 'llvm-thin' or 'llvm-full' "
+            "(got '${SWIFT_EMBEDDED_LTO_TYPE}')")
+        endif()
+      endif()
   endif()
 
   # Define availability macros.

@@ -1067,6 +1067,14 @@ bool SILFunction::hasValidLinkageForFragileRef(SerializedKind_t callerSerialized
   if (isExternForwardDeclaration())
     return true;
 
+  // A function exported through the interface-mode contract has its body
+  // emitted as a strong external definition by its owning module, not
+  // inlined into clients. A serialized caller in another module can
+  // reference it by name; the linker resolves the call to the owning
+  // module's definition.
+  if (isNeverEmitIntoClient())
+    return true;
+
   // The call site of this function must have checked that
   // caller.isAnySerialized() is true, as indicated by the
   // function name itself (contains 'ForFragileRef').
