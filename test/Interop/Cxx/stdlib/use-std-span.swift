@@ -1,7 +1,5 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -enable-experimental-feature BorrowingSequence)
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG -enable-experimental-feature BorrowingSequence)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -enable-experimental-feature BorrowingForLoop -enable-experimental-feature BorrowingSequence)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG -enable-experimental-feature BorrowingForLoop -enable-experimental-feature BorrowingSequence)
 
 
 // TODO: test failed in macOS PR testing but passes locally: rdar://163049442
@@ -9,7 +7,6 @@
 
 // REQUIRES: executable_test
 // REQUIRES: std_span
-// REQUIRES: swift_feature_BorrowingForLoop
 // REQUIRES: swift_feature_BorrowingSequence
 
 import StdlibUnittest
@@ -734,8 +731,6 @@ StdSpanTestSuite.test("CxxSpan conforms to CxxBorrowingSequence")
   expectEqual(counter, 3)
 }
 
-#if hasFeature(BorrowingForLoop)
-
 StdSpanTestSuite.test("CxxSpan of noncopyable conforms to CxxBorrowingSequence")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
@@ -769,7 +764,5 @@ StdSpanTestSuite.test("Borrowing for loop")
   }
   expectEqual(counter, 3)
 }
-
-#endif
 
 runAllTests()
