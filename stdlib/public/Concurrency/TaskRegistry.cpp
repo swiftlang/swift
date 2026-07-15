@@ -73,7 +73,7 @@ void swift::taskRegistryRemove(AsyncTask *task) {
                        task, (unsigned long long)task->getTaskId());
 }
 
-size_t swift::swift_task_registryCount() {
+size_t swift::__swift_concurrency_debug_task_registryCount() {
   size_t count = 0;
   for (size_t shardIndex = 0; shardIndex < TaskRegistryShardCount; ++shardIndex) {
     LazyMutex::ScopedLock guard(ShardLocks[shardIndex].mutex);
@@ -87,7 +87,7 @@ size_t swift::swift_task_registryCount() {
   return count;
 }
 
-void swift::swift_task_registryWalk(void (*callback)(void *, void *), void *context) {
+void swift::__swift_concurrency_debug_task_registryWalk(void (*callback)(void *, void *), void *context) {
   for (size_t shardIndex = 0; shardIndex < TaskRegistryShardCount; ++shardIndex) {
     LazyMutex::ScopedLock guard(ShardLocks[shardIndex].mutex);
     for (auto *task = _swift_concurrency_task_registry[shardIndex].head.load(
@@ -99,19 +99,19 @@ void swift::swift_task_registryWalk(void (*callback)(void *, void *), void *cont
   }
 }
 
-void *swift::swift_task_getShardHead(size_t shardIndex) {
+void *swift::__swift_concurrency_debug_task_getShardHead(size_t shardIndex) {
   if (shardIndex >= TaskRegistryShardCount)
     return nullptr;
   return _swift_concurrency_task_registry[shardIndex].head.load(std::memory_order_relaxed);
 }
 
-void *swift::swift_task_getTaskNext(void *task) {
+void *swift::__swift_concurrency_debug_task_getTaskNext(void *task) {
   if (!task)
     return nullptr;
   return static_cast<AsyncTask *>(task)->_private().registryNext.load(std::memory_order_relaxed);
 }
 
-uint64_t swift::swift_task_getId(void *task) {
+uint64_t swift::__swift_concurrency_debug_task_getId(void *task) {
   return static_cast<AsyncTask *>(task)->getTaskId();
 }
 

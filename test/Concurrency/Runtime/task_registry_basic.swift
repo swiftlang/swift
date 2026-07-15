@@ -18,7 +18,6 @@ import Musl
 #elseif os(Windows)
 import CRT
 #endif
-import Foundation
 import Dispatch
 import StdlibUnittest
 
@@ -26,7 +25,7 @@ let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
 
 func registryCount() -> Int {
   typealias Fn = @convention(c) () -> Int
-  guard let sym = dlsym(RTLD_DEFAULT, "swift_task_registryCount") else { return -1 }
+  guard let sym = dlsym(RTLD_DEFAULT, "__swift_concurrency_debug_task_registryCount") else { return -1 }
   return unsafeBitCast(sym, to: Fn.self)()
 }
 
@@ -35,17 +34,17 @@ typealias GetTaskNextFn = @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer?
 typealias GetTaskIdFn = @convention(c) (UnsafeRawPointer) -> UInt64
 
 func getShardHead(index: Int) -> UnsafeRawPointer? {
-  guard let sym = dlsym(RTLD_DEFAULT, "swift_task_getShardHead") else { return nil }
+  guard let sym = dlsym(RTLD_DEFAULT, "__swift_concurrency_debug_task_getShardHead") else { return nil }
   return unsafeBitCast(sym, to: GetShardHeadFn.self)(index)
 }
 
 func getTaskNext(task: UnsafeRawPointer) -> UnsafeRawPointer? {
-  guard let sym = dlsym(RTLD_DEFAULT, "swift_task_getTaskNext") else { return nil }
+  guard let sym = dlsym(RTLD_DEFAULT, "__swift_concurrency_debug_task_getTaskNext") else { return nil }
   return unsafeBitCast(sym, to: GetTaskNextFn.self)(task)
 }
 
 func getTaskId(task: UnsafeRawPointer) -> UInt64 {
-  guard let sym = dlsym(RTLD_DEFAULT, "swift_task_getId") else { return 0 }
+  guard let sym = dlsym(RTLD_DEFAULT, "__swift_concurrency_debug_task_getId") else { return 0 }
   return unsafeBitCast(sym, to: GetTaskIdFn.self)(task)
 }
 

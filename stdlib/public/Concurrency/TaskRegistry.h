@@ -45,27 +45,25 @@ SWIFT_EXPORT_FROM(swift_Concurrency)
 TaskRegistryShard _swift_concurrency_task_registry[TaskRegistryShardCount];
 
 /// Register a newly created task. Must be called after full initialization.
-SWIFT_EXPORT_FROM(swift_Concurrency)
 void taskRegistryInsert(AsyncTask *task);
 
 /// Deregister a task. Must be called before swift_slowDealloc frees it.
-SWIFT_EXPORT_FROM(swift_Concurrency)
 void taskRegistryRemove(AsyncTask *task);
 
 /// Returns the count of currently registered tasks. For testing and debugging.
-SWIFT_EXPORT_FROM(swift_Concurrency) size_t swift_task_registryCount();
+SWIFT_EXPORT_FROM(swift_Concurrency) size_t __swift_concurrency_debug_task_registryCount();
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
-void swift_task_registryWalk(void (*callback)(void *, void *), void *context);
+void __swift_concurrency_debug_task_registryWalk(void (*callback)(void *, void *), void *context);
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
-void *swift_task_getShardHead(size_t shardIndex);
+void *__swift_concurrency_debug_task_getShardHead(size_t shardIndex);
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
-void *swift_task_getTaskNext(void *task);
+void *__swift_concurrency_debug_task_getTaskNext(void *task);
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
-uint64_t swift_task_getId(void *task);
+uint64_t __swift_concurrency_debug_task_getId(void *task);
 
 } // namespace swift
 
