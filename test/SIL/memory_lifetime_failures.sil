@@ -856,7 +856,7 @@ bb0(%0 : @owned $T, %1 : @owned $Inner):
 
 sil @initfn : $@convention(thin) () -> @out T 
 
-// CHECK: SIL memory lifetime failure in @inject_enum_case: memory is not initialized, but should be
+// This is currently not checked
 sil [ossa] @inject_enum_case : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Optional<T>

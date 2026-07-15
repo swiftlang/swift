@@ -1027,3 +1027,13 @@ bb0(%0 : $Int):
   dealloc_stack %3
   return %4
 }
+
+sil [ossa] @dead_enum_with_leftover_inject : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $KlassOrBool
+  // DeadStoreElimination may have removed the payload store
+  inject_enum_addr %0, #KlassOrBool.bool!enumelt
+  dealloc_stack %0
+  %r = tuple ()
+  return %r
+}
