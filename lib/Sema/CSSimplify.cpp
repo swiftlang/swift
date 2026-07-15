@@ -6696,9 +6696,7 @@ bool ConstraintSystem::repairFailures(
           if (inlineCount->getValue() != literalCount) {
             conversionsOrFixes.push_back(
                 AllowInlineArrayLiteralCountMismatch::create(
-                    *this, inlineCount,
-                    IntegerType::get(std::to_string(literalCount),
-                                     /*isNegative=*/false, getASTContext()),
+                    *this, inlineCount->getValue().getSExtValue(), literalCount,
                     loc));
             return true;
           }
@@ -9249,22 +9247,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       // Attempt to bind the number of elements in the literal with the
       // contextual count. This will diagnose if the literal does not enough
       // or too many elements.
-      auto contextualCount = iaTy->getGenericArgs()[0];
-      auto literalCount = IntegerType::get(
-          std::to_string(arrayLiteral->getNumElements()),
-          /* isNegative */ false,
-          iaTy->getASTContext());
-
-      // If the counts are already equal, '2' == '2', then we're done.
-      if (contextualCount->isEqual(literalCount)) {
+      auto inlineArrayCountParam = iaTy->getGenericArgs()[0];
+      // If our contextual count is not known, e.g., InlineArray<_, Int> = [1, 2],
+      //then just eagerly bind the count to what the literal count is.
+      if (inlineArrayCountParam->isTypeVariableOrMember()) {
+        addConstraint(
+            ConstraintKind::Bind, inlineArrayCountParam,
+            IntegerType::get(std::to_string(arrayLiteral->getNumElements()),
+                             /* isNegative */ false, iaTy->getASTContext()),
+            locator);
         return SolutionKind::Solved;
       }
 
-      // If our contextual count is not known, e.g., InlineArray<_, Int> = [1, 2],
-      // then just eagerly bind the count to what the literal count is.
-      if (contextualCount->isTypeVariableOrMember()) {
-        addConstraint(ConstraintKind::Bind, contextualCount, literalCount,
-                      locator);
+      unsigned inlineArrayCount = 0;
+      if (auto *intCount = inlineArrayCountParam->getAs<IntegerType>()) {
+        inlineArrayCount = intCount->getValue().getZExtValue();
+      } else {
+        return SolutionKind::Error;
+      }
+
+      // If the counts are already equal, '2' == '2', then we're done.
+      if (inlineArrayCount == arrayLiteral->getNumElements()) {
         return SolutionKind::Solved;
       }
 
@@ -9272,9 +9275,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       if (!shouldAttemptFixes())
         return SolutionKind::Error;
 
-      auto fix = AllowInlineArrayLiteralCountMismatch::create(*this,
-                                                              contextualCount,
-                                                              literalCount, loc);
+      auto fix = AllowInlineArrayLiteralCountMismatch::create(
+          *this, inlineArrayCount, arrayLiteral->getNumElements(), loc);
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
   } break;
