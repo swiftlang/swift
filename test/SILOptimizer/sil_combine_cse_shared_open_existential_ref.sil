@@ -197,3 +197,49 @@ bb0(%88 : @owned $View, %77 : @owned $Bar):
   %132 = tuple ()
   return %132 : $()
 }
+
+//===----------------------------------------------------------------------===//
+// Regression test: an `open_existential_ref` is used by two sibling `apply`s
+// of *generic* functions (as opposed to `witness_method`s, as above).
+//
+// SILCombine's existential devirtualization visits one of the two sibling
+// applies first (whichever comes first in program order), proves the
+// existential's concrete type is `LeafNode`, and rewrites that apply's
+// operand and substitutions to the concrete type together. Along the way,
+// it also blindly redirects the *operand* of the other sibling apply to the
+// same concrete-typed value, without updating that apply's substitution
+// map, which still refers to the opened archetype. Because the eligibility
+// check for reprocessing an apply's substitutions inspects the apply's
+// *current* operand type, this other apply's operand type no longer looks
+// like an opened existential, so it's never revisited to fix up its
+// substitutions either. This produced SIL that failed verification:
+// "operand of 'apply' doesn't match function input type".
+//===----------------------------------------------------------------------===//
+
+protocol Taggable : AnyObject {}
+
+class LeafNode : Taggable {}
+
+sil @genericTake : $@convention(thin) <T where T : Taggable> (@guaranteed T) -> ()
+sil @genericPush : $@convention(thin) <T where T : Taggable> (@guaranteed T) -> ()
+
+// CHECK-LABEL: sil [ossa] @siblingGenericApplies :
+// CHECK-NOT: open_existential_ref
+// CHECK: function_ref @genericTake
+// CHECK: apply {{%[0-9]+}}<LeafNode>(%0)
+// CHECK: function_ref @genericPush
+// CHECK: apply {{%[0-9]+}}<LeafNode>(%0)
+// CHECK-NOT: open_existential_ref
+// CHECK-LABEL: } // end sil function 'siblingGenericApplies'
+sil [ossa] @siblingGenericApplies : $@convention(thin) (@owned LeafNode) -> () {
+bb0(%0 : @owned $LeafNode):
+  %4 = init_existential_ref %0 : $LeafNode : $LeafNode, $any Taggable
+  %5 = open_existential_ref %4 to $@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self
+  %6 = function_ref @genericTake : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %9 = function_ref @genericPush : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %10 = apply %9<@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  destroy_value %5
+  %14 = tuple ()
+  return %14 : $()
+}

@@ -1381,6 +1381,22 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
                                        conformance);
             }
           }
+        } else if (llvm::any_of(
+                       AI.getSubstitutionMap().getReplacementTypes(),
+                       [&](Type replacementTy) {
+                         return replacementTy->getCanonicalType() ==
+                                openedExistential->getType().getASTType();
+                       })) {
+          // Unlike the witness_method case above, this sibling `apply` is
+          // generic over the opened existential's type (e.g. calling a
+          // function constrained on the existential's protocol) rather than
+          // dispatching through a witness table. There's no follow-up
+          // devirtualization that will resolve its generic signature to the
+          // concrete type, so redirecting this operand to the concrete cast
+          // would leave the apply's substitution map referring to the
+          // abstract archetype while its operand provides the concrete
+          // type.
+          continue;
         }
       }
       use->set(uncheckedCast);
