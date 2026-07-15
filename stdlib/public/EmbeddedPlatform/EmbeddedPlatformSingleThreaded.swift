@@ -85,7 +85,6 @@ public func _swift_tls_init(
   _ key: Int,
   _ destructor: (@convention(c) (UnsafeMutableRawPointer?) -> Void)?
 ) {
-  _ = SingleThreadedTLS.values[key]
 }
 
 @implementation @c

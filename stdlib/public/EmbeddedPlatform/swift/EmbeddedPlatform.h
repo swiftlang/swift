@@ -47,7 +47,7 @@ typedef unsigned long long __swift_typeid_t;
  */
 typedef unsigned long long __swift_options_t;
 
-typedef __swift_ptrdiff_t __swift_tls_key_t;
+typedef __swift_ptrdiff_t swift_tls_key_t;
 
 /**
  * Number of reserved TLS keys used by Embedded Swift runtime components.
@@ -55,7 +55,9 @@ typedef __swift_ptrdiff_t __swift_tls_key_t;
  * The numeric values are kept in sync with the reserved keys in
  * swift/Threading/TLSKeys.h. The EmbeddedPlatform TLS contract does not
  * provide dynamic key allocation; every key passed to the `_swift_tls_*`
- * functions will be one of these reserved values.
+ * functions will be one of these reserved values. The key values are dense in
+ * the range `[0, SWIFT_TLS_KEY_COUNT)`, so platform implementations may use
+ * them directly as array indices.
  */
 #define SWIFT_TLS_KEY_COUNT 8
 
@@ -67,7 +69,7 @@ typedef __swift_ptrdiff_t __swift_tls_key_t;
 #define EMBEDDED_SWIFT_NULLABLE
 #endif
 
-typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
+typedef void (*swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
 
 #if defined(__has_feature) && (__has_feature(bounds_attributes) || __has_feature(bounds_safety_attributes))
 #define EMBEDDED_SWIFT_COUNTED_BY(N) __attribute__((__counted_by__(N)))
@@ -392,8 +394,8 @@ __swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
  * Initializes a reserved TLS key. `key` is one of the numeric reserved keys
  * described by `SWIFT_TLS_KEY_COUNT`. `destructor` may be NULL.
  */
-void _swift_tls_init(__swift_tls_key_t key,
-                     __swift_tls_dtor_t EMBEDDED_SWIFT_NULLABLE destructor);
+void _swift_tls_init(swift_tls_key_t key,
+                     swift_tls_dtor_t EMBEDDED_SWIFT_NULLABLE destructor);
 
 /**
  * Returns the value stored for a TLS key in the current execution context, or
@@ -401,14 +403,14 @@ void _swift_tls_init(__swift_tls_key_t key,
  *
  * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
  */
-void * EMBEDDED_SWIFT_NULLABLE _swift_tls_get(__swift_tls_key_t key);
+void * EMBEDDED_SWIFT_NULLABLE _swift_tls_get(swift_tls_key_t key);
 
 /**
  * Stores a value for a TLS key in the current execution context.
  *
  * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
  */
-void _swift_tls_set(__swift_tls_key_t key,
+void _swift_tls_set(swift_tls_key_t key,
                     void * EMBEDDED_SWIFT_NULLABLE value);
 
 /**

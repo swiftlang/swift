@@ -1,7 +1,5 @@
-// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern -wmo %s -c -o %t/main.o
-// RUN: %target-clang -x c -std=c11 -I %swift_obj_root/include -c %S/Inputs/embedded-platform-threading.c -o %t/threading.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %t/threading.o %target-embedded-multi-threaded-posix-shim %target-embedded-posix-shim -o %t/a.out -dead_strip
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-multi-threaded-posix-shim %target-embedded-posix-shim -o %t/a.out -dead_strip -pthreads
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
@@ -9,6 +7,22 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
+
+typealias pthread_t = UnsafeMutableRawPointer
+
+@_extern(c, "pthread_create")
+func pthread_create(
+  _ thread: UnsafeMutablePointer<pthread_t?>,
+  _ attr: UnsafeRawPointer?,
+  _ start: @convention(c) (UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer?,
+  _ arg: UnsafeMutableRawPointer?
+) -> Int
+
+@_extern(c, "pthread_join")
+func pthread_join(
+  _ thread: pthread_t,
+  _ result: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+) -> Int
 
 @_extern(c, "_swift_tls_init")
 func _swift_tls_init(
@@ -25,20 +39,34 @@ func _swift_tls_set(_ key: Int, _ value: UnsafeMutableRawPointer?)
 @_extern(c, "_swift_thread_isMain")
 func _swift_thread_isMain() -> Int
 
-@_extern(c, "embedded_platform_worker_is_main")
-func embedded_platform_worker_is_main() -> Int
-
 func check(_ condition: Bool) {
   if !condition {
     fatalError("unexpected multi-threaded POSIX platform behavior")
   }
 }
 
+func embeddedPlatformWorkerIsMain() -> Bool {
+  var thread: pthread_t? = nil
+  guard pthread_create(&thread, nil, { _ in
+    _swift_thread_isMain() != 0
+      ? UnsafeMutableRawPointer(bitPattern: 1)
+      : nil
+  }, nil) == 0, let thread else {
+    return true
+  }
+
+  var result: UnsafeMutableRawPointer?
+  guard pthread_join(thread, &result) == 0 else {
+    return true
+  }
+  return result != nil
+}
+
 @main
 struct Main {
   static func main() {
     check(_swift_thread_isMain() != 0)
-    check(embedded_platform_worker_is_main() == 0)
+    check(!embeddedPlatformWorkerIsMain())
 
     for key in 0..<8 {
       _swift_tls_init(key, nil)

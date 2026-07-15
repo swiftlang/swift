@@ -69,7 +69,7 @@ static void trap_if(int failed) {
   }
 }
 
-static pthread_key_t swift_embedded_platform_tls_key(__swift_tls_key_t key) {
+static pthread_key_t swift_embedded_platform_tls_key(swift_tls_key_t key) {
   trap_if(key < 0 || key >= SWIFT_TLS_KEY_COUNT);
   return SWIFT_EMBEDDED_PLATFORM_DARWIN_TLS_KEY_BASE + key;
 }
@@ -138,17 +138,17 @@ __swift_ptrdiff_t _swift_mutex_tryLock(void *mutex) {
   return os_unfair_lock_trylock(&m->u.unfair) ? 1 : 0;
 }
 
-void _swift_tls_init(__swift_tls_key_t key, __swift_tls_dtor_t destructor) {
+void _swift_tls_init(swift_tls_key_t key, swift_tls_dtor_t destructor) {
   trap_if(
       pthread_key_init_np((int)swift_embedded_platform_tls_key(key),
                           destructor) != 0);
 }
 
-void *_swift_tls_get(__swift_tls_key_t key) {
+void *_swift_tls_get(swift_tls_key_t key) {
   return pthread_getspecific(swift_embedded_platform_tls_key(key));
 }
 
-void _swift_tls_set(__swift_tls_key_t key, void *value) {
+void _swift_tls_set(swift_tls_key_t key, void *value) {
   trap_if(pthread_setspecific(swift_embedded_platform_tls_key(key), value) != 0);
 }
 

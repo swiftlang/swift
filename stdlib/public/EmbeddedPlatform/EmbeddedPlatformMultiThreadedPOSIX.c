@@ -55,19 +55,19 @@ static void swift_embedded_platform_remember_main_thread(void) {
   swift_embedded_platform_main_thread = pthread_self();
 }
 
-static pthread_key_t swift_embedded_platform_tls_key(__swift_tls_key_t key) {
+static pthread_key_t swift_embedded_platform_tls_key(swift_tls_key_t key) {
   trap_if(key < 0 || key >= SWIFT_TLS_KEY_COUNT);
   return swift_embedded_platform_tls_keys[key];
 }
 
-static int swift_embedded_platform_tls_is_initialized(__swift_tls_key_t key) {
+static int swift_embedded_platform_tls_is_initialized(swift_tls_key_t key) {
   trap_if(key < 0 || key >= SWIFT_TLS_KEY_COUNT);
   return swift_embedded_platform_tls_key_initialized[key] != 0;
 }
 
 static void
-swift_embedded_platform_tls_init_if_needed(__swift_tls_key_t key,
-                                           __swift_tls_dtor_t destructor) {
+swift_embedded_platform_tls_init_if_needed(swift_tls_key_t key,
+                                           swift_tls_dtor_t destructor) {
   trap_if(key < 0 || key >= SWIFT_TLS_KEY_COUNT);
   trap_if(pthread_mutex_lock(&swift_embedded_platform_tls_lock) != 0);
   if (!swift_embedded_platform_tls_key_initialized[key]) {
@@ -116,18 +116,18 @@ __swift_ptrdiff_t _swift_mutex_tryLock(void *mutex) {
   return pthread_mutex_trylock((pthread_mutex_t *)mutex) == 0 ? 1 : 0;
 }
 
-void _swift_tls_init(__swift_tls_key_t key, __swift_tls_dtor_t destructor) {
+void _swift_tls_init(swift_tls_key_t key, swift_tls_dtor_t destructor) {
   swift_embedded_platform_tls_init_if_needed(key, destructor);
 }
 
-void *_swift_tls_get(__swift_tls_key_t key) {
+void *_swift_tls_get(swift_tls_key_t key) {
   if (!swift_embedded_platform_tls_is_initialized(key)) {
     return NULL;
   }
   return pthread_getspecific(swift_embedded_platform_tls_key(key));
 }
 
-void _swift_tls_set(__swift_tls_key_t key, void *value) {
+void _swift_tls_set(swift_tls_key_t key, void *value) {
   swift_embedded_platform_tls_init_if_needed(key, NULL);
   trap_if(pthread_setspecific(swift_embedded_platform_tls_key(key), value) != 0);
 }
