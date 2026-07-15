@@ -7983,9 +7983,23 @@ GenericArgumentMetadata irgen::addGenericRequirements(
                                            /*key argument*/false,
                                            isPackRequirement,
                                            isValueRequirement);
+      // Pass along the generic signature so that, if the runtime demangler is
+      // too old to understand this type's mangled name and we fall back to a
+      // dangling metadata-accessor function, the accessor can map the
+      // type-parameter-dependent type into a generic environment and bind it
+      // from the generic requirements buffer at runtime.
+      //
+      // Use the CanType overload rather than the Type overload: the latter
+      // reduces the type against the signature, which would collapse the RHS
+      // of a same-type requirement onto its equivalence-class representative
+      // (e.g. `T.A == T.B` would be recorded as `T.A == T.A`) and corrupt the
+      // requirement. We want the original RHS, just mangled with the signature
+      // available for the dangling-accessor fallback.
       auto typeName =
-          IGM.getTypeRef(requirement.getSecondType(), nullptr,
-                         MangledTypeRefRole::Metadata).first;
+          IGM.getTypeRef(requirement.getSecondType()->getCanonicalType(),
+                         sig.getCanonicalSignature(),
+                         MangledTypeRefRole::Metadata)
+              .first;
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),
