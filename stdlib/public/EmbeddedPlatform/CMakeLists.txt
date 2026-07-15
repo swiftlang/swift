@@ -27,174 +27,92 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-multi-threaded-darwin-shim)
   add_dependencies(embedded-libraries embedded-multi-threaded-darwin-shim)
 
-  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
-    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
-    list(GET list 0 arch)
-    list(GET list 1 mod)
-    list(GET list 2 triple)
+  set(_embedded_platform_swift_flags
+    ${swift_stdlib_compile_flags}
+    "-import-bridging-header" ${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h
+    -enable-experimental-feature Extern
+    -enable-experimental-feature AllowRuntimeSymbolDeclarations
+    "-disable-bridging-pch")
 
-    if("${mod}" MATCHES "-windows-msvc$")
-      continue()
-    endif()
+  add_embedded_swift_target_library(
+    embedded-posix-shim
+    swiftEmbeddedPlatformPOSIX
+    PARTIAL_SOURCES_INTENDED
+    INSTALL_BINARY
+    NON_EMPTY_OBJECT_FILE
 
-    if("${arch}" MATCHES "avr")
-      continue()
-    endif()
+    EmbeddedPlatformPOSIX.swift
 
-    if (SWIFT_HOST_VARIANT STREQUAL "linux")
-      set(extra_c_compile_flags -ffreestanding)
-    elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
-      set(extra_c_compile_flags -ffreestanding)
-    endif()
-    list(APPEND extra_c_compile_flags -nostdinc++)
+    SWIFT_COMPILE_FLAGS ${_embedded_platform_swift_flags}
+    SKIP_MOD_REGEX "-windows-msvc$"
+    SKIP_ARCH_REGEX "avr"
+    ARCHITECTURE_KEY mod
+    INSTALL_IN_COMPONENT stdlib
+  )
 
-    set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
-    set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
-    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
-      set(SWIFT_SDK_embedded_ARCH_${mod}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
-    endif()
+  add_embedded_swift_target_library(
+    embedded-single-threaded-shim
+    swiftEmbeddedPlatformSingleThreaded
+    PARTIAL_SOURCES_INTENDED
+    INSTALL_BINARY
+    NON_EMPTY_OBJECT_FILE
 
-    add_swift_target_library_single(
-      embedded-posix-shim-${mod}
-      swiftEmbeddedPlatformPOSIX
-      STATIC
-      IS_FRAGILE
+    EmbeddedPlatformSingleThreaded.swift
+
+    SWIFT_COMPILE_FLAGS ${_embedded_platform_swift_flags}
+    SKIP_MOD_REGEX "-windows-msvc$"
+    SKIP_ARCH_REGEX "avr"
+    ARCHITECTURE_KEY mod
+    INSTALL_IN_COMPONENT stdlib
+  )
+
+  # The POSIX pthread-based shim only makes sense on hosted POSIX targets;
+  # skip bare-metal and Windows triples that lack a pthread implementation.
+  # Also skip Apple targets when the host is not macOS: cross-compiling to
+  # Apple from Linux/Windows without an Apple SDK picks up the host libc's
+  # `<pthread.h>`, which fails.
+  set(_mt_posix_skip_triple "-none-" "-windows-")
+  if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
+    list(APPEND _mt_posix_skip_triple "-apple-")
+  endif()
+
+  add_embedded_swift_target_library(
+    embedded-multi-threaded-posix-shim
+    swiftEmbeddedPlatformMultiThreadedPOSIX
+    PARTIAL_SOURCES_INTENDED
+    INSTALL_BINARY
+    NON_EMPTY_OBJECT_FILE
+
+    EmbeddedPlatformMultiThreadedPOSIX.c
+
+    C_COMPILE_FLAGS -nostdinc++ -I${CMAKE_CURRENT_SOURCE_DIR}/swift
+    SKIP_MOD_REGEX "-windows-msvc$"
+    SKIP_ARCH_REGEX "avr"
+    SKIP_TRIPLE_REGEX ${_mt_posix_skip_triple}
+    ARCHITECTURE_KEY mod
+    INSTALL_IN_COMPONENT stdlib
+  )
+
+  # The Darwin-specific `os_unfair_lock` shim is only meaningful on hosted
+  # Apple target triples, and can only be compiled when the host has an
+  # Apple SDK (i.e. macOS). Skip bare-metal `-apple-none-*` triples and
+  # non-macOS hosts.
+  if(SWIFT_HOST_VARIANT STREQUAL "macosx")
+    add_embedded_swift_target_library(
+      embedded-multi-threaded-darwin-shim
+      swiftEmbeddedPlatformMultiThreadedDarwin
       PARTIAL_SOURCES_INTENDED
+      INSTALL_BINARY
+      NON_EMPTY_OBJECT_FILE
 
-      EmbeddedPlatformPOSIX.swift
+      EmbeddedPlatformMultiThreadedDarwin.c
 
-      C_COMPILE_FLAGS ${extra_c_compile_flags}
-      SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded "-import-bridging-header" ${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h -enable-experimental-feature Extern -enable-experimental-feature AllowRuntimeSymbolDeclarations "-disable-bridging-pch"
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-      SDK "embedded"
-      ARCHITECTURE "${mod}"
-      DEPENDS embedded-stdlib-${mod}
+      C_COMPILE_FLAGS -nostdinc++ -I${CMAKE_CURRENT_SOURCE_DIR}/swift
+      ONLY_TRIPLE_REGEX "-apple-"
+      SKIP_TRIPLE_REGEX "-apple-none-"
+      SKIP_ARCH_REGEX "avr"
+      ARCHITECTURE_KEY mod
       INSTALL_IN_COMPONENT stdlib
-      )
-    swift_install_in_component(
-      TARGETS embedded-posix-shim-${mod}
-      DESTINATION "lib/swift/embedded/${mod}"
-      COMPONENT "stdlib"
-      )
-    swift_install_in_component(
-      FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswiftEmbeddedPlatformPOSIX.a"
-      DESTINATION "lib/swift/embedded/${mod}/"
-      COMPONENT "stdlib"
-      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-      )
-    set_property(TARGET embedded-posix-shim-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-
-    add_dependencies(embedded-posix-shim embedded-posix-shim-${mod})
-
-    add_swift_target_library_single(
-      embedded-single-threaded-shim-${mod}
-      swiftEmbeddedPlatformSingleThreaded
-      STATIC
-      IS_FRAGILE
-      PARTIAL_SOURCES_INTENDED
-
-      EmbeddedPlatformSingleThreaded.swift
-
-      C_COMPILE_FLAGS ${extra_c_compile_flags}
-      SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded "-import-bridging-header" ${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h -enable-experimental-feature Extern -enable-experimental-feature AllowRuntimeSymbolDeclarations "-disable-bridging-pch"
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-      SDK "embedded"
-      ARCHITECTURE "${mod}"
-      DEPENDS embedded-stdlib-${mod}
-      INSTALL_IN_COMPONENT stdlib
-      )
-    swift_install_in_component(
-      TARGETS embedded-single-threaded-shim-${mod}
-      DESTINATION "lib/swift/embedded/${mod}"
-      COMPONENT "stdlib"
-      )
-    swift_install_in_component(
-      FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswiftEmbeddedPlatformSingleThreaded.a"
-      DESTINATION "lib/swift/embedded/${mod}/"
-      COMPONENT "stdlib"
-      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-      )
-    set_property(TARGET embedded-single-threaded-shim-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-
-    add_dependencies(embedded-single-threaded-shim embedded-single-threaded-shim-${mod})
-
-    # The POSIX pthread-based shim only makes sense on hosted POSIX targets;
-    # skip bare-metal and Windows triples that lack a pthread implementation.
-    # Also skip Apple targets when the host is not macOS: cross-compiling to
-    # Apple from Linux/Windows without an Apple SDK picks up the host libc's
-    # `<pthread.h>`, which fails.
-    if(NOT "${triple}" MATCHES "-none-|-windows-" AND
-       (NOT "${triple}" MATCHES "-apple-" OR SWIFT_HOST_VARIANT STREQUAL "macosx"))
-      add_swift_target_library_single(
-        embedded-multi-threaded-posix-shim-${mod}
-        swiftEmbeddedPlatformMultiThreadedPOSIX
-        STATIC
-        IS_FRAGILE
-        PARTIAL_SOURCES_INTENDED
-
-        EmbeddedPlatformMultiThreadedPOSIX.c
-
-        C_COMPILE_FLAGS ${extra_c_compile_flags} -I${CMAKE_CURRENT_SOURCE_DIR}/swift
-        MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-        SDK "embedded"
-        ARCHITECTURE "${mod}"
-        DEPENDS embedded-stdlib-${mod}
-        INSTALL_IN_COMPONENT stdlib
-        )
-      swift_install_in_component(
-        TARGETS embedded-multi-threaded-posix-shim-${mod}
-        DESTINATION "lib/swift/embedded/${mod}"
-        COMPONENT "stdlib"
-        )
-      swift_install_in_component(
-        FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswiftEmbeddedPlatformMultiThreadedPOSIX.a"
-        DESTINATION "lib/swift/embedded/${mod}/"
-        COMPONENT "stdlib"
-        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-        )
-      set_property(TARGET embedded-multi-threaded-posix-shim-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-
-      add_dependencies(embedded-multi-threaded-posix-shim embedded-multi-threaded-posix-shim-${mod})
-    endif()
-
-    # The Darwin-specific `os_unfair_lock` shim is only meaningful on hosted
-    # Apple target triples, and can only be compiled when the host has an
-    # Apple SDK (i.e. macOS). Skip bare-metal `-apple-none-*` triples and
-    # non-macOS hosts.
-    if("${triple}" MATCHES "-apple-" AND
-       NOT "${triple}" MATCHES "-apple-none-" AND
-       SWIFT_HOST_VARIANT STREQUAL "macosx")
-      add_swift_target_library_single(
-        embedded-multi-threaded-darwin-shim-${mod}
-        swiftEmbeddedPlatformMultiThreadedDarwin
-        STATIC
-        IS_FRAGILE
-        PARTIAL_SOURCES_INTENDED
-
-        EmbeddedPlatformMultiThreadedDarwin.c
-
-        C_COMPILE_FLAGS ${extra_c_compile_flags} -I${CMAKE_CURRENT_SOURCE_DIR}/swift
-        MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-        SDK "embedded"
-        ARCHITECTURE "${mod}"
-        DEPENDS embedded-stdlib-${mod}
-        INSTALL_IN_COMPONENT stdlib
-        )
-      swift_install_in_component(
-        TARGETS embedded-multi-threaded-darwin-shim-${mod}
-        DESTINATION "lib/swift/embedded/${mod}"
-        COMPONENT "stdlib"
-        )
-      swift_install_in_component(
-        FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswiftEmbeddedPlatformMultiThreadedDarwin.a"
-        DESTINATION "lib/swift/embedded/${mod}/"
-        COMPONENT "stdlib"
-        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-        )
-      set_property(TARGET embedded-multi-threaded-darwin-shim-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-
-      add_dependencies(embedded-multi-threaded-darwin-shim embedded-multi-threaded-darwin-shim-${mod})
-    endif()
-  endforeach()
+    )
+  endif()
 endif()

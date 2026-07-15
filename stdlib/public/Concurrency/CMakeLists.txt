@@ -293,36 +293,27 @@ elseif(SWIFT_HOST_VARIANT STREQUAL "windows") # For now, don't build embedded Co
 endif()
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY)
   add_custom_target(embedded-concurrency)
+  add_custom_target(embedded-concurrency-default-executor)
   add_dependencies(embedded-libraries embedded-concurrency)
+  add_dependencies(embedded-concurrency embedded-concurrency-default-executor)
 
-  set(SWIFT_ENABLE_REFLECTION OFF)
-  set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
-  set(SWIFT_STDLIB_STABLE_ABI OFF)
-  set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
   set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
   set(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY TRUE)
   set(SWIFT_STDLIB_TRACING FALSE)
   set(SWIFT_STDLIB_HAS_ENVIRON FALSE)
   set(SWIFT_STDLIB_HAS_ASL FALSE)
+  set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
   list(APPEND LLVM_OPTIONAL_SOURCES ExecutorImpl.cpp)
 
-  # Under Embedded Swift, all stdlib APIs should be available always. Replace
-  # all availability macros with an empty expansion (`*`).
-  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
-  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
-    string(REGEX REPLACE ":.*" ":*" replaced "${def}")
-    list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
-  endforeach()
-  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
+  set(_concurrency_all_triples "${EMBEDDED_STDLIB_TARGET_TRIPLES}")
 
-  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
+  foreach(entry ${_concurrency_all_triples})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 0 arch)
     list(GET list 1 mod)
     list(GET list 2 triple)
 
     set(extra_c_compile_flags)
-    set(extra_swift_compile_flags)
 
     # Skip Concurrency for freestanding Wasm (no libc/libc++ available).
     if("${triple}" MATCHES "-none-wasm$")
@@ -365,35 +356,33 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         ExecutorImpl.swift
         PlatformExecutorCooperative.swift
       )
-      list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
+      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES
+        ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
         ExecutorImpl.cpp
       )
     else()
       set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
         PlatformExecutorNone.swift
       )
+      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES
+        ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
+      )
     endif()
 
-    set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
-    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
-    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
-    set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
-    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
-      set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
-      set(SWIFT_SDK_embedded_ARCH_${mod}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
-    endif()
+    # Restrict each call below to the current triple by temporarily narrowing
+    # the triple list visible to add_embedded_swift_target_library.
+    set(EMBEDDED_STDLIB_TARGET_TRIPLES "${entry}")
 
     # lib/swift/embedded/_Concurrency.swiftmodule
     # lib/swift/embedded/<triple>/libswift_Concurrency.a
-    add_swift_target_library_single(
-      embedded-concurrency-${mod}
+    add_embedded_swift_target_library(
+      embedded-concurrency
       swift_Concurrency
-      STATIC
-      IS_STDLIB IS_FRAGILE
+      IS_STDLIB
+      INSTALL_BINARY
+      NO_FREESTANDING_CXX
 
-      ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
+      ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES}
 
@@ -401,73 +390,31 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         ${SWIFT_CONCURRENCY_GYB_SOURCES}
 
       SWIFT_COMPILE_FLAGS
-        ${extra_swift_compile_flags} -enable-experimental-feature Embedded
         -parse-stdlib -DSWIFT_CONCURRENCY_EMBEDDED
-        -Xfrontend -emit-empty-object-file
         ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
       C_COMPILE_FLAGS
-        ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS} -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
+        ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
+        -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
         -ffunction-sections -fdata-sections -fno-exceptions -fno-cxx-exceptions -fno-unwind-tables
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-      SDK "embedded"
-      ARCHITECTURE "${arch}"
-      ARCHITECTURE_SUBDIR_NAME "${mod}"
-      DEPENDS embedded-stdlib-${mod}
       INSTALL_IN_COMPONENT stdlib
       )
-    swift_install_in_component(
-      TARGETS embedded-concurrency-${mod}
-      DESTINATION "lib/swift/embedded/${mod}"
-      COMPONENT "stdlib"
-      )
-    swift_install_in_component(
-      FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswift_Concurrency.a"
-      DESTINATION "lib/swift/embedded/${mod}/"
-      COMPONENT "stdlib"
-      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-      )
-
-    if(NOT "${arch}" MATCHES "wasm32")
-      set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-    endif()
-
-    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-${mod} ${triple})
-
-    add_dependencies(embedded-concurrency embedded-concurrency-${mod})
 
     # lib/swift/embedded/<triple>/libswift_ConcurrencyDefaultExecutor.a
-    add_swift_target_library_single(
-      embedded-concurrency-default-executor-${mod}
+    add_embedded_swift_target_library(
+      embedded-concurrency-default-executor
       swift_ConcurrencyDefaultExecutor
-      STATIC
-      IS_FRAGILE
+      INSTALL_BINARY
+      NO_FREESTANDING_CXX
 
       CooperativeGlobalExecutor.cpp
 
       C_COMPILE_FLAGS ${extra_c_compile_flags}
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-      SDK "embedded"
-      ARCHITECTURE "${mod}"
-      DEPENDS embedded-stdlib-${mod}
       INSTALL_IN_COMPONENT stdlib
       )
-    swift_install_in_component(
-      TARGETS embedded-concurrency-default-executor-${mod}
-      DESTINATION "lib/swift/embedded/${mod}"
-      COMPONENT "stdlib"
-      )
-    swift_install_in_component(
-      FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswift_ConcurrencyDefaultExecutor.a"
-      DESTINATION "lib/swift/embedded/${mod}/"
-      COMPONENT "stdlib"
-      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-      )
-    set_property(TARGET embedded-concurrency-default-executor-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-
-    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-default-executor-${mod} ${triple})
-
-    add_dependencies(embedded-concurrency embedded-concurrency-default-executor-${mod})
   endforeach()
+
+  # Restore the full triple list for any later consumers.
+  set(EMBEDDED_STDLIB_TARGET_TRIPLES "${_concurrency_all_triples}")
 
   # Copy the ExecutorImpl.h header into the local include directory
   # and install it in the compiler toolchain

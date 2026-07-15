@@ -3034,8 +3034,8 @@ bool ContextualFailure::diagnoseKeyPathLiteralMutabilityMismatch() const {
       continue;
 
     if (auto *setter = storageDecl->getOpaqueAccessor(AccessorKind::Set)) {
-      if (getUnsatisfiedAvailabilityConstraint(setter, S.getDC(),
-                                               component.getLoc())) {
+      if (getUnsatisfiedAvailabilityRestriction(setter, S.getDC(),
+                                                component.getLoc())) {
         auto where =
             ExportContext::forFunctionBody(S.getDC(), component.getLoc());
         return diagnoseDeclAvailability(setter, component.getLoc(),
@@ -4410,6 +4410,7 @@ findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
     // Is one more available than the other?
     WORSE(->isUnavailable());
     WORSE(->isDeprecated());
+    WORSE(->isClangDeclDeprecated());
 
     // Does one have a shorter name (so the non-matching prefix is shorter)?
     WORSE(->getName().getBaseName().userFacingName().size());

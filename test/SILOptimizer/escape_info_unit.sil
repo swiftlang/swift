@@ -1620,3 +1620,18 @@ bb0(%0 : $Builtin.Word):
   return %32
 }
 
+// CHECK-LABEL: Escape information for unchecked_ownership_conversion:
+// CHECK:       return[c0]:   %0 = alloc_ref $Y
+// CHECK:       return[]:   %1 = alloc_ref $F
+// CHECK:       End function unchecked_ownership_conversion
+sil [ossa] @unchecked_ownership_conversion : $@convention(thin) () -> @owned F {
+bb0:
+  specify_test "escape_info"
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $F
+  %2 = unchecked_ownership_conversion %1, @owned to @none
+  %3 = ref_element_addr %2, #F.y
+  store %0 to [init] %3
+  return %1
+}
+

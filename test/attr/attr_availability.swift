@@ -794,6 +794,11 @@ class Base {
 
   @available(*, unavailable, renamed: "Base.shinyLabeledArguments()")
   func unavailableHasType() {} // expected-note {{here}}
+
+  @available(*, deprecated)
+  func deprecated() {}
+
+  func notDeprecated() {}
 }
 
 class Sub : Base {
@@ -836,6 +841,11 @@ class Sub : Base {
   override func unavailableTooMany(a: Int) {} // expected-error {{'unavailableTooMany(a:)' has been renamed to 'shinyLabeledArguments(x:b:)'}} {{none}} expected-note {{remove 'override' modifier to declare a new 'unavailableTooMany'}} {{3-12=}}
   override func unavailableNoArgsTooMany() {} // expected-error {{'unavailableNoArgsTooMany()' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}} expected-note {{remove 'override' modifier to declare a new 'unavailableNoArgsTooMany'}} {{3-12=}}
   override func unavailableHasType() {} // expected-error {{'unavailableHasType()' has been replaced by 'Base.shinyLabeledArguments()'}} {{none}} expected-note {{remove 'override' modifier to declare a new 'unavailableHasType'}} {{3-12=}}
+
+  override func deprecated() {}
+
+  @available(*, deprecated)
+  override func notDeprecated() {}
 }
 
 // U: Unnamed, L: Labeled

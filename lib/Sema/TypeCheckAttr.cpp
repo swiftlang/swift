@@ -2240,17 +2240,18 @@ static std::optional<std::pair<SemanticAvailableAttr, const Decl *>>
 getSemanticAvailableRangeDeclAndAttr(const Decl *decl,
                                      AvailabilityDomain domain) {
   auto &ctx = decl->getASTContext();
-  AvailabilityConstraintFlags flags =
-      AvailabilityConstraintFlag::SkipEnclosingExtension;
-  if (auto constraint = swift::getAvailabilityConstraintForDeclInDomain(
-          decl, AvailabilityContext::forAlwaysAvailable(ctx), domain, flags)) {
-    switch (constraint->getReason()) {
-    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    case AvailabilityConstraint::Reason::UnavailableObsolete:
+  AvailabilityRestrictionFlags flags =
+      AvailabilityRestrictionFlag::SkipEnclosingExtension;
+  if (auto restriction = AvailabilityContext::forAlwaysAvailable(ctx)
+                             .restrictionForDeclInDomain(decl, domain, flags)) {
+    switch (restriction->getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
+    case AvailabilityRestriction::Reason::Deprecated:
       break;
-    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
-    case AvailabilityConstraint::Reason::Unintroduced:
-      return std::make_pair(constraint->getAttr(), decl);
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+    case AvailabilityRestriction::Reason::Unintroduced:
+      return std::make_pair(restriction->getAttr(), decl);
     }
   }
 
@@ -5639,7 +5640,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
 
-  // Compute availability constraints for the decl, relative to its parent
+  // Compute availability restrictions for the decl, relative to its parent
   // declaration or to the deployment target.
   auto availabilityContext = AvailabilityContext::forDeploymentTarget(Ctx);
   if (auto parent = D->parentDeclForAvailability()) {
@@ -5647,16 +5648,15 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
     availabilityContext.constrainWithContext(parentAvailability, Ctx);
   }
 
-  auto availabilityConstraint =
-      getAvailabilityConstraintsForDecl(D, availabilityContext)
-          .getPrimaryConstraint();
-  if (!availabilityConstraint)
+  auto availabilityRestriction =
+      availabilityContext.unsatisfiedRestrictionForDecl(D);
+  if (!availabilityRestriction)
     return;
 
   // If the decl is unavailable relative to its parent and it's not a
   // declaration that is allowed to be unavailable, diagnose.
-  if (availabilityConstraint->isUnavailable()) {
-    auto attr = availabilityConstraint->getAttr();
+  if (availabilityRestriction->isUnavailable()) {
+    auto attr = availabilityRestriction->getAttr();
     if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D, attr)) {
       diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
                             *diag);
@@ -5666,8 +5666,8 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
 
   // If the decl is potentially unavailable relative to its parent and it's
   // not a declaration that is allowed to be potentially unavailable, diagnose.
-  if (!availabilityConstraint->isUnavailable()) {
-    auto attr = availabilityConstraint->getAttr();
+  if (!availabilityRestriction->isUnavailable()) {
+    auto attr = availabilityRestriction->getAttr();
     if (auto diag =
             TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D))
       diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
@@ -5973,6 +5973,25 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   return ReferenceStorageType::get(type, ownershipKind, var->getASTContext());
 }
 
+// The raw values of this enum must be kept in sync with the select clause
+// in diag::availability_stored_property_no_potential and
+// diag::availability_stored_property_no_unavailable.
+enum NoAvailableAttrDiagnosticPropertyKind : unsigned {
+  StoredProperty,
+  ComputedPropertyWithInitialValue,
+};
+
+static std::optional<NoAvailableAttrDiagnosticPropertyKind>
+getPropertyKindForAvailableAttrDiagnostic(const VarDecl *VD) {
+  if (VD->hasStorageOrWrapsStorage())
+    return StoredProperty;
+
+  if (VD->hasInitialValue())
+    return ComputedPropertyWithInitialValue;
+
+  return std::nullopt;
+}
+
 std::optional<Diagnostic>
 TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
@@ -5988,7 +6007,8 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    if (!VD->hasStorageOrWrapsStorage())
+    auto disallowedKind = ::getPropertyKindForAvailableAttrDiagnostic(VD);
+    if (!disallowedKind)
       return std::nullopt;
 
     // Do not permit potential availability of script-mode global variables;
@@ -6000,7 +6020,8 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     // Globals and statics are lazily initialized, so they are safe
     // for potential unavailability.
     if (!VD->isStatic() && !DC->isModuleScopeContext())
-      return diag::availability_stored_property_no_potential;
+      return Diagnostic(diag::availability_stored_property_no_potential,
+                        unsigned(*disallowedKind));
 
   } else if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
     // An enum element with an associated value cannot be potentially
@@ -6062,7 +6083,8 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    if (!VD->hasStorageOrWrapsStorage())
+    auto disallowedKind = ::getPropertyKindForAvailableAttrDiagnostic(VD);
+    if (!disallowedKind)
       return std::nullopt;
 
     if (parentIsUnavailable(D))
@@ -6086,7 +6108,8 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
     // Globals and statics are lazily initialized, so they are safe for
     // unavailability.
     if (!VD->isStatic() && !D->getDeclContext()->isModuleScopeContext())
-      return diag::availability_stored_property_no_unavailable;
+      return Diagnostic(diag::availability_stored_property_no_unavailable,
+                        unsigned(*disallowedKind));
   }
 
   return std::nullopt;

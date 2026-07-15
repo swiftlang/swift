@@ -150,6 +150,10 @@ PASS(LoopInvariantCodeMotion, "loop-invariant-code-motion",
      "New Loop Invariant Code Motion")
 PASS(PackSpecialization, "pack-specialization",
      "Specialize uses of parameter packs")
+PASS(DeadObjectElimination, "dead-object-elimination",
+     "Removes dead object, stack and array allocations")
+PASS(MandatoryDeadObjectElimination, "mandatory-dead-object-elimination",
+     "Removes dead stack allocations")
 
 PASS(ClosureSpecialization, "closure-specialization",
      "Specialize functions with closure arguments")
@@ -268,7 +272,7 @@ LEGACY_PASS(DeadArgSignatureOpt, "dead-arg-signature-opt",
      "Dead Argument Elimination via Function Specialization")
 LEGACY_PASS(DeadFunctionAndGlobalElimination, "sil-deadfuncelim",
      "Dead Function and Global Variable Elimination")
-LEGACY_PASS(DeadObjectElimination, "deadobject-elim",
+LEGACY_PASS(LegacyDeadObjectElimination, "deadobject-elim",
      "Dead Object Elimination for Classes with Trivial Destruction")
 LEGACY_PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
@@ -354,8 +358,6 @@ LEGACY_PASS(MandatoryInlining, "mandatory-inlining",
      "Mandatory Inlining of Transparent Functions")
 LEGACY_PASS(InlineAlwaysInlining, "inline-always-inlining",
      "Inlining of '@inline(always)' Functions")
-LEGACY_PASS(Mem2Reg, "mem2reg",
-     "Memory to SSA Value Conversion to Remove Stack Allocation")
 LEGACY_PASS(MoveCondFailToPreds, "move-cond-fail-to-preds",
      "Move SIL cond_fail by Hoisting Checks")
 LEGACY_PASS(NoReturnFolding, "noreturn-folding",
@@ -378,8 +380,6 @@ LEGACY_PASS(PerformanceConstantPropagation, "performance-constant-propagation",
      "Constant Propagation for Performance without Diagnostics")
 LEGACY_PASS(PerformanceDiagnostics, "performance-diagnostics",
      "Constant Propagation for Performance without Diagnostics")
-LEGACY_PASS(PredictableDeadAllocationElimination, "predictable-deadalloc-elim",
-     "Eliminate dead temporary allocations after diagnostics")
 LEGACY_PASS(RedundantPhiElimination, "redundant-phi-elimination",
      "Redundant Phi Block Argument Elimination")
 LEGACY_PASS(PhiExpansion, "phi-expansion",

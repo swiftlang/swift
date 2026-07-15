@@ -636,7 +636,7 @@ set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "16.0" CACHE STRING
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "16.0" CACHE STRING
     "Minimum deployment target version for tvOS")
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "6.0" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "9.0" CACHE STRING
     "Minimum deployment target version for watchOS")
 
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_XROS "1.0" CACHE STRING
@@ -1440,6 +1440,26 @@ if(SWIFT_PARALLEL_LINK_JOBS)
     set_property(GLOBAL APPEND PROPERTY JOB_POOLS swift_link_job_pool=${SWIFT_PARALLEL_LINK_JOBS})
     set(CMAKE_JOB_POOL_LINK swift_link_job_pool)
   endif()
+endif()
+
+# Cap concurrency for embedded-stdlib Swift compilations.
+#
+# `SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS` defaults to a small fraction of
+# the host's logical cores so the C++ build phase still gets to run at
+# full parallelism; only the embedded Swift compilations queue up through
+# this pool.
+if(CMAKE_MAKE_PROGRAM MATCHES "ninja")
+  if(NOT DEFINED SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS)
+    cmake_host_system_information(
+      RESULT _swift_embedded_pool_cores QUERY NUMBER_OF_LOGICAL_CORES)
+    math(EXPR SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS
+         "(${_swift_embedded_pool_cores} + 3) / 4")
+    if(SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS LESS 1)
+      set(SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS 1)
+    endif()
+  endif()
+  set_property(GLOBAL APPEND PROPERTY
+    JOB_POOLS swift_embedded_compile_job_pool=${SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS})
 endif()
 
 # Set the CMAKE_OSX_* variables in a way that minimizes conflicts.

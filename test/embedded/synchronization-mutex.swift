@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -disable-availability-checking -wmo %s -c -o %t/main.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-posix-shim -o %t/a.out -dead_strip
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s --implicit-check-not=unexpected
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: synchronization
 // REQUIRES: swift_feature_Embedded
-// UNSUPPORTED: OS=wasip1
+// UNSUPPORTED: OS=wasip1 || OS=emscripten
 
 import Synchronization
 

@@ -191,9 +191,8 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
     assert(baseTy);
     if (isa<AbstractFunctionDecl>(decl) &&
         baseTy->getRValueType()->is<AnyMetatypeType>()) {
-      if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext()))
-        if (ext->isMetatypeExtension())
-          return true;
+      if (decl->getDeclContext()->isMetatypeExtension())
+        return true;
       return false;
     }
   }
@@ -1741,7 +1740,8 @@ static ConstraintSystem::SolutionKind matchCallArguments(
         //    func f<T>(_: @autoclosure () -> T) {}
         //
         //    f { } // OK
-        if (isExpr<ClosureExpr>(argExpr)) {
+        //    f { [v] in } // OK
+        if (isExpr<ClosureExpr>(argExpr) || isExpr<CaptureListExpr>(argExpr)) {
           cs.increaseScore(SK_FunctionToAutoClosureConversion, loc);
         }
 
@@ -6667,6 +6667,9 @@ bool ConstraintSystem::repairFailures(
       return true;
     }
 
+    if (hasAnyRestriction())
+      return false;
+
     if (isExpr<ArrayExpr>(anchor) || isExpr<DictionaryExpr>(anchor)) {
       // If we could record a generic arguments mismatch instead of this fix,
       // don't record a ContextualMismatch here.
@@ -6682,6 +6685,24 @@ bool ConstraintSystem::repairFailures(
       if (hasFixFor(loc, FixKind::TreatArrayLiteralAsDictionary)) {
         increaseScore(SK_Fix, loc);
         return true;
+      }
+
+      if (loc->directlyAt<ArrayExpr>() && lhs->isArray() &&
+          (rhs->isInlineArray() || rhs->is_InlineArray())) {
+        auto literalCount = castToExpr<ArrayExpr>(anchor)->getNumElements();
+        if (auto inlineCount = rhs->castTo<BoundGenericStructType>()
+                                   ->getGenericArgs()[0]
+                                   ->getAs<IntegerType>()) {
+          if (inlineCount->getValue() != literalCount) {
+            conversionsOrFixes.push_back(
+                AllowInlineArrayLiteralCountMismatch::create(
+                    *this, inlineCount,
+                    IntegerType::get(std::to_string(literalCount),
+                                     /*isNegative=*/false, getASTContext()),
+                    loc));
+            return true;
+          }
+        }
       }
 
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
@@ -10758,10 +10779,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
     // Metatype extension members are only accessible on the protocol
     // metatype itself, not on conforming types.
-    if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
-      if (ext->isMetatypeExtension() && !instanceTy->isExistentialType())
-        return;
-    }
+    if (decl->getDeclContext()->isMetatypeExtension() &&
+        !instanceTy->isExistentialType())
+      return;
 
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
@@ -10771,11 +10791,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         // Metatype extension instance members are instance members of the
         // metatype type itself.  They are accessed directly on the protocol
         // metatype value (e.g. P.value), not on an instance of the protocol.
-        if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
-          if (ext->isMetatypeExtension()) {
-            result.addViable(candidate);
-            return;
-          }
+        if (decl->getDeclContext()->isMetatypeExtension()) {
+          result.addViable(candidate);
+          return;
         }
 
         // `AnyObject` has special semantics, so let's just let it be.
@@ -10860,8 +10878,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
       /* We're OK */
     } else if (instanceTy->isExistentialType() &&
-               isa<ExtensionDecl>(decl->getDeclContext()) &&
-               cast<ExtensionDecl>(decl->getDeclContext())->isMetatypeExtension()) {
+               decl->getDeclContext()->isMetatypeExtension()) {
       // Metatype extension members are directly accessible on the
       // protocol metatype without requiring Self to be bound.
     } else if (hasStaticMembers && baseObjTy->is<MetatypeType>() &&
@@ -16099,6 +16116,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
         impact += FixImpact::Mismatch;
     }
 
+    if (fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch &&
+        locator->isForCollectionElement()) {
+      auto *collection = castToExpr<CollectionExpr>(locator->getAnchor());
+      // If the literal is passed to a call or subscript or used in a nested
+      // position, let's attempt to prefer a fix for a contextual mismatch.
+      // For example, `test([1])` if none of the overloads match it's better
+      // to prefer an argument type  mismatch over a collection element type
+      // mismatch because that points to an ambiguity with the `test` instead
+      // of the collection literal.
+      if (getSemanticsProvidingParentExpr(collection))
+        impact = FixImpact::TypeMismatch * 2;
+    }
+
     if (recordFix(fix, impact))
       return SolutionKind::Error;
 
@@ -16140,6 +16170,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return SolutionKind::Solved;
   }
 
+  case FixKind::AllowInlineArrayLiteralCountMismatch:
+    return recordFix(fix, FixImpact::TypeMismatch) ? SolutionKind::Error
+                                                   : SolutionKind::Solved;
+
   case FixKind::UseSubscriptOperator:
   case FixKind::ExplicitlyEscaping:
   case FixKind::MarkGlobalActorFunction:
@@ -16175,7 +16209,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidPlaceholder:
   case FixKind::IgnoreOutOfPlaceThenStmt:
   case FixKind::IgnoreMissingEachKeyword:
-  case FixKind::AllowInlineArrayLiteralCountMismatch:
   case FixKind::TooManyDynamicMemberLookups:
   case FixKind::IgnoreNonMetatypeDynamicType:
   case FixKind::IgnoreIsolatedConformance:

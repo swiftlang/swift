@@ -38,7 +38,6 @@ target_sources(swiftSILOptimizer PRIVATE
   NestedSemanticFunctionCheck.cpp
   OptimizeHopToExecutor.cpp
   PerformanceDiagnostics.cpp
-  PredictableMemOpt.cpp
   PMOMemoryUseCollector.cpp
   RawSILInstLowering.cpp
   ReferenceBindingTransform.cpp

@@ -171,62 +171,40 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-synchronization)
   add_dependencies(embedded-libraries embedded-synchronization)
 
-  set(SWIFT_ENABLE_REFLECTION OFF)
-  set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
-  set(SWIFT_STDLIB_STABLE_ABI OFF)
-  set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
-  set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
+  set(_embedded_synchronization_swift_flags
+    ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
+    -internal-import-bridging-header ${CMAKE_CURRENT_SOURCE_DIR}/../EmbeddedPlatform/swift/EmbeddedPlatform.h
+    -enable-experimental-feature LiteralExpressions)
 
-  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
-    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
-    list(GET list 0 arch)
-    list(GET list 1 mod)
-    list(GET list 2 triple)
+  # wasm32 builds the full Synchronization library plus its wasm-specific
+  # mutex implementation.
+  add_embedded_swift_target_library(
+    embedded-synchronization
+    swiftSynchronization
 
-    # Disable the Synchronization library on AVR for now.
-    if("${arch}" MATCHES "avr")
-      continue()
-    endif()
+    ${SWIFT_SYNCHRONIZATION_SOURCES}
+    ${SWIFT_SYNCHRONIZATION_WASM_SOURCES}
 
-    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
-    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
-    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
-      set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
-    endif()
+    GYB_SOURCES ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
+    SWIFT_COMPILE_FLAGS ${_embedded_synchronization_swift_flags}
+    ONLY_ARCH_REGEX "^wasm32$"
+    INSTALL_IN_COMPONENT stdlib
+  )
 
-    set(SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES)
+  # All other architectures get the full Synchronization sources plus the
+  # embedded Mutex implementation. wasm32 is handled by the previous call;
+  # avr is unsupported.
+  add_embedded_swift_target_library(
+    embedded-synchronization
+    swiftSynchronization
 
-    if("${arch}" MATCHES "wasm32")
-      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_SOURCES})
-      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_WASM_SOURCES})
-    else()
-      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_SOURCES})
-      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES Mutex/EmbeddedImpl.swift)
-      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES Mutex/Mutex.swift)
-    endif()
-      
-    add_swift_target_library_single(
-      embedded-synchronization-${mod}
-      swiftSynchronization
-      ONLY_SWIFTMODULE
-      IS_FRAGILE
-      
-      ${SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES}
-      
-      GYB_SOURCES
-        ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
+    ${SWIFT_SYNCHRONIZATION_SOURCES}
+    Mutex/EmbeddedImpl.swift
+    Mutex/Mutex.swift
 
-      SWIFT_COMPILE_FLAGS
-        ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
-        -Xcc -ffreestanding -enable-experimental-feature Embedded
-
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-      SDK "embedded"
-      ARCHITECTURE "${arch}"
-      DEPENDS embedded-stdlib-${mod}
-      INSTALL_IN_COMPONENT stdlib
-      )
-    add_dependencies(embedded-synchronization embedded-synchronization-${mod})
-  endforeach()
+    GYB_SOURCES ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
+    SWIFT_COMPILE_FLAGS ${_embedded_synchronization_swift_flags}
+    SKIP_ARCH_REGEX "^wasm32$" "^avr$"
+    INSTALL_IN_COMPONENT stdlib
+  )
 endif()

@@ -7537,13 +7537,21 @@ ERROR(availability_global_script_no_unavailable,
       none, "global variable cannot be marked unavailable "
       "with '@available' in script mode", ())
 
-ERROR(availability_stored_property_no_potential,
-      none, "stored properties cannot be marked potentially unavailable with "
-      "'@available'", ())
+#define NO_AVAILABLE_ON_PROPERTY_SELECT "select{" \
+      "stored properties|" \
+      "computed property with initial value}"
 
-ERROR(availability_stored_property_no_unavailable,
-      none, "stored properties cannot be marked unavailable with '@available'",
-      ())
+ERROR(availability_stored_property_no_potential, none,
+      "%" NO_AVAILABLE_ON_PROPERTY_SELECT "0 "
+      "cannot be marked potentially unavailable with '@available'",
+      (unsigned))
+
+ERROR(availability_stored_property_no_unavailable, none,
+      "%" NO_AVAILABLE_ON_PROPERTY_SELECT "0 "
+      "cannot be marked unavailable with '@available'",
+      (unsigned))
+
+#undef NO_AVAILABLE_ON_PROPERTY_SELECT
 
 ERROR(availability_enum_element_no_potential,
       none, "enum cases with associated values cannot be marked potentially unavailable with "
@@ -7573,13 +7581,6 @@ ERROR(public_decl_needs_availability, none,
 ERROR(attr_requires_decl_availability_for_platform,none,
       "'%0' requires that %1 have explicit availability for %2",
       (DeclAttribute, const Decl *, StringRef))
-
-// This doesn't display as an availability diagnostic, but it's
-// implemented there and fires when these subscripts are marked
-// unavailable, so it seems appropriate to put it here.
-ERROR(availability_string_subscript_migration, none,
-      "subscripts returning String were obsoleted in Swift 4; explicitly "
-      "construct a String from subscripted result", ())
 
 NOTE(availability_unavailable_implicit_init, none,
      "call to unavailable %kind0 from superclass %1 occurs implicitly at the "

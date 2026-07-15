@@ -9614,20 +9614,14 @@ Type DeclContext::getSelfInterfaceType() const {
     if (auto *builtinTupleDecl = dyn_cast<BuiltinTupleDecl>(nominalDecl))
       return builtinTupleDecl->getTupleSelfType(dyn_cast<ExtensionDecl>(this));
 
-    if (isa<ProtocolDecl>(nominalDecl)) {
+    if (auto *proto = dyn_cast<ProtocolDecl>(nominalDecl)) {
       // For metatype extensions, Self is the metatype of the existential
       // type.  Members are instance members of the metatype, so their self
       // parameter has type (any P).Type.
       for (auto *dc = this; dc; dc = dc->getParent()) {
-        if (auto *ext = dyn_cast<ExtensionDecl>(dc)) {
-          if (ext->isMetatypeExtension()) {
-            auto existentialTy =
-                ExistentialType::get(nominalDecl->getDeclaredInterfaceType());
-            return MetatypeType::get(existentialTy);
-          }
-          break;
-        }
-        if (isa<NominalTypeDecl>(dc))
+        if (dc->isMetatypeExtension())
+          return MetatypeType::get(proto->getDeclaredExistentialType());
+        if (isa<ExtensionDecl>(dc) || isa<NominalTypeDecl>(dc))
           break;
       }
 
@@ -12783,6 +12777,13 @@ void Decl::setClangNode(ClangNode Node) {
 #include "swift/AST/DeclNodes.def"
   }
   *(ptr - 1) = Node.getOpaqueValue();
+}
+
+bool Decl::isClangDeclDeprecated() const {
+  if (const clang::Decl *decl = getClangDecl())
+    return decl->isDeprecated();
+
+  return false;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Decls, is

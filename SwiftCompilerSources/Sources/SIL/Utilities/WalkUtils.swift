@@ -361,7 +361,7 @@ extension ValueDefUseWalker {
         return unmatchedPath(value: operand, path: path)
       }
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
-         is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst,
+         is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst, is UncheckedOwnershipConversionInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkDownUses(ofValue: (instruction as! SingleValueInstruction), path: path)
     case let urc as UncheckedRefCastInst:
@@ -483,6 +483,8 @@ public protocol AddressDefUseWalker {
   /// of the initial address in an instruction recognized by the walker
   /// but for which the requested `path` does not allow the walk to continue.
   mutating func unmatchedPath(address: Operand, path: Path) -> WalkResult
+
+  mutating func typeUse(typeDependentOperand: Operand, path: Path) -> WalkResult
 }
 
 extension AddressDefUseWalker {
@@ -494,6 +496,10 @@ extension AddressDefUseWalker {
     return .continueWalk
   }
   
+  public mutating func typeUse(typeDependentOperand: Operand, path: Path) -> WalkResult {
+    return .continueWalk
+  }
+
   public mutating func walkDownDefault(address operand: Operand, path: Path) -> WalkResult {
     let instruction = operand.instruction
 
@@ -571,7 +577,13 @@ extension AddressDefUseWalker {
   }
   
   public mutating func walkDownUses(ofAddress: Value, path: Path) -> WalkResult {
-    for operand in ofAddress.uses where !operand.isTypeDependent {
+    for operand in ofAddress.uses {
+      if operand.isTypeDependent {
+        if typeUse(typeDependentOperand: operand, path: path) == .abortWalk {
+          return .abortWalk
+        }
+        continue
+      }
       if walkDown(address: operand, path: path) == .abortWalk {
         return .abortWalk
       }
@@ -580,7 +592,13 @@ extension AddressDefUseWalker {
   }
 
   private mutating func walkDownNonEndAccessUses(of beginAccess: BeginAccessInst, path: Path) -> WalkResult {
-    for operand in beginAccess.uses where !operand.isTypeDependent {
+    for operand in beginAccess.uses {
+      if operand.isTypeDependent {
+        if typeUse(typeDependentOperand: operand, path: path) == .abortWalk {
+          return .abortWalk
+        }
+        continue
+      }
       if !(operand.instruction is EndAccessInst),
          walkDown(address: operand, path: path) == .abortWalk {
         return .abortWalk
@@ -727,7 +745,7 @@ extension ValueUseDefWalker {
       return walkUp(value: oer.existential, path: path.push(.existential, index: 0))
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
          is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst,
-         is BeginDeallocRefInst, is MarkDependenceInst,
+         is BeginDeallocRefInst, is MarkDependenceInst, is UncheckedOwnershipConversionInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)
     case let urc as UncheckedRefCastInst:
@@ -856,7 +874,7 @@ extension AddressUseDefWalker {
          is MarkUnresolvedNonCopyableValueInst,
          is DropDeinitInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path)
-  default:
+    default:
       return rootDef(address: def, path: path)
     }
   }

@@ -96,6 +96,26 @@ typedef unsigned long long __swift_options_t;
 #define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 1
 
 /**
+ * The number of pointer-size words that will be used to store a Mutex (as
+ * provided by the Synchronization library).
+ *
+ * This needs to be large enough to accommodate any implementation of Mutex that
+ * can be implemented for that given platform (e.g., via the `_swift_mutex_*`
+ * functions). It can be defined externally (via `-D` on the command line for
+ * Clang, `-Xcc -D` for Swift) to a different value, but that value must be
+ * consistent throughout the build to prevent ABI mismatches.
+ */
+#ifndef EMBEDDED_SWIFT_MUTEX_NUM_WORDS
+#if defined(__APPLE__) && __SIZEOF_POINTER__ == 4
+// On 32-bit Apple targets (e.g., watchOS armv7k / arm64_32) `pthread_mutex_t`
+// is 40 bytes, which doesn't fit in 8 four-byte words.
+#define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)12
+#else
+#define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)8
+#endif
+#endif
+
+/**
  * Determine the version of the platform abstraction layer that the Embedded
  * Swift library was built with.
  *
@@ -134,8 +154,8 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
   /**
    * No options.
    */
-  SWIFT_FREE_NONE EMBEDDED_SWIFT_NAME(none) = 0,
-} swift_free_flags_t EMBEDDED_SWIFT_NAME(SwiftFreeFlags);
+  SWIFT_DEALLOC_NONE EMBEDDED_SWIFT_NAME(none) = 0,
+} swift_dealloc_flags_t EMBEDDED_SWIFT_NAME(SwiftDeallocFlags);
 
 /**
  * Options provided to the Swift mutex initialization function.
@@ -178,17 +198,17 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
 void * EMBEDDED_SWIFT_NULLABLE _swift_allocate(__swift_size_t alignment, __swift_size_t size, swift_alloc_flags_t flags);
 
 /**
- * Frees the memory referenced by `ptr`.
+ * Deallocates the memory referenced by `ptr`.
  *
  * Parameters:
- *   - `ptr`: The pointer to be freed. If it is NULL, the operation does
+ *   - `ptr`: The pointer to be deallocated. If it is NULL, the operation does
  *     nothing.
  *   - `size`: the number of allocated bytes, which may be -1 if it is not
  *     known.
  *   - `alignment`: the minimum alignment of the resulting pointer, which must
  *     be a power of at least as large as `sizeof(void *)`, or be zero to
  *     indicate that the alignment is not known.
- *   - `flags`: flags to control the behavior of the free.
+ *   - `flags`: flags to control the behavior of the deallocation.
  *
  * This function is required when using any Embedded Swift facility that
  * requires memory allocation from the heap, whether explicitly (e.g., via the
@@ -197,7 +217,7 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_allocate(__swift_size_t alignment, __swift
  * 
  * This function can be implemented as a direct call to `free`.
  */
-void _swift_deallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_free_flags_t flags);
+void _swift_deallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_dealloc_flags_t flags);
 
 /**
  * Allocates memory with a given type and returns the resulting pointer.
@@ -323,7 +343,8 @@ void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
  *   - `mutex`: opaque caller-owned mutex storage initialized by this function
  *     and later passed to the other `_swift_mutex_*` functions. The contents
  *     are private to the platform implementation. The storage is at least
- *     eight pointer-sized words and has pointer alignment.
+ *     EMBEDDED_SWIFT_MUTEX_NUM_WORDS pointer-sized words and has pointer
+ *     alignment.
  *   - `flags`: flags controlling mutex behavior.
  *
  * This function is required when using Synchronization.Mutex.

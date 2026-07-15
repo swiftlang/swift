@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the AvailabilityContext data structure, which summarizes
-// availability constraints for a specific scope.
+// availability restrictions for a specific scope.
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,6 +20,7 @@
 
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -33,7 +34,7 @@ class AvailabilityScope;
 class Decl;
 class DeclContext;
 
-/// An `AvailabilityContext` summarizes the availability constraints for a
+/// An `AvailabilityContext` summarizes the availability restrictions for a
 /// specific scope, such as within a declaration or at a particular source
 /// location in a function body. This context is sufficient to determine whether
 /// a declaration is available or not in that scope.
@@ -128,6 +129,33 @@ public:
   void
   constrainWithDeclAndPlatformRange(const Decl *decl,
                                     const AvailabilityRange &platformRange);
+
+  /// Returns the strongest availability restriction that limits use of \p decl
+  /// when it is referenced from this context, or nullopt if use of \p decl is
+  /// not restricted.
+  std::optional<AvailabilityRestriction>
+  restrictionForDecl(const Decl *decl,
+                     AvailabilityRestrictionFlags flags = std::nullopt);
+
+  /// Returns the strongest availability restriction that must be satisfied to
+  /// use \p decl from this context, or nullopt if there is no such
+  /// restriction. Unlike `restrictionForDecl()`, deprecation restrictions are
+  /// not returned since deprecation does not prevent use of a declaration.
+  std::optional<AvailabilityRestriction>
+  unsatisfiedRestrictionForDecl(
+      const Decl *decl, AvailabilityRestrictionFlags flags = std::nullopt);
+
+  /// Returns the availability restriction in \p domain that limits use of \p
+  /// decl from this context, or nullopt if use of \p decl is not restricted.
+  std::optional<AvailabilityRestriction>
+  restrictionForDeclInDomain(const Decl *decl, AvailabilityDomain domain,
+                             AvailabilityRestrictionFlags flags = std::nullopt);
+
+  /// Returns the set of availability restrictions that limit use of \p decl
+  /// when it is referenced from this context.
+  DeclAvailabilityRestrictions
+  allRestrictionsForDecl(const Decl *decl,
+                         AvailabilityRestrictionFlags flags = std::nullopt);
 
   /// Returns true if `other` is as available or is more available.
   bool isContainedIn(const AvailabilityContext other) const;

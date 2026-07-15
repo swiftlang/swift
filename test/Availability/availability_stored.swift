@@ -27,6 +27,22 @@ struct GoodReferenceStruct {
   var x: NewStruct
   @NewPropertyWrapper var y: Int
   lazy var z: Int = 42
+  var computed: NewStruct {
+    get { x }
+    set { x = newValue }
+  }
+  var computedWithInit: NewStruct {
+    init { _ = newValue }
+    get { x }
+  }
+  var computedWithInitialValue: NewStruct = .init() {
+    init { _ = newValue }
+    get { x }
+  }
+  var computedWithImplicitInitialValue: NewStruct? {
+    init { _ = newValue }
+    get { x }
+  }
 }
 
 @available(macOS 50, *)
@@ -38,7 +54,7 @@ struct GoodNestedReferenceStruct {
   }
 }
 
-struct BadReferenceStruct1 { // expected-note {{add '@available' attribute to enclosing struct}}
+struct BadReferenceStruct1 { // expected-note 3 {{add '@available' attribute to enclosing struct}}
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   var x: NewStruct // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
@@ -50,6 +66,32 @@ struct BadReferenceStruct1 { // expected-note {{add '@available' attribute to en
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   lazy var z: Int = 42
+
+  @available(macOS 50, *)
+  var computed: NewStruct {
+    get { x }
+    set { x = newValue }
+  }
+
+  @available(macOS 50, *)
+  var computedWithInit: NewStruct {
+    init { _ = newValue }
+    get { x }
+  }
+
+  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  var computedWithInitialValue: NewStruct = .init() { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
+    init { _ = newValue }
+    get { x }
+  }
+
+  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  var computedWithImplicitInitialValue: NewStruct? { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
+    init { _ = newValue }
+    get { x }
+  }
 }
 
 @available(macOS 40, *)
@@ -65,6 +107,32 @@ struct BadReferenceStruct2 {
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   lazy var z: Int = 42
+
+  @available(macOS 50, *)
+  var computed: NewStruct {
+    get { x }
+    set { x = newValue }
+  }
+
+  @available(macOS 50, *)
+  var computedWithInit: NewStruct {
+    init { _ = newValue }
+    get { x }
+  }
+
+  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  var computedWithInitialValue: NewStruct = .init() { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
+    init { _ = newValue }
+    get { x }
+  }
+
+  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  var computedWithImplicitInitialValue: NewStruct? { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
+    init { _ = newValue }
+    get { x }
+  }
 }
 
 @available(macOS 40, *)
@@ -80,6 +148,32 @@ public struct PublicStruct {
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   public lazy var z: Int = 42
+
+  @available(macOS 50, *)
+  public var computed: NewStruct {
+    get { x }
+    set { x = newValue }
+  }
+
+  @available(macOS 50, *)
+  public var computedWithInit: NewStruct {
+    init { _ = newValue }
+    get { x }
+  }
+
+  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  public var computedWithInitialValue: NewStruct = .init() { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
+    init { _ = newValue }
+    get { x }
+  }
+
+  // expected-error@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  public var computedWithImplicitInitialValue: NewStruct? { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
+    init { _ = newValue }
+    get { x }
+  }
 }
 
 // The same behavior should hold for enum elements with payloads.
