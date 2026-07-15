@@ -290,7 +290,8 @@ bool OSSACanonicalizeGuaranteed::visitBorrowScopeUses(SILValue innerValue,
 
       case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::ForwardingConsume:
-        if (OSSACanonicalizeGuaranteed::isRewritableOSSAForward(user)) {
+        if (OSSACanonicalizeGuaranteed::isRewritableOSSAForward(user) &&
+            canOpcodeForwardInnerGuaranteedValues(use)) {
           if (!visitor.visitForwardingUse(use)) {
             return false;
           }

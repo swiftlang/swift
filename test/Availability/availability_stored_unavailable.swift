@@ -23,6 +23,9 @@ var spiAvailableMacOSGlobal: SPIAvailableMacOSStruct = .init()
 @available(*, unavailable)
 var universallyUnavailableGlobal: UniversallyUnavailableStruct = .init()
 
+@available(*, deprecated)
+struct DeprecatedStruct {}
+
 // Computed globals have no initial value to execute eagerly, so they are safe
 // to mark unavailable.
 @available(macOS, unavailable)
@@ -52,6 +55,12 @@ struct GoodAvailableStruct {
     init { _ = newValue }
     get { UnavailableMacOSStruct() }
   }
+
+  // Ok, deprecation is advisory.
+  @available(*, deprecated)
+  var deprecated: DeprecatedStruct
+
+  init() { fatalError() } // To suppress memberwise initializer
 }
 
 @available(macOS, unavailable)
@@ -129,6 +138,12 @@ struct BadStruct {
     init { _ = newValue }
     get { UniversallyUnavailableStruct() } // expected-error {{'UniversallyUnavailableStruct' is unavailable}}
   }
+
+  // Ok, deprecation is advisory.
+  @available(*, deprecated)
+  var deprecated: DeprecatedStruct
+
+  init() { fatalError() } // To suppress memberwise initializer
 }
 
 enum GoodAvailableEnum {
@@ -137,4 +152,62 @@ enum GoodAvailableEnum {
 
   @_spi_available(macOS, introduced: 10.9)
   case spiAvailableMacOS(SPIAvailableMacOSStruct)
+
+  // Ok, deprecation is advisory.
+  @available(*, deprecated)
+  case deprecated(DeprecatedStruct)
+}
+
+struct SuppressedMemberwiseInit { // expected-error {{cannot automatically synthesize memberwise initializer for 'SuppressedMemberwiseInit'}}
+  // Ok, computed properties without init accessors don't affect memberwise init.
+  @available(macOS, unavailable)
+  var computedUnavailableMacOS: UnavailableMacOSStruct {
+    get { UnavailableMacOSStruct() }
+    set { _ = newValue }
+  }
+
+  @available(macOS, unavailable)
+  var computedUnavailableMacOSWithInit: UnavailableMacOSStruct { // expected-note {{unavailable property 'computedUnavailableMacOSWithInit' with init accessor prevents automatic synthesis of memberwise initializer}}
+    init { _ = newValue }
+    get { UnavailableMacOSStruct() }
+  }
+
+  @available(*, unavailable)
+  var computedUniversallyUnavailableWithInit: UniversallyUnavailableStruct { // expected-note {{unavailable property 'computedUniversallyUnavailableWithInit' with init accessor prevents automatic synthesis of memberwise initializer}}
+    init { _ = newValue }
+    get { UniversallyUnavailableStruct() }
+  }
+
+  // Ok, deprecation is advisory.
+  @available(*, deprecated)
+  var deprecatedWithInit: DeprecatedStruct {
+    init { _ = newValue }
+    get { DeprecatedStruct() }
+  }
+}
+
+@available(macOS, unavailable)
+struct SuppressedMemberwiseInitUnavailableMacOS { // expected-error {{cannot automatically synthesize memberwise initializer for 'SuppressedMemberwiseInitUnavailableMacOS'}}
+  // Ok, as available as struct.
+  @available(macOS, unavailable)
+  var computedUnavailableMacOSWithInit: UnavailableMacOSStruct {
+    init { _ = newValue }
+    get { UnavailableMacOSStruct() }
+  }
+
+  @available(*, unavailable)
+  var computedUniversallyUnavailableWithInit: UniversallyUnavailableStruct { // expected-note {{unavailable property 'computedUniversallyUnavailableWithInit' with init accessor prevents automatic synthesis of memberwise initializer}}
+    init { _ = newValue }
+    get { UniversallyUnavailableStruct() }
+  }
+}
+
+@available(macOS, unavailable)
+struct HasMemberwiseInitUnavailableMacOS {
+  // Ok, as available as struct.
+  @available(macOS, unavailable)
+  var computedUnavailableMacOSWithInit: UnavailableMacOSStruct {
+    init { _ = newValue }
+    get { UnavailableMacOSStruct() }
+  }
 }

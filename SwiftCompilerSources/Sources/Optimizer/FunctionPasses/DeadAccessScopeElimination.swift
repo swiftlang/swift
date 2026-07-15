@@ -138,7 +138,12 @@ private func process(instruction: Instruction,
   switch instruction {
 
   case let beginAccess as BeginAccessInst:
-    if beginAccess.isDead || beginAccess.isFromLocallyAllocatedClass {
+    if beginAccess.isDead ||
+       (beginAccess.isFromLocallyAllocatedClass &&
+        // "signed" accesses must not be removed, even if there is no conflict, because such
+        // accesses need to do pointer authentication.
+        beginAccess.enforcement != .signed)
+    {
       // Might be removed again later if it turns out to be in a conflicting scope.
       removableScopes.insert(beginAccess)
     }
