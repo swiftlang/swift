@@ -94,7 +94,7 @@ public typealias CDouble = Double
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// `CLongDouble` is a type alias for `Double` (`Float64)`
+/// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
 /// on Windows,
 /// on Linux running on IBM System/390,
@@ -111,7 +111,7 @@ public typealias CLongDouble = Float80
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// `CLongDouble` is a type alias for `Double` (`Float64)`
+/// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
 /// on Windows,
 /// on Linux running on IBM System/390,
@@ -130,7 +130,7 @@ public typealias CLongDouble = Double
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// `CLongDouble` is a type alias for `Double` (`Float64)`
+/// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
 /// on Windows,
 /// on Linux running on IBM System/390,
@@ -152,7 +152,7 @@ public typealias CLongDouble = Double
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// `CLongDouble` is a type alias for `Double` (`Float64)`
+/// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
 /// on Windows,
 /// on Linux running on IBM System/390,
@@ -171,7 +171,7 @@ public typealias CLongDouble = Float80
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// `CLongDouble` is a type alias for `Double` (`Float64)`
+/// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
 /// on Windows,
 /// on Linux running on IBM System/390,
@@ -192,7 +192,7 @@ public typealias CLongDouble = Double
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// `CLongDouble` is a type alias for `Double` (`Float64)`
+/// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
 /// on Windows,
 /// on Linux running on IBM System/390,
@@ -211,7 +211,7 @@ public typealias CLongDouble = Double
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// `CLongDouble` is a type alias for `Double` (`Float64)`
+/// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
 /// on Windows,
 /// on Linux running on IBM System/390,
@@ -228,7 +228,7 @@ public typealias CLongDouble = Float80
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// `CLongDouble` is a type alias for `Double` (`Float64)`
+/// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
 /// on Windows,
 /// on Linux running on IBM System/390,
@@ -251,7 +251,7 @@ public typealias CLongDouble = Double
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// `CLongDouble` is a type alias for `Double` (`Float64)`
+/// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
 /// on Windows,
 /// on Linux running on IBM System/390,
@@ -270,7 +270,7 @@ public typealias CLongDouble = Float80
 ///
 /// This type's definition varies by platform,
 /// to match the variable definition of the C `long double` type.
-/// `CLongDouble` is a type alias for `Double` (`Float64)`
+/// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
 /// on Windows,
 /// on Linux running on IBM System/390,
