@@ -29,6 +29,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedDynamicExclusivity
+// REQUIRES: embedded_stdlib_default_codegen
 
 // UNSUPPORTED: OS=wasip1
 // UNSUPPORTED: OS=emscripten

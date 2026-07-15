@@ -146,6 +146,35 @@ option(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM
        "Whether to build the Embedded Swift standard library using the hooks in swift/EmbeddedPlatform.h"
        FALSE)
 
+set(SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX "" CACHE STRING
+    "If non-empty, embedded Swift target triples matching this regex are
+    built using the platform abstraction layer (hooks in
+    swift/EmbeddedPlatform.h). This is the per-triple analogue of
+    SWIFT_USE_SWIFT_EMBEDDED_PLATFORM (which turns the abstraction layer on
+    for every embedded triple); the two are OR'd together, so a triple
+    uses the abstraction layer when either the global option is TRUE or the
+    regex matches.")
+
+set(SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX "" CACHE STRING
+    "If non-empty, embedded Swift target triples matching this regex are
+    built using the Interface code-generation model. Their libraries' object
+    files contain real code (rather than the empty/stub objects produced for
+    the default Inlinable model), and clients reference the library's strong
+    external symbols instead of re-emitting `linkonce_odr` copies.")
+
+set(SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX "" CACHE STRING
+    "If non-empty, embedded Swift target triples matching this regex are
+    compiled with LLVM LTO (-lto=<type>). This is orthogonal to
+    SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX — enabling LTO on
+    triples that still use the default (empty-object-file) code-generation
+    model is harmless but produces no meaningful bitcode; you almost always
+    want to select the same triple set for both.")
+
+set(SWIFT_EMBEDDED_LTO_TYPE "llvm-full" CACHE STRING
+    "LTO type for embedded Swift libraries selected by
+SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX. Either 'llvm-thin' or
+'llvm-full'.")
+
 set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
     "List of extra target triples to build the embedded Swift standard library for")
 
