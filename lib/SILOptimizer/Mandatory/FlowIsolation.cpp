@@ -803,6 +803,10 @@ void BlockInfo::diagnoseAll(FunctionInfo &info, bool forDeinit,
 /// \returns true iff the access is concurrency-safe in a nonisolated context
 /// without an await.
 static bool accessIsConcurrencySafe(SILInstruction *inst, VarDecl *var) {
+  // Nonisolated storage remains accessible after self has escaped.
+  if (!getActorIsolation(var).isActorIsolated())
+    return true;
+
   // must be accessible from nonisolated.
   return isLetAccessibleAnywhere(
       inst->getFunction()->getModule().getSwiftModule(), var);
