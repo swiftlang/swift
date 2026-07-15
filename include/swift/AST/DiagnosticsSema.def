@@ -7213,6 +7213,14 @@ WARNING(witness_non_objc_storage_optional,none,
       "optional requirement of '@objc' protocol %2",
       (bool, DeclName, Identifier))
 
+WARNING(witness_weaker_effects,none,
+      "%0 provides a weaker '@_effects' guarantee than its protocol "
+      "requirement; add '@%1' to match",
+      (const ValueDecl *, StringRef))
+NOTE(witness_weaker_effects_req,none,
+     "protocol requirement declared '@%0' here",
+     (StringRef))
+
 ERROR(nonobjc_not_allowed,none,
       "declaration is %" OBJC_ATTR_SELECT "0, and cannot be marked '@nonobjc'",
       (unsigned))
