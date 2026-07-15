@@ -15,6 +15,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: embedded_stdlib_default_codegen
 
 import _Concurrency
 
