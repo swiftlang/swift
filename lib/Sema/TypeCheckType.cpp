@@ -4266,6 +4266,31 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       }
     }
 
+    if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
+      if (fnTy->isCalledOnce()) {
+      switch (ownership) {
+      case ParamSpecifier::Borrowing:
+      case ParamSpecifier::LegacyShared:
+        diagnose(eltTypeRepr->getLoc(),
+                 diag::called_once_cannot_be_used_with_borrowing);
+        elements.emplace_back(ErrorType::get(getASTContext()));
+        continue;
+
+      case ParamSpecifier::InOut:
+      case ParamSpecifier::Consuming:
+      case ParamSpecifier::LegacyOwned:
+      // used by `sending`
+      case ParamSpecifier::ImplicitlyCopyableConsuming:
+        break;
+      // @called(once) is consuming by default and we don't
+      // require it be to written explicitly.
+      case ParamSpecifier::Default:
+        ownership = ParamSpecifier::Consuming;
+        break;
+      }
+      }
+    }
+
     // Validate the presence of ownership for a noncopyable parameter.
     // FIXME: This won't diagnose if the type contains unbound generics.
     if (inStage(TypeResolutionStage::Interface)
@@ -4754,9 +4779,13 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         parsedClangFunctionType = nullptr;
       }
 
-      if (!repr->isInvalid() && called->isOnce())
+      if (!repr->isInvalid() && called->isOnce()) {
         isCalledOnce = true;
-
+        // `@called(once)` implies `consuming` which means that the
+        // type should always be escaping in parameter positions.
+        if (parentOptions.is(TypeResolverContext::FunctionInput))
+          noescape = false;
+      }
     } else {
       diagnoseInvalid(repr, called->getAttrLoc(),
                       diag::requires_experimental_feature, "@called", false,

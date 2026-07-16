@@ -15,8 +15,16 @@ func testInParameterEscaping(_: @escaping @called(once) () -> ()) {} // Ok
 func testInParameterAutoclosure(_: @autoclosure @called(once) () -> ()) {} // Ok
 // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
 
-func testInParameterExplicitOwnership(_: borrowing @called(once) () -> ()) {} // Ok
+func testInParameterExplicitOwnership(_: borrowing @called(once) () -> ()) {}
+// expected-supported-error@-1 {{'@called(once)' cannot be used together with 'borrowing'}}
+// expected-forbidden-error@-2 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+func testInParameterExplicitOwnership(_: inout @called(once) () -> ()) {} // Ok
 // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+func testInParameterConsuming(_: consuming @called(once) () -> ()) {} // Ok
+// expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+// expected-forbidden-error@-2 {{'consuming' cannot be applied to nonescaping closure}}
 
 func testInResultPosition(_: () -> @called(once) () -> Void) {}
 // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}

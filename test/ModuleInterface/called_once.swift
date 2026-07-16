@@ -12,12 +12,12 @@
 public typealias FnType = @called(once) () -> ()
 
 // CHECK: #if compiler(>=5.3) && $CalledAttribute
-// CHECK: public func test1(_: @called(once) () -> ())
+// CHECK: public func test1(_: consuming @escaping @called(once) () -> ())
 // CHECK: #endif
 public func test1(_: @called(once) () -> ()) {}
 
 // CHECK: #if compiler(>=5.3) && $CalledAttribute
-// CHECK: public func test2(_: @autoclosure @called(once) () -> ())
+// CHECK: public func test2(_: consuming @autoclosure @escaping @called(once) () -> ())
 // CHECK: #endif
 public func test2(_: @autoclosure @called(once) () -> ()) {}
 
@@ -33,15 +33,7 @@ public struct Test {
   public let prop: (@called(once) () -> Void)? = nil
 
   // CHECK: #if compiler(>=5.3) && $CalledAttribute
-  // CHECK: public subscript(fn: [@called(once) () -> ()]) -> Swift::Bool {
-  // CHECK:   get
-  // CHECK: }
-  public subscript(fn: [@called(once) () -> ()]) -> Bool {
-    false
-  }
-
-  // CHECK: #if compiler(>=5.3) && $CalledAttribute
-  // CHECK: public func f(_: (@called(once) () -> Swift::Void) -> Swift::Void)
+  // CHECK: public func f(_: (consuming @escaping @called(once) () -> Swift::Void) -> Swift::Void)
   // CHECK: #endif
   public func f(_: (@called(once) () -> Void) -> Void) {}
 }

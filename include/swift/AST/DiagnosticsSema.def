@@ -2507,6 +2507,10 @@ WARNING(spi_preferred_over_spi_available,none,
         "symbols that are '@_spi_available' on all platforms should use "
         "'@_spi' instead", ())
 
+// @called(once)
+ERROR(called_once_cannot_be_used_with_borrowing,none,
+      "'@called(once)' cannot be used together with 'borrowing'", ())
+
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
