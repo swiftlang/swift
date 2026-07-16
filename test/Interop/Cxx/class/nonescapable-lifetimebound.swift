@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend  -I %t/Inputs -emit-sil -verify %t/escaping_scopes.swift -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -diagnostic-style llvm
+// RUN: %target-swift-frontend  -I %t/Inputs -emit-sil -verify %t/escaping_scopes.swift -verify-additional-file %t/Inputs/nonescapable.h -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -diagnostic-style llvm
 
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_Lifetimes
@@ -235,6 +235,8 @@ struct OwnerBox {
 class SharedTrivialOwner {
 public:
     Owner field;
+    // The trivial 'Owner' field's borrow (see frtTrivialField) roots here.
+    // expected-note @-2 {{it depends on the lifetime of variable 'field'}}
 } SWIFT_SHARED_REFERENCE(retainSharedTrivialOwner, releaseSharedTrivialOwner);
 inline void retainSharedTrivialOwner(SharedTrivialOwner *) {}
 inline void releaseSharedTrivialOwner(SharedTrivialOwner *) {}
@@ -253,12 +255,25 @@ public:
 inline void retainSharedOwnerBox(SharedOwnerBox *) {}
 inline void releaseSharedOwnerBox(SharedOwnerBox *) {}
 
+// A value type with no user-declared destructor, but with a refcounted foreign
+// reference type as a member. Swift must treat this as non-trivial: its
+// implicit destruction releases the reference (affecting the refcount), so it
+// is not BitwiseCopyable and lifetime dependencies on it are tracked just like
+// other non-trivial types -- unlike a fully trivial struct.
+struct HasReferenceMember {
+    SharedTrivialOwner *ref = nullptr;
+    int data = 0;
+    View handOutView() const [[clang::lifetimebound]] {
+        return View(&data);
+    }
+};
+
 // CHECK: sil {{.*}}[clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil {{.*}}[clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0, borrow address 1) @owned View
-// CHECK: sil {{.*}}[clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow address_for_deps 0) @owned View
-// CHECK: sil {{.*}}[clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow address_for_deps 1) @owned View
+// CHECK: sil {{.*}}[clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
+// CHECK: sil {{.*}}[clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow 1) @owned View
 // CHECK: sil {{.*}}[clang getViewFromEither] {{.*}} : $@convention(c) (View, View) -> @lifetime(copy 0, copy 1) @owned View
 // CHECK: sil {{.*}}[clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
 // CHECK: sil {{.*}}[clang OtherView.init] {{.*}} : $@convention(c) (View) -> @lifetime(copy 0) @out OtherView
@@ -322,12 +337,15 @@ var globalOwner = makeOwner()
 struct Wrapper { var o: Owner }
 var globalWrapper = Wrapper(o: makeOwner())
 
+// A borrow of a *trivial* C++ value (here 'self' of a method on the trivial
+// type 'Owner') sourced from a global is not diagnosed: the global's storage is
+// immortal, so the borrow escapes soundly. This matches pure Swift, where a
+// '@_lifetime(borrow)' of a trivial value read from a global is likewise not
+// diagnosed. Contrast viaFreeFunc, where 'const Owner&' is passed
+// '@in_guaranteed' so the scoped access to the global is still diagnosed.
 @_lifetime(immortal)
 func viaMethod() -> View {
   return globalOwner.handOutView()
-  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
-  // expected-note @-2 {{it depends on this scoped access to variable 'globalOwner'}}
-  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
 }
 
 @_lifetime(immortal)
@@ -338,12 +356,11 @@ func viaFreeFunc() -> View {
   // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
 }
 
+// As viaMethod, but the trivial 'Owner' is reached through a field of a global.
+// Still not diagnosed (trivial value, immortal global storage).
 @_lifetime(immortal)
 func viaFieldMethod() -> View {
   return globalWrapper.o.handOutView()
-  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
-  // expected-note @-2 {{it depends on this scoped access to variable 'globalWrapper'}}
-  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
 }
 
 @_lifetime(immortal)
@@ -354,18 +371,32 @@ func viaFieldFreeFunc() -> View {
   // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
 }
 
+// A value type with a refcounted foreign-reference member (but no user
+// destructor) is non-trivial in Swift, so a borrow of it is tracked and its
+// escape is diagnosed -- unlike a fully trivial type.
+@_lifetime(immortal)
+func hasReferenceMemberEscapes() -> View {
+  let h = HasReferenceMember()
+  // expected-note @-1 {{it depends on the lifetime of variable 'h'}}
+  return h.handOutView()
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
+}
+
 final class SwiftBoxTrivial { var field = Owner(data: 0) }
+// expected-note @-1 {{it depends on the lifetime of variable 'field'}}
 final class SwiftBoxOwner { var field = NonTrivialOwner() }
 final class SwiftBoxNested { var field = OwnerBox() }
 
-// Foreign reference type base, trivial field.
+// Foreign reference type base, trivial field. The field 'Owner' is trivial, so
+// (as with viaMethod) the borrow is value-based; the escape is still diagnosed
+// but without an "it depends on" note.
 @available(SwiftStdlib 5.8, *)
 @_lifetime(borrow x)
 func frtTrivialField(x: SharedTrivialOwner) -> View {
   return x.field.handOutView()
   // expected-error @-1 {{lifetime-dependent value escapes its scope}}
-  // expected-note @-2 {{it depends on this scoped access to variable 'field'}}
-  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+  // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
 }
 
 // Foreign reference type base, non-trivial field.
@@ -388,13 +419,13 @@ func frtTransitiveField(x: SharedOwnerBox) -> View {
   // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
 }
 
-// Swift class base, trivial field.
+// Swift class base, trivial field. Trivial field 'Owner' → the "depends on"
+// note points at the field's declaration (see SwiftBoxTrivial above).
 @_lifetime(borrow b)
 func classTrivialField(b: SwiftBoxTrivial) -> View {
   return b.field.handOutView()
   // expected-error @-1 {{lifetime-dependent value escapes its scope}}
-  // expected-note @-2 {{it depends on this scoped access to variable 'field'}}
-  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+  // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
 }
 
 // Swift class base, non-trivial field.
