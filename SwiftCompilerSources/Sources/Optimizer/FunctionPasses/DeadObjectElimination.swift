@@ -638,6 +638,7 @@ private struct UseCollector : AddressDefUseWalker {
     var ssaUpdater = SSAUpdater(type: accesses.valueType,
                                 ownership: isTrivial ? .none : .owned,
                                 context)
+    defer { ssaUpdater.deinitialize() }
 
     // Prevent any phi arguments to be created "before" the allocation
     let undef = Undef.get(type: accesses.valueType, context)

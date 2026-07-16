@@ -1534,12 +1534,6 @@ void SwiftPassInvocation::finishedFunctionPassRun() {
 
   updateAnalysis();
 
-  insertedPhisBySSAUpdater.clear();
-  if (ssaUpdater) {
-    delete ssaUpdater;
-    ssaUpdater = nullptr;
-  }
-
   function = nullptr;
   transform = nullptr;
   silCombiner = nullptr;
@@ -1642,23 +1636,4 @@ SILFunction *SwiftPassInvocation::lookupStdlibFunction(StringRef name) {
   SILDeclRef declRef(decl, SILDeclRef::Kind::Func);
   SILOptFunctionBuilder funcBuilder(*getTransform());
   return funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition);
-}
-
-void SwiftPassInvocation::initializeSSAUpdater(SILFunction *function, SILType type, ValueOwnershipKind ownership) {
-  insertedPhisBySSAUpdater.clear();
-  if (!ssaUpdater)
-    ssaUpdater = new SILSSAUpdater(&insertedPhisBySSAUpdater);
-  ssaUpdater->initialize(function, type, ownership);
-}
-
-void SwiftPassInvocation::SSAUpdater_addAvailableValue(SILBasicBlock *block, SILValue value) {
-  ssaUpdater->addAvailableValue(block, value);
-}
-
-SILValue SwiftPassInvocation::SSAUpdater_getValueAtEndOfBlock(SILBasicBlock *block) {
-  return ssaUpdater->getValueAtEndOfBlock(block);
-}
-
-SILValue SwiftPassInvocation::SSAUpdater_getValueInMiddleOfBlock(SILBasicBlock *block) {
-  return ssaUpdater->getValueInMiddleOfBlock(block);
 }
