@@ -262,5 +262,5 @@ func testBigArrayInStruct(_ maxSizeTuple: IntTuple4096, _ maxSizeArray: IntArray
   var structWithBigArray = StructWithBigArray()
   structWithBigArray.max_size = maxSizeTuple    // no-error
   structWithBigArray.max_size = maxSizeArray    // expected-error {{cannot assign value of type 'IntArray4096' (aka 'InlineArray<4096, Int8>') to type '(CChar /* ... repeated 4096 times ... */)' (aka '(Int8 /* ... repeated 4096 times ... */)')}}
-  structWithBigArray.max_size_plus_one          // expected-error {{internal}}
+  _ = structWithBigArray.max_size_plus_one      // expected-error {{property 'max_size_plus_one' was not imported because its C array type could not be represented as a tuple}}
 }

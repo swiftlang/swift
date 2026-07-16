@@ -171,6 +171,11 @@ ERROR(init_candidate_inaccessible,none,
       "'%select{private|fileprivate|internal|package|@_spi|@_spi}1' protection level",
       (Type, AccessLevel))
 
+ERROR(candidate_inaccessible_c_array,none,
+      "%kind0 was not imported because its C array type could not be represented "
+      "as a tuple",
+      (const ValueDecl *))
+
 GROUPED_ERROR(member_from_missing_import,MemberImportVisibility,none,
       "%kind0 is not available due to missing import of defining module %1",
       (const ValueDecl *, const ModuleDecl *))
