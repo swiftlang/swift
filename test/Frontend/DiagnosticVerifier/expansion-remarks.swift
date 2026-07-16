@@ -10,6 +10,9 @@
 
 // RUN: %target-swift-frontend-verify -swift-version 5 -verify-child-notes -typo-correction-limit 10 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-positive.swift
 // RUN: not %target-swift-frontend-verify -swift-version 5 -verify-child-notes -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-negative.swift 2>&1 | %FileCheck %t/cross-buffer-location-negative.swift --implicit-check-not error: --implicit-check-not warning:
+// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-badline.swift 2>&1 | %FileCheck --check-prefix=CHECK-BADLINE %t/cross-buffer-location-badline.swift
+// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-wrongline.swift 2>&1 | %FileCheck --check-prefix=CHECK-WRONGLINE %t/cross-buffer-location-wrongline.swift
+// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-dup.swift 2>&1 | %FileCheck --check-prefix=CHECK-DUP %t/cross-buffer-location-dup.swift
 
 //--- main.swift
 @attached(peer, names: overloaded)
@@ -66,12 +69,15 @@ func foo() {}
 //   expected-note@1 2{{'x' declared here}} {{children:
 //     expected-note@#here{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
 //   }}
-//   expected-error@2{{cannot find 'a' in scope; did you mean 'x'?}} {{children:
+//   #aLine@2
+//   expected-error@#bLine{{cannot find 'b' in scope; did you mean 'x'?}} {{children:
 //     expected-note@#here{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
 //   }}
-//   expected-error@3{{cannot find 'b' in scope; did you mean 'x'?}} {{children:
-//     expected-note@#here{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
-//   }}
+//   #bLine@3
+// }}
+// Refer to location inside expansion from outside of it:
+// expected-error@#aLine{{cannot find 'a' in scope; did you mean 'x'?}} {{children:
+//   expected-note@#here{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
 // }}
 
 //--- cross-buffer-location-negative.swift
@@ -84,10 +90,58 @@ macro unstringifyPeer(_ s: String) =
 // CHECK: :[[@LINE+1]]:1: error: unexpected child note produced: in expansion of macro 'unstringifyPeer' on global function 'foo()' here
 @unstringifyPeer("func foo(_ y: Int) {\nqqq()\n}") // #here2
 func foo() {}
-// expected-expansion@-1:14{{
+// expected-error@#asdf {{missing error}}
+// expected-expansion@-2:14{{
 //   CHECK: :[[@LINE+1]]:6: note: for parent matched here
 //   expected-error@2{{cannot find 'qqq' in scope}} {{children:
+//     CHECK: :[[@LINE-4]]:4: error: expected error not produced
 //     CHECK: :[[@LINE+1]]:8: error: expected note not produced
 //     expected-note@#here2{{WRONG MESSAGE}}
 //   }}
+//   #asdf@2
+// }}
+
+//--- cross-buffer-location-badline.swift
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// The expansion buffer only spans four lines, so '@99' names a line that does
+// not exist.
+@unstringifyPeer("func foo(_ x: Int) {\na = 2\nb = x\n}")
+func foo() {}
+// expected-expansion@-1:14{{
+//   CHECK-BADLINE: :[[@LINE+1]]:{{[0-9]+}}: error: line 99 does not exist in the expansion buffer
+//   #bad@99
+//   expected-error@2{{cannot find 'a' in scope}}
+//   expected-error@3{{cannot find 'b' in scope}}
+// }}
+
+//--- cross-buffer-location-wrongline.swift
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+@unstringifyPeer("func foo(_ x: Int) {\na = 2\nb = x\n}")
+func foo() {}
+// expected-expansion@-1:14{{
+//   #wrong@3
+//   expected-error@2{{cannot find 'a' in scope}}
+//   expected-error@3{{cannot find 'b' in scope}}
+// }}
+// CHECK-WRONGLINE: :[[@LINE+1]]:4: error: expected error not produced
+// expected-error@#wrong{{cannot find 'a' in scope; did you mean 'x'?}}
+
+//--- cross-buffer-location-dup.swift
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+@unstringifyPeer("func foo(_ x: Int) {\na = 2\nb = x\n}") // #dup
+func foo() {}
+// expected-expansion@-1:14{{
+//   CHECK-DUP: :[[@LINE+1]]:{{[0-9]+}}: error: location marker '#dup' already defined
+//   #dup@2
+//   expected-error@2{{cannot find 'a' in scope}}
+//   expected-error@3{{cannot find 'b' in scope}}
 // }}
