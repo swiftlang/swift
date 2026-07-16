@@ -132,18 +132,14 @@ enum _ClockID: Int32 {
   case walltime = 3
 }
 
-/// Stable identifiers for the built-in system clocks.
+/// Identifier for the standard-library clocks.
 ///
-/// The raw values here are treated by the runtime as opaque identifiers -
-/// they participate in a stable-for-the-life-of-the-process equivalence
-/// relation over clocks. Custom clocks must not use these raw values; the
-/// deadline runtime distinguishes system clocks from custom clocks via a
-/// tagged discriminator, not the numeric value.
+/// Used as the `ID` type of `ContinuousClock` and `SuspendingClock` so their
+/// `withDeadline` scopes can be identity-matched by the runtime.
 @available(StdlibDeploymentTarget 6.5, *)
-public enum SystemClockID: UInt8, Sendable, Hashable {
-  case continuous = 1
-  case suspending = 2
-  case walltime = 3
+public enum SystemClockID: Sendable, Hashable {
+  case continuous
+  case suspending
 }
 
 @available(StdlibDeploymentTarget 5.7, *)

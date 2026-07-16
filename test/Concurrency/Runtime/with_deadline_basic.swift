@@ -26,6 +26,11 @@
     await test_task_group_child_inherits_cancellationReason()
     await test_detached_task_does_not_inherit_cancellationReason()
     await test_child_created_before_parent_cancel_still_sees_reason_after_cancel()
+    await test_nested_deadline_inner_tighter_operation_error_propagates()
+    await test_nested_deadline_outer_tighter_both_handlers_fire()
+    await test_nested_deadline_outer_tighter_inner_short_sleep()
+    await test_two_clock_composition()
+    await test_withDeadline_in_shorthand()
     print("done")
   }
 }
@@ -426,6 +431,198 @@ func test_child_created_before_parent_cancel_still_sees_reason_after_cancel() as
       // CHECK: child observed parent reason:true
     }
   }.value
+}
+
+// ==== -----------------------------------------------------------------------
+// MARK: Nested deadlines (proposal Examples 2-5)
+
+// Example 2: inner deadline is tighter than outer. The inner handler fires
+// (the inner cancellation scope is cancelled when the inner deadline
+// expires); the outer handler does NOT fire because the outer scope was
+// never cancelled. When `operation` inside inner throws its own error,
+// that error propagates out unchanged.
+@available(StdlibDeploymentTarget 6.5, *)
+func test_nested_deadline_inner_tighter_operation_error_propagates() async {
+  print("--- \(#function)")
+  // CHECK-LABEL: --- test_nested_deadline_inner_tighter_operation_error_propagates()
+
+  let clock = ContinuousClock()
+  let outer = clock.now.advanced(by: .seconds(10))
+  let inner = clock.now.advanced(by: .milliseconds(100))
+
+  var outerHandlerCount = 0
+  var innerHandlerCount = 0
+
+  do {
+    try await withTaskCancellationHandler {
+      _ = try await withDeadline(outer, clock: clock) {
+        try await withTaskCancellationHandler {
+          try await withDeadline(inner, clock: clock) {
+            throw MyError()
+          }
+        } onCancel: {
+          innerHandlerCount += 1
+        }
+      }
+    } onCancel: {
+      outerHandlerCount += 1
+    }
+    print("did not throw (unexpected)")
+  } catch is MyError {
+    print("caught MyError")
+    // CHECK: caught MyError
+  } catch {
+    print("threw wrong error: \(error)")
+  }
+
+  // The inner deadline never fired (operation threw first), so we expect
+  // BOTH handler counts to be 0 here. This documents that a throw beats
+  // a deadline: neither the inner nor the outer scope was cancelled.
+  print("outer handler:\(outerHandlerCount) inner handler:\(innerHandlerCount)")
+  // CHECK: outer handler:0 inner handler:0
+}
+
+// Example 3: outer deadline is tighter than inner. The outer deadline
+// fires first, cancels its own scope, which propagates inward: every
+// CancellationNotificationStatusRecord installed inside the outer scope's
+// dynamic extent fires. Both the outer-scope handler and the inner-scope
+// handler live inside the outer scope, so BOTH must fire. (Handlers
+// installed OUTSIDE the outer `withDeadline` would NOT fire — see
+// `test_scope_handler_outside_does_not_fire_on_scope_cancel` in
+// task_cancellation_scope.swift for the counterpart property.)
+@available(StdlibDeploymentTarget 6.5, *)
+func test_nested_deadline_outer_tighter_both_handlers_fire() async {
+  print("--- \(#function)")
+  // CHECK-LABEL: --- test_nested_deadline_outer_tighter_both_handlers_fire()
+
+  let clock = ContinuousClock()
+  let start = clock.now
+  let outer = start.advanced(by: .milliseconds(100))
+  let inner = start.advanced(by: .seconds(10))
+
+  var outerHandlerCount = 0
+  var innerHandlerCount = 0
+
+  _ = try? await withDeadline(outer, clock: clock) {
+    try await withTaskCancellationHandler {
+      try await withDeadline(inner, clock: clock) {
+        try await withTaskCancellationHandler {
+          try await Task.sleep(for: .seconds(30))
+        } onCancel: {
+          innerHandlerCount += 1
+        }
+      }
+    } onCancel: {
+      outerHandlerCount += 1
+    }
+  }
+
+  let elapsed = clock.now - start
+  let promptly = elapsed < .seconds(5)
+  print("promptly:\(promptly) outer handler:\(outerHandlerCount) inner handler:\(innerHandlerCount)")
+  // CHECK: promptly:true outer handler:1 inner handler:1
+}
+
+// Example 4: same nesting shape as Example 3, but the inner `sleep` is
+// shorter than the inner deadline. Outer is still the tighter deadline, so
+// both handlers still fire when outer fires (and the inner sleep never
+// gets to return on its own).
+@available(StdlibDeploymentTarget 6.5, *)
+func test_nested_deadline_outer_tighter_inner_short_sleep() async {
+  print("--- \(#function)")
+  // CHECK-LABEL: --- test_nested_deadline_outer_tighter_inner_short_sleep()
+
+  let clock = ContinuousClock()
+  let start = clock.now
+  let outer = start.advanced(by: .milliseconds(100))
+  let inner = start.advanced(by: .seconds(10))
+
+  var outerHandlerCount = 0
+  var innerHandlerCount = 0
+
+  _ = try? await withDeadline(outer, clock: clock) {
+    try await withTaskCancellationHandler {
+      try await withDeadline(inner, clock: clock) {
+        try await withTaskCancellationHandler {
+          try await Task.sleep(for: .seconds(5))
+        } onCancel: {
+          innerHandlerCount += 1
+        }
+      }
+    } onCancel: {
+      outerHandlerCount += 1
+    }
+  }
+
+  let elapsed = clock.now - start
+  let promptly = elapsed < .seconds(2)
+  print("promptly:\(promptly) outer handler:\(outerHandlerCount) inner handler:\(innerHandlerCount)")
+  // CHECK: promptly:true outer handler:1 inner handler:1
+}
+
+// Two-clock composition: an outer deadline on ContinuousClock and an inner
+// deadline on SuspendingClock. The runtime keys records by clock identity,
+// so both records coexist independently. Sleeping past the (tight) inner
+// SuspendingClock deadline must fire the inner scope, and the outer
+// ContinuousClock deadline must remain observable via
+// `_findNearestDeadline(clock: ContinuousClock())` while inside.
+@available(StdlibDeploymentTarget 6.5, *)
+func test_two_clock_composition() async {
+  print("--- \(#function)")
+  // CHECK-LABEL: --- test_two_clock_composition()
+
+  let cont = ContinuousClock()
+  let susp = SuspendingClock()
+  let contStart = cont.now
+  let contDeadline = contStart.advanced(by: .seconds(600))
+  let suspDeadline = susp.now.advanced(by: .milliseconds(100))
+
+  _ = try? await withDeadline(contDeadline, clock: cont) {
+    // Both records are on the task's status chain. Observing the
+    // outer via its own clock must still work.
+    let outerObserved = _findNearestDeadline(clock: cont) == contDeadline
+    print("outer continuous observable:\(outerObserved)")
+    // CHECK: outer continuous observable:true
+
+    do {
+      try await withDeadline(suspDeadline, clock: susp) {
+        try await Task.sleep(for: .seconds(30))
+      }
+      print("inner did not throw (unexpected)")
+    } catch is CancellationError {
+      let elapsed = cont.now - contStart
+      let promptly = elapsed < .seconds(5)
+      print("inner threw promptly:\(promptly)")
+      // CHECK: inner threw promptly:true
+    } catch {
+      print("inner threw wrong error: \(error)")
+    }
+  }
+}
+
+// Sanity coverage for the `withDeadline(in:)` shorthand overload. Same
+// semantics as `withDeadline(instant, clock:)` but with a duration relative
+// to `clock.now` at entry, and the clock defaulting to ContinuousClock.
+@available(StdlibDeploymentTarget 6.5, *)
+func test_withDeadline_in_shorthand() async {
+  print("--- \(#function)")
+  // CHECK-LABEL: --- test_withDeadline_in_shorthand()
+
+  let clock = ContinuousClock()
+  let start = clock.now
+  do {
+    try await withDeadline(in: .milliseconds(100)) {
+      try await Task.sleep(for: .seconds(30))
+    }
+    print("did not throw (unexpected)")
+  } catch is CancellationError {
+    let elapsed = clock.now - start
+    let promptly = elapsed < .seconds(5)
+    print("threw promptly:\(promptly)")
+    // CHECK: threw promptly:true
+  } catch {
+    print("threw wrong error: \(error)")
+  }
 }
 
 // Matches the "done" line printed at the end of Main.main; must appear as

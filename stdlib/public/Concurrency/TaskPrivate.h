@@ -1221,8 +1221,18 @@ inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
   // Slow path: any active cancellation scope on the current task also
   // observes as "cancelled" from code running inside the scope. The chain
   // walk is out-of-lined into TaskStatus.cpp to keep this header light.
-  if (SWIFT_UNLIKELY(status.hasTaskCancellationScope()))
+  //
+  // A cancellation shield masks scope cancellation the same way it masks
+  // whole-task cancellation: `withDeadline { }` (and any scope built on
+  // `__withTaskCancellationScope`) must have the same observable
+  // cancellation semantics as a spawned child task, and a shield inside
+  // a child task hides that child's own cancellation from `Task.isCancelled`
+  // reads made inside the shield.
+  if (SWIFT_UNLIKELY(status.hasTaskCancellationScope())) {
+    if (!ignoreShield && status.hasCancellationShield())
+      return false;
     return _swift_task_hasCancelledScope(const_cast<AsyncTask *>(this));
+  }
   return false;
 }
 
