@@ -37,6 +37,12 @@ func test(obj: RPFoo) {
   if let _ = obj.accessorDeclaredFirstAsNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
 
   obj.accessorInProto = nil // okay
+
+  // A readonly weak/assign/strong object property redeclared as readwrite in a
+  // class extension imports with a setter regardless of ownership.
+  obj.weakRedeclared = obj // okay
+  obj.assignRedeclared = obj // okay
+  obj.strongRedeclared = obj // okay
 }
 
 // https://github.com/apple/swift/issues/51011
@@ -60,11 +66,17 @@ func f_51011(obj: RPSub) {
 // CHECK-NEXT:   class func accessorDeclaredFirstAsNullable() -> Any
 // CHECK-NEXT:   var accessorDeclaredFirstAsNullable: Any { get }
 // CHECK-NEXT:   var accessorInProto: Any? { get }
+// CHECK-NEXT:   weak var weakRedeclared: @sil_weak RPFoo? { get }
+// CHECK-NEXT:   unowned(unsafe) var assignRedeclared: @sil_unmanaged RPFoo? { get }
+// CHECK-NEXT:   var strongRedeclared: RPFoo? { get }
 // CHECK-NEXT:   class func nonnullToNullable() -> UnsafeMutablePointer<Int32>
 // CHECK-NEXT:   class func nullableToNonnull() -> UnsafeMutablePointer<Int32>?
 // CHECK-NEXT:   class func typeChangeMoreSpecific() -> Any
 // CHECK-NEXT:   class func typeChangeMoreGeneral() -> RPFoo
 // CHECK-NEXT:   class func accessorInProto() -> Any?
+// CHECK-NEXT:   class func weakRedeclared() -> RPFoo?
+// CHECK-NEXT:   class func assignRedeclared() -> RPFoo?
+// CHECK-NEXT:   class func strongRedeclared() -> RPFoo?
 // CHECK-NEXT:   func accessorInProto() -> Any?
 // CHECK-NEXT: }
 // CHECK-NEXT: class RPBase : RPProto {
