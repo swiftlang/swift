@@ -783,10 +783,15 @@ bool DiagnosticVerifier::parseTargetBufferName(StringRef &MatchStart,
   return true;
 }
 
+static void forEachMarkerDefinition(
+    StringRef Text,
+    llvm::function_ref<void(const char *HashLoc, StringRef Name)> Callback);
+
 void DiagnosticVerifier::parseNestedExpectedDiagInfoBlock(
     unsigned BufferID, StringRef MatchStartIn,
     unsigned &PrevExpectedContinuationLine,
-    std::vector<ExpectedDiagnosticInfo> &NestedDiagsOut, size_t &End) {
+    std::vector<ExpectedDiagnosticInfo> &NestedDiagsOut, size_t &End,
+    bool InExpansion) {
   size_t NestedMatch = MatchStartIn.find("expected-");
   if (NestedMatch == StringRef::npos) {
     End = MatchStartIn.find("}}");
@@ -799,7 +804,8 @@ void DiagnosticVerifier::parseNestedExpectedDiagInfoBlock(
                                           DiagnosticKind(-1));
     unsigned NestedCount =
         parseExpectedDiagInfo(BufferID, NestedMatchStartIn,
-                              PrevExpectedContinuationLine, NestedExpected);
+                              PrevExpectedContinuationLine, NestedExpected,
+                              InExpansion);
 
     size_t PrevMatchEnd = NestedMatch + 1;
     if (NestedCount > 0) {
@@ -828,7 +834,7 @@ void DiagnosticVerifier::parseNestedExpectedDiagInfoBlock(
 unsigned DiagnosticVerifier::parseExpectedDiagInfo(
     unsigned BufferID, StringRef MatchStartIn,
     unsigned &PrevExpectedContinuationLine,
-    ExpectedDiagnosticInfo &Expected) {
+    ExpectedDiagnosticInfo &Expected, bool InExpansion) {
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
   StringRef InputFile = SM.getEntireTextForBuffer(BufferID);
 
@@ -867,6 +873,7 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
                                   *ExpectedClassification);
   int LineOffset = 0;
   bool AbsoluteLine = false;
+  bool RelativeLine = false;
 
   if (TextStartIdx > 0 && MatchStart[0] == '@') {
     if (MatchStart[1] != '#' && MatchStart[1] != '+' && MatchStart[1] != '-' && MatchStart[1] != ':' && (MatchStart[1] < '0' || MatchStart[1] > '9')) {
@@ -915,19 +922,27 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
 
       LineOffset = It->second.Line;
       AbsoluteLine = true;
-      if (It->second.BufferID != BufferID)
-        Expected.TargetBufferID = It->second.BufferID;
+      // A `@#marker` names an exact location, so pin its buffer. This matters
+      // for a diagnostic inside an expansion whose child note points back into
+      // the outer file: the marker's buffer differs from the expansion buffer
+      // the parent is verified against. When the marker is in the buffer being
+      // parsed this is a no-op at verification time.
+      Expected.TargetBufferID = It->second.BufferID;
 
       // Extract the remainder after the marker name (e.g. ":col" or empty)
       // and let the shared column-parsing code below handle it.
       Offs = MatchStart.slice(NameEnd, TextStartIdx).rtrim();
     } else if (MatchStart[1] == '+') {
+      RelativeLine = true;
       Offs = MatchStart.slice(2, TextStartIdx).rtrim();
     } else {
       Offs = MatchStart.slice(1, TextStartIdx).rtrim();
       if (Offs[0] >= '0' && Offs[0] <= '9')
         AbsoluteLine = true;
+      else if (Offs[0] == '-')
+        RelativeLine = true;
     }
+    ASSERT(!RelativeLine || !AbsoluteLine);
 
     size_t SpaceIndex = Offs.find(' ');
     if (SpaceIndex != StringRef::npos && SpaceIndex < TextStartIdx) {
@@ -962,6 +977,13 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
     }
   }
 
+  if (InExpansion && RelativeLine) {
+    addError(DiagnosticLoc,
+             "relative line offsets are not allowed inside expected-expansion; "
+             "use an absolute line number or a '@#marker' reference");
+    return 0;
+  }
+
   if (Expected.Classification == DiagnosticKindExpansion && !Expected.ColumnNo.has_value()) {
     addError(DiagnosticLoc, "expected-expansion requires column location");
     return 0;
@@ -992,13 +1014,25 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
   if (Expected.Classification == DiagnosticKindExpansion) {
     parseNestedExpectedDiagInfoBlock(BufferID, MatchStart,
                                      PrevExpectedContinuationLine,
-                                     Expected.NestedDiags, End);
+                                     Expected.NestedDiags, End,
+                                     /*InExpansion=*/true);
 
     if (End == StringRef::npos) {
       addError(DiagnosticLoc,
                "didn't find '}}' to match '{{' in expected-expansion");
       return 0;
     }
+
+    // A location marker defined inside an expansion block would name a physical
+    // line in the outer buffer, not a location in the virtual expansion buffer
+    // the nested diagnostics are verified against. Ban this footgun.
+    forEachMarkerDefinition(
+        MatchStart.slice(2, End),
+        [&](const char *HashLoc, StringRef MarkerName) {
+          addError(HashLoc,
+                   "location marker '#" + MarkerName +
+                       "' cannot be defined inside expected-expansion");
+        });
   } else {
     End = MatchStart.find("}}");
     if (End == StringRef::npos) {
@@ -1184,7 +1218,8 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
     Expected.ChildrenMarkerStartLoc = ExtraChecks.data();
     ExtraChecks = ExtraChecks.substr(StringRef("{{children:").size());
     parseNestedExpectedDiagInfoBlock(
-        BufferID, ExtraChecks, PrevExpectedContinuationLine, Expected.ExpectedChildNotes, End);
+        BufferID, ExtraChecks, PrevExpectedContinuationLine,
+        Expected.ExpectedChildNotes, End, InExpansion);
 
     if (End == StringRef::npos) {
       addError(Expected.ChildrenMarkerStartLoc,
@@ -1613,34 +1648,33 @@ DiagnosticVerifier::reportAndEraseUnexpected(
   return CapturedDiagnostics.erase(DiagIter);
 }
 
-/// Scan the buffer for location marker definitions of the form "// #name".
-/// A marker definition is a comment whose only content is "#name", e.g.:
+/// Invoke \p Callback for each location marker definition of the form "// #name"
+/// found in \p Text. \p HashLoc points at the '#' and \p Name is the marker
+/// name. A marker definition is a comment whose only content is "#name", e.g.:
 ///   code // #marker1
 ///   // #marker2
 /// The marker name consists of alphanumeric characters, hyphens, or
 /// underscores. Nothing else may appear in the comment after the marker name
 /// (except trailing whitespace). This prevents false positives from comments
 /// like "// #available(...)" or stack traces containing "// #10 0x...".
-void DiagnosticVerifier::scanForMarkers(unsigned BufferID) {
-  StringRef InputFile = SM.getEntireTextForBuffer(BufferID);
-  const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
-
-  for (size_t Pos = InputFile.find("//"); Pos != StringRef::npos;
-       Pos = InputFile.find("//", Pos + 2)) {
+static void forEachMarkerDefinition(
+    StringRef Text,
+    llvm::function_ref<void(const char *HashLoc, StringRef Name)> Callback) {
+  for (size_t Pos = Text.find("//"); Pos != StringRef::npos;
+       Pos = Text.find("//", Pos + 2)) {
     size_t Cur = Pos + 2;
-    while (Cur < InputFile.size() && (InputFile[Cur] == ' ' ||
-                                       InputFile[Cur] == '\t'))
+    while (Cur < Text.size() && (Text[Cur] == ' ' || Text[Cur] == '\t'))
       ++Cur;
 
-    if (Cur >= InputFile.size() || InputFile[Cur] != '#')
+    if (Cur >= Text.size() || Text[Cur] != '#')
       continue;
 
     size_t HashPos = Cur;
     size_t NameStart = HashPos + 1;
     size_t NameEnd = NameStart;
-    while (NameEnd < InputFile.size() &&
-           (isalnum(InputFile[NameEnd]) || InputFile[NameEnd] == '_' ||
-            InputFile[NameEnd] == '-'))
+    while (NameEnd < Text.size() &&
+           (isalnum(Text[NameEnd]) || Text[NameEnd] == '_' ||
+            Text[NameEnd] == '-'))
       ++NameEnd;
 
     if (NameEnd == NameStart)
@@ -1648,26 +1682,36 @@ void DiagnosticVerifier::scanForMarkers(unsigned BufferID) {
 
     // Only trailing whitespace is allowed after the marker name until EOL.
     size_t Rest = NameEnd;
-    while (Rest < InputFile.size() && (InputFile[Rest] == ' ' ||
-                                        InputFile[Rest] == '\t'))
+    while (Rest < Text.size() && (Text[Rest] == ' ' || Text[Rest] == '\t'))
       ++Rest;
-    if (Rest < InputFile.size() && InputFile[Rest] != '\n' &&
-        InputFile[Rest] != '\r' && InputFile[Rest] != '\0')
+    if (Rest < Text.size() && Text[Rest] != '\n' && Text[Rest] != '\r' &&
+        Text[Rest] != '\0')
       continue;
 
-    StringRef MarkerName = InputFile.slice(NameStart, NameEnd);
-    unsigned Line =
-        SM.getLineAndColumnInBuffer(
-              BufferStartLoc.getAdvancedLoc(HashPos), BufferID)
-            .first;
-
-    auto Result =
-        LocationMarkers.try_emplace(MarkerName, MarkerLocation{BufferID, Line});
-    if (!Result.second) {
-      addError(InputFile.data() + HashPos,
-               "location marker '#" + MarkerName + "' already defined");
-    }
+    Callback(Text.data() + HashPos, Text.slice(NameStart, NameEnd));
   }
+}
+
+/// Scan the buffer for location marker definitions and register them.
+void DiagnosticVerifier::scanForMarkers(unsigned BufferID) {
+  StringRef InputFile = SM.getEntireTextForBuffer(BufferID);
+  const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
+
+  forEachMarkerDefinition(
+      InputFile, [&](const char *HashLoc, StringRef MarkerName) {
+        unsigned Line = SM.getLineAndColumnInBuffer(
+                              BufferStartLoc.getAdvancedLoc(HashLoc -
+                                                            InputFile.data()),
+                              BufferID)
+                            .first;
+
+        auto Result = LocationMarkers.try_emplace(
+            MarkerName, MarkerLocation{BufferID, Line});
+        if (!Result.second) {
+          addError(HashLoc,
+                   "location marker '#" + MarkerName + "' already defined");
+        }
+      });
 }
 
 bool DiagnosticVerifier::hasMarkerAtLine(unsigned BufferID,

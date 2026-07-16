@@ -178,11 +178,13 @@ private:
   bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx);
   unsigned parseExpectedDiagInfo(unsigned BufferID, StringRef MatchStart,
                                  unsigned &PrevExpectedContinuationLine,
-                                 ExpectedDiagnosticInfo &Expected);
+                                 ExpectedDiagnosticInfo &Expected,
+                                 bool InExpansion = false);
   void parseNestedExpectedDiagInfoBlock(
       unsigned BufferID, StringRef MatchStartIn,
       unsigned &PrevExpectedContinuationLine,
-      std::vector<ExpectedDiagnosticInfo> &NestedDiagsOut, size_t &End);
+      std::vector<ExpectedDiagnosticInfo> &NestedDiagsOut, size_t &End,
+      bool InExpansion = false);
   void
   verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
                     unsigned BufferID, std::optional<size_t> ParentID);
