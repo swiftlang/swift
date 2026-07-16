@@ -476,6 +476,16 @@ namespace {
     }
 
     ImportResult
+    VisitOverflowBehaviorType(const clang::OverflowBehaviorType *type) {
+      Impl.addImportDiagnostic(
+          type,
+          Diagnostic(diag::unsupported_builtin_type, type->getTypeClassName()),
+          clang::SourceLocation());
+      // FIXME: handle OverflowBehaviorType.
+      return Type();
+    }
+
+    ImportResult
     VisitCountAttributedType(const clang::CountAttributedType *type) {
       return Visit(type->desugar());
     }
@@ -1080,6 +1090,7 @@ namespace {
     SUGAR_TYPE(Elaborated)
     SUGAR_TYPE(Using)
     SUGAR_TYPE(BTFTagAttributed)
+    SUGAR_TYPE(PredefinedSugar)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();

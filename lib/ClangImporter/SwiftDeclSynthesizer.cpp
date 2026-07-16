@@ -304,6 +304,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
   case clang::APValue::Struct:
   case clang::APValue::Union:
   case clang::APValue::Vector:
+  case clang::APValue::Matrix:
     llvm_unreachable("Unhandled APValue kind");
 
   case clang::APValue::Float:

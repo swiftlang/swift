@@ -936,8 +936,7 @@ public:
     if (Ctx.sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
       auto *UnsafeF = const_cast<SILFunction *>(F);
-      std::copy(po_begin(UnsafeF), po_end(UnsafeF),
-                std::back_inserter(RPOT));
+      llvm::copy(post_order(UnsafeF), std::back_inserter(RPOT));
       std::reverse(RPOT.begin(), RPOT.end());
       Ctx.initBlockIDs(RPOT);
       interleave(RPOT,
@@ -5101,7 +5100,7 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
     if (sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
       auto *UnsafeF = const_cast<SILFunction *>(Block->getParent());
-      std::copy(po_begin(UnsafeF), po_end(UnsafeF), std::back_inserter(RPOT));
+      llvm::copy(post_order(UnsafeF), std::back_inserter(RPOT));
       std::reverse(RPOT.begin(), RPOT.end());
       // Initialize IDs so our IDs are in RPOT as well. This is a hack.
       for (unsigned Index : indices(RPOT))
