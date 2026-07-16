@@ -505,6 +505,19 @@ void DebugValueInst::prependDeref() {
   load->setOperand(newArg);
 }
 
+void DebugValueInst::convertDerefToLoad() {
+  ASSERT(hasDeref() && "Must have deref to convert");
+  ASSERT(ReconstructionBlock && "Must have reconstruction block");
+  auto *ret = cast<ReturnInst>(ReconstructionBlock->getTerminator());
+  ASSERT(ret->getOperand()->getType().isLoadableOrOpaque(*getFunction()) &&
+         "Cannot insert load for address-only type");
+  SILBuilder builder(ret);
+  auto *load = builder.createLoad(getLoc(), ret->getOperand(),
+                                  LoadOwnershipQualifier::Unqualified);
+  ret->setOperand(load);
+  sharedUInt8().DebugValueInst.prependDeref = false;
+}
+
 void DebugValueInst::stripDeref() {
   // If we have an undef, nothing to do.
   if (isa<SILUndef>(getOperand()))
