@@ -119,15 +119,7 @@ func withDeadline<Return, Failure, C>(
   where Return: ~Copyable,
         Failure: Error,
         C: Clock & Identifiable {
-  // Fast path: if an outer `withDeadline` for this clock is already in
-  // effect and its deadline is at or before ours, the outer one governs.
-  // Just run `operation` inline - no record push, no cancellation scope,
-  // no timer allocation.
-  //
-  // The runtime maintains the invariant that the innermost matching
-  // record on the chain is the tightest one (because this fast-path
-  // itself refuses to install a looser deadline). So a single lookup
-  // returns the currently governing deadline.
+  // Fast path: if an outer deadline exists for the same clock
   if let outer = _findNearestDeadline(clock: clock), outer <= expiration {
     return try await operation()
   }

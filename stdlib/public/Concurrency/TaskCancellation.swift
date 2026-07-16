@@ -332,6 +332,7 @@ extension CancellationError {
   ///
   /// - SeeAlso: `Task.cancellationReason`
   /// - SeeAlso: `Task.cancel(reason:)`
+  @extensible
   public enum Reason: UInt8, Sendable {
     /// The task was cancelled without a specific reason being provided.
     ///
