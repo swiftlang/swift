@@ -286,7 +286,8 @@ extension MutableCollection {
   @inlinable
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
-      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      unsafe _failEarlyRangeCheck(
+        bounds, bounds: Range(uncheckedBounds: (startIndex, endIndex)))
       return Slice(base: self, bounds: bounds)
     }
     set {
@@ -356,7 +357,8 @@ extension MutableCollection where SubSequence == Slice<Self> {
   @export(implementation)
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
-      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      unsafe _failEarlyRangeCheck(
+        bounds, bounds: Range(uncheckedBounds: (startIndex, endIndex)))
       return Slice(base: self, bounds: bounds)
     }
     set {
