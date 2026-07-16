@@ -162,7 +162,7 @@ public:
   bool SerializeOptionsForDebugging = false;
   bool IsSIB = false;
   bool DisableCrossModuleIncrementalInfo = false;
-  bool DeterministicSourceInfo = false;
+  bool PrefixMapSourceInfo = false;
   bool StaticLibrary = false;
   bool HermeticSealAtLink = false;
   bool EmbeddedSwiftModule = false;

@@ -771,7 +771,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
       llvm::sys::fs::make_absolute(absolutePath);
 
       std::string remappedPath = std::string(absolutePath);
-      if (options.DeterministicSourceInfo) {
+      if (options.PrefixMapSourceInfo) {
         const auto &PathRemapper = options.SourceInfoPrefixMap;
         const auto &PathObfuscator = options.PathObfuscator;
         remappedPath =
@@ -790,7 +790,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
         info.getInterfaceHashExcludingTypeMembers().getRawValue();
 
       auto timestamp =
-          options.DeterministicSourceInfo
+          options.PrefixMapSourceInfo
               ? 0
               : std::chrono::duration_cast<std::chrono::nanoseconds>(
                     info.getLastModified().time_since_epoch())
