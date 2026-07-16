@@ -140,6 +140,28 @@ llvm::Value *emitBuiltinTaskCancellationShieldPush(IRGenFunction &IGF);
 
 void emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF);
 
+/// Emit IR for the taskPushDeadline builtin.
+///
+/// \returns the record pointer to hand back to emitBuiltinTaskPopDeadline;
+/// this may be null if the push was subsumed by an existing tighter
+/// deadline installed for the same clock.
+llvm::Value *emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
+                                         llvm::Value *systemClockRaw,
+                                         llvm::Value *customIDBox,
+                                         llvm::Value *deadlineSeconds,
+                                         llvm::Value *deadlineAttoseconds);
+
+/// Emit IR for the taskPopDeadline builtin.
+void emitBuiltinTaskPopDeadline(IRGenFunction &IGF, llvm::Value *record);
+
+/// Emit IR for the taskFindNearestDeadlineForClock builtin.
+///
+/// \returns the innermost matching `TaskDeadlineStatusRecord *` cast to
+/// UnsafeRawPointer, or a nil raw pointer if no deadline for the clock is
+/// installed.
+llvm::Value *emitBuiltinTaskFindNearestDeadlineForClock(
+    IRGenFunction &IGF, llvm::Value *systemClockRaw, llvm::Value *customIDBox);
+
 /// Emit IR for the taskCancellationScopePush builtin.
 ///
 /// \returns the record pointer to hand back to

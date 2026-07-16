@@ -426,6 +426,31 @@ OVERRIDE_TASK_STATUS(task_popTaskExecutorPreference, void,
                      swift::, (TaskExecutorPreferenceStatusRecord *record),
                      (record))
 
+// swift_task_pushDeadline takes multiple arguments so it goes through the
+// standard *Impl indirection. See TaskStatus.cpp for the implementation.
+OVERRIDE_TASK_STATUS(task_pushDeadline,
+                     TaskDeadlineStatusRecord *,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::,
+                     (uint64_t systemClockRaw,
+                      HeapObject *customIDBox,
+                      int64_t deadlineSeconds,
+                      int64_t deadlineAttoseconds),
+                     (systemClockRaw, customIDBox, deadlineSeconds,
+                      deadlineAttoseconds))
+
+OVERRIDE_TASK_STATUS(task_popDeadline, void,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, (TaskDeadlineStatusRecord *record),
+                     (record))
+
+OVERRIDE_TASK_STATUS(task_findNearestDeadlineForClock,
+                     TaskDeadlineStatusRecord *,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::,
+                     (uint64_t systemClockRaw, HeapObject *customIDBox),
+                     (systemClockRaw, customIDBox))
+
 // task_pushCancellationScope takes no arguments; the COMPATIBILITY_OVERRIDE
 // macro machinery cannot express an empty parameter tuple, so this
 // declaration is defined directly (without the *Impl indirection) in

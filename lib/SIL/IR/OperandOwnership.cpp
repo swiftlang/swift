@@ -1066,6 +1066,27 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
   return OperandOwnership::TrivialUse;
 }
 
+/// The `customIDBox` operand (index 1) is a consumed +1 `NativeObject?`;
+/// all other operands (`systemClockRaw`, `deadlineSeconds`,
+/// `deadlineAttoseconds`) are trivial UInt64/Int64 scalars.
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitTaskPushDeadline(BuiltinInst *bi,
+                                                        StringRef attr) {
+  if (&op == &bi->getOperandRef(1))
+    return OperandOwnership::DestroyingConsume;
+  return OperandOwnership::TrivialUse;
+}
+
+/// `customIDBox` (index 1) is borrowed - the runtime does not consume it;
+/// scalar operands are trivial.
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitTaskFindNearestDeadlineForClock(
+    BuiltinInst *bi, StringRef attr) {
+  if (&op == &bi->getOperandRef(1))
+    return OperandOwnership::InstantaneousUse;
+  return OperandOwnership::TrivialUse;
+}
+
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskRunInline)
 
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InitializeDefaultActor)
@@ -1115,8 +1136,12 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePop)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopeCancel)
 
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, CreateDetachedContinuation)
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, DestroyDetachedContinuation)
+// Trivial use since our operand is just an UnsafeRawPointer.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)
+// TaskPushDeadline and TaskFindNearestDeadlineForClock are handled by
+// custom visitors above so their `customIDBox` operand can be classified
+// as a consumed / borrowed reference respectively.
+
 #undef BUILTIN_OPERAND_OWNERSHIP
 
 #define SHOULD_NEVER_VISIT_BUILTIN(ID)                                         \

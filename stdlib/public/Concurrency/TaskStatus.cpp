@@ -663,6 +663,219 @@ static void swift_task_popTaskExecutorPreferenceImpl(
 }
 
 /**************************************************************************/
+/******************************** DEADLINES *******************************/
+/**************************************************************************/
+
+/// Bridged Swift-side helper that compares two `_ClockIDBox` heap objects
+/// for AnyHashable-equality. Defined in Task+Deadline.swift.
+extern "C" SWIFT_CC(swift)
+bool _swift_task_deadlineClockIDsEqual(HeapObject *a, HeapObject *b);
+
+/// Compare two deadlines expressed in the (seconds, attoseconds) two-word
+/// `Swift.Duration` representation. Returns a negative value if `a` is
+/// earlier (tighter), positive if `a` is later, and zero if they are equal.
+static int compareDeadline(int64_t aSec, int64_t aAtto,
+                           int64_t bSec, int64_t bAtto) {
+  if (aSec != bSec)
+    return (aSec < bSec) ? -1 : 1;
+  if (aAtto != bAtto)
+    return (aAtto < bAtto) ? -1 : 1;
+  return 0;
+}
+
+/// True iff `record`'s clock identity matches (`systemClockRaw`,
+/// `customIDBox`). Exactly one of the arguments is expected to be
+/// "populated" (`customIDBox != nullptr` for custom clocks, otherwise the
+/// system clock case).
+static bool
+deadlineRecordMatchesClock(TaskDeadlineStatusRecord *record,
+                           uint64_t systemClockRaw, HeapObject *customIDBox) {
+  if (customIDBox != nullptr) {
+    if (record->getClockKind() != TaskDeadlineStatusRecord::ClockKind::Custom)
+      return false;
+    return _swift_task_deadlineClockIDsEqual(record->getCustomIDBox(),
+                                             customIDBox);
+  }
+  if (record->getClockKind() != TaskDeadlineStatusRecord::ClockKind::System)
+    return false;
+  return record->getSystemClockRaw() == systemClockRaw;
+}
+
+/// Walk the current task's status records and return the innermost
+/// (first-installed-most-recent) deadline installed for the given clock,
+/// or nullptr if none. Deadlines pushed more recently sit closer to the
+/// head of the chain, so the first hit is the tightest (see subsumption
+/// logic in `swift_task_pushDeadlineImpl`).
+static TaskDeadlineStatusRecord *
+findNearestDeadlineForClockOnTask(AsyncTask *task, uint64_t systemClockRaw,
+                                  HeapObject *customIDBox) {
+  // Fast path: no deadline records installed at all
+  auto status = task->_private()._status().load(std::memory_order_relaxed);
+  if (!status.hasDeadline())
+    return nullptr;
+
+  TaskDeadlineStatusRecord *found = nullptr;
+  withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+    for (auto record : status.records()) {
+      if (record->getKind() != TaskStatusRecordKind::Deadline)
+        continue;
+      auto deadline = cast<TaskDeadlineStatusRecord>(record);
+      if (!deadlineRecordMatchesClock(deadline, systemClockRaw, customIDBox))
+        continue;
+
+      // By construction we never install a "looser" deadline for the same
+      // clock (see the subsumption fast-path below), so the first matching
+      // record we find is the tightest one currently active.
+      found = deadline;
+      return;
+    }
+  });
+  return found;
+}
+
+SWIFT_CC(swift)
+static TaskDeadlineStatusRecord *
+swift_task_pushDeadlineImpl(uint64_t systemClockRaw,
+                            HeapObject *customIDBox,
+                            int64_t deadlineSeconds,
+                            int64_t deadlineAttoseconds) {
+  auto task = swift_task_getCurrent();
+  if (!task) {
+    // No current task means no scope for the deadline to be attached to.
+    // If a `customIDBox` was passed we must release the +1 we were handed
+    if (customIDBox)
+      swift_release(customIDBox);
+    return nullptr;
+  }
+
+  // Subsumption fast-path: if there is already a deadline for the same
+  // clock that is at or before the one we would be installing, skip the
+  // push - the outer deadline governs and we have nothing new to record.
+  if (auto existing = findNearestDeadlineForClockOnTask(task, systemClockRaw,
+                                                       customIDBox)) {
+    if (compareDeadline(existing->getDeadlineSeconds(),
+                        existing->getDeadlineAttoseconds(),
+                        deadlineSeconds,
+                        deadlineAttoseconds) <= 0) {
+      SWIFT_TASK_DEBUG_LOG("[Deadline] Subsumed by existing record:%p on "
+                           "task:%p",
+                           existing, task);
+      // The caller handed us +1 on `customIDBox`; since we're not
+      // installing a record that would own it, release it here
+      if (customIDBox)
+        swift_release(customIDBox);
+      return nullptr;
+    }
+  }
+
+  void *allocation =
+      _swift_task_alloc_specific(task, sizeof(class TaskDeadlineStatusRecord));
+
+  TaskDeadlineStatusRecord *record;
+  if (customIDBox) {
+    record = ::new (allocation)
+        TaskDeadlineStatusRecord(customIDBox, deadlineSeconds,
+                                 deadlineAttoseconds);
+    SWIFT_TASK_DEBUG_LOG("[Deadline] Create custom-clock deadline record:%p "
+                         "for task:%p (customIDBox:%p, %lld.%lld)",
+                         allocation, task, customIDBox,
+                         (long long)deadlineSeconds,
+                         (long long)deadlineAttoseconds);
+  } else {
+    record = ::new (allocation)
+        TaskDeadlineStatusRecord(systemClockRaw, deadlineSeconds,
+                                 deadlineAttoseconds);
+    SWIFT_TASK_DEBUG_LOG("[Deadline] Create system-clock deadline record:%p "
+                         "for task:%p (systemClockRaw:%llu, %lld.%lld)",
+                         allocation, task,
+                         (unsigned long long)systemClockRaw,
+                         (long long)deadlineSeconds,
+                         (long long)deadlineAttoseconds);
+  }
+
+  addStatusRecord(task, record,
+                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    // Set the "has deadline" flag so
+                    // swift_task_findNearestDeadlineForClock can bail out
+                    // without walking the record chain when there are no
+                    // deadlines installed.
+                    newStatus = newStatus.withDeadline();
+                    return true; // always add the record
+                  });
+
+  return record;
+}
+
+SWIFT_CC(swift)
+static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
+  // Pushes that were subsumed return nullptr, and the pop must accept that.
+  if (!record)
+    return;
+
+  auto task = swift_task_getCurrent();
+  SWIFT_TASK_DEBUG_LOG("[Deadline] Remove deadline record:%p from task:%p",
+                       record, task);
+  if (!task)
+    return;
+
+  // Track how many deadline records are still installed after removing the
+  // target one. When this drops to zero we clear the HasDeadline flag so
+  // the fast path in `swift_task_findNearestDeadlineForClock` stays cheap.
+  int remainingDeadlines = 0;
+  removeStatusRecordWhere(
+      task,
+      /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
+        assert(status.hasDeadline() && "does not have record!");
+        if (cur->getKind() != TaskStatusRecordKind::Deadline)
+          return false;
+
+        if (cur == record)
+          return true; // remove this record
+
+        remainingDeadlines += 1;
+        return false;
+      },
+      /*updateStatus=*/[&](ActiveTaskStatus oldStatus,
+                            ActiveTaskStatus &newStatus) {
+        if (remainingDeadlines == 0) {
+          assert(oldStatus.hasDeadline());
+          newStatus = newStatus.withoutDeadline();
+        }
+      });
+
+  // Release the custom-clock ID box we took ownership of on push
+  if (record->getClockKind() == TaskDeadlineStatusRecord::ClockKind::Custom) {
+    if (auto *box = record->getCustomIDBox())
+      swift_release(box);
+  }
+
+  swift_task_dealloc(record);
+}
+
+SWIFT_CC(swift)
+static TaskDeadlineStatusRecord *
+swift_task_findNearestDeadlineForClockImpl(uint64_t systemClockRaw,
+                                           HeapObject *customIDBox) {
+  auto task = swift_task_getCurrent();
+  if (!task)
+    return nullptr;
+  return findNearestDeadlineForClockOnTask(task, systemClockRaw, customIDBox);
+}
+
+/// Read the (seconds, attoseconds) deadline components off a record. Small
+/// SPI intended for Swift-side diagnostics: production code should use
+/// `withDeadline` directly rather than reading the record layout out of
+/// band.
+extern "C" SWIFT_CC(swift)
+void _swift_task_deadlineComponents(TaskDeadlineStatusRecord *record,
+                                    int64_t *seconds,
+                                    int64_t *attoseconds) {
+  assert(record != nullptr);
+  *seconds = record->getDeadlineSeconds();
+  *attoseconds = record->getDeadlineAttoseconds();
+}
+
+/**************************************************************************/
 /************************** CANCELLATION SCOPES **************************/
 /**************************************************************************/
 
@@ -1085,6 +1298,10 @@ static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord 
   case TaskStatusRecordKind::TaskExecutorPreference:
     break;
 
+  // Deadline records themselves take no cancellation action.
+  case TaskStatusRecordKind::Deadline:
+    break;
+
   // Whole-task cancellation must not implicitly cancel independent
   // cancellation scopes; scopes are only cancelled via their own
   // `TaskCancellationScope.cancel()`.
@@ -1190,6 +1407,9 @@ static void performEscalationAction(AsyncTask *task, TaskStatusRecord *record,
     return;
   /// Executor preference we can ignore.
   case TaskStatusRecordKind::TaskExecutorPreference:
+    return;
+  // Deadline records do not participate in priority escalation.
+  case TaskStatusRecordKind::Deadline:
     return;
   // Cancellation scopes do not participate in priority escalation.
   case TaskStatusRecordKind::TaskCancellationScope:

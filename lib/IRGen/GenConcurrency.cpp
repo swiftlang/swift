@@ -383,6 +383,37 @@ void irgen::emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF) {
   call->setCallingConv(IGF.IGM.SwiftCC);
 }
 
+llvm::Value *irgen::emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
+                                               llvm::Value *systemClockRaw,
+                                               llvm::Value *customIDBox,
+                                               llvm::Value *deadlineSeconds,
+                                               llvm::Value *deadlineAttoseconds) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPushDeadlineFunctionPointer(),
+      {systemClockRaw, customIDBox, deadlineSeconds, deadlineAttoseconds});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return call;
+}
+
+void irgen::emitBuiltinTaskPopDeadline(IRGenFunction &IGF,
+                                       llvm::Value *record) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPopDeadlineFunctionPointer(), {record});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+llvm::Value *irgen::emitBuiltinTaskFindNearestDeadlineForClock(
+    IRGenFunction &IGF, llvm::Value *systemClockRaw, llvm::Value *customIDBox) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskFindNearestDeadlineForClockFunctionPointer(),
+      {systemClockRaw, customIDBox});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return call;
+}
+
 llvm::Value *irgen::emitBuiltinTaskCancellationScopePush(IRGenFunction &IGF) {
   auto *call = IGF.Builder.CreateCall(
       IGF.IGM.getTaskPushCancellationScopeFunctionPointer(), {});

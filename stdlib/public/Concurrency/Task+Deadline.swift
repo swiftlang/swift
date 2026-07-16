@@ -105,10 +105,17 @@ func withDeadline<Return, Failure, C>(
   where Return: ~Copyable,
         Failure: Error,
         C: Clock & Identifiable {
-  let clockID = _encodeClockID(clock)
+  // Encode the clock identity in the tagged form the runtime uses: for the
+  // built-in system clocks we pass a small integer raw value and no box; for
+  // custom clocks we pass 0 as the raw value and a Swift-side `_ClockIDBox`
+  // wrapping `clock.id` as `AnyHashable`. The runtime consumes the +1 on
+  // `customIDBox` (releasing it either on pop or immediately if the push is
+  // subsumed by an outer deadline for the same clock).
+  let (systemClockRaw, customIDBox) = _encodeClockIdentityForPush(clock)
   let (seconds, attoseconds) = _instantComponents(expiration, clock: clock)
   let deadlineRecord = unsafe Builtin.taskPushDeadline(
-    clockID: clockID,
+    systemClockRaw: systemClockRaw,
+    customIDBox: customIDBox,
     deadlineSeconds: seconds,
     deadlineAttoseconds: attoseconds)
   defer { unsafe Builtin.taskPopDeadline(record: deadlineRecord) }
@@ -133,18 +140,7 @@ func withDeadline<Return, Failure, C>(
 // ==== -----------------------------------------------------------------------
 // MARK: Timer arming
 
-/// Spawn a detached task that sleeps until `expiration` on the given clock,
-/// then cancels `scope`. Returns a closure that disarms the timer by
-/// cancelling the task; the sleeping task observes cancellation and exits
-/// without touching the scope.
-///
-/// This intentionally uses only stock building blocks (`Task { ... }` and
-/// `clock.sleep(until:tolerance:)`) rather than reaching for a
-/// clock-specific executor or a bespoke fire-once job: the deadline API is
-/// primarily useful for operations that are already async and long-running,
-/// so the extra Task allocation per `withDeadline` call is not a concern
-/// while this is SPI. It can be revisited once we have a lighter-weight
-/// timer primitive.
+/// Create a timer and return a function to cancel the underlying task/job.
 @available(StdlibDeploymentTarget 6.5, *)
 private func _armDeadlineTimer<C: Clock & Identifiable>(
   scope: borrowing TaskCancellationScope,
@@ -160,6 +156,9 @@ private func _armDeadlineTimer<C: Clock & Identifiable>(
   // of the timer task.
   let scopeRecord = unsafe scope._record
 
+  // TODO: Replace this by picking the "Clock's executor"
+  // TODO: Instead of creating a full task here, we want to enqueue a job at a deadline,
+  //       that cancels the scope; and the returned func from here must attempt to cancel the job.
   let timer = Task.detached {
     do {
       try await clock.sleep(until: expiration, tolerance: tolerance)
@@ -173,25 +172,52 @@ private func _armDeadlineTimer<C: Clock & Identifiable>(
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: Clock ID encoding
+// MARK: Clock identity encoding
 
-/// Map a `Clock & Identifiable` to the 64-bit clock identifier the deadline
-/// status record uses to determine subsumption between nested deadlines on
-/// the same clock. For the built-in clocks this reuses the stable
-/// `SystemClockID` raw values; for other clocks it falls back to the
-/// clock's own `id` hash.
+/// A heap-allocated box wrapping a custom clock's `id` as an `AnyHashable`.
+///
+/// Custom-clock deadlines pass a `+1` `_ClockIDBox` to the runtime via
+/// `Builtin.taskPushDeadline`; the runtime holds the reference for the
+/// lifetime of the installed record and calls back into Swift via
+/// `_swift_task_deadlineClockIDsEqual` to compare two records' clocks.
+@available(StdlibDeploymentTarget 6.5, *)
+internal final class _ClockIDBox {
+  let id: AnyHashable
+  init(_ id: AnyHashable) { self.id = id }
+}
+
+/// Runtime callback: compare the underlying `AnyHashable` values of two
+/// `_ClockIDBox`es. Non-box arguments compare as unequal.
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("_swift_task_deadlineClockIDsEqual")
+internal func _clockIDsEqual(_ a: AnyObject, _ b: AnyObject) -> Bool {
+  guard let boxA = a as? _ClockIDBox, let boxB = b as? _ClockIDBox else {
+    return false
+  }
+  return boxA.id == boxB.id
+}
+
+/// Map a `Clock & Identifiable` to the tagged form the deadline runtime
+/// uses to determine subsumption between nested deadlines on the same
+/// clock. Built-in system clocks encode as `(SystemClockID.rawValue, nil)`;
+/// custom clocks encode as `(0, +1 _ClockIDBox)`. Exactly one branch
+/// produces a non-null box; the runtime consumes the retain on push.
 @available(StdlibDeploymentTarget 6.5, *)
 @inline(__always)
-private func _encodeClockID<C: Clock & Identifiable>(_ clock: C) -> UInt64 {
+private func _encodeClockIdentityForPush<C: Clock & Identifiable>(
+  _ clock: C
+) -> (systemClockRaw: UInt64, customIDBox: Builtin.NativeObject?) {
   if let known = clock.id as? SystemClockID {
-    return UInt64(known.rawValue)
+    return (UInt64(known.rawValue), nil)
   }
-  // For custom clocks, hash to a stable-per-process UInt64 that is
-  // guaranteed distinct from `SystemClockID` values (which are small
-  // positive integers).
-  var hasher = Hasher()
-  hasher.combine(clock.id)
-  return UInt64(bitPattern: Int64(hasher.finalize()))
+  // Allocate a heap-owned box and hand a +1 to the runtime. `passRetained`
+  // performs the retain-and-take-ownership dance; the returned opaque
+  // pointer is reinterpreted as a `Builtin.NativeObject` for the builtin.
+  let box = _ClockIDBox(AnyHashable(clock.id))
+  let opaque = unsafe Unmanaged.passRetained(box).toOpaque()
+  let native = unsafe Builtin.reinterpretCast(opaque)
+    as Builtin.NativeObject
+  return (0, native)
 }
 
 // ==== -----------------------------------------------------------------------
@@ -223,3 +249,61 @@ private func _instantComponents<C: Clock & Identifiable>(
   let dur = unsafe unsafeBitCast(clock.now.duration(to: expiration), to: Swift.Duration.self)
   return dur.components
 }
+
+// ==== -----------------------------------------------------------------------
+// MARK: Nearest-deadline SPI
+
+/// Query the innermost active deadline installed on the current task for
+/// the given clock, or nil if none. Returned as the same two-component
+/// `Swift.Duration` representation the runtime stores.
+///
+/// Intended for tests / diagnostics: production code should use
+/// `withDeadline` directly.
+@available(StdlibDeploymentTarget 6.5, *)
+public func _findNearestDeadline<C: Clock & Identifiable>(
+  clock: C
+) -> (seconds: Int64, atto: Int64)? {
+  // For system clocks: pass the raw value and no box.
+  // For custom clocks: allocate a *temporary* box that we own for the
+  // duration of this call. Unlike `taskPushDeadline` (which consumes the
+  // box), `taskFindNearestDeadlineForClock` only borrows it, so the box
+  // is released when this function returns.
+  let ptr: UnsafeRawPointer
+  let keepAlive: _ClockIDBox?
+  if let known = clock.id as? SystemClockID {
+    ptr = unsafe Builtin.taskFindNearestDeadlineForClock(
+      systemClockRaw: UInt64(known.rawValue),
+      customIDBox: nil)
+    keepAlive = nil
+  } else {
+    let box = _ClockIDBox(AnyHashable(clock.id))
+    let opaque = unsafe Unmanaged.passUnretained(box).toOpaque()
+    let native = unsafe Builtin.reinterpretCast(opaque)
+      as Builtin.NativeObject
+    ptr = unsafe Builtin.taskFindNearestDeadlineForClock(
+      systemClockRaw: 0,
+      customIDBox: native)
+    keepAlive = box
+  }
+  _fixLifetime(keepAlive)
+
+  if unsafe Int(bitPattern: ptr) == 0 {
+    return nil
+  }
+  var secs: Int64 = 0
+  var atto: Int64 = 0
+  unsafe _swift_task_deadlineComponents(record: ptr,
+                                        seconds: &secs,
+                                        attoseconds: &atto)
+  return (secs, atto)
+}
+
+/// Read the (seconds, attoseconds) components off a
+/// `TaskDeadlineStatusRecord *` returned by
+/// `Builtin.taskFindNearestDeadlineForClock`.
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("_swift_task_deadlineComponents")
+internal func _swift_task_deadlineComponents(
+  record: UnsafeRawPointer,
+  seconds: UnsafeMutablePointer<Int64>,
+  attoseconds: UnsafeMutablePointer<Int64>)

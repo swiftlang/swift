@@ -1249,6 +1249,51 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddPriorityEscalationHandler,
 BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
                        "taskRemovePriorityEscalationHandler", "", Special)
 
+/// Equivalent to calling swift_task_pushDeadline.
+///
+/// Pushes a deadline status record for the given clock onto the current
+/// task, returning the record pointer that must be handed back to
+/// taskPopDeadline. The pointer may be null if the push was subsumed by
+/// an existing tighter deadline installed for the same clock.
+///
+/// The clock identity is passed in a tagged form: for the system clocks
+/// pass the `SystemClockID` raw value as `systemClockRaw` and nil for
+/// `customIDBox`; for custom clocks pass 0 as `systemClockRaw` and a
+/// retained `_ClockIDBox` (a Swift heap object wrapping the clock's `id`
+/// as an `AnyHashable`) as `customIDBox`. The runtime consumes the +1 on
+/// `customIDBox` and releases it in taskPopDeadline (or immediately, if
+/// the push is subsumed).
+///
+/// Signature: (systemClockRaw: UInt64, customIDBox: Builtin.NativeObject?,
+///             deadlineSeconds: Int64, deadlineAttoseconds: Int64)
+///           -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION(TaskPushDeadline, "taskPushDeadline", "", Special)
+
+/// Equivalent to calling swift_task_popDeadline.
+///
+/// Removes the deadline record previously installed by taskPushDeadline.
+/// Passing nil is a no-op, which supports the subsumption fast-path.
+///
+/// Signature: (record: UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(TaskPopDeadline, "taskPopDeadline", "", Special)
+
+/// Equivalent to calling swift_task_findNearestDeadlineForClock.
+///
+/// Returns the nearest (innermost) `TaskDeadlineStatusRecord` installed
+/// on the current task for the given clock, or a nil raw pointer if none.
+///
+/// The clock is identified in the same tagged form as taskPushDeadline:
+/// pass a system clock raw value in `systemClockRaw` and nil for
+/// `customIDBox` for system clocks; pass 0 as `systemClockRaw` and the
+/// `_ClockIDBox` for custom clocks. Unlike taskPushDeadline, the runtime
+/// does NOT consume the `customIDBox` reference - the caller retains
+/// ownership.
+///
+/// Signature: (systemClockRaw: UInt64, customIDBox: Builtin.NativeObject?)
+///           -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION(TaskFindNearestDeadlineForClock,
+                       "taskFindNearestDeadlineForClock", "", Special)
+
 /// Equivalent to calling swift_task_pushCancellationScope.
 ///
 /// Pushes a cancellation scope record onto the current task, returning the
@@ -1258,8 +1303,6 @@ BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
 ///
 /// Signature: () -> UnsafeRawPointer
 BUILTIN_MISC_OPERATION(TaskCancellationScopePush, "taskCancellationScopePush", "", Special)
-
-/// Equivalent to calling swift_task_popCancellationScope.
 ///
 /// Signature: (record: UnsafeRawPointer) -> ()
 BUILTIN_MISC_OPERATION(TaskCancellationScopePop, "taskCancellationScopePop", "", Special)

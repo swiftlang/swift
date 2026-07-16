@@ -132,6 +132,20 @@ enum _ClockID: Int32 {
   case walltime = 3
 }
 
+/// Stable identifiers for the built-in system clocks.
+///
+/// The raw values here are treated by the runtime as opaque identifiers -
+/// they participate in a stable-for-the-life-of-the-process equivalence
+/// relation over clocks. Custom clocks must not use these raw values; the
+/// deadline runtime distinguishes system clocks from custom clocks via a
+/// tagged discriminator, not the numeric value.
+@available(StdlibDeploymentTarget 6.5, *)
+public enum SystemClockID: Int64, Sendable, Hashable {
+  case continuous = 1
+  case suspending = 2
+  case walltime = 3
+}
+
 @available(StdlibDeploymentTarget 5.7, *)
 @_silgen_name("swift_get_time")
 internal func _getTime(

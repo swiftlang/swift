@@ -578,6 +578,14 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     StealerExclusionMax = 0xF,
     StealerExclusionMask = StealerExclusionMax << StealerExclusionShift,
 #endif
+
+    /// Whether the task has at least one `TaskDeadlineStatusRecord` in its
+    /// status record list. By storing this flag we can avoid taking the task
+    /// record lock and walking the record chain when querying the innermost
+    /// deadline (e.g. `Task.currentDeadline(for:)`), which is a hot path for
+    /// code that composes with `withDeadline` but rarely actually installs
+    /// one.
+    HasDeadline = 0x1000000,
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -815,6 +823,23 @@ public:
   }
   ActiveTaskStatus withoutTaskCancellationScope() const {
     return withFlags(Flags & ~HasTaskCancellationScope);
+  }
+
+  // HasDeadline
+  /// Is there at least one `TaskDeadlineStatusRecord` in the linked list of
+  /// status records?
+  ///
+  /// Cheap check that lets `swift_task_findNearestDeadlineForClock` bail out
+  /// without taking the task record lock when there are no deadlines
+  /// installed.
+  bool hasDeadline() const {
+    return Flags & HasDeadline;
+  }
+  ActiveTaskStatus withDeadline() const {
+    return withFlags(Flags | HasDeadline);
+  }
+  ActiveTaskStatus withoutDeadline() const {
+    return withFlags(Flags & ~HasDeadline);
   }
 
   // StealerExclusion

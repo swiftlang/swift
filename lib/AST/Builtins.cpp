@@ -2428,6 +2428,41 @@ static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
 
+static ValueDecl *getTaskPushDeadline(ASTContext &ctx, Identifier id) {
+  // (systemClockRaw: UInt64, customIDBox: __owned Builtin.NativeObject?,
+  //  deadlineSeconds: Int64, deadlineAttoseconds: Int64) -> UnsafeRawPointer
+  //
+  // The `customIDBox` operand is a consumed reference: the runtime takes
+  // ownership of the +1 and releases it either on pop or immediately if
+  // the push is subsumed. Ownership plumbing is handled by the
+  // OperandOwnership/ValueOwnership entries for TaskPushDeadline.
+  return getBuiltinFunction(
+      ctx, id, _thin,
+      _parameters(_label("systemClockRaw", ctx.getUInt64Type()),
+                  _label("customIDBox", _owned(_optional(_nativeObject))),
+                  _label("deadlineSeconds", ctx.getInt64Type()),
+                  _label("deadlineAttoseconds", ctx.getInt64Type())),
+      _unsafeRawPointer);
+}
+
+static ValueDecl *getTaskPopDeadline(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
+static ValueDecl *getTaskFindNearestDeadlineForClock(ASTContext &ctx,
+                                                    Identifier id) {
+  // (systemClockRaw: UInt64, customIDBox: Builtin.NativeObject?)
+  //   -> UnsafeRawPointer
+  //
+  // Unlike TaskPushDeadline, the runtime does not consume `customIDBox`.
+  return getBuiltinFunction(
+      ctx, id, _thin,
+      _parameters(_label("systemClockRaw", ctx.getUInt64Type()),
+                  _label("customIDBox", _optional(_nativeObject))),
+      _unsafeRawPointer);
+}
+
 static ValueDecl *getTaskCancellationScopePush(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _unsafeRawPointer);
 }
@@ -3607,6 +3642,15 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
     return getTaskRemovePriorityEscalationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskPushDeadline:
+    return getTaskPushDeadline(Context, Id);
+
+  case BuiltinValueKind::TaskPopDeadline:
+    return getTaskPopDeadline(Context, Id);
+
+  case BuiltinValueKind::TaskFindNearestDeadlineForClock:
+    return getTaskFindNearestDeadlineForClock(Context, Id);
 
   case BuiltinValueKind::TaskCancellationScopePush:
     return getTaskCancellationScopePush(Context, Id);

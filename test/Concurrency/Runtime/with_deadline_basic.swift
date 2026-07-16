@@ -14,6 +14,7 @@
     await test_cancels_operation_when_deadline_expires()
     await test_ambient_task_uncancelled_after_deadline()
     await test_throws_from_operation_before_deadline()
+    await test_custom_clock_deadline_subsumption()
     print("done")
   }
 }
@@ -105,6 +106,69 @@ func test_throws_from_operation_before_deadline() async {
     // CHECK: threw MyError
   } catch {
     print("threw wrong error: \(error)")
+  }
+}
+
+// Custom clock whose id is a String. Two nested `withDeadline` on the same
+// clock instance should have the inner (tighter) deadline observable while
+// running inside the inner scope, and the outer deadline observable after
+// the inner scope pops. This exercises the tagged-clock-ID path through
+// `Builtin.taskPushDeadline` / `Builtin.taskFindNearestDeadlineForClock`.
+@available(StdlibDeploymentTarget 6.5, *)
+struct StringIdClock: Clock, Identifiable {
+  typealias Instant = ContinuousClock.Instant
+  typealias Duration = Swift.Duration
+
+  let id: String
+
+  var now: Instant { ContinuousClock.now }
+  var minimumResolution: Swift.Duration { .nanoseconds(1) }
+
+  func sleep(until deadline: Instant, tolerance: Swift.Duration?) async throws {
+    try await ContinuousClock().sleep(until: deadline, tolerance: tolerance)
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_custom_clock_deadline_subsumption() async {
+  print("--- test_custom_clock_deadline_subsumption")
+  // CHECK-LABEL: --- test_custom_clock_deadline_subsumption
+
+  let clock = StringIdClock(id: "test-clock")
+  // A wide gap between the two deadlines so seconds-level differences are
+  // easy to distinguish. The absolute values matter less than the fact
+  // that the inner is strictly tighter than the outer.
+  let outer = clock.now.advanced(by: .seconds(600))
+  let inner = clock.now.advanced(by: .seconds(30))
+
+  _ = try? await withDeadline(outer, clock: clock) {
+    let observedOuter = _findNearestDeadline(clock: clock)
+    print("outer observed:\(observedOuter != nil)")
+    // CHECK: outer observed:true
+    let outerSeconds = observedOuter?.seconds ?? -1
+
+    _ = try? await withDeadline(inner, clock: clock) {
+      let observedInner = _findNearestDeadline(clock: clock)
+      // Inner (tighter) deadline must be strictly less than the outer.
+      if let observedInner {
+        let isTighter = observedInner.seconds < outerSeconds
+        print("inner observed:\(observedInner.seconds < outerSeconds ? "tighter" : "not-tighter")")
+        _ = isTighter
+        // CHECK: inner observed:tighter
+      } else {
+        print("inner missing")
+      }
+    }
+
+    // After the inner scope pops, the outer deadline must be observable again.
+    let observedAfter = _findNearestDeadline(clock: clock)
+    if let observedAfter {
+      let restored = observedAfter.seconds == outerSeconds
+      print("after inner pop restored outer:\(restored)")
+      // CHECK: after inner pop restored outer:true
+    } else {
+      print("after inner pop missing")
+    }
   }
 }
 

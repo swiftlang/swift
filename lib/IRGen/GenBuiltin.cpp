@@ -1599,6 +1599,27 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     emitBuiltinTaskCancellationScopeCancel(IGF, record);
     return;
   }
+  case BuiltinValueKind::TaskPushDeadline: {
+    auto *systemClockRaw = args.claimNext();
+    auto *customIDBox = args.claimNext();
+    auto *deadlineSeconds = args.claimNext();
+    auto *deadlineAttoseconds = args.claimNext();
+    out.add(emitBuiltinTaskPushDeadline(IGF, systemClockRaw, customIDBox,
+                                        deadlineSeconds, deadlineAttoseconds));
+    return;
+  }
+  case BuiltinValueKind::TaskPopDeadline: {
+    auto *record = args.claimNext();
+    emitBuiltinTaskPopDeadline(IGF, record);
+    return;
+  }
+  case BuiltinValueKind::TaskFindNearestDeadlineForClock: {
+    auto *systemClockRaw = args.claimNext();
+    auto *customIDBox = args.claimNext();
+    out.add(emitBuiltinTaskFindNearestDeadlineForClock(IGF, systemClockRaw,
+                                                       customIDBox));
+    return;
+  }
   case BuiltinValueKind::RemoveTaskLocalValue:
   case BuiltinValueKind::TaskLocalValuePop:
     // removeTaskLocalValue technically takes an argument, but we ignore

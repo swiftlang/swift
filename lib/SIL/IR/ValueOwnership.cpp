@@ -695,6 +695,9 @@ CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPop)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopePush)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopePop)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopeCancel)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskPushDeadline)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskPopDeadline)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskFindNearestDeadlineForClock)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

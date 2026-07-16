@@ -452,6 +452,82 @@ public:
   AsyncTask *&getNextWaitingTask();
 };
 
+/// A status record which represents a `withDeadline` deadline installed on
+/// the current task. Multiple deadlines for the same clock are coalesced by
+/// the runtime and the tightest one governs.
+///
+/// The clock identity is stored in a tagged form so that comparing two
+/// deadline records for the same clock is a fast integer compare when both
+/// clocks are system clocks, and falls back to a bridged Swift-side
+/// AnyHashable-equality call when either side is a custom clock.
+class TaskDeadlineStatusRecord : public TaskStatusRecord {
+public:
+  enum class ClockKind : uint8_t {
+    /// The clock is one of the built-in system clocks. `SystemClockRaw`
+    /// holds a `SystemClockID` raw value (1 = continuous, 2 = suspending,
+    /// 3 = walltime)
+    System = 0,
+    /// The clock is a user-defined clock. `CustomIDBox` holds a retained
+    /// pointer to a Swift heap-allocated `_ClockIDBox` wrapping the
+    /// clock's `id` as an `AnyHashable`
+    Custom = 1,
+  };
+
+private:
+  ClockKind Kind;
+  union {
+    /// A `SystemClockID` raw value when `Kind == ClockKind::System`
+    uint64_t SystemClockRaw;
+    /// A retained `HeapObject *` pointing to a Swift-side box that owns an
+    /// `AnyHashable` value. The runtime treats it as opaque and only
+    /// releases it in `swift_task_popDeadline`; comparison is done via a
+    /// bridged Swift helper `_swift_task_deadlineClockIDsEqual`
+    HeapObject *CustomIDBox;
+  };
+
+  /// The deadline instant, encoded as the two-component `Swift.Duration`
+  /// representation (seconds + attoseconds) relative to the clock's reference
+  /// point
+  int64_t DeadlineSeconds;
+  int64_t DeadlineAttoseconds;
+
+public:
+  TaskDeadlineStatusRecord(uint64_t systemClockRaw,
+                           int64_t deadlineSeconds,
+                           int64_t deadlineAttoseconds)
+      : TaskStatusRecord(TaskStatusRecordKind::Deadline),
+        Kind(ClockKind::System), SystemClockRaw(systemClockRaw),
+        DeadlineSeconds(deadlineSeconds),
+        DeadlineAttoseconds(deadlineAttoseconds) {}
+
+  TaskDeadlineStatusRecord(HeapObject *customIDBox,
+                           int64_t deadlineSeconds,
+                           int64_t deadlineAttoseconds)
+      : TaskStatusRecord(TaskStatusRecordKind::Deadline),
+        Kind(ClockKind::Custom), CustomIDBox(customIDBox),
+        DeadlineSeconds(deadlineSeconds),
+        DeadlineAttoseconds(deadlineAttoseconds) {
+    // The caller is expected to have +1 on the box already; ownership is
+    // transferred into the record and released on pop
+  }
+
+  ClockKind getClockKind() const { return Kind; }
+  uint64_t getSystemClockRaw() const {
+    assert(Kind == ClockKind::System);
+    return SystemClockRaw;
+  }
+  HeapObject *getCustomIDBox() const {
+    assert(Kind == ClockKind::Custom);
+    return CustomIDBox;
+  }
+  int64_t getDeadlineSeconds() const { return DeadlineSeconds; }
+  int64_t getDeadlineAttoseconds() const { return DeadlineAttoseconds; }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::Deadline;
+  }
+};
+
 /// A status record which represents a scoped cancellation domain that is
 /// independent of whole-task cancellation. Cancelling the scope is a local
 /// operation: it does not set the task's own cancellation flag and does not

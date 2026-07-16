@@ -73,6 +73,10 @@ enum class StackAllocationKind : uint8_t {
   /// builtin.
   BuiltinTaskAddCancellationHandler,
 
+  /// A BuiltinInst for the TaskPushDeadline builtin. The deallocation is
+  /// a BuiltinInst for the TaskPopDeadline builtin.
+  BuiltinTaskPushDeadline,
+
   /// A BuiltinInst for the TaskCancellationScopePush builtin. The deallocation
   /// is a BuiltinInst for the TaskCancellationScopePop builtin.
   BuiltinTaskCancellationScopePush,

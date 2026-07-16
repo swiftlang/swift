@@ -598,6 +598,66 @@ swift_task_pushTaskExecutorPreference(TaskExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record);
 
+/// Push a deadline status record onto the current task.
+///
+/// The pushed record participates in `withDeadline` composition: a nested
+/// deadline for the same clock is subsumed by any outer deadline that is
+/// tighter (i.e. earlier). Two records refer to the same clock iff either
+/// both are system clocks with matching `systemClockRaw`, or both are
+/// custom clocks whose `customIDBox` values compare equal via the
+/// Swift-side `_swift_task_deadlineClockIDsEqual` helper.
+///
+/// Exactly one of `systemClockRaw != 0` and `customIDBox != nullptr` must
+/// hold. When `customIDBox` is non-null the runtime takes ownership of
+/// the +1 reference: it is released either in `swift_task_popDeadline` or
+/// immediately if the push was subsumed and no new record was installed.
+///
+/// The deadline is passed as the two-component `Swift.Duration` representation
+/// (seconds + attoseconds) relative to the clock's reference point.
+///
+/// Returns the new record, or nullptr if the push was subsumed by an
+/// existing tighter deadline for the same clock. The caller must hand the
+/// returned pointer (including a nullptr) back to `swift_task_popDeadline`.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+TaskDeadlineStatusRecord *
+swift_task_pushDeadline(uint64_t systemClockRaw,
+                        HeapObject *customIDBox,
+                        int64_t deadlineSeconds,
+                        int64_t deadlineAttoseconds);
+
+/// Remove a single deadline record from the current task.
+///
+/// Must be passed the record intended to be removed (as returned by
+/// `swift_task_pushDeadline`). Passing nullptr is a no-op, which supports
+/// the subsumption fast-path where `swift_task_pushDeadline` did not need
+/// to install a new record. If the record is a custom-clock record its
+/// held `HeapObject *` clock ID box is released.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_popDeadline(TaskDeadlineStatusRecord *record);
+
+/// Find the nearest active deadline installed for the given clock on the
+/// current task, if any.
+///
+/// The clock is identified in the same tagged form as
+/// `swift_task_pushDeadline`. The runtime does NOT release `customIDBox`
+/// - the caller retains ownership.
+///
+/// Returns the matching record, or nullptr if no deadline for the clock
+/// is currently installed on the task. The caller may read the deadline
+/// components (`getDeadlineSeconds`, `getDeadlineAttoseconds`) off the
+/// returned record; the pointer remains valid for as long as the enclosing
+/// `withDeadline` scope is active.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+TaskDeadlineStatusRecord *
+swift_task_findNearestDeadlineForClock(uint64_t systemClockRaw,
+                                       HeapObject *customIDBox);
+
 /// Push a cancellation scope record onto the current task.
 ///
 /// Unlike deadlines, cancellation scope records are never subsumed: every
