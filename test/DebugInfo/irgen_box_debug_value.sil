@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-debugger-shadow-copies -g -emit-irgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -verify-debug-value-expr -disable-debugger-shadow-copies -g -emit-irgen %s | %FileCheck %s
 sil_stage canonical
 
 import Swift

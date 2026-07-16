@@ -947,6 +947,190 @@ bb0(%0 : @guaranteed $Proto & Ping):
   return %12 : $Ping
 }
 
+// Check that CSE merges two guaranteed open_existential_ref that open the
+// same existential to the same constraints: only one open_existential_ref
+// survives, and the second's users (which reference its distinct opened
+// archetype) are rewritten via LocalArchetypeCloner to use the first's.
+// CHECK-LABEL: sil [ossa] @cse_open_existential_ref_guaranteed :
+// CHECK: [[OPEN:%.*]] = open_existential_ref %0
+// CHECK: witness_method {{.*}}, #Proto.doThis : {{.*}}, [[OPEN]]
+// CHECK: apply {{%.*}}<{{.*}}>([[OPEN]])
+// CHECK-NOT: open_existential_ref
+// CHECK: witness_method {{.*}}, #Proto.doThat : {{.*}}, [[OPEN]]
+// CHECK: apply {{%.*}}<{{.*}}>([[OPEN]])
+// CHECK-LABEL: } // end sil function 'cse_open_existential_ref_guaranteed'
+sil [ossa] @cse_open_existential_ref_guaranteed : $@convention(thin) (@guaranteed Proto) -> () {
+bb0(%0 : @guaranteed $Proto):
+  %1 = open_existential_ref %0 : $Proto to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self
+  %2 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self, #Proto.doThis, %1 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %3 = apply %2<@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %4 = open_existential_ref %0 : $Proto to $@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self
+  %5 = witness_method $@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self, #Proto.doThat, %4 : $@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %6 = apply %5<@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Check that CSE merges two guaranteed open_existential_ref even when the
+// redundant one's result crosses into a successor block argument that has
+// a borrowed_from marker. The borrowed_from's result type is cached from
+// its operand at construction and is never re-derived, so it must be
+// re-cloned when the block argument's type is remapped -- otherwise it is
+// left referencing the erased open_existential_ref's local archetype,
+// orphaning that archetype's GenericEnvironment.
+// CHECK-LABEL: sil [ossa] @cse_open_existential_ref_blockarg :
+// CHECK: [[OPEN:%.*]] = open_existential_ref %0
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK-NOT: open_existential_ref
+// CHECK: br bb2([[OPEN]]
+// CHECK: bb2([[ARG:%.*]] :
+// CHECK: borrowed [[ARG]]
+// CHECK-LABEL: } // end sil function 'cse_open_existential_ref_blockarg'
+sil [ossa] @cse_open_existential_ref_blockarg : $@convention(thin) (@guaranteed Proto, Builtin.Int1) -> () {
+bb0(%0 : @guaranteed $Proto, %f : $Builtin.Int1):
+  %1 = open_existential_ref %0 : $Proto to $@opened("5B68354A-4796-11E6-B7DF-B8E856428C65", Proto) Self
+  %2 = witness_method $@opened("5B68354A-4796-11E6-B7DF-B8E856428C65", Proto) Self, #Proto.doThis, %1 : $@opened("5B68354A-4796-11E6-B7DF-B8E856428C65", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %3 = apply %2<@opened("5B68354A-4796-11E6-B7DF-B8E856428C65", Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  br bb1
+
+bb1:
+  %8 = open_existential_ref %0 : $Proto to $@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self
+  br bb2(%8 : $@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self)
+
+bb2(%9 : @guaranteed $@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self):
+  %9b = borrowed %9 from (%0)
+  %10 = witness_method $@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self, #Proto.doThat, %9b : $@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %11 = apply %10<@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self>(%9b) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// Check that CSE does not merge open_existential_ref when its result is
+// @owned (not @guaranteed). In OSSA, replacing an owned result would require
+// inserting ownership-fixup copies (OwnershipRAUW), which this pass
+// deliberately avoids -- see the ownership guard in getHash.
+// CHECK-LABEL: sil [ossa] @dont_cse_open_existential_ref_owned :
+// CHECK: open_existential_ref
+// CHECK: open_existential_ref
+// CHECK-LABEL: } // end sil function 'dont_cse_open_existential_ref_owned'
+sil [ossa] @dont_cse_open_existential_ref_owned : $@convention(thin) (@owned Proto) -> () {
+bb0(%0 : @owned $Proto):
+  %1 = copy_value %0 : $Proto
+  %2 = open_existential_ref %0 : $Proto to $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self
+  %3 = witness_method $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self, #Proto.doThis, %2 : $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %4 = apply %3<@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self>(%2) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  destroy_value %2 : $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self
+  %6 = open_existential_ref %1 : $Proto to $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self
+  %7 = witness_method $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self, #Proto.doThat, %6 : $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %8 = apply %7<@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self>(%6) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  destroy_value %6 : $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// Check that CSE merges two guaranteed open_existential_ref whose users are
+// themselves cloned (here, copy_value followed by init_existential_ref, the
+// pattern produced by lowering `===` on an `any AnyObject`-constrained
+// existential). copy_value's result type is cached from its operand's type
+// at construction and never re-derived, so the redundant open_existential_ref's
+// direct uses must be redirected to the surviving one *before* cloning,
+// otherwise the clone keeps a stale reference to the erased archetype while
+// init_existential_ref's ConcreteType field (remapped independently) points
+// at the new one, leaving inconsistent SIL.
+// CHECK-LABEL: sil [ossa] @cse_open_existential_ref_identity :
+// CHECK: [[OPEN:%.*]] = open_existential_ref {{%.*}}
+// CHECK: [[COPY1:%.*]] = copy_value [[OPEN]]
+// CHECK: init_existential_ref [[COPY1]] : $@opened({{.*}}) Self : $@opened({{.*}}) Self, $AnyObject
+// CHECK-NOT: open_existential_ref
+// CHECK: [[COPY2:%.*]] = copy_value [[OPEN]]
+// CHECK: init_existential_ref [[COPY2]] : $@opened({{.*}}) Self : $@opened({{.*}}) Self, $AnyObject
+// CHECK-LABEL: } // end sil function 'cse_open_existential_ref_identity'
+sil [ossa] @cse_open_existential_ref_identity : $@convention(thin) (@guaranteed Proto) -> () {
+bb0(%0 : @guaranteed $Proto):
+  %b = begin_borrow %0
+  %1 = open_existential_ref %b : $Proto to $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self
+  %2 = copy_value %1 : $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self
+  %3 = init_existential_ref %2 : $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self : $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self, $AnyObject
+  %4 = open_existential_ref %b : $Proto to $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self
+  %5 = copy_value %4 : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self
+  %6 = init_existential_ref %5 : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self, $AnyObject
+  end_borrow %b
+  destroy_value %3 : $AnyObject
+  destroy_value %6 : $AnyObject
+  %r = tuple ()
+  return %r : $()
+}
+
+// Check that CSE merges two guaranteed open_existential_ref even when one of
+// the redundant one's users is a `copy_value`. Unlike `witness_method`, whose
+// clone visitor independently remaps its result type via getOpType,
+// `copy_value`'s clone visitor just derives its result type from its
+// operand's type at construction time. If the redundant open_existential_ref's
+// uses were only redirected to the dominating one *after* copy_value gets
+// cloned, the clone would bake in the erased archetype's stale type,
+// crashing the verifier once the redundant open_existential_ref is erased.
+// CHECK-LABEL: sil [ossa] @cse_open_existential_ref_copy_value :
+// CHECK: [[OPEN:%.*]] = open_existential_ref %0
+// CHECK: witness_method {{.*}}, #Proto.doThis : {{.*}}, [[OPEN]]
+// CHECK-NOT: open_existential_ref
+// CHECK: [[COPY:%.*]] = copy_value [[OPEN]]
+// CHECK: witness_method {{.*}}, #Proto.doThat : {{.*}}, [[OPEN]]
+// CHECK: apply {{%.*}}<{{.*}}>([[COPY]])
+// CHECK: destroy_value [[COPY]]
+// CHECK-LABEL: } // end sil function 'cse_open_existential_ref_copy_value'
+sil [ossa] @cse_open_existential_ref_copy_value : $@convention(thin) (@guaranteed Proto) -> () {
+bb0(%0 : @guaranteed $Proto):
+  %1 = open_existential_ref %0 : $Proto to $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self
+  %2 = witness_method $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self, #Proto.doThis, %1 : $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %3 = apply %2<@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  br bb1
+
+bb1:
+  %5 = open_existential_ref %0 : $Proto to $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self
+  %6 = copy_value %5 : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self
+  %7 = witness_method $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self, #Proto.doThat, %5 : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %8 = apply %7<@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self>(%6) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  destroy_value %6 : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// Check that CSE merges two guaranteed open_existential_ref even when the
+// redundant one's result crosses into a successor block argument that has
+// no explicit `borrowed_from` marker of its own (the parser/verifier infers
+// one implicitly for a guaranteed phi). The inferred borrowed_from's result
+// type is cached from the phi's type at construction and is never
+// re-derived, so it must be explicitly refreshed (via updateGuaranteedPhis)
+// when the block argument's type is remapped -- otherwise it is left
+// referencing the erased open_existential_ref's local archetype.
+// CHECK-LABEL: sil [ossa] @cse_open_existential_ref_blockarg_implicit_borrow :
+// CHECK: [[OPEN:%.*]] = open_existential_ref %0
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK-NOT: open_existential_ref
+// CHECK: br bb2([[OPEN]]
+// CHECK: bb2([[ARG:%.*]] :
+// CHECK: borrowed [[ARG]]
+// CHECK-LABEL: } // end sil function 'cse_open_existential_ref_blockarg_implicit_borrow'
+sil [ossa] @cse_open_existential_ref_blockarg_implicit_borrow : $@convention(thin) (@guaranteed Proto) -> () {
+bb0(%0 : @guaranteed $Proto):
+  %1 = open_existential_ref %0 : $Proto to $@opened("9B68354A-4796-11E6-B7DF-B8E856428C69", Proto) Self
+  %2 = witness_method $@opened("9B68354A-4796-11E6-B7DF-B8E856428C69", Proto) Self, #Proto.doThis, %1 : $@opened("9B68354A-4796-11E6-B7DF-B8E856428C69", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %3 = apply %2<@opened("9B68354A-4796-11E6-B7DF-B8E856428C69", Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  br bb1
+
+bb1:
+  %8 = open_existential_ref %0 : $Proto to $@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self
+  br bb2(%8 : $@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self)
+
+bb2(%9 : @guaranteed $@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self):
+  %10 = witness_method $@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self, #Proto.doThat, %9 : $@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %11 = apply %10<@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self>(%9) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %15 = tuple ()
+  return %15 : $()
+}
+
 sil [ossa] [global_init] @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
 
 // CHECK-LABEL: sil [ossa] @cse_global_init :
