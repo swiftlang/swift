@@ -496,7 +496,7 @@ extension DropFirstSequence: Sequence {
   public typealias SubSequence = AnySequence<Element>
   
   @inlinable
-  public var underestimatedCount: Int { _base.underestimatedCount > _limit ? _base.underestimatedCount &- _limit : 0 }
+  public var underestimatedCount: Int { Swift.max(_assumeNonNegative(_base.underestimatedCount) - _assumeNonNegative(_limit), 0) }
 
   @inlinable
   @inline(__always)
