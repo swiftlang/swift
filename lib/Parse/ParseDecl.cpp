@@ -7565,13 +7565,6 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                              trailingWhereClause);
   ext->attachParsedAttrs(Attributes);
 
-  // Detect `extension P.Protocol { }` — a protocol metatype extension.
-  // Strip the `.Protocol` suffix so the extension binds to the protocol `P`.
-  if (auto *PTR = dyn_cast_or_null<ProtocolTypeRepr>(extendedType.getPtrOrNull())) {
-    ext->setIsMetatypeExtension();
-    ext->setExtendedTypeRepr(PTR->getBase());
-  }
-
   if (trailingWhereHadCodeCompletion && CodeCompletionCallbacks)
     CodeCompletionCallbacks->setParsedDecl(ext);
 

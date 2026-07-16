@@ -324,6 +324,9 @@ public:
   /// Whether the locator in question is for a pattern match.
   bool isForPatternMatch() const;
 
+  /// Whether the locator is for a named or `_` pattern decl.
+  bool isForPatternDecl() const;
+
   /// Whether this locator identifies an element type of a collection literal.
   bool isForCollectionElement() const;
 

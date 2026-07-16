@@ -844,3 +844,11 @@ _ = {
     1
   }
 }
+
+// https://github.com/swiftlang/swift/issues/85353
+func testOptionalMismatch(_ e: E, optStr: String?, i: Int) -> String? {
+  switch e {
+  case .e, .f: optStr
+  case .g: i // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+  }
+}

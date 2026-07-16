@@ -2,9 +2,8 @@
 
 // Protocol metatype extensions are reserved for COM interop: only a protocol
 // marked @com may carry one, and there is no user-facing feature flag that
-// unlocks them for arbitrary protocols. Every metatype extension written on a
-// non-@com type is rejected before any of the other metatype-extension
-// constraints are considered.
+// unlocks them for arbitrary protocols. A metatype extension written on a
+// non-@com *protocol* is rejected as reserved for COM interop.
 
 protocol P {}
 
@@ -17,10 +16,11 @@ extension P.Protocol { // expected-error {{protocol metatype extensions are rese
 protocol Q: P {}
 extension Q.Protocol {} // expected-error {{protocol metatype extensions are reserved for COM interop}}
 
-// --- Metatype extension on non-protocol types is rejected the same way; the
-//     COM-only check runs first.
+// --- `.Protocol` on a non-protocol type is not a protocol metatype at all, so
+//     it is rejected as an invalid metatype spelling before the COM-only rule
+//     is reached.
 struct S {}
-extension S.Protocol {} // expected-error {{protocol metatype extensions are reserved for COM interop}}
+extension S.Protocol {} // expected-error {{cannot use 'Protocol' with non-protocol type 'S'}}
 
 class C {}
-extension C.Protocol {} // expected-error {{protocol metatype extensions are reserved for COM interop}}
+extension C.Protocol {} // expected-error {{cannot use 'Protocol' with non-protocol type 'C'}}

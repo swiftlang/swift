@@ -866,7 +866,7 @@ protected:
     NumPathElements : 8
   );
 
-  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1+1,
+  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1,
     /// An encoding of the default and maximum access level for this extension.
     /// The value 4 corresponds to AccessLevel::Public
     ///
@@ -876,11 +876,7 @@ protected:
     DefaultAndMaxAccessLevel : 4,
 
     /// Whether there is are lazily-loaded conformances for this extension.
-    HasLazyConformances : 1,
-
-    /// Whether this is a `metatype extension` whose members live on the
-    /// protocol metatype and are not inherited by conforming types.
-    IsMetatypeExtension : 1
+    HasLazyConformances : 1
   );
 
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
@@ -2160,12 +2156,11 @@ public:
   SourceRange getBraces() const { return Braces; }
   void setBraces(SourceRange braces) { Braces = braces; }
 
-  bool isMetatypeExtension() const {
-    return Bits.ExtensionDecl.IsMetatypeExtension;
-  }
-  void setIsMetatypeExtension(bool value = true) {
-    Bits.ExtensionDecl.IsMetatypeExtension = value;
-  }
+  /// Whether this is a protocol metatype extension (`extension P.Protocol`).
+  /// Derived from the extended type representation for parsed extensions, or
+  /// from the extended type (the protocol metatype `(any P).Type`) for a
+  /// deserialized or synthesized extension that has no representation.
+  bool isMetatypeExtension() const;
 
   bool hasBeenBound() const { return ExtendedNominal.getInt(); }
 
