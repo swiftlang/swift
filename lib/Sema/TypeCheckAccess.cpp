@@ -2960,6 +2960,32 @@ void registerPackageAccessForPackageExtendedType(ExtensionDecl *ED) {
   // package visibility.
   recordRequiredImportAccessLevelForDecl(extendedType, DC, AccessLevel::Package,
                                          ED->getLoc());
+
+  // Also record types that appear only in the extension's where clause, so
+  // their modules count as used at package level.
+  if (ED->getTrailingWhereClause()) {
+    auto record = [&](const ValueDecl *VD, const TypeRepr *typeRepr) {
+      if (!VD)
+        return;
+      recordRequiredImportAccessLevelForDecl(
+          VD, DC, AccessLevel::Package,
+          typeRepr ? typeRepr->getLoc() : ED->getLoc());
+    };
+
+    forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
+      if (typeRepr) {
+        typeRepr->walk(DeclRefTypeReprFinder([&](const DeclRefTypeRepr *TR) {
+          record(TR->getBoundDecl(), TR);
+          return true;
+        }));
+      } else if (type) {
+        type.walk(SimpleTypeDeclFinder([&](const ValueDecl *VD) {
+          record(VD, /*typeRepr=*/nullptr);
+          return TypeWalker::Action::Continue;
+        }));
+      }
+    });
+  }
 }
 
 void swift::checkAccessControl(Decl *D) {
