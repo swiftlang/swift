@@ -26,7 +26,7 @@ public func test2(_: @autoclosure @called(once) () -> ()) {}
 // CHECK: #endif
 public func test3(_: () -> @called(once) () -> Void) {}
 
-public struct Test {
+public struct Test: ~Copyable {
   // CHECK: #if compiler(>=5.3) && $CalledAttribute
   // CHECK: public let prop: (@called(once) () -> Swift::Void)?
   // CHECK: #endif

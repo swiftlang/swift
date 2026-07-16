@@ -30,12 +30,12 @@ func testInResultPosition(_: () -> @called(once) () -> Void) {}
 // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
 
 func testInner() {
-  let array = [@called(once) () -> ()]() // Ok
+  let opt: (@called(once) () -> ())? = nil
   // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
-  _ = array
+  _ = opt
 }
 
-struct Test {
+struct Test : ~Copyable {
   let prop: @called(once) () -> Void // Ok
   // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
 }
