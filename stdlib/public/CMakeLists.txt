@@ -397,6 +397,19 @@ else()
   add_subdirectory(Cxx/libstdcxx)
 endif()
 
+# Directory containing the freshly-built compiler plugins (SwiftMacros, etc.).
+# Stdlib modules that use a compiler-plugin macro -- e.g. `@DebugDescription`,
+# or `_SwiftifyImport` synthesized from Clang bounds-safety annotations in a
+# bridging header -- must pass this via `-plugin-path` so the compiler uses the
+# just-built plugin instead of falling back to a stale one from the host
+# toolchain. Computed once here and inherited by the stdlib subdirectories
+# below (core, EmbeddedPlatform, Synchronization, ...).
+if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_HOST_PLUGINS_DIR "${CMAKE_BINARY_DIR}/lib/swift/host/plugins")
+else()
+  set(SWIFT_HOST_PLUGINS_DIR "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/host/plugins")
+endif()
+
 if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
