@@ -382,7 +382,7 @@ bb0(%arg : @owned $C):
 // CHECK: } // end sil function 'chained_callee'
 sil [ossa] @chained_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> () {
 bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
-  debug_value %0, var, name "c", argno 1
+  debug_value %0, var, name "c", argno 1, expr op_deref
   %2 = function_ref @simple_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
   %1 = copy_value %0
   %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
