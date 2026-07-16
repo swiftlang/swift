@@ -604,3 +604,8 @@ extension G where T == Int {
     }
   }
 }
+
+@_noAllocation
+func testUntypedDeallocation(_ p: UnsafeMutableRawPointer) {
+    p.deallocate() // expected-error {{this code pattern can cause a deallocation}}
+}
