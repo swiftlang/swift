@@ -308,6 +308,19 @@ public struct CancellationError: Error {
   public init() {}
 }
 
+@available(SwiftStdlib 5.1, *)
+extension CancellationError: CustomStringConvertible {
+  /// Preserves the historical `CancellationError()` textual representation
+  /// so `print(CancellationError())` doesn't leak the internal
+  /// `_reasonRawStorage` field.
+  public var description: String {
+    if #available(StdlibDeploymentTarget 6.5, *), _reasonRawStorage != 0xFF {
+      return "CancellationError(reason: \(reason))"
+    }
+    return "CancellationError()"
+  }
+}
+
 @available(StdlibDeploymentTarget 6.5, *)
 extension CancellationError {
   /// Describes why a task was cancelled.
