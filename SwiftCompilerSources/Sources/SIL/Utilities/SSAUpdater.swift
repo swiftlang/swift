@@ -108,18 +108,19 @@ public struct InstructionBasedSSAUpdater<Context: MutatingContext> {
         isSorted = true
       }
 
+      let vals = values
       var low = 0
-      var high = values.endIndex - 1
+      var high = vals.endIndex - 1
 
       while low != high {
         let mid = (low + high + 1) / 2
-        if instruction.dominatesInBlock(values[mid].atInstruction) {
+        if instruction.dominatesInBlock(vals[mid].atInstruction) {
           high = mid - 1
         } else {
           low = mid
         }
       }
-      let (value, atInstruction) = values[low]
+      let (value, atInstruction) = vals[low]
       if atInstruction.strictlyDominatesInBlock(instruction) {
         return value
       }
