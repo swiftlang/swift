@@ -36,6 +36,15 @@ public struct GenericSignature: CustomStringConvertible, NoReflectionChildren {
 
   public var isEmpty: Bool { bridged.impl == nil }
 
+  /// Whether every generic parameter in this signature is constrained to a
+  /// concrete type.
+  public var areAllParamsConcrete: Bool { bridged.areAllParamsConcrete() }
+
+  /// Whether every generic parameter in this signature is either constrained
+  /// to a concrete type or class-constrained (the two forms permitted by
+  /// Embedded Swift).
+  public var canBeEmittedInEmbeddedSwift: Bool { bridged.canBeEmittedInEmbeddedSwift() }
+
   public var canonicalSignature: CanonicalGenericSignature {
     CanonicalGenericSignature(bridged: bridged.getCanonicalSignature())
   }

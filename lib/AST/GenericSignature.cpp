@@ -196,6 +196,23 @@ bool GenericSignatureImpl::hasParameterPack() const {
   return false;
 }
 
+bool GenericSignatureImpl::canBeEmittedInEmbeddedSwift() const {
+  for (auto param: getGenericParams()) {
+    // Ignore parameters that are mapped to concrete types.
+    if (isConcreteType(Type(param)))
+      continue;
+
+    // Class-constrained parameters are okay.
+    if (auto layout = getLayoutConstraint(Type(param)))
+      if (layout->isClass())
+        continue;
+
+    return false;
+  }
+
+  return true;
+}
+
 ASTContext &GenericSignature::getASTContext(
                                     ArrayRef<GenericTypeParamType *> params,
                                     ArrayRef<swift::Requirement> requirements) {
