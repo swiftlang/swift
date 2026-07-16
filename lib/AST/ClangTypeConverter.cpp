@@ -454,11 +454,18 @@ clang::QualType ClangTypeConverter::visitTupleType(TupleType *type) {
       return clang::QualType();
   }
 
+  APInt size(32, tupleNumElements);
+  return convertCArrayType(eltTy, size);
+}
+
+clang::QualType
+ClangTypeConverter::convertCArrayType(Type eltTy, const APInt &size) {
+  ASSERT(!size.isZero());
+
   auto clangEltTy = convert(eltTy);
   if (clangEltTy.isNull())
     return clang::QualType();
 
-  APInt size(32, tupleNumElements);
   return ClangASTContext.getConstantArrayType(
       clangEltTy, size, nullptr, clang::ArraySizeModifier::Normal, 0);
 }
