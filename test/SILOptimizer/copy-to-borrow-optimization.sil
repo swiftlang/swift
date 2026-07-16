@@ -2376,11 +2376,11 @@ bb0(%0 : @guaranteed $Outer):
 // CHECK-LABEL: sil [ossa] @store_to_store_borrow :
 // CHECK:         %2 = alloc_stack $C
 // CHECK-NEXT:    %3 = store_borrow %0 to %2
-// CHECK-NEXT:    debug_value %3
+// CHECK-NEXT:    debug_value %3, var, name "x", expr op_deref
 // CHECK-NEXT:    apply undef(%3)
 // CHECK-NEXT:    load [copy] %3
 // CHECK-NEXT:    copy_addr %3 to %1
-// CHECK-NEXT:    debug_value %3
+// CHECK-NEXT:    debug_value %3, expr op_deref
 // CHECK-NEXT:    end_borrow %3
 // CHECK-NEXT:    dealloc_stack %2
 // CHECK-LABEL: } // end sil function 'store_to_store_borrow'
@@ -2388,12 +2388,12 @@ sil [ossa] @store_to_store_borrow : $@convention(thin) (@guaranteed C, @inout C)
 bb0(%0 : @guaranteed $C, %1 : $*C):
   %2 = copy_value %0
   %3 = alloc_stack $C
-  debug_value %3, var, name "x"
+  debug_value %3, var, name "x", expr op_deref
   store %2 to [init] %3
   %4 = apply undef(%3) : $@convention(thin) (@in_guaranteed C) -> ()
   %5 = load [copy] %3
   copy_addr %3 to %1
-  debug_value %3
+  debug_value %3, expr op_deref
   destroy_addr %3
   dealloc_stack %3
   return %5
@@ -2403,11 +2403,11 @@ bb0(%0 : @guaranteed $C, %1 : $*C):
 // CHECK:         %2 = alloc_stack $C
 // CHECK:       bb1:
 // CHECK-NEXT:    %4 = store_borrow %0 to %2
-// CHECK-NEXT:    debug_value %4
+// CHECK-NEXT:    debug_value %4, var, name "x", expr op_deref
 // CHECK-NEXT:    apply undef(%4)
 // CHECK-NEXT:    load [copy] %4
 // CHECK-NEXT:    copy_addr %4 to %1
-// CHECK-NEXT:    debug_value %4
+// CHECK-NEXT:    debug_value %4, expr op_deref
 // CHECK-NEXT:    end_borrow %4
 // CHECK-NEXT:    dealloc_stack %2
 // CHECK-LABEL: } // end sil function 'store_to_store_borrow_multi_bb'
@@ -2415,7 +2415,7 @@ sil [ossa] @store_to_store_borrow_multi_bb : $@convention(thin) (@guaranteed C, 
 bb0(%0 : @guaranteed $C, %1 : $*C):
   %2 = copy_value %0
   %3 = alloc_stack $C
-  debug_value %3, var, name "x"
+  debug_value %3, var, name "x", expr op_deref
   br bb1
 
 bb1:
@@ -2423,7 +2423,7 @@ bb1:
   %4 = apply undef(%3) : $@convention(thin) (@in_guaranteed C) -> ()
   %5 = load [copy] %3
   copy_addr %3 to %1
-  debug_value %3
+  debug_value %3, expr op_deref
   destroy_addr %3
   dealloc_stack %3
   return %5
