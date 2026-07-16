@@ -1078,12 +1078,12 @@ OperandOwnershipBuiltinClassifier::visitTaskPushDeadline(BuiltinInst *bi,
 }
 
 /// `customIDBox` (index 1) is borrowed - the runtime does not consume it;
-/// scalar operands are trivial.
+/// scalar operands are trivial. The customIDBox is passed as a raw pointer
+/// (index into a Swift-owned heap allocation whose lifetime is enforced
+/// separately by the caller), so all operands are TrivialUse.
 OperandOwnership
 OperandOwnershipBuiltinClassifier::visitTaskFindNearestDeadlineForClock(
     BuiltinInst *bi, StringRef attr) {
-  if (&op == &bi->getOperandRef(1))
-    return OperandOwnership::InstantaneousUse;
   return OperandOwnership::TrivialUse;
 }
 

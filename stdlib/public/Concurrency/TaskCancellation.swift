@@ -258,6 +258,25 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
+@available(StdlibDeploymentTarget 6.5, *)
+extension Task where Success == Never, Failure == Never {
+  /// The reason for the current task's cancellation, or `nil` if the task is
+  /// not cancelled.
+  ///
+  /// Mirrors ``Task/isCancelled``: once this returns a non-nil value it will
+  /// consistently return the same value for the remaining life of the task.
+  ///
+  /// Reading this from outside the context of a task returns `nil`.
+  ///
+  /// - SeeAlso: ``Task/isCancelled``
+  /// - SeeAlso: ``CancellationError/Reason``
+  public static var cancellationReason: CancellationError.Reason? {
+    unsafe withUnsafeCurrentTask { task in
+      unsafe task?.cancellationReason
+    }
+  }
+}
+
 @available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
   /// Throws an error if the task was canceled.
@@ -279,8 +298,58 @@ extension Task where Success == Never, Failure == Never {
 /// if the current task has been canceled.
 @available(SwiftStdlib 5.1, *)
 public struct CancellationError: Error {
+  // Raw storage for `Reason.rawValue`. `0xFF` sentinel means "unset";
+  // read back through `reason` yields `.unspecified` in that case. The
+  // struct is not `@frozen`, so growing it with a stored property is
+  // ABI-compatible for the resilient _Concurrency module.
+  internal var _reasonRawStorage: UInt8 = 0xFF
+
   // no extra information, cancellation is intended to be light-weight
   public init() {}
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+extension CancellationError {
+  /// Describes why a task was cancelled.
+  ///
+  /// This enum is non-frozen ("nonexhaustive"). Additional cases may be
+  /// added in future stdlib versions, so switch statements over
+  /// `CancellationError.Reason` should always include an `@unknown default:`
+  /// arm.
+  ///
+  /// - SeeAlso: `Task.cancellationReason`
+  /// - SeeAlso: `Task.cancel(reason:)`
+  public enum Reason: UInt8, Sendable {
+    /// The task was cancelled without a specific reason being provided.
+    ///
+    /// This is the reason produced by the plain `Task.cancel()` /
+    /// `UnsafeCurrentTask.cancel()` / `TaskGroup.cancelAll()` entry points,
+    /// as well as anything upstream that propagates cancellation without
+    /// supplying a reason.
+    case unspecified = 0
+
+    /// The task was cancelled because a `withDeadline` block's deadline
+    /// elapsed.
+    case deadlineExpired = 1
+  }
+
+  /// Create a `CancellationError` with a specific `Reason`.
+  ///
+  /// The `reason` is then accessible via the error's `reason` property.
+  public init(reason: Reason) {
+    self.init()
+    self._reasonRawStorage = reason.rawValue
+  }
+
+  /// The reason this task was cancelled.
+  ///
+  /// Errors constructed via the zero-argument `init()` (either directly or
+  /// by the runtime, e.g. when `Task.checkCancellation()` throws) report
+  /// `.unspecified`. Errors constructed via `init(reason:)` report the
+  /// specified reason.
+  public var reason: Reason {
+    Reason(rawValue: _reasonRawStorage) ?? .unspecified
+  }
 }
 
 @usableFromInline

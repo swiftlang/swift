@@ -7,6 +7,8 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+@_spi(Concurrency) import _Concurrency
+
 @available(StdlibDeploymentTarget 6.5, *)
 @main struct Main {
   static func main() async {

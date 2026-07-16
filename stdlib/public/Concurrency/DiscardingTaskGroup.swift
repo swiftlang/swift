@@ -218,6 +218,15 @@ public struct DiscardingTaskGroup {
     _taskGroupCancelAll(group: _group)
   }
 
+  /// Cancel all of the remaining tasks in the group, recording a specific
+  /// `CancellationError.Reason`.
+  ///
+  /// See ``TaskGroup/cancelAll(reason:)`` for details.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func cancelAll(reason: CancellationError.Reason) {
+    _taskGroupCancelAllWithReason(group: _group, reason: UInt(reason.rawValue))
+  }
+
   /// A Boolean value that indicates whether the group was canceled.
   ///
   /// To cancel a group, call the `DiscardingTaskGroup.cancelAll()` method.
@@ -514,6 +523,15 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// - SeeAlso: `ThrowingDiscardingTaskGroup.isCancelled`
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
+  }
+
+  /// Cancel all of the remaining tasks in the group, recording a specific
+  /// `CancellationError.Reason`.
+  ///
+  /// See ``TaskGroup/cancelAll(reason:)`` for details.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func cancelAll(reason: CancellationError.Reason) {
+    _taskGroupCancelAllWithReason(group: _group, reason: UInt(reason.rawValue))
   }
 
   /// A Boolean value that indicates whether the group was canceled.

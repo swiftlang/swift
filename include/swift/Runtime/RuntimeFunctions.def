@@ -2384,6 +2384,26 @@ FUNCTION(TaskCancel,
          EFFECT(RuntimeEffect::Concurrency),
          MEMEFFECTS(InaccessibleMemOnly))
 
+// void swift_task_cancelWithReason(AsyncTask *task, size_t reason);
+FUNCTION(TaskCancelWithReason,
+         _Concurrency, swift_task_cancelWithReason, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftTaskPtrTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         MEMEFFECTS(InaccessibleMemOnly))
+
+// size_t swift_task_getCancellationReason(AsyncTask *task);
+FUNCTION(TaskGetCancellationReason,
+         _Concurrency, swift_task_getCancellationReason, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(SizeTy),
+         ARGS(SwiftTaskPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         MEMEFFECTS(InaccessibleMemOnly))
+
 // AsyncTaskAndContext swift_task_create(
 //     size_t taskCreateFlags,
 //     TaskOptionRecord *options,

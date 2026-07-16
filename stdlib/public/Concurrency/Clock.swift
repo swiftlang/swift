@@ -140,7 +140,7 @@ enum _ClockID: Int32 {
 /// deadline runtime distinguishes system clocks from custom clocks via a
 /// tagged discriminator, not the numeric value.
 @available(StdlibDeploymentTarget 6.5, *)
-public enum SystemClockID: Int64, Sendable, Hashable {
+public enum SystemClockID: UInt8, Sendable, Hashable {
   case continuous = 1
   case suspending = 2
   case walltime = 3

@@ -494,6 +494,21 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     _taskGroupCancelAll(group: _group)
   }
 
+  /// Cancel all of the remaining tasks in the group, recording a specific
+  /// `CancellationError.Reason`.
+  ///
+  /// Semantically identical to ``cancelAll()``, but the passed `reason` is
+  /// propagated as the cancellation reason for each child task (readable via
+  /// `Task.cancellationReason` from inside those tasks). First-cancel-wins
+  /// on the reason for each child task individually.
+  ///
+  /// - SeeAlso: `cancelAll()`
+  /// - SeeAlso: `CancellationError.Reason`
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func cancelAll(reason: CancellationError.Reason) {
+    _taskGroupCancelAllWithReason(group: _group, reason: UInt(reason.rawValue))
+  }
+
   /// A Boolean value that indicates whether the group was canceled.
   ///
   /// To cancel a group, call the `TaskGroup.cancelAll()` method.
@@ -852,6 +867,15 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     _taskGroupCancelAll(group: _group)
   }
 
+  /// Cancel all of the remaining tasks in the group, recording a specific
+  /// `CancellationError.Reason`.
+  ///
+  /// See ``TaskGroup/cancelAll(reason:)`` for details.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func cancelAll(reason: CancellationError.Reason) {
+    _taskGroupCancelAllWithReason(group: _group, reason: UInt(reason.rawValue))
+  }
+
   /// A Boolean value that indicates whether the group was canceled.
   ///
   /// To cancel a group, call the `ThrowingTaskGroup.cancelAll()` method.
@@ -1117,6 +1141,10 @@ func _taskGroupAddPendingTask(
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_taskGroup_cancelAll")
 func _taskGroupCancelAll(group: Builtin.RawPointer)
+
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_taskGroup_cancelAllWithReason")
+func _taskGroupCancelAllWithReason(group: Builtin.RawPointer, reason: UInt)
 
 /// Checks ONLY if the group was specifically canceled.
 /// The task itself being canceled must be checked separately.

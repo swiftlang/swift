@@ -140,6 +140,19 @@ void swift_job_deallocate(Job *job, void *ptr);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancel(AsyncTask *task);
 
+/// Cancel a task with a specific `CancellationError.Reason`, encoded as a
+/// small integer (0 = unspecified, 1 = deadlineExpired). The reason is stored
+/// on the task's status flags and is observable via `Task.cancellationReason`
+/// from inside the task. First-cancel-wins on the reason: if the task is
+/// already cancelled, this is a no-op with respect to the reason.
+///
+/// The parameter is `size_t` to give future evolution room for more
+/// reasons without an ABI break.
+///
+/// This can be called from any thread.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_cancelWithReason(AsyncTask *task, size_t reason);
+
 /// Cancel all the child tasks that belong to the `group`.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancel_group_child_tasks(TaskGroup *group);
@@ -296,6 +309,13 @@ bool swift_taskGroup_addPending(TaskGroup *group, bool unconditionally);
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_taskGroup_cancelAll(TaskGroup *group);
+
+/// Cancel the group and all of its child tasks with a specific
+/// `CancellationError.Reason` (encoded as a small integer, 0 = unspecified,
+/// 1 = deadlineExpired). Behavior is otherwise identical to
+/// `swift_taskGroup_cancelAll`.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskGroup_cancelAllWithReason(TaskGroup *group, size_t reason);
 
 /// Check ONLY if the group was explicitly cancelled, e.g. by `cancelAll`.
 ///
@@ -698,6 +718,17 @@ size_t swift_task_getJobFlags(AsyncTask* task);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
+
+/// Read the cancellation reason set on the given task. Returns 0 when the
+/// task is not cancelled or was cancelled without a specific reason
+/// (`.unspecified`); returns 1 for `.deadlineExpired`.
+///
+/// Callers should check `swift_task_isCancelled(task)` first if they need
+/// to distinguish "not cancelled" from "cancelled with .unspecified".
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+size_t swift_task_getCancellationReason(AsyncTask* task);
 
 /// This is an options enum that is used to pass flags to
 /// swift_task_isCancelledWithFlags. It is meant to be a flexible toggle.

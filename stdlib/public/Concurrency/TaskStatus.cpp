@@ -875,6 +875,18 @@ void _swift_task_deadlineComponents(TaskDeadlineStatusRecord *record,
   *attoseconds = record->getDeadlineAttoseconds();
 }
 
+/// Fast-path check for `Task.hasActiveDeadline`: reads the task's status
+/// flags without walking any record chain. Returns true iff a deadline
+/// record is currently installed for any clock.
+extern "C" SWIFT_CC(swift)
+bool _swift_task_hasActiveDeadline() {
+  auto task = swift_task_getCurrent();
+  if (!task)
+    return false;
+  auto status = task->_private()._status().load(std::memory_order_relaxed);
+  return status.hasDeadline();
+}
+
 /**************************************************************************/
 /************************** CANCELLATION SCOPES **************************/
 /**************************************************************************/
@@ -1223,7 +1235,7 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
 ///
 /// The caller must guarantee that this is called while holding the owning
 /// task's status record lock.
-void swift::_swift_taskGroup_cancel(TaskGroup *group) {
+void swift::_swift_taskGroup_cancel(TaskGroup *group, size_t reason) {
   (void) group->statusCancel();
 
   // Because only the owning task of the task group can modify the
@@ -1231,22 +1243,23 @@ void swift::_swift_taskGroup_cancel(TaskGroup *group) {
   // while holding the owning task's status record lock, we do not need
   // any additional synchronization within this function.
   for (auto childTask : group->getTaskRecord()->children())
-    swift_task_cancel(childTask);
+    swift_task_cancelWithReason(childTask, reason);
 }
 
 /// Cancel the task group and all the child tasks that belong to `group`.
 ///
 /// The caller must guarantee that this is called from the owning task.
 void swift::_swift_taskGroup_cancel_unlocked(TaskGroup *group,
-                                                        AsyncTask *owningTask) {
+                                             AsyncTask *owningTask,
+                                             size_t reason) {
   // Early out. If there are no children, there's nothing to do. We can safely
   // check this without locking, since this can only be concurrently mutated
   // from a child task. If there are no children then no more can be added.
   if (!group->getTaskRecord()->getFirstChild())
     return;
 
-  ::withStatusRecordLock(owningTask, [&group](ActiveTaskStatus status) {
-    _swift_taskGroup_cancel(group);
+  ::withStatusRecordLock(owningTask, [&group, reason](ActiveTaskStatus status) {
+    _swift_taskGroup_cancel(group, reason);
   });
 }
 
@@ -1254,14 +1267,18 @@ void swift::_swift_taskGroup_cancel_unlocked(TaskGroup *group,
 /****************************** CANCELLATION ******************************/
 /**************************************************************************/
 
-/// Perform any cancellation actions required by the given record.
-static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord *record) {
+/// Perform any cancellation actions required by the given record. The
+/// `reason` is threaded through so child tasks inherit the parent's
+/// cancellation reason.
+static void performCancellationAction(ActiveTaskStatus status,
+                                      TaskStatusRecord *record,
+                                      size_t reason) {
   switch (record->getKind()) {
   // Child tasks need to be recursively cancelled.
   case TaskStatusRecordKind::ChildTask: {
     auto childRecord = cast<ChildTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
-      swift_task_cancel(child);
+      swift_task_cancelWithReason(child, reason);
     return;
   }
 
@@ -1270,7 +1287,7 @@ static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord 
   // under the synchronous control of the task that owns the group.
   case TaskStatusRecordKind::TaskGroup: {
     auto groupRecord = cast<TaskGroupTaskStatusRecord>(record);
-    _swift_taskGroup_cancel(groupRecord->getGroup());
+    _swift_taskGroup_cancel(groupRecord->getGroup(), reason);
     return;
   }
 
@@ -1319,19 +1336,26 @@ static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord 
 
 SWIFT_CC(swift)
 static void swift_task_cancelImpl(AsyncTask *task) {
-  SWIFT_TASK_DEBUG_LOG("cancel task = %p", task);
+  swift_task_cancelWithReason(task, /*unspecified=*/0);
+}
+
+SWIFT_CC(swift)
+static void swift_task_cancelWithReasonImpl(AsyncTask *task, size_t reason) {
+  SWIFT_TASK_DEBUG_LOG("cancel task = %p (reason=%zu)", task, reason);
 
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
   while (true) {
-    // Are we already cancelled? 
+    // Are we already cancelled?
     // Even if we have a cancellation shield active, we do want to set the isCancelled flag.
     if (oldStatus.isCancelled(/*ignoreShield=*/false)) {
       return;
     }
 
-    // Set cancelled bit even if oldStatus.isStatusRecordLocked()
-    newStatus = oldStatus.withCancelled();
+    // Set cancelled bit and reason bit atomically (first cancel wins on
+    // reason). Also handle the case where the status record lock is held -
+    // the flag is set regardless.
+    newStatus = oldStatus.withCancelled(reason);
 
     // consume here pairs with the release in addStatusRecord.
     if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
@@ -1356,7 +1380,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
       // be added since that's only possible while on task.
       //
       // Each action must independently take care of how to deal with cancellation shields.
-      performCancellationAction(newStatus, cur);
+      performCancellationAction(newStatus, cur, reason);
     }
   });
 }

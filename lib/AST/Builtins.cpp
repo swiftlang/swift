@@ -2452,14 +2452,21 @@ static ValueDecl *getTaskPopDeadline(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getTaskFindNearestDeadlineForClock(ASTContext &ctx,
                                                     Identifier id) {
-  // (systemClockRaw: UInt64, customIDBox: Builtin.NativeObject?)
+  // (systemClockRaw: UInt64, customIDBox: Builtin.RawPointer)
   //   -> UnsafeRawPointer
   //
-  // Unlike TaskPushDeadline, the runtime does not consume `customIDBox`.
+  // Unlike TaskPushDeadline, the runtime does not consume `customIDBox`;
+  // to avoid introducing owned SIL values that must then be threaded
+  // through consume/borrow boundaries, this variant takes the box as a
+  // trivial raw pointer instead of a NativeObject. Callers pass either
+  // a null pointer (system-clock case) or the +0 opaque address of a
+  // `_ClockIDBox` obtained via `Unmanaged.passUnretained(box).toOpaque()`
+  // (custom-clock case); the box's lifetime is enforced separately by
+  // `_fixLifetime`.
   return getBuiltinFunction(
       ctx, id, _thin,
       _parameters(_label("systemClockRaw", ctx.getUInt64Type()),
-                  _label("customIDBox", _optional(_nativeObject))),
+                  _label("customIDBox", _rawPointer)),
       _unsafeRawPointer);
 }
 

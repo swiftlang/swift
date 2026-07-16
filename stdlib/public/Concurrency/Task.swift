@@ -252,6 +252,21 @@ extension Task {
   public func cancel() {
     unsafe _taskCancel(_AsyncTask(_task))
   }
+
+  /// Cancel this task, recording a specific `CancellationError.Reason`.
+  ///
+  /// Semantically identical to ``Task/cancel()``, but the passed `reason` is
+  /// stored on the task and can be read back via ``Task/cancellationReason``.
+  /// First-cancel-wins on the reason: if the task is already cancelled, this
+  /// call is a no-op with respect to both the cancelled state and the
+  /// recorded reason.
+  ///
+  /// Child tasks recursively cancelled as a result of this call inherit the
+  /// same reason.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func cancel(reason: CancellationError.Reason) {
+    unsafe _taskCancelWithReason(_AsyncTask(_task), UInt(reason.rawValue))
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -920,6 +935,34 @@ public struct UnsafeCurrentTask {
     unsafe _taskCancel(_rawTask)
   }
 
+  /// Cancel the current task, recording a specific `CancellationError.Reason`.
+  ///
+  /// Semantically identical to `cancel()`, but the passed `reason` is stored
+  /// on the task and can be read back via ``UnsafeCurrentTask/cancellationReason``
+  /// or ``Task/cancellationReason``. First-cancel-wins on the reason: if the
+  /// task is already cancelled, this call is a no-op with respect to both
+  /// the cancelled state and the recorded reason.
+  ///
+  /// Child tasks recursively cancelled as a result of this call inherit the
+  /// same reason.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func cancel(reason: CancellationError.Reason) {
+    unsafe _taskCancelWithReason(_rawTask, UInt(reason.rawValue))
+  }
+
+  /// The reason for the current task's cancellation, or `nil` if the task
+  /// is not cancelled.
+  ///
+  /// Mirrors ``UnsafeCurrentTask/isCancelled``: once this returns non-nil it
+  /// will consistently return the same value for the remaining life of the
+  /// task. Not affected by cancellation shields.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public var cancellationReason: CancellationError.Reason? {
+    let raw = unsafe _taskGetCancellationReason(_rawTask)
+    guard unsafe _taskIsCancelled(_rawTask) else { return nil }
+    return CancellationError.Reason(rawValue: UInt8(truncatingIfNeeded: raw)) ?? .unspecified
+  }
+
   /// Checks if this task is executing in a scope with a task cancellation shield activated by the
   /// ``withTaskCancellationShield(operation:)-(()->Value)`` function.
   ///
@@ -1117,6 +1160,16 @@ public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws
 @_silgen_name("swift_task_cancel")
 @usableFromInline
 internal func _taskCancel(_ task: _AsyncTask)
+
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_task_cancelWithReason")
+@usableFromInline
+internal func _taskCancelWithReason(_ task: _AsyncTask, _ reason: UInt)
+
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_task_getCancellationReason")
+@usableFromInline
+internal func _taskGetCancellationReason(_ task: _AsyncTask) -> UInt
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_isCancelled")

@@ -111,13 +111,14 @@ AsyncTask *_swift_task_setCurrent(AsyncTask *newTask);
 ///
 /// The caller must guarantee that this is called while holding the owning
 /// task's status record lock.
-void _swift_taskGroup_cancel(TaskGroup *group);
+void _swift_taskGroup_cancel(TaskGroup *group, size_t reason);
 
 /// Cancel the task group and all the child tasks that belong to `group`.
 ///
 /// The caller must guarantee that this is called from the owning task.
 void _swift_taskGroup_cancel_unlocked(TaskGroup *group,
-                                                 AsyncTask *owningTask);
+                                      AsyncTask *owningTask,
+                                      size_t reason);
 
 /// Remove the given task from the given task group.
 ///
@@ -586,6 +587,13 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// code that composes with `withDeadline` but rarely actually installs
     /// one.
     HasDeadline = 0x1000000,
+
+    /// Additional bit that qualifies `IsCancelled`: when set, the cancellation
+    /// was caused by a deadline expiring (via `cancel(reason: .deadlineExpired)`).
+    /// When unset while `IsCancelled` is set, the reason is `.unspecified`.
+    /// Meaningless unless `IsCancelled` is set. First-cancel-wins on the reason;
+    /// once set it is not modified by subsequent cancels.
+    CancelReasonDeadlineExpired = 0x2000000,
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -676,6 +684,21 @@ public:
   bool isCancelledIgnoringShield() const { return Flags & IsCancelled; }
   ActiveTaskStatus withCancelled() const {
     return withFlags(Flags | IsCancelled);
+  }
+  ActiveTaskStatus withCancelled(size_t reason) const {
+    // Reasons are set only once, when transitioning from not-cancelled to
+    // cancelled. Callers should have checked `!isCancelled()` first.
+    uintptr_t bit = (reason == /*deadlineExpired*/ 1)
+      ? uintptr_t(CancelReasonDeadlineExpired) : 0;
+    return withFlags(Flags | IsCancelled | bit);
+  }
+
+  // CancellationReason
+  /// Read the cancellation-reason bit. Meaningful only when `isCancelled()`
+  /// (or `isCancelledIgnoringShield()`) returns true. Returns 0 for
+  /// `.unspecified` and 1 for `.deadlineExpired`.
+  size_t getCancellationReason() const {
+    return (Flags & CancelReasonDeadlineExpired) ? 1 : 0;
   }
 
   // IsStatusRecordLocked

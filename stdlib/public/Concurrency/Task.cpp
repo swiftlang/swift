@@ -1797,6 +1797,13 @@ bool swift::swift_task_isCancelledWithFlags(AsyncTask *task,
   return task->isCancelled(ignoreCancellationShield);
 }
 
+size_t swift::swift_task_getCancellationReason(AsyncTask *task) {
+  auto status = task->_private()._status().load(std::memory_order_relaxed);
+  if (!status.isCancelledIgnoringShield())
+    return 0;
+  return status.getCancellationReason();
+}
+
 SWIFT_CC(swift)
 static CancellationNotificationStatusRecord*
 swift_task_addCancellationHandlerImpl(
