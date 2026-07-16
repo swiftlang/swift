@@ -843,6 +843,9 @@ public:
 
   /// Returns true if the loop iterates from 0 until count of \p selfValue.
   bool isZeroToCount(SILValue selfValue) {
+    if (preIncrement) {
+      return false;
+    }
     return getZeroToCountOfSelf(Ind->Start, Ind->End) == selfValue;
   }
 
