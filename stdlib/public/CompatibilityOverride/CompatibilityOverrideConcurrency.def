@@ -442,12 +442,8 @@ OVERRIDE_TASK_STATUS(task_pushDeadline,
                      TaskDeadlineStatusRecord *,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::,
-                     (uint64_t systemClockRaw,
-                      HeapObject *customIDBox,
-                      int64_t deadlineSeconds,
-                      int64_t deadlineAttoseconds),
-                     (systemClockRaw, customIDBox, deadlineSeconds,
-                      deadlineAttoseconds))
+                     (const Metadata *clockType, HeapObject *box),
+                     (clockType, box))
 
 OVERRIDE_TASK_STATUS(task_popDeadline, void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -455,11 +451,14 @@ OVERRIDE_TASK_STATUS(task_popDeadline, void,
                      (record))
 
 OVERRIDE_TASK_STATUS(task_findNearestDeadlineForClock,
-                     TaskDeadlineStatusRecord *,
+                     HeapObject *,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::,
-                     (uint64_t systemClockRaw, HeapObject *customIDBox),
-                     (systemClockRaw, customIDBox))
+                     (OpaqueValue *queryClock,
+                      const Metadata *clockType,
+                      const WitnessTable *clockWT,
+                      const WitnessTable *identifiableWT),
+                     (queryClock, clockType, clockWT, identifiableWT))
 
 // task_pushCancellationScope takes no arguments; the COMPATIBILITY_OVERRIDE
 // macro machinery cannot express an empty parameter tuple, so this

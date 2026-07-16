@@ -105,35 +105,29 @@ func withDeadline<Return, Failure, C>(
   where Return: ~Copyable,
         Failure: Error,
         C: Clock & Identifiable {
-  let (seconds, attoseconds) = _instantComponents(expiration, clock: clock)
-
-  // Fast path: if an outer `withDeadline` for this clock is already in effect
-  // and its deadline is at or before ours, the outer one governs. Just run
-  // `operation` inline - no record push, no cancellation scope, no timer.
+  // Fast path: if an outer `withDeadline` for this clock is already in
+  // effect and its deadline is at or before ours, the outer one governs.
+  // Just run `operation` inline - no record push, no cancellation scope,
+  // no timer allocation.
   //
-  // This matches the invariant the runtime relies on to make
-  // `swift_task_findNearestDeadlineForClock` return the tightest record with
-  // a single chain walk: because we (and the runtime's own subsumption
-  // fast-path) never install a looser deadline for a clock that already has
-  // a tighter one, the innermost matching record is always the tightest.
-  let incoming = _DeadlineComponents(seconds: seconds, atto: attoseconds)
-  if let outer = _findNearestDeadline(clock: clock), outer <= incoming {
+  // The runtime maintains the invariant that the innermost matching
+  // record on the chain is the tightest one (because this fast-path
+  // itself refuses to install a looser deadline). So a single lookup
+  // returns the currently governing deadline.
+  if let outer = _findNearestDeadline(clock: clock), outer <= expiration {
     return try await operation()
   }
 
-  // Encode the clock identity in the tagged form the runtime uses: for the
-  // built-in system clocks we pass a small integer raw value and no box; for
-  // custom clocks we pass 0 as the raw value and a Swift-side `_ClockIDBox`
-  // wrapping `clock.id` as `AnyHashable`. The runtime consumes the +1 on
-  // `customIDBox` (releasing it either on pop or immediately if the push is
-  // subsumed - e.g. because another path installed a tighter deadline for
-  // the same clock between our fast-path check and the push).
-  let (systemClockRaw, customIDBox) = _encodeClockIdentityForPush(clock)
+  // Allocate a `_ClockBox<C>` on the Swift heap that carries both the
+  // clock and the deadline instant. The runtime consumes the +1 on push
+  // and releases it on pop.
+  let box = _ClockBox<C>(clock: clock, deadline: expiration)
+  let opaque = unsafe Unmanaged.passRetained(box).toOpaque()
+  let native = unsafe Builtin.reinterpretCast(opaque) as Builtin.NativeObject
+  let clockTypeRaw = unsafe Builtin.reinterpretCast(C.self) as Builtin.RawPointer
   let deadlineRecord = unsafe Builtin.taskPushDeadline(
-    systemClockRaw: systemClockRaw,
-    customIDBox: customIDBox,
-    deadlineSeconds: seconds,
-    deadlineAttoseconds: attoseconds)
+    clockType: clockTypeRaw,
+    box: native)
   defer { unsafe Builtin.taskPopDeadline(record: deadlineRecord) }
 
   // Arm a detached timer task on the given clock that will cancel the
@@ -150,50 +144,6 @@ func withDeadline<Return, Failure, C>(
     )
     defer { disarm() }
     return try await operation()
-  }
-}
-
-/// The two-word `Swift.Duration` representation the deadline runtime stores
-/// on a `TaskDeadlineStatusRecord`, exposed to Swift as an internal value
-/// type so we can define a lexicographic `<=` (and a full `Comparable`
-/// conformance) on it directly.
-///
-/// This is an implementation detail of `withDeadline` / `_findNearestDeadline`
-/// and is not part of the public API. It is exposed as `@_spi(Concurrency)`
-/// so runtime tests can inspect the innermost active deadline.
-@_spi(Concurrency)
-@available(StdlibDeploymentTarget 6.5, *)
-@frozen
-public struct _DeadlineComponents: Comparable, Sendable {
-  public var seconds: Int64
-  public var atto: Int64
-
-  @inlinable
-  public init(seconds: Int64, atto: Int64) {
-    self.seconds = seconds
-    self.atto = atto
-  }
-
-  /// Lexicographic ordering on (seconds, atto). Mirrors `compareDeadline` in
-  /// TaskStatus.cpp so that the Swift-side subsumption fast-path stays in
-  /// sync with what the runtime does.
-  @inlinable
-  public static func < (
-    lhs: _DeadlineComponents,
-    rhs: _DeadlineComponents
-  ) -> Bool {
-    if lhs.seconds != rhs.seconds {
-      return lhs.seconds < rhs.seconds
-    }
-    return lhs.atto < rhs.atto
-  }
-
-  @inlinable
-  public static func == (
-    lhs: _DeadlineComponents,
-    rhs: _DeadlineComponents
-  ) -> Bool {
-    return lhs.seconds == rhs.seconds && lhs.atto == rhs.atto
   }
 }
 
@@ -313,143 +263,116 @@ private func _armDeadlineTimer<C: Clock & Identifiable>(
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: Clock identity encoding
+// MARK: Clock box
 
-/// A heap-allocated box wrapping a custom clock's `id` as an `AnyHashable`.
+/// A non-generic base class carrying identity/compare methods that dispatch
+/// via Swift's dynamic-dispatch table into the concrete `_ClockBox<C>`.
+@available(StdlibDeploymentTarget 6.5, *)
+internal class _AnyClockBox {
+  init() {}
+
+  /// Whether `other` refers to the same logical clock as `self`.
+  ///
+  /// The caller (runtime) has already checked that both records have the
+  /// same `ClockType` metadata pointer, so both boxes are known to be
+  /// `_ClockBox<C>` for the same `C`. Concrete `_ClockBox<C>` overrides
+  /// this method with a properly-typed comparison of `clock.id`.
+  func hasSameClock(as other: _AnyClockBox) -> Bool {
+    // Base implementation reached only if someone instantiates a bare
+    // `_AnyClockBox` (should never happen).
+    return self === other
+  }
+}
+
+/// A heap-allocated Swift class that stores both the clock instance and the
+/// deadline instant. Retained by the `TaskDeadlineStatusRecord` on push and
+/// released on pop.
+@available(StdlibDeploymentTarget 6.5, *)
+internal final class _ClockBox<C: Clock & Identifiable>: _AnyClockBox {
+  let clock: C
+  let deadline: C.Instant
+
+  init(clock: C, deadline: C.Instant) {
+    self.clock = clock
+    self.deadline = deadline
+    super.init()
+  }
+
+  override func hasSameClock(as other: _AnyClockBox) -> Bool {
+    // The runtime guaranteed both records share ClockType metadata, so
+    // the downcast succeeds. Use unchecked downcast for the common path.
+    guard let typed = other as? _ClockBox<C> else { return false }
+    return clock.id == typed.clock.id
+  }
+}
+
+/// Bridged Swift-side helper called by the runtime for each candidate
+/// record while walking the chain looking for a deadline for the query
+/// clock. Both arguments are `_AnyClockBox` instances; the dispatch to
+/// `hasSameClock(as:)` picks the right `_ClockBox<C>.hasSameClock` via
+/// Swift's virtual dispatch, without any metadata plumbing on the C++
+/// side.
 ///
-/// Custom-clock deadlines pass a `+1` `_ClockIDBox` to the runtime via
-/// `Builtin.taskPushDeadline`; the runtime holds the reference for the
-/// lifetime of the installed record and calls back into Swift via
-/// `_swift_task_deadlineClockIDsEqual` to compare two records' clocks.
+/// C++-side ABI signature (see TaskStatus.cpp):
+///
+///     extern "C" SWIFT_CC(swift)
+///     bool _task_deadline_boxesSameClock(HeapObject *a, HeapObject *b);
 @available(StdlibDeploymentTarget 6.5, *)
-internal final class _ClockIDBox {
-  let id: AnyHashable
-  init(_ id: AnyHashable) { self.id = id }
-}
-
-/// Runtime callback: compare the underlying `AnyHashable` values of two
-/// `_ClockIDBox`es. Non-box arguments compare as unequal.
-@available(StdlibDeploymentTarget 6.5, *)
-@_silgen_name("_swift_task_deadlineClockIDsEqual")
-internal func _clockIDsEqual(_ a: AnyObject, _ b: AnyObject) -> Bool {
-  guard let boxA = a as? _ClockIDBox, let boxB = b as? _ClockIDBox else {
-    return false
-  }
-  return boxA.id == boxB.id
-}
-
-/// Map a `Clock & Identifiable` to the tagged form the deadline runtime
-/// uses to determine subsumption between nested deadlines on the same
-/// clock. Built-in system clocks encode as `(SystemClockID.rawValue, nil)`;
-/// custom clocks encode as `(0, +1 _ClockIDBox)`. Exactly one branch
-/// produces a non-null box; the runtime consumes the retain on push.
-@available(StdlibDeploymentTarget 6.5, *)
-@inline(__always)
-private func _encodeClockIdentityForPush<C: Clock & Identifiable>(
-  _ clock: C
-) -> (systemClockRaw: UInt64, customIDBox: Builtin.NativeObject?) {
-  if let known = clock.id as? SystemClockID {
-    return (UInt64(known.rawValue), nil)
-  }
-  // Allocate a heap-owned box and hand a +1 to the runtime. `passRetained`
-  // performs the retain-and-take-ownership dance; the returned opaque
-  // pointer is reinterpreted as a `Builtin.NativeObject` for the builtin.
-  let box = _ClockIDBox(AnyHashable(clock.id))
-  let opaque = unsafe Unmanaged.passRetained(box).toOpaque()
-  let native = unsafe Builtin.reinterpretCast(opaque)
-    as Builtin.NativeObject
-  return (0, native)
-}
-
-// ==== -----------------------------------------------------------------------
-// MARK: Instant decomposition
-
-/// Break a `C.Instant` into its two-component `Swift.Duration` representation
-/// (`(seconds, attoseconds)`) relative to the clock's reference point, as
-/// required by `Builtin.taskPushDeadline`. For the built-in clocks whose
-/// `Instant` wraps a `Swift.Duration` we go through their `_value` accessor
-/// directly; for custom clocks we approximate using
-/// `clock.now.duration(to: expiration)`.
-@available(StdlibDeploymentTarget 6.5, *)
-@inline(__always)
-private func _instantComponents<C: Clock & Identifiable>(
-  _ expiration: C.Instant,
-  clock: C
-) -> (seconds: Int64, attoseconds: Int64) {
-  if C.self == ContinuousClock.self {
-    let inst = unsafe unsafeBitCast(expiration, to: ContinuousClock.Instant.self)
-    return inst._value.components
-  }
-  if C.self == SuspendingClock.self {
-    let inst = unsafe unsafeBitCast(expiration, to: SuspendingClock.Instant.self)
-    return inst._value.components
-  }
-  // Fallback: represent the deadline as the duration from `now` to
-  // `expiration`. This loses the "absolute point in time" semantics but
-  // still gives a stable ordering for subsumption comparisons.
-  let dur = unsafe unsafeBitCast(clock.now.duration(to: expiration), to: Swift.Duration.self)
-  return dur.components
+@_silgen_name("_task_deadline_boxesSameClock")
+internal func _task_deadline_boxesSameClock(
+  _ a: AnyObject, _ b: AnyObject
+) -> Bool {
+  guard let boxA = a as? _AnyClockBox, let boxB = b as? _AnyClockBox
+  else { return false }
+  return boxA.hasSameClock(as: boxB)
 }
 
 // ==== -----------------------------------------------------------------------
 // MARK: Nearest-deadline SPI
 
 /// Query the innermost active deadline installed on the current task for
-/// the given clock, or nil if none. Returned as the same two-component
-/// `Swift.Duration` representation the runtime stores.
+/// the given clock, or nil if none.
 ///
-/// Intended for the `withDeadline` fast-path and internal tests / diagnostics.
-/// Exposed as `@_spi(Concurrency)` so runtime tests can query the active
-/// deadline; not part of the general public API.
+/// Intended for the `withDeadline` fast-path and internal tests /
+/// diagnostics. Exposed as `@_spi(Concurrency)` so runtime tests can
+/// query the active deadline; not part of the general public API.
 @_spi(Concurrency)
 @available(StdlibDeploymentTarget 6.5, *)
 public func _findNearestDeadline<C: Clock & Identifiable>(
   clock: C
-) -> _DeadlineComponents? {
-  // For system clocks: pass the raw value and a null pointer.
-  // For custom clocks: allocate a *temporary* box that we own for the
-  // duration of this call. Unlike `taskPushDeadline` (which consumes the
-  // box), `taskFindNearestDeadlineForClock` only borrows it via a raw
-  // pointer, so the box is released when this function returns.
-  let boxRaw: Builtin.RawPointer
-  let clockRaw: UInt64
-  let keepAlive: _ClockIDBox?
-  if let known = clock.id as? SystemClockID {
-    clockRaw = UInt64(known.rawValue)
-    boxRaw = unsafe Builtin.inttoptr_Word(0._builtinWordValue)
-    keepAlive = nil
-  } else {
-    let box = _ClockIDBox(AnyHashable(clock.id))
-    let opaque = unsafe Unmanaged.passUnretained(box).toOpaque()
-    clockRaw = 0
-    boxRaw = opaque._rawValue
-    keepAlive = box
-  }
-  let ptr: UnsafeRawPointer = unsafe Builtin.taskFindNearestDeadlineForClock(
-    systemClockRaw: clockRaw,
-    customIDBox: boxRaw)
-  _fixLifetime(keepAlive)
+) -> C.Instant? {
+  // Build a query box with the clock instance and a placeholder deadline;
+  // only the identity fields (clock.id via the virtual `hasSameClock`
+  // override) are consulted by the bridge, the deadline is unused.
+  let queryBox = _ClockBox<C>(clock: clock, deadline: clock.now)
+  let queryRaw = unsafe Unmanaged.passUnretained(queryBox).toOpaque()._rawValue
+  let clockTypeRaw = unsafe Builtin.reinterpretCast(C.self) as Builtin.RawPointer
 
-  if Int(bitPattern: ptr) == 0 {
+  let matchedRaw: Builtin.RawPointer = unsafe Builtin.taskFindNearestDeadlineForClock(
+    queryClock: queryRaw,
+    clockType: clockTypeRaw,
+    // clockWT + identifiableWT are unused by this path; runtime dispatches
+    // via the AnyObject-based bridge which does virtual dispatch on the
+    // box's Swift class.
+    clockWT: unsafe Builtin.inttoptr_Word(0._builtinWordValue),
+    identifiableWT: unsafe Builtin.inttoptr_Word(0._builtinWordValue))
+  _fixLifetime(queryBox)
+
+  // Null pointer means "no matching record".
+  let matchedInt = Int(bitPattern: UnsafeRawPointer(matchedRaw))
+  if matchedInt == 0 {
     return nil
   }
-  var secs: Int64 = 0
-  var atto: Int64 = 0
-  unsafe _swift_task_deadlineComponents(record: ptr,
-                                        seconds: &secs,
-                                        attoseconds: &atto)
-  return _DeadlineComponents(seconds: secs, atto: atto)
-}
 
-/// Read the (seconds, attoseconds) components off a
-/// `TaskDeadlineStatusRecord *` returned by
-/// `Builtin.taskFindNearestDeadlineForClock`.
-@available(StdlibDeploymentTarget 6.5, *)
-@_silgen_name("_swift_task_deadlineComponents")
-internal func _swift_task_deadlineComponents(
-  record: UnsafeRawPointer,
-  seconds: UnsafeMutablePointer<Int64>,
-  attoseconds: UnsafeMutablePointer<Int64>)
+  // Runtime handed us +1. Wrap via Unmanaged so ARC releases it once we
+  // read the deadline off it. `matchedRaw` points at a `_ClockBox<C>`
+  // (ClockType matched pointer-equal and hasSameClock returned true).
+  let matchedBox: AnyObject =
+    unsafe Unmanaged<AnyObject>.fromOpaque(UnsafeRawPointer(matchedRaw))
+      .takeRetainedValue()
+  let typed = unsafe unsafeDowncast(matchedBox, to: _ClockBox<C>.self)
+  return typed.deadline
+}
 
 // ==== -----------------------------------------------------------------------
 // MARK: Task.hasActiveDeadline / activeDeadline(for:)
@@ -478,7 +401,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// The returned instant is the earliest deadline whose clock identity
   /// (`clock.id`) matches the argument's - nested `withDeadline` scopes
-  /// on the same clock are coalesced by the runtime to the tightest one.
+  /// on the same clock are coalesced to the tightest one.
   ///
   /// Deadlines installed for a *different* clock are ignored (there is no
   /// meaningful cross-clock conversion, so no attempt is made to unify
@@ -491,32 +414,7 @@ extension Task where Success == Never, Failure == Never {
   public static func activeDeadline<C: Clock & Identifiable>(
     for clock: C
   ) -> C.Instant? {
-    guard let components = _findNearestDeadline(clock: clock) else {
-      return nil
-    }
-    // Reconstruct the C.Instant from the (seconds, atto) components. For
-    // the built-in clocks whose Instant wraps a Swift.Duration we can
-    // reverse `_instantComponents` via unsafeBitCast; for custom clocks we
-    // fall back to `clock.now.advanced(by: duration)` where `duration` is
-    // the total duration from the clock's reference point.
-    let duration = Swift.Duration(
-      secondsComponent: components.seconds,
-      attosecondsComponent: components.atto)
-    if C.self == ContinuousClock.self {
-      let instant = ContinuousClock.Instant(_value: duration)
-      return unsafe unsafeBitCast(instant, to: C.Instant.self)
-    }
-    if C.self == SuspendingClock.self {
-      let instant = SuspendingClock.Instant(_value: duration)
-      return unsafe unsafeBitCast(instant, to: C.Instant.self)
-    }
-    // Custom clocks: interpret the stored (seconds, atto) as a duration
-    // from `clock.now`, which is how `_instantComponents` derived it for
-    // custom clocks in the first place. This does drift when clock.now
-    // has advanced since installation; that's a known limitation while
-    // custom-clock deadlines fall through the duration-based path.
-    let dur = unsafe unsafeBitCast(duration, to: C.Instant.Duration.self)
-    return clock.now.advanced(by: dur)
+    _findNearestDeadline(clock: clock)
   }
 }
 

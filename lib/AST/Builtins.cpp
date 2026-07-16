@@ -2429,19 +2429,20 @@ static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
 }
 
 static ValueDecl *getTaskPushDeadline(ASTContext &ctx, Identifier id) {
-  // (systemClockRaw: UInt64, customIDBox: __owned Builtin.NativeObject?,
-  //  deadlineSeconds: Int64, deadlineAttoseconds: Int64) -> UnsafeRawPointer
+  // (clockType: Builtin.RawPointer, box: __owned Builtin.NativeObject)
+  //   -> UnsafeRawPointer
   //
-  // The `customIDBox` operand is a consumed reference: the runtime takes
-  // ownership of the +1 and releases it either on pop or immediately if
-  // the push is subsumed. Ownership plumbing is handled by the
-  // OperandOwnership/ValueOwnership entries for TaskPushDeadline.
+  // `clockType` is a raw metatype pointer (Swift side obtains it by
+  // reinterpreting `C.self` via unsafeBitCast). Kept as a trivial raw
+  // pointer at the SIL level to avoid a generic-arg dance for a value
+  // that only ever needs to be compared by pointer-equality.
+  //
+  // `box` is a retained (+1) `_ClockBox<C>` reference; the runtime takes
+  // ownership and releases it on pop.
   return getBuiltinFunction(
       ctx, id, _thin,
-      _parameters(_label("systemClockRaw", ctx.getUInt64Type()),
-                  _label("customIDBox", _owned(_optional(_nativeObject))),
-                  _label("deadlineSeconds", ctx.getInt64Type()),
-                  _label("deadlineAttoseconds", ctx.getInt64Type())),
+      _parameters(_label("clockType", _rawPointer),
+                  _label("box", _owned(_nativeObject))),
       _unsafeRawPointer);
 }
 
@@ -2452,22 +2453,24 @@ static ValueDecl *getTaskPopDeadline(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getTaskFindNearestDeadlineForClock(ASTContext &ctx,
                                                     Identifier id) {
-  // (systemClockRaw: UInt64, customIDBox: Builtin.RawPointer)
-  //   -> UnsafeRawPointer
+  // (queryClock: Builtin.RawPointer,
+  //  clockType: Builtin.RawPointer,
+  //  clockWT: Builtin.RawPointer,
+  //  identifiableWT: Builtin.RawPointer) -> Builtin.RawPointer
   //
-  // Unlike TaskPushDeadline, the runtime does not consume `customIDBox`;
-  // to avoid introducing owned SIL values that must then be threaded
-  // through consume/borrow boundaries, this variant takes the box as a
-  // trivial raw pointer instead of a NativeObject. Callers pass either
-  // a null pointer (system-clock case) or the +0 opaque address of a
-  // `_ClockIDBox` obtained via `Unmanaged.passUnretained(box).toOpaque()`
-  // (custom-clock case); the box's lifetime is enforced separately by
-  // `_fixLifetime`.
+  // At the SIL/builtin level all four arguments and the result are
+  // trivial raw pointers. The runtime returns a nullable `HeapObject *`;
+  // callers wrap it via `Unmanaged` on the Swift side once they've
+  // null-checked. Keeping the result trivial avoids IRGen complexity
+  // around optional-of-builtin-nativeobject and matches the pattern used
+  // by `TaskCancellationScopePush`.
   return getBuiltinFunction(
       ctx, id, _thin,
-      _parameters(_label("systemClockRaw", ctx.getUInt64Type()),
-                  _label("customIDBox", _rawPointer)),
-      _unsafeRawPointer);
+      _parameters(_label("queryClock", _rawPointer),
+                  _label("clockType", _rawPointer),
+                  _label("clockWT", _rawPointer),
+                  _label("identifiableWT", _rawPointer)),
+      _rawPointer);
 }
 
 static ValueDecl *getTaskCancellationScopePush(ASTContext &ctx, Identifier id) {

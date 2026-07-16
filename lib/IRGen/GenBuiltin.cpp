@@ -1600,12 +1600,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
   case BuiltinValueKind::TaskPushDeadline: {
-    auto *systemClockRaw = args.claimNext();
-    auto *customIDBox = args.claimNext();
-    auto *deadlineSeconds = args.claimNext();
-    auto *deadlineAttoseconds = args.claimNext();
-    out.add(emitBuiltinTaskPushDeadline(IGF, systemClockRaw, customIDBox,
-                                        deadlineSeconds, deadlineAttoseconds));
+    auto *clockType = args.claimNext();
+    auto *box = args.claimNext();
+    out.add(emitBuiltinTaskPushDeadline(IGF, clockType, box));
     return;
   }
   case BuiltinValueKind::TaskPopDeadline: {
@@ -1614,10 +1611,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
   case BuiltinValueKind::TaskFindNearestDeadlineForClock: {
-    auto *systemClockRaw = args.claimNext();
-    auto *customIDBox = args.claimNext();
-    out.add(emitBuiltinTaskFindNearestDeadlineForClock(IGF, systemClockRaw,
-                                                       customIDBox));
+    auto *queryClock = args.claimNext();
+    auto *clockType = args.claimNext();
+    auto *clockWT = args.claimNext();
+    auto *identifiableWT = args.claimNext();
+    out.add(emitBuiltinTaskFindNearestDeadlineForClock(
+        IGF, queryClock, clockType, clockWT, identifiableWT));
     return;
   }
   case BuiltinValueKind::RemoveTaskLocalValue:

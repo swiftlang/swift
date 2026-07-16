@@ -142,25 +142,25 @@ void emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF);
 
 /// Emit IR for the taskPushDeadline builtin.
 ///
-/// \returns the record pointer to hand back to emitBuiltinTaskPopDeadline;
-/// this may be null if the push was subsumed by an existing tighter
-/// deadline installed for the same clock.
+/// \returns the record pointer to hand back to emitBuiltinTaskPopDeadline.
 llvm::Value *emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
-                                         llvm::Value *systemClockRaw,
-                                         llvm::Value *customIDBox,
-                                         llvm::Value *deadlineSeconds,
-                                         llvm::Value *deadlineAttoseconds);
+                                         llvm::Value *clockType,
+                                         llvm::Value *box);
 
 /// Emit IR for the taskPopDeadline builtin.
 void emitBuiltinTaskPopDeadline(IRGenFunction &IGF, llvm::Value *record);
 
 /// Emit IR for the taskFindNearestDeadlineForClock builtin.
 ///
-/// \returns the innermost matching `TaskDeadlineStatusRecord *` cast to
-/// UnsafeRawPointer, or a nil raw pointer if no deadline for the clock is
-/// installed.
+/// The builtin is generic-over-C at the SIL level; IRGen supplies the
+/// four ABI-lowered args: the query clock's OpaqueValue address, plus
+/// the type metadata and witness tables for `C: Clock & Identifiable`.
+///
+/// \returns the matching `_ClockBox<C>` viewed as HeapObject *, borrowed
+/// (+0); nullptr if no deadline for the clock is installed.
 llvm::Value *emitBuiltinTaskFindNearestDeadlineForClock(
-    IRGenFunction &IGF, llvm::Value *systemClockRaw, llvm::Value *customIDBox);
+    IRGenFunction &IGF, llvm::Value *queryClock, llvm::Value *clockType,
+    llvm::Value *clockWT, llvm::Value *identifiableWT);
 
 /// Emit IR for the taskCancellationScopePush builtin.
 ///

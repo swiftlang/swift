@@ -2754,13 +2754,12 @@ FUNCTION(TaskRemovePriorityEscalationHandler,
          UNKNOWN_MEMEFFECTS)
 
 // TaskDeadlineStatusRecord*
-// swift_task_pushDeadline(uint64_t systemClockRaw, HeapObject *customIDBox,
-//                         int64_t deadlineSeconds, int64_t deadlineAttoseconds);
+// swift_task_pushDeadline(const Metadata *clockType, HeapObject *box);
 FUNCTION(TaskPushDeadline,
         _Concurrency, swift_task_pushDeadline, SwiftCC,
         ConcurrencyAvailability,
         RETURNS(Int8PtrTy),
-        ARGS(Int64Ty, Int8PtrTy, Int64Ty, Int64Ty),
+        ARGS(Int8PtrTy, Int8PtrTy),
         ATTRS(NoUnwind),
         EFFECT(RuntimeEffect::Concurrency),
         UNKNOWN_MEMEFFECTS)
@@ -2775,14 +2774,16 @@ FUNCTION(TaskPopDeadline,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// TaskDeadlineStatusRecord*
-// swift_task_findNearestDeadlineForClock(uint64_t systemClockRaw,
-//                                        HeapObject *customIDBox);
+// HeapObject *
+// swift_task_findNearestDeadlineForClock(OpaqueValue *queryClock,
+//                                        const Metadata *clockType,
+//                                        const WitnessTable *clockWT,
+//                                        const WitnessTable *identifiableWT);
 FUNCTION(TaskFindNearestDeadlineForClock,
          _Concurrency, swift_task_findNearestDeadlineForClock, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(Int8PtrTy),
-         ARGS(Int64Ty, Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)

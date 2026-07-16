@@ -1066,9 +1066,10 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
   return OperandOwnership::TrivialUse;
 }
 
-/// The `customIDBox` operand (index 1) is a consumed +1 `NativeObject?`;
-/// all other operands (`systemClockRaw`, `deadlineSeconds`,
-/// `deadlineAttoseconds`) are trivial UInt64/Int64 scalars.
+/// TaskPushDeadline takes (clockType: Builtin.RawPointer,
+/// box: __owned Builtin.NativeObject). The `box` operand at index 1 is
+/// consumed by the runtime; `clockType` at index 0 is a trivial raw
+/// pointer.
 OperandOwnership
 OperandOwnershipBuiltinClassifier::visitTaskPushDeadline(BuiltinInst *bi,
                                                         StringRef attr) {
@@ -1077,10 +1078,10 @@ OperandOwnershipBuiltinClassifier::visitTaskPushDeadline(BuiltinInst *bi,
   return OperandOwnership::TrivialUse;
 }
 
-/// `customIDBox` (index 1) is borrowed - the runtime does not consume it;
-/// scalar operands are trivial. The customIDBox is passed as a raw pointer
-/// (index into a Swift-owned heap allocation whose lifetime is enforced
-/// separately by the caller), so all operands are TrivialUse.
+/// TaskFindNearestDeadlineForClock takes four raw pointers (queryClock,
+/// clockType, clockWT, identifiableWT). All trivial - the caller retains
+/// ownership of the underlying box and the runtime only borrows through
+/// the pointers.
 OperandOwnership
 OperandOwnershipBuiltinClassifier::visitTaskFindNearestDeadlineForClock(
     BuiltinInst *bi, StringRef attr) {
