@@ -36,7 +36,8 @@ if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
   endif()
 elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded" OR
        "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "hooked" OR
-       "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "none")
+       "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "none" OR
+       "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "wasi")
   list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
     "-DSWIFT_CONCURRENCY_ENABLE_DISPATCH=0")
 else()
@@ -192,6 +193,17 @@ elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
     ExecutorImpl.swift
     PlatformExecutorCooperative.swift
     )
+elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "wasi")
+  # Multithreaded default executor for wasm32-unknown-wasip1-threads: a pool of
+  # wasi-threads worker threads (WASIGlobalExecutor.cpp) fronted by the Swift
+  # executors in PlatformExecutorWASI.swift.
+  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
+    WASIGlobalExecutor.cpp
+  )
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    ExecutorImpl.swift
+    PlatformExecutorWASI.swift
+  )
 else()
   set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
     ExecutorImpl.swift
@@ -202,6 +214,7 @@ endif()
 set(LLVM_OPTIONAL_SOURCES
   DispatchGlobalExecutor.cpp
   CooperativeGlobalExecutor.cpp
+  WASIGlobalExecutor.cpp
   DispatchGlobalExecutor.cpp
   CFExecutor.cpp
 )
