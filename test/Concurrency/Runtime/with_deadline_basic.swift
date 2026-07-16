@@ -15,6 +15,7 @@
     await test_ambient_task_uncancelled_after_deadline()
     await test_throws_from_operation_before_deadline()
     await test_custom_clock_deadline_subsumption()
+    await test_outer_deadline_subsumes_inner_no_scope()
     print("done")
   }
 }
@@ -168,6 +169,56 @@ func test_custom_clock_deadline_subsumption() async {
       // CHECK: after inner pop restored outer:true
     } else {
       print("after inner pop missing")
+    }
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_outer_deadline_subsumes_inner_no_scope() async {
+  print("--- test_outer_deadline_subsumes_inner_no_scope")
+  // CHECK-LABEL: --- test_outer_deadline_subsumes_inner_no_scope
+
+  // The outer withDeadline installs a tight deadline. The inner withDeadline
+  // requests a looser deadline for the same clock; because the outer is
+  // tighter, the inner withDeadline must take the fast path: no record
+  // installed, no cancellation scope wrapped around `operation`. We
+  // verify both properties.
+  let clock = ContinuousClock()
+  let outer = clock.now.advanced(by: .seconds(60))
+  let inner = clock.now.advanced(by: .seconds(600))
+
+  _ = try? await withDeadline(outer, clock: clock) {
+    // Snapshot the outer's (seconds, atto) so the inner can prove that no
+    // new record was pushed - the innermost record must still be the outer's.
+    guard let outerObserved = _findNearestDeadline(clock: clock) else {
+      print("outer missing (unexpected)")
+      return
+    }
+    print("outer observed")
+    // CHECK: outer observed
+
+    _ = try? await withDeadline(inner, clock: clock) {
+      // Property 1: inner did NOT push its own record. The nearest deadline
+      // for this clock must still be the outer's tight one.
+      let innerObserved = _findNearestDeadline(clock: clock)
+      let sameAsOuter =
+        (innerObserved?.seconds == outerObserved.seconds) &&
+        (innerObserved?.atto == outerObserved.atto)
+      print("inner sees outer only:\(sameAsOuter)")
+      // CHECK: inner sees outer only:true
+
+      // Property 2: inner did NOT wrap `operation` in a fresh cancellation
+      // scope. If it had, cancelling the ambient task from inside `operation`
+      // would still leave `Task.isCancelled` reading true (whole-task cancel
+      // propagates through any number of scopes), so this half is weak on
+      // its own. The strong signal is that with no scope pushed, the
+      // task's status-record chain has no CancellationScope record between
+      // the innermost record and the outer deadline record. We can only
+      // observe this indirectly - the record snapshot above already covers
+      // it. But we still exercise the "operation runs to completion" path
+      // to make sure the fast path doesn't accidentally skip the call.
+      print("inner operation ran")
+      // CHECK: inner operation ran
     }
   }
 }

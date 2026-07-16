@@ -105,14 +105,30 @@ func withDeadline<Return, Failure, C>(
   where Return: ~Copyable,
         Failure: Error,
         C: Clock & Identifiable {
+  let (seconds, attoseconds) = _instantComponents(expiration, clock: clock)
+
+  // Fast path: if an outer `withDeadline` for this clock is already in effect
+  // and its deadline is at or before ours, the outer one governs. Just run
+  // `operation` inline - no record push, no cancellation scope, no timer.
+  //
+  // This matches the invariant the runtime relies on to make
+  // `swift_task_findNearestDeadlineForClock` return the tightest record with
+  // a single chain walk: because we (and the runtime's own subsumption
+  // fast-path) never install a looser deadline for a clock that already has
+  // a tighter one, the innermost matching record is always the tightest.
+  if let outer = _findNearestDeadline(clock: clock),
+     _deadlineLessOrEqual(outer, (seconds, attoseconds)) {
+    return try await operation()
+  }
+
   // Encode the clock identity in the tagged form the runtime uses: for the
   // built-in system clocks we pass a small integer raw value and no box; for
   // custom clocks we pass 0 as the raw value and a Swift-side `_ClockIDBox`
   // wrapping `clock.id` as `AnyHashable`. The runtime consumes the +1 on
   // `customIDBox` (releasing it either on pop or immediately if the push is
-  // subsumed by an outer deadline for the same clock).
+  // subsumed - e.g. because another path installed a tighter deadline for
+  // the same clock between our fast-path check and the push).
   let (systemClockRaw, customIDBox) = _encodeClockIdentityForPush(clock)
-  let (seconds, attoseconds) = _instantComponents(expiration, clock: clock)
   let deadlineRecord = unsafe Builtin.taskPushDeadline(
     systemClockRaw: systemClockRaw,
     customIDBox: customIDBox,
@@ -137,6 +153,101 @@ func withDeadline<Return, Failure, C>(
   }
 }
 
+/// Lexicographic `<=` on the (seconds, attoseconds) deadline representation
+/// the runtime stores, mirroring `compareDeadline` in TaskStatus.cpp.
+@available(StdlibDeploymentTarget 6.5, *)
+@inline(__always)
+private func _deadlineLessOrEqual(
+  _ a: (seconds: Int64, atto: Int64),
+  _ b: (seconds: Int64, atto: Int64)
+) -> Bool {
+  if a.seconds != b.seconds {
+    return a.seconds < b.seconds
+  }
+  return a.atto <= b.atto
+}
+
+// ==== -----------------------------------------------------------------------
+// MARK: withDeadline(in:) shorthand
+
+/// Executes an operation with the expectation it completes within the given
+/// relative timeout, measured against `clock.now` at the point of call.
+///
+/// This is a shorthand for the instant-based `withDeadline` that constructs
+/// the deadline as `clock.now.advanced(by: timeout)` and forwards to the
+/// primary entry point; all deadline composition rules (minimum-expiration
+/// nesting, subsumption per clock identity) apply exactly as they do there.
+///
+/// ```swift
+/// let value = try await withDeadline(in: .seconds(5)) {
+///     try await fetchDataFromServer()
+/// }
+/// ```
+///
+/// - Parameters:
+///   - timeout: The duration, relative to `clock.now`, by which the
+///     operation must complete.
+///   - tolerance: The tolerance used for the sleep.
+///   - clock: The clock to use for measuring time.
+///   - operation: The asynchronous operation to complete before the deadline.
+///
+/// - Returns: The result of the operation if it completes successfully before or after the deadline expires.
+/// - Throws: The error thrown by the operation.
+@available(StdlibDeploymentTarget 6.5, *)
+public nonisolated(nonsending)
+func withDeadline<Return, Failure, C>(
+  in timeout: C.Instant.Duration,
+  tolerance: C.Instant.Duration? = nil,
+  clock: C = ContinuousClock(),
+  operation: nonisolated(nonsending) () async throws(Failure) -> Return
+) async throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error,
+        C: Clock & Identifiable {
+  return try await withDeadline(
+    clock.now.advanced(by: timeout),
+    tolerance: tolerance,
+    clock: clock,
+    operation: operation
+  )
+}
+
+/// Executes an operation with the expectation it completes within the given
+/// relative timeout, measured against `ContinuousClock().now` at the point
+/// of call.
+///
+/// This concrete overload disambiguates call sites like
+/// `withDeadline(in: .seconds(5)) { ... }`: because `Swift.Duration` is the
+/// `Instant.Duration` of more than one built-in clock, the generic overload
+/// alone cannot infer `C` from `timeout` when the `clock:` argument is
+/// defaulted.
+///
+/// - Parameters:
+///   - timeout: The duration, relative to `ContinuousClock().now`, by which
+///     the operation must complete.
+///   - tolerance: The tolerance used for the sleep.
+///   - operation: The asynchronous operation to complete before the deadline.
+///
+/// - Returns: The result of the operation if it completes successfully before or after the deadline expires.
+/// - Throws: The error thrown by the operation.
+@available(StdlibDeploymentTarget 6.5, *)
+public nonisolated(nonsending)
+func withDeadline<Return, Failure>(
+  in timeout: ContinuousClock.Instant.Duration,
+  tolerance: ContinuousClock.Instant.Duration? = nil,
+  operation: nonisolated(nonsending) () async throws(Failure) -> Return
+) async throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error {
+  let clock = ContinuousClock()
+  return try await withDeadline(
+    clock.now.advanced(by: timeout),
+    tolerance: tolerance,
+    clock: clock,
+    operation: operation
+  )
+}
+
 // ==== -----------------------------------------------------------------------
 // MARK: Timer arming
 
@@ -150,9 +261,9 @@ private func _armDeadlineTimer<C: Clock & Identifiable>(
 ) -> (@Sendable () -> Void) {
   // The scope handle itself is `~Escapable`, but its underlying record
   // pointer is a plain `UnsafeRawPointer` we can hand to the sending
-  // closure. The scope's lifetime is the body of `__withTaskCancellationScope`
+  // closure. The scope's lifetime is the operation of `__withTaskCancellationScope`
   // above us, and the returned disarm closure is called from `defer` inside
-  // that body - so the record pointer is guaranteed live for the duration
+  // that operation - so the record pointer is guaranteed live for the duration
   // of the timer task.
   let scopeRecord = unsafe scope._record
 
@@ -271,7 +382,7 @@ public func _findNearestDeadline<C: Clock & Identifiable>(
   let ptr: UnsafeRawPointer
   let keepAlive: _ClockIDBox?
   if let known = clock.id as? SystemClockID {
-    ptr = unsafe Builtin.taskFindNearestDeadlineForClock(
+    unsafe ptr = unsafe Builtin.taskFindNearestDeadlineForClock(
       systemClockRaw: UInt64(known.rawValue),
       customIDBox: nil)
     keepAlive = nil
