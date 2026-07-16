@@ -74,7 +74,7 @@ func test_scope_handler_fires() async {
   print("--- test_scope_handler_fires")
   // CHECK: --- test_scope_handler_fires
 
-  // Cancel the scope synchronously from within `body` after installing a
+  // Cancel the scope synchronously from within `operation` after installing a
   // withTaskCancellationHandler; the handler installed inside the scope
   // must fire so that Task.sleep etc. wake up. Since `TaskCancellationScope`
   // is `~Escapable`, cancellation from a truly-external task must go
@@ -236,7 +236,7 @@ func test_scope_ambient_cancel_while_inside_visible() async {
   print("--- test_scope_ambient_cancel_while_inside_visible")
   // CHECK: --- test_scope_ambient_cancel_while_inside_visible
 
-  // Cancelling the whole task from within the scope's body must be
+  // Cancelling the whole task from within the scope's operation must be
   // observed via Task.isCancelled inside the same scope.
   await Task {
     await __withTaskCancellationScope { _ in
