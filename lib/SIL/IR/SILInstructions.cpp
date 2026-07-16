@@ -2059,6 +2059,7 @@ void TermInst::replaceBranchTarget(SILBasicBlock *oldDest, SILBasicBlock *newDes
 bool TermInst::isFunctionExiting() const {
   switch (getTermKind()) {
   case TermKind::AwaitAsyncContinuationInst:
+  case TermKind::AwaitDetachedContinuationInst:
   case TermKind::BranchInst:
   case TermKind::CondBranchInst:
   case TermKind::SwitchValueInst:
@@ -2085,6 +2086,7 @@ bool TermInst::isFunctionExiting() const {
 bool TermInst::isProgramTerminating() const {
   switch (getTermKind()) {
   case TermKind::AwaitAsyncContinuationInst:
+  case TermKind::AwaitDetachedContinuationInst:
   case TermKind::BranchInst:
   case TermKind::CondBranchInst:
   case TermKind::SwitchValueInst:
@@ -2133,6 +2135,7 @@ const Operand *TermInst::forwardedOperand() const {
   case TermKind::DynamicMethodBranchInst:
   case TermKind::CheckedCastAddrBranchInst:
   case TermKind::AwaitAsyncContinuationInst:
+  case TermKind::AwaitDetachedContinuationInst:
     return nullptr;
   case TermKind::SwitchEnumInst: {
     auto *switchEnum = cast<SwitchEnumInst>(this);
@@ -3803,6 +3806,17 @@ SILType GetAsyncContinuationInstBase::getLoweredResumeType() const {
   auto &M = getFunction()->getModule();
   auto c = getFunction()->getTypeExpansionContext();
   return M.Types.getLoweredType(AbstractionPattern::getOpaque(), formalType, c);
+}
+
+AwaitDetachedContinuationInst *AwaitDetachedContinuationInst::create(
+    SILDebugLocation Loc, SILValue Continuation, SILValue ResumeBuf,
+    SILBasicBlock *resumeBB, SILBasicBlock *errorBBOrNull, SILFunction &F) {
+  // Two operands: the continuation token and the resume buffer.
+  auto Size = totalSizeToAlloc<swift::Operand>(2);
+  void *Buffer =
+      F.getModule().allocateInst(Size, alignof(AwaitDetachedContinuationInst));
+  return ::new (Buffer) AwaitDetachedContinuationInst(
+      Loc, Continuation, ResumeBuf, resumeBB, errorBBOrNull);
 }
 
 ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,

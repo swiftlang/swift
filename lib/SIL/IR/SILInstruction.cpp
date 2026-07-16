@@ -1209,6 +1209,7 @@ bool SILInstruction::mayRelease() const {
   case SILInstructionKind::GetAsyncContinuationInst:
   case SILInstructionKind::GetAsyncContinuationAddrInst:
   case SILInstructionKind::AwaitAsyncContinuationInst:
+  case SILInstructionKind::AwaitDetachedContinuationInst:
     return false;
 
   case SILInstructionKind::ApplyInst:
@@ -1679,6 +1680,7 @@ bool SILInstruction::isTriviallyDuplicatable() const {
 
   // Can't duplicate get/await_async_continuation.
   if (isa<AwaitAsyncContinuationInst>(this) ||
+      isa<AwaitDetachedContinuationInst>(this) ||
       isa<GetAsyncContinuationAddrInst>(this) ||
       isa<GetAsyncContinuationInst>(this))
     return false;
@@ -2016,7 +2018,8 @@ MultipleValueInstruction *MultipleValueInstructionResult::getParentImpl() const 
 /// excludes several of these cases.
 bool SILInstruction::maySuspend() const {
   // await_async_continuation always suspends the current task.
-  if (isa<AwaitAsyncContinuationInst>(this))
+  if (isa<AwaitAsyncContinuationInst>(this) ||
+      isa<AwaitDetachedContinuationInst>(this))
     return true;
 
   // hop_to_executor also may cause a suspension

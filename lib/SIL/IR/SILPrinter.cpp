@@ -3184,7 +3184,17 @@ public:
   void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *AI) {
     *this << getIDAndType(AI->getOperand())
           << ", resume " << Ctx.getID(AI->getResumeBB());
-    
+
+    if (auto errorBB = AI->getErrorBB()) {
+      *this << ", error " << Ctx.getID(errorBB);
+    }
+  }
+
+  void visitAwaitDetachedContinuationInst(AwaitDetachedContinuationInst *AI) {
+    *this << getIDAndType(AI->getContinuation())
+          << ", " << getIDAndType(AI->getResumeBuffer())
+          << ", resume " << Ctx.getID(AI->getResumeBB());
+
     if (auto errorBB = AI->getErrorBB()) {
       *this << ", error " << Ctx.getID(errorBB);
     }

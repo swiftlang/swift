@@ -544,6 +544,21 @@ BUILTIN_SIL_OPERATION(WithUnsafeContinuation, "withUnsafeContinuation", Special)
 /// the continuation is resumed.
 BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinuation", Special)
 
+/// awaitDetachedContinuation<T> : (Builtin.RawUnsafeContinuation) async -> sending T
+///
+/// Await a *detached* continuation (created by createDetachedContinuation and
+/// possibly resumed from another function/thread), binding the resume-point to
+/// the current function.  Returns a value of type T when the continuation is
+/// resumed.  Unlike withUnsafeContinuation, the continuation is created
+/// separately and its token is passed in.
+BUILTIN_SIL_OPERATION(AwaitDetachedContinuation, "awaitDetachedContinuation", Special)
+
+/// awaitDetachedThrowingContinuation<T> : (Builtin.RawUnsafeContinuation) async throws -> sending T
+///
+/// The throwing form of awaitDetachedContinuation: returns a value of type T or
+/// throws an error when the continuation is resumed.
+BUILTIN_SIL_OPERATION(AwaitDetachedThrowingContinuation, "awaitDetachedThrowingContinuation", Special)
+
 /// Force the current task to be rescheduled on the specified actor.
 BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 
@@ -860,6 +875,38 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
 /// Resume a throwing continuation abnormally with the given error.
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
                        "resumeThrowingContinuationThrowing", "", Special)
+
+/// Create a detached continuation for a result of type T, returning its opaque
+/// token.  The token is shared by both halves of a split continuation and must
+/// be awaited (awaitDetachedContinuation) and resumed
+/// (resumeDetachedContinuation*) exactly once, then it is torn down when the
+/// creating scope returns.
+///
+/// createDetachedContinuation<T> : () -> Builtin.RawUnsafeContinuation
+BUILTIN_MISC_OPERATION(CreateDetachedContinuation,
+                       "createDetachedContinuation", "", Special)
+
+/// Resume a non-throwing detached continuation normally with the given result,
+/// by context token.
+BUILTIN_MISC_OPERATION(ResumeDetachedContinuationReturning,
+                       "resumeDetachedContinuationReturning", "", Special)
+
+/// Resume a throwing detached continuation normally with the given result, by
+/// context token.
+BUILTIN_MISC_OPERATION(ResumeDetachedThrowingContinuationReturning,
+                       "resumeDetachedThrowingContinuationReturning", "", Special)
+
+/// Resume a throwing detached continuation abnormally with the given error, by
+/// context token.
+BUILTIN_MISC_OPERATION(ResumeDetachedThrowingContinuationThrowing,
+                       "resumeDetachedThrowingContinuationThrowing", "", Special)
+
+/// Destroy a detached continuation token created by createDetachedContinuation,
+/// after its result has been consumed by the await.
+///
+/// destroyDetachedContinuation : (Builtin.RawUnsafeContinuation) -> ()
+BUILTIN_MISC_OPERATION(DestroyDetachedContinuation,
+                       "destroyDetachedContinuation", "", Special)
 
 /// Unchecked pointer alignment assertion. Allows the compiler to assume
 /// alignment of the pointer to emit more efficient code.

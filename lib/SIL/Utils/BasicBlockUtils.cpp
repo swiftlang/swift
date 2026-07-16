@@ -161,6 +161,31 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     }
   }
 
+  case SILInstructionKind::AwaitDetachedContinuationInst: {
+    auto ADCI = cast<AwaitDetachedContinuationInst>(T);
+
+    switch (edgeIdx) {
+    case 0:
+      // resume BB. Address form: the value is delivered into the resume buffer,
+      // so the resume block takes no argument.
+      return;
+
+    case 1: {
+      assert(ADCI->getErrorBB());
+      auto &C = ADCI->getFunction()->getASTContext();
+      auto errorTy = C.getErrorExistentialType();
+      auto errorSILTy = SILType::getPrimitiveObjectType(errorTy);
+      // error BB. this takes the error value argument
+      args.push_back(
+          newEdgeBB->createPhiArgument(errorSILTy, OwnershipKind::Owned));
+      return;
+    }
+
+    default:
+      llvm_unreachable("only has at most two edges");
+    }
+  }
+
   case SILInstructionKind::SwitchValueInst: {
     auto SEI = cast<SwitchValueInst>(T);
     auto *succBB = getNthEdgeBlock(SEI, edgeIdx);

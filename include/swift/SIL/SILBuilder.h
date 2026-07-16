@@ -2811,6 +2811,16 @@ public:
                                                      continuation,
                                                      resumeBB, errorBB));
   }
+
+  AwaitDetachedContinuationInst *
+  createAwaitDetachedContinuation(SILLocation loc, SILValue continuation,
+                                  SILValue resumeBuffer,
+                                  SILBasicBlock *resumeBB,
+                                  SILBasicBlock *errorBB) {
+    return insertTerminator(AwaitDetachedContinuationInst::create(
+        getSILDebugLocation(loc), continuation, resumeBuffer, resumeBB, errorBB,
+        getFunction()));
+  }
   
   CondBranchInst *
   createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,

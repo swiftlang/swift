@@ -2847,6 +2847,7 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::YieldInst:
       break;
     case TermKind::AwaitAsyncContinuationInst:
+    case TermKind::AwaitDetachedContinuationInst:
       // TODO(async): Simplify AwaitAsyncContinuationInst
       break;
     }

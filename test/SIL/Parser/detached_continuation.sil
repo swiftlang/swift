@@ -1,0 +1,69 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all=true %s | %target-sil-opt -sil-print-types -enable-sil-verify-all=true | %FileCheck %s
+// REQUIRES: concurrency
+
+// Round-trip (print -> parse -> print) and verify the detached-continuation
+// instruction and builtins.
+
+import Builtin
+import Swift
+import _Concurrency
+
+// CHECK: sil @detached_create : $@convention(thin) () -> Builtin.RawUnsafeContinuation {
+sil @detached_create : $@convention(thin) () -> Builtin.RawUnsafeContinuation {
+bb0:
+  // CHECK: [[MT:%.*]] = metatype $@thin Builtin.Int32.Type
+  %mt = metatype $@thin Builtin.Int32.Type
+  // CHECK-NEXT: [[TOK:%.*]] = builtin "createDetachedContinuation"<Builtin.Int32>([[MT]] : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
+  %tok = builtin "createDetachedContinuation"<Builtin.Int32>(%mt : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
+  return %tok : $Builtin.RawUnsafeContinuation
+}
+
+// CHECK: sil @detached_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+sil @detached_await : $@async (Builtin.RawUnsafeContinuation) -> () {
+// CHECK-NEXT: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation):
+entry(%token : $Builtin.RawUnsafeContinuation):
+  // CHECK: [[SLOT:%.*]] = alloc_stack $Builtin.Int32
+  %a = alloc_stack $Builtin.Int32
+  // CHECK-NEXT: await_detached_continuation [[TOK]] : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32, resume [[RESUME:bb[0-9]+]]
+  await_detached_continuation %token : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32, resume bb1
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[RESUME]]:
+bb1:
+  // CHECK-NEXT: dealloc_stack
+  dealloc_stack %a : $*Builtin.Int32
+  return undef : $()
+}
+
+// CHECK: sil @detached_await_throws : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+sil @detached_await_throws : $@async (Builtin.RawUnsafeContinuation) -> () {
+// CHECK-NEXT: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation):
+entry(%token : $Builtin.RawUnsafeContinuation):
+  // CHECK: [[SLOT:%.*]] = alloc_stack $Builtin.Int32
+  %a = alloc_stack $Builtin.Int32
+  // CHECK-NEXT: await_detached_continuation [[TOK]] : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  await_detached_continuation %token : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32, resume bb1, error bb2
+  // CHECK-NEXT: {{^ *$}}
+  // CHECK-NEXT: [[RESUME]]:
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+  // CHECK: [[ERROR]]([[EVALUE:%.*]] : $any Error):
+bb2(%e : $Error):
+  dealloc_stack %a : $*Builtin.Int32
+  br bb3
+
+bb3:
+  return undef : $()
+}
+
+// CHECK: sil @detached_resume : $@convention(thin) (Builtin.RawUnsafeContinuation, @in Builtin.Int32) -> () {
+sil @detached_resume : $@convention(thin) (Builtin.RawUnsafeContinuation, @in Builtin.Int32) -> () {
+bb0(%token : $Builtin.RawUnsafeContinuation, %val : $*Builtin.Int32):
+  %v = load %val : $*Builtin.Int32
+  // CHECK: builtin "resumeDetachedContinuationReturning"<Builtin.Int32>({{%.*}} : $Builtin.RawUnsafeContinuation, {{%.*}} : $Builtin.Int32) : $()
+  %r = builtin "resumeDetachedContinuationReturning"<Builtin.Int32>(%token : $Builtin.RawUnsafeContinuation, %v : $Builtin.Int32) : $()
+  // CHECK: builtin "destroyDetachedContinuation"({{%.*}} : $Builtin.RawUnsafeContinuation) : $()
+  %d = builtin "destroyDetachedContinuation"(%token : $Builtin.RawUnsafeContinuation) : $()
+  %t = tuple ()
+  return %t : $()
+}

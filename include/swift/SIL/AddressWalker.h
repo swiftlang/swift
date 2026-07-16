@@ -183,6 +183,9 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
       case TermKind::TryApplyInst:
       case TermKind::SwitchEnumAddrInst:
       case TermKind::CheckedCastAddrBranchInst:
+      // await_detached_continuation writes the resumed value into its resume
+      // buffer operand, so it is a point use of that address.
+      case TermKind::AwaitDetachedContinuationInst:
         callVisitUse(op);
         continue;
       }
@@ -262,6 +265,8 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         case BuiltinValueKind::TSanInoutAccess:
         case BuiltinValueKind::ResumeThrowingContinuationReturning:
         case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
+        case BuiltinValueKind::ResumeDetachedThrowingContinuationReturning:
+        case BuiltinValueKind::ResumeDetachedContinuationReturning:
         case BuiltinValueKind::GenericAdd:
         case BuiltinValueKind::GenericFAdd:
         case BuiltinValueKind::GenericAnd:

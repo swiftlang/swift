@@ -124,15 +124,32 @@ internal func _dispatchEnqueueMain(_ job: UnownedJob)
 @_silgen_name("swift_dispatchEnqueueGlobal")
 internal func _dispatchEnqueueGlobal(_ job: UnownedJob)
 
-@available(StdlibDeploymentTarget 6.3, *)
-@_silgen_name("swift_dispatchEnqueueWithDeadline")
-internal func _dispatchEnqueueWithDeadline(_ global: CBool,
-                                           _ sec: CLongLong,
-                                           _ nsec: CLongLong,
-                                           _ tsec: CLongLong,
-                                           _ tnsec: CLongLong,
-                                           _ clock: CInt,
-                                           _ job: UnownedJob)
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+// A per-clock dispatch timer whose scheduling state is owned entirely by the
+// Swift `DispatchExecutor`.  `fire` is a C-convention trampoline invoked on the
+// timer queue when the armed deadline elapses.
+@available(StdlibDeploymentTarget 9999, *)
+@_silgen_name("swift_dispatchTimerCreate")
+internal func _dispatchTimerCreate(
+  _ clock: CInt,
+  _ qos: CInt,
+  _ fire: @convention(c) (UnsafeMutableRawPointer?) -> Void,
+  _ context: UnsafeMutableRawPointer?
+) -> UnsafeMutableRawPointer?
+
+@available(StdlibDeploymentTarget 9999, *)
+@_silgen_name("swift_dispatchTimerSet")
+internal func _dispatchTimerSet(_ timer: UnsafeMutableRawPointer?,
+                                _ sec: CLongLong,
+                                _ nsec: CLongLong,
+                                _ leewaySec: CLongLong,
+                                _ leewayNsec: CLongLong)
+
+@available(StdlibDeploymentTarget 9999, *)
+@_silgen_name("swift_dispatchTimerDisarm")
+internal func _dispatchTimerDisarm(_ timer: UnsafeMutableRawPointer?)
+#endif
+
 
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_dispatchAssertMainQueue")
@@ -145,3 +162,22 @@ func _createDefaultExecutorsOnce()
 internal func _getDispatchQueueForExecutor(
   _ executor: UnownedSerialExecutor
 ) -> OpaquePointer?
+
+// Resume a suspended task from a continuation, running it inline on the current
+// thread.
+@available(StdlibDeploymentTarget 9999, *)
+@usableFromInline
+@_silgen_name("swift_continuation_resumeSynchronously")
+internal func _swiftContinuationResumeSynchronously(
+  _ continuation: Builtin.RawUnsafeContinuation
+)
+
+// Resume a suspended task from a continuation by throwing an error, running it
+// inline on the current thread.
+@available(StdlibDeploymentTarget 9999, *)
+@usableFromInline
+@_silgen_name("swift_continuation_throwingResumeSynchronouslyWithError")
+internal func _swiftContinuationThrowingResumeSynchronouslyWithError(
+  _ continuation: Builtin.RawUnsafeContinuation,
+  _ error: __owned any Error
+)

@@ -4181,6 +4181,21 @@ void SILCloner<ImplClass>
 
 template <typename ImplClass>
 void SILCloner<ImplClass>
+::visitAwaitDetachedContinuationInst(AwaitDetachedContinuationInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createAwaitDetachedContinuation(
+                            getOpLocation(Inst->getLoc()),
+                            getOpValue(Inst->getContinuation()),
+                            getOpValue(Inst->getResumeBuffer()),
+                            getOpBasicBlock(Inst->getResumeBB()),
+                            Inst->getErrorBB()
+                              ? getOpBasicBlock(Inst->getErrorBB())
+                              : nullptr));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>
 ::visitHopToExecutorInst(HopToExecutorInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,

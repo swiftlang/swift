@@ -332,6 +332,7 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
 
   // Can't duplicate get/await_async_continuation.
   if (isa<AwaitAsyncContinuationInst>(I) ||
+      isa<AwaitDetachedContinuationInst>(I) ||
       isa<GetAsyncContinuationAddrInst>(I) || isa<GetAsyncContinuationInst>(I))
     return false;
 

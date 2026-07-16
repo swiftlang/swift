@@ -1079,6 +1079,15 @@ public:
   /// Public ABI.
   SerialExecutorRef ResumeToExecutor;
 
+  /// For a *detached* continuation (created via
+  /// swift_continuation_createDetached and awaited via
+  /// swift_continuation_awaitDetached), this records the task that is awaiting
+  /// the continuation so that a resume-by-context can enqueue it.  It is set at
+  /// await time, before the Pending->Awaited transition; before that (and for
+  /// non-detached continuations, which resume via task->ResumeContext instead)
+  /// it is null.  Not public ABI.
+  AsyncTask *AwaitingTask = nullptr;
+
 #if defined(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   /// In a task-to-thread model, instead of voluntarily descheduling the task
   /// from the thread, we will block the thread (and therefore task).

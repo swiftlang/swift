@@ -16,7 +16,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/Internal
 set(swift_concurrency_private_link_libraries)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   list(APPEND swift_concurrency_private_link_libraries
-    Synchronization
     mincore.lib # For QueryInterruptTime()
   )
 endif()
@@ -83,6 +82,9 @@ list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature"
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "Extern")
 
+# Needed for the split executor continuation (~Escapable awaiter + @_lifetime).
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "Lifetimes")
+
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
 
@@ -115,6 +117,10 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Continuation.swift
   Errors.swift
   Executor.swift
+  ContinuousClockExecutor.swift
+  ExecutorContinuation.swift
+  OperationExecutor.swift
+  SuspendingClockExecutor.swift
   ExecutorBridge.swift
   ExecutorAssertions.swift
   AsyncCompactMapSequence.swift
@@ -227,7 +233,7 @@ if((SWIFT_BUILD_CLANG_OVERLAYS
     OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
    AND (NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT
         OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT))
-  set(SWIFT_CONCURRENCY_DEPENDENCIES _Builtin_float)
+  list(APPEND SWIFT_CONCURRENCY_DEPENDENCIES _Builtin_float)
 endif()
 set(SWIFT_CONCURRENCY_GYB_SOURCES
   Task+init.swift.gyb

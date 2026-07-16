@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Types.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -394,6 +395,52 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto continuation = args.claimNext();
     auto error = args.claimNext();
     IGF.emitResumeAsyncContinuationThrowing(continuation, error);
+    return;
+  }
+
+  case BuiltinValueKind::CreateDetachedContinuation: {
+    // Ignore the metatype argument; the result type comes from the
+    // substitution.
+    (void)args.claimAll();
+    auto resultTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto metadata = IGF.emitTypeMetadataRef(resultTy);
+    // Detached continuations always support the throwing path; the ErrorResult
+    // stays null unless a throwing resume writes it.
+    AsyncContinuationFlags flags;
+    flags.setCanThrow(true);
+    auto call = IGF.Builder.CreateCall(
+        IGF.IGM.getContinuationCreateDetachedFunctionPointer(),
+        {metadata, IGF.IGM.getSize(Size(flags.getOpaqueValue()))});
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    // The returned context pointer is the RawUnsafeContinuation token.
+    auto &rawContTI = IGF.IGM.getRawUnsafeContinuationTypeInfo();
+    out.add(IGF.Builder.CreateBitOrPointerCast(call,
+                                               rawContTI.getStorageType()));
+    return;
+  }
+
+  case BuiltinValueKind::ResumeDetachedThrowingContinuationReturning:
+  case BuiltinValueKind::ResumeDetachedContinuationReturning: {
+    auto continuation = args.claimNext();
+    auto valueTy = argTypes[1];
+    auto valuePtr = args.claimNext();
+    bool throwing =
+      (Builtin.ID == BuiltinValueKind::ResumeDetachedThrowingContinuationReturning);
+    IGF.emitResumeDetachedContinuationReturning(continuation, valuePtr, valueTy,
+                                                throwing);
+    return;
+  }
+
+  case BuiltinValueKind::ResumeDetachedThrowingContinuationThrowing: {
+    auto continuation = args.claimNext();
+    auto error = args.claimNext();
+    IGF.emitResumeDetachedContinuationThrowing(continuation, error);
+    return;
+  }
+
+  case BuiltinValueKind::DestroyDetachedContinuation: {
+    auto continuation = args.claimNext();
+    IGF.emitDestroyDetachedContinuation(continuation);
     return;
   }
 

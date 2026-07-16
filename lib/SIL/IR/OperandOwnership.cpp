@@ -148,6 +148,7 @@ SHOULD_NEVER_VISIT_INST(TypeValue)
 
 // Instructions that require trivial operands.
 OPERAND_OWNERSHIP(TrivialUse, AwaitAsyncContinuation)
+OPERAND_OWNERSHIP(TrivialUse, AwaitDetachedContinuation)
 OPERAND_OWNERSHIP(TrivialUse, AddressToPointer)
 OPERAND_OWNERSHIP(TrivialUse, AllocRef)        // with tail operand
 OPERAND_OWNERSHIP(TrivialUse, AllocRefDynamic) // with tail operand
@@ -1066,6 +1067,35 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
   return OperandOwnership::TrivialUse;
 }
 
+OperandOwnership OperandOwnershipBuiltinClassifier::
+visitResumeDetachedContinuationReturning(BuiltinInst *bi, StringRef attr) {
+  // The value operand is consumed.
+  if (&op == &bi->getOperandRef(1))
+    return OperandOwnership::DestroyingConsume;
+
+  return OperandOwnership::TrivialUse;
+}
+
+OperandOwnership OperandOwnershipBuiltinClassifier::
+visitResumeDetachedThrowingContinuationReturning(BuiltinInst *bi,
+                                                 StringRef attr) {
+  // The value operand is consumed.
+  if (&op == &bi->getOperandRef(1))
+    return OperandOwnership::DestroyingConsume;
+
+  return OperandOwnership::TrivialUse;
+}
+
+OperandOwnership OperandOwnershipBuiltinClassifier::
+visitResumeDetachedThrowingContinuationThrowing(BuiltinInst *bi,
+                                                StringRef attr) {
+  // The error operand is consumed.
+  if (&op == &bi->getOperandRef(1))
+    return OperandOwnership::DestroyingConsume;
+
+  return OperandOwnership::TrivialUse;
+}
+
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskRunInline)
 
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InitializeDefaultActor)
@@ -1107,6 +1137,9 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, RemoveTaskLocalValue)
 
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPush)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)
+
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, CreateDetachedContinuation)
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, DestroyDetachedContinuation)
 
 #undef BUILTIN_OPERAND_OWNERSHIP
 

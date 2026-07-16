@@ -6513,6 +6513,44 @@ public:
     }
   }
 
+  void checkAwaitDetachedContinuationInst(AwaitDetachedContinuationInst *ADCI) {
+    // Unlike await_async_continuation, the first operand is a first-class
+    // Builtin.RawUnsafeContinuation token, *not* a co-located
+    // get_async_continuation instruction, so there is no co-location rule.
+    require(ADCI->getContinuation()->getType()
+                .is<BuiltinRawUnsafeContinuationType>(),
+            "await_detached_continuation operand must be a "
+            "Builtin.RawUnsafeContinuation");
+
+    // The second operand is the address of the buffer that receives the value.
+    require(ADCI->getResumeBuffer()->getType().isAddress(),
+            "await_detached_continuation resume buffer must be an address");
+
+    auto &C = ADCI->getFunction()->getASTContext();
+
+    // The error successor must be present iff the continuation is throwing.
+    if (ADCI->getErrorBB()) {
+      require(ADCI->getErrorBB()->getNumArguments() == 1,
+              "error successor must take one argument");
+      auto arg = ADCI->getErrorBB()->getArgument(0);
+      auto errorType = C.getErrorExistentialType();
+      requireSameType(arg->getType(),
+                      SILType::getPrimitiveObjectType(errorType),
+              "error successor argument must have Error type");
+
+      if (ADCI->getFunction()->hasOwnership()) {
+        require(arg->getOwnershipKind() == OwnershipKind::Owned,
+                "error successor argument must be owned");
+      }
+    }
+
+    // This is the address form: the resume value is delivered into the resume
+    // buffer, so the resume successor takes no arguments.
+    require(ADCI->getResumeBB()->getNumArguments() == 0,
+            "resume successor must take no arguments for "
+            "await_detached_continuation");
+  }
+
   void verifySameShape(CanPackType left, CanPackType right) {
     verifySameShape(left, right, 0, right->getNumElements());
   }

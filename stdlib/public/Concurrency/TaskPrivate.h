@@ -1912,6 +1912,25 @@ inline void AsyncTask::flagAsDestroyed() {
   SWIFT_TASK_DEBUG_LOG("task destroyed %p", this);
 }
 
+// ==== Executor tracking and enqueuing ---------------------------------------
+
+/// Should we yield the thread?
+inline bool shouldYieldThread() {
+  // return dispatch_swift_job_should_yield();
+  return false;
+}
+
+bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
+                     SerialExecutorRef newSerialExecutor,
+                     TaskExecutorRef currentTaskExecutor,
+                     TaskExecutorRef newTaskExecutor);
+
+class ExecutorTrackingInfo;
+
+SWIFT_CC(swiftasync)
+void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
+                        ExecutorTrackingInfo *oldTracking);
+
 // ==== Task Local Values -----------------------------------------------------
 
 inline void AsyncTask::localValuePush(const HeapObject *key,

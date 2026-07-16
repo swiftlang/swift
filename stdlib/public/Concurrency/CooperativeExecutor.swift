@@ -14,155 +14,42 @@
 
 import Swift
 
-// Store the Timestamp in the executor private data, if it will fit; otherwise,
-// use the allocator to allocate space for it and stash a pointer in the private
-// data area.
-@available(StdlibDeploymentTarget 6.3, *)
-extension ExecutorJob {
-  fileprivate var cooperativeExecutorTimestampIsIndirect: Bool {
-    return MemoryLayout<(Int, Int)>.size
-      < MemoryLayout<CooperativeExecutor.Timestamp>.size
-  }
-
-  fileprivate var cooperativeExecutorTimestampPointer: UnsafeMutablePointer<CooperativeExecutor.Timestamp> {
-    get {
-      assert(cooperativeExecutorTimestampIsIndirect)
-      return withUnsafeExecutorPrivateData {
-        unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<CooperativeExecutor.Timestamp>.self) {
-          return unsafe $0[0]
-        }
-      }
-    }
-    set {
-      assert(cooperativeExecutorTimestampIsIndirect)
-      withUnsafeExecutorPrivateData {
-        unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<CooperativeExecutor.Timestamp>.self) {
-          unsafe $0[0] = newValue
-        }
-      }
-    }
-  }
-
-  fileprivate var cooperativeExecutorTimestamp: CooperativeExecutor.Timestamp {
-    get {
-      if cooperativeExecutorTimestampIsIndirect {
-        let ptr = unsafe cooperativeExecutorTimestampPointer
-        return unsafe ptr.pointee
-      } else {
-        return withUnsafeExecutorPrivateData {
-          return unsafe $0.assumingMemoryBound(
-            to: CooperativeExecutor.Timestamp.self
-          )[0]
-        }
-      }
-    }
-    set {
-      if cooperativeExecutorTimestampIsIndirect {
-        let ptr = unsafe cooperativeExecutorTimestampPointer
-        unsafe ptr.pointee = newValue
-     } else {
-        withUnsafeExecutorPrivateData {
-          unsafe $0.withMemoryRebound(to: CooperativeExecutor.Timestamp.self) {
-            unsafe $0[0] = newValue
-          }
-        }
-      }
-    }
-  }
-
-  fileprivate mutating func setupCooperativeExecutorTimestamp() {
-    // If a Timestamp won't fit, allocate
-    if cooperativeExecutorTimestampIsIndirect {
-      let ptr: UnsafeMutablePointer<CooperativeExecutor.Timestamp>
-      // Try to use the task allocator if it has one
-      if let allocator {
-        unsafe ptr = allocator.allocate(as: CooperativeExecutor.Timestamp.self)
-      } else {
-        unsafe ptr = .allocate(capacity: 1)
-      }
-      unsafe self.cooperativeExecutorTimestampPointer = ptr
-    }
-  }
-
-  fileprivate mutating func clearCooperativeExecutorTimestamp() {
-    // If a Timestamp won't fit, deallocate
-    if cooperativeExecutorTimestampIsIndirect {
-      let ptr = unsafe self.cooperativeExecutorTimestampPointer
-      if let allocator {
-        unsafe allocator.deallocate(ptr)
-      } else {
-        unsafe ptr.deallocate()
-      }
-    }
-  }
-}
-
-#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-/// A wait queue is a specialised priority queue used to run a timer.
-@available(StdlibDeploymentTarget 6.3, *)
-struct WaitQueue {
-  var queue: PriorityQueue<UnownedJob>
-  var clock: _ClockID
-
-  init(clock: _ClockID) {
-    queue = PriorityQueue(compare: {
-                            ExecutorJob($0).cooperativeExecutorTimestamp
-                              < ExecutorJob($1).cooperativeExecutorTimestamp
-                          })
-    self.clock = clock
-  }
-
-  var currentTime: CooperativeExecutor.Timestamp {
-    var now: CooperativeExecutor.Timestamp = .zero
-    unsafe _getTime(seconds: &now.seconds,
-                    nanoseconds: &now.nanoseconds,
-                    clock: clock.rawValue)
-    return now
-  }
-
-  mutating func enqueue(_ job: consuming ExecutorJob,
-                        after delay: CooperativeExecutor.Duration) {
-    let deadline = currentTime + delay
-    job.setupCooperativeExecutorTimestamp()
-    job.cooperativeExecutorTimestamp = deadline
-    queue.push(UnownedJob(job))
-  }
-
-  mutating func forEachReadyJob(body: (consuming ExecutorJob) -> ()) {
-    let now = currentTime
-    while let job = queue.pop(
-            when: {
-              ExecutorJob($0).cooperativeExecutorTimestamp < now
-            }) {
-      var theJob = ExecutorJob(job)
-      theJob.clearCooperativeExecutorTimestamp()
-      body(theJob)
-    }
-  }
-
-  var timeToNextJob: CooperativeExecutor.Duration? {
-    if let job = queue.top {
-      let deadline = ExecutorJob(job).cooperativeExecutorTimestamp
-      let now = currentTime
-      if deadline > now {
-        return deadline - now
-      } else {
-        return CooperativeExecutor.Duration(seconds: 0, nanoseconds: 0)
-      }
-    }
-    return nil
-  }
-}
-#endif
-
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 final class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  var suspendingWaitQueue = WaitQueue(clock: .suspending)
-  var continuousWaitQueue = WaitQueue(clock: .continuous)
+  // Per-suspension delivery state for in-flight sleeps, keyed by the token id
+  // minted in `arm`.  Holds the raw continuation handle so fire and cancel can
+  // reconstruct the concrete `ExecutorContinuation<Void, CancellationError>` and
+  // resume it.  Deadline ordering lives in the per-clock sleep heaps below.
+  @safe
+  enum SleepWork {
+    case continuation(Builtin.RawUnsafeContinuation)
+    case job(UnownedJob)
+  }
+  @safe
+  struct SleepEntry {
+    var work: SleepWork
+    var onContinuous: Bool
+    // Set by `cancel`: the sleep is resolved by resuming its continuation
+    // *throwing* CancellationError rather than returning success.  The resume
+    // itself is still performed on the run-loop thread by `processReadySleeps`.
+    var cancelled: Bool = false
+  }
+  struct SleepHeapEntry {
+    var deadline: Timestamp
+    var token: OperationExecutorRegistration
+  }
+  var sleepContinuations: [OperationExecutorRegistration: SleepEntry] = [:]
+  var continuousSleepHeap =
+    PriorityQueue<SleepHeapEntry>(compare: { $0.deadline < $1.deadline })
+  var suspendingSleepHeap =
+    PriorityQueue<SleepHeapEntry>(compare: { $0.deadline < $1.deadline })
+  // Monotonic counter for minting tokens in `arm`.  The cooperative executor
+  // drains on a single thread, so a plain increment suffices.
+  var nextSleepID: UInt64 = 0
   #endif
   var shouldStop: Bool = false
 
@@ -243,9 +130,10 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
   public var isMainExecutor: Bool { true }
 }
 
+
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-@available(StdlibDeploymentTarget 6.3, *)
-extension CooperativeExecutor: SchedulingExecutor {
+@available(StdlibDeploymentTarget 9999, *)
+extension CooperativeExecutor {
 
   func currentTime(clock: _ClockID) -> Timestamp {
     var now: Timestamp = .zero
@@ -254,30 +142,167 @@ extension CooperativeExecutor: SchedulingExecutor {
                     clock: clock.rawValue)
     return now
   }
+}
 
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    // If it's a clock we know, get the duration to wait
-    if let _ = clock as? ContinuousClock {
-      let continuousDuration = delay as! ContinuousClock.Duration
-      let duration = Duration(from: continuousDuration)
-      continuousWaitQueue.enqueue(job, after: duration)
-    } else if let _ = clock as? SuspendingClock {
-      let suspendingDuration = delay as! SuspendingClock.Duration
-      let duration = Duration(from: suspendingDuration)
-      suspendingWaitQueue.enqueue(job, after: duration)
+@available(StdlibDeploymentTarget 9999, *)
+extension CooperativeExecutor: OperationExecutor {
+
+  // Shared arming logic; `deadline` is already converted to this executor's
+  // timestamp for the relevant clock.  Mints a fresh token, stores the
+  // continuation handle or job keyed by it (so fire/cancel can reconstruct the
+  // typed continuation to resume or run the job), and returns the token.
+  // Removing the dict entry is the single-delivery "claim" (a stale heap entry
+  // is skipped on fire via lazy deletion).
+  private func arm(
+    _ work: SleepWork,
+    onContinuous: Bool,
+    deadline: Timestamp
+  ) -> OperationExecutorRegistration {
+    nextSleepID &+= 1
+    let token = OperationExecutorRegistration(id: nextSleepID)
+    sleepContinuations[token] = SleepEntry(work: work, onContinuous: onContinuous)
+    if onContinuous {
+      continuousSleepHeap.push(SleepHeapEntry(deadline: deadline, token: token))
     } else {
-      fatalError("Sorry, cannot schedule on an unknown clock")
+      suspendingSleepHeap.push(SleepHeapEntry(deadline: deadline, token: token))
+    }
+    return token
+  }
+
+  // Called from the suspending function's cancellation handler, which runs on
+  // the *cancelling* task's thread -- so it must NOT resume the continuation
+  // here (executor continuations may only be resumed from the executor's own run
+  // context).  Instead it flags the sleep cancelled and pushes a now-deadline
+  // heap entry, so `processReadySleeps` wakes it on the run-loop thread and
+  // resumes it throwing CancellationError.  A scheduled job is simply dropped.
+  // A miss is safe: the sleep already fired/resolved, or the token is unknown.
+  public func cancel(_ token: OperationExecutorRegistration) {
+    guard var entry = sleepContinuations[token] else { return }
+    switch entry.work {
+    case .continuation:
+      entry.cancelled = true
+      sleepContinuations[token] = entry
+      let now = currentTime(clock: entry.onContinuous ? .continuous : .suspending)
+      let heapEntry = SleepHeapEntry(deadline: now, token: token)
+      if entry.onContinuous {
+        continuousSleepHeap.push(heapEntry)
+      } else {
+        suspendingSleepHeap.push(heapEntry)
+      }
+    case .job:
+      // Dropping a scheduled job needs no resume.
+      sleepContinuations.removeValue(forKey: token)
     }
   }
 
+  public func escalatePriority(of token: OperationExecutorRegistration,
+                               to newPriority: TaskPriority) {
+    // The cooperative executor runs all work on its single run-loop thread at
+    // the loop's own priority, so there is no per-continuation thread to
+    // escalate.  Nothing to do.
+  }
+}
+
+@available(StdlibDeploymentTarget 9999, *)
+extension CooperativeExecutor: ContinuousClockExecutor {
+  public func enqueue(
+    _ continuation: consuming ExecutorContinuation<Void, CancellationError>,
+    at instant: ContinuousClock.Instant,
+    tolerance: ContinuousClock.Duration?
+  ) -> OperationExecutorRegistration {
+    let delay = Duration(from: ContinuousClock().now.duration(to: instant))
+    return arm(.continuation(continuation._takeContext()),
+               onContinuous: true, deadline: currentTime(clock: .continuous) + delay)
+  }
+
+  public func enqueue(
+    _ job: consuming ExecutorJob,
+    at instant: ContinuousClock.Instant,
+    tolerance: ContinuousClock.Duration?
+  ) -> OperationExecutorRegistration {
+    let delay = Duration(from: ContinuousClock().now.duration(to: instant))
+    return arm(.job(UnownedJob(job)),
+               onContinuous: true, deadline: currentTime(clock: .continuous) + delay)
+  }
+}
+
+@available(StdlibDeploymentTarget 9999, *)
+extension CooperativeExecutor: SuspendingClockExecutor {
+  public func enqueue(
+    _ continuation: consuming ExecutorContinuation<Void, CancellationError>,
+    at instant: SuspendingClock.Instant,
+    tolerance: SuspendingClock.Duration?
+  ) -> OperationExecutorRegistration {
+    let delay = Duration(from: SuspendingClock().now.duration(to: instant))
+    return arm(.continuation(continuation._takeContext()),
+               onContinuous: false, deadline: currentTime(clock: .suspending) + delay)
+  }
+
+  public func enqueue(
+    _ job: consuming ExecutorJob,
+    at instant: SuspendingClock.Instant,
+    tolerance: SuspendingClock.Duration?
+  ) -> OperationExecutorRegistration {
+    let delay = Duration(from: SuspendingClock().now.duration(to: instant))
+    return arm(.job(UnownedJob(job)),
+               onContinuous: false, deadline: currentTime(clock: .suspending) + delay)
+  }
 }
 #endif
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: RunLoopExecutor {
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  // Resume every ready sleep on `heap` whose deadline has elapsed: a
+  // continuation resumes with success, a job is pushed onto the run queue.
+  // Removing the `sleepContinuations` entry is the single-delivery claim, so a
+  // racing `cancel` finds nothing; stale heap entries (whose dict entry was
+  // already claimed by cancel) are skipped.
+  func processReadySleeps(_ heap: inout PriorityQueue<SleepHeapEntry>,
+                          clock: _ClockID) {
+    let now = currentTime(clock: clock)
+    var dueContinuations: [Builtin.RawUnsafeContinuation] = []
+    var cancelledContinuations: [Builtin.RawUnsafeContinuation] = []
+    var dueJobs: [UnownedJob] = []
+    while let top = heap.top, !(now < top.deadline) {
+      _ = heap.pop()
+      if let e = sleepContinuations.removeValue(forKey: top.token) {
+        switch e.work {
+        case .continuation(let context):
+          if e.cancelled {
+            cancelledContinuations.append(context)
+          } else {
+            dueContinuations.append(context)
+          }
+        case .job(let job): dueJobs.append(job)
+        }
+      }
+    }
+    for context in dueContinuations {
+      let cont = ExecutorContinuation<Void, CancellationError>(context: context)
+      cont.resumeSynchronously(returning: ())
+    }
+    for context in cancelledContinuations {
+      let cont = ExecutorContinuation<Void, CancellationError>(context: context)
+      cont.resumeSynchronously(throwing: CancellationError())
+    }
+    for job in dueJobs {
+      runQueue.push(job)
+    }
+  }
+
+  // Time until the earliest pending sleep on `heap`, or nil if empty.
+  func timeToNextSleep(_ heap: PriorityQueue<SleepHeapEntry>,
+                       clock: _ClockID) -> Duration? {
+    guard let top = heap.top else { return nil }
+    let now = currentTime(clock: clock)
+    if top.deadline > now {
+      return top.deadline - now
+    }
+    return Duration(seconds: 0, nanoseconds: 0)
+  }
+  #endif
+
   public func run() throws {
     try runUntil { false }
   }
@@ -286,13 +311,11 @@ extension CooperativeExecutor: RunLoopExecutor {
     shouldStop = false
     while !shouldStop && !condition() {
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-      // Process the timer queues
-      suspendingWaitQueue.forEachReadyJob {
-        runQueue.push(UnownedJob($0))
-      }
-      continuousWaitQueue.forEachReadyJob {
-        runQueue.push(UnownedJob($0))
-      }
+      // Process ready sleep continuations.  `resumeSynchronously` runs the
+      // resumed task inline on this thread when compatible, else enqueues it
+      // back onto this executor's run queue.
+      processReadySleeps(&continuousSleepHeap, clock: .continuous)
+      processReadySleeps(&suspendingSleepHeap, clock: .suspending)
       #endif
 
       // Now run any queued jobs
@@ -304,12 +327,13 @@ extension CooperativeExecutor: RunLoopExecutor {
       }
 
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-      // Finally, wait until the next deadline
-      var toWait: Duration? = suspendingWaitQueue.timeToNextJob
+      // Finally, wait until the earliest pending sleep deadline.
+      var toWait: Duration? = timeToNextSleep(continuousSleepHeap,
+                                              clock: .continuous)
 
-      if let continuousToWait = continuousWaitQueue.timeToNextJob {
-        if toWait == nil ||  continuousToWait < toWait! {
-          toWait = continuousToWait
+      for candidate in [timeToNextSleep(suspendingSleepHeap, clock: .suspending)] {
+        if let candidate, toWait == nil || candidate < toWait! {
+          toWait = candidate
         }
       }
 
@@ -334,13 +358,13 @@ extension CooperativeExecutor: RunLoopExecutor {
   }
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: SerialExecutor {}
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: TaskExecutor {}
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: MainExecutor {}
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

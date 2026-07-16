@@ -2492,6 +2492,71 @@ FUNCTION(ContinuationThrowingResumeWithError,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
+// ContinuationAsyncContext *
+// swift_continuation_createDetached(const Metadata *resultType,
+//                                   AsyncContinuationFlags flags);
+FUNCTION(ContinuationCreateDetached,
+         _Concurrency, swift_continuation_createDetached, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(ContinuationAsyncContextPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_continuation_awaitDetached(ContinuationAsyncContext *context);
+FUNCTION(ContinuationAwaitDetached,
+         _Concurrency, swift_continuation_awaitDetached, SwiftAsyncCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(ContinuationAsyncContextPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_continuation_resumeDetached(ContinuationAsyncContext *context);
+FUNCTION(ContinuationResumeDetached,
+         _Concurrency, swift_continuation_resumeDetached, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(ContinuationAsyncContextPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void
+// swift_continuation_throwingResumeDetached(ContinuationAsyncContext *context);
+FUNCTION(ContinuationThrowingResumeDetached,
+         _Concurrency, swift_continuation_throwingResumeDetached, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(ContinuationAsyncContextPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_continuation_throwingResumeDetachedWithError(
+//     ContinuationAsyncContext *context, SwiftError *error);
+FUNCTION(ContinuationThrowingResumeDetachedWithError,
+         _Concurrency, swift_continuation_throwingResumeDetachedWithError,
+         SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(ContinuationAsyncContextPtrTy, ErrorPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_continuation_destroyDetached(ContinuationAsyncContext *context);
+FUNCTION(ContinuationDestroyDetached,
+         _Concurrency, swift_continuation_destroyDetached, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(ContinuationAsyncContextPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
 // SerialExecutorRef swift_task_getCurrentExecutor();
 FUNCTION(TaskGetCurrentExecutor,
          _Concurrency, swift_task_getCurrentExecutor, SwiftCC,

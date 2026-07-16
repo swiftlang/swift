@@ -92,6 +92,7 @@ static bool hasCriticalEdge(SILBasicBlock *BB) {
 static bool isColdTerminator(const TermInst *term) {
   switch (term->getTermKind()) {
   case TermKind::AwaitAsyncContinuationInst:
+  case TermKind::AwaitDetachedContinuationInst:
   case TermKind::BranchInst:
   case TermKind::CondBranchInst:
   case TermKind::SwitchValueInst:
