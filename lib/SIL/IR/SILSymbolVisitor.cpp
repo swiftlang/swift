@@ -541,7 +541,7 @@ public:
     for (const auto *derivativeAttr :
          AFD->getAttrs().getAttributes<DerivativeAttr>()) {
       for (auto *originaAFD :
-           derivativeAttr->getOriginalFunction(AFD->getASTContext())) {
+           derivativeAttr->getOriginalFunctions(AFD->getASTContext())) {
         auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
             originaAFD, derivativeAttr->getParameterIndices());
         addDerivativeConfiguration(

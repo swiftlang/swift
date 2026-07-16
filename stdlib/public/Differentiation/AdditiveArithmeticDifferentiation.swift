@@ -45,8 +45,7 @@ extension AdditiveArithmetic where Self: Differentiable {
     return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient  
+  @export(implementation)
   @derivative(of: +=)
   static func _vjpAddAssign(_ lhs: inout Self, _ rhs: Self) ->
     (value: Void, pullback: (inout TangentVector) -> TangentVector) {
@@ -54,8 +53,7 @@ extension AdditiveArithmetic where Self: Differentiable {
     return ((), { v in v })
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient  
+  @export(implementation)
   @derivative(of: +=)
   static func _jvpAddAssign(_ lhs: inout Self, _ rhs: Self) ->
     (value: Void, differential: (inout TangentVector, TangentVector) -> Void) {
@@ -79,8 +77,7 @@ extension AdditiveArithmetic where Self: Differentiable {
     return (lhs - rhs, { (dlhs, drhs) in dlhs - drhs })
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @derivative(of: -=)
   static func _vjpSubtractAssign(_ lhs: inout Self, _ rhs: Self) ->
     (value: Void, pullback: (inout TangentVector) -> TangentVector) {
@@ -88,8 +85,7 @@ extension AdditiveArithmetic where Self: Differentiable {
     return ((), { v in TangentVector.zero-v })
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @derivative(of: -=)
   static func _jvpSubtractAssign(_ lhs: inout Self, _ rhs: Self) ->
     (value: Void, differential: (inout TangentVector, TangentVector) -> Void) {
