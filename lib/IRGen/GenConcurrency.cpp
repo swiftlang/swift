@@ -385,7 +385,7 @@ void irgen::emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF) {
 
 llvm::Value *irgen::emitBuiltinTaskCancellationScopePush(IRGenFunction &IGF) {
   auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskPushTaskCancellationScopeFunctionPointer(), {});
+      IGF.IGM.getTaskPushCancellationScopeFunctionPointer(), {});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
   return call;
@@ -394,7 +394,7 @@ llvm::Value *irgen::emitBuiltinTaskCancellationScopePush(IRGenFunction &IGF) {
 void irgen::emitBuiltinTaskCancellationScopePop(IRGenFunction &IGF,
                                             llvm::Value *record) {
   auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskPopTaskCancellationScopeFunctionPointer(), {record});
+      IGF.IGM.getTaskPopCancellationScopeFunctionPointer(), {record});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 }
@@ -402,7 +402,7 @@ void irgen::emitBuiltinTaskCancellationScopePop(IRGenFunction &IGF,
 void irgen::emitBuiltinTaskCancellationScopeCancel(IRGenFunction &IGF,
                                                llvm::Value *record) {
   auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskCancelTaskCancellationScopeFunctionPointer(), {record});
+      IGF.IGM.getTaskCancelCancellationScopeFunctionPointer(), {record});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 }

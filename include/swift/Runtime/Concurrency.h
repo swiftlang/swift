@@ -603,20 +603,20 @@ void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* re
 /// Unlike deadlines, cancellation scope records are never subsumed: every
 /// call always installs its own independent record. The returned pointer is
 /// owned by the runtime and must be handed back to
-/// `swift_task_popTaskCancellationScope` when the scope exits.
+/// `swift_task_popCancellationScope` when the scope exits.
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-TaskCancellationScopeRecord * swift_task_pushTaskCancellationScope();
+TaskCancellationScopeRecord * swift_task_pushCancellationScope();
 
 /// Remove a single cancellation scope record from the current task.
 ///
 /// Must be passed the record intended to be removed (as returned by
-/// `swift_task_pushTaskCancellationScope`).
+/// `swift_task_pushCancellationScope`).
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_popTaskCancellationScope(TaskCancellationScopeRecord *record);
+void swift_task_popCancellationScope(TaskCancellationScopeRecord *record);
 
 /// Cancel a cancellation scope.
 ///
@@ -631,7 +631,7 @@ void swift_task_popTaskCancellationScope(TaskCancellationScopeRecord *record);
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_cancelTaskCancellationScope(TaskCancellationScopeRecord *record);
+void swift_task_cancelCancellationScope(TaskCancellationScopeRecord *record);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);

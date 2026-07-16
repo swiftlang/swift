@@ -462,7 +462,7 @@ public:
 /// `Task.sleep` that rely on `withTaskCancellationHandler` wake up.
 class TaskCancellationScopeRecord : public TaskStatusRecord {
   /// The task that installed this scope. Stored so that
-  /// `swift_task_cancelTaskCancellationScope` can be called from any thread /
+  /// `swift_task_cancelCancellationScope` can be called from any thread /
   /// task context; the scope's owning task is well-defined at push time and
   /// does not change over the record's lifetime.
   AsyncTask *OwningTask;

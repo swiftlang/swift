@@ -1249,7 +1249,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddPriorityEscalationHandler,
 BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
                        "taskRemovePriorityEscalationHandler", "", Special)
 
-/// Equivalent to calling swift_task_pushTaskCancellationScope.
+/// Equivalent to calling swift_task_pushCancellationScope.
 ///
 /// Pushes a cancellation scope record onto the current task, returning the
 /// record pointer that must be handed back to taskCancellationScopePop. Unlike
@@ -1259,12 +1259,12 @@ BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
 /// Signature: () -> UnsafeRawPointer
 BUILTIN_MISC_OPERATION(TaskCancellationScopePush, "taskCancellationScopePush", "", Special)
 
-/// Equivalent to calling swift_task_popTaskCancellationScope.
+/// Equivalent to calling swift_task_popCancellationScope.
 ///
 /// Signature: (record: UnsafeRawPointer) -> ()
 BUILTIN_MISC_OPERATION(TaskCancellationScopePop, "taskCancellationScopePop", "", Special)
 
-/// Equivalent to calling swift_task_cancelTaskCancellationScope.
+/// Equivalent to calling swift_task_cancelCancellationScope.
 ///
 /// Cancels the given scope only - does not affect the enclosing task's own
 /// cancellation state and does not invoke withTaskCancellationHandler

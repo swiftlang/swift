@@ -122,15 +122,15 @@ func __withTaskCancellationScope<Return, Failure>(
 
 @available(StdlibDeploymentTarget 6.5, *)
 @usableFromInline
-@_silgen_name("swift_task_pushTaskCancellationScope")
+@_silgen_name("swift_task_pushCancellationScope")
 internal func _taskPushTaskCancellationScope() -> UnsafeRawPointer /*TaskCancellationScopeRecord*/
 
 @available(StdlibDeploymentTarget 6.5, *)
 @usableFromInline
-@_silgen_name("swift_task_popTaskCancellationScope")
+@_silgen_name("swift_task_popCancellationScope")
 internal func _taskPopTaskCancellationScope(record: UnsafeRawPointer /*TaskCancellationScopeRecord*/)
 
 @available(StdlibDeploymentTarget 6.5, *)
 @usableFromInline
-@_silgen_name("swift_task_cancelTaskCancellationScope")
+@_silgen_name("swift_task_cancelCancellationScope")
 internal func _taskCancelTaskCancellationScope(record: UnsafeRawPointer /*TaskCancellationScopeRecord*/)

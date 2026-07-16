@@ -426,17 +426,17 @@ OVERRIDE_TASK_STATUS(task_popTaskExecutorPreference, void,
                      swift::, (TaskExecutorPreferenceStatusRecord *record),
                      (record))
 
-// task_pushTaskCancellationScope takes no arguments; the COMPATIBILITY_OVERRIDE
+// task_pushCancellationScope takes no arguments; the COMPATIBILITY_OVERRIDE
 // macro machinery cannot express an empty parameter tuple, so this
 // declaration is defined directly (without the *Impl indirection) in
 // TaskStatus.cpp.
 
-OVERRIDE_TASK_STATUS(task_popTaskCancellationScope, void,
+OVERRIDE_TASK_STATUS(task_popCancellationScope, void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, (TaskCancellationScopeRecord *record),
                      (record))
 
-OVERRIDE_TASK_STATUS(task_cancelTaskCancellationScope, void,
+OVERRIDE_TASK_STATUS(task_cancelCancellationScope, void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, (TaskCancellationScopeRecord *record),
                      (record))

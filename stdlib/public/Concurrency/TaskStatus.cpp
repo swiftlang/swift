@@ -669,7 +669,7 @@ static void swift_task_popTaskExecutorPreferenceImpl(
 SWIFT_CC(swift)
 SWIFT_EXPORT_FROM(swift_Concurrency)
 TaskCancellationScopeRecord *
-swift_task_pushTaskCancellationScope() {
+swift_task_pushCancellationScope() {
   auto task = swift_task_getCurrent();
   if (!task) {
     // No current task means no scope for the record to be attached to.
@@ -696,7 +696,7 @@ swift_task_pushTaskCancellationScope() {
 
 SWIFT_CC(swift)
 static void
-swift_task_popTaskCancellationScopeImpl(TaskCancellationScopeRecord *record) {
+swift_task_popCancellationScopeImpl(TaskCancellationScopeRecord *record) {
   auto task = swift_task_getCurrent();
   if (!task || !record)
     return;
@@ -733,7 +733,7 @@ swift_task_popTaskCancellationScopeImpl(TaskCancellationScopeRecord *record) {
 
 SWIFT_CC(swift)
 static void
-swift_task_cancelTaskCancellationScopeImpl(TaskCancellationScopeRecord *record) {
+swift_task_cancelCancellationScopeImpl(TaskCancellationScopeRecord *record) {
   // Cancelling a scope is a local operation on the scope's own atomic flag.
   // Unlike `swift_task_cancel`, it does NOT set the task's own IsCancelled
   // flag. To make code that reacts to cancellation via
