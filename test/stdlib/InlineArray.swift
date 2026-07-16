@@ -40,8 +40,8 @@ enum InlineArrayTests {
     testSuite.test("Uninhabited", testUninhabited)
     testSuite.test("Throws",      testThrows)
     testSuite.test("Closures",    testClosures)
-    testSuite.test("Regression1", testCollectionConformanceRegression1())
-    testSuite.test("Regression2", testCollectionConformanceRegression2())
+    testSuite.test("Regression1", testCollectionConformanceRegression1)
+    testSuite.test("Regression2", testCollectionConformanceRegression2)
     runAllTests()
   }
 
