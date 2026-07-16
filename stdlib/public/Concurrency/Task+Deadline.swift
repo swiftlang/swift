@@ -102,11 +102,9 @@ func withDeadline<Return, Failure, C>(
   clock: C = ContinuousClock(),
   operation: nonisolated(nonsending) () async throws(Failure) -> Return
 ) async throws(Failure) -> Return
-where Return: ~Copyable, Failure: Error, C: Clock & Identifiable {
-  // Push a deadline status record so `Task.hasActiveDeadline` / observers
-  // can see the innermost active deadline. Subsumption (a tighter enclosing
-  // deadline for the same clock) is handled by the runtime, which returns
-  // a nil record in that case.
+  where Return: ~Copyable,
+        Failure: Error,
+        C: Clock & Identifiable {
   let clockID = _encodeClockID(clock)
   let (seconds, attoseconds) = _instantComponents(expiration, clock: clock)
   let deadlineRecord = unsafe Builtin.taskPushDeadline(
@@ -115,19 +113,18 @@ where Return: ~Copyable, Failure: Error, C: Clock & Identifiable {
     deadlineAttoseconds: attoseconds)
   defer { unsafe Builtin.taskPopDeadline(record: deadlineRecord) }
 
-  // Try to find an executor that services this clock's timers. If we can't
-  // (unknown clock, or the runtime doesn't have a clock executor for it),
-  // fall back to running the operation without deadline enforcement -
-  // observers can still see the deadline record and cooperatively check it.
+  // Arm a detached timer task on the given clock that will cancel the
+  // scope wrapping `operation` once the deadline elapses. The scope is
+  // local to `operation`, so `Task.isCancelled` observed by `operation`
+  // (or by any `withTaskCancellationHandler` handler it installs) becomes
+  // true, but the enclosing task's own cancellation state is unaffected.
   return try await __withTaskCancellationScope { scope throws(Failure) in
-    guard let disarm = _armDeadlineTimer(
+    let disarm = _armDeadlineTimer(
       scope: scope,
       expiration: expiration,
       tolerance: tolerance,
       clock: clock
-    ) else {
-      return try await operation()
-    }
+    )
     defer { disarm() }
     return try await operation()
   }
@@ -136,62 +133,43 @@ where Return: ~Copyable, Failure: Error, C: Clock & Identifiable {
 // ==== -----------------------------------------------------------------------
 // MARK: Timer arming
 
-/// Enqueue a fire-once synchronous job on the clock's current executor that
-/// cancels `scope` when the deadline expires. Returns a closure that
-/// synchronously disarms the timer (a no-op if it has already fired).
+/// Spawn a detached task that sleeps until `expiration` on the given clock,
+/// then cancels `scope`. Returns a closure that disarms the timer by
+/// cancelling the task; the sleeping task observes cancellation and exits
+/// without touching the scope.
 ///
-/// Returns `nil` if no executor for this clock exists in the current
-/// preference chain - the caller should then run the operation without
-/// deadline enforcement.
+/// This intentionally uses only stock building blocks (`Task { ... }` and
+/// `clock.sleep(until:tolerance:)`) rather than reaching for a
+/// clock-specific executor or a bespoke fire-once job: the deadline API is
+/// primarily useful for operations that are already async and long-running,
+/// so the extra Task allocation per `withDeadline` call is not a concern
+/// while this is SPI. It can be revisited once we have a lighter-weight
+/// timer primitive.
 @available(StdlibDeploymentTarget 6.5, *)
 private func _armDeadlineTimer<C: Clock & Identifiable>(
   scope: borrowing TaskCancellationScope,
   expiration: C.Instant,
   tolerance: C.Instant.Duration?,
   clock: C
-) -> (@Sendable () -> Void)? {
-  // Building the timer job doesn't require any generic-over-C witness -
-  // it just needs to call `scope.cancel()` when it fires. But we do need
-  // an executor typed by `C` to actually enqueue with a `C.Instant`
-  // deadline; dispatch on the two system clocks that have known executor
-  // protocols today.
-  let priority = UInt8(Task.currentPriority.rawValue)
-  // Copy the raw scope pointer into an unsafe box so the sending closure
-  // doesn't need to move `scope` itself (it's ~Copyable / ~Escapable).
+) -> (@Sendable () -> Void) {
+  // The scope handle itself is `~Escapable`, but its underlying record
+  // pointer is a plain `UnsafeRawPointer` we can hand to the sending
+  // closure. The scope's lifetime is the body of `__withTaskCancellationScope`
+  // above us, and the returned disarm closure is called from `defer` inside
+  // that body - so the record pointer is guaranteed live for the duration
+  // of the timer task.
   let scopeRecord = unsafe scope._record
-  let timerJob = Builtin.createSynchronousJob(priority: priority) {
+
+  let timer = Task.detached {
+    do {
+      try await clock.sleep(until: expiration, tolerance: tolerance)
+    } catch {
+      // Timer was cancelled (disarmed) before the deadline elapsed.
+      return
+    }
     unsafe _taskCancelTaskCancellationScope(record: scopeRecord)
   }
-
-  if C.self == ContinuousClock.self {
-    guard let executor = Task.currentContinuousClockExecutor else { return nil }
-    let instant = unsafe unsafeBitCast(expiration, to: ContinuousClock.Instant.self)
-    let toleranceValue = tolerance.map { unsafe unsafeBitCast($0, to: ContinuousClock.Duration.self) }
-    let registration = executor.enqueue(
-      ExecutorJob(context: timerJob),
-      at: instant,
-      tolerance: toleranceValue
-    )
-    return { executor.cancel(registration) }
-  }
-  if C.self == SuspendingClock.self {
-    guard let executor = Task.currentSuspendingClockExecutor else { return nil }
-    let instant = unsafe unsafeBitCast(expiration, to: SuspendingClock.Instant.self)
-    let toleranceValue = tolerance.map { unsafe unsafeBitCast($0, to: SuspendingClock.Duration.self) }
-    let registration = executor.enqueue(
-      ExecutorJob(context: timerJob),
-      at: instant,
-      tolerance: toleranceValue
-    )
-    return { executor.cancel(registration) }
-  }
-
-  // Unknown clock - drop the timer job (its retain will be released when
-  // this scope exits without enqueue happening; without a scheduler owning
-  // it, the SynchronousJob leaks its context. That's acceptable while this
-  // primitive is SPI - custom-clock users must plumb through
-  // Continuous/SuspendingClock for now).
-  return nil
+  return { timer.cancel() }
 }
 
 // ==== -----------------------------------------------------------------------
