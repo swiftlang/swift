@@ -1354,6 +1354,10 @@ bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
   }
 }
 
+BridgedGenericEnvironment BridgedInstruction::OpenExistentialRefInst_getDefinedGenericEnvironment() const {
+  return {getAs<swift::OpenExistentialRefInst>()->getDefinedOpenedArchetype()->getGenericEnvironment()};
+}
+
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
   return {getAs<swift::GlobalAccessInst>()->getReferencedGlobal()};
 }
@@ -2151,9 +2155,11 @@ BridgedArgument BridgedBasicBlock::addBlockArgument(BridgedType type, BridgedVal
 
 BridgedArgument
 BridgedBasicBlock::insertPhiArgument(SwiftInt index, BridgedType type,
-                                     BridgedValue::Ownership ownership) const {
+                                     BridgedValue::Ownership ownership,
+                                     OptionalBridgedDeclObj decl) const {
   return {unbridged()->insertPhiArgument(index, type.unbridged(),
-                                         BridgedValue::unbridge(ownership))};
+                                         BridgedValue::unbridge(ownership),
+                                         decl.getAs<swift::ValueDecl>())};
 }
 
 BridgedArgument BridgedBasicBlock::addFunctionArgument(BridgedType type) const {
