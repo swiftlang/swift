@@ -4459,7 +4459,7 @@ public:
                 "ownership kind result?!");
       }
       if (operandTy.getNominalOrBoundGenericNominal()
-          ->getValueTypeDestructor()) {
+          ->hasValueTypeDestructor()) {
         require(
           isa<DropDeinitInst>(lookThroughOwnershipInsts(DSI->getOperand())),
             "a destructure of a move-only-type-with-deinit requires a "
@@ -7011,7 +7011,7 @@ public:
     require(type.isMoveOnly(/*orWrapped=*/false),
             "drop_deinit only allowed for move-only types");
     require(type.getNominalOrBoundGenericNominal()
-            ->getValueTypeDestructor(), "drop_deinit only allowed for "
+            ->hasValueTypeDestructor(), "drop_deinit only allowed for "
             "struct/enum types that define a deinit");
     assert(!type.isTrivial(F) && "a type with a deinit is nontrivial");
 
