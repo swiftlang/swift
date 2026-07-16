@@ -3307,11 +3307,15 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
 
       # Runtime dependencies of repl_swift.exe.  The Stage2-compiled swiftCore.dll
       # already lives in $CompilerCache\bin and is what repl_swift.exe is linked
-      # against, so only swiftrt.obj needs to be staged from the SDK here.
+      # against, so only swiftrt.obj and swiftrtd.obj need to be staged from the SDK here.
       New-Item -ItemType Directory -Force "$CompilerCache\$SwiftRTSubdir" | Out-Null
       Write-Host "Copying '$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj' to '$CompilerCache\$SwiftRTSubdir'"
       Copy-Item `
         -Path "$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" `
+        -Destination "$CompilerCache\$SwiftRTSubdir"
+      Write-Host "Copying '$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrtd.obj' to '$CompilerCache\$SwiftRTSubdir'"
+      Copy-Item `
+        -Path "$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrtd.obj" `
         -Destination "$CompilerCache\$SwiftRTSubdir"
       $TestingDefines += @{
         LLDB_INCLUDE_TESTS = "YES";

@@ -190,6 +190,15 @@ elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrtT.obj)
 
+  add_library(swiftrtTd OBJECT SwiftRT-COFF.cpp)
+  target_compile_definitions(swiftrtTd PRIVATE
+    SWIFT_STATIC_STDLIB _DEBUG _ITERATOR_DEBUG_LEVEL=2)
+  target_link_libraries(swiftrtTd PRIVATE swiftShims)
+  install(FILES $<TARGET_OBJECTS:swiftrtTd>
+    COMPONENT SwiftCore_runtime
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    RENAME swiftrtTd.obj)
+
   add_library(swiftrt OBJECT SwiftRT-COFF.cpp)
   target_link_libraries(swiftrt PRIVATE swiftShims)
   install(FILES $<TARGET_OBJECTS:swiftrt>
@@ -197,7 +206,16 @@ elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.obj)
 
-  install(TARGETS swiftrtT swiftrt
+  add_library(swiftrtd OBJECT SwiftRT-COFF.cpp)
+  target_compile_definitions(swiftrtd PRIVATE
+    _DEBUG _ITERATOR_DEBUG_LEVEL=2)
+  target_link_libraries(swiftrtd PRIVATE swiftShims)
+  install(FILES $<TARGET_OBJECTS:swiftrtd>
+    COMPONENT SwiftCore_runtime
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    RENAME swiftrtd.obj)
+
+  install(TARGETS swiftrtT swiftrtTd swiftrt swiftrtd
     EXPORT SwiftCoreTargets
     COMPONENT SwiftCore_runtime)
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")
