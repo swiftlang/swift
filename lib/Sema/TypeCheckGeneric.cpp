@@ -957,6 +957,13 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
     loc = ext->getLoc();
 
+    // A protocol metatype extension has no generic signature — its members are
+    // static members of the protocol metatype and cannot reference Self.  Bail
+    // before inspecting the extended type, which is the metatype `(any P).Type`
+    // rather than a nominal that requirements could be collected from.
+    if (ext->isMetatypeExtension())
+      return nullptr;
+
     collectAdditionalExtensionRequirements(ext->getExtendedType(), extraReqs);
 
     auto *extendedNominal = ext->getExtendedNominal();
@@ -969,11 +976,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // Self or its associated types will infer default requirements in
     // ordinary extensions of that protocol, so the signature can differ there.
     if (auto *proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
-      // Metatype extensions have no generic signature.  Their members are
-      // statically dispatched and cannot reference Self.
-      if (ext->isMetatypeExtension())
-        return nullptr;
-
       if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
           proto->getInverseRequirements().empty()) {
         return extendedNominal->getGenericSignatureOfContext();
