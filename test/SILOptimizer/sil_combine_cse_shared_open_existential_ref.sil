@@ -1,0 +1,245 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -common-subexpression-elimination -sil-combine | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+//===----------------------------------------------------------------------===//
+// Regression test: CSE merges the four `open_existential_ref`s below (all
+// opening the same existential with `@guaranteed` ownership) into a single
+// shared `open_existential_ref`, which is then used by four sibling `apply`s,
+// each calling a different `witness_method` requirement of `Designable`.
+//
+// SILCombine's existential devirtualization
+// (SILCombiner::createApplyWithConcreteType) then processes the first of
+// those sibling applies, proves the existential's concrete type is `View`,
+// and replaces that apply's operand with a concrete-typed value. Without
+// keeping the other three sibling applies' `witness_method` callees in sync
+// with the now-shared, redirected operand, this produced SIL that failed
+// verification: "operand of 'apply' doesn't match function input type".
+//===----------------------------------------------------------------------===//
+
+enum GradientType {
+  case a
+  case b
+  case c
+}
+
+enum GradientStartPoint {
+  case top
+  case bottom
+}
+
+protocol Designable : AnyObject {
+  var predefinedGradient: GradientType? { get set }
+  var startColor: Int? { get set }
+  var endColor: Int? { get set }
+  var startPoint: GradientStartPoint { get set }
+}
+
+class Base {
+  @_hasStorage var predefinedGradient: GradientType? { get set }
+}
+
+final class Bar : Base, Designable {
+  @_hasStorage var startColor: Int? { get set }
+  @_hasStorage var endColor: Int? { get set }
+  @_hasStorage var startPoint: GradientStartPoint { get set }
+}
+
+final class View : Base, Designable {
+  @_hasStorage var startColor: Int? { get set }
+  @_hasStorage var endColor: Int? { get set }
+  @_hasStorage var startPoint: GradientStartPoint { get set }
+}
+
+sil hidden [ossa] @$s4View18predefinedGradientTW : $@convention(witness_method: Designable) (@guaranteed View) -> Optional<GradientType> {
+bb0(%0 : @guaranteed $View):
+  %0b = upcast %0 : $View to $Base
+  %1 = ref_element_addr %0b, #Base.predefinedGradient
+  %2 = begin_access [read] [dynamic] %1
+  %3 = load [trivial] %2
+  end_access %2
+  return %3 : $Optional<GradientType>
+}
+
+sil hidden [ossa] @$s4View10startColorTW : $@convention(witness_method: Designable) (@guaranteed View) -> Optional<Int> {
+bb0(%0 : @guaranteed $View):
+  %1 = ref_element_addr %0, #View.startColor
+  %2 = begin_access [read] [dynamic] %1
+  %3 = load [trivial] %2
+  end_access %2
+  return %3 : $Optional<Int>
+}
+
+sil hidden [ossa] @$s4View8endColorTW : $@convention(witness_method: Designable) (@guaranteed View) -> Optional<Int> {
+bb0(%0 : @guaranteed $View):
+  %1 = ref_element_addr %0, #View.endColor
+  %2 = begin_access [read] [dynamic] %1
+  %3 = load [trivial] %2
+  end_access %2
+  return %3 : $Optional<Int>
+}
+
+sil hidden [ossa] @$s4View10startPointTW : $@convention(witness_method: Designable) (@guaranteed View) -> GradientStartPoint {
+bb0(%0 : @guaranteed $View):
+  %1 = ref_element_addr %0, #View.startPoint
+  %2 = begin_access [read] [dynamic] %1
+  %3 = load [trivial] %2
+  end_access %2
+  return %3 : $GradientStartPoint
+}
+
+sil hidden [ossa] @$s3Bar18predefinedGradientTW : $@convention(witness_method: Designable) (@guaranteed Bar) -> Optional<GradientType> {
+bb0(%0 : @guaranteed $Bar):
+  %0b = upcast %0 : $Bar to $Base
+  %1 = ref_element_addr %0b, #Base.predefinedGradient
+  %2 = begin_access [read] [dynamic] %1
+  %3 = load [trivial] %2
+  end_access %2
+  return %3 : $Optional<GradientType>
+}
+
+sil hidden [ossa] @$s3Bar10startColorTW : $@convention(witness_method: Designable) (@guaranteed Bar) -> Optional<Int> {
+bb0(%0 : @guaranteed $Bar):
+  %1 = ref_element_addr %0, #Bar.startColor
+  %2 = begin_access [read] [dynamic] %1
+  %3 = load [trivial] %2
+  end_access %2
+  return %3 : $Optional<Int>
+}
+
+sil hidden [ossa] @$s3Bar8endColorTW : $@convention(witness_method: Designable) (@guaranteed Bar) -> Optional<Int> {
+bb0(%0 : @guaranteed $Bar):
+  %1 = ref_element_addr %0, #Bar.endColor
+  %2 = begin_access [read] [dynamic] %1
+  %3 = load [trivial] %2
+  end_access %2
+  return %3 : $Optional<Int>
+}
+
+sil hidden [ossa] @$s3Bar10startPointTW : $@convention(witness_method: Designable) (@guaranteed Bar) -> GradientStartPoint {
+bb0(%0 : @guaranteed $Bar):
+  %1 = ref_element_addr %0, #Bar.startPoint
+  %2 = begin_access [read] [dynamic] %1
+  %3 = load [trivial] %2
+  end_access %2
+  return %3 : $GradientStartPoint
+}
+
+sil_witness_table View: Designable module main {
+  method #Designable.predefinedGradient!getter: @$s4View18predefinedGradientTW
+  method #Designable.startColor!getter: @$s4View10startColorTW
+  method #Designable.endColor!getter: @$s4View8endColorTW
+  method #Designable.startPoint!getter: @$s4View10startPointTW
+}
+
+sil_witness_table Bar: Designable module main {
+  method #Designable.predefinedGradient!getter: @$s3Bar18predefinedGradientTW
+  method #Designable.startColor!getter: @$s3Bar10startColorTW
+  method #Designable.endColor!getter: @$s3Bar8endColorTW
+  method #Designable.startPoint!getter: @$s3Bar10startPointTW
+}
+
+// CHECK-LABEL: sil [ossa] @copyGradient_inlined :
+// CHECK-NOT: = open_existential_ref
+// CHECK-NOT: = witness_method
+// CHECK: function_ref @$s4View18predefinedGradientTW
+// CHECK: apply {{%[0-9]+}}(%0)
+// CHECK: function_ref @$s4View10startColorTW
+// CHECK: apply {{%[0-9]+}}(%0)
+// CHECK: function_ref @$s4View8endColorTW
+// CHECK: apply {{%[0-9]+}}(%0)
+// CHECK: function_ref @$s4View10startPointTW
+// CHECK: apply {{%[0-9]+}}(%0)
+// CHECK-NOT: = open_existential_ref
+// CHECK-NOT: = witness_method
+// CHECK-LABEL: } // end sil function 'copyGradient_inlined'
+sil [ossa] @copyGradient_inlined : $@convention(thin) (@owned View, @owned Bar) -> () {
+bb0(%88 : @owned $View, %77 : @owned $Bar):
+  %89 = init_existential_ref %88 : $View : $View, $any Designable
+  %90 = begin_borrow [lexical] %89
+  %91 = begin_borrow [lexical] %77
+  %94 = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self
+  %95 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self, #Designable.predefinedGradient!getter, %94 : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<GradientType>
+  %96 = apply %95<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self>(%94) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<GradientType>
+  %97 = upcast %91 to $Base
+  %100 = ref_element_addr %97, #Base.predefinedGradient
+  %101 = begin_access [modify] [dynamic] [no_nested_conflict] %100
+  store %96 to [trivial] %101
+  end_access %101
+  %94b = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self
+  %104 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self, #Designable.startColor!getter, %94b : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %105 = apply %104<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self>(%94b) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %108 = ref_element_addr %91, #Bar.startColor
+  %109 = begin_access [modify] [dynamic] [no_nested_conflict] %108
+  store %105 to [trivial] %109
+  end_access %109
+  %94c = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self
+  %112 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self, #Designable.endColor!getter, %94c : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %113 = apply %112<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self>(%94c) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %116 = ref_element_addr %91, #Bar.endColor
+  %117 = begin_access [modify] [dynamic] [no_nested_conflict] %116
+  store %113 to [trivial] %117
+  end_access %117
+  %94d = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self
+  %120 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self, #Designable.startPoint!getter, %94d : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> GradientStartPoint
+  %121 = apply %120<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self>(%94d) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> GradientStartPoint
+  %124 = ref_element_addr %91, #Bar.startPoint
+  %125 = begin_access [modify] [dynamic] [no_nested_conflict] %124
+  store %121 to [trivial] %125
+  end_access %125
+  end_borrow %90
+  end_borrow %91
+  destroy_value %89
+  destroy_value %77
+  %132 = tuple ()
+  return %132 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Regression test: an `open_existential_ref` is used by two sibling `apply`s
+// of *generic* functions (as opposed to `witness_method`s, as above).
+//
+// SILCombine's existential devirtualization visits one of the two sibling
+// applies first (whichever comes first in program order), proves the
+// existential's concrete type is `LeafNode`, and rewrites that apply's
+// operand and substitutions to the concrete type together. Along the way,
+// it also blindly redirects the *operand* of the other sibling apply to the
+// same concrete-typed value, without updating that apply's substitution
+// map, which still refers to the opened archetype. Because the eligibility
+// check for reprocessing an apply's substitutions inspects the apply's
+// *current* operand type, this other apply's operand type no longer looks
+// like an opened existential, so it's never revisited to fix up its
+// substitutions either. This produced SIL that failed verification:
+// "operand of 'apply' doesn't match function input type".
+//===----------------------------------------------------------------------===//
+
+protocol Taggable : AnyObject {}
+
+class LeafNode : Taggable {}
+
+sil @genericTake : $@convention(thin) <T where T : Taggable> (@guaranteed T) -> ()
+sil @genericPush : $@convention(thin) <T where T : Taggable> (@guaranteed T) -> ()
+
+// CHECK-LABEL: sil [ossa] @siblingGenericApplies :
+// CHECK-NOT: open_existential_ref
+// CHECK: function_ref @genericTake
+// CHECK: apply {{%[0-9]+}}<LeafNode>(%0)
+// CHECK: function_ref @genericPush
+// CHECK: apply {{%[0-9]+}}<LeafNode>(%0)
+// CHECK-NOT: open_existential_ref
+// CHECK-LABEL: } // end sil function 'siblingGenericApplies'
+sil [ossa] @siblingGenericApplies : $@convention(thin) (@owned LeafNode) -> () {
+bb0(%0 : @owned $LeafNode):
+  %4 = init_existential_ref %0 : $LeafNode : $LeafNode, $any Taggable
+  %5 = open_existential_ref %4 to $@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self
+  %6 = function_ref @genericTake : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %9 = function_ref @genericPush : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %10 = apply %9<@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  destroy_value %5
+  %14 = tuple ()
+  return %14 : $()
+}
