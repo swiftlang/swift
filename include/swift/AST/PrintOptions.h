@@ -352,7 +352,13 @@ public:
   /// if SkipImplicit or SkipUnavailable is set.
   bool AlwaysPrintNonSendableExtensions = true;
 
+  /// Whether to print imported declarations with the \c swift_private
+  /// clang attribute.
   bool SkipSwiftPrivateClangDecls = false;
+
+  /// Whether to print only the visible projection of imported declarations
+  /// which use C arrays.
+  bool SkipHiddenCArrayProjections = true;
 
   /// Whether to skip underscored declarations from system modules.
   bool SkipPrivateSystemDecls = false;
