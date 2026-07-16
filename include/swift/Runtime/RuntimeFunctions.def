@@ -2733,9 +2733,9 @@ FUNCTION(TaskRemovePriorityEscalationHandler,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// CancellationScopeRecord* swift_task_pushCancellationScope();
-FUNCTION(TaskPushCancellationScope,
-        _Concurrency, swift_task_pushCancellationScope, SwiftCC,
+// TaskCancellationScopeRecord* swift_task_pushTaskCancellationScope();
+FUNCTION(TaskPushTaskCancellationScope,
+        _Concurrency, swift_task_pushTaskCancellationScope, SwiftCC,
         ConcurrencyAvailability,
         RETURNS(Int8PtrTy),
         ARGS(),
@@ -2743,9 +2743,9 @@ FUNCTION(TaskPushCancellationScope,
         EFFECT(RuntimeEffect::Concurrency),
         UNKNOWN_MEMEFFECTS)
 
-// void swift_task_popCancellationScope(CancellationScopeRecord *record);
-FUNCTION(TaskPopCancellationScope,
-         _Concurrency, swift_task_popCancellationScope, SwiftCC,
+// void swift_task_popTaskCancellationScope(TaskCancellationScopeRecord *record);
+FUNCTION(TaskPopTaskCancellationScope,
+         _Concurrency, swift_task_popTaskCancellationScope, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy),
@@ -2753,9 +2753,9 @@ FUNCTION(TaskPopCancellationScope,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_task_cancelCancellationScope(CancellationScopeRecord *record);
-FUNCTION(TaskCancelCancellationScope,
-         _Concurrency, swift_task_cancelCancellationScope, SwiftCC,
+// void swift_task_cancelTaskCancellationScope(TaskCancellationScopeRecord *record);
+FUNCTION(TaskCancelTaskCancellationScope,
+         _Concurrency, swift_task_cancelTaskCancellationScope, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy),

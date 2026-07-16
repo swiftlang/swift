@@ -692,9 +692,9 @@ CONSTANT_OWNERSHIP_BUILTIN(None, AddTaskLocalValue)
 CONSTANT_OWNERSHIP_BUILTIN(None, RemoveTaskLocalValue)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPush)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPop)
-CONSTANT_OWNERSHIP_BUILTIN(None, CancellationScopePush)
-CONSTANT_OWNERSHIP_BUILTIN(None, CancellationScopePop)
-CONSTANT_OWNERSHIP_BUILTIN(None, CancellationScopeCancel)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopePush)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopePop)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopeCancel)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

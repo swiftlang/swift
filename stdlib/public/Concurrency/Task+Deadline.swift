@@ -119,7 +119,7 @@ where Return: ~Copyable, Failure: Error, C: Clock & Identifiable {
   // (unknown clock, or the runtime doesn't have a clock executor for it),
   // fall back to running the operation without deadline enforcement -
   // observers can still see the deadline record and cooperatively check it.
-  return try await __withCancellationScope { scope throws(Failure) in
+  return try await __withTaskCancellationScope { scope throws(Failure) in
     guard let disarm = _armDeadlineTimer(
       scope: scope,
       expiration: expiration,
@@ -145,7 +145,7 @@ where Return: ~Copyable, Failure: Error, C: Clock & Identifiable {
 /// deadline enforcement.
 @available(StdlibDeploymentTarget 6.5, *)
 private func _armDeadlineTimer<C: Clock & Identifiable>(
-  scope: borrowing CancellationScope,
+  scope: borrowing TaskCancellationScope,
   expiration: C.Instant,
   tolerance: C.Instant.Duration?,
   clock: C
@@ -160,7 +160,7 @@ private func _armDeadlineTimer<C: Clock & Identifiable>(
   // doesn't need to move `scope` itself (it's ~Copyable / ~Escapable).
   let scopeRecord = unsafe scope._record
   let timerJob = Builtin.createSynchronousJob(priority: priority) {
-    unsafe _taskCancelCancellationScope(record: scopeRecord)
+    unsafe _taskCancelTaskCancellationScope(record: scopeRecord)
   }
 
   if C.self == ContinuousClock.self {

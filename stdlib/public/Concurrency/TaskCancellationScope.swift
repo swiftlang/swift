@@ -13,19 +13,19 @@
 import Swift
 
 // ==== -----------------------------------------------------------------------
-// MARK: CancellationScope
+// MARK: TaskCancellationScope
 
 /// A handle representing a scoped, independently-cancellable region within a
 /// task, distinct from whole-task cancellation.
 ///
 /// Unlike `Task.cancel()`, which flips the enclosing task's own `isCancelled`
-/// state, `CancellationScope.cancel()` only affects code running inside the
-/// `__withCancellationScope { scope in ... }` body. Structured child tasks
+/// state, `TaskCancellationScope.cancel()` only affects code running inside the
+/// `__withTaskCancellationScope { scope in ... }` body. Structured child tasks
 /// spawned inside the scope (via `TaskGroup` or `async let`) are NOT
 /// automatically cancelled through this mechanism.
 ///
 /// This type is `~Copyable` and `~Escapable`: the scope handle exists only
-/// for the duration of `__withCancellationScope`'s body and cannot leave
+/// for the duration of `__withTaskCancellationScope`'s body and cannot leave
 /// that body. Cancel from an external task by capturing the scope in a
 /// closure whose lifetime the caller has proven does not outlive the body
 /// (typically via a synchronous timer job whose disarm-on-scope-exit is
@@ -38,7 +38,7 @@ import Swift
 @available(StdlibDeploymentTarget 6.5, *)
 @safe
 @frozen
-public struct CancellationScope: ~Copyable, ~Escapable {
+public struct TaskCancellationScope: ~Copyable, ~Escapable {
   @usableFromInline
   internal let _record: UnsafeRawPointer
 
@@ -51,7 +51,7 @@ public struct CancellationScope: ~Copyable, ~Escapable {
   /// Cancel this scope.
   ///
   /// Setting the scope's cancellation flag causes `Task.isCancelled` to
-  /// return `true` for code running inside `__withCancellationScope`'s body
+  /// return `true` for code running inside `__withTaskCancellationScope`'s body
   /// (or its non-child callees), and fires any `withTaskCancellationHandler`
   /// handlers installed while the scope was active - this is what allows
   /// operations like `Task.sleep(for:)` inside the scope to return early.
@@ -67,19 +67,19 @@ public struct CancellationScope: ~Copyable, ~Escapable {
   /// Multiple calls to `cancel()` are safe; subsequent calls are no-ops.
   public func cancel() {
 #if $BuiltinConcurrencyStackNesting
-    unsafe Builtin.cancellationScopeCancel(record: _record)
+    unsafe Builtin.taskCancellationScopeCancel(record: _record)
 #else
-    unsafe _taskCancelCancellationScope(record: _record)
+    unsafe _taskCancelTaskCancellationScope(record: _record)
 #endif
   }
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: __withCancellationScope
+// MARK: __withTaskCancellationScope
 
 /// Executes an operation inside a fresh cancellation scope.
 ///
-/// The `body` closure receives a `CancellationScope` handle. Calling
+/// The `body` closure receives a `TaskCancellationScope` handle. Calling
 /// `scope.cancel()` (from `body` itself, or from any other concurrency
 /// context that has captured the handle for the duration of `body`) causes
 /// `Task.isCancelled` to return `true` for code executing inside `body`,
@@ -103,17 +103,17 @@ public struct CancellationScope: ~Copyable, ~Escapable {
 @_spi(Concurrency)
 @available(StdlibDeploymentTarget 6.5, *)
 public nonisolated(nonsending)
-func __withCancellationScope<Return, Failure>(
-  _ body: nonisolated(nonsending) (borrowing CancellationScope) async throws(Failure) -> Return
+func __withTaskCancellationScope<Return, Failure>(
+  _ body: nonisolated(nonsending) (borrowing TaskCancellationScope) async throws(Failure) -> Return
 ) async throws(Failure) -> Return where Return: ~Copyable, Failure: Error {
 #if $BuiltinConcurrencyStackNesting
-  let record = unsafe Builtin.cancellationScopePush()
-  defer { unsafe Builtin.cancellationScopePop(record: record) }
+  let record = unsafe Builtin.taskCancellationScopePush()
+  defer { unsafe Builtin.taskCancellationScopePop(record: record) }
 #else
-  let record = unsafe _taskPushCancellationScope()
-  defer { unsafe _taskPopCancellationScope(record: record) }
+  let record = unsafe _taskPushTaskCancellationScope()
+  defer { unsafe _taskPopTaskCancellationScope(record: record) }
 #endif
-  let scope = unsafe CancellationScope(record: record)
+  let scope = unsafe TaskCancellationScope(record: record)
   return try await body(scope)
 }
 
@@ -122,15 +122,15 @@ func __withCancellationScope<Return, Failure>(
 
 @available(StdlibDeploymentTarget 6.5, *)
 @usableFromInline
-@_silgen_name("swift_task_pushCancellationScope")
-internal func _taskPushCancellationScope() -> UnsafeRawPointer /*CancellationScopeRecord*/
+@_silgen_name("swift_task_pushTaskCancellationScope")
+internal func _taskPushTaskCancellationScope() -> UnsafeRawPointer /*TaskCancellationScopeRecord*/
 
 @available(StdlibDeploymentTarget 6.5, *)
 @usableFromInline
-@_silgen_name("swift_task_popCancellationScope")
-internal func _taskPopCancellationScope(record: UnsafeRawPointer /*CancellationScopeRecord*/)
+@_silgen_name("swift_task_popTaskCancellationScope")
+internal func _taskPopTaskCancellationScope(record: UnsafeRawPointer /*TaskCancellationScopeRecord*/)
 
 @available(StdlibDeploymentTarget 6.5, *)
 @usableFromInline
-@_silgen_name("swift_task_cancelCancellationScope")
-internal func _taskCancelCancellationScope(record: UnsafeRawPointer /*CancellationScopeRecord*/)
+@_silgen_name("swift_task_cancelTaskCancellationScope")
+internal func _taskCancelTaskCancellationScope(record: UnsafeRawPointer /*TaskCancellationScopeRecord*/)

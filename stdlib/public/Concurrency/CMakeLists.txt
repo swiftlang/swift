@@ -143,7 +143,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Task+PriorityEscalation.swift
   Task+TaskExecutor.swift
   TaskCancellation.swift
-  CancellationScope.swift
+  TaskCancellationScope.swift
   TaskGroup.swift
   DiscardingTaskGroup.swift
   TaskLocal.swift

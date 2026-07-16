@@ -1404,7 +1404,7 @@ SILInstruction::getStackAllocation() const {
       BUILTIN_CASE(TaskAddPriorityEscalationHandler,
                    TaskAddPriorityEscalationHandler)
       BUILTIN_CASE(TaskAddCancellationHandler, TaskAddCancellationHandler)
-      BUILTIN_CASE(CancellationScopePush, CancellationScopePush)
+      BUILTIN_CASE(TaskCancellationScopePush, TaskCancellationScopePush)
 #undef BUILTIN_CASE
 
       default:
@@ -1517,7 +1517,7 @@ SILInstruction::getStackDeallocation() const {
                    BuiltinTaskAddPriorityEscalationHandler)
       BUILTIN_CASE(TaskRemoveCancellationHandler,
                    BuiltinTaskAddCancellationHandler)
-      BUILTIN_CASE(CancellationScopePop, BuiltinCancellationScopePush)
+      BUILTIN_CASE(TaskCancellationScopePop, BuiltinTaskCancellationScopePush)
 #undef BUILTIN_CASE
 
       default:

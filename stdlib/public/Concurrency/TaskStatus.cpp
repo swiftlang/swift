@@ -668,8 +668,8 @@ static void swift_task_popTaskExecutorPreferenceImpl(
 
 SWIFT_CC(swift)
 SWIFT_EXPORT_FROM(swift_Concurrency)
-CancellationScopeRecord *
-swift_task_pushCancellationScope() {
+TaskCancellationScopeRecord *
+swift_task_pushTaskCancellationScope() {
   auto task = swift_task_getCurrent();
   if (!task) {
     // No current task means no scope for the record to be attached to.
@@ -677,9 +677,9 @@ swift_task_pushCancellationScope() {
   }
 
   void *allocation =
-      _swift_task_alloc_specific(task, sizeof(class CancellationScopeRecord));
-  auto record = ::new (allocation) CancellationScopeRecord(task);
-  SWIFT_TASK_DEBUG_LOG("[CancellationScope] Create scope record:%p for task:%p",
+      _swift_task_alloc_specific(task, sizeof(class TaskCancellationScopeRecord));
+  auto record = ::new (allocation) TaskCancellationScopeRecord(task);
+  SWIFT_TASK_DEBUG_LOG("[TaskCancellationScope] Create scope record:%p for task:%p",
                        record, task);
 
   addStatusRecord(task, record,
@@ -687,7 +687,7 @@ swift_task_pushCancellationScope() {
                     // Set the "has cancellation scope" flag so isCancelled()
                     // can bail out without walking the record chain when
                     // there are no scopes installed.
-                    newStatus = newStatus.withCancellationScope();
+                    newStatus = newStatus.withTaskCancellationScope();
                     return true; // always add the record
                   });
 
@@ -696,12 +696,12 @@ swift_task_pushCancellationScope() {
 
 SWIFT_CC(swift)
 static void
-swift_task_popCancellationScopeImpl(CancellationScopeRecord *record) {
+swift_task_popTaskCancellationScopeImpl(TaskCancellationScopeRecord *record) {
   auto task = swift_task_getCurrent();
   if (!task || !record)
     return;
 
-  SWIFT_TASK_DEBUG_LOG("[CancellationScope] Remove scope record:%p from task:%p",
+  SWIFT_TASK_DEBUG_LOG("[TaskCancellationScope] Remove scope record:%p from task:%p",
                        record, task);
 
   // Track how many scope records are still installed after removing the
@@ -710,8 +710,8 @@ swift_task_popCancellationScopeImpl(CancellationScopeRecord *record) {
   removeStatusRecordWhere(
       task,
       /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
-        assert(status.hasCancellationScope() && "does not have record!");
-        if (cur->getKind() != TaskStatusRecordKind::CancellationScope)
+        assert(status.hasTaskCancellationScope() && "does not have record!");
+        if (cur->getKind() != TaskStatusRecordKind::TaskCancellationScope)
           return false;
 
         if (cur == record)
@@ -723,8 +723,8 @@ swift_task_popCancellationScopeImpl(CancellationScopeRecord *record) {
       /*updateStatus=*/[&](ActiveTaskStatus oldStatus,
                             ActiveTaskStatus &newStatus) {
         if (remainingScopes == 0) {
-          assert(oldStatus.hasCancellationScope());
-          newStatus = newStatus.withoutCancellationScope();
+          assert(oldStatus.hasTaskCancellationScope());
+          newStatus = newStatus.withoutTaskCancellationScope();
         }
       });
 
@@ -733,7 +733,7 @@ swift_task_popCancellationScopeImpl(CancellationScopeRecord *record) {
 
 SWIFT_CC(swift)
 static void
-swift_task_cancelCancellationScopeImpl(CancellationScopeRecord *record) {
+swift_task_cancelTaskCancellationScopeImpl(TaskCancellationScopeRecord *record) {
   // Cancelling a scope is a local operation on the scope's own atomic flag.
   // Unlike `swift_task_cancel`, it does NOT set the task's own IsCancelled
   // flag. To make code that reacts to cancellation via
@@ -778,14 +778,17 @@ swift_task_cancelCancellationScopeImpl(CancellationScopeRecord *record) {
 }
 
 bool swift::_swift_task_hasCancelledScope(AsyncTask *task) {
-  // The `HasCancellationScope` flag must have been checked by the caller;
+  // if (!task->hasTaskCancellationScope())
+    // return false;
+
+  // The `HasTaskCancellationScope` flag must have been checked by the caller;
   // this walker takes the record lock unconditionally.
   bool found = false;
   withStatusRecordLock(task, [&](ActiveTaskStatus status) {
     for (auto record : status.records()) {
-      if (record->getKind() != TaskStatusRecordKind::CancellationScope)
+      if (record->getKind() != TaskStatusRecordKind::TaskCancellationScope)
         continue;
-      if (cast<CancellationScopeRecord>(record)->isCancelled()) {
+      if (cast<TaskCancellationScopeRecord>(record)->isCancelled()) {
         found = true;
         return;
       }
@@ -1084,8 +1087,8 @@ static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord 
 
   // Whole-task cancellation must not implicitly cancel independent
   // cancellation scopes; scopes are only cancelled via their own
-  // `CancellationScope.cancel()`.
-  case TaskStatusRecordKind::CancellationScope:
+  // `TaskCancellationScope.cancel()`.
+  case TaskStatusRecordKind::TaskCancellationScope:
     break;
 
   // This should never be found, but the compiler complains if we don't check.
@@ -1189,7 +1192,7 @@ static void performEscalationAction(AsyncTask *task, TaskStatusRecord *record,
   case TaskStatusRecordKind::TaskExecutorPreference:
     return;
   // Cancellation scopes do not participate in priority escalation.
-  case TaskStatusRecordKind::CancellationScope:
+  case TaskStatusRecordKind::TaskCancellationScope:
     return;
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:

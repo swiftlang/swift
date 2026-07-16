@@ -2428,16 +2428,16 @@ static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
 
-static ValueDecl *getCancellationScopePush(ASTContext &ctx, Identifier id) {
+static ValueDecl *getTaskCancellationScopePush(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _unsafeRawPointer);
 }
 
-static ValueDecl *getCancellationScopePop(ASTContext &ctx, Identifier id) {
+static ValueDecl *getTaskCancellationScopePop(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
 
-static ValueDecl *getCancellationScopeCancel(ASTContext &ctx, Identifier id) {
+static ValueDecl *getTaskCancellationScopeCancel(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
@@ -3608,14 +3608,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
     return getTaskRemovePriorityEscalationHandler(Context, Id);
 
-  case BuiltinValueKind::CancellationScopePush:
-    return getCancellationScopePush(Context, Id);
+  case BuiltinValueKind::TaskCancellationScopePush:
+    return getTaskCancellationScopePush(Context, Id);
 
-  case BuiltinValueKind::CancellationScopePop:
-    return getCancellationScopePop(Context, Id);
+  case BuiltinValueKind::TaskCancellationScopePop:
+    return getTaskCancellationScopePop(Context, Id);
 
-  case BuiltinValueKind::CancellationScopeCancel:
-    return getCancellationScopeCancel(Context, Id);
+  case BuiltinValueKind::TaskCancellationScopeCancel:
+    return getTaskCancellationScopeCancel(Context, Id);
 
   case BuiltinValueKind::TaskLocalValuePush:
     return getTaskLocalValuePush(Context, Id);

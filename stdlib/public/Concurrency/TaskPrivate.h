@@ -77,7 +77,7 @@ void *_swift_task_alloc_specific(AsyncTask *task, size_t size);
 void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
 
 /// Slow-path helper for `AsyncTask::isCancelled()` when the task has at
-/// least one `CancellationScopeRecord` installed (`HasCancellationScope`
+/// least one `TaskCancellationScopeRecord` installed (`HasTaskCancellationScope`
 /// flag set). Walks the record chain under `withStatusRecordLock` and
 /// returns true iff any scope on the chain has been cancelled.
 bool _swift_task_hasCancelledScope(AsyncTask *task);
@@ -559,11 +559,11 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     // release happens when the intrusively linked Task is dequeued.
     HasRetainForInstrusiveLinkage = 0x40000,
 
-    /// Whether the task has at least one `CancellationScopeRecord` in its
+    /// Whether the task has at least one `TaskCancellationScopeRecord` in its
     /// status record list. By storing this flag we can avoid taking the task
     /// record lock and walking the record chain when checking for
     /// cancellation, which is a hot path.
-    HasCancellationScope = 0x80000,
+    HasTaskCancellationScope = 0x80000,
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     /// The Task's intrusive link or a Stealer may only run if its
@@ -801,20 +801,20 @@ public:
     return withFlags(Flags & ~HasRetainForInstrusiveLinkage);
   }
 
-  // HasCancellationScope
-  /// Is there at least one `CancellationScopeRecord` in the linked list of
+  // HasTaskCancellationScope
+  /// Is there at least one `TaskCancellationScopeRecord` in the linked list of
   /// status records?
   ///
   /// Cheap check that lets `AsyncTask::isCancelled` bail-out without taking
   /// the task record lock when there are no cancellation scopes installed.
-  bool hasCancellationScope() const {
-    return Flags & HasCancellationScope;
+  bool hasTaskCancellationScope() const {
+    return Flags & HasTaskCancellationScope;
   }
-  ActiveTaskStatus withCancellationScope() const {
-    return withFlags(Flags | HasCancellationScope);
+  ActiveTaskStatus withTaskCancellationScope() const {
+    return withFlags(Flags | HasTaskCancellationScope);
   }
-  ActiveTaskStatus withoutCancellationScope() const {
-    return withFlags(Flags & ~HasCancellationScope);
+  ActiveTaskStatus withoutTaskCancellationScope() const {
+    return withFlags(Flags & ~HasTaskCancellationScope);
   }
 
   // StealerExclusion
@@ -1182,7 +1182,7 @@ inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
   // Slow path: any active cancellation scope on the current task also
   // observes as "cancelled" from code running inside the scope. The chain
   // walk is out-of-lined into TaskStatus.cpp to keep this header light.
-  if (SWIFT_UNLIKELY(status.hasCancellationScope()))
+  if (SWIFT_UNLIKELY(status.hasTaskCancellationScope()))
     return _swift_task_hasCancelledScope(const_cast<AsyncTask *>(this));
   return false;
 }

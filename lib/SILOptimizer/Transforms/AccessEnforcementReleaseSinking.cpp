@@ -225,9 +225,9 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::RemoveTaskLocalValue:
     case BuiltinValueKind::TaskCancellationShieldPush:
     case BuiltinValueKind::TaskCancellationShieldPop:
-    case BuiltinValueKind::CancellationScopePush:
-    case BuiltinValueKind::CancellationScopePop:
-    case BuiltinValueKind::CancellationScopeCancel:
+    case BuiltinValueKind::TaskCancellationScopePush:
+    case BuiltinValueKind::TaskCancellationScopePop:
+    case BuiltinValueKind::TaskCancellationScopeCancel:
       return true;
     }
   }

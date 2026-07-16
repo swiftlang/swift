@@ -238,7 +238,7 @@ private:
   void *Argument;
 
   /// Handlers must run at most once per registration, even when both a
-  /// scoped cancellation (via `CancellationScopeRecord`) and whole-task
+  /// scoped cancellation (via `TaskCancellationScopeRecord`) and whole-task
   /// cancellation (via `swift_task_cancel`) reach this record. This flag
   /// is flipped exactly once by the first caller of `run()`.
   std::atomic<bool> Fired{false};
@@ -460,9 +460,9 @@ public:
 /// extent (records installed on the chain between the scope record and the
 /// innermost record at cancellation time) are fired so operations like
 /// `Task.sleep` that rely on `withTaskCancellationHandler` wake up.
-class CancellationScopeRecord : public TaskStatusRecord {
+class TaskCancellationScopeRecord : public TaskStatusRecord {
   /// The task that installed this scope. Stored so that
-  /// `swift_task_cancelCancellationScope` can be called from any thread /
+  /// `swift_task_cancelTaskCancellationScope` can be called from any thread /
   /// task context; the scope's owning task is well-defined at push time and
   /// does not change over the record's lifetime.
   AsyncTask *OwningTask;
@@ -470,8 +470,8 @@ class CancellationScopeRecord : public TaskStatusRecord {
   std::atomic<bool> Cancelled{false};
 
 public:
-  explicit CancellationScopeRecord(AsyncTask *owningTask)
-      : TaskStatusRecord(TaskStatusRecordKind::CancellationScope),
+  explicit TaskCancellationScopeRecord(AsyncTask *owningTask)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskCancellationScope),
         OwningTask(owningTask) {}
 
   AsyncTask *getOwningTask() const { return OwningTask; }
@@ -479,7 +479,7 @@ public:
   void cancel() { Cancelled.store(true, std::memory_order_relaxed); }
 
   static bool classof(const TaskStatusRecord *record) {
-    return record->getKind() == TaskStatusRecordKind::CancellationScope;
+    return record->getKind() == TaskStatusRecordKind::TaskCancellationScope;
   }
 };
 

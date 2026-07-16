@@ -27,7 +27,7 @@ func test_scope_basic() async {
   print("--- test_scope_basic")
   // CHECK-LABEL: --- test_scope_basic
 
-  await __withCancellationScope { scope in
+  await __withTaskCancellationScope { scope in
     print("before cancel: isCancelled=\(Task.isCancelled)")
     // CHECK: before cancel: isCancelled=false
 
@@ -48,7 +48,7 @@ func test_scope_ambient_task_uncancelled() async {
   // CHECK: --- test_scope_ambient_task_uncancelled
 
   await Task {
-    await __withCancellationScope { scope in
+    await __withTaskCancellationScope { scope in
       scope.cancel()
       print("inside scope: isCancelled=\(Task.isCancelled)")
       // CHECK: inside scope: isCancelled=true
@@ -67,11 +67,11 @@ func test_scope_handler_fires() async {
 
   // Cancel the scope synchronously from within `body` after installing a
   // withTaskCancellationHandler; the handler installed inside the scope
-  // must fire so that Task.sleep etc. wake up. Since `CancellationScope`
+  // must fire so that Task.sleep etc. wake up. Since `TaskCancellationScope`
   // is `~Escapable`, cancellation from a truly-external task must go
   // through indirect state (e.g. a timer job disarmed synchronously);
   // this test just verifies the local-cancel-fires-inner-handler shape.
-  await __withCancellationScope { scope in
+  await __withTaskCancellationScope { scope in
     var fireCount = 0
     await withTaskCancellationHandler {
       scope.cancel()
@@ -92,7 +92,7 @@ func test_scope_handler_fires_once_on_double_cancel() async {
   // A handler installed inside a scope must fire at most once, even when
   // both a scope.cancel() AND a subsequent whole-task cancel target it.
   await Task {
-    await __withCancellationScope { scope in
+    await __withTaskCancellationScope { scope in
       var fireCount = 0
       await withTaskCancellationHandler {
         // Fire path #1: scope cancellation.
@@ -116,8 +116,8 @@ func test_scope_nested() async {
   print("--- test_scope_nested")
   // CHECK: --- test_scope_nested
 
-  await __withCancellationScope { outer in
-    await __withCancellationScope { inner in
+  await __withTaskCancellationScope { outer in
+    await __withTaskCancellationScope { inner in
       inner.cancel()
       print("inner cancelled, isCancelled=\(Task.isCancelled)")
       // CHECK: inner cancelled, isCancelled=true

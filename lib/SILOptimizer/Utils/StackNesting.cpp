@@ -202,7 +202,7 @@ static void createDealloc(SILBuilder &B, SILLocation loc, SILInstruction *alloc)
   case StackAllocationKind::BuiltinAddTaskLocalValue:
   case StackAllocationKind::BuiltinTaskAddPriorityEscalationHandler:
   case StackAllocationKind::BuiltinTaskAddCancellationHandler:
-  case StackAllocationKind::BuiltinCancellationScopePush:
+  case StackAllocationKind::BuiltinTaskCancellationScopePush:
     llvm_unreachable("cannot insert this builtin; not safely reorderable");
     return;
   case StackAllocationKind::AllocPackMetadata:
@@ -237,7 +237,7 @@ static bool isUnreorderableAllocation(StackAllocation allocation) {
   case StackAllocationKind::BuiltinAddTaskLocalValue:
   case StackAllocationKind::BuiltinTaskAddPriorityEscalationHandler:
   case StackAllocationKind::BuiltinTaskAddCancellationHandler:
-  case StackAllocationKind::BuiltinCancellationScopePush:
+  case StackAllocationKind::BuiltinTaskCancellationScopePush:
     return true;
   }
   llvm_unreachable("unknown stack allocation");
