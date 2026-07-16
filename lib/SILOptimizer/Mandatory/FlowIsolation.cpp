@@ -464,8 +464,27 @@ public:
     //
     auto funcIsolation = rafi->getFunction()->getActorIsolation();
     if (funcIsolation.isActorIsolated()) {
-      // If our value is Non-Sendable, then we can rely on region isolation.
-      if (SILIsolationInfo::isNonSendable(i->get())) {
+      VarDecl *accessedProperty = nullptr;
+      if (auto *seai = dyn_cast<StructElementAddrInst>(i->getUser())) {
+        accessedProperty = seai->getField();
+      } else if (auto *reai = dyn_cast<RefElementAddrInst>(i->getUser())) {
+        accessedProperty = reai->getField();
+      }
+
+      // A property projection's operand is the base value, so its region
+      // isolation may not describe the isolation of the projected storage.
+      if (accessedProperty) {
+        auto propertyIsolation = swift::getActorIsolation(accessedProperty);
+        if (propertyIsolation.isActorIsolated() &&
+            propertyIsolation == funcIsolation) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "isolated use that is safe b/c property is isolated "
+                        "to same as constructor. Op Num: "
+                     << i->getOperandNumber() << ". User: " << *i->getUser());
+          return;
+        }
+      } else if (SILIsolationInfo::isNonSendable(i->get())) {
+        // If our value is Non-Sendable, then we can rely on region isolation.
         if (auto iso = isolationInfoCache.getIsolationInfoAtInst(i->getUser(),
                                                                  i->get())) {
           if (iso->isActorIsolated() &&
@@ -478,32 +497,13 @@ public:
           }
         }
       } else {
-        // If our operand was Sendable, we may have our traversal at a
-        // projection. See if we can find a VarDecl for it.
-        if (auto *svi = dyn_cast<SingleValueInstruction>(i->getUser());
-            llvm::isa_and_present<StructElementAddrInst, RefElementAddrInst>(
-                svi)) {
-          Projection proj(svi);
-          if (auto *decl = proj.getVarDecl(svi->getOperand(0)->getType())) {
-            if (auto declIsolation = swift::getActorIsolation(decl);
-                declIsolation && declIsolation.isActorIsolated() &&
-                declIsolation == funcIsolation) {
-              LLVM_DEBUG(llvm::dbgs()
-                         << "isolated use that is safe b/c value is "
-                            "isolated to same as constructor. Op Num: "
-                         << i->getOperandNumber()
-                         << ". User: " << *i->getUser());
-              return;
-            }
-          }
-        }
-
         // If we are passing self to a partial_apply or a function, we could end
         // up here. In that case, we want to look at the use in terms of whether
         // or not the partial_apply or function has a callee that is isolated to
         // our function.
         if (ApplySite as = ApplySite::isa(i->getUser())) {
-          if (auto *calleeFunction = as.getCalleeFunction(); calleeFunction &&
+          if (auto *calleeFunction = as.getCalleeFunction();
+              calleeFunction &&
               (calleeFunction->getActorIsolation().isNonisolatedNonsending() ||
                calleeFunction->getActorIsolation() == funcIsolation)) {
             LLVM_DEBUG(llvm::dbgs()

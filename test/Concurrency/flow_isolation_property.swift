@@ -16,6 +16,11 @@ nonisolated final class PropertyIsolatedSendable: Sendable {
   }
 }
 
+@globalActor
+actor AnotherActor {
+  static let shared = AnotherActor()
+}
+
 nonisolated final class MixedIsolation {
   @MainActor var isolated: Int
   var nonisolated: Int
@@ -28,6 +33,26 @@ nonisolated final class MixedIsolation {
 
     self.nonisolated += 1
     self.isolated += 1 // expected-error {{cannot access property 'isolated' here in nonisolated initializer}}
+  }
+
+  @MainActor init(mainActor: ()) {
+    self.isolated = 0
+    self.nonisolated = 0
+
+    escape()
+
+    self.nonisolated += 1
+    self.isolated += 1
+  }
+
+  @AnotherActor init(anotherActor: ()) {
+    self.isolated = 0
+    self.nonisolated = 0
+
+    escape() // expected-note {{after calling instance method 'escape()', only global actor 'AnotherActor'-isolated properties of 'self' can be accessed from this init}}
+
+    self.nonisolated += 1
+    self.isolated += 1 // expected-error {{cannot access property 'isolated' here in global actor 'AnotherActor'-isolated initializer}}
   }
 
   nonisolated func escape() {}
