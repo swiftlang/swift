@@ -22,6 +22,10 @@
     await test_task_group_child_inherits_deadline()
     await test_detached_task_does_not_inherit_deadline()
     await test_nested_deadlines_inherited_correctly()
+    await test_async_let_inherits_cancellationReason()
+    await test_task_group_child_inherits_cancellationReason()
+    await test_detached_task_does_not_inherit_cancellationReason()
+    await test_child_created_before_parent_cancel_still_sees_reason_after_cancel()
     print("done")
   }
 }
@@ -322,6 +326,106 @@ func test_nested_deadlines_inherited_correctly() async {
       // CHECK: child sees inner:true
     }
   }
+}
+
+// ==== -----------------------------------------------------------------------
+// MARK: Cancellation reason inheritance
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_async_let_inherits_cancellationReason() async {
+  print("--- \(#function)")
+  // CHECK-LABEL: --- test_async_let_inherits_cancellationReason()
+
+  // Cancel the parent with a specific reason, then spawn an async let
+  // child. The child must be created already-cancelled (inherited from
+  // the parent) and must observe the same reason via
+  // `Task.cancellationReason`.
+  await Task {
+    withUnsafeCurrentTask { $0?.cancel(reason: .deadlineExpired) }
+    print("parent reason:\(Task.cancellationReason.map { "\($0)" } ?? "nil")")
+    // CHECK: parent reason:deadlineExpired
+
+    async let childReasonRaw: String = {
+      let r = Task.cancellationReason
+      return r.map { "\($0)" } ?? "nil"
+    }()
+    let childReason = await childReasonRaw
+    print("child reason:\(childReason)")
+    // CHECK: child reason:deadlineExpired
+  }.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_task_group_child_inherits_cancellationReason() async {
+  print("--- \(#function)")
+  // CHECK-LABEL: --- test_task_group_child_inherits_cancellationReason()
+
+  // Same as above but with a TaskGroup child.
+  await Task {
+    withUnsafeCurrentTask { $0?.cancel(reason: .deadlineExpired) }
+
+    await withTaskGroup(of: String.self) { group in
+      group.addTask {
+        return Task.cancellationReason.map { "\($0)" } ?? "nil"
+      }
+      let childReason = await group.next() ?? "missing"
+      print("group child reason:\(childReason)")
+      // CHECK: group child reason:deadlineExpired
+    }
+  }.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_detached_task_does_not_inherit_cancellationReason() async {
+  print("--- \(#function)")
+  // CHECK-LABEL: --- test_detached_task_does_not_inherit_cancellationReason()
+
+  // Detached tasks are unstructured; a detached task started inside
+  // a cancelled parent must NOT inherit the parent's cancellation.
+  // `Task.cancellationReason` on the detached task should be nil
+  // (not cancelled), regardless of what the parent has.
+  await Task {
+    withUnsafeCurrentTask { $0?.cancel(reason: .deadlineExpired) }
+
+    let detachedReason = await Task.detached {
+      return Task.cancellationReason.map { "\($0)" } ?? "nil"
+    }.value
+    print("detached reason:\(detachedReason)")
+    // CHECK: detached reason:nil
+  }.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_child_created_before_parent_cancel_still_sees_reason_after_cancel() async {
+  print("--- \(#function)")
+  // CHECK-LABEL: --- test_child_created_before_parent_cancel_still_sees_reason_after_cancel()
+
+  // A structured child spawned BEFORE the parent is cancelled must
+  // still observe the parent's cancellation via the runtime
+  // propagation path (swift_task_cancel -> ChildTask records ->
+  // recursive cancel with the same reason). This exercises the
+  // cancellation-reason-through-performCancellationAction path, not
+  // just the create-time inheritance path.
+  await Task {
+    await withTaskGroup(of: CancellationError.Reason?.self) { group in
+      // Spawn the child while the parent is NOT yet cancelled.
+      group.addTask {
+        // Wait long enough for the parent to cancel us with a reason.
+        try? await Task.sleep(for: .milliseconds(200))
+        return Task.cancellationReason
+      }
+
+      // Give the child a moment to enter its sleep, then cancel with
+      // a specific reason.
+      try? await Task.sleep(for: .milliseconds(50))
+      withUnsafeCurrentTask { $0?.cancel(reason: .deadlineExpired) }
+
+      let observed = await group.next()?.flatMap { $0 }
+      let matches = observed == .deadlineExpired
+      print("child observed parent reason:\(matches)")
+      // CHECK: child observed parent reason:true
+    }
+  }.value
 }
 
 // Matches the "done" line printed at the end of Main.main; must appear as

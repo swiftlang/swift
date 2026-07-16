@@ -1162,8 +1162,13 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // In a task group we would not have allowed the `add` to create a child anymore,
     // however better safe than sorry and `async let` are not expressed as task groups,
     // so they may have been spawned in any case still.
-    if ((group && group->isCancelled()) || swift_task_isCancelled(parent))
-      swift_task_cancel(task);
+    //
+    // Propagate the parent's cancellation reason so structured children
+    // see the same `Task.cancellationReason` the parent set (typically
+    // `.deadlineExpired` from a `withDeadline` scope).
+    if ((group && group->isCancelled()) || swift_task_isCancelled(parent)) {
+      swift_task_cancelWithReason(task, swift_task_getCancellationReason(parent));
+    }
 
     // Inherit the `HasDeadline` flag from the parent. Structured
     // children (async let, task groups) run "within" the same deadline
