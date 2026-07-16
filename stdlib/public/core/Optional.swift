@@ -558,7 +558,7 @@ func _diagnoseUnexpectedNilOptional(
   }
 }
 
-extension Optional: Equatable {
+extension Optional: Equatable where Wrapped: Equatable {
   /// Returns a Boolean value indicating whether two optional instances are
   /// equal.
   ///
@@ -616,7 +616,7 @@ extension Optional: Equatable {
   }
 }
 
-extension Optional: Hashable {
+extension Optional: Hashable where Wrapped: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
