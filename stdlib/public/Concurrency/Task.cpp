@@ -1163,10 +1163,19 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // however better safe than sorry and `async let` are not expressed as task groups,
     // so they may have been spawned in any case still.
     //
+    // Only whole-task cancellation propagates - not TaskCancellationScope
+    // cancellation. Scopes are local to the parent's dynamic extent and
+    // must not implicitly cancel structured children created inside them.
+    // Read the parent's IsCancelled bit directly, bypassing the scope
+    // chain walk `AsyncTask::isCancelled` does.
+    //
     // Propagate the parent's cancellation reason so structured children
     // see the same `Task.cancellationReason` the parent set (typically
     // `.deadlineExpired` from a `withDeadline` scope).
-    if ((group && group->isCancelled()) || swift_task_isCancelled(parent)) {
+    auto parentStatus =
+        parent->_private()._status().load(std::memory_order_relaxed);
+    if ((group && group->isCancelled()) ||
+        parentStatus.isCancelledIgnoringShield()) {
       swift_task_cancelWithReason(task, swift_task_getCancellationReason(parent));
     }
 

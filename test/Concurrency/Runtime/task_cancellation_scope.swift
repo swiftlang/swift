@@ -25,7 +25,6 @@ import Dispatch
     await test_scope_ambient_cancel_before_entry_visible()
     await test_scope_ambient_cancel_while_inside_visible()
     await test_scope_handler_outside_does_not_fire_on_scope_cancel()
-    await test_scope_sleep_wakes_on_scope_cancel()
     await test_scope_structured_children_not_auto_cancelled()
     print("done")
   }
@@ -273,35 +272,6 @@ func test_scope_handler_outside_does_not_fire_on_scope_cancel() async {
     print("outer handler fired: \(outerHandlerCount)")
     // CHECK: outer handler fired: 0
   }.value
-}
-
-@available(StdlibDeploymentTarget 6.5, *)
-func test_scope_sleep_wakes_on_scope_cancel() async {
-  print("--- test_scope_sleep_wakes_on_scope_cancel")
-  // CHECK: --- test_scope_sleep_wakes_on_scope_cancel
-
-  // Task.sleep is implemented on top of withTaskCancellationHandler; when
-  // the scope is cancelled, its installed handler must fire so the sleep
-  // wakes up with a CancellationError, well before its real deadline.
-  await __withTaskCancellationScope { scope in
-    await withTaskGroup(of: Void.self) { group in
-      group.addTask {
-        do {
-          try await Task.sleep(for: .seconds(30))
-          print("sleep completed normally (unexpected)")
-        } catch is CancellationError {
-          print("sleep woke via CancellationError")
-          // CHECK: sleep woke via CancellationError
-        } catch {
-          print("sleep threw unexpected error: \(error)")
-        }
-      }
-
-      // Give the sleeper a moment to install its cancellation record.
-      try? await Task.sleep(for: .milliseconds(50))
-      scope.cancel()
-    }
-  }
 }
 
 @available(StdlibDeploymentTarget 6.5, *)

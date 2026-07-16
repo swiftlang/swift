@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// The deadline APIs depend on Clock.now, Task.detached, clock.sleep, and
+// AnyHashable - all unavailable in Embedded Swift.
+#if !$Embedded
+
 import Swift
 
 // ==== -----------------------------------------------------------------------
@@ -81,10 +85,20 @@ import Swift
 /// This ensures both operations share the same absolute deadline, avoiding duration drift that can occur
 /// when timeouts are passed through multiple call layers.
 ///
-/// - Important: This function cancels the operation when the deadline expires, but waits for the
-/// operation to return. The function may run longer than the time until the deadline if the operation
-/// doesn't respond to cancellation immediately. As usual with tasks in Swift concurrency, operations
-/// must cooperatively check for cancellation if they aim to return "early" when cancelled.
+/// ### Cancellation behavior
+/// When a deadline expires, semantically the scope of the task which is running the `operation`
+/// becomes cancelled. This is observable using `Task.isCancelled` and similar APIs, and has
+/// the usual effect on child tasks an task cancellation handlers.
+///
+/// Even though this a deadline's expiry cancels the operation scope, the `withDeadline` block still
+/// will await for the operation to complete. This is consistent with Swift's approach to cooperative
+/// cancellation and structured concurrency. It does mean however that operation code must be checking
+/// for cancellation if it wants to react and return "early".
+///
+/// The `withDeadline` function may return after the deadline has expired, as there is no guarantee on
+/// interrupting the operation's execution. Similarily, even if the deadline is set in the past, the
+/// operation will still always execute - and it is up to the operation (or any of its parts, or child tasks)
+/// to check e.g. `Task.isCancelled` if it should proceed with its computation or not.
 ///
 /// - Parameters:
 ///   - expiration: The instant by which the operation must complete.
@@ -419,3 +433,5 @@ extension Task where Success == Never, Failure == Never {
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("_swift_task_hasActiveDeadline")
 internal func _swift_task_hasActiveDeadline() -> Bool
+
+#endif // !$Embedded
