@@ -298,6 +298,10 @@ bool BindingSet::forGenericParameter() const {
   return bool(TypeVar->getImpl().getGenericParameter());
 }
 
+bool BindingSet::isForPatternDecl() const {
+  return TypeVar->getImpl().getLocator()->isForPatternDecl();
+}
+
 bool BindingSet::canBeNil() const {
   for (const auto &literal : Literals) {
     if (literal.getProtocol()->isSpecificProtocol(
@@ -2572,7 +2576,7 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
 
 bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
   if (CS.shouldAttemptFixes() && isHole()) {
-    if (forClosureResult() || forGenericParameter())
+    if (forClosureResult() || forGenericParameter() || isForPatternDecl())
       return false;
   }
 

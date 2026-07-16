@@ -509,6 +509,9 @@ public:
   /// that represents a generic parameter.
   bool forGenericParameter() const;
 
+  /// Whether the binding set is for a named or `_` pattern decl.
+  bool isForPatternDecl() const;
+
   /// Whether the binding set has changed after construction, in which
   /// case we must recompute it on the next call to determineBestBindings().
   bool isDirty() const {
