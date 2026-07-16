@@ -172,14 +172,14 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   }
 }
 
-extension Optional where Wrapped: ~Copyable & ~Escapable {
+extension Optional where Wrapped: ~Copyable {
   /// Returns a borrowed reference to the payload within the optional, if there
   /// is one.
-  @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @available(StdlibDeploymentTarget 6.4, *)
+  @export(implementation)
   @_lifetime(borrow self)
   @_transparent
-  public func borrow() -> Ref<Wrapped>? {
+  public var ref: Ref<Wrapped>? {
     switch self {
     case .some(let wrapped):
       return Ref(wrapped)
@@ -188,24 +188,24 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
       return nil
     }
   }
-}
 
-extension Optional where Wrapped: ~Copyable {
   /// Returns the mutable reference to the payload within the optional, if there
   /// is one.
-  @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
-  @_lifetime(&self)
-  @_transparent
-  public mutating func mutate() -> MutableRef<Wrapped>? {
-    if self == nil {
-      return nil
+  @available(StdlibDeploymentTarget 6.4, *)
+  @export(implementation)
+  public var mutableRef: MutableRef<Wrapped>? {
+    @_lifetime(&self)
+    @_transparent
+    mutating get {
+      if self == nil {
+        return nil
+      }
+    
+      let ptr = unsafe UnsafeMutablePointer<Wrapped>(
+        Builtin.unprotectedAddressOf(&self)
+      )
+      return unsafe MutableRef(unsafeAddress: ptr, mutating: &self)
     }
-
-    let ptr = unsafe UnsafeMutablePointer<Wrapped>(
-      Builtin.unprotectedAddressOf(&self)
-    )
-    return unsafe MutableRef(unsafeAddress: ptr, mutating: &self)
   }
 
   /// Sets the value of the optional to the passed in new value while returning
@@ -217,12 +217,12 @@ extension Optional where Wrapped: ~Copyable {
   /// - Returns: A mutable reference inside the optional to its newly inserted
   ///   payload.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(&self)
   @_transparent
-  public mutating func insert(_ new: consuming Wrapped) -> MutableRef<Wrapped> {
+  public mutating func put(_ new: consuming Wrapped) -> MutableRef<Wrapped> {
     self = .some(new)
-    return unsafe mutate().unsafelyUnwrapped
+    return unsafe mutableRef.unsafelyUnwrapped
   }
 }
 
