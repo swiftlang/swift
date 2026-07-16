@@ -3506,14 +3506,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[DerivativeDeclAttrLayout::Code];
       auto *attr = cast<DerivativeAttr>(DA);
       auto &ctx = S.getASTContext();
-      assert(attr->getOriginalFunction(ctx).size() &&
+      assert(attr->getOriginalFunctions(ctx).size() &&
              attr->getOriginalDeclaration() &&
              "`@derivative` attribute should have original declaration set "
              "during construction or parsing");
       auto origDeclNameRef = attr->getOriginalFunctionName();
 
       SmallVector<DeclID, 1> origDeclIDs;
-      for (auto *origAFD : attr->getOriginalFunction(ctx))
+      for (auto *origAFD : attr->getOriginalFunctions(ctx))
         origDeclIDs.push_back(S.addDeclRef(origAFD));
       auto derivativeKind =
           getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
@@ -7123,7 +7123,7 @@ static void recordDerivativeFunctionConfig(
          attr->getDerivativeGenericSignature()});
   }
   for (auto *attr : AFD->getAttrs().getAttributes<DerivativeAttr>()) {
-    for (auto *origAFD : attr->getOriginalFunction(ctx)) {
+    for (auto *origAFD : attr->getOriginalFunctions(ctx)) {
       auto mangledName =
           ctx.getIdentifier(Mangler.mangleDeclWithPrefix(origAFD, ""));
       derivativeConfigs[mangledName].insert(

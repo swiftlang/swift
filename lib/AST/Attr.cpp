@@ -3110,14 +3110,14 @@ DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
 }
 
 TinyPtrVector<AbstractFunctionDecl *>
-DerivativeAttr::getOriginalFunction(ASTContext &context) const {
+DerivativeAttr::getOriginalFunctions(ASTContext &context) const {
   return evaluateOrDefault(
       context.evaluator,
       DerivativeAttrOriginalDeclRequest{const_cast<DerivativeAttr *>(this)},
       {});
 }
 
-void DerivativeAttr::setOriginalFunction(
+void DerivativeAttr::setOriginalFunctions(
     ASTContext &context, ArrayRef<AbstractFunctionDecl *> decls) {
   assert(!OriginalFunctions && "cannot overwrite original function");
   NumOriginalFunctions = decls.size();

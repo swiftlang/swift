@@ -7711,7 +7711,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     return true;
   }
 
-  attr->setOriginalFunction(Ctx, originalAFDs);
+  attr->setOriginalFunctions(Ctx, originalAFDs);
 
   // Get the resolved differentiability parameter indices.
   auto *resolvedDiffParamIndices = attr->getParameterIndices();

@@ -63,8 +63,8 @@ private:
   /// Whether or not this differentiability witness is serialized, which allows
   /// devirtualization from another module.
   bool IsSerialized;
-  /// Wheter or not this is differentiability witness for a defaul derivative
-  /// for non-differentiable protocol requirement
+  /// Whether or not this is differentiability witness for a defaul derivative
+  /// for non-differentiable protocol requirement.
   bool IsDefault;
   /// The AST `@differentiable` or `@derivative` attribute from which the
   /// differentiability witness is generated. Used for diagnostics.

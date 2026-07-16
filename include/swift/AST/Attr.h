@@ -2819,10 +2819,14 @@ public:
   DeclNameRefWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
   }
+  /// The resolved original functions for this derivative.
+  /// Note that there might be multiple original functions when
+  /// derivative is registered for a protocol requirement and there
+  /// is a default implementation.
   TinyPtrVector<AbstractFunctionDecl *>
-  getOriginalFunction(ASTContext &context) const;
-  void setOriginalFunction(ASTContext &context,
-                           ArrayRef<AbstractFunctionDecl *> decls);
+  getOriginalFunctions(ASTContext &context) const;
+  void setOriginalFunctions(ASTContext &context,
+                            ArrayRef<AbstractFunctionDecl *> decls);
   void setOriginalFunctionResolver(ASTContext &context,
                                    LazyMemberLoader *resolver,
                                    ArrayRef<uint64_t> resolverContextData);

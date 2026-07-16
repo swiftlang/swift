@@ -1616,7 +1616,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
         break;
       }
 
-      for (auto *origAFD : derivAttr->getOriginalFunction(getASTContext())) {
+      for (auto *origAFD : derivAttr->getOriginalFunctions(getASTContext())) {
         auto origDeclRef =
             SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
         auto *origFn = getFunction(origDeclRef, NotForDefinition);
