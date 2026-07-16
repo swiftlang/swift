@@ -604,6 +604,27 @@ public:
   /// `swift_task_popTaskExecutorPreference(record)` method pair.
   void dropInitialTaskExecutorPreferenceRecord();
 
+  /// Copy every active `TaskDeadlineStatusRecord` from `parent` onto `this`.
+  ///
+  /// Called once during child-task creation (in `swift_task_create_common`)
+  /// so structured children see the same deadlines as their parent. Each
+  /// inherited record retains the parent record's `_ClockBox<C>`; the child
+  /// releases those refs when its records are popped (or when the task
+  /// itself is destroyed, since inherited records never go through the
+  /// user-visible push/pop pair).
+  ///
+  /// The child's chain is not yet observable by any other thread at this
+  /// point, so this pushes records without going through the atomic
+  /// status-record CAS loop.
+  void inheritDeadlinesFrom(AsyncTask *parent);
+
+  /// Release any inherited `TaskDeadlineStatusRecord`s still installed on
+  /// the task. Called from `~AsyncTask()` to balance the retains
+  /// `inheritDeadlinesFrom` acquired. Records installed via the normal
+  /// `withDeadline` push/pop pair are already gone by task-destroy time;
+  /// this catches the ones that were only ever inherited.
+  void cleanupInheritedDeadlines();
+
   // ==== Task Local Values ----------------------------------------------------
 
   void localValuePush(const HeapObject *key,

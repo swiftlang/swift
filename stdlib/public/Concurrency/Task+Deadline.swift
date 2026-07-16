@@ -379,7 +379,7 @@ public func _findNearestDeadline<C: Clock & Identifiable>(
 
 @available(StdlibDeploymentTarget 6.5, *)
 extension Task where Success == Never, Failure == Never {
-  /// Whether any deadline is currently active on the current task.
+  /// Whether any deadline is set on the current task.
   ///
   /// Returns `true` when the current task is executing inside at least one
   /// `withDeadline` scope (for any clock), and `false` otherwise. This is
@@ -396,8 +396,7 @@ extension Task where Success == Never, Failure == Never {
     _swift_task_hasActiveDeadline()
   }
 
-  /// The tightest active deadline installed on the current task for
-  /// `clock`, or `nil` if there is no active deadline for that clock.
+  /// Find the tightest deadline given the specified clock.
   ///
   /// The returned instant is the earliest deadline whose clock identity
   /// (`clock.id`) matches the argument's - nested `withDeadline` scopes
@@ -411,9 +410,8 @@ extension Task where Success == Never, Failure == Never {
   /// time.
   ///
   /// - SeeAlso: ``hasActiveDeadline``
-  public static func activeDeadline<C: Clock & Identifiable>(
-    for clock: C
-  ) -> C.Instant? {
+  public static func activeDeadline<C: Clock & Identifiable>(for clock: C) -> C.Instant? {
+    // No need to short-circut here with hasDeadline as the `find...` already does so.
     _findNearestDeadline(clock: clock)
   }
 }

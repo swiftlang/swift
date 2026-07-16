@@ -833,11 +833,7 @@ public:
   }
 
   // HasTaskCancellationScope
-  /// Is there at least one `TaskCancellationScopeRecord` in the linked list of
-  /// status records?
-  ///
-  /// Cheap check that lets `AsyncTask::isCancelled` bail-out without taking
-  /// the task record lock when there are no cancellation scopes installed.
+  /// Is there at least one `TaskCancellationScopeRecord` in the status records?
   bool hasTaskCancellationScope() const {
     return Flags & HasTaskCancellationScope;
   }
@@ -849,12 +845,7 @@ public:
   }
 
   // HasDeadline
-  /// Is there at least one `TaskDeadlineStatusRecord` in the linked list of
-  /// status records?
-  ///
-  /// Cheap check that lets `swift_task_findNearestDeadlineForClock` bail out
-  /// without taking the task record lock when there are no deadlines
-  /// installed.
+  /// Is there at least one `TaskDeadlineStatusRecord` in the status records?
   bool hasDeadline() const {
     return Flags & HasDeadline;
   }

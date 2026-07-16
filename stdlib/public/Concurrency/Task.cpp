@@ -349,6 +349,12 @@ AsyncTask::~AsyncTask() {
     #endif
   }
 
+  // Release any deadline records inherited from the parent that no user
+  // pop ever ran on. These are safe to walk without taking the status
+  // record lock: the task has just completed and is being torn down, no
+  // other thread can be adding or removing records at this point.
+  cleanupInheritedDeadlines();
+
   Private.destroy();
 
   concurrency::trace::task_destroy(this);
@@ -1164,6 +1170,16 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // so they may have been spawned in any case still.
     if ((group && group->isCancelled()) || swift_task_isCancelled(parent))
       swift_task_cancel(task);
+
+    // Inherit any active deadlines from the parent. Structured children
+    // (async let, task groups) run "within" the same deadline scope as
+    // their parent, so `Task.hasActiveDeadline` and
+    // `Task.activeDeadline(for:)` should observe the same deadlines on
+    // the child that the parent would. This copies the parent's deadline
+    // records onto the child, retaining each record's `_ClockBox<C>`;
+    // the retains are balanced by `~AsyncTask::cleanupInheritedDeadlines`
+    // at task-destroy time.
+    task->inheritDeadlinesFrom(parent);
 
     // Inside a task group, we may have to perform some defensive copying,
     // check if doing so is necessary, and initialize storage using partial

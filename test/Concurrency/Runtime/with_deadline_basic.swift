@@ -18,6 +18,10 @@
     await test_throws_from_operation_before_deadline()
     await test_custom_clock_deadline_subsumption()
     await test_outer_deadline_subsumes_inner_no_scope()
+    await test_async_let_inherits_deadline()
+    await test_task_group_child_inherits_deadline()
+    await test_detached_task_does_not_inherit_deadline()
+    await test_nested_deadlines_inherited_correctly()
     print("done")
   }
 }
@@ -148,15 +152,13 @@ func test_custom_clock_deadline_subsumption() async {
     let observedOuter = _findNearestDeadline(clock: clock)
     print("outer observed:\(observedOuter != nil)")
     // CHECK: outer observed:true
-    let outerSeconds = observedOuter?.seconds ?? -1
 
     _ = try? await withDeadline(inner, clock: clock) {
       let observedInner = _findNearestDeadline(clock: clock)
       // Inner (tighter) deadline must be strictly less than the outer.
-      if let observedInner {
-        let isTighter = observedInner.seconds < outerSeconds
-        print("inner observed:\(observedInner.seconds < outerSeconds ? "tighter" : "not-tighter")")
-        _ = isTighter
+      if let observedInner, let observedOuter {
+        let isTighter = observedInner < observedOuter
+        print("inner observed:\(isTighter ? "tighter" : "not-tighter")")
         // CHECK: inner observed:tighter
       } else {
         print("inner missing")
@@ -165,8 +167,8 @@ func test_custom_clock_deadline_subsumption() async {
 
     // After the inner scope pops, the outer deadline must be observable again.
     let observedAfter = _findNearestDeadline(clock: clock)
-    if let observedAfter {
-      let restored = observedAfter.seconds == outerSeconds
+    if let observedAfter, let observedOuter {
+      let restored = observedAfter == observedOuter
       print("after inner pop restored outer:\(restored)")
       // CHECK: after inner pop restored outer:true
     } else {
@@ -190,7 +192,7 @@ func test_outer_deadline_subsumes_inner_no_scope() async {
   let inner = clock.now.advanced(by: .seconds(600))
 
   _ = try? await withDeadline(outer, clock: clock) {
-    // Snapshot the outer's (seconds, atto) so the inner can prove that no
+    // Snapshot the outer's Instant so the inner can prove that no
     // new record was pushed - the innermost record must still be the outer's.
     guard let outerObserved = _findNearestDeadline(clock: clock) else {
       print("outer missing (unexpected)")
@@ -203,9 +205,7 @@ func test_outer_deadline_subsumes_inner_no_scope() async {
       // Property 1: inner did NOT push its own record. The nearest deadline
       // for this clock must still be the outer's tight one.
       let innerObserved = _findNearestDeadline(clock: clock)
-      let sameAsOuter =
-        (innerObserved?.seconds == outerObserved.seconds) &&
-        (innerObserved?.atto == outerObserved.atto)
+      let sameAsOuter = innerObserved == outerObserved
       print("inner sees outer only:\(sameAsOuter)")
       // CHECK: inner sees outer only:true
 
@@ -221,6 +221,105 @@ func test_outer_deadline_subsumes_inner_no_scope() async {
       // to make sure the fast path doesn't accidentally skip the call.
       print("inner operation ran")
       // CHECK: inner operation ran
+    }
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_async_let_inherits_deadline() async {
+  print("--- test_async_let_inherits_deadline")
+  // CHECK-LABEL: --- test_async_let_inherits_deadline
+
+  // An async let child inside a withDeadline scope must see the parent's
+  // deadline: Task.hasActiveDeadline is true on the child, and
+  // Task.activeDeadline(for: theClock) returns the same instant the parent
+  // installed.
+  let clock = ContinuousClock()
+  let deadline = clock.now.advanced(by: .seconds(600))
+
+  _ = try? await withDeadline(deadline, clock: clock) {
+    // Parent observes the deadline.
+    print("parent hasActive:\(Task.hasActiveDeadline)")
+    // CHECK: parent hasActive:true
+
+    async let childSees: (Bool, Bool) = {
+      let hasAny = Task.hasActiveDeadline
+      let observed = Task.activeDeadline(for: clock)
+      let matchesParent = observed == deadline
+      return (hasAny, matchesParent)
+    }()
+
+    let (childHasAny, childMatchesParent) = await childSees
+    print("child hasActive:\(childHasAny)")
+    // CHECK: child hasActive:true
+    print("child sees parent deadline:\(childMatchesParent)")
+    // CHECK: child sees parent deadline:true
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_task_group_child_inherits_deadline() async {
+  print("--- test_task_group_child_inherits_deadline")
+  // CHECK-LABEL: --- test_task_group_child_inherits_deadline
+
+  // TaskGroup children also inherit deadlines from their parent (same
+  // structured-concurrency rule as async let).
+  let clock = ContinuousClock()
+  let deadline = clock.now.advanced(by: .seconds(600))
+
+  _ = try? await withDeadline(deadline, clock: clock) {
+    await withTaskGroup(of: Bool.self) { group in
+      group.addTask {
+        let hasAny = Task.hasActiveDeadline
+        let matches = Task.activeDeadline(for: clock) == deadline
+        return hasAny && matches
+      }
+      let result = await group.next() ?? false
+      print("group child sees parent deadline:\(result)")
+      // CHECK: group child sees parent deadline:true
+    }
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_detached_task_does_not_inherit_deadline() async {
+  print("--- test_detached_task_does_not_inherit_deadline")
+  // CHECK-LABEL: --- test_detached_task_does_not_inherit_deadline
+
+  // Detached tasks are unstructured - by definition they do not
+  // participate in the enclosing withDeadline scope. Task.hasActiveDeadline
+  // on a detached task started inside withDeadline should return false.
+  let clock = ContinuousClock()
+  let deadline = clock.now.advanced(by: .seconds(600))
+
+  _ = try? await withDeadline(deadline, clock: clock) {
+    let sawDeadline = await Task.detached {
+      Task.hasActiveDeadline
+    }.value
+    print("detached hasActive:\(sawDeadline)")
+    // CHECK: detached hasActive:false
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_nested_deadlines_inherited_correctly() async {
+  print("--- test_nested_deadlines_inherited_correctly")
+  // CHECK-LABEL: --- test_nested_deadlines_inherited_correctly
+
+  // Two nested withDeadline on the same clock (inner is tighter). An
+  // async let child spawned inside the inner scope should see the inner
+  // (tighter) deadline, not the outer one.
+  let clock = ContinuousClock()
+  let outer = clock.now.advanced(by: .seconds(600))
+  let inner = clock.now.advanced(by: .seconds(30))
+
+  _ = try? await withDeadline(outer, clock: clock) {
+    _ = try? await withDeadline(inner, clock: clock) {
+      async let childDeadline: ContinuousClock.Instant? = Task.activeDeadline(for: clock)
+      let observed = await childDeadline
+      let matchesInner = observed == inner
+      print("child sees inner:\(matchesInner)")
+      // CHECK: child sees inner:true
     }
   }
 }

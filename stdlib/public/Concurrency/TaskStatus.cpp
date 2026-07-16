@@ -24,6 +24,8 @@
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Thread.h"
 #include <atomic>
+#include <utility>
+#include <vector>
 
 using namespace swift;
 
@@ -823,6 +825,84 @@ bool _swift_task_hasActiveDeadline() {
     return false;
   auto status = task->_private()._status().load(std::memory_order_relaxed);
   return status.hasDeadline();
+}
+
+void AsyncTask::inheritDeadlinesFrom(AsyncTask *parent) {
+  assert(parent && "must have a parent to inherit deadlines from");
+
+  // Fast-path: parent has no deadline installed at all.
+  auto parentStatus =
+      parent->_private()._status().load(std::memory_order_relaxed);
+  if (!parentStatus.hasDeadline())
+    return;
+
+  // Snapshot the parent's deadline records under its status-record lock.
+  // We collect (clockType, box) pairs in the parent's chain order
+  // (innermost first) so that after we push them onto the child in
+  // reverse we end up with the exact same order the parent has.
+  std::vector<std::pair<const Metadata *, HeapObject *>> deadlines;
+  deadlines.reserve(4);
+  ::withStatusRecordLock(parent, [&](ActiveTaskStatus status) {
+    for (auto record : status.records()) {
+      if (record->getKind() != TaskStatusRecordKind::Deadline)
+        continue;
+      auto d = cast<TaskDeadlineStatusRecord>(record);
+      deadlines.push_back({d->getClockType(), d->getBox()});
+    }
+  });
+
+  if (deadlines.empty())
+    return;
+
+  // Push copies onto the child. The child's chain is not yet observable
+  // by other threads at this point (we're inside swift_task_create_common
+  // before the task is enqueued), so we can bypass the atomic status
+  // record CAS loop and mutate the ActiveTaskStatus directly. We still
+  // go through addStatusRecord for consistency with the rest of the
+  // runtime.
+  //
+  // Iterate in reverse so the first record we push (which becomes the
+  // outermost) is the parent's outermost, and the last one we push
+  // (which becomes the innermost) is the parent's innermost. This
+  // preserves the "innermost = tightest" invariant.
+  for (auto it = deadlines.rbegin(); it != deadlines.rend(); ++it) {
+    // Retain the box; the child's inherited record shares ownership with
+    // the parent's.
+    swift_retain(it->second);
+    void *allocation = _swift_task_alloc_specific(
+        this, sizeof(class TaskDeadlineStatusRecord));
+    auto record = ::new (allocation)
+        TaskDeadlineStatusRecord(it->first, it->second);
+    addStatusRecord(this, record,
+                    [&](ActiveTaskStatus oldStatus,
+                        ActiveTaskStatus &newStatus) {
+                      newStatus = newStatus.withDeadline();
+                      return true;
+                    });
+  }
+
+  SWIFT_TASK_DEBUG_LOG("[Deadline] Inherited %zu deadline record(s) from "
+                       "parent:%p onto child:%p",
+                       deadlines.size(), parent, this);
+}
+
+void AsyncTask::cleanupInheritedDeadlines() {
+  // The task is being destroyed so no other thread can be touching its
+  // status-record chain. Walk directly without taking the lock. We only
+  // need to release the box references we retained during
+  // `inheritDeadlinesFrom`; the record memory itself is part of the
+  // task's slab allocator and will be torn down by `Private.destroy()`.
+  auto status = _private()._status().load(std::memory_order_relaxed);
+  if (!status.hasDeadline())
+    return;
+
+  for (auto record : status.records()) {
+    if (record->getKind() != TaskStatusRecordKind::Deadline)
+      continue;
+    auto d = cast<TaskDeadlineStatusRecord>(record);
+    if (auto *box = d->getBox())
+      swift_release(box);
+  }
 }
 
 /**************************************************************************/
