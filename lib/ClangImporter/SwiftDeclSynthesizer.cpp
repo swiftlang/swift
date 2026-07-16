@@ -3116,14 +3116,23 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     }
     synthCxxMethodDecl->setParams(synthParams);
 
-    auto attrInfo = ReturnOwnershipInfo(selectedCtorDecl);
-    if (attrInfo.hasReturnsRetained)
-      synthCxxMethodDecl->addAttr(
-          clang::SwiftAttrAttr::Create(clangCtx, "returns_retained"));
+    if (selectedCtorDecl->hasAttrs()) {
+      auto attrInfo = ReturnOwnershipInfo(selectedCtorDecl);
+      if (attrInfo.hasReturnsRetained)
+        synthCxxMethodDecl->addAttr(
+            clang::SwiftAttrAttr::Create(clangCtx, "returns_retained"));
 
-    if (attrInfo.hasReturnsUnretained)
-      synthCxxMethodDecl->addAttr(
-          clang::SwiftAttrAttr::Create(clangCtx, "returns_unretained"));
+      if (attrInfo.hasReturnsUnretained)
+        synthCxxMethodDecl->addAttr(
+            clang::SwiftAttrAttr::Create(clangCtx, "returns_unretained"));
+
+      for (auto *attr : selectedCtorDecl->getAttrs()) {
+        if (isa<clang::AvailabilityAttr>(attr) ||
+            isa<clang::DeprecatedAttr>(attr) ||
+            isa<clang::UnavailableAttr>(attr))
+          synthCxxMethodDecl->addAttr(attr->clone(clangCtx));
+      }
+    }
 
     std::string swiftInitStr = "init(";
     for (unsigned i = 0; i < ctorParamCount; ++i) {
