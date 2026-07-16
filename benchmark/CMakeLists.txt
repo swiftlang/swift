@@ -211,6 +211,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Suffix
     single-source/SuperChars
     single-source/TaskGroups
+    single-source/TaskIsCancelledCancellationScopes
     single-source/TaskLocalGet
     single-source/ToddCoxeter
     single-source/TwoSum
@@ -218,6 +219,7 @@ set(SWIFT_BENCH_MODULES
     single-source/UTF8Decode
     single-source/UTF16Decode
     single-source/Walsh
+    single-source/WithDeadlineVsTaskGroup
     single-source/WithUnsafeCurrentTask
     single-source/WordCount
     single-source/XorLoop

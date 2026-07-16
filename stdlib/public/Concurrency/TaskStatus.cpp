@@ -954,6 +954,68 @@ swift_task_popCancellationScopeImpl(TaskCancellationScopeRecord *record) {
   swift_task_dealloc(record);
 }
 
+// ==== Cancellation Shields --------------------------------------------------
+
+bool AsyncTask::cancellationShieldPush() {
+  // Always install a fresh shield record. The record's position in the
+  // LIFO record chain is what the scope walker consults, so nested and
+  // interleaved shields (e.g. `scope { shield { scope { shield { ... } } } }`)
+  // must each get their own record even when an outer shield's bit is
+  // already set. The `HasActiveTaskCancellationShield` bit remains a
+  // fast-path signal for "any shield present" and is only cleared once
+  // every shield record has popped (see `cancellationShieldPop`).
+  //
+  // Status records are only ever pushed/popped by the owning task itself,
+  // so no CAS retry loop is needed for the bit toggle - `addStatusRecord`
+  // takes the record lock for us.
+  void *allocation =
+      _swift_task_alloc_specific(this, sizeof(class TaskCancellationShieldRecord));
+  auto record = ::new (allocation) TaskCancellationShieldRecord();
+  SWIFT_TASK_DEBUG_LOG("[TaskCancellationShield] Create shield record:%p for task:%p",
+                       record, this);
+
+  addStatusRecord(
+      this, record,
+      [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+        if (!oldStatus.hasCancellationShield())
+          newStatus = newStatus.withCancellationShield();
+        return true; // always add the record
+      });
+
+  return true;
+}
+
+void AsyncTask::cancellationShieldPop() {
+  // Remove the innermost shield record. If it was the last one, clear the
+  // `HasActiveTaskCancellationShield` fast-path bit; otherwise leave the
+  // bit set so nested shields keep the bit active.
+  int remainingShields = 0;
+  TaskCancellationShieldRecord *toDealloc = nullptr;
+  removeStatusRecordWhere(
+      this,
+      /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
+        if (cur->getKind() != TaskStatusRecordKind::CancellationShield)
+          return false;
+        if (toDealloc == nullptr) {
+          toDealloc = cast<TaskCancellationShieldRecord>(cur);
+          return true; // remove this innermost shield record
+        }
+        remainingShields += 1;
+        return false;
+      },
+      /*updateStatus=*/[&](ActiveTaskStatus oldStatus,
+                            ActiveTaskStatus &newStatus) {
+        if (remainingShields == 0) {
+          assert(oldStatus.hasCancellationShield());
+          newStatus = newStatus.withoutCancellationShield();
+        }
+      });
+
+  if (toDealloc)
+    swift_task_dealloc(toDealloc);
+}
+
+
 SWIFT_CC(swift)
 static void
 swift_task_cancelCancellationScopeImpl(TaskCancellationScopeRecord *record) {
@@ -1000,20 +1062,35 @@ swift_task_cancelCancellationScopeImpl(TaskCancellationScopeRecord *record) {
   });
 }
 
-bool swift::_swift_task_hasCancelledScope(AsyncTask *task) {
-  // if (!task->hasTaskCancellationScope())
-    // return false;
-
+TaskCancellationScopeRecord *
+swift::_swift_task_getCancellationScope(AsyncTask *task) {
   // The `HasTaskCancellationScope` flag must have been checked by the caller;
   // this walker takes the record lock unconditionally.
-  bool found = false;
+  //
+  // Walk innermost-first. A `TaskCancellationShieldRecord` encountered before
+  // any cancelled scope means the current call site is inside a shield that
+  // was pushed after (deeper than) the innermost cancelled scope; the shield
+  // masks the scope at this position - return nullptr so `isCancelled()`
+  // reads false, matching the "as-if child task" analog. A shield encountered
+  // AFTER a cancelled scope in the walk order would be outside the scope
+  // and cannot mask it - but we've already returned by then.
+  TaskCancellationScopeRecord *found = nullptr;
   ::withStatusRecordLock(task, [&](ActiveTaskStatus status) {
     for (auto record : status.records()) {
-      if (record->getKind() != TaskStatusRecordKind::TaskCancellationScope)
-        continue;
-      if (cast<TaskCancellationScopeRecord>(record)->isCancelled()) {
-        found = true;
+      switch (record->getKind()) {
+      case TaskStatusRecordKind::CancellationShield:
+        // Shield above any cancelled scope masks it; short-circuit.
         return;
+      case TaskStatusRecordKind::TaskCancellationScope: {
+        auto *scope = cast<TaskCancellationScopeRecord>(record);
+        if (scope->isCancelled()) {
+          found = scope;
+          return;
+        }
+        break;
+      }
+      default:
+        break;
       }
     }
   });
@@ -1323,6 +1400,13 @@ static void performCancellationAction(ActiveTaskStatus status,
   case TaskStatusRecordKind::TaskCancellationScope:
     break;
 
+  // Shield records are pure positional markers; they take no cancellation
+  // action. The shield's masking effect on `Task.isCancelled` is handled
+  // elsewhere via the `HasActiveTaskCancellationShield` bit and the
+  // scope-walker's shield-first short-circuit.
+  case TaskStatusRecordKind::CancellationShield:
+    break;
+
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:
     break;
@@ -1435,6 +1519,9 @@ static void performEscalationAction(AsyncTask *task, TaskStatusRecord *record,
     return;
   // Cancellation scopes do not participate in priority escalation.
   case TaskStatusRecordKind::TaskCancellationScope:
+    return;
+  // Cancellation shields do not participate in priority escalation.
+  case TaskStatusRecordKind::CancellationShield:
     return;
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:

@@ -2916,6 +2916,12 @@ enum class TaskStatusRecordKind : uint8_t {
   /// domain that is independent of whole-task cancellation.
   TaskCancellationScope = 8,
 
+  /// A TaskCancellationShieldRecord, present on the chain iff a cancellation
+  /// shield is currently active. Its position in the chain (relative to any
+  /// `TaskCancellationScope` records) tells the runtime whether a shield
+  /// masks a scope's cancellation at the current call site.
+  CancellationShield = 9,
+
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
   Private_RecordLock = 192

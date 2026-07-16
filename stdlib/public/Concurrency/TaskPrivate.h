@@ -79,8 +79,10 @@ void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
 /// Slow-path helper for `AsyncTask::isCancelled()` when the task has at
 /// least one `TaskCancellationScopeRecord` installed (`HasTaskCancellationScope`
 /// flag set). Walks the record chain under `withStatusRecordLock` and
-/// returns true iff any scope on the chain has been cancelled.
-bool _swift_task_hasCancelledScope(AsyncTask *task);
+/// returns the first cancelled scope record, or nullptr if none is cancelled.
+/// The caller must have already checked the flag.
+class TaskCancellationScopeRecord;
+TaskCancellationScopeRecord *_swift_task_getCancellationScope(AsyncTask *task);
 
 /// Given that we've already set the right executor as the active
 /// executor, run the given job.  This does additional bookkeeping
@@ -1218,20 +1220,16 @@ inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
   auto status = _private()._status().load(std::memory_order_relaxed);
   if (status.isCancelled(ignoreShield))
     return true;
-  // Slow path: any active cancellation scope on the current task also
-  // observes as "cancelled" from code running inside the scope. The chain
-  // walk is out-of-lined into TaskStatus.cpp to keep this header light.
-  //
-  // A cancellation shield masks scope cancellation the same way it masks
-  // whole-task cancellation: `withDeadline { }` (and any scope built on
-  // `__withTaskCancellationScope`) must have the same observable
-  // cancellation semantics as a spawned child task, and a shield inside
-  // a child task hides that child's own cancellation from `Task.isCancelled`
-  // reads made inside the shield.
+  // Slow path: only entered when a `TaskCancellationScopeRecord` is on the
+  // chain. The walker (`_swift_task_getCancellationScope`) is chain-aware:
+  // if a `TaskCancellationShieldRecord` sits above the innermost cancelled
+  // scope, the walker returns nullptr - the shield masks the scope at this
+  // call site, matching the "as-if child task" semantics of `withDeadline`.
+  // No shield-bit early-return here: the bit alone can't distinguish
+  // shield-inside-scope (must mask) from shield-outside-scope (must not).
   if (SWIFT_UNLIKELY(status.hasTaskCancellationScope())) {
-    if (!ignoreShield && status.hasCancellationShield())
-      return false;
-    return _swift_task_hasCancelledScope(const_cast<AsyncTask *>(this));
+    if (auto scope = _swift_task_getCancellationScope(const_cast<AsyncTask *>(this)))
+      return scope->isCancelled();
   }
   return false;
 }
@@ -2015,41 +2013,10 @@ inline bool AsyncTask::localValuePop() {
 
 // ==== Cancellation Shields --------------------------------------------------
 
-inline bool AsyncTask::cancellationShieldPush() {
-  while (true) {
-    auto oldStatus = _private()._status().load(std::memory_order_relaxed);
-    if (oldStatus.hasCancellationShield()) {
-      return false;
-    }
-
-    auto newStatus = oldStatus.withCancellationShield();
-    assert(newStatus.hasCancellationShield());
-
-    if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
-              /* success */ std::memory_order_relaxed,
-              /* failure */ std::memory_order_relaxed)) {
-      return true; // we did successfully install the shield
-    }
-  }
-}
-
-inline void AsyncTask::cancellationShieldPop() {
-  while (true) {
-    auto oldStatus = _private()._status().load(std::memory_order_relaxed);
-    if (!oldStatus.hasCancellationShield()) {
-      return;
-    }
-
-    auto newStatus = oldStatus.withoutCancellationShield();
-    assert(!newStatus.hasCancellationShield());
-
-    if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
-              /* success */ std::memory_order_relaxed,
-              /* failure */ std::memory_order_relaxed)) {
-      return;
-    }
-  }
-}
+// `cancellationShieldPush` / `cancellationShieldPop` are implemented in
+// TaskStatus.cpp because they push/pop a `TaskCancellationShieldRecord`
+// alongside the fast-path shield bit; the record makes shield-vs-scope
+// ordering visible to the scope walker in `_swift_task_getCancellationScope`.
 
 } // end namespace swift
 

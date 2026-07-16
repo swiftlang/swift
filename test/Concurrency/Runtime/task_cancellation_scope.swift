@@ -25,6 +25,8 @@ import Dispatch
     await test_scope_ambient_cancel_before_entry_visible()
     await test_scope_ambient_cancel_while_inside_visible()
     await test_scope_handler_outside_does_not_fire_on_scope_cancel()
+    await test_scope_with_cancellation_shield_inside()
+    await test_scope_with_cancellation_shield_outside()
     await test_scope_structured_children_not_auto_cancelled()
     print("done")
   }
@@ -271,6 +273,52 @@ func test_scope_handler_outside_does_not_fire_on_scope_cancel() async {
     // scope.cancel(); the task's own cancellation flag was never set.
     print("outer handler fired: \(outerHandlerCount)")
     // CHECK: outer handler fired: 0
+  }.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_scope_with_cancellation_shield_inside() async {
+  print("--- test_scope_with_cancellation_shield_inside")
+  // CHECK: --- test_scope_with_cancellation_shield_inside
+
+  await Task {
+    await __withTaskCancellationScope { scope in
+      scope.cancel()
+      print("inside scope: \(Task.isCancelled)")
+      // CHECK: inside scope: true
+      await withTaskCancellationShield {
+        print("inside scope, and shield: \(Task.isCancelled)")
+        // CHECK: inside scope, and shield: false
+      }
+    }
+  }.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_scope_with_cancellation_shield_outside() async {
+  print("--- test_scope_with_cancellation_shield_outside")
+  // CHECK: --- test_scope_with_cancellation_shield_outside
+
+  await Task {
+    await withTaskCancellationShield {
+      await __withTaskCancellationScope { scope in
+        scope.cancel()
+        // The outer shield is OUTSIDE the scope on the record chain, so
+        // walking innermost-first the walker hits the cancelled scope
+        // BEFORE the shield - the shield does not mask it. Same as a
+        // child task cancelled from within: a shield in the parent
+        // doesn't hide the child's own cancellation.
+        print("inside scope, and outer shield: \(Task.isCancelled)")
+        // CHECK: inside scope, and outer shield: true
+        await withTaskCancellationShield {
+          // This inner shield IS inside the scope. Walking innermost-first
+          // the walker now hits this shield first and short-circuits to
+          // nullptr - masks the cancellation.
+          print("inside scope, and inner shield: \(Task.isCancelled)")
+          // CHECK: inside scope, and inner shield: false
+        }
+      }
+    }
   }.value
 }
 

@@ -518,6 +518,26 @@ public:
   }
 };
 
+/// A status record representing an active `withTaskCancellationShield` block.
+/// Present on the record chain iff a shield is currently installed. Carries
+/// no state of its own; the record's position in the LIFO chain, relative
+/// to any `TaskCancellationScopeRecord`, is what the runtime consults when
+/// deciding whether a scope's cancellation is masked at a given call site.
+///
+/// The `HasActiveTaskCancellationShield` bit in `ActiveTaskStatus` remains
+/// the fast-path signal for whole-task cancellation masking and handler
+/// suppression; this record adds the positional information needed to
+/// answer scope-versus-shield ordering questions.
+class TaskCancellationShieldRecord : public TaskStatusRecord {
+public:
+  TaskCancellationShieldRecord()
+      : TaskStatusRecord(TaskStatusRecordKind::CancellationShield) {}
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::CancellationShield;
+  }
+};
+
 } // end namespace swift
 
 #endif
