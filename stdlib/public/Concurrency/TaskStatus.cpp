@@ -24,8 +24,6 @@
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Thread.h"
 #include <atomic>
-#include <utility>
-#include <vector>
 
 using namespace swift;
 
@@ -762,6 +760,34 @@ static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
   swift_task_dealloc(record);
 }
 
+/// Search a single task's status record chain for a deadline record
+/// whose clock matches `(clockType, queryBox)`. Returns the matching
+/// record's box (borrowed - runtime still owns the +1 on it), or
+/// nullptr if none. Takes the task's status-record lock while walking.
+static HeapObject *
+findDeadlineOnSingleTask(AsyncTask *task, HeapObject *queryBox,
+                         const Metadata *clockType) {
+  HeapObject *found = nullptr;
+  withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+    for (auto record : status.records()) {
+      if (record->getKind() != TaskStatusRecordKind::Deadline)
+        continue;
+      auto d = cast<TaskDeadlineStatusRecord>(record);
+      // Fast filter: types must be pointer-equal (necessary condition).
+      if (d->getClockType() != clockType)
+        continue;
+      // Same-clock check via Swift bridge. If the identities match, this
+      // is the record we want; the first one encountered walking outward
+      // from the head is the innermost (== tightest by push invariant).
+      if (!_task_deadline_boxesSameClock(d->getBox(), queryBox))
+        continue;
+      found = d->getBox();
+      return;
+    }
+  });
+  return found;
+}
+
 SWIFT_CC(swift)
 static HeapObject *
 swift_task_findNearestDeadlineForClockImpl(
@@ -783,28 +809,32 @@ swift_task_findNearestDeadlineForClockImpl(
   auto task = swift_task_getCurrent();
   if (!task)
     return nullptr;
-  auto status = task->_private()._status().load(std::memory_order_relaxed);
-  if (!status.hasDeadline())
-    return nullptr;
 
+  // Walk this task and all structured parents. Structured children
+  // inherit `HasDeadline` from their parent at create time (see
+  // `AsyncTask::inheritDeadlineFlagFrom`), so we can bail out of the
+  // whole search when we hit a task that reports no deadline anywhere
+  // in the ancestor chain.
+  //
+  // We only follow the childFragment parent link, which exists only for
+  // structured children. Detached tasks lack a childFragment and thus
+  // don't inherit the flag and don't participate in this walk.
   HeapObject *found = nullptr;
-  withStatusRecordLock(task, [&](ActiveTaskStatus status) {
-    for (auto record : status.records()) {
-      if (record->getKind() != TaskStatusRecordKind::Deadline)
-        continue;
-      auto d = cast<TaskDeadlineStatusRecord>(record);
-      // Fast filter: types must be pointer-equal (necessary condition).
-      if (d->getClockType() != clockType)
-        continue;
-      // Same-clock check via Swift bridge. If the identities match, this
-      // is the record we want; the first one encountered walking outward
-      // from the head is the innermost (== tightest by push invariant).
-      if (!_task_deadline_boxesSameClock(d->getBox(), queryBox))
-        continue;
-      found = d->getBox();
-      return;
-    }
-  });
+  for (auto *cur = task; cur; ) {
+    auto status = cur->_private()._status().load(std::memory_order_relaxed);
+    if (!status.hasDeadline())
+      break;
+
+    found = findDeadlineOnSingleTask(cur, queryBox, clockType);
+    if (found)
+      break;
+
+    // No local match; try structured parent.
+    if (!cur->hasChildFragment())
+      break;
+    cur = cur->childFragment()->getParent();
+  }
+
   // Return an owned reference (+1). The caller will consume it (typically
   // via Unmanaged in Swift). This lets the SIL builtin result be marked
   // Owned (no "borrowed builtin result" concept exists), and keeps the box
@@ -827,8 +857,8 @@ bool _swift_task_hasActiveDeadline() {
   return status.hasDeadline();
 }
 
-void AsyncTask::inheritDeadlinesFrom(AsyncTask *parent) {
-  assert(parent && "must have a parent to inherit deadlines from");
+void AsyncTask::inheritDeadlineFlagFrom(AsyncTask *parent) {
+  assert(parent && "must have a parent to inherit deadline flag from");
 
   // Fast-path: parent has no deadline installed at all.
   auto parentStatus =
@@ -836,73 +866,23 @@ void AsyncTask::inheritDeadlinesFrom(AsyncTask *parent) {
   if (!parentStatus.hasDeadline())
     return;
 
-  // Snapshot the parent's deadline records under its status-record lock.
-  // We collect (clockType, box) pairs in the parent's chain order
-  // (innermost first) so that after we push them onto the child in
-  // reverse we end up with the exact same order the parent has.
-  std::vector<std::pair<const Metadata *, HeapObject *>> deadlines;
-  deadlines.reserve(4);
-  ::withStatusRecordLock(parent, [&](ActiveTaskStatus status) {
-    for (auto record : status.records()) {
-      if (record->getKind() != TaskStatusRecordKind::Deadline)
-        continue;
-      auto d = cast<TaskDeadlineStatusRecord>(record);
-      deadlines.push_back({d->getClockType(), d->getBox()});
-    }
-  });
-
-  if (deadlines.empty())
-    return;
-
-  // Push copies onto the child. The child's chain is not yet observable
-  // by other threads at this point (we're inside swift_task_create_common
-  // before the task is enqueued), so we can bypass the atomic status
-  // record CAS loop and mutate the ActiveTaskStatus directly. We still
-  // go through addStatusRecord for consistency with the rest of the
-  // runtime.
+  // Set the flag on the child so `Task.hasActiveDeadline` observes it
+  // without walking any parent chain, and so
+  // `swift_task_findNearestDeadlineForClock`'s fast-path
+  // `if (!status.hasDeadline()) return nullptr` doesn't bail out
+  // prematurely. The actual lookup will walk into the parent chain via
+  // `childFragment()->getParent()` when it doesn't find a matching
+  // record locally.
   //
-  // Iterate in reverse so the first record we push (which becomes the
-  // outermost) is the parent's outermost, and the last one we push
-  // (which becomes the innermost) is the parent's innermost. This
-  // preserves the "innermost = tightest" invariant.
-  for (auto it = deadlines.rbegin(); it != deadlines.rend(); ++it) {
-    // Retain the box; the child's inherited record shares ownership with
-    // the parent's.
-    swift_retain(it->second);
-    void *allocation = _swift_task_alloc_specific(
-        this, sizeof(class TaskDeadlineStatusRecord));
-    auto record = ::new (allocation)
-        TaskDeadlineStatusRecord(it->first, it->second);
-    addStatusRecord(this, record,
-                    [&](ActiveTaskStatus oldStatus,
-                        ActiveTaskStatus &newStatus) {
-                      newStatus = newStatus.withDeadline();
-                      return true;
-                    });
-  }
-
-  SWIFT_TASK_DEBUG_LOG("[Deadline] Inherited %zu deadline record(s) from "
-                       "parent:%p onto child:%p",
-                       deadlines.size(), parent, this);
-}
-
-void AsyncTask::cleanupInheritedDeadlines() {
-  // The task is being destroyed so no other thread can be touching its
-  // status-record chain. Walk directly without taking the lock. We only
-  // need to release the box references we retained during
-  // `inheritDeadlinesFrom`; the record memory itself is part of the
-  // task's slab allocator and will be torn down by `Private.destroy()`.
-  auto status = _private()._status().load(std::memory_order_relaxed);
-  if (!status.hasDeadline())
-    return;
-
-  for (auto record : status.records()) {
-    if (record->getKind() != TaskStatusRecordKind::Deadline)
-      continue;
-    auto d = cast<TaskDeadlineStatusRecord>(record);
-    if (auto *box = d->getBox())
-      swift_release(box);
-  }
+  // The child's status is not observable by other threads yet (we're
+  // inside swift_task_create_common before the task is enqueued), so
+  // this is a plain unlocked update.
+  auto &status = _private()._status();
+  auto old = status.load(std::memory_order_relaxed);
+  status.store(old.withDeadline(), std::memory_order_relaxed);
+  SWIFT_TASK_DEBUG_LOG(
+      "[Deadline] Inherited HasDeadline flag from parent:%p onto child:%p",
+      parent, this);
 }
 
 /**************************************************************************/
