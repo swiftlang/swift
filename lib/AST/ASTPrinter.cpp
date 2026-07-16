@@ -2606,6 +2606,16 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     }
   }
 
+  if (Options.SkipHiddenCArrayProjections) {
+    if (auto cArrayAttr = D->getAttrs().getAttribute<CArrayProjectionAttr>()) {
+      auto clangLoader = D->getASTContext().getClangModuleLoader();
+      auto visibleProjection = clangLoader->getVisibleCArrayProjection();
+      
+      if (visibleProjection != cArrayAttr->getProjection())
+        return false;
+    }
+  }
+
   if (Options.SkipPrivateSystemDecls &&
       D->isPrivateSystemDecl(!Options.SkipUnderscoredSystemProtocols))
     return false;

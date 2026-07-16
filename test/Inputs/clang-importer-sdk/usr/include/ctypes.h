@@ -53,6 +53,10 @@ typedef struct {
   unsigned b[];
 } StructWithFlexibleArray;
 
+typedef struct {
+  unsigned elems[2][2];
+} Unsigned2x2;
+
 #include <stdarg.h>
 extern void hasVaList(va_list args);
 
