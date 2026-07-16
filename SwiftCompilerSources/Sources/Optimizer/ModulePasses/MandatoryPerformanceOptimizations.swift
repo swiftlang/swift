@@ -34,7 +34,7 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   // For embedded Swift, optimize all the functions (there cannot be any
   // generics, type metadata, etc.)
   if moduleContext.options.enableEmbeddedSwift {
-    worklist.addAllNonGenericFunctions(of: moduleContext)
+    worklist.addAllNonGenericFunctionsAndEmbeddedThunks(of: moduleContext)
   } else {
     worklist.addAllMandatoryRequiredFunctions(of: moduleContext)
   }
@@ -261,7 +261,8 @@ private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions
     return
   }
 
-  if shouldInline(apply: apply, callee: callee, alreadyInlinedFunctions: &alreadyInlinedFunctions) {
+  if shouldInline(apply: apply, callee: callee, alreadyInlinedFunctions: &alreadyInlinedFunctions,
+                  context) {
     if apply.inliningCanInvalidateStackNesting  {
       simplifyCtxt.notifyInvalidatedStackNesting()
     }
@@ -287,17 +288,31 @@ private func removeUnusedMetatypeInstructions(in function: Function, _ context: 
   }
 }
 
-private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>) -> Bool {
+private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>,
+                          _ context: FunctionPassContext) -> Bool {
   if let beginApply = apply as? BeginApplyInst,
      !beginApply.canInline
   {
     return false
   }
 
+  // In embedded Swift, a non-final class conforming to a protocol via a
+  // protocol-extension default implementation gets a witness thunk that is
+  // generic over its (class-constrained) conforming type — the covariant-Self
+  // pattern, `<τ : ConcreteClass>`. We want to inline the default impl into
+  // such a thunk to strip the thunk's dependence on the still-generic default
+  // implementation. See the corresponding `return true` below.
+  let isEmbeddedGenericThunkCaller = context.options.enableEmbeddedSwift &&
+                                     apply.parentFunction.thunkKind == .thunk &&
+                                     apply.parentFunction.isGeneric
+
   guard callee.canBeInlinedIntoCaller(withSerializedKind: apply.parentFunction.serializedKind) ||
         // Even if the serialization kind doesn't match, we need to make sure to inline witness method thunks
         // in embedded swift.
         callee.thunkKind == .thunk ||
+        // Likewise, the default implementation we fold into an embedded generic
+        // witness thunk may not share the thunk's serialization kind.
+        isEmbeddedGenericThunkCaller ||
         // Force inlining transparent co-routines. This might be necessary if `-enable-testing` is turned on.
         (apply is BeginApplyInst && callee.isTransparent)
   else {
@@ -336,6 +351,20 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
   if apply.substitutionMap.isEmpty,
      let pathIntoGlobal = apply.resultIsUsedInGlobalInitialization(),
      alreadyInlinedFunctions.insert(PathFunctionTuple(path: pathIntoGlobal, function: callee)).inserted {
+    return true
+  }
+
+  // In Embedded Swift, inline the protocol-extension default implementation
+  // that a generic witness thunk dispatches to, when that default impl's
+  // own generic signature cannot be emitted in embedded Swift (e.g. it is
+  // generic over `<Self : Protocol>`).
+  // Folding it into the thunk removes the reference to the un-emittable generic
+  // callee; the thunk itself stays generic over the class-constrained type,
+  // which IRGen can emit.
+  if isEmbeddedGenericThunkCaller,
+     !callee.genericSignature.isEmpty,
+     !callee.genericSignature.canBeEmittedInEmbeddedSwift,
+     alreadyInlinedFunctions.insert(PathFunctionTuple(path: SmallProjectionPath(), function: callee)).inserted {
     return true
   }
 
@@ -489,6 +518,24 @@ extension FunctionWorklist {
       pushIfNotVisited(f)
     }
     return
+  }
+
+  /// Like `addAllNonGenericFunctions`, but also pulls in generic protocol
+  /// witness thunks whose signature satisfies the embedded-Swift rules.
+  /// These thunks aren't reachable via the usual "specialize callees of
+  /// non-generic functions" traversal, but their bodies may contain calls to
+  /// generic protocol-extension default implementations that MUST be inlined
+  /// away before IRGen sees them (otherwise the still-generic callee trips
+  /// `hasValidSignatureForEmbedded` in IRGen). Optimizing the thunk itself
+  /// gives the inliner a chance to fold in those default-impl calls.
+  mutating func addAllNonGenericFunctionsAndEmbeddedThunks(of moduleContext: ModulePassContext) {
+    for f in moduleContext.functions {
+      if !f.isGeneric {
+        pushIfNotVisited(f)
+      } else if f.thunkKind == .thunk && f.genericSignature.canBeEmittedInEmbeddedSwift {
+        pushIfNotVisited(f)
+      }
+    }
   }
 
   mutating func addCallees(of function: Function, _ context: ModulePassContext) {
