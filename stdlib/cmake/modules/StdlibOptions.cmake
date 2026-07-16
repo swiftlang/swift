@@ -241,7 +241,7 @@ endif() # SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
 
 set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
     "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING
-    "Build the concurrency library to use the given global executor (options: none, dispatch, singlethreaded, hooked)")
+    "Build the concurrency library to use the given global executor (options: none, dispatch, singlethreaded, hooked, wasi)")
 
 option(SWIFT_STDLIB_OS_VERSIONING
        "Build stdlib with availability based on OS versions (Darwin only)."
