@@ -2057,7 +2057,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 {
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
   Bits.ExtensionDecl.HasLazyConformances = false;
-  Bits.ExtensionDecl.IsMetatypeExtension = false;
+
   setTrailingWhereClause(trailingWhereClause);
 }
 
@@ -2080,6 +2080,16 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
     result->setClangNode(clangNode);
 
   return result;
+}
+
+bool ExtensionDecl::isMetatypeExtension() const {
+  // A parsed `extension P.Protocol` keeps its `ProtocolTypeRepr`; recognize the
+  // form from that without forcing type resolution.  Deserialized and
+  // compiler-synthesized extensions have no representation, but their extended
+  // type is the protocol metatype `(any P).Type`, so recognize it from there.
+  if (auto *repr = getExtendedTypeRepr())
+    return isa<ProtocolTypeRepr>(repr);
+  return getExtendedType()->is<MetatypeType>();
 }
 
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
