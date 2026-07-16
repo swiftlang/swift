@@ -250,6 +250,20 @@ const clang::Type *importer::getUnderlyingType(const clang::EnumDecl *decl) {
 ImportedType importer::findOptionSetEnum(clang::QualType type,
                                          ClangImporter::Implementation &Impl) {
   auto typedefType = dyn_cast<clang::TypedefType>(type);
+
+  if (Impl.SwiftContext.LangOpts.EnableCXXInterop) {
+    // In C++ interop, a {CF,NS}_OPTIONS type is a Swift-unavailable typedef
+    // paired with an anonymous flag_enum. A typedef that aliases such a type,
+    // possibly through several levels, is itself available in Swift, so look
+    // through the alias chain to the underlying Swift-unavailable CF_OPTIONS
+    // typedef.
+    while (typedefType && !Impl.isUnavailableInSwift(typedefType->getDecl())) {
+      auto underlying =
+          desugarIfElaborated(typedefType->getDecl()->getUnderlyingType());
+      typedefType = dyn_cast<clang::TypedefType>(underlying);
+    }
+  }
+
   if (!typedefType || !Impl.isUnavailableInSwift(typedefType->getDecl()))
     // If this isn't a typedef, or it is a typedef that is available in Swift,
     // then this definitely isn't used for {CF,NS}_OPTIONS.
