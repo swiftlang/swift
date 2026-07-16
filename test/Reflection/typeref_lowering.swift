@@ -6,9 +6,6 @@
 // XFAIL: OS=windows-msvc
 // RUN: %empty-directory(%t)
 
-// rdar://173266760
-// XFAIL: OS=freebsd
-
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
 
