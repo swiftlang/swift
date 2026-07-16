@@ -253,7 +253,6 @@ private struct FunctionSpecializations {
         (user as! SingleValueInstruction).replace(with: box, context)
       case let debugValue as DebugValueInst:
         debugValue.operand.set(to: stack, context)
-        debugValue.prependDeref()
       case let apply as ApplySite:
         specialize(apply: apply, context)
       default:

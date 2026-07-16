@@ -602,14 +602,6 @@ void DebugValueInst::killOperand(SILType operandType) {
   }
 
   SILType origType = operandType ? operandType : getOperand()->getType();
-
-  // Non-undef debug_values on alloc_box are allowed and fixed by IRGen to
-  // refer to the project_box. Undef debug_values, however, should always
-  // have the type of the variable.
-  if (!operandType)
-    if (auto *abi = dyn_cast<AllocBoxInst>(getOperand()))
-      origType = abi->getAddressType().getObjectType();
-
   bool addressOnly = !origType.isLoadableOrOpaque(*getFunction());
 
   // For address-only types, keep the address type and prependDeref flag.
