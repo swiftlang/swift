@@ -274,7 +274,7 @@ func testBigArrayInStruct(_ maxSizeTuple: IntTuple4096, _ maxSizeArray: IntArray
   var structWithBigArray = StructWithBigArray()
   structWithBigArray.max_size = maxSizeTuple    // expected-modern-c-array-error {{cannot assign value of type 'IntTuple4096' (aka '(Int8 /* ... repeated 4096 times ... */)') to type '[4096 of CChar]' (aka 'InlineArray<4096, Int8>')}}
   structWithBigArray.max_size = maxSizeArray    // expected-legacy-c-array-error {{cannot assign value of type 'IntArray4096' (aka 'InlineArray<4096, Int8>') to type '(CChar /* ... repeated 4096 times ... */)' (aka '(Int8 /* ... repeated 4096 times ... */)')}}
-  _ = structWithBigArray.max_size_plus_one      // expected-legacy-c-array-error {{internal}}
+  _ = structWithBigArray.max_size_plus_one      // expected-legacy-c-array-error {{property 'max_size_plus_one' was not imported because its C array type could not be represented as a tuple}}
 }
 
 // Test the initializers and properties available in structs and unions with
@@ -323,7 +323,7 @@ func testStructWithSmallAndHugeArrayFields(
   // expected-legacy-c-array-error@-1 {{cannot convert value of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
 
   let _: InlineArray<5000, Int32> = s.huge
-  // expected-legacy-c-array-error@-1 {{'huge' is inaccessible due to 'internal' protection level}}
+  // expected-legacy-c-array-error@-1 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
 }
 
 @available(anyAppleOS 26, *)
@@ -337,10 +337,10 @@ func testStructWithAllHugeArrayFields(
   _ = StructWithAllHugeArrayFields()
 
   let _: InlineArray<5000, Int32> = s.huge1
-  // expected-legacy-c-array-error@-1 {{'huge1' is inaccessible due to 'internal' protection level}}
+  // expected-legacy-c-array-error@-1 {{property 'huge1' was not imported because its C array type could not be represented as a tuple}}
 
   let _: InlineArray<6000, Int32> = s.huge2
-  // expected-legacy-c-array-error@-1 {{'huge2' is inaccessible due to 'internal' protection level}}
+  // expected-legacy-c-array-error@-1 {{property 'huge2' was not imported because its C array type could not be represented as a tuple}}
 }
 
 @available(anyAppleOS 26, *)
@@ -364,7 +364,7 @@ func testUnionWithSmallAndHugeArrayFields(
   // expected-legacy-c-array-error@-1 {{cannot convert value of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
 
   let _: InlineArray<5000, Int32> = u.huge
-  // expected-legacy-c-array-error@-1 {{'huge' is inaccessible due to 'internal' protection level}}
+  // expected-legacy-c-array-error@-1 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
 }
 
 @available(anyAppleOS 26, *)
@@ -406,7 +406,7 @@ func testStructWithArrayTypedefField(
 @available(anyAppleOS 26, *)
 func testStructWithHugeArrayTypedefField(s: StructWithHugeArrayTypedefField) {
   let _: InlineArray<5000, Int32> = s.huge
-  // expected-legacy-c-array-error@-1 {{'huge' is inaccessible due to 'internal' protection level}}
+  // expected-legacy-c-array-error@-1 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
 }
 
 // Check that a struct field whose type is a `swift_newtype` doesn't have a
@@ -428,10 +428,10 @@ func testStructWithHugeArrayNewtypeField(s: StructWithHugeArrayNewtypeField) {
   // not available in legacy mode.
   let _: HugeArrayNewtype = s.huge
   // expected-legacy-c-array-error@-1 {{cannot find type 'HugeArrayNewtype' in scope}}
-  // expected-legacy-c-array-error@-2 {{'huge' is inaccessible due to 'internal' protection level}}
+  // expected-legacy-c-array-error@-2 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
 
   let _: InlineArray<9000, Int32> = s.huge.rawValue
-  // expected-legacy-c-array-error@-1 {{'huge' is inaccessible due to 'internal' protection level}}
+  // expected-legacy-c-array-error@-1 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
 }
 
 @available(anyAppleOS 26, *)
@@ -454,7 +454,7 @@ func testStructWithStructArrayFields(
   // expected-legacy-c-array-error@-1 {{cannot convert value of type '(FooStruct1, FooStruct1, FooStruct1, FooStruct1)' to specified type 'InlineArray<4, FooStruct1>'}}
 
   let _: InlineArray<5000, FooStruct1> = s.huge
-  // expected-legacy-c-array-error@-1 {{'huge' is inaccessible due to 'internal' protection level}}
+  // expected-legacy-c-array-error@-1 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
 }
 
 @available(anyAppleOS 26, *)
