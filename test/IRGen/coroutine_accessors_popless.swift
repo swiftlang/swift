@@ -7,6 +7,10 @@
 // RUN:     -enable-x86_64-corocc                                           \
 // RUN: | %IRGenFileCheck %s
 
+// This is a non-resilient test case (no -enable-library-evolution above),
+// so it only emits the new yield_once_2 coroutine ABI and never the
+// old yield_once_1 coroutine ABI.
+
 // REQUIRES: CPU=arm64 || CPU=arm64e || CPU=x86_64
 // REQUIRES: swift_feature_CoroutineAccessors
 
@@ -24,6 +28,39 @@
 //           :    ),
 // CHECK-SAME:    i32 0
 // CHECK-SAME:  }>
+
+// CHECK-arm64e-LABEL: _swift_coro_task_alloc.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_coro_task_alloc,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 ptrtoint (
+// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
+// CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
+// CHECK-arm64e-SAME:        i32 0,
+// CHECK-arm64e-SAME:        i32 1
+// CHECK-arm64e-SAME:      )
+// CHECK-arm64e-SAME:    )
+// CHECK-arm64e-SAME:    i64 24469 }
+// CHECK-arm64e-SAME:  section "llvm.ptrauth"
+// CHECK-arm64e-SAME:  align 8
+// CHECK-arm64e-LABEL: @_swift_coro_task_dealloc.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_coro_task_dealloc,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 ptrtoint (
+// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
+// CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
+// CHECK-arm64e-SAME:        i32 0,
+// CHECK-arm64e-SAME:        i32 2
+// CHECK-arm64e-SAME:      )
+// CHECK-arm64e-SAME:    )
+// CHECK-arm64e-SAME:    i64 40879 },
+// CHECK-arm64e-SAME:  section "llvm.ptrauth",
+// CHECK-arm64e-SAME:  align 8
+
+// CHECK-LABEL: _swift_coro_async_allocator = linkonce_odr hidden constant %swift.coro_allocator {
+// CHECK-SAME:      i32 1,
+// CHECK-SAME:      _swift_coro_task_alloc
+// CHECK-SAME:      _swift_coro_task_dealloc
+// CHECK-SAME:  }
 
 // CHECK-arm64e-LABEL: _swift_coro_typed_malloc.ptrauth = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_typed_malloc,
@@ -59,39 +96,6 @@
 // CHECK-apple-SAME:       _swift_coro_typed_malloc
 // CHECK-apple-SAME:       _swift_coro_free
 // CHECK-apple-SAME:  }
-
-// CHECK-arm64e-LABEL: _swift_coro_task_alloc.ptrauth = private constant {
-// CHECK-arm64e-SAME:    ptr @_swift_coro_task_alloc,
-// CHECK-arm64e-SAME:    i32 0,
-// CHECK-arm64e-SAME:    i64 ptrtoint (
-// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
-// CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 1
-// CHECK-arm64e-SAME:      )
-// CHECK-arm64e-SAME:    )
-// CHECK-arm64e-SAME:    i64 24469 }
-// CHECK-arm64e-SAME:  section "llvm.ptrauth"
-// CHECK-arm64e-SAME:  align 8
-// CHECK-arm64e-LABEL: @_swift_coro_task_dealloc.ptrauth = private constant {
-// CHECK-arm64e-SAME:    ptr @_swift_coro_task_dealloc,
-// CHECK-arm64e-SAME:    i32 0,
-// CHECK-arm64e-SAME:    i64 ptrtoint (
-// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
-// CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 2
-// CHECK-arm64e-SAME:      )
-// CHECK-arm64e-SAME:    )
-// CHECK-arm64e-SAME:    i64 40879 },
-// CHECK-arm64e-SAME:  section "llvm.ptrauth",
-// CHECK-arm64e-SAME:  align 8
-
-// CHECK-LABEL: _swift_coro_async_allocator = linkonce_odr hidden constant %swift.coro_allocator {
-// CHECK-SAME:      i32 1,
-// CHECK-SAME:      _swift_coro_task_alloc
-// CHECK-SAME:      _swift_coro_task_dealloc
-// CHECK-SAME:  }
 
 // CHECK-LABEL: @_swift_coro_alloc(
 // CHECK-SAME:      ptr [[FRAME:%[^,]+]]
@@ -266,7 +270,7 @@ public var force_yield_once_convention : () {
     let nothing: () = ()
     yield nothing
   }
-// CHECK-LABEL: define{{.*}} { ptr, ptr } @increment_i_yield_once(
+// CHECK-LABEL: define{{.*}} swiftcc { ptr, ptr } @increment_i_yield_once(
 //                  ptr noalias dereferenceable(32) %0
 // CHECK-SAME:  )
 // CHECK-SAME:  {
@@ -299,6 +303,9 @@ public var force_yield_once_convention : () {
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
+
+  // TODO: `_modify` should use `yield_once_2` with CoroutineAccessors enabled,
+  // the same ABI as `yielding mutate`
   @_silgen_name("increment_i_yield_once")
   _modify {
     increment(&i)
@@ -313,7 +320,7 @@ public var force_yield_once_2_convention : () {
     let nothing: () = ()
     yield nothing
   }
-// CHECK-LABEL: define{{.*}} { ptr, ptr } @increment_i_yield_once_2(
+// CHECK-LABEL: define{{.*}} swiftcorocc { ptr, ptr } @increment_i_yield_once_2(
 //                  ptr noalias %0
 // CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^)]+]]
 // CHECK-SAME:  )
