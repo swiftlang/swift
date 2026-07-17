@@ -2195,7 +2195,8 @@ public:
       	  // whose only case is empty.
           ++NonGenericEmptyPayloadCases;
         } else {
-      	  // Finally, we consider spare bits from regular payloads
+          // Finally, we consider spare bits from regular payloads and generic
+          // payloads of reference types.
           ++NonGenericNonEmptyPayloadCases;
           LastPayloadCaseTR = CaseTR;
         }
