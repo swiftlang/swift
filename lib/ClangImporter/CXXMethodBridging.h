@@ -51,10 +51,8 @@ struct CXXMethodBridging {
     if (method->getReturnType()->isReferenceType())
       return Kind::unknown;
 
-    // A getter is named with a "get" prefix, or -- when the method is
-    // explicitly annotated with 'import_computed_property'
-    // (the SWIFT_COMPUTED_PROPERTY macro) -- with any name. In the latter case
-    // the whole name becomes the (camelCased) property name.
+    // A getter is named with a "get" prefix, or -- when explicitly annotated
+    // with SWIFT_COMPUTED_PROPERTY -- with any name.
     if (hasGetterPrefix() || isExplicitComputedProperty())
       return Kind::getter;
 
@@ -91,9 +89,7 @@ struct CXXMethodBridging {
   bool hasGetterPrefix() { return getClangName().starts_with_insensitive("get"); }
   bool hasSetterPrefix() { return getClangName().starts_with_insensitive("set"); }
 
-  // True when the method carries the 'import_computed_property' Swift attribute
-  // (i.e. the SWIFT_COMPUTED_PROPERTY macro), which opts it in to being
-  // imported as a computed property even without a get/set name prefix.
+  // Checks for the SWIFT_COMPUTED_PROPERTY attribute.
   bool isExplicitComputedProperty() {
     for (const auto *attr : method->specific_attrs<clang::SwiftAttrAttr>())
       if (attr->getAttribute() == "import_computed_property")
@@ -101,8 +97,6 @@ struct CXXMethodBridging {
     return false;
   }
 
-  // The clang name with a leading "get"/"set" accessor prefix removed, if it
-  // has one; otherwise the whole name (e.g. an annotated prefix-less getter).
   // Returns a StringRef into the persistent Clang name, so it stays valid for
   // uses that outlive this object, such as a GetterSetterMap key.
   llvm::StringRef nameWithoutAccessorPrefix() {
@@ -114,8 +108,6 @@ struct CXXMethodBridging {
   std::string importNameAsCamelCaseName() {
     std::string output;
     auto kind = classify();
-    // The property name is derived from the accessor name without its get/set
-    // prefix (see nameWithoutAccessorPrefix); non-accessors keep their name.
     if (kind == Kind::getter || kind == Kind::setter) {
       output = nameWithoutAccessorPrefix().str();
     } else {
