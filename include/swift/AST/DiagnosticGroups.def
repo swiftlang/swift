@@ -40,6 +40,7 @@
 
 GROUP(no_group,none,"")
 
+GROUP(ActorConformanceToGlobalActorProtocol,none,"actors-cannot-conform-to-global-actor-protocols")
 GROUP(ActorIsolatedCall,none,"actor-isolated-call")
 GROUP(ActorIsolatedMutatingAsync,none,"actor-isolated-mutating-async")
 GROUP(AddPreconcurrencyImport,none,"add-preconcurrency-import")
@@ -67,6 +68,9 @@ GROUP(ImplicitStrongCapture,none,"implicit-strong-capture")
 GROUP(IsolatedConformances,none,"isolated-conformances")
 GROUP(MemberImportVisibility,none,"member-import-visibility")
 GROUP(MissingModuleOnKnownPaths,none,"missing-module-on-known-paths")
+GROUP(NonSendableExitingActor,none,"getting-non-sendable-values-out-of-actors")
+GROUP(NonSendableInAsyncConformanceOrOverride,none,"non-sendable-values-in-async-conformances-and-overrides")
+GROUP(NonSendableObjCInterop,none,"non-sendable-types-and-objective-c-interoperability")
 GROUP(NonSendableSuperclass,none,"non-sendable-superclass")
 GROUP(PackageModuleLoadedFromSDK,none,"")
 GROUP(OptionObsoletedByModuleSelectors,none,"option-obsoleted-by-module-selectors")
