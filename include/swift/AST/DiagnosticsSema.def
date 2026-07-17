@@ -2510,6 +2510,9 @@ WARNING(spi_preferred_over_spi_available,none,
 // @called(once)
 ERROR(called_once_cannot_be_used_with_borrowing,none,
       "'@called(once)' cannot be used together with 'borrowing'", ())
+ERROR(called_once_function_type_mismatch,none,
+      "invalid conversion from '@called(once)' function of type %0 "
+      "to function type %1", (Type, Type))
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,

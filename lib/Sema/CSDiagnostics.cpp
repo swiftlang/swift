@@ -7601,6 +7601,13 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
+    diagnoseAsError() {
+  emitDiagnostic(diag::called_once_function_type_mismatch, getFromType(),
+                 getToType());
+  return true;
+}
+
 bool InOutConversionFailure::diagnoseAsError() {
   auto *locator = getLocator();
   auto path = locator->getPath();
