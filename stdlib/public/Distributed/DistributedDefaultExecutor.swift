@@ -42,7 +42,7 @@ internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
   }
 }
 
-/// Obtain the unowned `SerialExecutor` that is used by by remote distributed actor references.
+/// Obtain the unowned `SerialExecutor` that is used by remote distributed actor references.
 /// The executor is shared between all remote default executor remote distributed actors,
 /// and it will crash if any job is enqueued on it.
 ///
