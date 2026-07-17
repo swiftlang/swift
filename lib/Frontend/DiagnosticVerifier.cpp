@@ -345,7 +345,7 @@ findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
       continue;
 
     // Verify the parent.
-    if (ParentID && I->ParentID != ParentID) {
+    if (I->ParentID != ParentID) {
       continue;
     }
 
@@ -2100,6 +2100,7 @@ static void createDiagnosticInfo(const DiagnosticInfo &Info,
                                  SourceManager &DiagSM,
                                  SourceManager &VerifierSM,
                                  bool VerifyChildNotes,
+                                 bool IgnoreMacroLocationNote,
                                  std::optional<size_t> ParentID,
                                  std::vector<CapturedDiagnosticInfo> &Out) {
   ASSERT(!Info.IsChildNote ||
@@ -2121,18 +2122,26 @@ static void createDiagnosticInfo(const DiagnosticInfo &Info,
   for (const auto &category : Info.CategoryChain)
     groupNames.emplace_back(category.Name.str());
 
+  SmallVector<const DiagnosticInfo *, 8> ChildNotes;
+  if (VerifyChildNotes) {
+    for (auto &ChildInfo : Info.ChildDiagnosticInfo) {
+      if (IgnoreMacroLocationNote &&
+          ChildInfo->ID == diag::in_macro_expansion.ID)
+        continue;
+      ChildNotes.push_back(ChildInfo);
+    }
+  }
+
   DiagLoc loc(DiagSM, VerifierSM, Info.Loc);
   const size_t Idx = Out.size();
   Out.emplace_back(
       message, loc.bufferID, Info.Kind, loc.sourceLoc, loc.line, loc.column,
       fixIts, llvm::sys::path::stem(Info.getCategoryDocumentationURL()).str(),
-      std::move(groupNames), Idx, ParentID,
-      VerifyChildNotes && !Info.ChildDiagnosticInfo.empty());
+      std::move(groupNames), Idx, ParentID, !ChildNotes.empty());
 
-  if (VerifyChildNotes) {
-    for (const DiagnosticInfo *ChildInfo : Info.ChildDiagnosticInfo)
-      createDiagnosticInfo(*ChildInfo, DiagSM, VerifierSM, VerifyChildNotes,
-                           Idx, Out);
+  for (const DiagnosticInfo *ChildInfo : ChildNotes) {
+    createDiagnosticInfo(*ChildInfo, DiagSM, VerifierSM, VerifyChildNotes,
+                         IgnoreMacroLocationNote, Idx, Out);
   }
 }
 
@@ -2155,7 +2164,8 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
     // Already added with parent diagnostic
     return;
 
-  createDiagnosticInfo(Info, SM, this->SM, VerifyChildNotes, std::nullopt,
+  createDiagnosticInfo(Info, SM, this->SM, VerifyChildNotes,
+                       IgnoreMacroLocationNote, std::nullopt,
                        CapturedDiagnostics);
 }
 

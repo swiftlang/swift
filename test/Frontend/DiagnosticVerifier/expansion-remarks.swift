@@ -14,6 +14,10 @@
 // RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-wrongline.swift 2>&1 | %FileCheck --check-prefix=CHECK-WRONGLINE %t/cross-buffer-location-wrongline.swift
 // RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-dup.swift 2>&1 | %FileCheck --check-prefix=CHECK-DUP %t/cross-buffer-location-dup.swift
 
+// RUN: %target-swift-frontend-verify -swift-version 5 -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift
+// RUN: %target-swift-frontend-verify -swift-version 5 -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift -verify-child-notes
+// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift 2>&1 | %FileCheck --check-prefix=DISABLED %t/ignore-macro-note.swift
+
 //--- main.swift
 @attached(peer, names: overloaded)
 macro unstringifyPeer(_ s: String) =
@@ -144,4 +148,16 @@ func foo() {}
 //   #dup@2
 //   expected-error@2{{cannot find 'a' in scope}}
 //   expected-error@3{{cannot find 'b' in scope}}
+// }}
+
+//--- ignore-macro-note.swift
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// DISABLED: ignore-macro-note.swift:[[@LINE+1]]:1: error: unexpected note produced: in expansion of macro 'unstringifyPeer' on global function 'foo()' here
+@unstringifyPeer("func foo(_ x: Int) {\nlet a = 2\n}")
+func foo() {}
+// expected-expansion@-1:14{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
 // }}
