@@ -1,0 +1,23 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -copy-propagation %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil [ossa] @salvage_convert_escape_to_noescape_ossa
+// CHECK: bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
+// CHECK:   debug_value %0, let, name "fn", transform {
+// CHECK:   bb0(%0 : $@callee_guaranteed () -> ()):
+// CHECK:     %1 = convert_escape_to_noescape %0 to $@noescape @callee_guaranteed () -> ()
+// CHECK:     return %1
+// CHECK:   }
+// CHECK:   return
+sil [ossa] @salvage_convert_escape_to_noescape_ossa : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
+  %1 = convert_escape_to_noescape %0 to $@noescape @callee_guaranteed () -> ()
+  debug_value %1, let, name "fn"
+  destroy_value %1
+  %r = tuple ()
+  return %r : $()
+}

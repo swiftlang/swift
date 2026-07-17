@@ -1,0 +1,58 @@
+// RUN: %target-sil-opt -sil-verify-all -sil-combine %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Base {}
+class Derived : Base {}
+
+// CHECK-LABEL: sil @salvage_upcast
+// CHECK: bb0(%0 : $Derived):
+// CHECK:   debug_value %0, let, name "obj", transform {
+// CHECK:   bb0(%0 : $Derived):
+// CHECK:     %1 = upcast %0 to $Base
+// CHECK:     return %1
+// CHECK:   }
+// CHECK:   return
+sil @salvage_upcast : $@convention(thin) (@guaranteed Derived) -> () {
+bb0(%0 : $Derived):
+  %1 = upcast %0 : $Derived to $Base
+  debug_value %1 : $Base, let, name "obj"
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @salvage_unchecked_ref_cast
+// CHECK: bb0(%0 : $Base):
+// CHECK:   debug_value %0, let, name "cast", transform {
+// CHECK:   bb0(%0 : $Base):
+// CHECK:     %1 = unchecked_ref_cast %0 to $Derived
+// CHECK:     return %1
+// CHECK:   }
+// CHECK:   return
+sil @salvage_unchecked_ref_cast : $@convention(thin) (@guaranteed Base) -> () {
+bb0(%0 : $Base):
+  %1 = unchecked_ref_cast %0 : $Base to $Derived
+  debug_value %1 : $Derived, let, name "cast"
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @salvage_convert_escape_to_noescape
+// CHECK: bb0(%0 : $@callee_guaranteed () -> ()):
+// CHECK:   debug_value %0, let, name "fn", transform {
+// CHECK:   bb0(%0 : $@callee_guaranteed () -> ()):
+// CHECK:     %1 = convert_escape_to_noescape %0 to $@noescape @callee_guaranteed () -> ()
+// CHECK:     return %1
+// CHECK:   }
+// CHECK:   return
+sil @salvage_convert_escape_to_noescape : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  %1 = convert_escape_to_noescape %0 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  debug_value %1 : $@noescape @callee_guaranteed () -> (), let, name "fn"
+  %r = tuple ()
+  return %r : $()
+}
+
