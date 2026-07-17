@@ -1115,6 +1115,8 @@ namespace {
     ImportNameVersion version;
     SwiftDeclSynthesizer synthesizer;
 
+    CArrayProjection currentCArrayProjection;
+
     /// The version that we're being asked to import for. May not be the version
     /// the user requested, as we may be forming an alternate for diagnostic
     /// purposes.
@@ -1529,7 +1531,8 @@ namespace {
   public:
     explicit SwiftDeclConverter(ClangImporter::Implementation &impl,
                                 ImportNameVersion vers)
-      : Impl(impl), version(vers), synthesizer(Impl) { }
+      : Impl(impl), version(vers), synthesizer(Impl),
+        currentCArrayProjection(impl.VisibleCArrayProjection) { }
 
     bool hadForwardDeclaration() const {
       return forwardDeclaration;
@@ -7648,14 +7651,6 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
 NominalTypeDecl *
 SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
                                           const clang::EnumDecl *decl) {
-  auto Loc = Impl.importSourceLoc(decl->getLocation());
-
-  // Create a struct with the underlying type as a field.
-  auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, getAccessLevel(decl), Loc, name, Loc, ArrayRef<InheritedEntry>(),
-      nullptr, dc);
-  Impl.ImportedDecls[Impl.getImportedDeclsKey(decl, getVersion())] = structDecl;
-
   // Compute the underlying type.
   auto underlyingType = importTypeIgnoreIUO(
       decl->getIntegerType(), ImportTypeKind::Enum,
@@ -7663,6 +7658,14 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
       isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
   if (!underlyingType)
     return nullptr;
+
+  auto Loc = Impl.importSourceLoc(decl->getLocation());
+
+  // Create a struct with the underlying type as a field.
+  auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
+      decl, getAccessLevel(decl), Loc, name, Loc, ArrayRef<InheritedEntry>(),
+      nullptr, dc);
+  Impl.ImportedDecls[Impl.getImportedDeclsKey(decl, getVersion())] = structDecl;
 
   synthesizer.makeStructRawValued(structDecl, underlyingType,
                                   {KnownProtocolKind::OptionSet});
@@ -8009,7 +8012,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Check whether we've already created the constructor.
   auto known =
-      Impl.Constructors.find(std::make_tuple(objcMethod, dc, getVersion()));
+      Impl.Constructors.find(std::make_tuple(objcMethod, dc, getVersion(),
+                                             currentCArrayProjection));
   if (known != Impl.Constructors.end())
     return known->second;
 
@@ -8262,7 +8266,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Check whether we've already created the constructor.
   auto known =
-      Impl.Constructors.find(std::make_tuple(objcMethod, dc, getVersion()));
+      Impl.Constructors.find(std::make_tuple(objcMethod, dc, getVersion(),
+                                             currentCArrayProjection));
   if (known != Impl.Constructors.end())
     return known->second;
 
@@ -8337,7 +8342,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   }
 
   // Record the constructor for future re-use.
-  Impl.Constructors[std::make_tuple(objcMethod, dc, getVersion())] = result;
+  Impl.Constructors[std::make_tuple(objcMethod, dc, getVersion(),
+                                    currentCArrayProjection)] = result;
   Impl.ConstructorsForNominal[ownerNominal].push_back(result);
 
   // If this constructor overrides another constructor, mark it as such.
