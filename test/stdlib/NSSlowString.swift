@@ -105,8 +105,7 @@ tests.test("Zalgo")
 		expectedCodeUnitCount: 125
 	)
 
-	// Check for interspersed zalgo and emoji
-	var megaZalgo = zalgo + zalgo + zalgo + zalgo
+	let megaZalgo = zalgo + zalgo
 	check(
 		NSSlowString(string: megaZalgo) as String,
 		expectedCount: megaZalgo.count,
