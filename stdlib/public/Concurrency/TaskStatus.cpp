@@ -729,7 +729,7 @@ static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
 
   // If we're removing the "outermost" deadline, we must clear the HasDeadline,
   // as we know for sure there's no more deadline records present.
-  bool clearFlag = record->isOutermostDeadline();
+  bool clearHasDeadlineFlag = record->isOutermostDeadline();
   removeStatusRecordWhere(
       task,
       /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
@@ -738,8 +738,8 @@ static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
       },
       /*updateStatus=*/[&](ActiveTaskStatus oldStatus,
                             ActiveTaskStatus &newStatus) {
-        if (clearFlag) {
-          assert(oldStatus.hasDeadline());
+        if (clearHasDeadlineFlag) {
+          assert(oldStatus.hasDeadline() && "Can't clear HasDeadline flag from task without deadline.");
           newStatus = newStatus.withoutDeadline();
         }
       });
@@ -756,7 +756,7 @@ static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
 /// whose clock matches `(clockType, queryBox)`. Returns the matching
 /// record's box, or nullptr if none.
 ///
-/// Takes the task's status-record lock while walking.
+/// Takes the task's status-record lock.
 static HeapObject *
 findDeadlineOnSingleTask(AsyncTask *task, HeapObject *queryBox,
                          const Metadata *clockType) {
@@ -803,17 +803,15 @@ swift_task_findNearestDeadlineForClockImpl(
   if (!task)
     return nullptr;
 
-  // Walk this task and all structured parents. Structured children
+  // Walk this task and its parents. Structured children
   // inherit `HasDeadline` from their parent at create time (see
   // `AsyncTask::inheritDeadlineFlagFrom`), so we can bail out of the
   // whole search when we hit a task that reports no deadline anywhere
   // in the ancestor chain.
-  //
-  // We only follow the childFragment parent link, which exists only for
-  // structured children. Detached tasks lack a childFragment and thus
-  // don't inherit the flag and don't participate in this walk.
   HeapObject *found = nullptr;
-  for (auto *cur = task; cur; ) {
+
+  auto *cur = task;
+  while (cur) {
     auto status = cur->_private()._status().load(std::memory_order_relaxed);
     if (!status.hasDeadline())
       break;
@@ -838,9 +836,8 @@ swift_task_findNearestDeadlineForClockImpl(
   return found;
 }
 
-/// Fast-path check for `Task.hasActiveDeadline`: reads the task's status
-/// flags without walking any record chain. Returns true iff a deadline
-/// record is currently installed for any clock.
+/// Fast-path check for `Task.hasActiveDeadline`.
+/// We know just based off task status flags if it has "any" deadline installed.
 extern "C" SWIFT_CC(swift)
 bool _swift_task_hasActiveDeadline() {
   auto task = swift_task_getCurrent();

@@ -389,7 +389,7 @@ extension Task where Success == Never, Failure == Never {
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: Clock box
+// MARK: Internals
 
 /// A non-generic base class carrying identity/compare methods that dispatch
 /// via Swift's dynamic-dispatch table into the concrete `_ClockBox<C>`.
@@ -432,7 +432,7 @@ internal final class _ClockBox<C: Clock & Identifiable>: _AnyClockBox {
   }
 }
 
-/// Bridged Swift-side helper called by the runtime for each candidate
+/// Swift-side helper called by the runtime for each candidate
 /// record while walking the chain looking for a deadline for the query
 /// clock. Both arguments are `_AnyClockBox` instances; the dispatch to
 /// `hasSameClock(as:)` picks the right `_ClockBox<C>.hasSameClock` via
@@ -452,9 +452,6 @@ internal func _task_deadline_boxesSameClock(
   else { return false }
   return boxA.hasSameClock(as: boxB)
 }
-
-// ==== -----------------------------------------------------------------------
-// MARK: Internal SPI
 
 /// Query the innermost active deadline installed on the current task for
 /// the given clock, or nil if none.
