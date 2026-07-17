@@ -1780,10 +1780,47 @@ Address TypeInfo::roundUpToTypeAlignment(IRGenFunction &IGF, Address base,
   return Address(Addr, getStorageType(), Align);
 }
 
+/// Emit a loop calling `emitElement` for each of the `count` indices, back to
+/// front if `reverse`. Used to open-code the array operations in embedded mode,
+/// where the runtime helpers need metadata we don't have.
+static void emitEmbeddedArrayLoop(
+    IRGenFunction &IGF, llvm::Value *count, bool reverse,
+    llvm::function_ref<void(llvm::Value *index)> emitElement) {
+  auto *one = llvm::ConstantInt::get(count->getType(), 1);
+  auto *origBB = IGF.Builder.GetInsertBlock();
+  auto *headerBB = IGF.createBasicBlock("loop_header");
+  auto *loopBB = IGF.createBasicBlock("loop_body");
+  auto *exitBB = IGF.createBasicBlock("loop_exit");
+
+  IGF.Builder.CreateBr(headerBB);
+  IGF.Builder.emitBlock(headerBB);
+  auto *phi = IGF.Builder.CreatePHI(count->getType(), 2);
+  phi->addIncoming(llvm::ConstantInt::get(count->getType(), 0), origBB);
+  IGF.Builder.CreateCondBr(IGF.Builder.CreateICmpSLT(phi, count), loopBB, exitBB);
+
+  IGF.Builder.emitBlock(loopBB);
+  llvm::Value *index =
+      reverse ? IGF.Builder.CreateSub(IGF.Builder.CreateSub(count, phi), one)
+              : phi;
+  emitElement(index);
+  phi->addIncoming(IGF.Builder.CreateAdd(phi, one), IGF.Builder.GetInsertBlock());
+  IGF.Builder.CreateBr(headerBB);
+
+  IGF.Builder.emitBlock(exitBB);
+}
+
 void TypeInfo::destroyArray(IRGenFunction &IGF, Address array,
                             llvm::Value *count, SILType T) const {
   if (isTriviallyDestroyable(ResilienceExpansion::Maximal))
     return;
+
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    emitEmbeddedArrayLoop(IGF, count, /*reverse=*/false, [&](llvm::Value *index) {
+      bool isOutlined = false;
+      destroy(IGF, indexArray(IGF, array, index, T), T, isOutlined);
+    });
+    return;
+  }
 
  emitDestroyArrayCall(IGF, T, array, count);
 }
@@ -1801,6 +1838,15 @@ void TypeInfo::initializeArrayWithCopy(IRGenFunction &IGF,
     return;
   }
 
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    emitEmbeddedArrayLoop(IGF, count, /*reverse=*/false, [&](llvm::Value *index) {
+      bool isOutlined = false;
+      initializeWithCopy(IGF, indexArray(IGF, dest, index, T),
+                         indexArray(IGF, src, index, T), T, isOutlined);
+    });
+    return;
+  }
+
   emitInitializeArrayWithCopyCall(IGF, T, dest, src, count);
 }
 
@@ -1814,6 +1860,16 @@ void TypeInfo::initializeArrayWithTakeNoAlias(IRGenFunction &IGF, Address dest,
         dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
         src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
         byteCount);
+    return;
+  }
+
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    emitEmbeddedArrayLoop(IGF, count, /*reverse=*/false, [&](llvm::Value *index) {
+      bool isOutlined = false;
+      initializeWithTake(IGF, indexArray(IGF, dest, index, T),
+                         indexArray(IGF, src, index, T), T, isOutlined,
+                         /*zeroizeIfSensitive=*/true);
+    });
     return;
   }
 
@@ -1834,6 +1890,16 @@ const {
     return;
   }
 
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    emitEmbeddedArrayLoop(IGF, count, /*reverse=*/false, [&](llvm::Value *index) {
+      bool isOutlined = false;
+      initializeWithTake(IGF, indexArray(IGF, dest, index, T),
+                         indexArray(IGF, src, index, T), T, isOutlined,
+                         /*zeroizeIfSensitive=*/true);
+    });
+    return;
+  }
+
   emitInitializeArrayWithTakeFrontToBackCall(IGF, T, dest, src, count);
 }
 
@@ -1848,6 +1914,16 @@ const {
         dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
         src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
         byteCount);
+    return;
+  }
+
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    emitEmbeddedArrayLoop(IGF, count, /*reverse=*/true, [&](llvm::Value *index) {
+      bool isOutlined = false;
+      initializeWithTake(IGF, indexArray(IGF, dest, index, T),
+                         indexArray(IGF, src, index, T), T, isOutlined,
+                         /*zeroizeIfSensitive=*/true);
+    });
     return;
   }
 
@@ -1867,6 +1943,15 @@ void TypeInfo::assignArrayWithCopyNoAlias(IRGenFunction &IGF, Address dest,
     return;
   }
 
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    emitEmbeddedArrayLoop(IGF, count, /*reverse=*/false, [&](llvm::Value *index) {
+      bool isOutlined = false;
+      assignWithCopy(IGF, indexArray(IGF, dest, index, T),
+                     indexArray(IGF, src, index, T), T, isOutlined);
+    });
+    return;
+  }
+
   emitAssignArrayWithCopyNoAliasCall(IGF, T, dest, src, count);
 }
 
@@ -1880,6 +1965,15 @@ void TypeInfo::assignArrayWithCopyFrontToBack(IRGenFunction &IGF, Address dest,
         dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
         src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
         byteCount);
+    return;
+  }
+
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    emitEmbeddedArrayLoop(IGF, count, /*reverse=*/false, [&](llvm::Value *index) {
+      bool isOutlined = false;
+      assignWithCopy(IGF, indexArray(IGF, dest, index, T),
+                     indexArray(IGF, src, index, T), T, isOutlined);
+    });
     return;
   }
 
@@ -1899,6 +1993,15 @@ void TypeInfo::assignArrayWithCopyBackToFront(IRGenFunction &IGF, Address dest,
     return;
   }
 
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    emitEmbeddedArrayLoop(IGF, count, /*reverse=*/true, [&](llvm::Value *index) {
+      bool isOutlined = false;
+      assignWithCopy(IGF, indexArray(IGF, dest, index, T),
+                     indexArray(IGF, src, index, T), T, isOutlined);
+    });
+    return;
+  }
+
   emitAssignArrayWithCopyBackToFrontCall(IGF, T, dest, src, count);
 }
 
@@ -1912,6 +2015,15 @@ void TypeInfo::assignArrayWithTake(IRGenFunction &IGF, Address dest,
         dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
         src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
         byteCount);
+    return;
+  }
+
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    emitEmbeddedArrayLoop(IGF, count, /*reverse=*/false, [&](llvm::Value *index) {
+      bool isOutlined = false;
+      assignWithTake(IGF, indexArray(IGF, dest, index, T),
+                     indexArray(IGF, src, index, T), T, isOutlined);
+    });
     return;
   }
 
