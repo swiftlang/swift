@@ -3261,6 +3261,21 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       increaseScore(SK_SyncInAsync, locator);
   }
 
+  if (func1->isCalledOnce() != func2->isCalledOnce()) {
+    if (func1->isCalledOnce() ||
+        (kind < ConstraintKind::Subtype && !isWitnessMatching(locator))) {
+      if (!shouldAttemptFixes())
+        return SolutionKind::Error;
+
+      auto *fix = ExecutionSemanticsMismatch::create(
+          *this, func1, func2, getConstraintLocator(locator));
+      if (recordFix(fix, FixImpact::FunctionTypeMismatch))
+        return SolutionKind::Error;
+    }
+
+    increaseScore(SK_FunctionConversion, locator);
+  }
+
   // Match @Sendable.
   auto sendableResult = matchFunctionSendability(
       func1, func2, kind, TMF_GenerateConstraints,
