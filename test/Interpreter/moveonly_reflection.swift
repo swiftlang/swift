@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift %s -o %t/exe
+// RUN: %target-build-swift %s -target %target-swift-5.8-abi-triple -o %t/exe
 // RUN: %target-codesign %t/exe
 // RUN: %target-run %t/exe > %t/output.txt
 // RUN: %FileCheck %s < %t/output.txt

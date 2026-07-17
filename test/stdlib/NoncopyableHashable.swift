@@ -9,7 +9,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift(-enable-experimental-feature Lifetimes)
+// The emission of runtime metadata for inverted requirements needs a 5.8+
+// target, so build the test targeting 5.8 and mark the tests as requiring 5.8.
+// RUN: %target-run-simple-swift(-target %target-swift-5.8-abi-triple -enable-experimental-feature Lifetimes)
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Lifetimes
 
@@ -61,7 +63,7 @@ extension InlineArray where Element: Hashable & ~Copyable {
   }
 }
 
-NoncopyableHashableTests.test("hashing noncopyables") {
+NoncopyableHashableTests.test("hashing noncopyables").require(.stdlib_5_8).code {
   let a = Noncopyable(wrapping: 1)
   let b = Noncopyable(wrapping: 2)
   let c = Noncopyable(wrapping: 1)
@@ -87,7 +89,7 @@ NoncopyableHashableTests.test("hashing noncopyables") {
   
 }
 
-NoncopyableHashableTests.test("hashing nonescapables") {  
+NoncopyableHashableTests.test("hashing nonescapables").require(.stdlib_5_8).code {
   let nc1 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 1))
   let nc2 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 1))
   let nc3 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 2))
