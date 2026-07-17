@@ -312,28 +312,37 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
   recursivelyDeleteTriviallyDeadInstructions(ai, force, callbacks);
 }
 
-void swift::collectUsesOfValue(SILValue v,
-                               llvm::SmallPtrSetImpl<SILInstruction *> &insts) {
+/// Recursively collect non-debug uses of a value
+static void
+collectNonDebugUsesOfValue(SILValue v,
+                           llvm::SmallPtrSetImpl<SILInstruction *> &insts) {
   for (auto ui = v->use_begin(), E = v->use_end(); ui != E; ++ui) {
     auto *user = ui->getUser();
+    
+    // Debug values should not be removed.
+    if (isa<DebugValueInst>(user))
+      continue;
+    
     // Instruction has been processed.
     if (!insts.insert(user).second)
       continue;
 
     // Collect the users of this instruction.
     for (auto result : user->getResults())
-      collectUsesOfValue(result, insts);
+      collectNonDebugUsesOfValue(result, insts);
   }
 }
 
 void swift::eraseUsesOfValue(SILValue v) {
   llvm::SmallPtrSet<SILInstruction *, 4> insts;
   // Collect the uses.
-  collectUsesOfValue(v, insts);
+  collectNonDebugUsesOfValue(v, insts);
   // Erase the uses, we can have instructions that become dead because
   // of the removal of these instructions, leave to DCE to cleanup.
   // Its not safe to do recursively delete here as some of the SILInstruction
   // maybe tracked by this set.
+  // Debug uses will have their operand changed to undef without being erased.
+  v->replaceAllUsesWithUndef();
   for (auto inst : insts) {
     inst->replaceAllUsesOfAllResultsWithUndef();
     inst->eraseFromParent();
