@@ -89,7 +89,6 @@ struct CXXMethodBridging {
   bool hasGetterPrefix() { return getClangName().starts_with_insensitive("get"); }
   bool hasSetterPrefix() { return getClangName().starts_with_insensitive("set"); }
 
-  // Checks for the SWIFT_COMPUTED_PROPERTY attribute.
   bool isExplicitComputedProperty() {
     for (const auto *attr : method->specific_attrs<clang::SwiftAttrAttr>())
       if (attr->getAttribute() == "import_computed_property")
@@ -97,8 +96,6 @@ struct CXXMethodBridging {
     return false;
   }
 
-  // Returns a StringRef into the persistent Clang name, so it stays valid for
-  // uses that outlive this object, such as a GetterSetterMap key.
   llvm::StringRef nameWithoutAccessorPrefix() {
     if (hasGetterPrefix() || hasSetterPrefix())
       return getClangName().drop_front(3);
