@@ -30,7 +30,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LanguageMode.h"
 #include "llvm/ADT/SmallVector.h"
 using namespace swift;

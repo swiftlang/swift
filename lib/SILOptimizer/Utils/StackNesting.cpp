@@ -13,7 +13,6 @@
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/StackAllocation.h"

@@ -31,16 +31,13 @@
 
 #define DEBUG_TYPE "diagnose-lifetime-issues"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 

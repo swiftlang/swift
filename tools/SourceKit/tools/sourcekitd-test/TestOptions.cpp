@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TestOptions.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"

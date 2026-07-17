@@ -13,7 +13,6 @@
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"

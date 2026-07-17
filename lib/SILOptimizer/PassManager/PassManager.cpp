@@ -14,7 +14,6 @@
 
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "../../IRGen/IRGenModule.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/MD5Stream.h"
@@ -34,7 +33,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GraphWriter.h"

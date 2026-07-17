@@ -15,7 +15,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include <optional>
 

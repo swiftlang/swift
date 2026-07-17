@@ -19,7 +19,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"

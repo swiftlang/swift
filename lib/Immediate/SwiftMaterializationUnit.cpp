@@ -38,7 +38,6 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/SILGenRequests.h"
 #include "swift/AST/TBDGenRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Immediate/SwiftMaterializationUnit.h"
 #include "swift/SIL/SILModule.h"

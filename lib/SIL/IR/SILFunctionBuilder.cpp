@@ -22,7 +22,6 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "clang/AST/Mangle.h"
 
 using namespace swift;
 

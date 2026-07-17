@@ -14,22 +14,14 @@
 
 #include "SILCombiner.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;

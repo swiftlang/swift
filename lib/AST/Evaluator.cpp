@@ -18,14 +18,11 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
-#include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include <vector>
 
 using namespace swift;

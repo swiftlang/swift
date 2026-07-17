@@ -18,8 +18,6 @@
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/ParseDeclName.h"

@@ -28,12 +28,10 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/ParseDeclName.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
@@ -46,7 +44,6 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <memory>

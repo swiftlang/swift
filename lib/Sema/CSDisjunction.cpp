@@ -26,29 +26,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "OpenedExistentials.h"
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSBindings.h"
 #include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
-#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
-#include <functional>
 
 #define DEBUG_TYPE "CSLookahead"
 #include "llvm/Support/Debug.h"

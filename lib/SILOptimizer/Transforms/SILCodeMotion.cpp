@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "sil-codemotion"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
@@ -28,7 +27,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"

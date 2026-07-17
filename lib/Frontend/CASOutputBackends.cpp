@@ -12,9 +12,7 @@
 
 #include "swift/Frontend/CASOutputBackends.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
-#include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/CompileJobCacheResult.h"
 #include "clang/Frontend/CompileJobCacheResult.h"

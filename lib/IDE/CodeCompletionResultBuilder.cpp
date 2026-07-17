@@ -17,7 +17,6 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
 #include "clang/AST/ASTContext.h"

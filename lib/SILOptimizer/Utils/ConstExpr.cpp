@@ -14,25 +14,19 @@
 
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/AST/Builtins.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include "llvm/ADT/PointerEmbeddedInt.h"
-#include "llvm/Support/TrailingObjects.h"
 
 using namespace swift;
 

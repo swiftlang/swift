@@ -23,7 +23,6 @@
 
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
@@ -31,7 +30,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeTransform.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILModule.h"
@@ -43,10 +41,8 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/SipHash.h"
 
 using namespace swift;

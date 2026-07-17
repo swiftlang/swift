@@ -12,7 +12,6 @@
 
 #include "swift/Basic/FileSystem.h"
 
-#include "swift/Basic/Assertions.h"
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"

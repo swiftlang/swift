@@ -15,7 +15,6 @@
 // We only use this so we can implement print on our type erased errors.
 #include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
 
 #define DEBUG_TYPE "region-isolation"

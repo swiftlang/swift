@@ -16,7 +16,6 @@
 
 #include "swift/AST/DiagnosticList.h"
 #include "swift/AST/DiagnosticsCommon.h"
-#include "swift/Basic/Assertions.h"
 using namespace swift;
 
 // Define all of the diagnostic objects and initialize them with their 

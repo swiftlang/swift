@@ -16,7 +16,6 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILInstruction.h"
 

@@ -13,17 +13,12 @@
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/ASTVisitor.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/InlinableText.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Lexer.h"
 
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 

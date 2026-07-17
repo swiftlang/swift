@@ -23,13 +23,11 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 // FIXME: [availability] Remove this when possible
-#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/PlatformKindUtils.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include <map>

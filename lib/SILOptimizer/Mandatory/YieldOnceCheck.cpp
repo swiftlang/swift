@@ -18,20 +18,16 @@
 
 #define DEBUG_TYPE "yield-once-check"
 
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
-#include "swift/SIL/Dominance.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
-#include "llvm/ADT/DenseSet.h"
 
 using namespace swift;
 

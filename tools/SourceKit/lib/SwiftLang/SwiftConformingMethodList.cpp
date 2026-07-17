@@ -11,10 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SwiftASTManager.h"
-#include "SwiftEditorDiagConsumer.h"
 #include "SwiftLangSupport.h"
-#include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/ConformingMethodList.h"
 #include "swift/IDETool/IDEInspectionInstance.h"
 #include "clang/AST/ASTContext.h"

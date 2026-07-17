@@ -18,9 +18,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILValue.h"
 
 using namespace swift;
 

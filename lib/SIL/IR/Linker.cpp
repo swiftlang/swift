@@ -53,9 +53,6 @@
 #define DEBUG_TYPE "sil-linker"
 #include "Linker.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -65,7 +62,6 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include <functional>
 
 using namespace swift;
 using namespace Lowering;

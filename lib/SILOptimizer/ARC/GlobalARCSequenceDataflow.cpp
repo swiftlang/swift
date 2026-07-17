@@ -18,13 +18,9 @@
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILSuccessor.h"
-#include "swift/SIL/CFG.h"
-#include "swift/SIL/SILModule.h"
-#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 

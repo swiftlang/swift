@@ -12,7 +12,6 @@
 
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILUndef.h"
@@ -22,14 +21,9 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Pattern.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "clang/AST/Attr.h"
-#include "clang/AST/Decl.h"
-#include "clang/AST/DeclObjC.h"
 
 using namespace swift;
 

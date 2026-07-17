@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-arc-analysis"
 
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
@@ -21,12 +20,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "llvm/ADT/BitVector.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 

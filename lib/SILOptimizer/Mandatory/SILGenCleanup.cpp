@@ -16,23 +16,16 @@
 
 #define DEBUG_TYPE "silgen-cleanup"
 
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "llvm/ADT/PostOrderIterator.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 using namespace swift;

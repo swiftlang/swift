@@ -22,7 +22,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LookupKinds.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"

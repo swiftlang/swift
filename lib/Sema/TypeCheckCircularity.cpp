@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 
 using namespace swift;

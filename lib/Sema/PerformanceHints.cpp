@@ -20,13 +20,11 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeVisitor.h"
 
 using namespace swift;
 

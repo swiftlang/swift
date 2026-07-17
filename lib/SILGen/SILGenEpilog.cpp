@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ASTVisitor.h"
 #include "SILGen.h"
 #include "SILGenFunction.h"
 #include "swift/AST/Types.h"

@@ -25,11 +25,9 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "swift/Strings.h"
 
 using namespace swift;
 
