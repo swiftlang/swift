@@ -74,6 +74,14 @@
 // RUN: %target-swift-frontend-verify -verify-child-notes -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/accept-child-note.swift
 // RUN: %diff %t/accept-child-note.swift %t/accept-child-note.swift.expected
 
+// A "cannot find in scope" error carries its typo-correction "did you mean"
+// notes as child notes, so inside an expansion they are synthesized into the
+// parent error's `{{children:...}}` block rather than as free-standing notes.
+// RUN: not %target-swift-frontend-verify -verify-child-notes -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/accept-typo-child-note.swift 2>%t/output.txt
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -verify-child-notes -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/accept-typo-child-note.swift
+// RUN: %diff %t/accept-typo-child-note.swift %t/accept-typo-child-note.swift.expected
+
 // Without -verify-ignore-macro-note, that outward "in expansion of macro" note
 // is verified too. It points back into the outer file and is only expressible
 // with '@#marker' syntax, which update-verify-tests cannot synthesize, so it
@@ -105,13 +113,19 @@
 // A diagnostic inside a nested expansion.
 // Its child notes are anchored via a chain of "in expansion from here" notes
 // whose innermost entry lives in the intermediate expansion buffer, not the
-// outer file. Here the inner diagnostics are addressable with
-// absolute '@n' lines inside their own expansion block, so the doubly-nested
-// expansion is synthesized and round-trips.
+// outer file. With -verify-child-notes this cannot currently be synthesized by
+// update-verify-tests since the child note is in a different expansion than
+// the parent diagnostic.
 // RUN: not %target-swift-frontend-verify -verify-child-notes -verify-ignore-macro-note -typo-correction-limit 10 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/nested-child-note.swift 2>%t/output.txt
+// RUN: not %update-verify-tests < %t/output.txt | %FileCheck --check-prefix CHECK-CHILD-NOTES-NESTED %s
+// CHECK-CHILD-NOTES-NESTED: cannot synthesize a child note that lives in a different macro expansion
+
+// Without -verify-child-notes we can synthesize the note directive in its
+// own expansion directive.
+// RUN: not %target-swift-frontend-verify -verify-ignore-macro-note -typo-correction-limit 10 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/nested-child-note.swift 2>%t/output.txt
 // RUN: %update-verify-tests < %t/output.txt
-// RUN: %target-swift-frontend-verify -verify-child-notes -verify-ignore-macro-note -typo-correction-limit 10 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/nested-child-note.swift
-// RUN: %diff %t/nested-child-note.swift %t/nested-child-note.swift.expected
+// RUN: %target-swift-frontend-verify -verify-ignore-macro-note -typo-correction-limit 10 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/nested-child-note.swift
+// RUN: %diff %t/nested-child-note.swift %t/nested-non-child-note.swift.expected
 
 //--- single.swift
 @attached(peer, names: overloaded)
@@ -159,7 +173,7 @@ func foo() {}
 macro unstringifyPeer(_ s: String) =
     #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
 
-// expected-note@+1 4{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
+// expected-note@+1 2{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
 @unstringifyPeer("""
 func foo(_ x: Int) {
     a = 2
@@ -195,7 +209,7 @@ func foo() {}
 macro unstringifyPeer(_ s: String) =
     #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
 
-// expected-note@+1 4{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
+// expected-note@+1 2{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
 @unstringifyPeer("""
 func foo(_ x: Int) {
     a = 2
@@ -241,7 +255,7 @@ func foo() {}
 macro unstringifyPeer(_ s: String) =
     #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
 
-// expected-note@+1 4{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
+// expected-note@+1 2{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
 @unstringifyPeer("""
 func foo(_ x: Int) {
     a = 2
@@ -287,7 +301,7 @@ macro unstringifyPeer(_ s: String) =
 macro unstringifyPeer2(_ s: String) =
     #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
 
-// expected-note@+1 7{{in expansion of macro 'unstringifyPeer' on global function 'bar()' here}}
+// expected-note@+1 3{{in expansion of macro 'unstringifyPeer' on global function 'bar()' here}}
 @unstringifyPeer("""
 func bar(_ y: Int) {
     @unstringifyPeer2(\"""
@@ -302,7 +316,7 @@ func bar(_ y: Int) {
 """)
 // expected-expansion@+10:14{{
 //   expected-note@1 2{{did you mean 'y'?}}
-//   expected-note@2 4{{in expansion of macro 'unstringifyPeer2' on local function 'foo()' here}}
+//   expected-note@2 2{{in expansion of macro 'unstringifyPeer2' on local function 'foo()' here}}
 //   expected-expansion@9:6{{
 //     expected-note@1 2{{did you mean 'x'?}}
 //     expected-error@2{{cannot find 'a' in scope}}
@@ -453,6 +467,28 @@ func foo() {}
 //   }}
 // }}
 
+//--- accept-typo-child-note.swift
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+@unstringifyPeer("func f(alpha: Int, alpaca: Int) {\n_ = alpar\n}")
+func f() {}
+
+//--- accept-typo-child-note.swift.expected
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+@unstringifyPeer("func f(alpha: Int, alpaca: Int) {\n_ = alpar\n}")
+// expected-expansion@+6:12{{
+//   expected-error@2{{cannot find 'alpar' in scope}} {{children:
+//     expected-note@1{{did you mean 'alpha'?}}
+//     expected-note@1{{did you mean 'alpaca'?}}
+//   }}
+// }}
+func f() {}
+
 //--- reject-child-notes.swift
 @attached(peer, names: overloaded)
 macro unstringifyPeer(_ s: String) =
@@ -528,7 +564,7 @@ func bar(_ y: Int) {
 """)
 func bar() {}
 
-//--- nested-child-note.swift.expected
+//--- nested-non-child-note.swift.expected
 @attached(peer, names: overloaded)
 macro unstringifyPeer(_ s: String) =
     #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")

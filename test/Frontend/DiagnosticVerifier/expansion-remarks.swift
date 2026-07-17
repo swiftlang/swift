@@ -70,18 +70,18 @@ func foo() {}
 // of macro" child note, whose location is the '@unstringifyPeer' attribute in
 // this (outer) file.
 // expected-expansion@-4:14{{
-//   expected-note@1 2{{'x' declared here}} {{children:
-//     expected-note@#here{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
-//   }}
+//   #xLine@1
 //   #aLine@2
 //   expected-error@#bLine{{cannot find 'b' in scope; did you mean 'x'?}} {{children:
 //     expected-note@#here{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
+//     expected-note@1{{'x' declared here}}
 //   }}
 //   #bLine@3
 // }}
 // Refer to location inside expansion from outside of it:
 // expected-error@#aLine{{cannot find 'a' in scope; did you mean 'x'?}} {{children:
 //   expected-note@#here{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
+//   expected-note@#xLine{{'x' declared here}}
 // }}
 
 //--- cross-buffer-location-negative.swift
