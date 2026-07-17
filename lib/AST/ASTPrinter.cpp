@@ -4897,8 +4897,15 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     break;
   }
 
+  // Whether a raw value was written explicitly is determined from the original
+  // (pre-folded) expression: constant folding produces an implicit literal.
+  // The folded value is what gets printed (e.g. '2 + 3' prints as '5').
+  if (auto *original = elt->getOriginalRawValueExpr();
+      !original || original->isImplicit())
+    return;
+
   auto *raw = elt->getRawValueExpr();
-  if (!raw || raw->isImplicit())
+  if (!raw)
     return;
 
   // Print the explicit raw value expression.
