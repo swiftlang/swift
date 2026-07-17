@@ -2848,11 +2848,8 @@ public:
   const Operand *getCalleeOperand() const { return &getAllOperands()[Callee]; }
   SILValue getCallee() const { return getCalleeOperand()->get(); }
 
-  /// Gets the origin of the callee by looking through function type conversions
-  /// until we find a function_ref, partial_apply, or unrecognized value.
-  ///
-  /// This is defined out of line to work around incomplete definition
-  /// issues. It is at the bottom of the file.
+  /// Gets the callee's origin by looking through instructions handled by
+  /// `getSingleValueCopyOrCast`.
   SILValue getCalleeOrigin() const;
 
   /// Gets the referenced function by looking through partial apply,
@@ -12103,38 +12100,6 @@ public:
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
-
-// This is defined out of line to work around the fact that this depends on
-// PartialApplyInst being defined, but PartialApplyInst is a subclass of
-// ApplyInstBase, so we can not place ApplyInstBase after it.
-template <class Impl, class Base>
-SILValue ApplyInstBase<Impl, Base, false>::getCalleeOrigin() const {
-  SILValue Callee = getCallee();
-  while (true) {
-    if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(Callee)) {
-      Callee = TTTFI->getCallee();
-      continue;
-    }
-    if (auto *CFI = dyn_cast<ConvertFunctionInst>(Callee)) {
-      Callee = CFI->getOperand();
-      continue;
-    }
-    if (auto *CETN = dyn_cast<ConvertEscapeToNoEscapeInst>(Callee)) {
-      Callee = CETN->getOperand();
-      continue;
-    }
-    // convert_escape_to_noescape's are within a borrow scope.
-    if (auto *beginBorrow = dyn_cast<BeginBorrowInst>(Callee)) {
-      Callee = beginBorrow->getOperand();
-      continue;
-    }
-    if (auto *copy = dyn_cast<CopyValueInst>(Callee)) {
-      Callee = copy->getOperand();
-      continue;
-    }
-    return Callee;
-  }
-}
 
 template <class Impl, class Base>
 bool ApplyInstBase<Impl, Base, false>::isCalleeDynamicallyReplaceable() const {
