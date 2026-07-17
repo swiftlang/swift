@@ -287,13 +287,18 @@ private:
     FoldingErrorOr<ConstantValuePtr>
     foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
       auto exprType = expr->getType();
-      auto value = expr->getValue();
       auto resultBitWidth = getIntegerBitWidth(exprType, Ctx);
       bool isSigned = isSignedIntegerType(exprType);
-      // Don't silently truncate a literal whose magnitude doesn't fit the
-      // target type; leave it unfolded so the existing overflow diagnostic
-      // (from the SIL constant-propagation pass, or the type checker) still
-      // fires. UpstreamError suppresses the generic folding follow-up.
+      // A literal whose value doesn't fit the target type is left unfolded so
+      // the existing overflow diagnostic (from the SIL constant-propagation
+      // pass, or the type checker) still fires, rather than folding it to a
+      // wrapped value. UpstreamError suppresses the generic folding follow-up.
+      // A negative literal never fits an unsigned type; other overflows are
+      // caught by the significant/active bit width. 'expr->getValue()' would
+      // already wrap a negative value, so test negativity first.
+      if (!isSigned && expr->isNegative())
+        return FoldingError(IllegalConstError::UpstreamError, expr->getLoc());
+      auto value = expr->getValue();
       unsigned needed =
           isSigned ? value.getSignificantBits() : value.getActiveBits();
       if (needed > resultBitWidth)
